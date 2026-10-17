@@ -16,7 +16,7 @@ const MODES: Array<{ id: Mode; title: string; hint: string }> = [
   { id: 'set', title: 'Replace labels', hint: 'Posts end up with exactly the chosen labels (none clears them).' },
 ];
 
-export function BulkLabels({ initialPosts, labels, page, hasMore, query, canWrite, bulkLimit, labelsPerPost }: { initialPosts: Post[]; labels: Label[]; page: number; hasMore: boolean; query: string; canWrite: boolean; bulkLimit: number; labelsPerPost: number }) {
+export function BulkLabels({ initialPosts, labels, page, hasMore, query, canWrite, bulkLimit, labelsPerPost, searchMaxCharacters }: { initialPosts: Post[]; labels: Label[]; page: number; hasMore: boolean; query: string; canWrite: boolean; bulkLimit: number; labelsPerPost: number; searchMaxCharacters: number }) {
   const [posts, setPosts] = useState(initialPosts);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [chosen, setChosen] = useState<Set<string>>(new Set());
@@ -44,7 +44,7 @@ export function BulkLabels({ initialPosts, labels, page, hasMore, query, canWrit
     {action.banner}
     <SidebarDock><form action="/publishing/collaboration" method="get" className={styles.search} role="search">
       <input type="hidden" name="view" value="assign" />
-      <label htmlFor="bulk-search">Search posts<input id="bulk-search" name="q" defaultValue={query} maxLength={120} placeholder="Words in the post" /></label>
+      <label htmlFor="bulk-search">Search posts<input id="bulk-search" name="q" defaultValue={query} maxLength={searchMaxCharacters} placeholder="Words in the post" /></label>
       <Button type="submit" variant="secondary">Search</Button>{query && <a href="/publishing/collaboration?view=assign">Clear</a>}
     </form></SidebarDock>
     {canWrite && <section className={styles.section} aria-labelledby="bulk-controls"><h2 id="bulk-controls">Change labels on selected posts</h2>
@@ -64,7 +64,7 @@ export function BulkLabels({ initialPosts, labels, page, hasMore, query, canWrit
         <td>{p.labels.length ? <span className={styles.chips}>{p.labels.map(l => <span key={l.id} className={styles.chip}>{l.name}</span>)}</span> : <span className={styles.meta}>No labels</span>}</td></tr>)}</tbody></table></div>
       : <p className={styles.empty}>{query ? 'No posts match this search.' : 'No posts yet. Create a post in the composer to organize it here.'}</p>}
     <nav className={styles.pagination} aria-label="Post pages">{page > 1 ? <a href={href(page - 1)}>Previous page</a> : <span />}<span>Page {page}</span>{hasMore ? <a href={href(page + 1)}>Next page</a> : <span />}</nav>
-    <ConfirmDialog open={review} title="Review label change" description={`${MODES.find(m => m.id === mode)!.title} on ${selected.size} selected post${selected.size === 1 ? '' : 's'}. Nothing is published or rescheduled; only labels change.`} confirmation={confirmation} actionLabel="Apply change" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void apply()}>
+    <ConfirmDialog feedback={action.feedback} open={review} title="Review label change" description={`${MODES.find(m => m.id === mode)!.title} on ${selected.size} selected post${selected.size === 1 ? '' : 's'}. Nothing is published or rescheduled; only labels change.`} confirmation={confirmation} actionLabel="Apply change" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void apply()}>
       <p>Labels: <strong>{[...chosen].map(id => labels.find(l => l.id === id)?.name).filter(Boolean).join(', ') || 'none (clears all labels)'}</strong></p>
     </ConfirmDialog>
   </div>;

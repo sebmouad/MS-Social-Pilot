@@ -10,7 +10,7 @@ import { entry } from '@/lib/config/entry';
 export const COLLAB_DEFAULTS = {
   bulkPostLimit: 50, labelsPerPostLimit: 20,
   fieldLimit: 20, fieldNameMax: 60, fieldOptionMax: 60, fieldOptionsLimit: 30, fieldValueMax: 500,
-  noteMax: 2000, notePageSize: 50, noteMentionLimit: 20, notesPerPostLimit: 500,
+  mentionDirectoryLimit: 200, noteMax: 2000, notePageSize: 50, noteMentionLimit: 20, notesPerPostLimit: 500,
   versionPageSize: 25, versionRetention: 50,
   queueSlotLimit: 100,
   mixRulesPerScope: 30, mixMaxPerWeek: 50, mixWindowDays: 7,
@@ -32,6 +32,7 @@ const rows: ReadonlyArray<readonly [keyof typeof COLLAB_DEFAULTS, string, string
   ['fieldOptionMax', 'Custom field option limit', 'Maximum characters in one choice option.', 1, 120],
   ['fieldOptionsLimit', 'Custom field options per field', 'Maximum options on one choice field.', 2, 100],
   ['fieldValueMax', 'Custom field value limit', 'Maximum characters in a custom field value.', 1, 2000],
+  ['mentionDirectoryLimit', 'Mention directory limit', 'Maximum eligible members read for a post note. Oversized directories are refused.', 1, 5000],
   ['noteMax', 'Post note length', 'Maximum characters in one internal post note.', 1, 10000],
   ['notePageSize', 'Post notes page size', 'Notes shown per page on a post.', 5, 200],
   ['noteMentionLimit', 'Post note mention limit', 'Maximum members mentioned in one note.', 1, 50],
@@ -53,8 +54,11 @@ const rows: ReadonlyArray<readonly [keyof typeof COLLAB_DEFAULTS, string, string
   ['transactionMaxWaitMs', 'Collaboration transaction wait', 'Maximum wait for a collaboration mutation slot.', 100, 10000],
 ];
 
+const EXECUTION_POLICY = new Set<keyof CollabBounds>(['versionRetention', 'queueSlotLimit', 'mixRulesPerScope', 'mixMaxPerWeek', 'mixWindowDays', 'recycleMaxIntervalDays', 'recycleMaxRepeats', 'recycleDefaultIntervalDays', 'variantsLimit', 'variantMaxCharacters', 'executorBatchSize', 'queueLookaheadDays']);
+/** Outer input safety ceilings follow the same registry declarations; live values are enforced by services. */
+export const COLLAB_INPUT_CEILINGS = Object.fromEntries(rows.map(([key, , , , max]) => [key, max])) as CollabBounds;
 export const COLLAB_CONFIG = rows.map(([key, label, description, min, max]) => entry({
   key: `publishing.collab.${key}`, group: G, label, kind: 'number', description,
-  defaultValue: COLLAB_DEFAULTS[key], schema: n(min, max), consumption: 'active',
+  defaultValue: COLLAB_DEFAULTS[key], schema: n(min, max), consumption: EXECUTION_POLICY.has(key) ? 'planned' : 'active',
 }));
 export const COLLAB_KEYS = rows.map(([key]) => key);

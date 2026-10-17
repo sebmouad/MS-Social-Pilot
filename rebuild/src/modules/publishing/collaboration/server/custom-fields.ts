@@ -4,6 +4,7 @@ import { prisma } from '@/server/data';
 import { authorizePublishing } from '../../server/access';
 import type { PublishingActor } from '../../server/types';
 import { createFieldConfirmation, dedupeOptions, deleteFieldConfirmation, FIELD_CREATE, FIELD_DELETE, FIELD_UPDATE, FIELD_VALUES, ID, setFieldValuesConfirmation, updateFieldConfirmation } from '../schemas';
+import type { Tx } from './core';
 import { assertMayEdit, audit, bad, bounds, exact, isUnique, lockActor, parse, POSTS, protect, requireWorkspaceAdmin, transact, visiblePost } from './core';
 
 export type CustomFieldRecord = { id: string; name: string; kind: 'text' | 'choice'; options: string[]; position: number };
@@ -12,7 +13,10 @@ const missing = () => new OperationError('not_found', 'This field is unavailable
 
 export async function readCustomFields(actor: PublishingActor): Promise<CustomFieldRecord[]> {
   await authorizePublishing(actor, POSTS, 'read');
-  return protect(prisma.$queryRaw<CustomFieldRecord[]>`SELECT id, name, kind::text AS kind, options, position FROM custom_fields WHERE "workspaceId" = ${actor.workspaceId} ORDER BY position ASC, name ASC`);
+  const limit = await bounds();
+  const rows = await protect(prisma.$queryRaw<CustomFieldRecord[]>`SELECT id, name, kind::text AS kind, options, position FROM custom_fields WHERE "workspaceId" = ${actor.workspaceId} ORDER BY position ASC, name ASC LIMIT ${limit.fieldLimit + 1}`);
+  if (rows.length > limit.fieldLimit) throw new OperationError('unavailable', 'The field directory exceeds its current limit. Ask an administrator to review it.');
+  return rows;
 }
 
 export async function createCustomField(actor: PublishingActor, input: unknown) {
@@ -36,6 +40,12 @@ export async function createCustomField(actor: PublishingActor, input: unknown) 
   }));
 }
 
+/** A malformed legacy relation must never let a workspace mutate another tenant's values. */
+async function assertLocalFieldReferences(tx: Tx, workspaceId: string, fieldId: string) {
+  const rows = await tx.$queryRaw<Array<{ foreignReferences: boolean }>>`SELECT EXISTS (SELECT 1 FROM post_field_values v JOIN posts p ON p.id = v."postId" WHERE v."fieldId" = ${fieldId} AND p."workspaceId" <> ${workspaceId}) AS "foreignReferences"`;
+  if (rows[0]?.foreignReferences !== false) throw new OperationError('conflict', 'This field has inconsistent related records. Ask an administrator to review them before changing it.');
+}
+
 export async function updateCustomField(actor: PublishingActor, input: unknown) {
   const data = parse(FIELD_UPDATE, input); exact(data.confirmation, updateFieldConfirmation(data.id));
   const limit = await bounds();
@@ -46,6 +56,7 @@ export async function updateCustomField(actor: PublishingActor, input: unknown) 
     requireWorkspaceAdmin(await lockActor(tx, actor, POSTS, true), 'manage custom fields');
     const found = await tx.$queryRaw<Array<{ id: string; name: string; position: number }>>`SELECT id, name, position FROM custom_fields WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const before = found[0]; if (!before) throw missing();
+    await assertLocalFieldReferences(tx, actor.workspaceId, data.id);
     if (data.kind === 'choice') {
       const stale = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM post_field_values WHERE "fieldId" = ${data.id} AND NOT (value = ANY(${options}::text[]))`;
       const n = Number(stale[0]?.count ?? 0);
@@ -68,6 +79,7 @@ export async function deleteCustomField(actor: PublishingActor, input: unknown) 
     requireWorkspaceAdmin(await lockActor(tx, actor, POSTS, true), 'manage custom fields');
     const found = await tx.$queryRaw<Array<{ id: string; name: string }>>`SELECT id, name FROM custom_fields WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const row = found[0]; if (!row) throw missing();
+    await assertLocalFieldReferences(tx, actor.workspaceId, row.id);
     const used = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM post_field_values WHERE "fieldId" = ${row.id}`;
     const valuesRemoved = Number(used[0]?.count ?? 0);
     await tx.$executeRaw`DELETE FROM custom_fields WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId}`;
@@ -83,11 +95,12 @@ export async function readPostFieldValues(actor: PublishingActor, postId: unknow
   const auth = await authorizePublishing(actor, POSTS, 'read');
   await visiblePost(prisma, auth, id);
   const [fields, values] = await protect(Promise.all([
-    prisma.$queryRaw<CustomFieldRecord[]>`SELECT id, name, kind::text AS kind, options, position FROM custom_fields WHERE "workspaceId" = ${actor.workspaceId} ORDER BY position ASC, name ASC`,
+    readCustomFields(actor),
     prisma.$queryRaw<Array<{ fieldId: string; value: string }>>`SELECT v."fieldId", v.value FROM post_field_values v JOIN custom_fields f ON f.id = v."fieldId" WHERE v."postId" = ${id} AND f."workspaceId" = ${actor.workspaceId}`,
   ]));
+  const limit = await bounds();
   const byField = new Map(values.map(v => [v.fieldId, v.value]));
-  return { postId: id, fields: fields.map(field => ({ ...field, value: byField.get(field.id) ?? '' })) };
+  return { postId: id, maxCharacters: limit.fieldValueMax, fields: fields.map(field => ({ ...field, value: byField.get(field.id) ?? '' })) };
 }
 
 /** Sets or clears (empty string) values for one post. Unknown fields and values outside a choice's options are refused. */

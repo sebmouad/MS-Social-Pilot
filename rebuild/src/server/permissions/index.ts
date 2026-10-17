@@ -34,6 +34,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'publishing/queue': 'publishing/queue',
   'publishing/approvals': 'publishing/approvals',
   'publishing/media': null,
+  'publishing/collaboration': 'publishing/posts',
   'publishing/labels': 'publishing/posts',
   'publishing/templates': 'publishing/templates',
   'inbox/conversations': 'analytics/inbox',

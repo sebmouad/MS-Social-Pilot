@@ -9,7 +9,7 @@ function sameOrigin(request: Request) {
   if (!origin) return false;
   try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
 }
-type Feature = 'publishing/posts' | 'publishing/queue';
+type Feature = 'publishing/collaboration' | 'publishing/queue';
 
 export async function handle(request: Request, options: { feature: Feature; write?: boolean; success?: number; fallback: string; run: (actor: PublishingActor, request: Request) => Promise<unknown> }) {
   if (options.write && !sameOrigin(request)) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);

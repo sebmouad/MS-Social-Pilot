@@ -10,7 +10,7 @@ import type { PublishingActor, PublishingAuthorization, PublishingFeature } from
 import { COLLAB_KEYS, COLLAB_CONFIG, type CollabBounds } from '../config';
 
 export type Tx = Prisma.TransactionClient;
-export const POSTS = 'publishing/posts' as const;
+export const POSTS = 'publishing/collaboration' as const;
 export const QUEUE = 'publishing/queue' as const;
 export const bad = (message = 'Check the details and confirm the exact action.') => new OperationError('invalid_request', message);
 export const unavailable = () => new OperationError('unavailable', 'This action is temporarily unavailable. Refresh and try again.');
@@ -55,7 +55,8 @@ export async function lockActor(tx: Tx, actor: PublishingActor, feature: Publish
 }
 
 export async function audit(tx: Tx, actor: PublishingActor, action: string, detail: object) {
-  await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, ${action}, ${JSON.stringify(detail)}::jsonb, NOW())`;
+  const count = await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, ${action}, ${JSON.stringify(detail)}::jsonb, NOW())`;
+  if (count !== 1) throw unavailable();
 }
 
 const MANAGERS = new Set(['owner', 'admin', 'editor']);

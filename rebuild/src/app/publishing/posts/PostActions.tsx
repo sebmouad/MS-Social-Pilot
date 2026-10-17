@@ -154,7 +154,7 @@ export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
   </form>;
 }
 
-export function PostRowActions({ post, targets, canEdit, canPublish, imageRules, canDuplicate = false }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules; canDuplicate?: boolean }) {
+export function PostRowActions({ post, targets, canEdit, canPublish, imageRules, canDuplicate = false, canOrganize = false }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules; canDuplicate?: boolean; canOrganize?: boolean }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editPending, setEditPending] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
@@ -165,6 +165,7 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules,
   const isDraft = post.status === 'draft' && !post.publishedAt;
   const isQueued = post.status === 'scheduled';
   return <div className={styles.rowActions}>
+    {canOrganize && <a className="ui-button ui-button--secondary ui-button--sm" href={`/publishing/collaboration/post/${encodeURIComponent(post.id)}`}>Organize post</a>}
     {canDuplicate ? <DuplicatePost postId={post.id} disabled={rowPending} onPendingChange={setDuplicatePending} /> : null}
     {canEdit && isDraft ? <details className={styles.editDetails}>
       <summary onClick={event => { if (rowPending) event.preventDefault(); }}>Edit post</summary>

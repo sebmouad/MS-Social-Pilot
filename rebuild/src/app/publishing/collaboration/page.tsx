@@ -1,3 +1,5 @@
+import { runtimeConfig } from '@/server/config/store';
+import { parseCollaborationSearch } from '@/modules/publishing/collaboration/search';
 import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
 import { requireViewer } from '@/server/context';
@@ -7,7 +9,7 @@ import { readCustomFields } from '@/modules/publishing/collaboration/server/cust
 import { listAssignablePosts } from '@/modules/publishing/collaboration/server/post-list';
 import { readContentMix } from '@/modules/publishing/collaboration/server/content-mix';
 import { readQueueSlots } from '@/modules/publishing/collaboration/server/queue-slots';
-import { readLabelPage } from '@/modules/publishing/server/labels';
+import { readCollaborationLabels } from '@/modules/publishing/collaboration/server/label-choices';
 import { collaborationCapabilities } from '@/modules/publishing/collaboration/ports';
 import { PageHeading } from '../publishing-ui';
 import { BulkLabels } from './BulkLabels';
@@ -23,19 +25,20 @@ export default async function CollaborationPage({ searchParams }: { searchParams
   const caps = collaborationCapabilities();
   const available: ViewId[] = ['assign', 'fields', ...(caps.queueTimes ? ['queue' as const] : []), ...(caps.contentMix ? ['mix' as const] : [])];
   const view: ViewId = available.includes(params.view as ViewId) ? (params.view as ViewId) : 'assign';
-  const feature = view === 'queue' || view === 'mix' ? 'publishing/queue' : 'publishing/posts';
+  const feature = view === 'queue' || view === 'mix' ? 'publishing/queue' : 'publishing/collaboration';
   const viewer = await requireViewer({ feature, channelScoped: true });
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const canWrite = canAccessFeature(viewer.permissions, feature, 'write');
   const failure = (error: unknown) => <><PageHeading title={TITLES[view]} description="Organize posts for your team." /><RouteNotice error focusKey="collab-load-error">{error instanceof OperationError ? error.message : 'This page could not be loaded. Refresh and try again.'}</RouteNotice></>;
   try {
+    const maxCharacters = await runtimeConfig('publishing.searchMaxCharacters');
+    const filters = parseCollaborationSearch(params, available, maxCharacters);
     const nav = <CollaborationNav view={view} available={available} />;
     if (view === 'assign') {
-      const page = params.page && /^[1-9]\d{0,4}$/.test(params.page) ? Number(params.page) : 1;
-      const q = typeof params.q === 'string' ? params.q.slice(0, 120) : '';
-      const [result, labels] = await Promise.all([listAssignablePosts(actor, { page, ...(q ? { q } : {}) }), readLabelPage(actor, { page: 1 })]);
+      const { page, q } = filters;
+      const [result, labels] = await Promise.all([listAssignablePosts(actor, { page, ...(q ? { q } : {}) }), readCollaborationLabels(actor)]);
       return <>{nav}<PageHeading title="Labels on posts" description="Tag many posts at once, or open a post to organize it in detail." />
-        <BulkLabels initialPosts={result.posts.map(p => ({ ...p, scheduledAt: p.scheduledAt?.toISOString() ?? null }))} labels={labels.labels.map(({ id, name, color }) => ({ id, name, color }))} page={result.page} hasMore={result.hasMore} query={result.query} canWrite={canWrite} bulkLimit={result.bulkLimit} labelsPerPost={result.labelsPerPostLimit} /></>;
+        <BulkLabels initialPosts={result.posts.map(p => ({ ...p, scheduledAt: p.scheduledAt?.toISOString() ?? null }))} labels={labels.labels.map(({ id, name, color }) => ({ id, name, color }))} page={result.page} hasMore={result.hasMore} query={result.query} canWrite={canWrite} bulkLimit={result.bulkLimit} labelsPerPost={result.labelsPerPostLimit} searchMaxCharacters={maxCharacters} /></>;
     }
     if (view === 'fields') {
       const [fields, limit] = await Promise.all([readCustomFields(actor), bounds()]);

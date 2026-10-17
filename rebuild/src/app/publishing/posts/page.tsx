@@ -10,6 +10,7 @@ import { CsvImportForm, PostRowActions } from "./PostActions";
 import { runtimeConfig } from '@/server/config/store';
 import { RouteNotice } from '@/components/RouteNotice';
 import { PostStatus } from '../../../../generated/client';
+import { canUseFeature } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { OperationError, isOperationErrorCode } from '@/lib/operation-error';
 
@@ -82,7 +83,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
       && !post.targets.some(target => target.status === 'processing' || target.status === 'scheduled_remote');
     return <details className={previewStyles.managePost}>
       <summary>Manage post</summary>
-      {canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} canDuplicate={canDuplicate} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>}
+      {canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} canOrganize={canUseFeature(viewer.entitlements, 'publishing/collaboration') && canAccessFeature(viewer.permissions, 'publishing/collaboration', 'read')} canDuplicate={canDuplicate} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>}
     </details>;
   };
   const previewFor = (post: (typeof rows)[number], variant: 'feed' | 'card') => <PostPreview

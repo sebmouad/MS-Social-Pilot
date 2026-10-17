@@ -1,7 +1,9 @@
+import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import type { PublishingActor } from '../server/types';
 import { collaborationCapabilities } from './ports';
-import { assignLabels } from './server/assignments';
+import { readCollaborationLabels } from './server/label-choices';
+import { assignLabels, readPostLabels } from './server/assignments';
 import { createCustomField, deleteCustomField, readCustomFields, readPostFieldValues, setPostFieldValues, updateCustomField } from './server/custom-fields';
 import { readContentMix, saveContentMix } from './server/content-mix';
 import { addPostNote, deletePostNote, readPostNotes } from './server/notes';
@@ -16,6 +18,8 @@ const obj = (properties: object, required: string[] = []) => ({ type: 'object', 
 
 /** MCP tools for the collaboration slice. Not wired: the MCP host registers and routes them. */
 export const collaborationToolDefinitions = [
+  { name: 'get_post_labels', description: 'Read labels currently associated with one visible post.', inputSchema: obj({ postId: id }, ['postId']) },
+  { name: 'list_post_label_choices', description: 'Paged workspace label choices for authorized post organization; continue while hasMore is true.', inputSchema: obj({ page: { type: 'integer', minimum: 1 } }) },
   { name: 'assign_post_labels', description: 'Add, remove or replace (mode add|remove|set) labels on up to the workspace bulk limit of posts, atomically. Posts must be visible and editable by you. Confirmation must exactly match "<MODE> LABELS ON <n> POST(S)", for example "ADD LABELS ON 3 POSTS".', inputSchema: obj({ postIds: { type: 'array', items: id, minItems: 1 }, labelIds: { type: 'array', items: id }, mode: { type: 'string', enum: ['add', 'remove', 'set'] }, confirmation }, ['postIds', 'labelIds', 'mode', 'confirmation']) },
   { name: 'list_custom_fields', description: 'List the workspace custom post fields (text or choice).', inputSchema: obj({}) },
   { name: 'create_custom_field', description: 'Create a custom post field; owners and admins with access to all channels. Confirmation must exactly match CREATE FIELD <name>.', inputSchema: obj({ name: { type: 'string' }, kind: { type: 'string', enum: ['text', 'choice'] }, options: { type: 'array', items: { type: 'string' } }, confirmation }, ['name', 'kind', 'confirmation']) },
@@ -45,9 +49,18 @@ export function availableCollaborationTools() {
   return collaborationToolDefinitions.filter(tool => (tool.name !== 'restore_post_version' || caps.versionRestore) && (!['list_queue_times', 'replace_queue_times'].includes(tool.name) || caps.queueTimes) && (!['get_content_mix', 'save_content_mix'].includes(tool.name) || caps.contentMix) && (!['get_post_recycle', 'set_post_recycle'].includes(tool.name) || caps.recycle));
 }
 
-export async function executeCollaborationTool(actor: PublishingActor, name: string, args: unknown) {
+async function dispatchCollaborationTool(actor: PublishingActor, name: string, args: unknown, maxResultItems?: number) {
   const a = (args ?? {}) as Record<string, unknown>;
   switch (name) {
+    case 'get_post_labels': return readPostLabels(actor, a.postId);
+    case 'list_post_label_choices': {
+      if (Object.keys(a).some(key => key !== 'page') || (a.page !== undefined && (!Number.isSafeInteger(a.page) || Number(a.page) < 1 || Number(a.page) > 100000))) throw new OperationError('invalid_request', 'Choose a valid label page.');
+      const configured = await runtimeConfig('publishing.labelPageSize');
+      if (!Number.isSafeInteger(configured) || configured < 1) throw new OperationError('unavailable', 'Labels are temporarily unavailable.');
+      const pageSize = Math.min(configured, maxResultItems ?? configured), page = Number(a.page ?? 1);
+      const result = await readCollaborationLabels(actor);
+      return { labels: result.labels.slice((page - 1) * pageSize, page * pageSize), page, pageSize, hasMore: result.labels.length > page * pageSize, total: result.labels.length };
+    }
     case 'assign_post_labels': return assignLabels(actor, args);
     case 'list_custom_fields': return { fields: await readCustomFields(actor) };
     case 'create_custom_field': return createCustomField(actor, args);
@@ -68,4 +81,19 @@ export async function executeCollaborationTool(actor: PublishingActor, name: str
     case 'set_post_recycle': return setRecycle(actor, args);
     default: throw new OperationError('invalid_request', 'Choose a supported collaboration action.');
   }
+}
+
+/** Host result ceilings never silently shorten a complete field directory or mutation receipt. */
+export async function executeCollaborationTool(actor: PublishingActor, name: string, args: unknown, maxResultItems?: number) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) throw new OperationError('invalid_request', 'Enter valid action details.');
+  const a = args as Record<string, unknown>;
+  const keys = name === 'list_custom_fields' || name === 'get_content_mix' ? [] : ['get_post_field_values', 'get_post_labels'].includes(name) ? ['postId'] : null;
+  if (keys && Object.keys(a).some(key => !keys.includes(key))) throw new OperationError('invalid_request', 'Choose valid action details.');
+  if (maxResultItems !== undefined && (!Number.isSafeInteger(maxResultItems) || maxResultItems < 1)) throw new OperationError('unavailable', 'This action is temporarily unavailable.');
+  if (maxResultItems !== undefined && collaborationWriteTools.has(name) && ['postIds', 'labelIds', 'mentionIds'].some(key => Array.isArray(a[key]) && a[key].length > maxResultItems)) throw new OperationError('invalid_request', 'The selection exceeds the current result limit.');
+  const result = await dispatchCollaborationTool(actor, name, args, maxResultItems);
+  if (maxResultItems !== undefined && !collaborationWriteTools.has(name) && result && typeof result === 'object') {
+    for (const value of Object.values(result)) if (Array.isArray(value) && value.length > maxResultItems) throw new OperationError('invalid_request', 'The complete result exceeds the current result limit. Narrow the request or ask an administrator to raise the limit.');
+  }
+  return result;
 }

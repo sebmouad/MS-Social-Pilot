@@ -1,3 +1,5 @@
+import { runtimeConfig } from '@/server/config/store';
+import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { z } from 'zod';
 import { authorizePublishing } from '../../server/access';
@@ -6,13 +8,16 @@ import type { PublishingActor } from '../../server/types';
 import { bounds, pageOffset, parse, POSTS, protect } from './core';
 import type { PostLabel } from './assignments';
 
-const SCHEMA = z.object({ q: z.string().trim().max(120).refine(v => !/[\u0000-\u001f\u007f]/.test(v)).optional(), page: z.number().int().min(1).max(100000).optional() }).strict();
+const SCHEMA = z.object({ q: z.string().trim().refine(v => !/[\u0000-\u001f\u007f]/.test(v)).optional(), page: z.number().int().min(1).max(100000).optional() }).strict();
 export type AssignablePost = { id: string; message: string; status: string; scheduledAt: Date | null; labels: PostLabel[] };
 
 /** Posts the caller may see (and, for contributors, only their own), newest first, with labels, for bulk assignment. One page = the bulk limit. */
 export async function listAssignablePosts(actor: PublishingActor, input: unknown = {}) {
   const query = parse(SCHEMA, input);
   const limit = await bounds();
+  const searchMax = await runtimeConfig('publishing.searchMaxCharacters');
+  if (!Number.isSafeInteger(searchMax) || searchMax < 1) throw new OperationError('unavailable', 'Search is temporarily unavailable.');
+  if ((query.q?.length ?? 0) > searchMax) throw new OperationError('invalid_request', 'The search is too long.');
   const auth = await authorizePublishing(actor, POSTS, 'read');
   const selected = await selectedPublishingTargetIds(actor.workspaceId, auth.entitlements, auth.actor.allowedTargetIds);
   const own = auth.actor.allowedTargetIds !== undefined || auth.role === 'contributor' ? actor.userId : undefined;

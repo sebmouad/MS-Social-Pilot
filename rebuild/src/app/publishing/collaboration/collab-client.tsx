@@ -30,16 +30,17 @@ export function useAction() {
     finally { setBusy(false); inFlight.current = false; }
   }
   const banner = notice ? <RouteNotice error={notice.error} focusKey={`collab-notice:${notice.key}`}>{notice.text}</RouteNotice> : null;
-  return { busy, run, banner };
+  return { busy, run, banner, feedback: notice?.error ? banner : null };
 }
 
 /** Review dialog that requires the exact confirmation text before the action is enabled. */
-export function ConfirmDialog({ open, title, description, confirmation, actionLabel, danger = false, busy, onCancel, onConfirm, children }: { open: boolean; title: string; description: string; confirmation: string; actionLabel: string; danger?: boolean; busy: boolean; onCancel: () => void; onConfirm: () => void; children?: ReactNode }) {
+export function ConfirmDialog({ open, title, description, confirmation, actionLabel, danger = false, busy, onCancel, onConfirm, children, feedback }: { open: boolean; title: string; description: string; confirmation: string; actionLabel: string; danger?: boolean; busy: boolean; onCancel: () => void; onConfirm: () => void; children?: ReactNode; feedback?: ReactNode }) {
   const [typed, setTyped] = useState('');
   useEffect(() => { if (!open) setTyped(''); }, [open]);
   const close = () => { if (!busy) { setTyped(''); onCancel(); } };
   return <Dialog open={open} title={title} description={description} onClose={close} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={close}>Cancel</Button><Button variant={danger ? 'danger' : 'primary'} disabled={busy || typed !== confirmation} onClick={onConfirm}>{busy ? 'Working…' : actionLabel}</Button></>}>
     {children}
+    {feedback}
     <label className={styles.confirmLabel}>Type <code>{confirmation}</code> to confirm<input autoComplete="off" value={typed} onChange={event => setTyped(event.target.value)} /></label>
   </Dialog>;
 }

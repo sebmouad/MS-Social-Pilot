@@ -5,6 +5,8 @@ const h = vi.hoisted(() => {
   return { viewer: vi.fn(), ops, op: (name: string) => (ops[name] ??= vi.fn(async () => ({ ok: name }))) };
 });
 vi.mock('@/server/context', () => ({ requireViewer: h.viewer }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => 50 }));
+vi.mock('@/modules/publishing/collaboration/server/label-choices', () => ({ readCollaborationLabels: h.op('labelChoices') }));
 vi.mock('@/modules/publishing/collaboration/server/assignments', () => ({ assignLabels: h.op('assign'), readPostLabels: h.op('readLabels') }));
 vi.mock('@/modules/publishing/collaboration/server/custom-fields', () => ({ createCustomField: h.op('createField'), readCustomFields: h.op('readFields'), updateCustomField: h.op('updateField'), deleteCustomField: h.op('deleteField'), readPostFieldValues: h.op('readValues'), setPostFieldValues: h.op('setValues') }));
 vi.mock('@/modules/publishing/collaboration/server/notes', () => ({ addPostNote: h.op('addNote'), deletePostNote: h.op('deleteNote'), readPostNotes: h.op('readNotes') }));
@@ -48,7 +50,7 @@ describe('collaboration HTTP', () => {
     await mixPut(post(`${base}/content-mix`, '{}', 'PUT'));
     expect(h.viewer).toHaveBeenLastCalledWith({ feature: 'publishing/queue', channelScoped: true, write: true });
     await assignPost(post(`${base}/assignments`, '{"postIds":["a"]}'));
-    expect(h.viewer).toHaveBeenLastCalledWith({ feature: 'publishing/posts', channelScoped: true, write: true });
+    expect(h.viewer).toHaveBeenLastCalledWith({ feature: 'publishing/collaboration', channelScoped: true, write: true });
     expect(h.ops.assign).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w' }, { postIds: ['a'] });
     h.viewer.mockRejectedValue(new Error('redirect'));
     expect((await slotsGet(new Request(`${base}/queue-slots`))).status).toBe(401);
@@ -113,10 +115,10 @@ describe('collaboration MCP', () => {
 });
 
 describe('collaboration contracts', () => {
-  it('registers unique active Root settings that accept their own defaults', () => {
+  it('distinguishes consumed Root limits from pending execution policy', () => {
     const keys = COLLAB_CONFIG.map(c => c.key);
     expect(new Set(keys).size).toBe(keys.length);
-    for (const item of COLLAB_CONFIG) { expect(item.key.startsWith('publishing.collab.')).toBe(true); expect(item.consumption).toBe('active'); expect(item.schema.safeParse(item.defaultValue).success).toBe(true); }
+    for (const item of COLLAB_CONFIG) { expect(item.key.startsWith('publishing.collab.')).toBe(true); expect(item.consumption).toBe(['bulkPostLimit', 'labelsPerPostLimit', 'fieldLimit', 'fieldNameMax', 'fieldOptionMax', 'fieldOptionsLimit', 'fieldValueMax', 'mentionDirectoryLimit', 'noteMax', 'notePageSize', 'noteMentionLimit', 'notesPerPostLimit', 'versionPageSize', 'transactionTimeoutMs', 'transactionMaxWaitMs'].some(key => item.key === `publishing.collab.${key}`) ? 'active' : 'planned'); expect(item.schema.safeParse(item.defaultValue).success).toBe(true); }
     expect(keys).toHaveLength(Object.keys(COLLAB_DEFAULTS).length);
   });
 
@@ -147,5 +149,30 @@ describe('collaboration contracts', () => {
     expect(MIX_SAVE.safeParse({ scope: { targetId: 't', groupId: 'g' }, rules: [], confirmation: 'c' }).success).toBe(false);
     expect(MIX_SAVE.safeParse({ scope: { targetId: 't' }, rules: [{ labelId: 'a', perWeek: 1 }, { labelId: 'a', perWeek: 2 }], confirmation: 'c' }).success).toBe(false);
     expect(slotKey({ dayOfWeek: 1, hour: 2, minute: 3 })).toBe('1-2-3');
+  });
+});
+
+describe('collaboration MCP request and result ceilings', () => {
+  const actor = { userId: 'u', workspaceId: 'w' };
+  it('refuses oversized complete read results instead of returning a shortened directory', async () => {
+    h.ops.readFields!.mockResolvedValueOnce([{ id: 'a' }, { id: 'b' }]);
+    await expect(executeCollaborationTool(actor, 'list_custom_fields', {}, 1)).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+  it('refuses an oversized mutation before dispatching it', async () => {
+    await expect(executeCollaborationTool(actor, 'assign_post_labels', { postIds: ['a', 'b'] }, 1)).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(h.ops.assign).not.toHaveBeenCalled();
+  });
+  it('rejects unknown directory arguments instead of ignoring them', async () => {
+    await expect(executeCollaborationTool(actor, 'list_custom_fields', { workspaceId: 'foreign' }, 10)).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(h.ops.readFields).not.toHaveBeenCalled();
+  });
+});
+
+describe('post organization label discovery parity', () => {
+  it('exposes association reads and pages label choices at the current MCP ceiling', async () => {
+    h.ops.labelChoices!.mockResolvedValueOnce({ labels: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] });
+    expect(await executeCollaborationTool({ userId: 'u', workspaceId: 'w' }, 'list_post_label_choices', { page: 2 }, 2)).toEqual({ labels: [{ id: 'c' }], page: 2, pageSize: 2, hasMore: false, total: 3 });
+    await executeCollaborationTool({ userId: 'u', workspaceId: 'w' }, 'get_post_labels', { postId: 'p' }, 2);
+    expect(h.ops.readLabels).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w' }, 'p');
   });
 });

@@ -45,7 +45,7 @@ export function FieldsManager({ initialFields, canManage, limits }: { initialFie
 
   return <div className={styles.root}>
     {action.banner}
-    <section className={styles.section}><h2>Custom fields</h2>
+    <section className={styles.section}><h2>Workspace fields</h2>
       <p className={styles.help}>Add fields such as a campaign code or product to every post. Up to {limits.fieldLimit} per workspace.</p>
       {canManage && <div className={styles.actions}><Button variant="primary" disabled={action.busy || fields.length >= limits.fieldLimit} onClick={() => begin()}>New field</Button></div>}
       {fields.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Custom post fields</caption><thead><tr><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Options</th>{canManage && <th scope="col">Actions</th>}</tr></thead>
@@ -61,8 +61,8 @@ export function FieldsManager({ initialFields, canManage, limits }: { initialFie
         {!valid && draft.name !== '' && <p role="alert" className={styles.help}>Choice fields need at least two different options.</p>}
         <div className={styles.actions}><Button type="submit" variant="primary" disabled={!valid || action.busy}>Review</Button><Button disabled={action.busy} onClick={() => setOpen(false)}>Cancel</Button></div>
       </form></section>}
-    <ConfirmDialog open={review?.kind === 'save'} title="Review field" description="Saving applies to every post in the workspace." confirmation={saveConfirmation} actionLabel="Confirm save" busy={action.busy} onCancel={() => setReview(null)} onConfirm={() => void save()}>
+    <ConfirmDialog feedback={action.feedback} open={review?.kind === 'save'} title="Review field" description="Saving applies to every post in the workspace." confirmation={saveConfirmation} actionLabel="Confirm save" busy={action.busy} onCancel={() => setReview(null)} onConfirm={() => void save()}>
       <p><strong>{draft.name.trim()}</strong> ({draft.kind}){options.length ? `: ${options.join(', ')}` : ''}</p></ConfirmDialog>
-    <ConfirmDialog open={review?.kind === 'delete'} title="Review field deletion" description={`Deleting “${review?.field?.name}” also removes the value every post holds for it. Posts themselves are kept.`} confirmation={review?.field ? deleteFieldConfirmation(review.field.id) : ''} actionLabel="Delete field" danger busy={action.busy} onCancel={() => setReview(null)} onConfirm={() => review?.field && void remove(review.field)} />
+    <ConfirmDialog feedback={action.feedback} open={review?.kind === 'delete'} title="Review field deletion" description={`Deleting “${review?.field?.name}” also removes the value every post holds for it. Posts themselves are kept.`} confirmation={review?.field ? deleteFieldConfirmation(review.field.id) : ''} actionLabel="Delete field" danger busy={action.busy} onCancel={() => setReview(null)} onConfirm={() => review?.field && void remove(review.field)} />
   </div>;
 }

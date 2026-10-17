@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COLLAB_DEFAULTS as D } from './config';
+import { COLLAB_INPUT_CEILINGS as D } from './config';
 
 /** Pure contracts shared by services, routes, MCP and screens. No database or provider knowledge. */
 const clean = (max: number) => z.string().trim().max(max).refine(v => !/[\u0000-\u001f\u007f]/.test(v), 'Control characters are not allowed.');

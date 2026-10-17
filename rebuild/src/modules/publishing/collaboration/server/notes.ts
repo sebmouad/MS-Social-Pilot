@@ -12,14 +12,16 @@ export type PostNoteRecord = { id: string; postId: string; body: string; authorI
 export type MentionCandidate = { id: string; name: string };
 
 /** Members who can see every channel the post goes to: the only people a note may mention. */
-async function candidates(db: Tx | typeof prisma, workspaceId: string, postId: string): Promise<MentionCandidate[]> {
-  return db.$queryRaw<MentionCandidate[]>`
+async function candidates(db: Tx | typeof prisma, workspaceId: string, postId: string, maximum: number): Promise<MentionCandidate[]> {
+  const rows = await db.$queryRaw<MentionCandidate[]>`
     SELECT u.id, u.name FROM memberships m JOIN users u ON u.id = m."userId"
     WHERE m."workspaceId" = ${workspaceId} AND u."disabledAt" IS NULL AND m.role::text <> 'client'
       AND (m."allPages" OR NOT EXISTS (
         SELECT 1 FROM post_targets pt WHERE pt."postId" = ${postId}
           AND NOT EXISTS (SELECT 1 FROM member_page_access a WHERE a."membershipId" = m.id AND a."targetId" = pt."targetId")))
-    ORDER BY u.name ASC, u.id ASC`;
+    ORDER BY u.name ASC, u.id ASC LIMIT ${maximum + 1}`;
+  if (rows.length > maximum) throw new OperationError('unavailable', 'The member directory is too large. Ask an administrator to review its limit.');
+  return rows;
 }
 
 export async function readPostNotes(actor: PublishingActor, input: unknown) {
@@ -30,7 +32,7 @@ export async function readPostNotes(actor: PublishingActor, input: unknown) {
   const page = query.page ?? 1;
   const rows = await protect(prisma.$queryRaw<PostNoteRecord[]>`SELECT n.id, n."postId", n.body, n."authorId", u.name AS "authorName", n."mentionIds", n."createdAt" FROM post_notes n LEFT JOIN users u ON u.id = n."authorId" WHERE n."postId" = ${query.postId} ORDER BY n."createdAt" DESC, n.id DESC LIMIT ${limit.notePageSize + 1} OFFSET ${pageOffset(page, limit.notePageSize)}`);
   const canWrite = auth.permissions.features[POSTS]?.write === true;
-  const mentionable = canWrite ? await protect(candidates(prisma, actor.workspaceId, query.postId)) : [];
+  const mentionable = canWrite && collaborationPorts().mentions ? await protect(candidates(prisma, actor.workspaceId, query.postId, limit.mentionDirectoryLimit)) : [];
   return { postId: query.postId, notes: rows.slice(0, limit.notePageSize), page, pageSize: limit.notePageSize, hasMore: rows.length > limit.notePageSize, mentionable, maxCharacters: limit.noteMax, viewerId: actor.userId, viewerCanModerate: isManager(auth.role) };
 }
 
@@ -45,7 +47,7 @@ export async function addPostNote(actor: PublishingActor, input: unknown) {
     await visiblePost(tx, auth, data.postId, true);
     const count = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM post_notes WHERE "postId" = ${data.postId}`;
     if (Number(count[0]?.count ?? 0) >= limit.notesPerPostLimit) throw new OperationError('conflict', 'This post has reached its note limit.');
-    const members = await candidates(tx, actor.workspaceId, data.postId);
+    const members = data.mentionIds.length ? await candidates(tx, actor.workspaceId, data.postId, limit.mentionDirectoryLimit) : [];
     const mentionIds = mentionedIn(data.body, members, data.mentionIds).filter(id => id !== actor.userId);
     const id = `note_${randomUUID()}`;
     await tx.$executeRaw`INSERT INTO post_notes (id, "postId", "authorId", body, "mentionIds", "createdAt") VALUES (${id}, ${data.postId}, ${actor.userId}, ${data.body}, ${mentionIds}::text[], NOW())`;

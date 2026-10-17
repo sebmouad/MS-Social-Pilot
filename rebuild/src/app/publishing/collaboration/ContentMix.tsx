@@ -59,7 +59,7 @@ export function ContentMix({ targets, groups, labels, rules, status, windowDays,
         </div> : <p className={styles.help}>{'groupId' in scope ? 'Group mixes can be changed by owners and admins with access to all channels.' : 'Only workspace owners and admins can change the content mix.'}</p>}
       </>}
     </section>
-    <ConfirmDialog open={review} title="Review content mix" description={`This replaces the rules for this ${scope && 'groupId' in scope ? 'group' : 'channel'} with ${rows.length} label rule${rows.length === 1 ? '' : 's'}. No post is created or rescheduled by saving.`} confirmation={confirmation} actionLabel="Save content mix" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void save()}>
+    <ConfirmDialog feedback={action.feedback} open={review} title="Review content mix" description={`This replaces the rules for this ${scope && 'groupId' in scope ? 'group' : 'channel'} with ${rows.length} label rule${rows.length === 1 ? '' : 's'}. No post is created or rescheduled by saving.`} confirmation={confirmation} actionLabel="Save content mix" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void save()}>
       <ul>{rows.map(r => <li key={r.labelId}>{r.perWeek} × {name(r.labelId)}</li>)}</ul></ConfirmDialog>
   </div>;
 }

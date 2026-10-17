@@ -53,6 +53,6 @@ export function QueueTimes({ slots, targets, canEditShared, canEditChannels, lim
       </form> : <p className={styles.help}>Only workspace owners and admins can change queue times{scope === '' ? ' for all channels' : ''}.</p>}
       {canEdit && <div className={styles.actions}><Button variant="primary" disabled={draft === null || action.busy} onClick={() => setReview(true)}>Review changes</Button>{draft && <Button disabled={action.busy} onClick={() => setDraft(null)}>Discard changes</Button>}</div>}
     </section>
-    <ConfirmDialog open={review} title="Review queue times" description={`This replaces the ${scope === '' ? 'shared' : 'channel'} timetable with ${rows.length} time${rows.length === 1 ? '' : 's'}. Posts already scheduled keep their time.`} confirmation={confirmation} actionLabel="Save queue times" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void save()} />
+    <ConfirmDialog feedback={action.feedback} open={review} title="Review queue times" description={`This replaces the ${scope === '' ? 'shared' : 'channel'} timetable with ${rows.length} time${rows.length === 1 ? '' : 's'}. Posts already scheduled keep their time.`} confirmation={confirmation} actionLabel="Save queue times" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void save()} />
   </div>;
 }

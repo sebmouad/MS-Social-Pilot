@@ -8,12 +8,12 @@ const state = vi.hoisted(() => ({
 }));
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn(), post: { findFirst: vi.fn(), findMany: vi.fn() } }));
 vi.mock('@/server/data', () => ({ prisma: db }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (key in state.config ? state.config[key] : key === 'data.workspaceOperationTimeoutMs' ? 30000 : DEFAULTS[key]) }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (key in state.config ? state.config[key] : key === 'publishing.labelMaxPerWorkspace' ? 200 : key === 'publishing.searchMaxCharacters' ? 200 : key === 'data.workspaceOperationTimeoutMs' ? 30000 : DEFAULTS[key]) }));
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, cb: () => Promise<unknown>) => cb() }));
 vi.mock('@/modules/publishing/server/access', () => ({
   authorizePublishing: vi.fn(async (actor: { userId: string; workspaceId: string }) => ({
     actor, role: state.role, entitlements: {},
-    permissions: { pageScope: state.all ? { all: true, ids: [] } : { all: false, ids: ['t1'] }, features: { 'publishing/posts': { read: true, write: true }, 'publishing/queue': { read: true, write: true } } },
+    permissions: { pageScope: state.all ? { all: true, ids: [] } : { all: false, ids: ['t1'] }, features: { 'publishing/collaboration': { read: true, write: true }, 'publishing/queue': { read: true, write: true } } },
   })),
 }));
 vi.mock('@/modules/publishing/server/read-scope', () => ({
@@ -32,6 +32,7 @@ import { recordPostVersion, requestVersionRestore } from '../src/modules/publish
 import { readQueueSlots, replaceQueueSlots } from '../src/modules/publishing/collaboration/server/queue-slots';
 import { readContentMix, saveContentMix } from '../src/modules/publishing/collaboration/server/content-mix';
 import { listAssignablePosts } from '../src/modules/publishing/collaboration/server/post-list';
+import { readCollaborationLabels } from '../src/modules/publishing/collaboration/server/label-choices';
 import { readRecycle, setRecycle } from '../src/modules/publishing/collaboration/server/recycle';
 
 const actor = { userId: 'user-a', workspaceId: 'workspace-a' };
@@ -49,6 +50,7 @@ beforeEach(() => {
   db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const q = sql(strings, values); state.queries.push(q);
     for (const [fragment, fn] of state.handlers) if (q.sql.includes(fragment)) return fn(values);
+    if (q.sql.includes('AS "foreignReferences"')) return [{ foreignReferences: false }];
     if (q.sql.includes('memberships m JOIN users u ON u.id = m."userId" WHERE m."userId"')) return [{ role: state.role, disabledAt: null }];
     if (q.sql.includes('FROM targets')) return [{ id: 't1', name: 'Alpha', type: 'page' }, { id: 't2', name: 'Beta', type: 'page' }];
     if (q.sql.includes('COUNT(*)')) return [{ count: BigInt(0) }];
@@ -441,5 +443,27 @@ describe('assignable post list', () => {
     expect(result.posts[0]).toMatchObject({ id: 'p1', labels: [{ id: 'l1', name: 'Spring', color: 'green' }] });
     expect(state.queries.at(-1)!.values).toContain('workspace-a');
     await expect(listAssignablePosts(actor, { page: 0 })).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+});
+
+describe('complete collaboration label choices', () => {
+  it('returns every allowed choice under the Root ceiling using a workspace predicate', async () => {
+    when('SELECT id, name, color FROM labels', () => [{ id: 'l1', name: 'One', color: 'blue' }, { id: 'l2', name: 'Two', color: 'green' }]);
+    expect((await readCollaborationLabels(actor)).labels).toHaveLength(2);
+    const query = state.queries.find(q => q.sql.includes('SELECT id, name, color FROM labels'))!;
+    expect(query.sql).toContain('WHERE "workspaceId" =');
+    expect(query.values).toEqual([actor.workspaceId, 201]);
+  });
+  it('refuses oversized choices rather than showing a partial picker', async () => {
+    state.config['publishing.labelMaxPerWorkspace'] = 1;
+    when('SELECT id, name, color FROM labels', () => [{ id: 'l1' }, { id: 'l2' }]);
+    await expect(readCollaborationLabels(actor)).rejects.toMatchObject({ code: 'unavailable' });
+  });
+});
+
+describe('plain notes without notification delivery', () => {
+  it('does not read a mention directory for a note with no requested mentions', async () => {
+    await addPostNote(actor, { postId: 'p1', body: 'A plain team note', confirmation: addNoteConfirmation('p1') });
+    expect(state.queries.some(q => q.sql.includes('ORDER BY u.name ASC, u.id ASC'))).toBe(false);
   });
 });

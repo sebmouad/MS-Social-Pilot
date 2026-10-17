@@ -1,6 +1,6 @@
 # Publishing collaboration (W1)
 
-Status: source and mocked-database tests only. No browser, live-provider, real-database or production evidence.
+Status: batch 67 integrates bulk labels, custom fields, internal notes and stored history reads with Root configuration, customer navigation, HTTP and workspace MCP. Guarded local HTTP/MCP/PostgreSQL proof and phone custom-field creation/deletion passed. Queue scheduling, content mix, recycling, version recording/restore and mention delivery remain unintegrated; production/provider evidence is absent.
 Contract: [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md). Inventory: [LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md).
 
 ## What exists
@@ -27,19 +27,16 @@ Other files: `config.ts` (24 Root settings `publishing.collab.*`), `schemas.ts` 
 custom-fields/[id],custom-fields/posts/[postId],notes,notes/[id],versions,queue-slots,content-mix,recycle}`.
 Screens: `/publishing/collaboration?view=assign|fields|queue|mix` and `/publishing/collaboration/post/[postId]`.
 
-## Host wiring required (not done here; all files reserved)
+## Host wiring and remaining integration
 
-1. **Root registry**: spread `COLLAB_CONFIG` (from `modules/publishing/collaboration/config`) into `lib/config/registry.ts`.
-2. **MCP**: register `availableCollaborationTools()`; route names in `collaborationTools` to `executeCollaborationTool(actor, name, args)`;
-   treat `collaborationWriteTools` as writes needing the confirmation argument.
-3. **Navigation**: add `/publishing/collaboration` (suggest title "Organize") to the publishing manifest and `PublishingSidebar`
-   (the page docks its own view links into the shell sidebar; link from Posts rows to `/publishing/collaboration/post/<id>`).
+1. **Root registry**: registry 61 installs `COLLAB_CONFIG`, owned by Publishing. Bounds for active metadata workflows are consumed; execution-policy controls are explicitly `planned` until workers/lifecycle hooks exist.
+2. **MCP**: host metadata, scoped dispatch, write handling and field-directory resource are installed. Port-dependent tools are absent from discovery and direct calls are refused. Complete read results exceeding the MCP ceiling are refused; mutation selections are checked before dispatch.
+3. **Navigation**: the Publishing manifest declares Organize and Posts actions link to post organization only when permitted. Subviews and search use the existing contextual sidebar/drawer. Post notes/history expose separate pagination links. Label association choices are complete within the Root workspace ceiling, independent of directory pagination.
 4. **Startup**: call `registerCollaborationPorts({ versions, recycle: RECYCLE_EXECUTOR, queue: QUEUE_SCHEDULER, mix: MIX_EXECUTOR, mentions })`
    (the three markers are exported by `server/executors.ts`). Register each ONLY after its wiring below exists. Until then: restore, recycle,
    queue times and content mix are absent from the customer screens (nav entries, post sections), API routes and MCP tools; the version
    history section is shown only when versions exist or restore is registered.
-5. **Entitlements/permissions**: no new feature ids; labels, fields, notes, versions, recycle use `publishing/posts`; queue times and
-   content mix use `publishing/queue`.
+5. **Entitlements/permissions**: `publishing/collaboration` inherits the existing Posts plan/module grant while retaining an independent installation feature switch. Metadata services, UI, HTTP and MCP recheck it. Queue times/content mix use `publishing/queue`, with their ports still unregistered.
 
 ## Lifecycle integration port (`server/publishing/lifecycle.ts`, reserved)
 
@@ -125,3 +122,13 @@ Verify on the migrated/preview database; the unit tests mock SQL and do not prov
 The draft worker authorization default was unsafe: missing eligibility callbacks allowed work, and recycling cached a workspace grant across later posts. Both executors now refuse before database access when the owner-qualification port is absent; recycling checks each item rather than reusing an earlier grant. Three regressions failed against the original implementation and pass after the change. The 68 focused service/contract/executor tests use mocks; they do not prove database concurrency or provider delivery.
 
 Keep all execution ports unregistered until current owner/plan/module/resource checks are connected and verified at the transaction/dispatch boundaries. Review still open: contributor variant approval on recycled copies, current selected/connected destination enforcement, transactional policy rechecks, missing version lifecycle hooks, report/export/erasure coverage, bounded mention directory, strict UI query handling, and real PostgreSQL/browser/MCP host evidence. This source batch does not advertise or enable scheduling.
+
+## Batch 67 integration and evidence
+
+The guarded script `scripts/verify-publishing-collaboration.ts` passed actual local HTTP/MCP/PostgreSQL CRUD, confirmations, stored results, foreign-post denial, read-only key denial, feature-disable denial, note pagination and malformed cross-tenant cascade refusal. It restores exact setting rows, disposable fixtures, keys and audits and verifies cleanup. No provider API or production data was used.
+
+Chrome verified desktop layout and phone 390px custom-field review/create/delete with exact confirmation and cleanup. The phone dialog measured 352px; document/visual widths remained 390px. A component regression verifies an offline error is focused inside the active review dialog, preserves confirmation and succeeds on retry. Mention notification choices remain hidden until a real delivery port exists. UI malformed/repeated filters are refused rather than silently clipped/defaulted. Input outer ceilings derive from the registry declarations; services still enforce live Root limits.
+
+Execution/restore hooks, real multi-user concurrency, broader theme/keyboard coverage, export/erasure behavioral proof and remaining legacy collaboration capabilities remain open. These checks establish the stated metadata workflows, not completion of Publishing or the rebuild.
+
+MCP label parity additionally includes `get_post_labels` and `list_post_label_choices` (Root page size intersected with the current MCP ceiling), so an organization-scoped key can discover usable associations without a separate directory permission. Notes and saved versions use the current workspace time zone in the UI. Plain notes do not query an unused notification roster.

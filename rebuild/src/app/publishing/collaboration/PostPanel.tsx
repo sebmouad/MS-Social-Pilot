@@ -11,15 +11,15 @@ type FieldValue = { id: string; name: string; kind: 'text' | 'choice'; options: 
 type Note = { id: string; body: string; authorId: string | null; authorName: string | null; createdAt: string };
 type Version = { id: string; authorName: string | null; createdAt: string; message: string; scheduledAt: string | null };
 type Recycle = { enabled: boolean; everyDays: number | null; limit: number | null; count: number; nextAt: string | null; variants: string[]; isRepeat: boolean; maxIntervalDays: number; maxRepeats: number; defaultIntervalDays: number; maxVariants: number };
-const when = (v: string) => { const d = new Date(v); return Number.isFinite(d.getTime()) ? new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(d) + ' UTC' : 'Unknown'; };
+const when = (v: string, timeZone: string) => { const d = new Date(v); return Number.isFinite(d.getTime()) ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(d) + ` ${timeZone}` : 'Unknown'; };
 
-export function PostPanel(p: { postId: string; canWrite: boolean; labels: Label[]; assigned: string[]; fields: FieldValue[]; notes: Note[]; mentionable: Array<{ id: string; name: string }>; noteMax: number; viewerId: string; canModerate: boolean; versions: Version[]; restore: boolean; recycle: Recycle | null; canRestoreNow: boolean; fieldValueMax?: number }) {
+export function PostPanel(p: { postId: string; canWrite: boolean; labels: Label[]; assigned: string[]; fields: FieldValue[]; notes: Note[]; mentionable: Array<{ id: string; name: string }>; noteMax: number; viewerId: string; canModerate: boolean; versions: Version[]; restore: boolean; recycle: Recycle | null; canRestoreNow: boolean; fieldValueMax?: number; notesCanAdd?: boolean; timeZone: string }) {
   return <div className={styles.root}>
     <LabelsSection {...p} />
     <FieldsSection {...p} valueMax={p.fieldValueMax} />
-    <NotesSection {...p} />
+    <NotesSection {...p} canAdd={p.notesCanAdd !== false} />
     {(p.restore || p.versions.length > 0) && <VersionsSection {...p} />}
-    {p.recycle && <RecycleSection postId={p.postId} canWrite={p.canWrite} initial={p.recycle} />}
+    {p.recycle && <RecycleSection timeZone={p.timeZone} postId={p.postId} canWrite={p.canWrite} initial={p.recycle} />}
   </div>;
 }
 
@@ -43,7 +43,7 @@ function LabelsSection({ postId, canWrite, labels, assigned }: { postId: string;
     {action.banner}
     {labels.length ? <div className={styles.grid}>{labels.map(l => <label key={l.id} className={styles.check}><input type="checkbox" disabled={!canWrite || action.busy} checked={chosen.has(l.id)} onChange={() => setChosen(c => { const n = new Set(c); if (!n.delete(l.id)) n.add(l.id); return n; })} />{l.name}</label>)}</div> : <p className={styles.empty}>No labels exist yet. Create some in Labels.</p>}
     {canWrite && <div className={styles.actions}><Button variant="primary" disabled={!dirty || action.busy} onClick={() => setReview(true)}>Review label change</Button></div>}
-    <ConfirmDialog open={review} title="Review label change" description="Only this post's labels change. Nothing is published or rescheduled." confirmation={confirmation} actionLabel="Save labels" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void apply()} />
+    <ConfirmDialog feedback={action.feedback} open={review} title="Review label change" description="Only this post's labels change. Nothing is published or rescheduled." confirmation={confirmation} actionLabel="Save labels" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void apply()} />
   </section>;
 }
 
@@ -72,7 +72,7 @@ function FieldsSection({ postId, canWrite, fields, valueMax }: { postId: string;
   </section>;
 }
 
-function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, viewerId, canModerate }: { postId: string; canWrite: boolean; notes: Note[]; mentionable: Array<{ id: string; name: string }>; noteMax: number; viewerId: string; canModerate: boolean }) {
+function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, viewerId, canModerate, canAdd = true, timeZone }: { postId: string; canWrite: boolean; notes: Note[]; mentionable: Array<{ id: string; name: string }>; noteMax: number; viewerId: string; canModerate: boolean; canAdd?: boolean; timeZone: string }) {
   const [notes, setNotes] = useState(initial);
   const [body, setBody] = useState('');
   const [mentions, setMentions] = useState<Set<string>>(new Set());
@@ -102,18 +102,18 @@ function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, 
   return <section className={styles.section} aria-labelledby="notes-title"><h2 id="notes-title">Team notes</h2>
     <p className={styles.help}>Notes are for your team only and are never published.</p>
     {action.banner}
-    {canWrite && <form className={styles.form} onSubmit={event => void add(event)}>
+    {canWrite && canAdd && <form className={styles.form} onSubmit={event => void add(event)}>
       <label>New note<textarea rows={3} maxLength={noteMax} required value={body} disabled={action.busy} onChange={e => setBody(e.target.value)} /></label>
       {mentionable.length > 0 && <fieldset className={styles.form}><legend className={styles.meta}>Mention (also type @Name in the note)</legend><div className={styles.grid}>{mentionable.filter(m => m.id !== viewerId).map(m => <label key={m.id} className={styles.check}><input type="checkbox" checked={mentions.has(m.id)} onChange={() => setMentions(s => { const n = new Set(s); if (!n.delete(m.id)) n.add(m.id); return n; })} />{m.name}</label>)}</div></fieldset>}
       <div className={styles.actions}><Button type="submit" variant="primary" disabled={action.busy || !body.trim()}>{action.busy ? 'Saving…' : 'Add note'}</Button><span className={styles.meta}>{body.length}/{noteMax}</span></div>
     </form>}
-    {notes.length ? <ul className={styles.form}>{notes.map(n => <li key={n.id} className={styles.note}><div>{n.body}</div><div className={styles.meta}>{n.authorName ?? 'Former member'} · {when(n.createdAt)}</div>
+    {notes.length ? <ul className={styles.form}>{notes.map(n => <li key={n.id} className={styles.note}><div>{n.body}</div><div className={styles.meta}>{n.authorName ?? 'Former member'} · {when(n.createdAt, timeZone)}</div>
       {canWrite && (n.authorId === viewerId || canModerate) && <Button size="sm" variant="danger" disabled={action.busy} onClick={() => setRemoving(n)}>Delete</Button>}</li>)}</ul> : <p className={styles.empty}>No notes yet.</p>}
-    <ConfirmDialog open={Boolean(removing)} title="Delete note" description="This permanently removes the note for everyone." confirmation={removing ? deleteNoteConfirmation(removing.id) : ''} actionLabel="Delete note" danger busy={action.busy} onCancel={() => setRemoving(null)} onConfirm={() => removing && void remove(removing)} />
+    <ConfirmDialog feedback={action.feedback} open={Boolean(removing)} title="Delete note" description="This permanently removes the note for everyone." confirmation={removing ? deleteNoteConfirmation(removing.id) : ''} actionLabel="Delete note" danger busy={action.busy} onCancel={() => setRemoving(null)} onConfirm={() => removing && void remove(removing)} />
   </section>;
 }
 
-function VersionsSection({ postId, versions, restore, canWrite, canRestoreNow }: { postId: string; versions: Version[]; restore: boolean; canWrite: boolean; canRestoreNow: boolean }) {
+function VersionsSection({ postId, versions, restore, canWrite, canRestoreNow, timeZone }: { postId: string; versions: Version[]; restore: boolean; canWrite: boolean; canRestoreNow: boolean; timeZone: string }) {
   const [target, setTarget] = useState<Version | null>(null);
   const action = useAction();
   async function apply(v: Version) {
@@ -127,14 +127,14 @@ function VersionsSection({ postId, versions, restore, canWrite, canRestoreNow }:
   return <section className={styles.section} aria-labelledby="versions-title"><h2 id="versions-title">Version history</h2>
     {action.banner}
     {versions.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Saved versions</caption><thead><tr><th scope="col">Saved</th><th scope="col">By</th><th scope="col">Text</th>{restore && canWrite && canRestoreNow && <th scope="col">Actions</th>}</tr></thead>
-      <tbody>{versions.map(v => <tr key={v.id}><th scope="row">{when(v.createdAt)}</th><td>{v.authorName ?? 'Unknown'}</td><td><span className={styles.msg}>{v.message || 'No text'}</span></td>{restore && canWrite && canRestoreNow && <td><Button size="sm" disabled={action.busy} onClick={() => setTarget(v)}>Restore</Button></td>}</tr>)}</tbody></table></div>
+      <tbody>{versions.map(v => <tr key={v.id}><th scope="row">{when(v.createdAt, timeZone)}</th><td>{v.authorName ?? 'Unknown'}</td><td><span className={styles.msg}>{v.message || 'No text'}</span></td>{restore && canWrite && canRestoreNow && <td><Button size="sm" disabled={action.busy} onClick={() => setTarget(v)}>Restore</Button></td>}</tr>)}</tbody></table></div>
       : <p className={styles.empty}>No earlier versions are stored for this post yet.</p>}
-    <ConfirmDialog open={Boolean(target)} title="Restore this version" description="The post is saved with this version's content as an ordinary edit, so the usual checks and approvals apply. Your current content stays in the history." confirmation={target ? restoreVersionConfirmation(target.id) : ''} actionLabel="Restore version" busy={action.busy} onCancel={() => setTarget(null)} onConfirm={() => target && void apply(target)}>
+    <ConfirmDialog feedback={action.feedback} open={Boolean(target)} title="Restore this version" description="The post is saved with this version's content as an ordinary edit, so the usual checks and approvals apply. Your current content stays in the history." confirmation={target ? restoreVersionConfirmation(target.id) : ''} actionLabel="Restore version" busy={action.busy} onCancel={() => setTarget(null)} onConfirm={() => target && void apply(target)}>
       {target && <p className={styles.note}>{target.message || 'No text'}</p>}</ConfirmDialog>
   </section>;
 }
 
-function RecycleSection({ postId, canWrite, initial }: { postId: string; canWrite: boolean; initial: Recycle }) {
+function RecycleSection({ postId, canWrite, initial, timeZone }: { postId: string; canWrite: boolean; initial: Recycle; timeZone: string }) {
   const [state, setState] = useState(initial);
   const [enabled, setEnabled] = useState(initial.enabled);
   const [days, setDays] = useState(initial.everyDays ?? initial.defaultIntervalDays);
@@ -156,7 +156,7 @@ function RecycleSection({ postId, canWrite, initial }: { postId: string; canWrit
   return <section className={styles.section} aria-labelledby="recycle-title"><h2 id="recycle-title">Repeat this post</h2>
     {action.banner}
     {state.isRepeat ? <p className={styles.help}>This post is a repeat of another post. Change repeating on the original.</p> : <>
-      <p className={styles.help}>{state.enabled ? `Repeating every ${state.everyDays} days. ${state.count} repeat${state.count === 1 ? '' : 's'} so far${state.nextAt ? `; next on ${when(state.nextAt)}` : ''}.` : 'Repeating is off.'} Channels may reject identical text, so add alternate wordings to rotate.</p>
+      <p className={styles.help}>{state.enabled ? `Repeating every ${state.everyDays} days. ${state.count} repeat${state.count === 1 ? '' : 's'} so far${state.nextAt ? `; next on ${when(state.nextAt, timeZone)}` : ''}.` : 'Repeating is off.'} Channels may reject identical text, so add alternate wordings to rotate.</p>
       <form className={styles.form} onSubmit={event => { event.preventDefault(); setReview(true); }}>
         <label className={styles.check}><input type="checkbox" disabled={!canWrite || action.busy} checked={enabled} onChange={e => setEnabled(e.target.checked)} />Repeat this post</label>
         <label>Days between repeats<input type="number" min={1} max={state.maxIntervalDays} required value={days} disabled={!canWrite || action.busy} onChange={e => setDays(Math.max(1, Math.min(state.maxIntervalDays, Number(e.target.value) || 1)))} /></label>
@@ -165,6 +165,6 @@ function RecycleSection({ postId, canWrite, initial }: { postId: string; canWrit
         {list.length > state.maxVariants && <p role="alert">Use at most {state.maxVariants} wordings.</p>}
         {canWrite && <div className={styles.actions}><Button type="submit" variant="primary" disabled={action.busy || list.length > state.maxVariants}>Review repeat settings</Button></div>}
       </form></>}
-    <ConfirmDialog open={review} title="Review repeat settings" description={enabled ? `The post will be copied every ${days} days${limit ? `, up to ${limit} times` : ''}. Repeats are new publications on the same channels.` : 'Repeating stops. Repeats already created are not removed.'} confirmation={confirmation} actionLabel="Save repeat settings" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void save()} />
+    <ConfirmDialog feedback={action.feedback} open={review} title="Review repeat settings" description={enabled ? `The post will be copied every ${days} days${limit ? `, up to ${limit} times` : ''}. Repeats are new publications on the same channels.` : 'Repeating stops. Repeats already created are not removed.'} confirmation={confirmation} actionLabel="Save repeat settings" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void save()} />
   </section>;
 }
