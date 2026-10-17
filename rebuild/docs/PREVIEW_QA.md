@@ -901,3 +901,59 @@ Private logs: `/private/tmp/socialpilot-media50-tests-final.log`,
 `/private/tmp/socialpilot-media50-browser-cleanup.log`.
 ORDERED_MEDIA_AUTHORING.md records ownership and remaining formats, upload
 recovery, live provider, full parity and release gaps. Production remains legacy.
+
+
+## Batch 51: captionless post content — 2026-10-17
+
+Shared authoring/edit/duplicate services now accept a normalized empty caption
+when validated media or a link provides post content. Empty/first-comment-only
+posts are refused. Scheduling/rescheduling validates stored content and publication
+checks it before creating provider intent. UI accepts pending local image Files,
+keeps invalid/empty URL recovery, labels captions optional with attachments and
+renders content without filler. Posts/Calendar share safe neutral summaries.
+MCP accepts an explicit empty string while refusing absent/non-string messages;
+confirmed writes still call the same current-authorized domain services.
+
+Verification passed **1336 tests across 208 files**, including the isolated
+PostgreSQL integration checks. Typecheck and an isolated production build passed;
+the running preview's `.next` was preserved. The first full suite caught old
+rescheduling mocks that omitted all newly selected content fields (five failures)
+and a malformed UUID in a new summary fixture (one failure). Fixtures were
+corrected, with explicit empty/first-comment-only reschedule denial and link-only
+reschedule coverage added; the full rerun passed. Two independent lower-cost
+implementation agents and a separate reviewer handled service/UI/review scopes.
+
+The extended guarded `scripts/verify-ordered-media.ts` passed actual local HTTP
+image uploads and authenticated MCP image-only creation, caption removal retaining
+ordered image descriptions/first comment, link-only replacement, and link/video-only
+creation with exact persisted content. Empty/first-comment-only create and update
+were refused, and an existing link survived a refused update. Temporary drafts were
+removed through authorized local MCP deletion; existing foreign-image, malformed
+payload, unsupported combination, Root cap, read-only key and revoked-scope checks
+still passed. Cleanup verified fixtures/images absent and exact restoration of
+all temporary settings. No provider request or production change occurred.
+
+Facebook engine fixture tests verify no-caption photo, remote-video and link
+requests omit the respective caption/description/message field; genuinely empty
+content makes no transport request. This is transport-fixture evidence, not real
+Graph publication proof. Automated component tests cover the composer, local edit,
+first-comment-only denial, preview and list/calendar summaries. They are not a
+substitute for live keyboard, phone/theme, upload and save/edit browser checks.
+
+The Premium strict static audit reran and exited 1 with the same two existing
+shared-primitive detection limitations: Button forwards action/type through
+`...props`, and AutoTextarea applies `resize: 'none'` through inline React style.
+Both were inspected in the previous batch and remain unchanged; no new findings.
+The strict audit is **not green**. No fake handler or duplicate CSS was added to
+silence it. Browser automatic approval review had rejected earlier phone fill/click
+actions because workspace credits were exhausted. The user has said they will
+refill; new browser calls remain pending confirmation of the refill. No alternate
+browser/automation path was used to bypass that rejection.
+
+Private evidence: `/private/tmp/socialpilot-content51-tests-final.log`,
+`/private/tmp/socialpilot-content51-typecheck-final.log`,
+`/private/tmp/socialpilot-content51-build-final.log`,
+`/private/tmp/socialpilot-content51-live-final.log`, and
+`/private/tmp/socialpilot-content51-design-audit.json`. CAPTIONLESS_POSTS.md owns
+this behavior and remaining scope. Native formats, durable temporary-photo
+recovery, full legacy/UI/API/MCP parity, live-provider and cutover gates stay open.

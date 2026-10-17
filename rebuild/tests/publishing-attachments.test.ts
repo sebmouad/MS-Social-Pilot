@@ -1,9 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/server/data', () => ({ prisma: {} }));
-import { assertLocalImageLimits, validatePostAttachments } from '../src/server/publishing/lifecycle';
+import { assertLocalImageLimits, validatePostAttachments, validatePostContent } from '../src/server/publishing/lifecycle';
 
 describe('post attachment validation', () => {
+  it('allows a trimmed empty caption only when a link or media makes the post contentful', () => {
+    expect(validatePostContent('  hello  ', 5, {})).toBe('hello');
+    expect(validatePostContent('  ', 5, { link: 'https://example.com' })).toBe('');
+    expect(validatePostContent('', 5, { media: [{ kind: 'image' }] })).toBe('');
+    expect(() => validatePostContent(' ', 5, {})).toThrow(/Add post text, a link, or media/);
+    expect(() => validatePostContent(' ', 5, { link: null, media: [] })).toThrow(/Add post text, a link, or media/);
+    expect(() => validatePostContent('too long', 3, { link: 'https://example.com' })).toThrow(/3 characters/);
+  });
+
   it('normalizes a public HTTPS link or media URL for persisted drafts', () => {
     expect(validatePostAttachments({ link: ' https://example.com/article ' }, 2, 500)).toEqual({ link: 'https://example.com/article', media: [] });
     expect(validatePostAttachments({ media: [{ kind: 'image', url: 'https://example.com/photo.jpg' }] }, 2, 500).media).toEqual([{ kind: 'image', url: 'https://example.com/photo.jpg' }]);

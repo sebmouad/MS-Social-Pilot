@@ -10,6 +10,8 @@ vi.mock('next/navigation', () => ({
 
 import { PostPreview } from '@/components/PostPreview';
 import { PostFilters } from '@/app/publishing/posts/PostFilters';
+import { postContentSummary } from '@/modules/publishing/content-summary';
+import { PostMessage } from '@/app/publishing/publishing-ui';
 
 const localImageId = '123e4567-e89b-42d3-a456-426614174000';
 const post = {
@@ -61,6 +63,17 @@ describe('PostPreview', () => {
     expect(markup).toContain('Amina');
   });
 
+  it('keeps a no-caption media post useful without inventing preview text', () => {
+    const markup = renderToStaticMarkup(createElement(PostPreview, {
+      post: { ...post, message: '', firstComment: null, link: null }, authorName: 'Amina', timeZone: 'UTC', variant: 'card',
+    }));
+
+    expect(markup).toContain('Campaign artwork');
+    expect(markup).toContain(`/api/media/${localImageId}`);
+    expect(markup).not.toContain('Your post text will appear here');
+    expect(markup).not.toContain('No text included');
+  });
+
   it('renders a safe video attachment and the saved shared link', () => {
     const markup = renderToStaticMarkup(createElement(PostPreview, {
       post: { ...post, media: [{ kind: 'video', url: 'https://cdn.example.test/clip.mp4' }] },
@@ -84,6 +97,17 @@ describe('PostPreview', () => {
 
     expect(savedMarkup).not.toContain('blob:local-preview');
     expect(authoringMarkup).toContain('blob:local-preview');
+  });
+});
+
+describe('captionless post identity', () => {
+  it('summarizes usable media and HTTP links without treating malformed references as content', () => {
+    expect(postContentSummary('', [{ kind: 'image', url: 'https://cdn.example.test/a.jpg' }, { kind: 'image', url: 'https://cdn.example.test/b.jpg' }], 'https://example.test/story')).toBe('Post with 2 images and link');
+    expect(postContentSummary('', [{ kind: 'video', url: 'https://cdn.example.test/a.mp4' }], 'javascript:alert(1)')).toBe('Post with 1 video');
+    expect(postContentSummary('', [{ kind: 'image', url: '' }, { kind: 'image', url: 'media:malformed' }], 'not a URL')).toBe('Post with no content');
+    expect(postContentSummary('  A caption  ', [{ kind: 'image', url: 'https://cdn.example.test/a.jpg' }], null)).toBe('A caption');
+    const tableCell = renderToStaticMarkup(createElement(PostMessage, { message: '', media: [{ kind: 'video', url: 'https://cdn.example.test/a.mp4' }], link: null }));
+    expect(tableCell).toContain('Post with 1 video');
   });
 });
 

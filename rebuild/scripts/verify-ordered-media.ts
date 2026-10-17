@@ -47,7 +47,7 @@ async function main() {
     images.push({ id: result.id, workspaceId: workspace });
     return result.reference;
   };
-  const row = () => client.post.findFirst({ where: { workspaceId, authorId: userId }, select: { id: true, media: true, firstComment: true, message: true, targets: { select: { targetId: true } } } });
+  const row = () => client.post.findFirst({ where: { workspaceId, authorId: userId }, select: { id: true, media: true, link: true, firstComment: true, message: true, targets: { select: { targetId: true } } } });
   try {
     check(await client.user.count({ where: { id: 'preview_qa_user', isInstanceOwner: true, disabledAt: null } }) === 1, 'Seeded preview owner required.');
     const graphSetting = await client.appSetting.findUnique({ where: { key: 'meta.graphBaseUrl' } });
@@ -82,6 +82,26 @@ async function main() {
     const updated = await rpc('update_post', { ...base, postId, media: reversed, confirmation: `UPDATE POST ${postId}` });
     check(updated.ok, 'MCP reorder must succeed.');
     saved = await row(); check(isDeepStrictEqual(saved?.media, reversed) && saved?.firstComment === base.firstComment, 'Reorder must preserve item/description association.');
+    check((await rpc('update_post', { ...base, message: '', postId, media: reversed, confirmation: `UPDATE POST ${postId}` })).ok, 'An image-only edit must accept an empty caption.');
+    saved = await row(); check(saved?.message === '' && isDeepStrictEqual(saved.media, reversed) && saved.firstComment === base.firstComment, 'Image-only edits must persist media, descriptions and first comment without filler text.');
+    check((await rpc('update_post', { ...base, message: '', link: 'https://example.test/article', postId, media: [], confirmation: `UPDATE POST ${postId}` })).ok, 'A link-only edit must accept an empty caption.');
+    saved = await row(); check(saved?.message === '' && saved.link === 'https://example.test/article' && isDeepStrictEqual(saved.media, []), 'Link-only edit must remove previous media and retain its link.');
+    check(!(await rpc('update_post', { ...base, message: ' ', postId, media: [], confirmation: `UPDATE POST ${postId}` })).ok, 'First comment alone must not replace all post content.');
+    saved = await row(); check(saved?.message === '' && saved.link === 'https://example.test/article', 'Refused empty edit must preserve the existing link-only post.');
+    check(!(await rpc('create_post', { ...base, message: '', media: [], confirmation: 'CREATE POST' })).ok, 'Empty or first-comment-only creates must be refused.');
+    const captionless = await rpc('create_post', { ...base, message: '', media: [{ kind: 'image', url: first }], confirmation: 'CREATE POST' });
+    check(captionless.ok && typeof captionless.data?.id === 'string', 'Image-only creation must return a receipt.');
+    const imageOnly = await client.post.findUnique({ where: { id: captionless.data.id }, select: { message: true, media: true } });
+    check(imageOnly?.message === '' && isDeepStrictEqual(imageOnly.media, [{ kind: 'image', url: first }]), 'Image-only creation must persist the actual content.');
+    check((await rpc('delete_post', { postId: captionless.data.id, deleteRemote: false, confirmation: `DELETE POST ${captionless.data.id} LOCAL` })).ok, 'Disposable image-only draft must be removed through the authorized service.');
+    for (const content of [{ media: [], link: 'https://example.test/another-article' }, { media: [{ kind: 'video', url: 'https://example.test/video.mp4' }] }]) {
+      const only = await rpc('create_post', { ...base, message: '', ...content, confirmation: 'CREATE POST' });
+      check(only.ok && typeof only.data?.id === 'string', 'Captionless link/video creation must return a receipt.');
+      const stored = await client.post.findUnique({ where: { id: only.data.id }, select: { message: true, media: true, link: true } });
+      check(stored?.message === '' && isDeepStrictEqual(stored.media, content.media) && stored.link === ('link' in content ? content.link : null), 'Captionless link/video content must persist exactly.');
+      check((await rpc('delete_post', { postId: only.data.id, deleteRemote: false, confirmation: `DELETE POST ${only.data.id} LOCAL` })).ok, 'Disposable captionless draft must be removed through the authorized service.');
+    }
+    check((await rpc('update_post', { ...base, postId, media: reversed, confirmation: `UPDATE POST ${postId}` })).ok, 'Original ordered draft must be restored for scope checks.');
     for (const extra of [
       { media: [{ kind: 'image', url: foreign }] },
       { media: [{ kind: 'image', url: first, localFile: { bytes: [1, 2] } }] },
@@ -101,7 +121,7 @@ async function main() {
     check(!(await rpc('update_post', { ...base, postId, media: [], confirmation: `UPDATE POST ${postId}` })).ok, 'Revoked destination access must prevent attachment changes.');
     saved = await row(); check(isDeepStrictEqual(saved?.media, reversed), 'Denied writes must preserve stored media.');
     check(await client.post.count({ where: { workspaceId, authorId: userId } }) === 1, 'Rejected creates must leave no extra posts.');
-    console.log(JSON.stringify({ uploadIsolation: true, currentCapabilities: true, orderedCreateAndEdit: true, descriptionsAndFirstComment: true, foreignAndMalformedDenied: true, providerCombinationsDenied: true, rootCountApplied: true, scopedAndReadOnlyWritesDenied: true, providerWrites: false }));
+    console.log(JSON.stringify({ uploadIsolation: true, currentCapabilities: true, orderedCreateAndEdit: true, captionlessCreateAndEdit: true, linkOnlyEdit: true, emptyContentDenied: true, descriptionsAndFirstComment: true, foreignAndMalformedDenied: true, providerCombinationsDenied: true, rootCountApplied: true, scopedAndReadOnlyWritesDenied: true, providerWrites: false }));
   } finally {
     let cleanupFailed = false;
     try {

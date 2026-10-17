@@ -19,7 +19,7 @@ import { reschedulePost, reviewPost } from '../src/server/publishing/lifecycle';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const input = { postId: 'p1', date: '2026-10-20', time: '09:00', timeZone: 'America/New_York' };
-const scheduled = { id: 'p1', authorId: 'u1', status: 'scheduled', scheduledAt: new Date('2026-10-18T13:00:00Z'), targets: [{ status: 'pending', remotePostId: null }] };
+const scheduled = { id: 'p1', authorId: 'u1', message: 'Example scheduled post', link: null, media: [], status: 'scheduled', scheduledAt: new Date('2026-10-18T13:00:00Z'), targets: [{ status: 'pending', remotePostId: null }] };
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -109,6 +109,19 @@ describe('rescheduling a scheduled post', () => {
     db.post.updateMany.mockResolvedValue({ count: 0 });
     await expect(reschedulePost(actor, input)).rejects.toThrow(/still waiting to publish/);
     expect(db.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty stored post or first-comment-only post before moving it', async () => {
+    db.post.findFirst.mockResolvedValue({ ...scheduled, message: ' ', firstComment: 'A follow-up is not post content' });
+    await expect(reschedulePost(actor, input)).rejects.toThrow(/Add post text, a link, or media/);
+    expect(db.post.updateMany).not.toHaveBeenCalled();
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('moves an attachment-only stored link post without adding a caption', async () => {
+    db.post.findFirst.mockResolvedValue({ ...scheduled, message: '', link: 'https://example.test/article' });
+    await expect(reschedulePost(actor, input)).resolves.toMatchObject({ scheduledAt: new Date('2026-10-20T13:00:00Z') });
+    expect(db.post.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.not.objectContaining({ message: expect.anything() }) }));
   });
 });
 

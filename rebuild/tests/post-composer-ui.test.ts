@@ -48,6 +48,37 @@ describe('dedicated post composer', () => {
     expect(container.textContent).toContain('Unsaved preview');
   });
 
+  it('saves a no-caption post with a link and leaves its preview focused on the link content', async () => {
+    await render();
+    const link = container.querySelector<HTMLInputElement>('#composer-link')!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    await act(async () => { setter.call(link, 'https://example.com/story'); link.dispatchEvent(new Event('input', { bubbles: true })); });
+    const preview = container.querySelector('[data-variant="card"]')!;
+    expect(preview.textContent).not.toContain('Your post text will appear here');
+    expect(preview.textContent).not.toContain('No text included');
+    expect(preview.textContent).toContain('Open shared link');
+
+    await act(async () => dock.querySelector<HTMLButtonElement>('button[name="intent"][value="draft"]')!.click());
+
+    expect(mocks.action).toHaveBeenCalledTimes(1);
+    expect((mocks.action.mock.calls[0]![1] as FormData).get('message')).toBe('');
+  });
+
+  it('rejects first-comment-only posts when attachment URL rows are still empty', async () => {
+    await render();
+    const addImage = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.trim() === 'Add image URL')!;
+    await act(async () => addImage.click());
+    const comment = container.querySelector<HTMLTextAreaElement>('#composer-first-comment')!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
+    await act(async () => { setter.call(comment, 'A first comment only'); comment.dispatchEvent(new Event('input', { bubbles: true })); });
+
+    await act(async () => dock.querySelector<HTMLButtonElement>('button[name="intent"][value="draft"]')!.click());
+
+    expect(mocks.action).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/add post text, a link, or media/i);
+    expect(document.activeElement).toBe(container.querySelector('[role="alert"]'));
+  });
+
   it('hides local upload for a selected remote-only destination without provider-specific rules', async () => {
     const remoteOnly = [{ id: 'remote-only', name: 'Remote-only fake provider', type: 'channel', provider: 'fake-provider', canPublish: true, publishingMedia: { kinds: ['image'] as const, maxImages: 3, maxVideos: 0, mixedKinds: false, linkWithMedia: true, imageAltText: false } }];
     await render(remoteOnly);

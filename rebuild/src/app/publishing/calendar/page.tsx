@@ -10,6 +10,7 @@ import { CalendarBoard } from "./CalendarBoard";
 import { runtimeConfig } from '@/server/config/store';
 import type { BoardDay, BoardPost } from "./types";
 import styles from "./calendar.module.css";
+import { postContentSummary } from '@/modules/publishing/content-summary';
 
 type Params = { view?: string; date?: string; month?: string; channel?: string; status?: string };
 const STATUSES = ["draft", "pending_approval", "rejected", "scheduled", "publishing", "published", "partially_failed", "failed", "cancelled"] as const;
@@ -57,7 +58,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     const movable = canEditCalendar && post.status === "scheduled" && post.targets.length > 0 && post.targets.every(target => target.status === "pending" && !target.remotePostId)
       && (MANAGERS.has(viewer.membership.role) || post.authorId === viewer.user.id);
     byDay.set(key, [...(byDay.get(key) ?? []), {
-      id: post.id, text: post.message.trim().slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable,
+      id: post.id, text: postContentSummary(post.message, post.media, post.link).slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable,
       authorName: post.authorId === viewer.user.id ? viewer.user.name : "Workspace member",
       clockLabel: formatPostPreviewTime(when, timeZone),
       wallTime,

@@ -1,5 +1,6 @@
 import type { PostSummary } from "@/server/data";
 import styles from "./publishing.module.css";
+import { postContentSummary } from '@/modules/publishing/content-summary';
 
 export function PageHeading({ title, description, eyebrow = "Publishing", summary }: { title: string; description: string; eyebrow?: string; summary?: string }) {
   return <header className={styles.heading}><div><p className={styles.eyebrow}>{eyebrow}</p><h1>{title}</h1><p>{description}</p></div>{summary ? <span className={styles.summary}>{summary}</span> : null}</header>;
@@ -14,9 +15,8 @@ export function PublishingPagination({ path, page, pages }: { path: string; page
   </nav>;
 }
 
-export function PostMessage({ message }: { message: string }) {
-  const text = message.trim();
-  return <span className={styles.message}>{text || "No text included"}</span>;
+export function PostMessage({ message, media, link }: { message: string; media?: unknown; link?: string | null }) {
+  return <span className={styles.message}>{postContentSummary(message, media, link)}</span>;
 }
 
 export function PostTargets({ post }: { post: PostSummary }) {

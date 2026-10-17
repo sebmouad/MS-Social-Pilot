@@ -92,6 +92,22 @@ describe('calendar post preview and navigation', () => {
     await act(async () => dialog.querySelector<HTMLButtonElement>('[aria-label="Close dialog"]')!.click());
     expect(document.querySelector('dialog[aria-labelledby]')).toBeNull();
   });
+  it('shows a content summary for captionless calendar cards and keeps the preview focused on media', async () => {
+    const preview = samplePost.preview!;
+    const post: BoardPost = {
+      ...samplePost,
+      text: 'Post with 2 images and link',
+      preview: { ...preview, message: '', firstComment: null, media: [...preview.media as Array<{ kind: string; url: string }>, { kind: 'image', url: 'https://cdn.example.test/photo-2.jpg' }] },
+    };
+    await render({ posts: [post] });
+    const lateHourSlot = container.querySelector('[role="group"][aria-label="Thursday, October 15, 11 PM"]')!;
+    expect(lateHourSlot.textContent).toContain('Post with 2 images and link');
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label^="View post:"]')!.click());
+    const dialog = document.querySelector<HTMLDialogElement>('dialog[aria-labelledby]')!;
+    expect(dialog.querySelector('img')?.getAttribute('src')).toBe('https://cdn.example.test/photo.jpg');
+    expect(dialog.textContent).not.toContain('No text included');
+    expect(dialog.textContent).not.toContain('Your post text will appear here');
+  });
 
   it('places previous, today and next navigation in the contextual sidebar with filters retained', async () => {
     await render();

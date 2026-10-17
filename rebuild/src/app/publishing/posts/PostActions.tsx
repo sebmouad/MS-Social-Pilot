@@ -60,9 +60,9 @@ function selectedMediaIssue(targets: TargetChoice[], media: readonly PostMediaIt
   return localUploadIssue(targets, items);
 }
 
-function postValidationErrors(form: HTMLFormElement) {
+function postValidationErrors(form: HTMLFormElement, hasOtherContent = false) {
   return validateFields(form, {
-    message: { empty: 'Write the post text before saving.' },
+    message: { empty: hasOtherContent ? '' : 'Add post text, a link, or media before saving. A first comment alone is not a post.' },
     link: { invalid: 'Enter a complete link, such as https://example.com.' },
   });
 }
@@ -77,10 +77,12 @@ function focusAlert(form: HTMLFormElement | null) {
 async function submitPostWithAttachments(event: FormEvent<HTMLFormElement>, validate: ReturnType<typeof useFormValidation>['validate'], attachments: ReturnType<typeof usePostAttachments>, targets: TargetChoice[], setUploading: (uploading: boolean) => void) {
   const form = event.currentTarget;
   if (form.dataset.submitting === 'true') { event.preventDefault(); return; }
-  if (!validate(form, postValidationErrors(form))) { event.preventDefault(); return; }
+  const linkField = form.elements.namedItem('link');
+  const link = linkField instanceof HTMLInputElement ? linkField.value : '';
+  const hasOtherContent = Boolean(link.trim() || attachments.items.some(item => item.file || item.url.trim()));
+  if (!validate(form, postValidationErrors(form, hasOtherContent))) { event.preventDefault(); return; }
   if (!attachments.validate()) { event.preventDefault(); focusAlert(form); return; }
   const media = attachments.media;
-  const link = form.elements.namedItem('link') instanceof HTMLInputElement ? (form.elements.namedItem('link') as HTMLInputElement).value : '';
   const issue = selectedMediaIssue(targets, media, link, attachments.items);
   if (issue) { event.preventDefault(); attachments.setError(issue); return; }
   if (!attachments.items.some(item => item.source === 'upload' && item.file)) { form.dataset.submitting = 'true'; return; }
@@ -121,8 +123,8 @@ export function PostEditorForm({ targets, imageRules, schedule }: { targets: Tar
   const uploadRules = localUploadRules(selectedTargets, imageRules);
   const attachments = usePostAttachments({ maxMedia: imageRules.maxMedia, maxAltCharacters: imageRules.maxAltCharacters, allowedMimeTypes: uploadRules.allowedMimeTypes, maxUploadBytes: uploadRules.maxUploadBytes, allowedKinds: allowedMediaKinds(selectedTargets), allowMixedKinds: !selectedTargets.length || selectedTargets.every(target => target.publishingMedia?.mixedKinds === true) });
   return <form noValidate action={createPostAction} className={styles.draftForm} onSubmit={event => { void submitPostWithAttachments(event, validation.validate, attachments, selectedTargets, setUploading); }}>
-    <label htmlFor={messageProps.id}>Post text</label>
-    <AutoTextarea name="message" required rows={4} placeholder="Write a post for your team…" {...messageProps} />
+    <label htmlFor={messageProps.id}>Post text <span>(optional with a link or media)</span></label>
+    <AutoTextarea name="message" rows={4} placeholder="Write a post for your team…" {...messageProps} />
     <FieldError {...validation.errorProps('message')} />
     <label htmlFor="new-post-first-comment">First comment <span>(optional)</span></label>
     <AutoTextarea id="new-post-first-comment" name="firstComment" rows={2} placeholder="Add a link or follow-up as the first comment…" />
@@ -331,9 +333,11 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
-    if (!validation.validate(form, postValidationErrors(form))) { event.preventDefault(); return; }
+    const linkField = form.elements.namedItem('link');
+    const link = linkField instanceof HTMLInputElement ? linkField.value : '';
+    const hasOtherContent = Boolean(link.trim() || attachments.items.some(item => item.file || item.url.trim()));
+    if (!validation.validate(form, postValidationErrors(form, hasOtherContent))) { event.preventDefault(); return; }
     if (!attachments.validate()) { event.preventDefault(); focusAlert(form); return; }
-    const link = form.elements.namedItem('link') instanceof HTMLInputElement ? (form.elements.namedItem('link') as HTMLInputElement).value : '';
     const issue = selectedMediaIssue(selectedTargets, attachments.media, link, attachments.items);
     if (issue) { event.preventDefault(); attachments.setError(issue); return; }
     const hasPendingUploads = attachments.items.some(item => item.source === 'upload' && item.file);
@@ -367,8 +371,8 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
   }}>
     <input type="hidden" name="postId" value={post.id} />
     <fieldset className={styles.formFields}>
-      <label htmlFor={`message-${post.id}`}>Post text</label>
-      <AutoTextarea id={`message-${post.id}`} name="message" value={values.message ?? post.message} onChange={event => setValue('message', event.currentTarget.value)} required rows={4} disabled={disabled || pending || uploading} aria-invalid={Boolean(validation.errors.message)} aria-describedby={validation.errors.message ? `message-error-${post.id}` : undefined} />
+      <label htmlFor={`message-${post.id}`}>Post text <span>(optional with a link or media)</span></label>
+      <AutoTextarea id={`message-${post.id}`} name="message" value={values.message ?? post.message} onChange={event => setValue('message', event.currentTarget.value)} rows={4} disabled={disabled || pending || uploading} aria-invalid={Boolean(validation.errors.message)} aria-describedby={validation.errors.message ? `message-error-${post.id}` : undefined} />
       {validation.errors.message && <p id={`message-error-${post.id}`} className={styles.formError} role="alert">{validation.errors.message}</p>}
       <label htmlFor={`comment-${post.id}`}>First comment <span>(optional)</span></label>
       <AutoTextarea id={`comment-${post.id}`} name="firstComment" value={values.firstComment ?? post.firstComment ?? ''} onChange={event => setValue('firstComment', event.currentTarget.value)} rows={2} disabled={disabled || pending || uploading} />

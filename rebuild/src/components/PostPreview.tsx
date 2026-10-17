@@ -116,7 +116,7 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
 
     {hasFailure ? <p className={styles.deliveryNotice} role="status">Delivery needs attention. Review the destination statuses above.</p> : null}
 
-    <div className={styles.message}>{post.message.trim() || 'No text included'}</div>
+    {post.message.trim() ? <div className={styles.message}>{post.message}</div> : null}
 
     {mediaOverride !== undefined ? mediaOverride : media.length ? <div className={styles.media}>
       {media.map((item, index) => item.kind === 'image'

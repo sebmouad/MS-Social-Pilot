@@ -84,6 +84,15 @@ export function validText(value: string, maxText: number) {
   return text;
 }
 
+/** Normalize post text while allowing attachment-only content. First comments
+ * are deliberately excluded: they cannot make an otherwise empty post valid. */
+export function validatePostContent(value: string, maxText: number, attachments: { link?: string | null; media?: readonly unknown[] }) {
+  const text = value.trim();
+  if (text.length > maxText) throw new OperationError('invalid_request', `Post text must be between 1 and ${maxText.toLocaleString()} characters.`);
+  if (!text && !attachments.link?.trim() && !attachments.media?.length) throw new OperationError('invalid_request', 'Add post text, a link, or media before saving.');
+  return text;
+}
+
 export function validFirstComment(value: string, maxText: number) {
   const text = value.trim();
   if (text.length > maxText) throw new OperationError('invalid_request', `First comment must be ${maxText.toLocaleString()} characters or fewer.`);
@@ -115,12 +124,14 @@ export async function validateTargets(actor: PublishingActor, ids: string[], max
 }
 
 async function assertStoredPostMediaCompatible(workspaceId: string, post: {
-  link?: string | null; media?: unknown;
+  message?: string | null; firstComment?: string | null; link?: string | null; media?: unknown;
   targets: Array<{ status: string; target?: { socialAccount?: { provider?: string | null } | null } }>;
 }) {
-  if (!Array.isArray(post.media) || post.media.length === 0) return;
+  if (post.media !== undefined && !Array.isArray(post.media)) throw new OperationError('invalid_request', 'Stored post attachments need review before scheduling.');
   const config = await limits();
-  const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as PublishMedia[] }, config.maxMedia, config.maxAlt);
+  const attachments = validatePostAttachments({ link: post.link ?? undefined, media: (post.media ?? []) as PublishMedia[] }, config.maxMedia, config.maxAlt);
+  validatePostContent(post.message ?? '', config.maxText, attachments);
+  if (!attachments.media.length) return;
   const resolved = await resolvePublishMedia(workspaceId, attachments.media);
   for (const destination of post.targets) {
     if (destination.status !== 'pending') continue;
@@ -185,7 +196,7 @@ export async function schedulePost(actor: PublishingActor, postId: string, sched
     await assertPostScope(actor, postId);
     if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
     await publishingTransaction(signal, async tx => {
-      const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, link: true, media: true, targets: { select: { status: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
+      const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, message: true, firstComment: true, link: true, media: true, targets: { select: { status: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length || post.targets.some(target => target.status !== 'pending')) throw new OperationError('conflict', 'This post cannot be scheduled.');
       await assertStoredPostMediaCompatible(actor.workspaceId, post);
       await tx.post.update({ where: { id: post.id }, data: { status: 'scheduled', scheduledAt, updatedAt: new Date() } });
@@ -211,7 +222,7 @@ export async function reschedulePost(actor: PublishingActor, input: RescheduleIn
     const scheduledAt = resolved.instant;
     if (scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
     await publishingTransaction(signal, async tx => {
-      const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, link: true, media: true, targets: { select: { status: true, remotePostId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
+      const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, message: true, firstComment: true, link: true, media: true, targets: { select: { status: true, remotePostId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('conflict', 'This post cannot be rescheduled.');
       if (post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new OperationError('conflict', 'Only posts that are still waiting to publish can be rescheduled.');
       await assertStoredPostMediaCompatible(actor.workspaceId, post);
@@ -242,9 +253,9 @@ export async function createPost(actor: PublishingActor, input: { message: strin
   return withPublishingOperation(actor, { targetIds: input.targetIds }, async ({ actor, signal, lockTargets }) => {
     await membership(actor);
     const config = await limits();
-    const text = validText(input.message, config.maxText);
     const firstComment = validFirstComment(input.firstComment, config.maxText);
     const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
+    const text = validatePostContent(input.message, config.maxText, attachments);
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
     const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
     if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new OperationError('invalid_request', 'Choose a future publishing time and at least one destination.');
@@ -265,9 +276,9 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
     const role = await membership(actor);
     await assertPostScope(actor, input.postId);
     const config = await limits();
-    const text = validText(input.message, config.maxText);
     const firstComment = validFirstComment(input.firstComment, config.maxText);
     const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
+    const text = validatePostContent(input.message, config.maxText, attachments);
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
     const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
     await publishingTransaction(signal, async tx => {
@@ -297,6 +308,7 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
     if (!post.targets.length) throw new OperationError('invalid_request', 'Select at least one destination before publishing.');
     if (!Array.isArray(post.media)) throw new OperationError('invalid_request', 'Stored post media needs review before publishing.');
     const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as unknown as PublishMedia[] }, Number(await runtimeConfig('publishing.maxRemoteMediaPerPost')), Number(await runtimeConfig('publishing.maxImageAltCharacters')));
+    validatePostContent(post.message, Number(await runtimeConfig('publishing.maxMessageCharacters')), attachments);
     const publishMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
     const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
     if (!entitlements) throw new OperationError('unavailable', 'This workspace is unavailable.');

@@ -86,6 +86,28 @@ describe('Facebook Graph adapter', () => {
     expect(String((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0])).toContain('/p1/feed');
   });
 
+  it.each([
+    { media: [{ kind: 'image' as const, url: 'https://cdn.test/image.jpg', altText: 'Artwork' }], path: '/p1/photos', fields: { url: 'https://cdn.test/image.jpg', alt_text_custom: 'Artwork' }, absent: 'caption' },
+    { media: [{ kind: 'video' as const, url: 'https://cdn.test/video.mp4' }], path: '/p1/videos', fields: { file_url: 'https://cdn.test/video.mp4' }, absent: 'description' },
+    { link: 'https://example.test/article', path: '/p1/feed', fields: { link: 'https://example.test/article' }, absent: 'message' },
+  ])('publishes captionless content without inventing remote text: $path', async ({ media, link, path, fields, absent }) => {
+    const fetcher = mockFetch(response({ id: 'remote-post' }));
+    const engine = createFacebookEngine(config, fetcher);
+    expect(await engine.publish({ targetId: 'p1', accessToken: 'page-token', text: '  ', media, link })).toMatchObject({ remoteId: 'remote-post' });
+    const [url, request] = vi.mocked(fetcher).mock.calls[0]!;
+    expect(new URL(String(url)).pathname).toBe(`/v99.0${path}`);
+    const body = request!.body as URLSearchParams;
+    for (const [key, value] of Object.entries(fields)) expect(body.get(key)).toBe(value);
+    expect(body.has(absent)).toBe(false);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an empty Facebook post before any remote request', async () => {
+    const fetcher = mockFetch();
+    await expect(createFacebookEngine(config, fetcher).publish({ targetId: 'p1', accessToken: 'page-token', text: '  ', media: [] })).rejects.toThrow('needs text, a link, or media');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it('uses a photo response post_id as the durable post identity', async () => {
     const engine = createFacebookEngine(config, mockFetch(response({ id: 'photo-1', post_id: 'p1_42' })));
     await expect(engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'photo', media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }] }))

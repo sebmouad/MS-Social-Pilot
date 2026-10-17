@@ -136,8 +136,9 @@ export function PostComposer({ targets, imageRules, schedule, authorName, create
     setMode(intent);
     setLocalError('');
     setUploadMessage('');
-    if (!message.trim()) {
-      event.preventDefault(); setLocalError('Write the post text before saving.');
+    const hasContent = Boolean(message.trim() || link.trim() || attachments.items.some(item => item.file || item.url.trim()));
+    if (!hasContent) {
+      event.preventDefault(); setLocalError('Add post text, a link, or media before saving. A first comment alone is not a post.');
       form.elements.namedItem('message') instanceof HTMLElement && (form.elements.namedItem('message') as HTMLElement).focus(); return;
     }
     if (message.length > imageRules.maxMessageCharacters) {
@@ -188,7 +189,7 @@ export function PostComposer({ targets, imageRules, schedule, authorName, create
       {localError && <p ref={feedbackRef} className={styles.error} role="alert" tabIndex={-1}>{localError}</p>}
       {state.status === 'error' && <p ref={feedbackRef} className={styles.error} role="alert" data-composer-error tabIndex={-1}>{state.message} Your post details are still here.{state.saveUnconfirmed ? <> <a href="/publishing/posts" target="_blank" rel="noopener noreferrer">Check Posts in a new tab</a>.</> : ' You can retry.'}</p>}
       {uploadMessage && <p className={styles.uploadNotice} role="status">{uploadMessage}</p>}
-      <label htmlFor="composer-message">Post text</label>
+      <label htmlFor="composer-message">Post text <span>(optional with a link or media)</span></label>
       <AutoTextarea id="composer-message" name="message" value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={7} placeholder="Write a post for your team…" aria-describedby="composer-message-count" />
       <div className={styles.fieldMeta} id="composer-message-count">{message.length.toLocaleString()} / {imageRules.maxMessageCharacters.toLocaleString()}</div>
       <label htmlFor="composer-first-comment">First comment <span>(optional)</span></label>

@@ -32,8 +32,8 @@ const post = {
   status: 'draft', publishedAt: null, targets: [{ id: 'post-target-draft', status: 'draft', remotePostId: 'remote-1', target: { id: 'target-a' } }],
 };
 
-async function render() {
-  await act(async () => root.render(createElement(PostRowActions, { post, targets, canEdit: true, canPublish: true, imageRules: rules })));
+async function render(row = post) {
+  await act(async () => root.render(createElement(PostRowActions, { post: row, targets, canEdit: true, canPublish: true, imageRules: rules })));
 }
 const publishedWithReadyComment = { ...post, status: 'published', publishedAt: new Date(), targets: [{ id: 'post-target-a', status: 'published', remotePostId: 'remote-1', remoteUrl: null, target: { id: 'target-a', name: 'Studio channel' } }] };
 const publishedWithUnknownComment = { ...publishedWithReadyComment, targets: [{ ...publishedWithReadyComment.targets[0]!, firstCommentAt: new Date(), firstCommentError: 'must never be shown to customers' }] };
@@ -208,6 +208,33 @@ describe('post row recovery', () => {
     expect(container.querySelector('details')?.open).toBe(true);
     expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/could not be saved/i);
     expect(document.activeElement instanceof HTMLElement && document.activeElement.hasAttribute('data-edit-error')).toBe(true);
+  });
+
+  it('allows an edited post to keep a link with an empty caption', async () => {
+    const linkPost = { ...post, message: 'Old caption', firstComment: '', link: null, media: [] };
+    await render(linkPost);
+    await act(async () => container.querySelector('summary')!.click());
+    await setValue(container.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!, '   ');
+    await setValue(container.querySelector<HTMLInputElement>('input[name="link"]')!, 'https://example.com/story');
+    await act(async () => container.querySelector<HTMLButtonElement>('details button[type="submit"]')!.click());
+
+    expect(mocks.edit).toHaveBeenCalledTimes(1);
+    const submitted = mocks.edit.mock.calls[0]![1] as FormData;
+    expect(submitted.get('message')).toBe('   ');
+    expect(submitted.get('link')).toBe('https://example.com/story');
+    expect(container.querySelector('[data-edit-error]')).toBeTruthy();
+  });
+
+  it('rejects an empty edited post even when its first comment has text', async () => {
+    const emptyPost = { ...post, message: 'Old caption', firstComment: 'Saved comment', link: null, media: [] };
+    await render(emptyPost);
+    await act(async () => container.querySelector('summary')!.click());
+    await setValue(container.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!, ' ');
+    await act(async () => container.querySelector<HTMLButtonElement>('details button[type="submit"]')!.click());
+
+    expect(mocks.edit).not.toHaveBeenCalled();
+    expect(container.textContent).toMatch(/add post text, a link, or media/i);
+    expect(document.activeElement).toBe(container.querySelector('textarea[name="message"]'));
   });
 
   it('disables every edit control while an edit is pending', async () => {

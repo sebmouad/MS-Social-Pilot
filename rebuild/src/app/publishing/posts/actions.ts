@@ -337,7 +337,8 @@ function composerValues(data: FormData): ComposerValues {
 function composerError(error: unknown) {
   const message = error instanceof Error ? error.message : '';
   if (/permission|cannot manage posts|outside your channel access/i.test(message)) return 'You do not have permission to create posts for one or more selected destinations.';
-  if (/Post text must|Write the post text/i.test(message)) return 'Write post text within the allowed character limit before saving.';
+  if (message === 'Add post text, a link, or media before saving.') return message;
+  if (/Post text must|Write the post text/i.test(message)) return 'Shorten the post text to fit the allowed character limit.';
   if (/First comment must/i.test(message)) return 'Shorten the first comment to fit the allowed character limit.';
   if (/target|destination/i.test(message)) return 'Check your selected destinations and try again.';
   if (/attachment|image|media|HTTPS URL/i.test(message)) return 'Check the attachment and its description, then try again.';

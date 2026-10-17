@@ -101,6 +101,22 @@ describe.skipIf(!databaseUrl)('post duplication on isolated PostgreSQL', () => {
     expect(await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM root_activities WHERE id = ${`duplicate:${requestId}`}`).toEqual([{ count: BigInt(0) }]);
   });
 
+  it('copies attachment-only content and rejects a first-comment-only source', async () => {
+    const f = await createFixture();
+    await client.post.update({ where: { id: f.sourceId }, data: { message: '   ', firstComment: null } });
+    const mediaRequestId = randomUUID();
+    await duplicatePost(f.actor, { postId: f.sourceId, requestId: mediaRequestId, confirmation: `DUPLICATE POST ${f.sourceId}` });
+    expect(await client.post.findUnique({ where: { id: mediaRequestId }, select: { message: true, media: true } })).toMatchObject({ message: '', media: [{ kind: 'image' }] });
+
+    await client.post.update({ where: { id: f.sourceId }, data: { media: [], link: 'https://example.test/story' } });
+    const linkRequestId = randomUUID();
+    await duplicatePost(f.actor, { postId: f.sourceId, requestId: linkRequestId, confirmation: `DUPLICATE POST ${f.sourceId}` });
+    expect(await client.post.findUnique({ where: { id: linkRequestId }, select: { message: true, link: true } })).toEqual({ message: '', link: 'https://example.test/story' });
+
+    await client.post.update({ where: { id: f.sourceId }, data: { link: null, firstComment: 'Only a comment' } });
+    await expect(duplicatePost(f.actor, { postId: f.sourceId, requestId: randomUUID(), confirmation: `DUPLICATE POST ${f.sourceId}` })).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
   it('denies cross-workspace and out-of-scope source IDs in PostgreSQL', async () => {
     const f = await createFixture();
     await expect(duplicatePost(f.actor, { postId: 'other-workspace-private-post', requestId: randomUUID(), confirmation: 'DUPLICATE POST other-workspace-private-post' })).rejects.toMatchObject({ code: 'not_found' });

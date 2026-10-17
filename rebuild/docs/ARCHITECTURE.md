@@ -365,3 +365,23 @@ ORDERED_MEDIA_AUTHORING.md and PREVIEW_QA.md record real local checks/cleanup an
 open browser/format/recovery work. No DDL, real provider operation or production
 change occurred. This does not complete image-only authoring, local video,
 intermediate photo journals, native formats, full MCP/provider parity or cutover.
+
+
+## Captionless post content — batch 51, 2026-10-17
+
+Shared Publishing now validates content after normalizing attachments: text can
+be empty when a validated link or media is present. First comments are excluded
+from that minimum-content rule. Creation, local edits, duplication, stored
+scheduling/rescheduling and publication preflight use the same rule and current
+Root character/media limits. Empty stored posts are refused before new publication
+intent. CSV and text-only local draft helpers still require text.
+
+Customer forms accept pending local image Files, then run the existing upload
+and compatibility checks before save. Shared previews omit absent captions;
+Posts/Calendar use one neutral safe content summary. MCP requires an explicit
+string `message`, permitting `""` with content, and dispatches through the same
+services with existing confirmation/permission/audit boundaries. No provider
+branch, setting, migration or schema change was added. Facebook's existing
+engine already omitted blank caption fields; new transport fixtures cover image,
+remote video and link posts without filler text. CAPTIONLESS_POSTS.md and
+PREVIEW_QA.md record evidence and remaining browser/live-provider/release gaps.

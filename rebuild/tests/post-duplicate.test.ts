@@ -8,7 +8,7 @@ const db = vi.hoisted(() => ({ postFindFirst: vi.fn(), postCreate: vi.fn(), quer
 vi.mock('../src/server/data', () => ({ prisma: { post: { findFirst: (...args: unknown[]) => db.postFindFirst(...args), create: (...args: unknown[]) => db.postCreate(...args) }, $queryRaw: (...args: unknown[]) => db.queryRaw(...args) } }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({ modules: { publishing: true } }) }));
 vi.mock('../src/server/publishing/lifecycle', () => ({
-  limits: (...args: unknown[]) => state.limits(...args), validText: (value: string) => value.trim(), validFirstComment: (value: string) => value.trim() || null,
+  limits: (...args: unknown[]) => state.limits(...args), validatePostContent: (value: string, _max: number, attachments: { link?: string | null; media?: unknown[] }) => { const text = value.trim(); if (!text && !attachments.link && !attachments.media?.length) throw new Error('Add post text, a link, or media before saving.'); return text; }, validFirstComment: (value: string) => value.trim() || null,
   validatePostAttachments: (value: unknown) => value, resolvePublishMedia: async (_workspace: string, media: unknown) => media,
   validateTargets: (...args: unknown[]) => state.validateTargets(...args),
 }));
@@ -96,5 +96,19 @@ describe('duplicatePost', () => {
     state.source = source({ link: 'https://example.test/story', media: [{ kind: 'image', url: 'https://example.test/image.jpg', altText: 'image' }] });
     await duplicatePost(actor, args());
     expect(state.validateTargets).toHaveBeenCalledWith(state.actor, ['target-1'], 10, state.source.media, true, 'https://example.test/story');
+  });
+
+  it('duplicates link-only and media-only posts with an empty normalized caption', async () => {
+    for (const attachments of [{ link: 'https://example.test/story', media: [] }, { media: [{ kind: 'image', url: 'https://example.test/image.jpg' }] }]) {
+      state.source = source({ message: '   ', firstComment: null, ...attachments });
+      await duplicatePost(actor, args());
+      expect(db.postCreate.mock.calls.at(-1)?.[0].data).toMatchObject({ message: '', link: attachments.link, media: attachments.media });
+    }
+  });
+
+  it('does not accept a first comment as the only post content', async () => {
+    state.source = source({ message: ' ', firstComment: 'Comment only', link: null, media: [] });
+    await expect(duplicatePost(actor, args())).rejects.toThrow(/Add post text, a link, or media/);
+    expect(db.postCreate).not.toHaveBeenCalled();
   });
 });

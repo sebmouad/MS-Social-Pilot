@@ -93,7 +93,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     actions={canAuthorDrafts ? actionFor(post) : undefined}
   />;
   const columns: TableColumn<(typeof rows)[number]>[] = [
-    { key: "post", label: "Post", render: post => <PostMessage message={post.message}/> },
+    { key: "post", label: "Post", render: post => <PostMessage message={post.message} media={post.media} link={post.link}/> },
     { key: "channels", label: "Channels", render: post => <PostTargets post={post}/> },
     { key: "status", label: "Status", render: post => <StatusChip status={post.status}/> },
     { key: "scheduled", label: "Publish time", render: post => <span className={styles.date}>{formatDate(post.scheduledAt ?? post.publishedAt, viewer.membership.workspace.timezone)}</span> },

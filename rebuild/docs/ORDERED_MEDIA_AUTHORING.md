@@ -79,8 +79,8 @@ endpoint. It uploads disposable example images, tests ordered persistence,
 foreign references, Root caps, read-only keys and revoked scope, then verifies
 fixture removal and exact restoration of temporary configuration.
 
-Text remains required by current shared authoring. Image/link-only posts, local
-video, resumable uploads, Reels/Stories/native scheduling, durable intermediate
+The follow-up in CAPTIONLESS_POSTS.md permits image/video/link-only posts without
+a caption. Local video uploads, resumable uploads, Reels/Stories/native scheduling, durable intermediate
 Facebook photo receipts/cleanup and complete format/MCP/legacy coverage remain
 required work. No live multi-photo canary was run because intermediate remote
 upload recovery is unfinished. Browser reload loses unsaved Files; upload cancel,

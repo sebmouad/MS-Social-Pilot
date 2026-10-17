@@ -3,7 +3,7 @@ import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
 import { loadEntitlements } from '@/server/entitlements';
 import type { PublishMedia } from '@/platforms/types';
-import { limits, validText, validFirstComment, validateTargets, resolvePublishMedia, validatePostAttachments } from '@/server/publishing/lifecycle';
+import { limits, validatePostContent, validFirstComment, validateTargets, resolvePublishMedia, validatePostAttachments } from '@/server/publishing/lifecycle';
 import { withPublishingOperation, withPublishingTransaction } from './guard';
 import { selectedPublishingTargetIds, publishingPostVisibilityWhere } from './read-scope';
 import type { PublishingActor } from './types';
@@ -49,10 +49,10 @@ export async function duplicatePost(actor: PublishingActor, input: unknown): Pro
       throw new OperationError('conflict', 'This post has an uncertain or active publishing state and cannot be duplicated.');
     }
     const config = await limits();
-    const message = validText(source.message, config.maxText);
     const firstComment = validFirstComment(source.firstComment ?? '', config.maxText);
     if (!Array.isArray(source.media)) throw new OperationError('invalid_request', 'Stored post attachments need review before duplication.');
     const attachments = validatePostAttachments({ link: source.link ?? undefined, media: source.media as unknown as PublishMedia[] }, config.maxMedia, config.maxAlt);
+    const message = validatePostContent(source.message, config.maxText, attachments);
     const media = await resolvePublishMedia(context.actor.workspaceId, attachments.media);
     const targets = await validateTargets(context.actor, source.targets.map(target => target.targetId), config.maxTargets, media, Boolean(firstComment), attachments.link);
     const now = new Date();

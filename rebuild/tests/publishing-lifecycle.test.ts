@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const db = vi.hoisted(() => ({
   membership: { findUnique: vi.fn() },
   target: { findMany: vi.fn() },
-  postTarget: { findMany: vi.fn() },
+  postTarget: { findMany: vi.fn(), deleteMany: vi.fn() },
   post: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}), hasPlatformCapability: () => true }));
 vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: provider.publish, ...(capabilities.firstComment ? { publishFirstComment: vi.fn() } : {}), ...(capabilities.media ? { publishingMedia: capabilities.media } : {}), supportsTargetKind: () => true }) }));
 
-import { cancelScheduledPost, createPost, publishPost, reviewPost, schedulePost, submitPostForApproval } from '../src/server/publishing/lifecycle';
+import { cancelScheduledPost, createPost, publishPost, reschedulePost, reviewPost, schedulePost, submitPostForApproval, updatePost } from '../src/server/publishing/lifecycle';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 
@@ -35,7 +35,7 @@ beforeEach(() => {
   capabilities.media = { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true };
   db.membership.findUnique.mockResolvedValue({ role: 'editor' });
   db.postTarget.findMany.mockResolvedValue([]);
-  db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', status: 'draft', targets: [{ status: 'pending' }] });
+  db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', status: 'draft', message: 'Existing post', firstComment: null, link: null, media: [], targets: [{ status: 'pending' }] });
   db.post.update.mockResolvedValue({});
   db.post.create.mockResolvedValue({});
   db.target.findMany.mockResolvedValue([{ id: 'target-1', type: 'page', accessToken: 'encrypted', socialAccount: { provider: 'facebook', invalidatedAt: null } }]);
@@ -85,6 +85,21 @@ describe('publishing lifecycle transitions', () => {
     expect(db.post.create.mock.calls[0]?.[0].data).toMatchObject({ link: 'https://example.test/', media });
   });
 
+  it('allows link-only and media-only content but rejects an empty post or first-comment-only post', async () => {
+    await createPost(actor, { message: '  ', firstComment: '', targetIds: ['target-1'], link: 'https://example.test/story' });
+    expect(db.post.create.mock.calls.at(-1)?.[0].data).toMatchObject({ message: '', link: 'https://example.test/story' });
+    await createPost(actor, { message: '', firstComment: '', targetIds: ['target-1'], media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }] });
+    expect(db.post.create.mock.calls.at(-1)?.[0].data.message).toBe('');
+    await expect(createPost(actor, { message: '  ', firstComment: '', targetIds: ['target-1'] })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(createPost(actor, { message: '', firstComment: 'Details only', targetIds: ['target-1'] })).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
+  it('applies the same attachment-only rule to edits', async () => {
+    await updatePost(actor, { postId: 'p1', message: ' ', firstComment: '', targetIds: ['target-1'], media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }] });
+    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ message: '', media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }] }) }));
+    await expect(updatePost(actor, { postId: 'p1', message: ' ', firstComment: 'Details only', targetIds: ['target-1'] })).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
   it('creates a scheduled post atomically and rejects a schedule without destinations', async () => {
     const scheduledAt = new Date(Date.now() + 3_600_000);
     await createPost(actor, { message: 'Planned update', firstComment: 'More details', targetIds: ['target-1'], scheduledAt });
@@ -125,6 +140,22 @@ describe('publishing lifecycle transitions', () => {
     });
     await expect(schedulePost(actor, 'p1', new Date(Date.now() + 60_000))).rejects.toThrow(/cannot combine/i);
     expect(db.post.update).not.toHaveBeenCalled();
+  });
+
+  it('validates stored post content before scheduling and rescheduling', async () => {
+    db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', status: 'draft', message: ' ', firstComment: 'Only comment', link: null, media: [], targets: [{ status: 'pending' }] });
+    await expect(schedulePost(actor, 'p1', new Date(Date.now() + 60_000))).rejects.toMatchObject({ code: 'invalid_request' });
+    db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', status: 'scheduled', scheduledAt: new Date(Date.now() + 60_000), message: ' ', firstComment: null, link: null, media: [], targets: [{ status: 'pending', remotePostId: null }] });
+    await expect(reschedulePost(actor, { postId: 'p1', date: '2099-01-01', time: '12:00', timeZone: 'UTC' })).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
+  it('rejects truly empty stored content before creating publication intent', async () => {
+    db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', message: ' ', firstComment: 'Only comment', link: null, media: [], status: 'draft', scheduledAt: null,
+      targets: [{ id: 'pt1', status: 'pending', remotePostId: null, target: { id: 'target-1', type: 'page', providerId: 'provider-1', canPublish: true, enabled: true, accessToken: 'token', socialAccount: { provider: 'facebook', invalidatedAt: null, tokenExpiresAt: null, scopes: 'publish' } } }],
+    });
+    await expect(publishPost(actor, 'p1')).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+    expect(provider.publish).not.toHaveBeenCalled();
   });
 
   it('cancels a local queued item and preserves remote scheduled posts', async () => {

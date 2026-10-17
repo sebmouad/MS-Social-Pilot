@@ -110,3 +110,11 @@ services repeat checks before save/schedule/duplication/publication intent. This
 closes the one-attachment UI and multi-image edit exclusion, not image-only posts,
 local video, native formats, durable temporary-photo recovery, full media/provider
 parity or production gates. The real-provider multi-photo canary remains unrun.
+
+
+Captionless content update, 2026-10-17: CAPTIONLESS_POSTS.md closes the shared
+text-required restriction for image, remote-video and link posts. UI/MCP authoring,
+duplication, scheduling/rescheduling and publication preflight share the same
+minimum-content rule. Empty/first-comment-only posts remain invalid. This is not
+live provider proof, native format support, durable temporary photo recovery,
+full Publishing parity or production readiness.

@@ -46,6 +46,18 @@ beforeEach(() => {
 });
 
 describe('recoverable post composer action', () => {
+  it('passes an explicit empty caption with validated ordered media to the shared service', async () => {
+    const media = [{ kind: 'image', url: 'https://cdn.test/cover.jpg', altText: 'Cover artwork' }];
+    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, formData({ intent: 'draft', message: '', firstComment: 'Useful follow-up', mediaJson: JSON.stringify(media), targetIds: [] }))).rejects.toThrow('redirect:/publishing/posts?notice=created');
+    expect(deps.createPost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ message: '', media, firstComment: 'Useful follow-up' }));
+  });
+
+  it('explains empty-content refusal and retains the first comment for correction', async () => {
+    deps.createPost.mockRejectedValueOnce(new Error('Add post text, a link, or media before saving.'));
+    const state = await createPostWithRecoveryAction({ status: 'idle', values: {} }, formData({ intent: 'draft', message: '', firstComment: 'Follow-up only', mediaJson: '[]', targetIds: [] }));
+    expect(state).toMatchObject({ status: 'error', message: 'Add post text, a link, or media before saving.', values: { message: '', firstComment: 'Follow-up only', mediaJson: '[]' } });
+  });
+
   it('returns field values and a safe message after a recoverable creation failure', async () => {
     deps.createPost.mockRejectedValue(new Error('Provider token decrypt failed at Root setup'));
     const data = formData({

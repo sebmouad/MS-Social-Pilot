@@ -1068,6 +1068,35 @@ describe('MCP workspace boundaries', () => {
     expect(db.$executeRaw).toHaveBeenCalled();
   });
 
+  it.each([
+    { message: '', media: [{ kind: 'image', url: 'https://example.test/photo.jpg' }] },
+    { message: '  ', media: [{ kind: 'video', url: 'https://example.test/video.mp4' }] },
+    { message: '', link: 'https://example.test/article' },
+  ])('delegates captionless content and its authorization to the shared post services %#', async content => {
+    const created = await call('create_post', { ...content, targetIds: ['page-a'], confirmation: 'CREATE POST' });
+    expect((await created.json()).result.isError).not.toBe(true);
+    expect(publishingMutations.create).toHaveBeenCalledWith(viewer, expect.objectContaining(content));
+    const updated = await call('update_post', { ...content, postId: 'new-post', targetIds: ['page-a'], confirmation: 'UPDATE POST new-post' });
+    expect((await updated.json()).result.isError).not.toBe(true);
+    expect(publishingMutations.update).toHaveBeenCalledWith(viewer, expect.objectContaining(content));
+  });
+
+  it.each([undefined, null, 42, {}, []])('rejects a missing or non-string caption without mutation %#', async message => {
+    for (const name of ['create_post', 'update_post']) {
+      const response = await call(name, { ...(message === undefined ? {} : { message }), media: [{ kind: 'image', url: 'https://example.test/photo.jpg' }], targetIds: ['page-a'], ...(name === 'update_post' ? { postId: 'new-post', confirmation: 'UPDATE POST new-post' } : { confirmation: 'CREATE POST' }) });
+      expect((await response.json()).result.structuredContent.code).toBe('invalid_request');
+    }
+    expect(publishingMutations.create).not.toHaveBeenCalled();
+    expect(publishingMutations.update).not.toHaveBeenCalled();
+  });
+
+  it('returns shared empty-content validation without recording a successful MCP mutation', async () => {
+    publishingMutations.create.mockRejectedValueOnce(new OperationError('invalid_request', 'Add post text, a link, or media before saving.'));
+    const response = await call('create_post', { message: '', firstComment: 'Not post content', media: [], targetIds: [], confirmation: 'CREATE POST' });
+    expect((await response.json()).result.structuredContent).toMatchObject({ code: 'invalid_request' });
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+  });
+
   it('passes complete ordered media and per-image descriptions through create and edit services', async () => {
     const media = [
       { kind: 'image', url: 'https://example.test/second.jpg', altText: 'Second image now first' },

@@ -66,7 +66,7 @@ Ads creation forms receive safe option values, labels, defaults, name limits and
 
 Use a real link for navigation and a button for mutation. Pending states disable duplicate submission without changing button geometry. Success copy repeats the action verb; inline errors stay near the action and preserve recoverable input. Destructive dialogs initially focus Cancel, keep the object and consequence visible, and close only after confirmed success. Escape and focus restoration must work. The shared native dialog exposes `aria-busy`, recovers focus when disabled controls lose it, and preserves its opener across preferred-focus changes. Styled dialogs disable closing while busy. Inbox deletion keeps its error in the open confirmation on failure; Calendar and Connections forward their pending state to the same dialog behavior. Remaining screen-local overlays and ad hoc notices still need consolidation.
 
-The post composer and CSV importer validate required text, optional URL syntax, attachment exclusivity, and file selection before submitting. A failed local check keeps the entered draft, shows an associated inline error, and focuses the field requiring correction. Server publishing and CSV checks remain authoritative. Empty data-table copy sits outside the horizontally scrolling table so it remains readable at phone widths.
+The post composer validates that text, a usable link, or media provides post content; its caption can be empty when attachments supply the content. The text-only CSV importer still requires post text. Both validate their applicable URL syntax, attachment compatibility, and file selection before submitting. A failed local check keeps the entered draft, shows an associated inline error, and focuses the field requiring correction. Server publishing and CSV checks remain authoritative. Empty data-table copy sits outside the horizontally scrolling table so it remains readable at phone widths.
 
 The Posts screen counts and pages after workspace and channel authorization. Table is the approved default; Feed and Cards share the same query and actions. View, status and channel controls live in the sidebar and persist in the URL across pages. A filtered empty result says no posts match rather than claiming the workspace has no posts. On 2026-10-16 Chrome changed Feed to Cards with Draft status using the sidebar, returning one draft with its first comment and retaining both choices. Actions and CSV import start collapsed; New post uses the dedicated composer link in the contextual sidebar. The shared drawer focuses its close control, traps Tab, closes with Escape, and returns focus to its opener; these behaviors were checked on Root configuration in Chrome at 390px. Earlier mobile Lighthouse scores predate the new shell and must not be treated as a fresh audit of it. This is local fixture evidence, not a large-data or provider test.
 
@@ -264,3 +264,21 @@ missing support produces customer-safe unavailable copy. No protocol/setup jargo
 belongs in the customer editor. ORDERED_MEDIA_AUTHORING.md owns domain details;
 PREVIEW_QA.md distinguishes checked behavior from the remaining credit-blocked
 browser matrix and other release gaps.
+
+
+## Captionless posts — 2026-10-17
+
+Composer and local edit accept an empty caption when a link or media supplies
+post content. Selected local image Files count before upload; empty attachment
+rows and a first comment alone do not. The optional-caption label is shared
+across the creation/edit flows. Empty-content errors retain all entered values
+and focus the text field for correction. Existing attachment, destination and
+Root limits remain authoritative at the service boundary.
+
+Saved social previews render the actual attachment/link without missing-caption
+filler. Posts table and Calendar reuse `modules/publishing/content-summary.ts`
+for neutral image/video/link summaries when text is absent. Existing malformed
+saved references are not described as usable attachments. The summary describes
+content only; it does not claim delivery or preview inaccessible remote media.
+CAPTIONLESS_POSTS.md records the service and MCP behavior; PREVIEW_QA.md separates
+automated/local HTTP evidence from the outstanding browser/provider checks.
