@@ -54,7 +54,7 @@ export async function duplicatePost(actor: PublishingActor, input: unknown): Pro
     if (!Array.isArray(source.media)) throw new OperationError('invalid_request', 'Stored post attachments need review before duplication.');
     const attachments = validatePostAttachments({ link: source.link ?? undefined, media: source.media as unknown as PublishMedia[] }, config.maxMedia, config.maxAlt);
     const media = await resolvePublishMedia(context.actor.workspaceId, attachments.media);
-    const targets = await validateTargets(context.actor, source.targets.map(target => target.targetId), config.maxTargets, media, Boolean(firstComment));
+    const targets = await validateTargets(context.actor, source.targets.map(target => target.targetId), config.maxTargets, media, Boolean(firstComment), attachments.link);
     const now = new Date();
     try {
       await withPublishingTransaction(context.signal, async tx => {

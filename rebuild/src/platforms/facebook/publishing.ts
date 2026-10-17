@@ -2,7 +2,7 @@ import type { FacebookConfig } from './config';
 import { validateFacebookConfig } from './config';
 import { PlatformApiError } from '../errors';
 import { facebookAppSecretProof, graphObjectUrl, isFacebookDefiniteRejection, isFacebookRetryable } from './protocol';
-import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult } from '../types';
+import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingMediaSupport } from '../types';
 
 export type FacebookFetch = typeof fetch;
 
@@ -54,6 +54,11 @@ export interface FacebookEngine {
   moderateComment(accessToken: string, commentId: string, hidden: boolean): Promise<void>;
   deleteComment(accessToken: string, commentId: string): Promise<void>;
 }
+
+const FACEBOOK_PUBLISHING_MEDIA: PublishingMediaSupport = {
+  kinds: ['image', 'video'], maxImages: null, maxVideos: 1,
+  mixedKinds: false, linkWithMedia: false, imageAltText: true,
+};
 
 type JsonObject = Record<string, unknown>;
 function object(value: unknown): JsonObject { return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {}; }
@@ -242,8 +247,14 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
         currency: typeof x.currency === 'string' ? x.currency : null, status: typeof x.account_status === 'number' ? x.account_status : null }));
     },
     async publish(input) {
-      const media = input.media ?? []; const images = media.filter(m => m.kind === 'image'); const videos = media.filter(m => m.kind === 'video');
-      if (videos.length > 1 || (videos.length && images.length)) throw new FacebookApiError('A Facebook post can contain one video or images, not both.', 0);
+      const media = input.media ?? [];
+      if (!Array.isArray(media) || media.some(item => !item || (item.kind !== 'image' && item.kind !== 'video') || typeof item.url !== 'string' || !item.url.trim() || (item.kind === 'video' && item.localFile))) {
+        throw new FacebookApiError('Facebook received an unsupported media attachment.', 0);
+      }
+      const images = media.filter(m => m.kind === 'image'); const videos = media.filter(m => m.kind === 'video');
+      if (videos.length > 1 || (videos.length && images.length) || (media.length > 0 && input.link?.trim())) {
+        throw new FacebookApiError('Facebook posts cannot combine a link with media, combine images and video, or contain multiple videos.', 0);
+      }
       if (!input.text?.trim() && !input.link && media.length === 0) throw new FacebookApiError('A Facebook post needs text, a link, or media.', 0);
       for (const image of images) {
         if (!image.localFile) continue;
@@ -478,6 +489,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
   return {
     id: 'facebook',
     localImageUpload: { maxBytes: config.maxImageUploadBytes, mimeTypes: config.allowedImageMimeTypes },
+    publishingMedia: FACEBOOK_PUBLISHING_MEDIA,
     capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
     canUseCredential,
     classifyPublishingFailure(error) {

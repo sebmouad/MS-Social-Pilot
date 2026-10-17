@@ -24,8 +24,8 @@ import { PostRowActions, runDeletePostWithRecovery, runRecordFirstCommentWithRec
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
-const targets = [{ id: 'target-a', name: 'Studio channel', type: 'channel', provider: null, canPublish: true }];
-const rules = { allowedMimeTypes: ['image/png'], maxUploadBytes: 5000, maxAltCharacters: 120, maxMessageCharacters: 500 };
+const targets = [{ id: 'target-a', name: 'Studio channel', type: 'channel', provider: null, canPublish: true, publishingMedia: { kinds: ['image', 'video'] as const, maxImages: 4, maxVideos: 1, mixedKinds: true, linkWithMedia: true, imageAltText: true }, localImageUpload: { maxBytes: 5000, mimeTypes: ['image/png'] } }];
+const rules = { allowedMimeTypes: ['image/png'], maxUploadBytes: 5000, maxAltCharacters: 120, maxMessageCharacters: 500, maxMedia: 4 };
 const post = {
   id: 'post-1', message: 'Saved text', firstComment: 'Saved comment', link: null,
   media: [{ kind: 'image', url: 'media:123e4567-e89b-42d3-a456-426614174000', altText: 'Saved description' }],
@@ -52,6 +52,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); this.tabIndex = -1; };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
+  class TestURL extends URL { static createObjectURL = vi.fn(() => 'blob:preview'); static revokeObjectURL = vi.fn(); }
+  vi.stubGlobal('URL', TestURL);
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
@@ -176,27 +178,33 @@ describe('post row recovery', () => {
   it('keeps edited values and an uploaded image reference after a server failure', async () => {
     mocks.edit.mockImplementationOnce(async (_previous, data) => ({
       status: 'error', message: 'The post could not be saved. Try again.',
-      values: { message: String(data.get('message') ?? ''), firstComment: String(data.get('firstComment') ?? ''), altText: String(data.get('altText') ?? ''), uploadedImageRef: String(data.get('uploadedImageRef') ?? ''), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string') },
+      values: { message: String(data.get('message') ?? ''), firstComment: String(data.get('firstComment') ?? ''), mediaJson: String(data.get('mediaJson') ?? ''), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string') },
     }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ reference: 'media:123e4567-e89b-42d3-a456-426614174222' }) }));
     await render();
     await act(async () => container.querySelector('summary')!.click());
     await setValue(container.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!, 'Revised text to retry');
     await setValue(container.querySelector<HTMLTextAreaElement>('textarea[name="firstComment"]')!, 'Revised comment to retry');
-    await setValue(container.querySelector<HTMLInputElement>('input[name="altText"]')!, 'Revised image description');
+    await setValue(container.querySelector<HTMLInputElement>('input[name^="mediaAlt-"]')!, 'Revised image description');
     const destination = container.querySelector<HTMLInputElement>('input[name="targetIds"]')!;
-    await act(async () => destination.click());
-    const uploaded = container.querySelector<HTMLInputElement>('input[name="uploadedImageRef"]')!;
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(uploaded, 'media:123e4567-e89b-42d3-a456-426614174111');
+    expect(destination.checked).toBe(true);
+    const input = container.querySelector<HTMLInputElement>('[data-testid="local-image-input"]')!;
+    const file = new File(['new-image'], 'second.png', { type: 'image/png' });
+    Object.defineProperty(input, 'files', { configurable: true, get: () => ({ 0: file, length: 1, item: (index: number) => index === 0 ? file : null }) });
+    await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
     await act(async () => container.querySelector<HTMLButtonElement>('details button[type="submit"]')!.click());
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 
     expect(mocks.edit).toHaveBeenCalledTimes(1);
     expect(container.querySelector<HTMLTextAreaElement>('textarea[name="message"]')?.value).toBe('Revised text to retry');
     expect(container.querySelector<HTMLTextAreaElement>('textarea[name="firstComment"]')?.value).toBe('Revised comment to retry');
-    expect(container.querySelector<HTMLInputElement>('input[name="altText"]')?.value).toBe('Revised image description');
-    expect(uploaded.value).toBe('media:123e4567-e89b-42d3-a456-426614174111');
-    expect(destination.checked).toBe(false);
+    expect(container.querySelectorAll<HTMLInputElement>('input[name^="mediaAlt-"]')[0]?.value).toBe('Revised image description');
+    expect(destination.checked).toBe(true);
     const submitted = mocks.edit.mock.calls[0]![1] as FormData;
-    expect(submitted.get('uploadedImageRef')).toBe('media:123e4567-e89b-42d3-a456-426614174111');
+    expect(JSON.parse(String(submitted.get('mediaJson')))).toEqual([
+      { kind: 'image', url: 'media:123e4567-e89b-42d3-a456-426614174000', altText: 'Revised image description' },
+      { kind: 'image', url: 'media:123e4567-e89b-42d3-a456-426614174222' },
+    ]);
     expect(container.querySelector('details')?.open).toBe(true);
     expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/could not be saved/i);
     expect(document.activeElement instanceof HTMLElement && document.activeElement.hasAttribute('data-edit-error')).toBe(true);
@@ -211,7 +219,7 @@ describe('post row recovery', () => {
     await act(async () => { save.click(); await Promise.resolve(); });
 
     expect(save.disabled).toBe(true);
-    expect(container.querySelector('details form fieldset')?.hasAttribute('disabled')).toBe(true);
+    expect(container.querySelector<HTMLTextAreaElement>('textarea[name="message"]')?.disabled).toBe(true);
     await act(async () => finish({ status: 'error', message: 'Retry', values: {} }));
     expect(save.disabled).toBe(false);
   });

@@ -70,4 +70,45 @@ describe('recoverable post composer action', () => {
       message: 'Draft without a date', targetIds: [], scheduledAt: undefined,
     }));
   });
+
+  it('passes the complete ordered mediaJson list to shared authoring', async () => {
+    const mediaJson = JSON.stringify([
+      { kind: 'image', url: 'media:123e4567-e89b-42d3-a456-426614174000', altText: 'Cover' },
+      { kind: 'image', url: 'https://cdn.test/second.jpg' },
+    ]);
+    const data = formData({ intent: 'draft', message: 'Album draft', mediaJson, targetIds: [] });
+
+    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, data)).rejects.toThrow('redirect:/publishing/posts?notice=created');
+
+    expect(deps.createPost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      message: 'Album draft', link: '', media: [
+        { kind: 'image', url: 'media:123e4567-e89b-42d3-a456-426614174000', altText: 'Cover' },
+        { kind: 'image', url: 'https://cdn.test/second.jpg' },
+      ],
+    }));
+  });
+
+  it('preserves the complete serialized media list after recoverable save failure', async () => {
+    const mediaJson = JSON.stringify([{ kind: 'image', url: 'https://cdn.test/one.jpg', altText: 'One' }]);
+    const data = formData({ intent: 'draft', message: 'Retain media', mediaJson, targetIds: [] });
+    deps.createPost.mockRejectedValue(new Error('temporary save failure'));
+
+    const result = await createPostWithRecoveryAction({ status: 'idle', values: {} }, data);
+
+    expect(result.values.mediaJson).toBe(mediaJson);
+  });
+
+  it('rejects malformed mediaJson and mixed legacy fields before calling authoring', async () => {
+    const malformed = await createPostWithRecoveryAction({ status: 'idle', values: {} }, formData({
+      intent: 'draft', message: 'Reject malformed', mediaJson: JSON.stringify([{ kind: 'image', url: 'https://cdn.test/a.jpg', clientId: 'ui-only' }]), targetIds: [],
+    }));
+    expect(malformed.status).toBe('error');
+    expect(deps.createPost).not.toHaveBeenCalled();
+
+    const both = await createPostWithRecoveryAction({ status: 'idle', values: {} }, formData({
+      intent: 'draft', message: 'Reject legacy mix', mediaJson: '[]', imageUrl: 'https://cdn.test/a.jpg', targetIds: [],
+    }));
+    expect(both.status).toBe('error');
+    expect(deps.createPost).not.toHaveBeenCalled();
+  });
 });

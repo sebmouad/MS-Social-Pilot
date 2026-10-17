@@ -12,9 +12,10 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
   const params = await searchParams;
   const canCreate = canAccessFeature(viewer.permissions, 'publishing/posts', 'write');
-  const [allowedMimeTypes, maxUploadBytes, maxAltCharacters, maxMessageCharacters, choices] = await Promise.all([
+  const [allowedMimeTypes, maxUploadBytes, maxAltCharacters, maxMessageCharacters, maxMedia, choices] = await Promise.all([
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'),
-    runtimeConfig('publishing.maxImageAltCharacters'), runtimeConfig('publishing.maxMessageCharacters'), publishingDestinationChoices(viewer),
+    runtimeConfig('publishing.maxImageAltCharacters'), runtimeConfig('publishing.maxMessageCharacters'),
+    runtimeConfig('publishing.maxRemoteMediaPerPost'), publishingDestinationChoices(viewer),
   ]);
   const createdAt = new Date();
   const schedule = {
@@ -24,7 +25,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   };
   return <>
     <PageHeading title="Create a post" description="Choose destinations, write your post, then save a draft or schedule it." />
-    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer targets={choices} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
+    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer targets={choices} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
       : <section className={styles.card}><p>You do not have permission to create posts in this workspace.</p></section>}
   </>;
 }

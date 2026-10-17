@@ -9,10 +9,10 @@ describe('post attachment validation', () => {
     expect(validatePostAttachments({ media: [{ kind: 'image', url: 'https://example.com/photo.jpg' }] }, 2, 500).media).toEqual([{ kind: 'image', url: 'https://example.com/photo.jpg' }]);
   });
 
-  it('rejects insecure URLs and combinations the active publishing engine would drop', () => {
+  it('rejects insecure URLs while leaving combinations to the selected adapter', () => {
     expect(() => validatePostAttachments({ link: 'http://example.com' }, 2, 500)).toThrow(/HTTPS/);
-    expect(() => validatePostAttachments({ link: 'https://example.com', media: [{ kind: 'image', url: 'https://example.com/i.jpg' }] }, 2, 500)).toThrow(/cannot be combined/);
-    expect(() => validatePostAttachments({ media: [{ kind: 'image', url: 'https://example.com/i.jpg' }, { kind: 'video', url: 'https://example.com/v.mp4' }] }, 2, 500)).toThrow(/cannot be combined/);
+    expect(validatePostAttachments({ link: 'https://example.com', media: [{ kind: 'image', url: 'https://example.com/i.jpg' }] }, 2, 500)).toMatchObject({ link: 'https://example.com/', media: [{ kind: 'image' }] });
+    expect(validatePostAttachments({ media: [{ kind: 'image', url: 'https://example.com/i.jpg' }, { kind: 'video', url: 'https://example.com/v.mp4' }] }, 2, 500).media).toHaveLength(2);
     expect(() => validatePostAttachments({ media: [{ kind: 'image', url: 'https://example.com/i.jpg' }] }, 0, 500)).toThrow(/Choose up to/);
   });
 
@@ -25,6 +25,15 @@ describe('post attachment validation', () => {
 
   it('enforces Root-managed image description length', () => {
     expect(() => validatePostAttachments({ media: [{ kind: 'image', url: 'https://example.com/i.jpg', altText: 'Too long' }] }, 2, 3)).toThrow(/3 characters/);
+    expect(() => validatePostAttachments({ media: [{ kind: 'image', url: 'https://example.com/i.jpg', altText: 5 } as never] }, 2, 500)).toThrow(/valid image description/i);
+  });
+
+  it('enforces the Root media count across local and remote attachments', () => {
+    expect(() => validatePostAttachments({ media: [
+      { kind: 'image', url: 'media:123e4567-e89b-42d3-a456-426614174000' },
+      { kind: 'image', url: 'https://example.com/second.jpg' },
+      { kind: 'video', url: 'https://example.com/video.mp4' },
+    ] }, 2, 500)).toThrow(/up to 2/i);
   });
 
   it('checks destination-specific image size and type before remote publishing', () => {

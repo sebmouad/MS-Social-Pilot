@@ -92,6 +92,28 @@ describe('Facebook Graph adapter', () => {
       .resolves.toMatchObject({ remoteId: 'p1_42' });
   });
 
+  it('sends image descriptions through the photo upload wire field', async () => {
+    const singleCalls: RequestInit[] = [];
+    const single = createFacebookEngine(config, vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      singleCalls.push(init ?? {});
+      return response({ id: 'photo-1', post_id: 'p1_2' });
+    }) as unknown as typeof fetch);
+    await single.publish({ targetId: 'p1', accessToken: 'page-token', text: 'Single image', media: [{ kind: 'image', url: 'https://cdn.test/one.jpg', altText: 'A cover' }] });
+    expect((singleCalls[0]?.body as URLSearchParams).get('alt_text_custom')).toBe('A cover');
+
+    const albumCalls: RequestInit[] = [];
+    const album = createFacebookEngine(config, vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      albumCalls.push(init ?? {});
+      return response({ id: `result-${albumCalls.length}` });
+    }) as unknown as typeof fetch);
+    await album.publish({ targetId: 'p1', accessToken: 'page-token', text: 'Album', media: [
+      { kind: 'image', url: 'https://cdn.test/one.jpg', altText: 'First' },
+      { kind: 'image', url: 'https://cdn.test/two.jpg', altText: 'Second' },
+    ] });
+    expect((albumCalls[0]?.body as URLSearchParams).get('alt_text_custom')).toBe('First');
+    expect((albumCalls[1]?.body as URLSearchParams).get('alt_text_custom')).toBe('Second');
+  });
+
   it('rejects malformed explicit photo post_id instead of falling back to photo id', async () => {
     const engine = createFacebookEngine(config, mockFetch(response({ id: 'photo-1', post_id: 42 })));
     await expect(engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'photo', media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }] }))
@@ -132,6 +154,27 @@ describe('Facebook Graph adapter', () => {
     expect(firstForm.get('temporary')).toBe('true');
     expect(firstForm.get('source')).toBeInstanceOf(File);
     expect((calls[2].body as URLSearchParams).get('attached_media[0]')).toBe(JSON.stringify({ media_fbid: 'photo-1' }));
+  });
+
+  it.each([
+    ['mixed image and video', [{ kind: 'image' as const, url: 'https://cdn.test/a.jpg' }, { kind: 'video' as const, url: 'https://cdn.test/a.mp4' }]],
+    ['link with image', [{ kind: 'image' as const, url: 'https://cdn.test/a.jpg' }]],
+  ])('rejects Facebook media combination %s before transport', async (label, media) => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    const engine = createFacebookEngine(config, fetcher);
+    await expect(engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'post',
+      ...(label === 'link with image' ? { link: 'https://example.test' } : {}), media })).rejects.toThrow(/cannot combine|not both/i);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ kind: 'audio', url: 'https://cdn.test/a.mp3' }],
+    [{ kind: 'video', url: 'media:123e4567-e89b-42d3-a456-426614174000', localFile: { bytes: new Uint8Array([1]), mimeType: 'video/mp4', fileName: 'clip.mp4' } }],
+  ])('rejects an unsupported Facebook media item before transport', async media => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    const engine = createFacebookEngine(config, fetcher);
+    await expect(engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'post', media: media as never })).rejects.toThrow(/media/i);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it('rejects oversized or content-mismatched local files before any provider request', async () => {

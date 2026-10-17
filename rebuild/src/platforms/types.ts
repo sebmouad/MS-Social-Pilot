@@ -55,6 +55,17 @@ export interface PublishMedia {
   localFile?: { bytes: Uint8Array; mimeType: string; fileName: string };
 }
 
+/** Safe media-format metadata used by shared Publishing authoring and destination choices. */
+export interface PublishingMediaSupport {
+  kinds: readonly ('image' | 'video')[];
+  /** Null means the module relies on the shared Root media ceiling. */
+  maxImages: number | null;
+  maxVideos: number | null;
+  mixedKinds: boolean;
+  linkWithMedia: boolean;
+  imageAltText: boolean;
+}
+
 export interface DiscoveryRequest { credential: PlatformCredential }
 export interface DiscoveryResult { targets: PlatformTarget[]; adAccounts?: PlatformAdAccount[] }
 export interface PublishRequest {
@@ -133,6 +144,8 @@ export interface AdCampaignCreateRequest {
 export interface PlatformAdapter {
   readonly id: string;
   readonly capabilities: CapabilityDeclaration;
+  /** Optional granular authoring support; absent metadata fails closed for media delivery. */
+  readonly publishingMedia?: PublishingMediaSupport;
   /** Adapter limits for ephemeral server-supplied image bytes during publish. */
   readonly localImageUpload?: { maxBytes: number; mimeTypes: readonly string[] };
   canUseCredential?(credential: PlatformCredential, capability: 'publishing' | 'remoteStatus' | 'remoteDelete' | 'firstComment'): boolean;

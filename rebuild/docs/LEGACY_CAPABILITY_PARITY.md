@@ -101,3 +101,12 @@ four configured Page metrics. This is bounded live read evidence, not OAuth
 callback, live UI/API/MCP, publishing/media/deletion/Inbox/Ads-write proof or
 complete provider parity. The connection lacks `ads_management`; broader metrics,
 formats, lifecycle coverage and every production release gate remain open.
+
+Ordered media update, 2026-10-17: ORDERED_MEDIA_AUTHORING.md records complete
+ordered list editing in the shared composer/local edit, per-image descriptions,
+multi-file selection, confirmed-reference upload retry and matching strict MCP
+media arrays. Adapter declarations own combinations and live-ready upload limits;
+services repeat checks before save/schedule/duplication/publication intent. This
+closes the one-attachment UI and multi-image edit exclusion, not image-only posts,
+local video, native formats, durable temporary-photo recovery, full media/provider
+parity or production gates. The real-provider multi-photo canary remains unrun.

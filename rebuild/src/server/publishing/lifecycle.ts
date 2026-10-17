@@ -13,6 +13,7 @@ import { OperationError } from '@/lib/operation-error';
 import { attemptFirstCommentInOperation } from '@/modules/publishing/server/first-comment';
 import { readPublishingCredential } from '@/modules/publishing/server/credentials';
 import { publishDestinationInOperation } from '@/modules/publishing/server/publication';
+import { assertPublishingMediaSupport } from '@/modules/publishing/media-support';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
@@ -43,10 +44,12 @@ export function validatePostAttachments(input: PostAttachments, maxMedia: number
   };
   const link = input.link?.trim() ? secureUrl(input.link.trim()) : null;
   const media = input.media ?? [];
+  if (!Array.isArray(media)) throw new OperationError('invalid_request', 'Choose valid media attachments.');
   if (media.length > maxMedia || media.some(item => !item || (item.kind !== 'image' && item.kind !== 'video') || typeof item.url !== 'string')) throw new OperationError('invalid_request', `Choose up to ${maxMedia} supported media attachments.`);
+  if (media.some(item => item.altText !== undefined && typeof item.altText !== 'string')) throw new OperationError('invalid_request', 'Choose a valid image description.');
   if (media.some(item => item.altText?.trim() && item.altText.trim().length > maxAlt)) throw new OperationError('invalid_request', `Image descriptions must be ${maxAlt} characters or fewer.`);
-  if ((link && media.length) || (media.some(item => item.kind === 'image') && media.some(item => item.kind === 'video'))) throw new OperationError('invalid_request', 'Choose a link, images, or a video; these formats cannot be combined in one post.');
-  return { link, media: media.map(item => ({ kind: item.kind, url: storedImageId(item) ? item.url : secureUrl(item.url), ...(item.altText?.trim() ? { altText: item.altText.trim() } : {}) })) };
+  if (media.some(item => item.kind === 'video' && item.altText?.trim())) throw new OperationError('invalid_request', 'Image descriptions can only be used with images.');
+  return { link, media: media.map(item => ({ kind: item.kind, url: storedImageId(item) ? item.url : secureUrl(item.url), ...(item.kind === 'image' && item.altText?.trim() ? { altText: item.altText.trim() } : {}) })) };
 }
 
 export async function resolvePublishMedia(workspaceId: string, media: PublishMedia[]): Promise<PublishMedia[]> {
@@ -87,7 +90,7 @@ export function validFirstComment(value: string, maxText: number) {
   return text || null;
 }
 
-export async function validateTargets(actor: PublishingActor, ids: string[], maxTargets: number, media: PublishMedia[] = [], firstCommentRequested = false) {
+export async function validateTargets(actor: PublishingActor, ids: string[], maxTargets: number, media: PublishMedia[] = [], firstCommentRequested = false, link?: string | null) {
   if (ids.length > maxTargets || new Set(ids).size !== ids.length) throw new OperationError('invalid_request', `Choose up to ${maxTargets} distinct destinations.`);
   if (actor.allowedTargetIds && ids.some(id => !actor.allowedTargetIds!.includes(id))) throw new OperationError('forbidden', 'One or more destinations are outside your channel access.');
   if (!ids.length) return [];
@@ -105,9 +108,27 @@ export async function validateTargets(actor: PublishingActor, ids: string[], max
       throw new OperationError('unavailable', 'One or more destinations are unavailable or cannot publish.');
     }
     if (firstCommentRequested && !adapter.publishFirstComment) throw new OperationError('invalid_request', 'A selected destination cannot add a first comment. Clear the comment or choose another destination.');
+    assertPublishingMediaSupport(adapter, media, link);
     assertLocalImageLimits(adapter, media);
   }
   return targets;
+}
+
+async function assertStoredPostMediaCompatible(workspaceId: string, post: {
+  link?: string | null; media?: unknown;
+  targets: Array<{ status: string; target?: { socialAccount?: { provider?: string | null } | null } }>;
+}) {
+  if (!Array.isArray(post.media) || post.media.length === 0) return;
+  const config = await limits();
+  const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as PublishMedia[] }, config.maxMedia, config.maxAlt);
+  const resolved = await resolvePublishMedia(workspaceId, attachments.media);
+  for (const destination of post.targets) {
+    if (destination.status !== 'pending') continue;
+    const provider = destination.target?.socialAccount?.provider;
+    const adapter = provider ? await platformFor(provider, 'publishing') : null;
+    assertPublishingMediaSupport(adapter ?? { publishingMedia: undefined } as PlatformAdapter, resolved, attachments.link);
+    assertLocalImageLimits(adapter ?? {}, resolved);
+  }
 }
 
 async function assertPostScope(actor: PublishingActor, postId: string) {
@@ -164,8 +185,9 @@ export async function schedulePost(actor: PublishingActor, postId: string, sched
     await assertPostScope(actor, postId);
     if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
     await publishingTransaction(signal, async tx => {
-      const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { status: true } } } });
+      const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, link: true, media: true, targets: { select: { status: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length || post.targets.some(target => target.status !== 'pending')) throw new OperationError('conflict', 'This post cannot be scheduled.');
+      await assertStoredPostMediaCompatible(actor.workspaceId, post);
       await tx.post.update({ where: { id: post.id }, data: { status: 'scheduled', scheduledAt, updatedAt: new Date() } });
       await audit(tx, actor, 'publishing.post_scheduled', { postId: post.id, scheduledAt: scheduledAt.toISOString() });
     });
@@ -189,9 +211,10 @@ export async function reschedulePost(actor: PublishingActor, input: RescheduleIn
     const scheduledAt = resolved.instant;
     if (scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
     await publishingTransaction(signal, async tx => {
-      const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, targets: { select: { status: true, remotePostId: true } } } });
+      const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, link: true, media: true, targets: { select: { status: true, remotePostId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('conflict', 'This post cannot be rescheduled.');
       if (post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new OperationError('conflict', 'Only posts that are still waiting to publish can be rescheduled.');
+      await assertStoredPostMediaCompatible(actor.workspaceId, post);
       const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'scheduled' }, data: { scheduledAt, updatedAt: new Date() } });
       if (changed.count !== 1) throw new OperationError('conflict', 'Only posts that are still waiting to publish can be rescheduled.');
       await audit(tx, actor, 'publishing.post_rescheduled', { postId: post.id, from: post.scheduledAt?.toISOString() ?? null, to: scheduledAt.toISOString() });
@@ -223,7 +246,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
     const firstComment = validFirstComment(input.firstComment, config.maxText);
     const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
-    const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment));
+    const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
     if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new OperationError('invalid_request', 'Choose a future publishing time and at least one destination.');
     const now = new Date();
     const id = randomUUID();
@@ -246,7 +269,7 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
     const firstComment = validFirstComment(input.firstComment, config.maxText);
     const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
-    const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment));
+    const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
     await publishingTransaction(signal, async tx => {
       const existing = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, publishedAt: true, targets: { select: { id: true, status: true, remotePostId: true } } } });
       if (!existing || (role.role === 'contributor' && existing.authorId !== actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
@@ -277,12 +300,13 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
     const publishMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
     const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
     if (!entitlements) throw new OperationError('unavailable', 'This workspace is unavailable.');
-    if (publishMedia.some(item => item.localFile)) {
-      for (const item of post.targets) {
-        if (item.status === 'published' || item.remotePostId || !['pending', 'failed'].includes(item.status)) continue;
-        const provider = item.target.socialAccount?.provider;
-        const adapter = provider ? await platformFor(provider, 'publishing') : null;
-        if (adapter) assertLocalImageLimits(adapter, publishMedia);
+    for (const item of post.targets) {
+      if (item.status === 'published' || item.remotePostId || !['pending', 'failed'].includes(item.status)) continue;
+      const provider = item.target.socialAccount?.provider;
+      const adapter = provider ? await platformFor(provider, 'publishing') : null;
+      if (adapter) {
+        assertPublishingMediaSupport(adapter, publishMedia, attachments.link);
+        assertLocalImageLimits(adapter, publishMedia);
       }
     }
     let published = 0;

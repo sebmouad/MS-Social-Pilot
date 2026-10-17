@@ -9,6 +9,7 @@ import { OperationError, operationFailure } from '@/lib/operation-error';
 import { wallTimeToInstant } from '@/lib/calendar-dates';
 import { recordFirstCommentOutcome, sendFirstComment } from '@/modules/publishing/server/first-comment';
 import { finishPostDeletion, getPostDeletion, recordPostDeletionOutcome, type PostDeletionReceipt } from '@/modules/publishing/server/deletion';
+import { parsePublishingMedia } from '@/modules/publishing/media-support';
 
 const PATH = '/publishing/posts';
 type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published' | 'publish-review' | 'synced' | 'failed';
@@ -18,6 +19,7 @@ export type FirstCommentActionState = { status: 'idle' | 'error' | 'success'; me
 export type ComposerValues = {
   intent: string;
   attachmentKind: string;
+  mediaJson: string;
   message: string;
   firstComment: string;
   link: string;
@@ -278,6 +280,13 @@ async function run(operation: (viewer: Awaited<ReturnType<typeof requireViewer>>
 
 function actor(viewer: Awaited<ReturnType<typeof requireViewer>>) { return { userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedTargetIds: viewer.permissions.pageScope.ids }) }; }
 function attachments(data: FormData) {
+  if (data.has('mediaJson')) {
+    const raw = stringField(data, 'mediaJson');
+    const legacyMedia = ['imageUrl', 'videoUrl', 'uploadedImageRef', 'existingImageRef', 'altText', 'existingAltText']
+      .some(key => stringField(data, key, true).trim());
+    if (legacyMedia) throw new OperationError('invalid_request', 'Submit either the ordered media list or the older attachment fields, not both.');
+    return { link: stringField(data, 'link', true).trim(), media: parsePublishingMedia(JSON.parse(raw)) };
+  }
   const image = stringField(data, 'imageUrl', true).trim();
   const video = stringField(data, 'videoUrl', true).trim();
   const link = stringField(data, 'link', true).trim();
@@ -318,7 +327,7 @@ function failureNotice(error: unknown) {
 function composerValues(data: FormData): ComposerValues {
   const values = (key: string) => { const value = data.get(key); return typeof value === 'string' ? value : ''; };
   return {
-    intent: values('intent'), attachmentKind: values('attachmentKind'), message: values('message'), firstComment: values('firstComment'),
+    intent: values('intent'), attachmentKind: values('attachmentKind'), mediaJson: values('mediaJson'), message: values('message'), firstComment: values('firstComment'),
     link: values('link'), imageUrl: values('imageUrl'), videoUrl: values('videoUrl'), uploadedImageRef: values('uploadedImageRef'),
     altText: values('altText'), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string'),
     scheduleDate: values('scheduleDate'), scheduleTime: values('scheduleTime'),

@@ -831,3 +831,73 @@ public-defaults/bundle copies were removed; sanitized final logs remain private:
 `/private/tmp/socialpilot-signing49-live-final.log`, and
 `/private/tmp/socialpilot-signing49-cleanup-final.log`.
 FACEBOOK_REQUEST_SIGNING.md records ownership, reproduction and remaining gates.
+
+## Batch 50: ordered media, authoring and adapter boundaries — 2026-10-17
+
+Verification passed **1304 tests across 208 files**, including actual isolated
+PostgreSQL authorization/recovery and duplication tests. Typecheck and isolated
+production build passed; the running preview's `.next` was preserved. Independent
+read-only review found no remaining P1/P2 issue in this batch. Earlier full-suite
+failures exposed a missing adapter declaration in the duplication fixture, a
+missing copied-link preflight argument and one brittle error-copy assertion;
+these were corrected before the final suite. No DDL or production change occurred.
+
+Focused cases cover ordered removal/reordering/description association,
+multi-image atomic selection, partial upload retry without reuploading confirmed
+files, malformed receipts, field/error IDs across editors, visible failure focus,
+pending field locking with enabled hidden serialization, count exhaustion and
+unsupported controls. Provider-neutral fixtures permit combinations that Facebook
+rejects; selected adapters decide compatibility before saves/schedules/duplication
+and publication intent. Strict action/MCP parsing rejects extra fields/bytes and
+ambiguous scalar/list shapes. Ready-only MCP destination metadata matches the UI.
+
+`scripts/verify-ordered-media.ts` refused missing preview inputs, then passed real
+localhost HTTP/MCP checks against the synthetic loopback preview: scoped uploads,
+ordered create/edit, per-image descriptions and first comment, foreign images,
+malformed payloads, Facebook-incompatible combinations, current Root count,
+read-only keys and revoked destination access. It verified removal of all its
+disposable images/records and exact restoration of temporary configuration,
+including original timestamps/encryption flags. No provider request was sent.
+
+Chrome **Clay, 1440×1000**: two synthetic images selected together, described,
+reordered and previewed; forced offline upload preserved both Files, order,
+descriptions, text and first comment. Online retry uploaded/saved both. Actual
+HTTP reads confirmed two ordered workspace references with matching descriptions.
+Multi-image editing reopened both items. Offline edit retained reordered media,
+edited text/description and focused recovery; retry persisted all changes and
+returned to Posts. Expanding edit initially exposed a file-input CSS specificity
+overflow; after fixing the scoped picker geometry, document width stayed 1440.
+The saved browser draft and both uploaded images were removed through existing
+local services, and absence was checked. Original seeded image fixtures remain.
+
+Chrome **Nightfall, 390×844**: composer/editor styling inspected; two synthetic
+Files selected, sidebar drawer opened and Save draft tested offline. The drawer
+closed, the visible failed row received focus and described errors, both Files
+and text remained, and document width stayed 390. The later phone description
+fill and menu-click actions were **not executed**: automatic approval review
+reported exhausted workspace credits. Phone successful save/retry, final keyboard
+matrix and Grove/Coast/other narrow theme checks remain unverified. The browser
+retains an unsaved synthetic phone draft and Nightfall theme pending resumption;
+that phone flow created no persistent post or uploads before the block.
+
+The browser's native upload tool separately refused the local fixture paths.
+File selection was instead simulated with File/DataTransfer objects built from
+the app's authorized synthetic media API. This exercises the actual change,
+preview and HTTP-upload paths, not the native OS file dialog.
+
+The newly available frontend-design + frontend-design-premium skills were applied
+to final review. Their strict static audit returned **two findings**, both in
+existing shared primitives: it did not recognize forwarded Button action props
+(`components/Button.tsx`) or inline JSX `resize: 'none'` (`AutoTextarea.tsx`).
+Source inspection and actual action/textarea behavior contradict those reports;
+no fake click handler or redundant style was added merely to silence the audit.
+The strict audit is **not reported as passed**. Its private JSON artifact is
+`/private/tmp/socialpilot-media50-premium-audit-artifact.json`.
+
+Private logs: `/private/tmp/socialpilot-media50-tests-final.log`,
+`/private/tmp/socialpilot-media50-typecheck-final.log`,
+`/private/tmp/socialpilot-media50-build-final.log`,
+`/private/tmp/socialpilot-media50-live-final.log`, and
+`/private/tmp/socialpilot-media50-browser-cleanup.log`.
+ORDERED_MEDIA_AUTHORING.md records ownership and remaining formats, upload
+recovery, live provider, full parity and release gaps. Production remains legacy.

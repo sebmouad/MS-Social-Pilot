@@ -30,6 +30,14 @@ describe('Facebook publishing credential readiness', () => {
     }
   });
 
+  it('declares only the media forms implemented by the Facebook publisher', () => {
+    const adapter = createFacebookAdapter(config);
+    expect(adapter.publishingMedia).toEqual({
+      kinds: ['image', 'video'], maxImages: null, maxVideos: 1,
+      mixedKinds: false, linkWithMedia: false, imageAltText: true,
+    });
+  });
+
   it('allows status reads only when every configured permission was granted', () => {
     const adapter = createFacebookAdapter(config, fetch, { postReadScopes: ['pages_read_engagement', 'pages_manage_posts'] });
 

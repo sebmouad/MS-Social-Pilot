@@ -28,6 +28,7 @@ There is no released billing or legal-copy contract for the rebuild. Do not inve
 | Theme and Scrollbar | `src/styles/tokens.css` | `DESIGN.md` | Grove, Coast, Clay, Nightfall | Publishing mobile Lighthouse accessibility 100 in all four themes; shared muted-text contrast test passes; other screens and scrollbar checks pending |
 | Read-only table | `src/components/DataTable.tsx` | Server list query | Sortable or static columns | Posts now has scoped database pagination; other table pagination parity pending |
 | Post preview | `src/components/PostPreview.tsx` | Scoped post list and destination records | Feed and Cards, alongside default Table | First comment, safe media/link handling and destination outcomes covered; local Chrome filter/view checks |
+| Post attachments | `src/modules/publishing/components/PostAttachments.tsx` | Root ceilings, shared authoring validation and adapter media metadata | Ordered remote media / local images; trusted unsaved preview distinct from saved validation | Order, description association, upload retry, multi-editor focus and actual local HTTP/MCP/browser checks; wider release matrix remains open |
 | Table Selection | No shared owner yet | `UX-CONTRACT.md` | None until a shared owner exists | Define before bulk table actions |
 | Select/Listbox | Native `<select>` | `DESIGN.md` and this contract | Browser-owned popup in English UI | Posts filter selection persisted after navigation in a 390px Chrome mobile preview; keyboard checks pending |
 | Date | Native date/time inputs | Workspace timezone policy | Date or datetime-local | Date-only parsing and browser checks pending |
@@ -236,3 +237,30 @@ live Publishing/Ads controls use current provider readiness and safe unavailable
 behavior. Root diagnostics retains technical configuration validation. Signing
 configuration and a connectivity pass do not prove full provider operation
 coverage. FACEBOOK_REQUEST_SIGNING.md and PREVIEW_QA.md record the current slice.
+
+## Ordered media authoring — 2026-10-17
+
+Composer and local edit initialize and submit the complete ordered media list.
+Add URLs or select several local images, edit each image description, Move up/down
+without dragging, and Remove without deleting the underlying image library file
+or remote content. Count/limit guidance explains unavailable add actions; unsupported
+formats/local uploads are absent for selected destinations. Pending Files remain
+visible when destination selection makes them incompatible and can be removed or
+the selection changed. Root/destination MIME intersections and the smallest byte
+bound apply; service validation remains authoritative.
+
+Sequential uploads commit each confirmed reference before continuing. Failure
+preserves files, order, descriptions, text, first comment and destination choices;
+retry reuses confirmed uploads and focuses the failed row. Multi-image editing
+is supported. A failed/unconfirmed save retains the complete submitted list and
+asks the user to inspect current state before repeating. Actual draft save/edit
+returns to Posts with existing focused feedback. The phone sidebar closes on
+upload failure and reveals its focused error. Unsaved browser Files are not a
+durable session; navigation/reload/cancel recovery remains unfinished.
+
+Strict action `mediaJson` and MCP `media` arrays use the same field shape and
+ordered persistence. Metadata is returned only for currently ready destinations;
+missing support produces customer-safe unavailable copy. No protocol/setup jargon
+belongs in the customer editor. ORDERED_MEDIA_AUTHORING.md owns domain details;
+PREVIEW_QA.md distinguishes checked behavior from the remaining credit-blocked
+browser matrix and other release gaps.

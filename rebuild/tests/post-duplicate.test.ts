@@ -91,4 +91,10 @@ describe('duplicatePost', () => {
     state.foundDraft = false;
     await expect(duplicatePost(actor, args())).rejects.toMatchObject({ code: 'conflict' });
   });
+
+  it('passes the copied link into destination media compatibility checks', async () => {
+    state.source = source({ link: 'https://example.test/story', media: [{ kind: 'image', url: 'https://example.test/image.jpg', altText: 'image' }] });
+    await duplicatePost(actor, args());
+    expect(state.validateTargets).toHaveBeenCalledWith(state.actor, ['target-1'], 10, state.source.media, true, 'https://example.test/story');
+  });
 });

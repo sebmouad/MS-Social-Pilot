@@ -71,6 +71,20 @@ describe('PostPreview', () => {
     expect(markup).toContain('href="https://example.test/article"');
     expect(markup).toContain('Open shared link');
   });
+
+  it('keeps temporary blob URLs restricted to an explicit trusted authoring slot', () => {
+    const temporaryPost = { ...post, media: [{ kind: 'image', url: 'blob:local-preview' }] };
+    const savedMarkup = renderToStaticMarkup(createElement(PostPreview, { post: temporaryPost, authorName: 'Amina', timeZone: 'UTC' }));
+    const authoringMarkup = renderToStaticMarkup(createElement(PostPreview, {
+      post: temporaryPost,
+      authorName: 'Amina',
+      timeZone: 'UTC',
+      mediaOverride: createElement('img', { src: 'blob:local-preview', alt: 'Temporary file preview' }),
+    }));
+
+    expect(savedMarkup).not.toContain('blob:local-preview');
+    expect(authoringMarkup).toContain('blob:local-preview');
+  });
 });
 
 describe('PostFilters view selection', () => {

@@ -13,7 +13,8 @@ const db = vi.hoisted(() => ({
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
 }));
-const capabilities = vi.hoisted(() => ({ firstComment: true }));
+const capabilities = vi.hoisted(() => ({ firstComment: true, media: null as null | { kinds: readonly ('image' | 'video')[]; maxImages: number | null; maxVideos: number | null; mixedKinds: boolean; linkWithMedia: boolean; imageAltText: boolean } }));
+const provider = vi.hoisted(() => ({ publish: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({
   'publishing.maxMessageCharacters': 10000, 'publishing.maxImportRows': 100,
@@ -21,15 +22,17 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
   'publishing.maxRemoteMediaPerPost': 4, 'publishing.maxImageAltCharacters': 500,
 })[key] }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}), hasPlatformCapability: () => true }));
-vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: vi.fn(), ...(capabilities.firstComment ? { publishFirstComment: vi.fn() } : {}), supportsTargetKind: () => true }) }));
+vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: provider.publish, ...(capabilities.firstComment ? { publishFirstComment: vi.fn() } : {}), ...(capabilities.media ? { publishingMedia: capabilities.media } : {}), supportsTargetKind: () => true }) }));
 
-import { cancelScheduledPost, createPost, reviewPost, schedulePost, submitPostForApproval } from '../src/server/publishing/lifecycle';
+import { cancelScheduledPost, createPost, publishPost, reviewPost, schedulePost, submitPostForApproval } from '../src/server/publishing/lifecycle';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 
 beforeEach(() => {
   vi.clearAllMocks();
   capabilities.firstComment = true;
+  provider.publish.mockReset();
+  capabilities.media = { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true };
   db.membership.findUnique.mockResolvedValue({ role: 'editor' });
   db.postTarget.findMany.mockResolvedValue([]);
   db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', status: 'draft', targets: [{ status: 'pending' }] });
@@ -46,6 +49,40 @@ describe('publishing lifecycle transitions', () => {
     capabilities.firstComment = false;
     await expect(createPost(actor, { message: 'Update', firstComment: 'Details', targetIds: ['target-1'] })).rejects.toThrow(/cannot add a first comment/);
     expect(db.post.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Facebook media combination before saving a draft or schedule', async () => {
+    await expect(createPost(actor, {
+      message: 'Unsupported album', firstComment: '', targetIds: ['target-1'],
+      media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }, { kind: 'video', url: 'https://cdn.test/a.mp4' }],
+      scheduledAt: new Date(Date.now() + 3_600_000),
+    })).rejects.toThrow(/cannot combine/i);
+    expect(db.post.create).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for media when an adapter omits its publishing media declaration', async () => {
+    capabilities.media = null;
+    await expect(createPost(actor, { message: 'Undeclared media', firstComment: '', targetIds: ['target-1'], media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }] })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(db.post.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported media before creating a durable publication attempt', async () => {
+    db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', message: 'Unsupported media', firstComment: null,
+      link: null, media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }, { kind: 'video', url: 'https://cdn.test/a.mp4' }],
+      status: 'draft', scheduledAt: null,
+      targets: [{ id: 'pt1', status: 'pending', remotePostId: null, target: { id: 'target-1', type: 'page', providerId: 'provider-1',
+        canPublish: true, enabled: true, accessToken: 'token', socialAccount: { provider: 'facebook', invalidatedAt: null, tokenExpiresAt: null, scopes: 'publish' } } }],
+    });
+    await expect(publishPost(actor, 'p1')).rejects.toThrow(/cannot combine/i);
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+    expect(provider.publish).not.toHaveBeenCalled();
+  });
+
+  it('uses a neutral adapter declaration to allow supported mixed media and link combinations', async () => {
+    capabilities.media = { kinds: ['image', 'video'], maxImages: null, maxVideos: null, mixedKinds: true, linkWithMedia: true, imageAltText: true };
+    const media = [{ kind: 'image' as const, url: 'https://cdn.test/a.jpg' }, { kind: 'video' as const, url: 'https://cdn.test/a.mp4' }];
+    await createPost(actor, { message: 'Cross-platform format', firstComment: '', targetIds: ['target-1'], media, link: 'https://example.test' });
+    expect(db.post.create.mock.calls[0]?.[0].data).toMatchObject({ link: 'https://example.test/', media });
   });
 
   it('creates a scheduled post atomically and rejects a schedule without destinations', async () => {
@@ -79,6 +116,15 @@ describe('publishing lifecycle transitions', () => {
     await schedulePost(actor, 'p1', new Date(Date.now() + 60_000));
     expect(db.post.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: expect.objectContaining({ status: 'scheduled' }) });
     await expect(schedulePost(actor, 'p1', new Date(Date.now() - 60_000))).rejects.toThrow(/future/);
+  });
+
+  it('rechecks selected-module media support before scheduling an existing draft', async () => {
+    db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', status: 'draft', link: 'https://example.test',
+      media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }],
+      targets: [{ status: 'pending', target: { type: 'page', socialAccount: { provider: 'facebook' } } }],
+    });
+    await expect(schedulePost(actor, 'p1', new Date(Date.now() + 60_000))).rejects.toThrow(/cannot combine/i);
+    expect(db.post.update).not.toHaveBeenCalled();
   });
 
   it('cancels a local queued item and preserves remote scheduled posts', async () => {

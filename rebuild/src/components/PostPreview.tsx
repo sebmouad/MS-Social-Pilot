@@ -34,6 +34,8 @@ type Props = {
   timeZone: string;
   variant?: 'feed' | 'card';
   actions?: ReactNode;
+  /** Trusted composer-only media rendering (for example, temporary File previews). */
+  mediaOverride?: ReactNode;
 };
 
 type MediaItem = { kind: string; url: string; altText?: string };
@@ -76,7 +78,7 @@ export function formatPostPreviewTime(date: Date, timeZone: string) {
   return new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
-export function PostPreview({ post, authorName, timeZone, variant = 'feed', actions }: Props) {
+export function PostPreview({ post, authorName, timeZone, variant = 'feed', actions, mediaOverride }: Props) {
   const media = mediaItems(post.media).flatMap(item => {
     const url = mediaUrl(item);
     return url ? [{ ...item, url }] : [];
@@ -116,7 +118,7 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
 
     <div className={styles.message}>{post.message.trim() || 'No text included'}</div>
 
-    {media.length ? <div className={styles.media}>
+    {mediaOverride !== undefined ? mediaOverride : media.length ? <div className={styles.media}>
       {media.map((item, index) => item.kind === 'image'
         ? <a className={styles.imageLink} href={item.url} target="_blank" rel="noopener noreferrer" aria-label="Open image attachment" key={`${item.url}-${index}`}>
             <img src={item.url} alt={item.altText?.trim() || 'Post image'} loading="lazy" />

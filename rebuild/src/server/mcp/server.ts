@@ -21,6 +21,7 @@ import { duplicatePost } from '@/modules/publishing/server/duplicate';
 import { readPublishingPostList } from '@/modules/publishing/server/read';
 import { exportPublishingPosts } from '@/modules/publishing/server/export';
 import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
+import { parsePublishingMedia } from '@/modules/publishing/media-support';
 import { runtimeConfig } from '../config/store';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
 import { analyticsRange } from '../analytics/data';
@@ -44,6 +45,14 @@ const textResult = (value: unknown) => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
   structuredContent: Array.isArray(value) ? { items: value } : value,
 });
+
+const postMediaInputSchema = {
+  type: 'array',
+  description: 'Complete ordered attachment list. Image URLs may be HTTPS or workspace media references. Root and destination limits apply. Use this instead of imageUrl/videoUrl.',
+  items: { type: 'object', required: ['kind', 'url'], properties: {
+    kind: { type: 'string', enum: ['image', 'video'] }, url: { type: 'string' }, altText: { type: 'string' },
+  }, additionalProperties: false },
+};
 
 const tools = [
   ...rootToolDefinitions,
@@ -90,8 +99,8 @@ const tools = [
   { name: 'finish_publication_projection', description: 'Finish a saved publication receipt in local records only. Never sends another provider request. Confirmation must exactly match FINISH PUBLICATION <operationId>.', inputSchema: { type: 'object', required: ['postId', 'operationId', 'confirmation'], properties: { postId: { type: 'string' }, operationId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'adopt_legacy_publication', description: 'Adopt an older processing destination into recovery after checking its current platform state. This does not contact or verify the platform. Confirmation must exactly match ADOPT PUBLICATION <postTargetId>.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'duplicate_post', description: 'Copy an authorized post into one new unscheduled local draft with its content, first comment, media and selected destinations. Remote publications, schedules and delivery history are not copied. Use a new lowercase UUID as requestId; reuse that same UUID after an unconfirmed response to retrieve the existing draft. Confirmation must exactly match DUPLICATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'requestId', 'confirmation'], properties: { postId: { type: 'string' }, requestId: { type: 'string', format: 'uuid' }, confirmation: { type: 'string' } }, additionalProperties: false } },
-  { name: 'create_post', description: 'Create a local post draft with selected destinations and optional first comment, link, or media URL. Confirmation must exactly match CREATE POST.', inputSchema: { type: 'object', required: ['message', 'targetIds', 'confirmation'], properties: { message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
-  { name: 'update_post', description: 'Edit an unpublished post and its selected destinations. Confirmation must exactly match UPDATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'message', 'targetIds', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'create_post', description: 'Create a local draft with selected destinations, first comment and an ordered media list with per-image descriptions. Use media instead of scalar imageUrl/videoUrl. Root and selected destination rules apply. Confirmation must exactly match CREATE POST.', inputSchema: { type: 'object', required: ['message', 'targetIds', 'confirmation'], properties: { message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, media: postMediaInputSchema, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'update_post', description: 'Replace an unpublished post content and complete ordered media list. An empty media list removes attachments. Use media instead of scalar imageUrl/videoUrl; Root and selected destination rules apply. Confirmation must exactly match UPDATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'message', 'targetIds', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, media: postMediaInputSchema, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'submit_post_for_approval', description: 'Submit a draft for review. Confirmation must exactly match SUBMIT POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'review_post', description: 'Approve or reject a pending post. Confirmation must exactly match APPROVE POST <postId> or REJECT POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'decision', 'confirmation'], properties: { postId: { type: 'string' }, decision: { type: 'string', enum: ['approve', 'reject'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'schedule_post', description: 'Schedule a draft for a future ISO timestamp. Confirmation must exactly match SCHEDULE POST <postId> <timestamp>.', inputSchema: { type: 'object', required: ['postId', 'scheduledAt', 'confirmation'], properties: { postId: { type: 'string' }, scheduledAt: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -205,6 +214,20 @@ function requiredString(args: Record<string, unknown>, key: string) {
   return value.trim();
 }
 
+function postMediaArguments(args: Record<string, unknown>) {
+  if (Object.prototype.hasOwnProperty.call(args, 'media')) {
+    if (args.imageUrl !== undefined || args.videoUrl !== undefined) throw new OperationError('invalid_request', 'Use the ordered media list or individual media URL fields, not both.');
+    return parsePublishingMedia(args.media);
+  }
+  for (const key of ['imageUrl', 'videoUrl']) {
+    if (args[key] !== undefined && typeof args[key] !== 'string') throw new OperationError('invalid_request', 'Media URLs must be strings.');
+  }
+  return parsePublishingMedia([
+    ...(typeof args.imageUrl === 'string' && args.imageUrl.trim() ? [{ kind: 'image', url: args.imageUrl.trim() }] : []),
+    ...(typeof args.videoUrl === 'string' && args.videoUrl.trim() ? [{ kind: 'video', url: args.videoUrl.trim() }] : []),
+  ]);
+}
+
 async function readMcpAnalyticsSnapshot(viewer: McpViewer, args: Record<string, unknown>, metricKey?: string) {
   const cap = viewer.maxResultItems ?? 100;
   const selectedIds = (value: unknown, label: string): unknown => {
@@ -287,8 +310,14 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const pageIds = pageIdsFor(viewer);
       const targets = await prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: await selectedResourceConnectionWhere(viewer.workspaceId, entitledPlatformIds(viewer.entitlements)) }, ...(pageIds ? { id: { in: pageIds } } : {}) }, orderBy: [{ type: 'asc' }, { name: 'asc' }], take: cap, select: { id: true, type: true, providerId: true, name: true, pictureUrl: true, canPublish: true } });
       const choices = await publishingTargetChoices(viewer.workspaceId, viewer.entitlements, targets.map(target => target.id));
-      const ready = new Map(choices.map(choice => [choice.id, choice.canPublish]));
-      return targets.map(target => ({ ...target, canPublish: ready.get(target.id) === true }));
+      const ready = new Map(choices.map(choice => [choice.id, choice]));
+      return targets.map(target => {
+        const choice = ready.get(target.id);
+        return { ...target, canPublish: choice?.canPublish === true,
+          ...(choice?.canPublish && choice.publishingMedia ? { publishingMedia: choice.publishingMedia } : {}),
+          ...(choice?.canPublish && choice.localImageUpload ? { localImageUpload: choice.localImageUpload } : {}),
+        };
+      });
     }
     case 'list_posts': {
       const posts = await readPublishingPostList({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(pageIdsFor(viewer) === undefined ? {} : { allowedTargetIds: pageIdsFor(viewer) }) }, args, { maxItems: cap });
@@ -649,10 +678,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
     case 'create_post': {
       requireConfirmation(args, 'CREATE POST');
       if (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string')) throw new OperationError('invalid_request', 'targetIds must be an array of destination IDs.');
-      const media = [
-        ...(typeof args.imageUrl === 'string' && args.imageUrl.trim() ? [{ kind: 'image' as const, url: args.imageUrl.trim() }] : []),
-        ...(typeof args.videoUrl === 'string' && args.videoUrl.trim() ? [{ kind: 'video' as const, url: args.videoUrl.trim() }] : []),
-      ];
+      const media = postMediaArguments(args);
       const result = await createPost(viewer, { message: requiredString(args, 'message'), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media });
       return auditedReceipt(viewer, name, { postId: result.id, targetCount: args.targetIds.length }, { id: result.id, status: 'draft' });
     }
@@ -660,10 +686,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const postId = requiredString(args, 'postId');
       requireConfirmation(args, `UPDATE POST ${postId}`);
       if (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string')) throw new OperationError('invalid_request', 'targetIds must be an array of destination IDs.');
-      const media = [
-        ...(typeof args.imageUrl === 'string' && args.imageUrl.trim() ? [{ kind: 'image' as const, url: args.imageUrl.trim() }] : []),
-        ...(typeof args.videoUrl === 'string' && args.videoUrl.trim() ? [{ kind: 'video' as const, url: args.videoUrl.trim() }] : []),
-      ];
+      const media = postMediaArguments(args);
       await updatePost(viewer, { postId, message: requiredString(args, 'message'), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media });
       return auditedReceipt(viewer, name, { postId, targetCount: args.targetIds.length }, { postId, updated: true });
     }

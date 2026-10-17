@@ -343,3 +343,25 @@ does not prove rebuild configuration migration, live UI/API/MCP, publishing,
 Inbox, Ads management or complete metric coverage. The observed connection lacks
 `ads_management`. FACEBOOK_REQUEST_SIGNING.md and PREVIEW_QA.md record proof and
 remaining limits. Production remains legacy; all cutover gates still apply.
+
+## Ordered media authoring and adapter format metadata — 2026-10-17
+
+Shared Publishing now owns one ordered attachment controller/editor used by
+creation and local post editing. Complete lists, per-image descriptions, trusted
+File previews and sequential confirmed-reference upload recovery replace the
+single-item UI and multi-image edit exclusion. Strict action/MCP list parsers
+reject bytes, client IDs and unknown fields. MCP create/update and destination
+tool/resource metadata now cover the same ordered media service boundary.
+
+Neutral `PublishingMediaSupport` declares supported kinds, optional count bounds,
+combinations and descriptions. Facebook owns its declaration and transport checks;
+shared validation no longer hardcodes its combinations. Current authoring,
+duplication, scheduling/rescheduling and pre-intent publication validate adapter
+support. Safe ready-only choices expose format/local-upload bounds and UI uses
+their intersection with Root limits. The existing Root media-count label now
+describes local references too; no new key or registry-version change occurred.
+
+ORDERED_MEDIA_AUTHORING.md and PREVIEW_QA.md record real local checks/cleanup and
+open browser/format/recovery work. No DDL, real provider operation or production
+change occurred. This does not complete image-only authoring, local video,
+intermediate photo journals, native formats, full MCP/provider parity or cutover.

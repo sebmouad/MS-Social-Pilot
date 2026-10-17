@@ -704,6 +704,21 @@ describe('MCP workspace boundaries', () => {
     expect(JSON.parse((await resource.json()).result.contents[0].text)[0].canPublish).toBe(false);
   });
 
+  it('exposes current safe media capabilities through destination tools and resources only when ready', async () => {
+    const publishingMedia = { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true };
+    const localImageUpload = { maxBytes: 1024, mimeTypes: ['image/png'] };
+    destinationReadiness.mockResolvedValue([{ id: 'page-allowed', canPublish: true, publishingMedia, localImageUpload }]);
+    const ready = (await (await call('list_pages')).json()).result.structuredContent.items[0];
+    expect(ready).toMatchObject({ canPublish: true, publishingMedia, localImageUpload });
+    const resource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 92, method: 'resources/read', params: { uri: 'msp://targets' } });
+    expect(JSON.parse((await resource.json()).result.contents[0].text)[0]).toMatchObject({ publishingMedia, localImageUpload });
+    destinationReadiness.mockResolvedValue([{ id: 'page-allowed', canPublish: false, publishingMedia, localImageUpload }]);
+    const unavailable = (await (await call('list_pages')).json()).result.structuredContent.items[0];
+    expect(unavailable.canPublish).toBe(false);
+    expect(unavailable).not.toHaveProperty('publishingMedia');
+    expect(unavailable).not.toHaveProperty('localImageUpload');
+  });
+
   it('constrains customer destination and Ads queries when platform access is absent', async () => {
     db.target.findMany.mockResolvedValue([]);
     const denied = { ...viewer, entitlements: { ...viewer.entitlements, platformCapabilities: {} } };
@@ -1051,6 +1066,43 @@ describe('MCP workspace boundaries', () => {
     expect((await updated.json()).result.structuredContent).toEqual({ postId: 'new-post', updated: true, mcpAuditRecorded: true });
     expect(publishingMutations.update).toHaveBeenCalledWith(viewer, expect.objectContaining({ postId: 'new-post', targetIds: ['page-a'] }));
     expect(db.$executeRaw).toHaveBeenCalled();
+  });
+
+  it('passes complete ordered media and per-image descriptions through create and edit services', async () => {
+    const media = [
+      { kind: 'image', url: 'https://example.test/second.jpg', altText: 'Second image now first' },
+      { kind: 'image', url: 'media:91bdd69a-65fe-4bac-b55d-339870d9d9c2', altText: 'First image now second' },
+    ];
+    const created = await call('create_post', { message: 'Two images', firstComment: 'Useful follow-up', targetIds: ['page-a'], media, confirmation: 'CREATE POST' });
+    expect((await created.json()).result.isError).not.toBe(true);
+    expect(publishingMutations.create).toHaveBeenCalledWith(viewer, expect.objectContaining({ media, firstComment: 'Useful follow-up' }));
+    const updated = await call('update_post', { postId: 'new-post', message: 'Reordered images', targetIds: ['page-a'], media: [...media].reverse(), confirmation: 'UPDATE POST new-post' });
+    expect((await updated.json()).result.isError).not.toBe(true);
+    expect(publishingMutations.update).toHaveBeenCalledWith(viewer, expect.objectContaining({ postId: 'new-post', media: [...media].reverse() }));
+    const cleared = await call('update_post', { postId: 'new-post', message: 'Remove attachments', targetIds: ['page-a'], media: [], confirmation: 'UPDATE POST new-post' });
+    expect((await cleared.json()).result.isError).not.toBe(true);
+    expect(publishingMutations.update).toHaveBeenLastCalledWith(viewer, expect.objectContaining({ media: [] }));
+  });
+
+  it.each([
+    { media: { kind: 'image', url: 'https://example.test/image.jpg' } },
+    { media: [{ kind: 'image', url: 'https://example.test/image.jpg', localFile: { bytes: [1, 2, 3] } }] },
+    { media: [{ kind: 'image', url: 'https://example.test/image.jpg', clientId: 'private-client-item' }] },
+    { media: [{ kind: 'audio', url: 'https://example.test/audio.mp3' }] },
+    { media: [{ kind: 'image', url: 3 }] },
+    { media: [{ kind: 'image', url: 'https://example.test/image.jpg', altText: 3 }] },
+    { media: [], imageUrl: 'https://example.test/image.jpg' },
+    { media: [], videoUrl: 'https://example.test/video.mp4' },
+  ])('rejects malformed or ambiguous ordered media before invoking a mutation %#', async extra => {
+    for (const name of ['create_post', 'update_post']) {
+      const args = { message: 'Safe text', targetIds: ['page-a'], ...extra,
+        ...(name === 'update_post' ? { postId: 'new-post', confirmation: 'UPDATE POST new-post' } : { confirmation: 'CREATE POST' }) };
+      const result = (await (await call(name, args)).json()).result;
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent.code).toBe('invalid_request');
+    }
+    expect(publishingMutations.create).not.toHaveBeenCalled();
+    expect(publishingMutations.update).not.toHaveBeenCalled();
   });
 
   it('offers Root configuration only to the signed-in instance owner and never returns secret values', async () => {

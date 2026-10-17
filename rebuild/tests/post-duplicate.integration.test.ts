@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { PrismaClient, type Prisma } from '../generated/client';
 
 const databaseUrl = process.env.REBUILD_PREVIEW_DATABASE_URL;
-const state = vi.hoisted(() => ({ prisma: null as unknown as PrismaClient, targetId: '' }));
+const state = vi.hoisted(() => ({ prisma: null as unknown as PrismaClient, targetId: '', publishingMedia: { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true } }));
 vi.mock('../src/server/data', () => ({ get prisma() { return state.prisma; } }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({
   'publishing.operationTimeoutMs': 60000, 'publishing.operationMaxWaitMs': 2000, 'publishing.transactionTimeoutMs': 15000,
@@ -14,7 +14,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
 }[key]) }));
 vi.mock('../src/modules/publishing/server/access', () => ({ authorizePublishing: async (actor: unknown) => ({ actor, role: 'owner', permissions: {}, entitlements: {} }) }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({ modules: { publishing: true } }), hasPlatformCapability: () => true }));
-vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: {}, publishFirstComment: {}, supportsTargetKind: () => true, localImageUpload: null }) }));
+vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: {}, publishFirstComment: {}, supportsTargetKind: () => true, publishingMedia: state.publishingMedia, localImageUpload: null }) }));
 vi.mock('../src/server/platforms/resource-visibility', () => ({ selectedResourceConnectionWhere: async () => ({ selected: true }) }));
 vi.mock('../src/modules/publishing/server/read-scope', () => ({
   selectedPublishingTargetIds: async (_workspaceId: string, _entitlements: unknown, allowed?: readonly string[]) => allowed ? [...allowed] : [state.targetId],
@@ -89,6 +89,15 @@ describe.skipIf(!databaseUrl)('post duplication on isolated PostgreSQL', () => {
     await expect(duplicatePost(f.actor, { postId: f.sourceId, requestId, confirmation: `DUPLICATE POST ${f.sourceId}` })).rejects.toMatchObject({ code: 'conflict' });
     expect(await client.post.count({ where: { workspaceId: f.workspaceId } })).toBe(2);
     expect(await client.post.findUnique({ where: { id: requestId }, select: { message: true } })).toEqual({ message: 'Unrelated existing draft' });
+    expect(await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM root_activities WHERE id = ${`duplicate:${requestId}`}`).toEqual([{ count: BigInt(0) }]);
+  });
+
+  it('rejects duplicating a link and media combination before inserting a draft or receipt', async () => {
+    const f = await createFixture(); const requestId = randomUUID();
+    await client.post.update({ where: { id: f.sourceId }, data: { link: 'https://example.test/story' } });
+    await expect(duplicatePost(f.actor, { postId: f.sourceId, requestId, confirmation: `DUPLICATE POST ${f.sourceId}` }))
+      .rejects.toMatchObject({ code: 'invalid_request', message: 'This destination cannot combine a link with media in one post.' });
+    expect(await client.post.count({ where: { workspaceId: f.workspaceId } })).toBe(1);
     expect(await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM root_activities WHERE id = ${`duplicate:${requestId}`}`).toEqual([{ count: BigInt(0) }]);
   });
 

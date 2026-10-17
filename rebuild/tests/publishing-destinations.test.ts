@@ -49,4 +49,25 @@ describe('shared publishing destination choices', () => {
     expect((await publishingDestinationChoices(viewer, now)).map(row => [row.id, row.canPublish])).toEqual([['current', false]]);
   });
 
+  it('returns safe media metadata only for currently ready publishing destinations', async () => {
+    deps.targets.mockResolvedValue([target('current'), target('expired', { socialAccount: { provider: 'example-network', invalidatedAt: null, tokenExpiresAt: now } })]);
+    deps.adapter.mockResolvedValue({
+      publish: vi.fn(), supportsTargetKind: () => true, canUseCredential: () => true,
+      publishingMedia: { kinds: ['image'], maxImages: null, maxVideos: 0, mixedKinds: false, linkWithMedia: false, imageAltText: true },
+      localImageUpload: { maxBytes: 4096, mimeTypes: ['image/png'] },
+      credential: { accessToken: 'must-not-leak' },
+    });
+
+    const choices = await publishingDestinationChoices(viewer, now);
+
+    expect(choices[0]).toMatchObject({
+      canPublish: true,
+      publishingMedia: { kinds: ['image'], maxImages: null, maxVideos: 0, mixedKinds: false, linkWithMedia: false, imageAltText: true },
+      localImageUpload: { maxBytes: 4096, mimeTypes: ['image/png'] },
+    });
+    expect(choices[0]).not.toHaveProperty('credential');
+    expect(choices[1]).not.toHaveProperty('publishingMedia');
+    expect(choices[1]).not.toHaveProperty('localImageUpload');
+  });
+
 });
