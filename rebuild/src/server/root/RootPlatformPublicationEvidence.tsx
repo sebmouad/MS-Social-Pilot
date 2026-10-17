@@ -1,10 +1,10 @@
-import { DataTable } from '@/components/DataTable';
 import { readRootPlatformPublicationEvidence } from './platform-publication-evidence';
 import { requireRootPage } from '@/server/config/access';
 import { SidebarDock } from '@/components/SidebarDock';
 import { Button } from '@/components/Button';
 import { installedPublicationRecovery } from '@/server/platforms/publication-recovery';
 import { OperationError } from '@/lib/operation-error';
+import { RootPlatformPublicationTable } from './RootPlatformPublicationTable';
 
 /** Provider-neutral presentation for the evidence schema declared by an installed platform module. */
 export async function RootPlatformPublicationEvidence({ providerId, operationId }: { providerId: string; operationId?: string | string[] }) {
@@ -38,21 +38,6 @@ export async function RootPlatformPublicationEvidence({ providerId, operationId 
       <h2 id="root-platform-publication-evidence-error-title">Publication evidence unavailable</h2>
       <p id="root-platform-publication-evidence-error">{errorMessage}</p>
     </section> : null}
-    {errorMessage || !evidence || 'providers' in evidence ? null : <PublicationEvidenceTable evidence={evidence} providerId={providerId} filtered={Boolean(filterValue)} />}
+    {errorMessage || !evidence || 'providers' in evidence ? null : <RootPlatformPublicationTable evidence={evidence} providerId={providerId} filtered={Boolean(filterValue)} />}
   </>;
-}
-
-function PublicationEvidenceTable({ evidence, providerId, filtered }: { evidence: Exclude<Awaited<ReturnType<typeof readRootPlatformPublicationEvidence>>, { providers: unknown }>; providerId: string; filtered: boolean }) {
-  const columns = evidence.columns.map(column => ({ key: column.key, label: column.label, render: (row: typeof evidence.items[number]) => {
-    const value = row[column.key];
-    return value === null || value === undefined ? '—' : typeof value === 'number' ? value : <span className="root-publication-evidence__cell">{value}</span>;
-  } }));
-  return <section className="root-jobs" aria-labelledby={`root-platform-publication-evidence-${providerId}`}>
-    <p className="root-jobs__eyebrow">Platform operations</p>
-    <h2 id={`root-platform-publication-evidence-${providerId}`}>{evidence.title}</h2>
-    <p>{evidence.description}</p>
-    <p>Read-only evidence contains operation and receipt identifiers only. It excludes customer content, credentials and raw provider errors.</p>
-    <DataTable rows={evidence.items} columns={columns} rowKey={row => `${providerId}-${JSON.stringify(row)}`} caption={evidence.title} emptyMessage={filtered ? 'No publication evidence is recorded for this operation.' : 'No publication evidence is recorded for this platform.'} />
-    {evidence.truncated ? <p role="status">This history is truncated by the platform evidence limit. Use the Platform evidence sidebar filter to narrow the results. Configured limits still apply to a single operation.</p> : null}
-  </section>;
 }

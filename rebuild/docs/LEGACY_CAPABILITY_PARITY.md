@@ -126,3 +126,13 @@ cleanup guards, private module-owned Root evidence and matching HTTP/MCP reads.
 Existing local receipt recovery can use an exact known feed ID without resending.
 Cleanup of known staged photos, unknown-step reconciliation, real provider media
 canary/cleanup and complete Facebook/legacy/cutover gates remain unfinished.
+
+
+Facebook known-photo cleanup update, 2026-10-17: an opt-in private Root action
+now records separate deletion intent/audit/receipts and shares UI/HTTP/MCP
+authority. Explicit external verification/race acknowledgment is required because
+Graph cannot reliably prove continued unused state. Known or uncertain feed
+effects block cleanup; uncertain DELETE results cannot be resent. Confirmed
+synthetic replay and fault tests do not prove live provider deletion. Unknown
+upload/feed/delete reconciliation, native formats, full Facebook/legacy/MCP
+coverage and production cutover remain open. See FACEBOOK_MEDIA_RECOVERY.md.

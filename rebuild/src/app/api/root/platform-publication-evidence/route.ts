@@ -1,6 +1,6 @@
 import { currentRootActor } from '@/server/config/access';
 import { OperationError, operationFailure } from '@/lib/operation-error';
-import { readRootPlatformPublicationEvidence } from '@/server/root/platform-publication-evidence';
+import { readRootPlatformPublicationEvidence, runRootPlatformPublicationAction } from '@/server/root/platform-publication-evidence';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -31,6 +31,22 @@ export async function GET(request: Request) {
     }));
   } catch (error) {
     const safe = operationFailure(error, 'Platform publication evidence could not be loaded.');
+    return reply({ error: safe.error, code: safe.code }, safe.status);
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const requestOrigin = new URL(request.url).origin;
+    if (request.headers.get('origin') !== requestOrigin) throw new OperationError('forbidden', 'Use this action from the installation control panel.');
+    const current = await currentRootActor();
+    if (!current?.isInstanceOwner) throw new OperationError(current ? 'forbidden' : 'unauthorized', 'Installation-owner access is required.');
+    let body: unknown;
+    try { body = await request.json(); }
+    catch { throw new OperationError('invalid_request', 'Enter a valid platform action and its exact confirmation.'); }
+    return reply(await runRootPlatformPublicationAction(current.id, body));
+  } catch (error) {
+    const safe = operationFailure(error, 'The platform action result could not be confirmed. Check platform evidence before taking further action.');
     return reply({ error: safe.error, code: safe.code }, safe.status);
   }
 }

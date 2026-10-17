@@ -303,3 +303,22 @@ than claiming publication failure guarantees remote absence. Cleanup controls ar
 not offered until the module implements safe intent/receipt/reconciliation behavior.
 FACEBOOK_MEDIA_RECOVERY.md owns current domain details; PREVIEW_QA.md distinguishes
 component/API/MCP proof from browser and real-provider checks still pending.
+
+
+## Module-owned Root recovery actions — 2026-10-17
+
+An installed module may attach implemented actions to its private evidence rows.
+Use one shared danger button and confirmation dialog with module-defined
+consequences, exact typed confirmation and explicit acknowledgment. Cancel gets
+initial focus. Pending disables close/competing submission. Only a matching
+confirmed receipt permits success; malformed/unknown responses retain input,
+focus useful guidance and block repeat. Close and review refreshes evidence;
+recognized validation errors remain correctable. Preserve focused confirmed
+feedback when the completed action disappears after refresh.
+
+Facebook manual staged-photo deletion is opt-in and defaults off. Its copy must
+state external verification and the race between inspection and deletion; a
+missing story ID never means proven unused. Unknown feed/delete effects remain
+held. No customer setup text, third menu or automatic retry is introduced.
+FACEBOOK_MEDIA_RECOVERY.md owns domain policy; PREVIEW_QA.md separates component,
+HTTP/MCP and browser/provider evidence.

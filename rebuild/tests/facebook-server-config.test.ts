@@ -20,5 +20,11 @@ describe('Facebook OAuth scope configuration', () => {
     await expect(configuredFacebookOAuth()).resolves.toMatchObject({
       scopes: ['pages_show_list', 'pages_messaging', 'pages_manage_engagement', 'pages_read_engagement', 'pages_manage_posts'],
     });
+    config.values.set('meta.mediaReadScopes', ['photo_read_override']);
+    config.values.set('meta.mediaDeleteScopes', ['photo_delete_override']);
+    config.values.set('meta.manualMediaCleanupEnabled', false);
+    expect((await configuredFacebookOAuth()).scopes).not.toContain('photo_delete_override');
+    config.values.set('meta.manualMediaCleanupEnabled', true);
+    expect((await configuredFacebookOAuth()).scopes).toEqual(expect.arrayContaining(['photo_read_override', 'photo_delete_override']));
   });
 });

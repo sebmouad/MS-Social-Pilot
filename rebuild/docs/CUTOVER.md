@@ -67,8 +67,8 @@ migration or a claim of the complete production-shaped cutover rehearsal.
    production. For the local rehearsal, use a sanitized, pre-migration custom
    format dump and a loopback-only PostgreSQL admin URL. Set
    `CUTOVER_DUMP_SANITIZED=YES` only after a separate sanitization review, and
-   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps`.
-   `rebuild/scripts/cutover-rehearsal.sh` pins those six SQL files by SHA-256,
+   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions`.
+   `rebuild/scripts/cutover-rehearsal.sh` pins those seven SQL files by SHA-256,
    restores the dump into local scratch databases, refuses migration objects
    or success records already present, applies only those files, checks the
    explicitly enumerated mapped columns and enum labels, reports aggregate
@@ -126,7 +126,7 @@ migration or a claim of the complete production-shaped cutover rehearsal.
   operational options, MCP parity, and live provider integration tests.
 - Production currently has no rebuild web or worker systemd unit and no
   verified proxy switch from 3100 to 3200.
-- The rebuild schema is not a migration schema. Its six checksum-pinned
+- The rebuild schema is not a migration schema. Its seven checksum-pinned
   additive migrations still need application and data-impact review against a
   sanitized production-shaped copy and a restore-aware plan.
 - There is no sanitized production-shaped staging evidence covering the full
@@ -193,3 +193,33 @@ now include the sixth migration. No production database, service or provider
 changed. This does not prove the full six-file rehearsal on a sanitized
 production-shaped baseline, media restore, application/authorization migration
 or production proxy/worker rollback. Those release gates remain open.
+
+
+## Seventh additive migration: Facebook media deletion receipts — batch 53
+
+`20261017030000_rebuild_facebook_media_deletions` adds one content-free
+workspace-owned table, strict NULL-safe states/receipt timestamps, bounded
+identifiers, immutable binding trigger and a unique non-rejected claim per
+workspace/media-step. It changes no legacy content, queue or credential table.
+Reviewed SHA-256:
+`3f5df63bf339fe532581f14738d089ca5f20a4c245f581f1587573b5bfe6cca5`.
+The rehearsal allowlist, checksum, baseline-object/history refusal and mapped
+column inventory now include all seven reviewed additive migrations.
+
+Before applying to the isolated synthetic preview, a custom-format backup was
+restored to a unique scratch database and every public base-table row count
+matched exactly across 99 tables. The seventh migration was applied to scratch;
+a second backup/restore matched exactly across 100 tables. The unchanged SQL
+was then applied only to the preview, preserving all previous table counts and
+starting the deletion journal empty. Both scratch databases were removed.
+
+Private mode-0600 backups:
+
+- `/private/tmp/socialpilot-preview-before-facebook-cleanup-20261017T101638796Z.dump` — 263195 bytes.
+- `/private/tmp/socialpilot-preview-with-facebook-cleanup-20261017T101638796Z.dump` — 270295 bytes.
+
+This is exact local backup/restore proof, not the complete seven-file rehearsal
+on a sanitized production-shaped baseline or a verified production rollback.
+No production database/service/provider changed. The earlier worker ownership,
+functional/authorization, live-provider, backup/media recovery and deployment
+rollback gates still apply. `socialpilot-deploy` still deploys the legacy app.

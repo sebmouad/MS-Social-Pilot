@@ -4,6 +4,7 @@ const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), noHook: false 
 vi.mock('../src/server/config/access', () => ({ requireRootPage: state.access }));
 vi.mock('../src/server/root/platform-publication-evidence', () => ({ readRootPlatformPublicationEvidence: state.read }));
 vi.mock('../src/server/platforms/publication-recovery', () => ({ installedPublicationRecovery: () => state.noHook ? undefined : { readEvidence: vi.fn() } }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('../src/components/SidebarDock', () => ({ SidebarDock: ({ children }: { children: import('react').ReactNode }) => children }));
 import { RootPlatformPublicationEvidence } from '../src/server/root/RootPlatformPublicationEvidence';
 import { OperationError } from '../src/lib/operation-error';
@@ -14,9 +15,15 @@ describe('generic Root platform publication evidence panel', () => {
   it('uses module-owned labels and values in the shared table', async () => {
     const html = renderToStaticMarkup(await RootPlatformPublicationEvidence({ providerId: 'platform' }));
     expect(html).toContain('Module upload receipts'); expect(html).toContain('Publication operation'); expect(html).toContain('receipt_1');
-    expect(html).toContain('Read-only evidence'); expect(state.read).toHaveBeenCalledWith('root', { providerId: 'platform' });
+    expect(html).toContain('Any available action requires its own module-defined confirmation'); expect(state.read).toHaveBeenCalledWith('root', { providerId: 'platform' });
     expect(html).toContain('name="operationId"'); expect(html).toContain('action="/root/platforms/platform"');
     expect(html).toContain('Apply filter'); expect(html).toContain('href="/root/platforms/platform"'); expect(html).toContain('Reset filter');
+  });
+  it('renders only module-declared row actions with module-owned confirmation and acknowledgement text', async () => {
+    state.read.mockResolvedValueOnce({ providerId: 'platform', title: 'Evidence', description: 'Known receipts.', columns: [{ key: 'receipt', label: 'Receipt' }], items: [{ receipt: 'row_1' }], rowIdKey: 'receipt', actions: [{ rowId: 'row_1', actionId: 'module_action', subjectId: 'row_1', label: 'Resolve receipt', description: 'Review this stored receipt.', acknowledgmentLabel: 'I checked this receipt', confirmation: 'RESOLVE row_1' }], truncated: false });
+    const html = renderToStaticMarkup(await RootPlatformPublicationEvidence({ providerId: 'platform' }));
+    expect(html).toContain('Resolve receipt'); expect(html).toContain('name="operationId"');
+    expect(html).not.toContain('Facebook'); expect(html).toContain('Actions');
   });
   it('distinguishes an empty history from unavailable evidence and reports truncation', async () => {
     state.read.mockResolvedValueOnce({ providerId: 'platform', title: 'Receipts', description: 'Bounded history.', columns: [{ key: 'id', label: 'Receipt' }], items: [], truncated: false });

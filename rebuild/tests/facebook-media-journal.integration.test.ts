@@ -35,6 +35,7 @@ vi.mock('../src/server/config/store', () => ({
     'publishing.transactionTimeoutMs': 5000,
     'publishing.transactionMaxWaitMs': 2000,
     'meta.mediaHistoryLimit': 100,
+    'meta.manualMediaCleanupEnabled': false,
   }[key]),
 }));
 

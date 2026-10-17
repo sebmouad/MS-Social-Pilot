@@ -51,3 +51,13 @@ Multi-photo staging now uses the pure `media-journal-port.ts` and module-owned
 without constructing an API engine. Per-photo/feed intents and receipts commit
 before sequencing continues. Partial effects remain held; cleanup/reconciliation
 is unfinished. See `rebuild/docs/FACEBOOK_MEDIA_RECOVERY.md` and current QA evidence.
+
+
+Manual known-photo cleanup is module-owned in `media-cleanup.ts` and
+`media-cleanup-transport.ts`; the pure transport port contains no persistence.
+Root's generic action host renders module-defined risk/confirmation metadata.
+The capability defaults off and requires external verification plus race
+acknowledgment because Graph does not prove continued unused state. Separate
+immutable deletion intent/receipt storage holds unknown effects; a confirmed
+receipt can replay without another request. See `docs/FACEBOOK_MEDIA_RECOVERY.md`
+for the exact eligibility, authorization, scope, recovery and evidence limits.

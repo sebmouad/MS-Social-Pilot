@@ -15,6 +15,35 @@ export interface PlatformPublicationEvidence {
   columns: Array<{ key: string; label: string }>;
   items: Array<Record<string, string | number | null>>;
   truncated: boolean;
+  /** Module-owned actions refer only to rows included in this evidence panel. */
+  rowIdKey?: string;
+  actions?: PlatformPublicationAction[];
+}
+
+export interface PlatformPublicationAction {
+  rowId: string;
+  actionId: string;
+  subjectId: string;
+  label: string;
+  description: string;
+  acknowledgmentLabel: string;
+  confirmation: string;
+}
+
+export interface PlatformPublicationActionInput {
+  actionId: string;
+  subjectId: string;
+  confirmation: string;
+  acknowledged: true;
+}
+
+export interface PlatformPublicationActionResult {
+  ok: boolean;
+  actionId: string;
+  subjectId: string;
+  operationId: string;
+  state: 'confirmed' | 'rejected' | 'needs_review';
+  message: string;
 }
 
 /** Installed module safety hooks remain active even while customer access is off. */
@@ -23,6 +52,7 @@ export interface PlatformPublicationRecovery {
   assertOutcome(tx: Prisma.TransactionClient, workspaceId: string, operationId: string, outcome: 'PUBLISHED' | 'ABSENT', remotePostId?: string): Promise<void>;
   /** Trusted Root-only caller; module returns content/credential-free evidence. */
   readEvidence(operationId?: string, resultCap?: number): Promise<PlatformPublicationEvidence>;
+  executeRootAction?(userId: string, input: PlatformPublicationActionInput): Promise<PlatformPublicationActionResult>;
 }
 
 export interface PlatformAnalyticsHost {

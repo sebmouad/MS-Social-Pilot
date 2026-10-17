@@ -412,3 +412,27 @@ finished staged-photo cleanup, unknown-step reconciliation, live provider proof,
 full module/legacy parity or cutover. Failed staging remains held until those
 provider-owned recovery operations are implemented and verified. Production is
 still legacy.
+
+
+## Manual Facebook staged-photo cleanup — batch 53, 2026-10-17
+
+Facebook owns an opt-in Root action, credential/read/delete transport and a
+separate content-free immutable deletion journal. Shared Root exposes generic
+module-defined confirmation/acknowledgment and HTTP/installation-MCP dispatch.
+Workspace/target/post/current-owner locks and independent committed intent/audit
+precede provider IO; a started parent is frozen before a late feed can begin.
+Confirmed receipts replay locally; ambiguous results or receipt faults remain
+held. Current parent bindings and projected identities are rechecked.
+
+Registry 50 adds consumed provider-owned manual cleanup and read/delete scope
+policies. Manual cleanup defaults off: a Photo read cannot prove continued
+unpublished/unused state or make DELETE conditional, so Root must externally
+verify and acknowledge that race for each action. Known/unknown feed effects
+block cleanup. Existing data guards and ABSENT recovery incorporate confirmed
+photo deletions without permitting unknown effects to disappear. The seventh
+additive migration has restore-verified preview-only evidence in CUTOVER.md.
+
+FACEBOOK_MEDIA_RECOVERY.md and PREVIEW_QA.md distinguish synthetic engine/DB/
+HTTP/MCP proof from pending live browser/provider testing. Unknown-step/delete
+reconciliation, broader Facebook/legacy/MCP parity and cutover remain unfinished.
+Production is still legacy.

@@ -1,8 +1,9 @@
 # Facebook multi-photo staging evidence
 
-2026-10-17, batch 52. Durable intermediate photo/feed intents and receipts are
-implemented locally. Cleanup and resolution of unknown staged uploads are still
-required. This is not complete Facebook recovery or approval for a live canary.
+2026-10-17, batches 52–53. Durable intermediate photo/feed intents and receipts
+and an opt-in, explicitly confirmed Root cleanup action for known staged photos
+are implemented locally. Unknown uploads/feed outcomes and live provider proof
+remain unfinished. This is not complete Facebook recovery or cutover approval.
 
 ## Module ownership and dispatch
 
@@ -50,7 +51,8 @@ Installed module safety hooks stop new claims and destination/workspace cleanup
 while staged or unknown evidence remains, including when a legacy parent state
 was separately resolved. Workspace-owned journal data is included by the existing
 FK-discovery export/count/erasure machinery; the safety gate runs before erasure.
-Recorded photos are settled only with a recorded feed receipt for that operation.
+Recorded photos are settled with a recorded feed receipt for that operation or
+a matching confirmed photo deletion receipt. Unknown deletions stay held.
 A confirmed feed does not itself prove completion of the parent's local record.
 
 Customer and Root manual publication outcomes call the same module hook. ABSENT
@@ -61,8 +63,7 @@ sending provider content. Recovery messages stay customer-safe; technical step
 identities are private in-app Root evidence. The scoped owner data export also
 includes retained content-free journal rows through workspace-FK discovery.
 
-**Remaining implementation:** explicit known-photo cleanup with its own durable
-DELETE intent/receipt; uncertain upload/feed outcome reconciliation; scoped human
+**Remaining implementation:** uncertain upload/feed/delete outcome reconciliation; scoped human
 step attestation and delayed-result conflict handling; cleanup jobs/history UX;
 and real provider create/status/delete proof with verified cleanup. Until those
 exist, failed staged uploads can remain held. Do not clear them by database edits,
@@ -74,7 +75,8 @@ The evidence table sits inside Root > Platform modules > Facebook. Its operation
 ID GET filter and reset live in the existing contextual sidebar. The shared table
 consumes module-owned columns; empty, invalid-filter, unavailable and truncated
 states are distinct. Limits still apply after filtering. No customer settings
-menu, third navigation layer or working-looking cleanup button was introduced.
+menu or third navigation layer was introduced. Implemented cleanup actions use
+module-owned metadata and the shared exact-confirmation dialog described below.
 
 Private GET `/api/root/platform-publication-evidence` accepts one provider ID,
 optional operation ID and bounded result cap; every response is no-store.
@@ -107,3 +109,79 @@ The official protocol reference pages are [Page Photos](https://developers.faceb
 [Page Feed](https://developers.facebook.com/docs/graph-api/reference/page/feed/)
 and [Photo](https://developers.facebook.com/docs/graph-api/reference/photo/).
 No provider lifetime or expiry assumption is used to claim remote cleanup.
+
+## Explicit known staged-photo cleanup — batch 53
+
+This is a manual operator action with a known limitation: Meta's Photo node
+documentation says `page_story_id` may be absent on published photos. Neither
+an absent/null field, `can_delete`, nor the original `published=false` upload
+proves that a photo remains unused. DELETE has no documented atomic
+"only if unused" precondition. The app cannot close an external attachment race.
+
+For that reason `meta.manualMediaCleanupEnabled` defaults to **false**. Root must
+explicitly opt in, externally check the photo, acknowledge that limitation for
+each action, and type `DELETE STAGED PHOTO <media-step-id>`. The action appears
+under Root > Platform modules > Facebook only for a recorded known photo with
+no feed intent, or a definitively rejected feed. Started/unknown/recorded feed
+steps and any known projected post identity are refused. A fresh Graph read
+requires the exact photo ID and explicit `can_delete=true`; a positive, empty
+present or malformed story value blocks deletion. An omitted/null story field
+is accepted only within the stated manual policy, never as proof of absence.
+
+Facebook owns `media-cleanup.ts`, `media-cleanup-transport.ts` and its pure
+transport port. Shared Root owns generic validation/dispatch, module metadata
+rendering and publication/workspace/target/active-owner locking. Step bindings
+are cross-checked against their parent before scope construction and again under
+the parent lock. A started parent is frozen to uncertain in the independently
+committed deletion intent, preventing a late engine from starting a feed.
+Existing known/unknown remote effects never trigger automatic cleanup or resend.
+
+The independent content-free `rebuild_facebook_media_deletions` table stores an
+immutable workspace/step/operation/destination/actor/remote-photo binding. It has
+only a workspace FK, preserving evidence across local object removal. An active
+or confirmed deletion is unique per workspace/step; rejected history is retained.
+Intent and domain audit commit before any provider IO. Current policy, target
+identity, decryptable token, connection validity/expiry and both scope policies
+are checked before intent and again in the callback. A fresh read precedes DELETE.
+
+| Deletion state | Meaning and next action |
+| --- | --- |
+| started | Durable intent; missing receipt remains held and cannot be resent |
+| confirmed | Exact DELETE returned `success=true` and receipt/audit committed; replay returns the same local receipt without provider IO |
+| rejected | No DELETE was sent, or a recognized definite Graph rejection was received; another explicitly confirmed action may be attempted after review |
+| uncertain | A dispatched DELETE lacked reliable confirmation; no repeat is allowed |
+
+Malformed/false success, transport errors/cancellation after dispatch, and
+receipt-write failures do not report success. A failed receipt write leaves its
+started intent held. Known cleaned photos can be settled while other unknown
+steps remain held. Cleaning photos does not automatically attest publication
+absence or release a publication retry: use the existing explicit Root outcome
+flow only after all module evidence permits it. Unknown photo/feed/delete
+reconciliation and delayed effects still need implementation.
+
+POST `/api/root/platform-publication-evidence` and installation MCP write tool
+`run_root_platform_publication_action` call the same current-owner service and
+module handler. Required input is providerId/actionId/subjectId/confirmation and
+`acknowledged=true`; remote identities are derived from durable evidence, not
+accepted from the caller. HTTP additionally requires same-origin requests.
+Workspace keys and ordinary workspace owners cannot execute this Root action.
+The existing read-only tool/resource includes safe current action metadata;
+reading never executes it. The generic dialog keeps input on errors, blocks
+repeat after unknown/malformed receipts and refreshes evidence for review.
+
+Registry 50 adds consumed Facebook-owned manual cleanup, read-scope and
+delete-scope policies. The latter two default to `pages_read_engagement` and
+`pages_manage_posts`, must be nonempty, and enter OAuth only when manual cleanup
+is enabled. Configured/granted scope strings do not prove provider permission,
+Page tasks or app-review readiness. Actual Graph read/DELETE authorization and
+live permission compatibility remain to be verified. Existing proof signing and
+Root Publishing operation/transaction budgets are reused.
+
+The seventh checksum-pinned additive migration is
+`20261017030000_rebuild_facebook_media_deletions`. CUTOVER.md records exact
+99/100-table restore checks and preview-only application. The real HTTP/MCP
+probe `scripts/verify-facebook-media-cleanup.ts` proves authorization, exact
+confirmation, durable **synthetic** confirmed replay and unknown-result refusal;
+it performs no provider deletion. Engine fixtures and guarded PostgreSQL fault
+tests cover the dispatch and receipt chain separately. PREVIEW_QA.md records
+full checks and explicitly pending browser/live-provider coverage.

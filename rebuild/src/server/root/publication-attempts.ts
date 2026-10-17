@@ -3,14 +3,12 @@ import type { Prisma } from '../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
-import { withWorkspaceOperation } from '@/server/data-control/guard';
-import { lockPublishingTargets } from '@/modules/publishing/server/guard';
 import { adoptLegacyPublicationInTransaction, projectPublicationInTransaction, recordPublicationOutcomeInTransaction } from '@/modules/publishing/server/publication';
 import { requireActiveRoot } from './operations';
+import { withRootPublicationOperation } from './publication-operation';
 
 type Attempt = { id: string; workspaceId: string; postId: string; postTargetId: string; targetId: string; provider: string; state: string; reason: string | null; remotePostId: string | null; remoteUrl: string | null; createdAt: Date; updatedAt: Date; workspaceName: string | null; targetName: string | null };
 const inputSchema = z.object({ operationId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), outcome: z.enum(['PUBLISHED', 'ABSENT']), remotePostId: z.string().optional(), remoteUrl: z.string().optional(), verifiedExternally: z.literal(true), confirmation: z.string() }).strict();
-const forbidden = () => new OperationError('forbidden', 'Installation-owner access is required.');
 
 /** Bounded content-free Root view of durable publication attempts. */
 export async function listRootPublicationAttempts(userId: string, cap?: number) {
@@ -56,19 +54,7 @@ export async function recordRootPublicationOutcome(userId: string, input: unknow
 }
 
 async function rootWorkspaceOperation(userId: string, workspaceId: string, postId: string, targetId: string, run: (tx: Prisma.TransactionClient) => Promise<unknown>) {
-  return withWorkspaceOperation(workspaceId, async () => {
-    await requireActiveRoot(userId);
-    const [timeout, maxWait] = await Promise.all([runtimeConfig('publishing.transactionTimeoutMs'), runtimeConfig('publishing.transactionMaxWaitMs')]);
-    return prisma.$transaction(async tx => {
-      const postKey = JSON.stringify(['publishing-post', workspaceId, postId]);
-      const postLock = await tx.$queryRaw<Array<{ acquired: boolean }>>`SELECT pg_try_advisory_xact_lock(hashtextextended(${postKey}, 0)) AS acquired`;
-      if (postLock[0]?.acquired !== true) throw new OperationError('conflict', 'Another action is running for this post. Check its outcome before continuing.');
-      await lockPublishingTargets(tx, workspaceId, [targetId]);
-      const actors = await tx.$queryRaw<Array<{ isInstanceOwner: boolean; disabledAt: Date | null }>>`SELECT "isInstanceOwner", "disabledAt" FROM users WHERE id = ${userId} FOR SHARE`;
-      if (!actors[0]?.isInstanceOwner || actors[0].disabledAt) throw forbidden();
-      return run(tx as Prisma.TransactionClient);
-    }, { timeout, maxWait });
-  });
+  return withRootPublicationOperation(userId, { workspaceId, postId, targetId }, tx => run(tx));
 }
 
 export async function finishRootPublicationProjection(userId: string, input: unknown) {

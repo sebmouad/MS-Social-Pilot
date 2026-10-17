@@ -40,4 +40,5 @@
 .root-platform-evidence-filter form { display: grid; gap: 12px; }
 .root-platform-evidence-filter .shell-subnav__label { margin: 0; }
 .root-platform-evidence-filter > a { width: fit-content; color: var(--accent); font-size: 13px; }
+.root-publication-evidence__actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .root-control__module-grid .ui-button { margin-top: auto; }

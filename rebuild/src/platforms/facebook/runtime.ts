@@ -40,7 +40,7 @@ export async function configuredFacebookAdapter() {
 }
 
 export async function configuredFacebookOAuth() {
-  const [appId, appSecret, redirectUri, scopes, inboxReadScopes, inboxWriteScopes, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes] = await Promise.all([
+  const [appId, appSecret, redirectUri, scopes, inboxReadScopes, inboxWriteScopes, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, manualMediaCleanupEnabled, mediaReadScopes, mediaDeleteScopes] = await Promise.all([
     configured<string>('meta.appId'),
     runtimeSecret('meta.appSecret'),
     configured<string>('meta.oauthRedirectUri'),
@@ -51,7 +51,10 @@ export async function configuredFacebookOAuth() {
     configured<string[]>('meta.postPublishScopes'),
     configured<string[]>('meta.postDeleteScopes'),
     configured<string[]>('meta.firstCommentScopes'),
+    configured<boolean>('meta.manualMediaCleanupEnabled'),
+    configured<string[]>('meta.mediaReadScopes'),
+    configured<string[]>('meta.mediaDeleteScopes'),
   ]);
   if (!appId || !appSecret || !redirectUri || !scopes.length) throw new Error('Meta connection is not configured.');
-  return { appId, appSecret, redirectUri, scopes: [...new Set([...scopes, ...inboxReadScopes, ...inboxWriteScopes, ...postReadScopes, ...postPublishScopes, ...postDeleteScopes, ...firstCommentScopes])] };
+  return { appId, appSecret, redirectUri, scopes: [...new Set([...scopes, ...inboxReadScopes, ...inboxWriteScopes, ...postReadScopes, ...postPublishScopes, ...postDeleteScopes, ...firstCommentScopes, ...(manualMediaCleanupEnabled ? [...mediaReadScopes, ...mediaDeleteScopes] : [])])] };
 }

@@ -1039,3 +1039,93 @@ Private evidence: `/private/tmp/socialpilot-photos52-tests-final.log`,
 `/private/tmp/socialpilot-photos52-migration.log`,
 `/private/tmp/socialpilot-photos52-probe-guard.log`, and
 `/private/tmp/socialpilot-photos52-design-audit.json`.
+
+
+## Batch 53 — manual known staged-photo deletion, 2026-10-17
+
+This batch implements one provider-owned private recovery action, not full
+Facebook recovery. Manual cleanup defaults off, requires exact step confirmation
+and external-unused/race acknowledgment, and refuses known or uncertain feed
+effects. The module derives all remote identity from durable evidence. Independent
+intent/receipt/audit transactions preserve unknown DELETE effects and forbid
+automatic resend. Shared Root publication/workspace/target/active-owner guards
+are reused across UI, HTTP and installation MCP. Provider rules remain enclosed
+in Facebook. Registry 50 owns the consumed manual-policy/read/delete scope keys.
+
+Verification:
+
+- The guarded isolated-preview full suite passed 1,445 tests in 222 files,
+  TypeScript passed, and the isolated production build passed. This was before
+  the final locked-query hardening that prevents a corrupt feed target from
+  being filtered out. After that change, the focused guarded PostgreSQL cleanup
+  suite passed 13/13 and TypeScript passed. A final full guarded suite/build/
+  HTTP-MCP rerun was requested but automatic approval review rejected execution
+  because workspace credits were exhausted; those final reruns remain pending.
+- Real PostgreSQL tests cover confirmed replay, intent/audit and receipt faults,
+  uncertain hold, explicit rejection retry, staged-photo settlement, ABSENT
+  protection, feed refusal, parent freeze and corrupted binding refusal.
+- Engine/transport fixtures cover configured grants/policy/current binding,
+  exact fresh photo identity and deletability, positive/malformed story refusal,
+  omitted story under manual policy, Graph signing and exact success receipts.
+  Regression tests reproduced policy/connection revocation during the GET; a
+  final current-credentials check now refuses DELETE in that case. False or
+  malformed DELETE responses through the real engine remain uncertain.
+- Component/HTTP/MCP tests cover active Root-only scope, module dispatch, typed
+  confirmation/acknowledgment, no secret leakage, pending/error/unknown feedback,
+  malformed non-JSON 404 hold, validation correction, Close and review refresh,
+  and persistent focused success after refreshed metadata removes the action.
+- Actual localhost HTTP/MCP probe `scripts/verify-facebook-media-cleanup.ts`
+  authenticated an installation owner with no fixture-workspace membership and
+  an ordinary owner/API key. It denied anonymous/ordinary-owner/key writes and
+  cross-origin requests, enforced disabled policy/exact confirmation/acknowledgment,
+  replayed the same synthetic confirmed receipt through HTTP/MCP, held uncertain
+  deletion in both interfaces and exposed retained evidence without another
+  action/intent. No provider callback or real Graph request was performed.
+  Temporary policy changes were audited and the exact prior setting restored;
+  disposable users/workspace/targets/sessions/keys/journal/audit records were
+  removed and absence checked. Config history retains the value-free test audit.
+- Seventh additive migration was backup/restore verified on exactly 99 then 100
+  public tables before preview application; CUTOVER.md records checksums and
+  private backups. No production change occurred.
+
+Independent review added parent-to-step checks before action scope construction
+and under lock, and tests prevent corrupt feed bindings from disappearing from
+eligibility queries. A transport-review concern about missing story fields was
+evaluated against Meta's documented limitation: neither missing nor null proves
+unused. The chosen policy remains explicit external verification/acknowledgment
+with cleanup disabled by default; a positive story always blocks it. This does
+not claim an atomic provider safety guarantee.
+
+Premium strict static audit exits 1 with exactly the same two existing shared
+primitive detection limitations: Button forwards action/type props and
+AutoTextarea sets inline resize. No new finding; the strict audit is not green.
+Browser automatic approval review previously rejected phone actions because
+workspace credits were exhausted. The user said they will refill, with no
+completed-refill confirmation yet. No browser run or alternate bypass occurred.
+Desktop/phone/theme/keyboard visual checks remain pending.
+
+No live Facebook DELETE/create canary, unknown upload/feed/delete reconciliation,
+complete provider format/permission/MCP/legacy parity, seven-file production-shaped
+cutover rehearsal or production rollout is established. Production remains legacy.
+FACEBOOK_MEDIA_RECOVERY.md defines the exact implemented/manual boundaries.
+
+Private evidence: `/private/tmp/socialpilot-cleanup53-tests-final.log`,
+`/private/tmp/socialpilot-cleanup53-typecheck-final.log`,
+`/private/tmp/socialpilot-cleanup53-build-final.log`,
+`/private/tmp/socialpilot-cleanup53-http-mcp-final.log`,
+`/private/tmp/socialpilot-cleanup53-migration.log`, and
+`/private/tmp/socialpilot-cleanup53-design-audit.json`.
+
+The later command approval block also affects integration reruns and potentially
+network publishing, not only browser inspection. It states that approval review
+could not complete because credits were exhausted, rather than deciding the
+action unsafe. No alternate execution path was used to bypass that block.
+The local filesystem-only checks remain distinct from blocked network/database
+checks. The local probe's additional API-key authentication assertion was added
+after its last successful run and still needs the blocked actual HTTP rerun.
+
+Final filesystem-only checks after the last safeguard passed: 1,362 tests in
+200 files, with the 83 guarded database tests in 22 files explicitly skipped;
+TypeScript and `git diff --check` also passed. This does not replace the pending
+final guarded full-suite/build/HTTP-MCP reruns. Private offline log:
+`/private/tmp/socialpilot-cleanup53-tests-offline-final.log`.

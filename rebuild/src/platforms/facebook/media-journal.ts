@@ -31,6 +31,10 @@ type MediaStep = {
   rejectedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  cleanupState?: string | null;
+  feedState?: string | null;
+  parentState?: string;
+  projectedRemotePostId?: string | null;
 };
 
 const conflict = (message = 'This Facebook publication step is already recorded or needs review.') =>
@@ -218,16 +222,31 @@ export async function readFacebookMediaEvidence(operationId?: string, resultCap?
     throw new OperationError('invalid_request', 'Choose a valid Facebook media history limit.');
   }
   const configuredLimit = safeLimit(await runtimeConfig('meta.mediaHistoryLimit'), 'media history');
+  const cleanupEnabled = await runtimeConfig('meta.manualMediaCleanupEnabled');
+  if (typeof cleanupEnabled !== 'boolean') throw unavailable('The Facebook manual cleanup policy is unavailable.');
   const limit = Math.min(configuredLimit, resultCap ?? configuredLimit);
   const rows = operationId === undefined
     ? await prisma.$queryRaw<MediaStep[]>`
-      SELECT "operationId", "workspaceId", "postId", "targetId", "phase", "ordinal", "state", "remoteId", "createdAt", "updatedAt"
-      FROM rebuild_facebook_media_steps ORDER BY "updatedAt" DESC, id DESC LIMIT ${limit + 1}`
+      SELECT s.id, s."operationId", s."workspaceId", s."postId", s."targetId", s."phase", s."ordinal", s."state", s."remoteId", s."createdAt", s."updatedAt",
+        d.state AS "cleanupState", f.state AS "feedState", a.state AS "parentState", pt."remotePostId" AS "projectedRemotePostId"
+      FROM rebuild_facebook_media_steps s
+      LEFT JOIN LATERAL (SELECT state FROM rebuild_facebook_media_deletions WHERE "workspaceId"=s."workspaceId" AND "mediaStepId"=s.id ORDER BY "createdAt" DESC, id DESC LIMIT 1) d ON true
+      LEFT JOIN rebuild_facebook_media_steps f ON f."workspaceId"=s."workspaceId" AND f."operationId"=s."operationId" AND f.phase='feed'
+      LEFT JOIN rebuild_publication_attempts a ON a.id=s."operationId" AND a."workspaceId"=s."workspaceId"
+      LEFT JOIN post_targets pt ON pt.id=s."postTargetId" AND pt."postId"=s."postId"
+      ORDER BY s."updatedAt" DESC, s.id DESC LIMIT ${limit + 1}`
     : await prisma.$queryRaw<MediaStep[]>`
-      SELECT "operationId", "workspaceId", "postId", "targetId", "phase", "ordinal", "state", "remoteId", "createdAt", "updatedAt"
-      FROM rebuild_facebook_media_steps WHERE "operationId" = ${operationId}
-      ORDER BY "ordinal" ASC, "phase" ASC LIMIT ${limit + 1}`;
+      SELECT s.id, s."operationId", s."workspaceId", s."postId", s."targetId", s."phase", s."ordinal", s."state", s."remoteId", s."createdAt", s."updatedAt",
+        d.state AS "cleanupState", f.state AS "feedState", a.state AS "parentState", pt."remotePostId" AS "projectedRemotePostId"
+      FROM rebuild_facebook_media_steps s
+      LEFT JOIN LATERAL (SELECT state FROM rebuild_facebook_media_deletions WHERE "workspaceId"=s."workspaceId" AND "mediaStepId"=s.id ORDER BY "createdAt" DESC, id DESC LIMIT 1) d ON true
+      LEFT JOIN rebuild_facebook_media_steps f ON f."workspaceId"=s."workspaceId" AND f."operationId"=s."operationId" AND f.phase='feed'
+      LEFT JOIN rebuild_publication_attempts a ON a.id=s."operationId" AND a."workspaceId"=s."workspaceId"
+      LEFT JOIN post_targets pt ON pt.id=s."postTargetId" AND pt."postId"=s."postId"
+      WHERE s."operationId" = ${operationId}
+      ORDER BY s."ordinal" ASC, s."phase" ASC LIMIT ${limit + 1}`;
   const items = rows.slice(0, limit).map(row => ({
+    id: row.id,
     operationId: row.operationId,
     workspaceId: row.workspaceId,
     postId: row.postId,
@@ -235,14 +254,27 @@ export async function readFacebookMediaEvidence(operationId?: string, resultCap?
     phase: row.phase,
     ordinal: row.ordinal,
     state: row.state,
+    cleanupState: row.cleanupState ?? null,
     remoteId: row.remoteId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }));
+  const actions = cleanupEnabled ? rows.slice(0, limit).filter(row => row.phase === 'photo' && row.state === 'recorded' && row.remoteId &&
+    (row.cleanupState === null || row.cleanupState === 'rejected') && (row.feedState === null || row.feedState === 'rejected') &&
+    ['started', 'uncertain', 'attested_absent', 'rejected'].includes(row.parentState ?? '') && !row.projectedRemotePostId).map(row => ({
+      rowId: row.id,
+      actionId: 'delete_staged_photo',
+      subjectId: row.id,
+      label: `Delete staged photo ${row.ordinal}`,
+      description: `Explicitly delete known unpublished Facebook photo ${row.remoteId} for publication ${row.operationId}. This removes that staged photo from the Page; the photo will not be available to a later post. Verify it is unused and accept that another administrator may publish it while this request is in flight.`,
+      acknowledgmentLabel: 'I verified this photo is unused and accept that Facebook state may change while deletion is in flight.',
+      confirmation: `DELETE STAGED PHOTO ${row.id}`,
+    })) : [];
   return {
     title: 'Facebook media upload recovery',
     description: 'Durable photo and feed upload intents and receipts. Started steps are held for review and are never sent again automatically.',
     columns: [
+      { key: 'id', label: 'Evidence row' },
       { key: 'operationId', label: 'Publication operation' },
       { key: 'workspaceId', label: 'Workspace' },
       { key: 'postId', label: 'Local post' },
@@ -250,12 +282,15 @@ export async function readFacebookMediaEvidence(operationId?: string, resultCap?
       { key: 'phase', label: 'Step' },
       { key: 'ordinal', label: 'Photo position' },
       { key: 'state', label: 'State' },
+      { key: 'cleanupState', label: 'Cleanup state' },
       { key: 'remoteId', label: 'Remote media ID' },
       { key: 'createdAt', label: 'Started (UTC)' },
       { key: 'updatedAt', label: 'Updated (UTC)' },
     ],
     items,
     truncated: rows.length > limit,
+    rowIdKey: 'id',
+    actions,
   };
 }
 
@@ -291,10 +326,18 @@ export async function assertFacebookMediaResolution(
     return;
   }
 
-  const hasRecordedFeed = Boolean(feed?.state === 'recorded');
-  const hasUnresolvedOrUnattachedPhoto = photos.some(photo => photo.state === 'started' || photo.state === 'uncertain' || photo.state === 'recorded');
-  if (hasRecordedFeed || hasUnresolvedOrUnattachedPhoto) {
+  if (feed && feed.state !== 'rejected' || photos.some(photo => photo.state === 'started' || photo.state === 'uncertain')) {
     throw conflict('Uploaded media still needs review before confirming this post was not published. Check the platform and contact your workspace administrator.');
+  }
+  const deletions = await tx.$queryRaw<Array<{ mediaStepId: string; state: string }>>`
+    SELECT "mediaStepId", state FROM rebuild_facebook_media_deletions
+    WHERE "workspaceId" = ${workspaceId} AND "operationId" = ${operationId} FOR UPDATE`;
+  if (deletions.some(row => row.state === 'started' || row.state === 'uncertain')) {
+    throw conflict('A Facebook staged-photo cleanup is unresolved.');
+  }
+  const confirmed = new Set(deletions.filter(row => row.state === 'confirmed').map(row => row.mediaStepId));
+  if (photos.some(photo => photo.state === 'recorded' && !confirmed.has(photo.id))) {
+    throw conflict('A known staged Facebook photo has not been confirmed deleted.');
   }
 }
 
@@ -315,8 +358,18 @@ export async function assertFacebookMediaSettled(
           SELECT 1 FROM rebuild_facebook_media_steps feed
           WHERE feed."workspaceId" = step."workspaceId" AND feed."operationId" = step."operationId"
             AND feed."phase" = 'feed' AND feed."state" = 'recorded'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM rebuild_facebook_media_deletions deletion
+          WHERE deletion."workspaceId" = step."workspaceId" AND deletion."mediaStepId" = step.id
+            AND deletion.state = 'confirmed'
         ))
       )
     LIMIT 1`;
   if (rows.length) throw conflict('A Facebook media upload needs review before this destination or workspace data can be removed.');
+  const deletions = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM rebuild_facebook_media_deletions
+    WHERE "workspaceId" = ${workspaceId} AND state IN ('started', 'uncertain')
+      AND (${targetIds === undefined} OR "targetId" = ANY(${[...(targetIds ?? [])]}::text[]))
+    LIMIT 1`;
+  if (deletions.length) throw conflict('A Facebook staged-photo cleanup needs review before this destination or workspace data can be removed.');
 }

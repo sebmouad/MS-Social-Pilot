@@ -52,6 +52,8 @@ export interface FacebookEngine {
   publish(input: FacebookPublishInput): Promise<FacebookPublished>;
   getStatus(accessToken: string, remoteId: string): Promise<{ state: 'published' | 'scheduled' | 'unknown'; publishedAt: Date | null }>;
   deletePost(accessToken: string, remoteId: string): Promise<void>;
+  getPhotoCleanupState(accessToken: string, remoteId: string): Promise<{ id: unknown; page_story_id?: unknown; can_delete: unknown }>;
+  deletePhoto(accessToken: string, remoteId: string, onDispatch?: () => void): Promise<void>;
   listInbox(accessToken: string, pageId: string): Promise<FacebookConversation[]>;
   listComments(accessToken: string, postId: string): Promise<FacebookComment[]>;
   getPageAnalytics(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<Record<string, number | null>>;
@@ -108,7 +110,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     if (!config.appSecret) throw new FacebookApiError('Facebook app secret is required for signed Graph requests.', 0);
     return facebookAppSecretProof(token, config.appSecret);
   };
-  async function request<T = unknown>(path: string, options: { method?: string; token: string; params?: Record<string, string | number | undefined>; body?: Record<string, string | undefined>; file?: { bytes: Uint8Array; mimeType: string; fileName: string } } ): Promise<T> {
+  async function request<T = unknown>(path: string, options: { method?: string; token: string; params?: Record<string, string | number | undefined>; body?: Record<string, string | undefined>; file?: { bytes: Uint8Array; mimeType: string; fileName: string }; onDispatch?: () => void } ): Promise<T> {
     assertOperationActive();
     const url = graphObjectUrl(config, path);
     if (options.method !== 'POST') {
@@ -138,8 +140,10 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     }
     const headers = body instanceof URLSearchParams ? { 'content-type': 'application/x-www-form-urlencoded' } : undefined;
     const signal = requestSignal();
+    if (signal.aborted) throw new FacebookApiError('Facebook operation was cancelled.', 0);
     let response: Response;
     try {
+      options.onDispatch?.();
       response = await fetchImpl(url, { method: options.method ?? 'GET', headers,
         body, redirect: 'error', signal });
     } catch (error) {
@@ -367,6 +371,13 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     async deletePost(token, remoteId) {
       const result = object(await request(encodeURIComponent(remoteId), { method: 'DELETE', token }));
       if (result.success !== true) throw new FacebookApiError('Facebook did not confirm post deletion.', 200);
+    },
+    async getPhotoCleanupState(token, remoteId) {
+      return object(await request(encodeURIComponent(remoteId), { token, params: { fields: 'id,page_story_id,can_delete' } })) as { id: unknown; page_story_id?: unknown; can_delete: unknown };
+    },
+    async deletePhoto(token, remoteId, onDispatch) {
+      const result = object(await request(encodeURIComponent(remoteId), { method: 'DELETE', token, onDispatch }));
+      if (result.success !== true) throw new FacebookApiError('Facebook did not confirm photo deletion.', 200);
     },
     async replyToConversation(token, conversationId, text) {
       const result = object(await request(`${encodeURIComponent(conversationId)}/messages`, { method: 'POST', token, body: { message: text } }));
