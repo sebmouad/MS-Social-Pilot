@@ -1,8 +1,8 @@
 import type { FacebookConfig } from '@/platforms/facebook/config';
 import { validateFacebookConfig } from '@/platforms/facebook/config';
-import { graphObjectUrl } from '@/platforms/facebook/protocol';
+import { facebookAppSecretProof, graphObjectUrl } from '@/platforms/facebook/protocol';
 import type { PlatformCredential } from '@/platforms/types';
-import { runtimeConfig } from '@/server/config/store';
+import { runtimeConfig, runtimeSecret } from '@/server/config/store';
 
 export type AdSetOptimizationGoal = 'LINK_CLICKS' | 'IMPRESSIONS';
 export type FacebookAdSetCreateInput = {
@@ -20,6 +20,8 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,100}$/;
 
 export async function createFacebookAdSet(config: FacebookConfig, input: FacebookAdSetCreateInput, fetchImpl: typeof fetch = fetch) {
   validateFacebookConfig(config);
+  if (config.appSecretProofEnabled && !config.appSecret) throw new Error('Facebook app secret is required for signed Graph requests.');
+  const appSecretProof = config.appSecretProofEnabled ? facebookAppSecretProof(input.credential.accessToken, config.appSecret!) : undefined;
   const name = input.name.trim();
   if (!SAFE_ID.test(input.accountId) || !SAFE_ID.test(input.campaignId)) throw new Error('Invalid ad account or campaign.');
   if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) throw new Error('Ad set names must contain 1 to 100 printable characters.');
@@ -38,11 +40,14 @@ export async function createFacebookAdSet(config: FacebookConfig, input: Faceboo
     targeting: JSON.stringify({ geo_locations: { countries: [input.countryCode], location_types: ['home', 'recent'] } }),
     status: 'PAUSED',
   });
+  if (appSecretProof) body.set('appsecret_proof', appSecretProof);
   let response: Response;
   try {
     const campaignUrl = graphObjectUrl(config, input.campaignId);
     campaignUrl.searchParams.set('fields', 'id,account_id');
     campaignUrl.searchParams.set('access_token', input.credential.accessToken);
+    if (appSecretProof) campaignUrl.searchParams.set('appsecret_proof', appSecretProof);
+    else campaignUrl.searchParams.delete('appsecret_proof');
     const campaignResponse = await fetchImpl(campaignUrl, { redirect: 'error', signal: AbortSignal.timeout(config.requestTimeoutMs) });
     const campaign = await campaignResponse.json().catch(() => null) as { id?: unknown; account_id?: unknown; error?: { message?: unknown } } | null;
     if (!campaignResponse.ok || campaign?.error) throw new Error(typeof campaign?.error?.message === 'string' ? campaign.error.message : `Facebook answered ${campaignResponse.status}.`);
@@ -61,10 +66,11 @@ export async function createFacebookAdSet(config: FacebookConfig, input: Faceboo
 }
 
 export async function configuredCreateFacebookAdSet(input: FacebookAdSetCreateInput) {
-  const [graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes] = await Promise.all([
+  const [graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes, appSecretProofEnabled, appSecret] = await Promise.all([
     runtimeConfig('meta.graphBaseUrl'), runtimeConfig('meta.oauthBaseUrl'), runtimeConfig('meta.graphVersion'), runtimeConfig('meta.requestTimeoutMs'),
     runtimeConfig('meta.maxPages'), runtimeConfig('meta.pageSize'), runtimeConfig('meta.pageInsightMetrics'), runtimeConfig('meta.adInsightFields'),
     runtimeConfig('meta.maxImageUploadBytes'), runtimeConfig('meta.allowedImageMimeTypes'),
+    runtimeConfig('meta.appSecretProofEnabled'), runtimeSecret('meta.appSecret'),
   ]);
-  return createFacebookAdSet({ graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes } as FacebookConfig, input);
+  return createFacebookAdSet({ graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes, appSecretProofEnabled, ...(appSecret ? { appSecret } : {}) } as FacebookConfig, input);
 }

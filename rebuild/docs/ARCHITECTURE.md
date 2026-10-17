@@ -321,3 +321,25 @@ Publishing controls and reuses its transaction duration/wait settings. No DDL
 or provider request is involved. POST_SEARCH_EXPORT.md records the protocol,
 permission/UX boundaries and open performance/asynchronous-export/legacy gaps;
 PREVIEW_QA.md owns actual evidence. Production remains legacy.
+
+## Facebook signed transport and live read sample — 2026-10-17
+
+Registry 48 adds consumed Facebook-owned `meta.appSecretProofEnabled`, default
+true, using the existing encrypted app secret. The Facebook engine signs Graph
+GET/DELETE, form/multipart POST and each paginated read; the separate ad-set
+transport signs campaign reads and creation. Pagination validates its endpoint
+before replacing incoming credentials with the caller token and fresh proof.
+OAuth browser/exchange protocols remain separate. Missing/unreadable signing
+material preserves safe adapter metadata/stored history while denying write
+readiness and failing before transport. Ads exposes a neutral host readiness
+check used by shared live read/manage services and direct mutations.
+
+The unsigned engine was rejected by the real app's proof requirement. The signed
+exact bundle subsequently passed six read checks against the authorized host's
+existing Graph v26.0 connection: identity/grants, 10 returned Pages, 5 ad accounts
+and 24 observations across four configured Page metrics. This engine-only legacy
+credential bridge changed no provider/database/configuration/service state and
+does not prove rebuild configuration migration, live UI/API/MCP, publishing,
+Inbox, Ads management or complete metric coverage. The observed connection lacks
+`ads_management`. FACEBOOK_REQUEST_SIGNING.md and PREVIEW_QA.md record proof and
+remaining limits. Production remains legacy; all cutover gates still apply.

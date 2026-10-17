@@ -91,3 +91,13 @@ ceilings are exported across displayed pages using a bounded database snapshot;
 oversized sets are refused with no partial file. This does not close saved
 views, bulk operations, large asynchronous archives, REST v1, provider coverage,
 complete legacy parity or production release gates.
+
+Facebook signing update, 2026-10-17: FACEBOOK_REQUEST_SIGNING.md records the
+Facebook-owned Root policy and authenticated Graph signing across normal,
+paginated and ad-set transports. Missing/unreadable secret readiness is safe;
+stored history remains readable. A real engine-only legacy credential bridge
+verified user/Page identity, required read grants, Page/ad-account discovery and
+four configured Page metrics. This is bounded live read evidence, not OAuth
+callback, live UI/API/MCP, publishing/media/deletion/Inbox/Ads-write proof or
+complete provider parity. The connection lacks `ads_management`; broader metrics,
+formats, lifecycle coverage and every production release gate remain open.

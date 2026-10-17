@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/server/config/store', async () => {
   const { CONFIG_BY_KEY } = await import('../src/lib/config/registry');
-  return { runtimeSecret: async () => null, runtimeConfig: async (key: string) => CONFIG_BY_KEY.get(key)!.defaultValue };
+  return { runtimeSecret: async (key: string) => key === 'meta.appSecret' ? 'synthetic-app-secret' : null, runtimeConfig: async (key: string) => CONFIG_BY_KEY.get(key)!.defaultValue };
 });
 import { configuredFacebookEngine } from '../src/platforms/facebook/runtime';
 afterEach(() => vi.unstubAllGlobals());

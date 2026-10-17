@@ -4,7 +4,7 @@ import type { FacebookConfig } from '../src/platforms/facebook/config';
 
 const config: FacebookConfig = {
   graphBaseUrl: 'https://graph.facebook.test', oauthBaseUrl: 'https://www.facebook.test', graphVersion: 'v99.0', requestTimeoutMs: 2_000,
-  maxPages: 4, pageSize: 25, pageInsightMetrics: ['page_views_total'], adInsightFields: ['spend', 'impressions'], maxImageUploadBytes: 1024, allowedImageMimeTypes: ['image/jpeg', 'image/png'],
+  maxPages: 4, pageSize: 25, pageInsightMetrics: ['page_views_total'], adInsightFields: ['spend', 'impressions'], maxImageUploadBytes: 1024, allowedImageMimeTypes: ['image/jpeg', 'image/png'], appSecretProofEnabled: false,
 };
 const response = (payload: unknown, status = 200) => new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
 const mockFetch = (...replies: Response[]) => vi.fn(async () => replies.shift() ?? response({ data: [] })) as unknown as typeof fetch;

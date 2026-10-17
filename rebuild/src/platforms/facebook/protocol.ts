@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto';
+
 /** Graph API wire protocol paths and field names are isolated here. */
 export const FACEBOOK_CONNECTION_CALLBACK_PATH = '/api/connections/facebook/callback';
 export const FACEBOOK_PROTOCOL = Object.freeze({
@@ -7,6 +9,11 @@ export const FACEBOOK_PROTOCOL = Object.freeze({
   linkField: 'link',
   responseIdField: 'id',
 });
+
+/** Meta's appsecret_proof is the lowercase hex HMAC-SHA256 of the request token. */
+export function facebookAppSecretProof(accessToken: string, appSecret: string): string {
+  return createHmac('sha256', appSecret).update(accessToken).digest('hex');
+}
 
 /** Explicit Graph codes for invalid requests, authentication, or permissions.
  * Other provider codes remain ambiguous even when paired with an HTTP 4xx.

@@ -793,3 +793,41 @@ open. Private evidence logs:
 `/private/tmp/socialpilot-search-typecheck-final.log`,
 `/private/tmp/socialpilot-search-build-final.log`, and
 `/private/tmp/socialpilot-search-export-live-final.log`.
+
+## Batch 49: Facebook signing and bounded live reads — 2026-10-17
+
+Final integrated verification passed **1253 tests across 206 files**, including
+actual isolated PostgreSQL tests. Typecheck and isolated production build passed;
+the running preview's `.next` was preserved. Focused regressions cover HMAC token
+identity across GET/DELETE/form/multipart, pagination token/proof replacement,
+disabled/missing-secret behavior, OAuth separation, request cancellation, ad-set
+ownership/create signing, registry ownership/default and server secret injection.
+Unreadable or blank secrets preserve engine/adapter metadata; Ads live read/manage gates
+and direct mutations fail closed without exposing technical configuration copy.
+
+In Chrome at localhost:3200 (Clay, 1440×1000), Root → Facebook sidebar search
+found exactly one active default-enabled Sign Graph requests control in API
+credentials. No setting was changed. Posts retained stored rows, and Ads retained
+stored results; both had no horizontal overflow or signing-setup error copy.
+These are representative desktop checks, not new full phone/theme/keyboard or
+real-provider UI verification. Earlier wider design evidence remains separate.
+
+The exact signed engine bundle passed six read checks on the authorized host
+against real Graph v26.0: matching user/Page identity, required read grants,
+10 returned Pages, 5 ad accounts, and 24 observations covering all four requested
+Page metrics. Empty/missing metrics or missing required grants are not passes.
+No remote content, ads or customer database rows were changed. No secret/token/
+proof/customer ID/value left the host. This is a legacy-credential engine probe,
+not rebuilt OAuth/config import, UI/API/MCP, complete metrics or write proof.
+The current connection lacks `ads_management`.
+
+Exact private remote probe artifacts were removed after testing. Legacy web,
+worker and proxy remained active; loopback/public health returned 200. No DDL,
+production configuration change, service restart or cutover occurred. The local
+public-defaults/bundle copies were removed; sanitized final logs remain private:
+`/private/tmp/socialpilot-signing49-tests-final.log`,
+`/private/tmp/socialpilot-signing49-typecheck-final.log`,
+`/private/tmp/socialpilot-signing49-build-final.log`,
+`/private/tmp/socialpilot-signing49-live-final.log`, and
+`/private/tmp/socialpilot-signing49-cleanup-final.log`.
+FACEBOOK_REQUEST_SIGNING.md records ownership, reproduction and remaining gates.

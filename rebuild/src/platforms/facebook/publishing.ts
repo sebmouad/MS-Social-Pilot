@@ -1,7 +1,7 @@
 import type { FacebookConfig } from './config';
 import { validateFacebookConfig } from './config';
 import { PlatformApiError } from '../errors';
-import { graphObjectUrl, isFacebookDefiniteRejection, isFacebookRetryable } from './protocol';
+import { facebookAppSecretProof, graphObjectUrl, isFacebookDefiniteRejection, isFacebookRetryable } from './protocol';
 import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult } from '../types';
 
 export type FacebookFetch = typeof fetch;
@@ -77,21 +77,39 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     ...(operationSignal ? [operationSignal] : []),
     AbortSignal.timeout(config.requestTimeoutMs),
   ]);
+  const proofFor = (token: string): string | undefined => {
+    if (!config.appSecretProofEnabled) return undefined;
+    if (!config.appSecret) throw new FacebookApiError('Facebook app secret is required for signed Graph requests.', 0);
+    return facebookAppSecretProof(token, config.appSecret);
+  };
   async function request<T = unknown>(path: string, options: { method?: string; token: string; params?: Record<string, string | number | undefined>; body?: Record<string, string | undefined>; file?: { bytes: Uint8Array; mimeType: string; fileName: string } } ): Promise<T> {
     assertOperationActive();
     const url = graphObjectUrl(config, path);
     if (options.method !== 'POST') {
-      url.searchParams.set('access_token', options.token);
       for (const [key, value] of Object.entries(options.params ?? {})) if (value !== undefined) url.searchParams.set(key, String(value));
+      url.searchParams.set('access_token', options.token);
+      const proof = proofFor(options.token);
+      if (proof) url.searchParams.set('appsecret_proof', proof);
+      else url.searchParams.delete('appsecret_proof');
     }
     const form = options.method === 'POST' && options.file ? new FormData() : undefined;
     if (form) {
-      form.set('access_token', options.token);
       for (const [key, value] of Object.entries(options.body ?? {})) if (value !== undefined) form.set(key, value);
+      form.set('access_token', options.token);
+      const proof = proofFor(options.token);
+      if (proof) form.set('appsecret_proof', proof);
+      else form.delete('appsecret_proof');
       const { bytes, mimeType, fileName } = options.file!;
       form.set('source', new Blob([bytes], { type: mimeType }), fileName);
     }
-    const body = options.method === 'POST' ? form ?? new URLSearchParams({ access_token: options.token, ...(options.body ?? {}) }) : undefined;
+    const body = options.method === 'POST' ? form ?? new URLSearchParams() : undefined;
+    if (body instanceof URLSearchParams) {
+      for (const [key, value] of Object.entries(options.body ?? {})) if (value !== undefined) body.set(key, value);
+      body.set('access_token', options.token);
+      const proof = proofFor(options.token);
+      if (proof) body.set('appsecret_proof', proof);
+      else body.delete('appsecret_proof');
+    }
     const headers = body instanceof URLSearchParams ? { 'content-type': 'application/x-www-form-urlencoded' } : undefined;
     const signal = requestSignal();
     let response: Response;
@@ -114,8 +132,18 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     const results: T[] = []; let next: string | undefined = first; const seen = new Set<string>();
     for (let page = 0; page < config.maxPages && next; page++) {
       assertOperationActive();
+      const nextUrl = new URL(next);
+      const configuredBase = new URL(config.graphBaseUrl);
+      if (nextUrl.origin !== configuredBase.origin || nextUrl.username || nextUrl.password || nextUrl.hash || !nextUrl.pathname.startsWith(`/${config.graphVersion}/`)) {
+        throw new FacebookApiError('Facebook returned a pagination URL outside the configured Graph endpoint.', 0);
+      }
+      nextUrl.searchParams.delete('access_token');
+      nextUrl.searchParams.delete('appsecret_proof');
+      nextUrl.searchParams.set('access_token', token);
+      const proof = proofFor(token);
+      if (proof) nextUrl.searchParams.set('appsecret_proof', proof);
       const signal = requestSignal();
-      const response = await fetchImpl(next, { redirect: 'error', signal }).catch((error: unknown) => {
+      const response = await fetchImpl(nextUrl, { redirect: 'error', signal }).catch((error: unknown) => {
         if (operationSignal?.aborted) throw new FacebookApiError('Facebook operation was cancelled.', 0);
         if (signal.aborted) throw new FacebookApiError('Facebook request timed out.', 0);
         throw new FacebookApiError(error instanceof Error ? error.message : 'Facebook request failed.', 0);
@@ -131,11 +159,6 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const link = typeof paging.next === 'string' ? paging.next : undefined;
       if (!link) { next = undefined; break; }
       if (seen.has(link)) throw new FacebookApiError('Facebook pagination returned a repeated next URL.', 0);
-      const nextUrl = new URL(link);
-      const configuredBase = new URL(config.graphBaseUrl);
-      if (nextUrl.protocol !== 'https:' || nextUrl.origin !== configuredBase.origin || !nextUrl.pathname.startsWith(`/${config.graphVersion}/`)) {
-        throw new FacebookApiError('Facebook returned a pagination URL outside the configured Graph endpoint.', 0);
-      }
       seen.add(link); next = link;
       if (page === config.maxPages - 1) throw new FacebookApiError('Facebook pagination exceeded the configured page limit.', 0);
     }
@@ -433,6 +456,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
   const requiredPostDeleteScopes = policy?.postDeleteScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
   const requiredFirstCommentScopes = policy?.firstCommentScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
   const canUseCredential: NonNullable<PlatformAdapter['canUseCredential']> = (credential, capability) => {
+      if (config.appSecretProofEnabled && !config.appSecret && ['publishing', 'remoteStatus', 'remoteDelete', 'firstComment'].includes(capability)) return false;
       if (capability === 'remoteStatus') {
         if (!requiredPostReadScopes.length || !credential.grantedScopes) return false;
         const granted = new Set(credential.grantedScopes.map(scope => scope.trim()));

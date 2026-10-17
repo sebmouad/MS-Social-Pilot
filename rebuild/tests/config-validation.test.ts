@@ -27,7 +27,12 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(47);
+    expect(CONFIG_SCHEMA_VERSION).toBe(48);
+    const appSecretProof = CONFIG_BY_KEY.get('meta.appSecretProofEnabled')!;
+    expect(appSecretProof).toMatchObject({ kind: 'boolean', defaultValue: true, consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
+    expect(appSecretProof.schema.safeParse(false).success).toBe(true);
+    expect(appSecretProof.schema.safeParse('true').success).toBe(false);
+    expect(appSecretProof.group).toBe('Facebook · API credentials');
     for (const [key, value, minimum, maximum] of [
       ['publishing.searchMaxCharacters', 200, 1, 2000],
       ['publishing.exportMaxPosts', 5000, 1, 50000],

@@ -5,7 +5,7 @@ import type { FacebookConfig } from '../src/platforms/facebook/config';
 const config: FacebookConfig = {
   graphBaseUrl: 'https://graph.facebook.test', oauthBaseUrl: 'https://www.facebook.test', graphVersion: 'v99.0', requestTimeoutMs: 2_000,
   maxPages: 4, pageSize: 25, pageInsightMetrics: ['page_views_total'], adInsightFields: ['spend', 'impressions'], maxImageUploadBytes: 1024,
-  allowedImageMimeTypes: ['image/jpeg', 'image/png'],
+  allowedImageMimeTypes: ['image/jpeg', 'image/png'], appSecretProofEnabled: false,
 };
 const policy = { postPublishScopes: ['pages_manage_posts'], postDeleteScopes: ['pages_manage_posts'], postReadScopes: ['pages_read_engagement'], firstCommentScopes: ['pages_manage_engagement'] };
 const credential = { accessToken: 'page-token', grantedScopes: ['pages_manage_posts', 'pages_read_engagement', 'pages_manage_engagement'] };

@@ -226,3 +226,13 @@ feedback inside its focus boundary. Content, first comments, all valid media
 references and normalized destination outcomes are included; this CSV is not a
 workspace archive or an import template. POST_SEARCH_EXPORT.md owns business
 and interface details; PREVIEW_QA.md records the local checks and limitations.
+
+### Provider signing readiness
+
+Provider signing controls belong only to private Root platform configuration.
+Customers do not receive app-secret or protocol setup instructions. Missing or
+unreadable signing material preserves authorized stored Publishing/Ads history;
+live Publishing/Ads controls use current provider readiness and safe unavailable
+behavior. Root diagnostics retains technical configuration validation. Signing
+configuration and a connectivity pass do not prove full provider operation
+coverage. FACEBOOK_REQUEST_SIGNING.md and PREVIEW_QA.md record the current slice.

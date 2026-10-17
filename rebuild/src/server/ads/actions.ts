@@ -8,6 +8,7 @@ import type { ScopedPageAccess } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { runtimeConfig } from '@/server/config/store';
 import { platformAds } from '@/server/platforms/registry';
+import type { PlatformAdsHost } from '@/server/platforms/host';
 import { OperationError } from '@/lib/operation-error';
 
 const MANAGER_ROLES = new Set(['owner', 'admin']);
@@ -29,6 +30,11 @@ export type AdsAdSetCreateInput = { adAccountId: string; campaignId: string; nam
 export type AdsObjectReadInput = { adAccountId: string; objectId: string; objectType: AdMutationRequest['objectType'] };
 
 function scopes(value: string) { return value.split(',').map(scope => scope.trim()).filter(Boolean); }
+
+async function adsHostReady(host: PlatformAdsHost): Promise<boolean> {
+  if (!host.isReady) return true;
+  try { return await host.isReady() === true; } catch { return false; }
+}
 
 const creationAuditWarning = 'Creation succeeded and the object is paused, but its audit record could not be saved. Do not submit this creation again.';
 async function recordAdsCreationAudit(actor: AdsActionActor, action: 'ads.campaign_created' | 'ads.adset_created', detail: Record<string, unknown>, logContext: Record<string, unknown>) {
@@ -71,6 +77,7 @@ export async function canManageWorkspaceAds(actor: AdsActionActor, adAccountId: 
   if (!hasPlatformCapability(entitlements, connection.provider)) return false;
   const host = await platformAds(connection.provider);
   if (!host) return false;
+  if (!(await adsHostReady(host))) return false;
   const required = await host.manageScopes();
   try { host.validateManageScopes(required, scopes(connection.scopes)); return true; } catch { return false; }
 }
@@ -91,7 +98,7 @@ export async function canReadWorkspaceAds(actor: AdsActionActor, adAccountId: st
   if (!connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) return false;
   if (!hasPlatformCapability(entitlements, connection.provider)) return false;
   const host = await platformAds(connection.provider);
-  return !!host && host.hasReadScopes(await host.readScopes(), scopes(connection.scopes));
+  return !!host && await adsHostReady(host) && host.hasReadScopes(await host.readScopes(), scopes(connection.scopes));
 }
 
 /** Read one stored-history-verified ad object using its account's provider module. */
@@ -143,6 +150,7 @@ async function managedAccount(actor: AdsActionActor, adAccountId: string, access
   if (!hasPlatformCapability(access.entitlements, connection.provider)) throw new OperationError('unavailable', 'This advertising account is unavailable.');
   const ads = await platformAds(connection.provider);
   if (!ads) throw new OperationError('unavailable', 'Advertising changes are currently unavailable.');
+  if (!(await adsHostReady(ads))) throw new OperationError('unavailable', 'Advertising changes are currently unavailable.');
   const [required, managementEnabled] = await Promise.all([ads.manageScopes(), runtimeConfig('ads.managementEnabled') as Promise<boolean>]);
   if (managementEnabled !== true) throw new OperationError('unavailable', 'Ads management is currently unavailable.');
   ads.validateManageScopes(required, scopes(connection.scopes));

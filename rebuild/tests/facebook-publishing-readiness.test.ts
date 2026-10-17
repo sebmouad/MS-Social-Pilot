@@ -14,11 +14,22 @@ import { FACEBOOK_CONFIG } from '../src/platforms/facebook/module';
 const config: FacebookConfig = {
   graphBaseUrl: 'https://graph.facebook.test', oauthBaseUrl: 'https://www.facebook.test', graphVersion: 'v99.0', requestTimeoutMs: 2_000,
   maxPages: 4, pageSize: 25, pageInsightMetrics: ['page_views_total'], adInsightFields: ['spend'], maxImageUploadBytes: 1024,
-  allowedImageMimeTypes: ['image/jpeg', 'image/png'],
+  allowedImageMimeTypes: ['image/jpeg', 'image/png'], appSecretProofEnabled: false,
 };
 const granted = (grantedScopes?: readonly string[]) => ({ accessToken: 'page-token', ...(grantedScopes ? { grantedScopes } : {}) });
 
 describe('Facebook publishing credential readiness', () => {
+  it('blocks publish, status, delete, and first-comment readiness when required proof secret is missing', () => {
+    const adapter = createFacebookAdapter({ ...config, appSecretProofEnabled: true }, fetch, {
+      postReadScopes: ['read'], postPublishScopes: ['publish'], postDeleteScopes: ['delete'], firstCommentScopes: ['comment'],
+    });
+    const credential = granted(['read', 'publish', 'delete', 'comment']);
+    expect(adapter.capabilities).toMatchObject({ publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported' });
+    for (const operation of ['publishing', 'remoteStatus', 'remoteDelete', 'firstComment'] as const) {
+      expect(adapter.canUseCredential!(credential, operation)).toBe(false);
+    }
+  });
+
   it('allows status reads only when every configured permission was granted', () => {
     const adapter = createFacebookAdapter(config, fetch, { postReadScopes: ['pages_read_engagement', 'pages_manage_posts'] });
 
@@ -69,6 +80,7 @@ describe('Facebook publishing credential readiness', () => {
       ['meta.requestTimeoutMs', config.requestTimeoutMs], ['meta.maxPages', config.maxPages], ['meta.pageSize', config.pageSize],
       ['meta.pageInsightMetrics', config.pageInsightMetrics], ['meta.adInsightFields', config.adInsightFields],
       ['meta.maxImageUploadBytes', config.maxImageUploadBytes], ['meta.allowedImageMimeTypes', config.allowedImageMimeTypes],
+      ['meta.appSecretProofEnabled', true],
       ['meta.postReadScopes', ['pages_read_engagement', 'pages_manage_posts']],
       ['meta.postPublishScopes', ['pages_manage_posts']], ['meta.postDeleteScopes', ['pages_manage_posts']],
       ['meta.firstCommentScopes', ['pages_manage_engagement']],

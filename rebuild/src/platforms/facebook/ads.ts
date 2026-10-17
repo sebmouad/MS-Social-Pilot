@@ -2,7 +2,7 @@ import type { FacebookCampaignObjective } from './protocol';
 import type { AdMutationRequest, AdObjectReadRequest } from '@/platforms/types';
 import { configuredFacebookEngine } from '@/platforms/facebook/runtime';
 import { configuredCreateFacebookAdSet, type AdSetOptimizationGoal } from '@/platforms/facebook/adset';
-import { runtimeConfig } from '@/server/config/store';
+import { runtimeConfig, runtimeSecret } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 
 export type { AdSetOptimizationGoal } from '@/platforms/facebook/adset';
@@ -50,6 +50,16 @@ export const facebookAdsHost = {
       defaultOption: 'LINK_CLICKS', options: [{ value: 'LINK_CLICKS', label: 'Link clicks' }, { value: 'IMPRESSIONS', label: 'Impressions' }],
       confirmationTemplate: 'CREATE PAUSED FACEBOOK AD SET {nameJson} UNDER CAMPAIGN {campaignId} IN ACCOUNT {adAccountId} WITH DAILY BUDGET {dailyBudgetMinor} MINOR UNITS TARGETING {countryCode} OPTIMIZED FOR {optimizationGoal}',
     },
+  },
+  async isReady() {
+    try {
+      const proofEnabled = await runtimeConfig('meta.appSecretProofEnabled');
+      if (proofEnabled === false) return true;
+      if (proofEnabled !== true) return false;
+      return Boolean((await runtimeSecret('meta.appSecret'))?.trim());
+    } catch {
+      return false;
+    }
   },
   async readScopes() { return runtimeConfig('meta.adsReadScopes') as Promise<string[]>; },
   async manageScopes() { return runtimeConfig('meta.adsManageScopes') as Promise<string[]>; },

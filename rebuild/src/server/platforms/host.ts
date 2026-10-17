@@ -15,6 +15,8 @@ export interface PlatformAnalyticsHost {
 export interface PlatformAdsHost {
   /** Safe, serializable UI configuration; never contains credentials or server functions. */
   ui: AdsUiSchema;
+  /** Whether current Root configuration can support this module's live Ads requests. */
+  isReady?(): Promise<boolean>;
   readScopes(): Promise<string[]>;
   manageScopes(): Promise<string[]>;
   hasReadScopes(required: readonly string[], granted: readonly string[]): boolean;

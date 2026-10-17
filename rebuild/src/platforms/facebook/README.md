@@ -32,3 +32,14 @@ and denies invalid policies and suspended customer workspaces. These policies
 control current customer access, not provider approval or data retention.
 Complete subscription administration and provider-owned background collector
 plan gating remain separate unfinished work.
+
+Authenticated Graph requests now use the module-owned HMAC-SHA256
+`appsecret_proof`, controlled by Root `meta.appSecretProofEnabled` (default true)
+and the encrypted app secret. Engine queries, form/multipart writes, pagination
+and ad-set ownership/create requests are covered. Pagination replaces incoming
+tokens/proofs with the actual caller credential; OAuth protocols remain separate.
+Missing/unreadable signing material cannot dispatch and does not hide stored
+history. Ads live readiness also checks required signing material. The real
+engine's six read checks passed on Graph v26.0; no live writes were tested.
+See `docs/FACEBOOK_REQUEST_SIGNING.md` for exact evidence and open limitations;
+older local-only evidence statements above remain applicable to their operations.

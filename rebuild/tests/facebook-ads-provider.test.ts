@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { createFacebookAdSet } from '../src/platforms/facebook/adset';
 import { facebookAdsHost } from '../src/platforms/facebook/ads';
 import { fillAdsTemplate } from '../src/platforms/ads-ui';
+import type { FacebookConfig } from '../src/platforms/facebook/config';
 
-const config = {
+const appSecret = 'synthetic-app-secret';
+const config: FacebookConfig = {
   graphBaseUrl: 'https://graph.facebook.com', oauthBaseUrl: 'https://www.facebook.com', graphVersion: 'v99.0',
   requestTimeoutMs: 5_000, maxPages: 10, pageSize: 25, pageInsightMetrics: [], adInsightFields: [],
-  maxImageUploadBytes: 1024, allowedImageMimeTypes: ['image/jpeg'],
+  maxImageUploadBytes: 1024, allowedImageMimeTypes: ['image/jpeg'], appSecretProofEnabled: true, appSecret,
 };
+const proof = (token: string) => createHmac('sha256', appSecret).update(token).digest('hex');
 const input = { credential: { accessToken: 'secret-token' }, accountId: 'act_99', campaignId: 'campaign-4', name: 'Prospecting',
   dailyBudgetMinor: 5000, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' as const };
 const response = (body: unknown, ok = true) => ({ ok, status: ok ? 200 : 400, json: async () => body }) as Response;
@@ -46,14 +50,16 @@ describe('Facebook ad set creation', () => {
 
   it('creates a paused ad set with explicit campaign, budget, delivery goal, and country targeting', async () => {
     const fetcher = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
-      if (String(url).endsWith('/campaign-4?fields=id%2Caccount_id&access_token=secret-token')) {
+      if (String(url).includes('/campaign-4?fields=id%2Caccount_id&access_token=secret-token&appsecret_proof=')) {
         expect(init?.method ?? 'GET').toBe('GET');
+        expect(new URL(String(url)).searchParams.get('appsecret_proof')).toBe(proof('secret-token'));
         return response({ id: 'campaign-4', account_id: '99' });
       }
       expect(String(url)).toBe('https://graph.facebook.com/v99.0/act_99/adsets');
       expect(init?.method).toBe('POST');
       const body = new URLSearchParams(String(init?.body));
       expect(body.get('access_token')).toBe('secret-token');
+      expect(body.get('appsecret_proof')).toBe(proof('secret-token'));
       expect(body.get('campaign_id')).toBe('campaign-4');
       expect(body.get('status')).toBe('PAUSED');
       expect(body.get('daily_budget')).toBe('5000');
@@ -81,6 +87,25 @@ describe('Facebook ad set creation', () => {
     await expect(createFacebookAdSet(config, { ...input, dailyBudgetMinor: 0 }, fetcher)).rejects.toThrow(/positive whole/);
     await expect(createFacebookAdSet(config, { ...input, optimizationGoal: 'LEAD_GENERATION' as never }, fetcher)).rejects.toThrow(/optimization goal/);
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('fails before transport when proof is enabled without the app secret', async () => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    await expect(createFacebookAdSet({ ...config, appSecret: undefined }, input, fetcher)).rejects.toThrow(/app secret/i);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('omits appsecret_proof from both Graph requests when Root disables signing', async () => {
+    const fetcher = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => init?.method === 'POST'
+      ? response({ id: 'adset-8' }) : response({ id: 'campaign-4', account_id: '99' })) as unknown as typeof fetch;
+    await expect(createFacebookAdSet({ ...config, appSecretProofEnabled: false }, input, fetcher)).resolves.toEqual({ remoteId: 'adset-8' });
+    const calls = vi.mocked(fetcher).mock.calls;
+    const campaignUrl = new URL(String(calls[0][0]));
+    const adSetBody = new URLSearchParams(String(calls[1][1]?.body));
+    expect(campaignUrl.searchParams.get('access_token')).toBe(input.credential.accessToken);
+    expect(campaignUrl.searchParams.has('appsecret_proof')).toBe(false);
+    expect(adSetBody.get('access_token')).toBe(input.credential.accessToken);
+    expect(adSetBody.has('appsecret_proof')).toBe(false);
   });
 
   it('surfaces a safe provider failure when Meta rejects the ad set', async () => {

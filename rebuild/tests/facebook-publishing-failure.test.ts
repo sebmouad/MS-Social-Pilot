@@ -4,7 +4,7 @@ import type { FacebookConfig } from '../src/platforms/facebook/config';
 
 const config: FacebookConfig = {
   graphBaseUrl: 'https://graph.facebook.test', oauthBaseUrl: 'https://www.facebook.test', graphVersion: 'v99.0', requestTimeoutMs: 2_000,
-  maxPages: 4, pageSize: 25, pageInsightMetrics: [], adInsightFields: [], maxImageUploadBytes: 1024, allowedImageMimeTypes: ['image/jpeg'],
+  maxPages: 4, pageSize: 25, pageInsightMetrics: [], adInsightFields: [], maxImageUploadBytes: 1024, allowedImageMimeTypes: ['image/jpeg'], appSecretProofEnabled: false,
 };
 
 describe('Facebook publishing failure classification', () => {

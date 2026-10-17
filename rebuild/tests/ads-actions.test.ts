@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
     $executeRaw: vi.fn(),
   },
   config: vi.fn(),
+  secret: vi.fn(),
   decrypt: vi.fn(),
   engine: { updateAd: vi.fn(), createCampaign: vi.fn(), readAdObject: vi.fn() },
   configuredEngine: vi.fn(),
@@ -20,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config, runtimeSecret: mocks.secret }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: mocks.decrypt }));
 vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: mocks.configuredEngine, configuredFacebookAdapter: vi.fn(), configuredFacebookOAuth: vi.fn() }));
 vi.mock('../src/server/platforms/registry', () => ({
@@ -59,7 +60,8 @@ beforeEach(() => {
     socialAccount: { id: 'social-1', provider: 'facebook', accessToken: 'encrypted-token', scopes: 'ads_read,ads_management', invalidatedAt: null, tokenExpiresAt: null },
   });
   mocks.prisma.adInsight.findFirst.mockResolvedValue({ id: 'insight-1' });
-  mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : ['ads_management']);
+  mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.appSecretProofEnabled' ? false : ['ads_management']);
+  mocks.secret.mockResolvedValue(null);
   mocks.decrypt.mockReturnValue('secret-token-value');
   mocks.configuredEngine.mockResolvedValue(mocks.engine);
   mocks.engine.updateAd.mockResolvedValue(undefined);
@@ -130,8 +132,38 @@ describe('workspace Ads actions', () => {
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(true);
     mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? false : key === 'platforms.facebook.enabled' ? true : ['ads_management']);
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(false);
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : ['ads_management']);
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.appSecretProofEnabled' ? false : ['ads_management']);
     mocks.prisma.adAccount.findFirst.mockResolvedValue({ socialAccount: { provider: 'facebook', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null } });
+    expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(false);
+  });
+
+  it('hides live read and manage readiness when required request signing has no app secret', async () => {
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' || key === 'meta.appSecretProofEnabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : ['ads_management']);
+    mocks.secret.mockResolvedValue(null);
+
+    expect(await canReadWorkspaceAds(actor, 'local-account-1')).toBe(false);
+    expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(false);
+    await expect(readWorkspaceAdObject(actor, { adAccountId: 'local-account-1', objectId: 'campaign-44', objectType: 'campaign' })).rejects.toThrow(/performance access is unavailable/);
+    expect(mocks.engine.readAdObject).not.toHaveBeenCalled();
+    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/Advertising changes are currently unavailable/);
+    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
+  });
+
+  it('keeps Ads read and manage readiness when signing is explicitly disabled without a secret', async () => {
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.appSecretProofEnabled' ? false : ['ads_management']);
+    mocks.secret.mockResolvedValue(null);
+
+    expect(await canReadWorkspaceAds(actor, 'local-account-1')).toBe(true);
+    expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(true);
+  });
+
+  it('fails closed when Ads readiness cannot load Root signing configuration', async () => {
+    mocks.config.mockImplementation(async (key: string) => {
+      if (key === 'meta.appSecretProofEnabled') throw new Error('private config failure');
+      return key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : ['ads_management'];
+    });
+
+    expect(await canReadWorkspaceAds(actor, 'local-account-1')).toBe(false);
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(false);
   });
 
@@ -249,7 +281,7 @@ describe('workspace Ads actions', () => {
     await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/currently unavailable/);
     expect(mocks.engine.updateAd).not.toHaveBeenCalled();
 
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : ['ads_management']);
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.appSecretProofEnabled' ? false : ['ads_management']);
     mocks.prisma.adAccount.findFirst.mockResolvedValue({
       id: 'local-account-1', actId: 'act_99',
       socialAccount: { id: 'social-1', provider: 'facebook', accessToken: 'encrypted-token', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null },
