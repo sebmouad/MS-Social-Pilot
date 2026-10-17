@@ -36,7 +36,8 @@ export function TemplateManager({ initialTemplates, labels, page, hasMore, query
   const saveConfirmation = `${editing ? 'UPDATE' : 'CREATE'} TEMPLATE ${editing ? editing.id : draft.name.trim()}`;
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (inFlight.current) return;
-    setConfirmation(''); setReview({ kind: 'save' });
+    if (!draft.name.trim() || !draft.body.trim()) { nextNotice('Enter a template name and message before reviewing the save.', true); return; }
+    setNotice(null); setConfirmation(''); setReview({ kind: 'save' });
   }
   async function performSave() {
     if (inFlight.current || confirmation !== saveConfirmation) return;
@@ -48,7 +49,7 @@ export function TemplateManager({ initialTemplates, labels, page, hasMore, query
       const saved = body as Template;
       setTemplates(current => editing ? current.map(item => item.id === saved.id ? saved : item).sort((a, b) => a.name.localeCompare(b.name)) : [...current, saved].sort((a, b) => a.name.localeCompare(b.name)));
       setDialog(false); setReview(null); nextNotice(editing ? 'Template updated.' : 'Template created. It is ready to select in the post composer.');
-    } catch (error) { nextNotice(error instanceof Error ? error.message : 'The save result is unknown. Refresh the list and check the current template before trying again.', true); }
+    } catch (error) { nextNotice(error instanceof Error && !(error instanceof TypeError) ? error.message : 'The save result is unknown. Refresh the list and check the current template before trying again.', true); }
     finally { setBusy(false); inFlight.current = false; }
   }
   function remove(template: Template) {
@@ -63,11 +64,11 @@ export function TemplateManager({ initialTemplates, labels, page, hasMore, query
       const body = await response.json().catch(() => null);
       if (!response.ok || !body || body.deleted !== true || body.id !== template.id) throw new Error(errorText(body));
       setTemplates(current => current.filter(item => item.id !== template.id)); setReview(null); nextNotice('Template deleted. Existing drafts and published posts are unchanged.');
-    } catch (error) { nextNotice(error instanceof Error ? error.message : 'The deletion result is unknown. Refresh and check the template before retrying.', true); }
+    } catch (error) { nextNotice(error instanceof Error && !(error instanceof TypeError) ? error.message : 'The deletion result is unknown. Refresh and check the template before retrying.', true); }
     finally { setBusy(false); inFlight.current = false; }
   }
   return <div className={styles.root}>
-    {notice && <RouteNotice error={notice.error} focusKey={`template-notice:${notice.key}`}>{notice.text}</RouteNotice>}
+    {notice && !dialog && !review && <RouteNotice error={notice.error} focusKey={`template-notice:${notice.key}`}>{notice.text}</RouteNotice>}
     <SidebarDock><form action="/publishing/templates" method="get" className={styles.search} role="search">
       <label htmlFor="template-search">Search templates</label><input id="template-search" name="q" defaultValue={query} maxLength={limits.maxSearchCharacters} placeholder="Name, category or message" />
       <Button type="submit" variant="secondary">Search</Button>{query && <a href="/publishing/templates">Clear</a>}
@@ -77,6 +78,7 @@ export function TemplateManager({ initialTemplates, labels, page, hasMore, query
     <nav className={styles.pagination} aria-label="Template pages">{page > 1 && <a href={`/publishing/templates?page=${page - 1}${query ? `&q=${encodeURIComponent(query)}` : ''}`}>Previous page</a>}<span>Page {page}</span>{hasMore && <a href={`/publishing/templates?page=${page + 1}${query ? `&q=${encodeURIComponent(query)}` : ''}`}>Next page</a>}</nav>
     <p className={styles.help}>Templates are shared with workspace members who can create posts. They save message text, hashtags, first comment and an optional label; media and links are chosen separately in the composer.</p>
     <Dialog open={dialog} title={editing ? 'Edit template' : 'New template'} description="Templates save reusable post content. Saving a template does not create or publish a post." onClose={close} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={close}>Cancel</Button><Button type="submit" form="template-form" variant="primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Create template'}</Button></>}>
+      {notice?.error && !review && <RouteNotice error focusKey={`template-edit-error:${notice.key}`}>{notice.text}</RouteNotice>}
       <form id="template-form" className={styles.form} onSubmit={event => void save(event)} noValidate>
         <label>Name<input disabled={busy} required maxLength={limits.maxNameCharacters} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label>
         <label>Category <span>(optional)</span><input disabled={busy} maxLength={limits.maxCategoryCharacters} value={draft.category} onChange={event => setDraft(current => ({ ...current, category: event.target.value }))} /></label>
@@ -88,6 +90,7 @@ export function TemplateManager({ initialTemplates, labels, page, hasMore, query
       </form>
     </Dialog>
     <Dialog open={Boolean(review)} title={review?.kind === 'delete' ? 'Review template deletion' : 'Review template save'} description={review?.kind === 'delete' ? `This removes “${review.template?.name}” from your workspace. Posts already created from it remain unchanged.` : 'Review the template changes before saving them to your workspace.'} onClose={() => !busy && setReview(null)} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setReview(null)}>Cancel</Button><Button variant={review?.kind === 'delete' ? 'danger' : 'primary'} disabled={busy || confirmation !== (review?.kind === 'delete' ? `DELETE TEMPLATE ${review.template?.id}` : saveConfirmation)} onClick={() => review?.kind === 'delete' && review.template ? void performDelete(review.template) : void performSave()}>{busy ? 'Working…' : review?.kind === 'delete' ? 'Delete template' : 'Confirm save'}</Button></>}>
+      {notice?.error && <RouteNotice error focusKey={`template-review-error:${notice.key}`}>{notice.text}</RouteNotice>}
       <p><strong>{review?.kind === 'delete' ? review.template?.name : draft.name || 'Untitled template'}</strong></p>
       {review?.kind === 'save' && <p className={styles.reviewPreview}>{draft.body}{draft.hashtags ? `\n${draft.hashtags}` : ''}{draft.firstComment ? `\n\nFirst comment: ${draft.firstComment}` : ''}</p>}
       <label className={styles.confirmLabel}>Type <code>{review?.kind === 'delete' ? `DELETE TEMPLATE ${review.template?.id}` : saveConfirmation}</code> to confirm<input autoComplete="off" value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label>

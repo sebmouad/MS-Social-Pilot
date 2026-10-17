@@ -32,6 +32,7 @@ describe('customer module manifests', () => {
   it('shows one Analytics page while retaining scoped CSV export as a capability', () => {
     expect(PAGES.filter(({ module, navigation }) => module === 'analytics' && navigation !== false).map(({ href }) => href)).toEqual(['/analytics']);
     expect(PAGES.find(({ id }) => id === 'analytics/reports')?.navigation).toBe(false);
+    expect(PAGES.find(({ id }) => id === 'analytics/explorer')?.navigation).toBe(false);
   });
 
   it('uses a compact mobile title for Publishing', () => {

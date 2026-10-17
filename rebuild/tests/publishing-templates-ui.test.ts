@@ -41,4 +41,23 @@ describe('template management UI', () => {
     expect(container.textContent).toContain('Template created.');
     expect(container.textContent).toContain('Welcome');
   });
+  it('shows an offline error inside the active review dialog and retains the draft for retry', async () => {
+    const fetch = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({ ok: true, json: async () => ({ id: 'retry-template', name: 'Retry test', category: '', body: 'Keep this draft', hashtags: '', firstComment: '', labelId: null, createdAt: '2026-10-17T12:00:00Z', updatedAt: '2026-10-17T12:00:00Z' }) });
+    vi.stubGlobal('fetch', fetch); await render();
+    await click(button('New template', dock));
+    const edit = container.querySelector<HTMLDialogElement>('dialog')!;
+    await enter(edit.querySelector<HTMLInputElement>('input')!, 'Retry test');
+    await enter(edit.querySelector<HTMLTextAreaElement>('textarea')!, 'Keep this draft');
+    await click(button('Create template', edit));
+    const review = container.querySelectorAll<HTMLDialogElement>('dialog')[1]!;
+    await enter(review.querySelector<HTMLInputElement>('input')!, 'CREATE TEMPLATE Retry test');
+    await click(button('Confirm save', review));
+    expect(review.querySelector('[role="alert"]')?.textContent).toContain('save result is unknown');
+    expect(review.textContent).toContain('Keep this draft');
+    expect(review.querySelector<HTMLInputElement>('input')?.value).toBe('CREATE TEMPLATE Retry test');
+    await click(button('Confirm save', review));
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain('Template created.');
+  });
+
 });

@@ -196,7 +196,7 @@ export async function reviewPost(actor: PublishingActor, postId: string, decisio
       const status = decision === 'approve' ? (post.scheduledAt ? 'scheduled' : 'draft') : 'rejected';
       const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'pending_approval' }, data: { status, updatedAt: new Date() } });
       if (changed.count !== 1) throw new OperationError('conflict', 'This post is no longer awaiting approval.');
-      await tx.$executeRaw`UPDATE posts SET "approvalStatus" = ${decision === 'approve' ? 'approved' : 'rejected'}, "reviewedById" = ${actor.userId}, "reviewedAt" = NOW(), "reviewNote" = ${reviewNote || null} WHERE id = ${post.id} AND "workspaceId" = ${actor.workspaceId}`;
+      await tx.$executeRaw`UPDATE posts SET "approvalStatus" = ${decision === 'approve' ? 'approved' : 'rejected'}::"ApprovalStatus", "reviewedById" = ${actor.userId}, "reviewedAt" = NOW(), "reviewNote" = ${reviewNote || null} WHERE id = ${post.id} AND "workspaceId" = ${actor.workspaceId}`;
       await audit(tx, actor, decision === 'approve' ? 'publishing.post_approved' : 'publishing.post_rejected', { postId: post.id, ...(reviewNote ? { note: reviewNote } : {}) });
     });
   });

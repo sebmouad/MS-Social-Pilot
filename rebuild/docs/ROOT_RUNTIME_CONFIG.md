@@ -187,3 +187,9 @@ Registry 58 adds Publishing-owned template bounds and label-directory ceiling,
 Inbox-owned note/saved-reply limits and Settings-owned workspace time-zone input
 policy. These are consumed by the corresponding services and controls. Existing
 shared Inbox transaction budgets also cover assignment, notes and saved replies.
+
+Registry 59 installs Publishing label CRUD bounds, password-recovery token
+lifetime and Analytics explorer page/search bounds. Labels and Explorer each
+have independent installation availability while preserving existing legacy
+Posts and Analytics plan/switch semantics. Recovery uses existing password/mail
+policy; no workspace MCP recovery permission is manufactured.

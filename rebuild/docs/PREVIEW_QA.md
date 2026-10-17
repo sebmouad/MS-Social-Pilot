@@ -1697,3 +1697,47 @@ No new browser/provider proof or production change follows from these checks.
 A separate guarded localhost HTTP/DB/MCP probe is being prepared; its evidence
 will be added only after execution and exact cleanup. Remaining parity and
 release limits are in CORE_WORKFLOWS.md and the capability inventory.
+
+## Fresh Templates browser observation and recovery fix
+
+Real local Chrome verification created an identifiable disposable template with
+message, hashtags and first comment, then exercised touch edit/review controls at
+390×844. Document/client/visual widths were all 390px with zero visual offset,
+and the review dialog was 352px wide. The previously observed 601px overflow
+was not reproduced on this route; other routes/themes still need acceptance.
+Offline save exposed an error outside the modal. The follow-up moves recoverable
+errors and focus inside the active dialog, preserves draft/confirmation, masks
+raw network error copy and adds a passing offline-then-retry component regression.
+A second real offline attempt confirmed the focused in-dialog error and retained
+first comment. Development hot reload then navigated to Chrome's offline page;
+a clean in-place online retry was not established. Network state was restored,
+the route reloaded, and touch deletion confirmed cleanup of the disposable
+template. No real post, provider write or customer record was involved.
+
+Batch 64 focused label, recovery, Explorer, permission and MCP checks passed;
+exact-snapshot full-suite/typecheck/build results will be recorded on completion.
+Live guarded probes remain distinct from mocked and browser evidence.
+
+## Batch 64 final evidence
+
+The final exact staged source passed **1,861 tests across 262 files**, guarded
+PostgreSQL checks enabled, typecheck and production build. An earlier candidate
+failed the one-Analytics-navigation contract; Explorer is now a contextual
+advanced view reached through the sidebar, preserving one Analytics navigation
+entry. The final full run passed that contract without weakening its assertion.
+
+Real localhost HTTP/Root/MCP/PostgreSQL probes passed for template CRUD/labels,
+workspace policy writes, approval enable/disable and pending draft/scheduled
+release, Inbox assignment/notes/saved replies, label cascade consequences and
+Explorer stored reads/feature denials. Probes verified synthetic fixture removal
+and exact restoration of captured Root settings. No provider, external mail or
+production write was used. These runs found an unsupported void advisory-lock
+result and text-to-enum approval SQL; explicit PostgreSQL result/type casts fix
+those actual integration failures. A separate cast also protects bound approval
+decisions in the publishing review path; its real end-to-end review flow is not
+established by the release-policy probe alone.
+
+Scripts and scope: CORE_WORKFLOWS_PROBE.md and LABELS_EXPLORER_PROBE.md. Password
+recovery remains mocked-tested and independently security-reviewed; full local
+SMTP/DB/browser reset verification is still open. Further browser/theme/mobile,
+full provider/legacy/MCP parity, migration and cutover gates remain required.

@@ -29,6 +29,8 @@ import { readAdsDailyRows } from '@/modules/ads/server/report-read';
 import { exportAdsReport } from '@/modules/ads/server/export';
 import { adsReportToolDefinitions, ADS_MCP_MAX_PAGE_ITEMS } from '@/modules/ads/mcp-metadata';
 import { teamToolDefinitions, teamTools, teamWriteTools, executeTeamTool, invitationAvailability } from '@/modules/settings/team-mcp';
+import { labelToolDefinitions, labelTools, labelWriteTools, executeLabelTool } from '@/modules/publishing/labels-mcp';
+import { analyticsExplorerToolDefinitions, analyticsExplorerTools, executeAnalyticsExplorerTool } from '@/modules/analytics/explorer-mcp';
 import { templateToolDefinitions, templateTools, templateWriteTools, executeTemplateTool } from '@/modules/publishing/template-mcp';
 import { inboxProductivityToolDefinitions, inboxProductivityTools, inboxProductivityWriteTools, executeInboxProductivityTool } from '@/modules/inbox/productivity-mcp';
 import { workspacePolicyToolDefinitions, workspacePolicyTools, workspacePolicyWriteTools, executeWorkspacePolicyTool } from '@/modules/settings/workspace-policy-mcp';
@@ -68,6 +70,8 @@ const tools = [
   ...teamToolDefinitions,
   ...workspacePolicyToolDefinitions,
   ...templateToolDefinitions,
+  ...labelToolDefinitions,
+  ...analyticsExplorerToolDefinitions,
   ...inboxProductivityToolDefinitions,
   { name: 'list_workspace_images', description: 'List bounded workspace image metadata. Image bytes remain in workspace storage and are not included.', inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 200 }, cursor: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_workspace_image', description: 'Read metadata for one image stored in this workspace.', inputSchema: { type: 'object', required: ['imageId'], properties: { imageId: { type: 'string' } }, additionalProperties: false } },
@@ -137,6 +141,11 @@ const toolFeatures: Record<string, string> = {
   get_workspace_policies: 'settings/workspace',
   update_workspace_policies: 'settings/workspace',
   export_posts: 'publishing/posts',
+  get_analytics_explorer: 'analytics/explorer',
+  list_post_labels: 'publishing/labels',
+  create_post_label: 'publishing/labels',
+  update_post_label: 'publishing/labels',
+  delete_post_label: 'publishing/labels',
   list_post_templates: 'publishing/templates',
   create_post_template: 'publishing/templates',
   update_post_template: 'publishing/templates',
@@ -199,9 +208,10 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', ...templateWriteTools]);
+const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', ...templateWriteTools, ...labelWriteTools]);
 const writeTools = new Set(['run_root_platform_publication_action', 'manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'delete_workspace_data', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 for (const name of teamWriteTools) writeTools.add(name);
+for (const name of labelWriteTools) writeTools.add(name);
 for (const name of templateWriteTools) writeTools.add(name);
 for (const name of inboxProductivityWriteTools) writeTools.add(name);
 for (const name of workspacePolicyWriteTools) writeTools.add(name);
@@ -328,6 +338,8 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
   if (teamTools.has(name)) return executeTeamTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args, cap);
   if (workspacePolicyTools.has(name)) return executeWorkspacePolicyTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
   if (templateTools.has(name as 'list_post_templates' | 'create_post_template' | 'update_post_template' | 'delete_post_template')) return executeTemplateTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name as 'list_post_templates' | 'create_post_template' | 'update_post_template' | 'delete_post_template', args);
+  if (labelTools.has(name as 'list_post_labels' | 'create_post_label' | 'update_post_label' | 'delete_post_label')) return executeLabelTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
+  if (analyticsExplorerTools.has(name)) return executeAnalyticsExplorerTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer), feature: 'analytics/explorer' }, cap);
   if (inboxProductivityTools.has(name)) return executeInboxProductivityTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args, cap);
   switch (name) {
     case 'list_workspace_images': {
@@ -830,6 +842,10 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     { uri: 'msp://workspace', name: 'Workspace', description: 'Current workspace details.', mimeType: 'application/json' },
     { uri: 'msp://settings/invitations', name: 'Workspace invitations', description: 'Bounded workspace invitations without raw links or credentials.', mimeType: 'application/json' },
     { uri: 'msp://settings/team', name: 'Workspace team', description: 'Bounded member and assignable-channel directory. Continue pages with list_workspace_team.', mimeType: 'application/json' },
+    { uri: 'msp://settings/policies', name: 'Workspace publishing policies', description: 'Current workspace time zone and contributor review policy; managers only.', mimeType: 'application/json' },
+    { uri: 'msp://publishing/templates', name: 'Post templates', description: 'Bounded workspace reusable templates. Continue pages with list_post_templates.', mimeType: 'application/json' },
+    { uri: 'msp://publishing/labels', name: 'Post labels', description: 'Bounded workspace label directory. Continue pages with list_post_labels.', mimeType: 'application/json' },
+    { uri: 'msp://analytics/explorer', name: 'Analytics metric explorer', description: 'Bounded stored metric catalog for authorized selected resources.', mimeType: 'application/json' },
     { uri: 'msp://targets', name: 'Destinations', description: 'Enabled workspace destinations.', mimeType: 'application/json' },
     { uri: 'msp://posts', name: 'Posts', description: 'Recent workspace posts.', mimeType: 'application/json' },
     { uri: 'msp://media/images', name: 'Workspace images', description: 'Bounded workspace image metadata; image bytes are excluded.', mimeType: 'application/json' },
@@ -840,8 +856,8 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     { uri: 'msp://data/deletion-preview', name: 'Data deletion preview', description: 'Current workspace record counts before deletion.', mimeType: 'application/json' },
     ...(canUseRootTool(viewer) ? rootResources : []),
   ].filter(resource => {
-    const feature = ['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
-    return (!['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) || canManageData(viewer)) && (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
+    const feature = resource.uri === 'msp://settings/policies' ? 'settings/workspace' : resource.uri === 'msp://publishing/templates' ? 'publishing/templates' : resource.uri === 'msp://publishing/labels' ? 'publishing/labels' : resource.uri === 'msp://analytics/explorer' ? 'analytics/explorer' : ['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
+    return (!['msp://settings/team', 'msp://settings/invitations', 'msp://settings/policies'].includes(resource.uri) || canManageData(viewer)) && (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
   }) });
   }
   if (method === 'resources/read') {
@@ -862,6 +878,10 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       let contents: unknown;
       if (uri === 'msp://workspace') contents = viewer.workspace;
       else if (uri === 'msp://settings/invitations') contents = await runTool(viewer, 'list_workspace_invitations', {});
+      else if (uri === 'msp://settings/policies') contents = await runTool(viewer, 'get_workspace_policies', {});
+      else if (uri === 'msp://publishing/templates') contents = await runTool(viewer, 'list_post_templates', {});
+      else if (uri === 'msp://publishing/labels') contents = await runTool(viewer, 'list_post_labels', {});
+      else if (uri === 'msp://analytics/explorer') contents = await runTool(viewer, 'get_analytics_explorer', {});
       else if (uri === 'msp://settings/team') contents = await runTool(viewer, 'list_workspace_team', {});
       else if (uri === 'msp://targets') contents = await runTool(viewer, 'list_pages', {});
       else if (uri === 'msp://posts') contents = await runTool(viewer, 'list_posts', { limit: 100 });

@@ -57,6 +57,7 @@ export default function SignIn() {
       {message && <p role="alert" className="muted">{message}</p>}
       <button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
     </form>
+    <p><a href="/password-recovery">Forgot your password?</a></p>
     <button type="button" onClick={signOut}>Sign out of this browser</button>
   </div></main>;
 }

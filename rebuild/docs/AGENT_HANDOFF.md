@@ -44,34 +44,43 @@ session tokens, private environment contents, customer records or raw logs here.
 
 ## Verified application baseline
 
-Latest verified application source is batch 63: template CRUD/composer reuse,
-Inbox assignment/private notes/saved replies, and workspace time zone/approval
-policies. Registry 58 owns the corresponding consumed bounds. Exact staged
-snapshot: 1,825 tests / 256 files passed with guarded PostgreSQL checks enabled,
-typecheck and production build passed. See CORE_WORKFLOWS.md and PREVIEW_QA.md.
-Fresh browser/provider evidence and production cutover are not established.
+Latest verified batch is 64: Publishing labels, password recovery and advanced
+metric exploration, including independent domain/HTTP/MCP checks and registry
+59 integration. Exact staged source passed 1,861 tests / 262 files with guarded
+PostgreSQL checks, typecheck and production build. Source gaps, scope and proof
+are recorded in PUBLISHING_LABELS.md, ACCOUNT_RECOVERY.md, ANALYTICS_EXPLORER.md
+and PREVIEW_QA.md. Password reset lacks fresh real SMTP/DB/browser proof.
 
-Previous batch `4dd2f834aaa857a288fc8d54ce192038d0da2059` adds invitation-based
-onboarding and mail (registry 57). Real localhost HTTP/SMTP capture/Root/MCP/DB
-verification passed and cleanup restored fixtures/settings; no external delivery
-or provider writes. Fresh phone/browser onboarding remains unverified.
+Previous published application batch `c6e1d89` adds templates/composer reuse,
+Inbox assignment/notes/saved replies and workspace time zone/approval policies
+(registry 58). Guarded real HTTP/MCP/DB probes now pass for those flows and for
+labels/Explorer; cleanup restored exact settings and disposable fixtures.
+Batch 64 fixes actual SQL advisory-lock/enum compatibility issues found by those
+probes. Browser template create, phone review/offline error and delete cleanup
+were observed; an uninterrupted online retry was disrupted by dev hot reload.
 
 ## Immediate continuation
 
-Batch 64 is concurrent and unfinished: Claude implemented Publishing labels
-(awaiting independent review/host wiring), Codex implemented password recovery
-(review underway) and an Analytics explorer (awaiting host wiring/review).
-A Claude Sonnet coordinator is dispatching the remaining parity work through
-separate file ownership; see CLAUDE_PARITY_COORDINATION.md if present and its
-private local status path. Do not stage unfinished workers with a broad add.
-Lead owns central registry/MCP/manifests/permission integration and Git publication.
-A guarded batch 63 HTTP/DB/MCP probe is assigned independently; record its actual
-results and cleanup rather than inferring runtime proof from unit tests.
-Full legacy parity, provider proof and release rehearsal remain required.
+Claude Code coordinator is running multiple Sonnet workers over the remaining
+parity inventory. See CLAUDE_PARITY_COORDINATION.md and private local status
+`/private/tmp/msp-claude-worker/coordinator-status.md`; results are in its sibling
+`results/` directory. Four initial slices delivered SOURCE/MOCKED TESTS ONLY:
+Publishing collaboration, sharing/bio, Ads extensions and Root legacy controls.
+Independent Codex reviews own Root W4, sharing W2 and Ads W3 files. Later waves
+cover remaining Analytics, agency/tasks, feeds/AI/media, integrations and native
+Facebook formats. Modules requiring proposed migrations/host ports must stay
+unavailable until integrated and verified; stored-only queue/recycle controls,
+unverified Graph shapes or backup status do not count as complete features.
+
+Lead owns central registry, manifests, permission/entitlement and MCP assembly,
+review, exact-snapshot checks and Git publication. Do not broadly stage the
+unfinished concurrent files. Preserve full target scope and keep useful legacy
+gaps open until runtime/UI/API/MCP evidence exists. Production remains legacy;
+all backup/restore and cutover gates still apply.
 
 Known phone issue: at 390px emulation the document scroll width reached 601px,
 with a wide fixed module rail and touch click timeouts; keyboard workflows worked.
-Do not claim mobile visual acceptance. Investigate the containing/visual viewport
+The later fresh Templates phone check measured 390px throughout and touch controls worked; this does not establish every route/theme. Investigate the containing/visual viewport
 and shared shell instead of adding screen-specific overflow clipping.
 
 ## Operational boundaries and remaining release gaps

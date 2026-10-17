@@ -212,3 +212,8 @@ Batch 63 adds reusable Publishing template CRUD/composer reuse, Inbox assignment
 notes/saved replies, and workspace time zone/approval policy. These scoped slices
 do not close the broader Publishing, Inbox or workspace settings rows. Runtime,
 browser/provider and cutover evidence remain separate; see CORE_WORKFLOWS.md.
+
+Batch 64 source adds shared label management, self-service email password
+recovery and normalized metric exploration. Account OAuth/general verification,
+full analytics demographic/report workflows, bulk label assignment and other
+legacy row gaps remain open. See the three module documents for exact scope.

@@ -40,6 +40,17 @@ describe('Root installation availability', () => {
     expect(resolveEntitlements({ ...source, planFeatures: ['product_v2', 'publishing/posts'] }).features['publishing/templates']).toBe(false);
   });
 
+  it('gates labels and metric exploration independently from their legacy plan switches', () => {
+    const baseline = resolveEntitlements(source);
+    expect(baseline.features['publishing/labels']).toBe(true);
+    expect(baseline.features['analytics/explorer']).toBe(true);
+    const disabled = resolveEntitlements({ ...source, installationAvailability: { 'entitlements.features.publishing/labels': false, 'entitlements.features.analytics/explorer': false } });
+    expect(disabled.features['publishing/labels']).toBe(false);
+    expect(disabled.features['publishing/posts']).toBe(true);
+    expect(disabled.features['analytics/explorer']).toBe(false);
+    expect(disabled.features['analytics/overview']).toBe(true);
+  });
+
   it('removes every child feature when a module is disabled', () => {
     const access = resolveEntitlements({ ...source, installationAvailability: { 'entitlements.modules.ads': false } });
     expect(access.modules.ads).toBe(false);

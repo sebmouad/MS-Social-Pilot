@@ -56,7 +56,7 @@ export async function updateWorkspacePolicy(actor: WorkspacePolicyActor, input: 
       if (!rows[0]) throw new OperationError('not_found', 'This workspace is unavailable.');
       if (rows[0].suspendedAt) throw new OperationError('forbidden', 'This workspace is suspended.');
       const lockKey = JSON.stringify(['workspace-policy', actor.workspaceId]);
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text`;
       const purge = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId }, select: { status: true } });
       if (purge && purge.status !== 'completed') throw new OperationError('conflict', 'Workspace data deletion is in progress.');
       const current = await tx.$queryRaw<Array<{ role: string; disabledAt: Date | null }>>`SELECT m.role::text AS role, u."disabledAt" FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} FOR UPDATE OF m, u`;
@@ -66,7 +66,7 @@ export async function updateWorkspacePolicy(actor: WorkspacePolicyActor, input: 
       if (!entitlements || entitlements.workspaceId !== actor.workspaceId || !canUseFeature(entitlements, 'settings/workspace') || !permissions || !canAccessFeature(permissions, 'settings/workspace', 'write')) throw forbidden();
       if (rows[0].requiresApproval && !value.data.requiresApproval) {
         const released = await tx.$queryRaw<Array<{ total: bigint; scheduled: bigint; drafts: bigint }>>`WITH released AS (
-          UPDATE posts SET "approvalStatus" = 'not_required', status = CASE WHEN "scheduledAt" IS NULL THEN 'draft' ELSE 'scheduled' END
+          UPDATE posts SET "approvalStatus" = 'not_required', status = CASE WHEN "scheduledAt" IS NULL THEN 'draft'::"PostStatus" ELSE 'scheduled'::"PostStatus" END
           WHERE "workspaceId" = ${actor.workspaceId} AND status = 'pending_approval' AND "approvalStatus" = 'pending'
           RETURNING "scheduledAt"
         ) SELECT COUNT(*)::bigint AS total, COUNT(*) FILTER (WHERE "scheduledAt" IS NOT NULL)::bigint AS scheduled, COUNT(*) FILTER (WHERE "scheduledAt" IS NULL)::bigint AS drafts FROM released`;

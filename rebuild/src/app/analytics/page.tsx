@@ -57,7 +57,7 @@ function Pagination({ query, parameter, page, pages, label }: { query: string; p
   </nav>;
 }
 
-function AnalyticsSidebar({ data, query, exportHref, connectionsHref }: { data: AnalyticsReadResult; query: string; exportHref?: string; connectionsHref?: string }) {
+function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHref }: { data: AnalyticsReadResult; query: string; exportHref?: string; connectionsHref?: string; explorerHref?: string }) {
   const params = new URLSearchParams(query);
   const selectedChannels = new Set(data.selected.channelIds);
   const selectedAccounts = new Set(data.selected.adAccountIds);
@@ -117,6 +117,7 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref }: { data: 
         <a className="analytics-sidebar-export" href={`/analytics?${removeQuery(data.query, 'metric')}`}>Back to all metric cards</a>
       </>}
       {exportHref && <><a className="analytics-sidebar-export" href={exportHref}>Export CSV</a><p className="analytics-export-note">Exports include up to {data.exportRowLimit} data rows. Larger downloads are marked as truncated.</p></>}
+      {explorerHref && <a className="analytics-sidebar-export" href={explorerHref}>Explore metric sources and types</a>}
       {connectionsHref && <a className="analytics-sidebar-export" href={connectionsHref}>View connections</a>}
       {!data.metrics.total && <p className="small-note">No metrics match these filters.</p>}
     </div>
@@ -202,11 +203,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     exportQuery.delete('page'); exportQuery.delete('pointPage'); exportQuery.delete('rowPage'); exportQuery.delete('metric');
   }
   const exportHref = canExport && exportQuery ? `/api/reports/export?${exportQuery.toString()}` : undefined;
+  const explorerHref = data && canUseFeature(viewer.entitlements, 'analytics/explorer') && canAccessFeature(viewer.permissions, 'analytics/explorer') ? `/analytics/explorer?${exportQuery?.toString() ?? ''}` : undefined;
   const connectionsHref = canManageConnections ? '/settings/connections' : undefined;
   const retryQuery = rawQuery(params);
   const retryHref = `/analytics${retryQuery ? `?${retryQuery}` : ''}`;
 
-  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar data={data} query={data.query} exportHref={exportHref} connectionsHref={!data.options.channels.length && !data.options.adAccounts.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar retryHref={retryHref} /> : undefined}>
+  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length && !data.options.adAccounts.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar retryHref={retryHref} /> : undefined}>
     <div className="page-stack">
       <header className="page-heading"><div><p className="eyebrow">Analytics</p><h1>Performance</h1>
         {data && <><p title="These are inclusive stored calendar-date boundaries in UTC.">Stored calendar dates (UTC): {formatDay(data.period.start)} to {formatDay(data.period.end)}.</p>

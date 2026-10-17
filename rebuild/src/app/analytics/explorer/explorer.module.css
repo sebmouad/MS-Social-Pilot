@@ -1,0 +1,41 @@
+.root { display: grid; gap: 1.25rem; min-width: 0; }
+.heading h1 { margin: 0; color: var(--ink); font-size: clamp(1.65rem, 4vw, 2.15rem); }
+.heading p { margin: .45rem 0 0; color: var(--ink-soft); line-height: 1.5; }
+.heading a, .sidebar a { color: var(--accent); text-underline-offset: .18em; }
+.eyebrow { margin: 0 0 .25rem; color: var(--accent); font-size: .75rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.panel { display: grid; gap: 1rem; min-width: 0; padding: clamp(1rem, 3vw, 1.35rem); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-panel); }
+.listHeader, .detailHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.listHeader h2, .detailHeader h2 { margin: 0; font-size: 1.15rem; }
+.listHeader p, .detailHeader p { margin: .3rem 0 0; color: var(--ink-soft); font-size: .88rem; line-height: 1.5; }
+.listHeader > span, .detailHeader > strong { flex: 0 0 auto; color: var(--ink); font-size: .95rem; }
+.metricList { display: grid; gap: .7rem; }
+.metricList article { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; min-width: 0; padding: .9rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.metricList article > div { min-width: 0; }
+.metricList h3 { margin: 0; font-size: 1rem; }
+.metricList h3 a { color: var(--accent); text-decoration: underline; text-underline-offset: .15em; }
+.metricList p, .metricList small { display: block; margin: .3rem 0 0; color: var(--ink-soft); font-size: .82rem; line-height: 1.45; overflow-wrap: anywhere; }
+.metricList article > strong { flex: 0 0 auto; max-width: 35%; color: var(--ink); text-align: end; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.coverage, .empty { margin: 0; color: var(--ink-soft); font-size: .88rem; }
+.tableWrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.tableWrap table { width: 100%; border-collapse: collapse; text-align: start; font-size: .87rem; }
+.tableWrap caption { padding: .7rem; color: var(--ink-soft); text-align: start; }
+.tableWrap th, .tableWrap td { padding: .65rem .75rem; border-top: 1px solid var(--line); vertical-align: top; }
+.tableWrap th { font-weight: 650; }
+.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; color: var(--ink-soft); font-size: .83rem; }
+.pager a { color: var(--accent); text-decoration: underline; text-underline-offset: .15em; }
+.sidebar { display: grid; gap: 1rem; min-width: 0; }
+.filters { display: grid; gap: .8rem; min-width: 0; }
+.filters h2 { margin: 0; font-size: 1rem; }
+.filters > label { display: grid; gap: .35rem; color: var(--ink-soft); font-size: .82rem; font-weight: 650; }
+.filters input:not([type=checkbox]), .filters select { width: 100%; min-width: 0; min-height: 40px; padding: .55rem .65rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); background: var(--surface); font: inherit; }
+.filters fieldset { display: grid; gap: .5rem; min-width: 0; max-height: 15rem; overflow: auto; margin: 0; padding: .65rem; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.filters legend { padding: 0 .2rem; color: var(--ink-soft); font-size: .8rem; font-weight: 700; }
+.filters fieldset > label:not(.check) { display: grid; gap: .3rem; color: var(--ink-soft); font-size: .78rem; }
+.filters fieldset p { margin: 0; color: var(--ink-soft); font-size: .8rem; }
+.check { display: flex; align-items: flex-start; gap: .5rem; color: var(--ink); font-size: .82rem; line-height: 1.35; overflow-wrap: anywhere; }
+.check input { flex: 0 0 auto; margin-top: .12rem; }
+.sidebarNote { margin: 0; color: var(--ink-soft); font-size: .78rem; line-height: 1.45; }
+.export { padding-top: .8rem; border-top: 1px solid var(--line); }
+.export > a { color: var(--accent); font-size: .84rem; font-weight: 700; text-decoration: underline; text-underline-offset: .15em; }
+.export > p { margin: .3rem 0 0; color: var(--ink-soft); font-size: .75rem; line-height: 1.4; }
+@media (max-width: 42rem) { .listHeader, .detailHeader { flex-direction: column; } .metricList article { flex-direction: column; } .metricList article > strong { max-width: 100%; text-align: start; } }

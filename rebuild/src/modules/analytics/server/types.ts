@@ -4,7 +4,7 @@ import type { AnalyticsAdAccount, AnalyticsAudienceEntry, AnalyticsTarget } from
 export type AnalyticsReadActor = { userId: string; workspaceId: string };
 export type AnalyticsReadConstraints = {
   allowedChannelIds?: readonly string[];
-  feature?: 'analytics/overview' | 'analytics/reports';
+  feature?: 'analytics/overview' | 'analytics/reports' | 'analytics/explorer';
 };
 export type AnalyticsReadInput = {
   start?: string;

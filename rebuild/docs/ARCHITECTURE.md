@@ -579,3 +579,19 @@ Registry 58 adds consumed module settings and bounds. Existing legacy tables
 are reused; no DDL or production change is implied. Approval metadata is cleared
 when approved content is edited; managers retain their existing bypass.
 See CORE_WORKFLOWS.md for coverage and remaining release evidence.
+
+## Labels, account recovery and Analytics explorer — batch 64
+
+Publishing labels use the legacy label relations with scoped CRUD, association
+counts, guarded cascade consequences and shared HTTP/MCP domain operations.
+Workspace-wide changes require all-channel authority and refuse corrupt foreign
+references. Settings account recovery uses hashed one-use email tokens, cheap
+validity preflight before password hashing, active-account locks and atomic token
+consumption/password update/session revocation. It preserves MFA and issues no
+session. Public recovery has no workspace MCP identity and is not exposed as a
+workspace tool. Analytics metric exploration uses the existing normalized reader
+with selected-resource scope, strict filters, paginated series and provenance.
+Registry 59 installs the corresponding module-owned operational policy. Root
+feature availability, permissions, manifests and MCP resources use canonical
+labels/explorer feature IDs. No DDL, provider write or production cutover occurs.
+See PUBLISHING_LABELS.md, ACCOUNT_RECOVERY.md and ANALYTICS_EXPLORER.md.
