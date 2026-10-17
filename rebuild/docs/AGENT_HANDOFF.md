@@ -121,3 +121,12 @@ Registry 60 integrates Root-owned plan controls, privilege directory/complete-or
 The guarded local `scripts/verify-root-operations.ts` passed actual HTTP/MCP/PostgreSQL operations, authorization refusals, confirmations, persisted outcomes and exact fixture/configuration cleanup. Desktop Chrome verified the privilege page and contextual filters. These checks do not prove phone/theme mutation flows, archive restoration, live provider capability or production readiness. Backup records report recorded status only. Production remains legacy; parallel Claude source slices are unfinished integration work and must not be included in this batch.
 
 Batch 65 verification: isolated staged-source snapshot passed 1,947 tests / 264 files, typecheck and production build. Chrome desktop also refused repeated privilege filters without broader results or export. Claude second-account coordinator terminated on its session limit (reset reported 04:10 Africa/Casablanca); do not mistake its status file for a live process or restart its already-completed slices. W6c/W7b follow-ups require inspection before resuming.
+
+
+## Batch 66 — Publishing collaboration source foundation
+
+The Publishing-owned collaboration slice is preserved in version control with service, HTTP, UI and MCP metadata source for bulk label assignments, custom fields, internal notes/mentions, versions, queue times, content mix and recycling. It is NOT host-integrated or release-ready: its Root settings are not registered, customer navigation/MCP host registration and publishing lifecycle/worker ports remain unconnected. Do not report these capabilities as delivered to customers.
+
+Lead review removed fail-open worker eligibility and per-run cached workspace grants. Missing owner-qualification callbacks now refuse before reads; each recycle item requires a fresh eligibility check. Three failing regressions establish the original bug; 68 focused mocked tests pass after the fix. Typecheck and production build passed the isolated source snapshot. Remaining security/integration gaps are explicit in PUBLISHING_COLLABORATION.md, including transaction-boundary checks, recycled-variant approval, destination authority, version hooks and PostgreSQL/browser/MCP proof. Continue integration; do not enable ports from metadata alone.
+
+Batch 66 isolated full suite: 2,015 tests / 267 files passed with guarded local PostgreSQL tests enabled; typecheck and production build passed. Collaboration-specific tests remain mocked and do not establish its real data, browser or runtime integration.

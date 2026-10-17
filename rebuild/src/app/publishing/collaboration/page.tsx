@@ -1,0 +1,55 @@
+import { OperationError } from '@/lib/operation-error';
+import { RouteNotice } from '@/components/RouteNotice';
+import { requireViewer } from '@/server/context';
+import { canAccessFeature } from '@/server/permissions';
+import { bounds } from '@/modules/publishing/collaboration/server/core';
+import { readCustomFields } from '@/modules/publishing/collaboration/server/custom-fields';
+import { listAssignablePosts } from '@/modules/publishing/collaboration/server/post-list';
+import { readContentMix } from '@/modules/publishing/collaboration/server/content-mix';
+import { readQueueSlots } from '@/modules/publishing/collaboration/server/queue-slots';
+import { readLabelPage } from '@/modules/publishing/server/labels';
+import { collaborationCapabilities } from '@/modules/publishing/collaboration/ports';
+import { PageHeading } from '../publishing-ui';
+import { BulkLabels } from './BulkLabels';
+import { CollaborationNav, type ViewId } from './CollaborationNav';
+import { ContentMix } from './ContentMix';
+import { FieldsManager } from './FieldsManager';
+import { QueueTimes } from './QueueTimes';
+
+const TITLES: Record<ViewId, string> = { assign: 'Labels on posts', fields: 'Custom fields', queue: 'Queue times', mix: 'Content mix' };
+
+export default async function CollaborationPage({ searchParams }: { searchParams: Promise<{ view?: string; page?: string; q?: string }> }) {
+  const params = await searchParams;
+  const caps = collaborationCapabilities();
+  const available: ViewId[] = ['assign', 'fields', ...(caps.queueTimes ? ['queue' as const] : []), ...(caps.contentMix ? ['mix' as const] : [])];
+  const view: ViewId = available.includes(params.view as ViewId) ? (params.view as ViewId) : 'assign';
+  const feature = view === 'queue' || view === 'mix' ? 'publishing/queue' : 'publishing/posts';
+  const viewer = await requireViewer({ feature, channelScoped: true });
+  const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
+  const canWrite = canAccessFeature(viewer.permissions, feature, 'write');
+  const failure = (error: unknown) => <><PageHeading title={TITLES[view]} description="Organize posts for your team." /><RouteNotice error focusKey="collab-load-error">{error instanceof OperationError ? error.message : 'This page could not be loaded. Refresh and try again.'}</RouteNotice></>;
+  try {
+    const nav = <CollaborationNav view={view} available={available} />;
+    if (view === 'assign') {
+      const page = params.page && /^[1-9]\d{0,4}$/.test(params.page) ? Number(params.page) : 1;
+      const q = typeof params.q === 'string' ? params.q.slice(0, 120) : '';
+      const [result, labels] = await Promise.all([listAssignablePosts(actor, { page, ...(q ? { q } : {}) }), readLabelPage(actor, { page: 1 })]);
+      return <>{nav}<PageHeading title="Labels on posts" description="Tag many posts at once, or open a post to organize it in detail." />
+        <BulkLabels initialPosts={result.posts.map(p => ({ ...p, scheduledAt: p.scheduledAt?.toISOString() ?? null }))} labels={labels.labels.map(({ id, name, color }) => ({ id, name, color }))} page={result.page} hasMore={result.hasMore} query={result.query} canWrite={canWrite} bulkLimit={result.bulkLimit} labelsPerPost={result.labelsPerPostLimit} /></>;
+    }
+    if (view === 'fields') {
+      const [fields, limit] = await Promise.all([readCustomFields(actor), bounds()]);
+      const canManage = canWrite && (viewer.membership.role === 'owner' || viewer.membership.role === 'admin') && viewer.permissions.pageScope.all;
+      return <>{nav}<PageHeading title="Custom fields" description="Track campaign codes, products or requesters on every post." />
+        <FieldsManager initialFields={fields} canManage={canManage} limits={{ fieldLimit: limit.fieldLimit, nameMax: limit.fieldNameMax, optionMax: limit.fieldOptionMax }} /></>;
+    }
+    if (view === 'queue') {
+      const [result, limit] = await Promise.all([readQueueSlots(actor), bounds()]);
+      return <>{nav}<PageHeading title="Queue times" description="Choose the weekly times queued posts publish at." />
+        <QueueTimes slots={result.slots} targets={result.targets.map(({ id, name }) => ({ id, name }))} canEditShared={result.canEditShared} canEditChannels={result.canEditChannels} limit={limit.queueSlotLimit} /></>;
+    }
+    const mix = await readContentMix(actor);
+    return <>{nav}<PageHeading title="Content mix" description="Balance what each channel posts by label." />
+      <ContentMix targets={mix.targets.map(({ id, name }) => ({ id, name }))} groups={mix.groups} labels={mix.labels.map(({ id, name }) => ({ id, name }))} rules={mix.rules} status={mix.status} windowDays={mix.windowDays} maxPerWeek={mix.maxPerWeek} canEditChannels={mix.canEditChannels} canEditGroups={mix.canEditGroups} /></>;
+  } catch (error) { return failure(error); }
+}

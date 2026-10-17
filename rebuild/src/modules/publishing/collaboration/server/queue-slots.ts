@@ -1,0 +1,54 @@
+import { randomUUID } from 'node:crypto';
+import { OperationError } from '@/lib/operation-error';
+import { prisma } from '@/server/data';
+import { authorizePublishing } from '../../server/access';
+import type { PublishingActor } from '../../server/types';
+import { collaborationPorts } from '../ports';
+import { replaceSlotsConfirmation, SLOTS_READ, SLOTS_REPLACE, slotKey } from '../schemas';
+import { audit, bad, bounds, exact, lockActor, parse, protect, QUEUE, requireWorkspaceAdmin, transact, usableTargets } from './core';
+
+const notOffered = () => new OperationError('unavailable', 'Queue times are not available yet.');
+export type QueueSlotRecord = { id: string; targetId: string | null; dayOfWeek: number; hour: number; minute: number };
+
+/** Shared times plus the own times of channels the caller can use; `targetId` narrows to one channel. */
+export async function readQueueSlots(actor: PublishingActor, input: unknown = {}) {
+  const query = parse(SLOTS_READ, input);
+  if (!collaborationPorts().queue) throw notOffered();
+  const auth = await authorizePublishing(actor, QUEUE, 'read');
+  const targets = await protect(usableTargets(auth));
+  if (query.targetId && !targets.some(t => t.id === query.targetId)) throw new OperationError('not_found', 'This channel is unavailable in the current workspace.');
+  const ids = query.targetId ? [query.targetId] : targets.map(t => t.id);
+  const slots = await protect(prisma.$queryRaw<QueueSlotRecord[]>`SELECT id, "targetId", "dayOfWeek", hour, minute FROM queue_slots WHERE "workspaceId" = ${actor.workspaceId} AND ("targetId" IS NULL OR "targetId" = ANY(${ids}::text[])) ORDER BY "dayOfWeek" ASC, hour ASC, minute ASC, id ASC`);
+  const canEdit = auth.permissions.features[QUEUE]?.write === true && (auth.role === 'owner' || auth.role === 'admin');
+  return { slots, targets, canEditShared: canEdit && auth.permissions.pageScope.all, canEditChannels: canEdit };
+}
+
+/**
+ * Replaces one timetable (shared, or one channel's own) in a single atomic step. Admin-only because the times decide when every
+ * queued post goes out; the shared timetable additionally needs access to all channels. Duplicate times collapse.
+ */
+export async function replaceQueueSlots(actor: PublishingActor, input: unknown) {
+  const data = parse(SLOTS_REPLACE, input); exact(data.confirmation, replaceSlotsConfirmation(data.targetId));
+  if (!collaborationPorts().queue) throw notOffered();
+  const limit = await bounds();
+  const unique = [...new Map(data.slots.map(s => [slotKey(s), s])).values()];
+  if (unique.length > limit.queueSlotLimit) throw bad(`Use at most ${limit.queueSlotLimit} times in one timetable.`);
+  const check = (auth: Awaited<ReturnType<typeof authorizePublishing>>) => {
+    if (auth.role !== 'owner' && auth.role !== 'admin') throw new OperationError('forbidden', 'Only workspace owners and admins can change queue times.');
+    if (data.targetId === null) requireWorkspaceAdmin(auth, 'change the shared queue times');
+  };
+  check(await authorizePublishing(actor, QUEUE, 'write'));
+  return protect(transact(actor.workspaceId, limit, async tx => {
+    const auth = await lockActor(tx, actor, QUEUE, true); check(auth);
+    if (data.targetId !== null) {
+      const targets = await usableTargets(auth);
+      if (!targets.some(t => t.id === data.targetId)) throw new OperationError('not_found', 'This channel is unavailable in the current workspace.');
+    }
+    const previous = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM queue_slots WHERE "workspaceId" = ${actor.workspaceId} AND "targetId" IS NOT DISTINCT FROM ${data.targetId}`;
+    await tx.$executeRaw`DELETE FROM queue_slots WHERE "workspaceId" = ${actor.workspaceId} AND "targetId" IS NOT DISTINCT FROM ${data.targetId}`;
+    for (const slot of unique) await tx.$executeRaw`INSERT INTO queue_slots (id, "workspaceId", "targetId", "dayOfWeek", hour, minute, "createdAt") VALUES (${`qs_${randomUUID()}`}, ${actor.workspaceId}, ${data.targetId}, ${slot.dayOfWeek}, ${slot.hour}, ${slot.minute}, NOW())`;
+    await audit(tx, actor, 'publishing.queue_times_replaced', { targetId: data.targetId, before: Number(previous[0]?.count ?? 0), after: unique.length });
+    await lockActor(tx, actor, QUEUE, true);
+    return { targetId: data.targetId, count: unique.length, replaced: Number(previous[0]?.count ?? 0) };
+  }));
+}
