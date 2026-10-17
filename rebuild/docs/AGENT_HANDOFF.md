@@ -112,3 +112,12 @@ and shared shell instead of adding screen-specific overflow clipping.
 Update this handoff and the relevant evidence/plan documents when a batch changes
 what the next agent must know. Preserve required target scope; report limitations
 rather than rewriting the target around unfinished implementation.
+
+
+## Batch 65 — private Root operations
+
+Registry 60 integrates Root-owned plan controls, privilege directory/complete-or-refused CSV, account/workspace lifecycle inspection and ownership transfer, redacted error management, and recorded backup/diagnostic summaries. UI/API/installation MCP use shared current-authority services; workspace roles and API keys cannot grant Root. Mutations serialize affected accounts/workspaces and audit atomically. Filters and CSV controls occupy the existing contextual sidebar.
+
+The guarded local `scripts/verify-root-operations.ts` passed actual HTTP/MCP/PostgreSQL operations, authorization refusals, confirmations, persisted outcomes and exact fixture/configuration cleanup. Desktop Chrome verified the privilege page and contextual filters. These checks do not prove phone/theme mutation flows, archive restoration, live provider capability or production readiness. Backup records report recorded status only. Production remains legacy; parallel Claude source slices are unfinished integration work and must not be included in this batch.
+
+Batch 65 verification: isolated staged-source snapshot passed 1,947 tests / 264 files, typecheck and production build. Chrome desktop also refused repeated privilege filters without broader results or export. Claude second-account coordinator terminated on its session limit (reset reported 04:10 Africa/Casablanca); do not mistake its status file for a live process or restart its already-completed slices. W6c/W7b follow-ups require inspection before resuming.

@@ -129,3 +129,10 @@ resume incomplete Analytics, agency/tasks, feeds/AI/media, integrations and
 Facebook formats. See CLAUDE_ACCOUNT2_COORDINATION.md for exact ownership.
 Lead retains central integration and Git publication. No partial worker result
 is a release claim, and production remains legacy.
+
+
+## Batch 65 — private Root operations
+
+Registry 60 integrates Root-owned plan controls, privilege directory/complete-or-refused CSV, account/workspace lifecycle inspection and ownership transfer, redacted error management, and recorded backup/diagnostic summaries. UI/API/installation MCP use shared current-authority services; workspace roles and API keys cannot grant Root. Mutations serialize affected accounts/workspaces and audit atomically. Filters and CSV controls occupy the existing contextual sidebar.
+
+The guarded local `scripts/verify-root-operations.ts` passed actual HTTP/MCP/PostgreSQL operations, authorization refusals, confirmations, persisted outcomes and exact fixture/configuration cleanup. Desktop Chrome verified the privilege page and contextual filters. These checks do not prove phone/theme mutation flows, archive restoration, live provider capability or production readiness. Backup records report recorded status only. Production remains legacy; parallel Claude source slices are unfinished integration work and must not be included in this batch.
