@@ -61,12 +61,22 @@ were observed; an uninterrupted online retry was disrupted by dev hot reload.
 
 ## Immediate continuation
 
-Claude Code coordinator is running multiple Sonnet workers over the remaining
-parity inventory. See CLAUDE_PARITY_COORDINATION.md and private local status
-`/private/tmp/msp-claude-worker/coordinator-status.md`; results are in its sibling
-`results/` directory. Four initial slices delivered SOURCE/MOCKED TESTS ONLY:
+The first Claude subscription reached its session limit after W1-W4 source
+handoffs; later W5/W6/W7 files are partial, and W8 had not started. Codex worker
+turns also stopped on exhausted workspace credits. The user explicitly selected
+a second Claude account. Its isolated CLI profile was verified signed in and
+distinct, without displaying account details. A second Sonnet coordinator has
+launched four review/fix workers over W1-W4, then will reconcile/finish later
+waves. See CLAUDE_ACCOUNT2_COORDINATION.md and private status
+`/private/tmp/msp-claude-worker/account2-status.md`. First-run status remains
+`/private/tmp/msp-claude-worker/coordinator-status.md`; per-worker results are in
+the sibling `results/` directory. Never publish login state or credential files. Four initial slices delivered SOURCE/MOCKED TESTS ONLY:
 Publishing collaboration, sharing/bio, Ads extensions and Root legacy controls.
-Independent Codex reviews own Root W4, sharing W2 and Ads W3 files. Later waves
+Second-account Claude review workers now own Root W4, sharing W2, Ads W3 and
+Publishing collaboration W1. Preserve partial Codex/parent review fixes, including
+Root config/policy separation, sorted account locks and CAS concerns. The parent
+must not edit those owned files concurrently. Root W4 focused mocks passed 77
+tests before this handoff; this is not real SQL/browser proof or host integration. Later waves
 cover remaining Analytics, agency/tasks, feeds/AI/media, integrations and native
 Facebook formats. Modules requiring proposed migrations/host ports must stay
 unavailable until integrated and verified; stored-only queue/recycle controls,

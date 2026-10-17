@@ -118,3 +118,14 @@ labels slice is in independent review. A separate coordinator is rotating up to
 four Claude workers through the remaining inventory; exact non-overlapping
 ownership is in CLAUDE_PARITY_COORDINATION.md. Lead retains integration, checks
 and publication. Queue state is implementation work, not verified completion.
+
+## Delegation continuity after first-account limits
+
+First Claude account delivered W1-W4 source handoffs; later-wave files were
+interrupted by its session cap. Codex worker credits were exhausted as well.
+At the user's explicit request, an isolated second Claude account was verified
+and its coordinator launched four review/fix workers over W1-W4. It will then
+resume incomplete Analytics, agency/tasks, feeds/AI/media, integrations and
+Facebook formats. See CLAUDE_ACCOUNT2_COORDINATION.md for exact ownership.
+Lead retains central integration and Git publication. No partial worker result
+is a release claim, and production remains legacy.
