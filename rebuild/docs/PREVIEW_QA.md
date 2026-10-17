@@ -1639,9 +1639,7 @@ while the UI omits them from the selectable list. Server scope validation refuse
 those IDs before replacing grants, so this is a blocked edit/recovery path, not a
 silent grant removal. The explicit removal action and warning are implemented and covered by component tests; no automatic grant removal occurs.
 
-Typecheck and an isolated production build passed. The final full-suite run is
-still in progress; do not infer its final count from the earlier run, which had
-two fixture failures corrected before the current run. The strict static audit
+Typecheck and an isolated production build passed. Initial full-suite runs found test-harness compatibility issues (registry version/metadata assertions and the new router dependency); these were corrected before the final passing run recorded below. The strict static audit
 reported two existing shared-primitive findings (`Button` prop forwarding and
 `AutoTextarea` inline resize suppression); no clean audit claim is made. Logs:
 `/private/tmp/socialpilot-team61-live-api.log`, `/private/tmp/socialpilot-team61-build.log`,
