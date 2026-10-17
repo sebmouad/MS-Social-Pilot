@@ -407,3 +407,7 @@ CSV. Both Ads routes explicitly admit current scoped readers while services keep
 management restrictions. ADS_REPORT_EXPORT.md owns data, permissions, limits and
 redaction policy; PREVIEW_QA.md owns actual evidence. Complete provider coverage,
 comparison/status/freshness analysis and all-screen accessibility remain open.
+
+## Workspace team access — batch 61
+
+Owners and admins can add an existing account, review its role/channel scope, edit another member, or remove workspace access through explicit exact-text confirmation. Changes preserve other workspace memberships. Owner/admin roles have all-channel access; only owners manage owner roles. Pending changes block duplicates and dialogs remain available after uncertain outcomes, with focused feedback and a directory refresh path. The current directory identifies unavailable prior channel grants; editing those grants still needs a clear recovery action before the workflow is complete. MCP uses the same confirmation and domain services. New invitations, account creation, mail and seat-plan policy are not implemented. See TEAM_ACCESS.md and PREVIEW_QA.md.

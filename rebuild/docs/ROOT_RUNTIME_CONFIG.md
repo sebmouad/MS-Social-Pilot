@@ -156,3 +156,7 @@ successful reads/writes and handled failures/denials. Unexpected read failures
 are masked. This matches the existing private MCP boundary and prevents browser
 caching of installation definitions/current safe values. It does not substitute
 for Root authorization or claim that every private route has been audited.
+
+## Settings team controls — registry 56
+
+The Settings module owns six active Root entries for team membership defaults and bounds: default role `contributor`, default all-channel access `false`, maximum members `500`, maximum channel grants `1000`, transaction timeout `15000` ms, and max wait `2000` ms. Team reads and writes consume the limits; defaults are declared for the team workflow. They do not implement invitation, onboarding, mail delivery or seat-plan policy. No table/schema migration accompanies this registry version. See TEAM_ACCESS.md.

@@ -1615,3 +1615,43 @@ collection metrics/formats, live grant/expiry proof, callback lifecycle, Inbox/
 Ads management, broader legacy/MCP parity and release gates remain unfinished.
 The private Facebook cleanup ledger/lock were not modified. Root numeric input
 min/max hints and the complete visual/accessibility matrix remain open.
+
+## Workspace team access — batch 61, 2026-10-17
+
+The Settings-owned team service is shared by the customer page, HTTP and MCP.
+The guarded `scripts/verify-team-access.ts` probe passed against actual local
+HTTP/MCP keys and PostgreSQL grants/audits. It exercised suspension and account
+disablement, channel-scope enforcement, admin/owner authority, self-protection,
+disabled-member removal, and retention of the removed person's other workspace.
+Cleanup was verified. No provider request, schema migration or production change
+occurred.
+
+In the owned browser tab, adding an account succeeded with focused feedback;
+a missing-account failure retained the form context. On a 390px Nightfall phone
+emulation, offline edit failure preserved Viewer role, two channel choices and
+confirmation, and focused the uncertain-outcome message. Online edit then succeeded with the Viewer role and both selected channels. Removal succeeded with focused feedback; HTTP readback confirmed absence. The three browser domain audits and disposable account cleanup were verified. The phone inspection also showed 601px document
+scroll width from the fixed module rail at a 390px viewport; touch interaction
+hit timeouts while keyboard interaction worked. Mobile visual/interaction pass
+is not claimed. Investigation remains open.
+
+The current edit form carries unavailable existing target IDs into submission,
+while the UI omits them from the selectable list. Server scope validation refuses
+those IDs before replacing grants, so this is a blocked edit/recovery path, not a
+silent grant removal. The explicit removal action and warning are implemented and covered by component tests; no automatic grant removal occurs.
+
+Typecheck and an isolated production build passed. The final full-suite run is
+still in progress; do not infer its final count from the earlier run, which had
+two fixture failures corrected before the current run. The strict static audit
+reported two existing shared-primitive findings (`Button` prop forwarding and
+`AutoTextarea` inline resize suppression); no clean audit claim is made. Logs:
+`/private/tmp/socialpilot-team61-live-api.log`, `/private/tmp/socialpilot-team61-build.log`,
+`/private/tmp/socialpilot-team61-rebuild-type.log`, `/private/tmp/socialpilot-team61-full-tests.log`,
+`/private/tmp/socialpilot-team61-release-tests.log`, and `/private/tmp/socialpilot-team61-ui-audit.json`.
+Final test totals follow below. Root defaults are least-privilege by default: contributor with no channels selected.
+
+Final batch 61 verification: **1,743 tests across 244 files passed**, with guarded
+PostgreSQL checks explicitly enabled (`/private/tmp/socialpilot-team61-final-tests.log`).
+Final rebuild typecheck and whitespace check passed; isolated production build
+passed without changing the preview `.next`. The original positional Team service
+and its obsolete test were removed; all entry points use the Settings-owned service.
+The browser test tab was closed, leaving the user's Analytics tab untouched.

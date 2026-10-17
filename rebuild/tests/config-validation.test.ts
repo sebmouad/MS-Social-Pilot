@@ -27,7 +27,14 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(55);
+    expect(CONFIG_SCHEMA_VERSION).toBe(56);
+    expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
+    expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
+    expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);
+    for (const key of ['settings.teamMaxMembers', 'settings.teamMaxChannels', 'settings.teamOperationTimeoutMs', 'settings.teamOperationMaxWaitMs']) {
+      expect(safeConfigShape().find(setting => setting.key === key)).toMatchObject({ consumption: 'active', owner: { kind: 'product', id: 'settings' } });
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(0).success).toBe(false);
+    }
     expect(CONFIG_BY_KEY.get('jobs.workspaceOwnerPolicy')!.schema.safeParse('any_active_owner').success).toBe(true);
     expect(CONFIG_BY_KEY.get('jobs.workspaceOwnerPolicy')!.schema.safeParse('all_active_owners').success).toBe(true);
     expect(CONFIG_BY_KEY.get('jobs.workspaceOwnerPolicy')!.schema.safeParse('root_bypass').success).toBe(false);

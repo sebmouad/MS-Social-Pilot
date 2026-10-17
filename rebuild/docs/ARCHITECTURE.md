@@ -562,3 +562,5 @@ Provider IO, granted-scope names and mapping remain inside Facebook. See
 WORKER_WORKSPACE_ACCESS.md for semantics and non-instantaneous policy-change
 limits, and PREVIEW_QA.md for actual evidence. No migration, live provider test
 or production cutover is established by this batch.
+
+Workspace team access, batch 61: the Settings module owns the shared team service, typed Root bounds/defaults, customer UI, HTTP route and MCP tools/resource. Directory and mutations recheck current user, membership, role, permission, feature and tenant scope; channel grants must target enabled resources within the entitled workspace. Serialized transactions keep membership, grants and domain audit atomic and preserve an active owner. Owners/admins receive all channels; owner-role assignment is owner-only. See TEAM_ACCESS.md. This is a team-management foundation for existing accounts, not invitations, email, onboarding or seat-plan policy. Production remains on legacy; no DDL or provider change was made in this batch.

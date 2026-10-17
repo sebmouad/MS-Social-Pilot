@@ -3,6 +3,9 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const router = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
+
 import { AccountManager } from '../src/app/settings/account/manager';
 import { McpKeyManager } from '../src/app/settings/mcp/keys';
 import { TeamControls } from '../src/app/settings/team/TeamControls';
@@ -22,6 +25,7 @@ async function submit(form: HTMLFormElement) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);

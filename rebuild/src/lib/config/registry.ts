@@ -6,11 +6,12 @@ import { configurationOwner } from './ownership';
 import { WORKSPACE_JOB_ACCESS_DEFAULTS, WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, WORKSPACE_JOB_OWNER_POLICY_SCHEMA } from '@/server/jobs/access-policy';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 55;
+export const CONFIG_SCHEMA_VERSION = 56;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
 import { ADS_CONFIG } from '@/modules/ads/config';
+import { SETTINGS_CONFIG } from '@/modules/settings/config';
 
 /**
  * This is the sole source for Root-managed runtime settings. `consumption`
@@ -22,6 +23,7 @@ export const CONFIG_REGISTRY = [
   ...PLATFORM_CONFIG,
   // Explicit installed product-module settings; schemas stay out of client manifests.
   ...ADS_CONFIG,
+  ...SETTINGS_CONFIG,
   entry({ key: 'jobs.workspaceOwnerPolicy', group: 'Jobs · Authorization', label: 'Workspace sync owner access', kind: 'select', description: 'Automatic provider reads require qualifying feature and platform access from the same active workspace owner. Any owner is the default; All owners is stricter. Root inspection never bypasses customer suspension.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerPolicy, schema: WORKSPACE_JOB_OWNER_POLICY_SCHEMA, consumption: 'active', options: [{ value: 'any_active_owner', label: 'Any active owner qualifies' }, { value: 'all_active_owners', label: 'All active owners qualify' }] }),
   entry({ key: 'jobs.workspaceOwnerLimit', group: 'Jobs · Authorization', label: 'Workspace sync owner check limit', kind: 'number', description: 'Maximum active owners inspected per workspace synchronization check. Larger owner sets are refused rather than authorized from a partial subset.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerLimit, schema: WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, consumption: 'active' }),
   entry({ key: 'sync.resourceOperationTimeoutMs', group: 'Sync schedules · Resource locking', label: 'Sync resource operation deadline (ms)', kind: 'number', description: 'Time budget for a locked resource read and persistence. Must fit inside the workspace operation budget together with wait and finalization grace.', defaultValue: 60000, schema: z.number().int().min(1000).max(300000), consumption: 'active' }),

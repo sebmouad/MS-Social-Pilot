@@ -1,0 +1,11 @@
+import { z } from 'zod';
+import { entry } from '@/lib/config/entry';
+
+export const SETTINGS_CONFIG = [
+  entry({ key: 'settings.teamDefaultRole', group: 'Settings · Team', label: 'New member default role', kind: 'select', description: 'Initial non-manager role in the Add member form. Every submitted role still requires explicit confirmation and current authority.', defaultValue: 'contributor', schema: z.enum(['editor', 'contributor', 'viewer', 'client']), consumption: 'active', options: [{ value: 'editor', label: 'Editor' }, { value: 'contributor', label: 'Contributor' }, { value: 'viewer', label: 'Viewer' }, { value: 'client', label: 'Client' }] }),
+  entry({ key: 'settings.teamDefaultAllChannels', group: 'Settings · Team', label: 'New members initially select all channels', kind: 'boolean', description: 'Initial channel choice in the Add member form. False starts with no grants selected. Manager roles always include every channel.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
+  entry({ key: 'settings.teamMaxMembers', group: 'Settings · Team', label: 'Maximum team members', kind: 'number', description: 'Maximum memberships in one workspace, including disabled accounts. Larger directories are refused without returning a partial list. This installation ceiling does not replace subscription seat policy.', defaultValue: 500, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
+  entry({ key: 'settings.teamMaxChannels', group: 'Settings · Team', label: 'Maximum team destinations', kind: 'number', description: 'Maximum selected destinations in one team membership scope.', defaultValue: 1000, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
+  entry({ key: 'settings.teamOperationTimeoutMs', group: 'Settings · Team', label: 'Team transaction timeout (ms)', kind: 'number', description: 'Maximum time allowed for the database transaction in a team directory or membership operation.', defaultValue: 15000, schema: z.number().int().min(1000).max(300000), consumption: 'active' }),
+  entry({ key: 'settings.teamOperationMaxWaitMs', group: 'Settings · Team', label: 'Team operation lock wait (ms)', kind: 'number', description: 'Maximum time to wait for a team operation transaction.', defaultValue: 2000, schema: z.number().int().min(100).max(30000), consumption: 'active' }),
+] as const;

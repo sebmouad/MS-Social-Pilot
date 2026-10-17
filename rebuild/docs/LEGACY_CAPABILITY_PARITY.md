@@ -205,3 +205,5 @@ also enforce the parent post's workspace. Root owns worker access/budgets and
 Facebook collection grants/windows. This closes those background-scope/stale-
 credential races; it does not complete provider collection formats, discovery,
 callback lifecycle, Ads management, live operation proof or release gates.
+
+Workspace team, batch 61: partial foundation. Settings now manages existing active accounts through tenant-scoped role/channel grants in the customer UI, HTTP and MCP, with current authorization, exact confirmations, atomic audit and Root-managed operation bounds/defaults. New invitations, registration/onboarding, email delivery and seat-plan policy remain unimplemented; no production cutover is implied. See TEAM_ACCESS.md and PREVIEW_QA.md.

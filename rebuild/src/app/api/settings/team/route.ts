@@ -1,57 +1,45 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { requireViewer } from '@/server/context';
-import { addTeamMember, removeTeamMember, teamErrorStatus, updateTeamMember } from '@/server/team';
+import { operationFailure } from '@/lib/operation-error';
+import { addTeamMember, getTeamDirectory, removeTeamMember, updateTeamMember } from '@/modules/settings/server/team';
 
 export const runtime = 'nodejs';
-const targetIds = z.array(z.string().min(1).max(200)).max(500).refine(ids => new Set(ids).size === ids.length, 'Channel assignments must be unique.');
-const addSchema = z.object({ email: z.string().email().max(320), role: z.string(), targetIds, allPages: z.boolean() });
-const updateSchema = z.object({ membershipId: z.string().min(1).max(200), role: z.string(), targetIds, allPages: z.boolean() });
-const removeSchema = z.object({ membershipId: z.string().min(1).max(200) });
+const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
 
-export async function POST(request: Request) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });
+export async function GET() {
   let viewer;
   try { viewer = await requireViewer({ feature: 'settings/team' }); }
-  catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
+  catch { return reply({ error: 'Sign in with workspace team access.', code: 'unauthorized' }, 401); }
   try {
-    const input = addSchema.parse(await request.json());
-    await addTeamMember({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input.email, input.role, input.targetIds, input.allPages);
-    return NextResponse.json({ ok: true });
-  } catch (error) { return mutationError(error); }
+    return reply(await getTeamDirectory({ userId: viewer.user.id, workspaceId: viewer.workspaceId }));
+  } catch (error) { return failure(error); }
 }
 
-export async function PATCH(request: Request) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });
-  let viewer;
-  try { viewer = await requireViewer({ feature: 'settings/team' }); }
-  catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
-  try {
-    const input = updateSchema.parse(await request.json());
-    await updateTeamMember({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input.membershipId, input.role, input.targetIds, input.allPages);
-    return NextResponse.json({ ok: true });
-  } catch (error) { return mutationError(error); }
-}
-
-export async function DELETE(request: Request) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });
-  let viewer;
-  try { viewer = await requireViewer({ feature: 'settings/team' }); }
-  catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
-  try {
-    const input = removeSchema.parse(await request.json());
-    await removeTeamMember({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input.membershipId);
-    return NextResponse.json({ ok: true });
-  } catch (error) { return mutationError(error); }
-}
-
-function sameOrigin(request: Request) {
+async function mutate(request: Request, action: 'add' | 'update' | 'remove') {
   const origin = request.headers.get('origin');
-  if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try {
+    if (!origin || new URL(origin).origin !== new URL(request.url).origin) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
+  } catch { return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403); }
+  let viewer;
+  try { viewer = await requireViewer({ feature: 'settings/team', write: true }); }
+  catch { return reply({ error: 'Sign in with workspace team access.', code: 'unauthorized' }, 401); }
+  let input: unknown;
+  try { input = await request.json(); }
+  catch { return reply({ error: 'Invalid team change.', code: 'invalid_request' }, 400); }
+  const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
+  try {
+    const result = action === 'add' ? await addTeamMember(actor, input)
+      : action === 'update' ? await updateTeamMember(actor, input)
+        : await removeTeamMember(actor, input);
+    return reply({ ok: true, ...result });
+  } catch (error) { return failure(error); }
 }
 
-function mutationError(error: unknown) {
-  if (error instanceof z.ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid team change.' }, { status: 400 });
-  return NextResponse.json({ error: error instanceof Error && teamErrorStatus(error) !== 500 ? error.message : 'Team change failed.' }, { status: teamErrorStatus(error) });
+function failure(error: unknown) {
+  const safe = operationFailure(error, 'The team change could not be confirmed. Check current access before trying again.');
+  return reply({ error: safe.error, code: safe.code }, safe.status);
 }
+
+export const POST = (request: Request) => mutate(request, 'add');
+export const PATCH = (request: Request) => mutate(request, 'update');
+export const DELETE = (request: Request) => mutate(request, 'remove');
