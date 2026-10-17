@@ -22,6 +22,7 @@ export type ComposerValues = {
   mediaJson: string;
   message: string;
   firstComment: string;
+  labelId: string;
   link: string;
   imageUrl: string;
   videoUrl: string;
@@ -115,6 +116,7 @@ export async function createPostWithRecoveryAction(previous: ComposerActionState
     await createPost(actor(viewer), {
       message: values.message,
       firstComment: values.firstComment,
+      labelId: values.labelId || null,
       ...attachments(data),
       targetIds: values.targetIds,
       scheduledAt,
@@ -330,7 +332,7 @@ function composerValues(data: FormData): ComposerValues {
     intent: values('intent'), attachmentKind: values('attachmentKind'), mediaJson: values('mediaJson'), message: values('message'), firstComment: values('firstComment'),
     link: values('link'), imageUrl: values('imageUrl'), videoUrl: values('videoUrl'), uploadedImageRef: values('uploadedImageRef'),
     altText: values('altText'), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string'),
-    scheduleDate: values('scheduleDate'), scheduleTime: values('scheduleTime'),
+    scheduleDate: values('scheduleDate'), scheduleTime: values('scheduleTime'), labelId: values('labelId'),
   };
 }
 

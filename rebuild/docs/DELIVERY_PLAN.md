@@ -99,10 +99,10 @@ Each handoff must name owned files and shared integration points.
 
 | Queue | Workstream | Current state |
 | --- | --- | --- |
-| 1 | Mail, invitations and account onboarding | Batch 62 integration and verification |
-| 2 | Publishing templates and composer reuse | Delegated implementation |
-| 3 | Inbox assignment, private notes and saved replies | Delegated implementation |
-| 4 | Workspace operational settings and runtime rules | Delegated time zone and approval policy subset |
+| 1 | Mail, invitations and account onboarding | Batch 62 published; recovery implementation in review |
+| 2 | Publishing templates and composer reuse | Batch 63 verified; runtime probe pending |
+| 3 | Inbox assignment, private notes and saved replies | Batch 63 verified; runtime probe pending |
+| 4 | Workspace operational settings and runtime rules | Time zone/approval subset verified in batch 63 |
 | 5 | Publishing labels, custom fields, notes, versions and bulk workflows | Queued |
 | 6 | Client review/share links and public bio workflows | Queued |
 | 7 | Analytics explorer, demographics, pinned metrics and complete reports | Queued |
@@ -112,3 +112,9 @@ Each handoff must name owned files and shared integration points.
 
 This queue organizes delivery and does not replace the complete legacy inventory
 or omit account recovery, provider formats, data/rollback and release gates.
+
+Claude Code Sonnet delegation is now available after user sign-in. Its first
+labels slice is in independent review. A separate coordinator is rotating up to
+four Claude workers through the remaining inventory; exact non-overlapping
+ownership is in CLAUDE_PARITY_COORDINATION.md. Lead retains integration, checks
+and publication. Queue state is implementation work, not verified completion.

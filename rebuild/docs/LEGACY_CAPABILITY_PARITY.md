@@ -207,3 +207,8 @@ credential races; it does not complete provider collection formats, discovery,
 callback lifecycle, Ads management, live operation proof or release gates.
 
 Workspace team and invitations, batches 61–62: Settings manages existing active accounts and invitation records through tenant-scoped role/channel grants in the customer UI, HTTP and management MCP. Invitation preview, existing-account acceptance and new-account registration use the public HTTP auth flow. Current authority, exact confirmations, transaction/audit atomicity, single-use expiry, SMTP status handling and Root-managed bounds were exercised with an isolated PostgreSQL database and local SMTP capture. General verification/recovery/OAuth flows, seat-plan policy, clean-phone/browser verification and full legacy parity remain missing. No production cutover is implied. See TEAM_ACCESS.md, ONBOARDING.md and PREVIEW_QA.md.
+
+Batch 63 adds reusable Publishing template CRUD/composer reuse, Inbox assignment/
+notes/saved replies, and workspace time zone/approval policy. These scoped slices
+do not close the broader Publishing, Inbox or workspace settings rows. Runtime,
+browser/provider and cutover evidence remain separate; see CORE_WORKFLOWS.md.

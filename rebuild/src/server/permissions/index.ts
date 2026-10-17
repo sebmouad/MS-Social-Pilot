@@ -34,6 +34,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'publishing/queue': 'publishing/queue',
   'publishing/approvals': 'publishing/approvals',
   'publishing/media': null,
+  'publishing/templates': 'publishing/templates',
   'inbox/conversations': 'analytics/inbox',
   'analytics/overview': 'analytics/overview',
   'analytics/reports': 'analytics/overview',
@@ -41,6 +42,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'ads/campaigns': 'ads/performance',
   'settings/connections': null,
   'settings/team': 'settings/team',
+  'settings/workspace': 'settings/team',
   'settings/mcp': 'settings/team',
   'settings/account': null,
   'settings/data': null,
@@ -71,12 +73,12 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
   }
 
   if (role === 'viewer') {
-    if (feature === 'settings/team' || feature === 'settings/mcp' || feature === 'settings/connections') return DENIED;
+    if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp' || feature === 'settings/connections') return DENIED;
     return { read: true, write: false };
   }
 
   if (role === 'editor') {
-    if (feature === 'settings/team' || feature === 'settings/mcp') return DENIED;
+    if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp') return DENIED;
     if (feature === 'settings/connections') return { read: true, write: false };
     return {
       read: true,
@@ -85,7 +87,7 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
   }
 
   if (role === 'contributor') {
-    if (feature === 'settings/team' || feature === 'settings/mcp') return DENIED;
+    if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp') return DENIED;
     if (feature === 'settings/connections') return { read: true, write: false };
     return {
       read: true,

@@ -566,3 +566,16 @@ or production cutover is established by this batch.
 Workspace team access, batch 61: the Settings module owns the shared team service, typed Root bounds/defaults, customer UI, HTTP route and MCP tools/resource. Directory and mutations recheck current user, membership, role, permission, feature and tenant scope; channel grants must target enabled resources within the entitled workspace. Serialized transactions keep membership, grants and domain audit atomic and preserve an active owner. Owners/admins receive all channels; owner-role assignment is owner-only. See TEAM_ACCESS.md.
 
 Workspace invitations and account onboarding, batch 62: the Settings-owned invitation service uses the existing legacy table through bound SQL, with no schema migration. Root registry 57 supplies five invitation bounds/switches and 14 shared SMTP mail controls. Customer UI, HTTP and management MCP share scoped invite/list/revoke service operations; public preview, acceptance and registration are HTTP flows. Hashed single-use fragment tokens, encrypted short-lived continuation cookies, exact confirmations, current inviter rechecks, lock-serialized transactions and atomic membership/audit updates constrain the flow. New accounts cannot overwrite existing users and receive no session; normal sign-in applies MFA. Ordinary roles start with no channel access; privileged roles require current Root MFA enrollment policy. See ONBOARDING.md. Preview SMTP capture verified the full HTTP/Root/MCP and PostgreSQL path, but clean phone/browser flow, full legacy parity and production cutover remain open.
+
+## Templates, Inbox productivity and workspace publishing policies — batch 63
+
+Publishing owns reusable template CRUD and composer reuse of message, hashtags,
+first comment and a workspace label. Inbox owns scoped assignment, private
+notes and saved-reply CRUD; choosing a saved reply fills the draft and never
+sends it. Settings owns workspace time zone and contributor approval policy.
+UI, HTTP and MCP dispatch through their shared module services, with current
+permissions, tenant scope, exact confirmations and atomic domain audits.
+Registry 58 adds consumed module settings and bounds. Existing legacy tables
+are reused; no DDL or production change is implied. Approval metadata is cleared
+when approved content is edited; managers retain their existing bypass.
+See CORE_WORKFLOWS.md for coverage and remaining release evidence.

@@ -17,7 +17,7 @@ export default async function PublishingLayout({ children }: { children: ReactNo
     runtimeConfig('publishing.searchMaxCharacters'), runtimeConfig('publishing.exportMaxPosts'), runtimeConfig('publishing.exportMaxBytes'),
   ]);
   const sidebar = <Suspense fallback={null}><PublishingSidebar channels={channels} today={workspaceDateKey(new Date(), viewer.membership.workspace.timezone)} searchMaxCharacters={searchMaxCharacters} exportMaxPosts={exportMaxPosts} exportMaxBytes={exportMaxBytes} /></Suspense>;
-  return <PageFrame module="publishing" scopedAccess sidebar={sidebar} sidebarWhen={['/publishing/posts', '/publishing/calendar']}><div className={styles.page}>
+  return <PageFrame module="publishing" scopedAccess sidebar={sidebar} sidebarWhen={['/publishing/posts', '/publishing/calendar', '/publishing/templates']}><div className={styles.page}>
     {children}
   </div></PageFrame>;
 }

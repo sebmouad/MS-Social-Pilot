@@ -44,26 +44,30 @@ session tokens, private environment contents, customer records or raw logs here.
 
 ## Verified application baseline
 
-Batch 62 adds invitation-based onboarding and transactional mail, following
-application batch `58f43a7` and continuity commit `f53138b`. Registry 57 owns
-SMTP and invitation policy. No schema migration or production change occurred.
+Latest verified application source is batch 63: template CRUD/composer reuse,
+Inbox assignment/private notes/saved replies, and workspace time zone/approval
+policies. Registry 58 owns the corresponding consumed bounds. Exact staged
+snapshot: 1,825 tests / 256 files passed with guarded PostgreSQL checks enabled,
+typecheck and production build passed. See CORE_WORKFLOWS.md and PREVIEW_QA.md.
+Fresh browser/provider evidence and production cutover are not established.
 
-Evidence: exact index snapshot passed 1,778 tests / 250 files with guarded
-PostgreSQL checks, typecheck and production build. Two additional owner-rank
-regressions passed in the 10-test invitation service file. Real localhost
-HTTP/SMTP capture/Root/MCP/DB verification passed; disposable fixtures and prior
-Root settings were restored. No external mail or provider call was used.
-Fresh browser/phone onboarding remains unverified. See ONBOARDING.md and
-PREVIEW_QA.md for boundaries and remaining account recovery/verification gaps.
+Previous batch `4dd2f834aaa857a288fc8d54ce192038d0da2059` adds invitation-based
+onboarding and mail (registry 57). Real localhost HTTP/SMTP capture/Root/MCP/DB
+verification passed and cleanup restored fixtures/settings; no external delivery
+or provider writes. Fresh phone/browser onboarding remains unverified.
 
 ## Immediate continuation
 
-Batch 63 work is concurrent and unfinished: Publishing templates/composer reuse,
-Inbox assignment/notes/saved replies, and workspace time zone/approval policies.
-Do not mix these working-tree changes into the already verified batch 62 index.
-Use explicit file staging and exact snapshots for review. Root registry and MCP
-integration belong to the designated integration worker. Full legacy parity,
-provider proof and release rehearsal remain required.
+Batch 64 is concurrent and unfinished: Claude implemented Publishing labels
+(awaiting independent review/host wiring), Codex implemented password recovery
+(review underway) and an Analytics explorer (awaiting host wiring/review).
+A Claude Sonnet coordinator is dispatching the remaining parity work through
+separate file ownership; see CLAUDE_PARITY_COORDINATION.md if present and its
+private local status path. Do not stage unfinished workers with a broad add.
+Lead owns central registry/MCP/manifests/permission integration and Git publication.
+A guarded batch 63 HTTP/DB/MCP probe is assigned independently; record its actual
+results and cleanup rather than inferring runtime proof from unit tests.
+Full legacy parity, provider proof and release rehearsal remain required.
 
 Known phone issue: at 390px emulation the document scroll width reached 601px,
 with a wide fixed module rail and touch click timeouts; keyboard workflows worked.

@@ -34,6 +34,12 @@ describe('Root installation availability', () => {
     expect(access.modules.analytics).toBe(true);
   });
 
+  it('honors Root and plan gates independently for reusable publishing templates', () => {
+    expect(resolveEntitlements(source).features['publishing/templates']).toBe(true);
+    expect(resolveEntitlements({ ...source, installationAvailability: { 'entitlements.features.publishing/templates': false } }).features['publishing/templates']).toBe(false);
+    expect(resolveEntitlements({ ...source, planFeatures: ['product_v2', 'publishing/posts'] }).features['publishing/templates']).toBe(false);
+  });
+
   it('removes every child feature when a module is disabled', () => {
     const access = resolveEntitlements({ ...source, installationAvailability: { 'entitlements.modules.ads': false } });
     expect(access.modules.ads).toBe(false);

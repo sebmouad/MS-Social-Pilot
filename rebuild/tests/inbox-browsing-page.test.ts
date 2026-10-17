@@ -33,7 +33,7 @@ describe('Inbox paging and recoverable route context', () => {
     state.workflow.mockResolvedValue(true);
     const html = await render();
     expect(state.toolbar).toHaveBeenCalledWith(expect.objectContaining({ canResolve: true, canHide: false, canDelete: false }));
-    expect(html).toContain('replying and moderation are unavailable');
+    expect(html).toContain('replying is unavailable for your role or this channel');
   });
   it('keeps a valid selected thread in reset recovery after invalid list cursor and masks unknown errors', async () => {
     state.list.mockRejectedValueOnce(new OperationError('invalid_request', 'Reset this Inbox cursor.'));

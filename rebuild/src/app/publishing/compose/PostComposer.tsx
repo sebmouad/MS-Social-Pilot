@@ -2,6 +2,7 @@
 
 import { AutoTextarea } from '@/components/AutoTextarea';
 import { Button } from '@/components';
+import { Dialog } from '@/components/Dialog';
 import { PostPreview } from '@/components/PostPreview';
 import { SidebarDock } from '@/components/SidebarDock';
 import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
@@ -20,6 +21,7 @@ type TargetChoice = {
 };
 type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number; maxMessageCharacters: number; maxMedia: number };
 type Schedule = { date: string; time: string; timeZone: string };
+type ComposerTemplate = { id: string; name: string; category: string; body: string; hashtags: string; firstComment: string; labelId: string | null };
 
 const INITIAL_STATE: ComposerActionState = { status: 'idle', values: {} };
 const FORM_ID = 'post-composer-form';
@@ -84,11 +86,12 @@ function selectedMediaIssue(targets: TargetChoice[], media: readonly PostMediaIt
   return localUploadIssue(targets, items);
 }
 
-export function PostComposer({ targets, imageRules, schedule, authorName, createdAt, createdAtDisplay }: { targets: TargetChoice[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string }) {
+export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay }: { targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string }) {
   const [state, formAction, pending] = useActionState(saveWithTransportRecovery, INITIAL_STATE);
   const initial = state.values;
   const [message, setMessage] = useState(initial.message ?? '');
   const [firstComment, setFirstComment] = useState(initial.firstComment ?? '');
+  const [labelId, setLabelId] = useState(initial.labelId ?? '');
   const [link, setLink] = useState(initial.link ?? '');
   const [selectedTargets, setSelectedTargets] = useState<string[]>(initial.targetIds ?? []);
   const [scheduleDate, setScheduleDate] = useState(initial.scheduleDate ?? schedule.date);
@@ -96,6 +99,9 @@ export function PostComposer({ targets, imageRules, schedule, authorName, create
   const [mode, setMode] = useState<'draft' | 'schedule'>((initial.intent as 'draft' | 'schedule') ?? 'draft');
   const [localError, setLocalError] = useState('');
   const [uploadMessage, setUploadMessage] = useState('');
+  const [templateChooserOpen, setTemplateChooserOpen] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState('');
+  const [templateToApply, setTemplateToApply] = useState<ComposerTemplate | null>(null);
   const [uploading, setUploading] = useState(false);
   const submitGuard = useRef<'ready' | 'uploading' | 'submitting'>('ready');
   const feedbackRef = useRef<HTMLParagraphElement>(null);
@@ -110,6 +116,21 @@ export function PostComposer({ targets, imageRules, schedule, authorName, create
     allowedKinds: allowedKinds(selected),
     allowMixedKinds: !selected.length || selected.every(target => target.publishingMedia?.mixedKinds === true),
   });
+  const templateContentExists = Boolean(message.trim() || firstComment.trim() || link.trim() || attachments.items.length);
+  const visibleTemplates = templates.filter(template => `${template.name} ${template.category} ${template.body}`.toLocaleLowerCase().includes(templateSearch.trim().toLocaleLowerCase()));
+  function chooseTemplate(template: ComposerTemplate) {
+    setTemplateChooserOpen(false);
+    setTemplateSearch('');
+    if (templateContentExists) setTemplateToApply(template);
+    else applyTemplate(template);
+  }
+  function applyTemplate(template: ComposerTemplate) {
+    const text = [template.body, template.hashtags].map(value => value.trim()).filter(Boolean).join('\n\n');
+    setMessage(text);
+    setFirstComment(template.firstComment);
+    setLabelId(template.labelId ?? '');
+    setTemplateToApply(null);
+  }
 
   useEffect(() => {
     if (state.status === 'error') {
@@ -194,6 +215,7 @@ export function PostComposer({ targets, imageRules, schedule, authorName, create
       <div className={styles.fieldMeta} id="composer-message-count">{message.length.toLocaleString()} / {imageRules.maxMessageCharacters.toLocaleString()}</div>
       <label htmlFor="composer-first-comment">First comment <span>(optional)</span></label>
       <AutoTextarea id="composer-first-comment" name="firstComment" value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder="Add a link or follow-up as the first comment…" />
+      <input type="hidden" name="labelId" value={labelId} />
 
       <fieldset className={styles.attachments} disabled={uploading || pending}>
         <legend>Attachments <span>(optional)</span></legend>
@@ -213,6 +235,7 @@ export function PostComposer({ targets, imageRules, schedule, authorName, create
 
     <SidebarDock>
       <aside className={styles.sidebarControls} aria-label="Post destinations and timing">
+        {templates.length > 0 && <Button type="button" variant="secondary" disabled={pending || uploading} onClick={() => setTemplateChooserOpen(true)}>Choose template</Button>}
         <div className={styles.actions}>
           <Button form={FORM_ID} type="submit" name="intent" value="draft" disabled={pending || uploading} onClick={() => setMode('draft')}>{uploading ? 'Uploading…' : pending ? 'Saving…' : 'Save draft'}</Button>
           <Button form={FORM_ID} type="submit" name="intent" value="schedule" variant="primary" disabled={pending || uploading} onClick={() => setMode('schedule')}>{uploading ? 'Uploading…' : pending ? 'Saving…' : 'Schedule post'}</Button>
@@ -233,5 +256,12 @@ export function PostComposer({ targets, imageRules, schedule, authorName, create
         </fieldset>
       </aside>
     </SidebarDock>
+    <Dialog open={templateChooserOpen} title="Choose a post template" description="This copies saved message text and first comment into the current composer. It does not create or publish a post." onClose={() => setTemplateChooserOpen(false)} actions={<Button data-dialog-cancel onClick={() => setTemplateChooserOpen(false)}>Close</Button>}>
+      <label className={styles.templateSearch}>Search templates<input type="search" value={templateSearch} onChange={event => setTemplateSearch(event.target.value)} maxLength={120} /></label>
+      {visibleTemplates.length ? <ul className={styles.templateList}>{visibleTemplates.map(template => <li key={template.id}><div><strong>{template.name}</strong><span>{template.category || 'Uncategorized'}</span><p>{template.body}{template.hashtags ? `\n${template.hashtags}` : ''}</p>{template.labelId && <small>Using this template will apply its workspace label to the new post.</small>}</div><Button type="button" size="sm" onClick={() => chooseTemplate(template)}>Use template</Button></li>)}</ul> : <p>No templates match this search.</p>}
+    </Dialog>
+    <Dialog open={Boolean(templateToApply)} title="Replace the current draft text?" description="The template will replace the current message and first comment. Your selected destinations, attachments, link and schedule stay as they are." onClose={() => setTemplateToApply(null)} actions={<><Button data-dialog-cancel onClick={() => setTemplateToApply(null)}>Keep current draft</Button><Button variant="primary" onClick={() => templateToApply && applyTemplate(templateToApply)}>Replace message and first comment</Button></>}>
+      <p><strong>{templateToApply?.name}</strong></p><p>{templateToApply?.body}</p>{templateToApply?.hashtags && <p>{templateToApply.hashtags}</p>}
+    </Dialog>
   </div>;
 }

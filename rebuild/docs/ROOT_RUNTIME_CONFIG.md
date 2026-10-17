@@ -182,3 +182,8 @@ requires ready SMTP and a valid public origin. The team service consumes the
 existing member/grant limits and bounded transaction timeout/wait controls.
 Configuration writes retain Root validation and audit behavior. No invitation
 table migration accompanies registry 57. See ONBOARDING.md.
+
+Registry 58 adds Publishing-owned template bounds and label-directory ceiling,
+Inbox-owned note/saved-reply limits and Settings-owned workspace time-zone input
+policy. These are consumed by the corresponding services and controls. Existing
+shared Inbox transaction budgets also cover assignment, notes and saved replies.

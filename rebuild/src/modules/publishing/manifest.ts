@@ -15,5 +15,6 @@ export const publishingManifest = {
     { id: 'publishing/queue', title: 'Queue', href: '/publishing/queue', description: 'Review work waiting to publish.' },
     { id: 'publishing/approvals', title: 'Approvals', href: '/publishing/approvals', description: 'Review posts before they go live.' },
     { id: 'publishing/media', title: 'Image library', href: '/publishing/media', description: 'Browse and manage images stored in this workspace.' },
+    { id: 'publishing/templates', title: 'Templates', href: '/publishing/templates', description: 'Create and reuse workspace post templates.' },
   ],
 } as const satisfies ModuleManifest;

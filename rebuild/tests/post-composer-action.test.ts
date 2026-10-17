@@ -83,6 +83,12 @@ describe('recoverable post composer action', () => {
     }));
   });
 
+  it('passes a selected template label into the atomic post-creation service', async () => {
+    const data = formData({ intent: 'draft', message: 'Template text', labelId: 'label-workspace-a', targetIds: [] });
+    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, data)).rejects.toThrow('redirect:/publishing/posts?notice=created');
+    expect(deps.createPost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ labelId: 'label-workspace-a' }));
+  });
+
   it('passes the complete ordered mediaJson list to shared authoring', async () => {
     const mediaJson = JSON.stringify([
       { kind: 'image', url: 'media:123e4567-e89b-42d3-a456-426614174000', altText: 'Cover' },

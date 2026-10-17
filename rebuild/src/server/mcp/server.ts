@@ -29,6 +29,9 @@ import { readAdsDailyRows } from '@/modules/ads/server/report-read';
 import { exportAdsReport } from '@/modules/ads/server/export';
 import { adsReportToolDefinitions, ADS_MCP_MAX_PAGE_ITEMS } from '@/modules/ads/mcp-metadata';
 import { teamToolDefinitions, teamTools, teamWriteTools, executeTeamTool, invitationAvailability } from '@/modules/settings/team-mcp';
+import { templateToolDefinitions, templateTools, templateWriteTools, executeTemplateTool } from '@/modules/publishing/template-mcp';
+import { inboxProductivityToolDefinitions, inboxProductivityTools, inboxProductivityWriteTools, executeInboxProductivityTool } from '@/modules/inbox/productivity-mcp';
+import { workspacePolicyToolDefinitions, workspacePolicyTools, workspacePolicyWriteTools, executeWorkspacePolicyTool } from '@/modules/settings/workspace-policy-mcp';
 import { parseAdsPerformanceFilters } from '@/modules/ads/performance-filters';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
@@ -63,6 +66,9 @@ const tools = [
   ...rootToolDefinitions,
   ...adsReportToolDefinitions,
   ...teamToolDefinitions,
+  ...workspacePolicyToolDefinitions,
+  ...templateToolDefinitions,
+  ...inboxProductivityToolDefinitions,
   { name: 'list_workspace_images', description: 'List bounded workspace image metadata. Image bytes remain in workspace storage and are not included.', inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 200 }, cursor: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_workspace_image', description: 'Read metadata for one image stored in this workspace.', inputSchema: { type: 'object', required: ['imageId'], properties: { imageId: { type: 'string' } }, additionalProperties: false } },
   { name: 'delete_workspace_image', description: 'Permanently delete an unused workspace image. Images attached to posts cannot be deleted. Confirmation must exactly match DELETE WORKSPACE IMAGE <imageId>.', inputSchema: { type: 'object', required: ['imageId', 'confirmation'], properties: { imageId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -115,6 +121,7 @@ const tools = [
   { name: 'set_connection_selection', description: 'Enable or disable one workspace channel or advertising account. Confirmation must exactly identify the selection and action.', inputSchema: { type: 'object', required: ['kind', 'id', 'enabled', 'confirmation'], properties: { kind: { type: 'string', enum: ['target', 'adAccount'] }, id: { type: 'string' }, enabled: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
 ];
 const dataTools = new Set(['preview_workspace_data_deletion', 'export_workspace_data', 'delete_workspace_data']);
+const managerSettingsTools = new Set<string>([...workspacePolicyTools]);
 const adsManagerTools = new Set(['list_ad_accounts', 'get_ad_creation_options', 'create_ad_campaign', 'create_ad_set', 'update_ad']);
 const canManageData = (viewer: McpViewer) => viewer.role === 'owner' || viewer.role === 'admin';
 const dataResource = (uri: string) => uri === 'msp://data/deletion-preview';
@@ -127,7 +134,13 @@ const toolFeatures: Record<string, string> = {
   list_workspace_invitations: 'settings/team',
   invite_workspace_member: 'settings/team',
   revoke_workspace_invitation: 'settings/team',
+  get_workspace_policies: 'settings/workspace',
+  update_workspace_policies: 'settings/workspace',
   export_posts: 'publishing/posts',
+  list_post_templates: 'publishing/templates',
+  create_post_template: 'publishing/templates',
+  update_post_template: 'publishing/templates',
+  delete_post_template: 'publishing/templates',
   list_workspace_images: 'publishing/media',
   get_workspace_image: 'publishing/media',
   delete_workspace_image: 'publishing/media',
@@ -136,6 +149,14 @@ const toolFeatures: Record<string, string> = {
   list_posts: 'publishing/posts',
   list_inbox: 'inbox/conversations',
   get_inbox_thread: 'inbox/conversations',
+  get_inbox_productivity: 'inbox/conversations',
+  list_inbox_saved_replies: 'inbox/conversations',
+  assign_inbox_item: 'inbox/conversations',
+  add_inbox_private_note: 'inbox/conversations',
+  delete_inbox_private_note: 'inbox/conversations',
+  create_inbox_saved_reply: 'inbox/conversations',
+  update_inbox_saved_reply: 'inbox/conversations',
+  delete_inbox_saved_reply: 'inbox/conversations',
   reply_to_inbox: 'inbox/conversations',
   set_inbox_resolved: 'inbox/conversations',
   get_inbox_deletion: 'inbox/conversations',
@@ -178,9 +199,12 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication']);
+const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', ...templateWriteTools]);
 const writeTools = new Set(['run_root_platform_publication_action', 'manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'delete_workspace_data', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 for (const name of teamWriteTools) writeTools.add(name);
+for (const name of templateWriteTools) writeTools.add(name);
+for (const name of inboxProductivityWriteTools) writeTools.add(name);
+for (const name of workspacePolicyWriteTools) writeTools.add(name);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -290,6 +314,7 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
 
 async function executeTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
   if (teamTools.has(name) && !canManageData(viewer)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage the team.');
+  if (managerSettingsTools.has(name) && !canManageData(viewer)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage workspace policies.');
   if (rootTools.has(name) && !canUseRootTool(viewer)) throw new OperationError('forbidden', 'Installation-owner access is required.');
   if (dataTools.has(name) && !canManageData(viewer)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage workspace data.');
   if (adsManagerTools.has(name) && !canManageData(viewer)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage ads.');
@@ -301,6 +326,9 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
   }
   const cap = viewer.maxResultItems ?? 100;
   if (teamTools.has(name)) return executeTeamTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args, cap);
+  if (workspacePolicyTools.has(name)) return executeWorkspacePolicyTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
+  if (templateTools.has(name as 'list_post_templates' | 'create_post_template' | 'update_post_template' | 'delete_post_template')) return executeTemplateTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name as 'list_post_templates' | 'create_post_template' | 'update_post_template' | 'delete_post_template', args);
+  if (inboxProductivityTools.has(name)) return executeInboxProductivityTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args, cap);
   switch (name) {
     case 'list_workspace_images': {
       const limit = Math.max(1, Math.min(cap, 200, Math.trunc(Number(args.limit) || cap)));
@@ -784,7 +812,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       if (params.arguments !== undefined && (!params.arguments || typeof params.arguments !== 'object' || Array.isArray(params.arguments))) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
       const args = (params.arguments ?? {}) as Record<string, unknown>;
       // Data deletion and local Inbox workflow own their service-level lock.
-      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !serviceGuardedPublishingTools.has(name) && !teamTools.has(name) && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
+      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !serviceGuardedPublishingTools.has(name) && !teamTools.has(name) && !inboxProductivityWriteTools.has(name) && !workspacePolicyTools.has(name) && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
         ? await withWorkspaceOperation(viewer.workspaceId, () => runTool(viewer, name, args))
         : await runTool(viewer, name, args);
       return reply(textResult(result));

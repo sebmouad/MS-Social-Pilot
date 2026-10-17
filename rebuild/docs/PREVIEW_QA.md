@@ -1680,3 +1680,20 @@ browser-flow pass is claimed. SMTP ambiguous outcomes are `uncertain`, not
 automatically retried; email logs may carry `delivery_unconfirmed` when SMTP
 accepted but its receipt could not be recorded. See ONBOARDING.md for exact
 security boundaries and remaining account-lifecycle parity.
+
+## Templates, Inbox productivity and workspace policies — batch 63
+
+The exact staged source snapshot passed **1,825 tests across 256 files**, with
+guarded PostgreSQL checks enabled, plus rebuild typecheck and production build.
+Tests include template CRUD and Root bounds (including raised and zero optional
+limits), Inbox productivity tenant/role/stale-write guards, and workspace approval
+policy regressions. Independent review found and fixed stale approval after a
+manager edited an approved draft; contributors must obtain a fresh review while
+managers retain their existing bypass. Workspace policy reads now block during
+purge and writes lock the current membership/user. Template forms consume Root
+limits, validate matching receipts, and preserve failed drafts.
+
+No new browser/provider proof or production change follows from these checks.
+A separate guarded localhost HTTP/DB/MCP probe is being prepared; its evidence
+will be added only after execution and exact cleanup. Remaining parity and
+release limits are in CORE_WORKFLOWS.md and the capability inventory.

@@ -100,6 +100,22 @@ describe('publishing lifecycle transitions', () => {
     await expect(updatePost(actor, { postId: 'p1', message: ' ', firstComment: 'Details only', targetIds: ['target-1'] })).rejects.toMatchObject({ code: 'invalid_request' });
   });
 
+  it('invalidates review after an editor changes an approved post’s content or destinations', async () => {
+    db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'contributor-1', status: 'draft', publishedAt: null, approvalStatus: 'approved', targets: [{ id: 'pt1', status: 'pending', remotePostId: null }] });
+    await updatePost(actor, { postId: 'p1', message: 'Changed after review', firstComment: '', targetIds: ['target-1'] });
+    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ message: 'Changed after review', targets: { create: [expect.objectContaining({ targetId: 'target-1' })] } }) }));
+    const reviewReset = db.$executeRaw.mock.calls.map(call => call[0]?.join('')).find(sql => sql?.includes('"approvalStatus" = \'pending\''));
+    expect(reviewReset).toContain('"reviewedById" = NULL');
+  });
+
+  it('keeps the manager publishing bypass after an edited approval is cleared', async () => {
+    db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'contributor-1', message: 'Changed after review', firstComment: null, link: null, media: [], status: 'draft', scheduledAt: null,
+      targets: [{ id: 'pt1', status: 'published', remotePostId: 'remote-1', target: { id: 'target-1' } }],
+    });
+    await expect(publishPost(actor, 'p1')).resolves.toMatchObject({ published: 1, failed: 0, skipped: false });
+    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'published' }) }));
+  });
+
   it('creates a scheduled post atomically and rejects a schedule without destinations', async () => {
     const scheduledAt = new Date(Date.now() + 3_600_000);
     await createPost(actor, { message: 'Planned update', firstComment: 'More details', targetIds: ['target-1'], scheduledAt });

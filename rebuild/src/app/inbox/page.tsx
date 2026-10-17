@@ -10,7 +10,8 @@ import { canManageInbox, canManageInboxWorkflow } from '@/server/inbox/actions';
 import { inboxReplyPolicy } from '@/server/inbox/policy';
 import { inboxCapabilities } from '@/server/inbox/providers';
 import { formatInboxTime } from '@/server/inbox/threads';
-import { InboxSyncBar, ReplyBox, ThreadToolbar } from './InboxActions';
+import { InboxSyncBar, ThreadToolbar } from './InboxActions';
+import { ThreadTools } from './ThreadTools';
 import { InboxTag } from './InboxTags';
 import styles from './inbox.module.css';
 
@@ -120,8 +121,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         </li>)}
       </ol>
       {canResolve ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canResolve} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} /> : null}
-      {canWrite && capabilities.reply ? <ReplyBox key={thread.id} id={thread.id} kind={thread.kind} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} />
-        : <p className={styles.readOnly}>{canWrite ? 'Replies are not available for this channel.' : 'You can read this conversation, but replying and moderation are unavailable right now. Your role may be read-only, or the channel may need to be reconnected in Connections.'}</p>}
+      <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} />
     </section>;
   }
 

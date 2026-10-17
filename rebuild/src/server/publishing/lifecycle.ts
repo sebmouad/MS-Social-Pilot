@@ -14,6 +14,7 @@ import { attemptFirstCommentInOperation } from '@/modules/publishing/server/firs
 import { readPublishingCredential } from '@/modules/publishing/server/credentials';
 import { publishDestinationInOperation } from '@/modules/publishing/server/publication';
 import { assertPublishingMediaSupport } from '@/modules/publishing/media-support';
+import { needsContributorApproval } from '@/modules/settings/workspace-policy';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
@@ -76,6 +77,16 @@ async function membership(actor: PublishingActor) {
   if (!result) throw new OperationError('unauthorized', 'You are no longer a member of this workspace.');
   if (!WRITERS.has(result.role)) throw new OperationError('forbidden', 'You do not have permission to manage posts.');
   return result;
+}
+
+/** Read the existing workspace approval switch through the legacy-compatible SQL view. */
+async function workspaceRequiresApproval(workspaceId: string) {
+  const rows = await prisma.$queryRaw<Array<{ requiresApproval: boolean }>>`SELECT "requiresApproval" FROM workspaces WHERE id = ${workspaceId}`;
+  if (!rows[0] || typeof rows[0].requiresApproval !== 'boolean') throw new OperationError('unavailable', 'Workspace publishing policy is unavailable.');
+  return rows[0].requiresApproval;
+}
+async function setApprovalPending(tx: Prisma.TransactionClient, actor: PublishingActor, postId: string) {
+  await tx.$executeRaw`UPDATE posts SET "approvalStatus" = 'pending', "submittedById" = ${actor.userId}, "submittedAt" = NOW(), "reviewedById" = NULL, "reviewedAt" = NULL, "reviewNote" = NULL WHERE id = ${postId} AND "workspaceId" = ${actor.workspaceId}`;
 }
 
 export function validText(value: string, maxText: number) {
@@ -161,6 +172,7 @@ export async function submitPostForApproval(actor: PublishingActor, postId: stri
       const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length) throw new OperationError('conflict', 'This post cannot be submitted for approval.');
       await tx.post.update({ where: { id: post.id }, data: { status: 'pending_approval', scheduledAt: null, updatedAt: new Date() } });
+      await setApprovalPending(tx, actor, post.id);
       await audit(tx, actor, 'publishing.post_submitted_for_approval', { postId: post.id });
     });
   });
@@ -179,11 +191,12 @@ export async function reviewPost(actor: PublishingActor, postId: string, decisio
     }
     await assertPostScope(actor, postId);
     await publishingTransaction(signal, async tx => {
-      const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, status: true } });
+      const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, status: true, scheduledAt: true } });
       if (!post || post.status !== 'pending_approval') throw new OperationError('conflict', 'This post is no longer awaiting approval.');
-      const status = decision === 'approve' ? 'draft' : 'rejected';
+      const status = decision === 'approve' ? (post.scheduledAt ? 'scheduled' : 'draft') : 'rejected';
       const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'pending_approval' }, data: { status, updatedAt: new Date() } });
       if (changed.count !== 1) throw new OperationError('conflict', 'This post is no longer awaiting approval.');
+      await tx.$executeRaw`UPDATE posts SET "approvalStatus" = ${decision === 'approve' ? 'approved' : 'rejected'}, "reviewedById" = ${actor.userId}, "reviewedAt" = NOW(), "reviewNote" = ${reviewNote || null} WHERE id = ${post.id} AND "workspaceId" = ${actor.workspaceId}`;
       await audit(tx, actor, decision === 'approve' ? 'publishing.post_approved' : 'publishing.post_rejected', { postId: post.id, ...(reviewNote ? { note: reviewNote } : {}) });
     });
   });
@@ -193,13 +206,15 @@ export async function reviewPost(actor: PublishingActor, postId: string, decisio
 export async function schedulePost(actor: PublishingActor, postId: string, scheduledAt: Date) {
   return withPublishingOperation(actor, { postId }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
+    const holdForApproval = !MANAGERS.has(role.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), role.role);
     await assertPostScope(actor, postId);
     if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
     await publishingTransaction(signal, async tx => {
       const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, message: true, firstComment: true, link: true, media: true, targets: { select: { status: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length || post.targets.some(target => target.status !== 'pending')) throw new OperationError('conflict', 'This post cannot be scheduled.');
       await assertStoredPostMediaCompatible(actor.workspaceId, post);
-      await tx.post.update({ where: { id: post.id }, data: { status: 'scheduled', scheduledAt, updatedAt: new Date() } });
+      await tx.post.update({ where: { id: post.id }, data: { status: holdForApproval ? 'pending_approval' : 'scheduled', scheduledAt, updatedAt: new Date() } });
+      if (holdForApproval) await setApprovalPending(tx, actor, post.id);
       await audit(tx, actor, 'publishing.post_scheduled', { postId: post.id, scheduledAt: scheduledAt.toISOString() });
     });
   });
@@ -249,9 +264,11 @@ export async function cancelScheduledPost(actor: PublishingActor, postId: string
   });
 }
 
-export async function createPost(actor: PublishingActor, input: { message: string; firstComment: string; targetIds: string[]; scheduledAt?: Date } & PostAttachments) {
+export async function createPost(actor: PublishingActor, input: { message: string; firstComment: string; targetIds: string[]; scheduledAt?: Date; labelId?: string | null } & PostAttachments) {
   return withPublishingOperation(actor, { targetIds: input.targetIds }, async ({ actor, signal, lockTargets }) => {
-    await membership(actor);
+    const member = await membership(actor);
+    if (input.labelId !== undefined && input.labelId !== null && (!/^[A-Za-z0-9_-]{1,200}$/.test(input.labelId))) throw new OperationError('invalid_request', 'Choose a valid post label.');
+    const holdForApproval = Boolean(input.scheduledAt) && !MANAGERS.has(member.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), member.role);
     const config = await limits();
     const firstComment = validFirstComment(input.firstComment, config.maxText);
     const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
@@ -262,8 +279,14 @@ export async function createPost(actor: PublishingActor, input: { message: strin
     const now = new Date();
     const id = randomUUID();
     await publishingTransaction(signal, async tx => {
-      await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, link: attachments.link, media: attachments.media, status: input.scheduledAt ? 'scheduled' : 'draft', scheduledAt: input.scheduledAt ?? null, publishedAt: null, createdAt: now, updatedAt: now,
+      if (input.labelId) {
+        const labels = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM labels WHERE id = ${input.labelId} AND "workspaceId" = ${actor.workspaceId} FOR SHARE`;
+        if (!labels.length) throw new OperationError('not_found', 'This post label is unavailable in the current workspace.');
+      }
+      await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, link: attachments.link, media: attachments.media, status: holdForApproval ? 'pending_approval' : input.scheduledAt ? 'scheduled' : 'draft', scheduledAt: input.scheduledAt ?? null, publishedAt: null, createdAt: now, updatedAt: now,
         targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
+      if (input.labelId) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") VALUES (${id}, ${input.labelId})`;
+      if (holdForApproval) await setApprovalPending(tx, actor, id);
       await audit(tx, actor, 'publishing.post_created', { postId: id, targetCount: targets.length });
       if (input.scheduledAt) await audit(tx, actor, 'publishing.post_scheduled', { postId: id, scheduledAt: input.scheduledAt.toISOString() });
     });
@@ -287,6 +310,10 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
       if (existing.publishedAt || ['publishing', 'published', 'partially_failed', 'scheduled'].includes(existing.status) || existing.targets.some(target => target.remotePostId || target.status === 'processing' || target.status === 'published' || target.status === 'scheduled_remote')) throw new OperationError('conflict', 'This post can no longer be edited.');
       await tx.postTarget.deleteMany({ where: { postId: existing.id } });
       await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, link: attachments.link, media: attachments.media, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
+      // Review covers the exact content and destinations that were reviewed.
+      // The guarded raw update only changes previously approved posts; managers
+      // retain their publishing bypass while contributors need fresh review.
+      await tx.$executeRaw`UPDATE posts SET "approvalStatus" = 'pending', "reviewedById" = NULL, "reviewedAt" = NULL, "reviewNote" = NULL WHERE id = ${existing.id} AND "workspaceId" = ${actor.workspaceId} AND "approvalStatus" = 'approved'`;
       await audit(tx, actor, 'publishing.post_updated', { postId: existing.id, targetCount: targets.length });
     });
   });
@@ -299,10 +326,15 @@ export { deletePostDurably as deletePost } from '@/modules/publishing/server/del
 export async function publishPost(actor: PublishingActor, postId: string, expectedScheduledAt?: Date) {
   return withPublishingOperation(actor, { postId, allowPublicationRecovery: true }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
+    const approvalRequired = !MANAGERS.has(role.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), role.role);
     await assertPostScope(actor, postId);
     const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true } } } } } } } });
     if (expectedScheduledAt !== undefined && (!post || post.status !== 'scheduled' || !post.scheduledAt || post.scheduledAt.getTime() !== expectedScheduledAt.getTime())) return { published: 0, failed: 0, needsReconciliation: 0, firstCommentsNeedingReview: 0, firstCommentsNotSent: 0, skipped: true };
     if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
+    if (approvalRequired) {
+      const approval = await prisma.$queryRaw<Array<{ approvalStatus: string }>>`SELECT "approvalStatus"::text AS "approvalStatus" FROM posts WHERE id = ${post.id} AND "workspaceId" = ${actor.workspaceId}`;
+      if (approval[0]?.approvalStatus !== 'approved') throw new OperationError('conflict', 'This workspace requires approval before this post can be published.');
+    }
     if (!['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status)) throw new OperationError('conflict', 'This post cannot be published in its current state.');
     if (post.status === 'scheduled' && (!post.scheduledAt || post.scheduledAt > new Date())) throw new OperationError('conflict', 'This post is scheduled for a future time.');
     if (!post.targets.length) throw new OperationError('invalid_request', 'Select at least one destination before publishing.');

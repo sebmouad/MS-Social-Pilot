@@ -23,6 +23,8 @@ describe('scoped permissions', () => {
     const editor = resolvePermissions(source({ role: 'editor' }));
     expect(canAccessFeature(editor, 'publishing/posts', 'read')).toBe(true);
     expect(canAccessFeature(editor, 'publishing/posts', 'write')).toBe(true);
+    expect(canAccessFeature(editor, 'publishing/templates', 'read')).toBe(true);
+    expect(canAccessFeature(editor, 'publishing/templates', 'write')).toBe(true);
     expect(canAccessFeature(editor, 'inbox/conversations', 'write')).toBe(true);
     expect(canAccessFeature(editor, 'ads/campaigns', 'write')).toBe(false);
     expect(canAccessFeature(editor, 'settings/team', 'read')).toBe(false);
@@ -39,6 +41,7 @@ describe('scoped permissions', () => {
     expect(canAccessFeature(client, 'publishing/calendar', 'read')).toBe(true);
     expect(canAccessFeature(client, 'publishing/approvals', 'write')).toBe(true);
     expect(canAccessFeature(client, 'publishing/posts', 'write')).toBe(false);
+    expect(canAccessFeature(client, 'publishing/templates', 'read')).toBe(false);
     expect(canAccessFeature(client, 'analytics/overview', 'read')).toBe(true);
     expect(canAccessFeature(client, 'analytics/reports', 'read')).toBe(true);
     expect(canAccessFeature(client, 'inbox/conversations', 'read')).toBe(false);

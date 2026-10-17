@@ -203,9 +203,11 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
 }
 
 /** Reply composer with a character count and the platform's reply rule in plain words. */
-export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000 }: { id: string; kind: Kind; allowed: boolean; headline: string; detail?: string; maxLength?: number }) {
+export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000, value, onChange }: { id: string; kind: Kind; allowed: boolean; headline: string; detail?: string; maxLength?: number; value?: string; onChange?: (value: string) => void }) {
   const validation = useFormValidation();
-  const [text, setText] = useState('');
+  const [localText, setLocalText] = useState('');
+  const text = value ?? localText;
+  const updateText = (next: string) => { if (value === undefined) setLocalText(next); onChange?.(next); };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState('');
@@ -224,7 +226,7 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
     const outcome = await send({ action: 'reply', id, kind, text });
     setBusy(false);
     if (!outcome.ok) { setError(outcome.error); return; }
-    setText(''); setSent('Reply sent.');
+    updateText(''); setSent('Reply sent.');
     router.refresh();
   }
 
@@ -232,7 +234,7 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
     <p id={ruleId} className={allowed ? styles.ruleOpen : styles.ruleClosed}><span aria-hidden="true">{allowed ? '●' : '■'}</span> <strong>{headline}</strong>{detail ? <span className={styles.ruleDetail}> {detail}</span> : null}</p>
     <label htmlFor={fieldId} className="ui-visually-hidden">Reply</label>
     <AutoTextarea id={fieldId} name="reply" rows={3} maxLength={maxLength} value={text} disabled={!allowed || busy} aria-describedby={[ruleId, countId, validation.fieldProps('reply')['aria-describedby']].filter(Boolean).join(' ')} aria-invalid={Boolean(error) || Boolean(validation.errors.reply) || undefined}
-      placeholder={allowed ? (kind === 'message' ? 'Write a reply…' : 'Write a public reply…') : 'Replies are not possible right now.'} onChange={event => { setText(event.target.value); setSent(''); }} />
+      placeholder={allowed ? (kind === 'message' ? 'Write a reply…' : 'Write a public reply…') : 'Replies are not possible right now.'} onChange={event => { updateText(event.target.value); setSent(''); }} />
     <FieldError {...validation.errorProps('reply')} />
     <div className={styles.replyFoot}>
       <span id={countId} className={remaining < 100 ? styles.countLow : styles.count}>{text.length.toLocaleString('en-US')} / {maxLength.toLocaleString('en-US')} characters{remaining < 100 ? ` · ${remaining} left` : ''}</span>
