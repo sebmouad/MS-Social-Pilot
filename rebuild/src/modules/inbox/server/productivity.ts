@@ -55,11 +55,17 @@ async function lockActorAndAssignee(tx: Prisma.TransactionClient, actor: InboxRe
 async function audit(tx: Prisma.TransactionClient, actor: InboxReadActor, action: string, detail: object) {
   await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, ${action}, ${JSON.stringify(detail)}::jsonb, NOW())`;
 }
-const safeDate = (value: unknown) => value instanceof Date ? value : new Date(String(value));
+/** Credential ceiling for item-level authorization; undefined means every channel the member may use. */
+const ceiling = (actor: InboxReadActor) => actor.allowedChannelIds === undefined ? {} : { allowedChannelIds: actor.allowedChannelIds };
+/** Saved replies are workspace-wide text with no channel meaning, so a resource-limited credential cannot touch them. */
+function requireAllChannels(actor: InboxReadActor) {
+  if (actor.allowedChannelIds !== undefined) throw new OperationError('forbidden', 'This operation requires access to all channels and ad accounts.');
+}
+const safeDate =(value: unknown) => value instanceof Date ? value : new Date(String(value));
 
 export async function readInboxProductivity(actor: InboxReadActor, input: unknown) {
   const parsed = inboxItemSchema.safeParse(input); if (!parsed.success) throw invalid();
-  const access = await authorizeInbox(actor, {}, 'read');
+  const access = await authorizeInbox(actor, ceiling(actor), 'read');
   const row = await item(actor, access.channelIds, parsed.data);
   if (!row) throw new OperationError('not_found', 'This Inbox item is unavailable in the current workspace.');
   const cap = await limits();
@@ -76,6 +82,7 @@ export async function readInboxProductivity(actor: InboxReadActor, input: unknow
 export async function listSavedReplies(actor: InboxReadActor, input: unknown = {}) {
   const parsed = z.object({ offset: z.number().int().min(0).max(100000).default(0), limit: z.number().int().positive().max(1000).optional(), q: z.string().trim().max(200).default('') }).strict().safeParse(input);
   if (!parsed.success) throw invalid();
+  requireAllChannels(actor);
   await authorizeInbox(actor, {}, 'read');
   const { savedReplyPageLimit } = await limits();
   const limit = Math.min(parsed.data.limit ?? savedReplyPageLimit, savedReplyPageLimit);
@@ -94,12 +101,13 @@ export async function performInboxProductivityAction(actor: InboxReadActor, inpu
   if (value.action === 'reply.create' && (value.name.length > cap.savedReplyNameMaxCharacters || value.body.length > cap.savedReplyBodyMaxCharacters || value.confirmation !== confirmation.createReply(value.name))) throw invalid();
   if (value.action === 'reply.update' && (value.name.length > cap.savedReplyNameMaxCharacters || value.body.length > cap.savedReplyBodyMaxCharacters || value.confirmation !== confirmation.updateReply(value.id))) throw invalid();
   if (value.action === 'reply.delete' && value.confirmation !== confirmation.deleteReply(value.id)) throw invalid();
-  const access = await authorizeInbox(actor, {}, 'write');
+  if (value.action.startsWith('reply.')) requireAllChannels(actor);
+  const access = await authorizeInbox(actor, ceiling(actor), 'write');
   if ('kind' in value && 'id' in value) {
     const target = await item(actor, access.channelIds, value);
     if (!target) throw new OperationError('not_found', 'This Inbox item is unavailable in the current workspace.');
     return withWorkspaceOperation(actor.workspaceId, async () => {
-      const fresh = await authorizeInbox(actor, {}, 'write');
+      const fresh = await authorizeInbox(actor, ceiling(actor), 'write');
       const current = await item(actor, fresh.channelIds, value);
       if (!current) throw new OperationError('not_found', 'This Inbox item is unavailable in the current workspace.');
       const t = await timeout();
@@ -131,7 +139,7 @@ export async function performInboxProductivityAction(actor: InboxReadActor, inpu
     const current = await item(actor, access.channelIds, { kind: note.kind as 'message'|'comment', id: note.itemId });
     if (!current) throw new OperationError('not_found', 'This private note is unavailable.');
     return withWorkspaceOperation(actor.workspaceId, async () => {
-      const fresh = await authorizeInbox(actor, {}, 'write');
+      const fresh = await authorizeInbox(actor, ceiling(actor), 'write');
       const checked = await item(actor, fresh.channelIds, { kind: note.kind as 'message'|'comment', id: note.itemId });
       if (!checked) throw new OperationError('not_found', 'This private note is unavailable.');
       const t = await timeout();

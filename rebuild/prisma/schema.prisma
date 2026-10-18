@@ -181,6 +181,7 @@ model McpApiKey {
   tokenPrefix String
   readFeatures String[] @default([])
   writeFeatures String[] @default([])
+  resourceScope Json?
   expiresAt   DateTime
   revokedAt   DateTime?
   createdAt   DateTime  @default(now())

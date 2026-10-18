@@ -48,13 +48,13 @@ export async function exportAdsReport(actor: AdsReadActor, input: unknown = {}, 
   const start = text(values.start, 'start', reportPolicy.maxFilterCharacters);
   const end = text(values.end, 'end', reportPolicy.maxFilterCharacters);
   const accountId = text(values.accountId, 'accountId', reportPolicy.maxFilterCharacters);
-  const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders);
+  const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders, access.allowedAdAccountIds);
   const filters = parseAdsPerformanceFilters({ ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), ...(accountId === undefined ? {} : { accountId }) }, accounts.map(account => account.id), new Date(), reportPolicy);
   if (objectId !== undefined && !filters.accountId) throw new OperationError('invalid_request', 'An Ads object id requires one explicit account and report level.');
 
   const levels = level === undefined ? undefined : [level as AdsInsightLevel];
   const dataset = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, {
-    ...(levels === undefined ? {} : { levels }), ...(objectId === undefined ? {} : { objectId }),
+    allowedAdAccountIds: access.allowedAdAccountIds, ...(levels === undefined ? {} : { levels }), ...(objectId === undefined ? {} : { objectId }),
   });
   const maxItems = constraints.maxItems ?? dataset.maxRows;
   if (dataset.insights.length > maxItems) throw new OperationError('invalid_request', 'This Ads export contains too many rows. Choose fewer accounts or a shorter date range. No partial file was created.');

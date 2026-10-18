@@ -7,7 +7,7 @@ import { deleteInboxCommentDurably } from '@/modules/inbox/server/deletion';
 import { authorizeInbox } from '@/modules/inbox/server/access';
 import type { InboxReadConstraints } from '@/modules/inbox/server/types';
 
-export type InboxActor = { userId: string; workspaceId: string };
+export type InboxActor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[] };
 export type InboxActionKind = 'message' | 'comment';
 
 async function providerForTarget(targetId: string, workspaceId: string): Promise<string> {
@@ -28,8 +28,11 @@ async function providerForItem(kind: InboxActionKind, id: string, workspaceId: s
   return { provider: target.socialAccount.provider, targetId: target.id };
 }
 
-async function requireVisibleChannel(actor: InboxActor, targetId: string, mode: 'read' | 'write' = 'read') {
-  const access = await authorizeInbox(actor, { allowedChannelIds: [targetId] }, mode);
+/** The requested channel is intersected with every credential ceiling (actor and explicit); neither overwrites the other. */
+async function requireVisibleChannel(actor: InboxActor, targetId: string, mode: 'read' | 'write' = 'read', constraints: InboxReadConstraints = {}) {
+  const ceilings = [actor.allowedChannelIds, constraints.allowedChannelIds];
+  const allowedChannelIds = ceilings.reduce<readonly string[]>((ids, ceiling) => ceiling === undefined ? ids : ids.filter(id => ceiling.includes(id)), [targetId]);
+  const access = await authorizeInbox(actor, { allowedChannelIds }, mode);
   if (!access.channelIds.includes(targetId)) throw new OperationError('not_found', 'This Inbox item is unavailable in the current workspace.');
 }
 
@@ -47,7 +50,7 @@ export async function canManageInbox(actor: InboxActor, targetId: string): Promi
 }
 
 export async function syncInbox(actor: InboxActor, targetId?: string) {
-  const access = await authorizeInbox(actor);
+  const access = await authorizeInbox(actor, actor.allowedChannelIds === undefined ? {} : { allowedChannelIds: actor.allowedChannelIds });
   if (targetId) {
     if (!access.channelIds.includes(targetId)) throw new OperationError('not_found', 'This Inbox channel is unavailable in the current workspace.');
     return (await host(await providerForTarget(targetId, actor.workspaceId))).sync(actor, targetId);
@@ -70,18 +73,18 @@ export async function syncInbox(actor: InboxActor, targetId?: string) {
   return totals;
 }
 
-export async function replyToInbox(actor: InboxActor, input: { kind: InboxActionKind; id: string; text: string }) {
+export async function replyToInbox(actor: InboxActor, input: { kind: InboxActionKind; id: string; text: string }, constraints: InboxReadConstraints = {}) {
   const item = await providerForItem(input.kind, input.id, actor.workspaceId);
-  await requireVisibleChannel(actor, item.targetId, 'write');
+  await requireVisibleChannel(actor, item.targetId, 'write', constraints);
   return (await host(item.provider)).reply(actor, input);
 }
 export async function setInboxResolved(actor: InboxActor, input: { kind: InboxActionKind; id: string; resolved: boolean; action?: 'resolve' }, constraints: InboxReadConstraints = {}) {
   return setInboxWorkflowResolved(actor, { kind: input.kind, id: input.id, resolved: input.resolved }, constraints);
 }
 export { canManageInboxWorkflow };
-export async function moderateInboxComment(actor: InboxActor, input: { id: string; hidden: boolean }) {
+export async function moderateInboxComment(actor: InboxActor, input: { id: string; hidden: boolean }, constraints: InboxReadConstraints = {}) {
   const item = await providerForItem('comment', input.id, actor.workspaceId);
-  await requireVisibleChannel(actor, item.targetId, 'write');
+  await requireVisibleChannel(actor, item.targetId, 'write', constraints);
   return (await host(item.provider)).moderate(actor, input);
 }
 export async function deleteInboxComment(actor: InboxActor, input: { id: string; confirmation: string }, constraints: InboxReadConstraints = {}) {

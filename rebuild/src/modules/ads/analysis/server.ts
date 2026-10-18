@@ -49,7 +49,7 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
   const direction = text(values.direction, 'sort direction', max) ?? (sort === 'name' ? 'asc' : 'desc');
   if (direction !== 'asc' && direction !== 'desc') throw new OperationError('invalid_request', 'Choose ascending or descending order.');
 
-  const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders);
+  const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders, access.allowedAdAccountIds);
   const { period, start, end, accountId } = values as Record<string, string | undefined>;
   const filters = parseAdsPerformanceFilters({
     ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), ...(accountId === undefined ? {} : { accountId }),
@@ -58,12 +58,12 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
   if (compare === 'accounts' && selectedAccounts.length > policy.maxCompareAccounts) throw new OperationError('invalid_request', `Compare at most ${policy.maxCompareAccounts} accounts. Choose a single account or fewer accounts.`);
 
   const levels: AdsInsightLevel[] = ['account', level];
-  const currentSet = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, { levels });
+  const currentSet = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, { levels, allowedAdAccountIds: access.allowedAdAccountIds });
   const current = currentSet.insights as unknown as Row[];
   let previousRows: Row[] = [];
   if (compare === 'previous') {
     const window = previousWindow(filters.since, filters.until);
-    previousRows = (await getAdsDataset(actor.workspaceId, { ...filters, ...window }, access.allowedTargetIds, access.allowedProviders, { levels: ['account'] })).insights as unknown as Row[];
+    previousRows = (await getAdsDataset(actor.workspaceId, { ...filters, ...window }, access.allowedTargetIds, access.allowedProviders, { levels: ['account'], allowedAdAccountIds: access.allowedAdAccountIds })).insights as unknown as Row[];
   }
 
   const accountMeta = new Map(currentSet.accounts.map(account => [account.id, account]));

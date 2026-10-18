@@ -60,6 +60,7 @@ import { platformAds } from '../platforms/registry';
 import { summarizeInsights } from '../ads/summary';
 import { deleteUnusedWorkspaceImage, getWorkspaceImageMetadata, listWorkspaceImages, uploadWorkspaceImage } from '../media/storage';
 
+import { resourceAllowedForScope, scopeRefusalMessage, toolAllowedForScope } from '@/modules/settings/mcp-access/tool-policy';
 import type { McpIdentity, McpViewer } from './types';
 export type { McpIdentity, McpViewer, McpInstallationViewer } from './types';
 import { rootToolDefinitions, rootTools, canUseRootTool, rootResources, rootResourceTool, runRootTool } from './root-tools';
@@ -67,6 +68,19 @@ type JsonRpcId = string | number | null;
 
 const versions = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const pageIdsFor = (viewer: McpViewer): string[] | undefined => viewer.permissions?.pageScope.all === false ? [...viewer.permissions.pageScope.ids] : undefined;
+/** Independent Ads ceiling from the key; undefined (all/legacy keys) adds no account restriction, [] allows none. */
+const adsTargetIdsFor = (viewer: McpViewer): string[] | undefined => viewer.adAccountTargetScope ? (viewer.adAccountTargetScope.all ? undefined : [...viewer.adAccountTargetScope.ids]) : pageIdsFor(viewer);
+const adAccountIdsFor = (viewer: McpViewer): string[] | undefined => viewer.allowedAdAccountIds === undefined ? undefined : [...viewer.allowedAdAccountIds];
+const adsActorFor = (viewer: McpViewer) => ({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: adsTargetIdsFor(viewer), ...(viewer.allowedAdAccountIds === undefined ? {} : { allowedAdAccountIds: [...viewer.allowedAdAccountIds] }) });
+/** Explicit actors: a bare viewer does not carry the key's resource ceiling into lifecycle services. */
+const publishingActor = (viewer: McpViewer) => {
+  const allowedTargetIds = pageIdsFor(viewer);
+  return { userId: viewer.userId, workspaceId: viewer.workspaceId, ...(allowedTargetIds === undefined ? {} : { allowedTargetIds }) };
+};
+const inboxActor = (viewer: McpViewer) => {
+  const allowedChannelIds = pageIdsFor(viewer);
+  return { userId: viewer.userId, workspaceId: viewer.workspaceId, ...(allowedChannelIds === undefined ? {} : { allowedChannelIds }) };
+};
 const textResult = (value: unknown) => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
   structuredContent: Array.isArray(value) ? { items: value } : value,
@@ -249,6 +263,9 @@ const toolFeatures: Record<string, string> = {
 };
 
 const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', ...templateWriteTools, ...labelWriteTools, ...collaborationWriteTools, ...analyticsPinWriteTools]);
+/** Registered workspace feature scopes; customer key choices must not promise unimplemented tools. */
+export function workspaceMcpFeatureIds(): readonly string[] { return [...new Set(Object.values(toolFeatures))]; }
+
 const writeTools = new Set(['run_root_platform_publication_action', 'manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'delete_workspace_data', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 for (const name of teamWriteTools) writeTools.add(name);
 for (const name of analyticsPinWriteTools) writeTools.add(name);
@@ -362,6 +379,7 @@ function analyticsPageArgs(args: Record<string, unknown>, cap: number, fallback:
 }
 
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
+  if (!toolAllowedForScope(viewer, name)) throw new OperationError('forbidden', scopeRefusalMessage);
   if (rootTools.has(name)) return runRootTool(viewer, name, args);
   if (toolFeatures[name] === 'ads/campaigns') return withAdsErrorBoundary(() => executeTool(viewer, name, args));
   if (['list_workspace_images', 'get_workspace_image', 'delete_workspace_image', 'upload_workspace_image'].includes(name)) return withMediaErrorBoundary(() => executeTool(viewer, name, args));
@@ -381,8 +399,8 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
     await assertWorkspaceNotPurging(viewer.workspaceId);
   }
   const cap = viewer.maxResultItems ?? 100;
-  const analyticsActor = { userId: viewer.userId, workspaceId: viewer.workspaceId, allowedChannelIds: pageIdsFor(viewer), maxResultItems: cap };
-  const adsReadActor = { userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) };
+  const analyticsActor = { userId: viewer.userId, workspaceId: viewer.workspaceId, allowedChannelIds: pageIdsFor(viewer), ...(viewer.allowedAdAccountIds === undefined ? {} : { allowedAdAccountIds: viewer.allowedAdAccountIds }), ...(viewer.adAccountTargetScope ? { adAccountTargetScope: viewer.adAccountTargetScope } : {}), maxResultItems: cap };
+  const adsReadActor = adsActorFor(viewer);
   if (analyticsDemographicsTools.has(name)) return executeAnalyticsDemographicsTool(analyticsActor, args);
   if (analyticsPinTools.has(name)) return executeAnalyticsPinTool(analyticsActor, name, args);
   if (analyticsComparisonTools.has(name)) return executeAnalyticsComparisonTool(analyticsActor, args);
@@ -398,8 +416,8 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
   if (notificationTools.has(name)) return executeNotificationTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
   if (templateTools.has(name as 'list_post_templates' | 'create_post_template' | 'update_post_template' | 'delete_post_template')) return executeTemplateTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name as 'list_post_templates' | 'create_post_template' | 'update_post_template' | 'delete_post_template', args);
   if (labelTools.has(name as 'list_post_labels' | 'create_post_label' | 'update_post_label' | 'delete_post_label')) return executeLabelTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
-  if (analyticsExplorerTools.has(name)) return executeAnalyticsExplorerTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer), feature: 'analytics/explorer' }, cap);
-  if (inboxProductivityTools.has(name)) return executeInboxProductivityTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args, cap);
+  if (analyticsExplorerTools.has(name)) return executeAnalyticsExplorerTool(analyticsActor, args, { allowedChannelIds: pageIdsFor(viewer), feature: 'analytics/explorer' }, cap);
+  if (inboxProductivityTools.has(name)) return executeInboxProductivityTool(inboxActor(viewer), name, args, cap);
   switch (name) {
     case 'list_workspace_images': {
       const limit = Math.max(1, Math.min(cap, 200, Math.trunc(Number(args.limit) || cap)));
@@ -467,7 +485,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       if (!kind || !id) throw new OperationError('invalid_request', 'kind and id are required.');
       requireConfirmation(args, `REPLY ${kind} ${id}`);
       const text = typeof args.text === 'string' ? args.text.trim() : '';
-      const result = await replyToInbox(viewer, { kind, id, text });
+      const result = await replyToInbox(inboxActor(viewer), { kind, id, text }, { allowedChannelIds: pageIdsFor(viewer) });
       return auditedReceipt(viewer, name, { kind, itemId: id }, { ...result, kind, itemId: id });
     }
     case 'get_inbox_deletion': {
@@ -501,7 +519,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const id = typeof args.id === 'string' ? args.id : '';
       if (!id || typeof args.hidden !== 'boolean') throw new OperationError('invalid_request', 'id and hidden are required.');
       requireConfirmation(args, `${args.hidden ? 'HIDE' : 'UNHIDE'} COMMENT ${id}`);
-      const result = await moderateInboxComment(viewer, { id, hidden: args.hidden });
+      const result = await moderateInboxComment(inboxActor(viewer), { id, hidden: args.hidden }, { allowedChannelIds: pageIdsFor(viewer) });
       return auditedReceipt(viewer, name, { itemId: id, hidden: args.hidden }, { ...result, itemId: id, hidden: args.hidden });
     }
     case 'get_analytics_overview': {
@@ -544,7 +562,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const limit = args.limit === undefined ? cap : Number(args.limit);
       if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
       const pageLimit = Math.min(limit, cap);
-      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer), entitledPlatformIds(viewer.entitlements));
+      const where = await getAdsAccountWhere(viewer.workspaceId, adsTargetIdsFor(viewer), entitledPlatformIds(viewer.entitlements), adAccountIdsFor(viewer));
       const [accounts, accountCount] = await Promise.all([
         prisma.adAccount.findMany({ where, orderBy: { name: 'asc' }, skip: offset, take: pageLimit, select: { id: true, actId: true, name: true, enabled: true, currency: true } }),
         prisma.adAccount.count({ where }),
@@ -555,14 +573,14 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       if (args.limit !== undefined && (!Number.isSafeInteger(args.limit) || (args.limit as number) < 1 || (args.limit as number) > ADS_MCP_MAX_PAGE_ITEMS)) {
         throw new OperationError('invalid_request', `limit must be an integer from 1 to ${ADS_MCP_MAX_PAGE_ITEMS}.`);
       }
-      return readAdsDailyRows({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, args, { maxItems: cap });
+      return readAdsDailyRows(adsActorFor(viewer), args, { maxItems: cap });
     }
     case 'export_ads_report':
-      return exportAdsReport({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, args, { maxItems: cap });
+      return exportAdsReport(adsActorFor(viewer), args, { maxItems: cap });
     case 'get_ads_performance': {
-      const allowedTargetIds = pageIdsFor(viewer);
+      const allowedTargetIds = adsTargetIdsFor(viewer);
       const policy = await loadAdsReportPolicy();
-      const accounts = await getAdsAccounts(viewer.workspaceId, allowedTargetIds, entitledPlatformIds(viewer.entitlements));
+      const accounts = await getAdsAccounts(viewer.workspaceId, allowedTargetIds, entitledPlatformIds(viewer.entitlements), adAccountIdsFor(viewer));
       const filters = parseAdsPerformanceFilters(args, accounts.map(account => account.id), new Date(), policy);
       const accountId = filters.accountId;
       const range = { from: filters.since, to: filters.until, endExclusive: true };
@@ -573,7 +591,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       if (typeof offset !== 'number' || !Number.isSafeInteger(offset) || offset < 0 || (args.limit !== undefined && (typeof args.limit !== 'number' || !Number.isSafeInteger(args.limit) || args.limit < 1 || args.limit > 200))) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
       if (typeof accountOffset !== 'number' || !Number.isSafeInteger(accountOffset) || accountOffset < 0) throw new OperationError('invalid_request', 'accountOffset must be a non-negative integer.');
       const levels: AdsInsightLevel[] = level === undefined ? ['campaign', 'adset', 'ad'] : [level as AdsInsightLevel];
-      const { insights, pageSize } = await getAdsDataset(viewer.workspaceId, filters, allowedTargetIds, entitledPlatformIds(viewer.entitlements), { levels });
+      const { insights, pageSize } = await getAdsDataset(viewer.workspaceId, filters, allowedTargetIds, entitledPlatformIds(viewer.entitlements), { levels, ...(viewer.allowedAdAccountIds === undefined ? {} : { allowedAdAccountIds: adAccountIdsFor(viewer) }) });
       const rows = summarizeInsights(insights, level as string | undefined).filter(row => ['campaign', 'adset', 'ad'].includes(row.level));
       const limit = args.limit === undefined ? pageSize : args.limit as number;
       const pageLimit = Math.min(limit, cap);
@@ -591,19 +609,19 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const objectId = requiredString(args, 'objectId');
       const objectType = requiredString(args, 'objectType') as 'campaign' | 'adset' | 'ad';
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(objectId) || !['campaign', 'adset', 'ad'].includes(objectType)) throw new OperationError('invalid_request', 'Invalid ad object request.');
-      return readWorkspaceAdObject({ userId: viewer.userId, workspaceId: viewer.workspaceId }, { adAccountId, objectId, objectType }, pageIdsFor(viewer));
+      return readWorkspaceAdObject(adsActorFor(viewer), { adAccountId, objectId, objectType }, adsTargetIdsFor(viewer));
     }
     case 'get_ad_creation_options': {
       const adAccountId = requiredString(args, 'adAccountId');
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId)) throw new OperationError('invalid_request', 'Invalid ad account ID.');
-      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer), entitledPlatformIds(viewer.entitlements));
+      const where = await getAdsAccountWhere(viewer.workspaceId, adsTargetIdsFor(viewer), entitledPlatformIds(viewer.entitlements), adAccountIdsFor(viewer));
       const account = await prisma.adAccount.findFirst({
-        where: { ...where, id: adAccountId },
+        where: { AND: [where, { id: adAccountId }] },
         select: { id: true, currency: true, socialAccount: { select: { provider: true } } },
       });
       const provider = account?.socialAccount?.provider;
       const host = provider ? await platformAds(provider) : null;
-      const manageable = account && await canManageWorkspaceAds({ userId: viewer.userId, workspaceId: viewer.workspaceId }, adAccountId);
+      const manageable = account && await canManageWorkspaceAds(adsActorFor(viewer), adAccountId);
       if (!account || !provider || !host || !manageable) throw new OperationError('unavailable', 'The selected advertising account is unavailable.');
       const creationUi = host.creationUi ? await host.creationUi() : host.ui;
       return {
@@ -611,7 +629,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
         provider,
         currency: account.currency,
         campaign: creationUi.campaign ? { options: creationUi.campaign.options, defaultOption: creationUi.campaign.defaultOption, confirmationTemplate: creationUi.campaign.confirmationTemplate, nameMaxLength: creationUi.campaign.nameMaxLength } : null,
-        adSet: viewer.permissions?.pageScope.all === true && pageIdsFor(viewer) === undefined && creationUi.adSet ? { options: creationUi.adSet.options, defaultOption: creationUi.adSet.defaultOption, confirmationTemplate: creationUi.adSet.confirmationTemplate, nameMaxLength: creationUi.adSet.nameMaxLength, countryCodeFormat: 'Two uppercase letters, for example MA', dailyBudgetFormat: 'Positive integer in minor currency units' } : null,
+        adSet: adsTargetIdsFor(viewer) === undefined && creationUi.adSet ? { options: creationUi.adSet.options, defaultOption: creationUi.adSet.defaultOption, confirmationTemplate: creationUi.adSet.confirmationTemplate, nameMaxLength: creationUi.adSet.nameMaxLength, countryCodeFormat: 'Two uppercase letters, for example MA', dailyBudgetFormat: 'Positive integer in minor currency units' } : null,
       };
     }
     case 'create_ad_campaign': {
@@ -620,7 +638,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const objective = requiredString(args, 'objective');
       const confirmation = requiredString(args, 'confirmation');
       const requestId = requiredString(args, 'requestId');
-      const result = await createWorkspaceAdCampaign({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, { adAccountId, name: nameValue, objective, confirmation, requestId });
+      const result = await createWorkspaceAdCampaign(adsActorFor(viewer), { adAccountId, name: nameValue, objective, confirmation, requestId });
       if (result.outcome !== 'succeeded' || !result.created) return result;
       return confirmedAdsReceipt(result, await auditConfirmedAdsWrite(viewer, name, { adAccountId, campaignId: result.campaignId, operationId: result.operationId }));
     }
@@ -633,10 +651,10 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const optimizationGoal = requiredString(args, 'optimizationGoal');
       const confirmation = requiredString(args, 'confirmation');
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(campaignId) || typeof dailyBudgetMinor !== 'number' || !Number.isSafeInteger(dailyBudgetMinor) || dailyBudgetMinor < 1 || !/^[A-Z]{2}$/.test(countryCode)) throw new OperationError('invalid_request', 'Invalid ad set request.');
-      if (viewer.permissions?.pageScope.all !== true) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
+      if (adsTargetIdsFor(viewer) !== undefined) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
       const requestId = requiredString(args, 'requestId');
-      const unrestricted = viewer.permissions?.pageScope.all === true && pageIdsFor(viewer) === undefined;
-      const result = await createWorkspaceAdSet({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, { adAccountId, campaignId, name: nameValue, dailyBudgetMinor, countryCode, optimizationGoal, confirmation, requestId }, unrestricted);
+      const unrestricted = adsTargetIdsFor(viewer) === undefined;
+      const result = await createWorkspaceAdSet(adsActorFor(viewer), { adAccountId, campaignId, name: nameValue, dailyBudgetMinor, countryCode, optimizationGoal, confirmation, requestId }, unrestricted);
       if (result.outcome !== 'succeeded' || !result.created) return result;
       return confirmedAdsReceipt(result, await auditConfirmedAdsWrite(viewer, name, { adAccountId, campaignId, adSetId: result.adSetId, operationId: result.operationId }));
     }
@@ -650,7 +668,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       if ((dailyBudgetMinor !== undefined && typeof dailyBudgetMinor !== 'number') || (lifetimeBudgetMinor !== undefined && typeof lifetimeBudgetMinor !== 'number')) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units.');
       const confirmation = requiredString(args, 'confirmation');
       const requestId = requiredString(args, 'requestId');
-      const result = await updateWorkspaceAd({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, { adAccountId, objectId, objectType, status, dailyBudgetMinor, lifetimeBudgetMinor, confirmation, requestId });
+      const result = await updateWorkspaceAd(adsActorFor(viewer), { adAccountId, objectId, objectType, status, dailyBudgetMinor, lifetimeBudgetMinor, confirmation, requestId });
       if (result.outcome !== 'succeeded') return result;
       return auditedReceipt(viewer, name, { adAccountId, objectId, operationId: result.operationId }, result);
     }
@@ -692,7 +710,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const postId = typeof args.postId === 'string' ? args.postId : '';
       if (!postId) throw new OperationError('invalid_request', 'postId is required.');
       requireConfirmation(args, `PUBLISH POST ${postId}`);
-      const result = await publishPost(viewer, postId);
+      const result = await publishPost(publishingActor(viewer), postId);
       return auditedReceipt(viewer, name, { postId, ...result }, { postId, ...result });
     }
     case 'send_first_comment': {
@@ -700,7 +718,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const postTargetId = requiredString(args, 'postTargetId');
       if (Object.keys(args).some(key => !['postId', 'postTargetId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Choose one post destination.');
       requireConfirmation(args, `SEND FIRST COMMENT ${postTargetId}`);
-      const result = await sendFirstComment(viewer, { postId, postTargetId });
+      const result = await sendFirstComment(publishingActor(viewer), { postId, postTargetId });
       return auditedReceipt(viewer, name, { postId, postTargetId, state: result.state }, result);
     }
     case 'record_first_comment_outcome': {
@@ -714,33 +732,33 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       if (outcome === 'not_sent' && remoteId) throw new OperationError('invalid_request', 'Do not include remoteId when outcome is not_sent.');
       const confirmation = `RECORD FIRST COMMENT ${postTargetId} ${outcome === 'sent' ? 'SENT' : 'NOT SENT'}`;
       requireConfirmation(args, confirmation);
-      const result = await recordFirstCommentOutcome(viewer, { postId, postTargetId, outcome, ...(remoteId ? { remoteId } : {}), confirmation });
+      const result = await recordFirstCommentOutcome(publishingActor(viewer), { postId, postTargetId, outcome, ...(remoteId ? { remoteId } : {}), confirmation });
       return auditedReceipt(viewer, name, { postId, postTargetId, outcome, state: result.state }, result);
     }
     case 'sync_post_status': {
       const postId = typeof args.postId === 'string' ? args.postId : '';
       if (!postId) throw new OperationError('invalid_request', 'postId is required.');
       requireConfirmation(args, `SYNC POST STATUS ${postId}`);
-      const result = await syncPostStatus(viewer, postId);
+      const result = await syncPostStatus(publishingActor(viewer), postId);
       return auditedReceipt(viewer, name, { postId, ...result }, { postId, ...result });
     }
     case 'delete_post': {
       const postId = typeof args.postId === 'string' ? args.postId : '';
       if (!postId || typeof args.deleteRemote !== 'boolean') throw new OperationError('invalid_request', 'postId and deleteRemote are required.');
       requireConfirmation(args, `DELETE POST ${postId} ${args.deleteRemote ? 'REMOTE' : 'LOCAL'}`);
-      const result = await deletePost(viewer, postId, args.deleteRemote);
+      const result = await deletePost(publishingActor(viewer), postId, args.deleteRemote);
       return auditedReceipt(viewer, name, { postId, remoteDeletionRequested: args.deleteRemote, state: result.state }, result);
     }
     case 'get_post_deletion_status': {
       const postId = requiredString(args, 'postId');
       if (Object.keys(args).some(key => key !== 'postId')) throw new OperationError('invalid_request', 'postId is the only accepted field.');
-      return getPostDeletion(viewer, { postId });
+      return getPostDeletion(publishingActor(viewer), { postId });
     }
     case 'finish_post_deletion': {
       const postId = requiredString(args, 'postId');
       if (Object.keys(args).some(key => !['postId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'postId and confirmation are the only accepted fields.');
       requireConfirmation(args, `FINISH POST DELETION ${postId}`);
-      const result = await finishPostDeletion(viewer, { postId, confirmation: `FINISH POST DELETION ${postId}` });
+      const result = await finishPostDeletion(publishingActor(viewer), { postId, confirmation: `FINISH POST DELETION ${postId}` });
       return auditedReceipt(viewer, name, { postId, state: result.state }, result);
     }
     case 'record_post_deletion_outcome': {
@@ -751,13 +769,13 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       if (args.verifiedOnPlatform !== true) throw new OperationError('invalid_request', 'verifiedOnPlatform must be true after an external platform check.');
       if (Object.keys(args).some(key => !['postId', 'operationId', 'outcome', 'verifiedOnPlatform', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Only the post, operation and verified outcome are accepted.');
       requireConfirmation(args, `RECORD POST DELETION ${operationId} ${outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}`);
-      const result = await recordPostDeletionOutcome(viewer, { postId, operationId, outcome, confirmation: `RECORD POST DELETION ${operationId} ${outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}`, verifiedOnPlatform: true });
+      const result = await recordPostDeletionOutcome(publishingActor(viewer), { postId, operationId, outcome, confirmation: `RECORD POST DELETION ${operationId} ${outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}`, verifiedOnPlatform: true });
       return auditedReceipt(viewer, name, { postId, operationId, outcome, state: result.state }, result);
     }
     case 'get_publication_status': {
       const postId = requiredString(args, 'postId');
       if (Object.keys(args).some(key => key !== 'postId')) throw new OperationError('invalid_request', 'postId is the only accepted field.');
-      return getPublicationStatus(viewer, { postId });
+      return getPublicationStatus(publishingActor(viewer), { postId });
     }
     case 'record_publication_outcome': {
       const postId = requiredString(args, 'postId');
@@ -766,34 +784,34 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       if (outcome !== 'PUBLISHED' && outcome !== 'ABSENT' || args.verifiedExternally !== true) throw new OperationError('invalid_request', 'Choose a valid outcome after an external platform check.');
       if (Object.keys(args).some(key => !['postId', 'operationId', 'outcome', 'remotePostId', 'remoteUrl', 'verifiedExternally', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Only the post, operation, receipt and verified outcome are accepted.');
       requireConfirmation(args, `RECORD PUBLICATION ${operationId} ${outcome}`);
-      const result = await recordPublicationOutcome(viewer, { postId, operationId, outcome, ...(typeof args.remotePostId === 'string' ? { remotePostId: args.remotePostId } : {}), ...(typeof args.remoteUrl === 'string' ? { remoteUrl: args.remoteUrl } : {}), confirmation: `RECORD PUBLICATION ${operationId} ${outcome}`, verifiedExternally: true });
+      const result = await recordPublicationOutcome(publishingActor(viewer), { postId, operationId, outcome, ...(typeof args.remotePostId === 'string' ? { remotePostId: args.remotePostId } : {}), ...(typeof args.remoteUrl === 'string' ? { remoteUrl: args.remoteUrl } : {}), confirmation: `RECORD PUBLICATION ${operationId} ${outcome}`, verifiedExternally: true });
       return auditedReceipt(viewer, name, { postId, operationId, outcome }, result);
     }
     case 'finish_publication_projection': {
       const postId = requiredString(args, 'postId'); const operationId = requiredString(args, 'operationId');
       if (Object.keys(args).some(key => !['postId', 'operationId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Only the post, operation and confirmation are accepted.');
       requireConfirmation(args, `FINISH PUBLICATION ${operationId}`);
-      const result = await finishPublicationProjection(viewer, { postId, operationId, confirmation: `FINISH PUBLICATION ${operationId}` });
+      const result = await finishPublicationProjection(publishingActor(viewer), { postId, operationId, confirmation: `FINISH PUBLICATION ${operationId}` });
       return auditedReceipt(viewer, name, { postId, operationId }, result);
     }
     case 'adopt_legacy_publication': {
       const postId = requiredString(args, 'postId'); const postTargetId = requiredString(args, 'postTargetId');
       if (Object.keys(args).some(key => !['postId', 'postTargetId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Only the post, destination and confirmation are accepted.');
       requireConfirmation(args, `ADOPT PUBLICATION ${postTargetId}`);
-      const result = await adoptLegacyPublication(viewer, { postId, postTargetId, confirmation: `ADOPT PUBLICATION ${postTargetId}` });
+      const result = await adoptLegacyPublication(publishingActor(viewer), { postId, postTargetId, confirmation: `ADOPT PUBLICATION ${postTargetId}` });
       return auditedReceipt(viewer, name, { postId, postTargetId }, result);
     }
     case 'duplicate_post': {
       const postId = requiredString(args, 'postId');
       requireConfirmation(args, `DUPLICATE POST ${postId}`);
-      const result = await duplicatePost(viewer, args);
+      const result = await duplicatePost(publishingActor(viewer), args);
       return auditedReceipt(viewer, name, { sourcePostId: result.sourcePostId, postId: result.postId, replayed: result.replayed }, result);
     }
     case 'create_post': {
       requireConfirmation(args, 'CREATE POST');
       if (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string')) throw new OperationError('invalid_request', 'targetIds must be an array of destination IDs.');
       const media = postMediaArguments(args);
-      const result = await createPost(viewer, { message: postMessageArgument(args), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media });
+      const result = await createPost(publishingActor(viewer), { message: postMessageArgument(args), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media });
       return auditedReceipt(viewer, name, { postId: result.id, targetCount: args.targetIds.length }, { id: result.id, status: 'draft' });
     }
     case 'update_post': {
@@ -801,20 +819,20 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       requireConfirmation(args, `UPDATE POST ${postId}`);
       if (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string')) throw new OperationError('invalid_request', 'targetIds must be an array of destination IDs.');
       const media = postMediaArguments(args);
-      await updatePost(viewer, { postId, message: postMessageArgument(args), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media });
+      await updatePost(publishingActor(viewer), { postId, message: postMessageArgument(args), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media });
       return auditedReceipt(viewer, name, { postId, targetCount: args.targetIds.length }, { postId, updated: true });
     }
     case 'submit_post_for_approval': {
       const postId = requiredString(args, 'postId');
       requireConfirmation(args, `SUBMIT POST ${postId}`);
-      await submitPostForApproval(viewer, postId);
+      await submitPostForApproval(publishingActor(viewer), postId);
       return auditedReceipt(viewer, name, { postId }, { postId, status: 'pending_approval' });
     }
     case 'review_post': {
       const postId = requiredString(args, 'postId');
       if (args.decision !== 'approve' && args.decision !== 'reject') throw new OperationError('invalid_request', 'decision must be approve or reject.');
       requireConfirmation(args, `${args.decision.toUpperCase()} POST ${postId}`);
-      await reviewPost(viewer, postId, args.decision);
+      await reviewPost(publishingActor(viewer), postId, args.decision);
       return auditedReceipt(viewer, name, { postId, decision: args.decision }, { postId, decision: args.decision });
     }
     case 'queue_post': {
@@ -827,13 +845,13 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const date = new Date(scheduledAt);
       if (!Number.isFinite(date.getTime()) || !/^\d{4}-\d\d-\d\dT/.test(scheduledAt)) throw new OperationError('invalid_request', 'scheduledAt must be an ISO date-time.');
       requireConfirmation(args, `SCHEDULE POST ${postId} ${scheduledAt}`);
-      await schedulePost(viewer, postId, date);
+      await schedulePost(publishingActor(viewer), postId, date);
       return auditedReceipt(viewer, name, { postId, scheduledAt: date.toISOString() }, { postId, status: 'scheduled', scheduledAt: date.toISOString() });
     }
     case 'cancel_scheduled_post': {
       const postId = requiredString(args, 'postId');
       requireConfirmation(args, `CANCEL SCHEDULE ${postId}`);
-      await cancelScheduledPost(viewer, postId);
+      await cancelScheduledPost(publishingActor(viewer), postId);
       return auditedReceipt(viewer, name, { postId }, { postId, status: 'draft' });
     }
     case 'set_connection_selection': {
@@ -869,12 +887,13 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
   if (method === 'tools/list') {
     if (viewer.scope === 'installation') return reply({ tools: canUseRootTool(viewer) ? rootToolDefinitions : [] });
     const invitationsReady = canManageData(viewer) && canUseFeature(viewer.entitlements, 'settings/team') ? await invitationAvailability() : false;
-    return reply({ tools: tools.filter(tool => (!collaborationTools.has(tool.name) || availableCollaborationTools().some(available => available.name === tool.name)) && (tool.name !== 'invite_workspace_member' || invitationsReady) && (rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (!teamTools.has(tool.name) || canManageData(viewer)) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (!adsManagerTools.has(tool.name) || canManageData(viewer)) && (!dataTools.has(tool.name) || canManageData(viewer)))) });
+    return reply({ tools: tools.filter(tool => toolAllowedForScope(viewer, tool.name) && (!collaborationTools.has(tool.name) || availableCollaborationTools().some(available => available.name === tool.name)) && (tool.name !== 'invite_workspace_member' || invitationsReady) && (rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (!teamTools.has(tool.name) || canManageData(viewer)) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (!adsManagerTools.has(tool.name) || canManageData(viewer)) && (!dataTools.has(tool.name) || canManageData(viewer)))) });
   }
   if (method === 'tools/call') {
     const name = String(params.name ?? '');
     if (!tools.some(tool => tool.name === name)) return error(-32602, `Unknown tool: ${name}`);
     try {
+      if (viewer.scope === 'workspace' && !toolAllowedForScope(viewer, name)) throw new OperationError('forbidden', scopeRefusalMessage);
       if (rootTools.has(name)) return reply(textResult(await runRootTool(viewer, name, (params.arguments === undefined ? {} : params.arguments) as Record<string, unknown>)));
       if (viewer.scope === 'installation') throw new OperationError('forbidden', 'Workspace access is required for this operation.');
       if (notificationTools.has(name) && (!canUseFeature(viewer.entitlements, 'settings/notifications') || !viewer.permissions || !canAccessFeature(viewer.permissions, 'settings/notifications', writeTools.has(name) ? 'write' : 'read'))) throw new OperationError('forbidden', 'Notifications are unavailable in this workspace.');
@@ -925,11 +944,12 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     ...(canUseRootTool(viewer) ? rootResources : []),
   ].filter(resource => {
     const feature = resource.uri === 'msp://settings/sharing' ? SHARING_FEATURE_ID : resource.uri === 'msp://settings/bio' ? BIO_FEATURE_ID : resource.uri === 'msp://tasks' ? TASKS_FEATURE_ID : resource.uri === 'msp://analytics/pins' ? 'analytics/pins' : resource.uri === 'msp://analytics/demographics' ? 'analytics/demographics' : resource.uri === 'msp://ads/objects' ? 'ads/objects' : resource.uri === 'msp://publishing/fields' ? 'publishing/posts' : resource.uri === 'msp://settings/policies' ? 'settings/workspace' : resource.uri === 'msp://notifications' ? 'settings/notifications' : resource.uri === 'msp://publishing/templates' ? 'publishing/templates' : resource.uri === 'msp://publishing/labels' ? 'publishing/labels' : resource.uri === 'msp://analytics/explorer' ? 'analytics/explorer' : ['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
-    return (!['msp://settings/team', 'msp://settings/invitations', 'msp://settings/policies'].includes(resource.uri) || canManageData(viewer)) && (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
+    return resourceAllowedForScope(viewer, resource.uri) && (!['msp://settings/team', 'msp://settings/invitations', 'msp://settings/policies'].includes(resource.uri) || canManageData(viewer)) && (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
   }) });
   }
   if (method === 'resources/read') {
     const uri = String(params.uri ?? '');
+    if (viewer.scope === 'workspace' && !resourceAllowedForScope(viewer, uri)) return error(-32602, 'Resource unavailable.');
     const installationTool = rootResourceTool(uri);
     if (installationTool) {
       try {

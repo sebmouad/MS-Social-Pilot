@@ -16,7 +16,9 @@ const MANAGER_ROLES = new Set(['owner', 'admin']);
 const OBJECT_TYPES = new Set<AdMutationRequest['objectType']>(['campaign', 'adset', 'ad']);
 const ACCOUNT_WHERE = { enabled: true } as const;
 
-export type AdsActionActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
+/** `allowedAdAccountIds` is an independent ad-account ceiling: [] allows none, undefined adds no restriction. */
+export type AdsActionActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[]; allowedAdAccountIds?: readonly string[] };
+const accountCeiling = (ids: readonly string[] | undefined) => ids === undefined ? {} : { AND: [{ id: { in: [...ids] } }] };
 export type AdsActionInput = {
   adAccountId: string;
   objectId: string;
@@ -41,7 +43,8 @@ async function adsHostReady(host: PlatformAdsHost): Promise<boolean> {
 }
 
 /** Resolve the selected account's module before producing its module-owned confirmation text. */
-export async function campaignCreationConfirmation(workspaceId: string, adAccountId: string, name: string, objective: string) {
+export async function campaignCreationConfirmation(workspaceId: string, adAccountId: string, name: string, objective: string, allowedAdAccountIds?: readonly string[]) {
+  if (allowedAdAccountIds !== undefined && !allowedAdAccountIds.includes(adAccountId)) throw new OperationError('unavailable', 'The selected advertising account is unavailable.');
   const account = await prisma.adAccount.findFirst({
     where: { id: adAccountId, workspaceId, ...ACCOUNT_WHERE, socialAccount: { is: { workspaceId, invalidatedAt: null } } },
     select: { currency: true, socialAccount: { select: { provider: true } } },
@@ -56,6 +59,7 @@ export async function campaignCreationConfirmation(workspaceId: string, adAccoun
 
 /** Server-rendering gate for action controls; mutation still repeats these checks. */
 export async function canManageWorkspaceAds(actor: AdsActionActor, adAccountId: string): Promise<boolean> {
+  if (actor.allowedAdAccountIds !== undefined && !actor.allowedAdAccountIds.includes(adAccountId)) return false;
   const [membership, entitlements, permissions, managementEnabled] = await Promise.all([
     prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } }),
     loadEntitlements(actor.userId, actor.workspaceId), loadPermissions(actor.userId, actor.workspaceId), runtimeConfig('ads.managementEnabled') as Promise<boolean>,
@@ -78,6 +82,7 @@ export async function canManageWorkspaceAds(actor: AdsActionActor, adAccountId: 
 
 /** Read access is independent from spend-changing management enablement and scope. */
 export async function canReadWorkspaceAds(actor: AdsActionActor, adAccountId: string, allowedTargetIds?: readonly string[]): Promise<boolean> {
+  if (actor.allowedAdAccountIds !== undefined && !actor.allowedAdAccountIds.includes(adAccountId)) return false;
   const [entitlements, permissions] = await Promise.all([loadEntitlements(actor.userId, actor.workspaceId), loadPermissions(actor.userId, actor.workspaceId)]);
   if (!entitlements || !permissions) return false;
   if (!canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'read')) return false;
@@ -101,7 +106,7 @@ export async function readWorkspaceAdObject(actor: AdsActionActor, input: AdsObj
   if (!(await canReadWorkspaceAds(actor, input.adAccountId, allowedTargetIds))) throw new OperationError('forbidden', 'Ads performance access is unavailable.');
   const account = await prisma.adAccount.findFirst({
     where: {
-      id: input.adAccountId, workspaceId: actor.workspaceId, ...ACCOUNT_WHERE,
+      id: input.adAccountId, ...accountCeiling(actor.allowedAdAccountIds), workspaceId: actor.workspaceId, ...ACCOUNT_WHERE,
       socialAccount: { is: { workspaceId: actor.workspaceId, invalidatedAt: null, ...(allowedTargetIds ? { targets: { some: { workspaceId: actor.workspaceId, id: { in: [...allowedTargetIds] } } } } : {}) } },
     },
     select: { id: true, actId: true, socialAccount: { select: { provider: true, accessToken: true, invalidatedAt: true, tokenExpiresAt: true } } },
@@ -137,12 +142,14 @@ export async function updateWorkspaceAd(actor: AdsActionActor, input: AdsActionI
     ? { type: 'status.set', ...base, status: input.status }
     : { type: 'budget.set', ...base, budget: hasDailyBudget ? { kind: 'daily', minor: input.dailyBudgetMinor } : { kind: 'lifetime', minor: input.lifetimeBudgetMinor } };
   return performAdsManagement(
-    { userId: actor.userId, workspaceId: actor.workspaceId, ...(actor.allowedTargetIds ? { allowedTargetIds: actor.allowedTargetIds } : {}) },
+    performerOf(actor),
     { adAccountId: input.adAccountId, operation, confirmation: input.confirmation, requestId: input.requestId },
   );
 }
 
-const performerOf = (actor: AdsActionActor) => ({ userId: actor.userId, workspaceId: actor.workspaceId, ...(actor.allowedTargetIds ? { allowedTargetIds: actor.allowedTargetIds } : {}) });
+function performerOf(actor: AdsActionActor) {
+  return { userId: actor.userId, workspaceId: actor.workspaceId, ...(actor.allowedTargetIds ? { allowedTargetIds: actor.allowedTargetIds } : {}), ...(actor.allowedAdAccountIds ? { allowedAdAccountIds: actor.allowedAdAccountIds } : {}) };
+}
 
 /**
  * Create a paused campaign through the shared Ads management journal (intent before provider I/O,

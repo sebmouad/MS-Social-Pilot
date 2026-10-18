@@ -59,7 +59,7 @@ export async function readAdsDailyRows(actor: AdsReadActor, input: unknown = {},
   const accountId = optionalText(values, 'accountId', reportPolicy.maxFilterCharacters);
   const period = optionalText(values, 'period', reportPolicy.maxFilterCharacters);
   const filtersInput = { ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), ...(accountId === undefined ? {} : { accountId }) };
-  const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders);
+  const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders, access.allowedAdAccountIds);
   const filters = parseAdsPerformanceFilters(filtersInput, accounts.map(account => account.id), new Date(), reportPolicy);
   if (objectId !== undefined && !filters.accountId) throw new OperationError('invalid_request', 'An Ads object id requires one explicit account and report level.');
 
@@ -67,7 +67,7 @@ export async function readAdsDailyRows(actor: AdsReadActor, input: unknown = {},
   const offset = safeInteger(values.offset, 0, Number.MAX_SAFE_INTEGER, 0, 'report offset');
   const levels = level === undefined ? undefined : [level as AdsInsightLevel];
   const dataset = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, {
-    ...(levels === undefined ? {} : { levels }), ...(objectId === undefined ? {} : { objectId }),
+    allowedAdAccountIds: access.allowedAdAccountIds, ...(levels === undefined ? {} : { levels }), ...(objectId === undefined ? {} : { objectId }),
   });
   const sorted = [...dataset.insights].sort((a, b) =>
     b.date.getTime() - a.date.getTime() || compare(a.adAccountId, b.adAccountId) || compare(a.level, b.level) || compare(a.objectId, b.objectId) || compare(a.id, b.id));

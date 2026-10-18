@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { readAnalyticsExplorer } from './server/explorer';
-import type { AnalyticsReadConstraints } from './server/types';
+import type { AnalyticsReadActor, AnalyticsReadConstraints } from './server/types';
 
 export const analyticsExplorerTools = new Set<string>(['get_analytics_explorer']);
 export const analyticsExplorerWriteTools = new Set<string>();
@@ -25,7 +25,7 @@ const inputSchema = z.object({
   page: z.number().int().positive().optional(), pointPage: z.number().int().positive().optional(), rowPage: z.number().int().positive().optional(),
 }).strict();
 
-export async function executeAnalyticsExplorerTool(actor: { userId: string; workspaceId: string }, args: unknown, constraints: AnalyticsReadConstraints = {}, maxItems?: number) {
+export async function executeAnalyticsExplorerTool(actor: AnalyticsReadActor, args: unknown, constraints: AnalyticsReadConstraints = {}, maxItems?: number) {
   const parsed = inputSchema.safeParse(args ?? {});
   if (!parsed.success) throw new OperationError('invalid_request', 'Choose valid Analytics Explorer filters.');
   return readAnalyticsExplorer(actor, parsed.data, constraints, maxItems);

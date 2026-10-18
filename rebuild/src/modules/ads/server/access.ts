@@ -5,7 +5,7 @@ import { loadPermissions } from '@/server/permissions/loader';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import { OperationError } from '@/lib/operation-error';
 
-export type AdsReadActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
+export type AdsReadActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[]; /** Explicit ad-account ceiling: [] means none, undefined means no account-level restriction. */ allowedAdAccountIds?: readonly string[] };
 
 /** Recheck all customer report permissions and intersect caller-provided scope with current grants. */
 export async function authorizeAdsRead(actor: AdsReadActor, feature: 'ads/campaigns' | 'ads/compare' | 'ads/objects' = 'ads/campaigns') {
@@ -28,11 +28,12 @@ export async function authorizeAdsRead(actor: AdsReadActor, feature: 'ads/campai
     ? grants
     : actor.allowedTargetIds.filter(id => grants === undefined || grants.includes(id));
   return {
-    actor: { userId: actor.userId, workspaceId: actor.workspaceId, ...(allowedTargetIds === undefined ? {} : { allowedTargetIds }) },
+    actor: { userId: actor.userId, workspaceId: actor.workspaceId, ...(allowedTargetIds === undefined ? {} : { allowedTargetIds }), ...(actor.allowedAdAccountIds === undefined ? {} : { allowedAdAccountIds: actor.allowedAdAccountIds }) },
     role: membership.role,
     permissions,
     entitlements,
     allowedTargetIds,
+    allowedAdAccountIds: actor.allowedAdAccountIds,
     allowedProviders: entitledPlatformIds(entitlements),
   };
 }

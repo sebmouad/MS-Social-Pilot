@@ -261,3 +261,24 @@ proxy behavior remain open. Full Facebook live coverage/held-photo cleanup,
 remaining module integrations, Root coverage, production-shaped migration and
 rollback/cutover remain required. Production/socialpilot-deploy remain legacy.
 See CLIENT_SHARING.md. Do not broad-stage unrelated unfinished source.
+
+
+## Batch80 — independent MCP resource ceilings
+
+New keys explicitly select channels and ad accounts independently, or all current
+and future selected resources. Shared issuance/revocation and request dispatch
+intersect current authority; workspace-wide tools/resources refuse selected keys.
+Session feature parity remains unchanged. Root registry72 owns new scope and
+transaction bounds. See MCP_RESOURCE_SCOPE.md for semantics, migration and gaps.
+
+Isolated database-enabled suite: 2711 tests/321 files, zero skips. Production build
+and serial typecheck passed, including final scoped themed controls. Actual local
+HTTP/MCP/PostgreSQL/Chromium probe passed independent issuance, account/channel
+isolation, Analytics sibling exclusion, global refusals and revocation; disposable
+data/media/audits were removed and exact Root settings restored. Desktop1440px
+and phone390px inspection passed scoped layout, with temporary Nightfall restored
+to Coast. Independent final Claude review stopped at quota, not a review pass.
+Fifteen migrations passed schema-only rehearsal; production-shaped rollback and
+full provider/release gates remain open. Sharing usable-connection/provider
+filtering, remaining legacy integrations and Root configuration coverage remain
+next work. Production/socialpilot-deploy remain legacy. Preserve photo canary lock.

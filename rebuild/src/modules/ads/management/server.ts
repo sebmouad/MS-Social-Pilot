@@ -14,7 +14,9 @@ import { adsOpsHostFor } from './registry';
 import { AdsNoDispatchError, asNoDispatch } from './errors';
 import { AD_OBJECT_TYPES, AD_OPERATION_IDS, isCreationOperation, type AdsNeutralOperation, type AdsObjectType, type AdsOpsHost } from './types';
 
-export type AdsManageActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
+/** `allowedAdAccountIds` is an independent ceiling: [] allows no account (every read/write refuses), undefined adds no restriction. */
+export type AdsManageActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[]; allowedAdAccountIds?: readonly string[] };
+const accountIdCeiling = (actor: AdsManageActor) => actor.allowedAdAccountIds === undefined ? {} : { AND: [{ id: { in: [...actor.allowedAdAccountIds] } }] };
 const MANAGER_ROLES = new Set(['owner', 'admin']);
 const SAFE_ID = /^[A-Za-z0-9_-]{1,100}$/;
 const CREATE_TOKEN = /^[A-Za-z0-9_.-]{1,100}$/;
@@ -109,7 +111,7 @@ async function managedContext(actor: AdsManageActor, adAccountId: string, level:
   const pageScope = access.permissions.pageScope;
   const account = await prisma.adAccount.findFirst({
     where: {
-      id: adAccountId, workspaceId: actor.workspaceId, enabled: true,
+      id: adAccountId, ...accountIdCeiling(actor), workspaceId: actor.workspaceId, enabled: true,
       socialAccount: { is: { workspaceId: actor.workspaceId, invalidatedAt: null, ...accountTargetScope(actor, pageScope) } },
     },
     select: { id: true, actId: true, currency: true, socialAccount: { select: { provider: true, accessToken: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } },
@@ -392,7 +394,7 @@ export async function listAdsOperations(actor: AdsManageActor, input: { adAccoun
   // Visible accounts follow the caller's channel scope; history never crosses workspaces.
   const pageScope = access.permissions.pageScope;
   const visible = await prisma.adAccount.findMany({
-    where: { workspaceId: actor.workspaceId, socialAccount: { is: { workspaceId: actor.workspaceId, ...accountTargetScope(actor, pageScope) } } },
+    where: { workspaceId: actor.workspaceId, ...accountIdCeiling(actor), socialAccount: { is: { workspaceId: actor.workspaceId, ...accountTargetScope(actor, pageScope) } } },
     select: { id: true },
   });
   const ids = visible.map(item => item.id).filter(id => input.adAccountId === undefined || id === input.adAccountId);
@@ -423,7 +425,7 @@ export async function resolveAdsOperation(actor: AdsManageActor, input: { operat
   // Current workspace, module, role and key ceilings apply; retained disabled accounts remain visible for history recovery.
   const pageScope = access.permissions.pageScope;
   const visible = await prisma.adAccount.findFirst({
-    where: { id: row.adAccountId, workspaceId: actor.workspaceId, socialAccount: { is: { workspaceId: actor.workspaceId, ...accountTargetScope(actor, pageScope) } } },
+    where: { id: row.adAccountId, ...accountIdCeiling(actor), workspaceId: actor.workspaceId, socialAccount: { is: { workspaceId: actor.workspaceId, ...accountTargetScope(actor, pageScope) } } },
     select: { id: true },
   });
   if (!visible) throw new OperationError('not_found', 'This change was not found.');

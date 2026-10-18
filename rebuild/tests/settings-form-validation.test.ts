@@ -94,7 +94,7 @@ describe('settings form validation', () => {
   });
 
   it('requires a key name, valid lifetime and at least one readable feature before creating', async () => {
-    await render(createElement(McpKeyManager, { features: [feature], initialKeys: [key], maxLifetimeDays: 180 }));
+    await render(createElement(McpKeyManager, { features: [feature], initialKeys: [key], maxLifetimeDays: 180,defaultLifetimeDays:90,resources:[],resourcesTruncated:false }));
     const form = container.querySelector('form')!;
     const name = form.querySelector<HTMLInputElement>('[name="name"]')!;
     vi.mocked(fetch).mockClear();
@@ -125,11 +125,12 @@ describe('settings form validation', () => {
     vi.mocked(fetch).mockImplementation(async input => String(input).includes('mcp-keys')
       ? ({ ok: true, json: async () => ({ token: 'sp_secret_token_value', key: { ...key, id: 'created-key' } }) } as Response)
       : ({ ok: true, json: async () => ({ sessions: [] }) } as Response));
-    await render(createElement(McpKeyManager, { features: [feature], initialKeys: [], maxLifetimeDays: 180 }));
+    await render(createElement(McpKeyManager, { features: [feature], initialKeys: [], maxLifetimeDays: 180,defaultLifetimeDays:90,resources:[],resourcesTruncated:false }));
     const form = container.querySelector('form')!;
     const name = form.querySelector<HTMLInputElement>('[name="name"]')!;
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
     await act(async () => { setter.call(name, 'automation'); name.dispatchEvent(new Event('input', { bubbles: true })); form.querySelector<HTMLInputElement>('input[type="checkbox"][name="features"]')!.click(); });
+    await act(async()=>{form.querySelector<HTMLInputElement>('[name=permissionConsent]')!.click();});
     await submit(form);
     expect(container.querySelector<HTMLTextAreaElement>('#new-api-token')?.value).not.toContain('sp_secret_token_value');
     const toggle = container.querySelector<HTMLButtonElement>('button[aria-pressed]')!;
@@ -148,11 +149,12 @@ describe('settings form validation', () => {
     vi.mocked(fetch).mockImplementation(async input => String(input).includes('mcp-keys')
       ? ({ ok: true, json: async () => ({ token: 'sp_secret_token_value', key: { ...key, id: 'created-key' } }) } as Response)
       : ({ ok: true, json: async () => ({ sessions: [] }) } as Response));
-    await render(createElement(McpKeyManager, { features: [feature], initialKeys: [], maxLifetimeDays: 180 }));
+    await render(createElement(McpKeyManager, { features: [feature], initialKeys: [], maxLifetimeDays: 180,defaultLifetimeDays:90,resources:[],resourcesTruncated:false }));
     const form = container.querySelector('form')!;
     const name = form.querySelector<HTMLInputElement>('[name="name"]')!;
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
     await act(async () => { setter.call(name, 'automation'); name.dispatchEvent(new Event('input', { bubbles: true })); form.querySelector<HTMLInputElement>('input[type="checkbox"][name="features"]')!.click(); });
+    await act(async()=>{form.querySelector<HTMLInputElement>('[name=permissionConsent]')!.click();});
     await submit(form);
 
     const token = container.querySelector<HTMLTextAreaElement>('#new-api-token')!;

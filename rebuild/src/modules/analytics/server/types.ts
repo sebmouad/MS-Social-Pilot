@@ -1,7 +1,11 @@
 import type { MetricView } from '@/server/analytics/aggregate';
 import type { AnalyticsAdAccount, AnalyticsAudienceEntry, AnalyticsTarget } from '@/server/analytics/catalog';
 
-export type AnalyticsReadActor = { userId: string; workspaceId: string };
+/** Fresh original-membership channel grants that authorize Ads data, independent of any credential's channel selection. */
+export type AdAccountTargetScope = { all: true } | { all: false; ids: readonly string[] };
+/** Optional independent ad-account ceiling: undefined means no ceiling, [] means none. */
+export type AnalyticsAdCeiling = { allowedAdAccountIds?: readonly string[]; adAccountTargetScope?: AdAccountTargetScope };
+export type AnalyticsReadActor = { userId: string; workspaceId: string } & AnalyticsAdCeiling;
 export type AnalyticsReadConstraints = {
   allowedChannelIds?: readonly string[];
   feature?: 'analytics/overview' | 'analytics/reports' | 'analytics/explorer' | 'analytics/demographics' | 'analytics/pins' | 'analytics/compare';

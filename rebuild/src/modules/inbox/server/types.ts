@@ -1,4 +1,5 @@
-export type InboxReadActor = { userId: string; workspaceId: string };
+/** allowedChannelIds is an optional credential ceiling; it narrows, never widens, current membership grants. */
+export type InboxReadActor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[] };
 export type InboxReadConstraints = { allowedChannelIds?: readonly string[]; maxItems?: number };
 export type InboxListItem = {
   key: string; kind: 'message' | 'comment'; id: string; author: string; preview: string; time: Date;

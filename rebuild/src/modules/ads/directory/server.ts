@@ -49,13 +49,13 @@ export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {},
   const limit = int(values.limit, 1, readPolicy.maxRows, readPolicy.pageSize, 'page size');
   const offset = int(values.offset, 0, Number.MAX_SAFE_INTEGER, 0, 'offset');
 
-  const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders);
+  const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders, access.allowedAdAccountIds);
   const providerByAccount = new Map(accounts.map(account => [account.id, account.socialAccount?.provider]));
   const { period, start, end, accountId } = values as Record<string, string | undefined>;
   const filters = parseAdsPerformanceFilters({
     ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), ...(accountId === undefined ? {} : { accountId }),
   }, accounts.map(account => account.id), now, reportPolicy);
-  const dataset = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, { levels: [level as AdsInsightLevel] });
+  const dataset = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, { levels: [level as AdsInsightLevel], allowedAdAccountIds: access.allowedAdAccountIds });
   const rows = dataset.insights as unknown as Row[];
 
   const groups = new Map<string, Row[]>();
@@ -111,16 +111,16 @@ export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, n
   if (!accountId || !level || !LEVELS.includes(level as DirectoryLevel) || !objectId || !SAFE_ID.test(objectId)) throw new OperationError('invalid_request', 'Choose an account, a level and an object.');
   const access = await authorizeAdsRead(actor, 'ads/objects');
   const reportPolicy = await loadAdsReportPolicy();
-  const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders);
+  const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders, access.allowedAdAccountIds);
   const { period, start, end } = values as Record<string, string | undefined>;
   const filters = parseAdsPerformanceFilters({ ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), accountId }, accounts.map(account => account.id), now, reportPolicy);
-  const dataset = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, { levels: [level as AdsInsightLevel], objectId });
+  const dataset = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, { levels: [level as AdsInsightLevel], objectId, allowedAdAccountIds: access.allowedAdAccountIds });
   const rows = dataset.insights as unknown as Row[];
   if (!rows.length) throw new OperationError('not_found', 'No stored report rows were found for this object in the selected range.');
   const totals = totalsFromRows(rows.map(flow));
   let live: { available: true; configuredStatus: string | null; effectiveStatus: string | null } | { available: false } = { available: false };
   try {
-    const snapshot = await readWorkspaceAdObject({ userId: actor.userId, workspaceId: actor.workspaceId }, { adAccountId: accountId, objectId, objectType: level as DirectoryLevel }, access.allowedTargetIds) as { configuredStatus?: string | null; effectiveStatus?: string | null };
+    const snapshot = await readWorkspaceAdObject({ userId: actor.userId, workspaceId: actor.workspaceId, ...(access.allowedAdAccountIds === undefined ? {} : { allowedAdAccountIds: access.allowedAdAccountIds }) }, { adAccountId: accountId, objectId, objectType: level as DirectoryLevel }, access.allowedTargetIds) as { configuredStatus?: string | null; effectiveStatus?: string | null };
     live = { available: true, configuredStatus: snapshot.configuredStatus ?? null, effectiveStatus: snapshot.effectiveStatus ?? null };
   } catch { /* live status is optional; stored figures remain valid */ }
   // Management is an optional enhancement to read-only detail. Host wiring,

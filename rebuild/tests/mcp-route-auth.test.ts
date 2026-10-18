@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
   enabled: true,
+  resourceScope: null as unknown,
   budget: 1000,
   token: undefined as string | undefined,
   session: null as unknown,
@@ -45,7 +46,7 @@ const request = () => new Request('http://localhost/api/mcp', {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  state.enabled = true; state.budget = 1000;
+  state.enabled = true; state.budget = 1000; state.resourceScope=null;
   clear('mcp:installation:u1'); clear('mcp:w1:u1'); clear('mcp:key:mk1');
   state.token = token;
   state.session = session;
@@ -58,11 +59,21 @@ beforeEach(() => {
   state.executeRaw.mockResolvedValue(1);
   state.queryRaw.mockImplementation(async (query: TemplateStringsArray, _userId: string, workspaceId: string) => query.join('').includes('AS role')
     ? [{ role: 'admin', allPages: true, workspaceDisabled: [], memberDisabled: [], clientAccess: [], pageIds: [] }]
-    : query.join('').includes('FROM mcp_api_keys') ? [{ id: 'mk1', workspaceId: 'w1', createdById: 'u1', readFeatures: ['publishing/posts'], writeFeatures: [] }]
+    : query.join('').includes('FROM mcp_api_keys') ? [{ id: 'mk1', workspaceId: 'w1', createdById: 'u1', resourceScope: state.resourceScope, readFeatures: ['publishing/posts'], writeFeatures: [] }]
       : [{ workspaceId, workspaceDisabled: [], suspendedAt: null, memberDisabled: [], planFeatures: null, isInstanceOwner: false }]);
 });
 
 describe('MCP route authentication', () => {
+  it('intersects an owner key ceiling before dispatch and refuses malformed stored scope', async () => {
+    state.resourceScope={version:1,mode:'selected',ids:['a'],adAccountIds:[]};
+    state.publishingRead.mockResolvedValue([]);
+    const call=()=>POST(new Request('http://localhost/api/mcp?scope=workspace',{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer mcp_${'a'.repeat(43)}`},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'list_posts',arguments:{}}})}));
+    const response=await call();expect(response.status).toBe(200);
+    expect(state.publishingRead.mock.calls[0][0]).toEqual({userId:'u1',workspaceId:'w1',allowedTargetIds:['a']});
+    state.resourceScope={version:1,mode:'selected'};state.publishingRead.mockClear();
+    expect((await call()).status).toBe(403);expect(state.publishingRead).not.toHaveBeenCalled();
+  });
+
   it('returns no-store JSON errors when ingress configuration is unavailable', async () => {
     vi.mocked(runtimeConfig).mockRejectedValueOnce(new Error('postgres://private-password@db'));
     const response = await POST(request());
@@ -132,7 +143,7 @@ describe('MCP route authentication', () => {
     state.user = { id: 'u1', isInstanceOwner: true, disabledAt: null };
     state.queryRaw.mockImplementation(async (query: TemplateStringsArray) => query.join('').includes('AS role')
       ? [{ role: 'owner', allPages: true, workspaceDisabled: [], memberDisabled: [], clientAccess: [], pageIds: [] }]
-      : query.join('').includes('FROM mcp_api_keys') ? [{ id: 'mk1', workspaceId: 'w1', createdById: 'u1', readFeatures: ['publishing/posts'], writeFeatures: [] }]
+      : query.join('').includes('FROM mcp_api_keys') ? [{ id: 'mk1', workspaceId: 'w1', createdById: 'u1', resourceScope: null, readFeatures: ['publishing/posts'], writeFeatures: [] }]
         : [{ workspaceId: 'w1', workspaceDisabled: [], suspendedAt: new Date(), memberDisabled: [], planFeatures: null, isInstanceOwner: true }]);
     for (const bearer of [false, true]) {
       const response = await POST(new Request('http://localhost/api/mcp?scope=workspace', { method: 'POST', headers: { 'content-type': 'application/json', ...(bearer ? { authorization: `Bearer mcp_${'a'.repeat(43)}` } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_posts', arguments: {} } }) }));

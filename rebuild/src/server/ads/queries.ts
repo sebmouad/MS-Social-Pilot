@@ -7,7 +7,8 @@ import { loadAdsReadPolicy } from '@/modules/ads/server/read-policy';
 export { parseAdsFilters, AdsFilterError, type AdsFilters, type AdsPeriod, type AdsSearchParams } from '@/modules/ads/report-filters';
 
 export type AdsInsightLevel = 'account' | 'campaign' | 'adset' | 'ad';
-export type AdsDatasetOptions = { levels?: readonly AdsInsightLevel[]; objectId?: string };
+/** `allowedAdAccountIds` is an independent ceiling: undefined keeps current behavior, [] allows no account. */
+export type AdsDatasetOptions = { levels?: readonly AdsInsightLevel[]; objectId?: string; allowedAdAccountIds?: readonly string[] };
 const ADS_INSIGHT_LEVELS: readonly AdsInsightLevel[] = ['account', 'campaign', 'adset', 'ad'];
 
 /** Read only the accounts and stored insight rows belonging to this workspace. */
@@ -22,9 +23,9 @@ export async function getAdsDataset(workspaceId: string, filters: AdsFilters, al
   if (objectId !== undefined && (typeof objectId !== 'string' || !objectId || /[\u0000-\u001f\u007f]/.test(objectId) || !selectedLevels || selectedLevels.length !== 1 || !filters.accountId)) {
     throw new OperationError('invalid_request', 'Choose one account and report level for an Ads object filter.');
   }
-  const accounts = await getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders);
+  const accounts = await getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders, options.allowedAdAccountIds);
   const visibleAccountIds = accounts.map(account => account.id);
-  const currentAccountScope = await getAdsAccountWhere(workspaceId, allowedTargetIds, allowedProviders);
+  const currentAccountScope = await getAdsAccountWhere(workspaceId, allowedTargetIds, allowedProviders, options.allowedAdAccountIds);
   const insights = await prisma.adInsight.findMany({
     where: {
       adAccount: { ...currentAccountScope, id: { in: filters.accountId ? visibleAccountIds.filter(id => id === filters.accountId) : visibleAccountIds } },
@@ -46,7 +47,7 @@ export async function getAdsDataset(workspaceId: string, filters: AdsFilters, al
 }
 
 /** Query predicate for enabled, selected ad accounts from installed and enabled platform modules. */
-export async function getAdsAccountWhere(workspaceId: string, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[]) {
+export async function getAdsAccountWhere(workspaceId: string, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[], allowedAdAccountIds?: readonly string[]) {
   const socialAccountIds = allowedTargetIds === undefined ? undefined : (await prisma.target.findMany({
     where: { workspaceId, id: { in: [...allowedTargetIds] } },
     select: { socialAccountId: true },
@@ -56,11 +57,13 @@ export async function getAdsAccountWhere(workspaceId: string, allowedTargetIds: 
     enabled: true,
     socialAccount: { is: await selectedResourceConnectionWhere(workspaceId, allowedProviders) },
     ...(socialAccountIds !== undefined ? { socialAccountId: { in: socialAccountIds } } : {}),
+    // Independent of channel authority: explicit account ids only narrow the intersection above.
+    ...(allowedAdAccountIds !== undefined ? { id: { in: [...allowedAdAccountIds] } } : {}),
   };
 }
 
-export async function getAdsAccounts(workspaceId: string, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[]) {
-  const where = await getAdsAccountWhere(workspaceId, allowedTargetIds, allowedProviders);
+export async function getAdsAccounts(workspaceId: string, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[], allowedAdAccountIds?: readonly string[]) {
+  const where = await getAdsAccountWhere(workspaceId, allowedTargetIds, allowedProviders, allowedAdAccountIds);
   return prisma.adAccount.findMany({
     where,
     orderBy: { name: "asc" },

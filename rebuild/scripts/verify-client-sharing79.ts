@@ -34,6 +34,7 @@ function expect(value: unknown, message: string) { if (!value) failures.push(`[$
 const gap = (message: string) => { gaps.push(`[${stage}] ${message}`); };
 
 const settingKeys = [
+  'platforms.facebook.enabled', 'entitlements.modules.ads', 'entitlements.modules.analytics', 'entitlements.features.ads/campaigns', 'entitlements.features.analytics/overview', 'entitlements.features.settings/mcp',
   'mcp.enabled', 'mcp.authenticatedRoles', 'mcp.maxResultItems', 'storage.mediaRoot',
   'sharing.pageSize', 'sharing.maxExpiryDays', 'sharing.defaultExpiryDays', 'bio.maxLinks', 'bio.availabilityCacheMs',
   'entitlements.modules.settings', 'entitlements.modules.publishing',
@@ -175,8 +176,8 @@ async function main() {
   try {
     stage = 'preflight and capture exact settings';
     check((await fetch(new URL('/sign-in', base), { redirect: 'manual', signal: AbortSignal.timeout(5000) })).status < 500, 'Local preview unavailable.');
-    const objects = await q<{ ready: boolean }>(Prisma.sql`SELECT to_regclass('public.share_links') IS NOT NULL AND to_regclass('public.review_decisions') IS NOT NULL AND to_regclass('public.bio_pages') IS NOT NULL AND to_regclass('public.bio_links') IS NOT NULL AND to_regclass('public.member_page_access') IS NOT NULL AND to_regclass('public.workspace_data_purges') IS NOT NULL AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'share_links' AND column_name = 'expiresAt') AS ready`);
-    check(objects[0]?.ready, 'Required sharing/bio tables or share_links.expiresAt missing; no fixtures written.');
+    const objects = await q<{ ready: boolean }>(Prisma.sql`SELECT to_regclass('public.share_links') IS NOT NULL AND to_regclass('public.review_decisions') IS NOT NULL AND to_regclass('public.bio_pages') IS NOT NULL AND to_regclass('public.bio_links') IS NOT NULL AND to_regclass('public.member_page_access') IS NOT NULL AND to_regclass('public.workspace_data_purges') IS NOT NULL AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'share_links' AND column_name = 'expiresAt') AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'mcp_api_keys' AND column_name = 'resourceScope') AS ready`);
+    check(objects[0]?.ready, 'Required sharing/bio tables, expiry or MCP scope column missing; no fixtures written.');
     for (const key of settingKeys) {
       const value = await db.appSetting.findUnique({ where: { key }, select: { key: true, value: true, encrypted: true, updatedAt: true } });
       check(!value?.encrypted, 'Unexpected encrypted probe setting.');
@@ -209,6 +210,14 @@ async function main() {
     const target = (key: keyof typeof T, workspaceId: string, name: string, enabled: boolean) => db.target.create({ data: { id: T[key], workspaceId, type: 'page', providerId: id(`provider_${key}`), name, accessToken: 'synthetic-never-used', enabled, canPublish: true, createdAt: now } });
     await target('a1', W.main, marker('Channel A1'), true); await target('a2', W.main, marker('Channel A2'), true); await target('b', W.main, marker('Channel B'), true); await target('off', W.main, marker('Channel Off'), false);
     await target('f', W.foreign, marker('Channel Foreign'), true); await target('erase', W.erase, marker('Channel Erase'), true); await target('purge', W.purge, marker('Channel Purge'), true);
+    const syntheticConnection = id('connection_main');
+    await db.socialAccount.create({data:{id:syntheticConnection,workspaceId:W.main,provider:'facebook',providerUserId:id('provider_user'),name:'Synthetic scope connection',accessToken:'synthetic-never-used',scopes:''}});
+    await db.target.updateMany({where:{id:{in:[T.a1,T.a2,T.b]}},data:{socialAccountId:syntheticConnection}});
+    const adA=id('ad_account_a'),adB=id('ad_account_b');
+    for(const [accountId,name,spend] of [[adA,'Scope account A',11],[adB,'Scope sibling B',22]] as const){
+      await db.adAccount.create({data:{id:accountId,workspaceId:W.main,socialAccountId:syntheticConnection,actId:accountId,name,currency:'USD',enabled:true}});
+      await db.adInsight.create({data:{id:id(`insight_${spend}`),adAccountId:accountId,level:'account',objectId:accountId,objectName:name,date:new Date(new Date().toISOString().slice(0,10)+'T00:00:00Z'),spend,impressions:100,clicks:3,reach:50,fetchedAt:new Date()}});
+    }
     await q(Prisma.sql`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${scopedMembership}, ${T.a1})`);
     const days = (n: number) => new Date(Date.now() + n * 86_400_000);
     const post = async (label: string, workspaceId: string, targets: string[], status: 'draft' | 'pending_approval' | 'rejected' | 'scheduled' | 'published' | 'failed', extra: { scheduledAt?: Date | null; publishedAt?: Date | null; media?: unknown; link?: string | null; firstComment?: string | null } = {}) => {
@@ -243,10 +252,12 @@ async function main() {
     await mk2('editor', U.editor, W.main, [S, B], [S, B]);
     await mk2('revoked', U.owner, W.main, [S, B], [S, B], { revokedAt: new Date() });
     await mk2('foreign', U.foreign, W.foreign, [S, B, A], [S, B, A]);
-    await mk2('scoped', U.scoped, W.main, [S, B, A], [S, B, A]);
+    await mk2('scoped', U.scoped, W.main, [S, B, A, 'ads/campaigns'], [S, B, A]);
+    await q(Prisma.sql`UPDATE mcp_api_keys SET "resourceScope"=${JSON.stringify({version:1,mode:'selected',ids:[T.a1],adAccountIds:[]})}::jsonb WHERE id=${keyIds.scoped}`);
 
     stage = 'enable local features, MCP and storage';
     for (const key of ['entitlements.modules.settings', 'entitlements.modules.publishing', 'entitlements.features.settings/sharing', 'entitlements.features.settings/bio', 'entitlements.features.settings/data', 'entitlements.features.publishing/approvals', 'entitlements.features.publishing/posts', 'entitlements.features.publishing/media'] as const) await save(key, true);
+    for(const key of ['platforms.facebook.enabled','entitlements.modules.ads','entitlements.modules.analytics','entitlements.features.ads/campaigns','entitlements.features.analytics/overview','entitlements.features.settings/mcp'] as const) await save(key,true);
     await save('mcp.enabled', true); await save('mcp.authenticatedRoles', ['owner', 'admin']); await save('mcp.maxResultItems', 100);
     await save('sharing.pageSize', 25); await save('sharing.maxExpiryDays', 180); await save('sharing.defaultExpiryDays', 30);
     await save('bio.maxLinks', 30); await save('bio.availabilityCacheMs', 0);
@@ -638,8 +649,34 @@ async function main() {
       expect(scopedList.data?.links?.every((l: any) => l.targetIds.length > 0 && l.targetIds.every((t: string) => t === T.a1)), 'A channel-scoped key must list only links wholly inside its scope.');
       if (scopedIn.data?.path) links.M3 = { id: scopedIn.data.id, token: tokenOf(scopedIn.data.path) };
     } else {
-      gap(`Channel-scoped Sharing keys are unreachable with real fixtures: the sharing manager roles (owner/admin) always resolve to unrestricted channel scope (resolvePermissions), so list_shareable_channels for an admin with allPages=false and one channel grant returned ${scopedIds.length} channels. The actor.allowedTargetIds ceiling in modules/sharing is covered only by unit tests, not end to end, and no scoped key can be fixtured to prove "no blanket channels".`);
+      expect(false, `Channel-scoped Sharing keys are unreachable with real fixtures: the sharing manager roles (owner/admin) always resolve to unrestricted channel scope (resolvePermissions), so list_shareable_channels for an admin with allPages=false and one channel grant returned ${scopedIds.length} channels. The actor.allowedTargetIds ceiling in modules/sharing is covered only by unit tests, not end to end, and no scoped key can be fixtured to prove "no blanket channels".`);
     }
+
+    stage = 'MCP independent resource issuance and sibling account isolation';
+    const issueBody={name:marker('API scoped key'),readFeatures:[S,A,'publishing/posts','ads/campaigns','analytics/overview','settings/connections','settings/data'],writeFeatures:[S,A,'settings/data'],expiresInDays:30,resourceScope:{version:1,mode:'selected',ids:[],adAccountIds:[adA]},confirmation:`CREATE MCP KEY ${marker('API scoped key')}`};
+    const foreignScope=await http('/api/settings/mcp-keys',{cookie:ownerMain,method:'POST',body:{...issueBody,resourceScope:{version:1,mode:'selected',ids:[T.f],adAccountIds:[]}}});
+    expect(foreignScope.status===403,'Key issuance must refuse a foreign channel identity.');
+    const issued=await http('/api/settings/mcp-keys',{cookie:ownerMain,method:'POST',body:issueBody});
+    check(issued.status===201&&typeof issued.body?.token==='string','Explicit account-only API key issuance failed.');
+    const issuedToken=issued.body.token,issuedId=issued.body.key.id;
+    const storedKey=await q<{tokenHash:string;resourceScope:unknown}>(Prisma.sql`SELECT "tokenHash","resourceScope" FROM mcp_api_keys WHERE id=${issuedId} AND "workspaceId"=${W.main}`);
+    expect(storedKey[0]?.tokenHash===sha(issuedToken)&&(storedKey[0]?.resourceScope as any)?.version===1&&(storedKey[0]?.resourceScope as any)?.mode==='selected'&&sameJson((storedKey[0]?.resourceScope as any)?.ids,[])&&sameJson((storedKey[0]?.resourceScope as any)?.adAccountIds,[adA]),'Key issuance must store only a credential digest and the exact independent resource ceiling.');
+    const scopedAccounts=await tool(issuedToken,'list_ad_accounts');
+    expect(!scopedAccounts.refused&&Array.isArray(scopedAccounts.data?.accounts)&&sameJson(scopedAccounts.data.accounts.map((a:any)=>a.id),[adA]),'Account-only key must see account A with no channel grants, never sibling account B.');
+    const noChannels=await tool(issuedToken,'list_shareable_channels');
+    expect(!noChannels.refused&&noChannels.data?.channels?.length===0,'Account-only key must have no channel access.');
+    const channelOnlyAds=await tool(keys.scoped,'list_ad_accounts');
+    expect(!channelOnlyAds.refused&&channelOnlyAds.data?.accounts?.length===0,'A channel-only key must not inherit sibling advertising accounts.');
+    for(const toolName of ['export_workspace_data','preview_workspace_data_deletion','delete_workspace_data']) expect((await tool(issuedToken,toolName,{})).refused,'Selected-resource keys must refuse workspace-wide data operations on direct calls.');
+    expect((await readResource(issuedToken,'msp://data/deletion-preview')).refused,'Selected-resource keys must not read a hidden global resource.');
+    const today=new Date().toISOString().slice(0,10);
+    const analyticsScoped=await tool(issuedToken,'get_analytics_overview',{start:today,end:today});
+    expect(!analyticsScoped.refused&&analyticsScoped.data?.adAccountCount===1&&analyticsScoped.data?.metrics?.find((m:any)=>m.key==='facebook:spend::USD')?.total===11&&!analyticsScoped.text.includes(adB),'Analytics must enforce the independent ad-account ceiling, including options and metrics.');
+    expect((await tool(issuedToken,'get_analytics_overview',{start:today,end:today,adAccountIds:[adB]})).refused,'Explicit Analytics filters must not escape the account ceiling.');
+    const wrongRevoke=await http('/api/settings/mcp-keys',{cookie:ownerMain,method:'DELETE',body:{id:issuedId,confirmation:'no'}});
+    expect(wrongRevoke.status===400,'Revocation requires its consequence confirmation.');
+    const revokedKey=await http('/api/settings/mcp-keys',{cookie:ownerMain,method:'DELETE',body:{id:issuedId,confirmation:`REVOKE MCP KEY ${issuedId}`}});
+    expect(revokedKey.status===200&&revokedKey.body?.revoked===true&&(await rpc('tools/list',{},issuedToken)).status===401,'Confirmed revocation must immediately stop the credential.');
 
     stage = 'bio: owner API save, read, edit';
     const bioUrl = '/api/sharing/bio';
@@ -781,7 +818,7 @@ async function main() {
     for (const action of ['sharing.bio_saved', 'sharing.bio_deleted']) expect(allAudits.some(a => a.action === action), `Missing audit action ${action}.`);
 
     if (failures.length) throw new ProbeFailure(`Sharing expectations not met (${failures.length}):\n- ${failures.join('\n- ')}${gaps.length ? `\nREMAINING GAPS (${gaps.length}):\n- ${gaps.join('\n- ')}` : ''}`);
-    console.log('PASS: actual local HTTP/MCP/PostgreSQL/Chromium Sharing and bio workflow — link create/list/revoke/rotate/delete with token-hash-only storage, pending-only public review (drafts excluded), long-comment approval + stored answer atomic outcome (including revoke race), advice/comments, revoked/expired/foreign/legacy refusals, creator/feature/suspension/purge state, MCP read-only/feature/result ceilings and resources, exact selected targets, uploaded image preview, bio save/edit/read/click/disable/feature-off/delete with dangerous-URL refusal, export and erasure coverage; no provider call.');
+    console.log('PASS: actual local HTTP/MCP/PostgreSQL/Chromium Sharing and bio workflow — link create/list/revoke/rotate/delete with token-hash-only storage, pending-only public review (drafts excluded), long-comment approval + stored answer atomic outcome (including revoke race), advice/comments, revoked/expired/foreign/legacy refusals, creator/feature/suspension/purge state, MCP read-only/feature/result ceilings and resources, exact selected targets, uploaded image preview, bio save/edit/read/click/disable/feature-off/delete with dangerous-URL refusal, export and erasure coverage; independent API-key issuance, selected-channel Sharing, account-only Ads/Analytics sibling isolation, workspace-wide refusals and revocation; no provider call.');
     if (gaps.length) console.log(`REMAINING GAPS (not passes, ${gaps.length}):\n- ${gaps.join('\n- ')}`);
   } finally {
     if (failures.length === 0 && gaps.length && stage) { /* gaps are printed on success above; failures print them in the thrown message */ }
@@ -801,6 +838,7 @@ async function main() {
     });
     if (fixture) await clean('exact synthetic fixture cleanup', async () => {
       const tryRun = async (sql: Prisma.Sql) => { try { await db.$executeRaw(sql); return true; } catch { return false; } };
+      await tryRun(Prisma.sql`DELETE FROM ad_insights WHERE "adAccountId" IN (SELECT id FROM ad_accounts WHERE "workspaceId"=ANY(${wsIds}::text[]))`);
       await tryRun(Prisma.sql`DELETE FROM review_decisions WHERE "shareLinkId" IN (SELECT id FROM share_links WHERE "workspaceId" = ANY(${wsIds}::text[])) OR "postId" IN (SELECT id FROM posts WHERE "workspaceId" = ANY(${wsIds}::text[]))`);
       await tryRun(Prisma.sql`DELETE FROM bio_links WHERE "pageId" IN (SELECT id FROM bio_pages WHERE "workspaceId" = ANY(${wsIds}::text[]))`);
       for (const table of ['post_versions', 'post_notes', 'post_labels', 'post_field_values']) await tryRun(Prisma.sql`DELETE FROM ${Prisma.raw(`"${table}"`)} WHERE "postId" IN (SELECT id FROM posts WHERE "workspaceId" = ANY(${wsIds}::text[]))`);

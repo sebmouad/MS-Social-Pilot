@@ -2,10 +2,10 @@ import { ANALYTICS_EXPLORER_CONFIG } from '../explorer-config';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
 import { readAnalyticsSnapshot } from './read';
-import type { AnalyticsReadConstraints } from './types';
+import type { AnalyticsReadActor, AnalyticsReadConstraints } from './types';
 import { parseAnalyticsExplorerInput, type AnalyticsExplorerInput, type AnalyticsExplorerMetricData, type AnalyticsExplorerResult } from '../explorer';
 
-type Actor = { userId: string; workspaceId: string };
+type Actor = AnalyticsReadActor;
 function pageSlice<T>(items: T[], requested: number | undefined, size: number) {
   const pages = Math.max(1, Math.ceil(items.length / size)); const current = Math.min(requested ?? 1, pages); const offset = (current - 1) * size;
   return { items: items.slice(offset, offset + size), total: items.length, page: current, pages, pageSize: size };

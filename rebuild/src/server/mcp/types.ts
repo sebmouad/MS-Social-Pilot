@@ -5,7 +5,7 @@ export type McpViewer = {
   scope: 'workspace'; userId: string; workspaceId: string; role: string;
   workspace: { id: string; name: string; timezone: string };
   entitlements: Entitlements; permissions?: ScopedPermissions;
-  maxResultItems?: number; apiKeyId?: string; isInstanceOwner?: boolean;
+  maxResultItems?: number; resourceRestricted?: boolean; allowedAdAccountIds?: readonly string[]; adAccountTargetScope?: ScopedPermissions['pageScope']; apiKeyId?: string; isInstanceOwner?: boolean;
 };
 export type McpInstallationViewer = {
   scope: 'installation'; userId: string; isInstanceOwner: true;

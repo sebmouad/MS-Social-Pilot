@@ -7,7 +7,7 @@ import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { buildAnalytics, type MetricView } from '@/server/analytics/aggregate';
-import { loadAnalytics } from '@/server/analytics/data';
+import { loadAnalytics, type AnalyticsAdScope } from '@/server/analytics/data';
 import { AnalyticsComparisonError, analyticsDateRange, compareAnalytics } from './comparison';
 import type { AnalyticsReadActor, AnalyticsReadConstraints, AnalyticsReadResult, AnalyticsSnapshot } from './types';
 
@@ -131,7 +131,15 @@ async function authorizeAnalytics(actor: AnalyticsReadActor, constraints: Analyt
   const allowedChannelIds = constraints.allowedChannelIds === undefined
     ? granted
     : constraints.allowedChannelIds.filter(id => granted === undefined || granted.includes(id));
-  return { allowedChannelIds, allowedProviders: entitledPlatformIds(entitlements) };
+  const scope = actor.adAccountTargetScope;
+  const adScope: AnalyticsAdScope = {
+    ...(actor.allowedAdAccountIds === undefined ? {} : { accountIds: [...actor.allowedAdAccountIds] }),
+    ...(scope === undefined ? {} : {
+      independentTargets: true,
+      ...(scope.all ? (granted === undefined ? {} : { targetIds: [...granted] }) : { targetIds: scope.ids.filter(id => granted === undefined || granted.includes(id)) }),
+    }),
+  };
+  return { allowedChannelIds, allowedProviders: entitledPlatformIds(entitlements), adScope };
 }
 
 async function runtimeLimits() {
@@ -157,7 +165,7 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
     if (error instanceof AnalyticsComparisonError) throw invalid();
     throw error;
   }
-  const initial = await loadAnalytics(actor.workspaceId, [], period.range, access.allowedChannelIds, undefined, access.allowedProviders);
+  const initial = await loadAnalytics(actor.workspaceId, [], period.range, access.allowedChannelIds, undefined, access.allowedProviders, access.adScope);
   const channelOptions = initial.targets;
   const adAccountOptions = initial.adAccounts;
   const requestedChannelIds = input.filter ? idList(input.channel) : channelOptions.map(item => item.id);
@@ -168,14 +176,14 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
   if (!sameIds(selectedChannelIds, requestedChannelIds) || !sameIds(selectedAdIds, requestedAdIds)) throw forbiddenResource();
   if (selectedChannelIds.length > limits.reportMaxChannels || selectedAdIds.length > limits.reportMaxChannels) throw invalid();
 
-  const currentData = await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders);
+  const currentData = await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, access.adScope);
   const selectedReturnedChannels = currentData.selectedTargets.map(item => item.id);
   if (!sameIds(selectedReturnedChannels, selectedChannelIds) || !sameIds(currentData.selectedAdIds, selectedAdIds)) throw forbiddenResource();
   assertUniqueMetricKeys(currentData.metrics);
   const view = buildAnalytics(currentData.metrics, currentData.audienceEntries, currentData.audienceSelected);
   const allMetrics = view.metrics;
   const comparisonData = period.comparison
-    ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders)
+    ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, access.adScope)
     : null;
   if (comparisonData && (!sameIds(comparisonData.selectedTargets.map(item => item.id), selectedChannelIds) || !sameIds(comparisonData.selectedAdIds, selectedAdIds))) throw forbiddenResource();
   if (comparisonData) assertUniqueMetricKeys(comparisonData.metrics);

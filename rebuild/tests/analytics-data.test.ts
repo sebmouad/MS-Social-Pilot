@@ -36,7 +36,7 @@ describe('shared analytics loading', () => {
     const available = await loadAnalytics('workspace-a', [], range, ['page-1'], undefined, ['facebook']);
     expect(state.ids).toHaveBeenCalledOnce();
     expect(state.analytics).toHaveBeenCalledWith('facebook');
-    expect(state.load).toHaveBeenCalledWith({ workspaceId: 'workspace-a', range, selectedTargetIds: [], allowedTargetIds: ['page-1'], selectedAdAccountIds: undefined });
+    expect(state.load).toHaveBeenCalledWith({ workspaceId: 'workspace-a', range, selectedTargetIds: [], allowedTargetIds: ['page-1'], selectedAdAccountIds: undefined, allowedAdAccountIds: undefined, allowedAdTargetIds: ['page-1'] });
     expect(available.targets.map(target => target.id)).toEqual(['page-1']);
     expect(available.metrics).toEqual([]);
   });

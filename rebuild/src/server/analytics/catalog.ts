@@ -54,6 +54,10 @@ export type AnalyticsProviderRequest = {
   selectedTargetIds: readonly string[];
   allowedTargetIds?: readonly string[];
   selectedAdAccountIds?: readonly string[];
+  /** Independent ad-account ceiling: undefined is no ceiling, an empty list is no access. */
+  allowedAdAccountIds?: readonly string[];
+  /** Channel grants authorizing Ads data; undefined means all. When the key is absent, allowedTargetIds applies. */
+  allowedAdTargetIds?: readonly string[];
 };
 
 export type AnalyticsProviderData = {

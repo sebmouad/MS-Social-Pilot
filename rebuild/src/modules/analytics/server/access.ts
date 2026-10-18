@@ -6,10 +6,11 @@ import { canUseFeature, loadEntitlements } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+import type { AnalyticsAdCeiling } from './types';
 
 export type Tx = Prisma.TransactionClient;
 export type AnalyticsFeature = 'analytics/overview' | 'analytics/reports' | 'analytics/demographics' | 'analytics/pins' | 'analytics/compare';
-export type Actor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[]; maxResultItems?: number };
+export type Actor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[]; maxResultItems?: number } & AnalyticsAdCeiling;
 export type Authorization = { role: string; scope: string[] | null };
 
 export const bad = (message = 'Choose valid details and confirm the exact action.') => new OperationError('invalid_request', message);

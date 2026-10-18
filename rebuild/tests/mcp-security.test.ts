@@ -544,7 +544,7 @@ describe('MCP workspace boundaries', () => {
     expect(result.performance).toHaveLength(1);
     expect(result.performance[0]).toMatchObject({ id: 'campaign-a', spend: 20, accountId: 'account-a' });
     expect(result.nextOffset).toBe(1);
-    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', ['page-allowed'], ['facebook']);
+    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', ['page-allowed'], ['facebook'], undefined);
     expect(adsQueries.dataset).toHaveBeenCalledWith('workspace-a', expect.objectContaining({ accountId: 'account-a' }), ['page-allowed'], ['facebook'], { levels: ['campaign', 'adset', 'ad'] });
 
     const denied = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 491, method: 'tools/call', params: { name: 'get_ads_performance', arguments: { accountId: 'other-workspace-account' } } });
@@ -609,7 +609,7 @@ describe('MCP workspace boundaries', () => {
     expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('get_live_ad_status');
     const response = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 492, method: 'tools/call', params: { name: 'get_live_ad_status', arguments: { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign' } } });
     expect((await response.json()).result.structuredContent).toMatchObject({ configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
-    expect(adsMutations.read).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign' }, ['page-allowed']);
+    expect(adsMutations.read).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a', allowedTargetIds: ['page-allowed'] }, { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign' }, ['page-allowed']);
     expect(db.$executeRaw).not.toHaveBeenCalled();
 
     const deniedViewer = { ...scoped, permissions: { ...scoped.permissions!, features: { ...scoped.permissions!.features, 'ads/campaigns': { read: false, write: false } } } };
@@ -669,7 +669,7 @@ describe('MCP workspace boundaries', () => {
 
     const adsResource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 54, method: 'resources/read', params: { uri: 'msp://ads/performance' } });
     expect((await adsResource.json()).result.contents[0].text).toContain('"performance"');
-    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', undefined, ['facebook']);
+    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', undefined, ['facebook'], undefined);
   });
   it('caps nested Analytics result rows and reports truncation', async () => {
     const limited = { ...viewer, maxResultItems: 1 };
@@ -830,7 +830,7 @@ describe('MCP workspace boundaries', () => {
     const scopedResult = (await scoped.json()).result.structuredContent;
     expect(scopedResult.campaign.options).toBeDefined();
     expect(scopedResult.adSet).toBeNull();
-    expect(db.adAccount.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ socialAccountId: { in: ['social-a'] } }) }));
+    expect(db.adAccount.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ AND: expect.arrayContaining([expect.objectContaining({ socialAccountId: { in: ['social-a'] } }), {id:'account-1'}]) }) }));
 
     const { canManageWorkspaceAds } = await import('../src/server/ads/actions');
     vi.mocked(canManageWorkspaceAds).mockResolvedValueOnce(false);
@@ -901,7 +901,7 @@ describe('MCP workspace boundaries', () => {
     await handleMcpMessage(denied, { jsonrpc: '2.0', id: 93, method: 'tools/call', params: { name: 'list_pages', arguments: {} } });
     expect(db.target.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ socialAccount: { is: expect.objectContaining({ provider: { in: [] } }) } }) }));
     await handleMcpMessage(denied, { jsonrpc: '2.0', id: 94, method: 'tools/call', params: { name: 'get_ads_performance', arguments: {} } });
-    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', undefined, []);
+    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', undefined, [], undefined);
   });
 
   it('scopes destination queries and delegates post reads with the MCP result cap', async () => {
@@ -994,12 +994,12 @@ describe('MCP workspace boundaries', () => {
 
     const sent = await call('reply_to_inbox', { kind: 'message', id: 'conv-a', text: 'hello', confirmation: 'REPLY message conv-a' });
     expect((await sent.json()).result.structuredContent).toMatchObject({ ok: true, kind: 'message', itemId: 'conv-a' });
-    expect(inboxMutations.reply).toHaveBeenCalledWith(viewer, { kind: 'message', id: 'conv-a', text: 'hello' });
+    expect(inboxMutations.reply).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { kind: 'message', id: 'conv-a', text: 'hello' }, { allowedChannelIds: undefined });
     expect(db.$executeRaw).toHaveBeenCalled();
 
     const moderate = await call('moderate_inbox_comment', { id: 'comment-a', hidden: true, confirmation: 'HIDE COMMENT comment-a' });
     expect((await moderate.json()).result.structuredContent).toMatchObject({ ok: true, itemId: 'comment-a', hidden: true });
-    expect(inboxMutations.moderate).toHaveBeenCalledWith(viewer, { id: 'comment-a', hidden: true });
+    expect(inboxMutations.moderate).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { id: 'comment-a', hidden: true }, { allowedChannelIds: undefined });
   });
 
   it('applies Inbox write permission to discovery and resolution calls', async () => {
@@ -1087,11 +1087,11 @@ describe('MCP workspace boundaries', () => {
 
     const publish = await call('publish_post', { postId: 'post-a', confirmation: 'PUBLISH POST post-a' });
     expect((await publish.json()).result.structuredContent).toMatchObject({ postId: 'post-a', published: 1 });
-    expect(publishingMutations.publish).toHaveBeenCalledWith(viewer, 'post-a');
+    expect(publishingMutations.publish).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'post-a');
 
     const status = await call('sync_post_status', { postId: 'post-a', confirmation: 'SYNC POST STATUS post-a' });
     expect((await status.json()).result.structuredContent).toMatchObject({ postId: 'post-a', synced: 1 });
-    expect(publishingMutations.sync).toHaveBeenCalledWith(viewer, 'post-a');
+    expect(publishingMutations.sync).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'post-a');
 
     const badDelete = await call('delete_post', { postId: 'post-a', deleteRemote: true, confirmation: 'DELETE POST post-a LOCAL' });
     expect((await badDelete.json()).result.isError).toBe(true);
@@ -1100,7 +1100,7 @@ describe('MCP workspace boundaries', () => {
     publishingMutations.remove.mockResolvedValueOnce({ ok: true, postId: 'post-a', localConfirmed: false, remoteDeletionRequested: true, state: 'needs_review', operations: [{ operationId: 'operation-1', targetId: 'target-a', targetName: 'Studio', state: 'uncertain', remoteConfirmed: false, localConfirmed: false }] });
     const remoteDelete = await call('delete_post', { postId: 'post-a', deleteRemote: true, confirmation: 'DELETE POST post-a REMOTE' });
     expect((await remoteDelete.json()).result.structuredContent).toMatchObject({ postId: 'post-a', ok: true, localConfirmed: false, remoteDeletionRequested: true, state: 'needs_review', operations: [{ state: 'uncertain' }] });
-    expect(publishingMutations.remove).toHaveBeenCalledWith(viewer, 'post-a', true);
+    expect(publishingMutations.remove).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'post-a', true);
     expect(db.$executeRaw).toHaveBeenCalled();
   });
 
@@ -1113,18 +1113,18 @@ describe('MCP workspace boundaries', () => {
 
     const status = await call('get_post_deletion_status', { postId: 'post-a' });
     expect((await status.json()).result.structuredContent).toMatchObject({ postId: 'post-a', state: 'needs_review' });
-    expect(postDeletions.get).toHaveBeenCalledWith(viewer, { postId: 'post-a' });
+    expect(postDeletions.get).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { postId: 'post-a' });
 
     const bad = await call('record_post_deletion_outcome', { postId: 'post-a', operationId: 'operation-1', outcome: 'deleted', verifiedOnPlatform: true, confirmation: 'RECORD POST DELETION operation-1 NOT DELETED' });
     expect((await bad.json()).result.isError).toBe(true);
     expect(postDeletions.record).not.toHaveBeenCalled();
     const recorded = await call('record_post_deletion_outcome', { postId: 'post-a', operationId: 'operation-1', outcome: 'deleted', verifiedOnPlatform: true, confirmation: 'RECORD POST DELETION operation-1 DELETED' });
     expect((await recorded.json()).result.structuredContent).toMatchObject({ state: 'local_pending', localConfirmed: false });
-    expect(postDeletions.record).toHaveBeenCalledWith(viewer, { postId: 'post-a', operationId: 'operation-1', outcome: 'deleted', confirmation: 'RECORD POST DELETION operation-1 DELETED', verifiedOnPlatform: true });
+    expect(postDeletions.record).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { postId: 'post-a', operationId: 'operation-1', outcome: 'deleted', confirmation: 'RECORD POST DELETION operation-1 DELETED', verifiedOnPlatform: true });
 
     const finished = await call('finish_post_deletion', { postId: 'post-a', confirmation: 'FINISH POST DELETION post-a' });
     expect((await finished.json()).result.structuredContent).toMatchObject({ state: 'completed', localConfirmed: true });
-    expect(postDeletions.finish).toHaveBeenCalledWith(viewer, { postId: 'post-a', confirmation: 'FINISH POST DELETION post-a' });
+    expect(postDeletions.finish).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { postId: 'post-a', confirmation: 'FINISH POST DELETION post-a' });
   });
 
   it('exposes scoped publication recovery and binds attestation and local projection to exact confirmations', async () => {
@@ -1136,16 +1136,16 @@ describe('MCP workspace boundaries', () => {
     const names = (await listed.json()).result.tools.map((tool: { name: string }) => tool.name);
     for (const name of ['get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication']) expect(names).toContain(name);
     await call('get_publication_status', { postId: 'post-a' });
-    expect(publicationRecovery.get).toHaveBeenCalledWith(viewer, { postId: 'post-a' });
+    expect(publicationRecovery.get).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { postId: 'post-a' });
     const bad = await call('record_publication_outcome', { postId: 'post-a', operationId: 'op-a', outcome: 'ABSENT', verifiedExternally: true, confirmation: 'RECORD PUBLICATION other ABSENT' });
     expect((await bad.json()).result.isError).toBe(true);
     expect(publicationRecovery.record).not.toHaveBeenCalled();
     await call('record_publication_outcome', { postId: 'post-a', operationId: 'op-a', outcome: 'ABSENT', verifiedExternally: true, confirmation: 'RECORD PUBLICATION op-a ABSENT' });
-    expect(publicationRecovery.record).toHaveBeenCalledWith(viewer, { postId: 'post-a', operationId: 'op-a', outcome: 'ABSENT', confirmation: 'RECORD PUBLICATION op-a ABSENT', verifiedExternally: true });
+    expect(publicationRecovery.record).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { postId: 'post-a', operationId: 'op-a', outcome: 'ABSENT', confirmation: 'RECORD PUBLICATION op-a ABSENT', verifiedExternally: true });
     await call('finish_publication_projection', { postId: 'post-a', operationId: 'op-a', confirmation: 'FINISH PUBLICATION op-a' });
-    expect(publicationRecovery.finish).toHaveBeenCalledWith(viewer, { postId: 'post-a', operationId: 'op-a', confirmation: 'FINISH PUBLICATION op-a' });
+    expect(publicationRecovery.finish).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { postId: 'post-a', operationId: 'op-a', confirmation: 'FINISH PUBLICATION op-a' });
     await call('adopt_legacy_publication', { postId: 'post-a', postTargetId: 'pt-a', confirmation: 'ADOPT PUBLICATION pt-a' });
-    expect(publicationRecovery.adopt).toHaveBeenCalledWith(viewer, { postId: 'post-a', postTargetId: 'pt-a', confirmation: 'ADOPT PUBLICATION pt-a' });
+    expect(publicationRecovery.adopt).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { postId: 'post-a', postTargetId: 'pt-a', confirmation: 'ADOPT PUBLICATION pt-a' });
   });
 
   it('exposes scoped first-comment send and manual outcome tools with exact confirmations', async () => {
@@ -1160,11 +1160,11 @@ describe('MCP workspace boundaries', () => {
 
     const sent = await call('send_first_comment', { postId: 'post-a', postTargetId: 'post-target-a', confirmation: 'SEND FIRST COMMENT post-target-a' });
     expect((await sent.json()).result.structuredContent).toMatchObject({ ok: true, state: 'sent', mcpAuditRecorded: true });
-    expect(firstCommentMutations.send).toHaveBeenCalledWith(viewer, { postId: 'post-a', postTargetId: 'post-target-a' });
+    expect(firstCommentMutations.send).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { postId: 'post-a', postTargetId: 'post-target-a' });
 
     const notSent = await call('record_first_comment_outcome', { postId: 'post-a', postTargetId: 'post-target-a', outcome: 'not_sent', confirmation: 'RECORD FIRST COMMENT post-target-a NOT SENT' });
     expect((await notSent.json()).result.structuredContent).toMatchObject({ ok: true, state: 'ready' });
-    expect(firstCommentMutations.record).toHaveBeenCalledWith(viewer, { postId: 'post-a', postTargetId: 'post-target-a', outcome: 'not_sent', confirmation: 'RECORD FIRST COMMENT post-target-a NOT SENT' });
+    expect(firstCommentMutations.record).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { postId: 'post-a', postTargetId: 'post-target-a', outcome: 'not_sent', confirmation: 'RECORD FIRST COMMENT post-target-a NOT SENT' });
     expect(workspaceGuard).not.toHaveBeenCalled();
   });
 
@@ -1219,7 +1219,7 @@ describe('MCP workspace boundaries', () => {
     const result = (await (await call('duplicate_post', args)).json()).result;
     expect(result.isError).not.toBe(true);
     expect(result.structuredContent).toMatchObject({ sourcePostId: args.postId, postId: args.requestId, draftCreated: true, replayed: false });
-    expect(postDuplicate).toHaveBeenCalledWith(viewer, args);
+    expect(postDuplicate).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, args);
     postDuplicate.mockResolvedValueOnce({ sourcePostId: args.postId, postId: args.requestId, draftCreated: true, replayed: true });
     expect((await (await call('duplicate_post', args)).json()).result.structuredContent.replayed).toBe(true);
     expect(workspaceGuard).not.toHaveBeenCalled();
@@ -1232,15 +1232,15 @@ describe('MCP workspace boundaries', () => {
 
     const created = await call('create_post', { message: 'hello', firstComment: 'follow-up', targetIds: ['page-a'], imageUrl: 'https://example.com/photo.jpg', confirmation: 'CREATE POST' });
     expect((await created.json()).result.structuredContent).toEqual({ id: 'new-post', status: 'draft', mcpAuditRecorded: true });
-    expect(publishingMutations.create).toHaveBeenCalledWith(viewer, expect.objectContaining({ targetIds: ['page-a'], firstComment: 'follow-up', media: [{ kind: 'image', url: 'https://example.com/photo.jpg' }] }));
+    expect(publishingMutations.create).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ targetIds: ['page-a'], firstComment: 'follow-up', media: [{ kind: 'image', url: 'https://example.com/photo.jpg' }] }));
 
     const time = '2030-01-02T12:00:00.000Z';
     const scheduled = await call('schedule_post', { postId: 'new-post', scheduledAt: time, confirmation: `SCHEDULE POST new-post ${time}` });
     expect((await scheduled.json()).result.structuredContent).toMatchObject({ postId: 'new-post', status: 'scheduled' });
-    expect(publishingMutations.schedule).toHaveBeenCalledWith(viewer, 'new-post', new Date(time));
+    expect(publishingMutations.schedule).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'new-post', new Date(time));
     const updated = await call('update_post', { postId: 'new-post', message: 'edited', targetIds: ['page-a'], confirmation: 'UPDATE POST new-post' });
     expect((await updated.json()).result.structuredContent).toEqual({ postId: 'new-post', updated: true, mcpAuditRecorded: true });
-    expect(publishingMutations.update).toHaveBeenCalledWith(viewer, expect.objectContaining({ postId: 'new-post', targetIds: ['page-a'] }));
+    expect(publishingMutations.update).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ postId: 'new-post', targetIds: ['page-a'] }));
     expect(db.$executeRaw).toHaveBeenCalled();
   });
 
@@ -1251,10 +1251,10 @@ describe('MCP workspace boundaries', () => {
   ])('delegates captionless content and its authorization to the shared post services %#', async content => {
     const created = await call('create_post', { ...content, targetIds: ['page-a'], confirmation: 'CREATE POST' });
     expect((await created.json()).result.isError).not.toBe(true);
-    expect(publishingMutations.create).toHaveBeenCalledWith(viewer, expect.objectContaining(content));
+    expect(publishingMutations.create).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining(content));
     const updated = await call('update_post', { ...content, postId: 'new-post', targetIds: ['page-a'], confirmation: 'UPDATE POST new-post' });
     expect((await updated.json()).result.isError).not.toBe(true);
-    expect(publishingMutations.update).toHaveBeenCalledWith(viewer, expect.objectContaining(content));
+    expect(publishingMutations.update).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining(content));
   });
 
   it.each([undefined, null, 42, {}, []])('rejects a missing or non-string caption without mutation %#', async message => {
@@ -1280,13 +1280,13 @@ describe('MCP workspace boundaries', () => {
     ];
     const created = await call('create_post', { message: 'Two images', firstComment: 'Useful follow-up', targetIds: ['page-a'], media, confirmation: 'CREATE POST' });
     expect((await created.json()).result.isError).not.toBe(true);
-    expect(publishingMutations.create).toHaveBeenCalledWith(viewer, expect.objectContaining({ media, firstComment: 'Useful follow-up' }));
+    expect(publishingMutations.create).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ media, firstComment: 'Useful follow-up' }));
     const updated = await call('update_post', { postId: 'new-post', message: 'Reordered images', targetIds: ['page-a'], media: [...media].reverse(), confirmation: 'UPDATE POST new-post' });
     expect((await updated.json()).result.isError).not.toBe(true);
-    expect(publishingMutations.update).toHaveBeenCalledWith(viewer, expect.objectContaining({ postId: 'new-post', media: [...media].reverse() }));
+    expect(publishingMutations.update).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ postId: 'new-post', media: [...media].reverse() }));
     const cleared = await call('update_post', { postId: 'new-post', message: 'Remove attachments', targetIds: ['page-a'], media: [], confirmation: 'UPDATE POST new-post' });
     expect((await cleared.json()).result.isError).not.toBe(true);
-    expect(publishingMutations.update).toHaveBeenLastCalledWith(viewer, expect.objectContaining({ media: [] }));
+    expect(publishingMutations.update).toHaveBeenLastCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ media: [] }));
   });
 
   it.each([

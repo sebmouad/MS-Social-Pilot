@@ -8,7 +8,7 @@ import { configurationOwner } from './ownership';
 import { WORKSPACE_JOB_ACCESS_DEFAULTS, WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, WORKSPACE_JOB_OWNER_POLICY_SCHEMA } from '@/server/jobs/access-policy';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 71;
+export const CONFIG_SCHEMA_VERSION = 72;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -193,6 +193,10 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'mcp.maxResultItems', group: 'MCP', label: 'Maximum MCP result items', kind: 'number', description: 'Maximum rows returned by a single MCP list operation.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'mcp.keys.maxActivePerWorkspace', group: 'MCP · API keys', label: 'Active API keys per workspace', kind: 'number', description: 'Maximum non-expired, non-revoked MCP bearer keys in each workspace.', defaultValue: 10, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'mcp.keys.maxLifetimeDays', group: 'MCP · API keys', label: 'Maximum API key lifetime (days)', kind: 'number', description: 'Longest lifetime workspace admins may select when issuing an MCP key.', defaultValue: 365, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
+  entry({ key: 'mcp.keys.maxResourceIds', group: 'MCP · API keys', label: 'API key resource selection limit', kind: 'number', description: 'Maximum explicitly selected channel and ad account identities on one key; also bounds issuance discovery.', defaultValue: 1000, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
+  entry({ key: 'mcp.keys.transactionTimeoutMs', group: 'MCP · API keys', label: 'API key transaction timeout', kind: 'number', description: 'Maximum duration of a guarded API key issuance or revocation transaction.', defaultValue: 15000, schema: z.number().int().min(1000).max(300000), consumption: 'active' }),
+  entry({ key: 'mcp.keys.transactionMaxWaitMs', group: 'MCP · API keys', label: 'API key transaction wait', kind: 'number', description: 'Maximum time to wait for an API key transaction.', defaultValue: 2000, schema: z.number().int().min(100).max(30000), consumption: 'active' }),
+  entry({ key: 'mcp.keys.defaultLifetimeDays', group: 'MCP · API keys', label: 'API key default lifetime', kind: 'number', description: 'Initial customer key lifetime, clamped to the maximum allowed lifetime.', defaultValue: 90, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
   entry({ key: 'mcp.keys.requestsPerMinute', group: 'MCP · API keys', label: 'API key requests per minute', kind: 'number', description: 'Request budget applied independently to each MCP bearer key.', defaultValue: 60, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
   entry({ key: 'theme.default', group: 'Theme defaults', label: 'Default workspace theme', kind: 'select', description: 'Theme used when a visitor has no saved theme preference.', defaultValue: 'grove', schema: optionList(THEMES.map((theme) => theme.id)), consumption: 'active', options: options(THEMES) }),
   entry({ key: 'operations.supportEmail', group: 'Operations', label: 'Support email', kind: 'text', description: 'Contact address shown to operators.', defaultValue: '', schema: z.union([z.literal(''), z.string().email()]), consumption: 'planned' }),

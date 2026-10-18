@@ -1,3 +1,4 @@
+import { intersectResourceScope, parseResourceScope } from '@/modules/settings/mcp-access/resource-scope';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
@@ -11,7 +12,7 @@ import { hit } from '@/server/rate-limit';
 import { loadPermissions } from '@/server/permissions/loader';
 import type { ScopedPermissions } from '@/server/permissions';
 
-type ApiKeyRow = { id: string; workspaceId: string; createdById: string; readFeatures: string[]; writeFeatures: string[] };
+type ApiKeyRow = { id: string; workspaceId: string; createdById: string; readFeatures: string[]; writeFeatures: string[]; resourceScope: unknown };
 type RequestScope = 'automatic' | 'workspace' | 'installation';
 
 function json(payload: unknown, init?: ResponseInit) {
@@ -79,7 +80,7 @@ async function getBearerViewer(request: Request): Promise<McpViewer | null> {
   if (!match || await runtimeConfig('mcp.enabled') !== true) return null;
   const tokenHash = createHash('sha256').update(match[1]).digest('hex');
   const rows = await prisma.$queryRaw<ApiKeyRow[]>`
-    SELECT id, "workspaceId", "createdById", "readFeatures", "writeFeatures"
+    SELECT id, "workspaceId", "createdById", "readFeatures", "writeFeatures", "resourceScope"
     FROM mcp_api_keys
     WHERE "tokenHash" = ${tokenHash} AND "revokedAt" IS NULL AND "expiresAt" > NOW()
     LIMIT 1
@@ -96,8 +97,11 @@ async function getBearerViewer(request: Request): Promise<McpViewer | null> {
   const currentPermissions = await loadPermissions(user.id, key.workspaceId);
   if (!entitlements || !currentPermissions) return null;
   const maxResultItems = await runtimeConfig('mcp.maxResultItems') as number;
+  const ceiling = parseResourceScope(key.resourceScope, await runtimeConfig('mcp.keys.maxResourceIds') as number);
+  const permissions = restrictPermissions(currentPermissions, key.readFeatures, key.writeFeatures);
+  permissions.pageScope = intersectResourceScope(currentPermissions.pageScope, ceiling);
   await prisma.$executeRaw`UPDATE mcp_api_keys SET "lastUsedAt" = NOW() WHERE id = ${key.id}`;
-  return { scope: 'workspace', userId: user.id, workspaceId: key.workspaceId, role: membership.role, workspace: membership.workspace, entitlements, permissions: restrictPermissions(currentPermissions, key.readFeatures, key.writeFeatures), maxResultItems, apiKeyId: key.id };
+  return { scope: 'workspace', userId: user.id, workspaceId: key.workspaceId, role: membership.role, workspace: membership.workspace, entitlements, permissions, resourceRestricted: ceiling?.mode === 'selected', ...(ceiling?.mode === 'selected' ? { allowedAdAccountIds: ceiling.adAccountIds, adAccountTargetScope: currentPermissions.pageScope } : {}), maxResultItems, apiKeyId: key.id };
 }
 
 function unauthenticated() {
