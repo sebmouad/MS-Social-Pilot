@@ -327,3 +327,31 @@ All source rows were absent, so this proves SQL ordering/schema compatibility
 and empty-database backup restoration only. The rehearsal now explicitly refuses
 pre-existing rebuild functions as well as tables/history. Customer-data migration,
 media recovery and production process/proxy rollback are still unverified.
+
+## Workspace purge gate and task comments (batch 76 in progress)
+
+The thirteen-file allowlist adds `20261018193000_rebuild_purge_write_gates`
+(SHA-256 `5250ec9a2e1176d59f8dd97b6b86d622187b87bd2d3944c41c7a411d157b51d6`)
+and `20261025100000_rebuild_task_comments`
+(SHA-256 `648427469b965c3c5572b131c4834f772f1fdfe6884a0fd8c32aebc3588750ea`).
+The purge table is an existing legacy prerequisite; its original create-table
+migration is not replayed over an existing table. Catalog inspection found the
+preview table without its trigger function, so the new additive reconciliation
+installs/replaces that shared function and installs missing gates on directly
+workspace-owned tables. Existing gates must name the expected function and be
+enabled. The task-comments migration then attaches the same gate, enforces a
+same-workspace task FK and adds author SET NULL/task cascade/body constraints.
+
+Before local application, a fresh private preview backup restored into scratch;
+both migrations applied there with unchanged counts for all 103 original public
+tables and unchanged settings digest. Only then were they applied locally with
+the same comparisons. Seven PostgreSQL tests pass for workspace/body integrity,
+author/task lifecycle and erasure gates, with disposable fixtures rolled back.
+This does not yet prove the full thirteen-file or production-shaped migration,
+application export/erasure behavior or production service rollback. Production
+remains legacy. The original purge migration file is unchanged.
+
+Batch 76: all thirteen checksum-pinned migrations passed a schema-only scratch
+rehearsal. The local actual HTTP/MCP export/erasure probe passed after dependency
+ordering repair; purge guards remained enabled. This does not close production
+data/media migration, service rollback or cutover gates.

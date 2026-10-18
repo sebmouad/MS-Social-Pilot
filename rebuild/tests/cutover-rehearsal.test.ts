@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const script = 'scripts/cutover-rehearsal.sh';
-const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation';
+const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments';
 
 describe('cutover rehearsal safety gates', () => {
   it('compares counts for every public base table and detects table-set drift', () => {
@@ -86,6 +86,29 @@ describe('cutover rehearsal safety gates', () => {
     expect(migration).toContain("'adset.create'");
   });
 
+  it('pins the purge gate and task comments, applies them in dependency order and refuses migrated baselines', () => {
+    const source = readFileSync(script, 'utf8');
+    const purge = readFileSync('../prisma/migrations/20261018193000_rebuild_purge_write_gates/migration.sql', 'utf8');
+    const comments = readFileSync('../prisma/migrations/20261025100000_rebuild_task_comments/migration.sql', 'utf8');
+    const hash = (text: string) => createHash('sha256').update(text).digest('hex');
+    expect(source).toContain(`verify_migration 20261018193000_rebuild_purge_write_gates ${hash(purge)}`);
+    expect(source).toContain(`verify_migration 20261025100000_rebuild_task_comments ${hash(comments)}`);
+    expect(source).not.toContain('PENDING_SHA256_');
+    // The comments migration creates a trigger on a function installed by the purge migration.
+    expect(comments).toContain('rebuild_reject_purging_workspace_write()');
+    expect(purge).toContain('CREATE OR REPLACE FUNCTION public.rebuild_reject_purging_workspace_write()');
+    const apply = (name: string) => source.indexOf(`migration_dir/${name}/migration.sql`);
+    expect(apply('20261018193000_rebuild_purge_write_gates')).toBeGreaterThan(apply('20261018190000_rebuild_ads_creation'));
+    expect(apply('20261025100000_rebuild_task_comments')).toBeGreaterThan(apply('20261018193000_rebuild_purge_write_gates'));
+    expect(source.indexOf('Required tables/columns are taken')).toBeGreaterThan(apply('20261025100000_rebuild_task_comments'));
+    expect(source).toContain("to_regclass('public.workspace_data_purges')");
+    expect(source).toContain("to_regclass('public.task_comments')");
+    expect(source).toContain('workspace_data_purges prerequisite table is missing');
+    expect(source).not.toContain("OR to_regclass('public.workspace_data_purges') IS NOT NULL");
+    expect(source).toContain("ARRAY['task_comments','workspaceId']");
+    expect(source).toContain("'20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments'");
+  });
+
   it('pins notifications and refuses an already migrated notification baseline', () => {
     const source = readFileSync(script, 'utf8');
     const migration = readFileSync('../prisma/migrations/20261018150000_rebuild_notifications/migration.sql', 'utf8');
@@ -115,7 +138,7 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain(hash(mediaSteps));
     expect(source).toContain(hash(mediaDeletions));
     expect(source).toContain(hash(resolutions));
-    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)');
+    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)');
     expect(source).toContain("USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps'");
     expect(source).toContain('CUTOVER_APPROVED_MIGRATION_SET');
     expect(source.indexOf('migration.sql"')) .toBeLessThan(source.indexOf('Required tables/columns are taken'));

@@ -4,6 +4,7 @@ import { homeManifest } from './home/manifest';
 import { inboxManifest } from './inbox/manifest';
 import { publishingManifest } from './publishing/manifest';
 import { settingsManifest } from './settings/manifest';
+import { tasksManifest } from './tasks/manifest';
 
 /** Customer module catalog. Internal Root tools intentionally live outside it. */
 export const moduleManifests = [
@@ -12,6 +13,7 @@ export const moduleManifests = [
   inboxManifest,
   analyticsManifest,
   adsManifest,
+  tasksManifest,
   settingsManifest,
 ] as const;
 

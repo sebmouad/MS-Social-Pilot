@@ -898,3 +898,27 @@ separate production build/serial typecheck. The previously requested reload/no-d
 implemented and regression-tested; unrelated unfinished feature modules remain
 excluded. Registry 68 is consumed by creation options and current provider checks.
 See ADS_PARITY.md for exact proof and remaining live/provider/release limits.
+
+## Batch 76 — Tasks and guarded erasure integration
+
+Tasks is host-integrated at `/tasks`: manifest/Root registry 69, shared current
+authorization, HTTP, ten scoped MCP tools and resource, comments, linked-post
+visibility, atomic checklist dates and optimistic updates. Delete requires a
+consequence checkbox. Shared erasure now follows FK child-before-parent order
+without bypassing purge guards. Two additive migrations were backup/restored and
+applied only to local preview. See AGENCY_TASKS.md and CUTOVER.md.
+
+Isolated snapshot passed 2,428 tests / 298 files (zero skips) and production build.
+Serial typecheck also passed. Seven real PostgreSQL constraint/purge tests and the guarded HTTP/MCP/export/
+erasure probe passed, preserving foreign data and restoring settings/fixtures.
+All thirteen migrations passed schema-only rehearsal, not production-shaped
+customer-data/media rollback proof. Phone create/comment/edit/delete passed;
+shared bottom-navigation scroll clearance fixed a reproduced action overlap.
+Four synthetic example tasks remain intentionally.
+
+Independent final Claude review did not complete: DNS failure, then automatic
+approval review rejected restart because workspace credits were exhausted. User
+said they would refill; availability is not yet confirmed. Local checks continue.
+Tasks configuration/paging/concurrency and browser limits are recorded in
+AGENCY_TASKS.md. Agency and other untracked slices remain unfinished and excluded.
+Production/socialpilot-deploy remain legacy. Preserve held-photo canary lock.

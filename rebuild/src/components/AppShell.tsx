@@ -12,6 +12,7 @@ function ModuleIcon({ name }: { name: string }) {
     Inbox: <><path d="M4 5.5h16l1 10.5h-5l-1.5 2h-5L8 16H3z" {...shared}/><path d="M8 11h8" {...shared}/></>,
     Analytics: <><path d="M4 19V5m0 14h16" {...shared}/><path d="m7 15 4-4 3 2 5-6" {...shared}/><circle cx="19" cy="7" r="1" fill="currentColor"/></>,
     Ads: <><path d="M4 19V5m0 14h16" {...shared}/><path d="m7 16 4-5 3 2 5-7" {...shared}/><path d="M15.5 6H19v3.5" {...shared}/></>,
+    Tasks: <><rect x="4" y="4" width="16" height="16" rx="3" {...shared}/><path d="m8 12.5 2.6 2.6L16 9.5" {...shared}/></>,
     Settings: <><circle cx="12" cy="12" r="3" {...shared}/><path d="m19 13.5 1.2 1-.9 1.6-1.5-.3a7.5 7.5 0 0 1-1.4 1l-.3 1.6h-1.9l-.5-1.5a7 7 0 0 1-1.7 0l-.8 1.2-1.7-.7.2-1.6a7 7 0 0 1-1.2-1.3l-1.6.1-.6-1.8 1.2-.9a7 7 0 0 1 0-1.7l-1.1-.8.7-1.8 1.5.2a7 7 0 0 1 1.3-1.2L10 5.1l1.8-.6.9 1.2a7 7 0 0 1 1.7 0l.8-1.1 1.8.7-.2 1.5A7 7 0 0 1 18 8l1.6-.1.6 1.8-1.2.9a7 7 0 0 1 0 1.7Z" {...shared}/></>,
   };
   return <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">{paths[name]}</svg>;

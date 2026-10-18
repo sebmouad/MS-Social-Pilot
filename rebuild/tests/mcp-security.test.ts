@@ -102,8 +102,8 @@ const viewer: McpViewer = {
   workspace: { id: 'workspace-a', name: 'Alpha', timezone: 'UTC' },
   entitlements: {
     workspaceId: 'workspace-a',
-    modules: { home: true, publishing: true, inbox: true, analytics: true, ads: true, settings: true },
-    features: { 'home/overview': true, 'publishing/posts': true, 'publishing/collaboration': true, 'publishing/labels': true, 'publishing/templates': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'publishing/media': true, 'inbox/conversations': true, 'analytics/explorer': true, 'analytics/overview': true, 'analytics/demographics': true, 'analytics/pins': true, 'analytics/compare': true, 'analytics/reports': true, 'ads/overview': true, 'ads/compare': true, 'ads/objects': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/workspace': true, 'settings/mcp': true, 'settings/account': true, 'settings/notifications': true, 'settings/appearance': true, 'settings/data': true },
+    modules: { home: true, publishing: true, inbox: true, analytics: true, ads: true, tasks: true, settings: true },
+    features: { 'tasks/board': true, 'home/overview': true, 'publishing/posts': true, 'publishing/collaboration': true, 'publishing/labels': true, 'publishing/templates': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'publishing/media': true, 'inbox/conversations': true, 'analytics/explorer': true, 'analytics/overview': true, 'analytics/demographics': true, 'analytics/pins': true, 'analytics/compare': true, 'analytics/reports': true, 'ads/overview': true, 'ads/compare': true, 'ads/objects': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/workspace': true, 'settings/mcp': true, 'settings/account': true, 'settings/notifications': true, 'settings/appearance': true, 'settings/data': true },
     platformCapabilities: { facebook: true },
   },
   permissions: resolvePermissions({ role: 'owner', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }),

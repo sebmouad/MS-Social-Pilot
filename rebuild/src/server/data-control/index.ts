@@ -4,6 +4,7 @@ import { OperationError } from '@/lib/operation-error';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
+import { orderTablesForDeletion, type TableDependency } from './deletion-order';
 import { canonicalMediaRoot, removeWorkspaceStorage, validateWorkspaceId } from './storage';
 
 export type DataControlActor = { userId: string; workspaceId: string; apiKeyId?: string };
@@ -29,6 +30,23 @@ async function workspaceTables(tx: DataControlTransaction | typeof prisma): Prom
     ORDER BY child.relname
   `;
   return [...new Set(rows.map(row => row.tableName))];
+}
+
+/** Order workspace-owned tables children-first using the real foreign keys among them. */
+async function workspaceTablesInDeletionOrder(tx: DataControlTransaction) {
+  const tables = await workspaceTables(tx);
+  const rows = await tx.$queryRaw<Array<Partial<TableDependency>>>`
+    SELECT child.relname AS child, parent.relname AS parent
+    FROM pg_constraint AS fk
+    JOIN pg_class AS child ON child.oid = fk.conrelid
+    JOIN pg_namespace AS child_ns ON child_ns.oid = child.relnamespace
+    JOIN pg_class AS parent ON parent.oid = fk.confrelid
+    JOIN pg_namespace AS parent_ns ON parent_ns.oid = parent.relnamespace
+    WHERE fk.contype = 'f' AND child_ns.nspname = 'public' AND parent_ns.nspname = 'public'
+      AND child.relkind = 'r' AND parent.relkind = 'r'
+  `;
+  const dependencies = rows.filter((row): row is TableDependency => typeof row.child === 'string' && typeof row.parent === 'string');
+  return orderTablesForDeletion(tables, dependencies);
 }
 
 function scrubLegacyValue(value: unknown): unknown {
@@ -297,7 +315,7 @@ async function finishWorkspaceDataPurge(actor: DataControlActor, timeout: number
       ...await directWorkspaceCounts(tx, actor.workspaceId),
     };
     await deleteIndirectWorkspaceRows(tx, actor.workspaceId);
-    for (const table of await workspaceTables(tx)) {
+    for (const table of await workspaceTablesInDeletionOrder(tx)) {
       await tx.$executeRawUnsafe(`DELETE FROM ${tableSql(table)} WHERE "workspaceId" = $1`, actor.workspaceId);
     }
     await tx.workspaceDataPurge.update({ where: { workspaceId: actor.workspaceId }, data: { status: 'db_deleted', counts, dbDeletedAt: new Date(), error: null } });

@@ -3,7 +3,7 @@ import { PAGES, type FeatureId, type ModuleId } from '@/lib/product';
 export type PermissionAction = 'read' | 'write';
 export type Permission = Readonly<Record<PermissionAction, boolean>>;
 export type ScopedPageAccess = { all: true } | { all: false; ids: readonly string[] };
-export type PermissionModule = Extract<ModuleId, 'publishing' | 'inbox' | 'analytics' | 'ads' | 'settings'>;
+export type PermissionModule = Extract<ModuleId, 'publishing' | 'inbox' | 'analytics' | 'ads' | 'tasks' | 'settings'>;
 
 export interface PermissionSource {
   role: string;
@@ -25,7 +25,7 @@ export interface ScopedPermissions {
 }
 
 const DENIED: Permission = { read: false, write: false };
-const MODULES: readonly PermissionModule[] = ['publishing', 'inbox', 'analytics', 'ads', 'settings'];
+const MODULES: readonly PermissionModule[] = ['publishing', 'inbox', 'analytics', 'ads', 'tasks', 'settings'];
 
 const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'home/overview': null,
@@ -48,6 +48,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'ads/compare': 'ads/performance',
   'ads/objects': 'ads/performance',
   'ads/campaigns': 'ads/performance',
+  'tasks/board': null,
   'settings/connections': null,
   'settings/team': 'settings/team',
   'settings/workspace': 'settings/team',
@@ -63,6 +64,7 @@ const MODULE_ROOT_SWITCH: Record<PermissionModule, string | null> = {
   inbox: 'analytics',
   analytics: 'analytics',
   ads: 'ads',
+  tasks: 'tasks',
   settings: null,
 };
 
@@ -87,6 +89,7 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
   }
 
   if (role === 'editor') {
+    if (feature === 'tasks/board') return { read: true, write: true };
     if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp') return DENIED;
     if (feature === 'settings/connections') return { read: true, write: false };
     return {
@@ -96,6 +99,8 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
   }
 
   if (role === 'contributor') {
+    // The Tasks service narrows a contributor to tasks they created or hold.
+    if (feature === 'tasks/board') return { read: true, write: true };
     if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp') return DENIED;
     if (feature === 'settings/connections') return { read: true, write: false };
     return {
