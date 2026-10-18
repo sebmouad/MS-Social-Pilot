@@ -161,7 +161,8 @@ describe('Tasks MCP host wiring', () => {
     const accepted = await body(await rpc(viewer, 'tools/call', { name: 'create_task', arguments: { title: 'Plan', confirmation: 'CREATE TASK Plan' } }));
     expect(accepted.result.isError).toBeUndefined();
     expect(guard.purging).toHaveBeenCalledWith('workspace-a');
-    expect(guard.operation).toHaveBeenCalledWith('workspace-a', expect.any(Function));
+    // The Tasks service owns its single workspace/purge/actor transaction; the MCP host must not open a second one.
+    expect(guard.operation).not.toHaveBeenCalled();
     expect(tasksService.performTaskAction).toHaveBeenCalledWith(
       { userId: 'user-a', workspaceId: 'workspace-a', allowedTargetIds: undefined, permissionCeiling: viewer.permissions },
       expect.objectContaining({ action: 'task.create', title: 'Plan' }),

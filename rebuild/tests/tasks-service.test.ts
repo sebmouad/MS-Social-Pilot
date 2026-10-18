@@ -28,12 +28,13 @@ const sqlText = (query: unknown) => typeof query === 'string' ? query : (query a
 const valuesOf = (query: unknown): unknown[] => (query as { values?: unknown[] })?.values ?? [];
 let role: string | null = 'editor'; let suspended: Date | null = null; let taskRow: Record<string, unknown> | null = null; let taskRows: Record<string, unknown>[] = [];
 let assignable = true; let postFound = true; let commentRow: Record<string, unknown> | null = null; let auditCount = 1; let scope: { all: boolean; ids: string[] } = { all: true, ids: [] };
+let purgeStatus: string | null = null;
 let freshWrite = true; let moduleOn = true; let featureOn = true; let access = { read: true, write: true }; let commentRows: Record<string, unknown>[] = [];
 const audits: string[] = []; const writes: Array<{ sql: string; values: unknown[] }> = [];
 const updatedAt = new Date('2026-10-18T10:00:00.000Z');
 
 beforeEach(() => {
-  vi.clearAllMocks(); role = 'editor'; suspended = null; taskRow = { id: 't1', title: 'Old', notes: null, status: 'todo', assigneeId: null, dueOn: null, postId: null, createdById: 'someone', updatedAt };
+  vi.clearAllMocks(); purgeStatus = null; role = 'editor'; suspended = null; taskRow = { id: 't1', title: 'Old', notes: null, status: 'todo', assigneeId: null, dueOn: null, postId: null, createdById: 'someone', updatedAt };
   taskRows = []; commentRows = []; assignable = true; postFound = true; commentRow = null; auditCount = 1; scope = { all: true, ids: [] }; moduleOn = true; featureOn = true; access = { read: true, write: true };
   audits.length = 0; writes.length = 0;
   mocks.config.mockImplementation(async (key: string) => caps[key]);
@@ -58,6 +59,7 @@ beforeEach(() => {
   mocks.prisma.$queryRaw.mockImplementation(async (query: unknown) => {
     const sql = sqlText(query);
     if (sql.includes('FOR SHARE OF m, u, w')) return role ? [{ role, suspendedAt: suspended }] : [];
+    if (sql.includes('SELECT status::text FROM workspace_data_purges')) return purgeStatus ? [{ status: purgeStatus }] : [];
     if (sql.includes('FROM memberships m JOIN users u ON u.id = m."userId" JOIN workspaces w')) return role ? [{ role, timezone: 'UTC', suspendedAt: suspended }] : [];
     if (sql.includes('SELECT m."userId" AS id')) return assignable ? [{ id: 'user-b' }] : [];
     if (sql.includes('GROUP BY t.status')) return [{ status: 'todo', total: 3, overdue: 1 }, { status: 'done', total: 2, overdue: 0 }];
@@ -176,6 +178,27 @@ describe('task writes', () => {
     mocks.prisma.$queryRaw.mockImplementation(async (query: unknown) => (sqlText(query).includes('FOR SHARE OF m, u, w') ? [{ role: 'editor', suspendedAt: new Date() }] : original(query)));
     await expect(performTaskAction(actor, create())).rejects.toMatchObject({ code: 'forbidden' });
     expect(writes).toHaveLength(0);
+  });
+  it('guards workspace, purge and actor inside one transaction without a nested operation lock', async () => {
+    await performTaskAction(actor, create());
+    expect(mocks.workspace).not.toHaveBeenCalled();
+    expect(mocks.prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.prisma.$queryRaw.mock.calls.some(([query]) => sqlText(query).includes('workspace_data_purges'))).toBe(true);
+    expect(writes).toHaveLength(1);
+  });
+  it.each(['requested', 'db_deleted'])('refuses writes while erasure is %s and accepts a completed purge row', async status => {
+    purgeStatus = status;
+    await expect(performTaskAction(actor, create())).rejects.toMatchObject({ code: 'conflict' });
+    expect(writes).toHaveLength(0);
+    purgeStatus = 'completed';
+    await expect(performTaskAction(actor, create())).resolves.toMatchObject({ ok: true });
+  });
+  it('stamps task changes with the statement clock so an optimistic token never moves backwards', async () => {
+    await performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'doing' });
+    await performTaskAction(actor, { action: 'task.update', id: 't1', title: 'New' });
+    const updates = writes.filter(write => write.sql.includes('UPDATE tasks'));
+    expect(updates).toHaveLength(2);
+    for (const update of updates) expect(update.sql).toContain('clock_timestamp()');
   });
   it('creates a task with limits, assignee check and audit', async () => {
     const result = await performTaskAction(actor, create({ title: ' Plan ', assigneeId: 'user-b', dueOn: '2026-12-01' }));

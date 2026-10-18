@@ -197,7 +197,12 @@ describe('workspace data controls', () => {
     expect(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."post_versions"'))).toBeLessThan(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."posts" WHERE')));
     expect(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."instagram_media"'))).toBeLessThan(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."instagram_accounts" WHERE')));
     expect(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."link_clicks"'))).toBeLessThan(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."short_links" WHERE')));
-    expect(tx.$executeRawUnsafe.mock.calls[0][0]).toContain('UPDATE "public"."posts" SET "sourceFeedItemId" = NULL');
+    // No pre-delete rewrite of posts: the feed-item link is removed by deleting posts first, then feed items.
+    expect(tx.$executeRawUnsafe.mock.calls.some((call: unknown[]) => /^UPDATE/.test(String(call[0])))).toBe(false);
+    const postsAt = deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."posts" WHERE'));
+    const feedItemsAt = deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."feed_items"'));
+    expect(feedItemsAt).toBeGreaterThan(postsAt);
+    expect(deleteSql.filter(sql => sql.startsWith('DELETE FROM "public"."feed_items"'))).toHaveLength(1);
     expect(events.filter(item => item === 'audit')).toHaveLength(2);
     const auditValues = tx.$executeRaw.mock.calls.flat().filter((value: unknown): value is string => typeof value === 'string');
     expect(auditValues.some(value => value.includes('"apiKeyId":"key-a"'))).toBe(true);

@@ -97,6 +97,16 @@ const INDIRECT_WORKSPACE_TABLES = [
   { table: 'post_versions', where: ownedBy('postId', 'posts') },
   { table: 'review_decisions', where: `(${ownedBy('postId', 'posts')} OR ${ownedBy('shareLinkId', 'share_links')})` },
 ] as const;
+/** Indirect tables that a direct table points at; they are removed once that direct table is empty. */
+const DELETED_AFTER_POSTS = new Set(['feed_items']);
+
+/** Remove this workspace's feed items after its posts. A post in another workspace that still
+ * points at one of them has only that optional link cleared by the FK; the post and any feed
+ * source outside this workspace are untouched. */
+async function deleteFeedItems(tx: DataControlTransaction, workspaceId: string) {
+  const { where } = INDIRECT_WORKSPACE_TABLES.find(entry => entry.table === 'feed_items')!;
+  await tx.$executeRawUnsafe(`DELETE FROM ${tableSql('feed_items')} child WHERE ${where}`, workspaceId);
+}
 
 async function directWorkspaceCounts(tx: DataControlTransaction | typeof prisma, workspaceId: string) {
   const counts: Record<string, number> = {};
@@ -248,14 +258,10 @@ async function collectWorkspaceDeletionCounts(tx: DataControlTransaction | typeo
  * only remove its link/child row and never a row belonging to another workspace.
  */
 async function deleteIndirectWorkspaceRows(tx: DataControlTransaction, workspaceId: string) {
-  // Posts are removed in the direct-table phase. Clear the optional feed-item
-  // pointer first so deleting an owned RSS item cannot strand a post FK.
-  await tx.$executeRawUnsafe(
-    `UPDATE ${tableSql('posts')} SET "sourceFeedItemId" = NULL WHERE "workspaceId" = $1 AND "sourceFeedItemId" IS NOT NULL`,
-    workspaceId,
-  );
+  // feed_items are not deleted here: posts.sourceFeedItemId references them with ON DELETE SET NULL,
+  // which would update posts that are still present. They go right after posts (deleteFeedItems).
   const statements = [
-    ...INDIRECT_WORKSPACE_TABLES.map(({ table, where }) => `DELETE FROM ${tableSql(table)} child WHERE ${where}`),
+    ...INDIRECT_WORKSPACE_TABLES.filter(({ table }) => !DELETED_AFTER_POSTS.has(table)).map(({ table, where }) => `DELETE FROM ${tableSql(table)} child WHERE ${where}`),
     `DELETE FROM ${tableSql('post_comments')} child USING ${tableSql('post_targets')} link WHERE child."postTargetId" = link."id" AND (link."postId" IN (SELECT "id" FROM ${tableSql('posts')} WHERE "workspaceId" = $1) OR link."targetId" IN (SELECT "id" FROM ${tableSql('targets')} WHERE "workspaceId" = $1))`,
     `DELETE FROM ${tableSql('conversation_messages')} child USING ${tableSql('conversations')} parent JOIN ${tableSql('targets')} owner ON owner."id" = parent."targetId" WHERE child."conversationId" = parent."id" AND owner."workspaceId" = $1`,
     `DELETE FROM ${tableSql('page_insights')} child USING ${tableSql('targets')} owner WHERE child."targetId" = owner."id" AND owner."workspaceId" = $1`,
@@ -265,6 +271,15 @@ async function deleteIndirectWorkspaceRows(tx: DataControlTransaction, workspace
     `DELETE FROM ${tableSql('conversations')} child USING ${tableSql('targets')} owner WHERE child."targetId" = owner."id" AND owner."workspaceId" = $1`,
   ];
   for (const statement of statements) await tx.$executeRawUnsafe(statement, workspaceId);
+}
+
+/** Erase every database row the workspace owns, children before parents, with the purge write gate left active. */
+export async function deleteWorkspaceDatabaseRows(tx: DataControlTransaction, workspaceId: string) {
+  await deleteIndirectWorkspaceRows(tx, workspaceId);
+  for (const table of await workspaceTablesInDeletionOrder(tx)) {
+    await tx.$executeRawUnsafe(`DELETE FROM ${tableSql(table)} WHERE "workspaceId" = $1`, workspaceId);
+    if (table === 'posts') await deleteFeedItems(tx, workspaceId);
+  }
 }
 
 function savedCounts(value: unknown): Record<string, number> {
@@ -314,10 +329,7 @@ async function finishWorkspaceDataPurge(actor: DataControlActor, timeout: number
       ...await indirectWorkspaceCounts(tx, actor.workspaceId),
       ...await directWorkspaceCounts(tx, actor.workspaceId),
     };
-    await deleteIndirectWorkspaceRows(tx, actor.workspaceId);
-    for (const table of await workspaceTablesInDeletionOrder(tx)) {
-      await tx.$executeRawUnsafe(`DELETE FROM ${tableSql(table)} WHERE "workspaceId" = $1`, actor.workspaceId);
-    }
+    await deleteWorkspaceDatabaseRows(tx, actor.workspaceId);
     await tx.workspaceDataPurge.update({ where: { workspaceId: actor.workspaceId }, data: { status: 'db_deleted', counts, dbDeletedAt: new Date(), error: null } });
     await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`data_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'workspace.data_deleted', ${JSON.stringify({ workspaceId: actor.workspaceId, ...(actor.apiKeyId ? { apiKeyId: actor.apiKeyId } : {}), counts })}::jsonb, NOW())`;
     return counts;

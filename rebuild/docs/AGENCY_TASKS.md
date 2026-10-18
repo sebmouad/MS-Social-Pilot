@@ -63,3 +63,27 @@ browser/database proof. Its cross-workspace reads need entitlement checks and
 an authority model that cannot leak through workspace-scoped MCP keys. Do not
 expose it until those boundaries and tests are implemented. Agency remains a
 separate unfinished batch; source presence is not capability completion.
+
+## Tasks review corrections — batch 78
+
+Independent Claude review completed after credits were restored. Two concrete
+findings were fixed: feed-linked post erasure previously attempted a purge-gated
+UPDATE, and Tasks writes nested multiple connection-holding transactions. Erasure
+now orders dependencies through intermediate tables, deletes feed items after
+posts, and never bypasses purge guards. Tasks uses one transaction; the MCP host
+does not wrap it again. Purge state is read in a fresh statement after acquiring
+the workspace lock. Updated edit/status timestamps use clock_timestamp().
+
+Isolated source passed 2,435 tests / 299 files with no skips, production build
+and serial typecheck. Six additional actual PostgreSQL tests passed single-pool
+create/checklist/comment, simultaneous optimistic conflict and purge refusal,
+with verified cleanup. A real feed-erasure regression reproduced the old 55000
+failure and verified foreign sources/items/posts survive the corrected deletion.
+The guarded actual HTTP/MCP/export/erasure probe passed on an isolated localhost
+preview; fixtures and exact captured Root settings were restored. An initial
+probe refused because no local server was listening; no fixtures were written.
+
+No migration/provider/production change. Optional optimistic tokens, plan/key
+revocation races, legacy schema drift and broader configuration coverage remain
+open. Agency is a separate unfinished integration and was excluded from this
+fix snapshot and commit. Production/socialpilot-deploy remain legacy.

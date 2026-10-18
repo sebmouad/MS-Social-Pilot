@@ -4,7 +4,6 @@ import { Prisma } from '../../../../generated/client';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
-import { withWorkspaceOperation } from '@/server/data-control/guard';
 import {
   TASK_ACTION_SCHEMA, TASK_FILTER_SCHEMA, TASK_POST_CHOICE_SCHEMA, TASK_TRANSITIONS, addCalendarDays, taskConfirmations,
   type TaskAction, type TaskCommentView, type TaskLimits, type TaskPostChoice, type TaskStatus, type TaskSummary, type TaskView, type TasksActor, type TasksReadOptions,
@@ -171,6 +170,9 @@ async function lockActor(tx: Prisma.TransactionClient, actor: TasksActor): Promi
   const rows = await tx.$queryRaw<Array<{ role: string; suspendedAt: Date | null; allPages?: boolean | null; memberDisabled?: string[] | null; workspaceDisabled?: string[] | null; clientAccess?: string[] | null }>>`SELECT m.role::text AS role, w."suspendedAt", m."allPages" AS "allPages", COALESCE(m."disabledModules", ARRAY[]::TEXT[]) AS "memberDisabled", COALESCE(w."disabledModules", ARRAY[]::TEXT[]) AS "workspaceDisabled", COALESCE(w."clientAccess", ARRAY[]::TEXT[]) AS "clientAccess" FROM memberships m JOIN users u ON u.id = m."userId" JOIN workspaces w ON w.id = m."workspaceId" WHERE m."workspaceId" = ${actor.workspaceId} AND m."userId" = ${actor.userId} AND u."disabledAt" IS NULL FOR SHARE OF m, u, w`;
   if (!rows[0] || !TASK_WRITE_ROLES.includes(rows[0].role)) throw new OperationError('forbidden', 'Tasks are unavailable for your role in this workspace.');
   if (rows[0].suspendedAt) throw new OperationError('forbidden', 'This workspace is suspended.');
+  // Read in a new statement after acquiring the lock: a snapshot taken before waiting could miss a purge that just committed.
+  const purge = await tx.$queryRaw<Array<{ status: string }>>`SELECT status::text FROM workspace_data_purges WHERE "workspaceId" = ${actor.workspaceId}`;
+  if (purge[0] && purge[0].status !== 'completed') throw new OperationError('conflict', 'Workspace data deletion is in progress.');
   // A Root module switch or role change committed after the preflight must win over it.
   const fresh = resolvePermissions({ role: rows[0].role, allPages: rows[0].allPages === true, workspaceDisabledModules: rows[0].workspaceDisabled ?? [], memberDisabledModules: rows[0].memberDisabled ?? [], clientAccess: rows[0].clientAccess ?? [], pageAccess: [] });
   if (!canAccessFeature(fresh, TASKS_FEATURE_ID, 'write')) throw new OperationError('forbidden', 'Tasks are unavailable for your role in this workspace.');
@@ -208,7 +210,8 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
   const config = await timeout();
   const needsPostCheck = (value.action === 'task.create' || value.action === 'task.update') && Boolean(value.postId);
   const visibility = needsPostCheck ? await postVisibility(actor, access) : null;
-  return withWorkspaceOperation(actor.workspaceId, () => prisma.$transaction(async tx => {
+  // One transaction: the shared workspace lock, purge exclusion, actor re-check and the write commit or fail together.
+  return prisma.$transaction(async tx => {
     const role = await lockActor(tx, actor);
 
     if (value.action === 'task.create') {
@@ -282,7 +285,7 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
     if (value.action === 'task.transition') {
       const from = current.status as TaskStatus;
       if (!TASK_TRANSITIONS[from]?.includes(value.status)) throw new OperationError('conflict', 'This task is already in that status. Refresh and check its current status.');
-      const changed = await tx.$executeRaw`UPDATE tasks SET status = ${value.status}, "updatedAt" = NOW() WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} AND status = ${from}`;
+      const changed = await tx.$executeRaw`UPDATE tasks SET status = ${value.status}, "updatedAt" = clock_timestamp() WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} AND status = ${from}`;
       if (changed !== 1) throw new OperationError('conflict', 'This task changed while you were working. Refresh and try again.');
       await audit(tx, actor, 'tasks.status_changed', { taskId: value.id, from, to: value.status });
       return { ok: true as const, action: value.action, id: value.id };
@@ -303,9 +306,9 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
     if (!changedFields.length) throw invalid('Change at least one task field.');
     if (changedFields.includes('assigneeId') && next.assigneeId) await assertAssignable(tx, actor, next.assigneeId);
     if (changedFields.includes('postId') && next.postId) await assertLinkable(tx, visibility, next.postId);
-    const changed = await tx.$executeRaw`UPDATE tasks SET title = ${next.title}, notes = ${next.notes}, "assigneeId" = ${next.assigneeId}, "dueOn" = ${next.dueOn}, "postId" = ${next.postId}, "updatedAt" = NOW() WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
+    const changed = await tx.$executeRaw`UPDATE tasks SET title = ${next.title}, notes = ${next.notes}, "assigneeId" = ${next.assigneeId}, "dueOn" = ${next.dueOn}, "postId" = ${next.postId}, "updatedAt" = clock_timestamp() WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
     if (changed !== 1) throw missing();
     await audit(tx, actor, 'tasks.updated', { taskId: value.id, fields: changedFields, ...(changedFields.includes('assigneeId') ? { assigneeId: next.assigneeId } : {}) });
     return { ok: true as const, action: value.action, id: value.id };
-  }, config));
+  }, config);
 }

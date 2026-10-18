@@ -21,6 +21,15 @@ describe('workspace erasure table order', () => {
     expect(order.indexOf('leaf')).toBeLessThan(order.indexOf('r'));
     expect(order.indexOf('root')).toBe(3);
   });
+  it('follows foreign keys through tables outside the set (posts -> feed_items -> feed_sources)', () => {
+    // feed_sources sorts before posts; deleting it first would cascade into feed_items and null the still-present posts.
+    const dependencies = [edge('posts', 'feed_items'), edge('feed_items', 'feed_sources')];
+    const order = orderTablesForDeletion(['feed_sources', 'posts'], dependencies);
+    expect(order).toEqual(['posts', 'feed_sources']);
+  });
+  it('still refuses a cycle that runs through an unlisted table', () => {
+    expect(() => orderTablesForDeletion(['a', 'b'], [edge('a', 'hidden'), edge('hidden', 'b'), edge('b', 'a')])).toThrow(/circular/);
+  });
   it('refuses cycles rather than guessing', () => {
     expect(() => orderTablesForDeletion(['a', 'b', 'c'], [edge('a', 'b'), edge('b', 'a')])).toThrow(/circular.*a, b/);
   });
