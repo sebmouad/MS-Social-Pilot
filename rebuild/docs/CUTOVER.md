@@ -305,3 +305,25 @@ objects/history and checks mapped columns. Only isolated preview was migrated,
 after fresh backup, scratch restore/migration and unchanged legacy count/settings
 comparison. A full ten-migration production-shaped staging and rollback rehearsal
 remains outstanding; production was not migrated.
+
+## Ads creation operation kinds (batch 75, validation in progress)
+
+The allowlist contains eleven migrations. The eleventh,
+`20261018190000_rebuild_ads_creation`, extends the Ads operation-kind CHECK to
+campaign/ad-set creation without rewriting existing records. SHA-256:
+`749fc69e2937588b95e7b050ebb49525e30b2624915abd2bdc92de6e92a899d0`.
+The script pins this file, applies it after the ledger migration, and includes
+its migration history in baseline refusals. A fresh local preview backup was
+scratch-restored and migrated before preview application, preserving checked
+legacy counts and settings digest. This proves that local additive step only;
+full eleven-migration production-shaped rehearsal and release rollback remain
+open. Production and its deployment command still target legacy.
+
+On 2026-10-18 the complete eleven-file sequence passed against a schema-only
+baseline derived from the isolated preview, excluding reviewed rebuild tables
+and their two immutable trigger functions. Mapped-column/enum checks and a second
+backup/restore matched across all public tables; scratch databases were removed.
+All source rows were absent, so this proves SQL ordering/schema compatibility
+and empty-database backup restoration only. The rehearsal now explicitly refuses
+pre-existing rebuild functions as well as tables/history. Customer-data migration,
+media recovery and production process/proxy rollback are still unverified.

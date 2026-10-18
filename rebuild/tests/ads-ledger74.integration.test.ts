@@ -62,4 +62,19 @@ describe.skipIf(!databaseUrl)('Ads ledger constraints on isolated PostgreSQL', (
     const rows = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM ads_management_operations WHERE "workspaceId"=${id}`;
     expect(rows[0]?.count).toBe(BigInt(2));
   }));
+  it.each(['campaign', 'adset'] as const)('holds an ambiguous %s creation until explicit resolution', async kind => fixture(async (tx, id) => {
+    const object = kind === 'campaign' ? '@create-campaign' : '@create-adset:parent-one';
+    const operation = `${kind}.create`;
+    const create = (suffix: string, request: string) => tx.$executeRaw`INSERT INTO ads_management_operations (id,"workspaceId","adAccountId","actorId","requestId","requestHash","operationType","objectType","objectId",params,status) VALUES (${`${id}_${suffix}`},${id},${id},${id},${request},${'b'.repeat(64)},${operation},${kind},${object},'{}'::jsonb,'pending')`;
+    await create('first', 'creation-request-first');
+    await tx.$executeRaw`UPDATE ads_management_operations SET status='uncertain',"completedAt"=NOW() WHERE id=${`${id}_first`}`;
+    await tx.$executeRaw`SAVEPOINT held_creation`;
+    await expect(create('second', 'creation-request-second')).rejects.toMatchObject({ code: 'P2010' });
+    await tx.$executeRaw`ROLLBACK TO SAVEPOINT held_creation`;
+    await tx.$executeRaw`UPDATE ads_management_operations SET status='resolved_not_applied',"resolvedBy"=${id},"resolvedAt"=NOW() WHERE id=${`${id}_first`}`;
+    await create('second', 'creation-request-second');
+    const rows = await tx.$queryRaw<Array<{ status: string; remoteId: string | null }>>`SELECT status,"remoteId" FROM ads_management_operations WHERE id=${`${id}_first`}`;
+    expect(rows).toEqual([{ status: 'resolved_not_applied', remoteId: null }]);
+  }));
+
 });

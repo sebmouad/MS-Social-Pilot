@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const script = 'scripts/cutover-rehearsal.sh';
-const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations';
+const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation';
 
 describe('cutover rehearsal safety gates', () => {
   it('compares counts for every public base table and detects table-set drift', () => {
@@ -71,7 +71,19 @@ describe('cutover rehearsal safety gates', () => {
     expect(createHash('sha256').update(migration).digest('hex')).toBe('61f575314590e45e8eafc7cb8088677fec2a78b39210b82187b6f2c05197d6d2');
     expect(source).toContain('verify_migration 20261018170000_rebuild_ads_operations 61f575314590e45e8eafc7cb8088677fec2a78b39210b82187b6f2c05197d6d2');
     expect(source).toContain("to_regclass('public.ads_management_operations')");
+    expect(source).toContain("to_regprocedure('public.rebuild_facebook_media_deletions_binding_immutable()')");
+    expect(source).toContain("to_regprocedure('public.rebuild_facebook_media_resolutions_immutable()')");
     expect(source).toContain("ARRAY['ads_management_operations','requestHash']");
+  });
+
+  it('pins creation operation kinds after the Ads ledger migration', () => {
+    const source = readFileSync(script, 'utf8');
+    const migration = readFileSync('../prisma/migrations/20261018190000_rebuild_ads_creation/migration.sql', 'utf8');
+    expect(createHash('sha256').update(migration).digest('hex')).toBe('749fc69e2937588b95e7b050ebb49525e30b2624915abd2bdc92de6e92a899d0');
+    expect(source).toContain('verify_migration 20261018190000_rebuild_ads_creation 749fc69e2937588b95e7b050ebb49525e30b2624915abd2bdc92de6e92a899d0');
+    expect(source.indexOf('migration_dir/20261018190000_rebuild_ads_creation/migration.sql')).toBeGreaterThan(source.indexOf('migration_dir/20261018170000_rebuild_ads_operations/migration.sql'));
+    expect(migration).toContain("'campaign.create'");
+    expect(migration).toContain("'adset.create'");
   });
 
   it('pins notifications and refuses an already migrated notification baseline', () => {
@@ -103,7 +115,7 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain(hash(mediaSteps));
     expect(source).toContain(hash(mediaDeletions));
     expect(source).toContain(hash(resolutions));
-    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)');
+    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)');
     expect(source).toContain("USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps'");
     expect(source).toContain('CUTOVER_APPROVED_MIGRATION_SET');
     expect(source.indexOf('migration.sql"')) .toBeLessThan(source.indexOf('Required tables/columns are taken'));

@@ -11,7 +11,7 @@ fail() { echo "cutover rehearsal: $*" >&2; exit 1; }
 : "${CUTOVER_DUMP_SANITIZED:?Set CUTOVER_DUMP_SANITIZED=YES only after confirming the dump is sanitized}"
 : "${CUTOVER_APPROVED_MIGRATION_SET:?Set CUTOVER_APPROVED_MIGRATION_SET to the reviewed migration set}"
 [ "$CUTOVER_DUMP_SANITIZED" = YES ] || fail "CUTOVER_DUMP_SANITIZED must be YES"
-approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations'
+approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation'
 [ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
 [ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
 
@@ -39,6 +39,7 @@ verify_migration 20261017030000_rebuild_facebook_media_deletions 3f5df63bf339fe5
 verify_migration 20261017040000_rebuild_facebook_media_resolution 3227fbe5f381a25c87955ac809ef605fe1f2d51d9bb4f3ca4e5e9ce743c2a844
 verify_migration 20261018150000_rebuild_notifications b60b92752dc3019e15156f1ecb4cb58d29b5de4a6676dd141ac13a955277b067
 verify_migration 20261018170000_rebuild_ads_operations 61f575314590e45e8eafc7cb8088677fec2a78b39210b82187b6f2c05197d6d2
+verify_migration 20261018190000_rebuild_ads_creation 749fc69e2937588b95e7b050ebb49525e30b2624915abd2bdc92de6e92a899d0
 
 # Only loopback TCP or the standard local PostgreSQL socket and database
 # /postgres are accepted. A copied production DATABASE_URL must fail closed.
@@ -87,13 +88,15 @@ BEGIN
      OR to_regclass('public.rebuild_facebook_media_deletions') IS NOT NULL
      OR to_regclass('public.rebuild_facebook_media_resolutions') IS NOT NULL
      OR to_regclass('public.rebuild_notifications') IS NOT NULL
-     OR to_regclass('public.ads_management_operations') IS NOT NULL THEN
+     OR to_regclass('public.ads_management_operations') IS NOT NULL
+     OR to_regprocedure('public.rebuild_facebook_media_deletions_binding_immutable()') IS NOT NULL
+     OR to_regprocedure('public.rebuild_facebook_media_resolutions_immutable()') IS NOT NULL THEN
     RAISE EXCEPTION 'staging dump already contains reviewed migration objects; use a pre-migration sanitized baseline';
   END IF;
   IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
-    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
       INTO already_applied
-      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations';
+      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation';
     IF already_applied THEN
       RAISE EXCEPTION 'staging dump migration history already contains an allowlisted migration';
     END IF;
@@ -110,6 +113,7 @@ psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261017030000_rebui
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261017040000_rebuild_facebook_media_resolution/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261018150000_rebuild_notifications/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261018170000_rebuild_ads_operations/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261018190000_rebuild_ads_creation/migration.sql"
 echo "reviewed additive migrations applied to local scratch database"
 
 # Required tables/columns are taken from rebuild/prisma/schema.prisma and
