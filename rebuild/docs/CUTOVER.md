@@ -355,3 +355,12 @@ Batch 76: all thirteen checksum-pinned migrations passed a schema-only scratch
 rehearsal. The local actual HTTP/MCP export/erasure probe passed after dependency
 ordering repair; purge guards remained enabled. This does not close production
 data/media migration, service rollback or cutover gates.
+
+Batch79 in progress: nullable share_links.expiresAt is locally applied via a
+fresh private backup and scratch restore/migration. Original 104 table counts,
+settings digest and share-link contents (excluding the new null column) matched.
+Migration SHA256 28d4f9da65ed866f6139aa982d4756906cd329080dccf6cf2d87dee32e59d263.
+All fourteen pinned SQL files passed a schema-only scratch rehearsal and eleven
+cutover guard tests. Legacy null-expiry links stay stored but are not publicly
+served by the rebuild; rotation/recreation requires a bounded lifetime. Production
+was untouched. Full customer-data/media/service rollback remains open.

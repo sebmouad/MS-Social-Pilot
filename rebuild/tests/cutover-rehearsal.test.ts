@@ -4,9 +4,17 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const script = 'scripts/cutover-rehearsal.sh';
-const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments';
+const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry';
 
 describe('cutover rehearsal safety gates', () => {
+  it('pins sharing expiry and refuses a partially migrated baseline', () => {
+    const source = readFileSync(script, 'utf8');
+    const migration = readFileSync('../prisma/migrations/20261018230000_rebuild_sharing_expiry/migration.sql', 'utf8');
+    expect(createHash('sha256').update(migration).digest('hex')).toBe('28d4f9da65ed866f6139aa982d4756906cd329080dccf6cf2d87dee32e59d263');
+    expect(source).toContain('verify_migration 20261018230000_rebuild_sharing_expiry 28d4f9da65ed866f6139aa982d4756906cd329080dccf6cf2d87dee32e59d263');
+    expect(source).toContain("table_name = 'share_links' AND column_name = 'expiresAt'");
+    expect(source).toContain("ARRAY['share_links','expiresAt']");
+  });
   it('compares counts for every public base table and detects table-set drift', () => {
     const source = readFileSync(script, 'utf8');
     expect(source).toContain("WHERE n.nspname = 'public' AND c.relkind = 'r'");
@@ -138,7 +146,7 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain(hash(mediaSteps));
     expect(source).toContain(hash(mediaDeletions));
     expect(source).toContain(hash(resolutions));
-    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)');
+    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)');
     expect(source).toContain("USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps'");
     expect(source).toContain('CUTOVER_APPROVED_MIGRATION_SET');
     expect(source.indexOf('migration.sql"')) .toBeLessThan(source.indexOf('Required tables/columns are taken'));

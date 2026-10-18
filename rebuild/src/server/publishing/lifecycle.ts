@@ -179,9 +179,41 @@ export async function submitPostForApproval(actor: PublishingActor, postId: stri
   });
 }
 
-/** Reviewers may approve to draft or reject; clients cannot review their own posts. */
-export async function reviewPost(actor: PublishingActor, postId: string, decision: 'approve' | 'reject', note?: string) {
+export type ReviewDecision = 'approve' | 'reject';
+/** Facts about the review, passed read-only to participant callbacks. */
+export type ReviewParticipantContext = Readonly<{
+  actor: Readonly<PublishingActor>;
+  postId: string;
+  decision: ReviewDecision;
+  /** Trimmed review note, or null when none was given. */
+  note: string | null;
+  /** Post state read inside the review transaction, before mutation. */
+  post: Readonly<{ id: string; status: string; scheduledAt: Date | null }>;
+  /** Status the post takes if the review commits. */
+  resultingStatus: 'draft' | 'scheduled' | 'rejected';
+}>;
+/**
+ * Optional domain participant that joins a review atomically. Both callbacks
+ * receive the review's own publishing transaction client, so their writes commit
+ * or roll back together with the status change and audit row. Throwing from
+ * either callback aborts the whole review. Callbacks must use only `tx`.
+ */
+export type ReviewParticipant = {
+  /** Runs after Publishing authority and post-state checks, before the post is mutated. Validate/lock external authorization here; throw to refuse. */
+  before?(tx: Prisma.TransactionClient, context: ReviewParticipantContext): Promise<void>;
+  /** Runs after the post is mutated and before the audit row is written. Record the domain outcome here. */
+  after?(tx: Prisma.TransactionClient, context: ReviewParticipantContext): Promise<void>;
+};
+
+/** Reviewers may approve to draft or reject; clients cannot review their own posts. An optional participant joins the same transaction. */
+export async function reviewPost(actor: PublishingActor, postId: string, decision: ReviewDecision, note?: string, participant?: ReviewParticipant) {
   return withPublishingOperation(actor, { postId, feature: 'publishing/approvals' }, async ({ actor, signal, lockTargets }) => {
+    if (decision !== 'approve' && decision !== 'reject') throw new OperationError('invalid_request', 'Choose approve or reject.');
+    if (note !== undefined && note !== null && typeof note !== 'string') throw new OperationError('invalid_request', 'Enter a valid review note.');
+    if (participant !== undefined && (participant === null || typeof participant !== 'object'
+      || (participant.before !== undefined && typeof participant.before !== 'function') || (participant.after !== undefined && typeof participant.after !== 'function'))) {
+      throw new OperationError('unavailable', 'Review could not be completed. Try again later.');
+    }
     const reviewNote = (note ?? '').trim();
     if (reviewNote.length > 500) throw new OperationError('invalid_request', 'Keep the review note to 500 characters or fewer.');
     const member = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
@@ -195,9 +227,17 @@ export async function reviewPost(actor: PublishingActor, postId: string, decisio
       const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, status: true, scheduledAt: true } });
       if (!post || post.status !== 'pending_approval') throw new OperationError('conflict', 'This post is no longer awaiting approval.');
       const status = decision === 'approve' ? (post.scheduledAt ? 'scheduled' : 'draft') : 'rejected';
+      const context: ReviewParticipantContext = Object.freeze({
+        actor: Object.freeze({ ...actor }), postId: post.id, decision, note: reviewNote || null,
+        post: Object.freeze({ id: post.id, status: post.status, scheduledAt: post.scheduledAt }), resultingStatus: status,
+      });
+      await participant?.before?.(tx, context);
+      signal.throwIfAborted();
       const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'pending_approval' }, data: { status, updatedAt: new Date() } });
       if (changed.count !== 1) throw new OperationError('conflict', 'This post is no longer awaiting approval.');
       await tx.$executeRaw`UPDATE posts SET "approvalStatus" = ${decision === 'approve' ? 'approved' : 'rejected'}::"ApprovalStatus", "reviewedById" = ${actor.userId}, "reviewedAt" = NOW(), "reviewNote" = ${reviewNote || null} WHERE id = ${post.id} AND "workspaceId" = ${actor.workspaceId}`;
+      await participant?.after?.(tx, context);
+      signal.throwIfAborted();
       await audit(tx, actor, decision === 'approve' ? 'publishing.post_approved' : 'publishing.post_rejected', { postId: post.id, ...(reviewNote ? { note: reviewNote } : {}) });
     });
   });

@@ -969,3 +969,20 @@ No person-wide MCP credential/tools are enabled: workspace keys cannot expand
 across tenants. Complete Agency writes/pagination/scale, remaining legacy source
 integrations, full Root technical controls, Facebook live coverage and migration/
 rollback/cutover remain open. Production and socialpilot-deploy remain legacy.
+
+## Atomic review participation and sharing schema foundation — batch79a
+
+reviewPost accepts an optional provider-neutral before/after participant that
+uses the same local Publishing transaction as approval and audit. Callback failure
+rolls back the complete local operation; authority/target/abort guards remain.
+This enables client feedback integration without embedding Sharing rules in
+Publishing. It does not remove broader Publishing guard pool nesting.
+
+Isolated foundation passed 2,509 tests / 307 files, production build and serial
+typecheck. Five actual PostgreSQL tests verify participant persistence/rollback/
+competing reviews with outer authority ports stubbed. An additive nullable
+share-link expiry column was backup/restored and applied only locally, with
+104 original table counts/settings/share contents preserved. Fourteen SQL files
+passed schema-only rehearsal. Public Sharing host/UI/security verification is
+still in progress and excluded from this foundation snapshot. Production and
+socialpilot-deploy remain legacy. See CUTOVER.md and AGENT_HANDOFF.md.

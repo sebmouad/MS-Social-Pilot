@@ -51,3 +51,10 @@ and exact service rollback. Keep legacy available until every functional, data,
 security, browser/API/MCP, provider and rollback gate in CUTOVER.md passes. Existing
 socialpilot-deploy is legacy. Deploy the rebuild only after those gates, verify
 production health and publish truthful evidence and remaining limitations.
+
+Batch79a verifies the atomic Publishing review-participant and expiry-schema
+foundation (2,509 tests / 307 files, build/typecheck, real PG transaction tests).
+Batch79b must finish actual Sharing/bio authorization, token rotation/revocation,
+media previews, feedback, MCP ceilings, public security, browser/API/probe and
+cleanup evidence before exposing those routes. Do not treat foundation proof
+as finished Client sharing or shrink the full legacy/MCP/release scope.

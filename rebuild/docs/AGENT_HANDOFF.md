@@ -126,3 +126,45 @@ batches; never broad-stage unrelated source. Production remains legacy.
 
 Update this file in place with current facts; Git preserves historical handoffs.
 Do not append contradictory old baselines or shrink the target to implemented work.
+
+## In-progress batch 79: client sharing and bio
+
+Published baseline is now `bab6fce4738449ac8bb951cd422af2752c846c60` (Agency),
+verified on GitHub main. Current uncommitted Sharing source is NOT release-ready.
+Account 1 owns sharing module/UI/API/tests; account 2 completed security review
+and neutral Publishing review-participant source/tests, then started a real-PG
+participant test. Parent owns Settings manifest/features, Root registry 71, MCP
+host/resources, migrations and verification. Inspect handles rather than assuming
+workers remain live. Their own test commands are routinely denied; parent runs
+actual tests. No production/provider operation belongs to this batch.
+
+Local additive migration `20261018230000_rebuild_sharing_expiry` is already applied
+after a fresh private backup, scratch restore/migration and checks preserving
+104 original table counts, exact settings and original share-link contents.
+SHA256: `28d4f9da65ed866f6139aa982d4756906cd329080dccf6cf2d87dee32e59d263`.
+Do not edit/replay it. Root Prisma ShareLink declares nullable expiresAt; schema
+validation passed. All fourteen pinned migrations passed schema-only rehearsal;
+eleven cutover safety tests passed. This is NOT customer-data/media rollback proof.
+
+Neutral reviewPost participant callbacks join the existing publishing transaction
+without Sharing-specific rules. The isolated foundation passed 2,509 tests / 307 files, zero skips, production
+build and serial typecheck. Five actual PostgreSQL participant tests prove local
+approval/feedback rollback and competing-review outcomes; outer authority ports
+are stubbed, so these are transaction proofs, not full public Sharing evidence.
+An initial fixture run used models absent from the thin rebuild Prisma client;
+five exact orphan synthetic fixtures were subsequently removed and verified.
+The corrected SQL-based fixture tests pass with cleanup. Actual Sharing flow
+integration remains pending.
+The independently reviewed Sharing defects include draft leakage, long-note
+approval fallback, non-atomic decision/approval, nested transactions, public rate
+limiter isolation/unknown-address behavior, bio current entitlement, unique-error
+mapping, media previews and MCP feature/resource/result ceilings. Do not expose
+public routes from mere host registration before these are addressed and verified.
+
+The local production-build preview now serves the verified review foundation
+from its isolated snapshot on localhost:3200; it does NOT include unverified
+Sharing source. One build started in the wrong preview directory was stopped
+and rerun in the correct snapshot before restoration. Production was untouched.
+Account1 Sharing implementation handle was 93328 at this checkpoint; re-poll
+that handle before dispatching overlapping module edits. Account2 PG worker is
+terminal. Private source handoffs stay outside Git; ownership remains as above.

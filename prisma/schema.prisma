@@ -1828,6 +1828,7 @@ model ShareLink {
   decides       Boolean   @default(false)
   /// With `decides`: posts still unanswered this many hours before their time are approved anyway. Null = never.
   publishAnywayHours Int?
+  expiresAt     DateTime?
   revokedAt     DateTime?
   createdById   String
   createdAt     DateTime  @default(now())
