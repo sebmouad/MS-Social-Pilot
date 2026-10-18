@@ -18,7 +18,7 @@ describe('custom field review recovery', () => {
   it('keeps the draft and exact confirmation while displaying and focusing an offline error inside the dialog, then retries', async () => {
     const fetch = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'field-a', name: 'Retry campaign', kind: 'text', options: [], position: 0 }) });
     vi.stubGlobal('fetch', fetch);
-    await act(async () => root.render(createElement(FieldsManager, { initialFields: [], canManage: true, limits: { fieldLimit: 20, nameMax: 60, optionMax: 60 } })));
+    await act(async () => root.render(createElement(FieldsManager, { initialFields: [], canManage: true, limits: { fieldLimit: 20, nameMax: 60, optionMax: 60, optionsMax: 30 } })));
     await click(button('New field'));
     await enter(container.querySelector<HTMLInputElement>('input')!, 'Retry campaign');
     await click(button('Review'));

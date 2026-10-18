@@ -1,5 +1,7 @@
 'use client';
 
+import { AutoTextarea } from '@/components/AutoTextarea';
+
 import { useState } from 'react';
 import { Button } from '@/components/Button';
 import { createFieldConfirmation, deleteFieldConfirmation, updateFieldConfirmation } from '@/modules/publishing/collaboration/schemas';
@@ -11,7 +13,7 @@ type Draft = { name: string; kind: 'text' | 'choice'; optionsText: string };
 const blank: Draft = { name: '', kind: 'text', optionsText: '' };
 const optionsOf = (d: Draft) => d.kind === 'choice' ? d.optionsText.split('\n').map(v => v.trim()).filter(Boolean) : [];
 
-export function FieldsManager({ initialFields, canManage, limits }: { initialFields: Field[]; canManage: boolean; limits: { fieldLimit: number; nameMax: number; optionMax: number } }) {
+export function FieldsManager({ initialFields, canManage, limits }: { initialFields: Field[]; canManage: boolean; limits: { fieldLimit: number; nameMax: number; optionMax: number; optionsMax: number } }) {
   const [fields, setFields] = useState(initialFields);
   const [editing, setEditing] = useState<Field | null>(null);
   const [draft, setDraft] = useState<Draft>(blank);
@@ -19,7 +21,13 @@ export function FieldsManager({ initialFields, canManage, limits }: { initialFie
   const [review, setReview] = useState<{ kind: 'save' | 'delete'; field?: Field } | null>(null);
   const action = useAction();
   const options = optionsOf(draft);
-  const valid = draft.name.trim().length > 0 && (draft.kind === 'text' || new Set(options).size >= 2);
+  const distinctOptions = new Set(options);
+  const optionIssue = distinctOptions.size > limits.optionsMax
+    ? `Use no more than ${limits.optionsMax} choices.`
+    : options.some(option => option.length > limits.optionMax)
+      ? `Each choice must be ${limits.optionMax} characters or fewer.`
+      : distinctOptions.size < 2 ? 'Add at least two different non-empty choices.' : null;
+  const valid = draft.name.trim().length > 0 && (draft.kind === 'text' || optionIssue === null);
   const begin = (field?: Field) => { setEditing(field ?? null); setDraft(field ? { name: field.name, kind: field.kind, optionsText: field.options.join('\n') } : blank); setOpen(true); };
   const saveConfirmation = editing ? updateFieldConfirmation(editing.id) : createFieldConfirmation(draft.name);
 
@@ -57,8 +65,8 @@ export function FieldsManager({ initialFields, canManage, limits }: { initialFie
       <form className={styles.form} onSubmit={event => { event.preventDefault(); if (valid) setReview({ kind: 'save' }); }} noValidate>
         <label>Name<input required maxLength={limits.nameMax} value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} /></label>
         <label>Type<select value={draft.kind} onChange={e => setDraft(d => ({ ...d, kind: e.target.value as Draft['kind'] }))}><option value="text">Text</option><option value="choice">Choice</option></select></label>
-        {draft.kind === 'choice' && <label>Options (one per line, at least two)<textarea rows={4} value={draft.optionsText} onChange={e => setDraft(d => ({ ...d, optionsText: e.target.value }))} /></label>}
-        {!valid && draft.name !== '' && <p role="alert" className={styles.help}>Choice fields need at least two different options.</p>}
+        {draft.kind === 'choice' && <label>Options (one per line)<AutoTextarea rows={4} aria-invalid={Boolean(optionIssue)} aria-describedby="field-option-help" value={draft.optionsText} onChange={e => setDraft(d => ({ ...d, optionsText: e.target.value }))} /></label>}
+        {draft.kind === 'choice' && <p id="field-option-help" role={optionIssue ? 'alert' : undefined} className={styles.help}>Up to {limits.optionsMax} choices, {limits.optionMax} characters each.{optionIssue ? ` ${optionIssue}` : ''}</p>}
         <div className={styles.actions}><Button type="submit" variant="primary" disabled={!valid || action.busy}>Review</Button><Button disabled={action.busy} onClick={() => setOpen(false)}>Cancel</Button></div>
       </form></section>}
     <ConfirmDialog feedback={action.feedback} open={review?.kind === 'save'} title="Review field" description="Saving applies to every post in the workspace." confirmation={saveConfirmation} actionLabel="Confirm save" busy={action.busy} onCancel={() => setReview(null)} onConfirm={() => void save()}>

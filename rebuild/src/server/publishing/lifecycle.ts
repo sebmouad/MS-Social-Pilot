@@ -15,6 +15,7 @@ import { readPublishingCredential } from '@/modules/publishing/server/credential
 import { publishDestinationInOperation } from '@/modules/publishing/server/publication';
 import { assertPublishingMediaSupport } from '@/modules/publishing/media-support';
 import { needsContributorApproval } from '@/modules/settings/workspace-policy';
+import { recordPostVersion, loadVersionRetention } from '@/modules/publishing/collaboration/server/versions';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
@@ -209,12 +210,15 @@ export async function schedulePost(actor: PublishingActor, postId: string, sched
     const holdForApproval = !MANAGERS.has(role.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), role.role);
     await assertPostScope(actor, postId);
     if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
+    const retention = await loadVersionRetention();
     await publishingTransaction(signal, async tx => {
       const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, message: true, firstComment: true, link: true, media: true, targets: { select: { status: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length || post.targets.some(target => target.status !== 'pending')) throw new OperationError('conflict', 'This post cannot be scheduled.');
       await assertStoredPostMediaCompatible(actor.workspaceId, post);
+      await recordPostVersion(tx, post.id, actor.userId, retention);
       await tx.post.update({ where: { id: post.id }, data: { status: holdForApproval ? 'pending_approval' : 'scheduled', scheduledAt, updatedAt: new Date() } });
       if (holdForApproval) await setApprovalPending(tx, actor, post.id);
+      await recordPostVersion(tx, post.id, actor.userId, retention);
       await audit(tx, actor, 'publishing.post_scheduled', { postId: post.id, scheduledAt: scheduledAt.toISOString() });
     });
   });
@@ -236,13 +240,16 @@ export async function reschedulePost(actor: PublishingActor, input: RescheduleIn
     if (!resolved.ok) throw new OperationError('invalid_request', resolved.reason === 'skipped' ? 'That time does not exist on that day because the clocks change. Choose another time.' : 'Choose a valid date and time.');
     const scheduledAt = resolved.instant;
     if (scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
+    const retention = await loadVersionRetention();
     await publishingTransaction(signal, async tx => {
       const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, message: true, firstComment: true, link: true, media: true, targets: { select: { status: true, remotePostId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('conflict', 'This post cannot be rescheduled.');
       if (post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new OperationError('conflict', 'Only posts that are still waiting to publish can be rescheduled.');
       await assertStoredPostMediaCompatible(actor.workspaceId, post);
+      await recordPostVersion(tx, post.id, actor.userId, retention);
       const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'scheduled' }, data: { scheduledAt, updatedAt: new Date() } });
       if (changed.count !== 1) throw new OperationError('conflict', 'Only posts that are still waiting to publish can be rescheduled.');
+      await recordPostVersion(tx, post.id, actor.userId, retention);
       await audit(tx, actor, 'publishing.post_rescheduled', { postId: post.id, from: post.scheduledAt?.toISOString() ?? null, to: scheduledAt.toISOString() });
     });
     return { scheduledAt };
@@ -254,11 +261,14 @@ export async function cancelScheduledPost(actor: PublishingActor, postId: string
   return withPublishingOperation(actor, { postId }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
     await assertPostScope(actor, postId);
+    const retention = await loadVersionRetention();
     await publishingTransaction(signal, async tx => {
       const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { status: true, remotePostId: true } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId) || post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new OperationError('conflict', 'This queued post can no longer be cancelled locally.');
+      await recordPostVersion(tx, post.id, actor.userId, retention);
       const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'scheduled' }, data: { status: 'draft', scheduledAt: null, updatedAt: new Date() } });
       if (changed.count !== 1) throw new OperationError('conflict', 'This queued post can no longer be cancelled locally.');
+      await recordPostVersion(tx, post.id, actor.userId, retention);
       await audit(tx, actor, 'publishing.post_schedule_cancelled', { postId: post.id });
     });
   });
@@ -276,6 +286,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
     const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
     if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new OperationError('invalid_request', 'Choose a future publishing time and at least one destination.');
+    const retention = await loadVersionRetention();
     const now = new Date();
     const id = randomUUID();
     await publishingTransaction(signal, async tx => {
@@ -287,6 +298,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
         targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
       if (input.labelId) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") VALUES (${id}, ${input.labelId})`;
       if (holdForApproval) await setApprovalPending(tx, actor, id);
+      await recordPostVersion(tx, id, actor.userId, retention);
       await audit(tx, actor, 'publishing.post_created', { postId: id, targetCount: targets.length });
       if (input.scheduledAt) await audit(tx, actor, 'publishing.post_scheduled', { postId: id, scheduledAt: input.scheduledAt.toISOString() });
     });
@@ -294,7 +306,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
   });
 }
 
-export async function updatePost(actor: PublishingActor, input: { postId: string; message: string; firstComment: string; targetIds: string[] } & PostAttachments) {
+export async function updatePost(actor: PublishingActor, input: { postId: string; message: string; firstComment: string; targetIds: string[] } & PostAttachments, restoreLabelIds?: readonly string[]) {
   return withPublishingOperation(actor, { postId: input.postId, targetIds: input.targetIds }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
     await assertPostScope(actor, input.postId);
@@ -304,19 +316,48 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
     const text = validatePostContent(input.message, config.maxText, attachments);
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
     const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
-    await publishingTransaction(signal, async tx => {
+    const retention = await loadVersionRetention();
+    const restoreLabelLimit = restoreLabelIds ? await runtimeConfig('publishing.collab.labelsPerPostLimit') : null;
+    if (restoreLabelIds && (!Number.isSafeInteger(restoreLabelLimit) || Number(restoreLabelLimit) < 1 || Number(restoreLabelLimit) > 100)) throw new OperationError('unavailable', 'Post label limits are temporarily unavailable.');
+    const saved = await publishingTransaction(signal, async tx => {
       const existing = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, publishedAt: true, targets: { select: { id: true, status: true, remotePostId: true } } } });
       if (!existing || (role.role === 'contributor' && existing.authorId !== actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
       if (existing.publishedAt || ['publishing', 'published', 'partially_failed', 'scheduled'].includes(existing.status) || existing.targets.some(target => target.remotePostId || target.status === 'processing' || target.status === 'published' || target.status === 'scheduled_remote')) throw new OperationError('conflict', 'This post can no longer be edited.');
+      await recordPostVersion(tx, existing.id, actor.userId, retention);
+      if (restoreLabelIds) {
+        if (new Set(restoreLabelIds).size !== restoreLabelIds.length || restoreLabelIds.length > Number(restoreLabelLimit)) throw new OperationError('invalid_request', `This version exceeds the current limit of ${restoreLabelLimit} post labels.`);
+        if (restoreLabelIds.length) {
+          const labels = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM labels WHERE "workspaceId" = ${actor.workspaceId} AND id = ANY(${[...restoreLabelIds]}::text[]) FOR SHARE`;
+          if (labels.length !== restoreLabelIds.length) throw new OperationError('conflict', 'A label in this version is no longer available. Nothing was changed.');
+        }
+      }
       await tx.postTarget.deleteMany({ where: { postId: existing.id } });
       await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, link: attachments.link, media: attachments.media, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
+      if (restoreLabelIds) {
+        await tx.$executeRaw`DELETE FROM post_labels WHERE "postId" = ${existing.id}`;
+        if (restoreLabelIds.length) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") SELECT ${existing.id}, restore_ids.label_id FROM unnest(${[...restoreLabelIds]}::text[]) AS restore_ids(label_id)`;
+      }
       // Review covers the exact content and destinations that were reviewed.
       // The guarded raw update only changes previously approved posts; managers
       // retain their publishing bypass while contributors need fresh review.
-      await tx.$executeRaw`UPDATE posts SET "approvalStatus" = 'pending', "reviewedById" = NULL, "reviewedAt" = NULL, "reviewNote" = NULL WHERE id = ${existing.id} AND "workspaceId" = ${actor.workspaceId} AND "approvalStatus" = 'approved'`;
+      const reset = await tx.$executeRaw`UPDATE posts SET "approvalStatus" = 'pending', "reviewedById" = NULL, "reviewedAt" = NULL, "reviewNote" = NULL WHERE id = ${existing.id} AND "workspaceId" = ${actor.workspaceId} AND "approvalStatus" = 'approved'`;
+      await recordPostVersion(tx, existing.id, actor.userId, retention);
       await audit(tx, actor, 'publishing.post_updated', { postId: existing.id, targetCount: targets.length });
+      return { status: existing.status, approvalReset: reset === 1 };
     });
+    return restoreLabelIds ? saved : undefined;
   });
+}
+
+/** Lifecycle port for version restoration. The save path rechecks current rights and only restores local draft/rejected content. */
+export async function restorePostVersion(input: { actor: PublishingActor; postId: string; snapshot: { message: string; firstComment: string | null; link: string | null; media: unknown; targetIds: string[]; labelIds: string[] } }) {
+  if (!Array.isArray(input.snapshot.media)) throw new OperationError('invalid_request', 'This saved version has invalid media and cannot be restored.');
+  const result = await updatePost(input.actor, {
+    postId: input.postId, message: input.snapshot.message, firstComment: input.snapshot.firstComment ?? '', link: input.snapshot.link ?? undefined,
+    media: input.snapshot.media as PublishMedia[], targetIds: input.snapshot.targetIds,
+  }, input.snapshot.labelIds);
+  if (!result) throw new OperationError('upstream_failure', 'The restore could not be confirmed. Open the post and check its current content before trying again.');
+  return { postId: input.postId, status: result.status, approvalReset: result.approvalReset };
 }
 
 /** Shared durable deletion service owns dispatch, receipts and local recovery. */

@@ -1,4 +1,4 @@
-vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => 15000 }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'publishing.collab.versionRetention' ? 50 : 15000 }));
 // Operation-lock/authority behavior is exercised by publishing-guard and PostgreSQL suites.
 vi.mock('@/modules/publishing/server/guard', () => ({
   withPublishingTransaction: (_signal: AbortSignal, work: (tx: unknown) => Promise<unknown>) => db.$transaction(work),
@@ -10,7 +10,7 @@ const db = vi.hoisted(() => ({
   membership: { findUnique: vi.fn() },
   postTarget: { findMany: vi.fn() },
   post: { findFirst: vi.fn(), updateMany: vi.fn() },
-  $transaction: vi.fn(),
+  $transaction: vi.fn(), rollbacks: 0,
   $executeRaw: vi.fn(),
 }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
@@ -30,7 +30,10 @@ beforeEach(() => {
   db.post.findFirst.mockResolvedValue(scheduled);
   db.post.updateMany.mockResolvedValue({ count: 1 });
   db.$executeRaw.mockResolvedValue(1);
-  db.$transaction.mockImplementation(async (work: (tx: typeof db) => Promise<unknown>) => work(db));
+  db.rollbacks = 0;
+  db.$transaction.mockImplementation(async (work: (tx: typeof db) => Promise<unknown>) => {
+    try { return await work(db); } catch (error) { db.rollbacks += 1; throw error; }
+  });
 });
 afterEach(() => vi.useRealTimers());
 
@@ -108,7 +111,11 @@ describe('rescheduling a scheduled post', () => {
   it('fails safely when the status changed between the read and the write', async () => {
     db.post.updateMany.mockResolvedValue({ count: 0 });
     await expect(reschedulePost(actor, input)).rejects.toThrow(/still waiting to publish/);
-    expect(db.$executeRaw).not.toHaveBeenCalled();
+    // The pre-change snapshot is attempted inside the transaction; the conflict
+    // must roll it back and prevent the reschedule audit from being reached.
+    expect(db.$executeRaw.mock.calls.some(([sql]) => (sql as TemplateStringsArray).join('').includes('INSERT INTO post_versions'))).toBe(true);
+    expect(db.$executeRaw.mock.calls.some(([sql]) => (sql as TemplateStringsArray).join('').includes('publishing.post_rescheduled'))).toBe(false);
+    expect(db.rollbacks).toBe(1);
   });
 
   it('rejects an empty stored post or first-comment-only post before moving it', async () => {

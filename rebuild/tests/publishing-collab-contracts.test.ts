@@ -118,7 +118,7 @@ describe('collaboration contracts', () => {
   it('distinguishes consumed Root limits from pending execution policy', () => {
     const keys = COLLAB_CONFIG.map(c => c.key);
     expect(new Set(keys).size).toBe(keys.length);
-    for (const item of COLLAB_CONFIG) { expect(item.key.startsWith('publishing.collab.')).toBe(true); expect(item.consumption).toBe(['bulkPostLimit', 'labelsPerPostLimit', 'fieldLimit', 'fieldNameMax', 'fieldOptionMax', 'fieldOptionsLimit', 'fieldValueMax', 'mentionDirectoryLimit', 'noteMax', 'notePageSize', 'noteMentionLimit', 'notesPerPostLimit', 'versionPageSize', 'transactionTimeoutMs', 'transactionMaxWaitMs'].some(key => item.key === `publishing.collab.${key}`) ? 'active' : 'planned'); expect(item.schema.safeParse(item.defaultValue).success).toBe(true); }
+    for (const item of COLLAB_CONFIG) { expect(item.key.startsWith('publishing.collab.')).toBe(true); expect(item.consumption).toBe(['bulkPostLimit', 'labelsPerPostLimit', 'fieldLimit', 'fieldNameMax', 'fieldOptionMax', 'fieldOptionsLimit', 'fieldValueMax', 'mentionDirectoryLimit', 'noteMax', 'notePageSize', 'noteMentionLimit', 'notesPerPostLimit', 'versionPageSize', 'versionRetention', 'transactionTimeoutMs', 'transactionMaxWaitMs'].some(key => item.key === `publishing.collab.${key}`) ? 'active' : 'planned'); expect(item.schema.safeParse(item.defaultValue).success).toBe(true); }
     expect(keys).toHaveLength(Object.keys(COLLAB_DEFAULTS).length);
   });
 

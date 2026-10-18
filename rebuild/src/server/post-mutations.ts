@@ -2,6 +2,7 @@ import { withPublishingOperation, withPublishingTransaction } from '@/modules/pu
 import { randomUUID } from "node:crypto";
 import { OperationError } from "@/lib/operation-error";
 import { prisma } from "./data";
+import { loadVersionRetention, recordPostVersion } from '@/modules/publishing/collaboration/server/versions';
 
 const AUTHOR_ROLES = new Set(["owner", "admin", "editor", "contributor"]);
 
@@ -16,6 +17,7 @@ export async function createLocalDraft(actor: PostMutationActor, message: string
     signal.throwIfAborted();
     const membership = await getCurrentMembership(actor);
     if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to create drafts.");
+    const retention = await loadVersionRetention();
 
     const now = new Date();
     return withPublishingTransaction(signal, async tx => {
@@ -33,6 +35,7 @@ export async function createLocalDraft(actor: PostMutationActor, message: string
         },
         select: { id: true },
       });
+      await recordPostVersion(tx, created.id, actor.userId, retention);
       await auditDraft(tx, actor, 'publishing.post_created', created.id);
       return created;
     });
@@ -45,21 +48,27 @@ export async function updateLocalDraft(actor: PostMutationActor, postId: string,
     signal.throwIfAborted();
     const membership = await getCurrentMembership(actor);
     if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to edit drafts.");
+    const retention = await loadVersionRetention();
 
     const ownsPost = membership.role === "contributor";
     await withPublishingTransaction(signal, async tx => {
+      const where = {
+        id: postId,
+        workspaceId: actor.workspaceId,
+        status: "draft" as const,
+        publishedAt: null,
+        ...(ownsPost ? { authorId: actor.userId } : {}),
+        targets: { none: {} },
+      };
+      const current = await tx.post.findFirst({ where, select: { id: true } });
+      if (!current) throw new OperationError('conflict', "This draft is unavailable or can no longer be edited.");
+      await recordPostVersion(tx, current.id, actor.userId, retention);
       const result = await tx.post.updateMany({
-        where: {
-          id: postId,
-          workspaceId: actor.workspaceId,
-          status: "draft",
-          publishedAt: null,
-          ...(ownsPost ? { authorId: actor.userId } : {}),
-          targets: { none: {} },
-        },
+        where,
         data: { message, updatedAt: new Date() },
       });
       if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be edited.");
+      await recordPostVersion(tx, current.id, actor.userId, retention);
       await auditDraft(tx, actor, 'publishing.post_updated', postId);
     });
   });

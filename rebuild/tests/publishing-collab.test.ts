@@ -50,6 +50,7 @@ beforeEach(() => {
   db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const q = sql(strings, values); state.queries.push(q);
     for (const [fragment, fn] of state.handlers) if (q.sql.includes(fragment)) return fn(values);
+    if (q.sql.includes('INSERT INTO post_notes')) return [{ createdAt: new Date('2026-10-18T12:34:56.000Z') }];
     if (q.sql.includes('AS "foreignReferences"')) return [{ foreignReferences: false }];
     if (q.sql.includes('memberships m JOIN users u ON u.id = m."userId" WHERE m."userId"')) return [{ role: state.role, disabledAt: null }];
     if (q.sql.includes('FROM targets')) return [{ id: 't1', name: 'Alpha', type: 'page' }, { id: 't2', name: 'Beta', type: 'page' }];
@@ -197,7 +198,8 @@ describe('internal notes', () => {
     candidates();
     const result = await addPostNote(actor, add({ body: 'Check this @Mia and @Me' }));
     expect(result).toMatchObject({ mentionIds: ['mia'], notified: 'unavailable' });
-    const insert = state.executions.find(q => q.sql.includes('INSERT INTO post_notes'))!;
+    const insert = state.queries.find(q => q.sql.includes('INSERT INTO post_notes'))!;
+    expect(result.createdAt).toEqual(new Date('2026-10-18T12:34:56.000Z'));
     expect(insert.values).toContainEqual(['mia']);
     expect(audited('publishing.post_note_added')).toBe(true);
     members();
@@ -243,7 +245,7 @@ describe('internal notes', () => {
 
 describe('version history', () => {
   const restore = { postId: 'p1', versionId: 'v1', confirmation: restoreVersionConfirmation('v1') };
-  const version = { id: 'v1', message: 'old', firstComment: null, link: null, media: [], format: 'post', targetIds: ['t1'], labelIds: [], scheduledAt: null, timezone: 'UTC' };
+  const version = { id: 'v1', message: 'old', firstComment: null, link: null, media: [], format: 'post', currentFormat: 'post', targetIds: ['t1'], labelIds: [], scheduledAt: null, timezone: 'UTC' };
 
   it('is unavailable until the lifecycle port is registered and never edits the post itself', async () => {
     await expect(requestVersionRestore(actor, restore)).rejects.toMatchObject({ code: 'unavailable' });
@@ -275,6 +277,15 @@ describe('version history', () => {
     port.restorePostVersion.mockClear();
     await expect(requestVersionRestore(actor, restore)).rejects.toMatchObject({ code: 'forbidden' });
     expect(port.restorePostVersion).not.toHaveBeenCalled();
+  });
+
+  it('refuses a version whose saved format differs instead of silently losing it', async () => {
+    const port = { restorePostVersion: vi.fn() };
+    registerCollaborationPorts({ versions: port });
+    when('FROM post_versions v JOIN posts p', () => [{ ...version, format: 'other-format' }]);
+    await expect(requestVersionRestore(actor, restore)).rejects.toMatchObject({ code: 'conflict' });
+    expect(port.restorePostVersion).not.toHaveBeenCalled();
+    expect(audited('publishing.version_restore_requested')).toBe(false);
   });
 
   it('records versions through a lifecycle helper, pruning only after an insert', async () => {

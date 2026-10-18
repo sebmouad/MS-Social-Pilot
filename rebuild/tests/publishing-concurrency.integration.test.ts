@@ -22,6 +22,7 @@ vi.mock('../src/server/config/store', () => ({
     'publishing.maxMessageCharacters': 10000,
     'publishing.maxRemoteMediaPerPost': 4,
     'publishing.maxImageAltCharacters': 500,
+    'publishing.collab.versionRetention': 50,
     'data.workspaceOperationTimeoutMs': 300000,
     'data.workspaceOperationLockWaitMs': 30000,
   }[key]),

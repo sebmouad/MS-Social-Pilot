@@ -12,6 +12,7 @@ const db = vi.hoisted(() => ({
   post: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
+  $queryRaw: vi.fn(),
 }));
 const capabilities = vi.hoisted(() => ({ firstComment: true, media: null as null | { kinds: readonly ('image' | 'video')[]; maxImages: number | null; maxVideos: number | null; mixedKinds: boolean; linkWithMedia: boolean; imageAltText: boolean } }));
 const provider = vi.hoisted(() => ({ publish: vi.fn() }));
@@ -20,11 +21,13 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
   'publishing.maxMessageCharacters': 10000, 'publishing.maxImportRows': 100,
   'publishing.maxImportBytes': 256000, 'publishing.maxTargetsPerPost': 20,
   'publishing.maxRemoteMediaPerPost': 4, 'publishing.maxImageAltCharacters': 500,
+  'publishing.collab.versionRetention': 50,
+  'publishing.collab.labelsPerPostLimit': 20,
 })[key] }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}), hasPlatformCapability: () => true }));
 vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: provider.publish, ...(capabilities.firstComment ? { publishFirstComment: vi.fn() } : {}), ...(capabilities.media ? { publishingMedia: capabilities.media } : {}), supportsTargetKind: () => true }) }));
 
-import { cancelScheduledPost, createPost, publishPost, reschedulePost, reviewPost, schedulePost, submitPostForApproval, updatePost } from '../src/server/publishing/lifecycle';
+import { cancelScheduledPost, createPost, publishPost, reschedulePost, restorePostVersion, reviewPost, schedulePost, submitPostForApproval, updatePost } from '../src/server/publishing/lifecycle';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 
@@ -41,6 +44,7 @@ beforeEach(() => {
   db.target.findMany.mockResolvedValue([{ id: 'target-1', type: 'page', accessToken: 'encrypted', socialAccount: { provider: 'facebook', invalidatedAt: null } }]);
   db.post.updateMany.mockResolvedValue({ count: 1 });
   db.$executeRaw.mockResolvedValue(1);
+  db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => strings.join('').includes('FROM labels') ? [{ id: 'label-1' }] : []);
   db.$transaction.mockImplementation(async (work: (tx: typeof db) => Promise<unknown>) => work(db));
 });
 
@@ -123,6 +127,44 @@ describe('publishing lifecycle transitions', () => {
     db.post.create.mockClear();
     await expect(createPost(actor, { message: 'No destination', firstComment: '', targetIds: [], scheduledAt })).rejects.toThrow(/destination/);
     expect(db.post.create).not.toHaveBeenCalled();
+  });
+
+  it('records the created state in the same transaction using the Root retention bound', async () => {
+    await createPost(actor, { message: 'Version one', firstComment: '', targetIds: ['target-1'] });
+    const snapshot = db.$executeRaw.mock.calls.map(call => call[0]?.join('')).find(sql => sql?.includes('INSERT INTO post_versions'));
+    expect(snapshot).toBeDefined();
+    expect(snapshot).toContain('INSERT INTO post_versions');
+    expect(snapshot).toContain('FROM posts p WHERE p.id');
+    expect(db.$transaction).toHaveBeenCalled();
+  });
+
+  it('restores an earlier snapshot through the ordinary save path and changes labels atomically', async () => {
+    const result = await restorePostVersion({ actor, postId: 'p1', snapshot: {
+      message: 'Earlier text', firstComment: 'First reply', link: null,
+      media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }], targetIds: ['target-1'], labelIds: ['label-1'],
+    } });
+    expect(result).toEqual({ postId: 'p1', status: 'draft', approvalReset: true });
+    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'p1' }, data: expect.objectContaining({ message: 'Earlier text', firstComment: 'First reply', link: null, media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }] }),
+    }));
+    expect(db.$executeRaw.mock.calls.map(call => call[0]?.join('')).some(sql => sql?.includes('DELETE FROM post_labels'))).toBe(true);
+    expect(db.$executeRaw.mock.calls.map(call => call[0]?.join('')).some(sql => sql?.includes('INSERT INTO post_versions'))).toBe(true);
+    expect(db.$transaction).toHaveBeenCalledOnce();
+  });
+
+  it('does not restore scheduled or in-flight posts', async () => {
+    db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', status: 'scheduled', scheduledAt: new Date(Date.now() + 60_000), targets: [{ id: 'pt1', status: 'pending', remotePostId: null }] });
+    await expect(restorePostVersion({ actor, postId: 'p1', snapshot: { message: 'Earlier', firstComment: null, link: null, media: [], targetIds: ['target-1'], labelIds: [] } })).rejects.toMatchObject({ code: 'conflict' });
+    expect(db.post.update).not.toHaveBeenCalled();
+    expect(db.$executeRaw.mock.calls.some(call => call[0]?.join('').includes('INSERT INTO post_labels'))).toBe(false);
+  });
+
+  it('refuses a historical label set that exceeds the current Root bound', async () => {
+    await expect(restorePostVersion({ actor, postId: 'p1', snapshot: {
+      message: 'Earlier', firstComment: null, link: null, media: [], targetIds: ['target-1'],
+      labelIds: Array.from({ length: 21 }, (_, index) => `label-${index}`),
+    } })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(db.post.update).not.toHaveBeenCalled();
   });
   it('submits an authored draft with destinations for approval', async () => {
     db.membership.findUnique.mockResolvedValue({ role: 'contributor' });

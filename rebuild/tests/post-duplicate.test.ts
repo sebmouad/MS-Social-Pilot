@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
   role: 'editor', actor: { userId: 'user-1', workspaceId: 'workspace-1', allowedTargetIds: ['target-1'] as string[] | undefined },
-  source: null as any, receipt: [] as any[], foundDraft: true, where: null as any, limits: vi.fn(), validateTargets: vi.fn(),
+  source: null as any, receipt: [] as any[], foundDraft: true, where: null as any, limits: vi.fn(), validateTargets: vi.fn(), historyCalls: [] as Array<{ postId: string; authorId: string; retention: number }>,
 }));
+const history = vi.hoisted(() => ({ load: vi.fn(), record: vi.fn() }));
 const db = vi.hoisted(() => ({ postFindFirst: vi.fn(), postCreate: vi.fn(), queryRaw: vi.fn(), executeRaw: vi.fn() }));
+vi.mock('../src/modules/publishing/collaboration/server/versions', () => ({ loadVersionRetention: history.load, recordPostVersion: history.record }));
 vi.mock('../src/server/data', () => ({ prisma: { post: { findFirst: (...args: unknown[]) => db.postFindFirst(...args), create: (...args: unknown[]) => db.postCreate(...args) }, $queryRaw: (...args: unknown[]) => db.queryRaw(...args) } }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({ modules: { publishing: true } }) }));
 vi.mock('../src/server/publishing/lifecycle', () => ({
@@ -33,6 +35,8 @@ describe('duplicatePost', () => {
     state.where = null; state.limits.mockReset().mockResolvedValue({ maxText: 1000, maxMedia: 4, maxAlt: 500, maxTargets: 10 }); state.validateTargets.mockReset().mockResolvedValue([{ id: 'target-1' }]);
     db.postFindFirst.mockReset().mockImplementation(async ({ where }: any) => { if (where.id === 'source-1') return state.source; return state.foundDraft ? { id: where.id } : null; });
     db.postCreate.mockReset().mockResolvedValue({}); db.queryRaw.mockReset().mockImplementation(async () => state.receipt); db.executeRaw.mockReset().mockResolvedValue(1);
+    state.historyCalls = []; history.load.mockReset().mockResolvedValue(50);
+    history.record.mockReset().mockImplementation(async (_tx: unknown, postId: string, authorId: string, retention: number) => { state.historyCalls.push({ postId, authorId, retention }); return true; });
   });
 
   it('requires an exact confirmation and a canonical lowercase request UUID', async () => {
@@ -71,7 +75,7 @@ describe('duplicatePost', () => {
     state.receipt = [{ actorId: 'user-1', action: 'publishing.post_duplicated', detail: { workspaceId: 'workspace-1', sourcePostId: 'source-1', requestId, postId: requestId } }];
     state.source = source({ message: 'Source edited since copy' });
     await expect(duplicatePost(actor, args())).resolves.toEqual({ sourcePostId: 'source-1', postId: requestId, draftCreated: true, replayed: true });
-    expect(state.limits).not.toHaveBeenCalled(); expect(db.postCreate).not.toHaveBeenCalled();
+    expect(state.limits).not.toHaveBeenCalled(); expect(db.postCreate).not.toHaveBeenCalled(); expect(history.load).not.toHaveBeenCalled(); expect(history.record).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -104,6 +108,21 @@ describe('duplicatePost', () => {
       await duplicatePost(actor, args());
       expect(db.postCreate.mock.calls.at(-1)?.[0].data).toMatchObject({ message: '', link: attachments.link, media: attachments.media });
     }
+  });
+
+  it('records the initial copy in the guarded transaction before claiming its receipt', async () => {
+    await duplicatePost(actor, args());
+    expect(history.load).toHaveBeenCalledTimes(1);
+    expect(state.historyCalls).toEqual([{ postId: args().requestId, authorId: 'user-1', retention: 50 }]);
+    expect(history.record.mock.invocationCallOrder[0]).toBeLessThan(db.executeRaw.mock.invocationCallOrder[0]!);
+    expect(history.record.mock.calls[0]![0]).toHaveProperty('post');
+  });
+
+  it('does not claim a duplication receipt when initial history recording fails', async () => {
+    history.record.mockRejectedValueOnce(new Error('history unavailable'));
+    await expect(duplicatePost(actor, args())).rejects.toThrow('history unavailable');
+    expect(db.postCreate).toHaveBeenCalledTimes(1);
+    expect(db.executeRaw).not.toHaveBeenCalled();
   });
 
   it('does not accept a first comment as the only post content', async () => {

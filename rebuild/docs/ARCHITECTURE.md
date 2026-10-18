@@ -647,3 +647,44 @@ configuration and authorization proofs. Unfinished source is excluded from this
 batch. Full Ads writes, report generation/schedules, live Facebook coverage,
 held-photo cleanup, migration/rollback rehearsal and cutover remain open.
 Production remains legacy; socialpilot-deploy still targets legacy.
+
+
+## Batch 69 — Publishing retained history and content restore
+
+Registry 63 marks version retention as active. Create/edit (including local drafts
+and new duplicates), scheduling/rescheduling and local schedule cancellation save
+history in the mutation transaction. Duplicate retries retain one initial snapshot;
+failed history writes roll back both post and receipt. Millisecond-monotonic
+snapshot timestamps fix transaction-NOW ties that could misorder/prune versions.
+
+The deterministic server composition registers lazy lifecycle restore for each
+customer page, versions HTTP mutation and MCP handler. Current authorization,
+post/version/workspace scope, destination/media rules, exact confirmations,
+approval reset and transactional labels remain enforced. Restoring content never
+replays a historical schedule/timezone; different-format versions are refused.
+The UI reviews the actual consequence without requiring an opaque-ID transcription,
+retains failed dialogs, and hides restore on known locked post states. Choice-field
+bounds mirror consumed Root limits; new notes use their stored database timestamp.
+See PUBLISHING_HISTORY.md for boundaries and open native/cross-format coverage.
+
+The final isolated staged-source snapshot passed 2,133 tests / 276 files and a
+production build. Serial typecheck passed after that build. The final guarded local
+HTTP/MCP/PostgreSQL history probe passed content/media/target/label restores,
+approval reset, exact-confirmation/foreign-version/published-post/read-only-key
+refusals, rapid ordering/deduplication and five-version retention, with exact
+fixture/audit/settings cleanup and no publication. Actual PostgreSQL concurrency
+and duplicate rollback/replay tests passed. Chrome created/edited/restored a
+labelled disposable draft, verified saved content and three history snapshots,
+then deleted it and observed history 404. Normal UI audit receipts remain.
+Independent lower-cost security review reported no important findings. UI tests
+cover failed restore/retry/success and live Root option bounds. Static UI audit
+has zero findings in changed collaboration owners and 32 elsewhere in the whole
+working tree; broad phone/theme/keyboard/offline compliance remains unproven.
+
+Next: fix the separate unproven demographic combined-total semantics; then wire
+queue allocation through the validated lifecycle before enabling queue-times
+ports. Content-mix/recycle jobs still need lifecycle-safe validation, approvals,
+current owner qualification where applicable and real worker/database proof.
+Remaining legacy integrations, Facebook live coverage and held-photo cleanup,
+migration/rollback rehearsal and cutover stay open. Production remains legacy;
+socialpilot-deploy still targets legacy. Do not broad-stage unfinished source.

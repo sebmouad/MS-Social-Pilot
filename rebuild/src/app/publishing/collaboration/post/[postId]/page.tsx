@@ -1,3 +1,4 @@
+import { ensurePublishingCollaboration } from '@/server/publishing/collaboration';
 import { SidebarDock } from '@/components/SidebarDock';
 import { parsePostCollaborationSearch } from '@/modules/publishing/collaboration/search';
 import { OperationError } from '@/lib/operation-error';
@@ -15,6 +16,7 @@ import { PageHeading } from '../../../publishing-ui';
 import { PostPanel } from '../../PostPanel';
 
 export default async function PostCollaborationPage({ params, searchParams }: { params: Promise<{ postId: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  ensurePublishingCollaboration();
   const { postId } = await params;
   const viewer = await requireViewer({ feature: 'publishing/collaboration', channelScoped: true });
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
@@ -42,7 +44,7 @@ export default async function PostCollaborationPage({ params, searchParams }: { 
         notes={notes.notes.map(n => ({ id: n.id, body: n.body, authorId: n.authorId, authorName: n.authorName, createdAt: n.createdAt.toISOString() }))}
         mentionable={caps.mentionNotifications ? notes.mentionable : []} noteMax={notes.maxCharacters} viewerId={notes.viewerId} canModerate={notes.viewerCanModerate}
         versions={versions.versions.map(v => ({ id: v.id, authorName: v.authorName, createdAt: v.createdAt.toISOString(), message: v.message, scheduledAt: v.scheduledAt?.toISOString() ?? null }))}
-        restore={caps.versionRestore} canRestoreNow={canWrite}
+        restore={caps.versionRestore} canRestoreNow={canWrite && versions.restorable}
         recycle={recycle ? { enabled: recycle.enabled, everyDays: recycle.everyDays, limit: recycle.limit, count: recycle.count, nextAt: recycle.nextAt?.toISOString() ?? null, variants: recycle.variants, isRepeat: recycle.isRepeat, maxIntervalDays: recycle.limits.maxIntervalDays, maxRepeats: recycle.limits.maxRepeats, defaultIntervalDays: recycle.limits.defaultIntervalDays, maxVariants: recycle.limits.maxVariants } : null} />
     </>;
   } catch (error) {

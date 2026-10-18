@@ -10,6 +10,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
   'publishing.transactionMaxWaitMs': 5000, 'publishing.maxTargetsPerOperation': 5000, 'publishing.identifierMaxCharacters': 200,
   'publishing.maxMessageCharacters': 10000, 'publishing.maxImportRows': 100, 'publishing.maxImportBytes': 1000000,
   'publishing.maxTargetsPerPost': 20, 'publishing.maxRemoteMediaPerPost': 4, 'publishing.maxImageAltCharacters': 500,
+  'publishing.collab.versionRetention': 50,
   'data.workspaceOperationTimeoutMs': 300000, 'data.workspaceOperationLockWaitMs': 30000,
 }[key]) }));
 vi.mock('../src/modules/publishing/server/access', () => ({ authorizePublishing: async (actor: unknown) => ({ actor, role: 'owner', permissions: {}, entitlements: {} }) }));
@@ -24,6 +25,23 @@ vi.mock('../src/modules/publishing/server/read-scope', () => ({
 import { duplicatePost } from '../src/modules/publishing/server/duplicate';
 
 type Fixture = { workspaceId: string; userId: string; socialId: string; targetId: string; sourceId: string; actor: { userId: string; workspaceId: string; allowedTargetIds: string[] } };
+function failTransactionSql(base: PrismaClient, needle: string, message: string): PrismaClient {
+  return new Proxy(base, { get(target, prop) {
+    if (prop !== '$transaction') { const value = Reflect.get(target, prop, target) as unknown; return typeof value === 'function' ? value.bind(target) : value; }
+    return (work: (tx: Prisma.TransactionClient) => Promise<unknown>, options?: object) => base.$transaction(async tx => {
+      const wrapped = new Proxy(tx, { get(transaction, key) {
+        if (key === '$executeRaw') return (...args: unknown[]) => {
+          const sql = (args[0] as TemplateStringsArray).join('');
+          if (sql.includes(needle)) throw new Error(message);
+          const execute = Reflect.get(transaction, key, transaction) as (...values: unknown[]) => unknown;
+          return execute.apply(transaction, args);
+        };
+        return Reflect.get(transaction, key, transaction);
+      } }) as PrismaClient;
+      return work(wrapped);
+    }, options);
+  } }) as PrismaClient;
+}
 describe.skipIf(!databaseUrl)('post duplication on isolated PostgreSQL', () => {
   let client: PrismaClient;
   const fixtures: Fixture[] = [];
@@ -67,20 +85,23 @@ describe.skipIf(!databaseUrl)('post duplication on isolated PostgreSQL', () => {
     expect(copy.targets[0]).toMatchObject({ targetId: f.targetId, status: 'pending', remotePostId: null, remoteUrl: null, firstCommentId: null, firstCommentAt: null, firstCommentError: null, publishedAt: null, comments: [] });
     await expect(duplicatePost(f.actor, { postId: f.sourceId, requestId, confirmation: `DUPLICATE POST ${f.sourceId}` })).resolves.toMatchObject({ replayed: true });
     expect(await client.post.count({ where: { workspaceId: f.workspaceId } })).toBe(2);
+    expect(await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM post_versions WHERE "postId" = ${requestId}`).toEqual([{ count: BigInt(1) }]);
 
     const rollbackId = randomUUID();
-    const base = state.prisma;
-    state.prisma = new Proxy(base, { get(target, prop) {
-      if (prop !== '$transaction') { const value = Reflect.get(target, prop, target) as unknown; return typeof value === 'function' ? value.bind(target) : value; }
-      return (work: (tx: Prisma.TransactionClient) => Promise<unknown>, options?: object) => base.$transaction(async tx => {
-        const wrapped = new Proxy(tx, { get(transaction, key) { if (key === '$executeRaw') return () => { throw new Error('synthetic audit insertion failure'); }; return Reflect.get(transaction, key, transaction); } }) as PrismaClient;
-        return work(wrapped);
-      }, options);
-    } }) as PrismaClient;
+    state.prisma = failTransactionSql(client, 'INSERT INTO root_activities', 'synthetic audit insertion failure');
     await expect(duplicatePost(f.actor, { postId: f.sourceId, requestId: rollbackId, confirmation: `DUPLICATE POST ${f.sourceId}` })).rejects.toThrow('synthetic audit insertion failure');
     state.prisma = client;
     expect(await client.post.findUnique({ where: { id: rollbackId } })).toBeNull();
+    expect(await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM post_versions WHERE "postId" = ${rollbackId}`).toEqual([{ count: BigInt(0) }]);
     expect(await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM root_activities WHERE id = ${`duplicate:${rollbackId}`}`).toEqual([{ count: BigInt(0) }]);
+
+    const historyRollbackId = randomUUID();
+    state.prisma = failTransactionSql(client, 'INSERT INTO post_versions', 'synthetic history insertion failure');
+    await expect(duplicatePost(f.actor, { postId: f.sourceId, requestId: historyRollbackId, confirmation: `DUPLICATE POST ${f.sourceId}` })).rejects.toThrow('synthetic history insertion failure');
+    state.prisma = client;
+    expect(await client.post.findUnique({ where: { id: historyRollbackId } })).toBeNull();
+    expect(await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM post_versions WHERE "postId" = ${historyRollbackId}`).toEqual([{ count: BigInt(0) }]);
+    expect(await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM root_activities WHERE id = ${`duplicate:${historyRollbackId}`}`).toEqual([{ count: BigInt(0) }]);
   });
 
   it('rejects an existing unrelated draft ID without overwriting it or claiming a receipt', async () => {

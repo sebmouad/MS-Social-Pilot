@@ -1,3 +1,4 @@
+import { ensurePublishingCollaboration } from '../publishing/collaboration';
 import { publishingTargetChoices } from '../publishing/destinations';
 import { deleteInboxCommentDurably, finishInboxDeletion, getInboxDeletion } from '@/modules/inbox/server/deletion';
 import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
@@ -821,6 +822,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
 }
 
 export async function handleMcpMessage(viewer: McpIdentity, message: Record<string, unknown>) {
+  ensurePublishingCollaboration();
   const validId = message.id === undefined || message.id === null || typeof message.id === 'string' || (typeof message.id === 'number' && Number.isFinite(message.id));
   const id = (validId ? message.id ?? null : null) as JsonRpcId;
   const method = message.method;

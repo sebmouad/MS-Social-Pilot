@@ -54,7 +54,7 @@ const rows: ReadonlyArray<readonly [keyof typeof COLLAB_DEFAULTS, string, string
   ['transactionMaxWaitMs', 'Collaboration transaction wait', 'Maximum wait for a collaboration mutation slot.', 100, 10000],
 ];
 
-const EXECUTION_POLICY = new Set<keyof CollabBounds>(['versionRetention', 'queueSlotLimit', 'mixRulesPerScope', 'mixMaxPerWeek', 'mixWindowDays', 'recycleMaxIntervalDays', 'recycleMaxRepeats', 'recycleDefaultIntervalDays', 'variantsLimit', 'variantMaxCharacters', 'executorBatchSize', 'queueLookaheadDays']);
+const EXECUTION_POLICY = new Set<keyof CollabBounds>(['queueSlotLimit', 'mixRulesPerScope', 'mixMaxPerWeek', 'mixWindowDays', 'recycleMaxIntervalDays', 'recycleMaxRepeats', 'recycleDefaultIntervalDays', 'variantsLimit', 'variantMaxCharacters', 'executorBatchSize', 'queueLookaheadDays']);
 /** Outer input safety ceilings follow the same registry declarations; live values are enforced by services. */
 export const COLLAB_INPUT_CEILINGS = Object.fromEntries(rows.map(([key, , , , max]) => [key, max])) as CollabBounds;
 export const COLLAB_CONFIG = rows.map(([key, label, description, min, max]) => entry({

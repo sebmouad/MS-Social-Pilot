@@ -50,10 +50,12 @@ export async function addPostNote(actor: PublishingActor, input: unknown) {
     const members = data.mentionIds.length ? await candidates(tx, actor.workspaceId, data.postId, limit.mentionDirectoryLimit) : [];
     const mentionIds = mentionedIn(data.body, members, data.mentionIds).filter(id => id !== actor.userId);
     const id = `note_${randomUUID()}`;
-    await tx.$executeRaw`INSERT INTO post_notes (id, "postId", "authorId", body, "mentionIds", "createdAt") VALUES (${id}, ${data.postId}, ${actor.userId}, ${data.body}, ${mentionIds}::text[], NOW())`;
+    const inserted = await tx.$queryRaw<Array<{ createdAt: Date }>>`INSERT INTO post_notes (id, "postId", "authorId", body, "mentionIds", "createdAt") VALUES (${id}, ${data.postId}, ${actor.userId}, ${data.body}, ${mentionIds}::text[], NOW()) RETURNING "createdAt"`;
+    const createdAt = inserted[0]?.createdAt;
+    if (!(createdAt instanceof Date) || !Number.isFinite(createdAt.getTime())) throw new OperationError('unavailable', 'The note save could not be confirmed. Check the current notes before trying again.');
     await audit(tx, actor, 'publishing.post_note_added', { postId: data.postId, noteId: id, mentions: mentionIds.length });
     await lockActor(tx, actor, POSTS, true);
-    return { id, mentionIds };
+    return { id, mentionIds, createdAt };
   }));
   // After commit: a delivery problem must never hide or undo a saved note, and it is reported honestly.
   let notified: 'sent' | 'none' | 'unavailable' | 'failed' = result.mentionIds.length ? 'unavailable' : 'none';
@@ -62,7 +64,7 @@ export async function addPostNote(actor: PublishingActor, input: unknown) {
     try { await port.notifyNoteMention({ workspaceId: actor.workspaceId, postId: data.postId, noteId: result.id, authorId: actor.userId, recipientIds: result.mentionIds }); notified = 'sent'; }
     catch { notified = 'failed'; }
   }
-  return { id: result.id, postId: data.postId, mentionIds: result.mentionIds, notified };
+  return { id: result.id, postId: data.postId, mentionIds: result.mentionIds, createdAt: result.createdAt, notified };
 }
 
 /** Removes a note: its author, or an editor and above. Visibility of the post is rechecked. */

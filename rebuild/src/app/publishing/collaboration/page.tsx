@@ -1,3 +1,4 @@
+import { ensurePublishingCollaboration } from '@/server/publishing/collaboration';
 import { runtimeConfig } from '@/server/config/store';
 import { parseCollaborationSearch } from '@/modules/publishing/collaboration/search';
 import { OperationError } from '@/lib/operation-error';
@@ -21,6 +22,7 @@ import { QueueTimes } from './QueueTimes';
 const TITLES: Record<ViewId, string> = { assign: 'Labels on posts', fields: 'Custom fields', queue: 'Queue times', mix: 'Content mix' };
 
 export default async function CollaborationPage({ searchParams }: { searchParams: Promise<{ view?: string; page?: string; q?: string }> }) {
+  ensurePublishingCollaboration();
   const params = await searchParams;
   const caps = collaborationCapabilities();
   const available: ViewId[] = ['assign', 'fields', ...(caps.queueTimes ? ['queue' as const] : []), ...(caps.contentMix ? ['mix' as const] : [])];
@@ -44,7 +46,7 @@ export default async function CollaborationPage({ searchParams }: { searchParams
       const [fields, limit] = await Promise.all([readCustomFields(actor), bounds()]);
       const canManage = canWrite && (viewer.membership.role === 'owner' || viewer.membership.role === 'admin') && viewer.permissions.pageScope.all;
       return <>{nav}<PageHeading title="Custom fields" description="Track campaign codes, products or requesters on every post." />
-        <FieldsManager initialFields={fields} canManage={canManage} limits={{ fieldLimit: limit.fieldLimit, nameMax: limit.fieldNameMax, optionMax: limit.fieldOptionMax }} /></>;
+        <FieldsManager initialFields={fields} canManage={canManage} limits={{ fieldLimit: limit.fieldLimit, nameMax: limit.fieldNameMax, optionMax: limit.fieldOptionMax, optionsMax: limit.fieldOptionsLimit }} /></>;
     }
     if (view === 'queue') {
       const [result, limit] = await Promise.all([readQueueSlots(actor), bounds()]);

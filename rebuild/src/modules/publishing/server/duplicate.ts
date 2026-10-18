@@ -7,6 +7,7 @@ import { limits, validatePostContent, validFirstComment, validateTargets, resolv
 import { withPublishingOperation, withPublishingTransaction } from './guard';
 import { selectedPublishingTargetIds, publishingPostVisibilityWhere } from './read-scope';
 import type { PublishingActor } from './types';
+import { loadVersionRetention, recordPostVersion } from '../collaboration/server/versions';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const MANAGERS = new Set(['owner', 'admin', 'editor']);
@@ -55,11 +56,13 @@ export async function duplicatePost(actor: PublishingActor, input: unknown): Pro
     const message = validatePostContent(source.message, config.maxText, attachments);
     const media = await resolvePublishMedia(context.actor.workspaceId, attachments.media);
     const targets = await validateTargets(context.actor, source.targets.map(target => target.targetId), config.maxTargets, media, Boolean(firstComment), attachments.link);
+    const retention = await loadVersionRetention();
     const now = new Date();
     try {
       await withPublishingTransaction(context.signal, async tx => {
         await tx.post.create({ data: { id: requestId, workspaceId: context.actor.workspaceId, authorId: context.actor.userId, message, firstComment, link: attachments.link, media: attachments.media, status: 'draft', scheduledAt: null, publishedAt: null, createdAt: now, updatedAt: now,
           targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
+        await recordPostVersion(tx, requestId, context.actor.userId, retention);
         const detail = JSON.stringify({ workspaceId: context.actor.workspaceId, postId: requestId, sourcePostId, requestId });
         await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${receiptId}, ${context.actor.userId}, 'publishing.post_duplicated', ${detail}::jsonb, ${now})`;
       });
