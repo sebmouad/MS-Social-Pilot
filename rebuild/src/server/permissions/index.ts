@@ -40,8 +40,13 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'inbox/conversations': 'analytics/inbox',
   'analytics/overview': 'analytics/overview',
   'analytics/explorer': 'analytics/overview',
+  'analytics/demographics': 'analytics/overview',
+  'analytics/compare': 'analytics/overview',
+  'analytics/pins': 'analytics/overview',
   'analytics/reports': 'analytics/overview',
   'ads/overview': 'ads/performance',
+  'ads/compare': 'ads/performance',
+  'ads/objects': 'ads/performance',
   'ads/campaigns': 'ads/performance',
   'settings/connections': null,
   'settings/team': 'settings/team',
@@ -67,7 +72,7 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
     if (feature === 'publishing/posts' || feature === 'publishing/calendar' || feature === 'publishing/approvals') {
       return { read: true, write: feature === 'publishing/approvals' };
     }
-    if (feature === 'analytics/overview' || feature === 'analytics/explorer' || feature === 'analytics/reports') {
+    if (feature === 'analytics/overview' || feature === 'analytics/explorer' || feature === 'analytics/reports' || feature === 'analytics/demographics' || feature === 'analytics/compare' || feature === 'analytics/pins') {
       return { read: clientAccess.has('analytics'), write: false };
     }
     if (feature === 'inbox/conversations') return { read: clientAccess.has('inbox'), write: false };

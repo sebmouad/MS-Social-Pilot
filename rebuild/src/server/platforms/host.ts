@@ -77,6 +77,8 @@ export interface PlatformAnalyticsHost {
 }
 
 export interface PlatformAdsHost {
+  /** Pure interpretation of provider-owned stored fields; no credentials or network requests. */
+  parentObjectId?(input: { level: 'campaign' | 'adset' | 'ad'; fields: unknown }): string | null;
   /** Safe, serializable UI configuration; never contains credentials or server functions. */
   ui: AdsUiSchema;
   /** Whether current Root configuration can support this module's live Ads requests. */

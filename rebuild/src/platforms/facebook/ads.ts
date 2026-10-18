@@ -1,3 +1,4 @@
+import { facebookStoredAdsParent } from './ads-parent';
 import type { FacebookCampaignObjective } from './protocol';
 import type { AdMutationRequest, AdObjectReadRequest } from '@/platforms/types';
 import { configuredFacebookEngine } from '@/platforms/facebook/runtime';
@@ -30,6 +31,7 @@ export function facebookAdSetConfirmation(input: { adAccountId: string; campaign
 }
 
 export const facebookAdsHost = {
+  parentObjectId: facebookStoredAdsParent,
   ui: {
     campaign: {
       nameLabel: 'Campaign name', nameMaxLength: 100, optionLabel: 'Objective', title: 'Create paused campaign',

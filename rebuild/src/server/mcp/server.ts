@@ -27,6 +27,11 @@ import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
 import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
 import { readAdsDailyRows } from '@/modules/ads/server/report-read';
 import { exportAdsReport } from '@/modules/ads/server/export';
+import { adsAnalysisToolDefinitions, adsAnalysisTools, executeAdsAnalysisTool } from '@/modules/ads/analysis/mcp';
+import { adsDirectoryToolDefinitions, adsDirectoryTools, executeAdsDirectoryTool } from '@/modules/ads/directory/mcp';
+import { analyticsDemographicsToolDefinitions, analyticsDemographicsTools, executeAnalyticsDemographicsTool } from '@/modules/analytics/demographics/mcp';
+import { analyticsPinToolDefinitions, analyticsPinTools, analyticsPinWriteTools, executeAnalyticsPinTool } from '@/modules/analytics/pins/mcp';
+import { analyticsComparisonToolDefinitions, analyticsComparisonTools, executeAnalyticsComparisonTool } from '@/modules/analytics/comparison/mcp';
 import { adsReportToolDefinitions, ADS_MCP_MAX_PAGE_ITEMS } from '@/modules/ads/mcp-metadata';
 import { teamToolDefinitions, teamTools, teamWriteTools, executeTeamTool, invitationAvailability } from '@/modules/settings/team-mcp';
 import { collaborationToolDefinitions, collaborationTools, collaborationWriteTools, availableCollaborationTools, executeCollaborationTool } from '@/modules/publishing/collaboration/mcp';
@@ -68,6 +73,11 @@ const postMediaInputSchema = {
 const tools = [
   ...rootToolDefinitions,
   ...adsReportToolDefinitions,
+  ...adsAnalysisToolDefinitions,
+  ...adsDirectoryToolDefinitions,
+  ...analyticsDemographicsToolDefinitions,
+  ...analyticsPinToolDefinitions,
+  ...analyticsComparisonToolDefinitions,
   ...teamToolDefinitions,
   ...workspacePolicyToolDefinitions,
   ...templateToolDefinitions,
@@ -133,6 +143,9 @@ const canManageData = (viewer: McpViewer) => viewer.role === 'owner' || viewer.r
 const dataResource = (uri: string) => uri === 'msp://data/deletion-preview';
 
 const toolFeatures: Record<string, string> = {
+  compare_ads_performance: 'ads/compare', list_ads_objects: 'ads/objects', get_ads_object: 'ads/objects',
+  get_analytics_demographics: 'analytics/demographics', compare_analytics: 'analytics/compare',
+  get_analytics_pins: 'analytics/pins', pin_analytics_metric: 'analytics/pins', unpin_analytics_metric: 'analytics/pins', reorder_analytics_pins: 'analytics/pins',
   ...Object.fromEntries(collaborationToolDefinitions.map(tool => [tool.name, ['list_queue_times', 'replace_queue_times', 'get_content_mix', 'save_content_mix'].includes(tool.name) ? 'publishing/queue' : 'publishing/collaboration'])),
   list_workspace_team: 'settings/team',
   add_workspace_member: 'settings/team',
@@ -211,9 +224,10 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', ...templateWriteTools, ...labelWriteTools, ...collaborationWriteTools]);
+const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', ...templateWriteTools, ...labelWriteTools, ...collaborationWriteTools, ...analyticsPinWriteTools]);
 const writeTools = new Set(['run_root_platform_publication_action', 'manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'delete_workspace_data', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 for (const name of teamWriteTools) writeTools.add(name);
+for (const name of analyticsPinWriteTools) writeTools.add(name);
 for (const name of collaborationWriteTools) writeTools.add(name);
 for (const name of labelWriteTools) writeTools.add(name);
 for (const name of templateWriteTools) writeTools.add(name);
@@ -339,6 +353,13 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
     await assertWorkspaceNotPurging(viewer.workspaceId);
   }
   const cap = viewer.maxResultItems ?? 100;
+  const analyticsActor = { userId: viewer.userId, workspaceId: viewer.workspaceId, allowedChannelIds: pageIdsFor(viewer), maxResultItems: cap };
+  const adsReadActor = { userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) };
+  if (analyticsDemographicsTools.has(name)) return executeAnalyticsDemographicsTool(analyticsActor, args);
+  if (analyticsPinTools.has(name)) return executeAnalyticsPinTool(analyticsActor, name, args);
+  if (analyticsComparisonTools.has(name)) return executeAnalyticsComparisonTool(analyticsActor, args);
+  if (adsAnalysisTools.has(name)) return executeAdsAnalysisTool(adsReadActor, name, args, cap);
+  if (adsDirectoryTools.has(name)) return executeAdsDirectoryTool(adsReadActor, name, args, cap);
   if (collaborationTools.has(name)) return executeCollaborationTool({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, name, args, cap);
   if (teamTools.has(name)) return executeTeamTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args, cap);
   if (workspacePolicyTools.has(name)) return executeWorkspacePolicyTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
@@ -852,6 +873,9 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     { uri: 'msp://publishing/templates', name: 'Post templates', description: 'Bounded workspace reusable templates. Continue pages with list_post_templates.', mimeType: 'application/json' },
     { uri: 'msp://publishing/fields', name: 'Custom post fields', description: 'Complete bounded authorized workspace custom field definitions.', mimeType: 'application/json' },
     { uri: 'msp://publishing/labels', name: 'Post labels', description: 'Bounded workspace label directory. Continue pages with list_post_labels.', mimeType: 'application/json' },
+    { uri: 'msp://analytics/pins', name: 'Pinned metrics', description: 'Your current scoped pinned metrics and available choices.', mimeType: 'application/json' },
+    { uri: 'msp://analytics/demographics', name: 'Audience breakdowns', description: 'Available scoped stored audience categories and coverage.', mimeType: 'application/json' },
+    { uri: 'msp://ads/objects', name: 'Ad objects', description: 'Current authorized stored object report page.', mimeType: 'application/json' },
     { uri: 'msp://analytics/explorer', name: 'Analytics metric explorer', description: 'Bounded stored metric catalog for authorized selected resources.', mimeType: 'application/json' },
     { uri: 'msp://targets', name: 'Destinations', description: 'Enabled workspace destinations.', mimeType: 'application/json' },
     { uri: 'msp://posts', name: 'Posts', description: 'Recent workspace posts.', mimeType: 'application/json' },
@@ -863,7 +887,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     { uri: 'msp://data/deletion-preview', name: 'Data deletion preview', description: 'Current workspace record counts before deletion.', mimeType: 'application/json' },
     ...(canUseRootTool(viewer) ? rootResources : []),
   ].filter(resource => {
-    const feature = resource.uri === 'msp://publishing/fields' ? 'publishing/posts' : resource.uri === 'msp://settings/policies' ? 'settings/workspace' : resource.uri === 'msp://publishing/templates' ? 'publishing/templates' : resource.uri === 'msp://publishing/labels' ? 'publishing/labels' : resource.uri === 'msp://analytics/explorer' ? 'analytics/explorer' : ['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
+    const feature = resource.uri === 'msp://analytics/pins' ? 'analytics/pins' : resource.uri === 'msp://analytics/demographics' ? 'analytics/demographics' : resource.uri === 'msp://ads/objects' ? 'ads/objects' : resource.uri === 'msp://publishing/fields' ? 'publishing/posts' : resource.uri === 'msp://settings/policies' ? 'settings/workspace' : resource.uri === 'msp://publishing/templates' ? 'publishing/templates' : resource.uri === 'msp://publishing/labels' ? 'publishing/labels' : resource.uri === 'msp://analytics/explorer' ? 'analytics/explorer' : ['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
     return (!['msp://settings/team', 'msp://settings/invitations', 'msp://settings/policies'].includes(resource.uri) || canManageData(viewer)) && (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
   }) });
   }
@@ -889,6 +913,9 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       else if (uri === 'msp://publishing/templates') contents = await runTool(viewer, 'list_post_templates', {});
       else if (uri === 'msp://publishing/fields') contents = await runTool(viewer, 'list_custom_fields', {});
       else if (uri === 'msp://publishing/labels') contents = await runTool(viewer, 'list_post_labels', {});
+      else if (uri === 'msp://analytics/pins') contents = await runTool(viewer, 'get_analytics_pins', {});
+      else if (uri === 'msp://analytics/demographics') contents = await runTool(viewer, 'get_analytics_demographics', {});
+      else if (uri === 'msp://ads/objects') contents = await runTool(viewer, 'list_ads_objects', {});
       else if (uri === 'msp://analytics/explorer') contents = await runTool(viewer, 'get_analytics_explorer', {});
       else if (uri === 'msp://settings/team') contents = await runTool(viewer, 'list_workspace_team', {});
       else if (uri === 'msp://targets') contents = await runTool(viewer, 'list_pages', {});

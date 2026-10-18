@@ -143,3 +143,34 @@ Batch 67 follow-up UX review: choice-field forms still rely on server enforcemen
 Batch 67 final verification: isolated staged-source snapshot passed 2,040 tests / 269 files with guarded PostgreSQL tests enabled; production build and subsequent serial typecheck passed. The final HTTP/MCP/PostgreSQL probe passed and verified exact cleanup. Independent lower-cost review reported no critical/important findings in the staged authorization/tenant/data-control changes. This is not release readiness.
 
 Next parallel ownership: `/root/ads_read68` owns Ads analysis/directory/compare/object read slices and ADS_PARITY.md; `/root/analytics_read68` owns Analytics demographics/pins/comparison read slices and ANALYTICS_PARITY.md. Both are reviewing/fixing existing untracked Claude source, tests and host-integration exports. Parent retains registry, manifests, MCP host, permissions, central navigation and Git. Do not stage their unfinished slices with batch 67; obtain results and real preview proof before exposing them. Claude second-account coordinator remains terminal on its session limit; its old status file is not proof of running work.
+
+
+## Batch 68 — integrated Ads and Analytics stored-data workflows
+
+Registry 62 installs Ads analysis thresholds and Analytics demographic, comparison
+and pin policies. Customer manifests and HTTP/workspace MCP expose scoped Ads
+comparison/directory and Analytics breakdowns/comparison/personal pins through
+shared module services. Facebook alone resolves its provider-specific parent
+fields; management actions remain hidden without their separate engine.
+Comparison controls display only the active mode. Audience failures preserve
+correction/reset controls. READ_WORKFLOWS.md records scope and limitations.
+
+An isolated staged-source snapshot passed 2,122 tests / 275 files with guarded
+synthetic PostgreSQL tests, production build and subsequent serial typecheck.
+Independent lower-cost reviews found no remaining important issue. The final
+scripts/verify-read-workflows.ts probe passed real localhost HTTP/MCP/PostgreSQL
+reads, current/previous Ads comparison, malformed/foreign scope refusals,
+feature-disable refusals, pin confirmations/persistence, read-only key refusal
+and authorized MCP pin/unpin. Both temporary tenants, resources, sessions, keys,
+insights and audits were removed and exact prior Root settings restored.
+Chrome verified desktop stored Ads figures, audience invalid-date correction,
+and 390px comparison mode/drawer behavior; temporary Nightfall was restored.
+The strict UI audit reports zero findings on changed routes and 38 elsewhere
+in the whole working tree; complete UI/state/theme compliance is not established.
+
+Next: finish lifecycle version recording/restore and its deterministic host ports;
+review/integrate the remaining legacy source slices with their migrations,
+configuration and authorization proofs. Unfinished source is excluded from this
+batch. Full Ads writes, report generation/schedules, live Facebook coverage,
+held-photo cleanup, migration/rollback rehearsal and cutover remain open.
+Production remains legacy; socialpilot-deploy still targets legacy.

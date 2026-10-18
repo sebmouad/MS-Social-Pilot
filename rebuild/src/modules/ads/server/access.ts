@@ -8,7 +8,7 @@ import { OperationError } from '@/lib/operation-error';
 export type AdsReadActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 
 /** Recheck all customer report permissions and intersect caller-provided scope with current grants. */
-export async function authorizeAdsRead(actor: AdsReadActor) {
+export async function authorizeAdsRead(actor: AdsReadActor, feature: 'ads/campaigns' | 'ads/compare' | 'ads/objects' = 'ads/campaigns') {
   const user = await prisma.user.findUnique({ where: { id: actor.userId }, select: { disabledAt: true } });
   if (!user || user.disabledAt) throw new OperationError('unauthorized', 'Sign in with an active account to view Ads reports.');
 
@@ -18,7 +18,7 @@ export async function authorizeAdsRead(actor: AdsReadActor) {
     loadPermissions(actor.userId, actor.workspaceId),
   ]);
   if (!membership || !entitlements || entitlements.workspaceId !== actor.workspaceId || !permissions ||
-    !canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'read')) {
+    !canUseFeature(entitlements, feature) || !canAccessFeature(permissions, feature, 'read')) {
     throw new OperationError('forbidden', 'Ads report access is unavailable in this workspace.');
   }
   await assertWorkspaceNotPurging(actor.workspaceId);

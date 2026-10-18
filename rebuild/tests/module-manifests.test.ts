@@ -29,8 +29,10 @@ describe('customer module manifests', () => {
     expect(PAGES.some(({ href }) => href === '/root' || href.startsWith('/root/'))).toBe(false);
   });
 
-  it('shows one Analytics page while retaining scoped CSV export as a capability', () => {
-    expect(PAGES.filter(({ module, navigation }) => module === 'analytics' && navigation !== false).map(({ href }) => href)).toEqual(['/analytics']);
+  it('shows the Analytics overview, audience, comparison and pins pages while retaining scoped CSV export as a capability', () => {
+    expect(PAGES.filter(({ module, navigation }) => module === 'analytics' && navigation !== false).map(({ href }) => href)).toEqual([
+      '/analytics', '/analytics/demographics', '/analytics/compare', '/analytics/pins',
+    ]);
     expect(PAGES.find(({ id }) => id === 'analytics/reports')?.navigation).toBe(false);
     expect(PAGES.find(({ id }) => id === 'analytics/explorer')?.navigation).toBe(false);
   });

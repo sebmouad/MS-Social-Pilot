@@ -6,10 +6,14 @@ import { configurationOwner } from './ownership';
 import { WORKSPACE_JOB_ACCESS_DEFAULTS, WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, WORKSPACE_JOB_OWNER_POLICY_SCHEMA } from '@/server/jobs/access-policy';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 61;
+export const CONFIG_SCHEMA_VERSION = 62;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
+import { ADS_ANALYSIS_CONFIG } from '@/modules/ads/analysis/config';
+import { DEMOGRAPHICS_CONFIG } from '@/modules/analytics/demographics/config';
+import { PINNED_METRIC_CONFIG } from '@/modules/analytics/pins/config';
+import { COMPARISON_CONFIG } from '@/modules/analytics/comparison/config';
 import { ADS_CONFIG } from '@/modules/ads/config';
 import { SETTINGS_CONFIG } from '@/modules/settings/config';
 import { SETTINGS_INVITATION_CONFIG } from '@/modules/settings/invitations-config';
@@ -33,6 +37,10 @@ export const CONFIG_REGISTRY = [
   ...PLATFORM_CONFIG,
   // Explicit installed product-module settings; schemas stay out of client manifests.
   ...ADS_CONFIG,
+  ...ADS_ANALYSIS_CONFIG,
+  ...DEMOGRAPHICS_CONFIG,
+  ...PINNED_METRIC_CONFIG,
+  ...COMPARISON_CONFIG,
   ...SETTINGS_CONFIG,
   ...SETTINGS_INVITATION_CONFIG,
   ...TEMPLATE_CONFIG,

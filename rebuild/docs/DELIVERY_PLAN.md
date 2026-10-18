@@ -150,3 +150,34 @@ Lead review removed fail-open worker eligibility and per-run cached workspace gr
 Registry 61 integrates Publishing collaboration metadata: bulk label assignment, complete bounded label choices, custom-field CRUD/values, internal note CRUD and stored version reads. The Organize manifest feature inherits the Posts plan/module switch while retaining its own installation switch. Shared services enforce current account/workspace/resource authority across UI, HTTP and authenticated workspace MCP, with transactional audits and complete-or-refused MCP results. Field updates/deletion reject corrupt cross-tenant relations. Execution controls are marked planned and unregistered ports remain hidden/refused.
 
 Actual guarded local HTTP/MCP/PostgreSQL proof passed CRUD, persistence, confirmations, foreign-post/cascade refusals, read-only key and feature-disable refusals, and note pagination/navigation; exact fixtures/settings/audits were restored. Chrome phone field review/create/delete and cleanup passed at 390px with a 352px dialog. Offline retry has component proof. Keep lifecycle history recording/restore, scheduling/recycle/mix authorization, mention delivery, full theme/concurrency/data-control tests and remaining legacy capabilities in the active plan. Production remains legacy; no cutover or provider change.
+
+
+## Batch 68 — integrated Ads and Analytics stored-data workflows
+
+Registry 62 installs Ads analysis thresholds and Analytics demographic, comparison
+and pin policies. Customer manifests and HTTP/workspace MCP expose scoped Ads
+comparison/directory and Analytics breakdowns/comparison/personal pins through
+shared module services. Facebook alone resolves its provider-specific parent
+fields; management actions remain hidden without their separate engine.
+Comparison controls display only the active mode. Audience failures preserve
+correction/reset controls. READ_WORKFLOWS.md records scope and limitations.
+
+An isolated staged-source snapshot passed 2,122 tests / 275 files with guarded
+synthetic PostgreSQL tests, production build and subsequent serial typecheck.
+Independent lower-cost reviews found no remaining important issue. The final
+scripts/verify-read-workflows.ts probe passed real localhost HTTP/MCP/PostgreSQL
+reads, current/previous Ads comparison, malformed/foreign scope refusals,
+feature-disable refusals, pin confirmations/persistence, read-only key refusal
+and authorized MCP pin/unpin. Both temporary tenants, resources, sessions, keys,
+insights and audits were removed and exact prior Root settings restored.
+Chrome verified desktop stored Ads figures, audience invalid-date correction,
+and 390px comparison mode/drawer behavior; temporary Nightfall was restored.
+The strict UI audit reports zero findings on changed routes and 38 elsewhere
+in the whole working tree; complete UI/state/theme compliance is not established.
+
+Next: finish lifecycle version recording/restore and its deterministic host ports;
+review/integrate the remaining legacy source slices with their migrations,
+configuration and authorization proofs. Unfinished source is excluded from this
+batch. Full Ads writes, report generation/schedules, live Facebook coverage,
+held-photo cleanup, migration/rollback rehearsal and cutover remain open.
+Production remains legacy; socialpilot-deploy still targets legacy.
