@@ -6,7 +6,7 @@ import { configurationOwner } from './ownership';
 import { WORKSPACE_JOB_ACCESS_DEFAULTS, WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, WORKSPACE_JOB_OWNER_POLICY_SCHEMA } from '@/server/jobs/access-policy';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 64;
+export const CONFIG_SCHEMA_VERSION = 65;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -26,6 +26,7 @@ import { ACCOUNT_RECOVERY_CONFIG } from '@/modules/settings/account-recovery-con
 import { ANALYTICS_EXPLORER_CONFIG } from '@/modules/analytics/explorer-config';
 import { QUEUE_CONFIG } from '@/modules/publishing/queue-config';
 import { COLLAB_CONFIG } from '@/modules/publishing/collaboration/config';
+import { PUBLISHING_AUTOMATION_CONFIG } from '@/modules/publishing/automation-config';
 import { ROOT_LEGACY_CONFIG } from '@/server/root/legacy/config';
 
 /**
@@ -53,6 +54,7 @@ export const CONFIG_REGISTRY = [
   ...ANALYTICS_EXPLORER_CONFIG,
   ...ROOT_LEGACY_CONFIG,
   ...COLLAB_CONFIG,
+  ...PUBLISHING_AUTOMATION_CONFIG,
   ...QUEUE_CONFIG,
   entry({ key: 'jobs.workspaceOwnerPolicy', group: 'Jobs · Authorization', label: 'Workspace sync owner access', kind: 'select', description: 'Automatic provider reads require qualifying feature and platform access from the same active workspace owner. Any owner is the default; All owners is stricter. Root inspection never bypasses customer suspension.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerPolicy, schema: WORKSPACE_JOB_OWNER_POLICY_SCHEMA, consumption: 'active', options: [{ value: 'any_active_owner', label: 'Any active owner qualifies' }, { value: 'all_active_owners', label: 'All active owners qualify' }] }),
   entry({ key: 'jobs.workspaceOwnerLimit', group: 'Jobs · Authorization', label: 'Workspace sync owner check limit', kind: 'number', description: 'Maximum active owners inspected per workspace synchronization check. Larger owner sets are refused rather than authorized from a partial subset.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerLimit, schema: WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, consumption: 'active' }),
@@ -130,7 +132,7 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'analytics.reportExportRows', group: 'Analytics metrics', label: 'Report CSV row limit', kind: 'number', description: 'Maximum data rows included in a report CSV download; truncated exports are marked.', defaultValue: 5000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
   entry({ key: 'analytics.reportMaxChannels', group: 'Analytics metrics', label: 'Maximum Analytics resources per selection', kind: 'number', description: 'Maximum selected channels or ad accounts accepted in one Analytics read.', defaultValue: 500, schema: z.number().int().min(1).max(5000), consumption: 'active' }),
 
-  entry({ key: 'jobs.order', group: 'Sync schedules', label: 'Background job priority order', kind: 'json', description: 'Names of installed jobs in dispatch order. Unlisted installed jobs follow in manifest order. Existing leases and concurrency limits still apply.', defaultValue: ['posts', 'analytics', 'inbox', 'purges', 'mediaCleanup'], schema: z.array(z.string().refine(name => moduleManifests.some(module => module.jobs.some(job => job.name === name)), 'Choose an installed job name.')).max(moduleManifests.reduce((count, module) => count + module.jobs.length, 0)).refine(names => new Set(names).size === names.length, 'List each job only once.'), consumption: 'active' }),
+  entry({ key: 'jobs.order', group: 'Sync schedules', label: 'Background job priority order', kind: 'json', description: 'Names of installed jobs in dispatch order. Unlisted installed jobs follow in manifest order. Existing leases and concurrency limits still apply.', defaultValue: ['posts', 'analytics', 'inbox', 'purges', 'mediaCleanup', 'publishingRecycle', 'publishingMix'], schema: z.array(z.string().refine(name => moduleManifests.some(module => module.jobs.some(job => job.name === name)), 'Choose an installed job name.')).max(moduleManifests.reduce((count, module) => count + module.jobs.length, 0)).refine(names => new Set(names).size === names.length, 'List each job only once.'), consumption: 'active' }),
   entry({ key: 'jobs.enabled', group: 'Sync schedules', label: 'Background jobs enabled', kind: 'boolean', description: 'Master availability switch for background work.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'sync.posts.schedule', group: 'Sync schedules', label: 'Post and publishing sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '*/5 * * * *', schema: cron, consumption: 'active' }),
   entry({ key: 'sync.analytics.schedule', group: 'Sync schedules', label: 'Analytics sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '15 * * * *', schema: cron, consumption: 'active' }),

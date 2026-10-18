@@ -4,7 +4,7 @@ import { prisma } from '@/server/data';
 import { authorizePublishing } from '../../server/access';
 import type { PublishingActor } from '../../server/types';
 import { collaborationPorts } from '../ports';
-import { effectiveMix, MIX_SAVE, saveMixConfirmation } from '../schemas';
+import { effectiveMix, MIX_AUTOFILL, MIX_SAVE, mixAutoFillConfirmation, saveMixConfirmation } from '../schemas';
 import { audit, bad, bounds, exact, lockActor, parse, protect, QUEUE, requireWorkspaceAdmin, transact, usableTargets } from './core';
 
 type RuleRow = { id: string; targetId: string | null; groupId: string | null; labelId: string; perWeek: number; dryNotifiedAt: Date | null };
@@ -25,20 +25,24 @@ export async function readContentMix(actor: PublishingActor, now = new Date()) {
   const targets = await protect(usableTargets(auth));
   const ids = targets.map(t => t.id);
   const until = new Date(now.getTime() + limit.mixWindowDays * 86_400_000);
-  const [labels, groups, rules, memberships, planned, drafts] = await protect(Promise.all([
+  const ownAuthor = auth.actor.allowedTargetIds !== undefined || auth.role === 'contributor' ? actor.userId : null;
+  const [labels, groups, rules, memberships, planned, drafts, workspace] = await protect(Promise.all([
     prisma.$queryRaw<Array<{ id: string; name: string; color: string }>>`SELECT id, name, color FROM labels WHERE "workspaceId" = ${actor.workspaceId} ORDER BY name ASC, id ASC`,
     wide ? prisma.$queryRaw<Array<{ id: string; name: string }>>`SELECT id, name FROM page_groups WHERE "workspaceId" = ${actor.workspaceId} ORDER BY name ASC, id ASC` : Promise.resolve([] as Array<{ id: string; name: string }>),
     prisma.$queryRaw<RuleRow[]>`SELECT id, "targetId", "groupId", "labelId", "perWeek", "dryNotifiedAt" FROM content_mix_rules WHERE "workspaceId" = ${actor.workspaceId} AND ("targetId" = ANY(${ids}::text[]) OR ("groupId" IS NOT NULL AND ${wide})) ORDER BY "createdAt" ASC, id ASC`,
     prisma.$queryRaw<Array<{ groupId: string; targetId: string }>>`SELECT gt."groupId", gt."targetId" FROM page_group_targets gt JOIN page_groups g ON g.id = gt."groupId" WHERE g."workspaceId" = ${actor.workspaceId} AND gt."targetId" = ANY(${ids}::text[])`,
-    prisma.$queryRaw<Array<{ targetId: string; labelId: string; n: bigint }>>`SELECT pt."targetId", pl."labelId", COUNT(DISTINCT p.id)::bigint AS n FROM posts p JOIN post_targets pt ON pt."postId" = p.id JOIN post_labels pl ON pl."postId" = p.id WHERE p."workspaceId" = ${actor.workspaceId} AND p.status::text = ANY(${PLANNED}::text[]) AND p."scheduledAt" >= ${now} AND p."scheduledAt" < ${until} AND pt."targetId" = ANY(${ids}::text[]) GROUP BY pt."targetId", pl."labelId"`,
+    prisma.$queryRaw<Array<{ targetId: string; labelId: string; n: bigint }>>`SELECT pt."targetId", pl."labelId", COUNT(DISTINCT p.id)::bigint AS n FROM posts p JOIN post_targets pt ON pt."postId" = p.id JOIN post_labels pl ON pl."postId" = p.id WHERE p."workspaceId" = ${actor.workspaceId} AND p.status::text = ANY(${PLANNED}::text[]) AND p."scheduledAt" >= ${now} AND p."scheduledAt" < ${until} AND pt."targetId" = ANY(${ids}::text[]) AND NOT EXISTS (SELECT 1 FROM post_targets hidden WHERE hidden."postId" = p.id AND NOT (hidden."targetId" = ANY(${ids}::text[]))) AND (${ownAuthor}::text IS NULL OR p."authorId" = ${ownAuthor}) GROUP BY pt."targetId", pl."labelId"`,
     prisma.$queryRaw<Array<{ targetId: string; labelId: string; n: bigint }>>`
       SELECT pt."targetId", pl."labelId", COUNT(DISTINCT p.id)::bigint AS n FROM posts p
       JOIN post_targets pt ON pt."postId" = p.id JOIN post_labels pl ON pl."postId" = p.id
       JOIN workspaces w ON w.id = p."workspaceId"
       LEFT JOIN memberships m ON m."userId" = p."authorId" AND m."workspaceId" = p."workspaceId"
       WHERE p."workspaceId" = ${actor.workspaceId} AND p.status::text = 'draft' AND pt."targetId" = ANY(${ids}::text[])
+        AND NOT EXISTS (SELECT 1 FROM post_targets hidden WHERE hidden."postId" = p.id AND NOT (hidden."targetId" = ANY(${ids}::text[])))
+        AND (${ownAuthor}::text IS NULL OR p."authorId" = ${ownAuthor})
         AND (p."approvalStatus"::text = 'approved' OR (p."approvalStatus"::text = 'not_required' AND (NOT w."requiresApproval" OR m.role::text IN ('owner','admin','editor'))))
       GROUP BY pt."targetId", pl."labelId"`,
+    prisma.$queryRaw<Array<{ mixAutoFill: boolean }>>`SELECT "mixAutoFill" FROM workspaces WHERE id = ${actor.workspaceId}`,
   ]));
   const groupsOf = new Map<string, string[]>();
   for (const m of memberships) groupsOf.set(m.targetId, [...(groupsOf.get(m.targetId) ?? []), m.groupId]);
@@ -50,7 +54,34 @@ export async function readContentMix(actor: PublishingActor, now = new Date()) {
     lines: [...mix].map(([labelId, e]): MixLine => ({ labelId, perWeek: e.perWeek, planned: plannedBy.get(`${targetId}\u0000${labelId}`) ?? 0, readyDrafts: draftsBy.get(`${targetId}\u0000${labelId}`) ?? 0 })),
   }));
   const canEdit = auth.permissions.features[QUEUE]?.write === true && (auth.role === 'owner' || auth.role === 'admin');
-  return { windowDays: limit.mixWindowDays, maxPerWeek: limit.mixMaxPerWeek, targets, groups, labels, rules: rules.map(({ dryNotifiedAt, ...r }) => ({ ...r, ranDry: Boolean(dryNotifiedAt) })), status, canEditChannels: canEdit, canEditGroups: canEdit && wide };
+  return { windowDays: limit.mixWindowDays, maxPerWeek: limit.mixMaxPerWeek, targets, groups, labels, rules: rules.map(({ dryNotifiedAt, ...r }) => ({ ...r, ranDry: Boolean(dryNotifiedAt) })), status, mixAutoFill: workspace[0]?.mixAutoFill === true, canEditChannels: canEdit, canEditGroups: canEdit && wide, canEditAutoFill: canEdit && wide };
+}
+
+/** Workspace-wide scheduler policy; this updates the workspace row, so it deliberately avoids withWorkspaceOperation's FOR SHARE lock. */
+export async function setContentMixAutoFill(actor: PublishingActor, input: unknown) {
+  const data = parse(MIX_AUTOFILL, input);
+  exact(data.confirmation, mixAutoFillConfirmation(data.enabled));
+  if (!collaborationPorts().mix) throw notOffered();
+  const limit = await bounds();
+  const check = (auth: Awaited<ReturnType<typeof authorizePublishing>>) => requireWorkspaceAdmin(auth, 'change automatic content-mix scheduling');
+  check(await authorizePublishing(actor, QUEUE, 'write'));
+  return protect(prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${actor.workspaceId}))::text`;
+    const workspaces = await tx.$queryRaw<Array<{ suspendedAt: Date | null; mixAutoFill: boolean }>>`SELECT "suspendedAt", "mixAutoFill" FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
+    const workspace = workspaces[0];
+    if (!workspace) throw new OperationError('unavailable', 'This workspace is unavailable.');
+    if (workspace.suspendedAt) throw new OperationError('forbidden', 'This workspace is suspended.');
+    const purge = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId }, select: { status: true } });
+    if (purge && purge.status !== 'completed') throw new OperationError('conflict', 'Workspace data deletion is in progress.');
+    check(await lockActor(tx, actor, QUEUE, true));
+    if (workspace.mixAutoFill !== data.enabled) {
+      const changed = await tx.$executeRaw`UPDATE workspaces SET "mixAutoFill" = ${data.enabled}, "updatedAt" = NOW() WHERE id = ${actor.workspaceId}`;
+      if (changed !== 1) throw new OperationError('conflict', 'The content-mix setting could not be saved. Refresh and check its current state.');
+      await audit(tx, actor, data.enabled ? 'publishing.content_mix_autofill_enabled' : 'publishing.content_mix_autofill_disabled', { enabled: data.enabled });
+    }
+    check(await lockActor(tx, actor, QUEUE, true));
+    return { enabled: data.enabled, changed: workspace.mixAutoFill !== data.enabled };
+  }, { timeout: limit.transactionTimeoutMs, maxWait: limit.transactionMaxWaitMs }));
 }
 
 /** Replaces the rules of one channel or group atomically. Admin-only; group rules need access to every channel. */

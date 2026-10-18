@@ -286,3 +286,42 @@ current job authority. Full composer queue-mode parity, remaining legacy modules
 Facebook native formats/live coverage and held-photo cleanup, production-shaped
 migration/rollback and cutover remain open. Production/socialpilot-deploy remain
 legacy. Do not broad-stage unfinished source slices.
+
+
+## Batch 72 — Publishing automation and customer controls
+
+Registry 65 installs Publishing-owned recycle/mix jobs, cron schedules and typed
+persistent scan positions. The existing worker now calls required lifecycle ports;
+raw copy/schedule shortcuts were removed. Current original-author permissions,
+per-provider current owner qualification, selected-resource/destination locks,
+content/media/credential readiness, approval policy, history and system audits
+apply in the same transaction as claims. Changed wording is held for review where
+required; exhausted limits and disabled destinations stop without consuming a run.
+Fair keyset scans advance past failed/skipped work; cursor writes use value-CAS
+and value-free audit. Global fairness/CAS has mocked regression coverage, not yet
+production-shaped multi-worker PostgreSQL proof.
+
+Content mix has a separately confirmed all-channel owner/admin workspace opt-in,
+shared HTTP/MCP services and sidebar controls. Counts apply complete post and
+resolved author scope; per-scope drafts and failed reviews survive correction.
+Both automation APIs initialize their own server bundle's ports. A real phone
+check found the drawer consuming modal Escape/Tab; the shared shell now defers
+to native dialogs. Chrome verified modal Tab containment, 352px review at 390px,
+Escape ordering/focus restoration, desktop controls and temporary Nightfall rendering.
+No seeded workspace automation was enabled in browser testing.
+
+The isolated final staged snapshot passed 2,186 tests / 280 files and a production
+build. Subsequent serial typecheck passed. The guarded actual
+HTTP/MCP/PostgreSQL probe passed opted-in scheduling/replay, read-only/confirmation
+refusals, system history/audit/labels, variant approval hold, revoked access
+immutability, disabled-destination stop and zero provider publication attempts.
+Two disposable drafts, their generated repeat and related fixture records were
+removed; eleven captured Root settings, including the prior encrypted adapter
+secret, were restored exactly. No production, provider write or DDL changed.
+PUBLISHING_AUTOMATION.md owns full semantics, proof and limitations.
+
+Next: wire dry/mention notifications, large-workspace bounds and remaining legacy
+module slices with their authorization/migration/worker/MCP proofs. Finish native
+Facebook formats and live capability coverage, resolve the held photo cleanup,
+and rehearse production-shaped data migration/rollback before cutover. Existing
+socialpilot-deploy still targets legacy. Do not broad-stage unfinished source.

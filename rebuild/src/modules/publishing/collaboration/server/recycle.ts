@@ -37,8 +37,11 @@ export async function setRecycle(actor: PublishingActor, input: unknown) {
   const data = parse(RECYCLE_SET, input); exact(data.confirmation, setRecycleConfirmation(data.postId));
   if (!collaborationPorts().recycle) throw unavailable();
   const limit = await bounds();
-  const variants = data.variants?.map(v => v.trim()).filter(Boolean);
-  if ((data.everyDays ?? 1) > limit.recycleMaxIntervalDays || (data.limit ?? 1) > limit.recycleMaxRepeats || (variants?.length ?? 0) > limit.variantsLimit || variants?.some(v => v.length > limit.variantMaxCharacters)) throw bad();
+  const suppliedVariants = data.variants?.map(value => value.trim()).filter(Boolean);
+  if ((data.everyDays !== undefined && data.everyDays > limit.recycleMaxIntervalDays) ||
+    (data.limit !== undefined && data.limit !== null && data.limit > limit.recycleMaxRepeats) ||
+    (suppliedVariants?.length ?? 0) > limit.variantsLimit ||
+    suppliedVariants?.some(value => value.length > limit.variantMaxCharacters)) throw bad();
   await authorizePublishing(actor, POSTS, 'write');
   return protect(transact(actor.workspaceId, limit, async tx => {
     const auth = await lockActor(tx, actor, POSTS, true);
@@ -48,17 +51,25 @@ export async function setRecycle(actor: PublishingActor, input: unknown) {
     const rows = await select(tx, actor.workspaceId, data.postId, true);
     const current = rows[0]; if (!current) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
     if (current.originPostId && data.enabled) throw new OperationError('conflict', 'This post is already a repeat. Change the original post instead.');
-    if (variants?.length && !isManager(auth.role)) {
+    const everyDays = data.everyDays ?? current.recycleEveryDays ?? limit.recycleDefaultIntervalDays;
+    if (!Number.isSafeInteger(everyDays) || everyDays < 1 || everyDays > limit.recycleMaxIntervalDays) throw bad(`Choose an interval from 1 to ${limit.recycleMaxIntervalDays} days.`);
+    const repeatLimit = data.limit === undefined ? current.recycleLimit : data.limit;
+    if (repeatLimit !== null && (!Number.isSafeInteger(repeatLimit) || repeatLimit < 1 || repeatLimit > limit.recycleMaxRepeats)) throw bad(`Choose a repeat limit from 1 to ${limit.recycleMaxRepeats}, or leave it unlimited.`);
+    const storedVariants = current.variants;
+    if (data.variants === undefined && (!Array.isArray(storedVariants) || storedVariants.some(value => typeof value !== 'string'))) throw bad('Stored alternate wordings need review before repeating can be changed.');
+    const nextVariants = data.variants === undefined
+      ? (storedVariants as string[]).map(value => value.trim()).filter(Boolean)
+      : data.variants.map(value => value.trim()).filter(Boolean);
+    if (nextVariants.length > limit.variantsLimit || nextVariants.some(value => value.length > limit.variantMaxCharacters)) throw bad(`Use at most ${limit.variantsLimit} alternate wordings of ${limit.variantMaxCharacters} characters each.`);
+    if (nextVariants.length && !isManager(auth.role)) {
       const approvals = await tx.$queryRaw<Array<{ requiresApproval: boolean }>>`SELECT "requiresApproval" FROM workspaces WHERE id = ${actor.workspaceId}`;
       if (approvals[0]?.requiresApproval) throw new OperationError('forbidden', 'Alternate wordings need an editor or above because they are published without a new review.');
     }
-    const everyDays = data.everyDays ?? current.recycleEveryDays ?? limit.recycleDefaultIntervalDays;
-    const repeatLimit = data.limit === undefined ? current.recycleLimit : data.limit;
     const nextAt = data.enabled ? nextRecycleAt({ everyDays, limit: repeatLimit, count: current.recycleCount, from: current.publishedAt ?? current.scheduledAt ?? new Date() }) : null;
     if (data.enabled && !nextAt) throw new OperationError('conflict', 'This post has already used all of its repeats.');
-    const nextVariants = JSON.stringify(variants ?? (Array.isArray(current.variants) ? current.variants : []));
-    await tx.$executeRaw`UPDATE posts SET "recycleEnabled" = ${data.enabled}, "recycleEveryDays" = ${everyDays}, "recycleLimit" = ${repeatLimit}, "recycleNextAt" = ${nextAt}, variants = ${nextVariants}::jsonb, "updatedAt" = NOW() WHERE id = ${data.postId} AND "workspaceId" = ${actor.workspaceId}`;
-    await audit(tx, actor, data.enabled ? 'publishing.recycle_enabled' : 'publishing.recycle_disabled', { postId: data.postId, everyDays, limit: repeatLimit, variants: variants?.length ?? null, nextAt });
+    const variantsJson = JSON.stringify(nextVariants);
+    await tx.$executeRaw`UPDATE posts SET "recycleEnabled" = ${data.enabled}, "recycleEveryDays" = ${everyDays}, "recycleLimit" = ${repeatLimit}, "recycleNextAt" = ${nextAt}, variants = ${variantsJson}::jsonb, "updatedAt" = NOW() WHERE id = ${data.postId} AND "workspaceId" = ${actor.workspaceId}`;
+    await audit(tx, actor, data.enabled ? 'publishing.recycle_enabled' : 'publishing.recycle_disabled', { postId: data.postId, everyDays, limit: repeatLimit, variants: nextVariants.length, nextAt });
     await lockActor(tx, actor, POSTS, true);
     const fresh = await select(tx, actor.workspaceId, data.postId, false);
     return toState(data.postId, fresh[0] ?? current);

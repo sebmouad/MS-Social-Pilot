@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, safeConfigShape } from '../src/lib/config/registry';
 import { configAuditDetail } from '../src/server/config/store';
+import { publishingManifest } from '../src/modules/publishing/manifest';
 
 describe('configuration registry', () => {
   it('has unique keys and public metadata never contains secret values', () => {
@@ -21,13 +22,25 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('meta.appSecret')!.schema.safeParse('x'.repeat(2049)).success).toBe(false);
     expect(CONFIG_BY_KEY.get('jobs.enabled')!.schema.safeParse(true).success).toBe(true);
     expect(CONFIG_BY_KEY.get('jobs.enabled')!.schema.safeParse('true').success).toBe(false);
+    for (const key of ['publishing.automation.recycleSchedule', 'publishing.automation.mixSchedule']) {
+      expect(safeConfigShape().find(setting => setting.key === key)).toMatchObject({ consumption: 'active', owner: { kind: 'product', id: 'publishing' } });
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse('*/15 * * * *').success).toBe(true);
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse('not a cron').success).toBe(false);
+    }
+    for (const key of ['publishing.automation.recycleCursor', 'publishing.automation.mixCursor']) {
+      expect(safeConfigShape().find(setting => setting.key === key)).toMatchObject({ kind: 'text', defaultValue: '', consumption: 'active', owner: { kind: 'product', id: 'publishing' } });
+      expect(publishingManifest.rootSettingKeys).toContain(key);
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse('').success).toBe(true);
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse('workspace:01_post-2').success).toBe(true);
+      for (const invalid of ['has spaces', 'bad/id', 'x'.repeat(81)]) expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(invalid).success).toBe(false);
+    }
     expect(CONFIG_BY_KEY.get('operations.supportEmail')!.schema.safeParse('').success).toBe(true);
     expect(CONFIG_BY_KEY.get('operations.supportEmail')!.schema.safeParse('ops@example.test').success).toBe(true);
     expect(CONFIG_BY_KEY.get('operations.supportEmail')!.schema.safeParse('not-an-email').success).toBe(false);
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(64);
+    expect(CONFIG_SCHEMA_VERSION).toBe(65);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);

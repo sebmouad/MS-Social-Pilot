@@ -61,6 +61,6 @@ export default async function CollaborationPage({ searchParams }: { searchParams
     }
     const mix = await readContentMix(actor);
     return <>{nav}<PageHeading title="Content mix" description="Balance what each channel posts by label." />
-      <ContentMix targets={mix.targets.map(({ id, name }) => ({ id, name }))} groups={mix.groups} labels={mix.labels.map(({ id, name }) => ({ id, name }))} rules={mix.rules} status={mix.status} windowDays={mix.windowDays} maxPerWeek={mix.maxPerWeek} canEditChannels={mix.canEditChannels} canEditGroups={mix.canEditGroups} /></>;
+      <ContentMix targets={mix.targets.map(({ id, name }) => ({ id, name }))} groups={mix.groups} labels={mix.labels.map(({ id, name }) => ({ id, name }))} rules={mix.rules} status={mix.status} windowDays={mix.windowDays} maxPerWeek={mix.maxPerWeek} mixAutoFill={mix.mixAutoFill} canEditChannels={mix.canEditChannels} canEditGroups={mix.canEditGroups} canEditAutoFill={mix.canEditAutoFill} /></>;
   } catch (error) { return failure(error); }
 }

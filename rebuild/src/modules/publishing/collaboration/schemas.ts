@@ -75,6 +75,8 @@ export const MIX_SAVE = z.object({
   confirmation: z.string(),
 }).strict();
 export const saveMixConfirmation = (scope: { targetId?: string; groupId?: string }) => `SAVE CONTENT MIX ${scope.targetId ?? scope.groupId ?? ''}`;
+export const MIX_AUTOFILL = z.object({ enabled: z.boolean(), confirmation: z.string() }).strict();
+export const mixAutoFillConfirmation = (enabled: boolean) => `${enabled ? 'ENABLE' : 'DISABLE'} CONTENT MIX`;
 type MixRule = { id: string; targetId: string | null; groupId: string | null; labelId: string; perWeek: number };
 /** A channel follows its own rules when it has any, otherwise its groups' rules (larger number wins per label). */
 export function effectiveMix<R extends MixRule>(rules: readonly R[], targetIds: readonly string[], groupsOf: ReadonlyMap<string, readonly string[]>) {

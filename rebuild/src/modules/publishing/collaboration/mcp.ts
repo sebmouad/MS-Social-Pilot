@@ -5,7 +5,7 @@ import { collaborationCapabilities } from './ports';
 import { readCollaborationLabels } from './server/label-choices';
 import { assignLabels, readPostLabels } from './server/assignments';
 import { createCustomField, deleteCustomField, readCustomFields, readPostFieldValues, setPostFieldValues, updateCustomField } from './server/custom-fields';
-import { readContentMix, saveContentMix } from './server/content-mix';
+import { readContentMix, saveContentMix, setContentMixAutoFill } from './server/content-mix';
 import { addPostNote, deletePostNote, readPostNotes } from './server/notes';
 import { readQueueSlots, replaceQueueSlots } from './server/queue-slots';
 import { readRecycle, setRecycle } from './server/recycle';
@@ -36,17 +36,18 @@ export const collaborationToolDefinitions = [
   { name: 'replace_queue_times', description: 'Replace one timetable (targetId null for the shared one). Owners and admins only; shared times need access to all channels. Confirmation must exactly match "REPLACE QUEUE TIMES <targetId>" or "REPLACE QUEUE TIMES SHARED".', inputSchema: obj({ targetId: { anyOf: [id, { type: 'null' }] }, slots: { type: 'array', items: slot }, confirmation }, ['targetId', 'slots', 'confirmation']) },
   { name: 'get_content_mix', description: 'Weekly content-mix rules per channel or group with planned counts and ready drafts for the rolling window.', inputSchema: obj({}) },
   { name: 'save_content_mix', description: 'Replace the label rules of one channel or group. Owners and admins only; groups need access to all channels. Confirmation must exactly match SAVE CONTENT MIX <targetId or groupId>.', inputSchema: obj({ scope: obj({ targetId: id, groupId: id }), rules: { type: 'array', items: obj({ labelId: id, perWeek: { type: 'integer', minimum: 1 } }, ['labelId', 'perWeek']) }, confirmation }, ['scope', 'rules', 'confirmation']) },
+  { name: 'set_content_mix_autofill', description: 'Enable or disable automatic scheduling to fill the workspace content mix. Workspace owners and admins with access to all channels only. Confirmation must exactly match ENABLE CONTENT MIX or DISABLE CONTENT MIX.', inputSchema: obj({ enabled: { type: 'boolean' }, confirmation }, ['enabled', 'confirmation']) },
   { name: 'get_post_recycle', description: 'Recycle (repeat) settings of a post. Only available when the host runs recycling.', inputSchema: obj({ postId: id }, ['postId']) },
   { name: 'set_post_recycle', description: 'Turn repeating on or off, set interval, repeat limit and alternate wordings. Confirmation must exactly match SET RECYCLE <postId>.', inputSchema: obj({ postId: id, enabled: { type: 'boolean' }, everyDays: { type: 'integer', minimum: 1 }, limit: { type: ['integer', 'null'], minimum: 1 }, variants: { type: 'array', items: { type: 'string' } }, confirmation }, ['postId', 'enabled', 'confirmation']) },
 ] as const;
 
 export const collaborationTools = new Set<string>(collaborationToolDefinitions.map(tool => tool.name));
-export const collaborationWriteTools = new Set<string>(['assign_post_labels', 'create_custom_field', 'update_custom_field', 'delete_custom_field', 'set_post_field_values', 'add_post_note', 'delete_post_note', 'restore_post_version', 'replace_queue_times', 'save_content_mix', 'set_post_recycle']);
+export const collaborationWriteTools = new Set<string>(['assign_post_labels', 'create_custom_field', 'update_custom_field', 'delete_custom_field', 'set_post_field_values', 'add_post_note', 'delete_post_note', 'restore_post_version', 'replace_queue_times', 'save_content_mix', 'set_content_mix_autofill', 'set_post_recycle']);
 
 /** Tools the host should advertise now: abilities that need a host port are absent until it is registered. */
 export function availableCollaborationTools() {
   const caps = collaborationCapabilities();
-  return collaborationToolDefinitions.filter(tool => (tool.name !== 'restore_post_version' || caps.versionRestore) && (!['list_queue_times', 'replace_queue_times'].includes(tool.name) || caps.queueTimes) && (!['get_content_mix', 'save_content_mix'].includes(tool.name) || caps.contentMix) && (!['get_post_recycle', 'set_post_recycle'].includes(tool.name) || caps.recycle));
+  return collaborationToolDefinitions.filter(tool => (tool.name !== 'restore_post_version' || caps.versionRestore) && (!['list_queue_times', 'replace_queue_times'].includes(tool.name) || caps.queueTimes) && (!['get_content_mix', 'save_content_mix', 'set_content_mix_autofill'].includes(tool.name) || caps.contentMix) && (!['get_post_recycle', 'set_post_recycle'].includes(tool.name) || caps.recycle));
 }
 
 async function dispatchCollaborationTool(actor: PublishingActor, name: string, args: unknown, maxResultItems?: number) {
@@ -77,6 +78,7 @@ async function dispatchCollaborationTool(actor: PublishingActor, name: string, a
     case 'replace_queue_times': return replaceQueueSlots(actor, args);
     case 'get_content_mix': return readContentMix(actor);
     case 'save_content_mix': return saveContentMix(actor, args);
+    case 'set_content_mix_autofill': return setContentMixAutoFill(actor, args);
     case 'get_post_recycle': return readRecycle(actor, args);
     case 'set_post_recycle': return setRecycle(actor, args);
     default: throw new OperationError('invalid_request', 'Choose a supported collaboration action.');

@@ -3,16 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Q = { sql: string; values: unknown[] };
 const state = vi.hoisted(() => ({
   queries: [] as Q[], executions: [] as Q[], handlers: [] as Array<[string, (values: unknown[]) => unknown]>,
-  role: 'owner', all: true, post: { id: 'p1', authorId: 'user-a', status: 'draft', scheduledAt: null } as null | { id: string; authorId: string; status: string; scheduledAt: Date | null },
+  role: 'owner', all: true, resolvedTargetIds: null as string[] | null, mixAutoFill: false, workspaceUpdateCount: 1, post: { id: 'p1', authorId: 'user-a', status: 'draft', scheduledAt: null } as null | { id: string; authorId: string; status: string; scheduledAt: Date | null },
   failAudit: false, config: {} as Record<string, unknown>, selectedCalls: [] as unknown[],
 }));
-const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn(), post: { findFirst: vi.fn(), findMany: vi.fn() } }));
+const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn(), workspaceDataPurge: { findUnique: vi.fn(async () => null) }, post: { findFirst: vi.fn(), findMany: vi.fn() } }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (key in state.config ? state.config[key] : key === 'publishing.labelMaxPerWorkspace' ? 200 : key === 'publishing.searchMaxCharacters' ? 200 : key === 'data.workspaceOperationTimeoutMs' ? 30000 : DEFAULTS[key]) }));
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, cb: () => Promise<unknown>) => cb() }));
 vi.mock('@/modules/publishing/server/access', () => ({
   authorizePublishing: vi.fn(async (actor: { userId: string; workspaceId: string }) => ({
-    actor, role: state.role, entitlements: {},
+    actor: { ...actor, ...(state.resolvedTargetIds ? { allowedTargetIds: state.resolvedTargetIds } : {}) }, role: state.role, entitlements: {},
     permissions: { pageScope: state.all ? { all: true, ids: [] } : { all: false, ids: ['t1'] }, features: { 'publishing/collaboration': { read: true, write: true }, 'publishing/queue': { read: true, write: true } } },
   })),
 }));
@@ -24,13 +24,13 @@ vi.mock('@/modules/publishing/server/read-scope', () => ({
 import { COLLAB_CONFIG, COLLAB_DEFAULTS } from '../src/modules/publishing/collaboration/config';
 const DEFAULTS: Record<string, unknown> = Object.fromEntries(COLLAB_CONFIG.map(item => [item.key, item.defaultValue]));
 import { registerCollaborationPorts } from '../src/modules/publishing/collaboration/ports';
-import { assignConfirmation, createFieldConfirmation, updateFieldConfirmation, setFieldValuesConfirmation, addNoteConfirmation, deleteNoteConfirmation, restoreVersionConfirmation, replaceSlotsConfirmation, saveMixConfirmation, setRecycleConfirmation, deleteFieldConfirmation } from '../src/modules/publishing/collaboration/schemas';
+import { assignConfirmation, createFieldConfirmation, updateFieldConfirmation, setFieldValuesConfirmation, addNoteConfirmation, deleteNoteConfirmation, restoreVersionConfirmation, replaceSlotsConfirmation, saveMixConfirmation, mixAutoFillConfirmation, setRecycleConfirmation, deleteFieldConfirmation } from '../src/modules/publishing/collaboration/schemas';
 import { assignLabels, readPostLabels } from '../src/modules/publishing/collaboration/server/assignments';
 import { createCustomField, deleteCustomField, setPostFieldValues, updateCustomField } from '../src/modules/publishing/collaboration/server/custom-fields';
 import { addPostNote, deletePostNote } from '../src/modules/publishing/collaboration/server/notes';
 import { recordPostVersion, requestVersionRestore } from '../src/modules/publishing/collaboration/server/versions';
 import { readQueueSlots, replaceQueueSlots } from '../src/modules/publishing/collaboration/server/queue-slots';
-import { readContentMix, saveContentMix } from '../src/modules/publishing/collaboration/server/content-mix';
+import { readContentMix, saveContentMix, setContentMixAutoFill } from '../src/modules/publishing/collaboration/server/content-mix';
 import { listAssignablePosts } from '../src/modules/publishing/collaboration/server/post-list';
 import { readCollaborationLabels } from '../src/modules/publishing/collaboration/server/label-choices';
 import { readRecycle, setRecycle } from '../src/modules/publishing/collaboration/server/recycle';
@@ -44,7 +44,7 @@ const writes = () => state.executions.filter(q => !q.sql.includes('activity_logs
 
 beforeEach(() => {
   vi.clearAllMocks(); registerCollaborationPorts({});
-  Object.assign(state, { queries: [], executions: [], handlers: [], role: 'owner', all: true, failAudit: false, config: {}, selectedCalls: [], post: { id: 'p1', authorId: 'user-a', status: 'draft', scheduledAt: null } });
+  Object.assign(state, { queries: [], executions: [], handlers: [], role: 'owner', all: true, resolvedTargetIds: null, mixAutoFill: false, workspaceUpdateCount: 1, failAudit: false, config: {}, selectedCalls: [], post: { id: 'p1', authorId: 'user-a', status: 'draft', scheduledAt: null } });
   db.$transaction.mockImplementation(async (cb: (tx: typeof db) => Promise<unknown>) => cb(db));
   db.post.findFirst.mockImplementation(async () => state.post);
   db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -53,12 +53,14 @@ beforeEach(() => {
     if (q.sql.includes('INSERT INTO post_notes')) return [{ createdAt: new Date('2026-10-18T12:34:56.000Z') }];
     if (q.sql.includes('AS "foreignReferences"')) return [{ foreignReferences: false }];
     if (q.sql.includes('memberships m JOIN users u ON u.id = m."userId" WHERE m."userId"')) return [{ role: state.role, disabledAt: null }];
+    if (q.sql.includes('SELECT "suspendedAt", "mixAutoFill" FROM workspaces')) return [{ suspendedAt: null, mixAutoFill: state.mixAutoFill }];
     if (q.sql.includes('FROM targets')) return [{ id: 't1', name: 'Alpha', type: 'page' }, { id: 't2', name: 'Beta', type: 'page' }];
     if (q.sql.includes('COUNT(*)')) return [{ count: BigInt(0) }];
     return [];
   });
   db.$executeRaw.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const q = sql(strings, values); state.executions.push(q);
+    if (q.sql.includes('UPDATE workspaces SET "mixAutoFill"')) return state.workspaceUpdateCount;
     if (state.failAudit && q.sql.includes('activity_logs')) throw new Error('audit unavailable');
     return 1;
   });
@@ -389,6 +391,38 @@ describe('content mix', () => {
     const restricted = await readContentMix(actor);
     expect(restricted.groups).toEqual([]); expect(restricted.canEditGroups).toBe(false);
   });
+
+  it('limits planned and ready-draft counts to the author when authorization resolves a channel-scoped actor', async () => {
+    state.role = 'admin'; state.all = false; state.resolvedTargetIds = ['t1'];
+    await readContentMix(actor, new Date('2026-03-01T00:00:00Z'));
+    const counts = state.queries.filter(q => q.sql.includes('p.status::text = ANY') || q.sql.includes("p.status::text = 'draft'"));
+    expect(counts).toHaveLength(2);
+    for (const query of counts) {
+      expect(query.sql).toContain('p."authorId"');
+      expect(query.values).toContain(actor.userId);
+    }
+  });
+
+  it('serializes and audits the workspace auto-fill switch for all-channel admins', async () => {
+    await expect(setContentMixAutoFill(actor, { enabled: true, confirmation: 'ENABLE CONTENT MIX p1' })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(db.$transaction).not.toHaveBeenCalled();
+    await expect(setContentMixAutoFill(actor, { enabled: true, confirmation: mixAutoFillConfirmation(true) })).resolves.toEqual({ enabled: true, changed: true });
+    expect(state.queries.some(q => q.sql.includes('pg_advisory_xact_lock'))).toBe(true);
+    expect(state.queries.some(q => q.sql.includes('FOR UPDATE') && q.sql.includes('workspaces'))).toBe(true);
+    expect(state.executions.some(q => q.sql.includes('UPDATE workspaces SET "mixAutoFill"') && q.values.includes(true))).toBe(true);
+    expect(audited('publishing.content_mix_autofill_enabled')).toBe(true);
+
+    state.role = 'editor';
+    await expect(setContentMixAutoFill(actor, { enabled: false, confirmation: mixAutoFillConfirmation(false) })).rejects.toMatchObject({ code: 'forbidden' });
+    state.role = 'admin'; state.all = false;
+    await expect(setContentMixAutoFill(actor, { enabled: false, confirmation: mixAutoFillConfirmation(false) })).rejects.toMatchObject({ code: 'forbidden' });
+  });
+
+  it('refuses an unverified workspace update before writing an audit receipt', async () => {
+    state.workspaceUpdateCount = 0;
+    await expect(setContentMixAutoFill(actor, { enabled: true, confirmation: mixAutoFillConfirmation(true) })).rejects.toMatchObject({ code: 'conflict' });
+    expect(audited('publishing.content_mix_autofill_enabled')).toBe(false);
+  });
 });
 
 describe('recycle', () => {
@@ -420,6 +454,32 @@ describe('recycle', () => {
     state.post = { id: 'p1', authorId: 'user-a', status: 'failed', scheduledAt: null };
     await expect(setRecycle(actor, set())).rejects.toMatchObject({ code: 'conflict' });
     await expect(setRecycle(actor, set({ everyDays: COLLAB_DEFAULTS.recycleMaxIntervalDays + 1 }))).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
+  it('validates inherited intervals, limits and stored wordings against current Root bounds', async () => {
+    state.config['publishing.collab.recycleMaxIntervalDays'] = 6;
+    state.handlers = []; when('FROM posts WHERE id', () => [{ ...row, recycleEveryDays: 7 }]);
+    await expect(setRecycle(actor, set({ everyDays: undefined }))).rejects.toMatchObject({ code: 'invalid_request' });
+
+    state.config['publishing.collab.recycleMaxIntervalDays'] = COLLAB_DEFAULTS.recycleMaxIntervalDays;
+    state.config['publishing.collab.recycleMaxRepeats'] = 3;
+    state.handlers = []; when('FROM posts WHERE id', () => [{ ...row, recycleLimit: 4 }]);
+    await expect(setRecycle(actor, set({ limit: undefined }))).rejects.toMatchObject({ code: 'invalid_request' });
+
+    state.config['publishing.collab.recycleMaxRepeats'] = COLLAB_DEFAULTS.recycleMaxRepeats;
+    state.config['publishing.collab.variantsLimit'] = 1;
+    state.handlers = []; when('FROM posts WHERE id', () => [{ ...row, variants: ['one', 'two'] }]);
+    await expect(setRecycle(actor, set({ variants: undefined }))).rejects.toMatchObject({ code: 'invalid_request' });
+
+    state.config['publishing.collab.variantsLimit'] = COLLAB_DEFAULTS.variantsLimit;
+    state.config['publishing.collab.variantMaxCharacters'] = 3;
+    state.handlers = []; when('FROM posts WHERE id', () => [{ ...row, variants: ['long'] }]);
+    await expect(setRecycle(actor, set({ variants: undefined }))).rejects.toMatchObject({ code: 'invalid_request' });
+
+    state.config['publishing.collab.variantMaxCharacters'] = COLLAB_DEFAULTS.variantMaxCharacters;
+    state.handlers = []; when('FROM posts WHERE id', () => [{ ...row, variants: [42] }]);
+    await expect(setRecycle(actor, set({ variants: undefined }))).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(wrote('UPDATE posts SET "recycleEnabled"')).toBe(false);
   });
 
   it('keeps unreviewed alternate wordings behind editor standing when approvals are required', async () => {

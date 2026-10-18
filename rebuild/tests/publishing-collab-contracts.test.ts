@@ -12,7 +12,7 @@ vi.mock('@/modules/publishing/collaboration/server/custom-fields', () => ({ crea
 vi.mock('@/modules/publishing/collaboration/server/notes', () => ({ addPostNote: h.op('addNote'), deletePostNote: h.op('deleteNote'), readPostNotes: h.op('readNotes') }));
 vi.mock('@/modules/publishing/collaboration/server/versions', () => ({ readPostVersions: h.op('readVersions'), requestVersionRestore: h.op('restore') }));
 vi.mock('@/modules/publishing/collaboration/server/queue-slots', () => ({ readQueueSlots: h.op('readSlots'), replaceQueueSlots: h.op('replaceSlots') }));
-vi.mock('@/modules/publishing/collaboration/server/content-mix', () => ({ readContentMix: h.op('readMix'), saveContentMix: h.op('saveMix') }));
+vi.mock('@/modules/publishing/collaboration/server/content-mix', () => ({ readContentMix: h.op('readMix'), saveContentMix: h.op('saveMix'), setContentMixAutoFill: h.op('setMixAutoFill') }));
 vi.mock('@/modules/publishing/collaboration/server/recycle', () => ({ readRecycle: h.op('readRecycle'), setRecycle: h.op('setRecycle') }));
 
 import { POST as assignPost, GET as assignGet } from '../src/app/api/publishing/assignments/route';
@@ -21,10 +21,12 @@ import { PUT as valuesPut } from '../src/app/api/publishing/custom-fields/posts/
 import { DELETE as noteDelete } from '../src/app/api/publishing/notes/[id]/route';
 import { GET as notesGet } from '../src/app/api/publishing/notes/route';
 import { PUT as slotsPut, GET as slotsGet } from '../src/app/api/publishing/queue-slots/route';
-import { PUT as mixPut } from '../src/app/api/publishing/content-mix/route';
+import { GET as mixGet, PUT as mixPut } from '../src/app/api/publishing/content-mix/route';
+import { GET as recycleGet } from '../src/app/api/publishing/recycle/route';
 import { GET as versionsGet } from '../src/app/api/publishing/versions/route';
 import { executeCollaborationTool, collaborationToolDefinitions, collaborationWriteTools, availableCollaborationTools } from '../src/modules/publishing/collaboration/mcp';
 import { registerCollaborationPorts } from '../src/modules/publishing/collaboration/ports';
+import { ensurePublishingCollaboration } from '../src/server/publishing/collaboration';
 import { COLLAB_CONFIG, COLLAB_DEFAULTS } from '../src/modules/publishing/collaboration/config';
 import { effectiveMix, mentionedIn, nextRecycleAt, FIELD_CREATE, MIX_SAVE, slotKey } from '../src/modules/publishing/collaboration/schemas';
 
@@ -49,6 +51,11 @@ describe('collaboration HTTP', () => {
     expect(h.viewer).toHaveBeenLastCalledWith({ feature: 'publishing/queue', channelScoped: true, write: true });
     await mixPut(post(`${base}/content-mix`, '{}', 'PUT'));
     expect(h.viewer).toHaveBeenLastCalledWith({ feature: 'publishing/queue', channelScoped: true, write: true });
+    await mixPut(post(`${base}/content-mix`, '{"action":"setAutoFill","enabled":true,"confirmation":"ENABLE CONTENT MIX"}', 'PUT'));
+    expect(h.ops.setMixAutoFill).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w' }, { enabled: true, confirmation: 'ENABLE CONTENT MIX' });
+    expect(availableCollaborationTools().map(tool => tool.name)).toContain('set_content_mix_autofill');
+    await mixGet(new Request(`${base}/content-mix`));
+    expect(availableCollaborationTools().map(tool => tool.name)).toContain('get_content_mix');
     await assignPost(post(`${base}/assignments`, '{"postIds":["a"]}'));
     expect(h.viewer).toHaveBeenLastCalledWith({ feature: 'publishing/collaboration', channelScoped: true, write: true });
     expect(h.ops.assign).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w' }, { postIds: ['a'] });
@@ -104,10 +111,26 @@ describe('collaboration MCP', () => {
     expect(names()).toEqual(expect.arrayContaining(['restore_post_version', 'set_post_recycle', 'get_post_recycle']));
   });
 
+  it('installs recycle and mix capabilities only through the manifest-backed host worker handlers', () => {
+    ensurePublishingCollaboration();
+    expect(availableCollaborationTools().map(tool => tool.name)).toEqual(expect.arrayContaining([
+      'set_post_recycle', 'get_post_recycle', 'get_content_mix', 'save_content_mix', 'set_content_mix_autofill', 'replace_queue_times',
+    ]));
+  });
+
+  it('initializes recycling for a direct API request without a prior page visit', async () => {
+    const response = await recycleGet(new Request(`${base}/recycle?postId=p1`));
+    expect(response.status).toBe(200);
+    expect(h.ops.readRecycle).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w' }, { postId: 'p1' });
+    expect(availableCollaborationTools().map(tool => tool.name)).toContain('get_post_recycle');
+  });
+
   it('routes calls to the shared services with the actor and rejects unknown tools', async () => {
     const actor = { userId: 'u', workspaceId: 'w' };
     await executeCollaborationTool(actor, 'replace_queue_times', { targetId: null });
     expect(h.ops.replaceSlots).toHaveBeenCalledWith(actor, { targetId: null });
+    await executeCollaborationTool(actor, 'set_content_mix_autofill', { enabled: true, confirmation: 'ENABLE CONTENT MIX' });
+    expect(h.ops.setMixAutoFill).toHaveBeenCalledWith(actor, { enabled: true, confirmation: 'ENABLE CONTENT MIX' });
     await executeCollaborationTool(actor, 'get_post_field_values', { postId: 'p1' });
     expect(h.ops.readValues).toHaveBeenCalledWith(actor, 'p1');
     await expect(executeCollaborationTool(actor, 'nope', {})).rejects.toMatchObject({ code: 'invalid_request' });
@@ -115,10 +138,10 @@ describe('collaboration MCP', () => {
 });
 
 describe('collaboration contracts', () => {
-  it('distinguishes consumed Root limits from pending execution policy', () => {
+  it('registers every consumed Root collaboration limit', () => {
     const keys = COLLAB_CONFIG.map(c => c.key);
     expect(new Set(keys).size).toBe(keys.length);
-    for (const item of COLLAB_CONFIG) { expect(item.key.startsWith('publishing.collab.')).toBe(true); expect(item.consumption).toBe(['bulkPostLimit', 'labelsPerPostLimit', 'fieldLimit', 'fieldNameMax', 'fieldOptionMax', 'fieldOptionsLimit', 'fieldValueMax', 'mentionDirectoryLimit', 'noteMax', 'notePageSize', 'noteMentionLimit', 'notesPerPostLimit', 'versionPageSize', 'versionRetention', 'queueSlotLimit', 'queueLookaheadDays', 'transactionTimeoutMs', 'transactionMaxWaitMs'].some(key => item.key === `publishing.collab.${key}`) ? 'active' : 'planned'); expect(item.schema.safeParse(item.defaultValue).success).toBe(true); }
+    for (const item of COLLAB_CONFIG) { expect(item.key.startsWith('publishing.collab.')).toBe(true); expect(item.consumption).toBe('active'); expect(item.schema.safeParse(item.defaultValue).success).toBe(true); }
     expect(keys).toHaveLength(Object.keys(COLLAB_DEFAULTS).length);
   });
 

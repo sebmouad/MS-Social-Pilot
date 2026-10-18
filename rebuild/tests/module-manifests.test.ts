@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MODULES, PAGES } from '@/lib/product';
 import { moduleManifests } from '@/modules';
+import { CONFIG_BY_KEY } from '@/lib/config/registry';
 
 describe('customer module manifests', () => {
   it('keeps module and feature ids and routes unique', () => {
@@ -39,5 +40,19 @@ describe('customer module manifests', () => {
 
   it('uses a compact mobile title for Publishing', () => {
     expect(MODULES.find(({ id }) => id === 'publishing')?.mobileTitle).toBe('Publish');
+  });
+
+  it('declares Publishing automation jobs with module-owned validated Root schedules', () => {
+    const publishing = moduleManifests.find(module => module.id === 'publishing')!;
+    expect(publishing.jobs.filter(job => job.name.startsWith('publishing'))).toEqual([
+      { name: 'publishingRecycle', label: 'Post recycling', configKey: 'publishing.automation.recycleSchedule' },
+      { name: 'publishingMix', label: 'Content mix scheduling', configKey: 'publishing.automation.mixSchedule' },
+    ]);
+    for (const job of publishing.jobs.filter(job => job.name.startsWith('publishing'))) {
+      expect(publishing.rootSettingKeys).toContain(job.configKey);
+      expect(CONFIG_BY_KEY.get(job.configKey)?.schema.safeParse('15 * * * *').success).toBe(true);
+    }
+    expect(CONFIG_BY_KEY.get('jobs.order')?.schema.safeParse(CONFIG_BY_KEY.get('jobs.order')?.defaultValue).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('jobs.order')?.defaultValue).toEqual(expect.arrayContaining(['publishingRecycle', 'publishingMix']));
   });
 });

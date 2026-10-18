@@ -1,23 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Q = { sql: string; values: unknown[] };
-const st = vi.hoisted(() => ({ executions: [] as Q[], queries: [] as Q[], handlers: [] as Array<[string, (v: unknown[]) => unknown]>, execResult: new Map<string, number>() }));
-const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
+const st = vi.hoisted(() => ({ executions: [] as Q[], queries: [] as Q[], handlers: [] as Array<[string, (v: unknown[]) => unknown]>, execResult: new Map<string, number>(), cursorValues: {} as Record<string, string>, cursorPresent: {} as Record<string, boolean> }));
+const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn(), appSetting: { findUnique: vi.fn() } }));
 vi.mock('@/server/data', () => ({ prisma: db }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (key === 'data.workspaceOperationTimeoutMs' ? 30000 : DEFAULTS[key]) }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (key === 'data.workspaceOperationTimeoutMs' ? 30000 : key === 'publishing.automation.recycleCursor' || key === 'publishing.automation.mixCursor' ? st.cursorValues[key] ?? '' : DEFAULTS[key]) }));
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, cb: () => Promise<unknown>) => cb() }));
 
 import { COLLAB_CONFIG } from '../src/modules/publishing/collaboration/config';
 const DEFAULTS: Record<string, unknown> = Object.fromEntries(COLLAB_CONFIG.map(i => [i.key, i.defaultValue]));
-import { allocateQueueTime, nextAvailableSlot, runContentMix, runRecycleCycle, slotsForPages, variantForRun, wallToUtc } from '../src/modules/publishing/collaboration/server/executors';
+import { allocateQueueTime, nextAvailableSlot, runContentMix, runRecycleCycle, slotsForPages, variantForRun, wallToUtc, type AutomationLifecycle } from '../src/modules/publishing/collaboration/server/executors';
 import { availableCollaborationTools } from '../src/modules/publishing/collaboration/mcp';
 import { registerCollaborationPorts } from '../src/modules/publishing/collaboration/ports';
 
 const when = (fragment: string, fn: (v: unknown[]) => unknown) => { st.handlers.unshift([fragment, fn]); };
 const wrote = (f: string) => st.executions.filter(q => q.sql.includes(f));
 const now = new Date('2026-03-02T10:00:00Z'); // Monday
+const lifecycle = {
+  recycle: vi.fn(async (_tx: Parameters<AutomationLifecycle['recycle']>[0], _input: Parameters<AutomationLifecycle['recycle']>[1]) => true),
+  stop: vi.fn(async (_tx: Parameters<AutomationLifecycle['stop']>[0], _input: Parameters<AutomationLifecycle['stop']>[1]) => true),
+  schedule: vi.fn(async (_tx: Parameters<AutomationLifecycle['schedule']>[0], _input: Parameters<AutomationLifecycle['schedule']>[1]) => true),
+} satisfies AutomationLifecycle;
 beforeEach(() => {
-  vi.clearAllMocks(); Object.assign(st, { executions: [], queries: [], handlers: [], execResult: new Map() });
+  vi.clearAllMocks(); Object.assign(st, { executions: [], queries: [], handlers: [], execResult: new Map(), cursorValues: {}, cursorPresent: {} });
+  db.appSetting.findUnique.mockImplementation(async ({ where }: { where: { key: string } }) => st.cursorPresent[where.key] ? { value: st.cursorValues[where.key], encrypted: false } : null);
+  lifecycle.recycle.mockResolvedValue(true); lifecycle.stop.mockResolvedValue(true); lifecycle.schedule.mockResolvedValue(true);
   db.$transaction.mockImplementation(async (cb: (tx: typeof db) => Promise<unknown>) => cb(db));
   db.$queryRaw.mockImplementation(async (s: TemplateStringsArray, ...values: unknown[]) => {
     const q = { sql: s.join('?'), values }; st.queries.push(q);
@@ -27,6 +34,8 @@ beforeEach(() => {
   db.$executeRaw.mockImplementation(async (s: TemplateStringsArray, ...values: unknown[]) => {
     const q = { sql: s.join('?'), values }; st.executions.push(q);
     for (const [f, n] of st.execResult) if (q.sql.includes(f)) return n;
+    if (q.sql.includes('INSERT INTO app_settings')) { const key = String(values[0]); st.cursorValues[key] = JSON.parse(String(values[1])); st.cursorPresent[key] = true; }
+    if (q.sql.includes('UPDATE app_settings SET')) { const key = String(values[1]); st.cursorValues[key] = JSON.parse(String(values[0])); st.cursorPresent[key] = true; }
     return 1;
   });
 });
@@ -66,42 +75,69 @@ describe('scheduling helpers', () => {
 
 const due = { id: 'p1', workspaceId: 'w1', message: 'Hello', firstComment: null, firstCommentDelayMinutes: 0, format: 'post', link: null, linkPreview: null, media: [], mediaKeys: [], publishMode: 'worker', timezone: 'UTC', authorId: 'u', recycleEveryDays: 7, recycleLimit: 3, recycleCount: 0, recycleNextAt: new Date('2026-03-02T09:00:00Z'), variants: ['Alt'] };
 describe('recycle executor', () => {
-  beforeEach(() => { when('FOR UPDATE SKIP LOCKED', () => [due]); when('FROM posts WHERE "recycleEnabled"', () => [{ id: 'p1', workspaceId: 'w1' }]); when('FROM post_targets pt JOIN targets', () => [{ targetId: 't1' }, { targetId: 't2' }]); });
+  beforeEach(() => { when('FOR UPDATE SKIP LOCKED', () => [due]); when('FROM posts WHERE id >', () => [{ id: 'p1', workspaceId: 'w1' }]); when('FROM post_targets pt JOIN targets', () => [{ targetId: 't1' }, { targetId: 't2' }]); });
   it('claims by compare-and-set, creates one deterministic scheduled copy with destinations and audits', async () => {
-    await expect(runRecycleCycle({ now, eligible: async () => true })).resolves.toMatchObject({ checked: 1, created: 1, failed: 0 });
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ checked: 1, created: 1, failed: 0 });
     const claim = wrote('UPDATE posts SET "recycleCount"')[0]!;
     expect(claim.values).toContain(1);
-    const insert = wrote('INSERT INTO posts')[0]!;
-    expect(insert.values).toContain('rc_p1_1'); expect(insert.values).toContain('Alt');
-    expect(wrote('INSERT INTO post_targets')).toHaveLength(2);
+    expect(lifecycle.recycle).toHaveBeenCalledWith(expect.anything(), { workspaceId: 'w1', sourcePostId: 'p1', copyId: 'rc_p1_1', message: 'Alt', scheduledAt: now, run: 1 });
+    expect(wrote('INSERT INTO posts')).toHaveLength(0); expect(wrote('INSERT INTO post_targets')).toHaveLength(0);
     expect(wrote('activity_logs')[0]!.values).toContain('publishing.recycled');
   });
   it('creates nothing when another worker won the claim or the row is locked', async () => {
     st.execResult.set('UPDATE posts SET "recycleCount"', 0);
-    await expect(runRecycleCycle({ now, eligible: async () => true })).resolves.toMatchObject({ created: 0, skipped: 1 });
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ created: 0, failed: 1 });
     expect(wrote('INSERT INTO posts')).toHaveLength(0);
-    st.handlers = []; when('FROM posts WHERE "recycleEnabled"', () => [{ id: 'p1', workspaceId: 'w1' }]);
-    await expect(runRecycleCycle({ now, eligible: async () => true })).resolves.toMatchObject({ skipped: 1 });
+    st.handlers = []; when('FROM posts WHERE id >', () => [{ id: 'p1', workspaceId: 'w1' }]);
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ skipped: 1 });
   });
   it('does not duplicate targets on an id conflict, and finishes at the repeat limit', async () => {
     st.execResult.set('INSERT INTO posts', 0);
-    await runRecycleCycle({ now, eligible: async () => true }); expect(wrote('INSERT INTO post_targets')).toHaveLength(0);
+    await runRecycleCycle({ now, eligible: async () => true, lifecycle }); expect(wrote('INSERT INTO post_targets')).toHaveLength(0);
     st.handlers = []; st.executions = [];
-    when('FROM posts WHERE "recycleEnabled"', () => [{ id: 'p1', workspaceId: 'w1' }]); when('FOR UPDATE SKIP LOCKED', () => [{ ...due, recycleCount: 2 }]); when('FROM post_targets pt JOIN targets', () => [{ targetId: 't1' }]);
-    await expect(runRecycleCycle({ now, eligible: async () => true })).resolves.toMatchObject({ created: 0, finished: 1 });
+    when('FROM posts WHERE id >', () => [{ id: 'p1', workspaceId: 'w1' }]); when('FOR UPDATE SKIP LOCKED', () => [{ ...due, recycleCount: 2 }]); when('FROM post_targets pt JOIN targets', () => [{ targetId: 't1' }]);
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ created: 1, finished: 1 });
     expect(wrote('UPDATE posts SET "recycleCount"')[0]!.values).toContain(false);
   });
   it('stops a post with no active destination and honours workspace eligibility', async () => {
-    st.handlers = []; when('FROM posts WHERE "recycleEnabled"', () => [{ id: 'p1', workspaceId: 'w1' }]); when('FOR UPDATE SKIP LOCKED', () => [due]);
-    await expect(runRecycleCycle({ now, eligible: async () => true })).resolves.toMatchObject({ finished: 1 });
+    st.handlers = []; when('FROM posts WHERE id >', () => [{ id: 'p1', workspaceId: 'w1' }]); when('FOR UPDATE SKIP LOCKED', () => [due]);
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ finished: 1 });
     expect(wrote('"recycleEnabled" = FALSE')).toHaveLength(1); expect(wrote('INSERT INTO posts')).toHaveLength(0);
     st.executions = [];
-    await expect(runRecycleCycle({ now, eligible: async () => false })).resolves.toMatchObject({ skipped: 1 });
-    expect(st.executions).toHaveLength(0);
+    await expect(runRecycleCycle({ now, eligible: async () => false, lifecycle })).resolves.toMatchObject({ skipped: 1 });
+    expect(wrote('UPDATE posts')).toHaveLength(0);
+  });
+  it('does not stop or audit a recycle source when lifecycle authorization declines', async () => {
+    st.handlers = []; when('FROM posts WHERE "recycleEnabled"', () => [{ id: 'p1', workspaceId: 'w1' }]);
+    when('FOR UPDATE SKIP LOCKED', () => [due]); // no active targets
+    lifecycle.stop.mockResolvedValueOnce(false);
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ skipped: 1 });
+    expect(lifecycle.stop).toHaveBeenCalledWith(expect.anything(), { workspaceId: 'w1', sourcePostId: 'p1', reason: 'no_active_destinations' });
+    expect(wrote('"recycleEnabled" = FALSE')).toHaveLength(0); expect(wrote('publishing.recycle_stopped')).toHaveLength(0);
+  });
+  it.each([
+    ['interval exceeds current Root limit', { ...due, recycleEveryDays: 366 }],
+    ['repeat limit exceeds current Root limit', { ...due, recycleLimit: 1001 }],
+    ['variant entry is malformed', { ...due, variants: ['valid', 12] }],
+    ['variant count exceeds current Root limit', { ...due, variants: Array.from({ length: 11 }, (_, i) => `Alt ${i}`) }],
+    ['variant length exceeds current Root limit', { ...due, variants: ['x'.repeat(5001)] }],
+  ])('refuses recycle when %s without calling lifecycle or mutating the source', async (_label, invalid) => {
+    when('FOR UPDATE SKIP LOCKED', () => [invalid]);
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ failed: 1, created: 0 });
+    expect(lifecycle.recycle).not.toHaveBeenCalled(); expect(lifecycle.stop).not.toHaveBeenCalled();
+    expect(wrote('UPDATE posts')).toHaveLength(0); expect(wrote('publishing.recycled')).toHaveLength(0);
+  });
+  it('stops an exhausted recycle cadence without creating one more copy and preserves its count', async () => {
+    when('FOR UPDATE SKIP LOCKED', () => [{ ...due, recycleLimit: 1, recycleCount: 1 }]);
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ finished: 1, created: 0 });
+    expect(lifecycle.recycle).not.toHaveBeenCalled();
+    expect(lifecycle.stop).toHaveBeenCalledWith(expect.anything(), { workspaceId: 'w1', sourcePostId: 'p1', reason: 'repeat_limit' });
+    expect(wrote('"recycleEnabled" = FALSE')[0]!.values).toContain(1);
+    expect(JSON.parse(String(wrote('activity_logs')[0]!.values[3]))).toMatchObject({ reason: 'repeat_limit' });
   });
   it('counts failures without stopping the batch', async () => {
     db.$transaction.mockRejectedValueOnce(new Error('db'));
-    await expect(runRecycleCycle({ now, eligible: async () => true })).resolves.toMatchObject({ failed: 1 });
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ failed: 1 });
   });
 });
 
@@ -116,31 +152,34 @@ describe('content mix executor', () => {
   };
   it('schedules ready drafts into distinct free times, atomically per draft, and audits', async () => {
     base(true, [draft('d1'), draft('d2')]);
-    await expect(runContentMix({ now, eligible: async () => true })).resolves.toMatchObject({ scheduled: 2, dry: 0 });
+    await expect(runContentMix({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ scheduled: 2, dry: 0 });
     const updates = wrote('SET status = \'scheduled\'');
-    expect(updates).toHaveLength(2); expect(updates[0]!.values[0]).not.toEqual(updates[1]!.values[0]);
-    expect(updates.every(u => u.sql.includes("status::text = 'draft'") && u.values.includes('w1'))).toBe(true);
-    expect(wrote('activity_logs').filter(q => q.values.includes('publishing.mix_scheduled'))).toHaveLength(2);
+    expect(updates).toHaveLength(0);
+    expect(lifecycle.schedule).toHaveBeenCalledTimes(2);
+    expect(lifecycle.schedule.mock.calls.map(c => c[1])).toEqual([
+      { workspaceId: 'w1', postId: 'd1', scheduledAt: expect.any(Date), timeZone: 'UTC' },
+      { workspaceId: 'w1', postId: 'd2', scheduledAt: expect.any(Date), timeZone: 'UTC' },
+    ]);
   });
   it('does not schedule when auto-fill is off, and tells once that a label ran dry', async () => {
     base(false, []);
     const notify = vi.fn(async () => {});
-    await expect(runContentMix({ now, notify, eligible: async () => true })).resolves.toMatchObject({ scheduled: 0, dry: 1 });
+    await expect(runContentMix({ now, notify, eligible: async () => true, lifecycle })).resolves.toMatchObject({ scheduled: 0, dry: 1 });
     expect(notify).toHaveBeenCalledWith({ workspaceId: 'w1', targetId: 't1', labelId: 'l1' });
     expect(wrote('SET status')).toHaveLength(0);
     st.execResult.set('"dryNotifiedAt" = ?', 0); notify.mockClear();
-    await expect(runContentMix({ now, notify, eligible: async () => true })).resolves.toMatchObject({ dry: 0 }); expect(notify).not.toHaveBeenCalled();
+    await expect(runContentMix({ now, notify, eligible: async () => true, lifecycle })).resolves.toMatchObject({ dry: 0 }); expect(notify).not.toHaveBeenCalled();
   });
   it('skips drafts that need review and survives a failing notifier', async () => {
     base(true, [{ ...draft('d1'), approvalStatus: 'pending' }, { ...draft('d2'), allActive: false }]);
     const notify = vi.fn(async () => { throw new Error('mail'); });
-    await expect(runContentMix({ now, notify, eligible: async () => true })).resolves.toMatchObject({ scheduled: 0, dry: 1, failed: 0 });
+    await expect(runContentMix({ now, notify, eligible: async () => true, lifecycle })).resolves.toMatchObject({ scheduled: 0, dry: 1, failed: 0 });
     expect(wrote('SET status')).toHaveLength(0);
   });
   it('leaves ineligible workspaces untouched', async () => {
     base(true, [draft('d1')]);
-    await expect(runContentMix({ now, eligible: async () => false })).resolves.toMatchObject({ skipped: 1 });
-    expect(st.executions).toHaveLength(0);
+    await expect(runContentMix({ now, eligible: async () => false, lifecycle })).resolves.toMatchObject({ skipped: 1 });
+    expect(wrote('UPDATE posts')).toHaveLength(0);
   });
 });
 
@@ -165,11 +204,82 @@ describe('required worker authorization', () => {
     expect(db.$queryRaw).not.toHaveBeenCalled();
     expect(db.$executeRaw).not.toHaveBeenCalled();
   });
+  it('validates and scopes an explicitly selected workspace before processing candidates', async () => {
+    await expect(runRecycleCycle({ now, workspaceId: 'w1', eligible: async () => true, lifecycle })).resolves.toMatchObject({ checked: 0 });
+    const recycleQuery = st.queries.find(q => q.sql.includes('FROM posts WHERE "workspaceId"'))!;
+    expect(recycleQuery.sql).toContain('"workspaceId" = ?'); expect(recycleQuery.values).toContain('w1');
+    st.queries = [];
+    await expect(runContentMix({ now, workspaceId: 'w1', eligible: async () => true, lifecycle })).resolves.toMatchObject({ workspaces: 0 });
+    const mixQuery = st.queries.find(q => q.sql.includes('FROM content_mix_rules WHERE "workspaceId"'))!;
+    expect(mixQuery.sql).toContain('"workspaceId" = ?'); expect(mixQuery.values).toContain('w1');
+    expect(db.appSetting.findUnique).not.toHaveBeenCalled(); expect(wrote('app_settings')).toHaveLength(0);
+    st.queries = [];
+    await expect(runContentMix({ now, workspaceId: '', eligible: async () => true, lifecycle })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(st.queries).toHaveLength(0);
+  });
+  it('rotates past a skipped first batch so later workspaces are reached', async () => {
+    const all = Array.from({ length: 51 }, (_, i) => ({ workspaceId: `w${String(i + 1).padStart(3, '0')}` }));
+    when('FROM content_mix_rules WHERE "workspaceId" >', values => all.filter(item => item.workspaceId > String(values[0])).slice(0, 50));
+    when('SELECT DISTINCT "workspaceId" FROM content_mix_rules ORDER BY', () => all.slice(0, 50));
+    const eligible = vi.fn(async () => false);
+    await expect(runContentMix({ now, eligible, lifecycle })).resolves.toMatchObject({ workspaces: 50, skipped: 50 });
+    expect(st.cursorValues['publishing.automation.mixCursor']).toBe('w050');
+    await expect(runContentMix({ now, eligible, lifecycle })).resolves.toMatchObject({ workspaces: 1, skipped: 1 });
+    expect(eligible).toHaveBeenCalledTimes(51);
+    expect(st.cursorValues['publishing.automation.mixCursor']).toBe('w051');
+  });
+  it('rotates recycle posts past a skipped first batch', async () => {
+    const all = Array.from({ length: 51 }, (_, i) => ({ id: `p${String(i + 1).padStart(3, '0')}`, workspaceId: 'w1' }));
+    when('FROM posts WHERE id >', values => all.filter(item => item.id > String(values[0])).slice(0, 50));
+    const eligible = vi.fn(async () => false);
+    await expect(runRecycleCycle({ now, eligible, lifecycle })).resolves.toMatchObject({ checked: 50, skipped: 50 });
+    expect(st.cursorValues['publishing.automation.recycleCursor']).toBe('p050');
+    await expect(runRecycleCycle({ now, eligible, lifecycle })).resolves.toMatchObject({ checked: 1, skipped: 1 });
+    expect(eligible).toHaveBeenCalledTimes(51);
+    expect(st.cursorValues['publishing.automation.recycleCursor']).toBe('p051');
+  });
+  it('does not overwrite a Root cursor edit made after the scan cursor was read', async () => {
+    st.cursorValues['publishing.automation.mixCursor'] = 'w010'; st.cursorPresent['publishing.automation.mixCursor'] = true;
+    when('FROM content_mix_rules WHERE "workspaceId" >', () => [{ workspaceId: 'w020' }]);
+    db.appSetting.findUnique.mockResolvedValueOnce({ value: 'root-edit', encrypted: false });
+    await expect(runContentMix({ now, eligible: async () => false, lifecycle })).resolves.toMatchObject({ workspaces: 1, skipped: 1 });
+    expect(wrote('UPDATE app_settings')).toHaveLength(0); expect(wrote('INSERT INTO root_activities')).toHaveLength(0);
+    expect(st.cursorValues['publishing.automation.mixCursor']).toBe('w010');
+  });
   it('rechecks each recycle item instead of caching an earlier workspace grant', async () => {
-    when('FROM posts WHERE "recycleEnabled"', () => [{ id: 'one', workspaceId: 'w1' }, { id: 'two', workspaceId: 'w1' }]);
+    when('FROM posts WHERE id >', () => [{ id: 'one', workspaceId: 'w1' }, { id: 'two', workspaceId: 'w1' }]);
     const eligible = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
-    await expect(runRecycleCycle({ now, eligible })).resolves.toMatchObject({ checked: 2, skipped: 2 });
+    await expect(runRecycleCycle({ now, eligible, lifecycle })).resolves.toMatchObject({ checked: 2, skipped: 2 });
     expect(eligible).toHaveBeenCalledTimes(2);
     expect(wrote('INSERT INTO posts')).toHaveLength(0);
+  });
+  it('requires lifecycle callbacks before reading candidates', async () => {
+    await expect(runRecycleCycle({ now, eligible: async () => true })).rejects.toMatchObject({ code: 'unavailable' });
+    await expect(runContentMix({ now, eligible: async () => true })).rejects.toMatchObject({ code: 'unavailable' });
+    expect(db.$queryRaw).not.toHaveBeenCalled(); expect(db.$executeRaw).not.toHaveBeenCalled();
+  });
+  it('does not claim a recycle run when lifecycle declines or throws', async () => {
+    when('FROM posts WHERE id >', () => [{ id: 'p1', workspaceId: 'w1' }]);
+    when('FOR UPDATE SKIP LOCKED', () => [due]);
+    when('FROM post_targets pt JOIN targets', () => [{ targetId: 't1' }]);
+    lifecycle.recycle.mockResolvedValueOnce(false);
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ skipped: 1, created: 0 });
+    expect(wrote('UPDATE posts SET "recycleCount"')).toHaveLength(0);
+    st.executions = []; lifecycle.recycle.mockRejectedValueOnce(new Error('lifecycle refused'));
+    await expect(runRecycleCycle({ now, eligible: async () => true, lifecycle })).resolves.toMatchObject({ failed: 1 });
+    expect(wrote('UPDATE posts SET "recycleCount"')).toHaveLength(0);
+  });
+  it('skips mix candidates when the lifecycle declines and rechecks eligibility per candidate', async () => {
+    const draft = (id: string) => ({ id, authorId: 'u', approvalStatus: 'approved', targets: ['t1'], allActive: true, labels: ['l1'] });
+    when('FROM content_mix_rules WHERE "workspaceId"', () => [{ id: 'r1', targetId: 't1', groupId: null, labelId: 'l1', perWeek: 2, dryNotifiedAt: null }]);
+    when('SELECT DISTINCT "workspaceId"', () => [{ workspaceId: 'w1' }]);
+    when('FROM workspaces', () => [{ timezone: 'UTC', mixAutoFill: true, requiresApproval: false }]);
+    when('FROM targets', () => [{ id: 't1' }]);
+    when('FROM queue_slots', () => [{ targetId: null, dayOfWeek: 1, hour: 15, minute: 0 }, { targetId: null, dayOfWeek: 3, hour: 9, minute: 0 }]);
+    when("p.status::text = 'draft'", () => [draft('d1'), draft('d2')]);
+    lifecycle.schedule.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const eligible = vi.fn().mockResolvedValue(true);
+    await expect(runContentMix({ now, eligible, lifecycle })).resolves.toMatchObject({ scheduled: 1, skipped: 1 });
+    expect(eligible).toHaveBeenCalledTimes(3); // workspace gate and each attempted schedule
   });
 });

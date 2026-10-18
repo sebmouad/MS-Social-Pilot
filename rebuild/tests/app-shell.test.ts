@@ -95,6 +95,38 @@ describe('two-sidebar app shell', () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(toggle);
   });
+  it('leaves Escape and Tab to an open native dialog above the drawer', async () => {
+    await render();
+    const toggle = container.querySelector<HTMLButtonElement>('.shell-filter-toggle')!;
+    await act(async () => toggle.click());
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+
+    const modal = document.createElement('dialog');
+    const confirm = document.createElement('button');
+    confirm.textContent = 'Confirm';
+    modal.append(confirm);
+    modal.setAttribute('open', '');
+    document.body.append(modal);
+    confirm.focus();
+
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    await act(async () => confirm.dispatchEvent(escape));
+    expect(escape.defaultPrevented).toBe(false);
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    await act(async () => confirm.dispatchEvent(tab));
+    expect(tab.defaultPrevented).toBe(false);
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+
+    modal.removeAttribute('open');
+    const drawerEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    await act(async () => window.dispatchEvent(drawerEscape));
+    expect(drawerEscape.defaultPrevented).toBe(true);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(toggle);
+    modal.remove();
+  });
   it('lets an open native select handle Escape before dismissing its drawer', async () => {
     await render(undefined, { sidebar: createElement('select', { 'aria-label': 'Channel' }, createElement('option', null, 'Example channel')) });
     await act(async () => container.querySelector<HTMLButtonElement>('.shell-filter-toggle')!.click());

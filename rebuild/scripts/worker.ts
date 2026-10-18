@@ -12,6 +12,16 @@ const log = (message: string, detail?: unknown) => console.log(`${new Date().toI
 const dependencies: WorkerDependencies = {
   readConfig: runtimeConfig,
   async execute(job: JobName, now: Date, retryLimit: number, retryBackoff: RetryBackoff) {
+    if (job === 'publishingRecycle') {
+      const { runPublishingRecycle } = await import('../src/server/publishing/automation');
+      const result = await runPublishingRecycle(now);
+      return Object.entries(result).map(([key, count]) => `${key}=${count}`).join(' ');
+    }
+    if (job === 'publishingMix') {
+      const { runPublishingMix } = await import('../src/server/publishing/automation');
+      const result = await runPublishingMix(now);
+      return Object.entries(result).map(([key, count]) => `${key}=${count}`).join(' ');
+    }
     if (job === 'purges') {
       const { resumePendingWorkspaceDataPurges } = await import('../src/server/data-control');
       const result = await resumePendingWorkspaceDataPurges();

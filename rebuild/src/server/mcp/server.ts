@@ -149,7 +149,7 @@ const toolFeatures: Record<string, string> = {
   compare_ads_performance: 'ads/compare', list_ads_objects: 'ads/objects', get_ads_object: 'ads/objects',
   get_analytics_demographics: 'analytics/demographics', compare_analytics: 'analytics/compare',
   get_analytics_pins: 'analytics/pins', pin_analytics_metric: 'analytics/pins', unpin_analytics_metric: 'analytics/pins', reorder_analytics_pins: 'analytics/pins',
-  ...Object.fromEntries(collaborationToolDefinitions.map(tool => [tool.name, ['list_queue_times', 'replace_queue_times', 'get_content_mix', 'save_content_mix'].includes(tool.name) ? 'publishing/queue' : 'publishing/collaboration'])),
+  ...Object.fromEntries(collaborationToolDefinitions.map(tool => [tool.name, ['list_queue_times', 'replace_queue_times', 'get_content_mix', 'save_content_mix', 'set_content_mix_autofill'].includes(tool.name) ? 'publishing/queue' : 'publishing/collaboration'])),
   list_workspace_team: 'settings/team',
   add_workspace_member: 'settings/team',
   update_workspace_member: 'settings/team',

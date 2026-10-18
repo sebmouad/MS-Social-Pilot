@@ -159,7 +159,7 @@ function RecycleSection({ postId, canWrite, initial, timeZone }: { postId: strin
   return <section className={styles.section} aria-labelledby="recycle-title"><h2 id="recycle-title">Repeat this post</h2>
     {action.banner}
     {state.isRepeat ? <p className={styles.help}>This post is a repeat of another post. Change repeating on the original.</p> : <>
-      <p className={styles.help}>{state.enabled ? `Repeating every ${state.everyDays} days. ${state.count} repeat${state.count === 1 ? '' : 's'} so far${state.nextAt ? `; next on ${when(state.nextAt, timeZone)}` : ''}.` : 'Repeating is off.'} Channels may reject identical text, so add alternate wordings to rotate.</p>
+      <p className={styles.help}>{state.enabled ? `Repeating every ${state.everyDays} days. ${state.count} repeat${state.count === 1 ? '' : 's'} so far${state.nextAt ? `; next on ${when(state.nextAt, timeZone)}` : ''}.` : 'Repeating is off.'} Channels may reject identical text, so alternate wordings can rotate. Changed wordings may need workspace approval; when approvals are required, only editors and above can add them.</p>
       <form noValidate className={styles.form} onSubmit={event => { event.preventDefault(); setReview(true); }}>
         <label className={styles.check}><input type="checkbox" disabled={!canWrite || action.busy} checked={enabled} onChange={e => setEnabled(e.target.checked)} />Repeat this post</label>
         <label>Days between repeats<input type="number" min={1} max={state.maxIntervalDays} required value={days} disabled={!canWrite || action.busy} onChange={e => setDays(Math.max(1, Math.min(state.maxIntervalDays, Number(e.target.value) || 1)))} /></label>
@@ -168,6 +168,6 @@ function RecycleSection({ postId, canWrite, initial, timeZone }: { postId: strin
         {list.length > state.maxVariants && <p role="alert">Use at most {state.maxVariants} wordings.</p>}
         {canWrite && <div className={styles.actions}><Button type="submit" variant="primary" disabled={action.busy || list.length > state.maxVariants}>Review repeat settings</Button></div>}
       </form></>}
-    <ConfirmDialog feedback={action.feedback} open={review} title="Review repeat settings" description={enabled ? `The post will be copied every ${days} days${limit ? `, up to ${limit} times` : ''}. Repeats are new publications on the same channels.` : 'Repeating stops. Repeats already created are not removed.'} confirmation={confirmation} actionLabel="Save repeat settings" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void save()} />
+    <ConfirmDialog feedback={action.feedback} open={review} confirmationMode="review" title="Review repeat settings" description={enabled ? `New posts will be prepared every ${days} days${limit ? `, up to ${limit} times` : ''} on the same channels. Workspace approval rules may hold each repeat for review before publication.` : 'Repeating stops. Repeats already created are not removed.'} confirmation={confirmation} actionLabel="Save repeat settings" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void save()} />
   </section>;
 }

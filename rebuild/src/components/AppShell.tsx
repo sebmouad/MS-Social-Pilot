@@ -45,6 +45,8 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     const focusable = () => [...(panel?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])].filter(item => item.getClientRects().length > 0);
     (focusable()[0] ?? panel)?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
+      // Native dialogs are top-layer modal UI and own Escape plus focus navigation.
+      if (document.querySelector('dialog[open]')) return;
       if (event.key === 'Escape') {
         if (event.defaultPrevented || event.isComposing) return;
         // An open native select owns the first Escape. Its browser popup must
