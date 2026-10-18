@@ -243,3 +243,39 @@ not be assumed to remove the scheduled publisher's current author permission
 checks; resolve job-specific authority explicitly and preserve the contract.
 All remaining legacy/provider/migration/rollback/browser/release gates remain
 open. Production and socialpilot-deploy remain legacy.
+
+
+## Batch 71 — saved queue times and lifecycle allocation
+
+Registry 64 installs Publishing-owned initial timetable defaults and activates
+queue-slot/lookahead bounds. Posts can enter the next valid shared/channel slot
+through one current-authorized, lock-serialized service used by HTTP and workspace
+MCP. Allocation preserves approval holds, records history and audit atomically,
+checks content/media/destinations and never publishes immediately. The contextual
+sidebar owns timetable selection; per-scope unsaved drafts survive selection
+changes. Review shows actual destinations, slots and workspace timezone.
+
+The isolated staged-source snapshot passed 2,148 tests / 279 files, production
+build and subsequent serial typecheck. Independent source review found no important
+remaining issue. Chrome verified desktop sidebar selection, draft retention/discard
+and a 390px phone layout. The final guarded HTTP/MCP/PostgreSQL queue probe passed, including actual
+authenticated HTML showing the changed Root default time and workspace timezone.
+Five temporary drafts and related fixtures were removed, and all ten captured
+Root settings and synthetic audit rows were restored exactly.
+The optional static UI audit runner is no longer installed; no fresh pass is claimed.
+
+Initial interrupted probe runs lost prior in-memory configuration snapshots.
+Exact pre-interruption settings cannot be claimed restored. A private preview
+backup was scratch-restored and counts/checksum matched before confirmed orphan
+fixture cleanup. A new typed, audited preview baseline was established. Subsequent
+successful guarded execution restored its captured baseline exactly. The hardened
+probe writes a private recovery ledger before mutations and keeps it on cleanup
+failure. See PUBLISHING_QUEUE.md and CUTOVER.md for scope and evidence. Production
+was untouched; this is not release rollback or arbitrary-kill recovery proof.
+
+Next: publish this verified batch; then integrate
+content mix/recycling through lifecycle-safe validation, approvals, history and
+current job authority. Full composer queue-mode parity, remaining legacy modules,
+Facebook native formats/live coverage and held-photo cleanup, production-shaped
+migration/rollback and cutover remain open. Production/socialpilot-deploy remain
+legacy. Do not broad-stage unfinished source slices.

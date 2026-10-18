@@ -1,3 +1,4 @@
+import { SidebarDock } from '@/components/SidebarDock';
 import { PostPreview } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
 import { readPublishingPostPage } from "@/modules/publishing/server/read";
@@ -26,6 +27,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   }
   const dayHeading = (key: string) => key === "unscheduled" ? "No time set" : `${key === today ? "Today · " : key === tomorrow ? "Tomorrow · " : ""}${new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }).format(new Date(`${key}T12:00:00Z`))}`;
   return <>
+    <SidebarDock><a className="text-link" href="/publishing/collaboration?view=queue">Queue times</a></SidebarDock>
     <PageHeading title="Queue" description={`Scheduled posts waiting to publish, in publishing order. Times are in ${timeZone.replaceAll("_", " ")}.`} summary={`${listing.total} scheduled ${listing.total === 1 ? "post" : "posts"} · page ${listing.page} of ${listing.pages}`} />
     {listing.total === 0 ? <EmptyState title="Nothing is scheduled">Posts you schedule from the composer wait here until their publishing time. <a className="text-link" href="/publishing/compose">Create a post</a> or open the <a className="text-link" href="/publishing/calendar">calendar</a> to plan one.</EmptyState> : <>
       {[...groups.entries()].map(([key, posts]) => <section key={key} className={workflow.group} aria-labelledby={`queue-${key}`}>

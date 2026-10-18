@@ -1,9 +1,11 @@
+import { queueDefaultSlotSchema } from '@/modules/publishing/queue-config';
 import { ensurePublishingCollaboration } from '@/server/publishing/collaboration';
 import { runtimeConfig } from '@/server/config/store';
 import { parseCollaborationSearch } from '@/modules/publishing/collaboration/search';
 import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
 import { requireViewer } from '@/server/context';
+import { canUseFeature } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { bounds } from '@/modules/publishing/collaboration/server/core';
 import { readCustomFields } from '@/modules/publishing/collaboration/server/custom-fields';
@@ -29,13 +31,17 @@ export default async function CollaborationPage({ searchParams }: { searchParams
   const view: ViewId = available.includes(params.view as ViewId) ? (params.view as ViewId) : 'assign';
   const feature = view === 'queue' || view === 'mix' ? 'publishing/queue' : 'publishing/collaboration';
   const viewer = await requireViewer({ feature, channelScoped: true });
+  const visibleViews = available.filter(candidate => {
+    const candidateFeature = candidate === 'queue' || candidate === 'mix' ? 'publishing/queue' : 'publishing/collaboration';
+    return canUseFeature(viewer.entitlements, candidateFeature) && canAccessFeature(viewer.permissions, candidateFeature, 'read');
+  });
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const canWrite = canAccessFeature(viewer.permissions, feature, 'write');
   const failure = (error: unknown) => <><PageHeading title={TITLES[view]} description="Organize posts for your team." /><RouteNotice error focusKey="collab-load-error">{error instanceof OperationError ? error.message : 'This page could not be loaded. Refresh and try again.'}</RouteNotice></>;
   try {
     const maxCharacters = await runtimeConfig('publishing.searchMaxCharacters');
-    const filters = parseCollaborationSearch(params, available, maxCharacters);
-    const nav = <CollaborationNav view={view} available={available} />;
+    const filters = parseCollaborationSearch(params, visibleViews, maxCharacters);
+    const nav = <CollaborationNav view={view} available={visibleViews} />;
     if (view === 'assign') {
       const { page, q } = filters;
       const [result, labels] = await Promise.all([listAssignablePosts(actor, { page, ...(q ? { q } : {}) }), readCollaborationLabels(actor)]);
@@ -51,7 +57,7 @@ export default async function CollaborationPage({ searchParams }: { searchParams
     if (view === 'queue') {
       const [result, limit] = await Promise.all([readQueueSlots(actor), bounds()]);
       return <>{nav}<PageHeading title="Queue times" description="Choose the weekly times queued posts publish at." />
-        <QueueTimes slots={result.slots} targets={result.targets.map(({ id, name }) => ({ id, name }))} canEditShared={result.canEditShared} canEditChannels={result.canEditChannels} limit={limit.queueSlotLimit} /></>;
+        <QueueTimes initialSlot={queueDefaultSlotSchema.parse(await runtimeConfig('publishing.queue.defaultSlot'))} timeZone={viewer.membership.workspace.timezone} slots={result.slots} targets={result.targets.map(({ id, name }) => ({ id, name }))} canEditShared={result.canEditShared} canEditChannels={result.canEditChannels} limit={limit.queueSlotLimit} /></>;
     }
     const mix = await readContentMix(actor);
     return <>{nav}<PageHeading title="Content mix" description="Balance what each channel posts by label." />

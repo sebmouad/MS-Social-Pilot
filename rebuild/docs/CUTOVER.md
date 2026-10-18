@@ -263,3 +263,24 @@ service or proxy was modified. This is limited provider evidence, not a rebuild
 deployment or migrated UI/API/MCP/worker proof. It closes none of the remaining
 cutover/rollback or full capability-parity gates. Do not run `socialpilot-deploy`
 as a substitute for the rebuild deployment plan above.
+
+## Queue probe interruption recovery — batch 71, local preview only
+
+Before deleting two confirmed interrupted synthetic queue runs, the private archive
+`/private/tmp/msp-queue71-before-cleanup-20261018120749988.dump` was restored into
+an isolated scratch database and compared. SHA-256:
+`8579ddf0f8601f2fc59069bf7a36b23535866bf22f2004dfef70929c2bcea897`.
+Users/workspaces/posts/settings/Root-audit counts matched (5/5/8/22/242), as did
+the configuration checksum. The scratch database was removed. The archive is the
+state before recovery, including the interrupted fixtures; it is not a recovered
+pre-probe configuration or a production cutover backup.
+
+The original pre-probe values for nine non-secret settings were lost when the
+probe processes were interrupted without persisted snapshots. After releasing
+orphan local preview transactions, both exact synthetic run scopes were deleted
+and zero remaining fixtures were verified. An audited typed preview baseline was
+explicitly established (MCP owner/admin access, Facebook and Publishing features
+enabled; collaboration retention/queue bounds from the registry). Exact recovery
+of the earlier values is not claimed. The private recovery ledger and archive
+remain available. Subsequent hardened probe runs passed and restored their captured
+new baseline exactly. No production process, data or provider content changed.

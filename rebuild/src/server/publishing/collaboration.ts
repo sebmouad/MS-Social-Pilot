@@ -1,3 +1,4 @@
+import { QUEUE_SCHEDULER } from '@/modules/publishing/collaboration/server/executors';
 import { collaborationPorts, registerCollaborationPorts, type VersionRestorePort } from '@/modules/publishing/collaboration/ports';
 
 // Construct the lifecycle lazily: it records versions through the collaboration
@@ -13,5 +14,5 @@ const versions: VersionRestorePort = {
  * No route depends on another route having been visited in the same process. */
 export function ensurePublishingCollaboration() {
   const current = collaborationPorts();
-  if (!current.versions) registerCollaborationPorts({ ...current, versions });
+  if (!current.versions || !current.queue) registerCollaborationPorts({ ...current, versions: current.versions ?? versions, queue: current.queue ?? QUEUE_SCHEDULER });
 }

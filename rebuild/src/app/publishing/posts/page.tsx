@@ -83,7 +83,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
       && !post.targets.some(target => target.status === 'processing' || target.status === 'scheduled_remote');
     return <details className={previewStyles.managePost}>
       <summary>Manage post</summary>
-      {canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} canOrganize={canUseFeature(viewer.entitlements, 'publishing/collaboration') && canAccessFeature(viewer.permissions, 'publishing/collaboration', 'read')} canDuplicate={canDuplicate} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>}
+      {canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} canOrganize={canUseFeature(viewer.entitlements, 'publishing/collaboration') && canAccessFeature(viewer.permissions, 'publishing/collaboration', 'read')} canDuplicate={canDuplicate} canQueue={canWritePosts && canUseFeature(viewer.entitlements, 'publishing/queue') && canAccessFeature(viewer.permissions, 'publishing/queue', 'write')} timeZone={viewer.membership.workspace.timezone} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>}
     </details>;
   };
   const previewFor = (post: (typeof rows)[number], variant: 'feed' | 'card') => <PostPreview

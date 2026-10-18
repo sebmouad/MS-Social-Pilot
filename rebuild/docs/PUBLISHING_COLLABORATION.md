@@ -132,3 +132,15 @@ Chrome verified desktop layout and phone 390px custom-field review/create/delete
 Execution/restore hooks, real multi-user concurrency, broader theme/keyboard coverage, export/erasure behavioral proof and remaining legacy collaboration capabilities remain open. These checks establish the stated metadata workflows, not completion of Publishing or the rebuild.
 
 MCP label parity additionally includes `get_post_labels` and `list_post_label_choices` (Root page size intersected with the current MCP ceiling), so an organization-scoped key can discover usable associations without a separate directory permission. Notes and saved versions use the current workspace time zone in the UI. Plain notes do not query an unused notification roster.
+
+
+## Batch 71 host status
+
+Saved queue times and guarded post placement are integrated through
+`server/publishing/queue.ts`, the Posts review action, HTTP and authenticated
+workspace MCP. Root registry 64 activates timetable/lookahead policies and the
+editor's default slot. See PUBLISHING_QUEUE.md for current authority, lock,
+approval, concurrency, UX and actual proof boundaries. Content mix/recycle
+execution remains unregistered and hidden; the source-only executor notes above
+must not be read as delivered worker integration. See CUTOVER.md for the local
+interrupted-probe recovery incident and controlled preview baseline.

@@ -13,6 +13,7 @@ import { validateFields } from '@/lib/ui/form-validation';
 import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
 import { PublicationRecovery } from './PublicationRecovery';
 import { DuplicatePost } from './DuplicatePost';
+import { QueuePostButton } from './QueuePostButton';
 import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
 import { publishingMediaIssue } from '@/modules/publishing/media-support';
 import type { PublishingMediaSupport } from '@/platforms/types';
@@ -154,7 +155,7 @@ export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
   </form>;
 }
 
-export function PostRowActions({ post, targets, canEdit, canPublish, imageRules, canDuplicate = false, canOrganize = false }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules; canDuplicate?: boolean; canOrganize?: boolean }) {
+export function PostRowActions({ post, targets, canEdit, canPublish, imageRules, canDuplicate = false, canOrganize = false, canQueue = false, timeZone = 'UTC' }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules; canDuplicate?: boolean; canOrganize?: boolean; canQueue?: boolean; timeZone?: string }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editPending, setEditPending] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
@@ -163,10 +164,13 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules,
   const selected = new Set(post.targets.map(item => item.target.id));
   const hasRemote = post.targets.some(item => Boolean(item.remotePostId));
   const isDraft = post.status === 'draft' && !post.publishedAt;
+  const queueDestinations = post.targets.filter(target => target.status === 'pending' && !target.remotePostId);
+  const isQueueEligible = canEdit && ['draft', 'rejected'].includes(post.status) && queueDestinations.length > 0;
   const isQueued = post.status === 'scheduled';
   return <div className={styles.rowActions}>
     {canOrganize && <a className="ui-button ui-button--secondary ui-button--sm" href={`/publishing/collaboration/post/${encodeURIComponent(post.id)}`}>Organize post</a>}
     {canDuplicate ? <DuplicatePost postId={post.id} disabled={rowPending} onPendingChange={setDuplicatePending} /> : null}
+    {canQueue ? <QueuePostButton postId={post.id} postMessage={post.message} destinations={queueDestinations.map(target => target.target.name ?? 'Destination')} timeZone={timeZone} eligible={isQueueEligible} /> : null}
     {canEdit && isDraft ? <details className={styles.editDetails}>
       <summary onClick={event => { if (rowPending) event.preventDefault(); }}>Edit post</summary>
       <PostEditForm post={post} targets={targets} selected={selected} imageRules={imageRules} disabled={rowPending} onPendingChange={setEditPending} />

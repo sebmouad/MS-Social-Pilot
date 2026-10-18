@@ -1,3 +1,4 @@
+import { queuePostRequest } from '../publishing/queue';
 import { ensurePublishingCollaboration } from '../publishing/collaboration';
 import { publishingTargetChoices } from '../publishing/destinations';
 import { deleteInboxCommentDurably, finishInboxDeletion, getInboxDeletion } from '@/modules/inbox/server/deletion';
@@ -133,6 +134,7 @@ const tools = [
   { name: 'update_post', description: 'Replace an unpublished post content and complete ordered media list. An empty media list removes attachments. Use media instead of scalar imageUrl/videoUrl; message may be empty with a link or media, but removing all content is refused. Root and selected destination rules apply. Confirmation must exactly match UPDATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'message', 'targetIds', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, media: postMediaInputSchema, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'submit_post_for_approval', description: 'Submit a draft for review. Confirmation must exactly match SUBMIT POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'review_post', description: 'Approve or reject a pending post. Confirmation must exactly match APPROVE POST <postId> or REJECT POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'decision', 'confirmation'], properties: { postId: { type: 'string' }, decision: { type: 'string', enum: ['approve', 'reject'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'queue_post', description: 'Assign a local draft to the next free saved queue time for all its destinations, in the workspace time zone. Required approvals still apply; no immediate publication. Confirmation must exactly match QUEUE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'schedule_post', description: 'Schedule a draft for a future ISO timestamp. Confirmation must exactly match SCHEDULE POST <postId> <timestamp>.', inputSchema: { type: 'object', required: ['postId', 'scheduledAt', 'confirmation'], properties: { postId: { type: 'string' }, scheduledAt: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'cancel_scheduled_post', description: 'Return a queued post to drafts before delivery. Confirmation must exactly match CANCEL SCHEDULE <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_connection_selection', description: 'Enable or disable one workspace channel or advertising account. Confirmation must exactly identify the selection and action.', inputSchema: { type: 'object', required: ['kind', 'id', 'enabled', 'confirmation'], properties: { kind: { type: 'string', enum: ['target', 'adAccount'] }, id: { type: 'string' }, enabled: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -220,13 +222,14 @@ const toolFeatures: Record<string, string> = {
   update_post: 'publishing/posts',
   submit_post_for_approval: 'publishing/posts',
   review_post: 'publishing/approvals',
+  queue_post: 'publishing/queue',
   schedule_post: 'publishing/posts',
   cancel_scheduled_post: 'publishing/posts',
   set_connection_selection: 'settings/connections',
 };
 
-const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', ...templateWriteTools, ...labelWriteTools, ...collaborationWriteTools, ...analyticsPinWriteTools]);
-const writeTools = new Set(['run_root_platform_publication_action', 'manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'delete_workspace_data', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
+const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', ...templateWriteTools, ...labelWriteTools, ...collaborationWriteTools, ...analyticsPinWriteTools]);
+const writeTools = new Set(['run_root_platform_publication_action', 'manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'delete_workspace_data', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 for (const name of teamWriteTools) writeTools.add(name);
 for (const name of analyticsPinWriteTools) writeTools.add(name);
 for (const name of collaborationWriteTools) writeTools.add(name);
@@ -790,6 +793,10 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       requireConfirmation(args, `${args.decision.toUpperCase()} POST ${postId}`);
       await reviewPost(viewer, postId, args.decision);
       return auditedReceipt(viewer, name, { postId, decision: args.decision }, { postId, decision: args.decision });
+    }
+    case 'queue_post': {
+      const outcome = await queuePostRequest({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, args);
+      return auditedReceipt(viewer, name, outcome, { postId: outcome.postId, scheduledAt: outcome.scheduledAt.toISOString(), status: outcome.status });
     }
     case 'schedule_post': {
       const postId = requiredString(args, 'postId');

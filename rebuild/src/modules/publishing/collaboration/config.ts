@@ -49,12 +49,12 @@ const rows: ReadonlyArray<readonly [keyof typeof COLLAB_DEFAULTS, string, string
   ['variantsLimit', 'Recycle wordings limit', 'Maximum alternate wordings on one post.', 1, 50],
   ['variantMaxCharacters', 'Recycle wording length', 'Maximum characters in one alternate wording.', 1, 20000],
   ['executorBatchSize', 'Collaboration worker batch size', 'Maximum recycle repeats or content-mix workspaces handled per worker tick.', 1, 500],
-  ['queueLookaheadDays', 'Queue look-ahead (days)', 'How far ahead a queue time may be allocated when filling a content mix.', 1, 120],
+  ['queueLookaheadDays', 'Queue look-ahead (days)', 'How far ahead the next saved queue time may be allocated.', 1, 120],
   ['transactionTimeoutMs', 'Collaboration transaction timeout', 'Maximum duration of one collaboration mutation.', 500, 30000],
   ['transactionMaxWaitMs', 'Collaboration transaction wait', 'Maximum wait for a collaboration mutation slot.', 100, 10000],
 ];
 
-const EXECUTION_POLICY = new Set<keyof CollabBounds>(['queueSlotLimit', 'mixRulesPerScope', 'mixMaxPerWeek', 'mixWindowDays', 'recycleMaxIntervalDays', 'recycleMaxRepeats', 'recycleDefaultIntervalDays', 'variantsLimit', 'variantMaxCharacters', 'executorBatchSize', 'queueLookaheadDays']);
+const EXECUTION_POLICY = new Set<keyof CollabBounds>(['mixRulesPerScope', 'mixMaxPerWeek', 'mixWindowDays', 'recycleMaxIntervalDays', 'recycleMaxRepeats', 'recycleDefaultIntervalDays', 'variantsLimit', 'variantMaxCharacters', 'executorBatchSize']);
 /** Outer input safety ceilings follow the same registry declarations; live values are enforced by services. */
 export const COLLAB_INPUT_CEILINGS = Object.fromEntries(rows.map(([key, , , , max]) => [key, max])) as CollabBounds;
 export const COLLAB_CONFIG = rows.map(([key, label, description, min, max]) => entry({
