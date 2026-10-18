@@ -20,7 +20,7 @@ async function main() {
   const prefix = `preview_read_${randomUUID().replaceAll('-','')}`, userId = `${prefix}_user`, token = randomBytes(32).toString('base64url'), bearer = `mcp_${randomBytes(32).toString('base64url')}`, writeBearer = `mcp_${randomBytes(32).toString('base64url')}`;
   const expiresAt = new Date(Date.now()+1800000), today = new Date(); today.setUTCHours(0,0,0,0); const day = today.toISOString().slice(0,10);
   const settings = new Map<string, Setting|null>(); const previousRootAudits = new Set<string>(); let settingsCaptured = false, rootWrites = false, fixtureStarted = false;
-  let workspaceId = '', workspaceBId = '', accountId = '', targetId = '', targetBId = '', socialId = '', socialBId = '', campaignInsightId = '', accountInsightId = '', previousInsightId = '', demoInsightId = '', pinInsightId = '';
+  let workspaceId = '', workspaceBId = '', accountId = '', targetId = '', targetBId = '', socialId = '', socialBId = '', campaignInsightId = '', accountInsightId = '', previousInsightId = '', demoInsightId = '', demoImpressionsInsightId = '', pinInsightId = '';
   const cookie = (ws=workspaceId) => `msp_session=${token}; sp_workspace=${ws}`;
   const hash = (s:string) => createHash('sha256').update(s).digest('hex');
   async function json(r:Response):Promise<any>{try{return await r.json()}catch{return null}}
@@ -51,10 +51,11 @@ async function main() {
     stage='enable modules and seed synthetic stored insights';
     await save('mcp.enabled',true); await save('mcp.authenticatedRoles',['owner','admin']); await save('platforms.facebook.enabled',true);
     await save('entitlements.features.ads/objects',true); await save('entitlements.features.ads/compare',true); await save('entitlements.features.analytics/demographics',true); await save('entitlements.features.analytics/compare',true); await save('entitlements.features.analytics/pins',true);
-    const fetchedAt=new Date(), at=new Date(`${day}T12:00:00.000Z`), previousDay=new Date(at.getTime()-86400000); campaignInsightId=`${prefix}_campaign`;accountInsightId=`${prefix}_account_current`;previousInsightId=`${prefix}_account_previous`;demoInsightId=`${prefix}_demo`;pinInsightId=`${prefix}_pin`;
+    const fetchedAt=new Date(), at=new Date(`${day}T12:00:00.000Z`), previousDay=new Date(at.getTime()-86400000); campaignInsightId=`${prefix}_campaign`;accountInsightId=`${prefix}_account_current`;previousInsightId=`${prefix}_account_previous`;demoInsightId=`${prefix}_demo`;demoImpressionsInsightId=`${prefix}_demo_impressions`;pinInsightId=`${prefix}_pin`;
     await db.adInsight.create({data:{id:campaignInsightId,adAccountId:accountId,level:'campaign',objectId:`${prefix}_campaign_obj`,objectName:'Synthetic campaign',date:at,spend:12.5,impressions:500,clicks:10,reach:400,cpc:1.25,cpm:25,cpp:null,ctr:2,frequency:1.25,actions:Prisma.JsonNull,fields:Prisma.JsonNull,fetchedAt}});
     await db.adInsight.createMany({data:[{id:accountInsightId,adAccountId:accountId,level:'account',objectId:`${prefix}_act`,objectName:'Synthetic ad account',date:at,spend:12.5,impressions:500,clicks:10,reach:400,cpc:1.25,cpm:25,cpp:null,ctr:2,frequency:1.25,actions:Prisma.JsonNull,fields:Prisma.JsonNull,fetchedAt},{id:previousInsightId,adAccountId:accountId,level:'account',objectId:`${prefix}_act`,objectName:'Synthetic ad account',date:previousDay,spend:9.5,impressions:400,clicks:8,reach:350,cpc:1.1875,cpm:23.75,cpp:null,ctr:2,frequency:1.1429,actions:Prisma.JsonNull,fields:Prisma.JsonNull,fetchedAt}]});
     await db.$executeRaw`INSERT INTO page_insights (id,"targetId",metric,period,"endTime",value,numeric,"fetchedAt") VALUES (${demoInsightId},${targetId},'page_fans_country', 'lifetime',${at},${JSON.stringify({US:12,CA:8})}::jsonb,NULL,${fetchedAt})`;
+    await db.$executeRaw`INSERT INTO page_insights (id,"targetId",metric,period,"endTime",value,numeric,"fetchedAt") VALUES (${demoImpressionsInsightId},${targetId},'page_impressions_country', 'lifetime',${at},${JSON.stringify({US:31,CA:69})}::jsonb,NULL,${fetchedAt})`;
     await db.$executeRaw`INSERT INTO page_insights (id,"targetId",metric,period,"endTime",value,numeric,"fetchedAt") VALUES (${pinInsightId},${targetId},'page_fans', 'day',${at},${JSON.stringify(37)}::jsonb,37,${fetchedAt})`;
     stage='Ads directory HTTP/MCP read and input validation';
     const dir=await json(await http(`/api/ads/directory?level=campaign&period=custom&start=${day}&end=${day}&accountId=${accountId}`));check(dir.items?.some((x:any)=>x.objectId===`${prefix}_campaign_obj`&&x.spend===12.5),'Ads directory HTTP did not return stored synthetic campaign data.');
@@ -69,7 +70,13 @@ async function main() {
     const foreignAdsCompare=await http(`/api/ads/compare?${new URLSearchParams({...adsCompareArgs,accountId:`${prefix}_foreign_account`})}`);check(foreignAdsCompare.status===409&&(await json(foreignAdsCompare))?.code==='unavailable','Ads comparison accepted a foreign account filter.');
     stage='Analytics demographics/comparison and pins HTTP/MCP';
     const demo=await json(await http(`/api/analytics/demographics?start=${day}&end=${day}&filter=1&channel=${targetId}`));
-    check(demo.ok===true&&JSON.stringify(demo).includes('page_fans_country')&&JSON.stringify(demo).includes('US'),'Demographics HTTP did not read stored breakdown rows.');
+    const countryMetrics=(demo.groups??[]).flatMap((group:any)=>group.metrics??[]);
+    const fansMetric=countryMetrics.find((item:any)=>String(item.key).includes('page_fans_country'));
+    const impressionsMetric=countryMetrics.find((item:any)=>String(item.key).includes('page_impressions_country'));
+    check(demo.ok===true&&fansMetric?.rows?.some((row:any)=>row.label==='US'&&row.value===12)&&fansMetric?.rows?.some((row:any)=>row.label==='CA'&&row.value===8)
+      &&impressionsMetric?.rows?.some((row:any)=>row.label==='US'&&row.value===31)&&impressionsMetric?.rows?.some((row:any)=>row.label==='CA'&&row.value===69)
+      &&(demo.groups??[]).filter((group:any)=>group.metrics?.some((item:any)=>String(item.key).includes('page_fans_country')||String(item.key).includes('page_impressions_country'))).every((group:any)=>group.combined===null),
+      'Demographics HTTP must retain both synthetic country metric values and leave the cross-metric combined count null.');
     const compare=await http('/api/analytics/comparison','POST',{mode:'period',a:{start:day,end:day},b:{start:day,end:day},channel:[targetId]});const cb=await json(compare);check(compare.ok&&cb.ok===true&&Array.isArray(cb.metrics)&&cb.metrics.length>0&&JSON.stringify(cb.metrics).includes('page_fans_country'),'Analytics comparison HTTP did not return the stored synthetic metric collection.');
     const mc=await rpc('compare_analytics',{mode:'period',a:{start:day,end:day},b:{start:day,end:day},channel:[targetId]});check(!mc.b.result?.isError&&mc.b.result?.structuredContent?.ok===true&&Array.isArray(mc.b.result?.structuredContent?.metrics)&&JSON.stringify(mc.b.result?.structuredContent?.metrics).includes('page_fans_country'),'Comparison MCP read failed.');
     const badCompare=await http('/api/analytics/comparison','POST',{mode:'period',a:{start:'bad',end:day},b:{start:day,end:day}});check(badCompare.status===400,'Comparison accepted malformed date filter.');
@@ -78,7 +85,14 @@ async function main() {
     await save('entitlements.features.ads/compare',false);const gateHttp=await http(`/api/ads/compare?${new URLSearchParams(adsCompareArgs)}`);check(!gateHttp.ok,'Ads comparison HTTP ignored the disabled Root feature gate.');
     const gateMcp=await rpc('compare_ads_performance',adsCompareArgs);check(gateMcp.b.result?.isError===true,'Ads comparison MCP ignored the disabled Root feature gate.');
     await save('entitlements.features.ads/compare',true);
-    const md=await rpc('get_analytics_demographics',{start:day,end:day,filter:'1',channel:[targetId]});check(!md.b.result?.isError&&JSON.stringify(md.b).includes('page_fans_country'),'Demographics MCP did not return stored breakdown.');
+    const md=await rpc('get_analytics_demographics',{start:day,end:day,filter:'1',channel:[targetId]});
+    const mcpGroups=md.b.result?.structuredContent?.groups??[], mcpCountryMetrics=mcpGroups.flatMap((group:any)=>group.metrics??[]);
+    const mcpFans=mcpCountryMetrics.find((item:any)=>String(item.key).includes('page_fans_country'));
+    const mcpImpressions=mcpCountryMetrics.find((item:any)=>String(item.key).includes('page_impressions_country'));
+    check(!md.b.result?.isError&&mcpFans?.rows?.some((row:any)=>row.label==='US'&&row.value===12)&&mcpFans?.rows?.some((row:any)=>row.label==='CA'&&row.value===8)
+      &&mcpImpressions?.rows?.some((row:any)=>row.label==='US'&&row.value===31)&&mcpImpressions?.rows?.some((row:any)=>row.label==='CA'&&row.value===69)
+      &&mcpGroups.filter((group:any)=>group.metrics?.some((item:any)=>String(item.key).includes('page_fans_country')||String(item.key).includes('page_impressions_country'))).every((group:any)=>group.combined===null),
+      'Demographics MCP must retain both synthetic country metric values and leave the cross-metric combined count null.');
     const pinsBefore=await json(await http('/api/analytics/pins'));const metric=(pinsBefore.pinnable??[]).find((x:any)=>x.key?.includes('page_fans'))?.key;check(typeof metric==='string','No pinnable stored page metric was available.');
     const wrong=await http('/api/analytics/pins','POST',{action:'pin',key:metric,confirmation:'wrong'});check(wrong.status===400,'Pins accepted an incorrect confirmation.');
     const pinned=await http('/api/analytics/pins','POST',{action:'pin',key:metric,confirmation:`PIN ANALYTICS METRIC ${metric}`});check(pinned.ok&& (await db.$queryRaw<Array<{pinned:string[]}>>`SELECT "pinnedMetrics" AS pinned FROM users WHERE id=${userId}`)[0]?.pinned.includes(`v2:${metric}`),'Confirmed pin did not persist to user storage.');
@@ -95,7 +109,7 @@ async function main() {
     if(rootWrites&&fixtureStarted)await clean('synthetic Root config audits',async()=>{const rows=await db.$queryRaw<Array<{id:string}>>`SELECT id FROM root_activities WHERE "actorId"=${userId} AND action='config.changed' AND detail->>'key'=ANY(${[...settingKeys]}::text[])`;const fresh=rows.map(x=>x.id).filter(id=>!previousRootAudits.has(id));if(fresh.length)await db.$executeRaw`DELETE FROM root_activities WHERE id=ANY(${fresh}::text[])`;const remaining=await db.$queryRaw<Array<{n:bigint}>>`SELECT COUNT(*)::bigint AS n FROM root_activities WHERE "actorId"=${userId} AND action='config.changed' AND detail->>'key'=ANY(${[...settingKeys]}::text[])`;check(remaining[0]!.n===BigInt(previousRootAudits.size),'Probe Root config audit rows remain or prior audit rows changed.')});
     if(fixtureStarted)await clean('synthetic workspace records',async()=>{
       await db.mcpApiKey.deleteMany({where:{id:{in:[`${prefix}_key`,`${prefix}_write_key`]}}});await db.session.deleteMany({where:{userId}});
-      await db.adInsight.deleteMany({where:{id:{in:[campaignInsightId,accountInsightId,previousInsightId]}}});if(demoInsightId)await db.$executeRaw`DELETE FROM page_insights WHERE id=${demoInsightId}`;if(pinInsightId)await db.$executeRaw`DELETE FROM page_insights WHERE id=${pinInsightId}`;
+      await db.adInsight.deleteMany({where:{id:{in:[campaignInsightId,accountInsightId,previousInsightId]}}});if(demoInsightId)await db.$executeRaw`DELETE FROM page_insights WHERE id=${demoInsightId}`;if(demoImpressionsInsightId)await db.$executeRaw`DELETE FROM page_insights WHERE id=${demoImpressionsInsightId}`;if(pinInsightId)await db.$executeRaw`DELETE FROM page_insights WHERE id=${pinInsightId}`;
       if(workspaceId){
         await db.$executeRaw`DELETE FROM activity_logs WHERE "workspaceId"=ANY(${[workspaceId,workspaceBId]}::text[])`;
         await db.adAccount.deleteMany({where:{id:accountId}});
@@ -106,7 +120,7 @@ async function main() {
       }
       await db.user.deleteMany({where:{id:userId}});
       const logs=await db.$queryRaw<Array<{n:bigint}>>`SELECT COUNT(*)::bigint AS n FROM activity_logs WHERE "workspaceId"=ANY(${[workspaceId,workspaceBId]}::text[])`;
-      const residualInsights=await db.$queryRaw<Array<{n:bigint}>>`SELECT (SELECT COUNT(*) FROM ad_insights WHERE id=ANY(${[campaignInsightId,accountInsightId,previousInsightId]}::text[]))+(SELECT COUNT(*) FROM page_insights WHERE id=ANY(${[demoInsightId,pinInsightId]}::text[])) AS n`;
+      const residualInsights=await db.$queryRaw<Array<{n:bigint}>>`SELECT (SELECT COUNT(*) FROM ad_insights WHERE id=ANY(${[campaignInsightId,accountInsightId,previousInsightId]}::text[]))+(SELECT COUNT(*) FROM page_insights WHERE id=ANY(${[demoInsightId,demoImpressionsInsightId,pinInsightId]}::text[])) AS n`;
       check(workspaceId!==''&&await db.workspace.count({where:{id:{in:[workspaceId,workspaceBId]}}})===0&&await db.user.count({where:{id:userId}})===0&&await db.session.count({where:{userId}})===0&&await db.mcpApiKey.count({where:{id:{in:[`${prefix}_key`,`${prefix}_write_key`]}}})===0&&await db.membership.count({where:{userId,workspaceId}})===0&&await db.socialAccount.count({where:{id:{in:[socialId,socialBId]}}})===0&&await db.target.count({where:{id:{in:[targetId,targetBId]}}})===0&&await db.adAccount.count({where:{id:accountId}})===0&&logs[0]!.n===BigInt(0)&&residualInsights[0]!.n===BigInt(0),'Synthetic workspace records, insight fixtures or audit rows remain after cleanup.');
     });
     if(settingsCaptured&&rootWrites)await clean('settings restoration verification',async()=>{for(const k of settingKeys){const x=await db.appSetting.findUnique({where:{key:k},select:{key:true,value:true,encrypted:true,updatedAt:true}});check(JSON.stringify(x)===JSON.stringify(settings.get(k)),`Setting ${k} failed exact restoration.`)}});

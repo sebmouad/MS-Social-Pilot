@@ -15,7 +15,9 @@ Management actions/history remain hidden without a registered management engine.
 
 Analytics owns `/analytics/demographics`, `/analytics/compare` and
 `/analytics/pins`. Breakdowns retain units, coverage, timestamps and explicit row
-bounds. Comparisons withhold differences for incompatible or incomplete measures.
+bounds. Category dimensions group related displays only: they do not prove
+measurement compatibility. Distinct breakdown metrics stay separate; no combined
+country/age/etc total is invented from shared labels or overlapping populations. Comparisons withhold differences for incompatible or incomplete measures.
 Channel-group comparison explicitly excludes ad accounts. Audience sums covered
 selected channels and does not claim deduplicated people. Personal pins preserve
 legacy preference entries; values and pin eligibility use the current workspace
@@ -64,3 +66,23 @@ to every metric at arbitrary size. General UI copy is not yet a complete
 Root-managed catalog. Full browser state/theme coverage, resource-revocation
 concurrency, live Facebook operations, migration/restore rehearsal and production
 cutover remain required by ARCHITECTURE_CONTRACT.md.
+
+
+## Batch 70 — no unproven demographic sums
+
+An independent semantic review found that adding every count-valued country
+breakdown could mix fans, impressions or overlapping populations. The neutral
+MetricView contract has no measurement/taxonomy/period/contribution proof that
+would justify this cross-metric operation. Grouped responses now return
+`combined: null`, retaining every individual metric, row, share and coverage.
+This does not change the required selected-channel audience total or aggregation
+of one normalized metric across its eligible resources. Any future cross-metric
+combination needs explicit neutral compatibility and disjointness evidence.
+
+The extended synthetic read-workflows probe stores country fans (US 12/CA 8)
+and country impressions (US 31/CA 69) for the same channel. HTTP and MCP must
+return both independent sets and no combined total. Unit regressions also cover
+unknown and overlapping resource coverage. The final isolated batch passed 2,134 tests / 276 files, production build and
+subsequent serial typecheck. The final local HTTP/MCP/PostgreSQL probe passed
+and verified exact fixture/audit/settings cleanup.
+No schema, Root setting definition or production/provider state changes.

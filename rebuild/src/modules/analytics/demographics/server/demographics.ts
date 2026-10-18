@@ -7,7 +7,6 @@ import { authorize, type Actor } from '../../server/access';
 import { demographicDimensionsSchema, type DemographicDimension } from '../config';
 import type { DemographicGroup, DemographicMetric, DemographicRow } from '../contracts';
 
-const NOTE = 'Category counts are added across sources. A person reached through more than one source is counted once per source, so this is not a count of unique people.';
 const tokens = (metric: Pick<MetricView, 'label' | 'key'>) => new Set(`${metric.label} ${metric.key}`.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
 
 /** First configured dimension whose term appears as a whole word in the metric's label or key. */
@@ -24,17 +23,6 @@ function toMetric(metric: MetricView, cap: number): DemographicMetric {
   const { rows, hiddenRows } = rowsWithShare(metric.rows, metric.unit, cap);
   return { key: metric.key, label: metric.label, sourceLabel: metric.sourceLabel, unit: metric.unit, coverage: metric.coverage, available: metric.available, latestAt: metric.latestAt, aggregationLabel: metric.aggregationLabel, ...(metric.aggregationNote ? { aggregationNote: metric.aggregationNote } : {}), rows, hiddenRows };
 }
-function combine(metrics: MetricView[], cap: number): DemographicGroup['combined'] {
-  if (metrics.length < 2 || metrics.some(metric => metric.unit !== 'count' || metric.resourceKind !== 'channel')) return null;
-  const sums = new Map<string, number>();
-  for (const metric of metrics) for (const row of metric.rows) if (Number.isFinite(row.value)) sums.set(row.label, (sums.get(row.label) ?? 0) + row.value);
-  const ids = metrics.map(metric => metric.coveredResourceIds);
-  const coverage = ids.every((list): list is string[] => Array.isArray(list)) ? new Set(ids.flat()).size : null;
-  const times = metrics.flatMap(metric => metric.latestAt ? [metric.latestAt.getTime()] : []);
-  const { rows, hiddenRows } = rowsWithShare([...sums].map(([label, value]) => ({ label, value })), 'count', cap);
-  return { rows, hiddenRows, coverage, sources: metrics.length, oldestAsOf: times.length ? new Date(Math.min(...times)) : null, newestAsOf: times.length ? new Date(Math.max(...times)) : null, note: NOTE };
-}
-
 export async function readDemographics(actor: Actor, input: unknown = {}) {
   await authorize(actor, 'analytics/demographics', 'read');
   const [rawDimensions, rawCap] = await Promise.all([runtimeConfig('analytics.demographics.dimensions'), runtimeConfig('analytics.demographics.maxRowsPerMetric')]);
@@ -49,9 +37,11 @@ export async function readDemographics(actor: Actor, input: unknown = {}) {
     if (!dimension) { other.push(metric); continue; }
     grouped.set(dimension.id, [...(grouped.get(dimension.id) ?? []), metric]);
   }
+  // A shared category dimension does not prove compatible measures or disjoint
+  // populations. The neutral metric contract cannot justify cross-metric sums.
   const groups: DemographicGroup[] = dimensions.data.flatMap(dimension => {
     const metrics = grouped.get(dimension.id);
-    return metrics?.length ? [{ id: dimension.id, label: dimension.label, metrics: metrics.map(metric => toMetric(metric, cap.data)), combined: combine(metrics, cap.data) }] : [];
+    return metrics?.length ? [{ id: dimension.id, label: dimension.label, metrics: metrics.map(metric => toMetric(metric, cap.data)), combined: null }] : [];
   });
   const result = {
     ok: true as const, period: snapshot.period, selected: snapshot.selected, options: snapshot.options,

@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 
 describe('demographics', () => {
-  it('groups breakdowns by configured dimension with shares, caps rows and combines counts honestly', async () => {
+  it('groups breakdowns by configured dimension while preserving each source metric', async () => {
     const a = metric({ key: 'a', label: 'Audience by country', kind: 'breakdown', rows: [{ label: 'US', value: 60, asOf: null }, { label: 'FR', value: 30, asOf: null }, { label: 'MA', value: 10, asOf: null }] });
     const b = metric({ key: 'b', label: 'Fans by country', kind: 'breakdown', coveredResourceIds: ['c2'], rows: [{ label: 'US', value: 40, asOf: null }] });
     const c = metric({ key: 'c', label: 'Mood', kind: 'breakdown', rows: [{ label: 'x', value: 1, asOf: null }] });
@@ -53,7 +53,10 @@ describe('demographics', () => {
     expect(r.groups).toHaveLength(1);
     const g = r.groups[0]!;
     expect(g.metrics[0]!.rows).toHaveLength(2); expect(g.metrics[0]!.hiddenRows).toBe(1); expect(g.metrics[0]!.rows[0]!.share).toBeCloseTo(60);
-    expect(g.combined!.rows[0]).toMatchObject({ label: 'US', value: 100 }); expect(g.combined!.coverage).toBe(2); expect(g.combined!.note).toMatch(/not a count of unique people/);
+    expect(g.combined).toBeNull();
+    expect(g.metrics.map(metric => metric.key)).toEqual(['a', 'b']);
+    expect(g.metrics[0]!.rows[0]).toMatchObject({ label: 'US', value: 60 });
+    expect(g.metrics[1]!.rows[0]).toMatchObject({ label: 'US', value: 40 });
     expect(r.other.map(m => m.key)).toEqual(['c']);
     expect(r.audience).toMatchObject({ covered: 1, selected: 2 });
   });
@@ -63,6 +66,21 @@ describe('demographics', () => {
     state.snapshots = [snap([a, b])];
     const g = (await readDemographics(actor, {})).groups[0]!;
     expect(g.combined).toBeNull(); expect(g.metrics[0]!.rows[0]!.share).toBeNull();
+  });
+  it('never fabricates a combined total for overlapping or unknown resource coverage', async () => {
+    const a = metric({ key: 'reach-country', label: 'Reach by country', kind: 'breakdown', rows: [{ label: 'US', value: 60, asOf: null }] });
+    const overlap = metric({ key: 'fans-country', label: 'Fans by country', kind: 'breakdown', coveredResourceIds: ['c2'], rows: [{ label: 'US', value: 40, asOf: null }] });
+    state.snapshots = [snap([a, overlap])];
+    const overlapping = (await readDemographics(actor, {})).groups[0]!;
+    expect(overlapping.combined).toBeNull();
+    expect(overlapping.metrics.map(item => item.rows[0]?.value)).toEqual([60, 40]);
+
+    const unknownCoverage = metric({ key: 'fans-country', label: 'Fans by country', kind: 'breakdown', coveredResourceIds: undefined, rows: [{ label: 'US', value: 40, asOf: null }] });
+    state.snapshots = [snap([a, unknownCoverage])];
+    const unknown = (await readDemographics(actor, {})).groups[0]!;
+    expect(unknown.combined).toBeNull();
+    expect(unknown.metrics).toHaveLength(2);
+    expect(unknown.metrics.map(item => item.rows[0]?.value)).toEqual([60, 40]);
   });
   it('reports empty without zeros, matches whole words only, and fails closed on bad config or authorization', async () => {
     state.snapshots = [snap([])]; expect((await readDemographics(actor, {})).empty).toBe(true);

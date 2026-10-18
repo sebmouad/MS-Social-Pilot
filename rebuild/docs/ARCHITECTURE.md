@@ -688,3 +688,31 @@ current owner qualification where applicable and real worker/database proof.
 Remaining legacy integrations, Facebook live coverage and held-photo cleanup,
 migration/rollback rehearsal and cutover stay open. Production remains legacy;
 socialpilot-deploy still targets legacy. Do not broad-stage unfinished source.
+
+
+## Batch 70 — honest demographic breakdown totals
+
+Independent semantic review found that a shared category dimension and count
+unit did not justify adding distinct breakdown measures or overlapping resource
+populations. The module now retains each source metric, row, share and coverage
+and returns combined:null. Selected-channel audience totals and normal per-metric
+aggregation remain unchanged. Future cross-metric sums require explicit neutral
+measurement/taxonomy/period and contribution-scope compatibility evidence.
+
+The isolated staged-source snapshot passed 2,134 tests / 276 files, production
+build and subsequent serial typecheck. Regressions cover separate fans/reach
+measures, known overlapping resources and unknown scope. The extended guarded
+local read-workflows probe checks fans (US12/CA8) and impressions (US31/CA69)
+from the same channel via HTTP and MCP, preserving both independent results
+without a fabricated combined total. The final probe passed and exact fixture/audit/settings cleanup was verified. READ_WORKFLOWS.md records semantics and scope. No schema/configuration
+registry change, live provider operation or production cutover belongs here.
+
+Next delivery: wire queue allocation through the existing validated lifecycle,
+with workspace-timezone slot selection, per-channel/shared intersection,
+transactional collision protection and UI/API/MCP parity before enabling its
+host marker. Content mix/recycle still bypass lifecycle validation/history and
+must remain hidden until corrected. The active-owner automatic-sync policy must
+not be assumed to remove the scheduled publisher's current author permission
+checks; resolve job-specific authority explicitly and preserve the contract.
+All remaining legacy/provider/migration/rollback/browser/release gates remain
+open. Production and socialpilot-deploy remain legacy.
