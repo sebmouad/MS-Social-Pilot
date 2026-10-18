@@ -7,6 +7,7 @@ import type { AnalyticsProviderData, AnalyticsProviderRequest } from '@/server/a
 import type { InboxReplyPolicyRequest } from '@/server/inbox/policy';
 import type { ReplyRule } from '@/server/inbox/threads';
 import type { AdsUiSchema } from '@/platforms/ads-ui';
+import type { AdsOpsHost } from '@/modules/ads/management/types';
 import type { Prisma } from '../../../generated/client';
 
 export interface PlatformPublicationEvidence {
@@ -77,6 +78,8 @@ export interface PlatformAnalyticsHost {
 }
 
 export interface PlatformAdsHost {
+  /** Optional complete object-management engine owned by this platform. */
+  operations?: AdsOpsHost;
   /** Pure interpretation of provider-owned stored fields; no credentials or network requests. */
   parentObjectId?(input: { level: 'campaign' | 'adset' | 'ad'; fields: unknown }): string | null;
   /** Safe, serializable UI configuration; never contains credentials or server functions. */

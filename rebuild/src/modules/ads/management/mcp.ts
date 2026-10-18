@@ -1,0 +1,40 @@
+import { assertAdsResultCeiling, validateAdsResultCeiling } from '../result-ceiling';
+import { OperationError } from '@/lib/operation-error';
+import { listAdsCreatives, listAdsOperations, performAdsManagement, previewAdsManagement, resolveAdsOperation, type AdsManageActor } from './server';
+
+const operation = { type: 'object', description: 'A neutral change: {type: status.set|budget.set|rename|creative.assign|delete, objectType, objectId, ...fields}. Only changes the account advertises will succeed.' };
+export const adsManagementTools = new Set(['preview_ads_change', 'apply_ads_change', 'list_ads_changes', 'resolve_ads_change', 'list_ads_creatives']);
+export const adsManagementWriteTools = new Set(['apply_ads_change', 'resolve_ads_change']);
+export const adsManagementToolDefinitions = [
+  { name: 'preview_ads_change', description: 'Validate an ad change and return the exact confirmation text and whether it can change spend. Makes no change.', inputSchema: { type: 'object', required: ['adAccountId', 'operation'], properties: { adAccountId: { type: 'string' }, operation }, additionalProperties: false } },
+  { name: 'apply_ads_change', description: 'Apply a status, budget, name, creative or delete change after repeating the exact confirmation from preview_ads_change. An unknown outcome is recorded and must be resolved; it is never retried automatically.', inputSchema: { type: 'object', required: ['adAccountId', 'operation', 'confirmation', 'requestId'], properties: { adAccountId: { type: 'string' }, operation, confirmation: { type: 'string' }, requestId: { type: 'string', description: 'Unique client request ID; reuse exactly for retries of this same confirmed change.' } }, additionalProperties: false } },
+  { name: 'list_ads_changes', description: 'List recorded ad changes including unresolved unknown outcomes.', inputSchema: { type: 'object', properties: { adAccountId: { type: 'string' }, status: { type: 'string', enum: ['pending', 'succeeded', 'rejected', 'uncertain', 'resolved_applied', 'resolved_not_applied'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
+  { name: 'resolve_ads_change', description: 'Record whether an unknown-outcome change was applied or not after checking the platform. For uncertain records use RESOLVE ADS CHANGE <id> AS APPLIED|NOT APPLIED. For pending recovery use RECOVER ADS CHANGE <id> AS APPLIED|NOT APPLIED; recovery refuses while a dispatch holds the account lock. Makes no remote call.', inputSchema: { type: 'object', required: ['operationId', 'resolution', 'confirmation'], properties: { operationId: { type: 'string' }, resolution: { type: 'string', enum: ['applied', 'not_applied'] }, note: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'list_ads_creatives', description: 'Browse existing creatives that can be assigned to an ad, when the platform supports it.', inputSchema: { type: 'object', required: ['adAccountId'], properties: { adAccountId: { type: 'string' }, after: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
+];
+export async function executeAdsManagementTool(actor: AdsManageActor, name: string, args: Record<string, unknown>, maxResultItems?: number) {
+  const allowed: Record<string, string[]> = {
+    preview_ads_change: ['adAccountId', 'operation'], apply_ads_change: ['adAccountId', 'operation', 'confirmation', 'requestId'], list_ads_changes: ['adAccountId', 'status', 'offset', 'limit'],
+    resolve_ads_change: ['operationId', 'resolution', 'note', 'confirmation'], list_ads_creatives: ['adAccountId', 'after', 'limit'],
+  };
+  if (!allowed[name] || Object.keys(args).some(key => !allowed[name]!.includes(key))) throw new OperationError('invalid_request', 'Choose valid Ads management input.');
+  validateAdsResultCeiling(maxResultItems);
+  const input = { ...args };
+  if (['list_ads_changes', 'list_ads_creatives'].includes(name) && maxResultItems !== undefined) {
+    if (input.limit !== undefined && (typeof input.limit !== 'number' || !Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > maxResultItems)) throw new OperationError('invalid_request', 'Choose a page size within the current result limit.');
+    if (input.limit === undefined) input.limit = maxResultItems;
+  }
+  const checked = async (result: Promise<unknown>) => {
+    const value = await result;
+    assertAdsResultCeiling(value, maxResultItems);
+    return value;
+  };
+  const a = input as never;
+  switch (name) {
+    case 'preview_ads_change': return previewAdsManagement(actor, a);
+    case 'apply_ads_change': return performAdsManagement(actor, a);
+    case 'list_ads_changes': return checked(listAdsOperations(actor, a));
+    case 'resolve_ads_change': return resolveAdsOperation(actor, a);
+    default: return checked(listAdsCreatives(actor, a));
+  }
+}

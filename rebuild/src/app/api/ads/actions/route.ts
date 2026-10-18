@@ -15,7 +15,8 @@ const schema = z.object({
   status: z.enum(['active', 'paused']).optional(),
   dailyBudgetMinor: z.number().int().positive().safe().optional(),
   lifetimeBudgetMinor: z.number().int().positive().safe().optional(),
-  confirmation: z.string().max(200),
+  confirmation: z.string().max(500),
+  requestId: z.string().regex(/^[A-Za-z0-9._:-]{8,128}$/),
 }).strict().refine(value => Number(Boolean(value.status)) + Number(value.dailyBudgetMinor !== undefined) + Number(value.lifetimeBudgetMinor !== undefined) === 1);
 
 export async function POST(request: Request) {
@@ -25,8 +26,8 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   try {
     const input = schema.parse(await request.json());
-    await withWorkspaceOperation(viewer.workspaceId, () => updateWorkspaceAd({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input));
-    return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store' } });
+    const outcome = await withWorkspaceOperation(viewer.workspaceId, () => updateWorkspaceAd({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input));
+    return NextResponse.json(outcome, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     return adsErrorResponse(error, 'Invalid ads action.');
   }

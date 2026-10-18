@@ -295,3 +295,13 @@ A fresh private local preview backup was scratch-restored and this additive SQL
 was scratch-applied before preview application; legacy counts and settings
 checksum matched. This does not prove a complete nine-migration staging rehearsal,
 production data/media migration or release rollback. Production was not migrated.
+
+
+## Ads ledger addition (batch 74)
+
+The allowlist now contains ten checksum-pinned migrations, adding
+`20261018170000_rebuild_ads_operations`. The rehearsal refuses existing ledger
+objects/history and checks mapped columns. Only isolated preview was migrated,
+after fresh backup, scratch restore/migration and unchanged legacy count/settings
+comparison. A full ten-migration production-shaped staging and rollback rehearsal
+remains outstanding; production was not migrated.

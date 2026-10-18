@@ -1,3 +1,4 @@
+import { ensureAdsManagement } from '@/server/ads/management';
 import { queuePostRequest } from '../publishing/queue';
 import { ensurePublishingCollaboration } from '../publishing/collaboration';
 import { publishingTargetChoices } from '../publishing/destinations';
@@ -30,6 +31,7 @@ import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
 import { readAdsDailyRows } from '@/modules/ads/server/report-read';
 import { exportAdsReport } from '@/modules/ads/server/export';
 import { adsAnalysisToolDefinitions, adsAnalysisTools, executeAdsAnalysisTool } from '@/modules/ads/analysis/mcp';
+import { adsManagementToolDefinitions, adsManagementTools, adsManagementWriteTools, executeAdsManagementTool } from '@/modules/ads/management/mcp';
 import { adsDirectoryToolDefinitions, adsDirectoryTools, executeAdsDirectoryTool } from '@/modules/ads/directory/mcp';
 import { analyticsDemographicsToolDefinitions, analyticsDemographicsTools, executeAnalyticsDemographicsTool } from '@/modules/analytics/demographics/mcp';
 import { analyticsPinToolDefinitions, analyticsPinTools, analyticsPinWriteTools, executeAnalyticsPinTool } from '@/modules/analytics/pins/mcp';
@@ -78,6 +80,7 @@ const tools = [
   ...adsReportToolDefinitions,
   ...adsAnalysisToolDefinitions,
   ...adsDirectoryToolDefinitions,
+  ...adsManagementToolDefinitions,
   ...analyticsDemographicsToolDefinitions,
   ...analyticsPinToolDefinitions,
   ...analyticsComparisonToolDefinitions,
@@ -112,7 +115,7 @@ const tools = [
   { name: 'get_live_ad_status', description: 'Read live configured and effective status for a campaign, ad set, or ad verified in stored insights. Requires Ads read access and an enabled connected account visible to your page scope.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, objectId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] } }, additionalProperties: false } },
   { name: 'create_ad_campaign', description: 'Create a paused campaign in the selected advertising account. Use the selected platform objective and exact confirmation format.', inputSchema: { type: 'object', required: ['adAccountId', 'name', 'objective', 'confirmation'], properties: { adAccountId: { type: 'string' }, name: { type: 'string' }, objective: { type: 'string', minLength: 1, maxLength: 100 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'create_ad_set', description: 'Create a paused ad set under a campaign verified in the selected account. Requires all Pages in scope. Confirmation must exactly match the account platform format.', inputSchema: { type: 'object', required: ['adAccountId', 'campaignId', 'name', 'dailyBudgetMinor', 'countryCode', 'optimizationGoal', 'confirmation'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, campaignId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, name: { type: 'string', minLength: 1, maxLength: 100 }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, countryCode: { type: 'string', pattern: '^[A-Z]{2}$' }, optimizationGoal: { type: 'string', minLength: 1, maxLength: 100 }, confirmation: { type: 'string', maxLength: 500 } }, additionalProperties: false } },
-  { name: 'update_ad', description: 'Change the status or one budget of a verified ad campaign, ad set, or ad. Confirmation must exactly match SET AD STATUS <objectId> TO <ACTIVE|PAUSED> or SET AD BUDGET <objectId> TO <amount> MINOR UNITS.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType', 'confirmation'], properties: { adAccountId: { type: 'string' }, objectId: { type: 'string' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, status: { type: 'string', enum: ['active', 'paused'] }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, lifetimeBudgetMinor: { type: 'integer', minimum: 1 }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'update_ad', description: 'Apply one status or budget change through the durable Ads management service. Supply the exact confirmation from preview_ads_change and a stable requestId reused for retries. Unknown outcomes remain held.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType', 'confirmation', 'requestId'], properties: { adAccountId: { type: 'string' }, objectId: { type: 'string' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, status: { type: 'string', enum: ['active', 'paused'] }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, lifetimeBudgetMinor: { type: 'integer', minimum: 1 }, confirmation: { type: 'string' }, requestId: { type: 'string' } }, additionalProperties: false } },
   { name: 'preview_workspace_data_deletion', description: 'Count workspace records that a data deletion would remove. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'export_workspace_data', description: 'Export the current workspace JSON snapshot, including directly workspace-owned legacy tables with credential fields redacted. Indirect records and media bytes are not included. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'delete_workspace_data', description: 'Delete workspace records and stored files while retaining workspace identity and members. A failed file cleanup can be retried. Confirmation must exactly match DELETE WORKSPACE DATA <workspaceId>. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', required: ['confirmation'], properties: { confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -148,6 +151,7 @@ const canManageData = (viewer: McpViewer) => viewer.role === 'owner' || viewer.r
 const dataResource = (uri: string) => uri === 'msp://data/deletion-preview';
 
 const toolFeatures: Record<string, string> = {
+  ...Object.fromEntries(adsManagementToolDefinitions.map(tool => [tool.name, 'ads/campaigns'])),
   compare_ads_performance: 'ads/compare', list_ads_objects: 'ads/objects', get_ads_object: 'ads/objects',
   get_analytics_demographics: 'analytics/demographics', compare_analytics: 'analytics/compare',
   get_analytics_pins: 'analytics/pins', pin_analytics_metric: 'analytics/pins', unpin_analytics_metric: 'analytics/pins', reorder_analytics_pins: 'analytics/pins',
@@ -245,6 +249,7 @@ for (const name of templateWriteTools) writeTools.add(name);
 for (const name of inboxProductivityWriteTools) writeTools.add(name);
 for (const name of workspacePolicyWriteTools) writeTools.add(name);
 for (const name of notificationWriteTools) writeTools.add(name);
+for (const name of adsManagementWriteTools) writeTools.add(name);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -371,7 +376,8 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
   if (analyticsPinTools.has(name)) return executeAnalyticsPinTool(analyticsActor, name, args);
   if (analyticsComparisonTools.has(name)) return executeAnalyticsComparisonTool(analyticsActor, args);
   if (adsAnalysisTools.has(name)) return executeAdsAnalysisTool(adsReadActor, name, args, cap);
-  if (adsDirectoryTools.has(name)) return executeAdsDirectoryTool(adsReadActor, name, args, cap);
+  if (adsManagementTools.has(name)) return executeAdsManagementTool(adsReadActor, name, args, cap);
+  if (adsDirectoryTools.has(name)) { ensureAdsManagement(); return executeAdsDirectoryTool(adsReadActor, name, args, cap); }
   if (collaborationTools.has(name)) return executeCollaborationTool({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, name, args, cap);
   if (teamTools.has(name)) return executeTeamTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args, cap);
   if (workspacePolicyTools.has(name)) return executeWorkspacePolicyTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
@@ -634,11 +640,10 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const lifetimeBudgetMinor = args.lifetimeBudgetMinor;
       if ((dailyBudgetMinor !== undefined && typeof dailyBudgetMinor !== 'number') || (lifetimeBudgetMinor !== undefined && typeof lifetimeBudgetMinor !== 'number')) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units.');
       const confirmation = requiredString(args, 'confirmation');
-      const budget = dailyBudgetMinor ?? lifetimeBudgetMinor;
-      if (budget !== undefined) requireConfirmation(args, `SET AD BUDGET ${objectId} TO ${budget} MINOR UNITS`);
-      else if (status === 'active' || status === 'paused') requireConfirmation(args, `SET AD STATUS ${objectId} TO ${status.toUpperCase()}`);
-      await updateWorkspaceAd(viewer, { adAccountId, objectId, objectType, status, dailyBudgetMinor, lifetimeBudgetMinor, confirmation });
-      return auditedReceipt(viewer, name, { adAccountId, objectId, objectType }, { adAccountId, objectId, updated: true });
+      const requestId = requiredString(args, 'requestId');
+      const result = await updateWorkspaceAd({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, { adAccountId, objectId, objectType, status, dailyBudgetMinor, lifetimeBudgetMinor, confirmation, requestId });
+      if (result.outcome !== 'succeeded') return result;
+      return auditedReceipt(viewer, name, { adAccountId, objectId, operationId: result.operationId }, result);
     }
     case 'preview_workspace_data_deletion':
       return previewWorkspaceDataDeletion({ userId: viewer.userId, workspaceId: viewer.workspaceId });

@@ -126,7 +126,7 @@ export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, n
   // Management is an optional enhancement to read-only detail. Host wiring,
   // Root config, or its ledger may be absent while stored Ads reads remain valid.
   let management: Awaited<ReturnType<NonNullable<ReturnType<typeof adsDirectoryManagementPort>>['describe']>> | null = null;
-  try { management = await adsDirectoryManagementPort()?.describe({ userId: actor.userId, workspaceId: actor.workspaceId }, accountId) ?? null; }
+  try { management = await adsDirectoryManagementPort()?.describe(actor, accountId) ?? null; }
   catch { /* keep scoped stored reporting available if management is unavailable */ }
   return {
     accountId, level, objectId, name: rows[0]!.objectName || objectId, currency: rows[0]!.adAccount.currency, totals,

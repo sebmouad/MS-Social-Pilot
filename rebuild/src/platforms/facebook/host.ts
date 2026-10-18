@@ -3,6 +3,7 @@ import type { PlatformHost } from '@/server/platforms/host';
 import { configuredFacebookAdapter, configuredFacebookOAuth } from './runtime';
 import { finishFacebookConnection, startFacebookConnection } from './connection';
 import { facebookAdsHost } from './ads';
+import { facebookAdsOps } from './ads-ops';
 import { facebookAnalyticsHost } from './analytics';
 import { facebookReplyPolicy, canManageFacebookInbox, syncFacebookInbox, replyToFacebookInbox, moderateFacebookComment, prepareDeleteFacebookComment } from './inbox';
 import { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } from './jobs';
@@ -11,7 +12,7 @@ import { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus
 export const facebookHost = {
   adapter: configuredFacebookAdapter,
   diagnostics: facebookDiagnostics,
-  ads: facebookAdsHost,
+  ads: { ...facebookAdsHost, operations: facebookAdsOps },
   analytics: facebookAnalyticsHost,
   inbox: { replyPolicy: facebookReplyPolicy, canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, moderate: moderateFacebookComment, prepareDeleteComment: prepareDeleteFacebookComment },
   connection: {

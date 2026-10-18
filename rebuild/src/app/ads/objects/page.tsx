@@ -1,3 +1,4 @@
+import { ensureAdsManagement } from '@/server/ads/management';
 import '../ads.css';
 import './objects.css';
 import { PageFrame } from '@/server/PageFrame';
@@ -21,6 +22,7 @@ const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const show = (value: number | null) => (value === null ? 'Unknown' : number.format(value));
 
 export default async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> }) {
+  ensureAdsManagement();
   const viewer = await requireViewer({ feature: 'ads/objects', channelScoped: true });
   const params = await searchParams;
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };

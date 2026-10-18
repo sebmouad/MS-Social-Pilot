@@ -1,3 +1,4 @@
+import { ensureAdsManagement } from '@/server/ads/management';
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic';
 /** Without objectId: list objects. With objectId (plus accountId and level): one object's detail. */
 export async function GET(request: Request) {
   try {
+    ensureAdsManagement();
     const viewer = await requireViewer({ feature: 'ads/objects', channelScoped: true });
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
     const query = searchRecord(request.url, ['offset', 'limit']);

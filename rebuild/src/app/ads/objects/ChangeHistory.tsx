@@ -1,38 +1,85 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@/components/Button';
+import { ModalDialog } from '@/components/ModalDialog';
+import { RouteNotice } from '@/components/RouteNotice';
 
-type Change = { id: string; operationType: string; objectType: string; objectId: string; status: string; createdAt: string; needsResolution: boolean; onHold?: boolean; resolutionNote: string | null };
+type Change = { id: string; operationType: string; objectType: string; objectId: string; status: string; createdAt: string; needsResolution: boolean; resolutionKind?: 'pending_recovery' | 'uncertain'; onHold?: boolean; resolutionNote: string | null };
+type Resolution = 'applied' | 'not_applied';
 const STATUS_TEXT: Record<string, string> = { pending: 'In progress (on hold)', succeeded: 'Applied', rejected: 'Not applied', uncertain: 'Unknown result', resolved_applied: 'Confirmed applied', resolved_not_applied: 'Confirmed not applied' };
 const TYPE_TEXT: Record<string, string> = { 'status.set': 'Pause or resume', 'budget.set': 'Budget change', rename: 'Rename', 'creative.assign': 'Creative change', delete: 'Delete' };
 
 export function ChangeHistory({ items }: { items: Change[] }) {
   const [rows, setRows] = useState(items);
-  const [busyId, setBusyId] = useState('');
-  const [message, setMessage] = useState('');
-  async function resolve(change: Change, resolution: 'applied' | 'not_applied') {
-    setBusyId(change.id); setMessage('');
-    const confirmation = `RESOLVE ADS CHANGE ${change.id} AS ${resolution === 'applied' ? 'APPLIED' : 'NOT APPLIED'}`;
+  const [resolving, setResolving] = useState<{ change: Change; resolution: Resolution } | null>(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [message, setMessage] = useState<{ text: string; error: boolean; key: string } | null>(null);
+
+  async function resolve() {
+    if (!resolving) return;
+    setBusy(true); setMessage(null);
+    const { change, resolution } = resolving;
+    const confirmation = `${change.resolutionKind === 'pending_recovery' ? 'RECOVER' : 'RESOLVE'} ADS CHANGE ${change.id} AS ${resolution === 'applied' ? 'APPLIED' : 'NOT APPLIED'}`;
     try {
-      const response = await fetch('/api/ads/management', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'resolve', operationId: change.id, resolution, confirmation }) });
+      const response = await fetch('/api/ads/management', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'resolve', operationId: change.id, resolution, ...(note.trim() ? { note: note.trim() } : {}), confirmation }) });
       const payload = await response.json().catch(() => ({})) as { error?: string; status?: string };
-      if (!response.ok || !payload.status) throw new Error(payload.error || 'This could not be saved.');
-      setRows(current => current.map(item => item.id === change.id ? { ...item, status: payload.status!, needsResolution: false, onHold: false } : item));
-      setMessage('Saved.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'This could not be saved.'); }
-    finally { setBusyId(''); }
+      if (!response.ok || !payload.status) throw new Error(payload.error || 'This could not be saved. Check Ads change history and try again.');
+      setRows(current => current.map(item => item.id === change.id ? { ...item, status: payload.status!, needsResolution: false, onHold: false, resolutionNote: note.trim() || null } : item));
+      setMessage({ text: 'Your review was recorded. This action did not contact the advertising platform or send the change again.', error: false, key: String(Date.now()) });
+      setResolving(null); setNote('');
+    } catch (error) {
+      setMessage({ text: error instanceof Error ? error.message : 'This could not be saved. Check Ads change history and try again.', error: true, key: String(Date.now()) });
+    } finally { setBusy(false); }
   }
-  if (!rows.length) return <p className="small-note">No changes have been made through this workspace yet.</p>;
+
+  function beginResolution(change: Change, resolution: Resolution) {
+    setMessage(null); setNote(''); setResolving({ change, resolution });
+  }
+
+  async function refreshHistory() {
+    setRefreshing(true); setMessage(null);
+    try {
+      const response = await fetch('/api/ads/management?view=changes');
+      const payload = await response.json().catch(() => ({})) as { error?: string; items?: Change[] };
+      if (!response.ok || !Array.isArray(payload.items)) throw new Error(payload.error || 'Change history could not be refreshed. Try again.');
+      setRows(payload.items);
+      setMessage({ text: 'Change history updated.', error: false, key: String(Date.now()) });
+    } catch (error) {
+      setMessage({ text: error instanceof Error ? error.message : 'Change history could not be refreshed. Try again.', error: true, key: String(Date.now()) });
+    } finally { setRefreshing(false); }
+  }
+
   return <>
-    {message ? <p role="status" className="small-note">{message}</p> : null}
-    <ul className="ads-change-history">{rows.map(change => <li key={change.id}>
-      <strong>{TYPE_TEXT[change.operationType] ?? change.operationType}</strong> · {change.objectType} {change.objectId} · {STATUS_TEXT[change.status] ?? change.status} · <time dateTime={change.createdAt}>{new Date(change.createdAt).toLocaleString()}</time>
-      {change.status === 'pending' ? <p className="small-note">This change has no confirmed result yet. New changes to this {change.objectType} stay on hold until it finishes or is reviewed. Do not repeat it.</p> : null}
-      {change.needsResolution ? <div>
-        <p className="small-note">The result of this change is unknown. Check the {change.objectType} in your advertising platform, then record what you found. The change will not be sent again.</p>
-        <button type="button" disabled={busyId === change.id} onClick={() => void resolve(change, 'applied')}>It was applied</button>{' '}
-        <button type="button" disabled={busyId === change.id} onClick={() => void resolve(change, 'not_applied')}>It was not applied</button>
-      </div> : null}
-    </li>)}</ul>
+    {message && !resolving ? <RouteNotice error={message.error} className={message.error ? 'ui-error' : 'small-note'} focusKey={message.key}>{message.text}</RouteNotice> : null}
+    <Button onClick={() => void refreshHistory()} disabled={refreshing || busy}>{refreshing ? 'Refreshing…' : 'Refresh change history'}</Button>
+    {!rows.length ? <p className="small-note">No changes have been made through this workspace yet.</p> : <ul className="ads-change-history">{rows.map(change => <li key={change.id}>
+      <strong>{TYPE_TEXT[change.operationType] ?? 'Ads change'}</strong> · {change.objectType} · {STATUS_TEXT[change.status] ?? 'Needs review'} · <time dateTime={change.createdAt}>{new Date(change.createdAt).toLocaleString()}</time>
+      {change.onHold && !change.needsResolution ? <p className="small-note">This change may still be in progress. It stays on hold until the result is recorded. Do not repeat it. The service will not allow a review while its request is still in flight.</p> : null}
+      {change.needsResolution ? <>
+        {change.resolutionKind === 'pending_recovery'
+          ? <p className="small-note">This request is still recorded as in progress. Check the object in your advertising platform first; the service checks for an active dispatch before it records your finding. This only updates workspace history; it never sends or repeats the change.</p>
+          : <p className="small-note">The result is unknown. Check the object in your advertising platform first. Recording your finding changes only this workspace’s history; it never sends or repeats the change.</p>}
+        <Button variant="secondary" disabled={busy} onClick={() => beginResolution(change, 'applied')}>I checked: it was applied</Button>{' '}
+        <Button variant="secondary" disabled={busy} onClick={() => beginResolution(change, 'not_applied')}>I checked: it was not applied</Button>
+      </> : null}
+      {change.resolutionNote ? <p className="small-note">Review note: {change.resolutionNote}</p> : null}
+    </li>)}</ul>}
+
+    {resolving ? <ModalDialog className="ui-dialog" labelledBy="ads-change-resolution-title" onDismiss={() => { if (!busy) setResolving(null); }} busy={busy}>
+      <div className="ui-dialog__header"><div><h2 id="ads-change-resolution-title">Record your review</h2><p>{resolving.resolution === 'applied' ? 'Mark this change as applied.' : 'Mark this change as not applied.'}</p></div></div>
+      <div className="ui-dialog__body">
+        <p><strong>Check the object in your advertising platform before continuing.</strong></p>
+        <p>This only records your finding in workspace history; it will not contact the platform or send the change again. The service checks for an active dispatch before saving a pending recovery.</p>
+        <label>Review note (optional)<textarea className="ui-input" value={note} maxLength={500} onChange={event => setNote(event.target.value)} disabled={busy} /></label>
+        {message ? <RouteNotice error className="ui-error" focusKey={message.key}>{message.text}</RouteNotice> : null}
+      </div>
+      <div className="ui-dialog__actions">
+        <Button data-dialog-cancel onClick={() => setResolving(null)} disabled={busy}>Cancel</Button>
+        <Button variant="primary" onClick={() => void resolve()} disabled={busy}>{busy ? 'Recording…' : 'Record review'}</Button>
+      </div>
+    </ModalDialog> : null}
   </>;
 }

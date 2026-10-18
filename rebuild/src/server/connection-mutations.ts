@@ -1,3 +1,4 @@
+import { assertAdsOperationsSettled } from '@/modules/ads/management/retention';
 import { assertPublishingTargetsSettled, lockPublishingTargets } from '@/modules/publishing/server/guard';
 import { assertInboxDeletionsSettled, lockInboxChannel } from '@/modules/inbox/server/comment-guard';
 import { OperationError } from '@/lib/operation-error';
@@ -142,6 +143,7 @@ export async function disconnectSocialAccount(actor: ConnectionMutationActor, so
       return { mode, stillScheduled, retained: { channels: targetIds.length, adAccounts: adAccountIds.length, instagramAccounts: instagramAccounts.length } };
     }
 
+    await assertAdsOperationsSettled(tx, actor.workspaceId, adAccountIds);
     if (stillScheduled > 0) throw new OperationError('conflict', 'This source has posts still scheduled at the provider. Cancel or reconcile those posts before deleting its local records.');
 
     const targetLinks = targetIds.length ? await tx.postTarget.findMany({ where: { targetId: { in: targetIds } }, select: { id: true, postId: true } }) : [];

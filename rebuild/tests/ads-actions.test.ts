@@ -18,7 +18,9 @@ const mocks = vi.hoisted(() => ({
   canUseFeature: vi.fn(),
   hasPlatformCapability: vi.fn(),
   canAccessFeature: vi.fn(),
+  perform: vi.fn(),
 }));
+vi.mock('../src/modules/ads/management/server', () => ({ performAdsManagement: mocks.perform }));
 
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config, runtimeSecret: mocks.secret }));
@@ -40,12 +42,15 @@ vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessF
 
 import { canManageWorkspaceAds, canReadWorkspaceAds, createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '../src/server/ads/actions';
 import { platformAds } from '../src/server/platforms/registry';
+import { OperationError } from '../src/lib/operation-error';
 
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
+const requestId = 'request-0001';
 const statusChange = {
   adAccountId: 'local-account-1', objectId: 'campaign-44', objectType: 'campaign' as const,
-  status: 'paused' as const, confirmation: 'SET AD STATUS campaign-44 TO PAUSED',
+  status: 'paused' as const, confirmation: 'preview-derived confirmation', requestId,
 };
+const applied = { outcome: 'succeeded' as const, operationId: 'adsop_1', remoteId: null, recorded: true };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -69,6 +74,7 @@ beforeEach(() => {
   mocks.engine.readAdObject.mockResolvedValue({ id: 'campaign-44', name: 'Spring', accountId: '99', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
   mocks.createFacebookAdSet.mockResolvedValue({ remoteId: 'adset-new' });
   mocks.prisma.$executeRaw.mockResolvedValue(1);
+  mocks.perform.mockResolvedValue(applied);
 });
 
 describe('workspace Ads actions', () => {
@@ -78,15 +84,6 @@ describe('workspace Ads actions', () => {
     await expect(readWorkspaceAdObject(actor, { adAccountId: 'local-account-1', objectId: 'campaign-44', objectType: 'campaign' })).rejects.toThrow(/performance access is unavailable/);
     expect(platformAds).not.toHaveBeenCalled();
     expect(mocks.engine.readAdObject).not.toHaveBeenCalled();
-  });
-  it('denies spend-changing Ads actions when the selected platform is not entitled', async () => {
-    mocks.hasPlatformCapability.mockReturnValue(false);
-    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/unavailable/);
-    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
-  });
-  it('rejects combined status and budget changes before contacting a provider', async () => {
-    await expect(updateWorkspaceAd(actor, { ...statusChange, dailyBudgetMinor: 500, confirmation: 'SET AD BUDGET campaign-44 TO 500 MINOR UNITS' })).rejects.toThrow('Choose one valid ad change.');
-    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
   });
   it('dispatches live reads through the provider recorded on the selected ad account', async () => {
     mocks.config.mockImplementation(async (key: string) => key === 'platforms.instagram.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : false);
@@ -145,8 +142,6 @@ describe('workspace Ads actions', () => {
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(false);
     await expect(readWorkspaceAdObject(actor, { adAccountId: 'local-account-1', objectId: 'campaign-44', objectType: 'campaign' })).rejects.toThrow(/performance access is unavailable/);
     expect(mocks.engine.readAdObject).not.toHaveBeenCalled();
-    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/Advertising changes are currently unavailable/);
-    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
   });
 
   it('keeps Ads read and manage readiness when signing is explicitly disabled without a secret', async () => {
@@ -174,12 +169,6 @@ describe('workspace Ads actions', () => {
     expect(scopedWhere.socialAccount.is.targets.some).toEqual({ workspaceId: actor.workspaceId, id: { in: ['target-allowed'] } });
     mocks.prisma.adAccount.findFirst.mockResolvedValueOnce(null);
     expect(await canManageWorkspaceAds(actor, 'account-linked-only-to-forbidden-channel')).toBe(false);
-
-    mocks.prisma.adAccount.findFirst.mockResolvedValueOnce(null);
-    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/unavailable/);
-    const mutationWhere = mocks.prisma.adAccount.findFirst.mock.calls[2][0].where;
-    expect(mutationWhere.socialAccount.is.targets.some).toEqual({ workspaceId: actor.workspaceId, id: { in: ['target-allowed'] } });
-    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
 
     mocks.prisma.adAccount.findFirst.mockResolvedValueOnce(null);
     await expect(createWorkspaceAdCampaign(actor, { adAccountId: 'local-account-1', name: 'Spring', objective: 'OUTCOME_TRAFFIC', confirmation: 'anything' })).rejects.toThrow(/unavailable/);
@@ -269,57 +258,43 @@ describe('workspace Ads actions', () => {
     auditLog.mockRestore();
   });
 
-  it('rechecks role and blocks a non-manager before looking up any account', async () => {
-    mocks.prisma.membership.findUnique.mockResolvedValue({ role: 'editor' });
+  it('maps a status change to one neutral operation and delegates with the request identity and confirmation', async () => {
+    await expect(updateWorkspaceAd(actor, statusChange)).resolves.toEqual(applied);
+    expect(mocks.perform).toHaveBeenCalledTimes(1);
+    expect(mocks.perform).toHaveBeenCalledWith(
+      { userId: 'user-1', workspaceId: 'workspace-1' },
+      { adAccountId: 'local-account-1', operation: { type: 'status.set', objectType: 'campaign', objectId: 'campaign-44', status: 'paused' }, confirmation: 'preview-derived confirmation', requestId },
+    );
+    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
+  });
+
+  it('maps daily and lifetime budgets to neutral budget operations', async () => {
+    const base = { adAccountId: 'local-account-1', objectId: 'adset-12', objectType: 'adset' as const, confirmation: 'c', requestId };
+    await updateWorkspaceAd(actor, { ...base, dailyBudgetMinor: 1250 });
+    await updateWorkspaceAd(actor, { ...base, lifetimeBudgetMinor: 90000 });
+    expect(mocks.perform.mock.calls[0][1].operation).toEqual({ type: 'budget.set', objectType: 'adset', objectId: 'adset-12', budget: { kind: 'daily', minor: 1250 } });
+    expect(mocks.perform.mock.calls[1][1].operation).toEqual({ type: 'budget.set', objectType: 'adset', objectId: 'adset-12', budget: { kind: 'lifetime', minor: 90000 } });
+    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
+  });
+
+  it('retains the caller’s allowed target scope when delegating', async () => {
+    await updateWorkspaceAd({ ...actor, allowedTargetIds: ['target-a'] }, statusChange);
+    expect(mocks.perform.mock.calls[0][0]).toEqual({ userId: 'user-1', workspaceId: 'workspace-1', allowedTargetIds: ['target-a'] });
+  });
+
+  it('rejects zero or multiple changes before delegating', async () => {
+    await expect(updateWorkspaceAd(actor, { ...statusChange, dailyBudgetMinor: 500 })).rejects.toThrow('Choose one valid ad change.');
+    await expect(updateWorkspaceAd(actor, { adAccountId: 'a', objectId: 'o', objectType: 'campaign', confirmation: 'c', requestId })).rejects.toThrow('Choose one valid ad change.');
+    expect(mocks.perform).not.toHaveBeenCalled();
+  });
+
+  it('never calls the provider update directly and surfaces service refusals and structured outcomes unchanged', async () => {
+    mocks.perform.mockRejectedValueOnce(new OperationError('forbidden', 'Only workspace owners and admins can manage ads.'));
     await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/owners and admins/);
-    expect(mocks.prisma.adAccount.findFirst).not.toHaveBeenCalled();
+    const uncertain = { outcome: 'uncertain' as const, operationId: 'adsop_2', message: 'unknown' };
+    mocks.perform.mockResolvedValueOnce(uncertain);
+    await expect(updateWorkspaceAd(actor, statusChange)).resolves.toBe(uncertain);
     expect(mocks.engine.updateAd).not.toHaveBeenCalled();
-  });
-
-  it('requires Root management enablement and the configured scope grant', async () => {
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? false : key === 'platforms.facebook.enabled' ? true : ['ads_management']);
-    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/currently unavailable/);
-    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
-
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.appSecretProofEnabled' ? false : ['ads_management']);
-    mocks.prisma.adAccount.findFirst.mockResolvedValue({
-      id: 'local-account-1', actId: 'act_99',
-      socialAccount: { id: 'social-1', provider: 'facebook', accessToken: 'encrypted-token', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null },
-    });
-    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/allow advertising changes/);
-    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
-  });
-
-  it('rejects caller-provided objects that are not in this account’s stored insight history', async () => {
-    mocks.prisma.adInsight.findFirst.mockResolvedValue(null);
-    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/cannot be verified/);
-    expect(mocks.prisma.adInsight.findFirst.mock.calls[0][0].where).toEqual({ adAccountId: 'local-account-1', level: 'campaign', objectId: 'campaign-44' });
-    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
-  });
-
-  it('requires the exact new budget in minor units, applies the mutation, and audits without credentials', async () => {
-    const budgetChange = {
-      adAccountId: 'local-account-1', objectId: 'adset-12', objectType: 'adset' as const,
-      dailyBudgetMinor: 1250, confirmation: 'SET AD BUDGET adset-12 TO 1250 MINOR UNITS',
-    };
-    await expect(updateWorkspaceAd(actor, { ...budgetChange, confirmation: 'yes' })).rejects.toThrow(/confirmation exactly/);
-    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
-
-    await updateWorkspaceAd(actor, budgetChange);
-    expect(mocks.engine.updateAd).toHaveBeenCalledWith({
-      credential: { accessToken: 'secret-token-value' }, accountId: 'act_99', objectId: 'adset-12', objectType: 'adset', dailyBudgetMinor: 1250,
-    });
-    const rawValues = mocks.prisma.$executeRaw.mock.calls[0] as unknown[];
-    expect(JSON.stringify(rawValues)).toContain('1250');
-    expect(JSON.stringify(rawValues)).not.toContain('secret-token-value');
-  });
-
-  it('denies mutations when the Root feature or workspace write permission is off', async () => {
-    mocks.canUseFeature.mockReturnValue(false);
-    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/not available/);
-    mocks.canUseFeature.mockReturnValue(true);
-    mocks.canAccessFeature.mockReturnValue(false);
-    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/not available/);
-    expect(mocks.prisma.adAccount.findFirst).not.toHaveBeenCalled();
+    expect(mocks.prisma.adInsight.findFirst).not.toHaveBeenCalled();
   });
 });

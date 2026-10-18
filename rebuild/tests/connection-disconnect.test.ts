@@ -8,6 +8,24 @@ vi.mock('../src/server/data', () => ({ prisma: Object.assign(mocks.prisma, { $tr
 afterEach(() => vi.clearAllMocks());
 
 describe('disconnect local data choices', () => {
+  it('refuses deleting a source whose Ads journal has an unsettled operation', async () => {
+    const tx = {
+      $queryRaw: vi.fn(async (sql: TemplateStringsArray) => {
+        const text = sql.join('');
+        if (text.includes('pg_try_advisory')) return [{ acquired: true }];
+        return [{ pending: text.includes('ads_management_operations') }];
+      }),
+      membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
+      socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 'source', targets: [], adAccounts: [{ id: 'account' }] }), deleteMany: vi.fn() },
+      adAccount: { deleteMany: vi.fn() },
+    };
+    mocks.transaction.mockImplementation(async (run: (client: typeof tx) => Promise<unknown>) => run(tx));
+    const { disconnectSocialAccount } = await import('../src/server/connection-mutations');
+    await expect(disconnectSocialAccount({ userId: 'user', workspaceId: 'workspace' }, 'source', 'delete', 'DELETE')).rejects.toThrow('advertising change still needs review');
+    expect(tx.adAccount.deleteMany).not.toHaveBeenCalled();
+    expect(tx.socialAccount.deleteMany).not.toHaveBeenCalled();
+  });
+
   it('includes linked Instagram rows in preview and delete mode', async () => {
     const tx = {
       $queryRaw: vi.fn(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: false }]),

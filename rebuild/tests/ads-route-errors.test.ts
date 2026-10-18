@@ -11,7 +11,7 @@ import { POST as read } from '../src/app/api/ads/object/route';
 import { OperationError } from '../src/lib/operation-error';
 
 const cases = [
-  { name: 'update', route: update, run: mocks.update, body: { adAccountId: 'account', objectId: 'object', objectType: 'campaign', status: 'paused', confirmation: 'exact' } },
+  { name: 'update', route: update, run: mocks.update, body: { adAccountId: 'account', objectId: 'object', objectType: 'campaign', status: 'paused', confirmation: 'exact', requestId: 'request-0001' } },
   { name: 'campaign', route: campaign, run: mocks.campaign, body: { adAccountId: 'account', name: 'Example', objective: 'example', confirmation: 'exact' } },
   { name: 'ad set', route: adSet, run: mocks.adSet, body: { adAccountId: 'account', campaignId: 'campaign', name: 'Example', dailyBudgetMinor: 100, countryCode: 'MA', optimizationGoal: 'example', confirmation: 'exact' } },
   { name: 'read', route: read, run: mocks.read, body: { adAccountId: 'account', objectId: 'object', objectType: 'campaign' } },
@@ -40,5 +40,21 @@ describe.each(cases)('Ads $name error boundary', ({ route, run, body }) => {
   it('rejects malformed input before invoking the service', async () => {
     expect((await route(request({}))).status).toBe(400);
     expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe('Ads update route contract', () => {
+  const body = { adAccountId: 'account', objectId: 'object', objectType: 'campaign', status: 'paused', confirmation: 'exact', requestId: 'request-0001' };
+  it('requires a request ID', async () => {
+    const { requestId: _omit, ...withoutId } = body;
+    expect((await update(request(withoutId))).status).toBe(400);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it('returns the structured service outcome and forwards the request identity', async () => {
+    const outcome = { outcome: 'uncertain', operationId: 'adsop_1', message: 'unknown' };
+    mocks.update.mockResolvedValueOnce(outcome);
+    const response = await update(request(body));
+    expect(await response.json()).toEqual(outcome);
+    expect(mocks.update).toHaveBeenCalledWith({ userId: 'user', workspaceId: 'workspace' }, body);
   });
 });

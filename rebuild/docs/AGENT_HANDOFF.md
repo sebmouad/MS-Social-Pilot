@@ -356,3 +356,49 @@ proof. Those slices remain outside this batch. Complete held-photo cleanup,
 production-shaped migration/rollback and remaining release gates before cutover.
 Production and socialpilot-deploy remain legacy. Do not broad-stage unfinished
 source or the unused old NotificationsForm dependent on Integrations.
+
+
+## Batch 74 — durable Ads object management
+
+Registry 67 registers Ads-owned operation policy. Facebook-owned host assembly
+exposes a neutral optional engine for status, budget, rename, existing-creative
+assignment and delete. Shared management services back UI/HTTP/workspace MCP;
+the older status/budget API/MCP shapes delegate to them. Current key target scope
+is intersected with fresh access. Same actor/workspace request identity binds the
+normalized account/payload; successful replays do not resend. A durable intent
+precedes provider I/O; dispatch rechecks pending state/authority under the account
+selection lock and passes its abort signal into Facebook transport. Ambiguity
+stays held. Explicit pending recovery and uncertain attestation use the same lock
+and CAS, preserve receipts, and remain available for retained disabled accounts.
+Connection deletion refuses unsettled journals. UI retains request identity across
+unknown responses and requires a fresh review after terminal resolution.
+Campaign/ad-set creation still needs equivalent durable journaling/recovery.
+Management remains off by default; this is not completed Ads or live-provider parity.
+
+The isolated snapshot passed 2,284 tests / 288 files and production build plus
+serial typecheck. Three actual PostgreSQL tests cover request uniqueness,
+uncertain holds/history and dispatch/recovery lock exclusion, workspace lock
+independence and release; fixtures roll back. The guarded local recovery probe
+passed real HTTP/MCP history, confirmations/read-only/foreign refusals, retained
+account pending/uncertain attestation, persisted outcomes/audits and feature gates.
+Both audit stores and fixtures were cleaned and five Root settings restored
+exactly. An initial probe checked the wrong audit store; two orphan disposable
+audit rows were subsequently removed with scoped orphan guards. Final proof
+checks both stores. No arbitrary-kill recovery claim is made.
+
+Chrome inspected desktop details with unavailable management hidden. A phone
+check found intrinsic page-grid expansion; the shared one-column grid now shrinks
+its track and leaves tables locally scrollable. Chrome measured page/client/scroll
+width 390px and table viewport 320px afterward. The CSS-final isolated build and
+serial typecheck passed. Full mutation/offline/all-theme browser evidence remains
+open. The Ads migration was fresh-backup/scratch-restored and scratch-applied
+before local preview application with legacy counts/settings preserved. Cutover
+has ten checksum-pinned migrations; the complete staging rehearsal is still open.
+See ADS_PARITY.md. Production and socialpilot-deploy remain legacy.
+
+Next: complete durable creation/ad-set/creative workflows and actual provider
+capability verification; finish Facebook-native host integration without enabling
+unverified formats. Preserve the held-photo canary lock. Continue remaining
+legacy module integrations, migration/media/rollback rehearsal and release gates.
+Do not broad-stage unrelated source slices. No provider/production write belongs
+to this batch.

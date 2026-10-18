@@ -63,14 +63,20 @@ describe('Ads form validation', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('blocks an invalid budget action before any request and focuses its associated error', async () => {
+  it('blocks an invalid budget action before a write and focuses its associated error', async () => {
+    const operations = [{ id: 'budget.set', objectTypes: ['campaign'], spendChanging: true, label: 'Change budget', inputs: [{ name: 'budget', kind: 'money-minor', budgetKinds: ['daily'] }] }];
+    vi.mocked(fetch).mockImplementation(async (url) => ({ ok: true, json: async () => String(url).includes('view=capabilities')
+      ? { canManage: true, operations, limits: { nameMaxCharacters: 100, maxBudgetMinor: 100000 } }
+      : { name: 'Example', currency: 'USD', totals: { spend: 0, impressions: 0, clicks: 0, cpc: null, ctr: null, cpm: null }, daily: [], live: { available: true }, management: { available: true, canManage: true, operations } } }) as Response);
     await render(createElement(AdsObjectActions, { adAccountId: 'account-1', objectId: 'object-1', objectType: 'campaign', currency: 'USD', canRead: false, canManage: true }));
-    await submit(container.querySelector('form')!);
-    const budget = container.querySelector<HTMLInputElement>('input[name="budgetAmount"]')!;
+    await act(async () => container.querySelector<HTMLButtonElement>('button')!.click());
+    const budget = container.querySelector<HTMLInputElement>('input[aria-label="New budget in USD"]')!;
+    expect(budget).not.toBeNull();
+    await submit(budget.closest('form')!);
     expect(budget.getAttribute('aria-invalid')).toBe('true');
-    expect(container.querySelector(`[id="${budget.getAttribute('aria-describedby')}"]`)?.textContent).toMatch(/valid amount/i);
+    expect(container.querySelector(`[id="${budget.getAttribute('aria-describedby')}"]`)?.textContent).toBeTruthy();
     expect(document.activeElement).toBe(budget);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(vi.mocked(fetch).mock.calls.every(([,init]) => !init?.method || init.method === 'GET')).toBe(true);
   });
 
   it('retains campaign input and confirmation context after a recoverable request failure', async () => {

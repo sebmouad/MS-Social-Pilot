@@ -23,7 +23,7 @@ button, input, select { font: inherit; }
 .auth-card .setup-secret { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-muted); overflow-wrap: anywhere; }
 .eyebrow { color: var(--accent) !important; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
 .muted { font-size: 13px; }
-.page-stack { display: grid; gap: 24px; }
+.page-stack { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 24px; }
 .page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .page-heading h1 { margin: 5px 0 6px; font-size: clamp(27px, 3vw, 38px); line-height: 1.15; letter-spacing: -.04em; }
 .page-heading p { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.5; }

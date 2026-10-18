@@ -10,12 +10,13 @@ import { runtimeConfig } from '@/server/config/store';
 import { platformAds } from '@/server/platforms/registry';
 import type { PlatformAdsHost } from '@/server/platforms/host';
 import { OperationError } from '@/lib/operation-error';
+import { performAdsManagement, type AdsManagementOutcome } from '@/modules/ads/management/server';
 
 const MANAGER_ROLES = new Set(['owner', 'admin']);
 const OBJECT_TYPES = new Set<AdMutationRequest['objectType']>(['campaign', 'adset', 'ad']);
 const ACCOUNT_WHERE = { enabled: true } as const;
 
-export type AdsActionActor = { userId: string; workspaceId: string };
+export type AdsActionActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 export type AdsActionInput = {
   adAccountId: string;
   objectId: string;
@@ -23,7 +24,10 @@ export type AdsActionInput = {
   status?: 'active' | 'paused';
   dailyBudgetMinor?: number;
   lifetimeBudgetMinor?: number;
+  /** Preview-derived confirmation text the caller must repeat exactly. */
   confirmation: string;
+  /** Idempotency key; retries with the same key replay the recorded outcome. */
+  requestId: string;
 };
 export type AdsCampaignCreateInput = { adAccountId: string; name: string; objective: string; confirmation: string };
 export type AdsAdSetCreateInput = { adAccountId: string; campaignId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string; confirmation: string };
@@ -159,23 +163,22 @@ async function managedAccount(actor: AdsActionActor, adAccountId: string, access
   return { account, connection, ads, credential: { accessToken } };
 }
 
-/** Mutate one previously observed object after rechecking every server-side boundary. */
-export async function updateWorkspaceAd(actor: AdsActionActor, input: AdsActionInput) {
-  const access = await requireAdsManager(actor);
+/**
+ * Map the single legacy-shaped change to one neutral operation and delegate to the
+ * Ads management service, which owns authorization, preview-derived confirmation,
+ * the durable ledger, provider dispatch and the structured outcome.
+ */
+export async function updateWorkspaceAd(actor: AdsActionActor, input: AdsActionInput): Promise<AdsManagementOutcome> {
   const hasStatus = input.status !== undefined, hasDailyBudget = input.dailyBudgetMinor !== undefined, hasLifetimeBudget = input.lifetimeBudgetMinor !== undefined;
-  if (!OBJECT_TYPES.has(input.objectType) || !input.objectId || !/^[A-Za-z0-9_-]{1,100}$/.test(input.objectId)) throw new OperationError('invalid_request', 'Invalid ad object.');
   if ([hasStatus, hasDailyBudget, hasLifetimeBudget].filter(Boolean).length !== 1) throw new OperationError('invalid_request', 'Choose one valid ad change.');
-  if (hasStatus && input.status !== 'active' && input.status !== 'paused') throw new OperationError('invalid_request', 'Invalid ad status.');
-  const budget = hasDailyBudget ? input.dailyBudgetMinor : input.lifetimeBudgetMinor;
-  if (budget !== undefined && (!Number.isSafeInteger(budget) || budget < 1)) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units.');
-  const confirmation = budget !== undefined ? `SET AD BUDGET ${input.objectId} TO ${budget} MINOR UNITS` : `SET AD STATUS ${input.objectId} TO ${input.status!.toUpperCase()}`;
-  if (input.confirmation !== confirmation) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
-  const { account, ads, credential } = await managedAccount(actor, input.adAccountId, access);
-  const owned = await prisma.adInsight.findFirst({ where: { adAccountId: account.id, level: input.objectType, objectId: input.objectId }, select: { id: true } });
-  if (!owned) throw new OperationError('not_found', 'This ad object cannot be verified for the selected account.');
-  await ads.update({ credential, accountId: account.actId, objectId: input.objectId, objectType: input.objectType,
-    ...(hasStatus ? { status: input.status } : {}), ...(hasDailyBudget ? { dailyBudgetMinor: input.dailyBudgetMinor } : {}), ...(hasLifetimeBudget ? { lifetimeBudgetMinor: input.lifetimeBudgetMinor } : {}) });
-  await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`ads_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'ads.object_updated', ${JSON.stringify({ workspaceId: actor.workspaceId, adAccountId: account.id, objectId: input.objectId, objectType: input.objectType, ...(hasStatus ? { status: input.status } : {}), ...(hasDailyBudget ? { dailyBudgetMinor: input.dailyBudgetMinor } : {}), ...(hasLifetimeBudget ? { lifetimeBudgetMinor: input.lifetimeBudgetMinor } : {}) })}::jsonb, NOW())`;
+  const base = { objectType: input.objectType, objectId: input.objectId };
+  const operation = hasStatus
+    ? { type: 'status.set', ...base, status: input.status }
+    : { type: 'budget.set', ...base, budget: hasDailyBudget ? { kind: 'daily', minor: input.dailyBudgetMinor } : { kind: 'lifetime', minor: input.lifetimeBudgetMinor } };
+  return performAdsManagement(
+    { userId: actor.userId, workspaceId: actor.workspaceId, ...(actor.allowedTargetIds ? { allowedTargetIds: actor.allowedTargetIds } : {}) },
+    { adAccountId: input.adAccountId, operation, confirmation: input.confirmation, requestId: input.requestId },
+  );
 }
 
 /** Create a paused campaign after rechecking workspace, account and provider boundaries. */

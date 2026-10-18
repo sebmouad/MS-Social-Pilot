@@ -137,7 +137,7 @@ beforeEach(() => {
   inboxDeletions.finish.mockResolvedValue({ ok: true, operationId: 'opaque-operation-1', itemId: 'comment-a', state: 'remote_confirmed', remoteConfirmed: true, localConfirmed: false });
   adsMutations.create.mockResolvedValue({ campaignId: 'campaign-1' });
   adsMutations.createAdSet.mockResolvedValue({ adSetId: 'adset-1', auditRecorded: true });
-  adsMutations.update.mockResolvedValue(undefined);
+  adsMutations.update.mockResolvedValue({ outcome: 'succeeded', operationId: 'ads-operation', recorded: true });
   adsMutations.read.mockResolvedValue({ id: 'campaign-a', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
   publishingMutations.publish.mockResolvedValue({ published: 1, failed: 0, needsReconciliation: 0 });
   publishingMutations.sync.mockResolvedValue({ synced: 1 });
@@ -283,7 +283,7 @@ describe('MCP workspace boundaries', () => {
     ['delete_post', { postId: 'post-a', deleteRemote: false, confirmation: 'DELETE POST post-a LOCAL' }, () => publishingMutations.remove, { ok: true, postId: 'post-a', localConfirmed: true, remoteDeletionRequested: false, state: 'completed', operations: [] }],
     ['upload_workspace_image', { fileName: 'new.png', mimeType: 'image/png', base64: 'AQID', confirmation: 'UPLOAD WORKSPACE IMAGE new.png' }, () => media.upload, { id: 'image-b' }],
     ['set_connection_selection', { kind: 'target', id: 'target-a', enabled: true, confirmation: 'SET CONNECTION target target-a ENABLED' }, () => mutations.select, { id: 'target-a', enabled: true }],
-    ['update_ad', { adAccountId: 'account-a', objectId: 'ad-a', objectType: 'ad', status: 'paused', confirmation: 'SET AD STATUS ad-a TO PAUSED' }, () => adsMutations.update, { objectId: 'ad-a', updated: true }],
+    ['update_ad', { adAccountId: 'account-a', objectId: 'ad-a', objectType: 'ad', status: 'paused', requestId: 'stable-request-1', confirmation: 'module preview confirmation' }, () => adsMutations.update, { outcome: 'succeeded', operationId: 'ads-operation', recorded: true }],
   ] as const)('preserves the %s receipt when its secondary MCP audit fails', async (name, args, mutation, expected) => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
@@ -758,10 +758,10 @@ describe('MCP workspace boundaries', () => {
     expect((await created.json()).result.structuredContent).toMatchObject({ campaignId: 'campaign-1', confirmedSuccess: true, mcpAuditRecorded: true });
     expect(adsMutations.create).toHaveBeenCalledWith(viewer, { ...campaign, confirmation });
 
-    const change = { adAccountId: 'account-1', objectId: 'campaign-1', objectType: 'campaign', status: 'paused' };
+    const change = { adAccountId: 'account-1', objectId: 'campaign-1', objectType: 'campaign', status: 'paused', requestId: 'stable-request-2' };
     const updated = await call('update_ad', { ...change, confirmation: 'SET AD STATUS campaign-1 TO PAUSED' });
-    expect((await updated.json()).result.structuredContent.updated).toBe(true);
-    expect(adsMutations.update).toHaveBeenCalledWith(viewer, { ...change, dailyBudgetMinor: undefined, lifetimeBudgetMinor: undefined, confirmation: 'SET AD STATUS campaign-1 TO PAUSED' });
+    expect((await updated.json()).result.structuredContent.outcome).toBe('succeeded');
+    expect(adsMutations.update).toHaveBeenCalledWith({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: undefined }, { ...change, dailyBudgetMinor: undefined, lifetimeBudgetMinor: undefined, confirmation: 'SET AD STATUS campaign-1 TO PAUSED' });
   });
   it('returns confirmed remote Ads receipts when MCP audit persistence fails', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
