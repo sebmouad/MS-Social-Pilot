@@ -168,3 +168,31 @@ and rerun in the correct snapshot before restoration. Production was untouched.
 Account1 Sharing implementation handle was 93328 at this checkpoint; re-poll
 that handle before dispatching overlapping module edits. Account2 PG worker is
 terminal. Private source handoffs stay outside Git; ownership remains as above.
+
+### Batch79 continuation checkpoint
+
+The atomic foundation is published and GitHub-verified at
+`682ca73ce771f54522ca5a33b04e35e4c50fd35b`. Its isolated production-build preview
+is restored on localhost:3200 (Agency visible at 1440px, no horizontal overflow).
+Account1 initial implementation handle93328 is terminal. It produced separate
+Settings sharing/bio pages, ten MCP definitions, uploaded-image previews and
+current owner-bio availability. Parent sharing/host targeted tests passed, but
+full feature integration is not yet verified or published.
+
+Account1 hardening handle62189 and account2 verifier handle82970 were confirmed
+live at this checkpoint. Do not restart on an observation timeout. Account1 owns
+Sharing module/routes/tests; account2 owns only scripts/verify-client-sharing79.ts.
+Parent owns shared host and config. Key hardening requirements: compare the
+current tokenHash under the feedback/review mutation lock (id/expiry alone do not
+stop a rotated token), serialize plain comment/advice writes, keep public limiter
+storage separate from login counters, enforce current Publishing feature/key
+ceilings before exposing post data, and limit review mode to pending approvals.
+No false advice acknowledgment on database/participant failures; keep client
+comment bodies out of generic activity logs. Account1 has the full findings.
+
+Remaining uncommitted host work installs Settings pages/Root registry71, Sharing
+MCP tools/resources/current permission ceilings and owner-service lock exclusion.
+Before exposing it: review completed hardening, run isolated full tests/build/
+serial typecheck, actual HTTP/MCP/PG/Chromium verifier and cleanup/export/erasure,
+then browser UX with example data and explicit main publication. Do not include
+unrelated AI/feeds/sharing-report/native-format source merely because it exists.
