@@ -402,3 +402,39 @@ unverified formats. Preserve the held-photo canary lock. Continue remaining
 legacy module integrations, migration/media/rollback rehearsal and release gates.
 Do not broad-stage unrelated source slices. No provider/production write belongs
 to this batch.
+
+## Active batches 75–76 — 2026-10-18
+
+Published main: `03580cf97e6311a0bed044adfc88e4949062bc54`, exact remote
+SHA verified. This isolated batch contains Ads creation operation-kind migration,
+eleven-file cutover pins/history/function refusals, five PostgreSQL ledger tests
+and migration evidence. Full eleven-migration schema-only rehearsal passed;
+all rows absent, so customer-data/media/service rollback proof is still open.
+
+Ads creation application code remains uncommitted. It integrates campaign/ad-set
+creation with the durable journal, payload-bound replay, selected-account locks,
+Root `meta.adsCreationUi` (registry 68), UI/HTTP/MCP stable request identity and
+conservative unknown-outcome holds. Baseline isolated suite: 2222 passing,
+108 skipped (290 files); build/typecheck passed. This predates review fixes.
+Static Claude review found misleading preflight errors and reload identity loss.
+First fixes added sessionStorage and typed no-dispatch markers, but review found
+that a later policy failure must never release an already-unknown original
+request. Claude hardening worker is active (terminal 34001), output private
+`ads75-review-hardening.txt`; revalidate its live handle before assuming progress.
+It also owns user/workspace storage scope and truthful replay delivery wording.
+Run targeted/full isolated tests, build/typecheck and changed-flow browser proof
+before publishing runtime. Seed campaign phone report had width/client/scroll
+390px with no page overflow; creation forms unavailable under current synthetic
+account grants, so this is report-layout evidence only.
+
+Independent Claude Tasks worker is active (terminal 16880), output private
+`tasks76-build.txt`. Owns Tasks source/routes/tests/new comments migration only;
+central registry/manifests/MCP/schema/cutover remain parent integration work.
+Read-only Agency/Tasks readiness audit: source packages are disconnected, config
+unregistered, Tasks comments table absent, entry points lack feature enforcement,
+Agency cross-workspace visibility must not leak through workspace MCP keys.
+Do not count those source folders as migrated functionality.
+
+Keep unrelated untracked feature slices out of Ads staging. Production and
+socialpilot-deploy remain legacy. Preserve held-photo canary and Page lock.
+No actual Ads provider creation or production change has occurred in these batches.

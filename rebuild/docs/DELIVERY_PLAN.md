@@ -409,3 +409,22 @@ unverified formats. Preserve the held-photo canary lock. Continue remaining
 legacy module integrations, migration/media/rollback rehearsal and release gates.
 Do not broad-stage unrelated source slices. No provider/production write belongs
 to this batch.
+
+## Current batch order — 2026-10-18
+
+1. Finish reviewed Ads creation integration and reload recovery; verify UI/API/MCP
+   outcome truthfulness, publish only the proven batch. Migration infrastructure
+   is already published as `03580cf9`.
+2. Integrate the independently prepared Tasks module with manifest-driven Root,
+   shared authorization, scoped MCP, comments migration and data lifecycle proof.
+3. Complete Agency cross-workspace administration without exposing it to a key
+   scoped to one workspace. Then integrate remaining sharing, feeds/AI/media,
+   report workflows and developer integrations from honest parity inventory.
+4. Complete Facebook native-format/live operation proof and held-canary cleanup;
+   rehearse production-shaped data/media migration and exact service rollback.
+   Production cutover remains blocked until every release gate passes.
+
+Use Claude workers for independent implementation and review. Parent owns host
+integration, verification and explicit main commits; no broad staging of
+unfinished feature source. Passing baseline checks never substitute for
+revalidation after review fixes.
