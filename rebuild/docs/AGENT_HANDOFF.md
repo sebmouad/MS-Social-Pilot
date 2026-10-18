@@ -196,3 +196,31 @@ Before exposing it: review completed hardening, run isolated full tests/build/
 serial typecheck, actual HTTP/MCP/PG/Chromium verifier and cleanup/export/erasure,
 then browser UX with example data and explicit main publication. Do not include
 unrelated AI/feeds/sharing-report/native-format source merely because it exists.
+
+
+## Sharing integration checkpoint — 2026-10-18, follow-up
+
+Both external Claude accounts contributed. Account1 completed Sharing implementation
+and hardening before reaching its session quota; account2 completed independent
+review, CRUD continuation and capability-minting fixes. These workers are terminal;
+do not restart the old handles from the preceding checkpoint.
+
+Current uncommitted Sharing source refuses Settings-only token rotation and requires
+current approval write for rotating a deciding link, including renewal/access edits.
+API-key domain audits carry key identity without credentials. Parent verification
+found and fixed missing-channel validation copy and an inaccurate target fixture.
+A millisecond-dependent expiry fixture made optimistic-version tests flaky; its
+expiry is now a fixed future instant. All 126 focused tests in six files pass.
+
+Fresh isolated snapshot: /private/tmp/msp79-finalcheck/app. Its production build
+passed; full suite passed 2506 tests with 129 database-dependent tests skipped
+(285 passing files, 28 skipped). These skips are not database integration proof.
+Serial typecheck passed after correcting test schema-union narrowing; all 54
+link tests passed again afterward. Earlier actual workflow run still has unresolved
+verification failures; source corrections need a rebuilt runtime and fresh complete
+HTTP/MCP/PostgreSQL/browser probe before Sharing is published as verified.
+
+Next: finish auth-wrapper and CRUD live assertions, bio confirmation UX, public
+phone layout verification, exact cleanup, synthetic examples and documentation.
+Sharing source remains uncommitted; unrelated unfinished modules remain excluded.
+Production and socialpilot-deploy remain legacy. Preserve the held-photo canary lock.
