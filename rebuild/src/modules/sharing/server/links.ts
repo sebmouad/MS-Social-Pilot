@@ -9,6 +9,7 @@ import {
 import { KIND_PUBLISHING_FEATURES } from '../semantics';
 import { audit, authorizeSharing, bad, exact, lockActor, missing, pageSize, protect, transact, type SharingAuthorization } from './access';
 import { sharingLimits } from './limits';
+import { sharingChannels } from './channels';
 
 type Row = { id: string; kind: ShareKind; title: string; description: string | null; targetIds: unknown; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; revokedAt: Date | null; expiresAt: Date | null; createdAt: Date; createdById: string; decisions: bigint | number; tokenHash?: string };
 export type ShareLinkSummary = { id: string; kind: ShareKind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; status: LinkStatus; expiresAt: Date | null; createdAt: Date; createdById: string; feedbackCount: number; /** Pass back as expectedVersion when editing; changes whenever the link or its address changes. */ version: string };
@@ -38,8 +39,9 @@ export async function listShareLinks(actor: SharingActor, input: unknown = {}, o
 /** Channels the actor may put on a link (enabled, in-workspace, within scope); the owner picker reads this. */
 export async function listShareableChannels(actor: SharingActor, options: SharingReadOptions = {}) {
   const auth = await authorizeSharing(actor, 'sharing', 'read');
-  const rows = await protect(prisma.$queryRaw<Array<{ id: string; name: string }>>`SELECT id, name FROM targets WHERE "workspaceId" = ${actor.workspaceId} AND enabled = true ORDER BY name ASC, id ASC LIMIT 500`);
-  return rows.filter(row => auth.scope === null || auth.scope.includes(row.id)).slice(0, pageSize(500, options.maxItems));
+  const limits = await sharingLimits();
+  const rows = await protect(sharingChannels(prisma, actor.workspaceId, auth.providers, auth.scope ?? undefined, pageSize(limits.channelPickerLimit!, options.maxItems)));
+  return rows.filter(row => auth.scope === null || auth.scope.includes(row.id)).slice(0, pageSize(limits.channelPickerLimit!, options.maxItems));
 }
 
 /** The client answers recorded through one link, newest first, with the post's current status (the actual approval effect). */
@@ -73,7 +75,7 @@ export async function createShareLink(actor: SharingActor, input: unknown) {
   const token = newToken();
   return protect(transact(actor.workspaceId, limits, async tx => {
     await lockActor(tx, actor, 'sharing', needed, data.decides ? ['publishing/approvals'] : []);
-    const owned = requested.length ? (await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM targets WHERE "workspaceId" = ${actor.workspaceId} AND enabled = true AND id = ANY(${requested}::text[])`).map(r => r.id) : [];
+    const owned = requested.length ? (await sharingChannels(tx, actor.workspaceId, auth.providers, requested, undefined, true)).map(r => r.id) : [];
     if (owned.length !== requested.length) throw bad('Choose channels that are enabled in this workspace.');
     // A scoped member can only name channels inside their own access; an empty list is already refused by the schema.
     if (auth.scope !== null && requested.some(id => !auth.scope!.includes(id))) throw new OperationError('forbidden', 'You can only share channels you have access to.');
@@ -149,7 +151,7 @@ export async function updateShareLink(actor: SharingActor, input: unknown) {
       if (next.decides && next.kind === 'calendar') throw bad('Calendar links cannot approve posts.');
       if (changed.includes('targetIds')) {
         if (auth.scope !== null && next.targetIds.some(id => !auth.scope!.includes(id))) throw new OperationError('forbidden', 'You can only share channels you have access to.');
-        const owned = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM targets WHERE "workspaceId" = ${actor.workspaceId} AND enabled = true AND id = ANY(${next.targetIds}::text[])`;
+        const owned = await sharingChannels(tx, actor.workspaceId, auth.providers, next.targetIds, undefined, true);
         if (owned.length !== next.targetIds.length) throw bad('Choose channels that are enabled in this workspace.');
       }
     }

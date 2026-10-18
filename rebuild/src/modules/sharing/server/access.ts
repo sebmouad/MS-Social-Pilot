@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
-import { canUseFeature, canUseModule, loadEntitlements } from '@/server/entitlements';
+import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
+import { canUseFeature, canUseModule, loadEntitlements, entitledPlatformIds } from '@/server/entitlements';
 import { canAccessFeature, resolvePermissions, type ScopedPermissions } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
@@ -11,7 +12,7 @@ import type { SharingActor } from '../contracts';
 import type { SharingLimits } from '../config';
 
 export type Tx = Prisma.TransactionClient;
-export type SharingAuthorization = { actor: SharingActor; area: SharingArea; role: string; scope: readonly string[] | null; canApprove: boolean; /** Publishing features the actor can currently read (entitled, granted, within any key ceiling). */ publishing: readonly string[] };
+export type SharingAuthorization = { actor: SharingActor; area: SharingArea; role: string; scope: readonly string[] | null; providers: readonly string[]; canApprove: boolean; /** Publishing features the actor can currently read (entitled, granted, within any key ceiling). */ publishing: readonly string[] };
 
 export const bad = (message = 'Choose valid sharing details and confirm the exact action.') => new OperationError('invalid_request', message);
 export const missing = () => new OperationError('not_found', 'This item is unavailable in the current workspace.');
@@ -55,7 +56,8 @@ export async function authorizeSharing(actor: SharingActor, area: SharingArea, a
   await assertWorkspaceNotPurging(actor.workspaceId);
   const approvals = canUseFeature(entitlements, 'publishing/approvals') && allowed(permissions, actor.permissionCeiling, 'publishing/approvals', 'write');
   const publishing = PUBLISHING_FEATURES.filter(f => canUseFeature(entitlements, f) && allowed(permissions, actor.permissionCeiling, f, 'read'));
-  return { actor, area, role: row.role, scope: effectiveScope(permissions.pageScope, actor.allowedTargetIds), canApprove: approvals, publishing };
+  const connection = area === 'sharing' ? await selectedResourceConnectionWhere(actor.workspaceId, entitledPlatformIds(entitlements)) : {provider:{in:[] as string[]}};
+  return { providers: connection.provider.in, actor, area, role: row.role, scope: effectiveScope(permissions.pageScope, actor.allowedTargetIds), canApprove: approvals, publishing };
 }
 
 /**

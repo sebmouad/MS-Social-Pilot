@@ -57,8 +57,8 @@ Final-source database suite, typecheck and local HTTP/MCP probe passed; scoped
 responsive browser inspection is recorded above. Full provider capability testing, legacy parity,
 Root configuration coverage and production-shaped rollback remain separate gates.
 Key-name bounds/copy and unbounded revoked-key history need further configuration
-and scale work. Sharing's target directory/public eligibility must also enforce
-current usable connections and enabled providers, rather than enabled target rows
-alone. Do not claim complete Sharing release readiness until corrected.
+and scale work. Batch81 corrected Sharing target/public eligibility through current connections
+and enabled/entitled providers; see SHARING_ELIGIBILITY.md. Broader Sharing
+release limits remain explicit in CLIENT_SHARING.md.
 Production and socialpilot-deploy remain legacy; preserve the held Facebook photo
 cleanup ledger and lock.

@@ -9,6 +9,7 @@ import { prisma } from '@/server/data';
 import { DECISION_SCHEMA, TOKEN_SHAPE, hashToken, type ShareKind } from '../contracts';
 import { ids } from './links';
 import { sharingLimits } from './limits';
+import { sharingChannels } from './channels';
 import { visitorAllowed } from './rate';
 import { REVIEW_NOTE_MAX, getReviewPort } from './review-port';
 
@@ -19,9 +20,9 @@ import { REVIEW_NOTE_MAX, getReviewPort } from './review-port';
  * scoped, currently enabled channels and post content already intended for review: never
  * author ids, remote ids, errors, approval notes, tokens, drafts or internal status.
  */
-export type PublicLink = { id: string; workspaceId: string; kind: ShareKind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; createdById: string; workspaceName: string; timezone: string; tokenHash: string; creatorScope: string[] | null };
+export type PublicLink = { id: string; workspaceId: string; kind: ShareKind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; createdById: string; workspaceName: string; timezone: string; tokenHash: string; creatorScope: string[] | null; providers: readonly string[] };
 export type PublicAccess<T> = { ok: true; value: T } | { ok: false; reason: 'not_found' | 'rate_limited' };
-type Row = Omit<PublicLink, 'targetIds' | 'workspaceName' | 'tokenHash' | 'creatorScope'> & { targetIds: unknown; workspaceName: string; tokenHash: string };
+type Row = Omit<PublicLink, 'targetIds' | 'workspaceName' | 'tokenHash' | 'creatorScope' | 'providers'> & { targetIds: unknown; workspaceName: string; tokenHash: string };
 const notFound = { ok: false, reason: 'not_found' } as const;
 const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -50,7 +51,7 @@ export async function resolvePublicLink(token: string, address: string | null, b
   const needed: readonly string[] | undefined = KIND_PUBLISHING_FEATURES[row.kind];
   if (!needed || needed.some(feature => !creator.publishing.includes(feature))) return notFound;
   const { tokenHash: _stored, ...rest } = row; void _stored;
-  return { ok: true, value: { ...rest, decides: rest.decides && creator.canApprove, targetIds: ids(row.targetIds), tokenHash, creatorScope: creator.scope === null ? null : [...creator.scope] } };
+  return { ok: true, value: { ...rest, decides: rest.decides && creator.canApprove, targetIds: ids(row.targetIds), tokenHash, providers: creator.providers, creatorScope: creator.scope === null ? null : [...creator.scope] } };
 }
 
 export type PublicStatus = 'awaiting_review' | 'planned' | 'published';
@@ -71,9 +72,7 @@ const REVIEW_STATUSES = ['pending_approval'], CALENDAR_STATUSES = ['scheduled', 
 
 /** Enabled channels this link can still show right now: its own selection (or all enabled) that remain enabled. */
 async function visibleTargets(link: PublicLink) {
-  const rows = link.targetIds.length
-    ? await prisma.$queryRaw<Array<{ id: string; name: string; pictureUrl: string | null }>>`SELECT id, name, "pictureUrl" FROM targets WHERE "workspaceId" = ${link.workspaceId} AND enabled = true AND id = ANY(${link.targetIds}::text[])`
-    : await prisma.$queryRaw<Array<{ id: string; name: string; pictureUrl: string | null }>>`SELECT id, name, "pictureUrl" FROM targets WHERE "workspaceId" = ${link.workspaceId} AND enabled = true`;
+  const rows = await sharingChannels(prisma, link.workspaceId, link.providers, link.targetIds.length ? link.targetIds : undefined);
   return new Map(rows.filter(row => link.creatorScope === null || link.creatorScope.includes(row.id)).map(row => [row.id, row]));
 }
 const httpsOnly = (value: unknown): string | null => { if (typeof value !== 'string') return null; try { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password ? u.toString() : null; } catch { return null; } };
@@ -165,9 +164,15 @@ async function lockPublicLinkForMutation(tx: Prisma.TransactionClient, link: Pub
   if (!live[0]) throw gone();
   const purge = await tx.$queryRaw<Array<{ status: string }>>`SELECT status::text FROM workspace_data_purges WHERE "workspaceId" = ${link.workspaceId} AND status::text <> 'completed'`;
   if (purge.length) throw gone();
-  const limited = link.targetIds.length > 0 || link.creatorScope !== null;
+  // Lock the post before resources on both advice and review paths.
+  const lockedPost = await tx.$queryRaw<Array<{ id: string }>>`SELECT p.id FROM posts p WHERE p.id = ${postId} AND p."workspaceId" = ${link.workspaceId} FOR NO KEY UPDATE OF p`;
+  if (!lockedPost[0]) throw gone();
   const list = link.creatorScope === null ? link.targetIds : link.targetIds.length ? link.targetIds.filter(id => link.creatorScope!.includes(id)) : [...link.creatorScope];
-  const shown = await tx.$queryRaw<Array<{ id: string }>>`SELECT p.id FROM posts p WHERE p.id = ${postId} AND p."workspaceId" = ${link.workspaceId} AND p.status::text = ANY(${REVIEW_STATUSES}::text[]) AND (p."scheduledAt" IS NULL OR p."scheduledAt" >= NOW()) AND EXISTS (SELECT 1 FROM post_targets pt JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId" WHERE pt."postId" = p.id AND t.enabled = true AND (${limited}::boolean = false OR t.id = ANY(${list}::text[]))) AND (${decides}::boolean = false OR NOT EXISTS (SELECT 1 FROM post_targets pt2 LEFT JOIN targets t2 ON t2.id = pt2."targetId" AND t2."workspaceId" = p."workspaceId" WHERE pt2."postId" = p.id AND NOT (t2.enabled = true AND (${limited}::boolean = false OR t2.id = ANY(${list}::text[]))))) FOR NO KEY UPDATE OF p`;
+  // Recheck and lock the connection/selection in the same transaction as feedback.
+  const currentTargets = await sharingChannels(tx, link.workspaceId, link.providers, link.targetIds.length || link.creatorScope !== null ? list : undefined, undefined, true);
+  const eligibleIds = currentTargets.map(target => target.id);
+  if (!eligibleIds.length) throw gone();
+  const shown = await tx.$queryRaw<Array<{ id: string }>>`SELECT p.id FROM posts p WHERE p.id = ${postId} AND p."workspaceId" = ${link.workspaceId} AND p.status::text = ANY(${REVIEW_STATUSES}::text[]) AND (p."scheduledAt" IS NULL OR p."scheduledAt" >= NOW()) AND EXISTS (SELECT 1 FROM post_targets pt JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId" WHERE pt."postId" = p.id AND t.enabled = true AND t.id = ANY(${eligibleIds}::text[])) AND (${decides}::boolean = false OR NOT EXISTS (SELECT 1 FROM post_targets pt2 LEFT JOIN targets t2 ON t2.id = pt2."targetId" AND t2."workspaceId" = p."workspaceId" WHERE pt2."postId" = p.id AND NOT COALESCE(t2.enabled = true AND t2.id = ANY(${eligibleIds}::text[]), false))) FOR NO KEY UPDATE OF p`;
   if (!shown[0]) throw gone();
 }
 

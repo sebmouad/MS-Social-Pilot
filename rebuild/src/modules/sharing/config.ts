@@ -11,6 +11,7 @@ const text = (key: string, group: string, label: string, description: string, de
 
 /** Root-managed bounds for client links and the public bio page. Values are read at use; none are hardcoded in services. */
 export const SHARING_LIMIT_CONFIG = [
+  num('sharing.channelPickerLimit', G, 'Shareable channel picker limit', 'Maximum eligible channels shown in the sharing selector after authorization filtering.', 500, n(1, 5000)),
   num('sharing.pageSize', G, 'Share link page size', 'Share links listed on one page of the owner view.', 25, n(5, 100)),
   num('sharing.feedbackPageSize', G, 'Feedback page size', 'Client answers listed on one page of a link\'s feedback.', 25, n(5, 100)),
   num('sharing.maxLinksPerWorkspace', G, 'Share links per workspace', 'Maximum share links (active or not) stored per workspace.', 200, n(1, 5000)),

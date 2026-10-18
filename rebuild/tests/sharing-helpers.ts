@@ -15,6 +15,7 @@ export function sql(strings: TemplateStringsArray, values: unknown[]) { return {
 
 /** Shared module mocks, installed with vi.mock in each test file so the services run against the fake database. */
 export const entitlementMock = () => ({
+  entitledPlatformIds: () => ['test-provider'],
   loadEntitlements: async (_u: string, workspaceId: string) => (state.entitled ? { workspaceId } : null),
   canUseModule: () => state.moduleOn,
   canUseFeature: (_e: unknown, feature: string) => !state.planDenied.includes(feature),

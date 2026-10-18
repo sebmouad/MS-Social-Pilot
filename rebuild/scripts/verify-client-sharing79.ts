@@ -60,7 +60,7 @@ async function main() {
   const userIds = Object.values(U);
   const W = { main: id('ws_main'), foreign: id('ws_foreign'), erase: id('ws_erase'), purge: id('ws_purge') };
   const wsIds = Object.values(W);
-  const T = { a1: id('t_a1'), a2: id('t_a2'), b: id('t_b'), off: id('t_off'), f: id('t_f'), erase: id('t_erase'), purge: id('t_purge') };
+  const T = { orphan: id('t_orphan'), a1: id('t_a1'), a2: id('t_a2'), b: id('t_b'), off: id('t_off'), f: id('t_f'), erase: id('t_erase'), purge: id('t_purge') };
   const marker = (label: string) => `${prefix} ${label}`;
   const sessionToken = { owner: randomBytes(32).toString('base64url'), admin: randomBytes(32).toString('base64url'), editor: randomBytes(32).toString('base64url'), foreign: randomBytes(32).toString('base64url') };
   const newKey = () => `mcp_${randomBytes(32).toString('base64url')}`;
@@ -208,11 +208,17 @@ async function main() {
       await db.session.create({ data: { id: id(`session_${who}`), userId, tokenHash: hashLegacySessionToken(sessionToken[who])!, expiresAt, pending: null } });
     }
     const target = (key: keyof typeof T, workspaceId: string, name: string, enabled: boolean) => db.target.create({ data: { id: T[key], workspaceId, type: 'page', providerId: id(`provider_${key}`), name, accessToken: 'synthetic-never-used', enabled, canPublish: true, createdAt: now } });
+    await target('orphan', W.main, marker('Orphan channel'), true);
     await target('a1', W.main, marker('Channel A1'), true); await target('a2', W.main, marker('Channel A2'), true); await target('b', W.main, marker('Channel B'), true); await target('off', W.main, marker('Channel Off'), false);
     await target('f', W.foreign, marker('Channel Foreign'), true); await target('erase', W.erase, marker('Channel Erase'), true); await target('purge', W.purge, marker('Channel Purge'), true);
     const syntheticConnection = id('connection_main');
     await db.socialAccount.create({data:{id:syntheticConnection,workspaceId:W.main,provider:'facebook',providerUserId:id('provider_user'),name:'Synthetic scope connection',accessToken:'synthetic-never-used',scopes:''}});
     await db.target.updateMany({where:{id:{in:[T.a1,T.a2,T.b]}},data:{socialAccountId:syntheticConnection}});
+    for (const [workspaceId,targetId] of [[W.foreign,T.f],[W.erase,T.erase],[W.purge,T.purge]] as const) {
+      const connectionId=id(`connection_${workspaceId}`);
+      await db.socialAccount.create({data:{id:connectionId,workspaceId,provider:'facebook',providerUserId:connectionId,name:'Synthetic sharing connection',accessToken:'synthetic-never-used',scopes:''}});
+      await db.target.update({where:{id:targetId},data:{socialAccountId:connectionId}});
+    }
     const adA=id('ad_account_a'),adB=id('ad_account_b');
     for(const [accountId,name,spend] of [[adA,'Scope account A',11],[adB,'Scope sibling B',22]] as const){
       await db.adAccount.create({data:{id:accountId,workspaceId:W.main,socialAccountId:syntheticConnection,actId:accountId,name,currency:'USD',enabled:true}});
@@ -281,6 +287,7 @@ async function main() {
     expect((await http('/api/sharing/links', { cookie: ownerMain, method: 'POST', body: { ...baseBody(t0), kind: 'results' } })).status === 400, 'An unsupported kind (results) must be refused (400).');
     expect((await http('/api/sharing/links', { cookie: ownerMain, method: 'POST', body: { ...baseBody(t0), targetIds: [T.f] } })).status === 400, 'A foreign-workspace channel must be refused (400).');
     expect((await http('/api/sharing/links', { cookie: ownerMain, method: 'POST', body: { ...baseBody(t0), targetIds: [T.off] } })).status === 400, 'A disabled channel must be refused (400).');
+    expect((await http('/api/sharing/links', { cookie: ownerMain, method: 'POST', body: { ...baseBody(t0), targetIds: [T.orphan] } })).status === 400, 'An enabled orphan channel without a usable connection must be refused (400).');
     expect((await http('/api/sharing/links', { cookie: ownerMain, method: 'POST', body: { ...baseBody(t0), kind: 'calendar', decides: true } })).status === 400, 'A deciding calendar link must be refused (400).');
     expect((await http('/api/sharing/links?bogus=1', { cookie: ownerMain })).status === 400 && (await http('/api/sharing/links?page=0', { cookie: ownerMain })).status === 400, 'Invalid list query must be refused (400).');
     expect(await countLinks(W.main) === before, 'A refused create changed the link table.');
@@ -333,6 +340,22 @@ async function main() {
     expect((await view(links['L1 review decides']!.token)).status === 200, 'A valid review link must open (200).');
     for (const bad of ['short', 'x'.repeat(65), `${'A'.repeat(42)}!`, randomBytes(32).toString('base64url')]) expect(await shareGone(bad), 'A malformed or unknown token must answer not-found.');
     expect(await isGone(`/share/${links['L1 review decides']!.token}/media/${randomUUID()}`), 'An unknown image id must answer not-found.');
+
+    stage = 'Sharing current connection and platform visibility';
+    await db.socialAccount.update({where:{id:syntheticConnection},data:{invalidatedAt:new Date()}});
+    expect(!(await view(links['L1 review decides'].token)).text.includes(marker('post pending1')), 'Invalidated connections must hide public post content.');
+    expect((await decide(links['L1 review decides'].token, {postId:P.p1,decision:'approved',authorName:'Synthetic disconnected visitor'})).status === 404, 'Invalidated connections must refuse public decisions.');
+    const invalidatedChannels=await tool(keys.full,'list_shareable_channels');
+    expect(!invalidatedChannels.refused && invalidatedChannels.data?.channels?.length===0, 'Invalidated and orphan connections must disappear from the Sharing picker.');
+    await db.socialAccount.update({where:{id:syntheticConnection},data:{invalidatedAt:null}});
+    await db.target.update({where:{id:T.a1},data:{enabled:false}});
+    expect(!(await view(links['L1 review decides'].token)).text.includes(marker('post pending1')), 'Deselecting a channel must hide its public post content.');
+    await db.target.update({where:{id:T.a1},data:{enabled:true}});
+    await save('platforms.facebook.enabled',false);
+    expect(!(await view(links['L1 review decides'].token)).text.includes(marker('post pending1')), 'A disabled platform must hide public post content.');
+    const platformOffChannels=await tool(keys.full,'list_shareable_channels');
+    expect(platformOffChannels.refused || platformOffChannels.data?.channels?.length===0, 'Disabled platform channels must disappear from the Sharing picker.');
+    await save('platforms.facebook.enabled',true);
 
     stage = 'public review view (Chromium DOM)';
     const l1Page = await render(`/share/${links['L1 review decides']!.token}`);
@@ -413,6 +436,29 @@ async function main() {
     expect(fbApproved?.decision === 'approved' && fbApproved.postStatus === 'scheduled' && fbApproved.comment === long.trim(), 'Feedback must show the post current status (the actual effect) and the full comment.');
     expect(!fb.text.includes(links['L1 review decides'].token) && !fb.text.includes(sha(links['L1 review decides'].token)), 'Feedback exposes the token or digest.');
     expect((await http(`/api/sharing/links/${foreignLink.link.id}/feedback`, { cookie: ownerMain })).status === 404, 'Feedback of a foreign-workspace link must be not-found.');
+
+    stage = 'atomicity: connection invalidation after review preflight';
+    const invalidConnection=id('connection_invalid_review');
+    await db.socialAccount.create({data:{id:invalidConnection,workspaceId:W.main,provider:'facebook',providerUserId:invalidConnection,name:'Synthetic invalid review connection',accessToken:'synthetic-never-used',scopes:'',invalidatedAt:new Date()}});
+    const guardedPost=await post('connection_review_race',W.main,[T.a1,T.a2],'pending_approval',{scheduledAt:days(2)});
+    const guardedLink=await mk('L guarded connection race',{kind:'review',targetIds:[T.a1,T.a2],decides:true});
+    let inFlightDecision:ReturnType<typeof decide>|undefined;
+    await db.$transaction(async tx=>{
+      await tx.$queryRaw`SELECT id FROM posts WHERE id=${guardedPost} FOR UPDATE`;
+      const backend=(await tx.$queryRaw<Array<{pid:number}>>`SELECT pg_backend_pid() AS pid`)[0].pid;
+      inFlightDecision=decide(guardedLink.link.token,{postId:guardedPost,decision:'approved',authorName:'Synthetic connection racer'});
+      let reachedPostLock=false;
+      for(let attempt=0;attempt<60;attempt++){
+        const waiting=await db.$queryRaw<Array<{waiting:boolean}>>`SELECT EXISTS(SELECT 1 FROM pg_stat_activity a WHERE ${backend} = ANY(pg_blocking_pids(a.pid))) AS waiting`;
+        if(waiting[0]?.waiting){reachedPostLock=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,50));
+      }
+      expect(reachedPostLock,'The review race did not reach its verified post-row blocker.');
+      await tx.target.update({where:{id:T.a2},data:{socialAccountId:invalidConnection}});
+    },{timeout:10000});
+    const racedDecision=await inFlightDecision!;
+    expect([404,409].includes(racedDecision.status) && (await postRow(guardedPost))?.status==='pending_approval' && (await decisionsFor(guardedLink.link.id)).length===0, 'A mixed post with a newly invalidated destination must not approve or store feedback after preflight.');
+    await db.target.update({where:{id:T.a2},data:{socialAccountId:syntheticConnection}});
 
     stage = 'comments switched off';
     await mk('L5 no comments', { kind: 'review', targetIds: [T.a2], decides: true, allowComments: false });

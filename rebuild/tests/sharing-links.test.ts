@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, defaults, install, state } from './sharing-helpers';
 
+vi.mock('@/server/platforms/resource-visibility', () => ({ selectedResourceConnectionWhere: async () => ({provider:{in:['test-provider']}}) }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (defaults as Record<string, unknown>)[key], runtimeConfigBatch: async (keys: readonly string[]) => Object.fromEntries(keys.map(key => [key, (defaults as Record<string, unknown>)[key]])) }));
 vi.mock('@/server/entitlements', async () => (await import('./sharing-helpers')).entitlementMock());
@@ -24,6 +25,14 @@ const createWorld = () => { state.respond = sqlText => sqlText.includes('FROM ta
 beforeEach(() => install());
 
 describe('sharing owner services', () => {
+  it('selects channels only through a current same-workspace connection', async () => {
+    await listShareableChannels(actor);
+    const query = state.queries.find(q => q.sql.includes('FROM targets'))!;
+    expect(query.sql).toContain('JOIN social_accounts');
+    expect(query.sql).toContain('"invalidatedAt" IS NULL');
+    expect(query.sql).toContain('a."workspaceId" = t."workspaceId"');
+  });
+
   it('requires exact confirmation and strict input before touching the database', async () => {
     await expect(createShareLink(actor, { ...create, confirmation: 'create share link spring' })).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(createShareLink(actor, { ...create, extra: 1 })).rejects.toMatchObject({ code: 'invalid_request' });

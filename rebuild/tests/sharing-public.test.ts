@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, defaults, install, state } from './sharing-helpers';
 
+vi.mock('@/server/platforms/resource-visibility', () => ({ selectedResourceConnectionWhere: async () => ({provider:{in:['test-provider']}}) }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (defaults as Record<string, unknown>)[key], runtimeConfigBatch: async (keys: readonly string[]) => Object.fromEntries(keys.map(key => [key, (defaults as Record<string, unknown>)[key]])) }));
 vi.mock('@/server/entitlements', async () => (await import('./sharing-helpers')).entitlementMock());
@@ -245,9 +246,13 @@ describe('public share links', () => {
   it('checks channel coverage and the pending state again under the lock, and only decisions require full coverage', async () => {
     world({ link: linkRow({ targetIds: ['t1'] }) });
     await submitDecision(TOKEN, 'a', { postId: 'p1', decision: 'approved', authorName: 'Pat' });
-    const lock = state.queries.find(q => q.sql.includes('FOR NO KEY UPDATE OF p'))!;
+    const lock = state.queries.find(q => q.sql.includes('FOR NO KEY UPDATE OF p') && q.sql.includes('NOT EXISTS (SELECT 1 FROM post_targets pt2'))!;
     expect(lock.sql).toContain("p.status::text = ANY("); expect(lock.sql).toContain('NOT EXISTS (SELECT 1 FROM post_targets pt2'); expect(lock.values).toContainEqual(['pending_approval']);
     expect(lock.values).toContainEqual(['t1']);
+    expect(lock.sql).toContain('NOT COALESCE(t2.enabled = true');
+    const firstPostLock = state.queries.findIndex(q=>q.sql.includes('FOR NO KEY UPDATE OF p'));
+    const mutationChannels = state.queries.findIndex((q,index)=>index>firstPostLock && q.sql.includes('FROM targets'));
+    expect(mutationChannels).toBeGreaterThan(firstPostLock);
   });
 
   it('stores nothing and reports the failure when the answer cannot be written atomically with an approval', async () => {

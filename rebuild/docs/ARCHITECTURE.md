@@ -1044,3 +1044,32 @@ Fifteen migrations passed schema-only rehearsal; production-shaped rollback and
 full provider/release gates remain open. Sharing usable-connection/provider
 filtering, remaining legacy integrations and Root configuration coverage remain
 next work. Production/socialpilot-deploy remain legacy. Preserve photo canary lock.
+
+
+## Batch81 — Sharing connection eligibility
+
+One neutral channel query now governs Sharing selection, create/access-edit
+validation and public visibility: selected target, current same-workspace
+non-invalidated connection and enabled/entitled provider. Explicit empty ceilings
+mean none; expired-token history stays readable. Public reads remain lock-free;
+mutation transactions hold connection/target locks and recheck post coverage
+after a post-row lock. Missing/cross-tenant destinations fail closed. Root
+registry73 adds consumed sharing.channelPickerLimit. No migration/provider write.
+
+Final isolated suite:2717 tests/322 files, zero skips; production build and serial
+typecheck passed. Real PostgreSQL tests reproduced old public-read blocking and
+proved corrected nonblocking reads plus mutation locks. Actual local HTTP/MCP/
+Chromium probe passed orphan rejection, invalidation/deselection/platform disable
+and an approval-preflight race with a verified live post blocker; no status or
+feedback survived refusal. All disposable data/audits/media/settings cleaned or
+restored exactly. Claude account1 reviewed and checked corrections; its final
+read-only review found no new actionable findings. See SHARING_ELIGIBILITY.md
+for evidence and provider-switch snapshot/rate/legacy/release limits.
+
+Next substantial batch: Analytics Reports host integration (existing untracked
+module), preserving legacy templates/schedules, adding durable run history,
+shared generation/mail/worker ports, manifest/navigation, Root config and MCP
+permissions/confirmations. Source inventory confirms this remains unintegrated.
+Do not include unrelated untracked integrations automatically. Full Facebook
+live coverage/photo cleanup, complete Root controls and production-shaped
+migration/media/service rollback remain required. Production stays legacy.
