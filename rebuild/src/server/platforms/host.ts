@@ -84,6 +84,8 @@ export interface PlatformAdsHost {
   parentObjectId?(input: { level: 'campaign' | 'adset' | 'ad'; fields: unknown }): string | null;
   /** Safe, serializable UI configuration; never contains credentials or server functions. */
   ui: AdsUiSchema;
+  /** Root-managed safe creation choices and copy, when supported by the installed module. */
+  creationUi?(): Promise<AdsUiSchema>;
   /** Whether current Root configuration can support this module's live Ads requests. */
   isReady?(): Promise<boolean>;
   readScopes(): Promise<string[]>;

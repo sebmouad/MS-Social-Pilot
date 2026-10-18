@@ -43,7 +43,7 @@ describe('Facebook ad set creation', () => {
     })).toBe(facebookAdsHost.campaignConfirmation('account-1', name, 'OUTCOME_TRAFFIC'));
     const values = { name, adAccountId: 'account-1', campaignId: 'campaign-2', dailyBudgetMinor: 2500, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' };
     expect(fillAdsTemplate(facebookAdsHost.ui.adSet.confirmationTemplate, {
-      ...values, nameJson: JSON.stringify(name), dailyBudgetMinor: String(values.dailyBudgetMinor),
+      ...values, nameJson: JSON.stringify(name), dailyBudgetMinor: String(values.dailyBudgetMinor), currencySuffix: '',
     })).toBe(facebookAdsHost.adSetConfirmation(values));
     expect(() => fillAdsTemplate('{missing}', {})).toThrow('Missing Ads template value');
   });

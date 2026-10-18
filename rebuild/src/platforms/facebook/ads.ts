@@ -1,3 +1,4 @@
+import { FACEBOOK_ADS_UI_DEFAULTS, FACEBOOK_ADS_CREATION_UI_SCHEMA } from './ads-ui-config';
 import { facebookStoredAdsParent } from './ads-parent';
 import type { FacebookCampaignObjective } from './protocol';
 import type { AdMutationRequest, AdObjectReadRequest } from '@/platforms/types';
@@ -32,26 +33,11 @@ export function facebookAdSetConfirmation(input: { adAccountId: string; campaign
 
 export const facebookAdsHost = {
   parentObjectId: facebookStoredAdsParent,
-  ui: {
-    campaign: {
-      nameLabel: 'Campaign name', nameMaxLength: 100, optionLabel: 'Objective', title: 'Create paused campaign',
-      description: 'Creates a paused campaign. Complete its ad setup before activating delivery.',
-      actionLabel: 'Create paused campaign', confirmTitle: 'Create this paused campaign?', confirmDescription: 'It will not deliver until activated separately.',
-      defaultOption: 'OUTCOME_TRAFFIC', options: [
-        { value: 'OUTCOME_AWARENESS', label: 'Awareness' }, { value: 'OUTCOME_ENGAGEMENT', label: 'Engagement' },
-        { value: 'OUTCOME_LEADS', label: 'Leads' }, { value: 'OUTCOME_SALES', label: 'Sales' },
-        { value: 'OUTCOME_TRAFFIC', label: 'Traffic' }, { value: 'OUTCOME_APP_PROMOTION', label: 'App promotion' },
-      ],
-      confirmationTemplate: 'CREATE PAUSED FACEBOOK CAMPAIGN {nameJson} IN ACCOUNT {adAccountId} WITH OBJECTIVE {objective}',
-    },
-    adSet: {
-      nameLabel: 'Ad set name', nameMaxLength: 100, budgetLabel: 'Daily budget', countryLabel: 'Country code', goalLabel: 'Optimize for',
-      title: 'Create paused ad set under {campaignName}',
-      description: 'Uses impressions billing. Enter a daily amount{currency}; delivery targets one country.',
-      actionLabel: 'Create paused ad set', confirmTitle: 'Create this paused ad set?', confirmDescription: 'It will not deliver until activated separately.',
-      defaultOption: 'LINK_CLICKS', options: [{ value: 'LINK_CLICKS', label: 'Link clicks' }, { value: 'IMPRESSIONS', label: 'Impressions' }],
-      confirmationTemplate: 'CREATE PAUSED FACEBOOK AD SET {nameJson} UNDER CAMPAIGN {campaignId} IN ACCOUNT {adAccountId} WITH DAILY BUDGET {dailyBudgetMinor} MINOR UNITS TARGETING {countryCode} OPTIMIZED FOR {optimizationGoal}',
-    },
+  ui: FACEBOOK_ADS_UI_DEFAULTS,
+  async creationUi() {
+    const checked = FACEBOOK_ADS_CREATION_UI_SCHEMA.safeParse(await runtimeConfig('meta.adsCreationUi'));
+    if (!checked.success) throw new OperationError('unavailable', 'Advertising creation choices are temporarily unavailable.');
+    return checked.data;
   },
   async isReady() {
     try {

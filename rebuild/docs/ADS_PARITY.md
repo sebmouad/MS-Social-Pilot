@@ -13,7 +13,7 @@ Status: **integrated stored reports and durable object-operation services, with 
 | Facebook | `src/platforms/facebook/ads-ops/{index,transport}.ts` | Implements all five operations plus `listCreatives`. Signed Graph form writes; ownership read-before-write; definite-rejection classification. |
 | API | `src/app/api/ads/{compare,directory,management}/route.ts` | Thin, same-origin POSTs, no-store. |
 | UI | `src/app/ads/compare`, `src/app/ads/objects` | Filters in the sidebar; confirmation dialog; change history with resolve. |
-| MCP | `analysis/mcp.ts`, `directory/mcp.ts`, `management/mcp.ts` | Definitions plus executors, exported, not wired. |
+| MCP | `analysis/mcp.ts`, `directory/mcp.ts`, `management/mcp.ts` | Definitions and executors dispatched by the authenticated central MCP host with feature/write gates. |
 | Config | `analysis/config.ts` (`ads.analysisPolicy`), `management/config.ts` (`ads.managementPolicy`) | Registered Root policies, validated and consumed. |
 
 Directory management reads use `directory/management-port.ts`, an optional neutral registration boundary. It defaults to absent; the host should register describe/history callbacks only after its management engine and journal are ready. UI report reads and object details do not import management services.
@@ -32,9 +32,9 @@ Directory management reads use `directory/management-port.ts`, an optional neutr
 9. A module classifier that throws, or returns anything other than `rejected`, is recorded as `uncertain` (held), never as an unrecorded exception.
 10. Preview returns `blockedByOpenChange` (true/false, or null when the ledger cannot be read), `spendChanging` and `irreversible` so callers can warn before the confirmation step. Capabilities return neutral per-operation `inputs` (choice, money-minor with budget kinds, text, creative-ref) and the active `limits`, so shared UI/MCP render forms without provider knowledge; the Facebook module alone fills them.
 
-Known remaining behaviour: there is no request-level idempotency key. A replay of an identical confirmed request after a recorded success executes again (status/budget/rename are naturally idempotent on the provider; a repeated delete is rejected by it). Overlapping in-flight requests are refused by the open-object unique index. Adding an idempotency key needs a ledger column (migration below would need extending) and is not implemented.
+Request identities bind to a normalized payload hash. Replays return the recorded outcome without sending another provider write; changed payloads under an existing identity are refused. Pending/uncertain creations retain their hold. A human attestation is not a provider receipt and does not assert a remote identity or current paused state.
 
-## Proposed migration (not applied)
+## Ledger migration (local preview only)
 
 Canonical migration: `prisma/migrations/20261018170000_rebuild_ads_operations/migration.sql` in the application repository. It includes immutable request identity/hash, per-actor request uniqueness, the open-object hold and resolution-shape constraints. Do not apply older proposal SQL from worker handoffs.
 
@@ -43,7 +43,7 @@ Without this table every write fails closed (`unavailable`) before any provider 
 
 ## Current host wiring
 
-- Registry 67 includes analysis and management policies; management stays off by default.
+- Published registry 67 includes analysis and management policies; pending creation integration adds version 68. Management stays off by default.
 - Facebook-owned host assembly provides its optional neutral object-operations engine.
 - Shared service paths back the Objects/Campaigns UI, management HTTP API and MCP tools.
 - The older status/budget API/MCP shape delegates to the same durable service.
@@ -61,15 +61,15 @@ Without this table every write fails closed (`unavailable`) before any provider 
 - No live Facebook call, spend or browser check has been made. CSV export of comparison and per-day compare charts remain open.
 
 
-## Batch 74 integration in progress (2026-10-18)
+## Batch 74 historical integration record (2026-10-18)
 
 The platform host has a neutral optional operations engine, assembled inside
 Facebook. Root registers `ads.managementPolicy` (schema 67); management remains
 off by default. Object details, neutral metadata/limits, reviewed changes,
 creatives and history use shared services. API/MCP paths pass request identity
 and scope; older status/budget API and MCP shapes now delegate to the same ledger.
-Campaign/ad-set creation remains on its existing separate path and still needs
-equivalent durable creation/recovery integration before complete Ads parity.
+At batch 74, campaign/ad-set creation remained on a separate path. Batch 75 below
+records its ongoing durable integration; live/provider/release proof remains open.
 
 Request IDs bind workspace, actor, account and normalized payload. Pending intent
 commits before dispatch. Dispatch and recovery serialize through the selected
@@ -112,3 +112,65 @@ corrected final probe verifies both stores. This is not arbitrary-kill recovery
 proof or end-to-end provider mutation/status verification. Management remained
 disabled throughout the probe. Live spend-changing operations, creative creation,
 complete creation journaling and the wider Facebook/release gates remain open.
+
+## Batch 75 — creation integration (validation in progress)
+
+Campaign/ad-set creation now uses the same durable Ads ledger and selected-account
+lock as object edits. Facebook creates paused objects; ad sets additionally require
+unrestricted resource scope and stored plus live parent-account ownership checks.
+UI, HTTP and MCP carry stable request identities. Unknown responses keep input and
+hold the request; human attestations are presented without claiming remote creation.
+Root `meta.adsCreationUi` validates current labels, supported objective/goal subsets,
+defaults and name bounds. Confirmation protocol templates remain module invariants.
+
+The eleventh checksum-pinned migration extends operation kinds. A fresh local
+preview backup restored and migrated successfully before preview application;
+legacy user/workspace/post counts and settings digest matched. This does not prove
+a full production-shaped eleven-migration cutover or live Ads creation. Production
+is unchanged. Full-suite/build/review results will be recorded after completion.
+
+Batch 75 actual local HTTP/MCP probe verified creation pending recovery and
+uncertain attestation without invented remote creation receipts, alongside
+read-only/incorrect-confirmation/foreign-ID refusals, retained-account access,
+audit persistence and feature-off behavior. Both synthetic workspaces and all
+fixtures were removed; exact prior Root settings were restored and verified.
+No provider operation was sent. This is recovery evidence, not live creation.
+
+Creation request identity (follow-up hardening, source and mocked/jsdom tests only; the
+tests were not executed in the editing session). A reviewed creation keeps one request id and a
+count of how many times it was sent, persisted per user, workspace and account (or campaign) in
+the tab's session storage. A refusal marked `attempt: "not_dispatched"` describes that single
+send only; it is not proof that an earlier send of the same id was never recorded. The form
+releases an identity on such a refusal only when that was its first and only send. Any
+identity sent more than once, or restored after a reload, stays held until a recorded
+terminal result (success, rejected, or an attested resolution). An intent commit that fails
+with an unobserved outcome carries no marker. HTTP and MCP failures carry the same marker
+(MCP `apply_ads_change` documents it); a replayed success says the object was created paused
+and that its delivery status may have changed. Still open: durable server-side lookup of
+history by request id, real browser proof and live provider creation.
+
+### Batch 75 verified scope — 2026-10-18
+
+Final isolated runtime snapshot passed 2346 tests across 291 files with no skips,
+including guarded PostgreSQL integration, plus production build and serial
+typecheck. Subsequent visual-only shared button/theme corrections passed focused
+UI regressions (25 tests), followed by a passing production build and serial typecheck.
+Chrome at 390px confirmed required-field focus/validation, dialog focus containment,
+Escape cancellation with input retained, an offline send held without HTTP/provider
+write, and reload restoring the original disabled request/input. Desktop 1440px
+retained two sidebars without page overflow. Ad-set review displayed USD 12.50,
+country and goal correctly. Four-theme creation-form text contrast measured at
+least 11.87:1. Undefined surface/border tokens were replaced with shared tokens;
+creation and dialog actions use shared button classes. Nightfall dialog was
+visually inspected after the correction. Fake-credential-only UI settings were
+captured privately and restored byte-for-byte in their stored representation.
+
+Browser request storage is scoped by user/workspace/account/kind/parent. A write
+is refused before fetch if storage cannot retain its identity. After a lost
+response, later per-send refusals cannot release the held original identity;
+only recorded terminal outcomes clear it. Replayed creation receipts report the
+historical creation without promising current delivery status. Clearing browser
+storage or starting an independent tab does not deduplicate a new intentional
+request; callers must preserve requestId and inspect history after uncertainty.
+Live campaign/ad-set writes, creative creation, complete provider capability
+coverage and production data/media/service rollback remain unverified.

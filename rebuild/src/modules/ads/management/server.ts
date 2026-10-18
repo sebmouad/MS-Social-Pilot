@@ -11,11 +11,13 @@ import { runtimeConfig } from '@/server/config/store';
 import { platformAds } from '@/server/platforms/registry';
 import { ADS_MANAGEMENT_POLICY_SCHEMA, type AdsManagementPolicy } from './config';
 import { adsOpsHostFor } from './registry';
-import { AD_OBJECT_TYPES, AD_OPERATION_IDS, type AdsNeutralOperation, type AdsObjectType, type AdsOpsHost } from './types';
+import { AdsNoDispatchError, asNoDispatch } from './errors';
+import { AD_OBJECT_TYPES, AD_OPERATION_IDS, isCreationOperation, type AdsNeutralOperation, type AdsObjectType, type AdsOpsHost } from './types';
 
 export type AdsManageActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const MANAGER_ROLES = new Set(['owner', 'admin']);
 const SAFE_ID = /^[A-Za-z0-9_-]{1,100}$/;
+const CREATE_TOKEN = /^[A-Za-z0-9_.-]{1,100}$/;
 export const OPERATION_STATUSES = ['pending', 'succeeded', 'rejected', 'uncertain', 'resolved_applied', 'resolved_not_applied'] as const;
 export type AdsOperationStatus = (typeof OPERATION_STATUSES)[number];
 
@@ -42,8 +44,24 @@ export function parseNeutralOperation(raw: unknown): AdsNeutralOperation {
   const value = raw as Record<string, unknown>;
   const { type, objectType, objectId } = value;
   if (typeof type !== 'string' || !AD_OPERATION_IDS.includes(type as never) || typeof objectType !== 'string' || !AD_OBJECT_TYPES.includes(objectType as never)) throw new OperationError('invalid_request', 'Choose a valid ad change.');
-  if (typeof objectId !== 'string' || !SAFE_ID.test(objectId)) throw new OperationError('invalid_request', 'Invalid ad object.');
   const keys = (allowed: string[]) => { if (Object.keys(value).some(key => !allowed.includes(key))) throw new OperationError('invalid_request', 'Choose a valid ad change.'); };
+  const text = (field: unknown, pattern: RegExp, message: string) => { if (typeof field !== 'string' || !pattern.test(field)) throw new OperationError('invalid_request', message); return field; };
+  // Creation has no existing object: no objectId, no status. The platform module always creates paused.
+  if (type === 'campaign.create') {
+    keys(['type', 'objectType', 'name', 'objective']);
+    if (objectType !== 'campaign' || typeof value.name !== 'string') throw new OperationError('invalid_request', 'Enter a campaign name and objective.');
+    return { type, objectType, name: value.name.trim(), objective: text(value.objective, CREATE_TOKEN, 'Choose a valid campaign objective.') };
+  }
+  if (type === 'adset.create') {
+    keys(['type', 'objectType', 'parentId', 'name', 'dailyBudgetMinor', 'countryCode', 'optimizationGoal']);
+    if (objectType !== 'adset' || typeof value.name !== 'string') throw new OperationError('invalid_request', 'Enter an ad set name.');
+    if (typeof value.dailyBudgetMinor !== 'number' || !Number.isSafeInteger(value.dailyBudgetMinor) || value.dailyBudgetMinor < 1) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units.');
+    return {
+      type, objectType, parentId: text(value.parentId, SAFE_ID, 'Choose a valid campaign.'), name: value.name.trim(), dailyBudgetMinor: value.dailyBudgetMinor,
+      countryCode: text(value.countryCode, /^[A-Z]{2}$/, 'Enter a two-letter country code.'), optimizationGoal: text(value.optimizationGoal, CREATE_TOKEN, 'Choose a valid optimization goal.'),
+    };
+  }
+  if (typeof objectId !== 'string' || !SAFE_ID.test(objectId)) throw new OperationError('invalid_request', 'Invalid ad object.');
   const base = { objectType: objectType as AdsObjectType, objectId };
   switch (type) {
     case 'status.set':
@@ -110,7 +128,7 @@ async function managedContext(actor: AdsManageActor, adAccountId: string, level:
   } else if (!ads.hasReadScopes(required, scopes(connection.scopes))) throw new OperationError('reconnect_required', 'Reconnect this advertising connection to continue.');
   const accessToken = decryptSecret(connection.accessToken);
   if (!accessToken) throw new OperationError('reconnect_required', 'This advertising connection is unavailable. Reconnect it before managing ads.');
-  return { account, ops, credential: { accessToken }, provider: connection.provider };
+  return { account, ops, credential: { accessToken }, provider: connection.provider, pageScope };
 }
 
 function supports(ops: AdsOpsHost, operation: AdsNeutralOperation) {
@@ -119,7 +137,30 @@ function supports(ops: AdsOpsHost, operation: AdsNeutralOperation) {
   return found;
 }
 
+/**
+ * Journal identity of the object a change targets. The ledger columns are NOT NULL and
+ * the open-object unique index guards (account, objectType, objectId), so creations use a
+ * deterministic placeholder: one unresolved campaign creation per account, and one unresolved
+ * ad set creation per parent campaign. This makes a held creation block a duplicate creation.
+ */
+function ledgerObjectId(operation: AdsNeutralOperation) {
+  if (operation.type === 'campaign.create') return '@create-campaign';
+  if (operation.type === 'adset.create') return `@create-adset:${operation.parentId}`;
+  return operation.objectId;
+}
+
+/** Ad set creation needs unrestricted page scope (the parent can't be bounded to channel targets). */
+function assertCreationScope(operation: AdsNeutralOperation, pageScope: AdsPageScope, allowedTargetIds?: readonly string[]) {
+  if (operation.type === 'adset.create' && (!pageScope.all || allowedTargetIds !== undefined)) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
+}
+
 async function assertOwnedObject(accountDbId: string, operation: AdsNeutralOperation) {
+  if (operation.type === 'campaign.create') return;
+  if (operation.type === 'adset.create') {
+    const parent = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: 'campaign', objectId: operation.parentId }, select: { id: true } });
+    if (!parent) throw new OperationError('not_found', 'This campaign cannot be verified for the selected account.');
+    return;
+  }
   const owned = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: objectLevel[operation.objectType], objectId: operation.objectId }, select: { id: true } });
   if (!owned) throw new OperationError('not_found', 'This ad object cannot be verified for the selected account.');
 }
@@ -128,8 +169,11 @@ async function assertOwnedObject(accountDbId: string, operation: AdsNeutralOpera
 async function validateWithPolicy(ops: AdsOpsHost, operation: AdsNeutralOperation) {
   const policy = await loadAdsManagementPolicy();
   if (operation.type === 'rename' && (!operation.name || operation.name.length > policy.nameMaxCharacters)) throw new OperationError('invalid_request', `Names must contain 1 to ${policy.nameMaxCharacters} characters.`);
+  if (isCreationOperation(operation) && (!operation.name || operation.name.length > policy.nameMaxCharacters)) throw new OperationError('invalid_request', `Names must contain 1 to ${policy.nameMaxCharacters} characters.`);
+  if (operation.type === 'adset.create' && operation.dailyBudgetMinor > policy.maxBudgetMinor) throw new OperationError('invalid_request', 'This budget is above the limit allowed for a single change.');
   if (operation.type === 'budget.set' && operation.budget.minor > policy.maxBudgetMinor) throw new OperationError('invalid_request', 'This budget is above the limit allowed for a single change.');
   ops.validate(operation, { nameMaxCharacters: policy.nameMaxCharacters, maxBudgetMinor: policy.maxBudgetMinor });
+  await ops.validateCurrent?.(operation, { nameMaxCharacters: policy.nameMaxCharacters, maxBudgetMinor: policy.maxBudgetMinor });
 }
 
 /** What this actor may do on one account; the UI shows only advertised operations. */
@@ -149,10 +193,11 @@ export async function previewAdsManagement(actor: AdsManageActor, input: { adAcc
   const operation = parseNeutralOperation(input.operation);
   const ctx = await managedContext(actor, input.adAccountId, 'write');
   const support = supports(ctx.ops, operation);
+  assertCreationScope(operation, ctx.pageScope, actor.allowedTargetIds);
   await validateWithPolicy(ctx.ops, operation);
   await assertOwnedObject(ctx.account.id, operation);
   // Best effort: tells the caller an earlier unresolved change will refuse this one. Null when the ledger cannot be read.
-  const held = await prisma.$queryRaw<{ id: string }[]>`SELECT id FROM ads_management_operations WHERE "workspaceId" = ${actor.workspaceId} AND "adAccountId" = ${ctx.account.id} AND "objectType" = ${operation.objectType} AND "objectId" = ${operation.objectId} AND status IN ('pending','uncertain') LIMIT 1`
+  const held = await prisma.$queryRaw<{ id: string }[]>`SELECT id FROM ads_management_operations WHERE "workspaceId" = ${actor.workspaceId} AND "adAccountId" = ${ctx.account.id} AND "objectType" = ${operation.objectType} AND "objectId" = ${ledgerObjectId(operation)} AND status IN ('pending','uncertain') LIMIT 1`
     .then(rows => rows.length > 0, () => null);
   return { confirmation: ctx.ops.confirmation(operation, { adAccountId: ctx.account.id, currency: ctx.account.currency }), spendChanging: support.spendChanging, irreversible: support.irreversible === true, blockedByOpenChange: held, operation };
 }
@@ -164,17 +209,25 @@ const audit = (actor: AdsManageActor, action: string, detail: Record<string, unk
   db.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${newId('ads')}, ${actor.userId}, ${action}, ${JSON.stringify({ workspaceId: actor.workspaceId, ...detail })}::jsonb, NOW())`;
 
 export type AdsManagementOutcome =
-  | { outcome: 'succeeded'; operationId: string; remoteId: string | null; recorded: boolean; warning?: string; replay?: true; status?: AdsOperationStatus }
+  | { outcome: 'succeeded'; operationId: string; remoteId: string | null; recorded: boolean; warning?: string; replay?: true; status?: AdsOperationStatus; created?: AdsCreatedObject }
   | { outcome: 'rejected'; operationId: string; message: string; terminal?: true; replay?: true; status?: AdsOperationStatus }
   | { outcome: 'uncertain'; operationId: string; message: string };
 
-type AdsLedgerStatus = { status: string; remoteId: string | null };
+/** Present only when the provider proved a creation (or a recorded success is replayed). Never on pending/uncertain/rejected. */
+export type AdsCreatedObject = { objectType: 'campaign' | 'adset'; remoteId: string };
+type AdsLedgerStatus = { status: string; remoteId: string | null; operationType?: string; objectType?: string };
+function createdFrom(ledger: { operationType?: string; objectType?: string }, remoteId: string | null): { created?: AdsCreatedObject } {
+  if (!remoteId || (ledger.operationType !== 'campaign.create' && ledger.operationType !== 'adset.create')) return {};
+  return { created: { objectType: ledger.operationType === 'campaign.create' ? 'campaign' : 'adset', remoteId } };
+}
 class AdsIntentNoLongerPending extends Error {
   constructor(readonly ledger: AdsLedgerStatus) { super('This Ads request has already moved past pending.'); }
 }
 
 function replayLedgerOutcome(operationId: string, ledger: AdsLedgerStatus): AdsManagementOutcome {
-  if (ledger.status === 'succeeded' || ledger.status === 'resolved_applied') return { outcome: 'succeeded', operationId, remoteId: ledger.remoteId, recorded: true, replay: true, status: ledger.status };
+  if (ledger.status === 'succeeded') return { outcome: 'succeeded', operationId, remoteId: ledger.remoteId, recorded: true, replay: true, status: ledger.status, ...createdFrom(ledger, ledger.remoteId) };
+  // A human attestation never proves a created object's identity, so no `created` is returned.
+  if (ledger.status === 'resolved_applied') return { outcome: 'succeeded', operationId, remoteId: ledger.remoteId, recorded: true, replay: true, status: ledger.status };
   if (ledger.status === 'resolved_not_applied') return { outcome: 'rejected', operationId, message: 'This request was reviewed and recorded as not applied. Create a new request only if you still want to make the change.', terminal: true, replay: true, status: 'resolved_not_applied' };
   if (ledger.status === 'rejected') return { outcome: 'rejected', operationId, message: 'The advertising platform rejected this change. Nothing was changed. Review the details before submitting a new request.' };
   if (ledger.status === 'uncertain') return { outcome: 'uncertain', operationId, message: 'The result of this change is unknown. Do not repeat it. Check the object in the advertising platform, then record what you found in Ads change history.' };
@@ -187,8 +240,8 @@ function requestPayloadHash(adAccountId: string, operation: AdsNeutralOperation)
 }
 
 async function replayRequest(actor: AdsManageActor, requestId: string, requestHash: string): Promise<AdsManagementOutcome | null> {
-  const rows = await prisma.$queryRaw<Array<{ id: string; requestHash: string; status: string; remoteId: string | null }>>`
-    SELECT id, "requestHash", status, "remoteId" FROM ads_management_operations
+  const rows = await prisma.$queryRaw<Array<{ id: string; requestHash: string; status: string; remoteId: string | null; operationType?: string; objectType?: string }>>`
+    SELECT id, "requestHash", status, "remoteId", "operationType", "objectType" FROM ads_management_operations
     WHERE "workspaceId" = ${actor.workspaceId} AND "actorId" = ${actor.userId} AND "requestId" = ${requestId} LIMIT 1`;
   const row = rows[0];
   if (!row) return null;
@@ -204,12 +257,18 @@ async function replayRequest(actor: AdsManageActor, requestId: string, requestHa
 export async function performAdsManagement(actor: AdsManageActor, input: { adAccountId: string; operation: unknown; confirmation: unknown; requestId: unknown }): Promise<AdsManagementOutcome> {
   if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) throw new OperationError('invalid_request', 'Provide a request ID containing 8 to 128 letters, numbers, dots, underscores, colons or hyphens.');
   const operation = parseNeutralOperation(input.operation);
-  const ctx = await managedContext(actor, input.adAccountId, 'write');
-  const support = supports(ctx.ops, operation);
-  await validateWithPolicy(ctx.ops, operation);
-  const expected = ctx.ops.confirmation(operation, { adAccountId: ctx.account.id, currency: ctx.account.currency });
-  if (input.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${expected}`);
-  await assertOwnedObject(ctx.account.id, operation);
+  // Creation only: a preflight failure of THIS send happened before its intent and any provider request. It says nothing about an earlier send of the same request id.
+  const beforeJournal = isCreationOperation(operation) ? asNoDispatch : (error: unknown) => error;
+  let ctx: Awaited<ReturnType<typeof managedContext>>, support: ReturnType<typeof supports>, expected: string;
+  try {
+    ctx = await managedContext(actor, input.adAccountId, 'write');
+    support = supports(ctx.ops, operation);
+    assertCreationScope(operation, ctx.pageScope, actor.allowedTargetIds);
+    await validateWithPolicy(ctx.ops, operation);
+    expected = ctx.ops.confirmation(operation, { adAccountId: ctx.account.id, currency: ctx.account.currency });
+    if (input.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${expected}`);
+    await assertOwnedObject(ctx.account.id, operation);
+  } catch (error) { throw beforeJournal(error); }
 
   const id = newId('adsop');
   const requestHash = requestPayloadHash(ctx.account.id, operation);
@@ -219,20 +278,27 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
       const active = await tx.adAccount.findFirst({ where: { id: ctx.account.id, workspaceId: actor.workspaceId, enabled: true }, select: { id: true } });
       if (!active) throw new OperationError('reconnect_required', 'This advertising account is no longer selected. Select it again before managing ads.');
       await tx.$executeRaw`INSERT INTO ads_management_operations (id, "workspaceId", "adAccountId", "actorId", "requestId", "requestHash", "operationType", "objectType", "objectId", params, status, "createdAt", "updatedAt")
-        VALUES (${id}, ${actor.workspaceId}, ${ctx.account.id}, ${actor.userId}, ${input.requestId}, ${requestHash}, ${operation.type}, ${operation.objectType}, ${operation.objectId}, ${JSON.stringify(operation)}::jsonb, 'pending', NOW(), NOW())`;
+        VALUES (${id}, ${actor.workspaceId}, ${ctx.account.id}, ${actor.userId}, ${input.requestId}, ${requestHash}, ${operation.type}, ${operation.objectType}, ${ledgerObjectId(operation)}, ${JSON.stringify(operation)}::jsonb, 'pending', NOW(), NOW())`;
     });
   } catch (error) {
     if (isDuplicate(error)) {
+      let lookedUp = false;
       try {
         const replay = await replayRequest(actor, input.requestId, requestHash);
+        lookedUp = true;
         if (replay) return replay;
       } catch (replayError) {
         if (replayError instanceof OperationError) throw replayError;
       }
-      throw new OperationError('conflict', 'An earlier change to this object has no confirmed outcome. Check it in Ads change history and resolve it before making another change.');
+      const message = 'An earlier change to this object has no confirmed outcome. Check it in Ads change history and resolve it before making another change.';
+      // A successful lookup finding no row for this request id means THIS send was not recorded; an earlier send could still be in flight, so clients must not release a request they already sent unresolved.
+      if (lookedUp && isCreationOperation(operation)) throw new AdsNoDispatchError('conflict', message, 'blocked_by_other_request');
+      throw new OperationError('conflict', message);
     }
-    if (error instanceof OperationError) throw error;
-    throw new OperationError('unavailable', 'Ads management is temporarily unavailable. Try again later.');
+    // An OperationError here is one of our own checks raised before the INSERT, so this send recorded nothing.
+    if (error instanceof OperationError) throw beforeJournal(error);
+    // Any other failure (including a lost commit acknowledgement) may have committed the intent: never claim it was not recorded.
+    throw new OperationError('unavailable', 'Ads management is temporarily unavailable. Check Ads change history before submitting a new request.');
   }
 
   let current: Awaited<ReturnType<typeof managedContext>> | undefined;
@@ -241,19 +307,21 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
     // The same fail-fast lock serializes selection changes through current authorization and provider dispatch.
     return await withSelectedResourceOperation(actor.workspaceId, { kind: 'adAccount', id: ctx.account.id }, async (_tx, signal) => {
       signal.throwIfAborted();
-      const [ledger] = await _tx.$queryRaw<AdsLedgerStatus[]>`SELECT status, "remoteId" FROM ads_management_operations WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
+      const [ledger] = await _tx.$queryRaw<AdsLedgerStatus[]>`SELECT status, "remoteId", "operationType", "objectType" FROM ads_management_operations WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
       if (!ledger || ledger.status !== 'pending') throw new AdsIntentNoLongerPending(ledger ?? { status: 'missing', remoteId: null });
       try {
         current = await managedContext(actor, input.adAccountId, 'write');
         if (current.account.id !== ctx.account.id || current.provider !== ctx.provider || current.ops.provider !== ctx.ops.provider) throw new OperationError('conflict', 'The advertising account changed while preparing this request. Review it and try again.');
         supports(current.ops, operation);
+        assertCreationScope(operation, current.pageScope, actor.allowedTargetIds);
         await validateWithPolicy(current.ops, operation);
+        if (operation.type === 'adset.create') await assertOwnedObject(current.account.id, operation);
         if (current.ops.confirmation(operation, { adAccountId: current.account.id, currency: current.account.currency }) !== expected) throw new OperationError('conflict', 'The advertising change confirmation is no longer current. Review it and try again.');
         signal.throwIfAborted();
       } catch (error) {
         const changed = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = 'rejected', "failureCode" = 'authority_changed', "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
         if (changed !== 1) throw error;
-        await audit(actor, 'ads.change_rejected', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: operation.objectId, reason: 'authority_changed' }, _tx);
+        await audit(actor, 'ads.change_rejected', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation), reason: 'authority_changed' }, _tx);
         const message = error instanceof OperationError ? error.message : 'Current advertising access could not be verified. Review access and try again.';
         return { outcome: 'rejected' as const, operationId: id, message: `No advertising change was sent. ${message}` };
       }
@@ -270,17 +338,25 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
         const code = kind === 'rejected' ? 'rejected' : 'unknown_outcome';
         const changed = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = ${status}, "failureCode" = ${code}, "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
         if (changed !== 1) throw new AdsIntentNoLongerPending({ status: 'uncertain', remoteId: null });
-        await audit(actor, `ads.change_${status}`, { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: operation.objectId }, _tx);
+        await audit(actor, `ads.change_${status}`, { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation) }, _tx);
         return kind === 'rejected'
           ? { outcome: 'rejected' as const, operationId: id, message: 'The advertising platform rejected this change. Nothing was changed. Review the details and try again.' }
           : { outcome: 'uncertain' as const, operationId: id, message: 'The result of this change is unknown. Do not repeat it. Check the object in the advertising platform, then record what you found in Ads change history.' };
       }
 
       const resultRemoteId = result.remoteId ?? null;
+      if (isCreationOperation(operation) && (resultRemoteId === null || !SAFE_ID.test(resultRemoteId))) {
+        // The provider returned without a verifiable identity: it may have created an object, so hold it as uncertain.
+        const held = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = 'uncertain', "failureCode" = 'missing_remote_id', "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
+        if (held !== 1) throw new AdsIntentNoLongerPending({ status: 'uncertain', remoteId: null });
+        await audit(actor, 'ads.change_uncertain', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation) }, _tx);
+        return { outcome: 'uncertain' as const, operationId: id, message: 'The result of this change is unknown. Do not repeat it. Check the object in the advertising platform, then record what you found in Ads change history.' };
+      }
+      const created = isCreationOperation(operation) ? { created: { objectType: operation.objectType, remoteId: resultRemoteId! } } : {};
       const changed = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = 'succeeded', "remoteId" = ${resultRemoteId}, "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
-      if (changed !== 1) return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: false, warning: 'The change was applied but its record could not be completed. Do not repeat it; the object stays on hold in Ads change history until the outcome is reviewed.' };
-      await audit(actor, 'ads.change_applied', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: operation.objectId, spendChanging: support.spendChanging }, _tx);
-      return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: true };
+      if (changed !== 1) return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: false, warning: 'The change was applied but its record could not be completed. Do not repeat it; the object stays on hold in Ads change history until the outcome is reviewed.', ...created };
+      await audit(actor, 'ads.change_applied', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation), spendChanging: support.spendChanging, ...(isCreationOperation(operation) ? { remoteId: resultRemoteId, createdPaused: true } : {}) }, _tx);
+      return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: true, ...created };
     });
   } catch (error) {
     if (error instanceof AdsIntentNoLongerPending) return replayLedgerOutcome(id, error.ledger);

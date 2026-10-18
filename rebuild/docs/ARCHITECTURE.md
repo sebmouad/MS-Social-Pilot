@@ -875,3 +875,26 @@ unverified formats. Preserve the held-photo canary lock. Continue remaining
 legacy module integrations, migration/media/rollback rehearsal and release gates.
 Do not broad-stage unrelated source slices. No provider/production write belongs
 to this batch.
+
+## Ads creation integration — batch 75 in progress
+
+Campaign/ad-set creation now shares Ads intent journaling, payload-bound replay,
+current resource locks and recovery. Root registry version 68 adds Facebook-owned
+`meta.adsCreationUi`, with validated supported-choice subsets/defaults and name
+ceilings consumed at preview and dispatch. Exact confirmation templates stay
+adapter invariants. Generic creation metadata is consumed by UI and MCP; no
+provider objective rules belong in shared code. Static Claude review requested
+reload-safe request identities and clearer pre-dispatch errors/history labels;
+those fixes and browser evidence remain open. Local migration backup/restore,
+three PostgreSQL ledger tests, isolated build/typecheck and 2222 passing tests
+(108 skipped) precede these pending fixes. Production remains legacy.
+
+Batch 75 verification update: the isolated Ads creation runtime passed 2346 tests
+in 291 files (no skips), guarded local HTTP/MCP creation recovery with exact
+fixture/settings cleanup, and production build/typecheck. Chrome verified phone
+validation/dialog/reload hold behavior without a provider write, desktop two-rail
+layout, and themed controls. Final shared button/color corrections passed 25 focused UI tests and a
+separate production build/serial typecheck. The previously requested reload/no-dispatch fixes are
+implemented and regression-tested; unrelated unfinished feature modules remain
+excluded. Registry 68 is consumed by creation options and current provider checks.
+See ADS_PARITY.md for exact proof and remaining live/provider/release limits.

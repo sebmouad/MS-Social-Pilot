@@ -170,92 +170,59 @@ describe('workspace Ads actions', () => {
     mocks.prisma.adAccount.findFirst.mockResolvedValueOnce(null);
     expect(await canManageWorkspaceAds(actor, 'account-linked-only-to-forbidden-channel')).toBe(false);
 
-    mocks.prisma.adAccount.findFirst.mockResolvedValueOnce(null);
-    await expect(createWorkspaceAdCampaign(actor, { adAccountId: 'local-account-1', name: 'Spring', objective: 'OUTCOME_TRAFFIC', confirmation: 'anything' })).rejects.toThrow(/unavailable/);
+  });
+
+  const campaignInput = { adAccountId: 'local-account-1', name: ' Spring launch ', objective: 'OUTCOME_TRAFFIC', confirmation: 'module-confirmation', requestId };
+  const adSetInput = { adAccountId: 'local-account-1', campaignId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS', confirmation: 'module-confirmation', requestId };
+
+  it('delegates campaign creation to the shared journal as a neutral operation with no objectId or status, and no direct provider call', async () => {
+    mocks.perform.mockResolvedValueOnce({ outcome: 'succeeded', operationId: 'adsop_9', remoteId: 'campaign-new', recorded: true, created: { objectType: 'campaign', remoteId: 'campaign-new' } });
+    const result = await createWorkspaceAdCampaign({ ...actor, allowedTargetIds: ['target-a'] }, campaignInput);
+    expect(mocks.perform).toHaveBeenCalledWith(
+      { userId: 'user-1', workspaceId: 'workspace-1', allowedTargetIds: ['target-a'] },
+      { adAccountId: 'local-account-1', confirmation: 'module-confirmation', requestId, operation: { type: 'campaign.create', objectType: 'campaign', name: ' Spring launch ', objective: 'OUTCOME_TRAFFIC' } },
+    );
+    expect(result).toMatchObject({ outcome: 'succeeded', campaignId: 'campaign-new', created: { objectType: 'campaign', remoteId: 'campaign-new' } });
     expect(mocks.engine.createCampaign).not.toHaveBeenCalled();
+    expect(mocks.prisma.$executeRaw).not.toHaveBeenCalled();
   });
 
-  it('requires exact confirmation, sends a paused campaign, and audits without the credential', async () => {
-    mocks.engine.createCampaign.mockClear().mockResolvedValue({ remoteId: 'campaign-new' });
-    const input = { adAccountId: 'local-account-1', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' as const,
-      confirmation: 'CREATE PAUSED FACEBOOK CAMPAIGN "Spring launch" IN ACCOUNT local-account-1 WITH OBJECTIVE OUTCOME_TRAFFIC' };
-    await expect(createWorkspaceAdCampaign(actor, { ...input, confirmation: 'yes' })).rejects.toThrow(/confirmation exactly/);
+  it('delegates ad set creation with parentId and returns adSetId only after confirmed success', async () => {
+    mocks.perform.mockResolvedValueOnce({ outcome: 'succeeded', operationId: 'adsop_10', remoteId: 'adset-new', recorded: true, created: { objectType: 'adset', remoteId: 'adset-new' } });
+    const result = await createWorkspaceAdSet(actor, adSetInput, true);
+    expect(mocks.perform.mock.calls[0][1]).toEqual({
+      adAccountId: 'local-account-1', confirmation: 'module-confirmation', requestId,
+      operation: { type: 'adset.create', objectType: 'adset', parentId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' },
+    });
+    expect(result).toMatchObject({ adSetId: 'adset-new' });
+    expect(mocks.createFacebookAdSet).not.toHaveBeenCalled();
+    expect(mocks.prisma.adInsight.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('never exposes legacy ids for uncertain, rejected or pending outcomes, even if a remote id were present', async () => {
+    const uncertain = { outcome: 'uncertain' as const, operationId: 'adsop_11', message: 'unknown' };
+    const rejected = { outcome: 'rejected' as const, operationId: 'adsop_12', message: 'no' };
+    for (const outcome of [uncertain, rejected]) {
+      mocks.perform.mockResolvedValueOnce(outcome).mockResolvedValueOnce(outcome);
+      const campaign = await createWorkspaceAdCampaign(actor, campaignInput);
+      expect(campaign).toBe(outcome); expect(campaign).not.toHaveProperty('campaignId');
+      const adSet = await createWorkspaceAdSet(actor, adSetInput, true);
+      expect(adSet).toBe(outcome); expect(adSet).not.toHaveProperty('adSetId');
+    }
+  });
+
+  it('does not report a success without a provider-proven created object as a legacy id', async () => {
+    mocks.perform.mockResolvedValueOnce({ outcome: 'succeeded', operationId: 'adsop_13', remoteId: 'replayed', recorded: true, replay: true, status: 'resolved_applied' });
+    const result = await createWorkspaceAdCampaign(actor, campaignInput);
+    expect(result).not.toHaveProperty('campaignId');
+  });
+
+  it('refuses limited-page ad set creation before delegating and surfaces service refusals unchanged', async () => {
+    await expect(createWorkspaceAdSet(actor, adSetInput, false)).rejects.toThrow(/limited page access/);
+    expect(mocks.perform).not.toHaveBeenCalled();
+    mocks.perform.mockRejectedValueOnce(new OperationError('conflict', 'An earlier change to this object has no confirmed outcome.'));
+    await expect(createWorkspaceAdCampaign(actor, campaignInput)).rejects.toThrow(/no confirmed outcome/);
     expect(mocks.engine.createCampaign).not.toHaveBeenCalled();
-    await expect(createWorkspaceAdCampaign(actor, input)).resolves.toEqual({ created: true, campaignId: 'campaign-new', status: 'paused', auditRecorded: true });
-    expect(mocks.engine.createCampaign).toHaveBeenCalledWith({ credential: { accessToken: 'secret-token-value' }, accountId: 'act_99', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' });
-    const rawValues = mocks.prisma.$executeRaw.mock.calls[0] as unknown[];
-    expect(JSON.stringify(rawValues)).toContain('campaign-new');
-    expect(JSON.stringify(rawValues)).toContain('PAUSED');
-    expect(JSON.stringify(rawValues)).not.toContain('secret-token-value');
-  });
-
-  it('blocks campaign creation when the Facebook channel is disabled or the scope is absent', async () => {
-    mocks.engine.createCampaign.mockClear();
-    const input = { adAccountId: 'local-account-1', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' as const,
-      confirmation: 'CREATE PAUSED FACEBOOK CAMPAIGN "Spring launch" IN ACCOUNT local-account-1 WITH OBJECTIVE OUTCOME_TRAFFIC' };
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : key === 'platforms.facebook.enabled' ? false : ['ads_management']);
-    await expect(createWorkspaceAdCampaign(actor, input)).rejects.toThrow(/Advertising changes are currently unavailable/);
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : ['ads_read']);
-    await expect(createWorkspaceAdCampaign(actor, input)).rejects.toThrow(/Advertising changes are currently unavailable/);
-    expect(mocks.engine.createCampaign).not.toHaveBeenCalled();
-  });
-
-  it('returns confirmed campaign success when only the local audit write fails', async () => {
-    const input = { adAccountId: 'local-account-1', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' as const,
-      confirmation: 'CREATE PAUSED FACEBOOK CAMPAIGN "Spring launch" IN ACCOUNT local-account-1 WITH OBJECTIVE OUTCOME_TRAFFIC' };
-    mocks.engine.createCampaign.mockClear().mockResolvedValue({ remoteId: 'campaign-confirmed' });
-    mocks.prisma.$executeRaw.mockRejectedValueOnce(new Error('database unavailable'));
-    const auditLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    await expect(createWorkspaceAdCampaign(actor, input)).resolves.toEqual({ created: true, campaignId: 'campaign-confirmed', status: 'paused', auditRecorded: false, warning: expect.stringContaining('Do not submit this creation again.') });
-    expect(mocks.engine.createCampaign).toHaveBeenCalledTimes(1);
-    expect(auditLog).toHaveBeenCalledWith('Ads creation succeeded but its audit record could not be saved.', { workspaceId: actor.workspaceId, actorId: actor.userId, adAccountId: 'local-account-1', campaignId: 'campaign-confirmed' });
-    auditLog.mockRestore();
-  });
-
-  it('creates a paused ad set only for an account-owned campaign and audits without credentials', async () => {
-    const input = { adAccountId: 'local-account-1', campaignId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000,
-      countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' as const,
-      confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-44 IN ACCOUNT local-account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' };
-    await expect(createWorkspaceAdSet(actor, { ...input, confirmation: 'yes' }, true)).rejects.toThrow(/confirmation exactly/);
-    expect(mocks.createFacebookAdSet).not.toHaveBeenCalled();
-    await expect(createWorkspaceAdSet(actor, input, true)).resolves.toEqual({ created: true, adSetId: 'adset-new', status: 'paused', auditRecorded: true });
-    expect(mocks.prisma.adInsight.findFirst).toHaveBeenCalledWith({ where: { adAccountId: 'local-account-1', level: 'campaign', objectId: 'campaign-44' }, select: { id: true } });
-    expect(mocks.createFacebookAdSet).toHaveBeenCalledWith(expect.objectContaining({ credential: { accessToken: 'secret-token-value' }, accountId: 'act_99', campaignId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' }));
-    const rawValues = mocks.prisma.$executeRaw.mock.calls[0] as unknown[];
-    expect(JSON.stringify(rawValues)).toContain('adset-new');
-    expect(JSON.stringify(rawValues)).toContain('PAUSED');
-    expect(JSON.stringify(rawValues)).not.toContain('secret-token-value');
-  });
-
-  it('rejects an ad set with an unverified campaign and does not send it to Meta', async () => {
-    mocks.prisma.adInsight.findFirst.mockResolvedValue(null);
-    const input = { adAccountId: 'local-account-1', campaignId: 'campaign-foreign', name: 'Prospecting', dailyBudgetMinor: 5000,
-      countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' as const,
-      confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-foreign IN ACCOUNT local-account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' };
-    await expect(createWorkspaceAdSet(actor, input, true)).rejects.toThrow(/cannot be verified/);
-    expect(mocks.createFacebookAdSet).not.toHaveBeenCalled();
-  });
-
-  it('enforces all-page scope inside ad set creation even when the caller claims full scope', async () => {
-    const input = { adAccountId: 'local-account-1', campaignId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000,
-      countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' as const,
-      confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-44 IN ACCOUNT local-account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' };
-    mocks.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['target-a'] } });
-    await expect(createWorkspaceAdSet(actor, input, true)).rejects.toThrow(/unavailable for limited page access/);
-    expect(mocks.prisma.adAccount.findFirst).not.toHaveBeenCalled();
-    expect(mocks.createFacebookAdSet).not.toHaveBeenCalled();
-  });
-
-  it('returns a created result with audit recovery status instead of encouraging a duplicate retry', async () => {
-    const input = { adAccountId: 'local-account-1', campaignId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000,
-      countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' as const,
-      confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-44 IN ACCOUNT local-account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' };
-    mocks.prisma.$executeRaw.mockRejectedValueOnce(new Error('database unavailable'));
-    const auditLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    await expect(createWorkspaceAdSet(actor, input, true)).resolves.toEqual({ created: true, adSetId: 'adset-new', status: 'paused', auditRecorded: false, warning: expect.stringContaining('Do not submit this creation again.') });
-    expect(mocks.createFacebookAdSet).toHaveBeenCalledTimes(1);
-    expect(auditLog).toHaveBeenCalledWith('Ads creation succeeded but its audit record could not be saved.', { workspaceId: actor.workspaceId, actorId: actor.userId, adAccountId: 'local-account-1', campaignId: 'campaign-44', adSetId: 'adset-new' });
-    auditLog.mockRestore();
   });
 
   it('maps a status change to one neutral operation and delegates with the request identity and confirmation', async () => {

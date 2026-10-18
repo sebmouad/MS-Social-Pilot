@@ -5,6 +5,7 @@ import { publishingTargetChoices } from '../publishing/destinations';
 import { deleteInboxCommentDurably, finishInboxDeletion, getInboxDeletion } from '@/modules/inbox/server/deletion';
 import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { withAdsErrorBoundary } from '../ads/errors';
+import { adsNoDispatchMetadata } from '@/modules/ads/management/errors';
 import { withMediaErrorBoundary } from '../media/mcp-errors';
 import { OperationError, operationFailure, type OperationErrorCode } from '@/lib/operation-error';
 import { selectedResourceConnectionWhere } from '../platforms/resource-visibility';
@@ -113,8 +114,8 @@ const tools = [
   { name: 'get_ad_creation_options', description: 'Read safe Ads creation choices and exact confirmation formats for one enabled, connected advertising account. Only workspace owners and admins can use this tool.', inputSchema: { type: 'object', required: ['adAccountId'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' } }, additionalProperties: false } },
   { name: 'get_ads_performance', description: 'Read stored campaign, ad set, and ad performance for accessible ad accounts. reportOptions lists current date presets and bounds. Defaults use the Ads report policy. Date inputs are inclusive UTC calendar days; range.to is exclusive. Without period, a start-only request ends today, and an end-only request uses the default preset duration. Performance rows and account summaries have independent offsets.', inputSchema: { type: 'object', properties: { period: { type: 'string', description: 'A current preset ID from reportOptions, or custom with both start and end. Do not combine presets and explicit dates.' }, start: { type: 'string', description: 'Inclusive UTC start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'Inclusive UTC end date, YYYY-MM-DD.' }, accountId: { type: 'string', description: 'Accessible ad account ID.' }, level: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, accountOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
   { name: 'get_live_ad_status', description: 'Read live configured and effective status for a campaign, ad set, or ad verified in stored insights. Requires Ads read access and an enabled connected account visible to your page scope.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, objectId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] } }, additionalProperties: false } },
-  { name: 'create_ad_campaign', description: 'Create a paused campaign in the selected advertising account. Use the selected platform objective and exact confirmation format.', inputSchema: { type: 'object', required: ['adAccountId', 'name', 'objective', 'confirmation'], properties: { adAccountId: { type: 'string' }, name: { type: 'string' }, objective: { type: 'string', minLength: 1, maxLength: 100 }, confirmation: { type: 'string' } }, additionalProperties: false } },
-  { name: 'create_ad_set', description: 'Create a paused ad set under a campaign verified in the selected account. Requires all Pages in scope. Confirmation must exactly match the account platform format.', inputSchema: { type: 'object', required: ['adAccountId', 'campaignId', 'name', 'dailyBudgetMinor', 'countryCode', 'optimizationGoal', 'confirmation'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, campaignId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, name: { type: 'string', minLength: 1, maxLength: 100 }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, countryCode: { type: 'string', pattern: '^[A-Z]{2}$' }, optimizationGoal: { type: 'string', minLength: 1, maxLength: 100 }, confirmation: { type: 'string', maxLength: 500 } }, additionalProperties: false } },
+  { name: 'create_ad_campaign', description: 'Create a paused campaign in the selected advertising account. Use the selected platform objective and exact confirmation format.', inputSchema: { type: 'object', required: ['adAccountId', 'name', 'objective', 'confirmation', 'requestId'], properties: { adAccountId: { type: 'string' }, name: { type: 'string' }, objective: { type: 'string', minLength: 1, maxLength: 100 }, confirmation: { type: 'string' }, requestId: { type: 'string', description: 'Stable request identity; reuse for retries of the same reviewed payload.' } }, additionalProperties: false } },
+  { name: 'create_ad_set', description: 'Create a paused ad set under a campaign verified in the selected account. Requires all Pages in scope. Confirmation must exactly match the account platform format.', inputSchema: { type: 'object', required: ['adAccountId', 'campaignId', 'name', 'dailyBudgetMinor', 'countryCode', 'optimizationGoal', 'confirmation', 'requestId'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, campaignId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, name: { type: 'string', minLength: 1, maxLength: 100 }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, countryCode: { type: 'string', pattern: '^[A-Z]{2}$' }, optimizationGoal: { type: 'string', minLength: 1, maxLength: 100 }, confirmation: { type: 'string', maxLength: 500 }, requestId: { type: 'string', description: 'Stable request identity; reuse for retries of the same reviewed payload.' } }, additionalProperties: false } },
   { name: 'update_ad', description: 'Apply one status or budget change through the durable Ads management service. Supply the exact confirmation from preview_ads_change and a stable requestId reused for retries. Unknown outcomes remain held.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType', 'confirmation', 'requestId'], properties: { adAccountId: { type: 'string' }, objectId: { type: 'string' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, status: { type: 'string', enum: ['active', 'paused'] }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, lifetimeBudgetMinor: { type: 'integer', minimum: 1 }, confirmation: { type: 'string' }, requestId: { type: 'string' } }, additionalProperties: false } },
   { name: 'preview_workspace_data_deletion', description: 'Count workspace records that a data deletion would remove. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'export_workspace_data', description: 'Export the current workspace JSON snapshot, including directly workspace-owned legacy tables with credential fields redacted. Indirect records and media bytes are not included. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -591,12 +592,13 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const host = provider ? await platformAds(provider) : null;
       const manageable = account && await canManageWorkspaceAds({ userId: viewer.userId, workspaceId: viewer.workspaceId }, adAccountId);
       if (!account || !provider || !host || !manageable) throw new OperationError('unavailable', 'The selected advertising account is unavailable.');
+      const creationUi = host.creationUi ? await host.creationUi() : host.ui;
       return {
         adAccountId: account.id,
         provider,
         currency: account.currency,
-        campaign: host.ui.campaign ? { options: host.ui.campaign.options, defaultOption: host.ui.campaign.defaultOption, confirmationTemplate: host.ui.campaign.confirmationTemplate } : null,
-        adSet: viewer.permissions?.pageScope.all === true && host.ui.adSet ? { options: host.ui.adSet.options, defaultOption: host.ui.adSet.defaultOption, confirmationTemplate: host.ui.adSet.confirmationTemplate, countryCodeFormat: 'Two uppercase letters, for example MA', dailyBudgetFormat: 'Positive integer in minor currency units' } : null,
+        campaign: creationUi.campaign ? { options: creationUi.campaign.options, defaultOption: creationUi.campaign.defaultOption, confirmationTemplate: creationUi.campaign.confirmationTemplate, nameMaxLength: creationUi.campaign.nameMaxLength } : null,
+        adSet: viewer.permissions?.pageScope.all === true && pageIdsFor(viewer) === undefined && creationUi.adSet ? { options: creationUi.adSet.options, defaultOption: creationUi.adSet.defaultOption, confirmationTemplate: creationUi.adSet.confirmationTemplate, nameMaxLength: creationUi.adSet.nameMaxLength, countryCodeFormat: 'Two uppercase letters, for example MA', dailyBudgetFormat: 'Positive integer in minor currency units' } : null,
       };
     }
     case 'create_ad_campaign': {
@@ -604,10 +606,10 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const nameValue = requiredString(args, 'name');
       const objective = requiredString(args, 'objective');
       const confirmation = requiredString(args, 'confirmation');
-      requireConfirmation(args, await campaignCreationConfirmation(viewer.workspaceId, adAccountId, nameValue, objective));
-      const result = await createWorkspaceAdCampaign(viewer, { adAccountId, name: nameValue, objective, confirmation });
-      const mcpAuditRecorded = await auditConfirmedAdsWrite(viewer, name, { adAccountId, campaignId: result.campaignId });
-      return confirmedAdsReceipt(result, mcpAuditRecorded);
+      const requestId = requiredString(args, 'requestId');
+      const result = await createWorkspaceAdCampaign({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, { adAccountId, name: nameValue, objective, confirmation, requestId });
+      if (result.outcome !== 'succeeded' || !result.created) return result;
+      return confirmedAdsReceipt(result, await auditConfirmedAdsWrite(viewer, name, { adAccountId, campaignId: result.campaignId, operationId: result.operationId }));
     }
     case 'create_ad_set': {
       const adAccountId = requiredString(args, 'adAccountId');
@@ -619,17 +621,11 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const confirmation = requiredString(args, 'confirmation');
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(campaignId) || typeof dailyBudgetMinor !== 'number' || !Number.isSafeInteger(dailyBudgetMinor) || dailyBudgetMinor < 1 || !/^[A-Z]{2}$/.test(countryCode)) throw new OperationError('invalid_request', 'Invalid ad set request.');
       if (viewer.permissions?.pageScope.all !== true) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
-      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer), entitledPlatformIds(viewer.entitlements));
-      const account = await prisma.adAccount.findFirst({
-        where: { ...where, id: adAccountId },
-        select: { socialAccount: { select: { provider: true } } },
-      });
-      const host = account?.socialAccount ? await platformAds(account.socialAccount.provider) : null;
-      if (!host) throw new OperationError('unavailable', 'The selected advertising account is unavailable.');
-      requireConfirmation(args, host.adSetConfirmation({ adAccountId, campaignId, name: nameValue.trim(), dailyBudgetMinor, countryCode, optimizationGoal }));
-      const result = await createWorkspaceAdSet(viewer, { adAccountId, campaignId, name: nameValue, dailyBudgetMinor, countryCode, optimizationGoal, confirmation }, true);
-      const mcpAuditRecorded = await auditConfirmedAdsWrite(viewer, name, { adAccountId, campaignId, adSetId: result.adSetId });
-      return confirmedAdsReceipt(result, mcpAuditRecorded);
+      const requestId = requiredString(args, 'requestId');
+      const unrestricted = viewer.permissions?.pageScope.all === true && pageIdsFor(viewer) === undefined;
+      const result = await createWorkspaceAdSet({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, { adAccountId, campaignId, name: nameValue, dailyBudgetMinor, countryCode, optimizationGoal, confirmation, requestId }, unrestricted);
+      if (result.outcome !== 'succeeded' || !result.created) return result;
+      return confirmedAdsReceipt(result, await auditConfirmedAdsWrite(viewer, name, { adAccountId, campaignId, adSetId: result.adSetId, operationId: result.operationId }));
     }
     case 'update_ad': {
       const adAccountId = requiredString(args, 'adAccountId');
@@ -884,7 +880,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       const safe = operationFailure(failure, writeTools.has(name)
         ? 'The outcome could not be confirmed. Check the current state before repeating this action.'
         : 'This operation could not be completed. Please try again.');
-      return reply({ ...textResult({ error: safe.error, code: safe.code }), isError: true });
+      return reply({ ...textResult({ error: safe.error, code: safe.code, ...adsNoDispatchMetadata(failure) }), isError: true });
     }
   }
   if (method === 'resources/list') {

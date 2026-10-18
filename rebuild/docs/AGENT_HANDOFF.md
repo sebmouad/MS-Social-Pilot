@@ -403,38 +403,42 @@ legacy module integrations, migration/media/rollback rehearsal and release gates
 Do not broad-stage unrelated source slices. No provider/production write belongs
 to this batch.
 
-## Active batches 75–76 — 2026-10-18
+## Current batches 75–76 — 2026-10-18
 
-Published main: `03580cf97e6311a0bed044adfc88e4949062bc54`, exact remote
-SHA verified. This isolated batch contains Ads creation operation-kind migration,
-eleven-file cutover pins/history/function refusals, five PostgreSQL ledger tests
-and migration evidence. Full eleven-migration schema-only rehearsal passed;
-all rows absent, so customer-data/media/service rollback proof is still open.
+Last exact remote verified before this runtime commit: `06d9ed8d579eec308fb4c5d0da397f89facb1c9f`.
+Migration batch `03580cf9` is published. Runtime batch 75 now has an isolated
+snapshot with 2346 passing tests/291 files, zero skips, production build and serial
+typecheck. The final visual-only button/color fixes passed 25 focused UI tests and
+production build/serial typecheck; verify Git HEAD/remote instead
+of assuming this document contains its own resulting commit SHA.
 
-Ads creation application code remains uncommitted. It integrates campaign/ad-set
-creation with the durable journal, payload-bound replay, selected-account locks,
-Root `meta.adsCreationUi` (registry 68), UI/HTTP/MCP stable request identity and
-conservative unknown-outcome holds. Baseline isolated suite: 2222 passing,
-108 skipped (290 files); build/typecheck passed. This predates review fixes.
-Static Claude review found misleading preflight errors and reload identity loss.
-First fixes added sessionStorage and typed no-dispatch markers, but review found
-that a later policy failure must never release an already-unknown original
-request. Claude hardening worker is active (terminal 34001), output private
-`ads75-review-hardening.txt`; revalidate its live handle before assuming progress.
-It also owns user/workspace storage scope and truthful replay delivery wording.
-Run targeted/full isolated tests, build/typecheck and changed-flow browser proof
-before publishing runtime. Seed campaign phone report had width/client/scroll
-390px with no page overflow; creation forms unavailable under current synthetic
-account grants, so this is report-layout evidence only.
+Ads creation is integrated through the durable journal, payload-bound replay,
+current selected-account locks, Root `meta.adsCreationUi` (registry 68), shared
+HTTP/MCP services and owner-scoped stable browser request identity. Unknown
+requests survive reload and later policy refusals. Browser storage failure
+refuses before fetch. Historical replay/attestation never promises current
+paused delivery. No actual Ads provider creation was sent.
 
-Independent Claude Tasks worker is active (terminal 16880), output private
-`tasks76-build.txt`. Owns Tasks source/routes/tests/new comments migration only;
-central registry/manifests/MCP/schema/cutover remain parent integration work.
-Read-only Agency/Tasks readiness audit: source packages are disconnected, config
-unregistered, Tasks comments table absent, entry points lack feature enforcement,
-Agency cross-workspace visibility must not leak through workspace MCP keys.
-Do not count those source folders as migrated functionality.
+Actual local HTTP/MCP probe verified creation journal recovery and uncertain
+attestation without invented remote identities, read-only/confirmation/foreign
+refusals, retained-account history and audits/feature gates. Exact fixtures and
+prior settings were restored. Full eleven-migration schema-only rehearsal passed;
+customer-data/media/service rollback proof remains open. Chrome verified phone
+validation/focus/escape/offline/reload hold behavior, desktop two sidebars,
+390px/1440px page width, shared dialog buttons and four-theme contrast. Private UI
+settings were restored exactly; the temporary browser request was removed because
+its only send was blocked offline. See ADS_PARITY.md.
 
-Keep unrelated untracked feature slices out of Ads staging. Production and
+Claude Tasks worker completed (terminal 16880 exited 0), source handoff private
+`tasks76-build.txt`. Tests/typecheck were denied inside its own non-interactive
+worker, so parent must run them; no tests are claimed passed. It owns Tasks
+source/routes/tests and new migration
+`20261025100000_rebuild_task_comments`, which depends on the existing purge gate
+migration. Central registry/manifest catalog/MCP/schema/cutover wiring remains
+parent work. New Tasks service denies until its feature is registered. Review
+source and legacy parity, integrate Root ownership and key ceilings, then test
+comments/export/erasure and browser flows before publishing Tasks. Agency source
+still lacks host integration; never expose cross-workspace data to workspace keys.
+
+Keep unrelated untracked slices out of Ads staging. Production and
 socialpilot-deploy remain legacy. Preserve held-photo canary and Page lock.
-No actual Ads provider creation or production change has occurred in these batches.

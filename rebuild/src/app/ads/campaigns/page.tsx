@@ -49,7 +49,11 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
     await canReadWorkspaceAds({ userId: viewer.user.id, workspaceId }, accountId, allowedTargetIds),
   ] as const)));
   const createAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
-  const adsUi = new Map(await Promise.all(accounts.map(async account => [account.id, account.socialAccount ? (await platformAds(account.socialAccount.provider))?.ui ?? null : null] as const)));
+  const adsUi = new Map(await Promise.all(accounts.map(async account => {
+    const host = account.socialAccount ? await platformAds(account.socialAccount.provider) : null;
+    const ui = host?.creationUi ? await host.creationUi().catch(() => null) : host?.ui ?? null;
+    return [account.id, ui] as const;
+  })));
   const canExport = canUseFeature(viewer.entitlements, 'ads/campaigns') && canAccessFeature(viewer.permissions, 'ads/campaigns', 'read');
   const exportPolicy = canExport ? await loadAdsOutputPolicy().catch(() => null) : null;
   const sidebar = <AdsReportSidebar accounts={accounts} filters={filters} action="/ads/campaigns" kind="objects" policy={policy} page={objectPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
@@ -87,12 +91,12 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
             </tr>)}</tbody></table></div></div>;
         })}
         {viewer.permissions.pageScope.all && actionAvailability.get(accountId) && adsUi.get(accountId)?.adSet && rows.some(row => row.level === 'campaign') ? <div className="ads-result-level"><h3>Create ad sets</h3><p className="small-note">Choose a campaign already verified in this account’s stored performance history.</p>
-          {adsUi.get(accountId)?.adSet ? rows.filter(row => row.level === 'campaign').map(row => <AdSetCreateForm key={row.id} adAccountId={accountId} campaignId={row.id} campaignName={row.name} currency={row.currency} config={adsUi.get(accountId)!.adSet!} />) : null}
+          {adsUi.get(accountId)?.adSet ? rows.filter(row => row.level === 'campaign').map(row => <AdSetCreateForm key={row.id} adAccountId={accountId} campaignId={row.id} campaignName={row.name} currency={row.currency} config={adsUi.get(accountId)!.adSet!} ownerScope={{ userId: viewer.user.id, workspaceId }} />) : null}
         </div> : null}
       </section>;
     }) : <section className="panel"><div className="empty-state"><h2>No campaign, ad set, or ad insights stored</h2><p>When insight rows are captured for the selected ad accounts and dates, each level will appear here with its saved metrics.</p><a className="text-link" href="/ads">Return to ad accounts →</a></div></section>}
     {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>Create a campaign</h2><p className="small-note">Each campaign is created paused under one enabled ad account.</p>
-      {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} />)}
+      {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={{ userId: viewer.user.id, workspaceId }} />)}
     </section> : null}
     <p className="ads-read-only-note">Review delivery and adjust eligible campaigns, ad sets, and ads. Changes require confirmation before they are sent.</p>
     </>}

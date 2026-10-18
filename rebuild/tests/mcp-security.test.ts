@@ -135,8 +135,8 @@ beforeEach(() => {
   inboxDeletions.get.mockResolvedValue({ operation: null });
   inboxDeletions.remove.mockResolvedValue({ ok: true, operationId: 'opaque-operation-1', itemId: 'comment-a', state: 'uncertain', remoteConfirmed: false, localConfirmed: false });
   inboxDeletions.finish.mockResolvedValue({ ok: true, operationId: 'opaque-operation-1', itemId: 'comment-a', state: 'remote_confirmed', remoteConfirmed: true, localConfirmed: false });
-  adsMutations.create.mockResolvedValue({ campaignId: 'campaign-1' });
-  adsMutations.createAdSet.mockResolvedValue({ adSetId: 'adset-1', auditRecorded: true });
+  adsMutations.create.mockResolvedValue({ outcome: 'succeeded', created: { objectType: 'campaign', remoteId: 'campaign-1' }, campaignId: 'campaign-1' });
+  adsMutations.createAdSet.mockResolvedValue({ outcome: 'succeeded', created: { objectType: 'adset', remoteId: 'adset-1' }, adSetId: 'adset-1', auditRecorded: true });
   adsMutations.update.mockResolvedValue({ outcome: 'succeeded', operationId: 'ads-operation', recorded: true });
   adsMutations.read.mockResolvedValue({ id: 'campaign-a', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
   publishingMutations.publish.mockResolvedValue({ published: 1, failed: 0, needsReconciliation: 0 });
@@ -739,7 +739,7 @@ describe('MCP workspace boundaries', () => {
     }
     expect(analytics.snapshot).toHaveBeenCalledWith(limited, expect.objectContaining({ filter: '1', channel: ['page-allowed'], metric: 'reach::day' }), { allowedChannelIds: ['page-allowed'] });
   });
-  it('applies ads write scope, manager role, and exact confirmations before shared ads services', async () => {
+  it('applies ads write scope, manager role, and required request identity before shared ads services', async () => {
     const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 60, method: 'tools/list' });
     expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('create_ad_campaign');
     const limited = { ...viewer, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }) };
@@ -749,34 +749,44 @@ describe('MCP workspace boundaries', () => {
     expect((await denied.json()).result.isError).toBe(true);
     expect(adsMutations.update).not.toHaveBeenCalled();
 
-    const campaign = { adAccountId: 'account-1', name: 'Autumn launch', objective: 'OUTCOME_TRAFFIC' };
-    const bad = await call('create_ad_campaign', { ...campaign, confirmation: 'CREATE CAMPAIGN' });
+    const campaign = { requestId: 'creation-request-75', adAccountId: 'account-1', name: 'Autumn launch', objective: 'OUTCOME_TRAFFIC' };
+    const bad = await call('create_ad_campaign', { ...campaign, requestId: undefined, confirmation: 'CREATE CAMPAIGN' });
     expect((await bad.json()).result.isError).toBe(true);
     expect(adsMutations.create).not.toHaveBeenCalled();
     const confirmation = 'CREATE PAUSED FACEBOOK CAMPAIGN "Autumn launch" IN ACCOUNT account-1 WITH OBJECTIVE OUTCOME_TRAFFIC';
     const created = await call('create_ad_campaign', { ...campaign, confirmation });
     expect((await created.json()).result.structuredContent).toMatchObject({ campaignId: 'campaign-1', confirmedSuccess: true, mcpAuditRecorded: true });
-    expect(adsMutations.create).toHaveBeenCalledWith(viewer, { ...campaign, confirmation });
+    expect(adsMutations.create).toHaveBeenCalledWith({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: undefined }, { ...campaign, confirmation });
 
     const change = { adAccountId: 'account-1', objectId: 'campaign-1', objectType: 'campaign', status: 'paused', requestId: 'stable-request-2' };
     const updated = await call('update_ad', { ...change, confirmation: 'SET AD STATUS campaign-1 TO PAUSED' });
     expect((await updated.json()).result.structuredContent.outcome).toBe('succeeded');
     expect(adsMutations.update).toHaveBeenCalledWith({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: undefined }, { ...change, dailyBudgetMinor: undefined, lifetimeBudgetMinor: undefined, confirmation: 'SET AD STATUS campaign-1 TO PAUSED' });
   });
+  it.each(['uncertain', 'resolved_applied'])('does not convert a %s creation into a confirmed remote receipt', async status => {
+    const result = status === 'uncertain'
+      ? { outcome: 'uncertain', operationId: 'held-operation', message: 'Check the recorded outcome.' }
+      : { outcome: 'succeeded', operationId: 'held-operation', status: 'resolved_applied', replay: true };
+    adsMutations.create.mockResolvedValueOnce(result);
+    const response = await call('create_ad_campaign', { adAccountId: 'account-1', name: 'Reviewed', objective: 'OUTCOME_TRAFFIC', requestId: 'stable-request-75', confirmation: 'reviewed confirmation' });
+    expect((await response.json()).result.structuredContent).toEqual(result);
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+  });
+
   it('returns confirmed remote Ads receipts when MCP audit persistence fails', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    adsMutations.create.mockResolvedValueOnce({ created: true, campaignId: 'remote-campaign-9', status: 'paused', auditRecorded: true });
+    adsMutations.create.mockResolvedValueOnce({ outcome: 'succeeded', created: { objectType: 'campaign', remoteId: 'remote-campaign-9' }, campaignId: 'remote-campaign-9', status: 'paused', auditRecorded: true });
     db.$executeRaw.mockRejectedValueOnce(new Error('database unavailable'));
-    const campaign = await call('create_ad_campaign', { adAccountId: 'account-1', name: 'Autumn launch', objective: 'OUTCOME_TRAFFIC', confirmation: 'CREATE PAUSED FACEBOOK CAMPAIGN "Autumn launch" IN ACCOUNT account-1 WITH OBJECTIVE OUTCOME_TRAFFIC' });
+    const campaign = await call('create_ad_campaign', { requestId: 'creation-request-75', adAccountId: 'account-1', name: 'Autumn launch', objective: 'OUTCOME_TRAFFIC', confirmation: 'CREATE PAUSED FACEBOOK CAMPAIGN "Autumn launch" IN ACCOUNT account-1 WITH OBJECTIVE OUTCOME_TRAFFIC' });
     const campaignResult = (await campaign.json()).result.structuredContent;
     expect(campaignResult).toMatchObject({ confirmedSuccess: true, campaignId: 'remote-campaign-9', status: 'paused', auditRecorded: true, mcpAuditRecorded: false });
     expect(campaignResult.warning).toContain('Do not submit this creation again.');
     expect(adsMutations.create).toHaveBeenCalledTimes(1);
 
     db.adAccount.findFirst.mockResolvedValue({ id: 'account-1', currency: 'USD', socialAccount: { provider: 'facebook' } });
-    adsMutations.createAdSet.mockResolvedValueOnce({ created: true, adSetId: 'remote-adset-7', status: 'paused', auditRecorded: true });
+    adsMutations.createAdSet.mockResolvedValueOnce({ outcome: 'succeeded', created: { objectType: 'adset', remoteId: 'remote-adset-7' }, adSetId: 'remote-adset-7', status: 'paused', auditRecorded: true });
     db.$executeRaw.mockRejectedValueOnce(new Error('database unavailable'));
-    const adSet = await call('create_ad_set', { adAccountId: 'account-1', campaignId: 'campaign-1', name: 'Prospecting', dailyBudgetMinor: 5000, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS', confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-1 IN ACCOUNT account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' });
+    const adSet = await call('create_ad_set', { requestId: 'adset-request-75', adAccountId: 'account-1', campaignId: 'campaign-1', name: 'Prospecting', dailyBudgetMinor: 5000, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS', confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-1 IN ACCOUNT account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' });
     const adSetResult = (await adSet.json()).result.structuredContent;
     expect(adSetResult).toMatchObject({ confirmedSuccess: true, adSetId: 'remote-adset-7', status: 'paused', auditRecorded: true, mcpAuditRecorded: false });
     expect(adSetResult.warning).toContain('Do not submit this creation again.');
@@ -784,7 +794,7 @@ describe('MCP workspace boundaries', () => {
     expect(log).toHaveBeenCalledWith('MCP Ads creation succeeded but its audit record could not be saved.', expect.objectContaining({ tool: 'create_ad_set', adSetId: 'remote-adset-7' }));
     log.mockRestore();
   });
-  it('discovers safe selected-account Ads options and creates ad sets only with all-page scope and exact confirmation', async () => {
+  it('discovers safe selected-account Ads options and delegates identified ad set requests with current scope', async () => {
     const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 70, method: 'tools/list' });
     expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('create_ad_set');
     db.adAccount.findFirst.mockResolvedValue({ id: 'account-1', currency: 'USD', socialAccount: { provider: 'facebook' } });
@@ -795,9 +805,9 @@ describe('MCP workspace boundaries', () => {
     const { canManageWorkspaceAds } = await import('../src/server/ads/actions');
     expect(canManageWorkspaceAds).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'account-1');
 
-    const values = { adAccountId: 'account-1', campaignId: 'campaign-1', name: 'Autumn audience', dailyBudgetMinor: 2500, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' };
+    const values = { requestId: 'adset-request-75', adAccountId: 'account-1', campaignId: 'campaign-1', name: 'Autumn audience', dailyBudgetMinor: 2500, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' };
     const exact = 'CREATE PAUSED FACEBOOK AD SET "Autumn audience" UNDER CAMPAIGN campaign-1 IN ACCOUNT account-1 WITH DAILY BUDGET 2500 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS';
-    const bad = await call('create_ad_set', { ...values, confirmation: 'CREATE AD SET' });
+    const bad = await call('create_ad_set', { ...values, requestId: undefined, confirmation: 'CREATE AD SET' });
     expect((await bad.json()).result.isError).toBe(true);
     expect(adsMutations.createAdSet).not.toHaveBeenCalled();
     const invalidBudget = await call('create_ad_set', { ...values, dailyBudgetMinor: '2500', confirmation: exact });
@@ -805,7 +815,7 @@ describe('MCP workspace boundaries', () => {
     expect(adsMutations.createAdSet).not.toHaveBeenCalled();
     const created = await call('create_ad_set', { ...values, confirmation: exact });
     expect((await created.json()).result.structuredContent.adSetId).toBe('adset-1');
-    expect(adsMutations.createAdSet).toHaveBeenCalledWith(viewer, { ...values, confirmation: exact }, true);
+    expect(adsMutations.createAdSet).toHaveBeenCalledWith({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: undefined }, { ...values, confirmation: exact }, true);
 
     const limited = { ...viewer, permissions: { ...viewer.permissions!, pageScope: { all: false, ids: ['page-a'] } } };
     const denied = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 71, method: 'tools/call', params: { name: 'create_ad_set', arguments: { ...values, confirmation: exact } } });

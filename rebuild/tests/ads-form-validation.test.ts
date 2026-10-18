@@ -26,6 +26,8 @@ function setValue(input: HTMLInputElement, value: string) {
 async function render(node: ReactNode) { await act(async () => root.render(createElement('div', null, node))); }
 async function submit(form: HTMLFormElement) { await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))); }
 
+const ownerScope = { userId: 'user-1', workspaceId: 'workspace-1' };
+
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
@@ -37,7 +39,7 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 
 describe('Ads form validation', () => {
   it('associates a missing campaign name error and focuses the field without opening confirmation', async () => {
-    await render(createElement(CampaignCreateForm, { adAccountId: 'account-1', accountName: 'Example account', config: campaignConfig }));
+    await render(createElement(CampaignCreateForm, { adAccountId: 'account-1', accountName: 'Example account', config: campaignConfig, ownerScope }));
     await submit(container.querySelector('form')!);
     const input = container.querySelector<HTMLInputElement>('input[name="name"]')!;
     expect(input.getAttribute('aria-invalid')).toBe('true');
@@ -49,7 +51,7 @@ describe('Ads form validation', () => {
   });
 
   it('shows associated budget and country errors on ad set creation and focuses the first invalid field', async () => {
-    await render(createElement(AdSetCreateForm, { adAccountId: 'account-1', campaignId: 'campaign-1', campaignName: 'Example', currency: 'USD', config: adSetConfig }));
+    await render(createElement(AdSetCreateForm, { adAccountId: 'account-1', campaignId: 'campaign-1', campaignName: 'Example', currency: 'USD', config: adSetConfig, ownerScope }));
     await act(async () => setValue(container.querySelector<HTMLInputElement>('input[name="name"]')!, 'Summer campaign'));
     await submit(container.querySelector('form')!);
     const name = container.querySelector<HTMLInputElement>('input[name="name"]')!;
@@ -79,16 +81,16 @@ describe('Ads form validation', () => {
     expect(vi.mocked(fetch).mock.calls.every(([,init]) => !init?.method || init.method === 'GET')).toBe(true);
   });
 
-  it('retains campaign input and confirmation context after a recoverable request failure', async () => {
-    vi.mocked(fetch).mockRejectedValueOnce(new Error('temporary network failure'));
-    await render(createElement(CampaignCreateForm, { adAccountId: 'account-1', accountName: 'Example account', config: campaignConfig }));
+  it('retains campaign input and context after a recoverable refusal', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ error: 'temporary refusal', attempt: 'not_dispatched' }) } as Response);
+    await render(createElement(CampaignCreateForm, { adAccountId: 'account-1', accountName: 'Example account', config: campaignConfig, ownerScope }));
     const input = container.querySelector<HTMLInputElement>('input[name="name"]')!;
     await act(async () => setValue(input, 'Keep this promotion'));
     await submit(container.querySelector('form')!);
     const confirm = container.querySelector<HTMLDialogElement>('dialog')!.querySelector<HTMLButtonElement>(`button:not([data-dialog-cancel])`)!;
     await act(async () => confirm.click());
     expect(container.querySelector<HTMLInputElement>('input[name="name"]')?.value).toBe('Keep this promotion');
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('temporary network failure');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('temporary refusal');
     expect(container.querySelector('dialog[open]')).not.toBeNull();
     expect(fetch).toHaveBeenCalledTimes(1);
   });

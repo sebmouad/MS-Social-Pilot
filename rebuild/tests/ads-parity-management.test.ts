@@ -25,6 +25,8 @@ import { describeAdsManagement, listAdsCreatives, listAdsOperations, parseNeutra
 import { executeAdsManagementTool } from '../src/modules/ads/management/mcp';
 import type { AdsNeutralOperation, AdsOpsHost } from '../src/modules/ads/management/types';
 import { OperationError } from '../src/lib/operation-error';
+import { AdsNoDispatchError, adsNoDispatchMetadata } from '../src/modules/ads/management/errors';
+import { withAdsErrorBoundary } from '../src/server/ads/errors';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const pause: AdsNeutralOperation = { type: 'status.set', objectType: 'campaign', objectId: 'c1', status: 'paused' };
@@ -35,9 +37,10 @@ const execute = vi.fn();
 const classify = vi.fn();
 const host: AdsOpsHost = {
   provider: 'testnet',
-  operations: [{ id: 'status.set', objectTypes: ['campaign', 'ad'], spendChanging: true, label: 'Pause or resume' }, { id: 'rename', objectTypes: ['campaign'], spendChanging: false, label: 'Rename' }],
+  operations: [{ id: 'status.set', objectTypes: ['campaign', 'ad'], spendChanging: true, label: 'Pause or resume' }, { id: 'rename', objectTypes: ['campaign'], spendChanging: false, label: 'Rename' },
+    { id: 'campaign.create', objectTypes: ['campaign'], spendChanging: true, label: 'Create campaign' }, { id: 'adset.create', objectTypes: ['adset'], spendChanging: true, label: 'Create ad set' }],
   validate: op => { if (op.type === 'rename' && !op.name) throw new OperationError('invalid_request', 'Enter a name.'); },
-  confirmation: op => `CONFIRM ${op.type === 'status.set' ? (op.status === 'paused' ? 'pause' : 'resume') : op.type} ${op.objectId}`,
+  confirmation: op => op.type === 'campaign.create' ? `CREATE PAUSED CAMPAIGN ${op.name}` : op.type === 'adset.create' ? `CREATE PAUSED AD SET ${op.name} UNDER ${op.parentId}` : `CONFIRM ${op.type === 'status.set' ? (op.status === 'paused' ? 'pause' : 'resume') : op.type} ${op.objectId}`,
   execute: (...args) => execute(...args), classifyFailure: error => classify(error),
   listCreatives: vi.fn(async () => ({ items: [], next: null })),
 };
@@ -262,7 +265,7 @@ describe('Ads management service', () => {
 describe('Ads management Root-managed bounds and failure handling', () => {
   const rename = (name: string): AdsNeutralOperation => ({ type: 'rename', objectType: 'campaign', objectId: 'c1', name });
   const budget = (minor: number): AdsNeutralOperation => ({ type: 'budget.set', objectType: 'campaign', objectId: 'c1', budget: { kind: 'daily', minor } });
-  const budgetHost: AdsOpsHost = { ...host, operations: [...host.operations, { id: 'budget.set', objectTypes: ['campaign'], spendChanging: true, label: 'Budget' }], confirmation: op => `CONFIRM ${op.type} ${op.objectId}` };
+  const budgetHost: AdsOpsHost = { ...host, operations: [...host.operations, { id: 'budget.set', objectTypes: ['campaign'], spendChanging: true, label: 'Budget' }], confirmation: op => `CONFIRM ${op.type} ${'objectId' in op ? op.objectId : ''}` };
 
   it('enforces the Root name limit before the ledger or provider, and passes limits to the module', async () => {
     const tooLong = rename('x'.repeat(ADS_MANAGEMENT_DEFAULT_POLICY.nameMaxCharacters + 1));
@@ -421,5 +424,174 @@ describe('Ads change history and resolution', () => {
     expect(host.listCreatives).toHaveBeenCalledWith(expect.anything(), { limit: ADS_MANAGEMENT_DEFAULT_POLICY.creativePageLimit });
     await expect(executeAdsManagementTool(actor, 'apply_ads_change', { adAccountId: 'acc1', operation: pause, confirmation: CONFIRM, requestId: 'request-mcp-001', extra: 1 })).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(executeAdsManagementTool(actor, 'apply_ads_change', { adAccountId: 'acc1', operation: pause, confirmation: CONFIRM, requestId: 'request-mcp-001' })).resolves.toMatchObject({ outcome: 'succeeded' });
+  });
+});
+
+
+describe('paused campaign and ad set creation through the shared journal', () => {
+  const campaign: AdsNeutralOperation = { type: 'campaign.create', objectType: 'campaign', name: 'Spring', objective: 'OUTCOME_TRAFFIC' };
+  const adset: AdsNeutralOperation = { type: 'adset.create', objectType: 'adset', parentId: 'c1', name: 'Prospecting', dailyBudgetMinor: 5000, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' };
+  const CAMPAIGN_CONFIRM = 'CREATE PAUSED CAMPAIGN Spring';
+  const ADSET_CONFIRM = 'CREATE PAUSED AD SET Prospecting UNDER c1';
+  const hashOf = (operation: AdsNeutralOperation) => createHash('sha256').update(JSON.stringify({ adAccountId: 'acc1', operation })).digest('hex');
+  const duplicate = () => state.prisma.$executeRaw.mockRejectedValueOnce(Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' }));
+  const updates = () => state.prisma.$executeRaw.mock.calls.filter(([strings]) => /UPDATE ads_management_operations/.test(sqlOf(strings)));
+
+  it('parses creation strictly: no objectId or status, bounded fields, trimmed names', () => {
+    expect(parseNeutralOperation({ ...campaign, name: ' Spring ' })).toEqual(campaign);
+    expect(parseNeutralOperation(adset)).toEqual(adset);
+    for (const bad of [
+      { ...campaign, objectId: 'x' }, { ...campaign, status: 'active' }, { ...campaign, objectType: 'adset' }, { ...campaign, objective: '' }, { ...campaign, objective: 'a b' }, { ...campaign, name: 5 },
+      { ...adset, objectId: 'x' }, { ...adset, status: 'active' }, { ...adset, objectType: 'campaign' }, { ...adset, parentId: 'bad id' }, { ...adset, parentId: undefined },
+      { ...adset, dailyBudgetMinor: 0 }, { ...adset, dailyBudgetMinor: 1.5 }, { ...adset, countryCode: 'ma' }, { ...adset, optimizationGoal: 'a/b' },
+    ]) expect(() => parseNeutralOperation(bad), JSON.stringify(bad)).toThrow(OperationError);
+  });
+
+  it('journals the intent before provider I/O, sends the exact operation, and returns created only after provider success', async () => {
+    execute.mockImplementation(async () => { calls.push('REMOTE'); return { remoteId: 'camp-new' }; });
+    const result = await performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM });
+    expect(result).toMatchObject({ outcome: 'succeeded', recorded: true, remoteId: 'camp-new', created: { objectType: 'campaign', remoteId: 'camp-new' } });
+    expect(calls[0]).toMatch(/^INSERT INTO ads_management_operations/);
+    expect(calls.indexOf('REMOTE')).toBe(1);
+    const insert = state.prisma.$executeRaw.mock.calls[0] as unknown[];
+    expect(insert).toContain('campaign.create'); expect(insert).toContain('@create-campaign');
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'act_1' }), campaign);
+    expect(JSON.stringify(execute.mock.calls[0][1])).not.toMatch(/status|objectId/);
+  });
+
+  it('creates an ad set only under a parent verified from the account history and journals it per parent', async () => {
+    execute.mockResolvedValue({ remoteId: 'adset-new' });
+    const result = await performAdsManagement(actor, { adAccountId: 'acc1', operation: adset, confirmation: ADSET_CONFIRM });
+    expect(result).toMatchObject({ outcome: 'succeeded', created: { objectType: 'adset', remoteId: 'adset-new' } });
+    expect(state.prisma.adInsight.findFirst).toHaveBeenCalledWith({ where: { adAccountId: 'acc1', level: 'campaign', objectId: 'c1' }, select: { id: true } });
+    expect(state.prisma.$executeRaw.mock.calls[0] as unknown[]).toContain('@create-adset:c1');
+  });
+
+  it('refuses an unverified parent campaign before any ledger write or provider call', async () => {
+    state.prisma.adInsight.findFirst.mockResolvedValue(null);
+    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: adset, confirmation: ADSET_CONFIRM })).rejects.toMatchObject({ code: 'not_found' });
+    await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation: adset })).rejects.toMatchObject({ code: 'not_found' });
+    expect(state.prisma.$executeRaw).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('refuses ad set creation for limited page scope but still allows campaign creation inside its ceiling', async () => {
+    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['t1'] } });
+    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: adset, confirmation: ADSET_CONFIRM })).rejects.toMatchObject({ code: 'forbidden' });
+    expect(execute).not.toHaveBeenCalled(); expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
+    execute.mockResolvedValue({ remoteId: 'camp-new' });
+    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM })).resolves.toMatchObject({ outcome: 'succeeded' });
+    expect(state.prisma.adAccount.findFirst.mock.calls[0][0].where.socialAccount.is.targets.some).toEqual({ workspaceId: 'w1', id: { in: ['t1'] } });
+  });
+
+  it('intersects an API-key target ceiling with the account lookup', async () => {
+    execute.mockResolvedValue({ remoteId: 'camp-new' });
+    await performAdsManagement({ ...actor, allowedTargetIds: ['t9'] }, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM });
+    expect(state.prisma.adAccount.findFirst.mock.calls[0][0].where.socialAccount.is.targets.some).toEqual({ workspaceId: 'w1', id: { in: ['t9'] } });
+  });
+
+  it('requires the module confirmation and Root name and budget limits before writing', async () => {
+    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: 'yes' })).rejects.toMatchObject({ code: 'invalid_request', message: expect.stringContaining(CAMPAIGN_CONFIRM) });
+    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: { ...campaign, name: '' }, confirmation: 'CREATE PAUSED CAMPAIGN ' })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: { ...adset, dailyBudgetMinor: ADS_MANAGEMENT_DEFAULT_POLICY.maxBudgetMinor + 1 }, confirmation: ADSET_CONFIRM })).rejects.toMatchObject({ message: expect.stringContaining('above the limit') });
+    expect(state.prisma.$executeRaw).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('replays a recorded creation with created identity and never resends', async () => {
+    duplicate();
+    state.prisma.$queryRaw.mockResolvedValueOnce([{ id: 'adsop_c', requestHash: hashOf(campaign), status: 'succeeded', remoteId: 'camp-1', operationType: 'campaign.create', objectType: 'campaign' }]);
+    const result = await performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM, requestId: 'request-001' });
+    expect(result).toMatchObject({ outcome: 'succeeded', replay: true, created: { objectType: 'campaign', remoteId: 'camp-1' } });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('does not claim a created object for an attested resolution replay', async () => {
+    duplicate();
+    state.prisma.$queryRaw.mockResolvedValueOnce([{ id: 'adsop_c', requestHash: hashOf(campaign), status: 'resolved_applied', remoteId: null, operationType: 'campaign.create', objectType: 'campaign' }]);
+    const result = await performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM, requestId: 'request-001' });
+    expect(result).toMatchObject({ outcome: 'succeeded', status: 'resolved_applied' });
+    expect(result).not.toHaveProperty('created');
+  });
+
+  it('refuses a request key reused with any different creation payload', async () => {
+    duplicate();
+    state.prisma.$queryRaw.mockResolvedValueOnce([{ id: 'adsop_a', requestHash: hashOf(adset), status: 'succeeded', remoteId: 'a1', operationType: 'adset.create', objectType: 'adset' }]);
+    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: { ...adset, dailyBudgetMinor: 5001 }, confirmation: ADSET_CONFIRM, requestId: 'request-001' })).rejects.toMatchObject({ code: 'conflict' });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it.each(['pending', 'uncertain'])('holds a matching %s creation without resending and blocks a different request on the same open key', async status => {
+    duplicate();
+    state.prisma.$queryRaw.mockResolvedValueOnce([{ id: 'adsop_o', requestHash: hashOf(campaign), status, remoteId: null, operationType: 'campaign.create', objectType: 'campaign' }]);
+    const held = performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM, requestId: 'request-001' });
+    if (status === 'uncertain') await expect(held).resolves.toMatchObject({ outcome: 'uncertain', operationId: 'adsop_o' }); else await expect(held).rejects.toMatchObject({ code: 'conflict' });
+    duplicate();
+    state.prisma.$queryRaw.mockResolvedValueOnce([]);
+    await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM, requestId: 'request-002' })).rejects.toMatchObject({ code: 'conflict', message: expect.stringContaining('no confirmed outcome') });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('never marks an ambiguous intent-commit failure as not dispatched', async () => {
+    state.prisma.$transaction.mockRejectedValueOnce(new Error('connection lost while committing'));
+    const failure = await performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM, requestId: 'request-001' }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(OperationError);
+    expect((failure as OperationError).message).toContain('Check Ads change history');
+    expect(adsNoDispatchMetadata(failure)).toEqual({});
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('marks a later preflight refusal of the same request id as this send only and never touches the recorded request', async () => {
+    // The original send already succeeded or is unknown; a later policy/confirmation refusal must change nothing persisted.
+    const failure = await performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: 'stale confirmation', requestId: 'request-001' }).catch((error: unknown) => error);
+    expect(adsNoDispatchMetadata(failure)).toEqual({ attempt: 'not_dispatched' });
+    expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
+    expect(updates()).toHaveLength(0);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('keeps the typed marker through the Ads error boundary and drops it for any other error', async () => {
+    const marked = new AdsNoDispatchError('conflict', 'Blocked.', 'blocked_by_other_request');
+    await expect(withAdsErrorBoundary(async () => { throw marked; })).rejects.toBe(marked);
+    const plain = await withAdsErrorBoundary(async () => { throw new Error('provider internals'); }).catch((error: unknown) => error);
+    expect(adsNoDispatchMetadata(plain)).toEqual({});
+    expect((plain as OperationError).message).not.toContain('provider internals');
+  });
+
+  it('records provider rejection without created, and ambiguity as uncertain without created', async () => {
+    classify.mockReturnValueOnce('rejected');
+    execute.mockRejectedValueOnce(new Error('bad'));
+    const rejected = await performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM });
+    expect(rejected).toMatchObject({ outcome: 'rejected' }); expect(rejected).not.toHaveProperty('created');
+    execute.mockRejectedValueOnce(new Error('timeout'));
+    const uncertain = await performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM, requestId: 'request-test-002' });
+    expect(uncertain).toMatchObject({ outcome: 'uncertain' }); expect(uncertain).not.toHaveProperty('created');
+    expect(updates().map(call => call[1])).toEqual(['rejected', 'uncertain']);
+  });
+
+  it.each([undefined, '', 'bad id!'])('treats a provider success with remoteId %j as uncertain, never as created', async remoteId => {
+    execute.mockResolvedValue(remoteId === undefined ? {} : { remoteId });
+    const result = await performAdsManagement(actor, { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM });
+    expect(result).toMatchObject({ outcome: 'uncertain' }); expect(result).not.toHaveProperty('created'); expect(result).not.toHaveProperty('remoteId');
+    expect(JSON.stringify(updates()[0])).toContain('missing_remote_id');
+  });
+
+  it('rechecks authority under the lock and rejects without dispatch when ad set scope narrows', async () => {
+    let calls = 0;
+    state.permissions.mockImplementation(async () => (++calls === 1 ? { pageScope: { all: true, ids: [] } } : { pageScope: { all: false, ids: ['t1'] } }));
+    const result = await performAdsManagement(actor, { adAccountId: 'acc1', operation: adset, confirmation: ADSET_CONFIRM });
+    expect(result).toMatchObject({ outcome: 'rejected', message: expect.stringContaining('No advertising change was sent') });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('preview reports a creation as spend-changing with the module confirmation and the held-object lookup keyed by creation', async () => {
+    const preview = await previewAdsManagement(actor, { adAccountId: 'acc1', operation: adset });
+    expect(preview).toMatchObject({ confirmation: ADSET_CONFIRM, spendChanging: true });
+    const heldQuery = state.prisma.$queryRaw.mock.calls[0] as unknown[];
+    expect(heldQuery).toContain('@create-adset:c1');
+  });
+
+  it('describes creation inputs only if the module advertises them, and drives MCP apply with the same service', async () => {
+    execute.mockResolvedValue({ remoteId: 'camp-new' });
+    const result = await executeAdsManagementTool(actor, 'apply_ads_change', { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM, requestId: 'request-mcp-001' });
+    expect(result).toMatchObject({ outcome: 'succeeded', created: { objectType: 'campaign', remoteId: 'camp-new' } });
   });
 });

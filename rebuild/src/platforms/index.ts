@@ -1,3 +1,4 @@
+import { FACEBOOK_ADS_CREATION_CONFIG } from './facebook/ads-ui-config';
 import { FACEBOOK_CONFIG, facebookModule } from './facebook/module';
 import type { PlatformModule } from './module';
 
@@ -12,7 +13,7 @@ import type { PlatformModule } from './module';
 export const PLATFORM_MODULES = [facebookModule] as const satisfies readonly PlatformModule[];
 
 /** Every module's Root settings, merged into the configuration registry. */
-export const PLATFORM_CONFIG = [...FACEBOOK_CONFIG] as const;
+export const PLATFORM_CONFIG = [...FACEBOOK_CONFIG, ...FACEBOOK_ADS_CREATION_CONFIG.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }))] as const;
 
 export type PlatformId = (typeof PLATFORM_MODULES)[number]['id'];
 

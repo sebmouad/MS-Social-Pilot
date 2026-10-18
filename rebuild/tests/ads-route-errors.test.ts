@@ -12,8 +12,8 @@ import { OperationError } from '../src/lib/operation-error';
 
 const cases = [
   { name: 'update', route: update, run: mocks.update, body: { adAccountId: 'account', objectId: 'object', objectType: 'campaign', status: 'paused', confirmation: 'exact', requestId: 'request-0001' } },
-  { name: 'campaign', route: campaign, run: mocks.campaign, body: { adAccountId: 'account', name: 'Example', objective: 'example', confirmation: 'exact' } },
-  { name: 'ad set', route: adSet, run: mocks.adSet, body: { adAccountId: 'account', campaignId: 'campaign', name: 'Example', dailyBudgetMinor: 100, countryCode: 'MA', optimizationGoal: 'example', confirmation: 'exact' } },
+  { name: 'campaign', route: campaign, run: mocks.campaign, body: { adAccountId: 'account', name: 'Example', objective: 'example', confirmation: 'exact', requestId: 'request-0002' } },
+  { name: 'ad set', route: adSet, run: mocks.adSet, body: { adAccountId: 'account', campaignId: 'campaign', name: 'Example', dailyBudgetMinor: 100, countryCode: 'MA', optimizationGoal: 'example', confirmation: 'exact', requestId: 'request-0003' } },
   { name: 'read', route: read, run: mocks.read, body: { adAccountId: 'account', objectId: 'object', objectType: 'campaign' } },
 ];
 const request = (body: unknown, origin = 'http://localhost') => new Request('http://localhost/api/ads/action', { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -40,6 +40,32 @@ describe.each(cases)('Ads $name error boundary', ({ route, run, body }) => {
   it('rejects malformed input before invoking the service', async () => {
     expect((await route(request({}))).status).toBe(400);
     expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe.each(cases.filter(item => item.name === 'campaign' || item.name === 'ad set'))('Ads $name creation route contract', ({ route, run, body }) => {
+  it('requires a well-formed request ID', async () => {
+    const { requestId: _omit, ...withoutId } = body as typeof body & { requestId: string };
+    expect((await route(request(withoutId))).status).toBe(400);
+    expect((await route(request({ ...body, requestId: 'short' }))).status).toBe(400);
+    expect(run).not.toHaveBeenCalled();
+  });
+  it('returns the structured outcome unchanged and forwards the request identity', async () => {
+    const outcome = { outcome: 'uncertain', operationId: 'adsop_1', message: 'unknown' };
+    run.mockResolvedValueOnce(outcome);
+    const response = await route(request(body));
+    expect(await response.json()).toEqual(outcome);
+    expect(run.mock.calls[0][0]).toEqual({ userId: 'user', workspaceId: 'workspace' });
+    expect(run.mock.calls[0][1]).toEqual(body);
+  });
+});
+
+describe('Ads ad set route scope guard', () => {
+  it('passes the viewer page-scope flag to the service', async () => {
+    mocks.viewer.mockResolvedValue({ user: { id: 'user' }, workspaceId: 'workspace', permissions: { pageScope: { all: false } } });
+    mocks.adSet.mockResolvedValueOnce({ outcome: 'rejected', operationId: 'x', message: 'no' });
+    await adSet(request(cases[2].body));
+    expect(mocks.adSet.mock.calls[0][2]).toBe(false);
   });
 });
 

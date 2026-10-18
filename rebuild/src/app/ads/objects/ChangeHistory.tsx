@@ -8,7 +8,8 @@ import { RouteNotice } from '@/components/RouteNotice';
 type Change = { id: string; operationType: string; objectType: string; objectId: string; status: string; createdAt: string; needsResolution: boolean; resolutionKind?: 'pending_recovery' | 'uncertain'; onHold?: boolean; resolutionNote: string | null };
 type Resolution = 'applied' | 'not_applied';
 const STATUS_TEXT: Record<string, string> = { pending: 'In progress (on hold)', succeeded: 'Applied', rejected: 'Not applied', uncertain: 'Unknown result', resolved_applied: 'Confirmed applied', resolved_not_applied: 'Confirmed not applied' };
-const TYPE_TEXT: Record<string, string> = { 'status.set': 'Pause or resume', 'budget.set': 'Budget change', rename: 'Rename', 'creative.assign': 'Creative change', delete: 'Delete' };
+const TYPE_TEXT: Record<string, string> = { 'status.set': 'Pause or resume', 'budget.set': 'Budget change', rename: 'Rename', 'creative.assign': 'Creative change', delete: 'Delete', 'campaign.create': 'New campaign', 'adset.create': 'New ad set' };
+const isCreation = (type: string) => type === 'campaign.create' || type === 'adset.create';
 
 export function ChangeHistory({ items }: { items: Change[] }) {
   const [rows, setRows] = useState(items);
@@ -56,7 +57,7 @@ export function ChangeHistory({ items }: { items: Change[] }) {
     {message && !resolving ? <RouteNotice error={message.error} className={message.error ? 'ui-error' : 'small-note'} focusKey={message.key}>{message.text}</RouteNotice> : null}
     <Button onClick={() => void refreshHistory()} disabled={refreshing || busy}>{refreshing ? 'Refreshing…' : 'Refresh change history'}</Button>
     {!rows.length ? <p className="small-note">No changes have been made through this workspace yet.</p> : <ul className="ads-change-history">{rows.map(change => <li key={change.id}>
-      <strong>{TYPE_TEXT[change.operationType] ?? 'Ads change'}</strong> · {change.objectType} · {STATUS_TEXT[change.status] ?? 'Needs review'} · <time dateTime={change.createdAt}>{new Date(change.createdAt).toLocaleString()}</time>
+      <strong>{TYPE_TEXT[change.operationType] ?? 'Ads change'}</strong> · {isCreation(change.operationType) ? null : <>{change.objectType} · </>}{STATUS_TEXT[change.status] ?? 'Needs review'} · <time dateTime={change.createdAt}>{new Date(change.createdAt).toLocaleString()}</time>
       {change.onHold && !change.needsResolution ? <p className="small-note">This change may still be in progress. It stays on hold until the result is recorded. Do not repeat it. The service will not allow a review while its request is still in flight.</p> : null}
       {change.needsResolution ? <>
         {change.resolutionKind === 'pending_recovery'

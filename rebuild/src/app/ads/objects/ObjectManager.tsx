@@ -53,7 +53,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
   const [creativeId, setCreativeId] = useState('');
   const validation = useFormValidation();
 
-  const supports = capabilities?.operations ?? detail?.management.operations ?? [];
+  const supports = (capabilities?.operations ?? detail?.management.operations ?? []).filter(operation => operation.id !== 'campaign.create' && operation.id !== 'adset.create');
   const canManage = capabilities?.canManage ?? detail?.management.canManage ?? false;
   const limits = capabilities?.limits;
   const supportFor = (opId: string) => supports.find(item => item.id === opId && item.objectTypes.includes(level));

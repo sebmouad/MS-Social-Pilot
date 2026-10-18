@@ -54,9 +54,14 @@ async function main() {
     stage='enable local history and MCP without enabling provider writes';
     await save('mcp.enabled',true); await save('mcp.authenticatedRoles',['owner','admin']);
     await save('platforms.facebook.enabled',true); await save('entitlements.features.ads/campaigns',true); await save('ads.managementEnabled',false);
-    const pendingId=`${prefix}_pending`, uncertainId=`${prefix}_uncertain`;
+    const pendingId=`${prefix}_pending`, uncertainId=`${prefix}_uncertain`, campaignCreationId=`${prefix}_campaign_creation`, adSetCreationId=`${prefix}_adset_creation`;
     for (const [id,status] of [[pendingId,'pending'],[uncertainId,'uncertain']] as const) {
       await db.$executeRaw`INSERT INTO ads_management_operations (id,"workspaceId","adAccountId","actorId","requestId","requestHash","operationType","objectType","objectId",params,status) VALUES (${id},${workspaceId},${accountId},${userId},${id},${'a'.repeat(64)},'rename','ad',${id},${JSON.stringify({type:'rename',objectType:'ad',objectId:id,name:'Disposable recovery fixture'})}::jsonb,${status})`;
+    }
+    for (const [id, kind, objectId, status] of [[campaignCreationId,'campaign','@create-campaign','pending'],[adSetCreationId,'adset','@create-adset:synthetic-parent','uncertain']] as const) {
+      const operationType = `${kind}.create`;
+      const params = kind === 'campaign' ? { type: operationType, objectType: kind, name: 'Disposable creation recovery', objective: 'OUTCOME_TRAFFIC' } : { type: operationType, objectType: kind, parentId: 'synthetic-parent', name: 'Disposable creation recovery', dailyBudgetMinor: 100, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' };
+      await db.$executeRaw`INSERT INTO ads_management_operations (id,"workspaceId","adAccountId","actorId","requestId","requestHash","operationType","objectType","objectId",params,status) VALUES (${id},${workspaceId},${accountId},${userId},${id},${'b'.repeat(64)},${operationType},${kind},${objectId},${JSON.stringify(params)}::jsonb,${status})`;
     }
     stage='read authenticated history through HTTP and MCP';
     const history=await http('/api/ads/management?view=changes'); const historyBody=await json(history);
@@ -72,15 +77,22 @@ async function main() {
     const retained=await json(await http('/api/ads/management?view=changes'));check(retained.items?.some((row:any)=>row.id===pendingId),'Retained disconnected account history hidden.');
     const recovered=await http('/api/ads/management','POST',{action:'resolve',operationId:pendingId,resolution:'not_applied',confirmation:`RECOVER ADS CHANGE ${pendingId} AS NOT APPLIED`});const recoveredBody=await json(recovered);check(recovered.ok&&recoveredBody.recoveredPending===true&&recoveredBody.status==='resolved_not_applied','HTTP pending recovery did not settle the retained account.');
     const resolved=await rpc('resolve_ads_change',{operationId:uncertainId,resolution:'applied',confirmation:`RESOLVE ADS CHANGE ${uncertainId} AS APPLIED`},writeBearer);check(!resolved.b.result?.isError&&resolved.b.result?.structuredContent?.status==='resolved_applied','Authorized MCP uncertain attestation failed.');
+    stage='recover creation journals through HTTP and MCP without inventing remote receipts';
+    const creationRecovered = await http('/api/ads/management','POST',{action:'resolve',operationId:campaignCreationId,resolution:'not_applied',confirmation:`RECOVER ADS CHANGE ${campaignCreationId} AS NOT APPLIED`});
+    const creationBody=await json(creationRecovered);
+    check(creationRecovered.ok&&creationBody.status==='resolved_not_applied','HTTP creation pending recovery failed.');
+    const creationAttested=await rpc('resolve_ads_change',{operationId:adSetCreationId,resolution:'applied',confirmation:`RESOLVE ADS CHANGE ${adSetCreationId} AS APPLIED`},writeBearer);
+    const attestedBody=creationAttested.b.result?.structuredContent;
+    check(!creationAttested.b.result?.isError&&attestedBody?.status==='resolved_applied'&&!attestedBody.created&&!attestedBody.remoteId,'MCP creation attestation invented a remote creation receipt.');
     const rows=await db.$queryRaw<Array<{id:string;status:string}>>`SELECT id,status FROM ads_management_operations WHERE "workspaceId"=${workspaceId}`;
     check(rows.some(row=>row.id===pendingId&&row.status==='resolved_not_applied')&&rows.some(row=>row.id===uncertainId&&row.status==='resolved_applied'),'Recovery outcomes not stored.');
     const audits=await db.$queryRaw<Array<{n:bigint}>>`SELECT COUNT(*)::bigint AS n FROM root_activities WHERE detail->>'workspaceId'=${workspaceId} AND action='ads.change_resolved'`;
-    check(audits[0]?.n===BigInt(2),'Recovery audit count differs from two confirmed changes.');
+    check(audits[0]?.n===BigInt(4),'Recovery audit count differs from four reviewed changes.');
     stage='feature-off refusal covers HTTP and MCP';
     await save('entitlements.features.ads/campaigns',false);
     const deniedHttp=await http('/api/ads/management?view=changes'), deniedMcp=await rpc('list_ads_changes',{});
     check(!deniedHttp.ok&&deniedMcp.b.result?.isError===true,'Disabled Ads feature did not refuse API and MCP.');
-    console.log('PASS: actual HTTP/MCP history, read-only/confirmation/foreign refusals, retained-account pending recovery, uncertain attestation, persisted states/audits and feature gate; no provider write.');
+    console.log('PASS: actual HTTP/MCP history, read-only/confirmation/foreign refusals, retained-account pending recovery, uncertain attestation, campaign/ad-set creation recovery without invented remote receipts, persisted states/audits and feature gate; no provider write.');
 
   } finally {
     stage=`cleanup after ${stage}`; const errors:string[]=[]; async function clean(label:string,fn:()=>Promise<unknown>){try{await fn()}catch{errors.push(label)}}

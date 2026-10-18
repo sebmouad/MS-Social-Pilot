@@ -16,7 +16,7 @@ const common = {
 describe('shared Ads creation UI', () => {
   it('renders another module’s campaign choices and limits without Facebook defaults', () => {
     const config: NonNullable<AdsUiSchema['campaign']> = { ...common, optionLabel: 'Promotion goal' };
-    const html = renderToStaticMarkup(createElement(CampaignCreateForm, { adAccountId: 'account-1', accountName: 'Example account', config }));
+    const html = renderToStaticMarkup(createElement(CampaignCreateForm, { adAccountId: 'account-1', accountName: 'Example account', config, ownerScope: { userId: 'user-1', workspaceId: 'workspace-1' } }));
     expect(html).toContain('Website visits');
     expect(html).toContain('maxLength="47"');
     expect(html).toContain('Provider-owned setup description');
@@ -26,7 +26,7 @@ describe('shared Ads creation UI', () => {
 
   it('renders module-owned ad set choices instead of assuming Facebook optimization goals', () => {
     const config: NonNullable<AdsUiSchema['adSet']> = { ...common, budgetLabel: 'Spend per day', countryLabel: 'Country', goalLabel: 'Delivery goal' };
-    const html = renderToStaticMarkup(createElement(AdSetCreateForm, { adAccountId: 'account-1', campaignId: 'promotion-1', campaignName: 'Example promotion', currency: 'USD', config }));
+    const html = renderToStaticMarkup(createElement(AdSetCreateForm, { adAccountId: 'account-1', campaignId: 'promotion-1', campaignName: 'Example promotion', currency: 'USD', config, ownerScope: { userId: 'user-1', workspaceId: 'workspace-1' } }));
     expect(html).toContain('Website visits');
     expect(html).toContain('Delivery goal');
     expect(html).not.toContain('LINK_CLICKS');
