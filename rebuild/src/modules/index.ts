@@ -1,3 +1,4 @@
+import { agencyManifest } from './agency/manifest';
 import { adsManifest } from './ads/manifest';
 import { analyticsManifest } from './analytics/manifest';
 import { homeManifest } from './home/manifest';
@@ -14,6 +15,7 @@ export const moduleManifests = [
   analyticsManifest,
   adsManifest,
   tasksManifest,
+  agencyManifest,
   settingsManifest,
 ] as const;
 

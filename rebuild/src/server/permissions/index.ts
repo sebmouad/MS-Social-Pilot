@@ -3,7 +3,7 @@ import { PAGES, type FeatureId, type ModuleId } from '@/lib/product';
 export type PermissionAction = 'read' | 'write';
 export type Permission = Readonly<Record<PermissionAction, boolean>>;
 export type ScopedPageAccess = { all: true } | { all: false; ids: readonly string[] };
-export type PermissionModule = Extract<ModuleId, 'publishing' | 'inbox' | 'analytics' | 'ads' | 'tasks' | 'settings'>;
+export type PermissionModule = Extract<ModuleId, 'publishing' | 'inbox' | 'analytics' | 'ads' | 'tasks' | 'agency' | 'settings'>;
 
 export interface PermissionSource {
   role: string;
@@ -25,7 +25,7 @@ export interface ScopedPermissions {
 }
 
 const DENIED: Permission = { read: false, write: false };
-const MODULES: readonly PermissionModule[] = ['publishing', 'inbox', 'analytics', 'ads', 'tasks', 'settings'];
+const MODULES: readonly PermissionModule[] = ['publishing', 'inbox', 'analytics', 'ads', 'tasks', 'agency', 'settings'];
 
 const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'home/overview': null,
@@ -49,6 +49,8 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'ads/objects': 'ads/performance',
   'ads/campaigns': 'ads/performance',
   'tasks/board': null,
+  'agency/overview': 'agency/overview',
+  'agency/clients': 'agency/clients',
   'settings/connections': null,
   'settings/team': 'settings/team',
   'settings/workspace': 'settings/team',
@@ -65,10 +67,12 @@ const MODULE_ROOT_SWITCH: Record<PermissionModule, string | null> = {
   analytics: 'analytics',
   ads: 'ads',
   tasks: 'tasks',
+  agency: 'agency',
   settings: null,
 };
 
 function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: ReadonlySet<string>): Permission {
+  if (feature.startsWith('agency/')) return { read: role === 'owner' || role === 'admin', write: false };
   if (role === 'owner' || role === 'admin') return { read: true, write: true };
 
   if (role === 'client') {

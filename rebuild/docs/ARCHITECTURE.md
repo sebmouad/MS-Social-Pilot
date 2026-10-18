@@ -4,7 +4,7 @@
 
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) is the mandatory target for Codex, Claude and subagents. This file describes implementation and gaps only. Follow [../../AGENTS.md](../../AGENTS.md); do not infer architecture permission from an unfinished boundary.
 
-Updated 2026-10-17. This document distinguishes the intended production architecture from the current rebuild. A component existing in source is not proof that its complete workflow is production-ready.
+Updated 2026-10-18. This document distinguishes the intended production architecture from the current rebuild. A component existing in source is not proof that its complete workflow is production-ready.
 
 ## Structure
 
@@ -946,3 +946,26 @@ No migration/provider/production change. Optional optimistic tokens, plan/key
 revocation races, legacy schema drift and broader configuration coverage remain
 open. Agency is a separate unfinished integration and was excluded from this
 fix snapshot and commit. Production/socialpilot-deploy remain legacy.
+
+## Agency host integration — batch 77
+
+Agency is a registered module at /agency and /agency/clients, with Root registry
+70, nine active settings, grouped plan grants and manager-only read navigation.
+Context sidebar owns pages/filters; no third menu. Every workspace and metric
+group is scoped to current access; disabled groups are withheld with coverage.
+Search matches workspace names before the Root scan cap and cannot infer client
+associations. Workspace switching reuses the session selection API. Suspended
+metadata still requires Agency plan/switch grants, with all metrics withheld.
+Installation disable applies before reads, and anonymous API requests return401.
+
+Isolated evidence: 2,490 tests / 305 files (no skips), production build and serial
+typecheck. Actual local production-build HTTP/MCP/PostgreSQL/hydrated Chromium
+probe passed tenant/key/policy/page/selection assertions with exact settings and
+fixture/audit cleanup. Chrome also verified two sidebars, phone no-overflow,
+sidebar no-match/reset, Escape focus return and offline/online retry. Four
+temporary theme color renderings were restored. See AGENCY.md for precise limits.
+
+No person-wide MCP credential/tools are enabled: workspace keys cannot expand
+across tenants. Complete Agency writes/pagination/scale, remaining legacy source
+integrations, full Root technical controls, Facebook live coverage and migration/
+rollback/cutover remain open. Production and socialpilot-deploy remain legacy.

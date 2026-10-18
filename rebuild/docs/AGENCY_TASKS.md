@@ -55,14 +55,14 @@ configuration coverage is not achieved. Reminders, recurrence, activity UI,
 comment editing and drag/drop are absent. These are not claimed legacy features.
 Production-shaped authorization/concurrency and release evidence remain open.
 
-## Agency — source only, unavailable
+## Agency — integrated local evidence
 
-Prepared Agency source aggregates administered workspaces and client invitations.
-It is not registered in navigation, configuration or MCP and has no integrated
-browser/database proof. Its cross-workspace reads need entitlement checks and
-an authority model that cannot leak through workspace-scoped MCP keys. Do not
-expose it until those boundaries and tests are implemented. Agency remains a
-separate unfinished batch; source presence is not capability completion.
+Agency now has a registered product manifest, Root registry 70 settings,
+permission/entitlement gates, sidebar navigation and selected-workspace actions.
+The actual local HTTP/MCP/PostgreSQL/Chromium probe passed multiworkspace reads,
+current policy, foreign/key refusals and exact fixture/settings cleanup.
+Person-wide MCP tooling and production parity remain incomplete. See AGENCY.md
+for current scope, evidence and limitations.
 
 ## Tasks review corrections — batch 78
 
