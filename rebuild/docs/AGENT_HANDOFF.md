@@ -224,3 +224,40 @@ Next: finish auth-wrapper and CRUD live assertions, bio confirmation UX, public
 phone layout verification, exact cleanup, synthetic examples and documentation.
 Sharing source remains uncommitted; unrelated unfinished modules remain excluded.
 Production and socialpilot-deploy remain legacy. Preserve the held-photo canary lock.
+
+
+## Sharing and bio host integration — batch79b
+
+Settings installs /settings/sharing and /settings/bio, Root registry71, eleven
+workspace MCP tools and two resources through shared services. Links support
+explicit channel selection, expiring hash-only credentials, versioned editing,
+confirmed address replacement/renewal, revoke/delete and client feedback. Public
+review uses atomic Publishing participation; current role/feature/scope/expiry
+checks apply, with streamed request bounds and token comparison under mutation
+locks. Bio preserves unchanged link IDs/clicks and rechecks successful public
+authority without a positive cache. Generic config-batch reads fail closed.
+
+Fresh isolated candidate passed 2647 tests /314 files (zero skips), production
+build and serial typecheck. Actual guarded local HTTP/MCP/PostgreSQL/Chromium
+probe passed, including editing/stale refusal/renewal, credential-mint denials,
+key audit provenance, oversized feedback, public review and uploaded images,
+bio controls, export and erasure. All disposable data/audits/media were removed
+and captured Root settings restored exactly. Synthetic example links and bio
+were then intentionally seeded separately for local UI review.
+
+Desktop inspection corrected table measure, native form-control overlap and
+checkbox sizing; a phone grid fix keeps table overflow local. Settings legacy
+button selectors now exempt design-system buttons instead of overriding primary
+and danger variants. Final compiled Chrome confirmation passed at desktop1440px and phone390px;
+public table overflow remains local, a creation dialog measures352px, and Bio
+inputs fit. Temporary Nightfall rendering was inspected and restored to Coast.
+Final CSS build and serial typecheck passed. Full all-theme accessibility and
+browser save/offline/retry evidence remain open.
+
+MCP manager keys still lack independent channel scopes in the key model; unit
+actor ceilings do not prove full end-to-end resource scope. Portal results,
+publish-anyway, public workspace logos/email, cross-process rate limiting and
+proxy behavior remain open. Full Facebook live coverage/held-photo cleanup,
+remaining module integrations, Root coverage, production-shaped migration and
+rollback/cutover remain required. Production/socialpilot-deploy remain legacy.
+See CLIENT_SHARING.md. Do not broad-stage unrelated unfinished source.

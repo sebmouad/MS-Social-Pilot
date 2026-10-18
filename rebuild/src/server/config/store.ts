@@ -42,6 +42,28 @@ export async function runtimeConfig(key: string): Promise<unknown> {
   return checked.data;
 }
 
+/** One validated database snapshot for a module's non-secret settings. Secret reads stay explicit. */
+export async function runtimeConfigBatch(keys: readonly string[]): Promise<Record<string, unknown>> {
+  const unique = [...new Set(keys)];
+  const definitions = unique.map(key => {
+    const definition = CONFIG_BY_KEY.get(key);
+    if (!definition || definition.kind === 'secret') throw new Error('Unknown non-secret configuration key.');
+    return definition;
+  });
+  if (!unique.length) return {};
+  const rows = await prisma.appSetting.findMany({ where: { key: { in: unique } }, select: { key: true, value: true, encrypted: true } });
+  const stored = new Map(rows.map(row => [row.key, row]));
+  const values: Record<string, unknown> = {};
+  for (const definition of definitions) {
+    const row = stored.get(definition.key);
+    if (row?.encrypted) throw new Error('A non-secret setting was stored as encrypted.');
+    const checked = definition.schema.safeParse(row ? row.value : definition.defaultValue);
+    if (!checked.success) throw new Error(`Stored configuration is invalid: ${definition.key}.`);
+    values[definition.key] = checked.data;
+  }
+  return values;
+}
+
 export async function runtimeSecret(key: string): Promise<string | null> {
   const definition = CONFIG_BY_KEY.get(key);
   if (!definition || definition.kind !== 'secret') throw new Error('Unknown secret configuration key.');

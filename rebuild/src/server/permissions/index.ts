@@ -54,6 +54,8 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'settings/connections': null,
   'settings/team': 'settings/team',
   'settings/workspace': 'settings/team',
+  'settings/sharing': 'settings/sharing',
+  'settings/bio': 'settings/bio',
   'settings/mcp': 'settings/team',
   'settings/account': null,
   'settings/notifications': null,
@@ -72,6 +74,7 @@ const MODULE_ROOT_SWITCH: Record<PermissionModule, string | null> = {
 };
 
 function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: ReadonlySet<string>): Permission {
+  if (feature === 'settings/sharing' || feature === 'settings/bio') return { read: role === 'owner' || role === 'admin', write: role === 'owner' || role === 'admin' };
   if (feature.startsWith('agency/')) return { read: role === 'owner' || role === 'admin', write: false };
   if (role === 'owner' || role === 'admin') return { read: true, write: true };
 

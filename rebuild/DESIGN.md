@@ -120,3 +120,10 @@ metric presentation across account cards and object table/mobile views, includin
 report day, separate fetch time, units and unknown provenance. Existing tokens,
 shared buttons and natural detail scrolling govern the component; no new menu,
 theme palette or provider-specific visual rule is introduced.
+
+
+Sharing desktop polish (batch79b): data tables use the available panel width;
+form measure caps apply to fields only. Grid tracks use minmax(0, 1fr) so wide
+tables scroll inside their region on phones. Text/select sizing must not apply
+to nested checkboxes; input widths remain within their field. Settings fallback
+button CSS excludes shared ui-button controls, preserving semantic variants.

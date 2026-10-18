@@ -1,0 +1,30 @@
+import { OperationError } from '@/lib/operation-error';
+import { runtimeConfig, runtimeConfigBatch } from '@/server/config/store';
+import { SHARING_COPY_CONFIG, SHARING_LIMIT_CONFIG, type SharingCopy, type SharingLimits } from '../config';
+
+const unavailable = () => new OperationError('unavailable', 'Sharing is temporarily unavailable. Try again later.');
+const short = (key: string) => key.replace(/^(sharing|bio)\./, (_, p: string) => (p === 'bio' ? 'bio_' : ''));
+
+/** Read and validate every sharing bound from Root configuration; fail closed when any is unreadable. */
+export async function sharingLimits(read?: (key: string) => Promise<unknown>): Promise<SharingLimits> {
+  const out: SharingLimits = {};
+  try {
+    const batch = read ? null : await runtimeConfigBatch(SHARING_LIMIT_CONFIG.map(item => item.key));
+    const values = read ? await Promise.all(SHARING_LIMIT_CONFIG.map(item => read(item.key))) : SHARING_LIMIT_CONFIG.map(item => batch![item.key]);
+    SHARING_LIMIT_CONFIG.forEach((item, index) => {
+      const parsed = item.schema.safeParse(values[index]);
+      if (!parsed.success) throw unavailable();
+      out[short(item.key)] = parsed.data as number;
+    });
+  } catch { throw unavailable(); }
+  if (out.defaultExpiryDays! > out.maxExpiryDays!) throw unavailable();
+  return out;
+}
+
+/** Visitor-facing copy from Root. Unreadable or invalid copy degrades to empty text rather than blocking the page. */
+export async function sharingCopy(read: (key: string) => Promise<unknown> = runtimeConfig): Promise<SharingCopy> {
+  const [intro, notice, footer] = await Promise.all(SHARING_COPY_CONFIG.map(async item => {
+    try { const parsed = item.schema.safeParse(await read(item.key)); return parsed.success ? String(parsed.data) : ''; } catch { return ''; }
+  }));
+  return { intro: intro ?? '', answerNotice: notice ?? '', bioFooter: footer ?? '' };
+}

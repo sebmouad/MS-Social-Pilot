@@ -38,8 +38,8 @@
 .mcp-key-feature small { display: block; color: var(--ink-faint); }
 .mcp-key-token { display: grid; gap: 6px; margin: 12px 0; font-size: 12px; font-weight: 700; }
 .mcp-key-token textarea { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--ink); font: 12px/1.5 monospace; }
-.mcp-key-form button,.settings-panel button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
-.mcp-key-form button:disabled,.settings-panel button:disabled { opacity: .55; cursor: not-allowed; }
+.mcp-key-form button:not(:global(.ui-button)),.settings-panel button:not(:global(.ui-button)) { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.mcp-key-form button:not(:global(.ui-button)):disabled,.settings-panel button:not(:global(.ui-button)):disabled { opacity: .55; cursor: not-allowed; }
 .settings-chip[data-disabled="true"] .settings-chip__dot { background: var(--line-strong); }
 .settings-account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--line); }
 .settings-account-item { min-width: 0; padding: 16px; background: var(--surface); }

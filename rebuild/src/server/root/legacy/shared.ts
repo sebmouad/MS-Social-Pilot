@@ -43,7 +43,7 @@ export const PRODUCT_PLAN_FEATURES: readonly PlanFeatureGroup[] = [
   { id: 'ads', title: 'Ads', features: [{ key: 'ads/performance', label: 'Performance' }] },
   { id: 'agency', title: 'Agency', features: [{ key: 'agency/overview', label: 'Managed workspaces' }, { key: 'agency/clients', label: 'Client overview' }] },
   { id: 'settings', title: 'Settings', features: [
-    { key: 'settings/team', label: 'Team' }, { key: 'settings/sharing', label: 'Sharing' }, { key: 'settings/media', label: 'Media' },
+    { key: 'settings/team', label: 'Team' }, { key: 'settings/sharing', label: 'Sharing' }, { key: 'settings/bio', label: 'Link in bio' }, { key: 'settings/media', label: 'Media' },
   ] },
 ];
 
