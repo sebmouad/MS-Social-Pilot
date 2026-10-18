@@ -34,6 +34,8 @@ describe('scoped permissions', () => {
     expect(canAccessModule(viewer, 'analytics', 'read')).toBe(true);
     expect(canAccessModule(viewer, 'analytics', 'write')).toBe(false);
     expect(canAccessFeature(viewer, 'settings/account', 'read')).toBe(true);
+    expect(canAccessFeature(viewer, 'settings/notifications', 'read')).toBe(true);
+    expect(canAccessFeature(viewer, 'settings/notifications', 'write')).toBe(false);
   });
 
   it('lets clients see only base features and explicitly granted client areas', () => {
@@ -47,6 +49,7 @@ describe('scoped permissions', () => {
     expect(canAccessFeature(client, 'inbox/conversations', 'read')).toBe(false);
     expect(canAccessFeature(client, 'ads/overview', 'read')).toBe(false);
     expect(canAccessFeature(client, 'settings/account', 'write')).toBe(true);
+    expect(canAccessFeature(client, 'settings/notifications', 'write')).toBe(true);
     expect(client.visibleFeatures).toContain('analytics/overview');
     expect(client.visibleFeatures).toContain('analytics/reports');
     expect(client.visibleFeatures).not.toContain('inbox/conversations');

@@ -2,6 +2,7 @@ import { MIX_EXECUTOR, QUEUE_SCHEDULER, RECYCLE_EXECUTOR } from '@/modules/publi
 import { collaborationPorts, registerCollaborationPorts, type VersionRestorePort } from '@/modules/publishing/collaboration/ports';
 import { publishingManifest } from '@/modules/publishing/manifest';
 import { runPublishingMix, runPublishingRecycle } from './automation';
+import { publishingMentionNotifications } from './notifications';
 
 // Construct the lifecycle lazily: it records versions through the collaboration
 // service, so eager construction would introduce a module initialization cycle.
@@ -22,7 +23,7 @@ export function ensurePublishingCollaboration() {
   // presence and paired manifest declarations are required before advertising controls.
   const recycle = hasRecycleJob && typeof runPublishingRecycle === 'function' ? RECYCLE_EXECUTOR : undefined;
   const mix = hasMixJob && typeof runPublishingMix === 'function' ? MIX_EXECUTOR : undefined;
-  if (!current.versions || !current.queue || (!!recycle && !current.recycle) || (!!mix && !current.mix)) {
-    registerCollaborationPorts({ ...current, versions: current.versions ?? versions, queue: current.queue ?? QUEUE_SCHEDULER, ...(recycle ? { recycle: current.recycle ?? recycle } : {}), ...(mix ? { mix: current.mix ?? mix } : {}) });
+  if (!current.versions || !current.queue || !current.mentions || (!!recycle && !current.recycle) || (!!mix && !current.mix)) {
+    registerCollaborationPorts({ ...current, versions: current.versions ?? versions, queue: current.queue ?? QUEUE_SCHEDULER, mentions: current.mentions ?? publishingMentionNotifications, ...(recycle ? { recycle: current.recycle ?? recycle } : {}), ...(mix ? { mix: current.mix ?? mix } : {}) });
   }
 }

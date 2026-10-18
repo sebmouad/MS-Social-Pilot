@@ -318,3 +318,41 @@ module slices with their authorization/migration/worker/MCP proofs. Finish nativ
 Facebook formats and live capability coverage, resolve the held photo cleanup,
 and rehearse production-shaped data migration/rollback before cutover. Existing
 socialpilot-deploy still targets legacy. Do not broad-stage unfinished source.
+
+
+## Batch 73 — personal alerts and durable delivery
+
+Registry 66 adds Settings-owned notification preferences, a private personal
+in-app alert list and queued email for note mentions and content-mix dry events.
+Publishing writes source events and recipient intents atomically. Current
+workspace, feature, member and selected-resource authority is checked again
+before delivery. Email opt-out retains in-app alerts. UI, HTTP and workspace MCP
+share services, exact write confirmations and personal recipient scope. Lost
+resource access redacts source references, including internal event identifiers.
+Typed Root bounds, cron, copy, preference defaults and retention are consumed.
+SMTP ambiguity and expired sending claims stay uncertain without automatic retry.
+Content-free claim/result/cancellation/retry/expiry/retention audits are durable.
+
+The isolated source snapshot passed 2,209 tests / 283 files, production build
+and subsequent serial typecheck. A guarded actual localhost HTTP/MCP/PostgreSQL
+and SMTP-capture probe passed atomic/idempotent mentions, recipient-only reads
+and writes, key restrictions, confirmations, opt-out, redaction, feature-disable,
+sent-once and expired-claim holds, delivery audits and atomic retention audit.
+All disposable fixtures/mail/audits and captured Root settings were restored.
+Chrome verified desktop rendering and a 390px phone drawer with a 352px review,
+Tab containment and Escape focus return. Temporary Nightfall rendering was
+inspected and restored to Grove; preference review was cancelled without saving.
+Full browser mutation/retry/all-theme proof is not established.
+
+The notification migration was backup/restored and scratch-applied before local
+preview application, preserving legacy counts/settings checksum. Cutover has its
+checksum and ninth-migration refusal/schema gates; a complete nine-migration
+production-shaped rehearsal remains outstanding. See NOTIFICATIONS.md for scope.
+
+Next: verify real mix-dry event generation and notification concurrency, finish
+legacy event delivery and large-workspace behavior, and integrate the reviewed
+Claude Facebook-native/Ads slices through current host contracts and real data
+proof. Those slices remain outside this batch. Complete held-photo cleanup,
+production-shaped migration/rollback and remaining release gates before cutover.
+Production and socialpilot-deploy remain legacy. Do not broad-stage unfinished
+source or the unused old NotificationsForm dependent on Integrations.

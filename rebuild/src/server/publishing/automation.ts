@@ -17,6 +17,7 @@ import { loadVersionRetention, recordPostVersion } from '@/modules/publishing/co
 import { runContentMix, runRecycleCycle, type AutomationLifecycle } from '@/modules/publishing/collaboration/server/executors';
 import { limits, resolvePublishMedia, validFirstComment, validatePostAttachments, validatePostContent, validateTargets } from './lifecycle';
 import type { PublishMedia } from '@/platforms/types';
+import { enqueueMixDryNotifications } from './notifications';
 
 type Tx = Prisma.TransactionClient;
 type Feature = 'publishing/queue' | 'publishing/collaboration';
@@ -162,5 +163,5 @@ export function runPublishingRecycle(now = new Date(), workspaceId?: string) {
   return runRecycleCycle({ now, workspaceId, eligible: workspaceId => workspaceEligible(workspaceId, 'publishing/collaboration', true), lifecycle: publishingAutomationLifecycle });
 }
 export function runPublishingMix(now = new Date(), workspaceId?: string) {
-  return runContentMix({ now, workspaceId, eligible: workspaceId => workspaceEligible(workspaceId, 'publishing/queue'), lifecycle: publishingAutomationLifecycle });
+  return runContentMix({ now, workspaceId, eligible: workspaceId => workspaceEligible(workspaceId, 'publishing/queue'), lifecycle: publishingAutomationLifecycle, enqueueNotice: enqueueMixDryNotifications });
 }

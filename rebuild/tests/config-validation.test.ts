@@ -40,7 +40,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(65);
+    expect(CONFIG_SCHEMA_VERSION).toBe(66);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);
@@ -191,7 +191,7 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('storage.mediaLibraryBatchLimit')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('storage.orphanMediaCleanupSchedule')!.schema.safeParse('17 3 * * *').success).toBe(true);
     for (const key of ['publishing.templatePageSize', 'publishing.templateMaxPerWorkspace', 'publishing.templateSearchMaxCharacters', 'publishing.templateNameMaxCharacters', 'publishing.templateCategoryMaxCharacters', 'publishing.templateBodyMaxCharacters', 'publishing.templateHashtagsMaxCharacters', 'publishing.templateFirstCommentMaxCharacters', 'publishing.templateTransactionTimeoutMs', 'publishing.templateTransactionMaxWaitMs', 'inbox.noteMaxCharacters', 'inbox.noteHistoryLimit', 'inbox.savedReplyPageLimit', 'inbox.savedReplyNameMaxCharacters', 'inbox.savedReplyBodyMaxCharacters', 'inbox.productivityAssigneeLimit']) expect(CONFIG_BY_KEY.has(key as never)).toBe(true);
-    for (const prefix of ['meta.', 'sync.', 'api.', 'entitlements.', 'retention.', 'logging.', 'mcp.', 'theme.']) {
+    for (const prefix of ['meta.', 'sync.', 'api.', 'entitlements.', 'retention.', 'logging.', 'mcp.', 'theme.', 'notifications.']) {
       expect(CONFIG_REGISTRY.some((item) => item.key.startsWith(prefix))).toBe(true);
     }
     expect(CONFIG_REGISTRY.every((item) => ['active', 'configured', 'planned'].includes(item.consumption))).toBe(true);

@@ -284,3 +284,14 @@ enabled; collaboration retention/queue bounds from the registry). Exact recovery
 of the earlier values is not claimed. The private recovery ledger and archive
 remain available. Subsequent hardened probe runs passed and restored their captured
 new baseline exactly. No production process, data or provider content changed.
+
+
+## Notification migration addition (batch 73)
+
+The reviewed allowlist now contains nine migrations, including
+`20261018150000_rebuild_notifications`. Its pinned checksum, existing-table and
+migration-history refusals, and mapped-column checks are in the rehearsal script.
+A fresh private local preview backup was scratch-restored and this additive SQL
+was scratch-applied before preview application; legacy counts and settings
+checksum matched. This does not prove a complete nine-migration staging rehearsal,
+production data/media migration or release rollback. Production was not migrated.

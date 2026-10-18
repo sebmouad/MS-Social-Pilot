@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const script = 'scripts/cutover-rehearsal.sh';
-const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution';
+const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications';
 
 describe('cutover rehearsal safety gates', () => {
   it('compares counts for every public base table and detects table-set drift', () => {
@@ -65,6 +65,15 @@ describe('cutover rehearsal safety gates', () => {
     expect(run({ CUTOVER_DUMP_SANITIZED: 'YES', CUTOVER_APPROVED_MIGRATION_SET: 'all' })).toContain('migration set must exactly match');
   });
 
+  it('pins notifications and refuses an already migrated notification baseline', () => {
+    const source = readFileSync(script, 'utf8');
+    const migration = readFileSync('../prisma/migrations/20261018150000_rebuild_notifications/migration.sql', 'utf8');
+    expect(createHash('sha256').update(migration).digest('hex')).toBe('b60b92752dc3019e15156f1ecb4cb58d29b5de4a6676dd141ac13a955277b067');
+    expect(source).toContain('verify_migration 20261018150000_rebuild_notifications b60b92752dc3019e15156f1ecb4cb58d29b5de4a6676dd141ac13a955277b067');
+    expect(source).toContain("to_regclass('public.rebuild_notifications')");
+    expect(source).toContain("ARRAY['rebuild_notifications','claimUntil']");
+  });
+
   it('pins the reviewed migration files and applies them before mapped-schema checks', () => {
     const source = readFileSync(script, 'utf8');
     const root = readFileSync('../prisma/migrations/20261015120000_mcp_api_keys/migration.sql', 'utf8');
@@ -85,7 +94,7 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain(hash(mediaSteps));
     expect(source).toContain(hash(mediaDeletions));
     expect(source).toContain(hash(resolutions));
-    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8)');
+    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9)');
     expect(source).toContain("USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps'");
     expect(source).toContain('CUTOVER_APPROVED_MIGRATION_SET');
     expect(source.indexOf('migration.sql"')) .toBeLessThan(source.indexOf('Required tables/columns are taken'));

@@ -59,6 +59,7 @@ const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
   'settings/workspace': 'settings/team',
   'settings/mcp': 'settings/team',
   'settings/account': null,
+  'settings/notifications': null,
   'settings/data': null,
   'settings/appearance': null,
 };

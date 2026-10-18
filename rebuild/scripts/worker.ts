@@ -27,6 +27,11 @@ const dependencies: WorkerDependencies = {
       const result = await resumePendingWorkspaceDataPurges();
       return `examined=${result.examined} completed=${result.completed} failed=${result.failed}`;
     }
+    if (job === 'notifications') {
+      const { deliverNotifications } = await import('../src/modules/settings/notifications/delivery');
+      const result = await deliverNotifications(now);
+      return `examined=${result.examined} sent=${result.sent} cancelled=${result.cancelled} failed=${result.failed} uncertain=${result.uncertain} skipped=${result.skipped} purged=${result.purged}`;
+    }
     if (job === 'mediaCleanup') {
       const { cleanupOrphanImages } = await import('../src/server/media/storage');
       const result = await cleanupOrphanImages(now);

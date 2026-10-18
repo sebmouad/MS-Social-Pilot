@@ -91,7 +91,7 @@ function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, 
       if (typeof result.id !== 'string' || !Number.isFinite(createdAt.getTime())) throw new Error('The note could not be verified. Refresh to check it.');
       setNotes(n => [{ id: result.id, body: text, authorId: viewerId, authorName: 'You', createdAt: createdAt.toISOString() }, ...n]);
       setBody(''); setMentions(new Set());
-      return result.notified === 'failed' ? 'Note saved, but the mention notification could not be delivered.' : result.notified === 'unavailable' ? 'Note saved. Mention notifications are not available, so mentioned members will not be told.' : 'Note saved.';
+      return result.notified === 'queued' ? 'Note saved. Mention notifications queued.' : 'Note saved.';
     });
   }
   async function remove(note: Note) {

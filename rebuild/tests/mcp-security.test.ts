@@ -28,6 +28,11 @@ vi.mock('../src/server/root/activity', () => ({ listRootActivity: rootActivity.l
 vi.mock('../src/server/root/directory', () => ({ listRootWorkspaces: rootWorkspaces.list }));
 vi.mock('../src/server/root/workspace-access', () => ({ setRootWorkspaceAccess: rootWorkspaces.change }));
 vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save, runtimeConfig: vi.fn(async (key: string) => key === 'ads.reportingFilters' ? rootConfig.adsPolicy : key === 'mcp.maxResultItems' ? 100 : key === 'root.directoryPageSize' ? 25 : 366) }));
+const notificationService = vi.hoisted(() => ({
+  readNotificationPreferences: vi.fn(), updateNotificationPreferences: vi.fn(), listNotifications: vi.fn(),
+  markNotificationRead: vi.fn(), deleteNotification: vi.fn(),
+}));
+vi.mock('../src/modules/settings/notifications/server', () => notificationService);
 const analytics = vi.hoisted(() => ({ snapshot: vi.fn() }));
 vi.mock('../src/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: analytics.snapshot }));
 const adsQueries = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn() }));
@@ -98,7 +103,7 @@ const viewer: McpViewer = {
   entitlements: {
     workspaceId: 'workspace-a',
     modules: { home: true, publishing: true, inbox: true, analytics: true, ads: true, settings: true },
-    features: { 'home/overview': true, 'publishing/posts': true, 'publishing/collaboration': true, 'publishing/labels': true, 'publishing/templates': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'publishing/media': true, 'inbox/conversations': true, 'analytics/explorer': true, 'analytics/overview': true, 'analytics/demographics': true, 'analytics/pins': true, 'analytics/compare': true, 'analytics/reports': true, 'ads/overview': true, 'ads/compare': true, 'ads/objects': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/workspace': true, 'settings/mcp': true, 'settings/account': true, 'settings/appearance': true, 'settings/data': true },
+    features: { 'home/overview': true, 'publishing/posts': true, 'publishing/collaboration': true, 'publishing/labels': true, 'publishing/templates': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'publishing/media': true, 'inbox/conversations': true, 'analytics/explorer': true, 'analytics/overview': true, 'analytics/demographics': true, 'analytics/pins': true, 'analytics/compare': true, 'analytics/reports': true, 'ads/overview': true, 'ads/compare': true, 'ads/objects': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/workspace': true, 'settings/mcp': true, 'settings/account': true, 'settings/notifications': true, 'settings/appearance': true, 'settings/data': true },
     platformCapabilities: { facebook: true },
   },
   permissions: resolvePermissions({ role: 'owner', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }),
@@ -158,6 +163,11 @@ beforeEach(() => {
   rootWorkspaces.list.mockResolvedValue({ workspaces: [{ id: 'workspace-b', suspendedAt: null }], total: 1 });
   rootWorkspaces.change.mockResolvedValue({ changed: true, suspended: true });
   rootActivity.list.mockResolvedValue({ items: [{ id: 'audit-a', action: 'config.changed', metadata: [] }], olderCursor: null, newerCursor: null });
+  notificationService.readNotificationPreferences.mockResolvedValue({ preferences: { onNoteMention: true, onQueueEmpty: true } });
+  notificationService.listNotifications.mockResolvedValue({ items: [{ id: 'notice-a', kind: 'note_mention' }], page: 1, pageSize: 25, hasMore: false });
+  notificationService.updateNotificationPreferences.mockResolvedValue({ preferences: { onNoteMention: false, onQueueEmpty: true } });
+  notificationService.markNotificationRead.mockResolvedValue({ id: 'notice-a', read: true });
+  notificationService.deleteNotification.mockResolvedValue({ id: 'notice-a', deleted: true });
   dataControls.preview.mockResolvedValue({ posts: 2 });
   dataControls.export.mockResolvedValue({ format: 'ms-social-pilot-workspace-export', workspace: { id: 'workspace-a' } });
   dataControls.remove.mockResolvedValue({ posts: 2 });
@@ -174,6 +184,40 @@ beforeEach(() => {
 });
 
 describe('MCP workspace boundaries', () => {
+  it('registers notification tools and resource on the authenticated workspace with read-only parity', async () => {
+    const invoke = (actor: McpViewer, method: string, params = {}) => handleMcpMessage(actor, { jsonrpc: '2.0', id: 7, method, params });
+    const readOnly: McpViewer = { ...viewer, role: 'viewer', apiKeyId: 'read-only-key', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }) };
+    const listed = await (await invoke(readOnly, 'tools/list')).json();
+    const names = listed.result.tools.map((tool: { name: string }) => tool.name);
+    expect(names).toEqual(expect.arrayContaining(['get_notification_preferences', 'list_notifications']));
+    expect(names).not.toEqual(expect.arrayContaining(['update_notification_preferences', 'mark_notification_read', 'delete_notification']));
+    expect((await invoke(readOnly, 'resources/list').then(response => response.json())).result.resources.map((item: { uri: string }) => item.uri)).toContain('msp://notifications');
+    const resource = await invoke(readOnly, 'resources/read', { uri: 'msp://notifications' });
+    expect(notificationService.listNotifications).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { page: 1 });
+    expect(JSON.parse((await resource.json()).result.contents[0].text).items[0].id).toBe('notice-a');
+    const denied = await (await invoke(readOnly, 'tools/call', { name: 'mark_notification_read', arguments: { id: 'notice-a', confirmation: 'READ NOTIFICATION notice-a' } })).json();
+    expect(denied.result.structuredContent.code).toBe('forbidden');
+    expect(notificationService.markNotificationRead).not.toHaveBeenCalled();
+  });
+  it('honors the dedicated notifications feature switch on direct MCP calls and resource reads', async () => {
+    const disabled: McpViewer = {
+      ...viewer,
+      entitlements: { ...viewer.entitlements, features: { ...viewer.entitlements.features, 'settings/notifications': false } },
+    };
+    const invoke = (method: string, params = {}) => handleMcpMessage(disabled, { jsonrpc: '2.0', id: 8, method, params });
+
+    const listedTools = await (await invoke('tools/list')).json();
+    expect(listedTools.result.tools.map((tool: { name: string }) => tool.name)).not.toEqual(expect.arrayContaining(['get_notification_preferences', 'list_notifications']));
+    const listedResources = await (await invoke('resources/list')).json();
+    expect(listedResources.result.resources.map((resource: { uri: string }) => resource.uri)).not.toContain('msp://notifications');
+
+    const toolCall = await (await invoke('tools/call', { name: 'list_notifications', arguments: { page: 1 } })).json();
+    expect(toolCall.result.structuredContent.code).toBe('forbidden');
+    const resourceRead = await (await invoke('resources/read', { uri: 'msp://notifications' })).json();
+    expect(resourceRead.error.code).toBe(-32602);
+    expect(notificationService.listNotifications).not.toHaveBeenCalled();
+    expect(notificationService.readNotificationPreferences).not.toHaveBeenCalled();
+  });
   it.each([
     ['list_pages', () => db.target.findMany],
     ['list_posts', () => publishingReads.list],

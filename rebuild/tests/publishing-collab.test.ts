@@ -207,15 +207,13 @@ describe('internal notes', () => {
     members();
   });
 
-  it('notifies after commit and reports delivery honestly without undoing the note', async () => {
+  it('enqueues mentions in the note transaction and refuses an unrecorded notification intent', async () => {
     candidates();
-    const notify = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('smtp secret'));
-    registerCollaborationPorts({ mentions: { notifyNoteMention: notify } });
-    await expect(addPostNote(actor, add())).resolves.toMatchObject({ notified: 'sent' });
-    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: 'workspace-a', recipientIds: ['mia'] }));
-    const failed = await addPostNote(actor, add());
-    expect(failed.notified).toBe('failed');
-    expect(JSON.stringify(failed)).not.toContain('smtp');
+    const enqueue = vi.fn().mockResolvedValueOnce({ queued: 1 }).mockRejectedValueOnce(new Error('private database details'));
+    registerCollaborationPorts({ mentions: { enqueueNoteMention: enqueue } });
+    await expect(addPostNote(actor, add())).resolves.toMatchObject({ notified: 'queued' });
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ $executeRaw: expect.any(Function) }), expect.objectContaining({ workspaceId: 'workspace-a', recipientIds: ['mia'] }));
+    await expect(addPostNote(actor, add())).rejects.toMatchObject({ code: 'upstream_failure' });
     state.handlers = []; candidates();
     await expect(addPostNote(actor, add({ body: 'no mention', mentionIds: [] }))).resolves.toMatchObject({ notified: 'none' });
   });

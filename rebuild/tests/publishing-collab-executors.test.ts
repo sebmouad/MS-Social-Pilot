@@ -164,16 +164,16 @@ describe('content mix executor', () => {
   it('does not schedule when auto-fill is off, and tells once that a label ran dry', async () => {
     base(false, []);
     const notify = vi.fn(async () => {});
-    await expect(runContentMix({ now, notify, eligible: async () => true, lifecycle })).resolves.toMatchObject({ scheduled: 0, dry: 1 });
-    expect(notify).toHaveBeenCalledWith({ workspaceId: 'w1', targetId: 't1', labelId: 'l1' });
+    await expect(runContentMix({ now, enqueueNotice: notify, eligible: async () => true, lifecycle })).resolves.toMatchObject({ scheduled: 0, dry: 1 });
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ $executeRaw: expect.any(Function) }), expect.objectContaining({ workspaceId: 'w1', targetId: 't1', labelId: 'l1', eventId: expect.any(String) }));
     expect(wrote('SET status')).toHaveLength(0);
     st.execResult.set('"dryNotifiedAt" = ?', 0); notify.mockClear();
-    await expect(runContentMix({ now, notify, eligible: async () => true, lifecycle })).resolves.toMatchObject({ dry: 0 }); expect(notify).not.toHaveBeenCalled();
+    await expect(runContentMix({ now, enqueueNotice: notify, eligible: async () => true, lifecycle })).resolves.toMatchObject({ dry: 0 }); expect(notify).not.toHaveBeenCalled();
   });
-  it('skips drafts that need review and survives a failing notifier', async () => {
+  it('skips drafts that need review and fails the transaction when durable intent cannot be recorded', async () => {
     base(true, [{ ...draft('d1'), approvalStatus: 'pending' }, { ...draft('d2'), allActive: false }]);
     const notify = vi.fn(async () => { throw new Error('mail'); });
-    await expect(runContentMix({ now, notify, eligible: async () => true, lifecycle })).resolves.toMatchObject({ scheduled: 0, dry: 1, failed: 0 });
+    await expect(runContentMix({ now, enqueueNotice: notify, eligible: async () => true, lifecycle })).resolves.toMatchObject({ scheduled: 0, dry: 0, failed: 1 });
     expect(wrote('SET status')).toHaveLength(0);
   });
   it('leaves ineligible workspaces untouched', async () => {

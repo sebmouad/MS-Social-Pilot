@@ -42,6 +42,7 @@ import { analyticsExplorerToolDefinitions, analyticsExplorerTools, executeAnalyt
 import { templateToolDefinitions, templateTools, templateWriteTools, executeTemplateTool } from '@/modules/publishing/template-mcp';
 import { inboxProductivityToolDefinitions, inboxProductivityTools, inboxProductivityWriteTools, executeInboxProductivityTool } from '@/modules/inbox/productivity-mcp';
 import { workspacePolicyToolDefinitions, workspacePolicyTools, workspacePolicyWriteTools, executeWorkspacePolicyTool } from '@/modules/settings/workspace-policy-mcp';
+import { notificationToolDefinitions, notificationTools, notificationWriteTools, executeNotificationTool } from '@/modules/settings/notifications/mcp';
 import { parseAdsPerformanceFilters } from '@/modules/ads/performance-filters';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
@@ -82,6 +83,7 @@ const tools = [
   ...analyticsComparisonToolDefinitions,
   ...teamToolDefinitions,
   ...workspacePolicyToolDefinitions,
+  ...notificationToolDefinitions,
   ...templateToolDefinitions,
   ...labelToolDefinitions,
   ...collaborationToolDefinitions,
@@ -159,6 +161,11 @@ const toolFeatures: Record<string, string> = {
   revoke_workspace_invitation: 'settings/team',
   get_workspace_policies: 'settings/workspace',
   update_workspace_policies: 'settings/workspace',
+  get_notification_preferences: 'settings/notifications',
+  update_notification_preferences: 'settings/notifications',
+  list_notifications: 'settings/notifications',
+  mark_notification_read: 'settings/notifications',
+  delete_notification: 'settings/notifications',
   export_posts: 'publishing/posts',
   get_analytics_explorer: 'analytics/explorer',
   list_post_labels: 'publishing/labels',
@@ -237,6 +244,7 @@ for (const name of labelWriteTools) writeTools.add(name);
 for (const name of templateWriteTools) writeTools.add(name);
 for (const name of inboxProductivityWriteTools) writeTools.add(name);
 for (const name of workspacePolicyWriteTools) writeTools.add(name);
+for (const name of notificationWriteTools) writeTools.add(name);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -367,6 +375,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
   if (collaborationTools.has(name)) return executeCollaborationTool({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, name, args, cap);
   if (teamTools.has(name)) return executeTeamTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args, cap);
   if (workspacePolicyTools.has(name)) return executeWorkspacePolicyTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
+  if (notificationTools.has(name)) return executeNotificationTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
   if (templateTools.has(name as 'list_post_templates' | 'create_post_template' | 'update_post_template' | 'delete_post_template')) return executeTemplateTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name as 'list_post_templates' | 'create_post_template' | 'update_post_template' | 'delete_post_template', args);
   if (labelTools.has(name as 'list_post_labels' | 'create_post_label' | 'update_post_label' | 'delete_post_label')) return executeLabelTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
   if (analyticsExplorerTools.has(name)) return executeAnalyticsExplorerTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer), feature: 'analytics/explorer' }, cap);
@@ -854,13 +863,14 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     try {
       if (rootTools.has(name)) return reply(textResult(await runRootTool(viewer, name, (params.arguments === undefined ? {} : params.arguments) as Record<string, unknown>)));
       if (viewer.scope === 'installation') throw new OperationError('forbidden', 'Workspace access is required for this operation.');
+      if (notificationTools.has(name) && (!canUseFeature(viewer.entitlements, 'settings/notifications') || !viewer.permissions || !canAccessFeature(viewer.permissions, 'settings/notifications', writeTools.has(name) ? 'write' : 'read'))) throw new OperationError('forbidden', 'Notifications are unavailable in this workspace.');
       if (teamTools.has(name) && !canManageData(viewer)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage the team.');
       if (name === 'set_connection_selection' && viewer.role !== 'owner' && viewer.role !== 'admin') throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
       if (params.arguments !== undefined && (!params.arguments || typeof params.arguments !== 'object' || Array.isArray(params.arguments))) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
       const args = (params.arguments ?? {}) as Record<string, unknown>;
       if (collaborationTools.has(name) && !availableCollaborationTools().some(tool => tool.name === name)) throw new OperationError('unavailable', 'This action is unavailable.');
       // Data deletion and local Inbox workflow own their service-level lock.
-      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !serviceGuardedPublishingTools.has(name) && !teamTools.has(name) && !inboxProductivityWriteTools.has(name) && !workspacePolicyTools.has(name) && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
+      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !serviceGuardedPublishingTools.has(name) && !teamTools.has(name) && !inboxProductivityWriteTools.has(name) && !workspacePolicyTools.has(name) && !notificationTools.has(name) && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
         ? await withWorkspaceOperation(viewer.workspaceId, () => runTool(viewer, name, args))
         : await runTool(viewer, name, args);
       return reply(textResult(result));
@@ -879,6 +889,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     { uri: 'msp://settings/invitations', name: 'Workspace invitations', description: 'Bounded workspace invitations without raw links or credentials.', mimeType: 'application/json' },
     { uri: 'msp://settings/team', name: 'Workspace team', description: 'Bounded member and assignable-channel directory. Continue pages with list_workspace_team.', mimeType: 'application/json' },
     { uri: 'msp://settings/policies', name: 'Workspace publishing policies', description: 'Current workspace time zone and contributor review policy; managers only.', mimeType: 'application/json' },
+    { uri: 'msp://notifications', name: 'Notifications', description: 'Your bounded notifications and email delivery state in the current workspace.', mimeType: 'application/json' },
     { uri: 'msp://publishing/templates', name: 'Post templates', description: 'Bounded workspace reusable templates. Continue pages with list_post_templates.', mimeType: 'application/json' },
     { uri: 'msp://publishing/fields', name: 'Custom post fields', description: 'Complete bounded authorized workspace custom field definitions.', mimeType: 'application/json' },
     { uri: 'msp://publishing/labels', name: 'Post labels', description: 'Bounded workspace label directory. Continue pages with list_post_labels.', mimeType: 'application/json' },
@@ -896,7 +907,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     { uri: 'msp://data/deletion-preview', name: 'Data deletion preview', description: 'Current workspace record counts before deletion.', mimeType: 'application/json' },
     ...(canUseRootTool(viewer) ? rootResources : []),
   ].filter(resource => {
-    const feature = resource.uri === 'msp://analytics/pins' ? 'analytics/pins' : resource.uri === 'msp://analytics/demographics' ? 'analytics/demographics' : resource.uri === 'msp://ads/objects' ? 'ads/objects' : resource.uri === 'msp://publishing/fields' ? 'publishing/posts' : resource.uri === 'msp://settings/policies' ? 'settings/workspace' : resource.uri === 'msp://publishing/templates' ? 'publishing/templates' : resource.uri === 'msp://publishing/labels' ? 'publishing/labels' : resource.uri === 'msp://analytics/explorer' ? 'analytics/explorer' : ['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
+    const feature = resource.uri === 'msp://analytics/pins' ? 'analytics/pins' : resource.uri === 'msp://analytics/demographics' ? 'analytics/demographics' : resource.uri === 'msp://ads/objects' ? 'ads/objects' : resource.uri === 'msp://publishing/fields' ? 'publishing/posts' : resource.uri === 'msp://settings/policies' ? 'settings/workspace' : resource.uri === 'msp://notifications' ? 'settings/notifications' : resource.uri === 'msp://publishing/templates' ? 'publishing/templates' : resource.uri === 'msp://publishing/labels' ? 'publishing/labels' : resource.uri === 'msp://analytics/explorer' ? 'analytics/explorer' : ['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
     return (!['msp://settings/team', 'msp://settings/invitations', 'msp://settings/policies'].includes(resource.uri) || canManageData(viewer)) && (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
   }) });
   }
@@ -913,12 +924,14 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       }
     }
     if (viewer.scope === 'installation') return error(-32602, 'Workspace access is required for this resource.');
+    if (uri === 'msp://notifications' && (!canUseFeature(viewer.entitlements, 'settings/notifications') || !viewer.permissions || !canAccessFeature(viewer.permissions, 'settings/notifications', 'read'))) return error(-32602, 'Resource unavailable.');
     if (dataResource(uri) && (!canManageData(viewer) || !canUseFeature(viewer.entitlements, 'settings/data') || !viewer.permissions || !canAccessFeature(viewer.permissions, 'settings/data', 'read'))) return error(-32602, 'Resource unavailable.');
     try {
       let contents: unknown;
       if (uri === 'msp://workspace') contents = viewer.workspace;
       else if (uri === 'msp://settings/invitations') contents = await runTool(viewer, 'list_workspace_invitations', {});
       else if (uri === 'msp://settings/policies') contents = await runTool(viewer, 'get_workspace_policies', {});
+      else if (uri === 'msp://notifications') contents = await runTool(viewer, 'list_notifications', { page: 1 });
       else if (uri === 'msp://publishing/templates') contents = await runTool(viewer, 'list_post_templates', {});
       else if (uri === 'msp://publishing/fields') contents = await runTool(viewer, 'list_custom_fields', {});
       else if (uri === 'msp://publishing/labels') contents = await runTool(viewer, 'list_post_labels', {});

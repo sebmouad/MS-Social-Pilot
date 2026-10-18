@@ -215,9 +215,10 @@ const MANAGERS = new Set(['owner', 'admin', 'editor']);
  * Fills each channel's weekly mix from ready drafts (only when the workspace turned auto-fill on) and marks labels that ran dry,
  * exactly once until drafts return. A draft is ready when approved, or not requiring approval for an author who may publish
  * without review; it must have only active destinations. Scheduling is one compare-and-set per draft inside the workspace
- * transaction; a failed notification never undoes scheduling (`notify` runs after commit).
+ * transaction. Notification intent, when installed, commits with the dry marker;
+ * SMTP delivery happens later and cannot undo scheduling.
  */
-export async function runContentMix(options: { now?: Date; workspaceId?: string; eligible?: (workspaceId: string) => Promise<boolean>; lifecycle?: AutomationLifecycle; notify?: (notice: MixDryNotice) => Promise<void> } = {}): Promise<MixRunResult> {
+export async function runContentMix(options: { now?: Date; workspaceId?: string; eligible?: (workspaceId: string) => Promise<boolean>; lifecycle?: AutomationLifecycle; enqueueNotice?: (tx: Tx, notice: MixDryNotice & { eventId: string }) => Promise<void> } = {}): Promise<MixRunResult> {
   if (typeof options.eligible !== 'function' || !options.lifecycle || typeof options.lifecycle.schedule !== 'function') throw new OperationError('unavailable', 'Automatic scheduling is unavailable until workspace access and publishing lifecycle can be verified.');
   if (options.workspaceId !== undefined && !ID.safeParse(options.workspaceId).success) throw new OperationError('invalid_request', 'Invalid workspace ID.');
   const now = options.now ?? new Date();
@@ -235,16 +236,15 @@ export async function runContentMix(options: { now?: Date; workspaceId?: string;
     result.workspaces += 1;
     try {
       if (!(await options.eligible(workspaceId))) { result.skipped += 1; continue; }
-      const out = await mixOne(workspaceId, now, limit, options.lifecycle, options.eligible);
+      const out = await mixOne(workspaceId, now, limit, options.lifecycle, options.eligible, options.enqueueNotice);
       result.scheduled += out.scheduled; result.dry += out.notices.length; result.skipped += out.skipped;
-      for (const notice of out.notices) { try { await options.notify?.(notice); } catch { /* the claim is recorded; delivery failures are the notifier's to report */ } }
     } catch { result.failed += 1; }
   }
   if (cursor !== undefined && list.length) await advanceCursor('publishing.automation.mixCursor', cursor, list[list.length - 1]!.workspaceId);
   return result;
 }
 
-async function mixOne(workspaceId: string, now: Date, limit: CollabBounds, lifecycle: AutomationLifecycle, eligible: (workspaceId: string) => Promise<boolean>): Promise<{ scheduled: number; skipped: number; notices: MixDryNotice[] }> {
+async function mixOne(workspaceId: string, now: Date, limit: CollabBounds, lifecycle: AutomationLifecycle, eligible: (workspaceId: string) => Promise<boolean>, enqueueNotice?: (tx: Tx, notice: MixDryNotice & { eventId: string }) => Promise<void>): Promise<{ scheduled: number; skipped: number; notices: MixDryNotice[] }> {
   return transact(workspaceId, limit, async tx => {
     const ws = await tx.$queryRaw<Array<{ timezone: string; mixAutoFill: boolean; requiresApproval: boolean }>>`SELECT timezone, "mixAutoFill", "requiresApproval" FROM workspaces WHERE id = ${workspaceId} FOR SHARE`;
     if (!ws[0]) return { scheduled: 0, skipped: 0, notices: [] };
@@ -296,6 +296,7 @@ async function mixOne(workspaceId: string, now: Date, limit: CollabBounds, lifec
       if (!fresh.length) continue;
       const won = await tx.$executeRaw`UPDATE content_mix_rules SET "dryNotifiedAt" = ${now} WHERE "workspaceId" = ${workspaceId} AND id = ANY(${fresh}::text[]) AND "dryNotifiedAt" IS NULL`;
       if (won === 0) continue;
+      await enqueueNotice?.(tx, { workspaceId, targetId: d.targetId, labelId: d.labelId, eventId: randomUUID() });
       notices.push({ workspaceId, targetId: d.targetId, labelId: d.labelId });
       await systemAudit(tx, workspaceId, 'publishing.mix_ran_dry', { targetId: d.targetId, labelId: d.labelId });
     }

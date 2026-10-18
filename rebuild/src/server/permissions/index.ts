@@ -53,6 +53,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'settings/workspace': 'settings/team',
   'settings/mcp': 'settings/team',
   'settings/account': null,
+  'settings/notifications': null,
   'settings/data': null,
   'settings/appearance': null,
 };
@@ -115,7 +116,9 @@ function permissionForFeature(source: PermissionSource, feature: FeatureId, disa
   const featureSwitch = FEATURE_MODULE_SWITCH[feature];
   if ((rootModuleSwitch && disabled.has(rootModuleSwitch)) || (featureSwitch && disabled.has(featureSwitch))) return DENIED;
 
-  return roleFeatureAccess(source.role, feature, clientAccess);
+  // Notification preferences are personal account settings; the navigation
+  // alias inherits the same role access as the Account page.
+  return roleFeatureAccess(source.role, feature === 'settings/notifications' ? 'settings/account' : feature, clientAccess);
 }
 
 /**

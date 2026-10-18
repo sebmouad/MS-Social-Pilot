@@ -1,4 +1,5 @@
 import type { PublishingActor } from '../server/types';
+import type { Prisma } from '../../../../generated/client';
 
 /**
  * Integration ports the host wires at startup. Collaboration never edits posts
@@ -27,9 +28,10 @@ export interface VersionRestorePort {
 /** Marks that a worker executes recycle rules (creates the repeats). Without it the recycle controls stay hidden. */
 export interface RecycleExecutorPort { readonly available: true }
 
-/** Delivers an in-app/mail notification for note mentions. Failure never fails the note. */
+/** Persist notification intent with the note. SMTP delivery runs after commit in
+ * its own worker; an SMTP failure never rolls back a saved note. */
 export interface MentionNotifierPort {
-  notifyNoteMention(input: { workspaceId: string; postId: string; noteId: string; authorId: string; recipientIds: readonly string[] }): Promise<void>;
+  enqueueNoteMention(tx: Prisma.TransactionClient, input: { workspaceId: string; postId: string; noteId: string; authorId: string; recipientIds: readonly string[] }): Promise<{ queued: number }>;
 }
 
 /** Marks that the host schedules queued posts from queue_slots (lifecycle allocation reads the saved times). Without it the Queue times controls stay hidden. */

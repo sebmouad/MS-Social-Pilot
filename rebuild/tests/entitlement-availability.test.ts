@@ -51,6 +51,15 @@ describe('Root installation availability', () => {
     expect(disabled.features['analytics/overview']).toBe(true);
   });
 
+  it('inherits account plan access while allowing the Root notification availability switch', () => {
+    const legacy = resolveEntitlements({ ...source, planFeatures: ['product_v2'] });
+    expect(legacy.features['settings/account']).toBe(true);
+    expect(legacy.features['settings/notifications']).toBe(true);
+    const disabled = resolveEntitlements({ ...source, installationAvailability: { 'entitlements.features.settings/notifications': false } });
+    expect(disabled.features['settings/account']).toBe(true);
+    expect(disabled.features['settings/notifications']).toBe(false);
+  });
+
   it('removes every child feature when a module is disabled', () => {
     const access = resolveEntitlements({ ...source, installationAvailability: { 'entitlements.modules.ads': false } });
     expect(access.modules.ads).toBe(false);

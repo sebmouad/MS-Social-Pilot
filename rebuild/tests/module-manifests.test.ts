@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MODULES, PAGES } from '@/lib/product';
 import { moduleManifests } from '@/modules';
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
+import { configurationOwner } from '@/lib/config/ownership';
 
 describe('customer module manifests', () => {
   it('keeps module and feature ids and routes unique', () => {
@@ -54,5 +55,16 @@ describe('customer module manifests', () => {
     }
     expect(CONFIG_BY_KEY.get('jobs.order')?.schema.safeParse(CONFIG_BY_KEY.get('jobs.order')?.defaultValue).success).toBe(true);
     expect(CONFIG_BY_KEY.get('jobs.order')?.defaultValue).toEqual(expect.arrayContaining(['publishingRecycle', 'publishingMix']));
+  });
+
+  it('registers notification delivery under Settings with Root-owned scheduling controls', () => {
+    const settings = moduleManifests.find(module => module.id === 'settings')!;
+    expect(settings.jobs).toContainEqual({ name: 'notifications', label: 'Notification delivery', configKey: 'notifications.deliverySchedule' });
+    expect(settings.rootSettingsPrefixes).toContain('notifications.');
+    expect(configurationOwner('notifications.deliverySchedule')).toEqual({ kind: 'product', id: 'settings' });
+    expect(PAGES.find(page => page.id === 'settings/notifications')).toMatchObject({ href: '/settings/notifications', title: 'Notifications', module: 'settings' });
+    expect(PAGES.filter(page => page.id === 'settings/account')).toHaveLength(1);
+    expect(CONFIG_BY_KEY.get('notifications.deliverySchedule')?.schema.safeParse('*/2 * * * *').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('jobs.order')?.defaultValue).toContain('notifications');
   });
 });
