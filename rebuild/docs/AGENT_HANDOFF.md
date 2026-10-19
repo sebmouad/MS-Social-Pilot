@@ -4,7 +4,7 @@ Updated: 2026-10-19. This is durable project context, not proof of current runti
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
 
-Current continuation: batch94 at the end of this document and FIRST_COMMENT_SCHEDULING.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+Current continuation: batch95 at the end of this document and MEDIA_INSPECTION.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
 
 ## Historical verified batch —84
 
@@ -658,3 +658,38 @@ removed, backup retained. Both Claude accounts and final independent review
 completed; scheduled inline owner-access and malformed resolved-receipt findings
 were fixed with database regressions. Verify origin/main when resuming.
 Production and held provider canary unchanged; full goal stays active.
+
+
+## Batch95 — trusted media prerequisite
+
+Shared immutable media inspection, public-source address-pinned fetching and a
+private Publishing media-probe diagnostic are implemented. Registry80 owns the
+consumed bounds/tool/temporary/download policy. Both Claude accounts reviewed
+source; abort, redirect-header, compressed-response, metadata and rotation
+findings were corrected. See [MEDIA_INSPECTION.md](MEDIA_INSPECTION.md).
+
+This is not native host integration or release completion. Bind authorized
+stored media and actual native upload bytes next; keep native formats disabled.
+Production, its legacy deploy command and the held photo canary are unchanged.
+Full goal remains active, including broader parity and production-shaped rollback.
+
+
+Final local evidence:3,270 tests across368 files passed with actual synthetic
+PostgreSQL and zero skips, grouped as3,264 tests/367 files plus the6-test global
+submitted-worker file run separately. An all-files concurrent rerun exposed that
+worker test selecting another file's temporary submitted row; separating the
+global scanner from concurrent fixture writers avoids this test isolation
+collision. It is not a new media or live-provider success claim. Production
+build and serial typecheck passed. The real configured inspector and availability
+check accepted a locally generated16x16,1-second MP4 and matched its byte digest.
+Both Claude accounts and independent lower-cost agents reviewed the batch;
+conservative duration and retained image concurrency permits were added after
+review. No new browser/API/MCP or live Meta run was made in this batch; existing
+diagnostic authorization tests passed through the shared service coverage.
+
+Fresh full backup/scratch restore preserved107 table counts and exact Root
+settings after final cleanup. No migration was added or reapplied; scratch and
+synthetic video were removed, backup retained. Backup SHA256:
+`277764d3a486b3138f1bef5e017966fc0c9cc2c6e6d5a28c86b3ff9e6e67b143`.
+The final built preview uses the original example database at localhost:3200;
+/sign-in returned HTTP200. Production and its held photo canary are unchanged.

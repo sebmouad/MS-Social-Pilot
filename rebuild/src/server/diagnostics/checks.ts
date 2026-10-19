@@ -8,6 +8,7 @@ import { prisma } from '@/server/data';
 import { encryptSecret, decryptSecret } from '@/server/secret-crypto';
 import { loadRootOperations } from '@/server/root/operations';
 import { PLATFORM_HOSTS } from '@/server/platforms';
+import { checkMediaProbeAvailability } from '@/server/media/inspect';
 import { diagnosticScope } from '@/lib/diagnostics';
 import { fail, pass, skipped, type DiagnosticDefinition } from './types';
 
@@ -43,7 +44,16 @@ export async function diagnosticChecks(actorId: string, scopeId: string, connect
     if (latest.some(run => !run || run.outcome !== 'ok')) return skipped('coverage_incomplete', 'Heartbeat is recent, but successful run evidence is incomplete. Review Operations.');
     return pass('worker_recent', 'Recent replacement-worker heartbeat and successful latest recorded attempts. This does not prove provider delivery.');
   } };
-  if (owner.kind === 'product') return [configuration, worker];
+  if (owner.kind === 'product') return [configuration, worker, ...(owner.id === 'publishing' ? [{
+    id: 'media_probe', label: 'Video metadata probe', async run(signal?: AbortSignal) {
+      try {
+        await checkMediaProbeAvailability(signal);
+        return pass('media_probe_available', 'Configured video metadata probe completed its fixed availability check. This does not prove media decoding or provider delivery.');
+      } catch {
+        return fail('media_probe_unavailable', 'Video metadata probe could not complete. Review the executable, temporary directory and inspection limits in Publishing settings.');
+      }
+    },
+  }] : [])];
   return [
     { id: 'database', label: 'Database read connectivity', async run() {
       const timeout = await runtimeConfig('diagnostics.databaseTimeoutMs');
