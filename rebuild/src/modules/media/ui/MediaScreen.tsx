@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
 import { requireViewer } from '@/server/context';
@@ -5,14 +6,14 @@ import { canAccessFeature } from '@/server/permissions';
 import { PageHeading } from '@/modules/publishing/ui/publishing-ui';
 import { readLibrary } from '../server/library';
 import { MEDIA_FEATURE_ID } from '../manifest';
-import { mediaText, type MediaLocale } from '../copy';
+import { mediaLocale, mediaText } from '../copy';
 import { MediaLibrary } from './MediaLibrary';
 import styles from './media.module.css';
 
 const ALLOWED = ['kind', 'q', 'page', 'usage'];
-const LOCALE: MediaLocale = 'en';
 
 export default async function MediaScreen({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const LOCALE = mediaLocale((await headers()).get('accept-language'));
   const t = (key: Parameters<typeof mediaText>[1]) => mediaText(LOCALE, key);
   const viewer = await requireViewer({ feature: MEDIA_FEATURE_ID, channelScoped: true });
   const params = await searchParams;

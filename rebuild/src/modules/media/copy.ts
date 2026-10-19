@@ -151,6 +151,11 @@ export const mediaCopy = {
 } as const;
 
 export type MediaLocale = keyof typeof mediaCopy;
+
+/** `fr` for French-speaking browsers, otherwise English. */
+export function mediaLocale(acceptLanguage: string | null | undefined): MediaLocale {
+  return /^\s*fr\b/i.test(acceptLanguage ?? '') ? 'fr' : 'en';
+}
 export type MediaCopyKey = keyof typeof mediaCopy.en;
 
 export function mediaText(locale: MediaLocale, key: MediaCopyKey, values: Record<string, string | number> = {}): string {
