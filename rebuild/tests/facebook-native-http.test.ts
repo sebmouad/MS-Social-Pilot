@@ -74,6 +74,32 @@ describe('Facebook native transport over loopback HTTP', () => {
     expect(observed.map(item => `${item.url} ${item.body}`).join('\n')).not.toContain('wire-test-app-secret');
   });
 
+  it('sends direct binary Graph uploads as signed multipart over a real local socket', async () => {
+    let observed = { contentType: '', body: '' };
+    const { baseUrl } = await listen((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on('data', chunk => chunks.push(Buffer.from(chunk)));
+      request.on('end', () => {
+        observed = { contentType: request.headers['content-type'] ?? '', body: Buffer.concat(chunks).toString('latin1') };
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ id: 'local-video' }));
+      });
+    });
+    const token = 'synthetic-binary-token';
+    const transport = createFacebookNativeTransport(configFor(baseUrl), token, policy);
+    await expect(transport.postGraphFile!('page_1/videos', { description: 'local multipart' }, {
+      kind: 'video', bytes: new Uint8Array([0, 1, 2, 255]), sizeBytes: 4, mimeType: 'video/mp4', fileName: 'ignored.mp4',
+    })).resolves.toEqual({ id: 'local-video' });
+    expect(observed.contentType).toMatch(/^multipart\/form-data; boundary=/);
+    expect(observed.body).toContain('name="description"');
+    expect(observed.body).toContain('local multipart');
+    expect(observed.body).toContain(`name="access_token"`);
+    expect(observed.body).toContain(createHmac('sha256', 'wire-test-app-secret').update(token).digest('hex'));
+    expect(observed.body).toContain('name="source"; filename="video.mp4"');
+    expect(observed.body).toContain('Content-Type: video/mp4');
+    expect(observed.body).toContain('\u0000\u0001\u0002ÿ');
+  });
+
   it('refuses an oversized streamed body after one request and returns only a safe error', async () => {
     let requests = 0;
     const { baseUrl } = await listen((_request, response) => {

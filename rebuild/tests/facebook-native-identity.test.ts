@@ -25,13 +25,13 @@ describe('native payload identity', () => {
 
   it.each(['target', 'description', 'bytes', 'url', 'size', 'duration', 'width', 'height', 'mime', 'filename', 'schedule', 'format'])(
     'binds %s changes', field => {
-      const original = field === 'schedule' || field === 'url' ? video() : reel(); const changed = structuredClone(original);
+      const original = field === 'schedule' || field === 'url' || field === 'size' ? video() : reel(); const changed = structuredClone(original);
       switch (field) {
         case 'target': changed.targetId = 'other'; break;
         case 'description': if ('description' in changed) changed.description = 'Changed'; break;
         case 'bytes': changed.media.bytes![1] = 9; break;
         case 'url': changed.media.url = 'https://example.invalid/other.mp4'; break;
-        case 'size': delete changed.media.sizeBytes; break;
+        case 'size': changed.media.sizeBytes = 2; break;
         case 'duration': changed.media.durationSeconds = 20; break;
         case 'width': changed.media.width = 1080; break;
         case 'height': changed.media.height = 1920; break;

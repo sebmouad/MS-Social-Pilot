@@ -108,6 +108,18 @@ describe('terminal state compare-and-set', () => {
 });
 
 describe('rate limits and readback requirements', () => {
+  it('holds an ambiguous multipart video receipt and never replays it', async () => {
+    const media: FacebookNativeMedia = { kind: 'video', bytes: new Uint8Array([1, 2, 3]), sizeBytes: 3, mimeType: 'video/mp4', durationSeconds: 30, width: 540, height: 960 };
+    const plan = planFacebookNative({ ...base, format: 'post', media: [media] });
+    const attempts = createMemoryAttemptStore();
+    const postGraphFile = vi.fn().mockRejectedValue(new Error('connection closed after dispatch'));
+    const t = transport({ postGraphFile });
+    const first = await executeFacebookNative(plan, 'binary-ambiguous', { transport: t, attempts });
+    expect(first).toMatchObject({ status: 'uncertain', phase: 'video_create', knownIds: [] });
+    expect(await executeFacebookNative(plan, 'binary-ambiguous', { transport: t, attempts })).toMatchObject({ status: 'already_attempted' });
+    expect(postGraphFile).toHaveBeenCalledTimes(1);
+    expect(t.postGraph).not.toHaveBeenCalled();
+  });
   it('throttle answers on comment and delete carry a bounded retry hint and never resend', async () => {
     const inner = await publishedVideo();
     const throttled = new FacebookApiError('slow down', 400, 32);

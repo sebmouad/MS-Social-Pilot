@@ -120,6 +120,44 @@ describe('Facebook native signed transport', () => {
     await expect(transport.upload(uploadUrl, { kind: 'video', url: 'https://media.test/video.mp4', sizeBytes: 3 })).rejects.toBeInstanceOf(FacebookApiError);
   });
 
+  it('sends direct Page source uploads as bounded multipart with signed credentials and fixed filenames', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => response({ id: 'upload-id' }));
+    const transport = createFacebookNativeTransport(config, 'token', policy, fetchImpl);
+    const bytes = new Uint8Array([1, 2, 3]);
+    const pending = transport.postGraphFile!('page_1/videos', { description: 'hello' }, { kind: 'video', bytes, sizeBytes: 3, mimeType: 'video/mp4', fileName: 'original.mp4' });
+    bytes[0] = 9; // mutation while the response promise is pending must not alter the upload body
+    await pending;
+    const init = fetchImpl.mock.calls[0]![1]!;
+    expect(init.method).toBe('POST');
+    expect(init.headers).toBeUndefined(); // fetch supplies the multipart boundary
+    const form = init.body as FormData;
+    expect(form.get('description')).toBe('hello');
+    expect(form.get('access_token')).toBe('token');
+    expect(form.get('appsecret_proof')).toBe(createHmac('sha256', 'app-secret').update('token').digest('hex'));
+    const source = form.get('source') as File;
+    expect(source.name).toBe('video.mp4');
+    expect(source.type).toBe('video/mp4');
+    expect([...new Uint8Array(await source.arrayBuffer())]).toEqual([1, 2, 3]);
+    expect(fetchImpl.mock.calls[0]![1]!.redirect).toBe('error');
+  });
+
+  it('rejects malformed direct sources and caller credentials before multipart dispatch', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => response({ id: 'never' }));
+    const transport = createFacebookNativeTransport(config, 'token', policy, fetchImpl);
+    const invalidBodies: Record<string, string>[] = [{ access_token: 'evil' }, { appsecret_proof: 'evil' }, { file_url: 'https://mutable.test/replacement.mp4' }];
+    for (const media of [
+      { kind: 'video' as const, bytes: new Uint8Array([1]), sizeBytes: 1, mimeType: 'video/mp4', url: 'https://mutable.test/a.mp4' },
+      { kind: 'video' as const, bytes: new Uint8Array(9), sizeBytes: 9, mimeType: 'video/mp4' },
+      { kind: 'video' as const, bytes: new Uint8Array([1]), sizeBytes: 2, mimeType: 'video/mp4' },
+      { kind: 'video' as const, bytes: new Uint8Array([1]), sizeBytes: 1, mimeType: 'video/evil' },
+      { kind: 'video' as const, bytes: new Uint8Array([1]), sizeBytes: 1, mimeType: 'video/mp4', fileName: '../evil.mp4' },
+    ]) await expect(transport.postGraphFile!('page_1/videos', {}, media)).rejects.toBeInstanceOf(FacebookApiError);
+    for (const body of invalidBodies)
+      await expect(transport.postGraphFile!('page_1/videos', body, { kind: 'video', bytes: new Uint8Array([1]), sizeBytes: 1, mimeType: 'video/mp4' })).rejects.toBeInstanceOf(FacebookApiError);
+    await expect(transport.postGraphFile!('../escape', {}, { kind: 'video', bytes: new Uint8Array([1]), sizeBytes: 1, mimeType: 'video/mp4' })).rejects.toBeInstanceOf(FacebookApiError);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('requires safe remote metadata, canonical URLs, and an unambiguous media source before dispatch', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () => response({ success: true }));
     const transport = createFacebookNativeTransport(config, 'token', policy, fetchImpl);

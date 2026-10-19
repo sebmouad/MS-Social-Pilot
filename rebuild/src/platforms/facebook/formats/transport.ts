@@ -124,8 +124,50 @@ export function createFacebookNativeTransport(configInput: FacebookConfig, acces
     }
     return object(payload);
   };
+  const postGraphFile = async (rawPath: string, values: Record<string, string>, media: FacebookNativeMedia): Promise<Record<string, unknown>> => {
+    const path = safeGraphPath(rawPath);
+    if (!media || (media.kind !== 'video' && media.kind !== 'image') || !(media.bytes instanceof Uint8Array) || media.bytes.byteLength < 1 ||
+      media.bytes.byteLength > stablePolicy.maxUploadBytes || !Number.isSafeInteger(media.sizeBytes) || media.sizeBytes !== media.bytes.byteLength || media.url !== undefined) {
+      throw new FacebookApiError(SAFE_ERROR, 0);
+    }
+    if (media.fileName !== undefined && (typeof media.fileName !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(media.fileName) || media.fileName.startsWith('.'))) throw new FacebookApiError(SAFE_ERROR, 0);
+    const mime = media.mimeType;
+    const supportedMime = media.kind === 'video' ? mime === 'video/mp4' : typeof mime === 'string' && config.allowedImageMimeTypes.includes(mime) && /^image\/(jpeg|png|webp)$/.test(mime);
+    if (!supportedMime) throw new FacebookApiError(SAFE_ERROR, 0);
+    if (!values || typeof values !== 'object' || Object.entries(values).some(([key, value]) =>
+      !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key) || ['access_token', 'appsecret_proof', 'source', 'url', 'file_url', 'filename', 'file_size', 'offset'].includes(key.toLowerCase()) || typeof value !== 'string' || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))) {
+      throw new FacebookApiError(SAFE_ERROR, 0);
+    }
+    // Snapshot before creating the body and before the first await; the transport must
+    // send the bytes whose length was validated even if its caller mutates the buffer.
+    const bytes = new Uint8Array(media.bytes);
+    const form = new FormData();
+    for (const [key, value] of Object.entries(values)) form.set(key, value);
+    form.set('access_token', token);
+    const signedProof = proof();
+    if (signedProof) form.set('appsecret_proof', signedProof);
+    const filename = media.kind === 'video' ? 'video.mp4' : mime === 'image/png' ? 'photo.png' : mime === 'image/webp' ? 'photo.webp' : 'photo.jpg';
+    form.set('source', new Blob([bytes], { type: mime }), filename);
+    const url = graphObjectUrl(config, path);
+    const expectedPathPrefix = graphObjectUrl(config, '').pathname;
+    if (url.origin !== new URL(config.graphBaseUrl).origin || !url.pathname.startsWith(expectedPathPrefix)) throw new FacebookApiError(SAFE_ERROR, 0);
+    const timeout = AbortSignal.timeout(config.requestTimeoutMs);
+    const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    if (requestSignal.aborted) throw new FacebookApiError(SAFE_ERROR, 0);
+    let response: Response;
+    try { response = await fetcher(url, { method: 'POST', body: form, signal: requestSignal, redirect: 'error' }); }
+    catch { throw new FacebookApiError(SAFE_ERROR, 0); }
+    const payload = await boundedJson(response, stablePolicy.maxResponseBytes, requestSignal);
+    if (!response.ok || Object.hasOwn(object(payload), 'error')) {
+      const error = object(object(payload).error);
+      throw new FacebookApiError(SAFE_ERROR, response.status, typeof error.code === 'number' ? error.code : undefined,
+        typeof error.error_subcode === 'number' ? error.error_subcode : undefined, error.is_transient === true);
+    }
+    return object(payload);
+  };
   return {
     postGraph: (path, body) => request('POST', path, body),
+    postGraphFile,
     getGraph: (path, fields, readSignal) => {
       if (!Array.isArray(fields) || fields.some(field => !/^[A-Za-z0-9_.,:()]+$/.test(field))) throw new FacebookApiError(SAFE_ERROR, 0);
       return request('GET', path, { fields: fields.join(',') }, readSignal);

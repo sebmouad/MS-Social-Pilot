@@ -62,6 +62,31 @@ describe('executeFacebookNative', () => {
     expect(o).toMatchObject({ status: 'submitted', scheduled: true });
     expect((v.post.mock.calls[0] as unknown[])[1]).toMatchObject({ published: 'false', file_url: vid.url });
   });
+  it('routes direct video and photo Story bytes only through the binary port', async () => {
+    const videoBytes = new Uint8Array([1, 2, 3]);
+    const videoPlan = planFacebookNative({ ...base, format: 'post', media: [{ ...vid, url: undefined, bytes: videoBytes, sizeBytes: 3, mimeType: 'video/mp4' }] });
+    const postGraphFile = vi.fn(async () => ({ id: 'VID-BYTES' }));
+    const videoTransport = { postGraph: vi.fn(), postGraphFile, upload: vi.fn() } as unknown as FacebookNativeTransport;
+    expect(await executeFacebookNative(videoPlan, 'bytes-video', { transport: videoTransport, attempts: createMemoryAttemptStore() })).toMatchObject({ status: 'submitted', remoteId: 'VID-BYTES' });
+    expect(postGraphFile).toHaveBeenCalledWith('P1/videos', {}, expect.objectContaining({ bytes: new Uint8Array([1, 2, 3]) }));
+    expect(videoTransport.postGraph).not.toHaveBeenCalled();
+
+    const photoBytes = new Uint8Array([4, 5]);
+    const photoPlan = planFacebookNative({ ...base, format: 'story', media: [{ ...img, url: undefined, bytes: photoBytes, sizeBytes: 2, mimeType: 'image/jpeg' }] });
+    const photoPort = vi.fn(async (_path: string, _body: Record<string, string>, _media: FacebookNativeMedia) => ({ id: 'PHOTO-BYTES' }));
+    const photoPost = vi.fn(async () => ({ post_id: 'STORY-BYTES' }));
+    const photoTransport = { postGraph: photoPost, postGraphFile: photoPort, upload: vi.fn() } as unknown as FacebookNativeTransport;
+    expect(await executeFacebookNative(photoPlan, 'bytes-photo', { transport: photoTransport, attempts: createMemoryAttemptStore() })).toMatchObject({ status: 'submitted', remoteId: 'STORY-BYTES' });
+    expect(photoPort.mock.calls.map(call => call[0])).toEqual(['P1/photos']); // Story creation is form-encoded.
+    expect(photoPost).toHaveBeenCalledWith('P1/photo_stories', { photo_id: 'PHOTO-BYTES' });
+  });
+  it('holds direct bytes when the binary port is unavailable instead of falling back to a URL', async () => {
+    const bytePlan = planFacebookNative({ ...base, format: 'post', media: [{ ...vid, url: undefined, bytes: new Uint8Array([1]), sizeBytes: 1, mimeType: 'video/mp4' }] });
+    const postGraph = vi.fn();
+    const outcome = await executeFacebookNative(bytePlan, 'no-binary-port', { transport: { postGraph, upload: vi.fn() }, attempts: createMemoryAttemptStore() });
+    expect(outcome).toMatchObject({ status: 'uncertain', phase: 'video_create' });
+    expect(postGraph).not.toHaveBeenCalled();
+  });
   it('definite rejection at start is rejected with no orphans', async () => {
     const d = mk([new FacebookApiError('bad', 400, 100)]);
     expect(await executeFacebookNative(plan('reel'), 'op4', d)).toMatchObject({ status: 'rejected', code: 100, orphanIds: [] });

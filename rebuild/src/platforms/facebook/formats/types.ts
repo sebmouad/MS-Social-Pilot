@@ -116,6 +116,8 @@ export interface FacebookNativeAttemptStore {
 /** Graph transport port. Implementations must throw FacebookApiError on non-2xx. */
 export interface FacebookNativeTransport {
   postGraph(path: string, body: Record<string, string>): Promise<Record<string, unknown>>;
+  /** Direct Page source multipart upload. Optional while URL-only test scaffolds remain; byte plans fail closed without it. */
+  postGraphFile?(path: string, body: Record<string, string>, media: FacebookNativeMedia): Promise<Record<string, unknown>>;
   /** Resumable upload to the provider-supplied upload address. */
   upload(uploadUrl: string, media: FacebookNativeMedia): Promise<void>;
 }

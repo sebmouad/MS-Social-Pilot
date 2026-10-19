@@ -27,7 +27,7 @@ export function snapshotFacebookNativePlan(input: FacebookNativePlan): {
     ...(source.bytes !== undefined ? { bytes: new Uint8Array(source.bytes) } : {}),
     ...(source.fileName !== undefined ? { fileName: source.fileName } : {}),
     ...(source.mimeType !== undefined ? { mimeType: source.mimeType } : {}),
-    ...(source.sizeBytes !== undefined ? { sizeBytes: source.sizeBytes } : {}),
+    ...(source.sizeBytes !== undefined ? { sizeBytes: source.sizeBytes } : source.bytes !== undefined ? { sizeBytes: source.bytes.byteLength } : {}),
     ...(source.durationSeconds !== undefined ? { durationSeconds: source.durationSeconds } : {}),
     ...(source.width !== undefined ? { width: source.width } : {}),
     ...(source.height !== undefined ? { height: source.height } : {}),
@@ -48,9 +48,7 @@ export function snapshotFacebookNativePlan(input: FacebookNativePlan): {
     (!Number.isSafeInteger(plan.scheduledUnix) || plan.scheduledUnix < 1)) throw invalid();
   if (media.kind !== (plan.format === 'story_photo' ? 'image' : 'video')) throw invalid();
   if (media.bytes !== undefined && (media.bytes.byteLength === 0 || media.url !== undefined)) throw invalid();
-  if ((plan.format === 'video' || plan.format === 'story_photo') && media.url === undefined) {
-    throw new Error('This upload path requires an HTTPS media URL.');
-  }
+  if ((plan.format === 'video' || plan.format === 'story_photo') && media.url === undefined && media.bytes === undefined) throw invalid();
   if (media.url !== undefined) {
     try {
       const url = new URL(media.url);

@@ -70,6 +70,17 @@ export async function executeFacebookNative(input: FacebookNativePlan, operation
       throw new Stop(classify(phase, e));
     }
   }
+  async function callFile(phase: string, path: string, body: Record<string, string>, media: FacebookNativeMedia): Promise<Record<string, unknown>> {
+    const step: FacebookNativeStep = { phase, dispatched: true, confirmed: false };
+    steps.push(step);
+    await checkpoint(phase);
+    try {
+      if (!deps.transport.postGraphFile) throw new Error('Binary Graph upload is unavailable.');
+      const r = await deps.transport.postGraphFile(path, body, media);
+      step.confirmed = true;
+      return r;
+    } catch (e) { throw new Stop(classify(phase, e)); }
+  }
   function classify(phase: string, e: unknown): FacebookNativeOutcome {
     const th = interpretFacebookThrottle(e);
     const throttle = th ? { throttle: th } : {};
@@ -104,8 +115,9 @@ export async function executeFacebookNative(input: FacebookNativePlan, operation
         const body: Record<string, string> = { description: plan.description };
         if (!plan.description) delete body.description;
         if (plan.scheduledUnix !== null) { body.published = 'false'; body.scheduled_publish_time = String(plan.scheduledUnix); }
-        body.file_url = plan.media.url!;
-        const r = await call('video_create', `${plan.targetId}/videos`, body);
+        const r = plan.media.bytes !== undefined
+          ? await callFile('video_create', `${plan.targetId}/videos`, body, plan.media)
+          : await call('video_create', `${plan.targetId}/videos`, { ...body, file_url: plan.media.url! });
         const id = need('video_create', r.id); remember(id);
         await checkpoint('video_create');
         return await settle({ status: 'submitted', remoteId: id, url: null, scheduled: plan.scheduledUnix !== null, steps, readbackRequired: true });
@@ -130,8 +142,9 @@ export async function executeFacebookNative(input: FacebookNativePlan, operation
       }
       case 'story_photo': {
         const body: Record<string, string> = { published: 'false' };
-        body.url = plan.media.url!;
-        const photo = await call('photo_upload', `${plan.targetId}/photos`, body);
+        const photo = plan.media.bytes !== undefined
+          ? await callFile('photo_upload', `${plan.targetId}/photos`, body, plan.media)
+          : await call('photo_upload', `${plan.targetId}/photos`, { ...body, url: plan.media.url! });
         const photoId = need('photo_upload', photo.id); remember(photoId);
         await checkpoint('photo_upload');
         const r = await call('story_create', `${plan.targetId}/photo_stories`, { photo_id: photoId });
