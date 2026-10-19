@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
+import type { ComposerActionState } from '../src/app/publishing/posts/actions';
 import type { PublishingFormatDescriptor } from '../src/platforms/types';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  action: vi.fn(async (_previous: unknown, _data: FormData) => ({ status: 'error', message: 'safe failure', values: {} })),
+  push: vi.fn(),
+  action: vi.fn(async (_previous: unknown, _data: FormData): Promise<ComposerActionState> => ({ status: 'error', message: 'safe failure', values: {} })),
 }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('../src/app/publishing/posts/actions', () => ({ createPostWithRecoveryAction: mocks.action }));
 
 import { SidebarDockContext } from '../src/components/SidebarDock';
@@ -35,6 +38,25 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); dock.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('dedicated post composer', () => {
+  it('navigates only after confirmed save and prevents another submission while opening Posts', async () => {
+    mocks.action.mockResolvedValueOnce({status:'success',destination:'/publishing/posts?notice=created',values:{}});
+    await render();
+    const link=container.querySelector<HTMLInputElement>('#composer-link')!;
+    const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
+    await act(async()=>{setter.call(link,'https://example.test/saved');link.dispatchEvent(new Event('input',{bubbles:true}));});
+    expect(mocks.push).not.toHaveBeenCalled();
+    await act(async()=>dock.querySelector<HTMLButtonElement>('button[name="intent"][value="draft"]')!.click());
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith('/publishing/posts?notice=created');
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('Post saved');
+    expect(container.querySelector<HTMLTextAreaElement>('#composer-message')!.disabled).toBe(true);
+    expect(container.querySelector<HTMLTextAreaElement>('#composer-first-comment')!.disabled).toBe(true);
+    expect(container.textContent).toContain('Saved post preview');
+    expect(container.querySelector<HTMLAnchorElement>('a[href="/publishing/posts?notice=created"]')).not.toBeNull();
+    expect(dock.querySelector<HTMLButtonElement>('button[name="intent"][value="draft"]')!.disabled).toBe(true);
+    expect(mocks.action).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the sidebar destinations associated with the form and updates the neutral preview', async () => {
     await render();
     const message = container.querySelector<HTMLTextAreaElement>('#composer-message')!;

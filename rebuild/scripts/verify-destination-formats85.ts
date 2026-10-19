@@ -31,10 +31,8 @@ async function main(){
    const context=await browser.newContext({viewport:{width,height:950}});
    try{
     await context.addCookies([{name:'msp_session',value:token,url:origin,httpOnly:true,sameSite:'Lax'},{name:'sp_workspace',value:workspace,url:origin,httpOnly:true,sameSite:'Lax'}]);
-    // Keep same-origin Next action streams outside Playwright interception.
-    // Only external origins are intercepted; the deliberate failed save below
-    // remains a separate one-shot page route.
-    // External traffic is blocked by a dead loopback proxy; only local app origins bypass it.
+    // A dead loopback proxy blocks external traffic without intercepting local action streams.
+    // The deliberate failed save below uses a separate one-shot route, removed before retry.
     const page=await context.newPage();page.on('requestfailed',request=>{if(new URL(request.url()).origin!==origin)console.error(JSON.stringify({blockedOrigin:new URL(request.url()).origin}));});const networkEvents:Array<Record<string,unknown>>=[];
     const tracked=(request:import('playwright').Request)=>['document','fetch','xhr'].includes(request.resourceType());
     page.on('request',request=>{if(tracked(request))networkEvents.push({event:'request',method:request.method(),path:new URL(request.url()).pathname,type:request.resourceType(),action:Boolean(request.headers()['next-action'])});});
@@ -52,7 +50,8 @@ async function main(){
     check(await formats.locator('select').count()===0,'Single-format choice must not create a redundant picker');
     const saved=JSON.parse(await page.locator('input[name="destinationFormatsJson"]').inputValue());check(saved[channel]==='post'&&Object.keys(saved).length===1,'Only selected destination intent must be serialized');
     check(!await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),'Layout must fit desktop and phone');
-    await page.screenshot({path:`/private/tmp/formats85-${width}-${theme}.png`,fullPage:true});views++;
+    check(await page.getByRole('button',{name:'Save draft',exact:true}).isEnabled(),'A fresh valid composer must allow saving in every theme');
+    await page.screenshot({path:`/private/tmp/formats85-${width}-${theme}.png`,fullPage:true,animations:'disabled'});views++;
     if(width===1440&&theme==='grove'){
      await page.route('**/publishing/compose',route=>route.request().method()==='POST'?route.abort():route.continue(),{times:1});
      await page.getByRole('button',{name:'Save draft',exact:true}).click();
@@ -68,9 +67,10 @@ async function main(){
      catch(error){
       const alertText=(await page.locator('[role="alert"]').allTextContents().catch(()=>[])).join(' ').slice(0,500);
       console.error(JSON.stringify({saveFailure:{url:page.url(),alertText,networkEvents:networkEvents.slice(-30)}}));
-      await page.screenshot({path:'/private/tmp/formats85-save-failure.png',fullPage:true}).catch(()=>{});
+      await page.screenshot({path:'/private/tmp/formats85-save-failure.png',fullPage:true,animations:'disabled'}).catch(()=>{});
       throw error;
      }
+     check(await db.post.count({where:{workspaceId:workspace,authorId:owner,message}})===1,'A confirmed save must create exactly one draft');
      const draft=await db.post.findFirst({where:{workspaceId:workspace,authorId:owner,message},include:{targets:true}});
      check(draft?.firstComment==='Synthetic first comment'&&draft.targets.length===1&&draft.targets[0]?.formatId==='post','Browser save must persist first comment and destination format');created++;
     }

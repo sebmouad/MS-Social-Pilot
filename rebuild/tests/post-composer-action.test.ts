@@ -48,7 +48,7 @@ beforeEach(() => {
 describe('recoverable post composer action', () => {
   it('passes an explicit empty caption with validated ordered media to the shared service', async () => {
     const media = [{ kind: 'image', url: 'https://cdn.test/cover.jpg', altText: 'Cover artwork' }];
-    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, formData({ intent: 'draft', message: '', firstComment: 'Useful follow-up', mediaJson: JSON.stringify(media), targetIds: [] }))).rejects.toThrow('redirect:/publishing/posts?notice=created');
+    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, formData({ intent: 'draft', message: '', firstComment: 'Useful follow-up', mediaJson: JSON.stringify(media), targetIds: [] }))).resolves.toMatchObject({status:'success',destination:'/publishing/posts?notice=created'});
     expect(deps.createPost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ message: '', media, firstComment: 'Useful follow-up' }));
   });
 
@@ -76,7 +76,7 @@ describe('recoverable post composer action', () => {
   it('creates a draft without requiring schedule fields', async () => {
     const data = formData({ intent: 'draft', message: 'Draft without a date', targetIds: [] });
 
-    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, data)).rejects.toThrow('redirect:/publishing/posts?notice=created');
+    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, data)).resolves.toMatchObject({status:'success',destination:'/publishing/posts?notice=created'});
 
     expect(deps.createPost).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: 'workspace-1' }), expect.objectContaining({
       message: 'Draft without a date', targetIds: [], scheduledAt: undefined,
@@ -85,7 +85,7 @@ describe('recoverable post composer action', () => {
 
   it('passes a selected template label into the atomic post-creation service', async () => {
     const data = formData({ intent: 'draft', message: 'Template text', labelId: 'label-workspace-a', targetIds: [] });
-    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, data)).rejects.toThrow('redirect:/publishing/posts?notice=created');
+    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, data)).resolves.toMatchObject({status:'success',destination:'/publishing/posts?notice=created'});
     expect(deps.createPost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ labelId: 'label-workspace-a' }));
   });
 
@@ -96,7 +96,7 @@ describe('recoverable post composer action', () => {
     ]);
     const data = formData({ intent: 'draft', message: 'Album draft', mediaJson, targetIds: [] });
 
-    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, data)).rejects.toThrow('redirect:/publishing/posts?notice=created');
+    await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, data)).resolves.toMatchObject({status:'success',destination:'/publishing/posts?notice=created'});
 
     expect(deps.createPost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       message: 'Album draft', link: '', media: [
@@ -137,4 +137,15 @@ describe('recoverable post composer action', () => {
  const result=await createPostWithRecoveryAction({status:'idle',values:{}},formData({intent:'draft',message:'Retain this post',firstComment:'Retain comment',targetIds:['target-a'],mediaJson:'[]',destinationFormatsJson:json}));
  expect(deps.createPost).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({destinationFormats:{'target-a':'removed-format'}}));
  expect(result).toMatchObject({status:'error',message:'Choose an available format for each selected destination.',values:{message:'Retain this post',destinationFormatsJson:json,targetIds:['target-a']}});
+ });
+
+ it('does not invite a duplicate save if cache refresh fails after commit', async()=>{
+   const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+   deps.revalidatePath.mockImplementationOnce(()=>{throw Error('cache unavailable');});
+   const state=await createPostWithRecoveryAction({status:'idle',values:{}},formData({intent:'draft',message:'Committed once',targetIds:[]}));
+   expect(state).toMatchObject({status:'success',destination:'/publishing/posts?notice=created'});
+   expect(deps.createPost).toHaveBeenCalledTimes(1);
+   expect(deps.redirect).not.toHaveBeenCalled();
+   expect(log).toHaveBeenCalledWith('Publishing view refresh failed after a confirmed post save.');
+   log.mockRestore();
  });

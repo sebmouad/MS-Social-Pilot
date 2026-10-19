@@ -445,3 +445,8 @@ React state after handled or transport failures. Success navigates away. The
 unreferenced alternate quick-create component was removed. See
 [DESTINATION_FORMATS.md](docs/DESTINATION_FORMATS.md) for persistence and remaining
 provider limitations. Browser verification evidence is recorded with the batch.
+
+
+### Confirmed authoring success (batch86)
+
+The stateful composer receives an explicit server acknowledgement before navigating to Posts. Until navigation completes, show and focus a saved status with a normal fallback link, freeze edits and disable another submission. A cache refresh error after commit must not invite a second creation. A transport result that is unconfirmed remains distinct from a known failed validation; retain input and ask the user to inspect Posts before deliberate retry.

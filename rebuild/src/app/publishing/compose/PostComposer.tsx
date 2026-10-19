@@ -12,6 +12,7 @@ import { DestinationFormats, effectiveDestinationFormat } from '@/modules/publis
 import type { PublishingFormatDescriptor, PublishingMediaSupport } from '@/platforms/types';
 import { useActionState, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { createPostWithRecoveryAction, type ComposerActionState } from '../posts/actions';
 import styles from './PostComposer.module.css';
 
@@ -106,9 +107,12 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
 }
 
 export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay }: { targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string }) {
+  const router = useRouter();
+  const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   usePreserveFormState(formRef);
   const [state, formAction, pending] = useActionState(saveWithTransportRecovery, INITIAL_STATE);
+  const saved = state.status === 'success';
   const initial = state.values;
   const [message, setMessage] = useState(initial.message ?? '');
   const [firstComment, setFirstComment] = useState(initial.firstComment ?? '');
@@ -160,13 +164,19 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
   }
 
   useEffect(() => {
+    if (state.status === 'success' && state.destination && navigated.current !== state) {
+      navigated.current = state;
+      router.push(state.destination);
+    }
+  }, [state, router]);
+  useEffect(() => {
     if (state.status === 'error') {
       submitGuard.current = 'ready';
       setLocalError('');
     }
   }, [state]);
   useEffect(() => {
-    if (localError || state.status === 'error') feedbackRef.current?.focus();
+    if (localError || state.status === 'error' || state.status === 'success') feedbackRef.current?.focus();
   }, [localError, state]);
 
   const previewPost = useMemo(() => ({
@@ -234,41 +244,42 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
 
   return <div className={styles.composerLayout}>
     <form id={FORM_ID} ref={formRef} action={formAction} onSubmit={onSubmit} className={styles.form} noValidate>
+      {saved && <p ref={feedbackRef} tabIndex={-1} className={styles.uploadNotice} role="status">Post saved. Opening Posts… {state.destination && <a href={state.destination}>View saved posts</a>}</p>}
       {localError && <p ref={feedbackRef} className={styles.error} role="alert" tabIndex={-1}>{localError}</p>}
       {state.status === 'error' && <p ref={feedbackRef} className={styles.error} role="alert" data-composer-error tabIndex={-1}>{state.message} Your post details are still here.{state.saveUnconfirmed ? <> <a href="/publishing/posts" target="_blank" rel="noopener noreferrer">Check Posts in a new tab</a>.</> : ' You can retry.'}</p>}
       {uploadMessage && <p className={styles.uploadNotice} role="status">{uploadMessage}</p>}
       <label htmlFor="composer-message">Post text <span>(optional with a link or media)</span></label>
-      <AutoTextarea id="composer-message" name="message" value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={7} placeholder="Write a post for your team…" aria-describedby="composer-message-count" />
+      <AutoTextarea id="composer-message" name="message" disabled={saved} value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={7} placeholder="Write a post for your team…" aria-describedby="composer-message-count" />
       <div className={styles.fieldMeta} id="composer-message-count">{message.length.toLocaleString()} / {imageRules.maxMessageCharacters.toLocaleString()}</div>
       <label htmlFor="composer-first-comment">First comment <span>(optional)</span></label>
-      <AutoTextarea id="composer-first-comment" name="firstComment" value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder="Add a link or follow-up as the first comment…" />
+      <AutoTextarea id="composer-first-comment" name="firstComment" disabled={saved} value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder="Add a link or follow-up as the first comment…" />
       <input type="hidden" name="labelId" value={labelId} />
       <input type="hidden" name="destinationFormatsJson" value={destinationFormatsJson} />
 
-      <fieldset className={styles.attachments} disabled={uploading || pending}>
+      <fieldset className={styles.attachments} disabled={uploading || pending || saved}>
         <legend>Attachments <span>(optional)</span></legend>
         <label htmlFor="composer-link">Link <span>(optional)</span></label>
         <input id="composer-link" name="link" type="url" value={link} onChange={event => setLink(event.currentTarget.value)} placeholder="https://example.com" />
-        <PostAttachments controller={attachments} disabled={uploading || pending} />
+        <PostAttachments controller={attachments} disabled={uploading || pending || saved} />
         <small>Attachment support depends on the selected destinations.</small>
       </fieldset>
     </form>
 
     <section className={styles.previewPanel} aria-labelledby="composer-preview-title">
       <div className={styles.previewHeading}><h2 id="composer-preview-title">Preview</h2><span>Neutral preview</span></div>
-      <div className={styles.unsavedLabel}>Unsaved preview · no destination response is available yet</div>
+      <div className={styles.unsavedLabel}>{saved ? 'Saved post preview' : 'Unsaved preview'} · no destination response is available yet</div>
       <PostPreview post={previewPost} authorName={authorName || 'Your team'} timeZone={schedule.timeZone} variant="card" mediaOverride={<AuthoringMediaPreview controller={attachments} />} />
       {mode === 'schedule' && scheduleDate && scheduleTime && <p className={styles.schedulePreview}>Will schedule for {scheduleDate} at {scheduleTime} ({schedule.timeZone.replaceAll('_', ' ')}).</p>}
     </section>
 
     <SidebarDock>
       <aside className={styles.sidebarControls} aria-label="Post destinations and timing">
-        {templates.length > 0 && <Button type="button" variant="secondary" disabled={pending || uploading} onClick={() => setTemplateChooserOpen(true)}>Choose template</Button>}
+        {templates.length > 0 && <Button type="button" variant="secondary" disabled={pending || uploading || saved} onClick={() => setTemplateChooserOpen(true)}>Choose template</Button>}
         <div className={styles.actions}>
-          <Button form={FORM_ID} type="submit" name="intent" value="draft" disabled={pending || uploading} onClick={() => setMode('draft')}>{uploading ? 'Uploading…' : pending ? 'Saving…' : 'Save draft'}</Button>
-          <Button form={FORM_ID} type="submit" name="intent" value="schedule" variant="primary" disabled={pending || uploading} onClick={() => setMode('schedule')}>{uploading ? 'Uploading…' : pending ? 'Saving…' : 'Schedule post'}</Button>
+          <Button form={FORM_ID} type="submit" name="intent" value="draft" disabled={pending || uploading || saved} onClick={() => setMode('draft')}>{uploading ? 'Uploading…' : saved ? 'Opening…' : pending ? 'Saving…' : 'Save draft'}</Button>
+          <Button form={FORM_ID} type="submit" name="intent" value="schedule" variant="primary" disabled={pending || uploading || saved} onClick={() => setMode('schedule')}>{uploading ? 'Uploading…' : saved ? 'Opening…' : pending ? 'Saving…' : 'Schedule post'}</Button>
         </div>
-        <fieldset className={styles.destinationList} disabled={pending || uploading}>
+        <fieldset className={styles.destinationList} disabled={pending || uploading || saved}>
           <legend>Destinations</legend>
           {targets.filter(target => target.canPublish).length ? targets.filter(target => target.canPublish).map(target => <label key={target.id}>
             <input form={FORM_ID} type="checkbox" name="targetIds" value={target.id} checked={selectedTargets.includes(target.id)} onChange={event => { const checked = event.currentTarget.checked; setSelectedTargets(current => checked ? [...current, target.id] : current.filter(id => id !== target.id)); }} />
@@ -276,11 +287,11 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
           </label>) : <p>No destinations are ready to publish right now.</p>}
           <small>Drafts can be saved without a destination. Scheduling needs at least one.</small>
         </fieldset>
-        {selected.some(target => target.publishingFormats?.length) && <fieldset className={styles.destinationList} disabled={pending || uploading}>
+        {selected.some(target => target.publishingFormats?.length) && <fieldset className={styles.destinationList} disabled={pending || uploading || saved}>
           <legend>Formats</legend>
-          <DestinationFormats targets={targets} selectedIds={selected.map(target => target.id)} values={formatChoices} formId={FORM_ID} disabled={pending || uploading} onChange={(id, value) => setFormatChoices(current => ({ ...current, [id]: value }))} />
+          <DestinationFormats targets={targets} selectedIds={selected.map(target => target.id)} values={formatChoices} formId={FORM_ID} disabled={pending || uploading || saved} onChange={(id, value) => setFormatChoices(current => ({ ...current, [id]: value }))} />
         </fieldset>}
-        <fieldset className={styles.scheduleFields} disabled={pending || uploading}>
+        <fieldset className={styles.scheduleFields} disabled={pending || uploading || saved}>
           <legend>Schedule</legend>
           <p>Times use {schedule.timeZone.replaceAll('_', ' ')}.</p>
           <label htmlFor="composer-date">Date</label><input form={FORM_ID} id="composer-date" type="date" name="scheduleDate" value={scheduleDate} onChange={event => setScheduleDate(event.currentTarget.value)} />

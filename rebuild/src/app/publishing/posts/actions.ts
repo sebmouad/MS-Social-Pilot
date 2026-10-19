@@ -33,7 +33,7 @@ export type ComposerValues = {
   scheduleDate: string;
   scheduleTime: string;
 };
-export type ComposerActionState = { status: 'idle' | 'error'; message?: string; saveUnconfirmed?: boolean; values: Partial<ComposerValues> };
+export type ComposerActionState = { message?: string; saveUnconfirmed?: boolean; values: Partial<ComposerValues> } & ({ status: 'idle' | 'error'; destination?: never } | { status: 'success'; destination: string });
 
 export type PostEditActionState = { status: 'idle' | 'error'; message?: string; values: Partial<ComposerValues> };
 export type PostDeleteActionState = { status: 'idle' | 'error'; message?: string; deleteRemote: boolean; receipt?: PostDeletionReceipt; operationId?: string };
@@ -122,14 +122,15 @@ export async function createPostWithRecoveryAction(previous: ComposerActionState
       targetIds: values.targetIds,
       scheduledAt,
     });
-    revalidatePath(PATH);
-    revalidatePath('/publishing/queue');
-    revalidatePath('/publishing/approvals');
   } catch (error) {
     if (isRedirect(error)) throw error;
     return { status: 'error', message: composerError(error), values };
   }
-  redirect(`${PATH}?notice=${values.intent === 'schedule' ? 'scheduled' : 'created'}`);
+  // Cache refresh failure cannot turn a committed write into a retryable save.
+  try { refreshPublishing(); } catch { console.error('Publishing view refresh failed after a confirmed post save.'); }
+  // Acknowledge the committed write independently of Next's redirect Flight stream.
+  // The stateful composer navigates only after this result reaches the client.
+  return { status: 'success', destination: `${PATH}?notice=${values.intent === 'schedule' ? 'scheduled' : 'created'}`, values };
 }
 
 export async function createPostAction(data: FormData) {

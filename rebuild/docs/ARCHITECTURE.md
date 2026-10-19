@@ -1128,3 +1128,8 @@ coverage and other legacy integrations remain open. Production stays legacy.
 ## Batch85: per-destination publishing intent
 
 New post targets persist their module-declared format separately. Shared lifecycle, queue, automation, duplication, versions, CSV and MCP validate and preserve this intent; existing null targets retain their historical global fallback. Composer and edit use one shared sidebar control and a native reset-preservation hook. See DESTINATION_FORMATS.md. Facebook still exposes only its implemented feed format; native formats remain unwired.
+
+
+## Batch86 authoring acknowledgement
+
+Stateful post creation returns a typed committed-success destination, followed by client navigation and an accessible fallback link. This avoids the observed completed303/pending-composer behavior. Post-commit cache refresh cannot be reported as failed creation. Browser save/retry now passes all four themes at desktop/phone widths; the full goal and production gates remain open. See DESTINATION_FORMATS.md for scoped evidence.
