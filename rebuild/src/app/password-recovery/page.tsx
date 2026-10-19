@@ -1,6 +1,6 @@
 import { PasswordRecoveryForm } from './recovery-form';
 
-export const metadata = { title: 'Password recovery · MS Social Pilot', robots: { index: false, follow: false }, referrer: 'no-referrer' as const };
+export const metadata = { title: 'Password recovery', robots: { index: false, follow: false }, referrer: 'no-referrer' as const };
 
 export default function PasswordRecoveryPage() {
   return <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6">

@@ -1,12 +1,14 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { validateFields } from '@/lib/ui/form-validation';
 
 export default function SignIn() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [signUpOpen, setSignUpOpen] = useState(false);
+  useEffect(() => { void fetch('/api/auth/register', { cache: 'no-store' }).then(r => r.json()).then((b: { available?: boolean }) => setSignUpOpen(b.available === true)).catch(() => undefined); }, []);
   async function signOut() {
     await fetch('/api/auth/sign-out', { method: 'POST' });
     setMessage('This browser has been signed out.');
@@ -58,6 +60,7 @@ export default function SignIn() {
       <button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
     </form>
     <p><a href="/password-recovery">Forgot your password?</a></p>
+    {signUpOpen && <p><a href="/sign-up">Create an account</a></p>}
     <button type="button" onClick={signOut}>Sign out of this browser</button>
   </div></main>;
 }

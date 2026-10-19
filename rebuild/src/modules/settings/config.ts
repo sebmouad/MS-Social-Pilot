@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SETTINGS_INVITATION_CONFIG } from './invitations-config';
 import { SETTINGS_WORKSPACE_CONFIG } from './workspace-policy-config';
 import { ACCOUNT_RECOVERY_CONFIG } from './account-recovery-config';
+import { REGISTRATION_CONFIG } from './registration-config';
 import { NOTIFICATIONS_CONFIG } from './notifications/config';
 import { entry, cron } from '@/lib/config/entry';
 
@@ -20,6 +21,7 @@ export const SETTINGS_MODULE_CONFIG = [
   ...SETTINGS_INVITATION_CONFIG,
   ...SETTINGS_WORKSPACE_CONFIG,
   ...ACCOUNT_RECOVERY_CONFIG,
+  ...REGISTRATION_CONFIG,
   ...NOTIFICATIONS_CONFIG,
   entry({ key: 'connections.statusLabels', group: 'Connections', label: 'Connection status labels', kind: 'json', description: 'Customer-facing labels for connected, expired and revoked sources. Health and permission checks are independent of these labels.', defaultValue: { connected: 'Connected', expired: 'Reconnect needed', revoked: 'Reconnect needed' }, schema: z.object({ connected: z.string().trim().min(1).max(80), expired: z.string().trim().min(1).max(80), revoked: z.string().trim().min(1).max(80) }).strict(), consumption: 'active' }),
   entry({ key: 'data.purgeRecoverySchedule', group: 'Data controls', label: 'Workspace erasure recovery schedule', kind: 'text', description: 'Five-field cron schedule for resuming already-confirmed workspace deletions after interruption.', defaultValue: '*/7 * * * *', schema: cron, consumption: 'active' }),
