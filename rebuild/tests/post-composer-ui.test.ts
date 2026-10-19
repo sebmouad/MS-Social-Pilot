@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { PublishingFormatDescriptor } from '../src/platforms/types';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,7 +16,7 @@ let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
 let dock: HTMLDivElement;
 const targets = [{ id: 'target-a', name: 'Studio channel', type: 'channel', provider: 'facebook', canPublish: true, publishingMedia: { kinds: ['image', 'video'] as const, maxImages: 2, maxVideos: 1, mixedKinds: true, linkWithMedia: false, imageAltText: true }, localImageUpload: { maxBytes: 5000, mimeTypes: ['image/png'] } }];
-type TestTarget = { id: string; name: string; type: string; provider: string | null; canPublish: boolean; publishingMedia?: { kinds: readonly ('image' | 'video')[]; maxImages: number | null; maxVideos: number | null; mixedKinds: boolean; linkWithMedia: boolean; imageAltText: boolean }; localImageUpload?: { maxBytes: number; mimeTypes: readonly string[] } };
+type TestTarget = { id: string; name: string; type: string; provider: string | null; canPublish: boolean; publishingFormats?: readonly PublishingFormatDescriptor[]; defaultPublishingFormatId?: string; publishingMedia?: { kinds: readonly ('image' | 'video')[]; maxImages: number | null; maxVideos: number | null; mixedKinds: boolean; linkWithMedia: boolean; imageAltText: boolean }; localImageUpload?: { maxBytes: number; mimeTypes: readonly string[] } };
 const rules = { allowedMimeTypes: ['image/png'], maxUploadBytes: 5000, maxAltCharacters: 120, maxMessageCharacters: 500, maxMedia: 2 };
 const schedule = { date: '2026-10-20', time: '10:30', timeZone: 'UTC' };
 
@@ -185,3 +186,16 @@ describe('dedicated post composer', () => {
     expect(container.textContent).toMatch(/cannot combine a link with media/i);
   });
 });
+
+ it('keeps portal destination controls and format serialization in sync when an action requests a native form reset', async () => {
+ const format:PublishingFormatDescriptor={id:'compact',label:'Compact',media:{kinds:[],maxImages:0,maxVideos:0,mixedKinds:false,linkWithMedia:false,imageAltText:false},firstComment:true,remoteStatus:true,remoteDelete:true,scheduling:{application:true,native:false}};
+ await render([{...targets[0]!,publishingFormats:[format],defaultPublishingFormatId:'compact'}]);
+ const destination=dock.querySelector<HTMLInputElement>('input[name="targetIds"]')!;
+ await act(async()=>destination.click());
+ const form=container.querySelector<HTMLFormElement>('#post-composer-form')!;
+ expect(destination.checked).toBe(true);
+ await act(async()=>form.reset());
+ expect(destination.checked).toBe(true);
+ expect(new FormData(form).getAll('targetIds')).toEqual(['target-a']);
+ expect(JSON.parse(new FormData(form).get('destinationFormatsJson') as string)).toEqual({'target-a':'compact'});
+ });

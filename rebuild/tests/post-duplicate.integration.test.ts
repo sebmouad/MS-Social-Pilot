@@ -15,13 +15,14 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
 }[key]) }));
 vi.mock('../src/modules/publishing/server/access', () => ({ authorizePublishing: async (actor: unknown) => ({ actor, role: 'owner', permissions: {}, entitlements: {} }) }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({ modules: { publishing: true } }), hasPlatformCapability: () => true }));
-vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: {}, publishFirstComment: {}, supportsTargetKind: () => true, publishingFormats: ['post', 'synthetic-opaque-format'].map(id => ({ id, label: id, media: state.publishingMedia, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } })), publishingMedia: state.publishingMedia, localImageUpload: null }) }));
+vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: {}, publishFirstComment: {}, supportsTargetKind: () => true, publishingFormats: ['post', 'synthetic-opaque-format'].map(id => ({ id, label: id, media: state.publishingMedia, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } })), defaultPublishingFormatId: 'post', publishingMedia: state.publishingMedia, localImageUpload: null }) }));
 vi.mock('../src/server/platforms/resource-visibility', () => ({ selectedResourceConnectionWhere: async () => ({ selected: true }) }));
 vi.mock('../src/modules/publishing/server/read-scope', () => ({
   selectedPublishingTargetIds: async (_workspaceId: string, _entitlements: unknown, allowed?: readonly string[]) => allowed ? [...allowed] : [state.targetId],
   publishingPostVisibilityWhere: (workspaceId: string, ids: readonly string[]) => ({ workspaceId, targets: { some: { targetId: { in: [...ids] } }, every: { targetId: { in: [...ids] } } } }),
 }));
 
+import { recordPostVersion } from '../src/modules/publishing/collaboration/server/versions';
 import { duplicatePost } from '../src/modules/publishing/server/duplicate';
 
 type Fixture = { workspaceId: string; userId: string; socialId: string; targetId: string; sourceId: string; actor: { userId: string; workspaceId: string; allowedTargetIds: string[] } };
@@ -81,6 +82,24 @@ describe.skipIf(!databaseUrl)('post duplication on isolated PostgreSQL', () => {
     const requestId=randomUUID();
     await duplicatePost(f.actor,{postId:f.sourceId,requestId,confirmation:`DUPLICATE POST ${f.sourceId}`});
     expect((await client.post.findUniqueOrThrow({where:{id:requestId}})).format).toBe('synthetic-opaque-format');
+  });
+  it('preserves an opaque destination format when the source legacy post format is post', async () => {
+    const f = await createFixture();
+    await client.postTarget.updateMany({ where: { postId: f.sourceId, targetId: f.targetId }, data: { formatId: 'synthetic-opaque-format' } });
+    const requestId = randomUUID();
+    await duplicatePost(f.actor, { postId: f.sourceId, requestId, confirmation: `DUPLICATE POST ${f.sourceId}` });
+    const copy = await client.post.findUniqueOrThrow({ where: { id: requestId }, include: { targets: true } });
+    expect(copy.format).toBe('post');
+    expect(copy.targets).toHaveLength(1);
+    expect(copy.targets[0]!.formatId).toBe('synthetic-opaque-format');
+    const initial = await client.$queryRaw<Array<{destinationFormats:unknown}>>`SELECT "destinationFormats" FROM post_versions WHERE "postId"=${requestId}`;
+    expect(initial).toEqual([{destinationFormats:{[f.targetId]:'synthetic-opaque-format'}}]);
+    await client.postTarget.updateMany({where:{postId:requestId},data:{formatId:'post'}});
+    await client.$transaction(tx=>recordPostVersion(tx,requestId,f.userId,50));
+    const changed = await client.$queryRaw<Array<{destinationFormats:unknown}>>`SELECT "destinationFormats" FROM post_versions WHERE "postId"=${requestId} ORDER BY "createdAt" DESC,id DESC`;
+    expect(changed).toHaveLength(2);
+    expect(changed[0]?.destinationFormats).toEqual({[f.targetId]:'post'});
+
   });
   it('copies content into a clean pending draft, replays one receipt, and rolls back a failed audit', async () => {
     const f = await createFixture(); const requestId = randomUUID();

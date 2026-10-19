@@ -1,5 +1,6 @@
 'use client';
 
+import { usePreserveFormState } from '@/components/usePreserveFormState';
 import { AutoTextarea } from '@/components/AutoTextarea';
 import { Button } from '@/components';
 import { Dialog } from '@/components/Dialog';
@@ -7,7 +8,8 @@ import { PostPreview } from '@/components/PostPreview';
 import { SidebarDock } from '@/components/SidebarDock';
 import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
 import { publishingMediaIssue } from '@/modules/publishing/media-support';
-import type { PublishingMediaSupport } from '@/platforms/types';
+import { DestinationFormats, effectiveDestinationFormat } from '@/modules/publishing/components/DestinationFormats';
+import type { PublishingFormatDescriptor, PublishingMediaSupport } from '@/platforms/types';
 import { useActionState, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { createPostWithRecoveryAction, type ComposerActionState } from '../posts/actions';
@@ -17,6 +19,8 @@ type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
 type TargetChoice = {
   id: string; name: string; type: string; provider: string | null; canPublish: boolean;
   publishingMedia?: PublishingMediaSupport;
+  publishingFormats?: readonly PublishingFormatDescriptor[];
+  defaultPublishingFormatId?: string;
   localImageUpload?: LocalImageUpload;
 };
 type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number; maxMessageCharacters: number; maxMedia: number };
@@ -47,9 +51,24 @@ function initialMedia(value: unknown): PostMediaItem[] {
   } catch { return []; }
 }
 
-function allowedKinds(targets: TargetChoice[]) {
+function parseFormats(value: unknown): Record<string, string> {
+  if (typeof value !== 'string' || !value) return {};
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+  } catch { return {}; }
+}
+
+/** The chosen format's media rules when its module declares them; otherwise the legacy destination metadata. */
+function mediaSupport(target: TargetChoice, formats: Record<string, string>): PublishingMediaSupport | undefined {
+  const id = effectiveDestinationFormat(target, formats);
+  return target.publishingFormats?.find(format => format.id === id)?.media ?? target.publishingMedia;
+}
+
+function allowedKinds(targets: TargetChoice[], formats: Record<string, string>) {
   if (!targets.length) return [...ALL_MEDIA_KINDS];
-  return ALL_MEDIA_KINDS.filter(kind => targets.every(target => target.publishingMedia?.kinds.includes(kind)));
+  return ALL_MEDIA_KINDS.filter(kind => targets.every(target => mediaSupport(target, formats)?.kinds.includes(kind)));
 }
 
 function localUploadRules(targets: TargetChoice[], rules: ImageRules) {
@@ -76,17 +95,19 @@ function localUploadIssue(targets: TargetChoice[], items: ReturnType<typeof useP
   return null;
 }
 
-function selectedMediaIssue(targets: TargetChoice[], media: readonly PostMediaItem[], link: string, items: ReturnType<typeof usePostAttachments>['items']) {
+function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, string>, media: readonly PostMediaItem[], link: string, items: ReturnType<typeof usePostAttachments>['items']) {
   if (!targets.length) return null;
   const completeMedia = items.map(item => ({ kind: item.kind, url: item.url || 'media:pending', ...(item.altText === undefined ? {} : { altText: item.altText }) }));
   for (const target of targets) {
-    const issue = publishingMediaIssue(target.publishingMedia, completeMedia.length ? completeMedia : media, link);
+    const issue = publishingMediaIssue(mediaSupport(target, formats),completeMedia.length ? completeMedia : media, link);
     if (issue) return `${target.name}: ${issue}`;
   }
   return localUploadIssue(targets, items);
 }
 
 export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay }: { targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  usePreserveFormState(formRef);
   const [state, formAction, pending] = useActionState(saveWithTransportRecovery, INITIAL_STATE);
   const initial = state.values;
   const [message, setMessage] = useState(initial.message ?? '');
@@ -94,6 +115,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
   const [labelId, setLabelId] = useState(initial.labelId ?? '');
   const [link, setLink] = useState(initial.link ?? '');
   const [selectedTargets, setSelectedTargets] = useState<string[]>(initial.targetIds ?? []);
+  const [formatChoices, setFormatChoices] = useState<Record<string, string>>(() => parseFormats(initial.destinationFormatsJson));
   const [scheduleDate, setScheduleDate] = useState(initial.scheduleDate ?? schedule.date);
   const [scheduleTime, setScheduleTime] = useState(initial.scheduleTime ?? schedule.time);
   const [mode, setMode] = useState<'draft' | 'schedule'>((initial.intent as 'draft' | 'schedule') ?? 'draft');
@@ -107,14 +129,19 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
   const feedbackRef = useRef<HTMLParagraphElement>(null);
   const selected = useMemo(() => targets.filter(target => selectedTargets.includes(target.id) && target.canPublish), [targets, selectedTargets]);
   const uploadRules = localUploadRules(selected, imageRules);
+  const destinationFormatsJson = useMemo(() => {
+    const out: Record<string, string> = Object.create(null);
+    for (const target of selected) { const value = effectiveDestinationFormat(target, formatChoices); if (value !== undefined) out[target.id] = value; }
+    return JSON.stringify(out);
+  }, [selected, formatChoices]);
   const attachments = usePostAttachments({
     initialMedia: initialMedia(initial.mediaJson),
     maxMedia: imageRules.maxMedia,
     maxAltCharacters: imageRules.maxAltCharacters,
     allowedMimeTypes: uploadRules.allowedMimeTypes,
     maxUploadBytes: uploadRules.maxUploadBytes,
-    allowedKinds: allowedKinds(selected),
-    allowMixedKinds: !selected.length || selected.every(target => target.publishingMedia?.mixedKinds === true),
+    allowedKinds: allowedKinds(selected, formatChoices),
+    allowMixedKinds: !selected.length || selected.every(target => mediaSupport(target, formatChoices)?.mixedKinds === true),
   });
   const templateContentExists = Boolean(message.trim() || firstComment.trim() || link.trim() || attachments.items.length);
   const visibleTemplates = templates.filter(template => `${template.name} ${template.category} ${template.body}`.toLocaleLowerCase().includes(templateSearch.trim().toLocaleLowerCase()));
@@ -175,7 +202,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
     }
     if (!attachments.validate()) { event.preventDefault(); setLocalError('Fix the attachment issues before saving.'); form.querySelector<HTMLElement>('[role="alert"]')?.focus(); return; }
 
-    const supportIssue = selectedMediaIssue(selected, attachments.media, link, attachments.items);
+    const supportIssue = selectedMediaIssue(selected, formatChoices, attachments.media, link, attachments.items);
     if (supportIssue) { event.preventDefault(); attachments.setError(supportIssue); setLocalError('Review the destination attachment requirements before saving.'); form.querySelector<HTMLElement>('[role="alert"]')?.focus(); return; }
 
     const hasPendingUploads = attachments.items.some(item => item.source === 'upload' && item.file);
@@ -206,7 +233,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
   }
 
   return <div className={styles.composerLayout}>
-    <form id={FORM_ID} action={formAction} onSubmit={onSubmit} className={styles.form} noValidate>
+    <form id={FORM_ID} ref={formRef} action={formAction} onSubmit={onSubmit} className={styles.form} noValidate>
       {localError && <p ref={feedbackRef} className={styles.error} role="alert" tabIndex={-1}>{localError}</p>}
       {state.status === 'error' && <p ref={feedbackRef} className={styles.error} role="alert" data-composer-error tabIndex={-1}>{state.message} Your post details are still here.{state.saveUnconfirmed ? <> <a href="/publishing/posts" target="_blank" rel="noopener noreferrer">Check Posts in a new tab</a>.</> : ' You can retry.'}</p>}
       {uploadMessage && <p className={styles.uploadNotice} role="status">{uploadMessage}</p>}
@@ -216,6 +243,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
       <label htmlFor="composer-first-comment">First comment <span>(optional)</span></label>
       <AutoTextarea id="composer-first-comment" name="firstComment" value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder="Add a link or follow-up as the first comment…" />
       <input type="hidden" name="labelId" value={labelId} />
+      <input type="hidden" name="destinationFormatsJson" value={destinationFormatsJson} />
 
       <fieldset className={styles.attachments} disabled={uploading || pending}>
         <legend>Attachments <span>(optional)</span></legend>
@@ -248,6 +276,10 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
           </label>) : <p>No destinations are ready to publish right now.</p>}
           <small>Drafts can be saved without a destination. Scheduling needs at least one.</small>
         </fieldset>
+        {selected.some(target => target.publishingFormats?.length) && <fieldset className={styles.destinationList} disabled={pending || uploading}>
+          <legend>Formats</legend>
+          <DestinationFormats targets={targets} selectedIds={selected.map(target => target.id)} values={formatChoices} formId={FORM_ID} disabled={pending || uploading} onChange={(id, value) => setFormatChoices(current => ({ ...current, [id]: value }))} />
+        </fieldset>}
         <fieldset className={styles.scheduleFields} disabled={pending || uploading}>
           <legend>Schedule</legend>
           <p>Times use {schedule.timeZone.replaceAll('_', ' ')}.</p>

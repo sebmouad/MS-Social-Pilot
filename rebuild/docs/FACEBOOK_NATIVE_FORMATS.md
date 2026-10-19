@@ -96,3 +96,8 @@ catalogs, credential narrowing and MCP tool/resource projection. Both Claude
 accounts reviewed; their preflight/catalog defects were corrected. The MCP suite
 passed again with the final projection assertions (140 tests). No new browser or
 live provider proof is claimed. Existing production remains legacy.
+
+
+## Batch85 continuation
+
+Per-destination intent now replaces the global bridge for newly selected targets across composer, editing, CSV, lifecycle, automation, copies, snapshots, exports and MCP. Historical null targets retain the bridge. This completes host intent storage, not Facebook native engine coverage: native dispatch, format-aware status/deletion/comment routing and real provider verification remain required before advertising additional formats.

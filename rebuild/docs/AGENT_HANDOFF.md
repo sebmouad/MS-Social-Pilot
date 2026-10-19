@@ -372,3 +372,10 @@ permissions/confirmations. Source inventory confirms this remains unintegrated.
 Do not include unrelated untracked integrations automatically. Full Facebook
 live coverage/photo cleanup, complete Root controls and production-shaped
 migration/media/service rollback remain required. Production stays legacy.
+
+
+## Current continuation: batch85 (supersedes earlier next-batch notes)
+
+Working tree contains per-destination format storage and propagation, a shared sidebar format control, and native form-reset preservation. Details: DESTINATION_FORMATS.md. Local migration and eighteen-file schema-only rehearsal passed after actual backup/restore/count verification. Current candidate snapshot is `/private/tmp/formats85-reviewed/app`; final tests are being refreshed. Browser proves input and associated sidebar checkbox survive a dropped save; retry receives Next action redirect headers but navigation still needs diagnosis. No browser success claim until rerun passes. Unrelated untracked AI/feeds/media/integration modules are outside this batch. Both Claude accounts reviewed/implemented assigned slices; parent corrected explicit-value fallback and form reset behavior. Full goal stays active; Facebook native engine, live cleanup, parity and production-shaped rollback remain open.
+
+Final batch85 evidence: isolated synthetic PostgreSQL suite 2,953 tests / 342 files, zero skips; typecheck and production build passed. Final actual HTTP/MCP probe passed format retention/update, invalid-format rejection, scope/grant denials and exact cleanup. Browser retry still hangs after an action303 with x-action-redirect, both without same-origin interception and with production runtime. Checkbox/input preservation is proven; the full eight-view browser matrix is NOT passed. No provider content or production service changed. Next: diagnose streamed action response completion/internal redirect render before claiming authoring recovery complete.

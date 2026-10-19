@@ -372,6 +372,8 @@ model PostTarget {
   postId       String
   targetId     String
   status       PostTargetStatus
+  /// Opaque module format identity; null means existing legacy intent.
+  formatId String?
   remotePostId String?
   remoteUrl    String?
   firstCommentId String?

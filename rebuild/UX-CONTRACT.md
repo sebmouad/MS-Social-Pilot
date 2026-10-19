@@ -432,3 +432,16 @@ email delivery is unavailable; new sends are absent until their actual runtime
 requirements are met. History times show the workspace timezone. Domain and
 permission authority is [REPORT_WORKFLOWS.md](docs/REPORT_WORKFLOWS.md); final
 browser/failure-path evidence is still pending for this batch.
+
+## Destination formats (batch85)
+
+The shared `DestinationFormats` owner renders selected-channel format metadata in
+the contextual sidebar for compose/edit. One choice is a label, multiple choices
+use the canonical browser-owned select; unknown saved values remain unavailable
+until changed. Only selected target keys are serialized. Media checks use the
+chosen descriptor. Managed action editors use `usePreserveFormState` to cancel
+native resets in capture phase, keeping associated sidebar controls aligned with
+React state after handled or transport failures. Success navigates away. The
+unreferenced alternate quick-create component was removed. See
+[DESTINATION_FORMATS.md](docs/DESTINATION_FORMATS.md) for persistence and remaining
+provider limitations. Browser verification evidence is recorded with the batch.

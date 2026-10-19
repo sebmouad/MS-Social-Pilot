@@ -136,3 +136,14 @@ Button, FormValidation, AutoTextarea and RouteNotice retain their established
 roles. Native English selects/date controls are accepted under the existing
 platform-owned popup decision. Preparation offers CSV and a downloaded printable
 page, with explicit UTC periods and honest preparation/delivery status.
+
+## Publishing format controls (batch85)
+
+`DestinationFormats` reuses `ui-field`, `ui-input` and `ui-field-error` tokens.
+Keep controls in the contextual sidebar; do not add a third menu or wrapped
+segmented pills. A single module format is a plain label. Multiple format choices
+use the existing native-select policy, with channel-specific accessible labels
+and a retained unavailable option for stale selections. All four themes inherit
+the same tokens and dimensions.
+
+Batch85 review sources: installed Frontend Design/Premium UX plus freshly fetched official Vercel Web Interface Guidelines and React Best Practices. Apply the existing brand and UX contract when generic guidance differs. This is review guidance, not evidence that every screen passes.

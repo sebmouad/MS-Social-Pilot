@@ -13,6 +13,7 @@ export type VersionSnapshot = {
   link: string | null;
   media: unknown;
   format: string;
+  destinationFormats?: Record<string,string>;
   targetIds: string[];
   labelIds: string[];
   scheduledAt: Date | null;

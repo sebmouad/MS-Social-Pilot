@@ -1,7 +1,10 @@
 "use client";
+import { SidebarDock } from '@/components/SidebarDock';
+import { DestinationFormats, effectiveDestinationFormat } from '@/modules/publishing/components/DestinationFormats';
+import { usePreserveFormState } from '@/components/usePreserveFormState';
 import { AutoTextarea } from '@/components/AutoTextarea';
 
-import { cancelScheduledPostAction, createPostAction, deletePostWithRecoveryAction, importPostsAction, publishPostAction, recordFirstCommentOutcomeAction, schedulePostAction, sendFirstCommentAction, submitForApprovalAction, syncPostAction, updatePostWithRecoveryAction, type ComposerValues, type FirstCommentActionState, type PostDeleteActionState, type PostEditActionState } from "./actions";
+import { cancelScheduledPostAction, deletePostWithRecoveryAction, importPostsAction, publishPostAction, recordFirstCommentOutcomeAction, schedulePostAction, sendFirstCommentAction, submitForApprovalAction, syncPostAction, updatePostWithRecoveryAction, type ComposerValues, type FirstCommentActionState, type PostDeleteActionState, type PostEditActionState } from "./actions";
 import { startTransition, useActionState, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { flushSync } from 'react-dom';
 import { Button } from "@/components";
@@ -16,14 +19,18 @@ import { DuplicatePost } from './DuplicatePost';
 import { QueuePostButton } from './QueuePostButton';
 import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
 import { publishingMediaIssue } from '@/modules/publishing/media-support';
-import type { PublishingMediaSupport } from '@/platforms/types';
+import type { PublishingFormatDescriptor, PublishingMediaSupport } from '@/platforms/types';
 
 type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
-type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean; publishingMedia?: PublishingMediaSupport; localImageUpload?: LocalImageUpload };
+type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean; publishingMedia?: PublishingMediaSupport; publishingFormats?: readonly PublishingFormatDescriptor[]; defaultPublishingFormatId?: string; localImageUpload?: LocalImageUpload };
 type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number; maxMedia: number };
-type PostRow = { id: string; message: string; firstComment: string | null; link: string | null; media: Array<{kind: string; url: string; altText?: string}>; status: string; publishedAt: Date | null; targets: Array<{ id: string; status: string; remotePostId: string | null; firstCommentId?: string | null; firstCommentAt?: Date | string | null; firstCommentError?: string | null; target: { id: string; name?: string | null } }> };
+type PostRow = { format?: string; id: string; message: string; firstComment: string | null; link: string | null; media: Array<{kind: string; url: string; altText?: string}>; status: string; publishedAt: Date | null; targets: Array<{ id: string; formatId?: string | null; status: string; remotePostId: string | null; firstCommentId?: string | null; firstCommentAt?: Date | string | null; firstCommentError?: string | null; target: { id: string; name?: string | null } }> };
 
 const MEDIA_KINDS = ['image', 'video'] as const;
+
+function readFormatValues(value: string | undefined): Record<string,string> {
+  try { const parsed: unknown = JSON.parse(value ?? '{}'); return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string,string] => typeof entry[1] === 'string')) : {}; } catch { return {}; }
+}
 
 function allowedMediaKinds(targets: TargetChoice[]) {
   return targets.length ? MEDIA_KINDS.filter(kind => targets.every(target => target.publishingMedia?.kinds.includes(kind))) : [...MEDIA_KINDS];
@@ -75,35 +82,6 @@ function focusAlert(form: HTMLFormElement | null) {
   alert.focus();
 }
 
-async function submitPostWithAttachments(event: FormEvent<HTMLFormElement>, validate: ReturnType<typeof useFormValidation>['validate'], attachments: ReturnType<typeof usePostAttachments>, targets: TargetChoice[], setUploading: (uploading: boolean) => void) {
-  const form = event.currentTarget;
-  if (form.dataset.submitting === 'true') { event.preventDefault(); return; }
-  const linkField = form.elements.namedItem('link');
-  const link = linkField instanceof HTMLInputElement ? linkField.value : '';
-  const hasOtherContent = Boolean(link.trim() || attachments.items.some(item => item.file || item.url.trim()));
-  if (!validate(form, postValidationErrors(form, hasOtherContent))) { event.preventDefault(); return; }
-  if (!attachments.validate()) { event.preventDefault(); focusAlert(form); return; }
-  const media = attachments.media;
-  const issue = selectedMediaIssue(targets, media, link, attachments.items);
-  if (issue) { event.preventDefault(); attachments.setError(issue); return; }
-  if (!attachments.items.some(item => item.source === 'upload' && item.file)) { form.dataset.submitting = 'true'; return; }
-
-  event.preventDefault();
-  if (form.dataset.uploading === 'true') return;
-  form.dataset.uploading = 'true';
-  const submitter = (event.nativeEvent as SubmitEvent).submitter;
-  setUploading(true);
-  try {
-    if (!await attachments.prepareUploads()) return;
-    form.dataset.uploading = 'false';
-    flushSync(() => setUploading(false));
-    form.requestSubmit(submitter instanceof HTMLElement ? submitter as HTMLButtonElement : undefined);
-  } finally {
-    setUploading(false);
-    form.dataset.uploading = 'false';
-  }
-}
-
 function parseInitialMedia(value: string): PostMediaItem[] {
   try {
     const parsed: unknown = JSON.parse(value);
@@ -112,30 +90,6 @@ function parseInitialMedia(value: string): PostMediaItem[] {
       && ((item as PostMediaItem).kind === 'image' || (item as PostMediaItem).kind === 'video')
       && typeof (item as PostMediaItem).url === 'string'));
   } catch { return []; }
-}
-
-export function PostEditorForm({ targets, imageRules, schedule }: { targets: TargetChoice[]; imageRules: ImageRules; schedule?: { date: string; time: string; timeZone: string } }) {
-  const [uploading, setUploading] = useState(false);
-  const [targetIds, setTargetIds] = useState<string[]>([]);
-  const validation = useFormValidation();
-  const messageProps = validation.fieldProps('message');
-  const linkProps = validation.fieldProps('link');
-  const selectedTargets = targets.filter(target => targetIds.includes(target.id) && target.canPublish);
-  const uploadRules = localUploadRules(selectedTargets, imageRules);
-  const attachments = usePostAttachments({ maxMedia: imageRules.maxMedia, maxAltCharacters: imageRules.maxAltCharacters, allowedMimeTypes: uploadRules.allowedMimeTypes, maxUploadBytes: uploadRules.maxUploadBytes, allowedKinds: allowedMediaKinds(selectedTargets), allowMixedKinds: !selectedTargets.length || selectedTargets.every(target => target.publishingMedia?.mixedKinds === true) });
-  return <form noValidate action={createPostAction} className={styles.draftForm} onSubmit={event => { void submitPostWithAttachments(event, validation.validate, attachments, selectedTargets, setUploading); }}>
-    <label htmlFor={messageProps.id}>Post text <span>(optional with a link or media)</span></label>
-    <AutoTextarea name="message" rows={4} placeholder="Write a post for your team…" {...messageProps} />
-    <FieldError {...validation.errorProps('message')} />
-    <label htmlFor="new-post-first-comment">First comment <span>(optional)</span></label>
-    <AutoTextarea id="new-post-first-comment" name="firstComment" rows={2} placeholder="Add a link or follow-up as the first comment…" />
-    <label htmlFor={linkProps.id}>Link <span>(optional)</span></label><input name="link" type="url" placeholder="https://example.com" {...linkProps} />
-    <FieldError {...validation.errorProps('link')} />
-    <PostAttachments controller={attachments} disabled={uploading} />
-    <TargetPicker targets={targets} selected={new Set(targetIds)} disabled={uploading} onSelectionChange={next => setTargetIds([...next])} />
-    {schedule && <fieldset className={styles.targetPicker}><legend>Publishing time</legend><p>Times use {schedule.timeZone.replaceAll('_', ' ')}.</p><label>Date<input type="date" name="scheduleDate" defaultValue={schedule.date} required /></label><label>Time<input type="time" name="scheduleTime" defaultValue={schedule.time} required /></label></fieldset>}
-    <div className={styles.formFooter}><span>{schedule ? 'Save a draft or add it to the queue.' : 'Saved locally until you publish it.'}</span>{schedule && <Button type="submit" name="intent" value="draft" disabled={uploading}>Save draft</Button>}<Button variant="primary" type="submit" name="intent" value={schedule ? 'schedule' : 'draft'} disabled={uploading}>{uploading ? 'Uploading…' : schedule ? 'Add to queue' : 'Create post'}</Button></div>
-  </form>;
 }
 
 export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
@@ -303,7 +257,7 @@ export async function runRecordFirstCommentWithRecovery(previous: FirstCommentAc
 
 function PostEditForm({ post, targets, selected, imageRules, disabled, onPendingChange }: { post: PostRow; targets: TargetChoice[]; selected: Set<string>; imageRules: ImageRules; disabled: boolean; onPendingChange: (pending: boolean) => void }) {
   const initialValues: Partial<ComposerValues> = {
-    intent: '', mediaJson: JSON.stringify(post.media), message: post.message, firstComment: post.firstComment ?? '', link: post.link ?? '',
+    intent: '', mediaJson: JSON.stringify(post.media), destinationFormatsJson: JSON.stringify(Object.fromEntries(post.targets.map(t => [t.target.id, t.formatId ?? post.format]).filter((entry): entry is [string,string] => typeof entry[1] === 'string'))), message: post.message, firstComment: post.firstComment ?? '', link: post.link ?? '',
     targetIds: [...selected], scheduleDate: '', scheduleTime: '',
   };
   const [actionState, formAction, pending] = useActionState(runUpdatePostWithRecovery, { status: 'idle', values: initialValues } satisfies PostEditActionState);
@@ -312,6 +266,7 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
   const [uploading, setUploading] = useState(false);
   const validation = useFormValidation();
   const formRef = useRef<HTMLFormElement>(null);
+  usePreserveFormState(formRef);
   const lastApplied = useRef<PostEditActionState | null>(null);
 
   useEffect(() => { onPendingChange(pending); }, [onPendingChange, pending]);
@@ -324,15 +279,20 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
   function setValue(name: keyof ComposerValues, value: string) { setValues(current => ({ ...current, [name]: value })); }
   const targetIds = new Set(values.targetIds ?? selected);
   const selectedTargets = targets.filter(target => targetIds.has(target.id) && target.canPublish);
-  const uploadRules = localUploadRules(selectedTargets, imageRules);
+  const formatChoices = readFormatValues(values.destinationFormatsJson);
+  const serializedFormats = JSON.stringify(Object.fromEntries(selectedTargets.flatMap(target => {
+    const id = effectiveDestinationFormat(target, formatChoices); return id === undefined ? [] : [[target.id, id]];
+  })));
+  const formatTargets = selectedTargets.map(target => ({ ...target, publishingMedia: target.publishingFormats?.find(format => format.id === effectiveDestinationFormat(target, formatChoices))?.media ?? target.publishingMedia }));
+  const uploadRules = localUploadRules(formatTargets, imageRules);
   const attachments = usePostAttachments({
     initialMedia: parseInitialMedia(initialValues.mediaJson ?? '[]'),
     maxMedia: imageRules.maxMedia,
     maxAltCharacters: imageRules.maxAltCharacters,
     allowedMimeTypes: uploadRules.allowedMimeTypes,
     maxUploadBytes: uploadRules.maxUploadBytes,
-    allowedKinds: allowedMediaKinds(selectedTargets),
-    allowMixedKinds: !selectedTargets.length || selectedTargets.every(target => target.publishingMedia?.mixedKinds === true),
+    allowedKinds: allowedMediaKinds(formatTargets),
+    allowMixedKinds: !formatTargets.length || formatTargets.every(target => target.publishingMedia?.mixedKinds === true),
   });
   useEffect(() => { if (attachments.error) focusAlert(formRef.current); }, [attachments.error]);
 
@@ -343,7 +303,7 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
     const hasOtherContent = Boolean(link.trim() || attachments.items.some(item => item.file || item.url.trim()));
     if (!validation.validate(form, postValidationErrors(form, hasOtherContent))) { event.preventDefault(); return; }
     if (!attachments.validate()) { event.preventDefault(); focusAlert(form); return; }
-    const issue = selectedMediaIssue(selectedTargets, attachments.media, link, attachments.items);
+    const issue = selectedMediaIssue(formatTargets, attachments.media, link, attachments.items);
     if (issue) { event.preventDefault(); attachments.setError(issue); return; }
     const hasPendingUploads = attachments.items.some(item => item.source === 'upload' && item.file);
     if (!hasPendingUploads) { setUploadMessage(''); return; }
@@ -371,10 +331,12 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
     }
   }
 
-  return <form ref={formRef} noValidate action={formAction} className={styles.editForm} onSubmit={event => {
+  return <form id={`post-edit-${post.id}`} ref={formRef} noValidate action={formAction} className={styles.editForm} onSubmit={event => {
     void onSubmit(event);
   }}>
     <input type="hidden" name="postId" value={post.id} />
+    <input type="hidden" name="destinationFormatsJson" value={serializedFormats} />
+    <SidebarDock><fieldset className="ui-field"><legend>Post formats</legend><DestinationFormats targets={targets} selectedIds={selectedTargets.map(target=>target.id)} values={formatChoices} onChange={(id,value) => setValues(current => ({...current,destinationFormatsJson:JSON.stringify({...readFormatValues(current.destinationFormatsJson),[id]:value})}))} formId={`post-edit-${post.id}`} disabled={disabled || pending || uploading} /></fieldset></SidebarDock>
     <fieldset className={styles.formFields}>
       <label htmlFor={`message-${post.id}`}>Post text <span>(optional with a link or media)</span></label>
       <AutoTextarea id={`message-${post.id}`} name="message" value={values.message ?? post.message} onChange={event => setValue('message', event.currentTarget.value)} rows={4} disabled={disabled || pending || uploading} aria-invalid={Boolean(validation.errors.message)} aria-describedby={validation.errors.message ? `message-error-${post.id}` : undefined} />

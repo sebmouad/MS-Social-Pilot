@@ -1,3 +1,4 @@
+import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../generated/client';
 import { prisma } from '@/server/data';
@@ -36,7 +37,7 @@ async function prepare(tx: Tx, workspaceId: string, postId: string, feature: Fea
   await tx.$queryRaw`SELECT id FROM posts WHERE id=${postId} AND "workspaceId"=${workspaceId} FOR UPDATE`;
   const post = await tx.post.findFirst({ where: { id: postId, workspaceId }, select: {
     id: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, publishedAt: true,
-    targets: { select: { id: true, targetId: true, status: true, remotePostId: true } },
+    targets: { select: { id: true, targetId: true, formatId: true, status: true, remotePostId: true } },
   } });
   if (!post || !post.targets.length || !Array.isArray(post.media)) throw unavailable();
   const ids = post.targets.map(target => target.targetId);
@@ -52,15 +53,16 @@ async function prepare(tx: Tx, workspaceId: string, postId: string, feature: Fea
   const policy = policies[0];
   if (!policy || !isValidTimeZone(policy.timezone) || typeof policy.requiresApproval !== 'boolean') throw unavailable();
   const stored = (await tx.$queryRaw<Stored[]>`SELECT format, "approvalStatus"::text AS "approvalStatus", "firstCommentDelayMinutes" FROM posts WHERE id=${postId} AND "workspaceId"=${workspaceId}`)[0];
-  // These are existing core storage protocol values, not provider rules. Native
-  // formats and delayed first comments need their complete lifecycle first.
-  if (!stored || stored.format !== 'post' || stored.firstCommentDelayMinutes !== 0) throw unavailable();
+  // Delayed comments still require their separate complete lifecycle. Format
+  // compatibility is declared and validated independently for each destination.
+  if (!stored || stored.firstCommentDelayMinutes !== 0) throw unavailable();
   const config = await limits();
   const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as unknown as PublishMedia[] }, config.maxMedia, config.maxAlt);
   const message = validatePostContent(replacementText ?? post.message, config.maxText, attachments);
   const firstComment = validFirstComment(post.firstComment ?? '', config.maxText);
   const media = await resolvePublishMedia(workspaceId, attachments.media);
-  await validateTargets(auth.actor, ids, config.maxTargets, media, Boolean(firstComment), attachments.link);
+  const destinations = await validateTargets(auth.actor, ids, config.maxTargets, media, Boolean(firstComment), attachments.link);
+  const destinationFormats = await resolveAuthorizedDestinationFormats(destinations, undefined, config.maxTargets, {media,link:attachments.link,firstComment,scheduled:true},{formats:new Map(post.targets.map(t=>[t.targetId,t.formatId ?? null])),legacyFormat:stored.format});
   const targets = await tx.target.findMany({ where: { id: { in: ids }, workspaceId, enabled: true, canPublish: true },
     select: { id: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true } } } });
   if (targets.length !== ids.length) throw unavailable();
@@ -74,7 +76,7 @@ async function prepare(tx: Tx, workspaceId: string, postId: string, feature: Fea
   }
   await authorizePublishing(auth.actor, feature, 'write');
   await authorizePublishing(auth.actor, 'publishing/posts', 'write');
-  return { post, stored, policy, actor: auth.actor, role: auth.role, message, firstComment, attachments, retention: await loadVersionRetention() };
+  return { destinationFormats, post, stored, policy, actor: auth.actor, role: auth.role, message, firstComment, attachments, retention: await loadVersionRetention() };
 }
 
 async function systemAudit(tx: Tx, workspaceId: string, action: string, detail: object) {
@@ -137,7 +139,7 @@ export const publishingAutomationLifecycle: AutomationLifecycle = {
     await tx.post.create({ data: { id: input.copyId, workspaceId: input.workspaceId, authorId: post.authorId, message: ready.message,
       firstComment: ready.firstComment, link: ready.attachments.link, media: ready.attachments.media,
       status: hold ? 'pending_approval' : 'scheduled', scheduledAt: input.scheduledAt, createdAt: new Date(), updatedAt: new Date(),
-      targets: { create: post.targets.map(target => ({ id: randomUUID(), targetId: target.targetId, status: 'pending' as const })) } } });
+      targets: { create: post.targets.map(target => ({ id: randomUUID(), targetId: target.targetId, formatId: ready.destinationFormats[target.targetId], status: 'pending' as const })) } } });
     const metadata = await tx.$executeRaw`UPDATE posts SET timezone=${policy.timezone}, "publishMode"='worker'::"PublishMode", "originPostId"=${post.id}, "approvalStatus"=${hold ? 'pending' : reviewed ? 'approved' : 'not_required'}::"ApprovalStatus", "submittedById"=${hold ? post.authorId : null}, "submittedAt"=${hold ? new Date() : null} WHERE id=${input.copyId} AND "workspaceId"=${input.workspaceId}`;
     if (metadata !== 1) throw unavailable();
     const badLabels = await tx.$queryRaw<Array<{ labelId: string }>>`SELECT pl."labelId" FROM post_labels pl LEFT JOIN labels l ON l.id=pl."labelId" WHERE pl."postId"=${post.id} AND (l.id IS NULL OR l."workspaceId"<>${input.workspaceId}) LIMIT 1`;

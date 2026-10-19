@@ -14,7 +14,7 @@ const db = vi.hoisted(() => ({
   $executeRaw: vi.fn(),
   $queryRaw: vi.fn(),
 }));
-const capabilities = vi.hoisted(() => ({ firstComment: true, media: null as null | { kinds: readonly ('image' | 'video')[]; maxImages: number | null; maxVideos: number | null; mixedKinds: boolean; linkWithMedia: boolean; imageAltText: boolean } }));
+const capabilities = vi.hoisted(() => ({ firstComment: true, defaultFormatId: 'post', media: null as null | { kinds: readonly ('image' | 'video')[]; maxImages: number | null; maxVideos: number | null; mixedKinds: boolean; linkWithMedia: boolean; imageAltText: boolean } }));
 const provider = vi.hoisted(() => ({ publish: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({
@@ -29,8 +29,8 @@ vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({
   publish: provider.publish,
   ...(capabilities.firstComment ? { publishFirstComment: vi.fn() } : {}),
   ...(capabilities.media ? { publishingMedia: capabilities.media } : {}),
-  publishingFormats: [{ id: 'post', label: 'Post', media: { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true }, firstComment: capabilities.firstComment, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }],
-  defaultPublishingFormatId: 'post', supportsTargetKind: () => true,
+  publishingFormats: [...new Set(['post', capabilities.defaultFormatId])].map(id => ({ id, label: id, media: capabilities.media ?? { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true }, firstComment: capabilities.firstComment, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } })),
+  defaultPublishingFormatId: capabilities.defaultFormatId, supportsTargetKind: () => true,
 }) }));
 
 import { cancelScheduledPost, createPost, publishPost, reschedulePost, restorePostVersion, reviewPost, schedulePost, submitPostForApproval, updatePost } from '../src/server/publishing/lifecycle';
@@ -40,6 +40,7 @@ const actor = { userId: 'u1', workspaceId: 'w1' };
 beforeEach(() => {
   vi.clearAllMocks();
   capabilities.firstComment = true;
+  capabilities.defaultFormatId = 'post';
   provider.publish.mockReset();
   capabilities.media = { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true };
   db.membership.findUnique.mockResolvedValue({ role: 'editor' });
@@ -102,6 +103,13 @@ describe('publishing lifecycle transitions', () => {
     expect(provider.publish).not.toHaveBeenCalled();
   });
 
+  it('rejects a stale explicit destination format before persistence or dispatch', async () => {
+    await expect(createPost(actor, { message: 'Stale format', firstComment: '', targetIds: ['target-1'], destinationFormats: { 'old-target': 'post' } })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(db.post.create).not.toHaveBeenCalled();
+    expect(provider.publish).not.toHaveBeenCalled();
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+  });
+
   it('uses a neutral adapter declaration to allow supported mixed media and link combinations', async () => {
     capabilities.media = { kinds: ['image', 'video'], maxImages: null, maxVideos: null, mixedKinds: true, linkWithMedia: true, imageAltText: true };
     const media = [{ kind: 'image' as const, url: 'https://cdn.test/a.jpg' }, { kind: 'video' as const, url: 'https://cdn.test/a.mp4' }];
@@ -147,6 +155,31 @@ describe('publishing lifecycle transitions', () => {
     db.post.create.mockClear();
     await expect(createPost(actor, { message: 'No destination', firstComment: '', targetIds: [], scheduledAt })).rejects.toThrow(/destination/);
     expect(db.post.create).not.toHaveBeenCalled();
+  });
+
+  it('persists the selected default format on each destination row', async () => {
+    await createPost(actor, { message: 'Format-bound post', firstComment: '', targetIds: ['target-1'] });
+    expect(db.post.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      targets: { create: [expect.objectContaining({ targetId: 'target-1', formatId: 'post' })] },
+    }) });
+  });
+
+  it('preserves a legacy format for an existing destination and uses the module default for a new one', async () => {
+    capabilities.defaultFormatId = 'module-default';
+    db.target.findMany.mockResolvedValueOnce([
+      { id: 'target-1', type: 'page', accessToken: 'encrypted', socialAccount: { provider: 'facebook', invalidatedAt: null } },
+      { id: 'target-2', type: 'page', accessToken: 'encrypted', socialAccount: { provider: 'facebook', invalidatedAt: null } },
+    ]);
+    db.post.findFirst.mockResolvedValueOnce({ id: 'p1', authorId: 'u1', format: 'post', status: 'draft', publishedAt: null,
+      targets: [{ id: 'pt1', targetId: 'target-1', formatId: null, status: 'pending', remotePostId: null }],
+    });
+    await updatePost(actor, { postId: 'p1', message: 'Updated', firstComment: '', targetIds: ['target-1', 'target-2'] });
+    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      targets: { create: [
+        expect.objectContaining({ targetId: 'target-1', formatId: 'post' }),
+        expect.objectContaining({ targetId: 'target-2', formatId: 'module-default' }),
+      ] },
+    }) }));
   });
 
   it('records the created state in the same transaction using the Root retention bound', async () => {

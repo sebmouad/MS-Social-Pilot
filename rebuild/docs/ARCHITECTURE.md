@@ -1123,3 +1123,8 @@ reviews; findings were corrected and verified. See REPORT_WORKFLOWS.md.
 Goals/response-time/destinations/top-post report sections and AI recap remain
 incomplete. Whole-tree design audit, full Facebook formats/live coverage, Root
 coverage and other legacy integrations remain open. Production stays legacy.
+
+
+## Batch85: per-destination publishing intent
+
+New post targets persist their module-declared format separately. Shared lifecycle, queue, automation, duplication, versions, CSV and MCP validate and preserve this intent; existing null targets retain their historical global fallback. Composer and edit use one shared sidebar control and a native reset-preservation hook. See DESTINATION_FORMATS.md. Facebook still exposes only its implemented feed format; native formats remain unwired.

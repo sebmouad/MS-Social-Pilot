@@ -11,7 +11,7 @@ fail() { echo "cutover rehearsal: $*" >&2; exit 1; }
 : "${CUTOVER_DUMP_SANITIZED:?Set CUTOVER_DUMP_SANITIZED=YES only after confirming the dump is sanitized}"
 : "${CUTOVER_APPROVED_MIGRATION_SET:?Set CUTOVER_APPROVED_MIGRATION_SET to the reviewed migration set}"
 [ "$CUTOVER_DUMP_SANITIZED" = YES ] || fail "CUTOVER_DUMP_SANITIZED must be YES"
-approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate'
+approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats'
 [ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
 [ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
 
@@ -46,6 +46,7 @@ verify_migration 20261018230000_rebuild_sharing_expiry 28d4f9da65ed866f6139aa982
 verify_migration 20261018233000_rebuild_mcp_resource_scope 465a5d76679b45d7cb3fa6560b9d6a32501e56faab1922107547452a0b5519ab
 verify_migration 20261019010000_rebuild_report_runs caa0c553569cf9f984e973ceb6e3ee858750209c6d2931e1316d3323b4357c4a
 verify_migration 20261019011000_rebuild_report_purge_gate 122e813070361737ba1a89d775d2f92922dadd36423debb83411e0d5a4aa5d9e
+verify_migration 20261019020000_rebuild_destination_formats 30325cdda1951cde93fab77a12bc349caa4422861fe133f68320ac3b979af6c6
 
 # Only loopback TCP or the standard local PostgreSQL socket and database
 # /postgres are accepted. A copied production DATABASE_URL must fail closed.
@@ -101,15 +102,17 @@ BEGIN
      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'share_links' AND column_name = 'expiresAt')
      OR to_regclass('public.task_comments') IS NOT NULL
      OR to_regclass('public.report_runs') IS NOT NULL
+     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_targets' AND column_name = 'formatId')
+     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_versions' AND column_name = 'destinationFormats')
      OR EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'rebuild_workspace_purge_write_gate' AND tgrelid = to_regclass('public.report_runs'))
      OR to_regprocedure('public.rebuild_facebook_media_deletions_binding_immutable()') IS NOT NULL
      OR to_regprocedure('public.rebuild_facebook_media_resolutions_immutable()') IS NOT NULL THEN
     RAISE EXCEPTION 'staging dump already contains reviewed migration objects; use a pre-migration sanitized baseline';
   END IF;
   IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
-    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
       INTO already_applied
-      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate';
+      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats';
     IF already_applied THEN
       RAISE EXCEPTION 'staging dump migration history already contains an allowlisted migration';
     END IF;
@@ -136,6 +139,7 @@ psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261018233000_rebui
 # first, then attach its write gate in the following additive migration.
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019010000_rebuild_report_runs/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019011000_rebuild_report_purge_gate/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019020000_rebuild_destination_formats/migration.sql"
 echo "reviewed additive migrations applied to local scratch database"
 
 # Required tables/columns are taken from rebuild/prisma/schema.prisma and
@@ -158,6 +162,7 @@ BEGIN
     ARRAY['targets','id'], ARRAY['targets','workspaceId'], ARRAY['targets','socialAccountId'], ARRAY['targets','type'], ARRAY['targets','providerId'], ARRAY['targets','name'], ARRAY['targets','pictureUrl'], ARRAY['targets','accessToken'], ARRAY['targets','enabled'], ARRAY['targets','canPublish'], ARRAY['targets','createdAt'], ARRAY['targets','updatedAt'],
     ARRAY['page_insights','id'], ARRAY['page_insights','targetId'], ARRAY['page_insights','metric'], ARRAY['page_insights','period'], ARRAY['page_insights','endTime'], ARRAY['page_insights','value'], ARRAY['page_insights','numeric'], ARRAY['page_insights','fetchedAt'],
     ARRAY['posts','id'], ARRAY['posts','workspaceId'], ARRAY['posts','authorId'], ARRAY['posts','message'], ARRAY['posts','firstComment'], ARRAY['posts','status'], ARRAY['posts','scheduledAt'], ARRAY['posts','publishedAt'], ARRAY['posts','createdAt'], ARRAY['posts','updatedAt'],
+    ARRAY['post_targets','formatId'], ARRAY['post_versions','destinationFormats'],
     ARRAY['post_targets','id'], ARRAY['post_targets','postId'], ARRAY['post_targets','targetId'], ARRAY['post_targets','status'], ARRAY['post_targets','remotePostId'], ARRAY['post_targets','remoteUrl'], ARRAY['post_targets','firstCommentId'], ARRAY['post_targets','firstCommentAt'], ARRAY['post_targets','firstCommentError'], ARRAY['post_targets','publishedAt'], ARRAY['post_targets','updatedAt'],
     ARRAY['post_comments','id'], ARRAY['post_comments','postTargetId'], ARRAY['post_comments','remoteId'], ARRAY['post_comments','parentRemoteId'], ARRAY['post_comments','message'], ARRAY['post_comments','fromName'], ARRAY['post_comments','fromId'], ARRAY['post_comments','likeCount'], ARRAY['post_comments','replyCount'], ARRAY['post_comments','isHidden'], ARRAY['post_comments','createdTime'], ARRAY['post_comments','fetchedAt'], ARRAY['post_comments','firstSeenAt'], ARRAY['post_comments','resolvedAt'], ARRAY['post_comments','assigneeId'], ARRAY['post_comments','sentById'], ARRAY['post_comments','sentiment'],
     ARRAY['conversations','id'], ARRAY['conversations','targetId'], ARRAY['conversations','remoteId'], ARRAY['conversations','snippet'], ARRAY['conversations','unreadCount'], ARRAY['conversations','messageCount'], ARRAY['conversations','participants'], ARRAY['conversations','updatedTime'], ARRAY['conversations','fetchedAt'], ARRAY['conversations','resolvedAt'], ARRAY['conversations','assigneeId'],

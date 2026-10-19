@@ -400,3 +400,8 @@ This contains no customer rows and proves neither production-shaped migration
 nor app/permission behavior, media recovery or proxy/service rollback. Reports
 functional, database concurrency and browser verification remain separate gates.
 Production and `socialpilot-deploy` remain legacy.
+
+
+## Batch85 additive format migration (local only)
+
+The reviewed eighteenth migration `20261019020000_rebuild_destination_formats` adds nullable target format intent and version snapshot maps. SHA-256: `30325cdda1951cde93fab77a12bc349caa4422861fe133f68320ac3b979af6c6`. No existing target is backfilled or deleted. Before local application, a full private preview backup was restored into a disposable database and public table counts compared. Backup SHA-256: `468586569142294bf5d67ae96833c2951a74f78bfd4fce2be4f68a4d1f017b97`. Counts remained unchanged after application. The actual eighteen-file schema-only rehearsal passed, including its independent restore/count check. This does not prove production-shaped migration, media recovery or service rollback. No production migration or cutover occurred.

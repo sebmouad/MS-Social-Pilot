@@ -47,7 +47,7 @@ async function main() {
   const call = (bearer: string, args: object) => rpc(bearer, 'tools/call', { name: 'duplicate_post', arguments: args });
   const sourceSnapshot = async (postId: string) => client.post.findUnique({ where: { id: postId }, select: {
     id: true, workspaceId: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, updatedAt: true,
-    targets: { orderBy: { id: 'asc' }, select: { id: true, targetId: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true, publishedAt: true } },
+    targets: { orderBy: { id: 'asc' }, select: { id: true, targetId: true, formatId: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true, publishedAt: true } },
   } });
   const receiptIds = [requestId, collisionRequestId, hiddenRequestId, foreignRequestId].map(value => `duplicate:${value}`);
 
@@ -91,7 +91,7 @@ async function main() {
     const createPublishedSource = (postId: string, targetRowId: string, targetId: string, message: string) => client.post.create({ data: {
       id: postId, workspaceId, authorId: userId, message, firstComment: `${id} synthetic first comment`, link: null, media, status: 'published',
       scheduledAt: null, publishedAt: now, createdAt: now, updatedAt: now,
-      targets: { create: { id: targetRowId, targetId, status: 'published', remotePostId: `${postId}_fake_remote_post`, remoteUrl: `https://example.test/${postId}`, firstCommentId: `${postId}_fake_remote_comment`, firstCommentAt: now, firstCommentError: 'synthetic old error', publishedAt: now } },
+      targets: { create: { id: targetRowId, targetId, formatId: 'post', status: 'published', remotePostId: `${postId}_fake_remote_post`, remoteUrl: `https://example.test/${postId}`, firstCommentId: `${postId}_fake_remote_comment`, firstCommentAt: now, firstCommentError: 'synthetic old error', publishedAt: now } },
     } });
     await createPublishedSource(sourceId, sourceTargetRowId, 'preview_target_north', `${id} original source message`);
     await createPublishedSource(collisionSourceId, collisionTargetRowId, 'preview_target_north', `${id} collision source message`);
@@ -114,7 +114,7 @@ async function main() {
       && copied.firstComment === originalSource.firstComment && JSON.stringify(copied.media) === JSON.stringify(originalSource.media)
       && copied.link === originalSource.link && copied.status === 'draft' && copied.scheduledAt === null && copied.publishedAt === null,
     'The HTTP copy must preserve all requested content as an unscheduled local draft.');
-    check(copied.targets.length === 1 && copied.targets[0]?.targetId === 'preview_target_north' && copied.targets[0]?.status === 'pending'
+    check(copied.targets.length === 1 && copied.targets[0]?.targetId === 'preview_target_north' && copied.targets[0]?.formatId === 'post' && copied.targets[0]?.status === 'pending'
       && copied.targets[0]?.remotePostId === null && copied.targets[0]?.remoteUrl === null && copied.targets[0]?.firstCommentId === null
       && copied.targets[0]?.firstCommentAt === null && copied.targets[0]?.firstCommentError === null && copied.targets[0]?.publishedAt === null && copied.targets[0]?.comments.length === 0,
     'The copied destination must be clean pending state with no remote identity or history.');
@@ -156,6 +156,11 @@ async function main() {
       && !readTools.body.result?.isError && Array.isArray(readTools.body.result?.tools) && !readTools.body.result.tools.some((tool: { name?: string }) => tool.name === 'duplicate_post')
       && readDiscoveryAttempt.body.result?.isError && readDiscoveryAttempt.body.result?.structuredContent?.code === 'forbidden', 'The read-only key must neither duplicate posts nor discover destinations.');
 
+    const beforeInvalid = await client.post.count({ where: { authorId: userId } });
+    const invalidFormat = await rpc(writeBearer, 'tools/call', {name:'create_post',arguments:{message:`${id} invalid format`,targetIds:['preview_target_north'],destinationFormats:{preview_target_north:'unavailable-format'},confirmation:'CREATE POST'}});
+    check(invalidFormat.body.result?.isError && await client.post.count({where:{authorId:userId}}) === beforeInvalid, 'MCP must refuse an unavailable destination format before saving a draft.');
+    const edited = await rpc(writeBearer, 'tools/call', {name:'update_post',arguments:{postId:requestId,message:`${id} format update`,firstComment:'Retained first comment',targetIds:['preview_target_north'],destinationFormats:{preview_target_north:'post'},confirmation:`UPDATE POST ${requestId}`}});
+    check(!edited.body.result?.isError && (await client.postTarget.findFirst({where:{postId:requestId}}))?.formatId === 'post', 'MCP edit must preserve explicit per-destination format through the real service.');
     await client.$executeRaw`DELETE FROM member_page_access WHERE "membershipId" = ${membershipId} AND "targetId" = 'preview_target_north'`;
     const revokedReplay = await call(writeBearer, requestBody(sourceId, requestId));
     check(revokedReplay.body.result?.isError && ['not_found', 'forbidden'].includes(revokedReplay.body.result?.structuredContent?.code)
@@ -164,14 +169,14 @@ async function main() {
     check(JSON.stringify(await sourceSnapshot(sourceId)) === JSON.stringify(originalSource), 'The original synthetic source and remote history must remain unchanged.');
     console.log(JSON.stringify({ httpCreated201: true, mcpReplayedSameDraft: true, copyHasTwoImagesAndFirstComment: true, copyDeliveryIsCleanPending: true,
       replayPreservedEdits: true, sameRequestDifferentSourceConflicts: true, malformedHttpDenied: true, crossWorkspaceAndHiddenSourcesDenied: true,
-      readKeyCannotWriteOrDiscover: true, currentGrantRevocationDeniesReplay: true, originalSourceUnchanged: true,
+      readKeyCannotWriteOrDiscover: true, currentGrantRevocationDeniesReplay: true, originalSourceUnchanged: true, perDestinationFormatRetained: true, mcpExplicitFormatUpdated: true, invalidFormatRefusedBeforeSave: true,
       editorDeniedByOriginalMcpPolicy: editorDeniedByOriginalPolicy, temporaryEditorPolicyGrant: roleSettingChanged, providerDispatch: false }));
   } finally {
     try {
       let cleanupFailed = false;
       try {
         await client.$transaction(async tx => {
-          await tx.$executeRaw`DELETE FROM root_activities WHERE "actorId" = ${userId} AND detail->>'workspaceId' = ${workspaceId} AND (action = 'mcp.write' OR (id = ANY(${receiptIds}) AND action = 'publishing.post_duplicated'))`;
+          await tx.$executeRaw`DELETE FROM root_activities WHERE "actorId" = ${userId} AND detail->>'workspaceId' = ${workspaceId} AND (action = 'mcp.write' OR action LIKE 'publishing.%')`;
           await tx.postTarget.deleteMany({ where: { postId: { in: [sourceId, collisionSourceId, hiddenSourceId, foreignPostId, requestId] } } });
           await tx.post.deleteMany({ where: { id: { in: [sourceId, collisionSourceId, hiddenSourceId, foreignPostId, requestId] }, authorId: userId } });
           await tx.mcpApiKey.deleteMany({ where: { id: { in: [writeKeyId, readKeyId] }, workspaceId } });

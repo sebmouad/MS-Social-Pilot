@@ -1,3 +1,4 @@
+vi.mock('../src/modules/publishing/server/formats', () => ({ resolveAuthorizedDestinationFormats: async (targets: Array<{id:string}>) => Object.fromEntries(targets.map(t=>[t.id,'example-opaque-format'])) }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
@@ -99,7 +100,7 @@ describe('duplicatePost', () => {
   it('passes the copied link into destination media compatibility checks', async () => {
     state.source = source({ link: 'https://example.test/story', media: [{ kind: 'image', url: 'https://example.test/image.jpg', altText: 'image' }] });
     await duplicatePost(actor, args());
-    expect(state.validateTargets).toHaveBeenCalledWith(state.actor, ['target-1'], 10, state.source.media, true, 'https://example.test/story', 'example-opaque-format');
+    expect(state.validateTargets).toHaveBeenCalledWith(state.actor, ['target-1'], 10, state.source.media, true, 'https://example.test/story');
   });
 
   it('duplicates link-only and media-only posts with an empty normalized caption', async () => {

@@ -20,7 +20,7 @@ export async function loadVersionRetention(): Promise<number> {
 
 export type PostVersionRecord = {
   id: string; postId: string; authorId: string | null; authorName: string | null; createdAt: Date; message: string; firstComment: string | null;
-  link: string | null; media: unknown; format: string; targetIds: string[]; labelIds: string[]; scheduledAt: Date | null; timezone: string;
+  link: string | null; media: unknown; format: string; destinationFormats: Record<string, string>; targetIds: string[]; labelIds: string[]; scheduledAt: Date | null; timezone: string;
 };
 /** Statuses where content is final or in flight; the lifecycle port makes the final decision for all others. */
 const LOCKED_STATUSES = new Set(['published', 'publishing', 'partially_failed', 'cancelled', 'scheduled']);
@@ -31,7 +31,7 @@ export async function readPostVersions(actor: PublishingActor, input: unknown) {
   const auth = await authorizePublishing(actor, POSTS, 'read');
   const post = await visiblePost(prisma, auth, query.postId);
   const page = query.page ?? 1;
-  const rows = await protect(prisma.$queryRaw<PostVersionRecord[]>`SELECT v.id, v."postId", v."authorId", u.name AS "authorName", v."createdAt", v.message, v."firstComment", v.link, v.media, v.format, v."targetIds", v."labelIds", v."scheduledAt", v.timezone FROM post_versions v JOIN posts p ON p.id = v."postId" LEFT JOIN users u ON u.id = v."authorId" WHERE v."postId" = ${query.postId} AND p."workspaceId" = ${actor.workspaceId} ORDER BY v."createdAt" DESC, v.id DESC LIMIT ${limit.versionPageSize + 1} OFFSET ${pageOffset(page, limit.versionPageSize)}`);
+  const rows = await protect(prisma.$queryRaw<PostVersionRecord[]>`SELECT v.id, v."postId", v."authorId", u.name AS "authorName", v."createdAt", v.message, v."firstComment", v.link, v.media, v.format, v."destinationFormats", v."targetIds", v."labelIds", v."scheduledAt", v.timezone FROM post_versions v JOIN posts p ON p.id = v."postId" LEFT JOIN users u ON u.id = v."authorId" WHERE v."postId" = ${query.postId} AND p."workspaceId" = ${actor.workspaceId} ORDER BY v."createdAt" DESC, v.id DESC LIMIT ${limit.versionPageSize + 1} OFFSET ${pageOffset(page, limit.versionPageSize)}`);
   return { postId: query.postId, restorable: !LOCKED_STATUSES.has(post.status), versions: rows.slice(0, limit.versionPageSize), page, pageSize: limit.versionPageSize, hasMore: rows.length > limit.versionPageSize };
 }
 
@@ -42,9 +42,10 @@ export async function readPostVersions(actor: PublishingActor, input: unknown) {
 export async function recordPostVersion(tx: Tx, postId: string, authorId: string | null, retention: number): Promise<boolean> {
   if (!Number.isSafeInteger(retention) || retention < 1) throw new OperationError('unavailable', 'Version history is temporarily unavailable.');
   const inserted = await tx.$executeRaw`
-    INSERT INTO post_versions (id, "postId", "authorId", "createdAt", message, "firstComment", link, media, format, "targetIds", "labelIds", "scheduledAt", timezone)
+    INSERT INTO post_versions (id, "postId", "authorId", "createdAt", message, "firstComment", link, media, format, "destinationFormats", "targetIds", "labelIds", "scheduledAt", timezone)
     SELECT 'ver_' || gen_random_uuid()::text, p.id, ${authorId},
       GREATEST(clock_timestamp(), COALESCE((SELECT MAX("createdAt") + interval '1 millisecond' FROM post_versions WHERE "postId" = p.id), clock_timestamp())), p.message, p."firstComment", p.link, p.media, p.format,
+      COALESCE((SELECT jsonb_object_agg(t."targetId", COALESCE(t."formatId", p.format)) FROM post_targets t WHERE t."postId" = p.id), '{}'::jsonb),
       COALESCE((SELECT array_agg(t."targetId" ORDER BY t."targetId") FROM post_targets t WHERE t."postId" = p.id), ARRAY[]::text[]),
       COALESCE((SELECT array_agg(l."labelId" ORDER BY l."labelId") FROM post_labels l WHERE l."postId" = p.id), ARRAY[]::text[]),
       p."scheduledAt", p.timezone
@@ -54,6 +55,7 @@ export async function recordPostVersion(tx: Tx, postId: string, authorId: string
           AND prev.message = p.message AND prev."firstComment" IS NOT DISTINCT FROM p."firstComment" AND prev.link IS NOT DISTINCT FROM p.link
           AND prev.media IS NOT DISTINCT FROM p.media AND prev.format = p.format AND prev.timezone = p.timezone AND prev."scheduledAt" IS NOT DISTINCT FROM p."scheduledAt"
           AND prev."targetIds" = COALESCE((SELECT array_agg(t."targetId" ORDER BY t."targetId") FROM post_targets t WHERE t."postId" = p.id), ARRAY[]::text[])
+          AND prev."destinationFormats" IS NOT DISTINCT FROM COALESCE((SELECT jsonb_object_agg(t."targetId", COALESCE(t."formatId", p.format)) FROM post_targets t WHERE t."postId" = p.id), '{}'::jsonb)
           AND prev."labelIds" = COALESCE((SELECT array_agg(l."labelId" ORDER BY l."labelId") FROM post_labels l WHERE l."postId" = p.id), ARRAY[]::text[]))`;
   if (inserted > 0) await tx.$executeRaw`DELETE FROM post_versions WHERE "postId" = ${postId} AND id IN (SELECT id FROM post_versions WHERE "postId" = ${postId} ORDER BY "createdAt" DESC, id DESC OFFSET ${retention})`;
   return inserted > 0;
@@ -75,7 +77,7 @@ export async function requestVersionRestore(actor: PublishingActor, input: unkno
     const post = await visiblePost(tx, auth, data.postId, true);
     assertMayEdit(auth, post);
     if (LOCKED_STATUSES.has(post.status)) throw new OperationError('conflict', 'This post can no longer be edited, so an earlier version cannot be restored.');
-    const rows = await tx.$queryRaw<Array<Omit<VersionSnapshot, 'versionId'> & { id: string; currentFormat: string }>>`SELECT p.format AS "currentFormat", v.id, v.message, v."firstComment", v.link, v.media, v.format, v."targetIds", v."labelIds", v."scheduledAt", v.timezone FROM post_versions v JOIN posts p ON p.id = v."postId" WHERE v.id = ${data.versionId} AND v."postId" = ${data.postId} AND p."workspaceId" = ${actor.workspaceId}`;
+    const rows = await tx.$queryRaw<Array<Omit<VersionSnapshot, 'versionId'> & { id: string; currentFormat: string }>>`SELECT p.format AS "currentFormat", v.id, v.message, v."firstComment", v.link, v.media, v.format, v."destinationFormats", v."targetIds", v."labelIds", v."scheduledAt", v.timezone FROM post_versions v JOIN posts p ON p.id = v."postId" WHERE v.id = ${data.versionId} AND v."postId" = ${data.postId} AND p."workspaceId" = ${actor.workspaceId}`;
     const row = rows[0];
     if (!row) throw new OperationError('not_found', 'This version is unavailable for the post.');
     if (row.currentFormat !== row.format) throw new OperationError('conflict', 'This version uses a different post format and cannot be restored here. No content was changed.');

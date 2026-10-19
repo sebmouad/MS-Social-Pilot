@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({
   state: {
     role: 'admin', post: null as any, policy: { timezone: 'UTC', requiresApproval: true },
+    formats: ['post', 'synthetic-module-format'].map(id => ({ id, label: id, media: { kinds: ['image', 'video'], maxImages: 4, maxVideos: 4, mixedKinds: true, linkWithMedia: true, imageAltText: true }, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } })),
     stored: { format: 'post', approvalStatus: 'approved', firstCommentDelayMinutes: 0 },
     targets: [{ id: 't1', accessToken: 'credential', socialAccount: { provider: 'facebook', invalidatedAt: null, tokenExpiresAt: null, scopes: [] } }] as any[],
     credential: true, capability: true, targetValidation: true, allowedTargetIds: undefined as string[] | undefined, collision: false, badLabels: [] as any[],
@@ -17,7 +18,7 @@ const h = vi.hoisted(() => ({
 vi.mock('@/server/data', () => ({ prisma: { $queryRaw: (...args: any[]) => h.state.queryRaw(...args) } }));
 vi.mock('@/server/jobs/access', () => ({ assertWorkspaceJobAccess: (...args: any[]) => h.state.jobAccess(...args) }));
 vi.mock('@/server/entitlements', () => ({ hasPlatformCapability: () => h.state.capability }));
-vi.mock('@/server/platforms/registry', () => ({ platformFor: async () => ({}) }));
+vi.mock('@/server/platforms/registry', () => ({ platformFor: async () => ({ publish: vi.fn(), publishingFormats: h.state.formats, defaultPublishingFormatId: 'post' }) }));
 vi.mock('@/server/platforms/resource-lock', () => ({ lockSelectedResources: vi.fn() }));
 vi.mock('@/modules/publishing/server/access', () => ({ authorizePublishing: vi.fn(async () => {}) }));
 vi.mock('@/modules/publishing/server/guard', () => ({ lockPublishingTargets: vi.fn() }));
@@ -40,6 +41,9 @@ vi.mock('@/server/publishing/lifecycle', () => ({
   resolvePublishMedia: async (_workspaceId: string, media: unknown) => media,
   validateTargets: async (actor: any, ids: string[]) => {
     if (!h.state.targetValidation || (actor.allowedTargetIds !== undefined && ids.some(id => !actor.allowedTargetIds.includes(id)))) throw new OperationError('conflict', 'target validation refused');
+    const destinations = ids.map(id => h.state.targets.find(target => target.id === id)).filter(Boolean);
+    if (destinations.length !== ids.length) throw new OperationError('conflict', 'target validation refused');
+    return destinations;
   },
 }));
 
@@ -51,7 +55,7 @@ function post(status: string, overrides: Record<string, unknown> = {}) {
   return {
     id: 'source1', workspaceId: 'w1', authorId: 'author1', message: 'Original', firstComment: null,
     link: null, media: [], status, publishedAt: status === 'published' ? new Date('2026-01-01T00:00:00Z') : null,
-    targets: [{ id: 'pt1', targetId: 't1', status: 'pending', remotePostId: null }], ...overrides,
+    targets: [{ id: 'pt1', targetId: 't1', formatId: null, status: 'pending', remotePostId: null }], ...overrides,
   };
 }
 
@@ -165,8 +169,16 @@ describe('Publishing automatic lifecycle', () => {
     expect(h.state.executeRaw.mock.calls[0]).toContain('approved');
   });
 
+  it('accepts and stores a supported destination format that differs from legacy post format', async () => {
+    h.state.stored = { format: 'post', approvalStatus: 'approved', firstCommentDelayMinutes: 0 };
+    h.state.post = post('published', { targets: [{ id: 'pt1', targetId: 't1', formatId: 'synthetic-module-format', status: 'pending', remotePostId: null }] });
+    await expect(publishingAutomationLifecycle.recycle(makeTx(), recycleInput())).resolves.toBe(true);
+    expect(h.state.create.mock.calls[0]![0].data.targets.create).toEqual([
+      expect.objectContaining({ targetId: 't1', formatId: 'synthetic-module-format', status: 'pending' }),
+    ]);
+  });
+
   it.each([
-    ['native format', { format: 'carousel' }, { firstCommentDelayMinutes: 0 }],
     ['delayed first comment', { format: 'post' }, { firstCommentDelayMinutes: 10 }],
   ])('refuses recycle with %s before copy creation', async (_label, stored, extra) => {
     h.state.stored = { approvalStatus: 'approved', ...stored, ...extra } as any;

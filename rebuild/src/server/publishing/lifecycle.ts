@@ -1,3 +1,4 @@
+import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
 import { validateSelectedPublishingFormat } from '@/modules/publishing/formats';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../generated/client';
@@ -31,7 +32,7 @@ export async function limits(): Promise<PublishingLimits> {
   return { maxText: Number(maxText), maxImportRows: Number(maxImportRows), maxImportBytes: Number(maxImportBytes), maxTargets: Number(maxTargets), maxMedia: Number(maxMedia), maxAlt: Number(maxAlt) };
 }
 
-type PostAttachments = { link?: string; media?: PublishMedia[] };
+type PostAttachments = { link?: string; media?: PublishMedia[]; destinationFormats?: unknown };
 const MEDIA_REFERENCE = /^media:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 function storedImageId(media: PublishMedia): string | null {
   return media.kind === 'image' ? MEDIA_REFERENCE.exec(media.url)?.[1] ?? null : null;
@@ -139,7 +140,7 @@ export async function validateTargets(actor: PublishingActor, ids: string[], max
 
 async function assertStoredPostMediaCompatible(workspaceId: string, post: {
   message?: string | null; firstComment?: string | null; link?: string | null; media?: unknown; format?: string;
-  targets: Array<{ status: string; target?: { socialAccount?: { provider?: string | null } | null } }>;
+  targets: Array<{ status: string; formatId?: string | null; target?: { socialAccount?: { provider?: string | null } | null } }>;
 }) {
   if (post.media !== undefined && !Array.isArray(post.media)) throw new OperationError('invalid_request', 'Stored post attachments need review before scheduling.');
   const config = await limits();
@@ -150,7 +151,7 @@ async function assertStoredPostMediaCompatible(workspaceId: string, post: {
     if (destination.status !== 'pending') continue;
     const provider = destination.target?.socialAccount?.provider;
     const adapter = provider ? await platformFor(provider, 'publishing') : null;
-    validateSelectedPublishingFormat(adapter?.publishingFormats, post.format, { media: resolved, link: attachments.link, firstComment: post.firstComment, scheduled: true });
+    validateSelectedPublishingFormat(adapter?.publishingFormats, destination.formatId ?? post.format, { media: resolved, link: attachments.link, firstComment: post.firstComment, scheduled: true });
     assertPublishingMediaSupport(adapter ?? { publishingMedia: undefined } as PlatformAdapter, resolved, attachments.link);
     assertLocalImageLimits(adapter ?? {}, resolved);
   }
@@ -254,7 +255,7 @@ export async function schedulePost(actor: PublishingActor, postId: string, sched
     if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
     const retention = await loadVersionRetention();
     await publishingTransaction(signal, async tx => {
-      const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, message: true, firstComment: true, format: true, link: true, media: true, targets: { select: { status: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
+      const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, message: true, firstComment: true, format: true, link: true, media: true, targets: { select: { status: true, formatId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length || post.targets.some(target => target.status !== 'pending')) throw new OperationError('conflict', 'This post cannot be scheduled.');
       await assertStoredPostMediaCompatible(actor.workspaceId, post);
       await recordPostVersion(tx, post.id, actor.userId, retention);
@@ -284,7 +285,7 @@ export async function reschedulePost(actor: PublishingActor, input: RescheduleIn
     if (scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
     const retention = await loadVersionRetention();
     await publishingTransaction(signal, async tx => {
-      const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, message: true, firstComment: true, format: true, link: true, media: true, targets: { select: { status: true, remotePostId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
+      const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, message: true, firstComment: true, format: true, link: true, media: true, targets: { select: { status: true, formatId: true, remotePostId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('conflict', 'This post cannot be rescheduled.');
       if (post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new OperationError('conflict', 'Only posts that are still waiting to publish can be rescheduled.');
       await assertStoredPostMediaCompatible(actor.workspaceId, post);
@@ -328,6 +329,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
     const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
     if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new OperationError('invalid_request', 'Choose a future publishing time and at least one destination.');
+    const destinationFormats = await resolveAuthorizedDestinationFormats(targets, input.destinationFormats, config.maxTargets, { media: uploadMedia, link: attachments.link, firstComment, scheduled: Boolean(input.scheduledAt) });
     const retention = await loadVersionRetention();
     const now = new Date();
     const id = randomUUID();
@@ -337,7 +339,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
         if (!labels.length) throw new OperationError('not_found', 'This post label is unavailable in the current workspace.');
       }
       await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, link: attachments.link, media: attachments.media, status: holdForApproval ? 'pending_approval' : input.scheduledAt ? 'scheduled' : 'draft', scheduledAt: input.scheduledAt ?? null, publishedAt: null, createdAt: now, updatedAt: now,
-        targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
+        targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
       if (input.labelId) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") VALUES (${id}, ${input.labelId})`;
       if (holdForApproval) await setApprovalPending(tx, actor, id);
       await recordPostVersion(tx, id, actor.userId, retention);
@@ -362,9 +364,10 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
     const restoreLabelLimit = restoreLabelIds ? await runtimeConfig('publishing.collab.labelsPerPostLimit') : null;
     if (restoreLabelIds && (!Number.isSafeInteger(restoreLabelLimit) || Number(restoreLabelLimit) < 1 || Number(restoreLabelLimit) > 100)) throw new OperationError('unavailable', 'Post label limits are temporarily unavailable.');
     const saved = await publishingTransaction(signal, async tx => {
-      const existing = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, publishedAt: true, targets: { select: { id: true, status: true, remotePostId: true } } } });
+      const existing = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, format: true, status: true, publishedAt: true, targets: { select: { id: true, targetId: true, formatId: true, status: true, remotePostId: true } } } });
       if (!existing || (role.role === 'contributor' && existing.authorId !== actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
       if (existing.publishedAt || ['publishing', 'published', 'partially_failed', 'scheduled'].includes(existing.status) || existing.targets.some(target => target.remotePostId || target.status === 'processing' || target.status === 'published' || target.status === 'scheduled_remote')) throw new OperationError('conflict', 'This post can no longer be edited.');
+      const destinationFormats = await resolveAuthorizedDestinationFormats(targets, input.destinationFormats, config.maxTargets, { media: uploadMedia, link: attachments.link, firstComment }, { formats: new Map(existing.targets.map(target => [target.targetId, target.formatId ?? null])), legacyFormat: existing.format });
       await recordPostVersion(tx, existing.id, actor.userId, retention);
       if (restoreLabelIds) {
         if (new Set(restoreLabelIds).size !== restoreLabelIds.length || restoreLabelIds.length > Number(restoreLabelLimit)) throw new OperationError('invalid_request', `This version exceeds the current limit of ${restoreLabelLimit} post labels.`);
@@ -374,7 +377,7 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
         }
       }
       await tx.postTarget.deleteMany({ where: { postId: existing.id } });
-      await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, link: attachments.link, media: attachments.media, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
+      await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, link: attachments.link, media: attachments.media, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
       if (restoreLabelIds) {
         await tx.$executeRaw`DELETE FROM post_labels WHERE "postId" = ${existing.id}`;
         if (restoreLabelIds.length) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") SELECT ${existing.id}, restore_ids.label_id FROM unnest(${[...restoreLabelIds]}::text[]) AS restore_ids(label_id)`;
@@ -392,11 +395,12 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
 }
 
 /** Lifecycle port for version restoration. The save path rechecks current rights and only restores local draft/rejected content. */
-export async function restorePostVersion(input: { actor: PublishingActor; postId: string; snapshot: { message: string; firstComment: string | null; link: string | null; media: unknown; targetIds: string[]; labelIds: string[] } }) {
+export async function restorePostVersion(input: { actor: PublishingActor; postId: string; snapshot: { message: string; firstComment: string | null; link: string | null; media: unknown; format?: string; destinationFormats?: Record<string,string>; targetIds: string[]; labelIds: string[] } }) {
   if (!Array.isArray(input.snapshot.media)) throw new OperationError('invalid_request', 'This saved version has invalid media and cannot be restored.');
   const result = await updatePost(input.actor, {
     postId: input.postId, message: input.snapshot.message, firstComment: input.snapshot.firstComment ?? '', link: input.snapshot.link ?? undefined,
     media: input.snapshot.media as PublishMedia[], targetIds: input.snapshot.targetIds,
+    destinationFormats: input.snapshot.format !== undefined || input.snapshot.destinationFormats !== undefined ? Object.fromEntries(input.snapshot.targetIds.map(id=>[id,input.snapshot.destinationFormats?.[id] ?? input.snapshot.format])) : undefined,
   }, input.snapshot.labelIds);
   if (!result) throw new OperationError('upstream_failure', 'The restore could not be confirmed. Open the post and check its current content before trying again.');
   return { postId: input.postId, status: result.status, approvalReset: result.approvalReset };
@@ -411,7 +415,7 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
     const role = await membership(actor);
     const approvalRequired = !MANAGERS.has(role.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), role.role);
     await assertPostScope(actor, postId);
-    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, format: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true } } } } } } } });
+    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, format: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, formatId: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true } } } } } } } });
     if (expectedScheduledAt !== undefined && (!post || post.status !== 'scheduled' || !post.scheduledAt || post.scheduledAt.getTime() !== expectedScheduledAt.getTime())) return { published: 0, failed: 0, needsReconciliation: 0, firstCommentsNeedingReview: 0, firstCommentsNotSent: 0, skipped: true };
     if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
     if (approvalRequired) {
@@ -432,7 +436,7 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       const provider = item.target.socialAccount?.provider;
       const adapter = provider ? await platformFor(provider, 'publishing') : null;
       if (adapter) {
-        validateSelectedPublishingFormat(adapter.publishingFormats, post.format, { media: publishMedia, link: attachments.link, firstComment: post.firstComment });
+        validateSelectedPublishingFormat(adapter.publishingFormats, item.formatId ?? post.format, { media: publishMedia, link: attachments.link, firstComment: post.firstComment });
         assertPublishingMediaSupport(adapter, publishMedia, attachments.link);
         assertLocalImageLimits(adapter, publishMedia);
       }
@@ -453,7 +457,7 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       if (!eligible) { failed++; await markTarget(actor, item.id, 'failed', signal); continue; }
       const outcome = await publishDestinationInOperation({ actor, signal }, {
         postId: post.id, postTargetId: item.id, targetId: item.target.id, provider: provider!, expectedStatus: item.status as 'pending' | 'failed',
-        dispatch: operationId => adapter!.publish!({ credential: credential!, target: { id: item.target.providerId, name: '', kind: item.target.type }, formatId: post.format, text: post.message, link: attachments.link, media: publishMedia, signal, operationId }),
+        dispatch: operationId => adapter!.publish!({ credential: credential!, target: { id: item.target.providerId, name: '', kind: item.target.type }, formatId: item.formatId ?? post.format, text: post.message, link: attachments.link, media: publishMedia, signal, operationId }),
         classifyFailure: error => adapter!.classifyPublishingFailure?.(error) ?? 'uncertain',
       });
       if (outcome === 'failed') { failed++; continue; }
@@ -483,7 +487,7 @@ export async function syncPostStatus(actor: PublishingActor, postId: string) {
   return withPublishingOperation(actor, { postId }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
     await assertPostScope(actor, postId);
-    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } } } } } } });
+    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true, formatId: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } } } } } } });
     if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
     const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
     if (!entitlements) throw new OperationError('unavailable', 'This workspace is unavailable.');
@@ -528,21 +532,27 @@ export async function importPostsCsv(actor: PublishingActor, csv: string) {
     const rows = parsePublishingCsv(csv);
     if (rows.length < 2 || rows.length > config.maxImportRows + 1) throw new OperationError('invalid_request', `CSV must include a header and contain at most ${config.maxImportRows} posts.`);
     const header = rows[0]!.map(value => value.trim());
-    if (header.length !== 3 || header[0] !== 'message' || header[1] !== 'firstComment' || header[2] !== 'channels') throw new OperationError('invalid_request', 'CSV header must be message,firstComment,channels.');
+    if ((header.length !== 3 && header.length !== 4) || header[0] !== 'message' || header[1] !== 'firstComment' || header[2] !== 'channels' || (header.length === 4 && header[3] !== 'destinationFormats')) throw new OperationError('invalid_request', 'CSV header must be message,firstComment,channels with optional destinationFormats.');
     const available = await prisma.target.findMany({ where: { workspaceId: actor.workspaceId, enabled: true, canPublish: true, ...(actor.allowedTargetIds ? { id: { in: [...actor.allowedTargetIds] } } : {}) }, select: { id: true, name: true, type: true, socialAccount: { select: { provider: true } } } });
     const choices = available.map(target => ({ id: target.id, name: target.name, type: target.type, provider: target.socialAccount?.provider ?? null }));
     const inputs = rows.slice(1).map((row, index) => {
-      if (row.length !== 3) throw new OperationError('invalid_request', `CSV row ${index + 2} must have exactly three columns.`);
-      return { message: validText(row[0]!, config.maxText), firstComment: validFirstComment(row[1]!, config.maxText), targetIds: resolveCsvDestinationIds(row[2]!, choices, index + 2) };
+      if (row.length !== header.length) throw new OperationError('invalid_request', `CSV row ${index + 2} must match the header columns.`);
+      let destinationFormats: unknown;
+      if (header.length === 4 && row[3]?.trim()) { try { destinationFormats = JSON.parse(row[3]); } catch { throw new OperationError('invalid_request', `CSV row ${index + 2} needs a valid destinationFormats JSON object.`); } }
+      return { destinationFormats, message: validText(row[0]!, config.maxText), firstComment: validFirstComment(row[1]!, config.maxText), targetIds: resolveCsvDestinationIds(row[2]!, choices, index + 2) };
     });
     await lockTargets([...new Set(inputs.flatMap(input => input.targetIds))]);
-    for (const input of inputs) await validateTargets(actor, input.targetIds, config.maxTargets, [], Boolean(input.firstComment));
+    const resolvedFormats: Array<Record<string,string>> = [];
+    for (const input of inputs) {
+      const destinations = await validateTargets(actor, input.targetIds, config.maxTargets, [], Boolean(input.firstComment));
+      resolvedFormats.push(await resolveAuthorizedDestinationFormats(destinations, input.destinationFormats, config.maxTargets, {media:[],firstComment:input.firstComment}));
+    }
     const targetCount = new Set(inputs.flatMap(row => row.targetIds)).size;
     const now = new Date();
     const ids = inputs.map(() => randomUUID());
     await publishingTransaction(signal, async tx => {
       for (const [index, input] of inputs.entries()) await tx.post.create({ data: { id: ids[index]!, workspaceId: actor.workspaceId, authorId: actor.userId, message: input.message, firstComment: input.firstComment, status: 'draft', scheduledAt: null, publishedAt: null, createdAt: now, updatedAt: now,
-        targets: { create: input.targetIds.map(targetId => ({ id: randomUUID(), targetId, status: 'pending' as const })) } } });
+        targets: { create: input.targetIds.map(targetId => ({ id: randomUUID(), targetId, formatId: resolvedFormats[index]![targetId], status: 'pending' as const })) } } });
       await audit(tx, actor, 'publishing.posts_imported', { postCount: ids.length, targetCount });
     });
     return { count: ids.length };

@@ -48,10 +48,10 @@ function safeMedia(value: unknown): Array<{ kind: string; url: string; altText?:
 }
 
 function rowValues(post: {
-  id: string; authorId: string; message: string; firstComment: string | null; link: string | null; media: unknown;
+  id: string; authorId: string; message: string; firstComment: string | null; format?: string; link: string | null; media: unknown;
   status: string; scheduledAt: Date | null; publishedAt: Date | null; createdAt: Date;
   targets: Array<{
-    id: string; status: string; remotePostId: string | null; remoteUrl: string | null; firstCommentId: string | null;
+    id: string; formatId?: string | null; status: string; remotePostId: string | null; remoteUrl: string | null; firstCommentId: string | null;
     firstCommentAt: Date | null; firstCommentError: string | null;
     target: { id: string; name: string; type: string };
   }>;
@@ -61,6 +61,7 @@ function rowValues(post: {
     name: target.target.name,
     type: target.target.type,
     status: target.status,
+    format_id: target.formatId ?? post.format ?? null,
     remote_id: target.remotePostId,
     remote_url: target.remoteUrl,
     first_comment: {
@@ -127,10 +128,10 @@ export async function exportPublishingPosts(
         where: cursorWhere ? { AND: [query.where, cursorWhere] } : query.where,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take,
         select: {
-          id: true, authorId: true, message: true, firstComment: true, link: true, media: true,
+          id: true, authorId: true, message: true, firstComment: true, format: true, link: true, media: true,
           status: true, scheduledAt: true, publishedAt: true, createdAt: true,
           targets: { select: {
-            id: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true,
+            id: true, formatId: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true,
             target: { select: { id: true, name: true, type: true } },
           } },
         },

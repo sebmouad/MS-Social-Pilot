@@ -20,6 +20,7 @@ export type ComposerValues = {
   intent: string;
   attachmentKind: string;
   mediaJson: string;
+  destinationFormatsJson: string;
   message: string;
   firstComment: string;
   labelId: string;
@@ -282,6 +283,14 @@ async function run(operation: (viewer: Awaited<ReturnType<typeof requireViewer>>
 
 function actor(viewer: Awaited<ReturnType<typeof requireViewer>>) { return { userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedTargetIds: viewer.permissions.pageScope.ids }) }; }
 function attachments(data: FormData) {
+  const result = mediaAttachments(data);
+  const raw = data.get('destinationFormatsJson');
+  if (raw === null || raw === '') return result;
+  if (typeof raw !== 'string') throw new OperationError('invalid_request', 'Choose valid destination formats.');
+  try { return { ...result, destinationFormats: JSON.parse(raw) as unknown }; }
+  catch { throw new OperationError('invalid_request', 'Choose valid destination formats.'); }
+}
+function mediaAttachments(data: FormData) {
   if (data.has('mediaJson')) {
     const raw = stringField(data, 'mediaJson');
     const legacyMedia = ['imageUrl', 'videoUrl', 'uploadedImageRef', 'existingImageRef', 'altText', 'existingAltText']
@@ -329,7 +338,7 @@ function failureNotice(error: unknown) {
 function composerValues(data: FormData): ComposerValues {
   const values = (key: string) => { const value = data.get(key); return typeof value === 'string' ? value : ''; };
   return {
-    intent: values('intent'), attachmentKind: values('attachmentKind'), mediaJson: values('mediaJson'), message: values('message'), firstComment: values('firstComment'),
+    intent: values('intent'), attachmentKind: values('attachmentKind'), mediaJson: values('mediaJson'), destinationFormatsJson: values('destinationFormatsJson'), message: values('message'), firstComment: values('firstComment'),
     link: values('link'), imageUrl: values('imageUrl'), videoUrl: values('videoUrl'), uploadedImageRef: values('uploadedImageRef'),
     altText: values('altText'), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string'),
     scheduleDate: values('scheduleDate'), scheduleTime: values('scheduleTime'), labelId: values('labelId'),
@@ -342,6 +351,7 @@ function composerError(error: unknown) {
   if (message === 'Add post text, a link, or media before saving.') return message;
   if (/Post text must|Write the post text/i.test(message)) return 'Shorten the post text to fit the allowed character limit.';
   if (/First comment must/i.test(message)) return 'Shorten the first comment to fit the allowed character limit.';
+  if (/publishing format|destination formats/i.test(message)) return 'Choose an available format for each selected destination.';
   if (/target|destination/i.test(message)) return 'Check your selected destinations and try again.';
   if (/attachment|image|media|HTTPS URL/i.test(message)) return 'Check the attachment and its description, then try again.';
   if (/schedule|publishing time|future/i.test(message)) return 'Choose a valid future time in your workspace time zone and select at least one destination.';

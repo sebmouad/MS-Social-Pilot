@@ -171,3 +171,10 @@ permissions/confirmations. Source inventory confirms this remains unintegrated.
 Do not include unrelated untracked integrations automatically. Full Facebook
 live coverage/photo cleanup, complete Root controls and production-shaped
 migration/media/service rollback remain required. Production stays legacy.
+
+
+## Current batch85
+
+Per-destination format storage and shared authoring controls are implemented; local additive migration and eighteen-file schema-only rehearsal passed. Final isolated suite and retry browser verification are in progress. Do not infer native Facebook formats or cutover readiness. Complete browser retry navigation, publish this reviewed batch, then continue Facebook format-engine coverage and outstanding parity inventory.
+
+Final batch85 evidence: isolated synthetic PostgreSQL suite 2,953 tests / 342 files, zero skips; typecheck and production build passed. Final actual HTTP/MCP probe passed format retention/update, invalid-format rejection, scope/grant denials and exact cleanup. Browser retry still hangs after an action303 with x-action-redirect, both without same-origin interception and with production runtime. Checkbox/input preservation is proven; the full eight-view browser matrix is NOT passed. No provider content or production service changed. Next: diagnose streamed action response completion/internal redirect render before claiming authoring recovery complete.

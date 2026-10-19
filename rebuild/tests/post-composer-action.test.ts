@@ -130,3 +130,11 @@ describe('recoverable post composer action', () => {
     expect(deps.createPost).not.toHaveBeenCalled();
   });
 });
+
+ it('passes the selected format map and retains it with useful format guidance after a rejected save', async () => {
+ const json=JSON.stringify({'target-a':'removed-format'});
+ deps.createPost.mockRejectedValueOnce(new Error('The selected publishing format is unavailable for this destination. Choose an available format.'));
+ const result=await createPostWithRecoveryAction({status:'idle',values:{}},formData({intent:'draft',message:'Retain this post',firstComment:'Retain comment',targetIds:['target-a'],mediaJson:'[]',destinationFormatsJson:json}));
+ expect(deps.createPost).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({destinationFormats:{'target-a':'removed-format'}}));
+ expect(result).toMatchObject({status:'error',message:'Choose an available format for each selected destination.',values:{message:'Retain this post',destinationFormatsJson:json,targetIds:['target-a']}});
+ });

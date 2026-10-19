@@ -120,8 +120,8 @@ export async function listPostPage(workspaceId: string, page: number, pageSize: 
     take: size,
     select: {
       id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true,
-      firstComment: true, authorId: true, link: true, media: true,
-      targets: { select: { id: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true, target: { select: { id: true, type: true, name: true, pictureUrl: true } } } },
+      firstComment: true, format: true, authorId: true, link: true, media: true,
+      targets: { select: { id: true, formatId: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true, target: { select: { id: true, type: true, name: true, pictureUrl: true } } } },
     },
   });
   return { posts: safeCommentErrors(posts), total, page: currentPage, pages };
@@ -142,8 +142,8 @@ export async function listCalendarRange(workspaceId: string, from: Date, to: Dat
     orderBy: [{ scheduledAt: 'asc' }, { publishedAt: 'asc' }, { id: 'asc' }],
     select: {
       id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, authorId: true,
-      firstComment: true, link: true, media: true,
-      targets: { select: { id: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true, target: { select: { id: true, name: true, type: true, pictureUrl: true, socialAccount: { select: { provider: true } } } } } },
+      firstComment: true, format: true, link: true, media: true,
+      targets: { select: { id: true, formatId: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true, target: { select: { id: true, name: true, type: true, pictureUrl: true, socialAccount: { select: { provider: true } } } } } },
     },
   });
   return safeCommentErrors(posts);

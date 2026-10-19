@@ -1,3 +1,4 @@
+import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
 import { OperationError } from '@/lib/operation-error';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
@@ -36,7 +37,7 @@ export async function queuePost(actor: PublishingActor, postId: string) {
         where: { id: postId, workspaceId: actor.workspaceId },
         select: {
           id: true, authorId: true, status: true, publishedAt: true, message: true, firstComment: true, format: true, link: true, media: true,
-          targets: { select: { id: true, targetId: true, status: true, remotePostId: true } },
+          targets: { select: { id: true, targetId: true, formatId: true, status: true, remotePostId: true } },
         },
       }),
     ]);
@@ -58,7 +59,8 @@ export async function queuePost(actor: PublishingActor, postId: string) {
     const attachments = validatePostAttachments({ link: post.link ?? undefined, media: (post.media ?? []) as unknown as import('@/platforms/types').PublishMedia[] }, publishingLimits.maxMedia, publishingLimits.maxAlt);
     const message = validatePostContent(post.message ?? '', publishingLimits.maxText, attachments);
     const resolvedMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
-    await validateTargets(context.actor, targetIds, publishingLimits.maxTargets, resolvedMedia, Boolean(firstComment), attachments.link, post.format, true);
+    const destinations = await validateTargets(context.actor, targetIds, publishingLimits.maxTargets, resolvedMedia, Boolean(firstComment), attachments.link);
+    await resolveAuthorizedDestinationFormats(destinations, undefined, publishingLimits.maxTargets, {media:resolvedMedia,link:attachments.link,firstComment,scheduled:true},{formats:new Map(post.targets.map(t=>[t.targetId,t.formatId ?? null])),legacyFormat:post.format});
     const holdForApproval = !MANAGERS.has(role) && needsContributorApproval(policy[0].requiresApproval, role);
 
     return withPublishingTransaction(context.signal, async tx => {
@@ -77,11 +79,11 @@ export async function queuePost(actor: PublishingActor, postId: string) {
       }
       const current = await tx.post.findFirst({
         where: { id: postId, workspaceId: actor.workspaceId },
-        select: { id: true, authorId: true, status: true, publishedAt: true, message: true, firstComment: true, link: true, media: true, targets: { select: { targetId: true, status: true, remotePostId: true } } },
+        select: { id: true, authorId: true, status: true, publishedAt: true, message: true, firstComment: true, format: true, link: true, media: true, targets: { select: { targetId: true, formatId: true, status: true, remotePostId: true } } },
       });
       if (!current || current.authorId !== post.authorId || current.status !== post.status || current.targets.length !== targetIds.length ||
-        current.publishedAt || current.message !== post.message || current.firstComment !== post.firstComment || current.link !== post.link ||
-        JSON.stringify(current.media) !== JSON.stringify(post.media) || current.targets.some(t => t.status !== 'pending' || t.remotePostId || !targetIds.includes(t.targetId))) {
+        current.publishedAt || current.message !== post.message || current.firstComment !== post.firstComment || current.format !== post.format || current.link !== post.link ||
+        JSON.stringify(current.media) !== JSON.stringify(post.media) || current.targets.some(t => t.status !== 'pending' || t.remotePostId || !targetIds.includes(t.targetId) || t.formatId !== post.targets.find(original => original.targetId === t.targetId)?.formatId)) {
         throw new OperationError('conflict', 'This post changed while it was being queued. Refresh and try again.');
       }
       const scheduledAt = await allocateQueueTime(tx, actor.workspaceId, workspace[0].timezone, targetIds, new Date(), collaborationBounds.queueLookaheadDays);

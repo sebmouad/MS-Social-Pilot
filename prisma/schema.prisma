@@ -660,6 +660,7 @@ model PostVersion {
   link         String?
   media        Json      @default("[]")
   format       String
+  destinationFormats Json @default("{}")
   targetIds    String[]  @default([])
   labelIds     String[]  @default([])
   scheduledAt  DateTime?
@@ -899,6 +900,8 @@ model PostTarget {
   /// Publish this destination without the post's pictures or video (text and link only).
   skipMedia Boolean @default(false)
 
+  /// Opaque module format identity; null means existing legacy intent.
+  formatId String?
   remotePostId       String?
   remoteUrl          String?
   /// The first comment, once Facebook accepted it.
