@@ -6,6 +6,10 @@ Updated 2026-10-19. Goal: [GOAL.md](GOAL.md). Mandatory target:
 
 ## Current position —2026-10-19
 
+Native safety checkpoint83 hardens source-only phase receipts and conservative
+status/deletion; it does not expose new formats. Next remains full native
+integration. See FACEBOOK_NATIVE_FORMATS.md.
+
 Reports batch82 verified locally:2865 tests/331 files, zero skips; build/typecheck,
 9 actual PostgreSQL cases, local API/MCP/browser/data and SMTP probes. Two
 migrations preserve existing report definitions;17-file schema-only rehearsal.

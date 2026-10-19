@@ -6,6 +6,15 @@
 
 Updated 2026-10-19. This document distinguishes the intended production architecture from the current rebuild. A component existing in source is not proof that its complete workflow is production-ready.
 
+## Native-format safety checkpoint (batch83)
+
+Facebook native format scaffolding is versioned but remains unregistered and
+unavailable. Phase intent/remote identity checkpoints, strict finish receipts,
+conservative status/deletion interpretation and numeric metadata validation have
+mocked regression coverage. No new customer format, Root setting, migration or
+live provider capability is claimed. See [FACEBOOK_NATIVE_FORMATS.md](FACEBOOK_NATIVE_FORMATS.md).
+The SQL store proposal is not an approved tenant-bound production journal.
+
 ## Structure
 
 ```mermaid

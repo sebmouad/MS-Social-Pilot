@@ -4,7 +4,25 @@ Updated: 2026-10-19. This is durable project context, not proof of current runti
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
 
-## Latest verified batch —82 (2026-10-19)
+## Current native-format checkpoint —83
+
+Native source and mocked tests are now owned/versioned, still `wired:false`.
+Executor checkpoints phase intents and IDs before subsequent remote writes;
+malformed finish/Story identities remain uncertain; direct byte-only uploads
+are refused; asynchronous video receipts require readback. Status mapping needs
+positive publication/schedule evidence. Graph100/sub33 never proves absence or
+successful deletion. Numeric metadata and dates fail closed. Both Claude
+accounts completed independent read-only reviews; additional final-ID and child-
+operation reconciliation defects were corrected. Clean HEAD plus owned source:
+2918 tests/336 files, zero skips with guarded local PostgreSQL; typecheck and
+production build passed. Native-only tests:53. No new UI/browser/live claims.
+
+No migration or provider write was performed. Do not mistake the proposed
+unscoped SQL store for a tenant-bound/fenced production journal. Next remains
+full native-format host integration (contracts, storage, Root, UI/API/MCP and
+live proof). Preserve the held photo canary and production legacy service.
+
+## Prior verified batch —82 (2026-10-19)
 
 Reports is integrated and locally verified; see REPORT_WORKFLOWS.md. Final
 candidate:2865 tests/331 files, zero skips, build/typecheck,9 actual PostgreSQL
