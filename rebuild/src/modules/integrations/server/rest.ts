@@ -7,8 +7,10 @@ import { canUseFeature, entitledPlatformIds } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
 import { authenticateBearerHeader } from '@/server/mcp/bearer';
+import { auditedReceipt, pageIdsFor, publishingActor } from '@/server/mcp/kit';
+import { createPostForApi, listPostsWithFirstComment } from '@/modules/publishing/server/api';
 import type { McpViewer } from '@/server/mcp/types';
-import { REST_HOOK_ID_SCHEMA, REST_HOOK_SCHEMA, WEBHOOK_EVENTS, type IntegrationsActor } from '../contracts';
+import { REST_HOOK_ID_SCHEMA, REST_HOOK_SCHEMA, REST_POST_CREATE_SCHEMA, WEBHOOK_EVENTS, type IntegrationsActor } from '../contracts';
 import { audit, authorize, notFound, parse, protect, requireEnabled, runtime, transact } from './core';
 import { createWebhook, displayUrl, type WebhookView } from './webhooks';
 import type { WebhookDeps } from './webhook-transport';
@@ -109,3 +111,58 @@ export async function restUnsubscribe(ctx: ApiKeyContext, input: unknown) {
 }
 
 export const REST_WEBHOOK_FEATURE = WEBHOOKS_FEATURE_ID;
+
+/** The grant a key needs for /api/v1/posts: the same one the MCP post tools use, with its read/write split and channel ceiling. */
+export const REST_POSTS_FEATURE = 'publishing/posts';
+export const REST_POSTS_QUERY_KEYS = ['status', 'from', 'to', 'limit', 'channelId', 'pages', 'q'] as const;
+export const REST_POSTS_BODY_MAX_BYTES = 256 * 1024;
+
+/** Read a JSON body with a hard byte cap, checked before and after reading, so an oversized request is refused. */
+export async function readCappedJson(request: Request, maxBytes = REST_POSTS_BODY_MAX_BYTES): Promise<unknown> {
+  const declared = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) throw new OperationError('invalid_request', 'This request is too large.');
+  const text = await request.text();
+  if (Buffer.byteLength(text) > maxBytes) throw new OperationError('invalid_request', 'This request is too large.');
+  try { return JSON.parse(text) as unknown; } catch { throw new OperationError('invalid_request', 'Enter valid details.'); }
+}
+
+/**
+ * Posts visible to the key, newest first, through the Publishing list service: the key's channel ceiling, the owner's current access
+ * and the key's result cap apply. `pages` (the legacy name) takes one channel id and is the same filter as `channelId`.
+ */
+export async function restListPosts(ctx: ApiKeyContext, query: Record<string, string>) {
+  const { viewer } = ctx;
+  const input: Record<string, unknown> = {};
+  for (const key of ['status', 'from', 'to', 'q'] as const) if (query[key] !== undefined) input[key] = query[key];
+  if (query.limit !== undefined) {
+    if (!/^[1-9]\d{0,3}$/.test(query.limit)) throw new OperationError('invalid_request', 'Choose a valid result size.');
+    input.limit = Number(query.limit);
+  }
+  if (query.channelId !== undefined && query.pages !== undefined && query.channelId !== query.pages) throw new OperationError('invalid_request', 'Choose one channel filter.');
+  const channel = query.channelId ?? query.pages;
+  if (channel !== undefined) {
+    if (channel.includes(',')) throw new OperationError('invalid_request', 'Filter by one channel at a time.');
+    input.channelId = channel;
+  }
+  const ids = pageIdsFor(viewer);
+  const posts = await listPostsWithFirstComment({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(ids === undefined ? {} : { allowedTargetIds: ids }) }, input, viewer.maxResultItems ?? 100);
+  return { posts };
+}
+
+/**
+ * Create a draft, or schedule it when `scheduledAt` is given, through the Publishing `createPost` service: channel ceiling, format and
+ * media validation, workspace approval holds (a held post is returned as `pending_approval`), versioning and audit all apply as in the
+ * app and MCP. A key-level audit record is written like the MCP write receipt.
+ */
+export async function restCreatePost(ctx: ApiKeyContext, input: unknown) {
+  const data = parse(REST_POST_CREATE_SCHEMA, input, 'Check the post details: message, targetIds and an optional future scheduledAt.');
+  const { viewer } = ctx;
+  const result = await createPostForApi(publishingActor(viewer), {
+    message: data.message, targetIds: data.targetIds, ...(data.firstComment === undefined ? {} : { firstComment: data.firstComment }),
+    ...(data.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: data.firstCommentDelayMinutes }),
+    ...(data.link === undefined ? {} : { link: data.link }), ...(data.media === undefined ? {} : { media: data.media }),
+    ...(data.destinationFormats === undefined ? {} : { destinationFormats: data.destinationFormats }),
+    ...(data.scheduledAt === undefined ? {} : { scheduledAt: new Date(data.scheduledAt) }),
+  });
+  return auditedReceipt(viewer, 'rest.create_post', { postId: result.id, targetCount: data.targetIds.length, status: result.status }, { id: result.id, status: result.status, scheduledAt: result.scheduledAt, held: result.status === 'pending_approval' });
+}

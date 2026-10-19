@@ -5,7 +5,10 @@ import { hit } from '@/server/rate-limit';
 import { decryptSecret, encryptSecret } from '@/server/secret-crypto';
 import { DELIVERY_QUERY_SCHEMA, ID_CONFIRM_SCHEMA, WEBHOOK_CREATE_SCHEMA, WEBHOOK_EVENTS, WEBHOOK_UPDATE_SCHEMA, confirmations, newWebhookSecret, type IntegrationsActor, type WebhookEvent } from '../contracts';
 import { audit, authorize, exact, notFound, pageOffset, parse, protect, requireEnabled, runtime, transact, type Tx } from './core';
+import { emitRecentEvents } from './events';
 import { checkReceiver, defaultWebhookDeps, sendSigned, type WebhookDeps } from './webhook-transport';
+
+export { emitWebhook, emitRecentPostEvents, emitRecentEvents } from './events';
 
 export type WebhookView = { id: string; name: string; urlDisplay: string; events: WebhookEvent[]; enabled: boolean; source: 'dashboard' | 'api_key'; lastError: string | null; lastSentAt: Date | null; createdAt: Date; pending: number; failed: number };
 export type DeliveryView = { id: string; event: string; status: string; attempts: number; responseStatus: number | null; error: string | null; nextAttemptAt: Date; deliveredAt: Date | null; createdAt: Date };
@@ -177,56 +180,6 @@ export async function redeliverWebhook(actor: IntegrationsActor, input: unknown,
   })());
 }
 
-/**
- * Queue an event for every enabled endpoint of the workspace that listens for it. Never throws: a webhook must not break what it
- * reports on. `eventId` makes emitting idempotent per endpoint: the check and the insert run under one advisory lock, so two
- * concurrent emitters of the same event queue it once.
- */
-export async function emitWebhook(workspaceId: string, event: WebhookEvent, data: Record<string, unknown>, options: { eventId?: string; now?: Date; occurredAt?: Date } = {}): Promise<{ queued: number; dropped: boolean }> {
-  try {
-    const rt = await runtime(); if (!rt.enabled.webhooks) return { queued: 0, dropped: false };
-    const now = options.now ?? new Date(); const eventId = options.eventId ?? randomUUID(); const occurredAt = options.occurredAt ?? now;
-    const payload = JSON.stringify({ event, eventId, occurredAt: occurredAt.toISOString(), data });
-    if (Buffer.byteLength(payload) > rt.limits.webhookMaxPayloadBytes) return { queued: 0, dropped: true };
-    const queued = await prisma.$transaction(async tx => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`integrations:event:${workspaceId}:${eventId}`}, 0))::text`;
-      return Number(await tx.$executeRaw`INSERT INTO webhook_deliveries (id, "endpointId", "workspaceId", event, payload, status, attempts, "nextAttemptAt", "createdAt")
-        SELECT 'whd_' || gen_random_uuid()::text, e.id, e."workspaceId", ${event}, ${payload}::jsonb, 'pending', 0, ${now}, ${now}
-        FROM webhook_endpoints e JOIN workspaces w ON w.id = e."workspaceId"
-        WHERE e."workspaceId" = ${workspaceId} AND e.enabled AND ${event} = ANY(e.events) AND w."suspendedAt" IS NULL AND e."createdAt" <= ${occurredAt}
-          AND NOT EXISTS (SELECT 1 FROM webhook_deliveries d WHERE d."endpointId" = e.id AND d.payload ->> 'eventId' = ${eventId})`);
-    }, { timeout: rt.limits.transactionTimeoutMs, maxWait: rt.limits.transactionMaxWaitMs });
-    return { queued, dropped: false };
-  } catch { return { queued: 0, dropped: false }; }
-}
-
-/**
- * Turn recent post results into `post.published` / `post.failed` events without touching Publishing code: each result has a stable
- * event id (destination + outcome [+ attempt count]), so scanning an overlapping window repeatedly queues each event once.
- * Only workspaces with an enabled endpoint that listens for these events are scanned.
- */
-export async function emitRecentPostEvents(now = new Date()): Promise<{ examined: number; queued: number }> {
-  const rt = await runtime(); if (!rt.enabled.webhooks) return { examined: 0, queued: 0 };
-  const since = new Date(now.getTime() - rt.limits.webhookEventLookbackMinutes * 60_000);
-  const rows = await prisma.$queryRaw<Array<{ id: string; postId: string; targetId: string; targetName: string; workspaceId: string; status: string; attempts: number; remoteUrl: string | null; errorCode: string | null; publishedAt: Date | null; updatedAt: Date }>>`
-    SELECT pt.id, pt."postId", pt."targetId", t.name AS "targetName", p."workspaceId", pt.status::text AS status, pt.attempts, pt."remoteUrl", pt."errorCode", pt."publishedAt", pt."updatedAt"
-    FROM post_targets pt JOIN posts p ON p.id = pt."postId" JOIN targets t ON t.id = pt."targetId"
-    WHERE pt.status::text IN ('published', 'failed') AND pt."updatedAt" >= ${since} AND pt."updatedAt" <= ${now}
-      AND EXISTS (SELECT 1 FROM webhook_endpoints e WHERE e."workspaceId" = p."workspaceId" AND e.enabled AND e.events && ARRAY['post.published', 'post.failed']::text[])
-    ORDER BY pt."updatedAt" ASC LIMIT ${rt.limits.webhookEventScanLimit}`;
-  let queued = 0;
-  for (const row of rows) {
-    const published = row.status === 'published';
-    const occurredAt = (published ? row.publishedAt : null) ?? row.updatedAt;
-    const result = await emitWebhook(row.workspaceId, published ? 'post.published' : 'post.failed', {
-      postId: row.postId, destinationId: row.targetId, destinationName: row.targetName,
-      ...(published ? { url: row.remoteUrl } : { errorCode: row.errorCode?.slice(0, 80) ?? null }),
-    }, { eventId: `post_target:${row.id}:${published ? 'published' : `failed:${row.attempts}`}`, now, occurredAt });
-    queued += result.queued;
-  }
-  return { examined: rows.length, queued };
-}
-
 /** Endpoints a key subscribed stop when that key is revoked or expires (the key's own record is owned by MCP access). */
 export async function disableEndedKeyWebhooks(): Promise<number> {
   return Number(await prisma.$executeRaw`UPDATE webhook_endpoints e SET enabled = false, "lastError" = 'API key ended.' WHERE e."apiTokenId" IS NOT NULL AND e.enabled
@@ -238,7 +191,7 @@ export async function deliverDueWebhooks(deps: WebhookDeps = defaultWebhookDeps(
   const rt = await runtime(); const zero = { delivered: 0, retrying: 0, failed: 0, purged: 0, events: 0 };
   if (!rt.enabled.webhooks) return zero;
   await disableEndedKeyWebhooks();
-  const scanned = await emitRecentPostEvents(now);
+  const scanned = await emitRecentEvents(now);
   const lease = new Date(now.getTime() + rt.limits.webhookLeaseSeconds * 1000);
   const claimed = await prisma.$queryRaw<Array<{ id: string; endpointId: string; workspaceId: string; event: string; payload: unknown; attempts: number }>>`UPDATE webhook_deliveries d SET "nextAttemptAt" = ${lease}
     WHERE d.id IN (SELECT d2.id FROM webhook_deliveries d2 JOIN webhook_endpoints e ON e.id = d2."endpointId" JOIN workspaces w ON w.id = d2."workspaceId"

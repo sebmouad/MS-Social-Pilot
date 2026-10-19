@@ -12,9 +12,8 @@ import { recordFirstCommentOutcome, sendFirstComment } from './server/first-comm
 import { finishPostDeletion, getPostDeletion, recordPostDeletionOutcome } from './server/deletion';
 import { adoptLegacyPublication, finishPublicationProjection, getPublicationStatus, recordPublicationOutcome } from './server/publication';
 import { duplicatePost } from './server/duplicate';
-import { readPublishingPostList } from './server/read';
+import { listPostsWithFirstComment } from './server/api';
 import { exportPublishingPosts } from './server/export';
-import { FIRST_COMMENT_LABELS, firstCommentState } from './first-comment-state';
 import { parsePublishingMedia } from './media-support';
 import { templateToolDefinitions, executeTemplateTool } from './template-mcp';
 import { labelToolDefinitions, executeLabelTool } from './labels-mcp';
@@ -268,12 +267,7 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
     execute: async (viewer, name, args, cap) => {
       switch (name) {
       case 'list_posts': {
-        const posts = await readPublishingPostList({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(pageIdsFor(viewer) === undefined ? {} : { allowedTargetIds: pageIdsFor(viewer) }) }, args, { maxItems: cap });
-        return posts.map(post => ({ ...post, targets: post.targets.map(row => {
-          const state = firstCommentState(post.firstComment, row);
-          return { id: row.id, status: row.status, remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, publishedAt: row.publishedAt, target: row.target,
-            firstComment: { state, label: FIRST_COMMENT_LABELS[state], ...(row.firstCommentAt ? { attemptedAt: row.firstCommentAt } : {}), ...(row.firstCommentId ? { remoteCommentId: row.firstCommentId } : {}), errorPresent: Boolean(row.firstCommentError) } };
-        }) }));
+        return listPostsWithFirstComment({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(pageIdsFor(viewer) === undefined ? {} : { allowedTargetIds: pageIdsFor(viewer) }) }, args, cap);
       }
       case 'export_posts': {
         return exportPublishingPosts({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(pageIdsFor(viewer) === undefined ? {} : { allowedTargetIds: pageIdsFor(viewer) }) }, args, {
