@@ -1133,3 +1133,10 @@ New post targets persist their module-declared format separately. Shared lifecyc
 ## Batch86 authoring acknowledgement
 
 Stateful post creation returns a typed committed-success destination, followed by client navigation and an accessible fallback link. This avoids the observed completed303/pending-composer behavior. Post-commit cache refresh cannot be reported as failed creation. Browser save/retry now passes all four themes at desktop/phone widths; the full goal and production gates remain open. See DESTINATION_FORMATS.md for scoped evidence.
+
+
+## Batch87 native transport and Root policy
+
+Signed Facebook-owned Graph/resumable transport and registry76 native controls are implemented. Twenty-five native settings are grouped under Facebook and labelled configured; customer dispatch remains unwired. A local Root diagnostic validates one native configuration snapshot and cross-field limits without provider requests. The private constructor refuses missing required signing material. Real loopback HTTP tests verify encoding/signatures, response bounds and timeouts. See FACEBOOK_NATIVE_TRANSPORT.md. Root phone verification identified a long-search-heading overflow; shared settings heading/key wrapping fixes it.
+
+The full objective stays active. Do not register the unscoped SQL proposal or treat this transport as complete native delivery. Keep the existing parent publication journal as the sole claim authority; next implement tenant-bound child phase receipts, payload identity/fencing, export/erasure and PostgreSQL concurrency checks, then native dispatch/status/comment/deletion and live cleanup. Production and the held photo-cleanup canary remain unchanged.

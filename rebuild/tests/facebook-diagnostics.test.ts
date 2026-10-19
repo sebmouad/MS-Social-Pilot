@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ connection: vi.fn(), oauth: vi.fn(), engine: vi.fn(), identity: vi.fn(), permissions: vi.fn(), decrypt: vi.fn(), channels: vi.fn(), accounts: vi.fn() }));
+const state = vi.hoisted(() => ({ native: vi.fn(), connection: vi.fn(), oauth: vi.fn(), engine: vi.fn(), identity: vi.fn(), permissions: vi.fn(), decrypt: vi.fn(), channels: vi.fn(), accounts: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { socialAccount: { findFirst: state.connection } } }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: state.decrypt }));
-vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: state.engine, configuredFacebookOAuth: state.oauth }));
+vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookNativeSettings:state.native, configuredFacebookEngine: state.engine, configuredFacebookOAuth: state.oauth }));
 import { facebookDiagnostics } from '../src/platforms/facebook/diagnostics';
 import { FacebookApiError } from '../src/platforms/facebook/publishing';
 const checks = async (id?: string) => { const list = await facebookDiagnostics.checks(id); return Object.fromEntries(list.map(check => [check.id, check.run])); };
 beforeEach(() => {
   vi.clearAllMocks();
+  state.native.mockResolvedValue({});
   state.connection.mockResolvedValue({ providerUserId: 'user-id', accessToken: 'encrypted-token', tokenExpiresAt: null, invalidatedAt: null });
   state.decrypt.mockReturnValue('plaintext-token');
   state.oauth.mockResolvedValue({ scopes: ['scope-a', 'scope-b'] });
@@ -17,6 +18,16 @@ beforeEach(() => {
   state.channels.mockResolvedValue([{ id: 'page', accessToken: 'private-page-token' }]); state.accounts.mockResolvedValue([{ id: 'ad-account' }]);
 });
 describe('Facebook-owned read-only connectivity diagnostics', () => {
+  it('checks native policy locally without claiming native availability or exposing invalid values', async()=>{
+    const run=await checks();
+    expect(await run.native_configuration()).toMatchObject({status:'pass',code:'native_policy_valid'});
+    expect((await run.native_configuration()).message).toContain('remain unavailable');
+    state.native.mockRejectedValueOnce(new Error('secret endpoint token'));
+    const result=await run.native_configuration();
+    expect(result).toMatchObject({status:'fail',code:'native_policy_invalid'});
+    expect(JSON.stringify(result)).not.toContain('secret endpoint token');
+    expect(state.engine).not.toHaveBeenCalled();expect(state.decrypt).not.toHaveBeenCalled();
+  });
   it('skips authenticated checks without selection; configuration presence is not remote proof', async () => {
     const run = await checks();
     expect(await run.connection_setup()).toMatchObject({ status: 'pass', code: 'connection_configured' });

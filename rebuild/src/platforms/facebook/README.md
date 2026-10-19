@@ -61,3 +61,5 @@ acknowledgment because Graph does not prove continued unused state. Separate
 immutable deletion intent/receipt storage holds unknown effects; a confirmed
 receipt can replay without another request. See `docs/FACEBOOK_MEDIA_RECOVERY.md`
 for the exact eligibility, authorization, scope, recovery and evidence limits.
+
+Native-format transport, Root policy and diagnostic status: [FACEBOOK_NATIVE_TRANSPORT.md](../../../docs/FACEBOOK_NATIVE_TRANSPORT.md). These dependencies do not enable native customer formats or replace the guarded parent publication journal.

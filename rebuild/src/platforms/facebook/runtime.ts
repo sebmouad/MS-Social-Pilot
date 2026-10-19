@@ -1,7 +1,9 @@
 import { createFacebookAdapter, createFacebookEngine } from '@/platforms/facebook/publishing';
 import type { FacebookConfig } from '@/platforms/facebook/config';
-import { runtimeConfig, runtimeSecret } from '@/server/config/store';
+import { runtimeConfig, runtimeConfigBatch, runtimeSecret } from '@/server/config/store';
 import { facebookMediaJournal } from './media-journal';
+import { FACEBOOK_NATIVE_CONFIG, FACEBOOK_NATIVE_TRANSPORT_CONFIG, facebookNativePolicyFrom, facebookNativeTransportPolicyFrom } from './native-config';
+import { createFacebookNativeTransport } from './formats/transport';
 
 async function configured<T>(key: string): Promise<T> {
   return await runtimeConfig(key) as T;
@@ -58,4 +60,23 @@ export async function configuredFacebookOAuth() {
   ]);
   if (!appId || !appSecret || !redirectUri || !scopes.length) throw new Error('Meta connection is not configured.');
   return { appId, appSecret, redirectUri, scopes: [...new Set([...scopes, ...insightReadScopes, ...inboxReadScopes, ...inboxWriteScopes, ...postReadScopes, ...postPublishScopes, ...postDeleteScopes, ...firstCommentScopes, ...(manualMediaCleanupEnabled ? [...mediaReadScopes, ...mediaDeleteScopes] : [])])] };
+}
+
+
+/** Private native-engine dependency. Constructing it does not advertise a format or dispatch I/O. */
+export async function configuredFacebookNativeTransport(accessToken: string, options?: { signal?: AbortSignal }) {
+  const [config, settings] = await Promise.all([
+    configuredFacebookConfig(),
+    configuredFacebookNativeSettings(),
+  ]);
+  if (config.appSecretProofEnabled && !config.appSecret) throw new Error('Native Facebook signing configuration is unavailable.');
+  const policy = settings.transport;
+  return createFacebookNativeTransport(config, accessToken, policy, fetch, options?.signal);
+}
+
+
+/** One validated snapshot for Root diagnostics and future native dispatch. No provider I/O. */
+export async function configuredFacebookNativeSettings() {
+  const values = await runtimeConfigBatch([...FACEBOOK_NATIVE_CONFIG, ...FACEBOOK_NATIVE_TRANSPORT_CONFIG].map(setting => setting.key));
+  return { policy: facebookNativePolicyFrom(values), transport: facebookNativeTransportPolicyFrom(values) };
 }

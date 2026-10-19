@@ -27,7 +27,7 @@ describe('limits from Root config', () => {
     expect(() => facebookNativePolicyFrom({ 'facebook.native.poll.maxPolls': 0 })).toThrow();
     const short = facebookNativePolicyFrom({ 'facebook.native.scheduleMinSeconds': 60 });
     expect(planFacebookNative({ ...base, format: 'post', scheduledAt: new Date(now.getTime() + 120e3), policy: short })).toMatchObject({ format: 'video' });
-    expect(FACEBOOK_NATIVE_CONFIG.every((c) => c.consumption === 'planned')).toBe(true);
+    expect(FACEBOOK_NATIVE_CONFIG.every((c) => c.consumption === 'configured')).toBe(true);
   });
   it('group stays rejected', () => {
     expect(code(() => planFacebookNative({ ...base, format: 'post', targetKind: 'group' }))).toBe('target_kind_unsupported');

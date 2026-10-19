@@ -101,3 +101,10 @@ live provider proof is claimed. Existing production remains legacy.
 ## Batch85 continuation
 
 Per-destination intent now replaces the global bridge for newly selected targets across composer, editing, CSV, lifecycle, automation, copies, snapshots, exports and MCP. Historical null targets retain the bridge. This completes host intent storage, not Facebook native engine coverage: native dispatch, format-aware status/deletion/comment routing and real provider verification remain required before advertising additional formats.
+
+
+## Batch87 native transport and Root policy
+
+Signed Facebook-owned Graph/resumable transport and registry76 native controls are implemented. Twenty-five native settings are grouped under Facebook and labelled configured; customer dispatch remains unwired. A local Root diagnostic validates one native configuration snapshot and cross-field limits without provider requests. The private constructor refuses missing required signing material. Real loopback HTTP tests verify encoding/signatures, response bounds and timeouts. See FACEBOOK_NATIVE_TRANSPORT.md. Root phone verification identified a long-search-heading overflow; shared settings heading/key wrapping fixes it.
+
+The full objective stays active. Do not register the unscoped SQL proposal or treat this transport as complete native delivery. Keep the existing parent publication journal as the sole claim authority; next implement tenant-bound child phase receipts, payload identity/fencing, export/erasure and PostgreSQL concurrency checks, then native dispatch/status/comment/deletion and live cleanup. Production and the held photo-cleanup canary remain unchanged.

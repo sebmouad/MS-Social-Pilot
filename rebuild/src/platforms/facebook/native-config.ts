@@ -1,17 +1,18 @@
 import { z } from 'zod';
+import { entry } from '@/lib/config/entry';
 import type { FacebookNativePolicy } from './formats/types';
 
 /**
  * Root-managed settings for native Facebook formats. Same entry shape as the shared
- * registry; the lead registers these (consumption stays 'planned' until wired).
+ * registry; these are registered under Facebook and stay 'configured' until customer dispatch is wired.
  * Defaults are starting values taken from legacy behaviour / Meta documentation and
  * are UNVERIFIED against current Graph; Root can change them without a release.
  * Protocol invariants that are NOT policy (Graph paths, field names, upload phases)
  * stay in formats/execute.ts and formats/status.ts.
  */
-const n = (key: string, label: string, description: string, defaultValue: number, min: number, max: number, float = false) => ({
-  key: `facebook.native.${key}`, group: 'Facebook native formats', label, kind: 'number' as const, description, defaultValue,
-  schema: float ? z.number().min(min).max(max) : z.number().int().min(min).max(max), consumption: 'planned' as const,
+const n = (key: string, label: string, description: string, defaultValue: number, min: number, max: number, float = false) => entry({
+  key: `facebook.native.${key}`, group: 'Facebook · Native format policy', label, kind: 'number' as const, description, defaultValue,
+  schema: float ? z.number().min(min).max(max) : z.number().int().min(min).max(max), consumption: 'configured' as const,
 });
 
 export const FACEBOOK_NATIVE_CONFIG = Object.freeze([
@@ -39,14 +40,14 @@ export const FACEBOOK_NATIVE_CONFIG = Object.freeze([
   n('poll.intervalMs', 'Processing check interval (ms)', 'Wait between status reads.', 5000, 500, 60000),
 ] as const);
 
-type Values = Readonly<Record<string, number | undefined>>;
+type Values = Readonly<Record<string, unknown>>;
 
 /** Build a policy from Root values; missing keys use the registry defaults. Throws on invalid or inconsistent values. */
 export function facebookNativePolicyFrom(values: Values = {}): FacebookNativePolicy {
   const v = (k: string): number => {
     const e = FACEBOOK_NATIVE_CONFIG.find((x) => x.key === `facebook.native.${k}`);
     if (!e) throw new Error(`Unknown Facebook native setting ${k}.`);
-    return e.schema.parse(values[e.key] ?? e.defaultValue);
+    return e.schema.parse(values[e.key] === undefined ? e.defaultValue : values[e.key]);
   };
   const lim = (p: string, hasDuration = true) => {
     const l = {
@@ -65,4 +66,27 @@ export function facebookNativePolicyFrom(values: Values = {}): FacebookNativePol
   };
   if (policy.scheduleMinSeconds >= policy.scheduleMaxSeconds) throw new Error('Facebook native schedule window is inconsistent.');
   return policy;
+}
+
+
+/** Credential-bearing upload requests may only use explicitly configured HTTPS origins. */
+export const FACEBOOK_NATIVE_UPLOAD_ORIGINS_SCHEMA = z.array(z.string().max(2048).refine(value => {
+  try { const u = new URL(value); return u.protocol === 'https:' && u.origin === value && !u.username && !u.password; }
+  catch { return false; }
+}, 'Use an exact HTTPS origin without a path, credentials, query or fragment.')).min(1).max(20);
+
+export const FACEBOOK_NATIVE_TRANSPORT_CONFIG = [
+  entry({ key: 'facebook.native.uploadOrigins', group: 'Facebook · Native publishing transport', label: 'Resumable upload origins', kind: 'json', description: 'Exact trusted HTTPS origins allowed to receive Page credentials for provider-returned upload addresses. Changing this trust boundary requires operator review. Native customer formats remain unavailable until their integration passes release checks.', defaultValue: ['https://rupload.facebook.com'], schema: FACEBOOK_NATIVE_UPLOAD_ORIGINS_SCHEMA, consumption: 'configured' }),
+  entry({ key: 'facebook.native.maxUploadBytes', group: 'Facebook · Native publishing transport', label: 'Binary upload maximum (bytes)', kind: 'number', description: 'Server-side binary ceiling for the native transport. Per-format policy may impose a lower limit. This does not enable a customer publishing format.', defaultValue: 1073741824, schema: z.number().int().min(1).max(107374182400), consumption: 'configured' }),
+  entry({ key: 'facebook.native.maxResponseBytes', group: 'Facebook · Native publishing transport', label: 'Native response maximum (bytes)', kind: 'number', description: 'Maximum JSON response bytes read by the signed native transport before refusing an ambiguous provider result.', defaultValue: 1048576, schema: z.number().int().min(1024).max(8388608), consumption: 'configured' }),
+] as const;
+
+export function facebookNativeTransportPolicyFrom(values: Readonly<Record<string, unknown>>) {
+  const read = <T extends z.ZodTypeAny>(setting: {key: string; schema: T; defaultValue: unknown}): z.output<T> =>
+    setting.schema.parse(values[setting.key] === undefined ? setting.defaultValue : values[setting.key]);
+  return {
+    uploadOrigins: read(FACEBOOK_NATIVE_TRANSPORT_CONFIG[0]),
+    maxUploadBytes: read(FACEBOOK_NATIVE_TRANSPORT_CONFIG[1]),
+    maxResponseBytes: read(FACEBOOK_NATIVE_TRANSPORT_CONFIG[2]),
+  };
 }

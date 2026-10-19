@@ -147,3 +147,5 @@ and a retained unavailable option for stale selections. All four themes inherit
 the same tokens and dimensions.
 
 Batch85 review sources: installed Frontend Design/Premium UX plus freshly fetched official Vercel Web Interface Guidelines and React Best Practices. Apply the existing brand and UX contract when generic guidance differs. This is review guidance, not evidence that every screen passes.
+
+Root technical search headings and keys wrap within their content width. Preserve complete identifiers and existing internal table scrolling; never mask document overflow to hide an oversized heading. Batch87 corrects an observed phone overflow.

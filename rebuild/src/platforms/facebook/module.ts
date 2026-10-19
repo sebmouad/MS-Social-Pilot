@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FACEBOOK_NATIVE_CONFIG, FACEBOOK_NATIVE_TRANSPORT_CONFIG } from './native-config';
 import { entry, url, stringList } from '@/lib/config/entry';
 import { enabledEntry, type PlatformModule } from '../module';
 
@@ -28,6 +29,8 @@ export const facebookModule = {
 export const FACEBOOK_ANALYTICS_LOOKBACK_DAYS_SCHEMA = z.number().int().min(1).max(366);
 
 const facebookConfigEntries = [
+  ...FACEBOOK_NATIVE_CONFIG,
+  ...FACEBOOK_NATIVE_TRANSPORT_CONFIG,
   entry({ key: 'meta.manualMediaAttestationEnabled', group: 'Facebook · Publishing recovery', label: 'Allow external media outcome reports', kind: 'boolean', description: 'Allow private Root operators to record externally verified photo, feed and deletion outcomes. Human reports are not provider receipts. A delayed provider request may still complete; contradictory later evidence remains held for review. No automatic resend is permitted.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'meta.manualMediaCleanupEnabled', group: 'Facebook · Publishing recovery', label: 'Allow manual staged-photo deletion', kind: 'boolean', description: 'Allow private Root operators to delete known staged photos after an explicit unused-photo check and confirmation. Meta cannot guarantee the photo stays unattached between inspection and deletion. Unknown or published feed outcomes remain blocked.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'meta.mediaReadScopes', group: 'Facebook · API scopes · publishing', label: 'Staged photo inspection scopes', kind: 'json', description: 'Granted permissions required before private Root photo inspection. Actual provider permissions and can_delete are checked separately; configuration does not grant access.', defaultValue: ['pages_read_engagement'], schema: stringList.min(1), consumption: 'active' }),

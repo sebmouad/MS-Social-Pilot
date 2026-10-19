@@ -1,6 +1,6 @@
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
-import { configuredFacebookEngine, configuredFacebookOAuth } from './runtime';
+import { configuredFacebookEngine, configuredFacebookOAuth, configuredFacebookNativeSettings } from './runtime';
 import { FacebookApiError } from './publishing';
 import { facebookModule } from './module';
 import { fail, pass, skipped, type CheckOutcome, type PlatformDiagnostics } from '@/server/diagnostics/types';
@@ -22,6 +22,10 @@ export const facebookDiagnostics: PlatformDiagnostics = {
       : !connection ? fail('connection_missing', 'Selected connection is no longer available for this platform.')
         : connection.invalidatedAt || connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date() ? fail('reconnect_required', 'Connection is revoked or expired. Reconnect before testing the API.') : null;
     return [
+      { id: 'native_configuration', label: 'Native publishing policy', async run() {
+        try { await configuredFacebookNativeSettings(); return pass('native_policy_valid', 'Native transport trust and format limits are valid locally. Native formats remain unavailable; no provider request was sent.'); }
+        catch { return fail('native_policy_invalid', 'Review native publishing transport and format limits in this platform’s settings. No provider request was sent.'); }
+      } },
       { id: 'connection_setup', label: 'Connection configuration', async run() {
         try { await configuredFacebookOAuth(); return pass('connection_configured', 'Application credentials, redirect and requested scopes are present. Provider approval and remote credential validity are not verified by this check.'); }
         catch { return fail('connection_unconfigured', 'Review application ID, secret, redirect and requested scopes in this platform’s settings.'); }

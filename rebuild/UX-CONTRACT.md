@@ -450,3 +450,5 @@ provider limitations. Browser verification evidence is recorded with the batch.
 ### Confirmed authoring success (batch86)
 
 The stateful composer receives an explicit server acknowledgement before navigating to Posts. Until navigation completes, show and focus a saved status with a normal fallback link, freeze edits and disable another submission. A cache refresh error after commit must not invite a second creation. A transport result that is unconfirmed remains distinct from a known failed validation; retain input and ask the user to inspect Posts before deliberate retry.
+
+Root module settings must remain usable when searching by a long configuration key. Wrap the result heading and technical identifiers within the phone viewport; preserve sidebar filtering and the owning table scroller. Native-policy diagnostic results distinguish locally valid settings from provider verification and customer availability.
