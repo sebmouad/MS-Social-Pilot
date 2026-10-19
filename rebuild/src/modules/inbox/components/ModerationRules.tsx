@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/Button';
+import { useConfirm } from '@/components/useConfirm';
 import { MODERATION_ACTIONS, MODERATION_MATCHES, moderationConfirmation, moderationRuleProblem, moderationText, type ModerationLocale, type ModerationRuleInput } from '../moderation';
 import styles from './ModerationRules.module.css';
 
@@ -26,8 +27,10 @@ export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { let live = true; void load().catch(e => { if (live) setError(e instanceof Error ? e.message : t('loadFailed')); }); return () => { live = false; }; }, [load]);
+  // Destructive or remote actions ask in the shared dialog (Cancel has initial focus); a declined ask sends nothing.
+  const [confirmAsk, confirmDialog] = useConfirm({ title: t('confirmTitle'), cancel: t('cancel'), confirm: t('confirmGo') });
   async function act(body: Record<string, unknown>, ask?: string) {
-    if (ask && !window.confirm(ask)) return null;
+    if (ask && !(await confirmAsk(ask))) return null;
     setBusy(true); setError(''); setNotice('');
     try {
       const response = await fetch('/api/inbox/moderation', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -99,5 +102,6 @@ export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean
         {canWrite && row.undoable && <div><Button size="sm" variant="quiet" disabled={busy} onClick={async () => { const result = await act({ action: 'action.undo', id: row.id, confirmation: moderationConfirmation.undo(row.id) }, t('undoHideConfirm')); if (result) setNotice(t('undoneOk')); }}>{t('undoHide')}</Button></div>}
       </li>)}</ul>}
     </section>
+    {confirmDialog}
   </div>;
 }
