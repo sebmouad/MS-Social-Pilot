@@ -1224,3 +1224,30 @@ host authorization, verified status/comment/deletion, audited process-loss/nativ
 conflict recovery, cleaned live provider coverage and broader legacy/configuration/
 production rollback gates remain open. No live provider request or production
 deployment occurred. Whole-app UX/accessibility is not cleared by this matrix.
+
+
+## Batch90: native status observations stay separate from proof
+
+The private Facebook status scaffold now requires an explicit final identity,
+keeps both Story formats unsupported for Video reads, snapshots polling inputs,
+validates Root registry bounds, copies field arrays and supports per-read
+cancellation through signed transport and polling waits. Staged identities are
+not promoted by status, first-comment or delete helpers. Scheduled/failed status
+observations do not confirm publication or release known remote objects.
+Reconciliation keeps incomplete work held, requires explicit true update receipts
+and rereads durable outcomes when possible. Cancellation gates new sends while
+preserving explicit remote receipts already returned.
+
+Isolated synthetic PostgreSQL suite:3082 tests/351 files, zero skips. Production
+build and serial typecheck passed. Actual loopback HTTP tests prove stalled-body
+read cancellation and successful subsequent requests. Both Claude accounts supplied
+independent source reviews; a lower-cost builder/reviewer helped implement and
+check the fixes. No UI/browser, migration, live Meta or production change occurred.
+Native customer formats remain unavailable; the full goal remains active.
+
+Next implement the identity-bound, audited native read-proof/recovery writer and
+canonical host/status/comment/deletion services, then scoped API/MCP and cleaned
+live provider evidence. See FACEBOOK_NATIVE_STATUS.md and
+FACEBOOK_NATIVE_JOURNAL_PLAN.md. Existing Root evidence is not native resolution.
+Preserve production and the held photo-cleanup canary. Broader parity/configuration
+and production-shaped migration/media/service rollback gates remain required.

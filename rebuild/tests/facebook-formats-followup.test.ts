@@ -88,13 +88,14 @@ describe('reconciliation', () => {
     expect(o.status).toBe('uncertain');
     return { attempts, post };
   }
-  it('confirms from readback without resending', async () => {
+  it('keeps a staged Reel held without promoting its upload identity', async () => {
     const { attempts, post } = await uncertainReel();
     const { t } = reader([{ status: { video_status: 'ready', publishing_phase: { status: 'complete' } }, published: true }]);
     const r = await reconcileFacebookNativeAttempt('op', { transport: t, attempts, sleep });
-    expect(r.state).toBe('confirmed');
+    expect(r).toMatchObject({ state: 'uncertain', readback: { status: 'unknown', detail: 'no_remote_id', polls: 0 } });
+    expect(t.getGraph).not.toHaveBeenCalled();
     expect(post).toHaveBeenCalledTimes(2);
-    expect(await attempts.get('op')).toMatchObject({ state: 'confirmed' });
+    expect(await attempts.get('op')).toMatchObject({ state: 'uncertain', remoteId: null });
   });
   it('stays uncertain when unreadable, and handles missing records', async () => {
     const { attempts } = await uncertainReel();
@@ -140,7 +141,7 @@ describe('remote deletion', () => {
     expect(await deleteFacebookNativeRemote('pub', { transport: d.t, attempts, sleep })).toEqual({ status: 'deleted', alreadyAbsent: false });
     expect(d.t.deleteGraph).toHaveBeenCalledWith('VID');
     expect((await attempts.get('pub'))?.state).toBe('deleted');
-    expect((await deleteFacebookNativeRemote('pub', { transport: d.t, attempts, sleep })).status).toBe('already_attempted');
+    expect((await deleteFacebookNativeRemote('pub', { transport: d.t, attempts, sleep })).status).toBe('no_publication');
     expect(d.t.deleteGraph).toHaveBeenCalledTimes(1);
   });
   it('maps rejection and keeps ambiguous absence uncertain', async () => {

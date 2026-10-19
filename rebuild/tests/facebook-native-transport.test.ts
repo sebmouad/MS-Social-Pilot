@@ -42,6 +42,37 @@ describe('Facebook native signed transport', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
+  it('cancels individual reads without cancelling the transport lifetime', async () => {
+    const lifetime = new AbortController();
+    const read = new AbortController();
+    const fetchImpl = vi.fn<typeof fetch>(async (_url, init) => {
+      if (fetchImpl.mock.calls.length === 1) {
+        return await new Promise<Response>((_resolve, reject) => {
+          init!.signal!.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+          read.abort();
+        });
+      }
+      return response({ id: 'ok' });
+    });
+    const transport = createFacebookNativeTransport(config, 'token', policy, fetchImpl, lifetime.signal);
+    await expect(transport.getGraph('123', ['id'], read.signal)).rejects.toMatchObject({ message: 'Facebook request failed.' });
+    expect(lifetime.signal.aborted).toBe(false);
+    await expect(transport.getGraph('123', ['id'])).resolves.toEqual({ id: 'ok' });
+    const alreadyAborted = new AbortController();
+    alreadyAborted.abort();
+    await expect(transport.getGraph('123', ['id'], alreadyAborted.signal)).rejects.toMatchObject({ message: 'Facebook request failed.' });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains lifetime cancellation when an individual read signal is present', async () => {
+    const lifetime = new AbortController();
+    lifetime.abort();
+    const fetchImpl = vi.fn<typeof fetch>();
+    const transport = createFacebookNativeTransport(config, 'token', policy, fetchImpl, lifetime.signal);
+    await expect(transport.getGraph('123', ['id'], new AbortController().signal)).rejects.toMatchObject({ message: 'Facebook request failed.' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('rejects unsafe Graph paths and reserved credential fields before dispatch', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () => response({}));
     const transport = createFacebookNativeTransport(config, 'secret-token', policy, fetchImpl);

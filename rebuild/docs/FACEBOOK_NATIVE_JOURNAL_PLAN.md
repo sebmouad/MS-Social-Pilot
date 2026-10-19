@@ -1,6 +1,7 @@
 # Native Facebook journal: foundation and remaining gates
 
 Status: batch89 implements private durable receipts and installed safety guards.
+Batch90 hardens status observation boundaries; see FACEBOOK_NATIVE_STATUS.md.
 Native customer formats remain unavailable. This is not the complete Facebook
 engine, live-provider proof or a production cutover.
 
@@ -94,3 +95,10 @@ partial-source reviews are not provider or PostgreSQL proof.
    media migration and application/service rollback gates before deployment.
 
 Production and the held photo-cleanup canary remain unchanged.
+
+
+Batch90 removes unsafe status-to-confirmed/rejected promotion from the private
+scaffold. Polling cancellation, immutable inputs, final-identity requirements and
+explicit update receipt handling are tested. This closes scaffold hazards, not
+required integration item2: the authorized identity-bound durable proof writer,
+Root resolution and process-loss recovery still need implementation.

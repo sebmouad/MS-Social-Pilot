@@ -93,7 +93,7 @@ export function createFacebookNativeTransport(configInput: FacebookConfig, acces
     return facebookAppSecretProof(token, config.appSecret);
   };
   const request = async (method: 'GET' | 'POST' | 'DELETE', rawPath: string,
-    values: Record<string, string> = {}): Promise<Record<string, unknown>> => {
+    values: Record<string, string> = {}, readSignal?: AbortSignal): Promise<Record<string, unknown>> => {
     const path = safeGraphPath(rawPath);
     if (Object.keys(values).some(key => ['access_token', 'appsecret_proof'].includes(key.toLowerCase()))) throw new FacebookApiError(SAFE_ERROR, 0);
     const url = graphObjectUrl(config, path);
@@ -110,7 +110,7 @@ export function createFacebookNativeTransport(configInput: FacebookConfig, acces
       if (signedProof) url.searchParams.set('appsecret_proof', signedProof);
     }
     const timeout = AbortSignal.timeout(config.requestTimeoutMs);
-    const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const requestSignal = AbortSignal.any([timeout, ...(signal ? [signal] : []), ...(readSignal ? [readSignal] : [])]);
     if (requestSignal.aborted) throw new FacebookApiError(SAFE_ERROR, 0);
     let response: Response;
     try {
@@ -126,9 +126,9 @@ export function createFacebookNativeTransport(configInput: FacebookConfig, acces
   };
   return {
     postGraph: (path, body) => request('POST', path, body),
-    getGraph: (path, fields) => {
+    getGraph: (path, fields, readSignal) => {
       if (!Array.isArray(fields) || fields.some(field => !/^[A-Za-z0-9_.,:()]+$/.test(field))) throw new FacebookApiError(SAFE_ERROR, 0);
-      return request('GET', path, { fields: fields.join(',') });
+      return request('GET', path, { fields: fields.join(',') }, readSignal);
     },
     deleteGraph: path => request('DELETE', path),
     upload: async (rawUrl: string, media: FacebookNativeMedia): Promise<void> => {

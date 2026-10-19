@@ -91,6 +91,30 @@ describe('Facebook native transport over loopback HTTP', () => {
     expect(requests).toBe(1);
   });
 
+  it('cancels a stalled read body without poisoning subsequent requests', async () => {
+    let requests = 0;
+    let observed!: () => void;
+    const arrived = new Promise<void>(resolve => { observed = resolve; });
+    const { baseUrl } = await listen((_request, response) => {
+      requests += 1;
+      response.writeHead(200, { 'content-type': 'application/json' });
+      if (requests === 1) {
+        response.write('{"partial":');
+        observed();
+      } else response.end(JSON.stringify({ id: 'local-object' }));
+    });
+    const transport = createFacebookNativeTransport(configFor(baseUrl), 'synthetic-token', policy);
+    const controller = new AbortController();
+    const pending = transport.getGraph('page_1', ['id'], controller.signal).catch(error => error);
+    await arrived;
+    controller.abort();
+    const failure = await pending;
+    expect(failure).toBeInstanceOf(FacebookApiError);
+    expect(failure).toMatchObject({ message: 'Facebook request failed.' });
+    await expect(transport.getGraph('page_1', ['id'])).resolves.toEqual({ id: 'local-object' });
+    expect(requests).toBe(2);
+  });
+
   it('aborts a stalled response body at the configured request timeout without retrying', async () => {
     let requests = 0;
     const { baseUrl } = await listen((_request, response) => {

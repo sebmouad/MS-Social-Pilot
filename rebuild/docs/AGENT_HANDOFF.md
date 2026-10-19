@@ -4,7 +4,7 @@ Updated: 2026-10-19. This is durable project context, not proof of current runti
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
 
-Current continuation: batch89 at the end of this document and FACEBOOK_NATIVE_JOURNAL_PLAN.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+Current continuation: batch90 at the end of this document, FACEBOOK_NATIVE_STATUS.md and FACEBOOK_NATIVE_JOURNAL_PLAN.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
 
 ## Historical verified batch —84
 
@@ -495,3 +495,30 @@ credentials or raw rows belong here. Final cleanup independently matched all105
 prior local table counts and Root settings against the restored baseline, with
 zero native fixture rows. Keep the full goal active and continue actual native
 host/status/recovery integration, then remaining parity and release gates.
+
+
+## Batch90: native status observations stay separate from proof
+
+The private Facebook status scaffold now requires an explicit final identity,
+keeps both Story formats unsupported for Video reads, snapshots polling inputs,
+validates Root registry bounds, copies field arrays and supports per-read
+cancellation through signed transport and polling waits. Staged identities are
+not promoted by status, first-comment or delete helpers. Scheduled/failed status
+observations do not confirm publication or release known remote objects.
+Reconciliation keeps incomplete work held, requires explicit true update receipts
+and rereads durable outcomes when possible. Cancellation gates new sends while
+preserving explicit remote receipts already returned.
+
+Isolated synthetic PostgreSQL suite:3082 tests/351 files, zero skips. Production
+build and serial typecheck passed. Actual loopback HTTP tests prove stalled-body
+read cancellation and successful subsequent requests. Both Claude accounts supplied
+independent source reviews; a lower-cost builder/reviewer helped implement and
+check the fixes. No UI/browser, migration, live Meta or production change occurred.
+Native customer formats remain unavailable; the full goal remains active.
+
+Next implement the identity-bound, audited native read-proof/recovery writer and
+canonical host/status/comment/deletion services, then scoped API/MCP and cleaned
+live provider evidence. See FACEBOOK_NATIVE_STATUS.md and
+FACEBOOK_NATIVE_JOURNAL_PLAN.md. Existing Root evidence is not native resolution.
+Preserve production and the held photo-cleanup canary. Broader parity/configuration
+and production-shaped migration/media/service rollback gates remain required.

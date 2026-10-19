@@ -122,7 +122,8 @@ export interface FacebookNativeTransport {
 
 /** Read/delete port for readback, polling, first comments and remote deletion. Throws FacebookApiError on non-2xx. */
 export interface FacebookNativeReadTransport extends FacebookNativeTransport {
-  getGraph(path: string, fields: string[]): Promise<Record<string, unknown>>;
+  /** Per-read cancellation is combined with the transport lifetime signal and request timeout. */
+  getGraph(path: string, fields: string[], signal?: AbortSignal): Promise<Record<string, unknown>>;
   deleteGraph(path: string): Promise<Record<string, unknown>>;
 }
 

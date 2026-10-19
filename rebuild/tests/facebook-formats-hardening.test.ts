@@ -87,7 +87,7 @@ describe('terminal state compare-and-set', () => {
   });
   it('reconcile loses to a concurrent deletion and reports the real state', async () => {
     const attempts = createMemoryAttemptStore();
-    await attempts.begin({ operationId: 'op', format: 'reel', state: 'uncertain', knownIds: ['V'] });
+    await attempts.begin({ operationId: 'op', format: 'reel', state: 'uncertain', knownIds: ['V'], remoteId: 'V' });
     const t = transport({
       getGraph: vi.fn().mockImplementation(async () => { await attempts.update('op', { state: 'deleted' }); return { status: { video_status: 'ready', publishing_phase: { status: 'complete' } }, published: true }; }),
     });
@@ -97,7 +97,7 @@ describe('terminal state compare-and-set', () => {
   });
   it('reconcile does not overwrite a state settled concurrently by another worker', async () => {
     const attempts = createMemoryAttemptStore();
-    await attempts.begin({ operationId: 'op', format: 'reel', state: 'uncertain', knownIds: ['V'] });
+    await attempts.begin({ operationId: 'op', format: 'reel', state: 'uncertain', knownIds: ['V'], remoteId: 'V' });
     const t = transport({
       getGraph: vi.fn().mockImplementation(async () => { await attempts.update('op', { state: 'rejected' }); return { status: { video_status: 'ready', publishing_phase: { status: 'complete' } }, published: true }; }),
     });
