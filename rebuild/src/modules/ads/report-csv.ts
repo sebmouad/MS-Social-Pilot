@@ -9,11 +9,11 @@ export const ADS_REPORT_CSV_COLUMNS = [
 const EXPORT_LIMIT_MESSAGE = 'Advertising report exceeds the configured export size limit.';
 const encoder = new TextEncoder();
 
-function quote(value: string): string {
+export function quote(value: string): string {
   return `"${value.replaceAll('"', '""')}"`;
 }
 
-function safeText(value: string): string {
+export function safeText(value: string): string {
   return /^[\s\uFEFF]*[=+\-@＝＋－＠]/.test(value) ? `'${value}` : value;
 }
 

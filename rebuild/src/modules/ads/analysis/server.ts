@@ -5,9 +5,11 @@ import { parseAdsPerformanceFilters } from '../performance-filters';
 import { adsIsoDay } from '../report-filters';
 import { authorizeAdsRead, type AdsReadActor } from '../server/access';
 import { loadAdsReportPolicy } from '../server/report-policy';
+import { loadAdsOutputPolicy } from '../server/output-policy';
 import { ADS_ANALYSIS_POLICY_SCHEMA } from './config';
+import { buildAdsComparisonCsv } from './csv';
 import {
-  OBJECT_SORT_KEYS, assessFreshness, buildFindings, buildKpis, findingMessage, previousWindow, sortObjects, totalsFromRows,
+  OBJECT_SORT_KEYS, assessFreshness, buildFindings, buildKpis, findingMessage, peakReach, previousWindow, sortObjects, spendSharePercent, sumActions, totalsFromRows,
   type AdsAnalysisPolicy, type AdsObjectFigures, type AdsObjectSortKey,
 } from './metrics';
 
@@ -19,7 +21,7 @@ export async function loadAdsAnalysisPolicy(readConfig: typeof runtimeConfig = r
   catch { throw new OperationError('unavailable', 'Ads comparison is temporarily unavailable. Try again later.'); }
 }
 
-type Row = { adAccountId: string; level: string; objectId: string; objectName: string | null; date: Date; fetchedAt: Date | null; spend: number; impressions: number; clicks: number; adAccount: { id: string; name: string; currency: string | null } };
+type Row = { adAccountId: string; level: string; objectId: string; objectName: string | null; date: Date; fetchedAt: Date | null; spend: number; impressions: number; clicks: number; reach?: number; actions?: unknown; adAccount: { id: string; name: string; currency: string | null } };
 const flow = (row: Row) => ({ date: adsIsoDay(row.date), spend: row.spend, impressions: row.impressions, clicks: row.clicks });
 const text = (value: unknown, key: string, max: number) => {
   if (value === undefined) return undefined;
@@ -86,10 +88,16 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
     const previous = compare === 'previous' && prevRows.length ? totalsFromRows(prevRows.map(flow)) : null;
     const byObject = new Map<string, Row[]>();
     for (const row of objectRows) byObject.set(`${row.adAccountId}:${row.objectId}`, [...(byObject.get(`${row.adAccountId}:${row.objectId}`) ?? []), row]);
-    const objects: Array<AdsObjectFigures & { accountId: string; accountName: string }> = [...byObject.values()].map(rows => {
+    const objects: Array<AdsObjectFigures & { accountId: string; accountName: string; sharePercent: number | null; reachPeakDay: number | null; actions: Record<string, number> }> = [...byObject.values()].map(rows => {
       const t = totalsFromRows(rows.map(flow));
       const latest = [...rows].sort((a, b) => b.date.getTime() - a.date.getTime())[0]!;
-      return { objectId: latest.objectId, name: latest.objectName || latest.objectId, accountId: latest.adAccountId, accountName: latest.adAccount.name, spend: t.spend, impressions: t.impressions, clicks: t.clicks, cpc: t.cpc, ctr: t.ctr, cpm: t.cpm };
+      return {
+        objectId: latest.objectId, name: latest.objectName || latest.objectId, accountId: latest.adAccountId, accountName: latest.adAccount.name,
+        spend: t.spend, impressions: t.impressions, clicks: t.clicks, cpc: t.cpc, ctr: t.ctr, cpm: t.cpm,
+        sharePercent: spendSharePercent(t.spend, totals?.spend ?? null),
+        reachPeakDay: peakReach(rows.map(row => row.reach).filter((value): value is number => typeof value === 'number')),
+        actions: sumActions(rows.map(row => row.actions)),
+      };
     });
     const trendByDay = new Map<string, { date: string; spend: number; impressions: number; clicks: number }>();
     for (const row of accountRows) {
@@ -100,7 +108,10 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
     const findings = totals ? buildFindings({ current: totals, previous, objects, policy }) : [];
     const names = [...group.accountIds].map(id => accountMeta.get(id)?.name ?? current.find(row => row.adAccountId === id)?.adAccount.name ?? id);
     return {
-      key: group.key, currency: group.currency, accounts: [...group.accountIds].map((id, index) => ({ id, name: names[index]! })),
+      key: group.key, currency: group.currency,
+      accounts: [...group.accountIds].map((id, index) => ({ id, name: names[index]!, lastSyncedAt: accountMeta.get(id)?.lastSyncedAt?.toISOString() ?? null })),
+      coverage: accountRows.length ? { firstDay: adsIsoDay(accountRows.reduce((a, b) => (b.date < a ? b.date : a), accountRows[0]!.date)), lastDay: adsIsoDay(accountRows.reduce((a, b) => (b.date > a ? b.date : a), accountRows[0]!.date)) } : null,
+      actions: sumActions(accountRows.map(row => row.actions)),
       hasData: accountRows.length > 0 || objectRows.length > 0,
       accountTotalsAvailable: accountRows.length > 0,
       totals, previous, kpis: totals ? buildKpis(totals, previous) : [],
@@ -121,7 +132,15 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
     range: { from: adsIsoDay(filters.since), to: adsIsoDay(filters.until), endExclusive: true as const },
     previousRange: compare === 'previous' ? (() => { const w = previousWindow(filters.since, filters.until); return { from: adsIsoDay(w.since), to: adsIsoDay(w.until), endExclusive: true as const }; })() : null,
     accountId: filters.accountId, groups: result,
-    notes: ['Totals are recomputed from stored daily flows; ratios are not averaged.', 'Amounts in different currencies are never combined.', 'Reach is not additive and is not totalled.'],
+    notes: ['Totals are recomputed from stored daily flows; ratios are not averaged.', 'Amounts in different currencies are never combined.', 'Reach is not additive and is not totalled; object rows show the highest single day.'],
     generatedAt: now.toISOString(),
   };
+}
+
+/** The comparison as one complete CSV, bounded by the Root export size limit (`ads.exportMaxBytes`). */
+export async function exportAdsComparison(actor: AdsReadActor, input: unknown = {}, now = new Date()) {
+  const [outputPolicy, result] = await Promise.all([loadAdsOutputPolicy(), readAdsComparison(actor, input, now)]);
+  const built = buildAdsComparisonCsv(result, outputPolicy.exportMaxBytes);
+  const base = outputPolicy.exportFileName.replace(/\.csv$/i, '');
+  return { format: 'ms-social-pilot-ads-comparison-csv' as const, version: 1 as const, fileName: `${base}-comparison-${result.range.from}_${result.range.to}.csv`, ...built };
 }

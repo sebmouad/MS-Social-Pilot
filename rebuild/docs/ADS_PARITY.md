@@ -174,3 +174,20 @@ storage or starting an independent tab does not deduplicate a new intentional
 request; callers must preserve requestId and inspect history after uncertainty.
 Live campaign/ad-set writes, creative creation, complete provider capability
 coverage and production data/media/service rollback remain unverified.
+
+## Legacy read/report parity — wave 2 (Session B)
+
+Compared legacy `ads/page.tsx`, `ads-analysis.ts` and `messages/{en,fr}` with the module. Already present before this batch: sortable objects (nulls last), freshness, findings, previous-period deltas, one group per currency, per-day trend and the stored-row CSV (`/api/ads/report/export`).
+
+Added (read-only, stored data, no provider call, no new setting; the CSV reuses `ads.exportMaxBytes` and `ads.exportFileName`):
+
+| Item | Where |
+| --- | --- |
+| Share of spend per object, CPM and peak-day reach columns, per-object and account action totals | `analysis/server.ts`, `analysis/metrics.ts` (`spendSharePercent`, `sumActions`, `peakReach`) |
+| Last-synced time per account and stored data coverage (first/last day) | `analysis/server.ts`, Compare screen |
+| Comparison CSV export (HTTP `?format=csv`; MCP `compare_ads_performance` with `format: "csv"`) | `analysis/csv.ts`, `exportAdsComparison`, `api/ads/compare/route.ts`, `analysis/mcp.ts` |
+| en/fr copy catalog; Compare screen follows `Accept-Language` | `analysis/copy.ts` (`adsCopy`, `adsText`), `ui/compare/CompareScreen.tsx` |
+
+Reach stays a peak single day, never a sum; unknown figures are empty or "Unknown", never zero. Tests: `tests/ads-comparison-parity.test.ts` (mocked data only: no PostgreSQL, browser or live provider run).
+
+Still open versus legacy: parent campaign name column for ad sets and ads (stored rows carry no parent name; needs a Facebook-owned resolver), clickable column-header sorting (sorting is by sidebar select), spend-share and daily charts (tables only), en/fr copy for the Campaigns/Objects/Directory screens, and a browser check of the Compare screen (four themes, 1440px/390px). The MCP csv result is capped by row count only.

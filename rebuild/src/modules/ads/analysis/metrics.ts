@@ -133,6 +133,31 @@ export function assessFreshness(fetchedAt: readonly (Date | null)[], now: Date, 
   return { status: ageHours > staleAfterHours ? 'stale' : 'fresh', newestFetchAt: new Date(newest).toISOString(), oldestFetchAt: new Date(oldest).toISOString(), ageHours };
 }
 
+/** Share of the group's spend as a whole percent; null when there is no spend to share. */
+export function spendSharePercent(spend: number, totalSpend: number | null): number | null {
+  if (totalSpend === null || !Number.isFinite(totalSpend) || totalSpend <= 0 || !Number.isFinite(spend)) return null;
+  return Math.round((spend / totalSpend) * 100);
+}
+
+/** Sum per-day action maps (`{ type: count }`). Non-numeric entries are ignored; the result is sorted by count. */
+export function sumActions(maps: readonly unknown[], maxKeys = 200): Record<string, number> {
+  const totals = new Map<string, number>();
+  for (const map of maps) {
+    if (!map || typeof map !== 'object' || Array.isArray(map)) continue;
+    for (const [key, value] of Object.entries(map as Record<string, unknown>)) {
+      if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+      totals.set(key, (totals.get(key) ?? 0) + value);
+    }
+  }
+  return Object.fromEntries([...totals].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, maxKeys));
+}
+
+/** Reach counts people, so days cannot be added: the highest single day is the only honest period figure. */
+export function peakReach(values: readonly number[]): number | null {
+  const finite = values.filter(Number.isFinite);
+  return finite.length ? Math.max(...finite) : null;
+}
+
 /** Previous window of the same length ending where the current one starts. */
 export function previousWindow(since: Date, until: Date): { since: Date; until: Date } {
   const span = until.getTime() - since.getTime();
