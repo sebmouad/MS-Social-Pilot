@@ -9,7 +9,7 @@ export const publishingManifest = {
     { name: 'publishingRecycle', label: 'Post recycling', configKey: 'publishing.automation.recycleSchedule' },
     { name: 'publishingMix', label: 'Content mix scheduling', configKey: 'publishing.automation.mixSchedule' },
   ],
-  rootSettingsPrefixes: ['publishing.', 'media.inspect', 'media.ffprobe'],
+  rootSettingsPrefixes: ['publishing.', 'media.inspect', 'media.ffprobe', 'ai.'],
   rootSettingKeys: ['sync.posts.schedule', 'storage.orphanMediaRetentionDays', 'storage.orphanMediaBatchLimit', 'storage.mediaLibraryBatchLimit', 'storage.orphanMediaCleanupSchedule', 'publishing.automation.recycleSchedule', 'publishing.automation.mixSchedule', 'publishing.automation.recycleCursor', 'publishing.automation.mixCursor', ...MEDIA_ROOT_KEYS],
   title: 'Publishing',
   mobileTitle: 'Publish',

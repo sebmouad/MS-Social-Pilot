@@ -16,6 +16,8 @@ import { useRouter } from 'next/navigation';
 import { createPostWithRecoveryAction, type ComposerActionState } from '@/modules/publishing/ui/posts/actions';
 import { crowdedDestinationPlatforms } from '@/modules/settings/workspace-operations';
 import { workspaceOperationsCopy } from '@/modules/settings/workspace-operations-copy';
+import { AiAssist } from '@/modules/ai/components/AiAssist';
+import type { AiStatus } from '@/modules/ai/ai';
 import styles from './PostComposer.module.css';
 
 type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
@@ -108,7 +110,7 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items);
 }
 
-export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0 }: { targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
+export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en' }: { aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -265,6 +267,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
       <label htmlFor="composer-message">Post text <span>(optional with a link or media)</span></label>
       <AutoTextarea id="composer-message" name="message" disabled={saved} value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={7} placeholder="Write a post for your team…" aria-describedby="composer-message-count" />
       <div className={styles.fieldMeta} id="composer-message-count">{message.length.toLocaleString()} / {imageRules.maxMessageCharacters.toLocaleString()}</div>
+      <AiAssist status={aiStatus} locale={aiLocale} text={message} disabled={pending || saved} onUse={(suggestion, kind) => setMessage(current => (kind === 'hashtags' ? `${current.trimEnd()}${current.trim() ? '\n\n' : ''}${suggestion}` : suggestion).slice(0, imageRules.maxMessageCharacters))} />
       <label htmlFor="composer-first-comment">First comment <span>(optional)</span></label>
       <AutoTextarea id="composer-first-comment" name="firstComment" disabled={saved} value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder="Add a link or follow-up as the first comment…" />
       <label htmlFor="composer-first-comment-delay">Wait before the first comment <span>(minutes; 0 sends it right after publication)</span></label>

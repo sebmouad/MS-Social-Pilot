@@ -1,0 +1,12 @@
+.assist { display: grid; gap: 10px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.assist h3 { margin: 0; font-size: 13px; color: var(--ink); }
+.note { margin: 0; font-size: 12px; color: var(--ink-soft); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.field { display: grid; gap: 4px; min-width: 0; font-size: 12px; color: var(--ink-soft); }
+.field span { color: var(--ink-faint); }
+.assist select, .assist input { min-height: 40px; min-width: 0; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); background: var(--surface); font: inherit; font-size: 13px; }
+.assist select:focus-visible, .assist input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.error { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--danger); background: var(--danger-soft); font-size: 13px; }
+.result { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); }
+.result p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; color: var(--ink); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }

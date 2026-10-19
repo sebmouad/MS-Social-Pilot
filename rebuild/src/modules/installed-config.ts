@@ -1,5 +1,6 @@
 import { ADS_MODULE_CONFIG } from './ads/config';
 import { AGENCY_CONFIG } from './agency/config';
+import { AI_CONFIG } from './ai/config';
 import { ANALYTICS_MODULE_CONFIG } from './analytics/config';
 import { INBOX_MODULE_CONFIG } from './inbox/config';
 import { MEDIA_CONFIG } from './media/config';
@@ -22,4 +23,5 @@ export const INSTALLED_MODULE_CONFIG = [
   ...TASKS_CONFIG,
   ...AGENCY_CONFIG,
   ...SHARING_CONFIG,
+  ...AI_CONFIG,
 ] as const;

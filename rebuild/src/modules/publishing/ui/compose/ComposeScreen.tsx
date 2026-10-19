@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { requireViewer } from '@/server/context';
 import { runtimeConfig } from '@/server/config/store';
 import { canAccessFeature } from '@/server/permissions';
@@ -8,6 +9,7 @@ import { isDateKey } from '@/lib/calendar-dates';
 import { formatPostPreviewTime } from '@/components/PostPreview';
 import { PageHeading } from '@/modules/publishing/ui/publishing-ui';
 import { PostComposer } from './PostComposer';
+import { aiStatus } from '@/modules/ai/server/ai';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import styles from '@/modules/publishing/ui/publishing.module.css';
 
@@ -24,6 +26,9 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   const templates = canUseTemplates ? await readTemplatePage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, {}).then(result => result.templates.map(({ id, name, category, body, hashtags, firstComment, firstCommentDelayMinutes, labelId }) => ({ id, name, category, body, hashtags, firstComment, firstCommentDelayMinutes, labelId }))) : [];
   // Advisory only: an unavailable setting hides the warning rather than blocking composition.
   const spacingGapMinutes = canCreate ? await loadWorkspaceOperations(viewer.workspaceId).then(value => value.spamGapMinutes, () => 0) : 0;
+  // Suggestion-only writing help; the status is empty (and the control hidden) when unavailable.
+  const aiLocale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' as const : 'en' as const;
+  const aiAssist = canCreate ? await aiStatus({ userId: viewer.user.id, workspaceId: viewer.workspaceId }).catch(() => undefined) : undefined;
   const createdAt = new Date();
   const schedule = {
     date: params.date && isDateKey(params.date) ? params.date : '',
@@ -32,7 +37,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   };
   return <>
     <PageHeading title="Create a post" description="Choose destinations, write your post, then save a draft or schedule it." />
-    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer targets={choices} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
+    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer aiStatus={aiAssist} aiLocale={aiLocale} targets={choices} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
       : <section className={styles.card}><p>You do not have permission to create posts in this workspace.</p></section>}
   </>;
 }
