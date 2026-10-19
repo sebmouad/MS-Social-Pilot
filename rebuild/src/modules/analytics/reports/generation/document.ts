@@ -7,7 +7,7 @@ import { platformAnalytics } from '@/server/platforms/registry';
 import type { DestinationMeasures, PostPerformance } from '@/server/platforms/host';
 import { channelGoalProgress } from '../../goals/server/goals';
 import type { GoalMonth, GoalProgress } from '../../goals/contracts';
-import { formatDuration, readResponseTime, type ResponseTimeSummary } from './response-time';
+import { describeBusinessHours, formatDuration, readResponseTime, type ResponseTimeSummary } from './response-time';
 
 /** One channel's per-destination summary: neutral counts plus the platform module's stored measures (null = not stored). */
 export type DestinationSummary = {
@@ -74,7 +74,10 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const metrics = included.includes('analysis') ? snapshot.allMetrics.filter(m => m.resourceKind === 'channel') : [];
   const audience = included.includes('audience') ? snapshot.audience : null;
   const response = included.includes('responseTime') ? input.responseTime ?? null : null;
-  const responseLine = response ? `Median first response ${formatDuration(response.medianMs)}; ${response.answered} answered, ${response.unanswered} waiting at period end. Calendar time, from stored Inbox messages${response.partial ? '; only the earliest messages were read' : ''}.` : '';
+  const responseBasis = response ? (response.businessHours
+    ? `Business hours (${describeBusinessHours(response.businessHours)}): median first response ${formatDuration(response.businessMedianMs)}, counting only time inside business hours. Calendar time: median first response ${formatDuration(response.medianMs)}.`
+    : `Calendar time: median first response ${formatDuration(response.medianMs)}. Business hours are not set for this workspace, so no business-hours figure is shown.`) : '';
+  const responseLine = response ? `${responseBasis} ${response.answered} answered, ${response.unanswered} waiting at period end. From stored Inbox messages${response.partial ? '; only the earliest messages were read' : ''}.` : '';
   const recap = included.includes('aiRecap') ? input.recap ?? null : null;
   const recapText = recap ? (recap.state === 'ready' ? recap.text : RECAP_UNAVAILABLE) : '';
   const topPosts = included.includes('topPosts') ? input.topPosts ?? [] : null;
@@ -93,7 +96,8 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   if (recap) rows.push(['ai_recap', 'ai_recap', 'AI recap (AI-generated)', 'AI-generated', '', '', recap.state === 'ready' ? recap.text : '', '', '', recap.state === 'ready' ? RECAP_LABEL : RECAP_UNAVAILABLE]);
   if (audience) for (const e of audience.entries) rows.push(['audience', e.metric, e.metricLabel, e.sourceLabel, e.name, e.asOf, e.value, 'people', `${audience.covered} of ${audience.selected} channels`, 'Latest value per channel; not unique people']);
   if (response) {
-    rows.push(['response_time', 'median_first_response_minutes', 'Median first response', 'Inbox', '', '', response.medianMs === null ? '' : Math.round(response.medianMs / 60_000), 'minutes', response.partial ? 'partial' : '', 'Median wait until the channel replied; calendar time']);
+    rows.push(['response_time', 'median_first_response_minutes', 'Median first response (calendar time)', 'Inbox', '', '', response.medianMs === null ? '' : Math.round(response.medianMs / 60_000), 'minutes', response.partial ? 'partial' : '', 'Median wait until the channel replied; calendar time']);
+    rows.push(['response_time', 'median_first_response_business_minutes', 'Median first response (business hours)', 'Inbox', '', '', response.businessHours && response.businessMedianMs !== null ? Math.round(response.businessMedianMs / 60_000) : '', 'minutes', response.businessHours ? (response.partial ? 'partial' : '') : 'not set', response.businessHours ? `Median wait counting only business hours: ${describeBusinessHours(response.businessHours)}` : 'Business hours are not set for this workspace; no figure']);
     rows.push(['response_time', 'answered_waits', 'Answered waits', 'Inbox', '', '', response.answered, 'waits', '', 'Count in period']);
     rows.push(['response_time', 'unanswered_waits', 'Waiting at period end', 'Inbox', '', '', response.unanswered, 'waits', '', 'Count at period end']);
   }
@@ -187,7 +191,7 @@ export function recapFacts(snapshot: Snapshot, input: { sections: ReportSectionI
   const lines: string[] = [];
   if (wanted.has('published')) lines.push(`Posts: published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`);
   if (wanted.has('audience') && snapshot.audience) lines.push(`Audience: ${snapshot.audience.covered ? snapshot.audience.total : 'Not available'} (${snapshot.audience.covered} of ${snapshot.audience.selected} channels; not unique people).`);
-  if (wanted.has('responseTime') && input.responseTime) lines.push(`Median first response ${formatDuration(input.responseTime.medianMs)}; ${input.responseTime.answered} answered, ${input.responseTime.unanswered} waiting.`);
+  if (wanted.has('responseTime') && input.responseTime) lines.push(`Median first response ${input.responseTime.businessHours ? `${formatDuration(input.responseTime.businessMedianMs)} in business hours, ${formatDuration(input.responseTime.medianMs)} in calendar time` : `${formatDuration(input.responseTime.medianMs)} in calendar time (no business hours set)`}; ${input.responseTime.answered} answered, ${input.responseTime.unanswered} waiting.`);
   if (wanted.has('goals') && input.goals?.goals.length) for (const g of input.goals.goals.slice(0, 20)) lines.push(`Goal ${factText(g.label)}: ${g.actual === null ? 'No data' : g.actual} of ${g.target} (${g.percent}%, ${factText(g.paceLabel)}).`);
   const d = wanted.has('destinations') ? input.destination : null;
   if (d) lines.push(`Destination: ${d.posts} posts published; ${d.measures.map(m => `${factText(m.label)} ${m.value ?? 'Not available'}`).join('; ')}.`);

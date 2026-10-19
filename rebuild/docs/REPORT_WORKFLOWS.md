@@ -86,8 +86,10 @@ the exact main commit against origin/main.
 
 Wave 2 (2026-10-19) adds Response time and Top posts sections, selectable by
 default in Root's enabled sections. Response time reads stored conversation
-messages (a reply is app-sent or from the channel's own identity), calendar
-time, capped at 20,000 messages with a partial flag. Top posts asks the
+messages (a reply is app-sent or from the channel's own identity), capped at
+20,000 messages with a partial flag. It reports calendar time and, when the
+workspace sets business hours, a second median that counts only time inside them
+(see Business-hours response time below). Top posts asks the
 channel's platform module through the optional `PlatformAnalyticsHost.postPerformance`
 hook (stored data only, no provider call); a module without it yields an empty,
 labelled section. Evidence: unit tests only, no PostgreSQL or browser run.
@@ -197,3 +199,32 @@ The guarded example seed was executed twice successfully after verification.
 Two example layouts, one future schedule and one Prepared history item remain
 intentionally in the synthetic preview; rerunning preserved those identities.
 This is separate from the probes, whose disposable fixtures were removed.
+
+## Business-hours response time
+
+Ported from legacy `src/lib/response-time.ts`. The workspace operations setting
+(open weekdays 0 Sunday to 6 Saturday, start hour inclusive, end hour exclusive,
+1-24; no day selected means not set) is read from `workspaces` with the workspace
+time zone. A wait's business time is the overlap of [first visitor message, first
+channel reply) with each open day's [start, end) window on the workspace clock;
+closed weekdays and nights count zero. Windows are converted to real instants, so
+daylight-saving days are exact (a window holding the spring gap is an hour shorter,
+one holding the autumn repeat an hour longer; an edge inside the gap moves to the
+first real instant after it; a closing edge in the repeated hour uses its last
+occurrence, an opening edge the first). Legacy resolved those edge cases with
+`date-fns-tz` defaults; ordinary hours are identical. A wait is walked over at most
+400 calendar days. Hours that are set but unusable (end not after start, out of
+range, unknown zone) are treated as not set, never replaced by invented hours.
+
+Pure arithmetic: `modules/analytics/reports/generation/business-hours.ts`; summary:
+`response-time.ts`. Outputs always label both figures: CSV rows
+`median_first_response_minutes` (calendar time) and
+`median_first_response_business_minutes` (coverage `not set` and an empty value when
+no hours are set), the same rows in JSON, and the HTML/text line "Business hours
+(Mon-Fri 09:00-18:00 (zone)): ... Calendar time: ...", or a plain statement that
+business hours are not set. The AI recap facts mention both. Legacy also showed
+response time with per-page/per-member rows and resolve time on its analysis page;
+the rebuild report keeps its single median and does not add an Inbox screen figure
+(the Inbox screens are owned by another session). Evidence: unit tests
+(`tests/business-hours.test.ts`, `tests/report-response-time.test.ts`) with mocked
+database only; no PostgreSQL or browser run.

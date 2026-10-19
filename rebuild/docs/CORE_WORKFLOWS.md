@@ -56,8 +56,10 @@ Live consumers, and the only fields rendered on `/settings/workspace`:
   (one post sends to all destinations at once). Grouping uses the neutral
   platform id; there is no automatic staggering.
 
-Stored and exposed through API/MCP only, with no consumer yet, so not rendered:
-week start, business hours, best-time mode, link shortening (no short-link
+Business hours are consumed by the Reports Response time section (see
+REPORT_WORKFLOWS.md). Stored and exposed through API/MCP only, with no consumer
+yet, so not rendered:
+week start, best-time mode, link shortening (no short-link
 service), undo-send window, AI enablement/tone/brand voice/avoid words and the
 negative-comment alert. The form sends these back unchanged. Evidence is unit
 tests only (`tests/workspace-operations*.test.ts`); no browser or database run.
