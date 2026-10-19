@@ -1,5 +1,6 @@
 import type { ModuleManifest } from '../types';
 import { MEDIA_PAGES, MEDIA_ROOT_KEYS } from '../media/manifest';
+import { FEEDS_JOBS, FEEDS_PAGES, FEEDS_ROOT_KEYS } from '../feeds/manifest';
 
 export const publishingManifest = {
   id: 'publishing',
@@ -8,9 +9,10 @@ export const publishingManifest = {
     { name: 'mediaCleanup', label: 'Orphan image cleanup', configKey: 'storage.orphanMediaCleanupSchedule' },
     { name: 'publishingRecycle', label: 'Post recycling', configKey: 'publishing.automation.recycleSchedule' },
     { name: 'publishingMix', label: 'Content mix scheduling', configKey: 'publishing.automation.mixSchedule' },
+    ...FEEDS_JOBS,
   ],
   rootSettingsPrefixes: ['publishing.', 'media.inspect', 'media.ffprobe', 'ai.'],
-  rootSettingKeys: ['sync.posts.schedule', 'storage.orphanMediaRetentionDays', 'storage.orphanMediaBatchLimit', 'storage.mediaLibraryBatchLimit', 'storage.orphanMediaCleanupSchedule', 'publishing.automation.recycleSchedule', 'publishing.automation.mixSchedule', 'publishing.automation.recycleCursor', 'publishing.automation.mixCursor', ...MEDIA_ROOT_KEYS],
+  rootSettingKeys: ['sync.posts.schedule', 'storage.orphanMediaRetentionDays', 'storage.orphanMediaBatchLimit', 'storage.mediaLibraryBatchLimit', 'storage.orphanMediaCleanupSchedule', 'publishing.automation.recycleSchedule', 'publishing.automation.mixSchedule', 'publishing.automation.recycleCursor', 'publishing.automation.mixCursor', ...MEDIA_ROOT_KEYS, ...FEEDS_ROOT_KEYS],
   title: 'Publishing',
   mobileTitle: 'Publish',
   href: '/publishing/posts',
@@ -21,6 +23,7 @@ export const publishingManifest = {
     { id: 'publishing/queue', title: 'Queue', href: '/publishing/queue', description: 'Review work waiting to publish.' },
     { id: 'publishing/approvals', title: 'Approvals', href: '/publishing/approvals', description: 'Review posts before they go live.' },
     ...MEDIA_PAGES,
+    ...FEEDS_PAGES,
     { id: 'publishing/collaboration', title: 'Organize', href: '/publishing/collaboration', description: 'Label posts, manage custom fields and collaborate with your team.' },
     { id: 'publishing/labels', title: 'Labels', href: '/publishing/labels', description: 'Organize workspace content with shared labels.' },
     { id: 'publishing/templates', title: 'Templates', href: '/publishing/templates', description: 'Create and reuse workspace post templates.' },

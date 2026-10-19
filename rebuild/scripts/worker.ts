@@ -22,6 +22,11 @@ const dependencies: WorkerDependencies = {
       const result = await runPublishingMix(now);
       return Object.entries(result).map(([key, count]) => `${key}=${count}`).join(' ');
     }
+    if (job === 'feedsPoll') {
+      const { runFeedPolling } = await import('@/modules/feeds/server/polling');
+      const result = await runFeedPolling();
+      return `${result.reason ? `${result.reason} ` : ''}examined=${result.examined} claimed=${result.claimed} posts=${result.postsCreated} held=${result.held} skipped=${result.skipped} failed=${result.failed}`;
+    }
     if (job === 'purges') {
       const { resumePendingWorkspaceDataPurges } = await import('../src/server/data-control');
       const result = await resumePendingWorkspaceDataPurges();

@@ -2,6 +2,7 @@ import { ADS_MODULE_CONFIG } from './ads/config';
 import { AGENCY_CONFIG } from './agency/config';
 import { AI_CONFIG } from './ai/config';
 import { ANALYTICS_MODULE_CONFIG } from './analytics/config';
+import { FEEDS_CONFIG } from './feeds/config';
 import { INBOX_MODULE_CONFIG } from './inbox/config';
 import { MEDIA_CONFIG } from './media/config';
 import { PUBLISHING_MODULE_CONFIG } from './publishing/config';
@@ -19,6 +20,7 @@ export const INSTALLED_MODULE_CONFIG = [
   ...SETTINGS_MODULE_CONFIG,
   ...PUBLISHING_MODULE_CONFIG,
   ...MEDIA_CONFIG,
+  ...FEEDS_CONFIG,
   ...INBOX_MODULE_CONFIG,
   ...TASKS_CONFIG,
   ...AGENCY_CONFIG,

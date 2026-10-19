@@ -1,5 +1,7 @@
 # Feeds ingestion, AI assist and media library (W6b)
 
+> Superseded: content feeds are integrated and documented in [FEEDS.md](FEEDS.md); media in [MEDIA_LIBRARY.md](MEDIA_LIBRARY.md); AI in [AI_ASSIST.md](AI_ASSIST.md). The text below is the original WIP note.
+
 Status: SOURCE and MOCKED TESTS ONLY. Not wired into the host, not browser-checked, no real SQL run,
 no live provider or network call. Production remains legacy.
 
