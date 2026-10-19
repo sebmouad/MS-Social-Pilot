@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
 import { ADS_REPORT_DEFAULT_POLICY } from './report-policy';
 import { ADS_READ_DEFAULT_POLICY, ADS_READ_MAX_ROWS_SCHEMA, ADS_READ_PAGE_SIZE_SCHEMA } from './read-policy';
+import { ADS_ANALYSIS_CONFIG } from './analysis/config';
+import { ADS_MANAGEMENT_CONFIG } from './management/config';
 import { ADS_DETAIL_MAX_BYTES_SCHEMA, ADS_OUTPUT_DEFAULT_POLICY, ADS_EXPORT_FILE_NAME_SCHEMA, ADS_EXPORT_MAX_BYTES_SCHEMA } from './output-policy';
 
 const preset = z.object({
@@ -51,3 +53,11 @@ export const ADS_CONFIG = [entry({
   description: 'Safe filename used for complete Ads CSV report downloads.',
   defaultValue: ADS_OUTPUT_DEFAULT_POLICY.exportFileName, schema: ADS_EXPORT_FILE_NAME_SCHEMA, consumption: 'active',
 })] as const;
+
+/** Every Root setting this product module declares. The registry merges installed modules; edit only here. */
+export const ADS_MODULE_CONFIG = [
+  ...ADS_CONFIG,
+  ...ADS_ANALYSIS_CONFIG,
+  ...ADS_MANAGEMENT_CONFIG,
+  entry({ key: 'ads.managementEnabled', group: 'Ads controls', label: 'Ads management enabled', kind: 'boolean', description: 'Allow authorized workspace owners and admins to use supported advertising management operations. Platform grants, account scope and confirmations are still required.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
+] as const;
