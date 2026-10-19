@@ -7,7 +7,7 @@ import { loadReportUiPolicy } from '@/modules/analytics/server/report-ui-policy'
 describe('Root-managed Reports presentation policy',()=>{
   it('accepts defaults and never offers unsupported sections as usable choices',()=>{
     const policy=REPORT_UI_POLICY_SCHEMA.parse(DEFAULT_REPORT_UI_POLICY);
-    expect(policy.sectionOptions.map(item=>item.id)).toEqual(['analysis', 'goals', 'responseTime', 'audience', 'published', 'destinations', 'topPosts']);
+    expect(policy.sectionOptions.map(item=>item.id)).toEqual(['analysis', 'goals', 'responseTime', 'audience', 'published', 'destinations', 'topPosts', 'aiRecap']);
     expect(REPORT_UI_POLICY_SCHEMA.safeParse({...DEFAULT_REPORT_UI_POLICY,enabledSections:['goals']}).success).toBe(false);
     expect(REPORT_UI_POLICY_SCHEMA.safeParse({...DEFAULT_REPORT_UI_POLICY,enabledSections:[...DEFAULT_REPORT_UI_POLICY.enabledSections,'bogus']}).success).toBe(false);
   });
@@ -19,7 +19,10 @@ describe('Root-managed Reports presentation policy',()=>{
   });
   it('reads validated Root configuration and fails closed on malformed policy',async()=>{
     vi.mocked(runtimeConfig).mockResolvedValue(DEFAULT_REPORT_UI_POLICY as never);
-    expect(await loadReportUiPolicy()).toEqual(REPORT_UI_POLICY_SCHEMA.parse(DEFAULT_REPORT_UI_POLICY));
+    const parsed=REPORT_UI_POLICY_SCHEMA.parse(DEFAULT_REPORT_UI_POLICY);
+    // Without AI assist (no actor) the recap is not among the choices.
+    expect((await loadReportUiPolicy()).sectionOptions.map(item=>item.id)).toEqual(parsed.sectionOptions.map(item=>item.id).filter(id=>id!=='aiRecap'));
+    expect((await loadReportUiPolicy()).rangeOptions).toEqual(parsed.rangeOptions);
     expect(runtimeConfig).toHaveBeenCalledWith('analytics.reports.ui');
     vi.mocked(runtimeConfig).mockResolvedValue({} as never);
     await expect(loadReportUiPolicy()).rejects.toMatchObject({code:'unavailable'});

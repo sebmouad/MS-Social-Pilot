@@ -50,7 +50,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     const [templates, schedules, runs, policy, limits, defaultPeriod, templateOptions, channelSnapshot] = await Promise.all([
       listReportTemplates(actor, { page }), listReportSchedules(actor, { page }),
       canGenerate ? listReportRuns(actor, { page: runsPage }) : Promise.resolve({ ok: true as const, runs: [], page: runsPage, hasMore: false }),
-      loadReportUiPolicy(), reportLimits(), canGenerate ? reportDefaultPeriod().catch(() => null) : Promise.resolve(null), reportTemplateOptions(actor),
+      loadReportUiPolicy(actor), reportLimits(), canGenerate ? reportDefaultPeriod().catch(() => null) : Promise.resolve(null), reportTemplateOptions(actor),
       channelSnapshotPromise,
     ]);
     // Channel choices are scoped to report access; no broader overview entitlement is required.

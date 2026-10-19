@@ -4,11 +4,12 @@ import { prisma } from '@/server/data';
 import { REPORT_SECTION_IDS, REPORT_SUPPORTED_SECTIONS, listSchema, reportConfirmation, templateActionSchema, type ReportActor, type ReportTemplateView, type ReportSectionId } from '../contracts';
 import { audit, authorizeReport, bad, isUnique, lockActor, missing, pageOf, requireWorkspaceWide } from './access';
 import { reportLimits, transact } from './limits';
+import { recapOffered } from './recap';
 
 type Row = { id: string; name: string; sections: unknown; rangeKey: string; createdAt: Date; scheduleCount: bigint | number };
 /** Stored choices are kept as they are, including ones the shared readers cannot yet supply; unknown ids are dropped. */
 export const cleanSections = (value: unknown): ReportSectionId[] => (Array.isArray(value) ? value : []).filter((s): s is ReportSectionId => (REPORT_SECTION_IDS as readonly string[]).includes(s as string));
-const supported = (section: string) => (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(section);
+const supportedIn = (section: string) => (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(section);
 
 export async function listReportTemplates(actor: ReportActor, input: unknown = {}) {
   const parsed = listSchema.safeParse(input ?? {}); if (!parsed.success) throw bad('Choose a valid result page.');
@@ -22,7 +23,7 @@ export async function listReportTemplates(actor: ReportActor, input: unknown = {
   const rows = await prisma.$queryRaw<Row[]>`SELECT t.id, t.name, t.sections, t."rangeKey", t."createdAt", (SELECT COUNT(*) FROM report_schedules s WHERE s."templateId" = t.id AND s."workspaceId" = t."workspaceId" AND (${scope === null}::boolean OR s."targetId" = ANY(${[...(scope ?? [])]}::text[]))) AS "scheduleCount" FROM report_templates t WHERE t."workspaceId" = ${actor.workspaceId} ORDER BY t.name ASC, t.id ASC OFFSET ${offset} LIMIT ${size + 1}`;
   const templates: ReportTemplateView[] = rows.slice(0, size).map(r => ({ id: r.id, name: r.name, sections: cleanSections(r.sections), rangeKey: r.rangeKey as ReportTemplateView['rangeKey'], createdAt: r.createdAt, scheduleCount: Number(r.scheduleCount) }));
   // `sections` is every stored identifier (unchanged); `selectableSections` is what a new choice may include today.
-  return { ok: true as const, templates, page: parsed.data.page, hasMore: rows.length > size, sections: REPORT_SECTION_IDS, selectableSections: REPORT_SUPPORTED_SECTIONS, canManage: auth.canManage };
+  return { ok: true as const, templates, page: parsed.data.page, hasMore: rows.length > size, sections: REPORT_SECTION_IDS, selectableSections: (await recapOffered(actor)) ? REPORT_SUPPORTED_SECTIONS : REPORT_SUPPORTED_SECTIONS.filter(s => s !== 'aiRecap'), canManage: auth.canManage };
 }
 
 export async function manageReportTemplate(actor: ReportActor, input: unknown) {
@@ -34,6 +35,8 @@ export async function manageReportTemplate(actor: ReportActor, input: unknown) {
   requireWorkspaceWide(actor);
   const limits = await reportLimits();
   if (value.action !== 'delete' && [...value.name].length > limits.nameMax) throw bad(`Use a name of ${limits.nameMax} characters or fewer.`);
+  const aiOk = value.action !== 'delete' && value.sections.includes('aiRecap') ? await recapOffered(actor) : true;
+  const supported = (section: string) => supportedIn(section) && (section !== 'aiRecap' || aiOk);
   const unsupportedNew = (list: readonly ReportSectionId[], stored: readonly string[] = []) => list.filter(s => !supported(s) && !stored.includes(s));
   if (value.action === 'create' && unsupportedNew(value.sections).length) throw bad('Choose only report sections that are available.');
   try {

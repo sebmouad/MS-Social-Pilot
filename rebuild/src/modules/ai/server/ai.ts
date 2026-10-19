@@ -58,6 +58,13 @@ export async function aiStatus(actor: AiActor, deps: AiDeps = {}): Promise<AiSta
   return s && workspace?.enabled ? { available: true, kinds: AI_KINDS, tones: TONES, maxInputCharacters: s.maxInput } : none;
 }
 
+/** Whether a report recap can be offered to this actor now: write access to Reports, AI configured and on for the workspace. No provider call, nothing claimed. */
+export async function summaryAvailable(actor: AiActor, deps: AiDeps = {}): Promise<boolean> {
+  try { await authorizeAi(actor, SUMMARY_FEATURE, 'write'); } catch { return false; }
+  const [s, workspace] = await Promise.all([settings(deps), workspaceContext(actor.workspaceId)]);
+  return Boolean(s && workspace?.enabled);
+}
+
 /**
  * Claim one request in the audit trail (rolling hourly limit per workspace). The claim counts even
  * when the provider then fails, so a failing provider cannot be used to bypass the limit. The claim

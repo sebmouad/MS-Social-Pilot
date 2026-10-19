@@ -10,7 +10,7 @@ vi.mock('@/server/config/store', async () => {
 });
 vi.mock('@/modules/ai/server/access', () => ({ authorizeAi: state.auth }));
 
-import { aiStatus, runAssist, summarize } from '../src/modules/ai/server/ai';
+import { aiStatus, runAssist, summarize, summaryAvailable } from '../src/modules/ai/server/ai';
 import { anthropicPort } from '../src/modules/ai/server/anthropic';
 import { buildPrompt, cleanOutput, parseHashtags } from '../src/modules/ai/ai';
 import { AI_MCP, aiToolDefinitions, executeAiTool } from '../src/modules/ai/mcp';
@@ -178,6 +178,17 @@ describe('workspace preferences and defaults', () => {
 });
 
 describe('summarize (reusable recap)', () => {
+  it('reports availability for the report recap without claiming a request', async () => {
+    expect(await summaryAvailable(actor, { port: port() })).toBe(true);
+    expect(state.auth).toHaveBeenCalledWith(actor, 'analytics/reports', 'write');
+    expect(state.exec).toHaveLength(0);
+    state.overrides['ai.enabled'] = false;
+    expect(await summaryAvailable(actor, { port: port() })).toBe(false);
+    state.overrides = {}; state.workspaceOn = false;
+    expect(await summaryAvailable(actor, { port: port() })).toBe(false);
+    state.workspaceOn = true; state.auth.mockRejectedValue(new Error('forbidden'));
+    expect(await summaryAvailable(actor, { port: port() })).toBe(false);
+  });
   it('authorizes the report feature, shares the hourly limit and returns text only', async () => {
     const p = port('"Reach rose 12% to 3,400."');
     expect(await summarize(actor, { facts: 'reach 3400 (prev 3036)', language: 'French' }, { port: p })).toEqual({ text: 'Reach rose 12% to 3,400.' });

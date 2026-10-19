@@ -3,7 +3,7 @@ import type { ScopedPermissions } from '@/server/permissions';
 import type { AnalyticsAdCeiling } from '../server/types';
 
 /** Report parts and range presets are stored in the shared legacy tables; keep the identifiers stable. */
-export const REPORT_SECTION_IDS = ['analysis', 'goals', 'responseTime', 'audience', 'published', 'destinations', 'topPosts'] as const;
+export const REPORT_SECTION_IDS = ['analysis', 'goals', 'responseTime', 'audience', 'published', 'destinations', 'topPosts', 'aiRecap'] as const;
 export const REPORT_RANGE_KEYS = ['today', 'yesterday', '7d', '30d', '90d', 'thisMonth', 'lastMonth', 'thisYear', 'all'] as const;
 export const REPORT_FREQUENCIES = ['weekly', 'monthly'] as const;
 export type ReportSectionId = (typeof REPORT_SECTION_IDS)[number];
@@ -62,7 +62,12 @@ export type ReportScheduleView = {
 };
 
 /** Sections the shared Analytics readers can honestly supply today; other stored section ids are listed as not included in a report. */
-export const REPORT_SUPPORTED_SECTIONS = ['analysis', 'goals', 'responseTime', 'audience', 'published', 'destinations', 'topPosts'] as const;
+export const REPORT_SUPPORTED_SECTIONS = ['analysis', 'goals', 'responseTime', 'audience', 'published', 'destinations', 'topPosts', 'aiRecap'] as const;
+/**
+ * Sections that also depend on a runtime service. `aiRecap` can be named and enabled in Root, but customers are offered it
+ * (and new templates may add it) only while AI assist is on and configured for them; a stored choice is otherwise listed as not included.
+ */
+export const REPORT_AI_SECTIONS = ['aiRecap'] as const;
 
 export type ReportPeriod = { start: string; end: string };
 export type ReportGenerationRequest = {

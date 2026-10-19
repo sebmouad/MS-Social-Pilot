@@ -120,7 +120,18 @@ the button) and returned as `json` by the run route and `generate_report`. No XL
 legacy had neither and no dependency is present. Default `maxStoredArtifactBytes` rose
 from 2.2 MB to 3.3 MB to hold the third rendering. Unit tests only.
 
-Remaining legacy report coverage includes AI recap; stored choices are preserved and generated output names
+AI recap (`aiRecap`): legacy stored only a per-schedule `aiRecap` flag, so the rebuild adds `aiRecap` as a report
+section id. Generation feeds `summarize` (AI module) a bounded text of the figures other chosen sections already
+computed (never post, message or recipient text), under the run's actor: the manual caller, or the schedule owner for
+scheduled runs (`summarize` authorizes from the database, so it works in the worker; a revoked owner already stops the run at
+the schedule boundary). AI off, unconfigured, workspace-disabled or no write access to Reports: the section is listed under
+"not included". Hourly-limit conflict, provider failure, empty answer or timeout: the report still succeeds and the section
+says the recap is unavailable for this run. Output is labelled AI-generated in HTML, text, CSV (`ai_recap` row) and JSON, and
+therefore in scheduled email. Customers are offered the section (policy choices, template create/update, MCP) only while AI
+assist is available to them; a stored template keeps it. One recap request counts toward the workspace hourly AI limit per
+generation. Unit tests with the provider mocked.
+
+Remaining legacy report coverage: stored choices are preserved and generated output names
 unsupported sections honestly. This batch is not full report parity. Complete
 Facebook live coverage, the held photo cleanup, full Root configuration coverage,
 remaining legacy integrations and production-shaped data/media/service rollback

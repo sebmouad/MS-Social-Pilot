@@ -96,7 +96,7 @@ describe('report templates', () => {
   it('lists one page with hasMore, drops unknown stored sections and names what a new choice may use', async () => {
     const r = await listReportTemplates(actor, { page: 1 });
     expect(r.templates).toHaveLength(2); expect(r.hasMore).toBe(true); expect(r.templates[0]!.sections).toEqual(['audience']);
-    expect(r.selectableSections).toEqual(REPORT_SUPPORTED_SECTIONS);
+    expect(r.selectableSections).toEqual(REPORT_SUPPORTED_SECTIONS.filter(s => s !== 'aiRecap')); // AI recap is offered only while AI assist is available
     await expect(listReportTemplates(actor, { page: 0 })).rejects.toMatchObject({ code: 'invalid_request' });
   });
   it('bounds a key page by its result ceiling', async () => {

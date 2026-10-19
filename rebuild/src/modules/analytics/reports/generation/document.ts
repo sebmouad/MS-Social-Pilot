@@ -1,6 +1,6 @@
 import type { MetricView } from '@/modules/analytics/server/aggregate';
 import { readAnalyticsSnapshot } from '../../server/read';
-import { REPORT_SECTION_IDS, REPORT_SUPPORTED_SECTIONS, type ReportGenerationPort, type ReportGenerationRequest, type ReportGenerationResult, type ReportOutput, type ReportSectionId } from '../contracts';
+import { REPORT_SECTION_IDS, REPORT_SUPPORTED_SECTIONS, type ReportActor, type ReportGenerationPort, type ReportGenerationRequest, type ReportGenerationResult, type ReportOutput, type ReportSectionId } from '../contracts';
 import { authorizeReport, resultCeiling, usableChannelIds } from '../server/access';
 import { prisma } from '@/server/data';
 import { platformAnalytics } from '@/server/platforms/registry';
@@ -20,6 +20,14 @@ export type DestinationSummary = {
 };
 
 export type ReportBounds = { maxRows: number; maxBytes: number };
+
+/** The AI recap of one run: `ready` carries generated text; `unavailable` means it could not be produced this run (rate limit or provider failure). */
+export type RecapState = { state: 'ready'; text: string } | { state: 'unavailable' };
+export const RECAP_LABEL = 'AI-generated summary of the figures in this report. It may contain mistakes; check it against the figures.';
+export const RECAP_UNAVAILABLE = 'The AI recap is unavailable for this run. The figures below are unaffected.';
+/** Recap writer. Receives only compact report figures; the default is the AI module's authorized `summarize`. */
+export type RecapWriter = (actor: { userId: string; workspaceId: string; permissionCeiling?: ReportActor['permissionCeiling'] }, request: { facts: string; subject: string; language: string }) => Promise<{ text: string }>;
+const defaultRecap: RecapWriter = async (actor, request) => (await import('@/modules/ai/server/ai')).summarize(actor, request, { feature: 'analytics/reports' });
 
 const bytes = (text: string) => Buffer.byteLength(text, 'utf8');
 /** Longest prefix within `max` UTF-8 bytes that never ends inside a character. */
@@ -56,9 +64,10 @@ type Snapshot = Awaited<ReturnType<typeof readAnalyticsSnapshot>>;
  * as-of times; a metric without data is "Not available", never zero. Every rendering is bounded in rows and UTF-8 bytes, and
  * anything cut is marked; when even the fixed parts exceed the bound a minimal notice is returned instead of an overflowing page.
  */
-export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null }, bounds: ReportBounds): ReportOutput {
+export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null; recap?: RecapState | null }, bounds: ReportBounds): ReportOutput {
   const wanted = new Set(input.sections);
-  const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s));
+  // The recap is included only when the run produced it or recorded that it could not; otherwise (AI off or not permitted) it is not included.
+  const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s) && (s !== 'aiRecap' || Boolean(input.recap)));
   const notIncluded = REPORT_SECTION_IDS.filter(s => wanted.has(s) && !included.includes(s));
   const period = { start: snapshot.period.start, end: snapshot.period.end };
   const channelName = clamp(input.channelName, 200);
@@ -66,6 +75,8 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const audience = included.includes('audience') ? snapshot.audience : null;
   const response = included.includes('responseTime') ? input.responseTime ?? null : null;
   const responseLine = response ? `Median first response ${formatDuration(response.medianMs)}; ${response.answered} answered, ${response.unanswered} waiting at period end. Calendar time, from stored Inbox messages${response.partial ? '; only the earliest messages were read' : ''}.` : '';
+  const recap = included.includes('aiRecap') ? input.recap ?? null : null;
+  const recapText = recap ? (recap.state === 'ready' ? recap.text : RECAP_UNAVAILABLE) : '';
   const topPosts = included.includes('topPosts') ? input.topPosts ?? [] : null;
   const destination = included.includes('destinations') ? input.destination ?? null : null;
   const destinationNote = destination ? `Stored values summed over ${destination.posts} published post${destination.posts === 1 ? '' : 's'}; a measure no post has stored is Not available, not zero.` : '';
@@ -79,6 +90,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   // CSV: long form, one row per summary/point/resource, cut at the row and byte limits.
   const header = ['record_type', 'metric_key', 'metric', 'source', 'resource', 'date', 'value', 'unit', 'coverage', 'aggregation'];
   const rows: unknown[][] = [];
+  if (recap) rows.push(['ai_recap', 'ai_recap', 'AI recap (AI-generated)', 'AI-generated', '', '', recap.state === 'ready' ? recap.text : '', '', '', recap.state === 'ready' ? RECAP_LABEL : RECAP_UNAVAILABLE]);
   if (audience) for (const e of audience.entries) rows.push(['audience', e.metric, e.metricLabel, e.sourceLabel, e.name, e.asOf, e.value, 'people', `${audience.covered} of ${audience.selected} channels`, 'Latest value per channel; not unique people']);
   if (response) {
     rows.push(['response_time', 'median_first_response_minutes', 'Median first response', 'Inbox', '', '', response.medianMs === null ? '' : Math.round(response.medianMs / 60_000), 'minutes', response.partial ? 'partial' : '', 'Median wait until the channel replied; calendar time']);
@@ -128,6 +140,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     const shown = metrics.slice(0, count);
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:14px/1.5 system-ui,sans-serif;margin:2rem;color:#111}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #bbb;padding:.35rem .5rem;text-align:left}small{color:#555}@media print{body{margin:0}}</style></head><body>`
       + `<h1>${esc(title)}</h1><p><small>Generated ${esc(input.generatedAt.toISOString())}. Values come from stored analytics; "Not available" means no data, not zero.</small></p>`
+      + (recap ? `<h2>AI recap</h2><p><strong>AI-generated.</strong> <small>${esc(RECAP_LABEL)}</small></p><p>${esc(recapText)}</p>` : '')
       + (included.includes('published') ? `<h2>Published posts</h2><p>Published ${esc(snapshot.publishing.published)}, scheduled ${esc(snapshot.publishing.scheduled)}, failed ${esc(snapshot.publishing.failed)}.</p>` : '')
       + (response ? `<h2>Response time</h2><p>${esc(responseLine)}</p>` : '')
       + (goals ? `<h2>Goals</h2>${goals.goals.length ? `<p><small>Month ${esc(goals.month.start)} to ${esc(goals.month.end)} (${esc(goals.month.timeZone)}), up to generation for the current month.</small></p><table><thead><tr><th>Goal</th><th>Target</th><th>This month</th><th>Progress</th><th>Pace</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? 'No data' : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : '<p>No goals are set for this channel.</p>'}` : '')
@@ -146,7 +159,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     html = cutBytes(`<!doctype html><html lang="en"><body><p>${esc(clamp(title, 80))}</p><p><strong>This report was shortened to fit its size limit.</strong></p></body></html>`, bounds.maxBytes);
     htmlTruncated = true;
   }
-  const baseLines = [title, '', ...(included.includes('published') ? [`Published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`] : []),
+  const baseLines = [title, '', ...(recap ? [`AI recap (AI-generated; ${RECAP_LABEL})`, recapText, ''] : []), ...(included.includes('published') ? [`Published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`] : []),
     ...(response ? [`Response time: ${responseLine}`] : []),
     ...(goals ? [`Goals (month ${goals.month.start} to ${goals.month.end}):`, ...(goals.goals.length ? goals.goals.map(goalText) : ['No goals are set for this channel.'])] : []),
     ...(included.includes('destinations') ? ['Destinations:', ...(destination ? [`${clamp(destination.name, 200)} (${destination.type}): ${destination.posts} posts; ${destination.measures.map(m => `${m.label} ${measureText(m)}`).join('; ')}; link clicks (lifetime) ${linkClicksText}`] : ['Destination summary not available.'])] : []),
@@ -162,17 +175,43 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   return { channelName, period, generatedAt: input.generatedAt.toISOString(), sections: included, notIncluded, csv, html, text, json, rowCount: csvRows, bytes: bytes(csv), htmlBytes: bytes(html), textBytes: bytes(text), jsonBytes: bytes(json), truncated: csvTruncated || htmlTruncated || textTruncated || jsonTruncated || csv !== csvRaw };
 }
 
+const RECAP_FACT_CHARS = 4000;
+const factText = (text: unknown) => String(text ?? '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]+/g, ' ').replace(/[\r\n\u2028\u2029]+/g, ' ').trim();
+/**
+ * Compact, bounded figures for the AI recap: only what the other chosen sections already compute and the actor is already
+ * authorized to read. No post text, URLs, message text or recipients are included; missing data is stated as such, never zero.
+ * Returns '' when no other section supplies a figure.
+ */
+export function recapFacts(snapshot: Snapshot, input: { sections: ReportSectionId[]; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null }): string {
+  const wanted = new Set(input.sections);
+  const lines: string[] = [];
+  if (wanted.has('published')) lines.push(`Posts: published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`);
+  if (wanted.has('audience') && snapshot.audience) lines.push(`Audience: ${snapshot.audience.covered ? snapshot.audience.total : 'Not available'} (${snapshot.audience.covered} of ${snapshot.audience.selected} channels; not unique people).`);
+  if (wanted.has('responseTime') && input.responseTime) lines.push(`Median first response ${formatDuration(input.responseTime.medianMs)}; ${input.responseTime.answered} answered, ${input.responseTime.unanswered} waiting.`);
+  if (wanted.has('goals') && input.goals?.goals.length) for (const g of input.goals.goals.slice(0, 20)) lines.push(`Goal ${factText(g.label)}: ${g.actual === null ? 'No data' : g.actual} of ${g.target} (${g.percent}%, ${factText(g.paceLabel)}).`);
+  const d = wanted.has('destinations') ? input.destination : null;
+  if (d) lines.push(`Destination: ${d.posts} posts published; ${d.measures.map(m => `${factText(m.label)} ${m.value ?? 'Not available'}`).join('; ')}.`);
+  if (wanted.has('topPosts') && input.topPosts?.length) lines.push(`Top posts: ${input.topPosts.length} ranked by ${factText(input.topPosts[0]!.rankLabel)}; best has ${input.topPosts[0]!.rankValue ?? 'Not available'}.`);
+  // Longest, least essential lines last so a cut never drops the compact figures.
+  if (wanted.has('analysis')) for (const m of snapshot.allMetrics.filter(x => x.resourceKind === 'channel').slice(0, 25)) {
+    const first = m.points.length ? m.points[0]!.value : null; const last = m.points.length ? m.points[m.points.length - 1]!.value : null;
+    lines.push(`${factText(m.label).slice(0, 80)}: ${valueText(m)} (${coverageText(m)})${m.total !== null && first !== null && last !== null && m.points.length > 1 ? `; first day ${first}, last day ${last}` : ''}.`);
+  }
+  const text = lines.join('\n');
+  return text.length > RECAP_FACT_CHARS ? text.slice(0, RECAP_FACT_CHARS) : text;
+}
+
 /**
  * The module's report builder; a host registers it. It re-checks the actor's current authority (including key ceilings and
  * the channel's connection/platform state) and reads only through the shared scoped Analytics reader, one channel at a time.
  * The actor's result ceiling bounds the generated rows themselves, not just list pages.
  */
-export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds>; now?: () => Date }): ReportGenerationPort {
+export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds>; now?: () => Date; recap?: RecapWriter }): ReportGenerationPort {
   return {
     async generate(request: ReportGenerationRequest): Promise<ReportGenerationResult> {
       try {
         const { actor } = request;
-        if (!request.sections.some(s => (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s))) return { ok: false, reason: 'no_supported_sections' };
+        if (!request.sections.some(s => s !== 'aiRecap' && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s))) return { ok: false, reason: 'no_supported_sections' };
         const auth = await authorizeReport(actor, 'read');
         if (auth.scope !== null && !auth.scope.includes(request.channelId)) return { ok: false, reason: 'channel_unavailable' };
         if (!(await usableChannelIds(prisma, actor.workspaceId, auth.providers, [request.channelId])).length) return { ok: false, reason: 'channel_unavailable' };
@@ -187,13 +226,32 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
         const topPosts = request.sections.includes('topPosts') ? await readTopPosts(actor.workspaceId, request.channelId, request.period) : null;
         const destination = request.sections.includes('destinations') ? await readDestination(actor.workspaceId, request.channelId, request.period) : null;
         const goals = request.sections.includes('goals') ? await channelGoalProgress(actor.workspaceId, request.channelId, request.period.end, deps.now?.() ?? new Date()) : null;
-        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? 'Channel', sections: request.sections, responseTime, topPosts, destination, goals, generatedAt: deps.now?.() ?? new Date() }, bounds) };
+        const recap = request.sections.includes('aiRecap') ? await makeRecap(deps.recap ?? defaultRecap, actor, channel?.name ?? 'Channel', snapshot, { sections: request.sections, responseTime, topPosts, destination, goals }) : null;
+        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? 'Channel', sections: request.sections, responseTime, topPosts, destination, goals, recap, generatedAt: deps.now?.() ?? new Date() }, bounds) };
       } catch (error) {
         const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
         return { ok: false, reason: code === 'unauthorized' || code === 'forbidden' ? 'access_unavailable' : 'generation_failed' };
       }
     },
   };
+}
+
+/**
+ * Ask for the recap under the run's own actor (the schedule owner for scheduled runs; the AI module re-authorizes and applies the
+ * shared workspace limit). AI off or no AI access: null, so the section is listed as not included. Rate limit, provider failure or
+ * an unusable answer: the report still succeeds and the section says the recap is unavailable. Nothing is invented.
+ */
+async function makeRecap(write: RecapWriter, actor: ReportActor, channelName: string, snapshot: Snapshot, parts: Parameters<typeof recapFacts>[1]): Promise<RecapState | null> {
+  const facts = recapFacts(snapshot, parts);
+  if (!facts) return { state: 'unavailable' };
+  try {
+    const out = await write({ userId: actor.userId, workspaceId: actor.workspaceId, permissionCeiling: actor.permissionCeiling }, { facts, subject: `${factText(channelName).slice(0, 100)}, ${snapshot.period.start} to ${snapshot.period.end}`, language: 'English' });
+    const text = typeof out?.text === 'string' ? out.text.trim() : '';
+    return text ? { state: 'ready', text } : { state: 'unavailable' };
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
+    return code === 'unavailable' || code === 'forbidden' || code === 'unauthorized' ? null : { state: 'unavailable' };
+  }
 }
 
 /** Ten best posts by the channel's own module ranking; a module without the hook yields an empty, honest section. */
