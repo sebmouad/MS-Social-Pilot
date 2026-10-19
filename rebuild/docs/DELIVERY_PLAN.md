@@ -197,3 +197,48 @@ The full objective stays active. Do not register the unscoped SQL proposal or tr
 
 
 Final batch87 evidence:2,980 tests in346 files, zero skips, with guarded synthetic PostgreSQL and real localhost HTTP sockets. Final typecheck and production build passed. Actual local API/MCP and Chromium checks passed Root ownership, exact write confirmations, invalid/cross-origin denial, workspace-scope denial, schema76 auditing, native-policy diagnostics without provider reads, and desktop Nightfall/phone Grove viewport fit after long-key wrapping. Temporary Root settings restored byte-for-byte including timestamps, sessions and scoped test audits cleaned. Two lower-cost native agents contributed storage investigation/transport/wire tests; both Claude accounts supplied independent reviews. Findings corrected include body deadlines, pinned configuration, metadata/byte validation, missing-signing refusal and honest consumption status. Static whole-worktree premium audit remains34 findings; this batch does not clear unrelated UI. No provider write, migration or production deployment occurred.
+
+
+## Batch88: native payload and receipt safety
+
+The Facebook executor snapshots the complete used payload before its first await,
+including a copied Buffer/Uint8Array and probed metadata. A versioned SHA256
+identity covers target, format, caption, schedule, source, bytes digest and media
+metadata without storing raw content in the identity. Matching recorded hashes
+refuse changed payloads under an existing operation; older hashless proposal
+records return a conflict and remain held without dispatch. Remote URL identity is not proof that the
+server will return immutable bytes. Host media probing/binding remains required.
+
+Every checkpoint and final settlement requires an explicit true write result.
+A provider success followed by failed/unconfirmed local settlement returns an
+uncertain result and cannot invite automatic resend. Staged IDs remain in known
+identities rather than becoming final publication IDs. Repeated phase IDs are
+deduplicated while phase receipts remain intact. Unexpected execution errors
+return a held outcome. Submission results use status:submitted, require readbackRequired:true and
+return no invented permalink; only later verified status can prove live delivery.
+The scaffold row state still uses its historical published value for a submission
+receipt; consumers must not treat it as live status. Unsupported schedule/caption
+fields, non-byte runtime values and unsupported direct uploads fail before
+claiming an operation. Canonical HTTPS URLs are intentional, matching transport
+validation; credentials/fragments and ambiguous normalization are refused.
+
+Native formats remain unavailable. The existing unscoped SQL store is still an
+unregistered proposal; its missing hash/tenant binding is not fixed by executor
+snapshots. The next database batch must replace it with a tenant-bound fenced
+child journal under the existing shared publication claim, integrate export/
+erasure and recovery guards, and pass actual PostgreSQL concurrency and migration
+backup/restore checks before application. No migration or provider write belongs
+to batch88. Production and the held photo-cleanup canary remain unchanged.
+
+Next journal gates: [FACEBOOK_NATIVE_JOURNAL_PLAN.md](FACEBOOK_NATIVE_JOURNAL_PLAN.md).
+
+Final batch88 evidence: isolated database-enabled suite3015 tests/347 files, zero
+skips; production build passed. Serial typecheck passed after that build.
+Thirty-five new identity/receipt tests cover Buffer mutation, changed payloads,
+hashless historical holds, malformed port replies, runtime byte types, metadata,
+unsupported fields and failed final writes without resend. Both Claude accounts
+completed independent reviews; a correction review confirmed the prior fixes.
+The shared result is now submitted, distinct from verified live status. There
+was no new UI/browser, live provider, migration-application or production evidence
+in this batch. The local SQL proposal and its static test remain uncommitted and
+unapplied, pending the journal integration gates. Full goal remains active.

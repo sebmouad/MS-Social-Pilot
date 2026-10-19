@@ -136,8 +136,8 @@ describe('rate limits and readback requirements', () => {
   it('a Reel and a plain video require readback before a live claim', async () => {
     const t = transport({ postGraph: vi.fn().mockResolvedValueOnce({ video_id: 'V', upload_url: 'https://u' }).mockResolvedValueOnce({ success: true }) });
     const reel = await executeFacebookNative(planFacebookNative({ ...base, format: 'reel' }), 'r', { transport: t, attempts: createMemoryAttemptStore() });
-    expect(reel).toMatchObject({ status: 'published', readbackRequired: true });
+    expect(reel).toMatchObject({ status: 'submitted', readbackRequired: true });
     const v = await executeFacebookNative(planFacebookNative({ ...base, format: 'post' }), 'v', { transport: transport({ postGraph: vi.fn().mockResolvedValue({ id: 'X' }) }), attempts: createMemoryAttemptStore() });
-    expect(v).toMatchObject({ status: 'published', readbackRequired: true });
+    expect(v).toMatchObject({ status: 'submitted', readbackRequired: true });
   });
 });

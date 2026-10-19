@@ -66,15 +66,23 @@ export class FacebookNativeValidationError extends Error {
 
 /** Per-attempt outcome. `uncertain` must never be resent automatically. */
 export type FacebookNativeOutcome =
-  | { status: 'published'; remoteId: string; url: string | null; scheduled: boolean; steps: FacebookNativeStep[]; /** Facebook may still be processing the item; confirm with readFacebookNativeStatus before treating it as live. */ readbackRequired?: boolean }
+  | { status: 'submitted'; remoteId: string; url: string | null; scheduled: boolean; steps: FacebookNativeStep[]; /** Submission receipt only; confirm with readFacebookNativeStatus before treating it as live. */ readbackRequired: true }
   | { status: 'rejected'; code: number | null; message: string; orphanIds: string[]; steps: FacebookNativeStep[]; throttle?: { retryAfterSeconds: number | null } }
   | { status: 'uncertain'; phase: string; knownIds: string[]; message: string; steps: FacebookNativeStep[]; throttle?: { retryAfterSeconds: number | null } }
   | { status: 'already_attempted'; previous: FacebookNativeAttemptRecord };
 
-export interface FacebookNativeStep { phase: string; dispatched: boolean; confirmed: boolean }
+export interface FacebookNativeStep {
+  phase: string;
+  /** Write-ahead dispatch intent: the request MAY have been sent. Not wire proof. */
+  dispatched: boolean;
+  /** The transport returned a response; format-specific receipt checks still apply. */
+  confirmed: boolean;
+}
 
 export interface FacebookNativeAttemptRecord {
   operationId: string;
+  /** Exact snapshotted payload identity; absent only in older test/proposal records. */
+  payloadHash?: string;
   format: FacebookNativeFormat;
   state: 'started' | 'published' | 'rejected' | 'uncertain' | 'confirmed' | 'deleted';
   knownIds: string[];
@@ -89,6 +97,10 @@ export class FacebookAttemptStoreUnavailableError extends Error {
   constructor() { super('The publishing attempt record is unavailable; nothing was sent.'); this.name = 'FacebookAttemptStoreUnavailableError'; }
 }
 
+export class FacebookNativePayloadConflictError extends Error {
+  constructor() { super('This publishing operation already belongs to different content. Review its result before creating another operation.'); this.name = 'FacebookNativePayloadConflictError'; }
+}
+
 /** Durable idempotency port. begin() must be atomic: the first caller wins. */
 export interface FacebookNativeAttemptStore {
   begin(record: FacebookNativeAttemptRecord): Promise<{ created: true } | { created: false; existing: FacebookNativeAttemptRecord }>;
@@ -97,7 +109,7 @@ export interface FacebookNativeAttemptStore {
    * that applies only if the current state is one of them. Returns false when it was not applied.
    */
   update(operationId: string, patch: Partial<Pick<FacebookNativeAttemptRecord, 'state' | 'knownIds' | 'remoteId' | 'steps'>>,
-    expectedStates?: ReadonlyArray<FacebookNativeAttemptRecord['state']>): Promise<boolean | void>;
+    expectedStates?: ReadonlyArray<FacebookNativeAttemptRecord['state']>): Promise<boolean>;
   get(operationId: string): Promise<FacebookNativeAttemptRecord | null>;
 }
 

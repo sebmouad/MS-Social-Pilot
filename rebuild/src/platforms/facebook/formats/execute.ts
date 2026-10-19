@@ -1,15 +1,15 @@
 import { FacebookApiError } from '../publishing';
 import { isFacebookDefiniteRejection } from '../protocol';
-import { FacebookAttemptStoreUnavailableError } from './types';
+import { FacebookAttemptStoreUnavailableError, FacebookNativePayloadConflictError } from './types';
 import { interpretFacebookThrottle } from './throttle';
+import { snapshotFacebookNativePlan } from './identity';
 import type {
   FacebookNativeMedia, FacebookNativeAttemptStore, FacebookNativeOutcome, FacebookNativePlan, FacebookNativeStep, FacebookNativeTransport,
 } from './types';
 
-function str(v: unknown): string | null { return typeof v === 'string' && v.trim() && v.length <= 2048 ? v.trim() : null; }
-const reelUrl = (id: string) => `https://www.facebook.com/reel/${id}`;
-const storyUrl = (pageId: string) => `https://www.facebook.com/stories/${pageId}`;
-const videoUrl = (pageId: string, id: string) => `https://www.facebook.com/${pageId}/videos/${id}/`;
+function str(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() && v === v.trim() && v.length <= 2048 && !/[\u0000-\u001f\u007f]/.test(v) ? v : null;
+}
 
 class Stop extends Error { constructor(readonly outcome: FacebookNativeOutcome) { super('stop'); } }
 
@@ -19,18 +19,32 @@ class Stop extends Error { constructor(readonly outcome: FacebookNativeOutcome) 
  * after dispatch (timeout, 5xx, malformed answer) is `uncertain` and is recorded,
  * never retried. A repeated operationId returns `already_attempted` without I/O.
  */
-export async function executeFacebookNative(plan: FacebookNativePlan, operationId: string,
+export async function executeFacebookNative(input: FacebookNativePlan, operationId: string,
   deps: { transport: FacebookNativeTransport; attempts: FacebookNativeAttemptStore }): Promise<FacebookNativeOutcome> {
+  const { plan, payloadHash } = snapshotFacebookNativePlan(input);
   let begun;
-  try { begun = await deps.attempts.begin({ operationId, format: plan.format, state: 'started', knownIds: [], targetId: plan.targetId }); }
+  try {
+    begun = await deps.attempts.begin({ operationId, payloadHash, format: plan.format, state: 'started', knownIds: [], targetId: plan.targetId });
+    if (!begun || begun.created !== true && (begun.created !== false || !begun.existing)) throw new Error('Invalid attempt receipt');
+  }
   catch { throw new FacebookAttemptStoreUnavailableError(); } // fail closed: nothing dispatched
-  if (!begun.created) return { status: 'already_attempted', previous: begun.existing };
+  if (!begun.created) {
+    if (begun.existing.payloadHash !== payloadHash) throw new FacebookNativePayloadConflictError();
+    return { status: 'already_attempted', previous: begun.existing };
+  }
   const steps: FacebookNativeStep[] = [];
   const known: string[] = [];
   const settle = async (o: FacebookNativeOutcome) => {
-    const state = o.status === 'published' ? 'published' : o.status === 'rejected' ? 'rejected' : 'uncertain';
-    const remoteId = o.status === 'published' ? o.remoteId : known[0] ?? null;
-    try { await deps.attempts.update(operationId, { state, knownIds: [...known], remoteId, steps: steps.map(s => ({ ...s })) }, ['started']); } catch { /* record stays 'started'; reconciliation treats it as uncertain */ }
+    const state = o.status === 'submitted' ? 'published' : o.status === 'rejected' ? 'rejected' : 'uncertain';
+    // Ambiguous/rejected uploads never promote staging IDs to submission IDs.
+    const remoteId = o.status === 'submitted' ? o.remoteId : null;
+    try {
+      const applied = await deps.attempts.update(operationId, { state, knownIds: [...known], remoteId, steps: steps.map(s => ({ ...s })) }, ['started']);
+      if (applied !== true) throw new Error('Attempt no longer writable');
+    } catch {
+      return { status: 'uncertain' as const, phase: 'receipt_settlement', knownIds: [...known],
+        message: 'The publishing result could not be saved. Check the Page before trying again.', steps };
+    }
     return o;
   };
   async function checkpoint(phase: string): Promise<void> {
@@ -38,7 +52,7 @@ export async function executeFacebookNative(plan: FacebookNativePlan, operationI
       const applied = await deps.attempts.update(operationId, {
         knownIds: [...known], steps: steps.map(s => ({ ...s })),
       }, ['started']);
-      if (applied === false) throw new Error('Attempt no longer writable');
+      if (applied !== true) throw new Error('Attempt no longer writable');
     } catch {
       throw new Stop({ status: 'uncertain', phase, knownIds: [...known],
         message: 'Publishing progress could not be saved. Check the Page before trying again.', steps });
@@ -69,10 +83,11 @@ export async function executeFacebookNative(plan: FacebookNativePlan, operationI
     if (!id) throw new Stop({ status: 'uncertain', phase, knownIds: [...known], message: 'Facebook answered without the expected identity.', steps });
     return id;
   }
+  function remember(id: string) { if (!known.includes(id)) known.push(id); }
   async function resumable(edge: string, media: FacebookNativeMedia): Promise<string> {
     const start = await call('upload_start', edge, { upload_phase: 'start' });
     const videoId = need('upload_start', start.video_id);
-    known.push(videoId);
+    remember(videoId);
     await checkpoint('upload_start'); // Retain the ID even when the upload address is malformed.
     const uploadUrl = need('upload_start', start.upload_url);
     const step: FacebookNativeStep = { phase: 'upload_transfer', dispatched: true, confirmed: false };
@@ -86,15 +101,14 @@ export async function executeFacebookNative(plan: FacebookNativePlan, operationI
   try {
     switch (plan.format) {
       case 'video': {
-        if (!plan.media.url) throw new Stop({ status: 'rejected', code: null, message: 'This upload path requires an HTTPS media URL.', orphanIds: [], steps });
         const body: Record<string, string> = { description: plan.description };
         if (!plan.description) delete body.description;
         if (plan.scheduledUnix !== null) { body.published = 'false'; body.scheduled_publish_time = String(plan.scheduledUnix); }
-        if (plan.media.url) body.file_url = plan.media.url;
+        body.file_url = plan.media.url!;
         const r = await call('video_create', `${plan.targetId}/videos`, body);
-        const id = need('video_create', r.id); known.push(id);
+        const id = need('video_create', r.id); remember(id);
         await checkpoint('video_create');
-        return await settle({ status: 'published', remoteId: id, url: videoUrl(plan.targetId, id), scheduled: plan.scheduledUnix !== null, steps, readbackRequired: true });
+        return await settle({ status: 'submitted', remoteId: id, url: null, scheduled: plan.scheduledUnix !== null, steps, readbackRequired: true });
       }
       case 'reel': {
         const videoId = await resumable(`${plan.targetId}/video_reels`, plan.media);
@@ -102,33 +116,35 @@ export async function executeFacebookNative(plan: FacebookNativePlan, operationI
           upload_phase: 'finish', video_id: videoId, video_state: 'PUBLISHED', ...(plan.description ? { description: plan.description } : {}),
         });
         if (finish.success !== true) throw new Stop({ status: 'uncertain', phase: 'reel_finish', knownIds: [...known], message: 'Facebook did not confirm publication. Check the Page before trying again.', steps });
-        return await settle({ status: 'published', remoteId: videoId, url: reelUrl(videoId), scheduled: false, steps, readbackRequired: true });
+        // The Reel finish protocol addresses this same video_id. Explicit
+        // success acknowledges submission of that object, not live readiness.
+        return await settle({ status: 'submitted', remoteId: videoId, url: null, scheduled: false, steps, readbackRequired: true });
       }
       case 'story_video': {
         const videoId = await resumable(`${plan.targetId}/video_stories`, plan.media);
         const r = await call('story_finish', `${plan.targetId}/video_stories`, { upload_phase: 'finish', video_id: videoId });
         const id = need('story_finish', r.post_id);
-        known.push(id);
+        remember(id);
         await checkpoint('story_finish');
-        return await settle({ status: 'published', remoteId: id, url: storyUrl(plan.targetId), scheduled: false, steps, readbackRequired: true });
+        return await settle({ status: 'submitted', remoteId: id, url: null, scheduled: false, steps, readbackRequired: true });
       }
       case 'story_photo': {
-        if (!plan.media.url) throw new Stop({ status: 'rejected', code: null, message: 'This upload path requires an HTTPS media URL.', orphanIds: [], steps });
         const body: Record<string, string> = { published: 'false' };
-        if (plan.media.url) body.url = plan.media.url;
+        body.url = plan.media.url!;
         const photo = await call('photo_upload', `${plan.targetId}/photos`, body);
-        const photoId = need('photo_upload', photo.id); known.push(photoId);
+        const photoId = need('photo_upload', photo.id); remember(photoId);
         await checkpoint('photo_upload');
         const r = await call('story_create', `${plan.targetId}/photo_stories`, { photo_id: photoId });
         const id = need('story_create', r.post_id ?? r.id);
-        known.push(id);
+        remember(id);
         await checkpoint('story_create');
-        return await settle({ status: 'published', remoteId: id, url: storyUrl(plan.targetId), scheduled: false, steps, readbackRequired: true });
+        return await settle({ status: 'submitted', remoteId: id, url: null, scheduled: false, steps, readbackRequired: true });
       }
     }
   } catch (e) {
     if (e instanceof Stop) return settle(e.outcome);
-    throw e;
+    return settle({ status: 'uncertain', phase: 'unexpected_failure', knownIds: [...known],
+      message: 'The publishing outcome needs review. Check the Page before trying again.', steps });
   }
 }
 

@@ -21,7 +21,7 @@ describe('native phase durability', () => {
       expect(row?.knownIds).toEqual(['video']);
       expect(row?.steps?.at(-1)).toEqual({ phase: 'upload_transfer', dispatched: true, confirmed: false });
     });
-    expect((await executeFacebookNative(reel, 'op', { attempts, transport: { postGraph, upload } })).status).toBe('published');
+    expect((await executeFacebookNative(reel, 'op', { attempts, transport: { postGraph, upload } })).status).toBe('submitted');
     expect((await attempts.get('op'))?.steps?.every(s => s.confirmed)).toBe(true);
   });
 
@@ -59,7 +59,8 @@ describe('native phase durability', () => {
     const attempts = createMemoryAttemptStore();
     const transport = { postGraph: vi.fn(), upload: vi.fn() };
     const plan: FacebookNativePlan = { format: 'video', targetId: 'page', media: { kind: 'video', bytes: new Uint8Array([1]) }, description: '', scheduledUnix: null };
-    expect((await executeFacebookNative(plan, 'bytes', { attempts, transport })).status).toBe('rejected');
+    await expect(executeFacebookNative(plan, 'bytes', { attempts, transport })).rejects.toThrow('requires an HTTPS media URL');
+    expect(await attempts.get('bytes')).toBeNull();
     expect(transport.postGraph).not.toHaveBeenCalled();
   });
 });

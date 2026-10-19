@@ -49,17 +49,17 @@ describe('executeFacebookNative', () => {
   it('publishes a reel via start, upload, finish', async () => {
     const d = mk([{ video_id: 'V1', upload_url: 'https://up/x' }, { success: true }]);
     const o = await executeFacebookNative(plan('reel'), 'op1', d);
-    expect(o).toMatchObject({ status: 'published', remoteId: 'V1', url: 'https://www.facebook.com/reel/V1' });
+    expect(o).toMatchObject({ status: 'submitted', remoteId: 'V1', url: null, readbackRequired: true });
     expect(d.post.mock.calls.map((c) => (c as unknown[])[0])).toEqual(['P1/video_reels', 'P1/video_reels']);
     expect(d.up).toHaveBeenCalledTimes(1);
   });
   it('publishes photo story and scheduled video', async () => {
     const s = mk([{ id: 'PH' }, { post_id: 'S1' }]);
-    expect(await executeFacebookNative(plan('story', [img]), 'op2', s)).toMatchObject({ status: 'published', remoteId: 'S1' });
+    expect(await executeFacebookNative(plan('story', [img]), 'op2', s)).toMatchObject({ status: 'submitted', remoteId: 'S1' });
     const p = planFacebookNative({ ...base, format: 'post', scheduledAt: new Date(now.getTime() + 3600e3) });
     const v = mk([{ id: 'VID' }]);
     const o = await executeFacebookNative(p, 'op3', v);
-    expect(o).toMatchObject({ status: 'published', scheduled: true });
+    expect(o).toMatchObject({ status: 'submitted', scheduled: true });
     expect((v.post.mock.calls[0] as unknown[])[1]).toMatchObject({ published: 'false', file_url: vid.url });
   });
   it('definite rejection at start is rejected with no orphans', async () => {

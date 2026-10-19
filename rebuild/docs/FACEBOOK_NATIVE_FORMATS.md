@@ -15,7 +15,8 @@ The scaffold implements only its existing video scheduling path.
 
 The [official Meta Reels collection](https://www.postman.com/meta/facebook/documentation/r56bjfd/facebook-api)
 describes start, transfer, finish and status operations. Media limits in
-`native-config.ts` remain unverified defaults and are not registered Root controls.
+`native-config.ts` remain unverified defaults; batch87 registers their Root controls
+as configured, with customer runtime wiring pending.
 [Groups API removal](https://developers.facebook.com/docs/graph-api/changelog/version19.0/)
 means legacy Group publishing must not be advertised.
 
@@ -108,3 +109,48 @@ Per-destination intent now replaces the global bridge for newly selected targets
 Signed Facebook-owned Graph/resumable transport and registry76 native controls are implemented. Twenty-five native settings are grouped under Facebook and labelled configured; customer dispatch remains unwired. A local Root diagnostic validates one native configuration snapshot and cross-field limits without provider requests. The private constructor refuses missing required signing material. Real loopback HTTP tests verify encoding/signatures, response bounds and timeouts. See FACEBOOK_NATIVE_TRANSPORT.md. Root phone verification identified a long-search-heading overflow; shared settings heading/key wrapping fixes it.
 
 The full objective stays active. Do not register the unscoped SQL proposal or treat this transport as complete native delivery. Keep the existing parent publication journal as the sole claim authority; next implement tenant-bound child phase receipts, payload identity/fencing, export/erasure and PostgreSQL concurrency checks, then native dispatch/status/comment/deletion and live cleanup. Production and the held photo-cleanup canary remain unchanged.
+
+
+## Batch88: native payload and receipt safety
+
+The Facebook executor snapshots the complete used payload before its first await,
+including a copied Buffer/Uint8Array and probed metadata. A versioned SHA256
+identity covers target, format, caption, schedule, source, bytes digest and media
+metadata without storing raw content in the identity. Matching recorded hashes
+refuse changed payloads under an existing operation; older hashless proposal
+records return a conflict and remain held without dispatch. Remote URL identity is not proof that the
+server will return immutable bytes. Host media probing/binding remains required.
+
+Every checkpoint and final settlement requires an explicit true write result.
+A provider success followed by failed/unconfirmed local settlement returns an
+uncertain result and cannot invite automatic resend. Staged IDs remain in known
+identities rather than becoming final publication IDs. Repeated phase IDs are
+deduplicated while phase receipts remain intact. Unexpected execution errors
+return a held outcome. Submission results use status:submitted, require readbackRequired:true and
+return no invented permalink; only later verified status can prove live delivery.
+The scaffold row state still uses its historical published value for a submission
+receipt; consumers must not treat it as live status. Unsupported schedule/caption
+fields, non-byte runtime values and unsupported direct uploads fail before
+claiming an operation. Canonical HTTPS URLs are intentional, matching transport
+validation; credentials/fragments and ambiguous normalization are refused.
+
+Native formats remain unavailable. The existing unscoped SQL store is still an
+unregistered proposal; its missing hash/tenant binding is not fixed by executor
+snapshots. The next database batch must replace it with a tenant-bound fenced
+child journal under the existing shared publication claim, integrate export/
+erasure and recovery guards, and pass actual PostgreSQL concurrency and migration
+backup/restore checks before application. No migration or provider write belongs
+to batch88. Production and the held photo-cleanup canary remain unchanged.
+
+Next journal gates: [FACEBOOK_NATIVE_JOURNAL_PLAN.md](FACEBOOK_NATIVE_JOURNAL_PLAN.md).
+
+Final batch88 evidence: isolated database-enabled suite3015 tests/347 files, zero
+skips; production build passed. Serial typecheck passed after that build.
+Thirty-five new identity/receipt tests cover Buffer mutation, changed payloads,
+hashless historical holds, malformed port replies, runtime byte types, metadata,
+unsupported fields and failed final writes without resend. Both Claude accounts
+completed independent reviews; a correction review confirmed the prior fixes.
+The shared result is now submitted, distinct from verified live status. There
+was no new UI/browser, live provider, migration-application or production evidence
+in this batch. The local SQL proposal and its static test remain uncommitted and
+unapplied, pending the journal integration gates. Full goal remains active.
