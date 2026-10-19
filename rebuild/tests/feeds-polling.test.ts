@@ -40,7 +40,7 @@ beforeEach(() => {
   db.$transaction.mockImplementation(async (cb: (tx: typeof db) => Promise<unknown>) => cb(db));
   db.$queryRawUnsafe.mockImplementation(async (query: string, ...values: unknown[]) => {
     if (query.startsWith('SELECT id, "workspaceId" FROM feed_sources')) return state.due;
-    if (query.startsWith('UPDATE feed_sources SET "lastPolledAt"')) { state.exec.push({ sql: query, values }); const row = state.claim.get(String(values[3])); state.claim.delete(String(values[3])); return row ? [row] : []; }
+    if (query.startsWith('UPDATE feed_sources SET "lastPolledAt"')) { state.exec.push({ sql: query, values }); const row = state.claim.get(String(values[2])); state.claim.delete(String(values[2])); return row ? [row] : []; }
     return [];
   });
   db.$queryRaw.mockImplementation(async (s: TemplateStringsArray, ...v: unknown[]) => {

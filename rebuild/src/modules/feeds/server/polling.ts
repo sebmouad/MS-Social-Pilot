@@ -77,8 +77,8 @@ export async function runFeedPolling(deps: PollDeps = {}): Promise<FeedPollSumma
     if (deps.shouldStop?.()) break;
     // The claim is the lease: it succeeds for exactly one worker and only while the feed is still due and on.
     const claimed = await prisma.$queryRawUnsafe<FeedRow[]>(
-      `UPDATE feed_sources SET "lastPolledAt" = NOW() WHERE id = $4 AND "workspaceId" = $5 AND enabled = true AND ${DUE} RETURNING ${FEED_COLUMNS}`,
-      settings.intervalSeconds, settings.maxBackoff, 0, candidate.id, candidate.workspaceId).catch(() => null);
+      `UPDATE feed_sources SET "lastPolledAt" = NOW() WHERE id = $3 AND "workspaceId" = $4 AND enabled = true AND ${DUE} RETURNING ${FEED_COLUMNS}`,
+      settings.intervalSeconds, settings.maxBackoff, candidate.id, candidate.workspaceId).catch(() => null);
     const feed = claimed?.[0];
     if (!feed) { summary.skipped += 1; note(candidate.id, 'lost_claim'); continue; }
     summary.claimed += 1;
