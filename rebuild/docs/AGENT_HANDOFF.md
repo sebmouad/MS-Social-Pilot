@@ -707,7 +707,7 @@ Wave 1 open items: real-PostgreSQL run of saved views, moderation and bulk;
 browser check of /inbox/moderation, /root/sessions, /root/connections and the
 Posts table checkboxes (four themes, 1440px and 390px); moderation does not run
 after sync; v1 Posts API (needs an API-key route seam) and async large exports;
-hidden workspace settings without consumers (week start, business hours,
+hidden workspace settings without consumers (week start,
 best-time, shortening, undo window, AI voice, negative-comment alert); Root
 registration, user/workspace deletion, audit export. Owner decision pending:
 publish currently fails if workspace UTM settings cannot be loaded.
@@ -771,7 +771,11 @@ month measures, Goals/Destinations/Top posts/Response time report SQL, feed clai
 and exactly-once review posts held for approval, and webhook queue-once plus
 signed leased delivery; it removes every row it creates.
 
-Next: remaining real-PostgreSQL and browser runs of waves 1–2; business-hours response time;
+Wave 1 verification evidence: WAVE1_VERIFICATION.md (Session A, `215960db`).
+Business-hours response time is in the Reports Response time section (REPORT_WORKFLOWS.md).
+
+Next: browser runs of the wave 2 screens; OAuth clients and v1 posts (this session);
+auth/onboarding (Session A);
 then wave 3 (auth/onboarding, feeds and integrations WIP, agency extras, owner
 export). The untracked feeds/integrations/webhooks/API-access WIP in the main
 checkout is still unintegrated; its media and AI parts are superseded by main.
