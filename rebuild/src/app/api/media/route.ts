@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { listWorkspaceImages, uploadWorkspaceImage } from '@/server/media/storage';
+import { mediaHolderVisibility } from '@/modules/publishing/server/media-holders';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { runtimeConfig } from '@/server/config/store';
 import { MediaBodyTooLarge, readBoundedImageForm } from '@/server/media/body';
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
   try {
     const limit = Number(await runtimeConfig('storage.mediaLibraryBatchLimit'));
     const cursor = new URL(request.url).searchParams.get('cursor') || undefined;
-    const result = await listWorkspaceImages(viewer.workspaceId, { limit, cursor });
+    const result = await listWorkspaceImages(viewer.workspaceId, { limit, cursor, holderVisibility: await mediaHolderVisibility(viewer) });
     return NextResponse.json(result, { headers: { 'cache-control': 'private, no-store' } });
   } catch (error) {
     if (error instanceof MediaStorageUnavailable) return NextResponse.json({ error: error.message }, { status: 503, headers: { 'cache-control': 'no-store' } });

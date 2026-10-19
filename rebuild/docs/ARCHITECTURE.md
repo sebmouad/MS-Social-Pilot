@@ -1421,3 +1421,18 @@ synthetic video were removed, backup retained. Backup SHA256:
 `277764d3a486b3138f1bef5e017966fc0c9cc2c6e6d5a28c86b3ff9e6e67b143`.
 The final built preview uses the original example database at localhost:3200;
 /sign-in returned HTTP200. Production and its held photo canary are unchanged.
+
+## Media library usage and holders — wave 2 session B, 2026-10-19
+
+`/publishing/media` and `GET /api/media` now show workspace image usage (files,
+bytes, reclaimable unused images) and, per image, how many posts use it and which
+ones, with not-yet-published posts first and links to each post. Posts are named
+only within Publishing's whole-post visibility (`modules/publishing/server/media-holders.ts`);
+scoped members see a count for the posts they can't see. En/fr copy:
+`modules/publishing/media-library-copy.ts`. MCP image tools return the same counts
+and name no posts until `server/mcp/server.ts` passes the holder visibility
+(Session A edit). Evidence: unit tests; full suite 3,339/3,340 on a scratch copy
+of the synthetic preview database (the single failure is the known
+`config-validation` registry test already failing on main). No browser or
+provider run. Still open: video library/imports, a storage quota, Connections
+lifecycle callbacks and the remaining Ads report/export items.

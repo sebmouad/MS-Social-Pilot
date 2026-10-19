@@ -7,11 +7,19 @@ import { canonicalMediaRoot, validateWorkspaceId } from '@/server/data-control/s
 import { prisma } from '@/server/data';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { MediaStorageUnavailable, MediaValidationError } from './errors';
+import type { Prisma } from '../../../generated/client';
 
 export type MediaActor = { userId: string; workspaceId: string };
 export type WorkspaceImage = { id: string; mimeType: string; fileName: string };
 export type WorkspaceImageBytes = WorkspaceImage & { bytes: Buffer };
-export type WorkspaceImageListing = { id: string; mimeType: string; size: number; createdAt: Date; inUse: boolean };
+/** A post that references an image. `pending` marks posts that have not gone out (legacy `heldBy`). */
+export type ImageHolder = { id: string; status: string; excerpt: string; pending: boolean };
+export type WorkspaceImageListing = { id: string; mimeType: string; size: number; createdAt: Date; inUse: boolean; usedBy: number; heldBy: ImageHolder[] };
+/** Workspace storage totals across every stored image file, not only the current page. */
+export type WorkspaceImageUsage = { files: number; bytes: number; unusedFiles: number; unusedBytes: number };
+/** Posts still headed for publication; deleting their image would break a later send or retry. */
+const PENDING_STATUSES = new Set(['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing', 'partially_failed', 'failed']);
+const HOLDERS_PER_IMAGE = 5;
 export type OrphanCleanupResult = { removed: number; bytes: number; errors: number };
 const IMAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -112,10 +120,40 @@ function mediaReferences(value: unknown): Set<string> {
 }
 
 async function referenceSet(workspaceId: string): Promise<Set<string>> {
-  const posts = await prisma.post.findMany({ where: { workspaceId }, select: { media: true } });
-  const ids = new Set<string>();
-  for (const post of posts) for (const id of mediaReferences(post.media)) ids.add(id);
-  return ids;
+  return new Set((await referenceMap(workspaceId)).keys());
+}
+
+/** image id → posts referencing it, pending posts first. Tenant-scoped; one query per call. */
+async function referenceMap(workspaceId: string): Promise<Map<string, ImageHolder[]>> {
+  const posts = await prisma.post.findMany({ where: { workspaceId }, select: { id: true, status: true, message: true, media: true } });
+  const map = new Map<string, ImageHolder[]>();
+  for (const post of posts) {
+    const holder: ImageHolder = { id: String(post.id ?? ''), status: String(post.status ?? ''), excerpt: excerpt(post.message), pending: PENDING_STATUSES.has(String(post.status)) };
+    for (const id of mediaReferences(post.media)) map.set(id, [...(map.get(id) ?? []), holder]);
+  }
+  for (const holders of map.values()) holders.sort((a, b) => Number(b.pending) - Number(a.pending) || a.id.localeCompare(b.id));
+  return map;
+}
+
+function excerpt(message: unknown): string {
+  const text = typeof message === 'string' ? message.replace(/\s+/g, ' ').trim() : '';
+  return text.length > 80 ? `${text.slice(0, 79)}…` : text;
+}
+
+/** Holder visibility: null (the default) names no posts; counts are still reported. */
+export type HolderVisibility = Prisma.PostWhereInput | null;
+
+async function visibleHolderIds(refs: Map<string, ImageHolder[]>, imageIds: readonly string[], visibility: HolderVisibility): Promise<Set<string>> {
+  if (!visibility) return new Set();
+  const ids = [...new Set(imageIds.flatMap(id => (refs.get(id.toLowerCase()) ?? []).map(holder => holder.id)))];
+  if (!ids.length) return new Set();
+  const rows = await prisma.post.findMany({ where: { AND: [{ id: { in: ids } }, visibility] }, select: { id: true }, take: ids.length });
+  return new Set(rows.map(row => String(row.id)));
+}
+
+function listingFor(refs: Map<string, ImageHolder[]>, visible: ReadonlySet<string>, id: string, base: { mimeType: string; size: number; createdAt: Date }): WorkspaceImageListing {
+  const holders = refs.get(id.toLowerCase()) ?? [];
+  return { id, ...base, inUse: holders.length > 0, usedBy: holders.length, heldBy: holders.filter(holder => visible.has(holder.id)).slice(0, HOLDERS_PER_IMAGE) };
 }
 
 function detectedImageMime(bytes: Buffer): string | undefined {
@@ -123,7 +161,7 @@ function detectedImageMime(bytes: Buffer): string | undefined {
 }
 
 /** Return a bounded, tenant-scoped page of stored image metadata without reading image bytes. */
-export async function listWorkspaceImages(workspaceId: string, options: { limit: number; cursor?: string }): Promise<{ items: WorkspaceImageListing[]; nextCursor: string | null }> {
+export async function listWorkspaceImages(workspaceId: string, options: { limit: number; cursor?: string; holderVisibility?: HolderVisibility }): Promise<{ items: WorkspaceImageListing[]; nextCursor: string | null; usage: WorkspaceImageUsage }> {
   const { limit, cursor } = options;
   if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new MediaValidationError('invalid_listing_limit');
   let after: { mtimeMs: number; id: string } | undefined;
@@ -138,7 +176,7 @@ export async function listWorkspaceImages(workspaceId: string, options: { limit:
     if (typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT') return null;
     throw error;
   });
-  if (!dir) return { items: [], nextCursor: null };
+  if (!dir) return { items: [], nextCursor: null, usage: { files: 0, bytes: 0, unusedFiles: 0, unusedBytes: 0 } };
   const entries = await readdir(dir, { withFileTypes: true });
   const files: Array<{ id: string; size: number; modifiedAt: Date; mtimeMs: number }> = [];
   for (const entry of entries) {
@@ -149,7 +187,12 @@ export async function listWorkspaceImages(workspaceId: string, options: { limit:
     files.push({ id: entry.name, size: info.size, modifiedAt: info.mtime, mtimeMs: info.mtimeMs });
   }
   files.sort((a, b) => b.mtimeMs - a.mtimeMs || a.id.localeCompare(b.id));
-  const refs = await referenceSet(workspaceId);
+  const refs = await referenceMap(workspaceId);
+  const usage: WorkspaceImageUsage = { files: files.length, bytes: 0, unusedFiles: 0, unusedBytes: 0 };
+  for (const file of files) {
+    usage.bytes += file.size;
+    if (!refs.has(file.id.toLowerCase())) { usage.unusedFiles++; usage.unusedBytes += file.size; }
+  }
   const remaining = after ? files.filter(file => file.mtimeMs < after!.mtimeMs || (file.mtimeMs === after!.mtimeMs && file.id.localeCompare(after!.id) > 0)) : files;
   const page = remaining.slice(0, limit);
   const checked = await Promise.all(page.map(async ({ id, size, modifiedAt }) => {
@@ -161,22 +204,26 @@ export async function listWorkspaceImages(workspaceId: string, options: { limit:
         const { bytesRead } = await handle.read(signature, 0, signature.length, 0);
         const mimeType = detectedImageMime(signature.subarray(0, bytesRead));
         if (!mimeType) return null;
-        return { id, mimeType, size, createdAt: modifiedAt, inUse: refs.has(id.toLowerCase()) };
+        return { id, mimeType, size, createdAt: modifiedAt };
       } finally { await handle.close(); }
     } catch { return null; }
   }));
-  const items = checked.filter((item): item is WorkspaceImageListing => item !== null);
+  const found = checked.filter((item): item is { id: string; mimeType: string; size: number; createdAt: Date } => item !== null);
+  const visible = await visibleHolderIds(refs, found.map(item => item.id), options.holderVisibility ?? null);
+  const items = found.map(({ id, ...base }) => listingFor(refs, visible, id, base));
   return {
     items,
+    usage,
     nextCursor: remaining.length > page.length && page.length ? Buffer.from(JSON.stringify({ mtimeMs: page[page.length - 1]!.mtimeMs, id: page[page.length - 1]!.id })).toString('base64url') : null,
   };
 }
 
-export async function getWorkspaceImageMetadata(workspaceId: string, id: string): Promise<WorkspaceImageListing> {
+export async function getWorkspaceImageMetadata(workspaceId: string, id: string, holderVisibility: HolderVisibility = null): Promise<WorkspaceImageListing> {
   const file = await safeImageFile(workspaceId, id);
   if (!file) throw new Error('Image not found.');
-  const [image, refs, info] = await Promise.all([readWorkspaceImage(workspaceId, id), referenceSet(workspaceId), lstat(file.path)]);
-  return { id, mimeType: image.mimeType, size: info.size, createdAt: info.mtime, inUse: refs.has(id.toLowerCase()) };
+  const [image, refs, info] = await Promise.all([readWorkspaceImage(workspaceId, id), referenceMap(workspaceId), lstat(file.path)]);
+  const visible = await visibleHolderIds(refs, [id], holderVisibility);
+  return listingFor(refs, visible, id, { mimeType: image.mimeType, size: info.size, createdAt: info.mtime });
 }
 
 async function safeImageFile(workspaceId: string, id: string): Promise<{ path: string; size: number } | null> {

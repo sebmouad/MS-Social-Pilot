@@ -66,6 +66,34 @@ describe('workspace image storage', () => {
     config.maxBytes = 1024;
   });
 
+  it('reports workspace usage and names only holders the caller may see', async () => {
+    tempRoot = await mkdtemp(path.join(os.tmpdir(), 'media-store-test-'));
+    config.root = path.join(tempRoot, 'root');
+    await mkdir(config.root);
+    const bytes = Buffer.from([0xff, 0xd8, 0xff, 0x00]);
+    const used = await uploadWorkspaceImage({ userId: 'u1', workspaceId: 'workspace-a' }, new File([bytes], 'a.jpg', { type: 'image/jpeg' }));
+    await uploadWorkspaceImage({ userId: 'u1', workspaceId: 'workspace-a' }, new File([bytes, bytes], 'b.jpg', { type: 'image/jpeg' }));
+    const posts = [
+      { id: 'p-published', status: 'published', message: 'Old  launch\npost', media: [{ url: `media:${used.id}` }] },
+      { id: 'p-scheduled', status: 'scheduled', message: 'Next week', media: [{ url: `media:${used.id}` }] },
+      { id: 'p-hidden', status: 'draft', message: 'Other channel secret', media: [{ url: `media:${used.id}` }] },
+    ];
+    db.post.findMany.mockImplementation((async (args: { where: { AND?: unknown } }) => args.where.AND
+      ? [{ id: 'p-published' }, { id: 'p-scheduled' }]
+      : posts) as never);
+    const page = await listWorkspaceImages('workspace-a', { limit: 10, holderVisibility: { workspaceId: 'workspace-a' } });
+    expect(page.usage).toEqual({ files: 2, bytes: 12, unusedFiles: 1, unusedBytes: 8 });
+    const item = page.items.find(entry => entry.id === used.id)!;
+    expect(item.usedBy).toBe(3);
+    expect(item.heldBy.map(holder => holder.id)).toEqual(['p-scheduled', 'p-published']);
+    expect(item.heldBy[1]!.excerpt).toBe('Old launch post');
+    expect(JSON.stringify(page)).not.toContain('secret');
+    const blind = await listWorkspaceImages('workspace-a', { limit: 10 });
+    expect(blind.items.find(entry => entry.id === used.id)).toMatchObject({ usedBy: 3, heldBy: [] });
+    db.post.findMany.mockReset();
+    db.post.findMany.mockResolvedValue([]);
+  });
+
   it('rejects mismatched content, over-limit input, and workspace symlinks', async () => {
     tempRoot = await mkdtemp(path.join(os.tmpdir(), 'media-store-test-'));
     config.root = path.join(tempRoot, 'root');

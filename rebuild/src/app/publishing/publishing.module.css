@@ -96,6 +96,10 @@
 .mediaDetails { display: flex; justify-content: space-between; gap: 8px; padding: 12px 12px 8px; color: var(--ink-faint); font-size: 11px; }
 .mediaType { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); font-weight: 650; }
 .mediaFooter { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px 12px; }
+.mediaHolders { display: grid; gap: 4px; padding: 0 12px 10px; font-size: 12px; color: var(--ink-faint); min-width: 0; }
+.mediaHolders ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.mediaHolders li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mediaUsage { margin: 0 0 12px; color: var(--ink-faint); font-size: 13px; }
 .mediaMore { display: flex; justify-content: center; }
 @media (max-width: 1100px) { .postWorkbench { grid-template-columns: minmax(0, 1fr); } .importCard { position: static; } }
 @media (max-width: 720px) { .heading { align-items: flex-start; flex-direction: column; } .calendar { display: none; } .agenda { display: block; } .formFooter { align-items: flex-start; flex-direction: column; } }
