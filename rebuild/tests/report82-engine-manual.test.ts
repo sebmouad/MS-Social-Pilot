@@ -79,9 +79,9 @@ describe('standalone channel report (a download, no delivery needed)', () => {
     expect(execs('activity_logs').some(e => e.values.includes('analytics.report_run_finished'))).toBe(true);
   });
   it('uses the template sections and lists stored ones that cannot be supplied', async () => {
-    state.templateSections = ['audience', 'goals'];
+    state.templateSections = ['audience', 'destinations'];
     const out = await runReportNow(actor, channelInput({ templateId: 't1' }), NOW);
-    expect(out.notIncluded).toEqual(['goals']);
+    expect(out.notIncluded).toEqual(['destinations']);
     expect(out.csv).toContain('audience'); expect(out.csv).not.toContain('summary');
     expect(inserts()[0]!.values).toContain(channelHash({ templateId: 't1' }));
   });
@@ -151,9 +151,9 @@ describe('standalone channel report (a download, no delivery needed)', () => {
 describe('schedule report', () => {
   it('prepares the most recent complete period, never emails, and records Prepared', async () => {
     registerReportGeneration({ generation: real(), mail: mailPort, eligible: async () => true });
-    state.scheduleSections = ['analysis', 'goals'];
+    state.scheduleSections = ['analysis', 'destinations'];
     const out = await runReportNow(actor, scheduleInput(), NOW);
-    expect(out).toMatchObject({ ok: true, outcome: 'prepared', period: { start: '2026-10-12', end: '2026-10-18' }, truncated: false, notIncluded: ['goals'], replayed: false });
+    expect(out).toMatchObject({ ok: true, outcome: 'prepared', period: { start: '2026-10-12', end: '2026-10-18' }, truncated: false, notIncluded: ['destinations'], replayed: false });
     expect(mailPort.send).not.toHaveBeenCalled();
     expect(inserts()[0]!.values).toContain(`manual:w1:u1:${RID}`);
     expect(inserts()[0]!.values).toContain('s1');

@@ -9,7 +9,7 @@ import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import type { AnalyticsAdCeiling } from './types';
 
 export type Tx = Prisma.TransactionClient;
-export type AnalyticsFeature = 'analytics/overview' | 'analytics/reports' | 'analytics/demographics' | 'analytics/pins' | 'analytics/compare';
+export type AnalyticsFeature = 'analytics/overview' | 'analytics/reports' | 'analytics/demographics' | 'analytics/pins' | 'analytics/goals' | 'analytics/compare';
 export type Actor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[]; maxResultItems?: number } & AnalyticsAdCeiling;
 export type Authorization = { role: string; scope: string[] | null };
 

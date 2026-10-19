@@ -47,10 +47,11 @@ describe('report templates', () => {
     expect(JSON.stringify(log.values)).not.toContain('Weekly');
   });
   it('does not let a new template advertise sections the shared readers cannot supply, but keeps legacy stored ones', async () => {
-    await expect(manageReportTemplate(actor, { action: 'create', name: 'Goals', sections: ['goals'], rangeKey: '7d', confirmation: reportConfirmation.createTemplate('Goals') })).rejects.toMatchObject({ code: 'invalid_request' });
-    // An existing template that already stores 'goals' may be renamed and keep it, but may not gain another unsupported section.
-    state.templateSections = ['analysis', 'goals'];
-    await expect(manageReportTemplate(actor, { action: 'update', id: 't1', name: 'Kept', sections: ['analysis', 'goals'], rangeKey: '7d', confirmation: reportConfirmation.updateTemplate('t1') })).resolves.toMatchObject({ ok: true });
+    await expect(manageReportTemplate(actor, { action: 'create', name: 'Destinations', sections: ['destinations'], rangeKey: '7d', confirmation: reportConfirmation.createTemplate('Destinations') })).rejects.toMatchObject({ code: 'invalid_request' });
+    // An existing template that already stores 'destinations' may be renamed and keep it; one that does not may not gain it.
+    state.templateSections = ['analysis', 'destinations'];
+    await expect(manageReportTemplate(actor, { action: 'update', id: 't1', name: 'Kept', sections: ['analysis', 'destinations'], rangeKey: '7d', confirmation: reportConfirmation.updateTemplate('t1') })).resolves.toMatchObject({ ok: true });
+    state.templateSections = ['analysis'];
     await expect(manageReportTemplate(actor, { action: 'update', id: 't1', name: 'Kept', sections: ['analysis', 'destinations'], rangeKey: '7d', confirmation: reportConfirmation.updateTemplate('t1') })).rejects.toMatchObject({ code: 'invalid_request' });
   });
   it.each(['viewer', 'member'])('denies writes to role %s but allows listing', async role => {

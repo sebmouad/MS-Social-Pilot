@@ -8,7 +8,7 @@ export type AnalyticsAdCeiling = { allowedAdAccountIds?: readonly string[]; adAc
 export type AnalyticsReadActor = { userId: string; workspaceId: string } & AnalyticsAdCeiling;
 export type AnalyticsReadConstraints = {
   allowedChannelIds?: readonly string[];
-  feature?: 'analytics/overview' | 'analytics/reports' | 'analytics/explorer' | 'analytics/demographics' | 'analytics/pins' | 'analytics/compare';
+  feature?: 'analytics/overview' | 'analytics/reports' | 'analytics/explorer' | 'analytics/demographics' | 'analytics/pins' | 'analytics/goals' | 'analytics/compare';
 };
 export type AnalyticsReadInput = {
   start?: string;

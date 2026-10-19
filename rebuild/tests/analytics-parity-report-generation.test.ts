@@ -36,14 +36,14 @@ beforeEach(() => {
 
 describe('report rendering', () => {
   it('keeps channel metrics only, marks missing as not available, escapes HTML and spreadsheet formulas', () => {
-    const out = renderReport(snapshot() as never, { channelName: 'Page One', sections: ['analysis', 'audience', 'published', 'goals'], generatedAt: new Date('2026-10-19T08:00:00Z') }, bounds);
+    const out = renderReport(snapshot() as never, { channelName: 'Page One', sections: ['analysis', 'audience', 'published', 'destinations'], generatedAt: new Date('2026-10-19T08:00:00Z') }, bounds);
     expect(out.csv).not.toContain('Spend');
     expect(out.csv).toContain(`"'=HYPERLINK(""x"")"`);
     expect(out.html).toContain('&lt;b&gt;Empty&lt;/b&gt;');
     expect(out.html).toContain('Not available');
     expect(out.html).toContain('not unique people');
-    expect(out.notIncluded).toEqual(['goals']);
-    expect(out.html).toContain('Not included: goals');
+    expect(out.notIncluded).toEqual(['destinations']);
+    expect(out.html).toContain('Not included: destinations');
     expect(out.truncated).toBe(false);
     expect(out.bytes).toBe(Buffer.byteLength(out.csv, 'utf8'));
   });
@@ -90,7 +90,7 @@ describe('report generator', () => {
     expect(gen.calls).toBe(0);
   });
   it('refuses a report that lists only unsupported sections', async () => {
-    expect(await generator().generate({ actor, channelId: 'c1', sections: ['goals', 'destinations'], period: { start: '2026-10-12', end: '2026-10-18' } })).toEqual({ ok: false, reason: 'no_supported_sections' });
+    expect(await generator().generate({ actor, channelId: 'c1', sections: ['destinations'], period: { start: '2026-10-12', end: '2026-10-18' } })).toEqual({ ok: false, reason: 'no_supported_sections' });
   });
   it("bounds the generated rows themselves by the actor's result ceiling", async () => {
     const result = await generator().generate({ actor: { ...actor, maxResultItems: 3 }, channelId: 'c1', sections: ['analysis', 'audience', 'published'], period: { start: '2026-10-12', end: '2026-10-18' } });

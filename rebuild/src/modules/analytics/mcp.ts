@@ -7,6 +7,7 @@ import { readAnalyticsSnapshot } from './server/read';
 import { analyticsReportToolDefinitions, analyticsReportAvailableToolDefinitions, executeAnalyticsReportTool } from './reports/mcp';
 import { analyticsDemographicsToolDefinitions, executeAnalyticsDemographicsTool } from './demographics/mcp';
 import { analyticsPinToolDefinitions, executeAnalyticsPinTool } from './pins/mcp';
+import { analyticsGoalToolDefinitions, executeAnalyticsGoalTool } from './goals/mcp';
 import { analyticsComparisonToolDefinitions, executeAnalyticsComparisonTool } from './comparison/mcp';
 import { analyticsExplorerToolDefinitions, executeAnalyticsExplorerTool } from './explorer-mcp';
 
@@ -87,6 +88,17 @@ export const ANALYTICS_MCP: readonly McpToolGroup[] = [
       { uri: 'msp://analytics/pins', name: "Pinned metrics", description: "Your current scoped pinned metrics and available choices.", mimeType: 'application/json', feature: 'analytics/pins', readTool: 'get_analytics_pins' },
     ],
     execute: (viewer, name, args, cap) => executeAnalyticsPinTool(analyticsActorFor(viewer, cap), name, args),
+  },
+  {
+    id: 'analytics-goals',
+    tools: analyticsGoalToolDefinitions,
+    features: { get_analytics_goals: 'analytics/goals', set_analytics_goals: 'analytics/goals' },
+    writeTools: ['set_analytics_goals'],
+    scope: { resourceTools: ['get_analytics_goals', 'set_analytics_goals'], resources: ['msp://analytics/goals'] },
+    resources: [
+      { uri: 'msp://analytics/goals', name: "Goals", description: "Monthly channel goals with month-to-date progress.", mimeType: 'application/json', feature: 'analytics/goals', readTool: 'get_analytics_goals' },
+    ],
+    execute: (viewer, name, args, cap) => executeAnalyticsGoalTool(analyticsActorFor(viewer, cap), name, args),
   },
   {
     id: 'analytics-demographics',

@@ -5,6 +5,8 @@ import { authorizeReport, resultCeiling, usableChannelIds } from '../server/acce
 import { prisma } from '@/server/data';
 import { platformAnalytics } from '@/server/platforms/registry';
 import type { PostPerformance } from '@/server/platforms/host';
+import { channelGoalProgress } from '../../goals/server/goals';
+import type { GoalMonth, GoalProgress } from '../../goals/contracts';
 import { formatDuration, readResponseTime, type ResponseTimeSummary } from './response-time';
 
 export type ReportBounds = { maxRows: number; maxBytes: number };
@@ -44,7 +46,7 @@ type Snapshot = Awaited<ReturnType<typeof readAnalyticsSnapshot>>;
  * as-of times; a metric without data is "Not available", never zero. Every rendering is bounded in rows and UTF-8 bytes, and
  * anything cut is marked; when even the fixed parts exceed the bound a minimal notice is returned instead of an overflowing page.
  */
-export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null }, bounds: ReportBounds): ReportOutput {
+export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null }, bounds: ReportBounds): ReportOutput {
   const wanted = new Set(input.sections);
   const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s));
   const notIncluded = REPORT_SECTION_IDS.filter(s => wanted.has(s) && !included.includes(s));
@@ -56,6 +58,8 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const responseLine = response ? `Median first response ${formatDuration(response.medianMs)}; ${response.answered} answered, ${response.unanswered} waiting at period end. Calendar time, from stored Inbox messages${response.partial ? '; only the earliest messages were read' : ''}.` : '';
   const topPosts = included.includes('topPosts') ? input.topPosts ?? [] : null;
   const postTitle = (p: PostPerformance) => clamp(p.text || '(no text)', 120);
+  const goals = included.includes('goals') ? input.goals ?? { month: { month: '', start: '', end: '', timeZone: '' }, goals: [] } : null;
+  const goalText = (g: GoalProgress) => `${g.label}: ${g.actual === null ? 'No data' : g.actual} of ${g.target} (${g.percent}%, ${g.paceLabel})`;
   const audienceAsOf = audience ? audience.entries.map(e => e.asOf).filter((d): d is Date => d instanceof Date).sort((a, b) => b.getTime() - a.getTime())[0] : undefined;
 
   // CSV: long form, one row per summary/point/resource, cut at the row and byte limits.
@@ -67,6 +71,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     rows.push(['response_time', 'answered_waits', 'Answered waits', 'Inbox', '', '', response.answered, 'waits', '', 'Count in period']);
     rows.push(['response_time', 'unanswered_waits', 'Waiting at period end', 'Inbox', '', '', response.unanswered, 'waits', '', 'Count at period end']);
   }
+  if (goals) for (const g of goals.goals) rows.push(['goal', g.metric, g.label, 'Goals', '', goals.month.start, g.actual ?? '', 'target ' + g.target, `${g.percent}%`, `${g.paceLabel}; month ${goals.month.start} to ${goals.month.end} (${goals.month.timeZone})`]);
   if (topPosts) topPosts.forEach((p, i) => {
     rows.push(['top_post', `rank_${i + 1}`, postTitle(p), p.rankLabel, p.url ?? '', p.publishedAt, p.rankValue ?? '', p.rankLabel.toLowerCase(), '', 'Stored per-post measures; missing is not zero']);
     for (const m of p.measures) rows.push(['top_post_measure', m.key, m.label, p.rankLabel, postTitle(p), p.publishedAt, m.value ?? '', '', '', `Rank ${i + 1}`]);
@@ -96,6 +101,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
       + `<h1>${esc(title)}</h1><p><small>Generated ${esc(input.generatedAt.toISOString())}. Values come from stored analytics; "Not available" means no data, not zero.</small></p>`
       + (included.includes('published') ? `<h2>Published posts</h2><p>Published ${esc(snapshot.publishing.published)}, scheduled ${esc(snapshot.publishing.scheduled)}, failed ${esc(snapshot.publishing.failed)}.</p>` : '')
       + (response ? `<h2>Response time</h2><p>${esc(responseLine)}</p>` : '')
+      + (goals ? `<h2>Goals</h2>${goals.goals.length ? `<p><small>Month ${esc(goals.month.start)} to ${esc(goals.month.end)} (${esc(goals.month.timeZone)}), up to generation for the current month.</small></p><table><thead><tr><th>Goal</th><th>Target</th><th>This month</th><th>Progress</th><th>Pace</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? 'No data' : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : '<p>No goals are set for this channel.</p>'}` : '')
       + (topPosts ? `<h2>Top posts</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>Post</th><th>Published</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.url ? `<a href="${esc(p.url)}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}</td><td>${asOf(p.publishedAt)}</td><td>${p.rankValue === null ? 'Not available' : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? 'Not available' : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<p>No published posts with stored measures in this period.</p>'}` : '')
       + audienceHtml
       + (metrics.length ? `<h2>Metrics</h2><table><thead><tr><th>Metric</th><th>Source</th><th>Value</th><th>Basis</th><th>Coverage</th><th>As of</th></tr></thead><tbody>${shown.map(m => `<tr><td>${esc(m.label)}</td><td>${esc(m.sourceLabel)}</td><td>${esc(valueText(m))}</td><td>${esc([m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. '))}</td><td>${esc(coverageText(m))}</td><td>${asOf(m.latestAt)}</td></tr>`).join('')}</tbody></table>` : '')
@@ -112,6 +118,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   }
   const baseLines = [title, '', ...(included.includes('published') ? [`Published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`] : []),
     ...(response ? [`Response time: ${responseLine}`] : []),
+    ...(goals ? [`Goals (month ${goals.month.start} to ${goals.month.end}):`, ...(goals.goals.length ? goals.goals.map(goalText) : ['No goals are set for this channel.'])] : []),
     ...(topPosts ? ['Top posts:', ...(topPosts.length ? topPosts.map((p, i) => `${i + 1}. ${postTitle(p)} (${asOf(p.publishedAt)}): ${p.rankLabel} ${p.rankValue ?? 'Not available'}`) : ['No published posts with stored measures in this period.'])] : []),
     ...(audience ? [`Audience: ${audience.covered ? audience.total : 'Not available'} (${audience.covered} of ${audience.selected} channels${audienceAsOf ? `; as of ${asOf(audienceAsOf)}` : ''}; not unique people)`] : [])];
   const metricLines = metrics.map(m => `${clamp(m.label, 200)} (${clamp(m.sourceLabel, 200)}): ${valueText(m)}; ${coverageText(m)}; as of ${asOf(m.latestAt)}`);
@@ -147,7 +154,8 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
         const bounds = { maxRows: ceiling === undefined ? base.maxRows : Math.min(base.maxRows, ceiling), maxBytes: base.maxBytes };
         const responseTime = request.sections.includes('responseTime') ? await readResponseTime(actor.workspaceId, request.channelId, request.period) : null;
         const topPosts = request.sections.includes('topPosts') ? await readTopPosts(actor.workspaceId, request.channelId, request.period) : null;
-        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? 'Channel', sections: request.sections, responseTime, topPosts, generatedAt: deps.now?.() ?? new Date() }, bounds) };
+        const goals = request.sections.includes('goals') ? await channelGoalProgress(actor.workspaceId, request.channelId, request.period.end, deps.now?.() ?? new Date()) : null;
+        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? 'Channel', sections: request.sections, responseTime, topPosts, goals, generatedAt: deps.now?.() ?? new Date() }, bounds) };
       } catch (error) {
         const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
         return { ok: false, reason: code === 'unauthorized' || code === 'forbidden' ? 'access_unavailable' : 'generation_failed' };

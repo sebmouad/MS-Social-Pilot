@@ -31,9 +31,9 @@ describe('customer module manifests', () => {
     expect(PAGES.some(({ href }) => href === '/root' || href.startsWith('/root/'))).toBe(false);
   });
 
-  it('shows the Analytics overview, audience, comparison and pins pages while retaining scoped CSV export as a capability', () => {
+  it('shows the Analytics overview, audience, comparison, goals and pins pages while retaining scoped CSV export as a capability', () => {
     expect(PAGES.filter(({ module, navigation }) => module === 'analytics' && navigation !== false).map(({ href }) => href)).toEqual([
-      '/analytics', '/analytics/demographics', '/analytics/compare', '/analytics/pins', '/analytics/reports',
+      '/analytics', '/analytics/demographics', '/analytics/compare', '/analytics/goals', '/analytics/pins', '/analytics/reports',
     ]);
     expect(PAGES.find(({ id }) => id === 'analytics/reports')?.href).toBe('/analytics/reports');
     expect(moduleManifests.find(({id})=>id==='analytics')?.jobs).toEqual(expect.arrayContaining([expect.objectContaining({name:'analyticsReports',configKey:'analytics.reports.schedule'})]));

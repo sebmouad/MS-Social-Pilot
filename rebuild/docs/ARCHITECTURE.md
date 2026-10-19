@@ -1141,7 +1141,8 @@ settings cleaned/restored; insert-only synthetic review examples remain by inten
 migration/media/service rollback. Both Claude accounts contributed independent
 reviews; findings were corrected and verified. See REPORT_WORKFLOWS.md.
 
-Goals/response-time/destinations/top-post report sections and AI recap remain
+Response-time, top-post and goals report sections now exist (wave 2; Goals also has
+/analytics/goals, API and MCP). Destinations section and AI recap remain
 incomplete. Whole-tree design audit, full Facebook formats/live coverage, Root
 coverage and other legacy integrations remain open. Production stays legacy.
 

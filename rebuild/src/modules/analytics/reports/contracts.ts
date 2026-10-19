@@ -62,7 +62,7 @@ export type ReportScheduleView = {
 };
 
 /** Sections the shared Analytics readers can honestly supply today; other stored section ids are listed as not included in a report. */
-export const REPORT_SUPPORTED_SECTIONS = ['analysis', 'responseTime', 'audience', 'published', 'topPosts'] as const;
+export const REPORT_SUPPORTED_SECTIONS = ['analysis', 'goals', 'responseTime', 'audience', 'published', 'topPosts'] as const;
 
 export type ReportPeriod = { start: string; end: string };
 export type ReportGenerationRequest = {

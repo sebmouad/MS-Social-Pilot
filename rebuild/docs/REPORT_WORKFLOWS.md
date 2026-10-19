@@ -91,7 +91,19 @@ time, capped at 20,000 messages with a partial flag. Top posts asks the
 channel's platform module through the optional `PlatformAnalyticsHost.postPerformance`
 hook (stored data only, no provider call); a module without it yields an empty,
 labelled section. Evidence: unit tests only, no PostgreSQL or browser run.
-Remaining legacy report coverage includes goals, destinations and AI recap; stored choices are preserved and generated output names
+Wave 2 also adds Goals (`modules/analytics/goals`): monthly per-channel targets
+stored in the legacy `page_goals` table, with the legacy meanings (new followers =
+follows − unfollows, views, Page engagement, posts published), judged in the
+workspace time zone. Posts published is counted from stored publications for any
+channel; the other metrics come from the channel module's optional neutral
+`goalMeasures` hook (Facebook reads stored daily Page insights, newest Meta metric
+name per day). Only metrics a channel can measure are offered. `/analytics/goals`
+(en/fr), `GET/POST /api/analytics/goals`, MCP `get_analytics_goals` /
+`set_analytics_goals` (confirmation `SET ANALYTICS GOALS <channelId>`, owners,
+admins and editors) and a Goals report section for the month holding the report
+period's last day. Unit tests with mocked data only.
+
+Remaining legacy report coverage includes destinations and AI recap; stored choices are preserved and generated output names
 unsupported sections honestly. This batch is not full report parity. Complete
 Facebook live coverage, the held photo cleanup, full Root configuration coverage,
 remaining legacy integrations and production-shaped data/media/service rollback
