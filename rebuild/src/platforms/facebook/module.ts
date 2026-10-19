@@ -29,6 +29,7 @@ export const facebookModule = {
 export const FACEBOOK_ANALYTICS_LOOKBACK_DAYS_SCHEMA = z.number().int().min(1).max(366);
 
 const facebookConfigEntries = [
+  entry({ key: 'facebook.native.statusRecoveryEnabled', group: 'Facebook · Publishing recovery', label: 'Allow verified native status checks', kind: 'boolean', description: 'Allow private Root to inspect final Video/Reel identities and save audited status proofs. Only identity- and Page-matched published receipts can verify a native journal. This does not enable customer formats, publish content, infer absence, or clear orphan/conflict evidence.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
   ...FACEBOOK_NATIVE_CONFIG,
   ...FACEBOOK_NATIVE_TRANSPORT_CONFIG,
   entry({ key: 'meta.manualMediaAttestationEnabled', group: 'Facebook · Publishing recovery', label: 'Allow external media outcome reports', kind: 'boolean', description: 'Allow private Root operators to record externally verified photo, feed and deletion outcomes. Human reports are not provider receipts. A delayed provider request may still complete; contradictory later evidence remains held for review. No automatic resend is permitted.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),

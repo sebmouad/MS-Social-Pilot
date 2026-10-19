@@ -16,6 +16,10 @@ describe('Root-configured Facebook native transport',()=>{
   expect(state.create).toHaveBeenCalledTimes(1);
   expect(state.create).toHaveBeenCalledWith(expect.objectContaining({appSecretProofEnabled:true,appSecret:state.secret}), 'private-page-token', {uploadOrigins:['https://uploads.example.test'],maxUploadBytes:4096,maxResponseBytes:1048576},fetch,controller.signal);
  });
+ it('keeps status transport available when unrelated format limits are inconsistent',async()=>{
+  setup();state.values.set('facebook.native.reel.minDurationSeconds',100);state.values.set('facebook.native.reel.maxDurationSeconds',90);
+  await configuredFacebookNativeTransport('token');expect(state.create).toHaveBeenCalledTimes(1);
+ });
  it('refuses a required missing signing secret before constructing transport',async()=>{
   setup();state.secret=null;await expect(configuredFacebookNativeTransport('token')).rejects.toThrow('signing configuration is unavailable');expect(state.create).not.toHaveBeenCalled();
  });

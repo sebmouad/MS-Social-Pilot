@@ -76,6 +76,7 @@ function safeEvidence(value: PlatformPublicationEvidence, providerId: string): R
     const visibleRows = new Set(rowIds as string[]);
     actions = value.actions.flatMap(action => {
       if (!action || typeof action !== 'object' ||
+        action.intent !== undefined && !['inspect', 'change', 'delete'].includes(action.intent) ||
         typeof action.rowId !== 'string' || action.rowId.length > maxEvidenceCellCharacters ||
         typeof action.actionId !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(action.actionId) ||
         typeof action.subjectId !== 'string' || !action.subjectId || action.subjectId.length > maxEvidenceCellCharacters ||
@@ -88,7 +89,7 @@ function safeEvidence(value: PlatformPublicationEvidence, providerId: string): R
       const context = safeActionContext(action.context);
       // The module may return actions for the extra lookahead row; only actions for
       // rows visible under the current cap leave this service.
-      return visibleRows.has(action.rowId) ? [{ rowId: action.rowId, actionId: action.actionId, subjectId: action.subjectId, label: action.label, description: action.description, acknowledgmentLabel: action.acknowledgmentLabel, confirmation: action.confirmation, ...(context === undefined ? {} : { context }), ...(fields === undefined ? {} : { fields }) }] : [];
+      return visibleRows.has(action.rowId) ? [{ ...(action.intent === undefined ? {} : { intent: action.intent }), rowId: action.rowId, actionId: action.actionId, subjectId: action.subjectId, label: action.label, description: action.description, acknowledgmentLabel: action.acknowledgmentLabel, confirmation: action.confirmation, ...(context === undefined ? {} : { context }), ...(fields === undefined ? {} : { fields }) }] : [];
     });
     rowIdKey = value.rowIdKey;
   } else if (value.rowIdKey !== undefined) throw safeFallback();

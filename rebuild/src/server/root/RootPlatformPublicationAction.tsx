@@ -116,7 +116,7 @@ export function RootPlatformPublicationAction({ providerId, action, onReceipt }:
     setError(null);
   };
   return <>
-    <Button type="button" variant="danger" size="sm" disabled={reviewRequired} onClick={() => { setOpen(true); setError(null); setNotice(null); }}>{action.label}</Button>
+    <Button type="button" variant={action.intent === 'inspect' ? 'secondary' : 'danger'} size="sm" disabled={reviewRequired} onClick={() => { setOpen(true); setError(null); setNotice(null); }}>{action.label}</Button>
     {!onReceipt && notice ? <p ref={noticeRef} className="root-control__notice" role="status" tabIndex={-1}>{notice}</p> : null}
     {open ? <ModalDialog className="ui-dialog root-platform-action-dialog" labelledBy={`root-platform-action-${id}`} describedBy={`root-platform-action-description-${id}`} onDismiss={dismiss} busy={busy}>
       <div className="ui-dialog__header"><h2 id={`root-platform-action-${id}`}>{action.label}</h2></div>
@@ -157,7 +157,7 @@ export function RootPlatformPublicationAction({ providerId, action, onReceipt }:
       </div>
       <div className="ui-dialog__actions">
         <Button type="button" data-dialog-cancel disabled={busy} onClick={dismiss}>{reviewRequired ? 'Close and review' : 'Cancel'}</Button>
-        <Button type="button" variant="danger" disabled={busy || reviewRequired || confirmation !== action.confirmation || !acknowledged} onClick={() => void submit()}>{busy ? 'Working…' : action.label}</Button>
+        <Button type="button" variant={action.intent === 'inspect' ? 'secondary' : 'danger'} disabled={busy || reviewRequired || confirmation !== action.confirmation || !acknowledged} onClick={() => void submit()}>{busy ? 'Working…' : action.label}</Button>
       </div>
     </ModalDialog> : null}
   </>;

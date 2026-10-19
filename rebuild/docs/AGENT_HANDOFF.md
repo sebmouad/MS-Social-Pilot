@@ -4,7 +4,7 @@ Updated: 2026-10-19. This is durable project context, not proof of current runti
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
 
-Current continuation: batch90 at the end of this document, FACEBOOK_NATIVE_STATUS.md and FACEBOOK_NATIVE_JOURNAL_PLAN.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+Current continuation: batch91 at the end of this document and FACEBOOK_NATIVE_STATUS.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
 
 ## Historical verified batch —84
 
@@ -522,3 +522,26 @@ live provider evidence. See FACEBOOK_NATIVE_STATUS.md and
 FACEBOOK_NATIVE_JOURNAL_PLAN.md. Existing Root evidence is not native resolution.
 Preserve production and the held photo-cleanup canary. Broader parity/configuration
 and production-shaped migration/media/service rollback gates remain required.
+
+
+## Batch91 — private native status proof recovery
+
+Migration20 (`20261019040000_rebuild_facebook_native_status_proofs`, SHA256
+`253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4`) was applied
+locally after full backup and scratch-restore verification. The complete20-file
+schema-only rehearsal passed; 106 prior table counts/settings were preserved and
+the proof ledger is table107. This is not production-shaped service/media/customer
+rollback. The full suite passed3136 tests/355 files, zero skips, including26
+actual PostgreSQL journal/recovery cases (14+12); production build and typecheck
+passed. Both Claude accounts reviewed the source and findings were checked.
+
+The built-server HTTPS-mock plus Root API/installation-MCP probe passed, including
+anonymous/ordinary/cross-origin/key-based Root denial, wrong-confirmation no-GET,
+evidence visibility with platform and recovery flag off, and exactly two GETs:
+accepted published proof via browser and a held scheduled observation via MCP.
+Eight views covered four themes at1440px and390px. Screenshot inspection found and fixed Cancel wrapping at390px. The final build,
+typecheck and complete probe passed again, including the one-line Cancel check;
+the corrected phone screenshot was inspected. No live Meta request or production change occurred.
+Native customer formats remain unavailable; Story, deletion, host, first-comment,
+live-provider and production-shaped rollback gates remain open. Production and
+socialpilot-deploy remain legacy. See FACEBOOK_NATIVE_STATUS.md for current detail.

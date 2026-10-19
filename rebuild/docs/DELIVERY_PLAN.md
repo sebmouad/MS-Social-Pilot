@@ -4,7 +4,7 @@ Updated 2026-10-19. Goal: [GOAL.md](GOAL.md). Mandatory target:
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md). Current evidence and gaps:
 [ARCHITECTURE.md](ARCHITECTURE.md), [LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md).
 
-Current continuation: batch90 at the end of this document, FACEBOOK_NATIVE_STATUS.md and FACEBOOK_NATIVE_JOURNAL_PLAN.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+Current continuation: batch91 at the end of this document and FACEBOOK_NATIVE_STATUS.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
 
 ## Historical position before batch85 —2026-10-19
 
@@ -310,3 +310,24 @@ live provider evidence. See FACEBOOK_NATIVE_STATUS.md and
 FACEBOOK_NATIVE_JOURNAL_PLAN.md. Existing Root evidence is not native resolution.
 Preserve production and the held photo-cleanup canary. Broader parity/configuration
 and production-shaped migration/media/service rollback gates remain required.
+
+
+## Batch91 — native status proof recovery, local validation complete
+
+The default-off private Root recovery path and append-only proof ledger are
+implemented. Migration20 was backup/scratch-restored, applied locally and
+preserved 106 prior table counts/settings; the full20-file schema-only rehearsal
+passed. Full suite:3,136 tests/355 files, zero skips, including26 actual PostgreSQL
+journal/recovery cases. Build and typecheck passed. Both Claude accounts reviewed
+the source and findings were checked. The built-server HTTPS-mock plus Root
+API/MCP probe passed with exactly two GETs (accepted published proof and a held
+scheduled observation); eight views covered four themes at desktop and phone
+sizes. Screenshot review caught and fixed a wrapped Cancel action at390px. The final
+build/typecheck and eight-view probe passed, including the one-line Cancel check
+and corrected phone screenshot inspection. This is not live Meta,
+production-shaped service/media/customer rollback, or release evidence. Native
+formats remain unavailable and Story/deletion/host/first-comment/live gates stay
+open. Production and socialpilot-deploy remain legacy.
+
+Next: integrate native formats with the canonical host, status, first-comment and
+deletion services; then complete cleaned live-provider and broader release gates. Do not claim whole-app UX clearance or cutover readiness.

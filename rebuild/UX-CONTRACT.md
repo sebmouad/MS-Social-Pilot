@@ -465,3 +465,16 @@ keyboard disclosure in Grove, Coast, Clay and Nightfall at1440px/390px, includin
 sidebar filter retention and no document overflow. Metadata row-identity guards,
 action-unconfirmed messages and filter-scoped success notices have regressions.
 This is scoped Root evidence UX proof, not a whole-app accessibility clearance.
+
+
+Batch91 Root publication inspection uses the canonical shared action dialog and
+secondary Button styling; recovery/delete actions retain danger emphasis. The
+confirmation identifies final identity/Page and displayed revision. A built-server
+probe passed Root API/installation-MCP authorization and eight desktop/phone views
+across Grove, Coast, Clay and Nightfall. It verified wrong-confirmation no-GET,
+visibility while platform/recovery are off, and exactly two HTTPS-mock reads:
+accepted published proof via browser and held scheduled observation via MCP.
+Screenshot inspection caught and fixed Cancel wrapping at390px. The responsive
+single-column footer passed the final build/typecheck, eight-view probe and
+corrected phone screenshot inspection.
+This is scoped Root evidence, not whole-app UX clearance.

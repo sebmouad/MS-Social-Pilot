@@ -65,12 +65,12 @@ export async function configuredFacebookOAuth() {
 
 /** Private native-engine dependency. Constructing it does not advertise a format or dispatch I/O. */
 export async function configuredFacebookNativeTransport(accessToken: string, options?: { signal?: AbortSignal }) {
-  const [config, settings] = await Promise.all([
+  const [config, transportValues] = await Promise.all([
     configuredFacebookConfig(),
-    configuredFacebookNativeSettings(),
+    runtimeConfigBatch(FACEBOOK_NATIVE_TRANSPORT_CONFIG.map(setting => setting.key)),
   ]);
   if (config.appSecretProofEnabled && !config.appSecret) throw new Error('Native Facebook signing configuration is unavailable.');
-  const policy = settings.transport;
+  const policy = facebookNativeTransportPolicyFrom(transportValues);
   return createFacebookNativeTransport(config, accessToken, policy, fetch, options?.signal);
 }
 

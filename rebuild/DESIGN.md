@@ -156,3 +156,15 @@ columns. Keep technical row IDs and complete receipt fields in an accessible
 native details disclosure; retain separately confirmed module actions in their
 own column. Use theme tokens, visible summary focus, wrapped long identifiers
 and a locally scrollable table. This generic control contains no provider rules.
+
+
+Batch91 Root publication actions use neutral inspection intent and the canonical
+shared action dialog with the existing secondary Button variant; recovery/delete
+controls retain danger emphasis. Keep provider rules out of the shared styling,
+retain the two-sidebar navigation, and keep proof rows free of content. The
+confirmation names the final identity/Page and displayed revision because
+acceptance changes local recovery state. Built-server probes covered eight views
+across four themes at desktop and phone sizes. Screenshot inspection caught and fixed Cancel wrapping at390px. The responsive
+single-column shared-dialog footer passed the final eight-view probe and phone
+screenshot inspection. This is scoped Root evidence, not whole-app
+UX clearance.

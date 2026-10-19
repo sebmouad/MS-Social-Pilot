@@ -91,12 +91,19 @@ describe('Facebook native journal recovery guards', () => {
   });
 
   it('requires an unconflicted final confirmed ID match for PUBLISHED resolution', async () => {
-    query.mockResolvedValue([{ state: 'confirmed', knownIds: ['upload-id', 'remote-final'], remoteId: 'remote-final', conflicted: false, parentProvider: 'facebook' }]);
+    query.mockResolvedValue([{ state: 'confirmed', knownIds: ['remote-final'], remoteId: 'remote-final', conflicted: false, parentProvider: 'facebook', hasAcceptedProof: true }]);
     await expect(assertFacebookNativeResolution(transaction(query), 'workspace-a', 'operation-a', 'PUBLISHED', 'remote-final')).resolves.toBeUndefined();
 
     await expect(assertFacebookNativeResolution(transaction(query), 'workspace-a', 'operation-a', 'PUBLISHED', 'upload-id'))
       .rejects.toMatchObject({ name: 'OperationError', code: 'conflict' });
     expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it('holds a confirmed flag that has no accepted identity-bound proof', async () => {
+    query.mockResolvedValue([{ state: 'confirmed', knownIds: ['remote-final'], remoteId: 'remote-final',
+      conflicted: false, parentProvider: 'facebook', hasAcceptedProof: false }]);
+    await expect(assertFacebookNativeResolution(transaction(query), 'workspace-a', 'operation-a', 'PUBLISHED', 'remote-final'))
+      .rejects.toMatchObject({ code: 'conflict' });
   });
 
   it('reads bounded content-free Root evidence and omits private payload and fence fields', async () => {
@@ -122,7 +129,8 @@ describe('Facebook native journal recovery guards', () => {
     expect(captured.sql).toContain("WHERE a.provider = 'facebook'");
     expect(captured.sql).not.toContain('"payloadHash"');
     expect(captured.sql).not.toContain('"ownerToken"');
-    expect(captured.sql).not.toContain('j.steps');
+    expect(captured.sql).toContain('j.steps'); // Used privately to decide eligibility; never returned as a cell.
+    expect(evidence.items[0]).not.toHaveProperty('steps');
     expect(captured.sql).not.toContain('j."workspaceId" =');
     expect(evidence.columns.map(column => column.key)).not.toContain('payloadHash');
     expect(evidence.columns.map(column => column.key)).not.toContain('ownerToken');

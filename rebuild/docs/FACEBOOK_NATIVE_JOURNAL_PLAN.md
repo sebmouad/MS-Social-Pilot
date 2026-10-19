@@ -1,9 +1,10 @@
 # Native Facebook journal: foundation and remaining gates
 
-Status: batch89 implements private durable receipts and installed safety guards.
-Batch90 hardens status observation boundaries; see FACEBOOK_NATIVE_STATUS.md.
-Native customer formats remain unavailable. This is not the complete Facebook
-engine, live-provider proof or a production cutover.
+Status: batch89 implements private durable receipts and installed safety guards;
+batch90 hardens observation boundaries; batch91 adds the identity-bound proof
+writer and private Root recovery action. See FACEBOOK_NATIVE_STATUS.md. Native
+customer formats remain unavailable. This is not the complete Facebook engine,
+live-provider proof or a production cutover.
 
 ## Implemented boundary
 
@@ -36,7 +37,13 @@ The old unscoped `formats/store.ts` proposal and fake-SQL tests are removed.
 Memory storage remains a test/single-process helper; the durable wrapper constructs
 its own scoped store. It rejects `:comment`/`:delete` aliases and cannot confirm or
 delete objects through the worker port. The existing first-comment/deletion
-recovery services remain the required integration path.
+recovery services remain the required integration path. Batch91 adds a separate
+identity-bound Video/Reel GET proof writer and audited Root resolution service;
+it accepts only the displayed revision after rechecking current Page, grants,
+credentials and configuration. Revoked authority before GET yields audited
+unknown without provider I/O. Accepted proof is required by installed parent
+outcome/erasure guards, while the parent shared publication outcome stays
+separate from child proof.
 
 ## Installed safety and Root UX
 
@@ -55,7 +62,11 @@ The generic Root table accepts validated module-owned summary columns. Facebook
 shows state, record type, final identity and update time first. Keyboard-operable
 native details retain the complete declared evidence fields; existing confirmed
 module actions remain separate. Filters remain in the contextual sidebar/drawer.
-Unknown native recovery actions are refused rather than routed to cleanup.
+Unknown native recovery actions are refused rather than routed to cleanup. Batch91
+Root/API/installation-MCP recovery records no content in proof rows and remains
+available for bounded evidence inspection while Facebook or its default-off
+`facebook.native.statusRecoveryEnabled` flag is disabled. This does not grant
+workspace clients Root authority.
 
 ## Migration and evidence
 
@@ -84,9 +95,10 @@ partial-source reviews are not provider or PostgreSQL proof.
 1. Complete native host dispatch with current shared authorization, module/plan/
    scope checks, actual media probing and immutable source handling. Keep only
    the existing implemented feed format customer-visible until these pass.
-2. Implement verified final status and canonical shared first-comment/deletion
-   recovery. Root needs audited resolution for held native receipts and late
-   facts after process loss; irreversibly conflicted rows currently remain held.
+2. Integrate canonical shared first-comment/deletion recovery. Root still needs
+   process-loss/late-fact resolution for held receipts; irreversibly conflicted
+   rows remain held. The identity-bound status-proof writer and Root acceptance
+   path are implemented in batch91, but do not resolve every such conflict.
 3. Verify eventual host/webhook recovery cannot acquire dispatch authority or
    bypass unresolved-orphan guards. Test races at that actual service boundary.
 4. Complete UI/API/MCP authorization, local failure/retry UX and cleaned live
@@ -97,8 +109,34 @@ partial-source reviews are not provider or PostgreSQL proof.
 Production and the held photo-cleanup canary remain unchanged.
 
 
-Batch90 removes unsafe status-to-confirmed/rejected promotion from the private
-scaffold. Polling cancellation, immutable inputs, final-identity requirements and
-explicit update receipt handling are tested. This closes scaffold hazards, not
-required integration item2: the authorized identity-bound durable proof writer,
-Root resolution and process-loss recovery still need implementation.
+## Batch91 status-proof recovery and remaining work
+
+The identity-bound proof writer, private Root confirmation/recovery service and
+proof-backed installed outcome/erasure guards are implemented. The Root
+confirmation binds to the displayed revision; acceptance takes short parent-first
+fencing and acceptance transactions, audits atomically, and rechecks current
+authority after the GET. It does not acquire creator dispatch ownership or resend.
+Changed-revision, stale-credential and non-positive observations remain retained
+as observations rather than dispatch authority. Parent outcome remains distinct.
+
+Migration20 (`20261019040000_rebuild_facebook_native_status_proofs`, SHA256
+`253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4`) passed full
+backup/scratch-restore verification before local application. The complete20-file
+schema-only rehearsal passed; 106 prior table counts/settings were preserved and
+the proof ledger is table107. The suite passed3136 tests/355 files, zero skips,
+including26 actual PostgreSQL journal/recovery cases (14+12); build/typecheck
+passed. Both Claude accounts reviewed the source and findings were checked.
+Built-server HTTPS-mock Root API/MCP and eight desktop/phone views across four
+themes passed, with exactly two GETs (accepted published browser proof; held
+scheduled MCP observation). Screenshot review caught and fixed a390px Cancel-action wrap; the responsive
+footer passed the final build/typecheck, eight-view probe and phone inspection. No live Meta or
+production request/change occurred. This rehearsal is not production-shaped
+service/media/customer rollback.
+
+Remaining: canonical host dispatch and its shared authorization/media checks;
+canonical shared first-comment and deletion services; recovery for process-loss,
+late receipts, unresolved orphans and irreversibly conflicting rows without
+resend; host/webhook races that preserve dispatch fencing; cleaned live Meta
+coverage for any supported format; and broader parity plus production-shaped
+data/media/service rollback. Keep customer native formats unavailable. Production
+and the held photo-cleanup canary remain unchanged.

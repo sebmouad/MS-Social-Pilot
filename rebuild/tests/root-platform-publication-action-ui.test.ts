@@ -40,6 +40,18 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 
 describe('Root platform publication action dialog', () => {
+  it('uses shared neutral buttons for module-declared inspections', async () => {
+    await act(async () => root.render(createElement(RootPlatformPublicationAction, {
+      providerId: 'example', action: { ...action, intent: 'inspect' },
+    })));
+    const opener = container.querySelector('button')!;
+    expect(opener.className).toContain('ui-button--secondary');
+    await act(async () => opener.click());
+    const buttons = Array.from(document.querySelectorAll('dialog button'));
+    expect(buttons.some(button => button.className.includes('ui-button--danger'))).toBe(false);
+    expect(buttons.find(button => button.textContent?.includes(action.label))?.className).toContain('ui-button--secondary');
+  });
+
   it('opens with cancel focused, requires exact text and acknowledgement, and preserves fields after an uncertain receipt', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: false, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_1', state: 'needs_review', message: 'Review the current receipt.' }) });
     vi.stubGlobal('fetch', fetchMock);

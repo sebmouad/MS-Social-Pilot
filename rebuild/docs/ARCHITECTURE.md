@@ -1251,3 +1251,39 @@ live provider evidence. See FACEBOOK_NATIVE_STATUS.md and
 FACEBOOK_NATIVE_JOURNAL_PLAN.md. Existing Root evidence is not native resolution.
 Preserve production and the held photo-cleanup canary. Broader parity/configuration
 and production-shaped migration/media/service rollback gates remain required.
+
+
+## Batch91 — private native status proof recovery
+
+The private, default-off Facebook recovery path now records provider-owned
+identity/Page observations in an append-only proof ledger. Exact final Video/Reel
+identity, current credentials/configuration and Page authority are checked before
+GET; current authority and displayed revision are checked again before acceptance.
+Revoked pre-GET authority returns an audited unknown without issuing a GET.
+Parent-first fencing, confirmation, atomic audit and installed outcome/erasure
+guards require accepted proof at the current revision. Parent publication outcome
+remains separate from child evidence. The Root action is shared by Root UI, API
+and installation MCP; workspace clients receive no Root authority. Proof rows
+contain no content, and evidence remains inspectable while the platform or
+recovery flag is disabled. Registry77 keeps recovery default-off.
+
+Migration20 (`20261019040000_rebuild_facebook_native_status_proofs`, SHA256
+`253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4`) was applied
+locally only after full backup and scratch-restore verification. The complete
+20-file schema-only backup/restore rehearsal passed; 106 prior table counts and
+settings were preserved, with the proof ledger as table107. This is not a
+production-shaped service, media or customer rollback rehearsal. The full suite
+passed 3,136 tests across 355 files with zero skips, including 26 actual
+PostgreSQL journal/recovery cases (14 + 12); production build and typecheck passed.
+Both Claude accounts reviewed the source and their findings were checked.
+
+The built-server HTTPS-mock plus Root API/MCP probe passed access denial,
+confirmation and evidence-visibility cases, with exactly two GETs: accepted
+published proof from browser and scheduled/held observation from MCP. Eight
+views covered four themes at 1440px and 390px. Screenshot review caught and fixed
+Cancel wrapping at390px. The final build/typecheck and complete eight-view probe
+passed again, including the one-line Cancel check and corrected phone inspection. No live Meta request or production change
+occurred. Native customer formats remain unavailable; Story, remote deletion,
+first-comment, canonical host integration, live provider coverage and
+production-shaped rollback remain release gaps. See
+[FACEBOOK_NATIVE_STATUS.md](FACEBOOK_NATIVE_STATUS.md).

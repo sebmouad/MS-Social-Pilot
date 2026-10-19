@@ -11,7 +11,7 @@ fail() { echo "cutover rehearsal: $*" >&2; exit 1; }
 : "${CUTOVER_DUMP_SANITIZED:?Set CUTOVER_DUMP_SANITIZED=YES only after confirming the dump is sanitized}"
 : "${CUTOVER_APPROVED_MIGRATION_SET:?Set CUTOVER_APPROVED_MIGRATION_SET to the reviewed migration set}"
 [ "$CUTOVER_DUMP_SANITIZED" = YES ] || fail "CUTOVER_DUMP_SANITIZED must be YES"
-approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal'
+approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs'
 [ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
 [ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
 
@@ -48,6 +48,7 @@ verify_migration 20261019010000_rebuild_report_runs caa0c553569cf9f984e973ceb6e3
 verify_migration 20261019011000_rebuild_report_purge_gate 122e813070361737ba1a89d775d2f92922dadd36423debb83411e0d5a4aa5d9e
 verify_migration 20261019020000_rebuild_destination_formats 30325cdda1951cde93fab77a12bc349caa4422861fe133f68320ac3b979af6c6
 verify_migration 20261019030000_rebuild_facebook_native_journal 3ef505dccb5156ea1d84472998d19fb8427b1232669f57ca98a8ac6cd1e04d46
+verify_migration 20261019040000_rebuild_facebook_native_status_proofs 253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4
 
 # Only loopback TCP or the standard local PostgreSQL socket and database
 # /postgres are accepted. A copied production DATABASE_URL must fail closed.
@@ -104,19 +105,21 @@ BEGIN
      OR to_regclass('public.task_comments') IS NOT NULL
      OR to_regclass('public.report_runs') IS NOT NULL
      OR to_regclass('public.rebuild_facebook_native_journal') IS NOT NULL
+     OR to_regclass('public.rebuild_facebook_native_status_proofs') IS NOT NULL
      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_targets' AND column_name = 'formatId')
      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_versions' AND column_name = 'destinationFormats')
      OR EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'rebuild_workspace_purge_write_gate' AND tgrelid = to_regclass('public.report_runs'))
      OR to_regprocedure('public.rebuild_facebook_media_deletions_binding_immutable()') IS NOT NULL
      OR to_regprocedure('public.rebuild_facebook_media_resolutions_immutable()') IS NOT NULL
      OR to_regprocedure('public.rebuild_facebook_native_journal_guard()') IS NOT NULL
+     OR to_regprocedure('public.rebuild_facebook_native_status_proofs_guard()') IS NOT NULL
      OR to_regprocedure('public.rebuild_publication_attempts_native_binding_guard()') IS NOT NULL THEN
     RAISE EXCEPTION 'staging dump already contains reviewed migration objects; use a pre-migration sanitized baseline';
   END IF;
   IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
-    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
       INTO already_applied
-      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal';
+      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal', '20261019040000_rebuild_facebook_native_status_proofs';
     IF already_applied THEN
       RAISE EXCEPTION 'staging dump migration history already contains an allowlisted migration';
     END IF;
@@ -145,6 +148,7 @@ psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019010000_rebui
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019011000_rebuild_report_purge_gate/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019020000_rebuild_destination_formats/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019030000_rebuild_facebook_native_journal/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019040000_rebuild_facebook_native_status_proofs/migration.sql"
 echo "reviewed additive migrations applied to local scratch database"
 
 # Required tables/columns are taken from rebuild/prisma/schema.prisma and
@@ -186,6 +190,7 @@ BEGIN
     ,ARRAY['rebuild_facebook_media_resolutions','id'], ARRAY['rebuild_facebook_media_resolutions','workspaceId'], ARRAY['rebuild_facebook_media_resolutions','operationId'], ARRAY['rebuild_facebook_media_resolutions','mediaStepId'], ARRAY['rebuild_facebook_media_resolutions','deletionId'], ARRAY['rebuild_facebook_media_resolutions','postId'], ARRAY['rebuild_facebook_media_resolutions','postTargetId'], ARRAY['rebuild_facebook_media_resolutions','targetId'], ARRAY['rebuild_facebook_media_resolutions','remoteTargetId'], ARRAY['rebuild_facebook_media_resolutions','publicationActorId'], ARRAY['rebuild_facebook_media_resolutions','eventActorId'], ARRAY['rebuild_facebook_media_resolutions','phase'], ARRAY['rebuild_facebook_media_resolutions','ordinal'], ARRAY['rebuild_facebook_media_resolutions','source'], ARRAY['rebuild_facebook_media_resolutions','outcome'], ARRAY['rebuild_facebook_media_resolutions','remoteId'], ARRAY['rebuild_facebook_media_resolutions','createdAt'], ARRAY['rebuild_facebook_media_steps','attestedAt'], ARRAY['rebuild_facebook_media_steps','attestedBy'], ARRAY['rebuild_facebook_media_deletions','attestedAt'], ARRAY['rebuild_facebook_media_deletions','attestedBy']
     ,ARRAY['report_runs','id'], ARRAY['report_runs','workspaceId'], ARRAY['report_runs','scheduleId'], ARRAY['report_runs','targetId'], ARRAY['report_runs','kind'], ARRAY['report_runs','idempotencyKey'], ARRAY['report_runs','claimToken'], ARRAY['report_runs','requestHash'], ARRAY['report_runs','periodStart'], ARRAY['report_runs','periodEnd'], ARRAY['report_runs','status'], ARRAY['report_runs','leaseUntil'], ARRAY['report_runs','startedAt'], ARRAY['report_runs','finishedAt'], ARRAY['report_runs','rowCount'], ARRAY['report_runs','truncated'], ARRAY['report_runs','failureReason'], ARRAY['report_runs','deliveries'], ARRAY['report_runs','requestedById'], ARRAY['report_runs','output'], ARRAY['report_runs','outputExpiresAt'], ARRAY['report_runs','createdAt']
     ,ARRAY['rebuild_facebook_native_journal','operationId'], ARRAY['rebuild_facebook_native_journal','workspaceId'], ARRAY['rebuild_facebook_native_journal','postId'], ARRAY['rebuild_facebook_native_journal','postTargetId'], ARRAY['rebuild_facebook_native_journal','targetId'], ARRAY['rebuild_facebook_native_journal','actorId'], ARRAY['rebuild_facebook_native_journal','remoteTargetId'], ARRAY['rebuild_facebook_native_journal','format'], ARRAY['rebuild_facebook_native_journal','sourceFormatId'], ARRAY['rebuild_facebook_native_journal','payloadHash'], ARRAY['rebuild_facebook_native_journal','ownerToken'], ARRAY['rebuild_facebook_native_journal','revision'], ARRAY['rebuild_facebook_native_journal','state'], ARRAY['rebuild_facebook_native_journal','knownIds'], ARRAY['rebuild_facebook_native_journal','steps'], ARRAY['rebuild_facebook_native_journal','remoteId'], ARRAY['rebuild_facebook_native_journal','conflicted'], ARRAY['rebuild_facebook_native_journal','createdAt'], ARRAY['rebuild_facebook_native_journal','updatedAt']
+    ,ARRAY['rebuild_facebook_native_status_proofs','id'], ARRAY['rebuild_facebook_native_status_proofs','workspaceId'], ARRAY['rebuild_facebook_native_status_proofs','operationId'], ARRAY['rebuild_facebook_native_status_proofs','observedRevision'], ARRAY['rebuild_facebook_native_status_proofs','appliedRevision'], ARRAY['rebuild_facebook_native_status_proofs','payloadHash'], ARRAY['rebuild_facebook_native_status_proofs','format'], ARRAY['rebuild_facebook_native_status_proofs','remoteTargetId'], ARRAY['rebuild_facebook_native_status_proofs','remoteId'], ARRAY['rebuild_facebook_native_status_proofs','actorId'], ARRAY['rebuild_facebook_native_status_proofs','outcome'], ARRAY['rebuild_facebook_native_status_proofs','detail'], ARRAY['rebuild_facebook_native_status_proofs','observedAt'], ARRAY['rebuild_facebook_native_status_proofs','accepted'], ARRAY['rebuild_facebook_native_status_proofs','createdAt']
   ] LOOP
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.columns
@@ -263,6 +268,37 @@ BEGIN
       AND t.tgfoid = to_regprocedure('public.rebuild_publication_attempts_native_binding_guard()')
       AND t.tgenabled IN ('O', 'A') AND NOT t.tgisinternal
   ) THEN RAISE EXCEPTION 'Facebook native parent binding trigger is missing or disabled'; END IF;
+  IF (SELECT count(*) FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'rebuild_facebook_native_status_proofs') <> 15 THEN
+    RAISE EXCEPTION 'Facebook native status proof table must have exactly 15 columns';
+  END IF;
+  IF (SELECT count(*) FROM pg_constraint
+      WHERE conrelid = 'public.rebuild_facebook_native_status_proofs'::regclass AND contype = 'f') <> 3 OR
+     NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.rebuild_facebook_native_status_proofs'::regclass AND conname = 'rebuild_facebook_native_status_proofs_workspaceId_fkey' AND confrelid = 'public.workspaces'::regclass AND confdeltype = 'c') OR
+     NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.rebuild_facebook_native_status_proofs'::regclass AND conname = 'rebuild_facebook_native_status_proofs_parent_fkey' AND confrelid = 'public.rebuild_publication_attempts'::regclass AND confdeltype = 'c') OR
+     NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.rebuild_facebook_native_status_proofs'::regclass AND conname = 'rebuild_facebook_native_status_proofs_operation_fkey' AND confrelid = 'public.rebuild_facebook_native_journal'::regclass AND confdeltype = 'c') THEN
+    RAISE EXCEPTION 'Facebook native status proof table must have three cascading tenant/parent/operation FKs';
+  END IF;
+  IF to_regprocedure('public.rebuild_facebook_native_status_proofs_guard()') IS NULL OR
+     NOT EXISTS (
+       SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relname = 'rebuild_facebook_native_status_proofs'
+         AND t.tgname = 'rebuild_facebook_native_status_proofs_guard_trigger'
+         AND t.tgfoid = to_regprocedure('public.rebuild_facebook_native_status_proofs_guard()')
+         AND t.tgenabled IN ('O', 'A') AND NOT t.tgisinternal
+     ) OR NOT EXISTS (
+       SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relname = 'rebuild_facebook_native_status_proofs'
+         AND t.tgname = 'rebuild_workspace_purge_write_gate'
+         AND t.tgfoid = to_regprocedure('public.rebuild_reject_purging_workspace_write()')
+         AND t.tgenabled IN ('O', 'A') AND NOT t.tgisinternal
+     ) THEN RAISE EXCEPTION 'Facebook native status proof integrity or purge trigger is missing or disabled'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_index i JOIN pg_class idx ON idx.oid = i.indexrelid
+    WHERE i.indrelid = 'public.rebuild_facebook_native_status_proofs'::regclass
+      AND idx.relname = 'rebuild_fb_native_proofs_accepted_revision_key'
+      AND i.indisunique AND pg_get_expr(i.indpred, i.indrelid) = 'accepted'
+  ) THEN RAISE EXCEPTION 'Facebook native status proof accepted-revision unique index is missing'; END IF;
 END $$;
 SQL
 

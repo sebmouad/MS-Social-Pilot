@@ -26,7 +26,7 @@ describe('destination format migration rehearsal guards', () => {
     expect(rehearsal).toContain("table_name = 'post_versions' AND column_name = 'destinationFormats'");
     expect(rehearsal).toContain("ARRAY['post_targets','formatId']");
     expect(rehearsal).toContain("ARRAY['post_versions','destinationFormats']");
-    expect(rehearsal).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)');
+    expect(rehearsal).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)');
     expect(rehearsal).toContain("'20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats'");
   });
 

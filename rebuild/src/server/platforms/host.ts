@@ -27,6 +27,8 @@ export interface PlatformPublicationEvidence {
 }
 
 export interface PlatformPublicationAction {
+  /** Module-owned emphasis; inspections reuse the shared neutral button variant. */
+  intent?: 'inspect' | 'change' | 'delete';
   rowId: string;
   actionId: string;
   subjectId: string;

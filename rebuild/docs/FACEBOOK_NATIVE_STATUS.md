@@ -1,8 +1,8 @@
 # Facebook native status and recovery boundary
 
-Status: batch90 hardens the private, unregistered status scaffold. Native customer
-formats remain unavailable. Submission receipts, status observations, durable
-publication confirmation and remote cleanup are separate facts.
+Status: batch91 implements private, default-off native status proof recovery.
+Native customer formats remain unavailable. Submission receipts, status
+observations, accepted recovery proof and remote cleanup are separate facts.
 
 ## Implemented safety
 
@@ -33,7 +33,7 @@ unregistered. Their source and mocked tests are not canonical shared service
 integration, durable recovery or live Meta evidence. Their child-suffix model must
 not be connected to the scoped native journal.
 
-## Required complete recovery
+## Recovery implementation boundary
 
 The next implementation must provide a Facebook-owned, identity-bound status
 proof and an audited recovery writer under existing shared Root/service authority.
@@ -82,3 +82,57 @@ receipt-persistence reporting. Its parent deletion write now uses expected-state
 CAS; the returned deletion status describes the explicit remote receipt, not a
 guarantee that both local projections committed. A canonical recovery service
 must retain and reconcile those facts without resending.
+
+
+## Batch91: audited native status proof recovery
+
+Batch91 implements the private recovery path and local schema; customer native
+publishing remains unavailable. It adds an
+append-only workspace-owned proof ledger, identity/Page-checked final Video/Reel
+GET observations, a private Root confirmation tied to the displayed revision,
+short parent-first fencing/acceptance transactions and atomic normalized audits.
+Accepted proof is required by the installed outcome/erasure guards; a confirmed
+child flag alone is insufficient. Root/API/installation MCP reuse the same module
+action service; workspace clients retain no Root authority. Native customer
+formats stay unavailable and `facebook.native.statusRecoveryEnabled` defaults
+false. Graph100/sub33 and Story objects never prove publication or absence.
+
+Root setting construction and acceptance hold app_settings SHARE only during
+short local transactions, covering absent/default setting rows and avoiding a
+mixed/ABA trust snapshot during transport construction. Final acceptance also
+locks the current source and selected Page while rechecking policy/grants/token.
+No database row locks are held by those short transactions during the remote GET;
+the existing outer workspace/post/target authority remains in force. Proofs from
+changed revisions or lost credentials are retained as observations, never reused
+as dispatch authority. Parent publication projection stays separate.
+
+The additive migration is
+`20261019040000_rebuild_facebook_native_status_proofs`, currently SHA256
+`253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4`.
+Its15-column ledger has three cascading workspace/parent/child FKs, immutable
+updates, active Root observer validation, scoped accepted-revision uniqueness and
+the shared purge gate. Root observer and original publication author are distinct.
+All new PostgreSQL identifier names fit the63-byte identifier limit.
+
+Both Claude accounts reviewed the source and findings were checked. The pre-GET
+revoked-authority observation was improved so stale credentials cannot trigger a
+provider read. The complete local full suite passed 3,136 tests across 355 files,
+with zero skips, including 26 actual PostgreSQL journal/recovery cases (14 plus
+12). A complete 20-file schema-only backup/restore rehearsal passed. The migration
+was applied locally only after full backup and scratch-restore verification;
+106 prior table counts/settings were preserved and the proof ledger is the 107th
+table. This rehearsal does not establish production-shaped service/media/customer
+rollback.
+
+The production build and typecheck passed. The real built-server probe passed
+Root API/installation-MCP authorization and eight desktop/phone views across four
+themes. It made exactly two provider-like HTTPS mock GETs: browser accepted proof
+for a published object and MCP held a scheduled observation. Anonymous, ordinary
+workspace, cross-origin and key-based Root access were denied; wrong confirmation
+made no GET; evidence remained visible with the platform and recovery flag off.
+Fixtures, settings and audits were restored. Screenshot inspection found and
+fixed Cancel wrapping at390px using a single-column shared-dialog action footer.
+The final build/typecheck and complete eight-view probe passed again, including
+an explicit one-line Cancel check; the corrected phone screenshot was inspected.
+No live Meta request or production change occurred. Native formats, Story support,
+deletion, host integration, first comments and live-provider gates remain open.

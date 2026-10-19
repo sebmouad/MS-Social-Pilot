@@ -6,14 +6,18 @@ import { FACEBOOK_NATIVE_CAPABILITIES } from '../src/platforms/facebook/native-c
 
 describe('Facebook-owned native Root configuration', () => {
   it('registers every native setting under its platform owner without advertising a format', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBeGreaterThanOrEqual(76);
+    expect(CONFIG_SCHEMA_VERSION).toBeGreaterThanOrEqual(77);
+    expect(CONFIG_BY_KEY.get('facebook.native.statusRecoveryEnabled')).toMatchObject({ defaultValue: false, consumption: 'active' });
+    expect(configurationOwner('facebook.native.statusRecoveryEnabled')).toEqual({kind:'platform',id:'facebook'});
     for (const setting of [...FACEBOOK_NATIVE_CONFIG,...FACEBOOK_NATIVE_TRANSPORT_CONFIG]) {
       expect(CONFIG_BY_KEY.get(setting.key)).toMatchObject({key:setting.key,consumption:setting.consumption});
       expect(configurationOwner(setting.key)).toEqual({kind:'platform',id:'facebook'});
       expect(setting.schema.safeParse(setting.defaultValue).success).toBe(true);
     }
     expect(FACEBOOK_NATIVE_CAPABILITIES.every(value=>value.wired===false)).toBe(true);
-    expect([...FACEBOOK_NATIVE_CONFIG,...FACEBOOK_NATIVE_TRANSPORT_CONFIG].every(value=>value.consumption==='configured')).toBe(true);
+    expect(FACEBOOK_NATIVE_CONFIG.every(value=>value.consumption==='configured')).toBe(true);
+    expect(CONFIG_BY_KEY.get('facebook.native.maxResponseBytes')?.consumption).toBe('active');
+    expect(FACEBOOK_NATIVE_TRANSPORT_CONFIG.filter(value=>value.key!=='facebook.native.maxResponseBytes').every(value=>value.consumption==='configured')).toBe(true);
   });
   it('rejects credential upload origins with paths, credentials, fragments or non-HTTPS schemes', () => {
     for (const origin of ['http://rupload.facebook.com','https://evil.test/video-upload','https://token@rupload.facebook.com','https://rupload.facebook.com?token=x','https://rupload.facebook.com#fragment']) {

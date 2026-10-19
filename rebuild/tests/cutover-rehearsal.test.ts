@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const script = 'scripts/cutover-rehearsal.sh';
-const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal';
+const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs';
 
 describe('cutover rehearsal safety gates', () => {
   it('pins report run migrations, refuses already migrated objects/history, and proves the purge gate', () => {
@@ -22,7 +22,7 @@ describe('cutover rehearsal safety gates', () => {
     expect(reportGateApply).toBeGreaterThan(reportRunsApply);
     expect(source).toContain("to_regclass('public.report_runs') IS NOT NULL");
     expect(source).toContain("tgrelid = to_regclass('public.report_runs')");
-    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)');
+    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)');
     expect(source).toContain("'20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate'");
     expect(source).toContain("t.tgfoid = to_regprocedure('public.rebuild_reject_purging_workspace_write()')");
     expect(source).toContain("t.tgenabled IN ('O', 'A')");
@@ -170,7 +170,7 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain(hash(mediaSteps));
     expect(source).toContain(hash(mediaDeletions));
     expect(source).toContain(hash(resolutions));
-    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)');
+    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)');
     expect(source).toContain("USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps'");
     expect(source).toContain('CUTOVER_APPROVED_MIGRATION_SET');
     expect(source.indexOf('migration.sql"')) .toBeLessThan(source.indexOf('Required tables/columns are taken'));
@@ -238,8 +238,8 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain(`verify_migration 20261019030000_rebuild_facebook_native_journal ${hash}`);
     expect(source).toContain(approvedMigrationSet);
     expect(apply('20261019030000_rebuild_facebook_native_journal')).toBeGreaterThan(apply('20261019020000_rebuild_destination_formats'));
-    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)');
-    expect(source).toContain("'20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal'");
+    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)');
+    expect(source).toContain("'20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal', '20261019040000_rebuild_facebook_native_status_proofs'");
     expect(source).toContain("to_regclass('public.rebuild_facebook_native_journal') IS NOT NULL");
     expect(source).toContain("to_regprocedure('public.rebuild_facebook_native_journal_guard()') IS NOT NULL");
     expect(source).toContain("to_regprocedure('public.rebuild_publication_attempts_native_binding_guard()') IS NOT NULL");
@@ -257,5 +257,30 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain("t.tgname = 'rebuild_facebook_native_journal_guard_trigger'");
     expect(source).toContain("t.tgname = 'rebuild_publication_attempts_native_binding_guard_trigger'");
     expect(source).not.toContain('rebuild_facebook_native_journal_active');
+  });
+
+  it('pins and rehearses the identity-bound native status proof ledger', () => {
+    const source = readFileSync(script, 'utf8');
+    const migration = readFileSync('../prisma/migrations/20261019040000_rebuild_facebook_native_status_proofs/migration.sql', 'utf8');
+    const schema = readFileSync('prisma/schema.prisma', 'utf8');
+    const hash = createHash('sha256').update(migration).digest('hex');
+    const apply = (name: string) => source.indexOf(`migration_dir/${name}/migration.sql`);
+
+    expect(hash).toBe('253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4');
+    expect(source).toContain(`verify_migration 20261019040000_rebuild_facebook_native_status_proofs ${hash}`);
+    expect(source).toContain(approvedMigrationSet);
+    expect(apply('20261019040000_rebuild_facebook_native_status_proofs')).toBeGreaterThan(apply('20261019030000_rebuild_facebook_native_journal'));
+    expect(source).toContain("to_regclass('public.rebuild_facebook_native_status_proofs') IS NOT NULL");
+    expect(source).toContain("to_regprocedure('public.rebuild_facebook_native_status_proofs_guard()') IS NOT NULL");
+    expect(source).toContain('Facebook native status proof table must have exactly 15 columns');
+    expect(source).toContain('Facebook native status proof table must have three cascading tenant/parent/operation FKs');
+    expect(source).toContain('Facebook native status proof integrity or purge trigger is missing or disabled');
+    expect(source).toContain('Facebook native status proof accepted-revision unique index is missing');
+    for (const column of ['id', 'workspaceId', 'operationId', 'observedRevision', 'appliedRevision', 'payloadHash', 'format', 'remoteTargetId', 'remoteId', 'actorId', 'outcome', 'detail', 'observedAt', 'accepted', 'createdAt']) {
+      expect(source).toContain(`ARRAY['rebuild_facebook_native_status_proofs','${column}']`);
+    }
+    expect(migration).toContain('CREATE UNIQUE INDEX "rebuild_fb_native_proofs_accepted_revision_key"');
+    expect(migration).toContain('WHERE "accepted"');
+    expect(schema).not.toContain('model RebuildFacebookNativeStatusProof');
   });
 });

@@ -60,3 +60,9 @@
 .root-platform-action-dialog .ui-dialog__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .root-platform-action-dialog .ui-dialog__body > * { scroll-margin-block: 12px; }
 .root-control__module-grid .ui-button { margin-top: auto; }
+
+/* Keep confirmation actions readable when technical identities fill a phone dialog. */
+@media (max-width: 480px) {
+  .root-platform-action-dialog .ui-dialog__actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .root-platform-action-dialog .ui-dialog__actions .ui-button { width: 100%; min-width: 0; }
+}
