@@ -250,6 +250,7 @@ model Session {
 
 /// One client or brand. An agency has several; a single business has one.
 model Workspace {
+  reportRuns RebuildReportRun[]
   id            String @id @default(cuid())
   name          String
   slug          String @unique
@@ -462,6 +463,7 @@ model SocialAccount {
 
 /// A destination: a Facebook Page or Group.
 model Target {
+  reportRuns RebuildReportRun[]
   id              String     @id @default(cuid())
   workspaceId     String
   /// Nullable so disconnecting an account can drop the credentials without
@@ -2484,4 +2486,36 @@ model ChangelogEntry {
 
   @@index([publishedOn])
   @@map("changelog_entries")
+}
+
+
+/// Durable report outcomes; content receipts are retained only for manual downloads.
+model RebuildReportRun {
+  id String @id
+  workspaceId String
+  scheduleId String?
+  targetId String
+  kind String
+  idempotencyKey String @unique
+  claimToken String
+  requestHash String? @db.Char(64)
+  periodStart String
+  periodEnd String
+  status String
+  leaseUntil DateTime @db.Timestamptz(6)
+  startedAt DateTime @default(now()) @db.Timestamptz(6)
+  finishedAt DateTime? @db.Timestamptz(6)
+  rowCount Int?
+  truncated Boolean @default(false)
+  failureReason String?
+  deliveries Json @default("[]")
+  requestedById String?
+  output Json?
+  outputExpiresAt DateTime? @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  workspace Workspace @relation(fields:[workspaceId], references:[id], onDelete:Cascade)
+  target Target @relation(fields:[targetId], references:[id], onDelete:Cascade)
+  @@index([workspaceId,startedAt(sort:Desc),id], map:"report_runs_workspace_history")
+  @@index([workspaceId,targetId,startedAt(sort:Desc),id], map:"report_runs_channel_history")
+  @@map("report_runs")
 }

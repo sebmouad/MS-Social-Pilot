@@ -67,8 +67,8 @@ migration or a claim of the complete production-shaped cutover rehearsal.
    production. For the local rehearsal, use a sanitized, pre-migration custom
    format dump and a loopback-only PostgreSQL admin URL. Set
    `CUTOVER_DUMP_SANITIZED=YES` only after a separate sanitization review, and
-   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution`.
-   `rebuild/scripts/cutover-rehearsal.sh` pins those eight SQL files by SHA-256,
+   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate`.
+   `rebuild/scripts/cutover-rehearsal.sh` pins those 17 SQL files by SHA-256,
    restores the dump into local scratch databases, refuses migration objects
    or success records already present, applies only those files, checks the
    explicitly enumerated mapped columns and enum labels, reports aggregate
@@ -126,7 +126,7 @@ migration or a claim of the complete production-shaped cutover rehearsal.
   operational options, MCP parity, and live provider integration tests.
 - Production currently has no rebuild web or worker systemd unit and no
   verified proxy switch from 3100 to 3200.
-- The rebuild schema is not a migration schema. Its eight checksum-pinned
+- The rebuild schema is not a migration schema. Its 17 checksum-pinned
   additive migrations still need application and data-impact review against a
   sanitized production-shaped copy and a restore-aware plan.
 - There is no sanitized production-shaped staging evidence covering the full
@@ -364,3 +364,39 @@ All fourteen pinned SQL files passed a schema-only scratch rehearsal and eleven
 cutover guard tests. Legacy null-expiry links stay stored but are not publicly
 served by the rebuild; rotation/recreation requires a bounded lifetime. Production
 was untouched. Full customer-data/media/service rollback remains open.
+
+## Reports run history and purge gate — batch82 preparation
+
+Two additive migrations preserve the legacy report templates, schedules,
+recipients and `aiRecap` fields:
+
+- `20261019010000_rebuild_report_runs`, SHA-256
+  `caa0c553569cf9f984e973ceb6e3ee858750209c6d2931e1316d3323b4357c4a`.
+  Adds workspace/target-owned run history, schedule SET NULL references, claims,
+  leases, payload hashes and bounded-retention prepared artifacts. No legacy
+  report rows are rewritten.
+- `20261019011000_rebuild_report_purge_gate`, SHA-256
+  `122e813070361737ba1a89d775d2f92922dadd36423debb83411e0d5a4aa5d9e`.
+  Attaches the existing workspace purge write gate to report run INSERT/UPDATE;
+  DELETE remains available to erasure. The first file was already applied to
+  the isolated preview when the missing trigger was discovered, so its immutable
+  SQL was preserved and the correction added as a separate migration.
+
+Before local application, private mode-restricted backups were restored to
+scratch databases and the unchanged SQL applied there. The base migration
+preserved exact counts across 104 prior tables and report template/schedule and
+Root-setting fingerprints. The follow-up restored the resulting 105-table
+preview and applied its gate before changing the local preview. Backup SHA-256:
+`2f46073f5b7da217bf839143480740214bc063eef3bde0e2486b53054400721a`
+(base) and
+`6b56da0f038953cb0cbf6c803ef64e0166e6630572192c9a927226c7b7d886b0`
+(purge gate). Private backup paths are kept outside Git.
+
+The rehearsal script now pins all 17 reviewed files, refuses preexisting report
+objects or successful migration history, checks all 22 mapped run columns and
+verifies the enabled purge trigger/function binding. An actual local schema-only
+17-file rehearsal passed, including its independent backup/restore count check.
+This contains no customer rows and proves neither production-shaped migration
+nor app/permission behavior, media recovery or proxy/service rollback. Reports
+functional, database concurrency and browser verification remain separate gates.
+Production and `socialpilot-deploy` remain legacy.

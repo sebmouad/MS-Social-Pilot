@@ -1,3 +1,5 @@
+import { analyticsReportToolDefinitions, analyticsReportAvailableToolDefinitions, analyticsReportTools, analyticsReportWriteTools, executeAnalyticsReportTool } from '@/modules/analytics/reports/mcp';
+import { ensureReportWorkflows } from '@/server/analytics/report-workflows';
 import { sharingToolDefinitions, sharingTools, sharingWriteTools, executeSharingTool } from '@/modules/sharing/mcp';
 import { SHARING_TOOL_ACCESS, SHARING_FEATURE_ID, BIO_FEATURE_ID } from '@/modules/sharing/semantics';
 import { ensureAdsManagement } from '@/server/ads/management';
@@ -60,7 +62,7 @@ import { platformAds } from '../platforms/registry';
 import { summarizeInsights } from '../ads/summary';
 import { deleteUnusedWorkspaceImage, getWorkspaceImageMetadata, listWorkspaceImages, uploadWorkspaceImage } from '../media/storage';
 
-import { resourceAllowedForScope, scopeRefusalMessage, toolAllowedForScope } from '@/modules/settings/mcp-access/tool-policy';
+import { isResourceRestricted, resourceAllowedForScope, scopeRefusalMessage, toolAllowedForScope } from '@/modules/settings/mcp-access/tool-policy';
 import type { McpIdentity, McpViewer } from './types';
 export type { McpIdentity, McpViewer, McpInstallationViewer } from './types';
 import { rootToolDefinitions, rootTools, canUseRootTool, rootResources, rootResourceTool, runRootTool } from './root-tools';
@@ -103,6 +105,7 @@ const tools = [
   ...tasksToolDefinitions,
   ...sharingToolDefinitions,
   ...analyticsDemographicsToolDefinitions,
+  ...analyticsReportToolDefinitions,
   ...analyticsPinToolDefinitions,
   ...analyticsComparisonToolDefinitions,
   ...teamToolDefinitions,
@@ -172,6 +175,7 @@ const canManageData = (viewer: McpViewer) => viewer.role === 'owner' || viewer.r
 const dataResource = (uri: string) => uri === 'msp://data/deletion-preview';
 
 const toolFeatures: Record<string, string> = {
+  ...Object.fromEntries(analyticsReportToolDefinitions.map(tool => [tool.name, 'analytics/reports'])),
   ...Object.fromEntries(adsManagementToolDefinitions.map(tool => [tool.name, 'ads/campaigns'])),
   ...Object.fromEntries(tasksToolDefinitions.map(tool => [tool.name, TASKS_FEATURE_ID])),
   ...Object.fromEntries(Object.entries(SHARING_TOOL_ACCESS).map(([name, access]) => [name, access.feature])),
@@ -278,6 +282,7 @@ for (const name of notificationWriteTools) writeTools.add(name);
 for (const name of adsManagementWriteTools) writeTools.add(name);
 for (const name of tasksWriteTools) writeTools.add(name);
 for (const name of sharingWriteTools) writeTools.add(name);
+for (const name of analyticsReportWriteTools) writeTools.add(name);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -401,6 +406,11 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
   const cap = viewer.maxResultItems ?? 100;
   const analyticsActor = { userId: viewer.userId, workspaceId: viewer.workspaceId, allowedChannelIds: pageIdsFor(viewer), ...(viewer.allowedAdAccountIds === undefined ? {} : { allowedAdAccountIds: viewer.allowedAdAccountIds }), ...(viewer.adAccountTargetScope ? { adAccountTargetScope: viewer.adAccountTargetScope } : {}), maxResultItems: cap };
   const adsReadActor = adsActorFor(viewer);
+  if (analyticsReportTools.has(name)) {
+    await ensureReportWorkflows();
+    if (!(await analyticsReportAvailableToolDefinitions()).some(tool=>tool.name===name)) throw new OperationError('unavailable','This report action is unavailable right now.');
+    return executeAnalyticsReportTool({...analyticsActor,resourceRestricted:isResourceRestricted(viewer),...(viewer.apiKeyId?{apiKeyId:viewer.apiKeyId}:{}),...(viewer.permissions?{permissionCeiling:viewer.permissions}:{})},name,args);
+  }
   if (analyticsDemographicsTools.has(name)) return executeAnalyticsDemographicsTool(analyticsActor, args);
   if (analyticsPinTools.has(name)) return executeAnalyticsPinTool(analyticsActor, name, args);
   if (analyticsComparisonTools.has(name)) return executeAnalyticsComparisonTool(analyticsActor, args);
@@ -886,8 +896,10 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
   }
   if (method === 'tools/list') {
     if (viewer.scope === 'installation') return reply({ tools: canUseRootTool(viewer) ? rootToolDefinitions : [] });
+    await ensureReportWorkflows();
+    const reportNames=new Set<string>((await analyticsReportAvailableToolDefinitions()).map(tool=>tool.name));
     const invitationsReady = canManageData(viewer) && canUseFeature(viewer.entitlements, 'settings/team') ? await invitationAvailability() : false;
-    return reply({ tools: tools.filter(tool => toolAllowedForScope(viewer, tool.name) && (!collaborationTools.has(tool.name) || availableCollaborationTools().some(available => available.name === tool.name)) && (tool.name !== 'invite_workspace_member' || invitationsReady) && (rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (!teamTools.has(tool.name) || canManageData(viewer)) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (!adsManagerTools.has(tool.name) || canManageData(viewer)) && (!dataTools.has(tool.name) || canManageData(viewer)))) });
+    return reply({ tools: tools.filter(tool => (!analyticsReportTools.has(tool.name) || reportNames.has(tool.name)) && toolAllowedForScope(viewer, tool.name) && (!collaborationTools.has(tool.name) || availableCollaborationTools().some(available => available.name === tool.name)) && (tool.name !== 'invite_workspace_member' || invitationsReady) && (rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (!teamTools.has(tool.name) || canManageData(viewer)) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (!adsManagerTools.has(tool.name) || canManageData(viewer)) && (!dataTools.has(tool.name) || canManageData(viewer)))) });
   }
   if (method === 'tools/call') {
     const name = String(params.name ?? '');
@@ -903,7 +915,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       const args = (params.arguments ?? {}) as Record<string, unknown>;
       if (collaborationTools.has(name) && !availableCollaborationTools().some(tool => tool.name === name)) throw new OperationError('unavailable', 'This action is unavailable.');
       // Data deletion, local Inbox workflow and Tasks own their service-level lock.
-      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !serviceGuardedPublishingTools.has(name) && !teamTools.has(name) && !inboxProductivityWriteTools.has(name) && !workspacePolicyTools.has(name) && !notificationTools.has(name) && !tasksWriteTools.has(name) && !sharingWriteTools.has(name) && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
+      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !serviceGuardedPublishingTools.has(name) && !teamTools.has(name) && !inboxProductivityWriteTools.has(name) && !workspacePolicyTools.has(name) && !notificationTools.has(name) && !tasksWriteTools.has(name) && !sharingWriteTools.has(name) && !analyticsReportWriteTools.has(name) && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
         ? await withWorkspaceOperation(viewer.workspaceId, () => runTool(viewer, name, args))
         : await runTool(viewer, name, args);
       return reply(textResult(result));
@@ -916,6 +928,8 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     }
   }
   if (method === 'resources/list') {
+    if(viewer.scope==='workspace')await ensureReportWorkflows();
+    const reportNames=new Set<string>((await analyticsReportAvailableToolDefinitions()).map(tool=>tool.name));
     if (viewer.scope === 'installation') return reply({ resources: canUseRootTool(viewer) ? rootResources : [] });
     return reply({ resources: [
     { uri: 'msp://workspace', name: 'Workspace', description: 'Current workspace details.', mimeType: 'application/json' },
@@ -926,6 +940,9 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     { uri: 'msp://publishing/templates', name: 'Post templates', description: 'Bounded workspace reusable templates. Continue pages with list_post_templates.', mimeType: 'application/json' },
     { uri: 'msp://publishing/fields', name: 'Custom post fields', description: 'Complete bounded authorized workspace custom field definitions.', mimeType: 'application/json' },
     { uri: 'msp://publishing/labels', name: 'Post labels', description: 'Bounded workspace label directory. Continue pages with list_post_labels.', mimeType: 'application/json' },
+    { uri: 'msp://analytics/reports/templates', name: 'Report templates', description: 'Workspace-wide saved report definitions.', mimeType: 'application/json' },
+    { uri: 'msp://analytics/reports/schedules', name: 'Report schedules', description: 'Current scoped report schedules and authorized recipient metadata.', mimeType: 'application/json' },
+    ...(reportNames.has('list_report_runs') ? [{ uri: 'msp://analytics/reports/runs', name: 'Report history', description: 'Scoped report outcomes and delivery history.', mimeType: 'application/json' }] : []),
     { uri: 'msp://analytics/pins', name: 'Pinned metrics', description: 'Your current scoped pinned metrics and available choices.', mimeType: 'application/json' },
     { uri: 'msp://analytics/demographics', name: 'Audience breakdowns', description: 'Available scoped stored audience categories and coverage.', mimeType: 'application/json' },
     { uri: 'msp://settings/sharing', name: 'Client links', description: 'Bounded workspace client-link metadata; secrets are never listed.', mimeType: 'application/json' },
@@ -943,7 +960,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     { uri: 'msp://data/deletion-preview', name: 'Data deletion preview', description: 'Current workspace record counts before deletion.', mimeType: 'application/json' },
     ...(canUseRootTool(viewer) ? rootResources : []),
   ].filter(resource => {
-    const feature = resource.uri === 'msp://settings/sharing' ? SHARING_FEATURE_ID : resource.uri === 'msp://settings/bio' ? BIO_FEATURE_ID : resource.uri === 'msp://tasks' ? TASKS_FEATURE_ID : resource.uri === 'msp://analytics/pins' ? 'analytics/pins' : resource.uri === 'msp://analytics/demographics' ? 'analytics/demographics' : resource.uri === 'msp://ads/objects' ? 'ads/objects' : resource.uri === 'msp://publishing/fields' ? 'publishing/posts' : resource.uri === 'msp://settings/policies' ? 'settings/workspace' : resource.uri === 'msp://notifications' ? 'settings/notifications' : resource.uri === 'msp://publishing/templates' ? 'publishing/templates' : resource.uri === 'msp://publishing/labels' ? 'publishing/labels' : resource.uri === 'msp://analytics/explorer' ? 'analytics/explorer' : ['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
+    const feature = resource.uri.startsWith('msp://analytics/reports/') ? 'analytics/reports' : resource.uri === 'msp://settings/sharing' ? SHARING_FEATURE_ID : resource.uri === 'msp://settings/bio' ? BIO_FEATURE_ID : resource.uri === 'msp://tasks' ? TASKS_FEATURE_ID : resource.uri === 'msp://analytics/pins' ? 'analytics/pins' : resource.uri === 'msp://analytics/demographics' ? 'analytics/demographics' : resource.uri === 'msp://ads/objects' ? 'ads/objects' : resource.uri === 'msp://publishing/fields' ? 'publishing/posts' : resource.uri === 'msp://settings/policies' ? 'settings/workspace' : resource.uri === 'msp://notifications' ? 'settings/notifications' : resource.uri === 'msp://publishing/templates' ? 'publishing/templates' : resource.uri === 'msp://publishing/labels' ? 'publishing/labels' : resource.uri === 'msp://analytics/explorer' ? 'analytics/explorer' : ['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
     return resourceAllowedForScope(viewer, resource.uri) && (!['msp://settings/team', 'msp://settings/invitations', 'msp://settings/policies'].includes(resource.uri) || canManageData(viewer)) && (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
   }) });
   }
@@ -974,6 +991,9 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       else if (uri === 'msp://publishing/templates') contents = await runTool(viewer, 'list_post_templates', {});
       else if (uri === 'msp://publishing/fields') contents = await runTool(viewer, 'list_custom_fields', {});
       else if (uri === 'msp://publishing/labels') contents = await runTool(viewer, 'list_post_labels', {});
+      else if (uri === 'msp://analytics/reports/templates') contents = await runTool(viewer, 'list_report_templates', {});
+      else if (uri === 'msp://analytics/reports/schedules') contents = await runTool(viewer, 'list_report_schedules', {});
+      else if (uri === 'msp://analytics/reports/runs') contents = await runTool(viewer, 'list_report_runs', {});
       else if (uri === 'msp://analytics/pins') contents = await runTool(viewer, 'get_analytics_pins', {});
       else if (uri === 'msp://analytics/demographics') contents = await runTool(viewer, 'get_analytics_demographics', {});
       else if (uri === 'msp://settings/sharing') contents = await runTool(viewer, 'list_share_links', {});

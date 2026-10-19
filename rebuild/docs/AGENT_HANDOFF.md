@@ -1,8 +1,29 @@
 # Codex and Claude project memory / handoff
 
-Updated: 2026-10-18. This is durable project context, not proof of current runtime
+Updated: 2026-10-19. This is durable project context, not proof of current runtime
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
+
+## Latest verified batch —82 (2026-10-19)
+
+Reports is integrated and locally verified; see REPORT_WORKFLOWS.md. Final
+candidate:2865 tests/331 files, zero skips, build/typecheck,9 actual PostgreSQL
+cases, real local HTTP/MCP/Chromium/SMTP and ZIP export/erasure. Fresh-claim and
+workspace-first maintenance corrections passed post-change checks. Registry74,
+two additive report migrations and17-file schema-only rehearsal. Both Claude
+accounts reviewed. Production/socialpilot-deploy remain legacy; preserve photo
+canary lock. Synthetic Reports examples were inserted twice without replacement.
+
+Next substantial P0 work: Facebook native format engine integration. Existing
+formats source is unregistered/unverified, not ready functionality. Add granular
+neutral contracts, durable migration/recovery and actual UI/API/MCP/Root paths
+only for verified supported operations. Meta developer docs were rate-limited;
+research found official Page Reels lifecycle evidence, while current scheduling,
+scopes/deletion and Stories need stronger evidence. Do not advertise removed
+Groups API. Feeds/AI/media/integrations remain separate unfinished untracked
+batches; do not broad-stage. Reports still lacks several legacy sections/AI recap.
+Complete Root controls, whole-app UX, provider/live and production-shaped
+migration/media/service rollback remain required. Keep the full goal active.
 
 ## Canonical context
 

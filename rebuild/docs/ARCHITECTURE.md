@@ -4,7 +4,7 @@
 
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) is the mandatory target for Codex, Claude and subagents. This file describes implementation and gaps only. Follow [../../AGENTS.md](../../AGENTS.md); do not infer architecture permission from an unfinished boundary.
 
-Updated 2026-10-18. This document distinguishes the intended production architecture from the current rebuild. A component existing in source is not proof that its complete workflow is production-ready.
+Updated 2026-10-19. This document distinguishes the intended production architecture from the current rebuild. A component existing in source is not proof that its complete workflow is production-ready.
 
 ## Structure
 
@@ -1073,3 +1073,31 @@ permissions/confirmations. Source inventory confirms this remains unintegrated.
 Do not include unrelated untracked integrations automatically. Full Facebook
 live coverage/photo cleanup, complete Root controls and production-shaped
 migration/media/service rollback remain required. Production stays legacy.
+
+
+## Reports host integration — batch82
+
+Analytics owns the complete report workflow service boundary in
+`modules/analytics/reports`; host `server/analytics/report-workflows.ts` assembles
+shared Analytics generation and transactional mail. `/analytics/reports`, thin
+HTTP routes, six authenticated MCP tools and three resources share these rules.
+A distinct manifest job and consumed Root registry74 controls govern delivery,
+choices and bounds. The existing Analytics CSV exporter remains separate.
+
+Manual downloads use payload-bound retained receipts and current authorization.
+Scheduled sends use fresh one-at-a-time claims, lease fencing, per-recipient
+intents, authority checks and uncertain outcomes without resend. Maintenance
+locks workspaces before report rows and skips erasure. Legacy templates,
+schedules, recipients and aiRecap are preserved by two additive migrations.
+
+Final isolated suite:2865 tests/331 files, zero skips; build/serial typecheck.
+Actual local API/MCP/Chromium/ZIP export/erasure, nine PostgreSQL cases and
+schema-only SMTP capture passed, including final fixes. All disposable data and
+settings cleaned/restored; insert-only synthetic review examples remain by intent.
+17 migrations passed schema-only rehearsal; this is not production-shaped
+migration/media/service rollback. Both Claude accounts contributed independent
+reviews; findings were corrected and verified. See REPORT_WORKFLOWS.md.
+
+Goals/response-time/destinations/top-post report sections and AI recap remain
+incomplete. Whole-tree design audit, full Facebook formats/live coverage, Root
+coverage and other legacy integrations remain open. Production stays legacy.

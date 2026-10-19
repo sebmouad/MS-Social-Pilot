@@ -27,6 +27,11 @@ const dependencies: WorkerDependencies = {
       const result = await resumePendingWorkspaceDataPurges();
       return `examined=${result.examined} completed=${result.completed} failed=${result.failed}`;
     }
+    if (job === 'analyticsReports') {
+      const { runScheduledReports } = await import('../src/server/analytics/report-workflows');
+      const result = await runScheduledReports(now);
+      return Object.entries(result).map(([key, value]) => `${key}=${value}`).join(' ');
+    }
     if (job === 'notifications') {
       const { deliverNotifications } = await import('../src/modules/settings/notifications/delivery');
       const result = await deliverNotifications(now);

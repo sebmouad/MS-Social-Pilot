@@ -1,8 +1,24 @@
 # Shared delivery plan
 
-Updated 2026-10-18. Goal: [GOAL.md](GOAL.md). Mandatory target:
+Updated 2026-10-19. Goal: [GOAL.md](GOAL.md). Mandatory target:
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md). Current evidence and gaps:
 [ARCHITECTURE.md](ARCHITECTURE.md), [LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md).
+
+## Current position —2026-10-19
+
+Reports batch82 verified locally:2865 tests/331 files, zero skips; build/typecheck,
+9 actual PostgreSQL cases, local API/MCP/browser/data and SMTP probes. Two
+migrations preserve existing report definitions;17-file schema-only rehearsal.
+See REPORT_WORKFLOWS.md for exact scope and limits. Production remains legacy.
+
+Next: complete Facebook native Page formats through granular adapter contracts,
+durable intent/receipt/reconciliation and shared UI/API/MCP/Root paths, grounded
+in current official provider evidence. Do not expose unregistered format code
+or claim removed Groups publishing. Then integrate remaining media/feed/AI/
+integration modules as owned, tested batches and finish legacy report sections.
+Continue Root configuration/diagnostics coverage and system UX audit corrections.
+Full provider proof, held-photo resolution, production-shaped migration, media
+restore, single publisher and service/proxy rollback precede any cutover.
 
 ## Delivery method
 

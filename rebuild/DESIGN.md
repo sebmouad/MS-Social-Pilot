@@ -127,3 +127,12 @@ form measure caps apply to fields only. Grid tracks use minmax(0, 1fr) so wide
 tables scroll inside their region on phones. Text/select sizing must not apply
 to nested checkboxes; input widths remain within their field. Settings fallback
 button CSS excludes shared ui-button controls, preserving semantic variants.
+
+Reports (batch82) use the same contextual sidebar for preparation, creation and
+paging. Templates, schedules and history are separate semantic tables within
+one work area; each table owns narrow-screen horizontal overflow. No third
+menu, wrapping pill group or new visual identity is introduced. Shared Dialog,
+Button, FormValidation, AutoTextarea and RouteNotice retain their established
+roles. Native English selects/date controls are accepted under the existing
+platform-owned popup decision. Preparation offers CSV and a downloaded printable
+page, with explicit UTC periods and honest preparation/delivery status.

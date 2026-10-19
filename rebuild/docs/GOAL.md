@@ -1,6 +1,6 @@
 # Active delivery goal
 
-Updated: 2026-10-17. **Status: active; incomplete.**
+Updated: 2026-10-19. **Status: active; incomplete.**
 
 Rebuild MS Social Pilot in `app/rebuild` as a production-ready modular,
 platform-neutral application with a complete Facebook adapter, branded selectable
@@ -27,3 +27,6 @@ completion. Only an explicit user instruction changes or pauses the objective.
 
 Continue from [DELIVERY_PLAN.md](DELIVERY_PLAN.md) and
 [AGENT_HANDOFF.md](AGENT_HANDOFF.md). These documents are shared by Codex and Claude.
+
+Reports batch82 is verified local progress, not achievement of this full goal.
+See REPORT_WORKFLOWS.md and the current handoff for evidence and next work.

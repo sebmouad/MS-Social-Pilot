@@ -411,3 +411,24 @@ comparison/status/freshness analysis and all-screen accessibility remain open.
 ## Workspace team access — batch 61
 
 Owners and admins can add an existing account, review its role/channel scope, edit another member, or remove workspace access through explicit exact-text confirmation. Changes preserve other workspace memberships. Owner/admin roles have all-channel access; only owners manage owner roles. Pending changes block duplicates and dialogs remain available after uncertain outcomes, with focused feedback and a directory refresh path. The current directory identifies unavailable prior channel grants; editing those grants still needs a clear recovery action before the workflow is complete. MCP uses the same confirmation and domain services. New invitations, account creation, mail and seat-plan policy are not implemented. See TEAM_ACCESS.md and PREVIEW_QA.md.
+
+## Analytics Reports — batch82
+
+Report templates, schedules and run history share `/analytics/reports`, with
+contextual-sidebar actions and independent history paging. Template and schedule
+page state remains in URL parameters. Complete authorized template choices are
+loaded separately from the visible table page; saved unavailable choices remain
+named in edit forms. Creation/edit/deletion use the shared dialog, preserve
+entered values after failure, associate field errors and focus useful feedback.
+Confirmation buttons use action verbs; result messages describe what completed.
+
+Prepare report accepts one selected channel, an optional template and inclusive
+UTC dates. It needs no email transport. Review explicitly says that nothing is
+emailed, and uncertain responses retain the same request UUID for safe retry.
+The CSV receipt validates its name, row count and exact UTF-8 bytes before a
+Blob download; printable HTML is a downloaded artifact. Prepared is distinct
+from scheduled delivery outcomes. Schedules/history remain manageable while
+email delivery is unavailable; new sends are absent until their actual runtime
+requirements are met. History times show the workspace timezone. Domain and
+permission authority is [REPORT_WORKFLOWS.md](docs/REPORT_WORKFLOWS.md); final
+browser/failure-path evidence is still pending for this batch.

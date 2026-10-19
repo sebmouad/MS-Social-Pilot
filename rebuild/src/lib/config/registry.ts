@@ -1,3 +1,5 @@
+import { REPORT_WORKFLOW_CONFIG } from '@/modules/analytics/reports/config';
+import { REPORT_UI_CONFIG, REPORT_HOST_CONFIG } from '@/modules/analytics/report-ui-config';
 import { SHARING_CONFIG } from '@/modules/sharing/config';
 import { AGENCY_CONFIG } from '@/modules/agency/config';
 import { z } from 'zod';
@@ -8,7 +10,7 @@ import { configurationOwner } from './ownership';
 import { WORKSPACE_JOB_ACCESS_DEFAULTS, WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, WORKSPACE_JOB_OWNER_POLICY_SCHEMA } from '@/server/jobs/access-policy';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 73;
+export const CONFIG_SCHEMA_VERSION = 74;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -49,6 +51,9 @@ export const CONFIG_REGISTRY = [
   ...DEMOGRAPHICS_CONFIG,
   ...PINNED_METRIC_CONFIG,
   ...COMPARISON_CONFIG,
+  ...REPORT_WORKFLOW_CONFIG,
+  ...REPORT_UI_CONFIG,
+  ...REPORT_HOST_CONFIG,
   ...SETTINGS_CONFIG,
   ...SETTINGS_INVITATION_CONFIG,
   ...TEMPLATE_CONFIG,

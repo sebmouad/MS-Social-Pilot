@@ -21,6 +21,7 @@ const resourceScopedTools: ReadonlySet<string> = new Set([
   'moderate_inbox_comment', 'get_inbox_productivity', 'assign_inbox_item', 'add_inbox_private_note', 'delete_inbox_private_note',
   // Analytics and Ads reads and spend-bound writes that carry the ceiling.
   'get_analytics_overview', 'get_analytics_metric_details', 'get_analytics_demographics', 'compare_analytics', 'get_analytics_explorer',
+  'list_report_schedules', 'manage_report_schedule', 'list_report_runs', 'generate_report',
   'get_analytics_pins', 'pin_analytics_metric', 'unpin_analytics_metric', 'reorder_analytics_pins',
   'list_ad_accounts', 'get_ad_creation_options', 'get_ads_performance', 'get_ads_report_rows', 'export_ads_report', 'compare_ads_performance',
   'list_ads_objects', 'get_ads_object', 'get_live_ad_status', 'create_ad_campaign', 'create_ad_set', 'update_ad',
@@ -37,6 +38,7 @@ const resourceScopedTools: ReadonlySet<string> = new Set([
 const workspaceWideTools: ReadonlySet<string> = new Set([
   // Tasks are workspace records; a post ceiling redacts their links, not their own content.
   'list_tasks', 'get_task', 'create_task', 'create_task_checklist', 'update_task', 'move_task', 'delete_task', 'add_task_comment', 'delete_task_comment',
+  'list_report_templates', 'manage_report_template',
   'list_workspace_images', 'get_workspace_image', 'delete_workspace_image', 'upload_workspace_image',
   'list_post_templates', 'create_post_template', 'update_post_template', 'delete_post_template',
   'list_post_labels', 'create_post_label', 'update_post_label', 'delete_post_label', 'list_post_label_choices',
@@ -55,6 +57,7 @@ const workspaceWideTools: ReadonlySet<string> = new Set([
 
 const resourceScopedResources: ReadonlySet<string> = new Set([
   'msp://workspace', 'msp://targets', 'msp://posts', 'msp://inbox', 'msp://settings/sharing',
+  'msp://analytics/reports/schedules', 'msp://analytics/reports/runs',
   'msp://analytics/overview', 'msp://analytics/pins', 'msp://analytics/demographics', 'msp://analytics/explorer',
   'msp://ads/objects', 'msp://ads/performance', 'msp://ads/daily',
 ]);
