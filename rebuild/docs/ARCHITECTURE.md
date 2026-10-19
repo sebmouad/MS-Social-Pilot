@@ -1142,7 +1142,9 @@ migration/media/service rollback. Both Claude accounts contributed independent
 reviews; findings were corrected and verified. See REPORT_WORKFLOWS.md.
 
 Response-time, top-post and goals report sections now exist (wave 2; Goals also has
-/analytics/goals, API and MCP). Destinations section and AI recap remain
+/analytics/goals, API and MCP). Destinations section and JSON export added
+(REPORT_WORKFLOWS.md). Media library: MEDIA_LIBRARY.md; composer AI assist:
+AI_ASSIST.md (registry 83). AI recap remains
 incomplete. Whole-tree design audit, full Facebook formats/live coverage, Root
 coverage and other legacy integrations remain open. Production stays legacy.
 

@@ -746,3 +746,18 @@ aggregators: parallel sessions no longer need to edit them per capability (only
 belong in `modules/publishing/mcp.ts` (media holder visibility) and
 `modules/publishing/config.ts` (optional quota key). See ARCHITECTURE.md Structure.
 No behavior change; production remains legacy.
+
+## Wave 2 progress (2026-10-20)
+
+On main, unit-tested with mocked data only (3,229 pass, 205 database tests
+skipped; no PostgreSQL, browser, MCP-with-real-keys or live-provider run):
+Goals (`03adea6d`), Ads comparison parity (`54aa606c`), Reports Destinations
+section and JSON export (`0e318bc0`), Media library at `/publishing/media`
+(`c988335b`, MEDIA_LIBRARY.md), composer AI assist (`036a7c39`, AI_ASSIST.md).
+Registry 83. AI assist is off by default and needs an Anthropic key in Root.
+
+Next: AI recap report section via `summarize` in `modules/ai/server/ai.ts`;
+real-PostgreSQL and browser runs of waves 1–2; business-hours response time;
+then wave 3 (auth/onboarding, feeds and integrations WIP, agency extras, owner
+export). The untracked feeds/integrations/webhooks/API-access WIP in the main
+checkout is still unintegrated; its media and AI parts are superseded by main.
