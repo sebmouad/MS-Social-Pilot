@@ -1,19 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { OperationError } from '../src/lib/operation-error';
 import { PrismaClient } from '../generated/client';
 
 const databaseUrl = process.env.REBUILD_PREVIEW_DATABASE_URL;
 const integration = vi.hoisted(() => ({
   prisma: null as unknown as PrismaClient,
+  jobAccess: vi.fn(async () => {}),
   adapter: null as unknown as { publish: ReturnType<typeof vi.fn>; publishFirstComment: ReturnType<typeof vi.fn>; classifyPublishingFailure: ReturnType<typeof vi.fn>; supportsTargetKind: ReturnType<typeof vi.fn>; publishingMedia: { kinds: readonly ('image' | 'video')[]; maxImages: number | null; maxVideos: number | null; mixedKinds: boolean; linkWithMedia: boolean; imageAltText: boolean }; publishingFormats: readonly unknown[]; defaultPublishingFormatId: string },
 }));
 
+vi.mock('../src/server/jobs/access', () => ({ assertWorkspaceJobAccess: integration.jobAccess }));
 vi.mock('../src/server/data', () => ({ get prisma() { return integration.prisma; } }));
 vi.mock('../src/server/config/store', () => ({
   runtimeConfig: async (key: string) => ({
     'publishing.operationTimeoutMs': 60000, 'publishing.operationMaxWaitMs': 2000,
     'publishing.transactionTimeoutMs': 15000, 'publishing.transactionMaxWaitMs': 5000,
-    'publishing.maxTargetsPerOperation': 5000, 'publishing.identifierMaxCharacters': 200,
+    'publishing.maxTargetsPerOperation': 5000, 'publishing.identifierMaxCharacters': 200, 'publishing.maxFirstCommentDelayMinutes': 10080,
     'publishing.maxMessageCharacters': 10000, 'publishing.maxRemoteMediaPerPost': 4,
     'publishing.maxImageAltCharacters': 500, 'data.workspaceOperationTimeoutMs': 300000,
     'data.workspaceOperationLockWaitMs': 30000,
@@ -62,7 +65,7 @@ describe.skipIf(!databaseUrl)('first-comment receipt safety on isolated PostgreS
     for (const fixture of fixtures.splice(0)) await cleanup(fixture);
   });
 
-  beforeEach(() => resetAdapter());
+  beforeEach(() => { integration.jobAccess.mockReset().mockResolvedValue(undefined); resetAdapter(); });
 
   afterAll(async () => {
     integration.prisma = client;
@@ -169,6 +172,19 @@ describe.skipIf(!databaseUrl)('first-comment receipt safety on isolated PostgreS
       },
     }) as PrismaClient;
   }
+
+  it('requires current owner job access for an inline comment after scheduled publication', async () => {
+    const fixture = await createFixture();
+    const scheduledAt = new Date(Date.now() - 60_000);
+    await client.post.update({ where: { id: fixture.postId }, data: { status: 'scheduled', scheduledAt } });
+    integration.jobAccess.mockRejectedValue(new OperationError('forbidden', 'Automatic workspace access is unavailable.'));
+    const result = await publishPost(fixture.actor, fixture.postId, scheduledAt);
+    expect(result.published).toBe(1);
+    expect(integration.jobAccess).toHaveBeenCalled();
+    expect(integration.adapter.publishFirstComment).not.toHaveBeenCalled();
+    const target = await client.postTarget.findUnique({ where: { id: fixture.postTargetId } });
+    expect(target).toMatchObject({ status: 'published', firstCommentId: null, firstCommentAt: null });
+  });
 
   it('commits the post receipt before comment dispatch and never repeats an ambiguous comment', async () => {
     const fixture = await createFixture();

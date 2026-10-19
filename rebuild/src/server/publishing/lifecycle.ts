@@ -12,6 +12,7 @@ import { readWorkspaceImage } from '@/server/media/storage';
 import { isValidTimeZone, wallTimeToInstant } from '@/lib/calendar-dates';
 import { withPublishingOperation, withPublishingTransaction as publishingTransaction } from '@/modules/publishing/server/guard';
 import { OperationError } from '@/lib/operation-error';
+import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay';
 import { attemptFirstCommentInOperation } from '@/modules/publishing/server/first-comment';
 import { readPublishingCredential } from '@/modules/publishing/server/credentials';
 import { publishDestinationInOperation } from '@/modules/publishing/server/publication';
@@ -32,7 +33,7 @@ export async function limits(): Promise<PublishingLimits> {
   return { maxText: Number(maxText), maxImportRows: Number(maxImportRows), maxImportBytes: Number(maxImportBytes), maxTargets: Number(maxTargets), maxMedia: Number(maxMedia), maxAlt: Number(maxAlt) };
 }
 
-type PostAttachments = { link?: string; media?: PublishMedia[]; destinationFormats?: unknown };
+type PostAttachments = { link?: string; media?: PublishMedia[]; destinationFormats?: unknown; firstCommentDelayMinutes?: unknown };
 const MEDIA_REFERENCE = /^media:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 function storedImageId(media: PublishMedia): string | null {
   return media.kind === 'image' ? MEDIA_REFERENCE.exec(media.url)?.[1] ?? null : null;
@@ -324,6 +325,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
     const holdForApproval = Boolean(input.scheduledAt) && !MANAGERS.has(member.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), member.role);
     const config = await limits();
     const firstComment = validFirstComment(input.firstComment, config.maxText);
+    const firstCommentDelayMinutes = input.firstCommentDelayMinutes === undefined ? undefined : parseFirstCommentDelay(input.firstCommentDelayMinutes, await runtimeConfig('publishing.maxFirstCommentDelayMinutes'));
     const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
     const text = validatePostContent(input.message, config.maxText, attachments);
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
@@ -338,7 +340,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
         const labels = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM labels WHERE id = ${input.labelId} AND "workspaceId" = ${actor.workspaceId} FOR SHARE`;
         if (!labels.length) throw new OperationError('not_found', 'This post label is unavailable in the current workspace.');
       }
-      await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, link: attachments.link, media: attachments.media, status: holdForApproval ? 'pending_approval' : input.scheduledAt ? 'scheduled' : 'draft', scheduledAt: input.scheduledAt ?? null, publishedAt: null, createdAt: now, updatedAt: now,
+      await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, firstCommentDelayMinutes: firstCommentDelayMinutes ?? 0, link: attachments.link, media: attachments.media, status: holdForApproval ? 'pending_approval' : input.scheduledAt ? 'scheduled' : 'draft', scheduledAt: input.scheduledAt ?? null, publishedAt: null, createdAt: now, updatedAt: now,
         targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
       if (input.labelId) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") VALUES (${id}, ${input.labelId})`;
       if (holdForApproval) await setApprovalPending(tx, actor, id);
@@ -356,6 +358,7 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
     await assertPostScope(actor, input.postId);
     const config = await limits();
     const firstComment = validFirstComment(input.firstComment, config.maxText);
+    const firstCommentDelayMinutes = input.firstCommentDelayMinutes === undefined ? undefined : parseFirstCommentDelay(input.firstCommentDelayMinutes, await runtimeConfig('publishing.maxFirstCommentDelayMinutes'));
     const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
     const text = validatePostContent(input.message, config.maxText, attachments);
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
@@ -377,7 +380,7 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
         }
       }
       await tx.postTarget.deleteMany({ where: { postId: existing.id } });
-      await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, link: attachments.link, media: attachments.media, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
+      await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, ...(firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes }), link: attachments.link, media: attachments.media, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
       if (restoreLabelIds) {
         await tx.$executeRaw`DELETE FROM post_labels WHERE "postId" = ${existing.id}`;
         if (restoreLabelIds.length) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") SELECT ${existing.id}, restore_ids.label_id FROM unnest(${[...restoreLabelIds]}::text[]) AS restore_ids(label_id)`;
@@ -395,10 +398,10 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
 }
 
 /** Lifecycle port for version restoration. The save path rechecks current rights and only restores local draft/rejected content. */
-export async function restorePostVersion(input: { actor: PublishingActor; postId: string; snapshot: { message: string; firstComment: string | null; link: string | null; media: unknown; format?: string; destinationFormats?: Record<string,string>; targetIds: string[]; labelIds: string[] } }) {
+export async function restorePostVersion(input: { actor: PublishingActor; postId: string; snapshot: { message: string; firstComment: string | null; firstCommentDelayMinutes?: number; link: string | null; media: unknown; format?: string; destinationFormats?: Record<string,string>; targetIds: string[]; labelIds: string[] } }) {
   if (!Array.isArray(input.snapshot.media)) throw new OperationError('invalid_request', 'This saved version has invalid media and cannot be restored.');
   const result = await updatePost(input.actor, {
-    postId: input.postId, message: input.snapshot.message, firstComment: input.snapshot.firstComment ?? '', link: input.snapshot.link ?? undefined,
+    postId: input.postId, message: input.snapshot.message, firstComment: input.snapshot.firstComment ?? '', firstCommentDelayMinutes: input.snapshot.firstCommentDelayMinutes ?? 0, link: input.snapshot.link ?? undefined,
     media: input.snapshot.media as PublishMedia[], targetIds: input.snapshot.targetIds,
     destinationFormats: input.snapshot.format !== undefined || input.snapshot.destinationFormats !== undefined ? Object.fromEntries(input.snapshot.targetIds.map(id=>[id,input.snapshot.destinationFormats?.[id] ?? input.snapshot.format])) : undefined,
   }, input.snapshot.labelIds);
@@ -465,7 +468,7 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       published++;
       if (post.firstComment?.trim()) {
         try {
-          const comment = await attemptFirstCommentInOperation({ actor, role: role.role, signal }, { postId: post.id, postTargetId: item.id });
+          const comment = await attemptFirstCommentInOperation({ actor, role: role.role, signal, dueAt: new Date(), automatic: expectedScheduledAt !== undefined }, { postId: post.id, postTargetId: item.id });
           if (comment.state === 'needs_review') firstCommentsNeedingReview++;
           else if (comment.state === 'ready') firstCommentsNotSent++;
         } catch {
@@ -495,14 +498,19 @@ export async function importPostsCsv(actor: PublishingActor, csv: string) {
     const rows = parsePublishingCsv(csv);
     if (rows.length < 2 || rows.length > config.maxImportRows + 1) throw new OperationError('invalid_request', `CSV must include a header and contain at most ${config.maxImportRows} posts.`);
     const header = rows[0]!.map(value => value.trim());
-    if ((header.length !== 3 && header.length !== 4) || header[0] !== 'message' || header[1] !== 'firstComment' || header[2] !== 'channels' || (header.length === 4 && header[3] !== 'destinationFormats')) throw new OperationError('invalid_request', 'CSV header must be message,firstComment,channels with optional destinationFormats.');
+    const optionalColumns = header.slice(3);
+    if (header[0] !== 'message' || header[1] !== 'firstComment' || header[2] !== 'channels' ||
+      optionalColumns.some(column => !['destinationFormats', 'firstCommentDelayMinutes'].includes(column)) || new Set(header).size !== header.length)
+      throw new OperationError('invalid_request', 'CSV header must be message,firstComment,channels with optional destinationFormats and firstCommentDelayMinutes.');
+    const formatsColumn = header.indexOf('destinationFormats'), delayColumn = header.indexOf('firstCommentDelayMinutes');
+    const maxCommentDelay = delayColumn >= 0 ? await runtimeConfig('publishing.maxFirstCommentDelayMinutes') : undefined;
     const available = await prisma.target.findMany({ where: { workspaceId: actor.workspaceId, enabled: true, canPublish: true, ...(actor.allowedTargetIds ? { id: { in: [...actor.allowedTargetIds] } } : {}) }, select: { id: true, name: true, type: true, socialAccount: { select: { provider: true } } } });
     const choices = available.map(target => ({ id: target.id, name: target.name, type: target.type, provider: target.socialAccount?.provider ?? null }));
     const inputs = rows.slice(1).map((row, index) => {
       if (row.length !== header.length) throw new OperationError('invalid_request', `CSV row ${index + 2} must match the header columns.`);
       let destinationFormats: unknown;
-      if (header.length === 4 && row[3]?.trim()) { try { destinationFormats = JSON.parse(row[3]); } catch { throw new OperationError('invalid_request', `CSV row ${index + 2} needs a valid destinationFormats JSON object.`); } }
-      return { destinationFormats, message: validText(row[0]!, config.maxText), firstComment: validFirstComment(row[1]!, config.maxText), targetIds: resolveCsvDestinationIds(row[2]!, choices, index + 2) };
+      if (formatsColumn >= 0 && row[formatsColumn]?.trim()) { try { destinationFormats = JSON.parse(row[formatsColumn]); } catch { throw new OperationError('invalid_request', `CSV row ${index + 2} needs a valid destinationFormats JSON object.`); } }
+      return { destinationFormats, firstCommentDelayMinutes: delayColumn < 0 ? 0 : parseFirstCommentDelay(row[delayColumn], maxCommentDelay!), message: validText(row[0]!, config.maxText), firstComment: validFirstComment(row[1]!, config.maxText), targetIds: resolveCsvDestinationIds(row[2]!, choices, index + 2) };
     });
     await lockTargets([...new Set(inputs.flatMap(input => input.targetIds))]);
     const resolvedFormats: Array<Record<string,string>> = [];
@@ -514,7 +522,7 @@ export async function importPostsCsv(actor: PublishingActor, csv: string) {
     const now = new Date();
     const ids = inputs.map(() => randomUUID());
     await publishingTransaction(signal, async tx => {
-      for (const [index, input] of inputs.entries()) await tx.post.create({ data: { id: ids[index]!, workspaceId: actor.workspaceId, authorId: actor.userId, message: input.message, firstComment: input.firstComment, status: 'draft', scheduledAt: null, publishedAt: null, createdAt: now, updatedAt: now,
+      for (const [index, input] of inputs.entries()) await tx.post.create({ data: { id: ids[index]!, workspaceId: actor.workspaceId, authorId: actor.userId, message: input.message, firstComment: input.firstComment, firstCommentDelayMinutes: input.firstCommentDelayMinutes, status: 'draft', scheduledAt: null, publishedAt: null, createdAt: now, updatedAt: now,
         targets: { create: input.targetIds.map(targetId => ({ id: randomUUID(), targetId, formatId: resolvedFormats[index]![targetId], status: 'pending' as const })) } } });
       await audit(tx, actor, 'publishing.posts_imported', { postCount: ids.length, targetCount });
     });

@@ -588,7 +588,7 @@ function createFacebookFirstCommentPublisher(config: FacebookConfig, fetchImpl: 
   return async (request: FirstCommentRequest): Promise<{ remoteId: string }> => {
     if (request.signal?.aborted) throw new FacebookApiError('Facebook operation was cancelled.', 0);
     const text = request.text.trim();
-    if (!request.remotePostId.trim() || !text) throw new FacebookApiError('A Facebook first comment needs a post id and text.', 0);
+    if (!/^[A-Za-z0-9_:-]+$/.test(request.remotePostId) || !text) throw new FacebookApiError('A Facebook first comment needs a post id and text.', 0);
     const remoteId = await createFacebookEngine(config, fetchImpl, request.signal)
       .replyToComment(request.credential.accessToken, request.remotePostId, text);
     if (typeof remoteId !== 'string' || !remoteId.trim()) throw new FacebookApiError('Facebook did not return a first-comment id.', 200);

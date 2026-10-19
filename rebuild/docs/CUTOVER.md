@@ -434,7 +434,7 @@ The reviewed sequence now pins21 files. Migration20,
 `20261019040000_rebuild_facebook_native_status_proofs`, SHA-256
 `253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4`, adds
 provider-owned, append-only Root observations without granting dispatch authority.
-Migration21, `20261019050000_rebuild_publication_submissions`, SHA-256
+Migration21, `20261019050000_rebuild_publication_submissions,20261019060000_rebuild_template_comment_delay`, SHA-256
 `91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931`, extends
 only the shared publication state/reason/receipt CHECKs. A submitted identity is
 held until a matching verified outcome can be recorded and projected separately.
@@ -451,3 +451,12 @@ checks. These are local schema/data checks, not production-shaped customer,
 media, application or service rollback proof. Do not narrow allowed states on a
 rollback while submitted receipts exist or discard their remote identities.
 Production cutover remains blocked on the full release gates above.
+
+
+## Batch94 additive delay checkpoint
+Migration22 adds template/version delay fields; the post field is existing legacy
+metadata newly mapped in rebuild Prisma. SQL is checksum-pinned in the staging
+rehearsal, which passed the complete22-file schema-only path. Fresh local backup,
+actual PostgreSQL workflow and browser/MCP evidence are recorded in
+FIRST_COMMENT_SCHEDULING.md. Local example application and exact107-table/settings cleanup passed; scratch
+removed and backup retained. The complete checkpoint is recorded there. No production migration, proxy/service change or cutover occurred.

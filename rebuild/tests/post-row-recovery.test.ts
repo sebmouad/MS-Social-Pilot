@@ -25,7 +25,7 @@ import { PostRowActions, runDeletePostWithRecovery, runRecordFirstCommentWithRec
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
 const targets = [{ id: 'target-a', name: 'Studio channel', type: 'channel', provider: null, canPublish: true, publishingMedia: { kinds: ['image', 'video'] as const, maxImages: 4, maxVideos: 1, mixedKinds: true, linkWithMedia: true, imageAltText: true }, localImageUpload: { maxBytes: 5000, mimeTypes: ['image/png'] } }];
-const rules = { allowedMimeTypes: ['image/png'], maxUploadBytes: 5000, maxAltCharacters: 120, maxMessageCharacters: 500, maxMedia: 4 };
+const rules = { allowedMimeTypes: ['image/png'], maxUploadBytes: 5000, maxAltCharacters: 120, maxMessageCharacters: 500, maxMedia: 4, maxFirstCommentDelayMinutes: 10080 };
 const post = {
   id: 'post-1', message: 'Saved text', firstComment: 'Saved comment', link: null,
   media: [{ kind: 'image', url: 'media:123e4567-e89b-42d3-a456-426614174000', altText: 'Saved description' }],
@@ -87,7 +87,7 @@ describe('post row recovery', () => {
     expect(send).toBeTruthy();
     await act(async () => send.click());
     const dialog = container.querySelector('dialog')!;
-    const submit = Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Send once')!;
+    const submit = Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Send now')!;
     expect(submit.disabled).toBe(true);
     await act(async () => dialog.querySelector<HTMLInputElement>('input[name="acknowledged"]')!.click());
     await act(async () => submit.click());
@@ -96,6 +96,29 @@ describe('post row recovery', () => {
     expect(submitted.get('acknowledged')).toBe('on');
     expect(container.querySelector('dialog')).toBeTruthy();
     expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/check its current state/i);
+  });
+
+  it('shows a future first-comment due time and makes the immediate manual send explicit', async () => {
+    const dueLater = { ...publishedWithReadyComment, firstCommentDelayMinutes: 15, targets: [{ ...publishedWithReadyComment.targets[0]!, publishedAt: new Date(Date.now() + 60 * 60_000) }] };
+    await act(async () => root.render(createElement(PostRowActions, { post: dueLater, targets, canEdit: true, canPublish: true, imageRules: rules, timeZone: 'UTC' })));
+    expect(container.textContent).toContain('First comment scheduled for');
+    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Send now')).toBe(true);
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Send now')!.click());
+    const dialog = container.querySelector('dialog')!;
+    expect(dialog.textContent).toContain('without waiting for its saved delay');
+    expect(Array.from(dialog.querySelectorAll('button')).some(button => button.textContent === 'Send now')).toBe(true);
+  });
+
+  it('shows a successful immediate send instead of the previous delayed label', async () => {
+    mocks.sendComment.mockResolvedValueOnce({ status: 'success', postId: 'post-1', postTargetId: 'post-target-a', state: 'sent', message: 'Sent.' } as any);
+    const delayed = { ...publishedWithReadyComment, firstCommentDelayMinutes: 15, targets: [{ ...publishedWithReadyComment.targets[0]!, publishedAt: new Date() }] };
+    await act(async () => root.render(createElement(PostRowActions, { post: delayed, targets, canEdit: true, canPublish: true, imageRules: rules, timeZone: 'UTC' })));
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Send now')!.click());
+    const dialog = container.querySelector('dialog')!;
+    await act(async () => dialog.querySelector<HTMLInputElement>('input[name="acknowledged"]')!.click());
+    await act(async () => Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Send now')!.click());
+    expect(container.textContent).toContain('First comment recorded as sent');
+    expect(container.textContent).not.toContain('First comment scheduled for');
   });
 
   it('keeps uncertain comments blocked until a manually verified outcome is acknowledged', async () => {
@@ -130,7 +153,7 @@ describe('post row recovery', () => {
     await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Send first comment')!.click());
     dialog = container.querySelector('dialog')!;
     await act(async () => dialog.querySelector<HTMLInputElement>('input[name="acknowledged"]')!.click());
-    await act(async () => Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Send once')!.click());
+    await act(async () => Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Send now')!.click());
     expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/unconfirmed/i);
     await act(async () => container.querySelector<HTMLButtonElement>('[data-first-comment-cancel]')!.click());
     expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Send first comment')).toBe(false);

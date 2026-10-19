@@ -10,11 +10,13 @@ import { wallTimeToInstant } from '@/lib/calendar-dates';
 import { recordFirstCommentOutcome, sendFirstComment } from '@/modules/publishing/server/first-comment';
 import { finishPostDeletion, getPostDeletion, recordPostDeletionOutcome, type PostDeletionReceipt } from '@/modules/publishing/server/deletion';
 import { parsePublishingMedia } from '@/modules/publishing/media-support';
+import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay';
+import { runtimeConfig } from '@/server/config/store';
 
 const PATH = '/publishing/posts';
 type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published' | 'publish-review' | 'synced' | 'failed';
 
-export type FirstCommentActionState = { status: 'idle' | 'error' | 'success'; message?: string; postId: string; postTargetId: string; state?: 'sent' | 'needs_review' | 'ready'; outcome?: 'sent' | 'not_sent'; remoteId?: string };
+export type FirstCommentActionState = { status: 'idle' | 'error' | 'success'; message?: string; postId: string; postTargetId: string; state?: 'sent' | 'needs_review' | 'ready' | 'scheduled'; outcome?: 'sent' | 'not_sent'; remoteId?: string };
 
 export type ComposerValues = {
   intent: string;
@@ -23,6 +25,7 @@ export type ComposerValues = {
   destinationFormatsJson: string;
   message: string;
   firstComment: string;
+  firstCommentDelayMinutes: string;
   labelId: string;
   link: string;
   imageUrl: string;
@@ -43,7 +46,8 @@ export async function updatePostWithRecoveryAction(previous: PostEditActionState
   try {
     const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
     if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new OperationError('forbidden', 'You cannot manage posts.');
-    await updatePost(actor(viewer), { postId: stringField(data, 'postId'), message: values.message, firstComment: values.firstComment, targetIds: values.targetIds, ...attachments(data) });
+    const firstCommentDelayMinutes = await parsedCommentDelay(values.firstCommentDelayMinutes, data.has('firstCommentDelayMinutes'));
+    await updatePost(actor(viewer), { postId: stringField(data, 'postId'), message: values.message, firstComment: values.firstComment, ...(firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes }), targetIds: values.targetIds, ...attachments(data) });
     refreshPublishing();
   } catch (error) {
     if (isRedirect(error)) throw error;
@@ -117,6 +121,7 @@ export async function createPostWithRecoveryAction(previous: ComposerActionState
     await createPost(actor(viewer), {
       message: values.message,
       firstComment: values.firstComment,
+      firstCommentDelayMinutes: await parsedCommentDelay(values.firstCommentDelayMinutes),
       labelId: values.labelId || null,
       ...attachments(data),
       targetIds: values.targetIds,
@@ -143,7 +148,7 @@ export async function createPostAction(data: FormData) {
       if (!result.ok) throw new Error('Choose a valid publishing time in your workspace time zone.');
       return result.instant;
     })() : undefined;
-    await createPost(postActor, { message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string'), scheduledAt });
+    await createPost(postActor, { message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), firstCommentDelayMinutes: await parsedCommentDelay(stringField(data, 'firstCommentDelayMinutes', true)), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string'), scheduledAt });
     return scheduledAt ? 'scheduled' : 'created';
   });
 }
@@ -151,7 +156,8 @@ export async function createPostAction(data: FormData) {
 export async function updatePostAction(data: FormData) {
   await run(async viewer => {
     const postActor = actor(viewer);
-    await updatePost(postActor, { postId: stringField(data, 'postId'), message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
+    const delay = data.has('firstCommentDelayMinutes') ? await parsedCommentDelay(stringField(data, 'firstCommentDelayMinutes', true)) : undefined;
+    await updatePost(postActor, { postId: stringField(data, 'postId'), message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...(delay === undefined ? {} : { firstCommentDelayMinutes: delay }), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
     return 'updated';
   });
 }
@@ -184,10 +190,10 @@ export async function sendFirstCommentAction(previous: FirstCommentActionState, 
     if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new OperationError('forbidden', 'You cannot manage posts.');
     const result = await sendFirstComment(actor(viewer), { postId, postTargetId });
     refreshPublishing();
-    if (!result || result.ok !== true || result.postId !== postId || result.postTargetId !== postTargetId || !['sent', 'needs_review', 'ready'].includes(result.state)) {
+    if (!result || result.ok !== true || result.postId !== postId || result.postTargetId !== postTargetId || !['sent', 'needs_review', 'ready', 'scheduled'].includes(result.state)) {
       return { status: 'error', postId, postTargetId, state: 'needs_review', message: 'The send result could not be confirmed. Check the platform and current post before another action.' };
     }
-    if (result.state !== 'sent') return { status: 'error', postId, postTargetId, state: result.state, message: result.state === 'needs_review' ? 'The comment result is uncertain. Check the platform before recording an outcome or sending again.' : 'The platform refused this request. The saved comment is ready for a separate send request.' };
+    if (result.state !== 'sent') return { status: 'error', postId, postTargetId, state: result.state, message: result.state === 'needs_review' ? 'The comment result is uncertain. Check the platform before recording an outcome or sending again.' : result.state === 'scheduled' ? 'The saved delay has not passed yet. You can send it now or wait until its scheduled time.' : 'The platform refused this request. The saved comment is ready for a separate send request.' };
     return { status: 'success', postId, postTargetId, state: 'sent', message: 'The first comment was recorded as sent.' };
   } catch (error) {
     if (isRedirect(error)) throw error;
@@ -339,11 +345,16 @@ function failureNotice(error: unknown) {
 function composerValues(data: FormData): ComposerValues {
   const values = (key: string) => { const value = data.get(key); return typeof value === 'string' ? value : ''; };
   return {
-    intent: values('intent'), attachmentKind: values('attachmentKind'), mediaJson: values('mediaJson'), destinationFormatsJson: values('destinationFormatsJson'), message: values('message'), firstComment: values('firstComment'),
+    intent: values('intent'), attachmentKind: values('attachmentKind'), mediaJson: values('mediaJson'), destinationFormatsJson: values('destinationFormatsJson'), message: values('message'), firstComment: values('firstComment'), firstCommentDelayMinutes: values('firstCommentDelayMinutes') || '0',
     link: values('link'), imageUrl: values('imageUrl'), videoUrl: values('videoUrl'), uploadedImageRef: values('uploadedImageRef'),
     altText: values('altText'), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string'),
     scheduleDate: values('scheduleDate'), scheduleTime: values('scheduleTime'), labelId: values('labelId'),
   };
+}
+
+async function parsedCommentDelay(value: string, present = true): Promise<number | undefined> {
+  if (!present) return undefined;
+  return parseFirstCommentDelay(value, Number(await runtimeConfig('publishing.maxFirstCommentDelayMinutes')));
 }
 
 function composerError(error: unknown) {

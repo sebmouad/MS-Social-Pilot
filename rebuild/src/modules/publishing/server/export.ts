@@ -7,7 +7,7 @@ import { publishingPostReadQuery } from './read-query';
 import type { PublishingActor } from './types';
 
 const COLUMNS = [
-  'post_id', 'author_id', 'message', 'first_comment', 'link', 'media_json', 'status',
+  'post_id', 'author_id', 'message', 'first_comment', 'firstCommentDelayMinutes', 'link', 'media_json', 'status',
   'scheduled_at', 'published_at', 'created_at', 'destinations_json',
 ] as const;
 const TOO_LARGE = 'This export exceeds the synchronous limit. Narrow your filters and try again.';
@@ -48,7 +48,7 @@ function safeMedia(value: unknown): Array<{ kind: string; url: string; altText?:
 }
 
 function rowValues(post: {
-  id: string; authorId: string; message: string; firstComment: string | null; format?: string; link: string | null; media: unknown;
+  id: string; authorId: string; message: string; firstComment: string | null; firstCommentDelayMinutes?: number; format?: string; link: string | null; media: unknown;
   status: string; scheduledAt: Date | null; publishedAt: Date | null; createdAt: Date;
   targets: Array<{
     id: string; formatId?: string | null; status: string; remotePostId: string | null; remoteUrl: string | null; firstCommentId: string | null;
@@ -72,7 +72,7 @@ function rowValues(post: {
     },
   }));
   return [
-    post.id, post.authorId, post.message, post.firstComment, post.link,
+    post.id, post.authorId, post.message, post.firstComment, post.firstCommentDelayMinutes ?? 0, post.link,
     JSON.stringify(safeMedia(post.media)), post.status,
     post.scheduledAt, post.publishedAt, post.createdAt, JSON.stringify(destinations),
   ].map(asText);
@@ -128,7 +128,7 @@ export async function exportPublishingPosts(
         where: cursorWhere ? { AND: [query.where, cursorWhere] } : query.where,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take,
         select: {
-          id: true, authorId: true, message: true, firstComment: true, format: true, link: true, media: true,
+          id: true, authorId: true, message: true, firstComment: true, firstCommentDelayMinutes: true, format: true, link: true, media: true,
           status: true, scheduledAt: true, publishedAt: true, createdAt: true,
           targets: { select: {
             id: true, formatId: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true,

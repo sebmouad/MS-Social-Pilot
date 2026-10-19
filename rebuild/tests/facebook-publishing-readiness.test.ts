@@ -130,6 +130,15 @@ describe('Facebook publishing credential readiness', () => {
     await expect(adapter.publishFirstComment!({ credential: granted([]), remotePostId: 'p1_2', text: 'Comment' })).rejects.toThrow(/permission/i);
     expect(fetcher).not.toHaveBeenCalled();
   });
+  it('refuses path-like first-comment identities before network', async () => {
+    const fetcher = vi.fn();
+    const adapter = createFacebookAdapter(config, fetcher as unknown as typeof fetch, { firstCommentScopes: ['comment-write'] });
+    for (const remotePostId of ['.', '..', '../posts', 'post/edge', 'post?x=y']) {
+      await expect(adapter.publishFirstComment!({ credential: granted(['comment-write']), remotePostId, text: 'Comment' })).rejects.toThrow(/post id/i);
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it('keeps adapter operations callable without a receiver object', async () => {
     const adapter = createFacebookAdapter(config, async () => new Response(JSON.stringify({ id: 'p1_2' })), { postPublishScopes: ['publish-write'] });
     const publish = adapter.publish!;

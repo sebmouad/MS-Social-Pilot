@@ -1,3 +1,5 @@
+import { runtimeConfig } from '@/server/config/store';
+import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay';
 import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../generated/client';
@@ -53,9 +55,8 @@ async function prepare(tx: Tx, workspaceId: string, postId: string, feature: Fea
   const policy = policies[0];
   if (!policy || !isValidTimeZone(policy.timezone) || typeof policy.requiresApproval !== 'boolean') throw unavailable();
   const stored = (await tx.$queryRaw<Stored[]>`SELECT format, "approvalStatus"::text AS "approvalStatus", "firstCommentDelayMinutes" FROM posts WHERE id=${postId} AND "workspaceId"=${workspaceId}`)[0];
-  // Delayed comments still require their separate complete lifecycle. Format
-  // compatibility is declared and validated independently for each destination.
-  if (!stored || stored.firstCommentDelayMinutes !== 0) throw unavailable();
+  if (!stored) throw unavailable();
+  parseFirstCommentDelay(stored.firstCommentDelayMinutes, await runtimeConfig('publishing.maxFirstCommentDelayMinutes'));
   const config = await limits();
   const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as unknown as PublishMedia[] }, config.maxMedia, config.maxAlt);
   const message = validatePostContent(replacementText ?? post.message, config.maxText, attachments);
@@ -137,7 +138,7 @@ export const publishingAutomationLifecycle: AutomationLifecycle = {
     const hold = policy.requiresApproval && !reviewed && (!unchanged || !MANAGERS.has(ready.role));
     if (await tx.post.findUnique({ where: { id: input.copyId }, select: { id: true } })) throw unavailable();
     await tx.post.create({ data: { id: input.copyId, workspaceId: input.workspaceId, authorId: post.authorId, message: ready.message,
-      firstComment: ready.firstComment, link: ready.attachments.link, media: ready.attachments.media,
+      firstComment: ready.firstComment, firstCommentDelayMinutes: stored.firstCommentDelayMinutes, link: ready.attachments.link, media: ready.attachments.media,
       status: hold ? 'pending_approval' : 'scheduled', scheduledAt: input.scheduledAt, createdAt: new Date(), updatedAt: new Date(),
       targets: { create: post.targets.map(target => ({ id: randomUUID(), targetId: target.targetId, formatId: ready.destinationFormats[target.targetId], status: 'pending' as const })) } } });
     const metadata = await tx.$executeRaw`UPDATE posts SET timezone=${policy.timezone}, "publishMode"='worker'::"PublishMode", "originPostId"=${post.id}, "approvalStatus"=${hold ? 'pending' : reviewed ? 'approved' : 'not_required'}::"ApprovalStatus", "submittedById"=${hold ? post.authorId : null}, "submittedAt"=${hold ? new Date() : null} WHERE id=${input.copyId} AND "workspaceId"=${input.workspaceId}`;

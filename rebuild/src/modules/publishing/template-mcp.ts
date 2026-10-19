@@ -10,6 +10,7 @@ const templateFields = {
   body: { type: 'string', minLength: 1, maxLength: TEMPLATE_CEILINGS.body },
   hashtags: { type: 'string', maxLength: TEMPLATE_CEILINGS.hashtags },
   firstComment: { type: 'string', maxLength: TEMPLATE_CEILINGS.firstComment },
+  firstCommentDelayMinutes: { type: 'integer', minimum: 0, description: 'Whole minutes before the saved first comment is sent; 0 means immediately after publication.' },
   labelId: { type: ['string', 'null'], maxLength: 80 },
   confirmation: { type: 'string' },
 };

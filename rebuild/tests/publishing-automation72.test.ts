@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   runRecycle: vi.fn(), runMix: vi.fn(),
 }));
 
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'publishing.maxFirstCommentDelayMinutes' ? 10080 : undefined }));
 vi.mock('@/server/data', () => ({ prisma: { $queryRaw: (...args: any[]) => h.state.queryRaw(...args) } }));
 vi.mock('@/server/jobs/access', () => ({ assertWorkspaceJobAccess: (...args: any[]) => h.state.jobAccess(...args) }));
 vi.mock('@/server/entitlements', () => ({ hasPlatformCapability: () => h.state.capability }));
@@ -178,12 +179,16 @@ describe('Publishing automatic lifecycle', () => {
     ]);
   });
 
-  it.each([
-    ['delayed first comment', { format: 'post' }, { firstCommentDelayMinutes: 10 }],
-  ])('refuses recycle with %s before copy creation', async (_label, stored, extra) => {
-    h.state.stored = { approvalStatus: 'approved', ...stored, ...extra } as any;
-    await expect(publishingAutomationLifecycle.recycle(makeTx(), recycleInput())).rejects.toMatchObject({ code: 'conflict' });
+  it.each([-1, 10081])('refuses recycle with delay %s outside the current bound', async delay => {
+    h.state.stored.firstCommentDelayMinutes = delay;
+    await expect(publishingAutomationLifecycle.recycle(makeTx(), recycleInput())).rejects.toMatchObject({ code: 'invalid_request' });
     expect(h.state.create).not.toHaveBeenCalled(); expect(h.recordVersion).not.toHaveBeenCalled();
+  });
+
+  it('preserves the requested delay in recycled posts', async () => {
+    h.state.stored.firstCommentDelayMinutes = 10;
+    await publishingAutomationLifecycle.recycle(makeTx(), recycleInput());
+    expect(h.state.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ firstCommentDelayMinutes: 10 }) }));
   });
 
   it('refuses a deterministic copy collision before creation', async () => {

@@ -11,7 +11,7 @@ fail() { echo "cutover rehearsal: $*" >&2; exit 1; }
 : "${CUTOVER_DUMP_SANITIZED:?Set CUTOVER_DUMP_SANITIZED=YES only after confirming the dump is sanitized}"
 : "${CUTOVER_APPROVED_MIGRATION_SET:?Set CUTOVER_APPROVED_MIGRATION_SET to the reviewed migration set}"
 [ "$CUTOVER_DUMP_SANITIZED" = YES ] || fail "CUTOVER_DUMP_SANITIZED must be YES"
-approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs,20261019050000_rebuild_publication_submissions'
+approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs,20261019050000_rebuild_publication_submissions,20261019060000_rebuild_template_comment_delay'
 [ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
 [ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
 
@@ -50,6 +50,7 @@ verify_migration 20261019020000_rebuild_destination_formats 30325cdda1951cde93fa
 verify_migration 20261019030000_rebuild_facebook_native_journal 3ef505dccb5156ea1d84472998d19fb8427b1232669f57ca98a8ac6cd1e04d46
 verify_migration 20261019040000_rebuild_facebook_native_status_proofs 253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4
 verify_migration 20261019050000_rebuild_publication_submissions 91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931
+verify_migration 20261019060000_rebuild_template_comment_delay 4c2f5699a826b8008003718084ee13eb0e4ee37e8e861ffdaf4a8a0a292bcfc5
 
 # Only loopback TCP or the standard local PostgreSQL socket and database
 # /postgres are accepted. A copied production DATABASE_URL must fail closed.
@@ -110,6 +111,8 @@ BEGIN
      OR to_regprocedure('public.rebuild_facebook_native_status_proofs_guard()') IS NOT NULL
      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_targets' AND column_name = 'formatId')
      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_versions' AND column_name = 'destinationFormats')
+     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_templates' AND column_name = 'firstCommentDelayMinutes')
+     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_versions' AND column_name = 'firstCommentDelayMinutes')
      OR EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'rebuild_workspace_purge_write_gate' AND tgrelid = to_regclass('public.report_runs'))
      OR to_regprocedure('public.rebuild_facebook_media_deletions_binding_immutable()') IS NOT NULL
      OR to_regprocedure('public.rebuild_facebook_media_resolutions_immutable()') IS NOT NULL
@@ -119,9 +122,9 @@ BEGIN
     RAISE EXCEPTION 'staging dump already contains reviewed migration objects; use a pre-migration sanitized baseline';
   END IF;
   IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
-    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
       INTO already_applied
-      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal', '20261019040000_rebuild_facebook_native_status_proofs', '20261019050000_rebuild_publication_submissions';
+      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal', '20261019040000_rebuild_facebook_native_status_proofs', '20261019050000_rebuild_publication_submissions', '20261019060000_rebuild_template_comment_delay';
     IF already_applied THEN
       RAISE EXCEPTION 'staging dump migration history already contains an allowlisted migration';
     END IF;
@@ -152,6 +155,43 @@ psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019020000_rebui
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019030000_rebuild_facebook_native_journal/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019040000_rebuild_facebook_native_status_proofs/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019050000_rebuild_publication_submissions/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019060000_rebuild_template_comment_delay/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+DO $$
+DECLARE
+  token text := replace(gen_random_uuid()::text, '-', '');
+  workspace_id text := 'cutover_comment_delay_' || replace(gen_random_uuid()::text, '-', '');
+  user_id text := 'cutover_comment_delay_user_' || replace(gen_random_uuid()::text, '-', '');
+  post_id text := 'cutover_comment_delay_post_' || replace(gen_random_uuid()::text, '-', '');
+  template_default integer;
+  version_default integer;
+  rejected integer := 0;
+BEGIN
+  INSERT INTO workspaces (id,name,slug,timezone,"createdAt","updatedAt") VALUES (workspace_id,'Comment delay rehearsal',workspace_id,'UTC',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+  INSERT INTO users (id,email,name,"passwordHash","createdAt","updatedAt") VALUES (user_id,token || '@example.test','Comment delay rehearsal','unusable',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+  INSERT INTO posts (id,"workspaceId","authorId",message,format,timezone,"createdAt","updatedAt") VALUES (post_id,workspace_id,user_id,'','post','UTC',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+  INSERT INTO post_templates (id,"workspaceId",name,body,"createdAt","updatedAt") VALUES (token || '_template',workspace_id,token,'',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+  SELECT "firstCommentDelayMinutes" INTO template_default FROM post_templates WHERE id=token || '_template';
+  INSERT INTO post_versions (id,"postId",message,format,timezone,"createdAt") VALUES (token || '_version',post_id,'','post','UTC',CURRENT_TIMESTAMP);
+  SELECT "firstCommentDelayMinutes" INTO version_default FROM post_versions WHERE id=token || '_version';
+  IF template_default <> 0 OR version_default <> 0 THEN RAISE EXCEPTION 'first-comment delay defaults must be zero'; END IF;
+
+  BEGIN
+    UPDATE post_templates SET "firstCommentDelayMinutes"=-1 WHERE id=token || '_template';
+    RAISE EXCEPTION 'negative template delay was accepted';
+  EXCEPTION WHEN check_violation THEN rejected := rejected + 1;
+  END;
+  BEGIN
+    UPDATE post_versions SET "firstCommentDelayMinutes"=-1 WHERE id=token || '_version';
+    RAISE EXCEPTION 'negative version delay was accepted';
+  EXCEPTION WHEN check_violation THEN rejected := rejected + 1;
+  END;
+  IF rejected <> 2 THEN RAISE EXCEPTION 'expected two negative first-comment delays to be rejected, got %', rejected; END IF;
+  RAISE NOTICE 'template and version first-comment delay defaults and checks verified';
+END $$;
+ROLLBACK;
+SQL
 psql "$source_url" -q -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
 DO $$
@@ -229,8 +269,8 @@ BEGIN
     ARRAY['social_accounts','id'], ARRAY['social_accounts','workspaceId'], ARRAY['social_accounts','provider'], ARRAY['social_accounts','providerUserId'], ARRAY['social_accounts','name'], ARRAY['social_accounts','pictureUrl'], ARRAY['social_accounts','accessToken'], ARRAY['social_accounts','refreshToken'], ARRAY['social_accounts','tokenExpiresAt'], ARRAY['social_accounts','scopes'], ARRAY['social_accounts','invalidatedAt'], ARRAY['social_accounts','invalidReason'], ARRAY['social_accounts','createdAt'], ARRAY['social_accounts','updatedAt'],
     ARRAY['targets','id'], ARRAY['targets','workspaceId'], ARRAY['targets','socialAccountId'], ARRAY['targets','type'], ARRAY['targets','providerId'], ARRAY['targets','name'], ARRAY['targets','pictureUrl'], ARRAY['targets','accessToken'], ARRAY['targets','enabled'], ARRAY['targets','canPublish'], ARRAY['targets','createdAt'], ARRAY['targets','updatedAt'],
     ARRAY['page_insights','id'], ARRAY['page_insights','targetId'], ARRAY['page_insights','metric'], ARRAY['page_insights','period'], ARRAY['page_insights','endTime'], ARRAY['page_insights','value'], ARRAY['page_insights','numeric'], ARRAY['page_insights','fetchedAt'],
-    ARRAY['posts','id'], ARRAY['posts','workspaceId'], ARRAY['posts','authorId'], ARRAY['posts','message'], ARRAY['posts','firstComment'], ARRAY['posts','status'], ARRAY['posts','scheduledAt'], ARRAY['posts','publishedAt'], ARRAY['posts','createdAt'], ARRAY['posts','updatedAt'],
-    ARRAY['post_targets','formatId'], ARRAY['post_versions','destinationFormats'],
+    ARRAY['posts','id'], ARRAY['posts','workspaceId'], ARRAY['posts','authorId'], ARRAY['posts','message'], ARRAY['posts','firstComment'], ARRAY['posts','firstCommentDelayMinutes'], ARRAY['posts','status'], ARRAY['posts','scheduledAt'], ARRAY['posts','publishedAt'], ARRAY['posts','createdAt'], ARRAY['posts','updatedAt'],
+    ARRAY['post_templates','firstCommentDelayMinutes'], ARRAY['post_targets','formatId'], ARRAY['post_versions','destinationFormats'], ARRAY['post_versions','firstCommentDelayMinutes'],
     ARRAY['post_targets','id'], ARRAY['post_targets','postId'], ARRAY['post_targets','targetId'], ARRAY['post_targets','status'], ARRAY['post_targets','remotePostId'], ARRAY['post_targets','remoteUrl'], ARRAY['post_targets','firstCommentId'], ARRAY['post_targets','firstCommentAt'], ARRAY['post_targets','firstCommentError'], ARRAY['post_targets','publishedAt'], ARRAY['post_targets','updatedAt'],
     ARRAY['post_comments','id'], ARRAY['post_comments','postTargetId'], ARRAY['post_comments','remoteId'], ARRAY['post_comments','parentRemoteId'], ARRAY['post_comments','message'], ARRAY['post_comments','fromName'], ARRAY['post_comments','fromId'], ARRAY['post_comments','likeCount'], ARRAY['post_comments','replyCount'], ARRAY['post_comments','isHidden'], ARRAY['post_comments','createdTime'], ARRAY['post_comments','fetchedAt'], ARRAY['post_comments','firstSeenAt'], ARRAY['post_comments','resolvedAt'], ARRAY['post_comments','assigneeId'], ARRAY['post_comments','sentById'], ARRAY['post_comments','sentiment'],
     ARRAY['conversations','id'], ARRAY['conversations','targetId'], ARRAY['conversations','remoteId'], ARRAY['conversations','snippet'], ARRAY['conversations','unreadCount'], ARRAY['conversations','messageCount'], ARRAY['conversations','participants'], ARRAY['conversations','updatedTime'], ARRAY['conversations','fetchedAt'], ARRAY['conversations','resolvedAt'], ARRAY['conversations','assigneeId'],

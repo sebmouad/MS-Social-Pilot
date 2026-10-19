@@ -11,6 +11,7 @@ export const TEMPLATE_INPUT_SCHEMA = z.object({
   body: clean(TEMPLATE_CEILINGS.body).refine(value => value.length > 0, 'Enter a message.'),
   hashtags: clean(TEMPLATE_CEILINGS.hashtags).default(''),
   firstComment: clean(TEMPLATE_CEILINGS.firstComment).default(''),
+  firstCommentDelayMinutes: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
   labelId: z.string().max(80).nullable().default(null),
 }).strict();
 export type TemplateInput = z.infer<typeof TEMPLATE_INPUT_SCHEMA>;

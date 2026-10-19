@@ -40,10 +40,10 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
   const { notice, recovery, page: pageParam, status, channel, q, view: viewParam } = await searchParams;
   const view = viewParam === 'feed' || viewParam === 'cards' ? viewParam : 'table';
-  const [allowedMimeTypes, maxUploadBytes, maxAltCharacters, maxMedia] = await Promise.all([
-    runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'), runtimeConfig('publishing.maxRemoteMediaPerPost'),
+  const [allowedMimeTypes, maxUploadBytes, maxAltCharacters, maxMedia, maxFirstCommentDelayMinutes] = await Promise.all([
+    runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'), runtimeConfig('publishing.maxRemoteMediaPerPost'), runtimeConfig('publishing.maxFirstCommentDelayMinutes'),
   ]);
-  const imageRules = { allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMedia: Number(maxMedia) };
+  const imageRules = { allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMedia: Number(maxMedia), maxFirstCommentDelayMinutes: Number(maxFirstCommentDelayMinutes) };
   const requestedPage = pageParam && /^[1-9]\d*$/.test(pageParam) && Number.isSafeInteger(Number(pageParam)) ? Number(pageParam) : 1;
   const selectedStatus = Object.values(PostStatus).find(value => value === status);
   const selectedChannel = channel || undefined;

@@ -47,7 +47,9 @@ const dependencies: WorkerDependencies = {
     if (job === 'posts') {
       const due = await publishDuePosts(now);
       const remote = await runEnabledPlatformJob('posts', now, retryLimit, retryBackoff);
-      return `due=${due.examined}/${due.updated} platform=${remote.examined}/${remote.updated} skipped=${due.skipped + remote.skipped} failed=${due.failed + remote.failed}`;
+      const { runDueFirstComments } = await import('../src/modules/publishing/server/first-comment-jobs');
+      const comments = await runDueFirstComments(new Date());
+      return `due=${due.examined}/${due.updated} platform=${remote.examined}/${remote.updated} comments=${comments.examined}/${comments.sent} held=${comments.held} skipped=${due.skipped + remote.skipped + comments.skipped} failed=${due.failed + remote.failed + comments.failed}`;
     }
     if (job === 'analytics') {
       const result = await runEnabledPlatformJob('analytics', now, retryLimit, retryBackoff);

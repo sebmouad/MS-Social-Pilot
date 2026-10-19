@@ -349,6 +349,7 @@ model Post {
   authorId    String
   message     String
   firstComment String?
+  firstCommentDelayMinutes Int @default(0)
   /// Existing legacy column; opaque module format identity, not interpreted by the shared core.
   format      String       @default("post")
   link        String?

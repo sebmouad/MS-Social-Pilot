@@ -78,8 +78,8 @@ export async function readPublishingPostList(actor: PublishingActor, input: unkn
     ...(statuses.length ? [{ status: { in: statuses } }] : []),
     ...(from || to ? [{ scheduledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }] : [])] };
   const posts = await prisma.post.findMany({ where, orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }], take: limit,
-    select: { id: true, authorId: true, message: true, firstComment: true, format: true, link: true, media: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true,
-      targets: { select: { id: true, formatId: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true,
+    select: { id: true, authorId: true, message: true, firstComment: true, firstCommentDelayMinutes: true, format: true, link: true, media: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true,
+      targets: { select: { id: true, formatId: true, status: true, remotePostId: true, remoteUrl: true, publishedAt: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true,
         target: { select: { id: true, type: true, name: true } } } } } });
   return posts.map(post => ({ ...post, targets: post.targets.map(row => ({ ...row, firstCommentError: row.firstCommentError === FIRST_COMMENT_REJECTED ? FIRST_COMMENT_REJECTED : row.firstCommentError ? 'review_required' : null })) }));
 }

@@ -491,3 +491,13 @@ are separate steps and surfaces. A provider submission, valid ID, or URL alone
 does not show a live post. Root browser verification passed16 views across four themes/two widths,
 including focus, fixed IDs and viewport fit. Customer recovery component tests
 passed; its full browser matrix remains separate; see [ASYNC_PUBLICATION_RECEIPTS.md](docs/ASYNC_PUBLICATION_RECEIPTS.md).
+
+
+## First-comment timing (batch94)
+Composer/edit/template fields expose Root-bounded whole minutes, zero after
+confirmed publication. Each destination uses its own publication time. Posts
+show saved timing and an acknowledged Send now action; uncertain attempts remain
+blocked for outcome recording. A successful local send replaces the prior
+scheduled label. Numeric bounds, keyboard focus, mobile navigation closure and
+themed layout have local probe evidence in docs/FIRST_COMMENT_SCHEDULING.md;
+live-provider/native-format and full-app UX clearance remain separate.

@@ -1375,3 +1375,14 @@ Production, the held photo canary and the current private native-format switch
 remain unchanged. Full customer browser matrix, first-comment continuation,
 automatic native host dispatch, safe deletion/live-provider evidence, broader
 legacy parity and production-shaped rollback/cutover remain open.
+
+
+## Delayed first comments (batch94)
+
+The Publishing module now owns neutral due-comment scanning and receipt-safe
+continuation through the existing posts job. Root controls delay bounds/cursor
+(registry79); saved authoring, templates, versions, duplicate/recycle and exports
+carry the delay. Automatic delivery requires both current qualifying-owner access
+and the original author's own authority; UI/MCP manual send and recovery use the
+same guarded service. Native formats remain disabled. Scope, migration22, local
+evidence and remaining gates: [FIRST_COMMENT_SCHEDULING.md](FIRST_COMMENT_SCHEDULING.md).

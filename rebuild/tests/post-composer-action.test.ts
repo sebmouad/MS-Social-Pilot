@@ -11,6 +11,7 @@ const deps = vi.hoisted(() => ({
 
 vi.mock('../src/server/context', () => ({ requireViewer: deps.requireViewer }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: deps.canAccessFeature }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'publishing.maxFirstCommentDelayMinutes' ? 10080 : undefined }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: deps.withWorkspaceOperation }));
 vi.mock('../src/server/publishing/lifecycle', () => ({
   createPost: deps.createPost,
@@ -50,6 +51,21 @@ describe('recoverable post composer action', () => {
     const media = [{ kind: 'image', url: 'https://cdn.test/cover.jpg', altText: 'Cover artwork' }];
     await expect(createPostWithRecoveryAction({ status: 'idle', values: {} }, formData({ intent: 'draft', message: '', firstComment: 'Useful follow-up', mediaJson: JSON.stringify(media), targetIds: [] }))).resolves.toMatchObject({status:'success',destination:'/publishing/posts?notice=created'});
     expect(deps.createPost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ message: '', media, firstComment: 'Useful follow-up' }));
+  });
+
+  it('passes the configured whole-minute first-comment delay and retains it on recoverable failure', async () => {
+    deps.createPost.mockRejectedValueOnce(new Error('temporary save failure'));
+    const data = formData({ intent: 'draft', message: 'A draft', firstComment: 'A follow-up', firstCommentDelayMinutes: '37', targetIds: [] });
+    const result = await createPostWithRecoveryAction({ status: 'idle', values: {} }, data);
+    expect(deps.createPost).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ firstCommentDelayMinutes: 37 }));
+    expect(result.values.firstCommentDelayMinutes).toBe('37');
+  });
+
+  it.each(['-1', '1.5', '10081', 'not a number'])('rejects an invalid first-comment delay %s before saving', async delay => {
+    const result = await createPostWithRecoveryAction({ status: 'idle', values: {} }, formData({ intent: 'draft', message: 'A draft', firstComment: 'A follow-up', firstCommentDelayMinutes: delay, targetIds: [] }));
+    expect(result.status).toBe('error');
+    expect(result.values.firstCommentDelayMinutes).toBe(delay);
+    expect(deps.createPost).not.toHaveBeenCalled();
   });
 
   it('explains empty-content refusal and retains the first comment for correction', async () => {

@@ -12,7 +12,7 @@ export function readPublishingCredential(target: CredentialTarget, adapter: Pick
   try {
     const accessToken = decryptSecret(target.accessToken);
     if (!accessToken.trim()) return null;
-    const credential = { accessToken, grantedScopes: source.scopes.split(',').map(scope => scope.trim()).filter(Boolean) };
+    const credential = { accessToken, grantedScopes: source.scopes.split(/[\s,]+/).map(scope => scope.trim()).filter(Boolean) };
     return adapter.canUseCredential?.(credential, operation) === false ? null : credential;
   } catch {
     // Invalid encryption or an unavailable adapter policy is not permission to dispatch.

@@ -1,5 +1,6 @@
 import { REPORT_WORKFLOW_CONFIG } from '@/modules/analytics/reports/config';
 import { REPORT_UI_CONFIG, REPORT_HOST_CONFIG } from '@/modules/analytics/report-ui-config';
+import { FIRST_COMMENT_CONFIG } from '@/modules/publishing/first-comment-config';
 import { SHARING_CONFIG } from '@/modules/sharing/config';
 import { AGENCY_CONFIG } from '@/modules/agency/config';
 import { z } from 'zod';
@@ -10,7 +11,7 @@ import { configurationOwner } from './ownership';
 import { WORKSPACE_JOB_ACCESS_DEFAULTS, WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, WORKSPACE_JOB_OWNER_POLICY_SCHEMA } from '@/server/jobs/access-policy';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 78;
+export const CONFIG_SCHEMA_VERSION = 79;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -70,6 +71,7 @@ export const CONFIG_REGISTRY = [
   ...QUEUE_CONFIG,
   ...TASKS_CONFIG,
   ...AGENCY_CONFIG,
+  ...FIRST_COMMENT_CONFIG,
   ...SHARING_CONFIG,
   entry({ key: 'jobs.workspaceOwnerPolicy', group: 'Jobs · Authorization', label: 'Workspace sync owner access', kind: 'select', description: 'Automatic provider reads require qualifying feature and platform access from the same active workspace owner. Any owner is the default; All owners is stricter. Root inspection never bypasses customer suspension.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerPolicy, schema: WORKSPACE_JOB_OWNER_POLICY_SCHEMA, consumption: 'active', options: [{ value: 'any_active_owner', label: 'Any active owner qualifies' }, { value: 'all_active_owners', label: 'All active owners qualify' }] }),
   entry({ key: 'jobs.workspaceOwnerLimit', group: 'Jobs · Authorization', label: 'Workspace sync owner check limit', kind: 'number', description: 'Maximum active owners inspected per workspace synchronization check. Larger owner sets are refused rather than authorized from a partial subset.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerLimit, schema: WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, consumption: 'active' }),

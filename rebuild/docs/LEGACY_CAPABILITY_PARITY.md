@@ -227,3 +227,19 @@ Chromium/SMTP passed. Two additive migrations passed backup/restore and the
 17-file schema-only rehearsal. This closes those report workflow slices only.
 Remaining sections/AI recap, full Facebook engine, complete Root coverage and
 production-shaped rollback/cutover remain required. See REPORT_WORKFLOWS.md.
+
+
+### Batch94 P1 first-comment timing checkpoint
+Root-bounded delays now flow through composer/edit/CSV/template, duplication,
+recycle, version save/restore, scoped UI/MCP reads and export. A neutral worker
+continues due comments after confirmed per-destination publication, including
+asynchronous status reconciliation. Scheduled inline comments enforce current
+owner job access in addition to the original author. Attempts commit before
+dispatch; uncertain/rejected results cannot auto-retry, malformed successful
+responses cannot release a claim, and valid IDs can survive operation cancellation.
+Local PostgreSQL,3216 tests, build/typecheck and four-theme/two-width Chromium/MCP
+evidence are scoped in FIRST_COMMENT_SCHEDULING.md. This closes the local delayed-
+comment implementation gap for the current supported format; native formats,
+full live-provider delivery and broader publication/deletion release gates remain
+open. Persistent receipt-storage failures remain held without a guaranteed
+late-fact append; do not describe the entire Publishing/Facebook engine as done.

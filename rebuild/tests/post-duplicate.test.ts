@@ -26,7 +26,7 @@ vi.mock('../src/modules/publishing/server/read-scope', () => ({
 
 import { duplicatePost } from '../src/modules/publishing/server/duplicate';
 
-const source = (overrides: Record<string, unknown> = {}) => ({ id: 'source-1', workspaceId: 'workspace-1', authorId: 'user-1', format: 'example-opaque-format', message: 'Source message', firstComment: 'First comment', link: null, media: [], status: 'published', scheduledAt: null, publishedAt: new Date(), targets: [{ targetId: 'target-1', status: 'published', remotePostId: 'remote-1' }], ...overrides });
+const source = (overrides: Record<string, unknown> = {}) => ({ id: 'source-1', workspaceId: 'workspace-1', authorId: 'user-1', format: 'example-opaque-format', message: 'Source message', firstComment: 'First comment', firstCommentDelayMinutes: 42, link: null, media: [], status: 'published', scheduledAt: null, publishedAt: new Date(), targets: [{ targetId: 'target-1', status: 'published', remotePostId: 'remote-1' }], ...overrides });
 const args = (postId = 'source-1', requestId = '11111111-1111-4111-8111-111111111111') => ({ postId, requestId, confirmation: `DUPLICATE POST ${postId}` });
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
 
@@ -109,6 +109,12 @@ describe('duplicatePost', () => {
       await duplicatePost(actor, args());
       expect(db.postCreate.mock.calls.at(-1)?.[0].data).toMatchObject({ message: '', link: attachments.link, media: attachments.media });
     }
+  });
+
+  it('preserves the first-comment delay when creating an unscheduled copy', async () => {
+    state.source = source({ firstCommentDelayMinutes: 42 });
+    await duplicatePost(actor, args());
+    expect(db.postCreate.mock.calls.at(-1)?.[0].data.firstCommentDelayMinutes).toBe(42);
   });
 
   it('records the initial copy in the guarded transaction before claiming its receipt', async () => {

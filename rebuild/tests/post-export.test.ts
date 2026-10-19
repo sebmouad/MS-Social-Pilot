@@ -12,7 +12,7 @@ import { OperationError } from '../src/lib/operation-error';
 
 const actor = { userId: 'user-a', workspaceId: 'workspace-a', allowedTargetIds: ['channel-a'] };
 const post = (overrides: Record<string, unknown> = {}) => ({
-  id: 'post-a', authorId: 'user-a', message: 'Hello, world', firstComment: null, link: null,
+  id: 'post-a', authorId: 'user-a', message: 'Hello, world', firstComment: null, firstCommentDelayMinutes: 0, link: null,
   media: [{ kind: 'image', url: 'https://example.test/a.jpg', altText: 'Photo' }], status: 'published',
   scheduledAt: null, publishedAt: new Date('2026-10-01T12:00:00.000Z'), createdAt: new Date('2026-09-30T12:00:00.000Z'),
   targets: [{ id: 'post-target-a', status: 'published', remotePostId: 'remote-a', remoteUrl: 'https://example.test/post', firstCommentId: null,
@@ -43,13 +43,14 @@ describe('Publishing posts CSV export', () => {
     expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ workspaceId: 'workspace-a' }), take: 100,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: expect.objectContaining({ id: true, message: true, firstComment: true, media: true, targets: expect.any(Object) }),
+      select: expect.objectContaining({ id: true, message: true, firstComment: true, firstCommentDelayMinutes: true, media: true, targets: expect.any(Object) }),
     }));
     expect(result).toMatchObject({ format: 'ms-social-pilot-posts-csv', version: 1, fileName: 'posts.csv', postCount: 1, filters: { q: 'HELLO', status: 'published', channelId: 'channel-a' }, channelUnavailable: false });
     expect(result.byteLength).toBe(Buffer.byteLength(result.csv, 'utf8'));
     expect(result.csv.split('\r\n')).toHaveLength(3);
     expect(result.csv).toContain('Channel A');
     expect(result.csv).toContain('remote-a');
+    expect(result.csv.split('\r\n')[0]).toContain('firstCommentDelayMinutes');
     expect(result.csv).not.toContain('firstCommentError');
     expect(mocks.transactionOptions).toMatchObject({ isolationLevel: 'RepeatableRead', timeout: 15000, maxWait: 5000 });
   });
@@ -66,6 +67,13 @@ describe('Publishing posts CSV export', () => {
     expect(result.csv).toContain('needs_review');
     expect(result.csv).toContain('true');
     expect(result.csv).not.toMatch(/private provider response|secret/);
+  });
+
+  it('exports the configured first-comment delay as a distinct field', async () => {
+    mocks.findMany.mockResolvedValue([post({ firstComment: 'Follow up', firstCommentDelayMinutes: 45 })]);
+    const result = await exportPublishingPosts(actor);
+    expect(result.csv.split('\r\n')[0]).toContain('firstCommentDelayMinutes');
+    expect(result.csv.split('\r\n')[1]).toContain('"45"');
   });
 
   it('refuses the whole export when matching posts exceed the configured ceiling', async () => {

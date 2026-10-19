@@ -20,11 +20,12 @@ import { QueuePostButton } from './QueuePostButton';
 import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
 import { publishingMediaIssue } from '@/modules/publishing/media-support';
 import type { PublishingFormatDescriptor, PublishingMediaSupport } from '@/platforms/types';
+import { formatPostPreviewTime } from '@/components/PostPreview';
 
 type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
 type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean; publishingMedia?: PublishingMediaSupport; publishingFormats?: readonly PublishingFormatDescriptor[]; defaultPublishingFormatId?: string; localImageUpload?: LocalImageUpload };
-type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number; maxMedia: number };
-type PostRow = { format?: string; id: string; message: string; firstComment: string | null; link: string | null; media: Array<{kind: string; url: string; altText?: string}>; status: string; publishedAt: Date | null; targets: Array<{ id: string; formatId?: string | null; status: string; remotePostId: string | null; firstCommentId?: string | null; firstCommentAt?: Date | string | null; firstCommentError?: string | null; target: { id: string; name?: string | null } }> };
+type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number; maxMedia: number; maxFirstCommentDelayMinutes: number };
+type PostRow = { format?: string; id: string; message: string; firstComment: string | null; firstCommentDelayMinutes?: number; link: string | null; media: Array<{kind: string; url: string; altText?: string}>; status: string; publishedAt: Date | null; targets: Array<{ id: string; formatId?: string | null; status: string; remotePostId: string | null; publishedAt?: Date | string | null; firstCommentId?: string | null; firstCommentAt?: Date | string | null; firstCommentError?: string | null; target: { id: string; name?: string | null } }> };
 
 const MEDIA_KINDS = ['image', 'video'] as const;
 
@@ -101,7 +102,7 @@ export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
     } else setError('');
   }}>
     <label htmlFor="posts-csv">Import posts from CSV</label>
-    <p className={styles.help}>Required header: <code>message,firstComment,channels</code>. Use the channel labels below; separate multiple channels with semicolons. Leave channels empty to import a local draft. Imported posts remain drafts.</p>
+    <p className={styles.help}>Required header: <code>message,firstComment,channels</code>. Optional: <code>firstCommentDelayMinutes</code> (whole minutes; defaults to 0). Use the channel labels below; separate multiple channels with semicolons. Leave channels empty to import a local draft. Imported posts remain drafts.</p>
     <ul className={styles.targetReference}>{targets.filter(target => target.canPublish).map(target => <li key={target.id}>{csvDestinationLabel(target)}</li>)}</ul>
     <input id="posts-csv" type="file" name="csv" accept=".csv,text/csv" required aria-invalid={Boolean(error)} aria-describedby={error ? 'posts-csv-error' : undefined} />
     {error && <p id="posts-csv-error" className={styles.formError}>{error}</p>}
@@ -142,14 +143,14 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules,
     <PublicationRecovery postId={post.id} excerpt={post.message} targets={post.targets.map(item => ({ id: item.id, name: item.target.name, status: item.status, remotePostId: item.remotePostId }))} />
     {post.firstComment?.trim() ? <section className={styles.help} aria-label="First comment status">
       <strong>First comment delivery</strong>
-      {post.targets.map(target => <FirstCommentControl key={target.id} postId={post.id} postComment={post.firstComment!} target={target} />)}
+      {post.targets.map(target => <FirstCommentControl key={target.id} postId={post.id} postComment={post.firstComment!} delayMinutes={post.firstCommentDelayMinutes ?? 0} timeZone={timeZone} target={target} />)}
     </section> : null}
     <Button variant="danger" size="sm" type="button" disabled={rowPending} onClick={() => setDeleteOpen(true)}>Delete locally</Button>
     {deleteOpen && <PostDeleteDialog postId={post.id} postMessage={post.message} hasRemote={hasRemote} onDismiss={() => setDeleteOpen(false)} onPendingChange={setDeletePending} />}
   </div>;
 }
 
-function FirstCommentControl({ postId, postComment, target }: { postId: string; postComment: string; target: PostRow['targets'][number] }) {
+function FirstCommentControl({ postId, postComment, delayMinutes, timeZone, target }: { postId: string; postComment: string; delayMinutes: number; timeZone: string; target: PostRow['targets'][number] }) {
   const [mode, setMode] = useState<'send' | 'record' | null>(null);
   const [localState, setLocalState] = useState<FirstCommentActionState['state'] | null>(null);
   const controlRef = useRef<HTMLDivElement>(null);
@@ -164,17 +165,24 @@ function FirstCommentControl({ postId, postComment, target }: { postId: string; 
     }
   }, [mode]);
   const displayState = localState ?? state;
+  const publishedAt = target.publishedAt ? new Date(target.publishedAt) : null;
+  const dueAt = publishedAt && Number.isFinite(publishedAt.getTime()) ? new Date(publishedAt.getTime() + delayMinutes * 60_000) : null;
+  const isScheduled = displayState === 'ready' && delayMinutes > 0;
+  const stateText = displayState === 'scheduled' ? 'First comment is scheduled'
+    : isScheduled && dueAt ? `First comment scheduled for ${formatPostPreviewTime(dueAt, timeZone)} (${timeZone.replaceAll('_', ' ')})`
+      : isScheduled ? `First comment waits ${delayMinutes.toLocaleString()} minutes after publication`
+        : FIRST_COMMENT_LABELS[displayState];
   const open = (next: 'send' | 'record') => setMode(next);
 
   return <div ref={controlRef} className={styles.firstCommentRow} role="group" aria-label={`First comment delivery for ${target.target.name ?? 'this destination'}`} tabIndex={-1} data-first-comment-control>
-    <span>{target.target.name ?? 'Destination'}: {FIRST_COMMENT_LABELS[displayState]}</span>
-    {displayState === 'ready' ? <Button type="button" size="sm" onClick={() => open('send')}>Send first comment</Button> : null}
+    <span>{target.target.name ?? 'Destination'}: {stateText}</span>
+    {displayState === 'ready' ? <Button type="button" size="sm" onClick={() => open('send')}>{delayMinutes > 0 ? 'Send now' : 'Send first comment'}</Button> : null}
     {displayState === 'needs_review' ? <Button type="button" size="sm" onClick={() => open('record')}>Record comment outcome</Button> : null}
-    {mode ? <FirstCommentDialog key={`${target.id}:${mode}`} mode={mode} postId={postId} postComment={postComment} target={target} onDismiss={() => setMode(null)} onProgress={setLocalState} onComplete={state => { focusAfterComplete.current = true; setLocalState(state); setMode(null); }} /> : null}
+    {mode ? <FirstCommentDialog key={`${target.id}:${mode}`} mode={mode} postId={postId} postComment={postComment} delayMinutes={delayMinutes} target={target} onDismiss={() => setMode(null)} onProgress={setLocalState} onComplete={state => { focusAfterComplete.current = true; setLocalState(state); setMode(null); }} /> : null}
   </div>;
 }
 
-function FirstCommentDialog({ mode, postId, postComment, target, onDismiss, onProgress, onComplete }: { mode: 'send' | 'record'; postId: string; postComment: string; target: PostRow['targets'][number]; onDismiss: () => void; onProgress: (state: FirstCommentActionState['state']) => void; onComplete: (state: FirstCommentActionState['state']) => void }) {
+function FirstCommentDialog({ mode, postId, postComment, delayMinutes, target, onDismiss, onProgress, onComplete }: { mode: 'send' | 'record'; postId: string; postComment: string; delayMinutes: number; target: PostRow['targets'][number]; onDismiss: () => void; onProgress: (state: FirstCommentActionState['state']) => void; onComplete: (state: FirstCommentActionState['state']) => void }) {
   const [acknowledged, setAcknowledged] = useState(false);
   const [outcome, setOutcome] = useState<'sent' | 'not_sent'>('not_sent');
   const [remoteId, setRemoteId] = useState('');
@@ -197,14 +205,14 @@ function FirstCommentDialog({ mode, postId, postComment, target, onDismiss, onPr
       <input type="hidden" name="postId" value={postId} />
       <input type="hidden" name="postTargetId" value={target.id} />
       <input type="hidden" name="confirmation" value={acknowledged ? `SEND FIRST COMMENT ${target.id}` : ''} />
-      <div className="ui-dialog__header"><div><h2 id={`first-comment-title-${target.id}`}>Send the first comment?</h2><p>This sends the saved comment to {target.target.name ?? 'this destination'} once.</p></div></div>
+      <div className="ui-dialog__header"><div><h2 id={`first-comment-title-${target.id}`}>Send the first comment now?</h2><p>This sends the saved comment to {target.target.name ?? 'this destination'} once{delayMinutes > 0 ? ', without waiting for its saved delay' : ''}.</p></div></div>
       <div className="ui-dialog__body">
         <p className={styles.help}>{postComment}</p>
         <p>If the platform accepts it but the response is delayed, the result will need review. Check its current status before any further action.</p>
         <label className={styles.confirmCheck}><input type="checkbox" name="acknowledged" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.currentTarget.checked)} /> I understand the result may be delayed and I will check status before repeating.</label>
         {sendState.status === 'error' ? <p className="ui-error" role="alert" data-first-comment-error tabIndex={-1}>{sendState.message ?? 'The send result could not be confirmed. Check its current state before another action.'}</p> : null}
       </div>
-      <div className="ui-dialog__actions"><Button type="button" data-first-comment-cancel disabled={pending} onClick={onDismiss}>Cancel</Button><Button variant="primary" type="submit" disabled={pending || !acknowledged}>Send once</Button></div>
+      <div className="ui-dialog__actions"><Button type="button" data-first-comment-cancel disabled={pending} onClick={onDismiss}>Cancel</Button><Button variant="primary" type="submit" disabled={pending || !acknowledged}>Send now</Button></div>
     </form> : <form noValidate onSubmit={event => {
       event.preventDefault();
       if (!acknowledged || pending || (outcome === 'sent' && !remoteId.trim())) return;
@@ -257,7 +265,7 @@ export async function runRecordFirstCommentWithRecovery(previous: FirstCommentAc
 
 function PostEditForm({ post, targets, selected, imageRules, disabled, onPendingChange }: { post: PostRow; targets: TargetChoice[]; selected: Set<string>; imageRules: ImageRules; disabled: boolean; onPendingChange: (pending: boolean) => void }) {
   const initialValues: Partial<ComposerValues> = {
-    intent: '', mediaJson: JSON.stringify(post.media), destinationFormatsJson: JSON.stringify(Object.fromEntries(post.targets.map(t => [t.target.id, t.formatId ?? post.format]).filter((entry): entry is [string,string] => typeof entry[1] === 'string'))), message: post.message, firstComment: post.firstComment ?? '', link: post.link ?? '',
+    intent: '', mediaJson: JSON.stringify(post.media), destinationFormatsJson: JSON.stringify(Object.fromEntries(post.targets.map(t => [t.target.id, t.formatId ?? post.format]).filter((entry): entry is [string,string] => typeof entry[1] === 'string'))), message: post.message, firstComment: post.firstComment ?? '', firstCommentDelayMinutes: String(post.firstCommentDelayMinutes ?? 0), link: post.link ?? '',
     targetIds: [...selected], scheduleDate: '', scheduleTime: '',
   };
   const [actionState, formAction, pending] = useActionState(runUpdatePostWithRecovery, { status: 'idle', values: initialValues } satisfies PostEditActionState);
@@ -276,7 +284,7 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
     setValues(current => ({ ...current, ...actionState.values }));
     formRef.current?.querySelector<HTMLElement>('[data-edit-error]')?.focus();
   }, [actionState]);
-  function setValue(name: keyof ComposerValues, value: string) { setValues(current => ({ ...current, [name]: value })); }
+  function setValue(name: keyof ComposerValues, value: string) { setValues(current => ({ ...current, [name]: value })); validation.clear(name); }
   const targetIds = new Set(values.targetIds ?? selected);
   const selectedTargets = targets.filter(target => targetIds.has(target.id) && target.canPublish);
   const formatChoices = readFormatValues(values.destinationFormatsJson);
@@ -284,6 +292,7 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
     const id = effectiveDestinationFormat(target, formatChoices); return id === undefined ? [] : [[target.id, id]];
   })));
   const formatTargets = selectedTargets.map(target => ({ ...target, publishingMedia: target.publishingFormats?.find(format => format.id === effectiveDestinationFormat(target, formatChoices))?.media ?? target.publishingMedia }));
+  const delayField = validation.fieldProps('firstCommentDelayMinutes', `comment-delay-help-${post.id}`);
   const uploadRules = localUploadRules(formatTargets, imageRules);
   const attachments = usePostAttachments({
     initialMedia: parseInitialMedia(initialValues.mediaJson ?? '[]'),
@@ -343,6 +352,10 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
       {validation.errors.message && <p id={`message-error-${post.id}`} className={styles.formError} role="alert">{validation.errors.message}</p>}
       <label htmlFor={`comment-${post.id}`}>First comment <span>(optional)</span></label>
       <AutoTextarea id={`comment-${post.id}`} name="firstComment" value={values.firstComment ?? post.firstComment ?? ''} onChange={event => setValue('firstComment', event.currentTarget.value)} rows={2} disabled={disabled || pending || uploading} />
+      <label htmlFor={delayField.id}>Wait before the first comment <span>(minutes; 0 sends it right after publication)</span></label>
+      <input name="firstCommentDelayMinutes" type="number" inputMode="numeric" min={0} max={imageRules.maxFirstCommentDelayMinutes} step={1} value={values.firstCommentDelayMinutes ?? String(post.firstCommentDelayMinutes ?? 0)} onChange={event => setValue('firstCommentDelayMinutes', event.currentTarget.value)} disabled={disabled || pending || uploading} {...delayField} />
+      <p id={`comment-delay-help-${post.id}`} className={styles.help}>Choose a whole number from 0 to {imageRules.maxFirstCommentDelayMinutes.toLocaleString()} minutes.</p>
+      <FieldError {...validation.errorProps('firstCommentDelayMinutes')} />
       <label htmlFor={`link-${post.id}`}>Link <span>(optional)</span></label><input id={`link-${post.id}`} name="link" type="url" value={values.link ?? post.link ?? ''} onChange={event => setValue('link', event.currentTarget.value)} disabled={disabled || pending || uploading} aria-invalid={Boolean(validation.errors.link)} aria-describedby={validation.errors.link ? `link-error-${post.id}` : undefined} />
       {validation.errors.link && <p id={`link-error-${post.id}`} className={styles.formError} role="alert">{validation.errors.link}</p>}
       <PostAttachments controller={attachments} disabled={disabled || pending || uploading} />
@@ -456,7 +469,7 @@ function isActionRedirect(error: unknown): boolean {
 
 function valuesFromFormData(data: FormData): Partial<ComposerValues> {
   const value = (name: string) => { const result = data.get(name); return typeof result === 'string' ? result : ''; };
-  return { intent: value('intent'), attachmentKind: value('attachmentKind'), mediaJson: value('mediaJson'), message: value('message'), firstComment: value('firstComment'), link: value('link'), imageUrl: value('imageUrl'), videoUrl: value('videoUrl'), uploadedImageRef: value('uploadedImageRef'), altText: value('altText'), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string'), scheduleDate: value('scheduleDate'), scheduleTime: value('scheduleTime') };
+  return { intent: value('intent'), attachmentKind: value('attachmentKind'), mediaJson: value('mediaJson'), message: value('message'), firstComment: value('firstComment'), firstCommentDelayMinutes: value('firstCommentDelayMinutes'), link: value('link'), imageUrl: value('imageUrl'), videoUrl: value('videoUrl'), uploadedImageRef: value('uploadedImageRef'), altText: value('altText'), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string'), scheduleDate: value('scheduleDate'), scheduleTime: value('scheduleTime') };
 }
 
 function ScheduleForm({ postId, disabled = false }: { postId: string; disabled?: boolean }) {

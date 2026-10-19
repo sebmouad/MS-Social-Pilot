@@ -1173,9 +1173,11 @@ describe('MCP workspace boundaries', () => {
   });
 
   it('normalizes first-comment state in list_posts and never returns stored error text', async () => {
-    publishingReads.list.mockResolvedValueOnce([{ id: 'post-a', message: 'Saved post', firstComment: 'Details below', status: 'published', targets: [{ id: 'post-target-a', status: 'published', remotePostId: 'remote-post-a', remoteUrl: null, firstCommentId: null, firstCommentAt: new Date('2026-10-16T12:00:00.000Z'), firstCommentError: 'review_required', target: { id: 'target-a', type: 'page', name: 'Studio' } }] }]);
+    publishingReads.list.mockResolvedValueOnce([{ id: 'post-a', message: 'Saved post', firstComment: 'Details below', firstCommentDelayMinutes: 45, status: 'published', targets: [{ id: 'post-target-a', status: 'published', publishedAt: new Date('2026-10-16T12:00:00.000Z'), remotePostId: 'remote-post-a', remoteUrl: null, firstCommentId: null, firstCommentAt: new Date('2026-10-16T12:00:00.000Z'), firstCommentError: 'review_required', target: { id: 'target-a', type: 'page', name: 'Studio' } }] }]);
     const response = await call('list_posts');
     const post = (await response.json()).result.structuredContent.items[0];
+    expect(post.firstCommentDelayMinutes).toBe(45);
+    expect(post.targets[0].publishedAt).toEqual('2026-10-16T12:00:00.000Z');
     expect(post.targets[0]).toMatchObject({ id: 'post-target-a', firstComment: { state: 'needs_review', label: 'First comment needs review', errorPresent: true } });
     expect(JSON.stringify(post)).not.toContain('private provider error');
   });
@@ -1234,17 +1236,17 @@ describe('MCP workspace boundaries', () => {
     expect((await denied.json()).result.isError).toBe(true);
     expect(publishingMutations.create).not.toHaveBeenCalled();
 
-    const created = await call('create_post', { message: 'hello', firstComment: 'follow-up', targetIds: ['page-a'], imageUrl: 'https://example.com/photo.jpg', confirmation: 'CREATE POST' });
+    const created = await call('create_post', { message: 'hello', firstComment: 'follow-up', firstCommentDelayMinutes: 45, targetIds: ['page-a'], imageUrl: 'https://example.com/photo.jpg', confirmation: 'CREATE POST' });
     expect((await created.json()).result.structuredContent).toEqual({ id: 'new-post', status: 'draft', mcpAuditRecorded: true });
-    expect(publishingMutations.create).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ targetIds: ['page-a'], firstComment: 'follow-up', media: [{ kind: 'image', url: 'https://example.com/photo.jpg' }] }));
+    expect(publishingMutations.create).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ targetIds: ['page-a'], firstComment: 'follow-up', firstCommentDelayMinutes: 45, media: [{ kind: 'image', url: 'https://example.com/photo.jpg' }] }));
 
     const time = '2030-01-02T12:00:00.000Z';
     const scheduled = await call('schedule_post', { postId: 'new-post', scheduledAt: time, confirmation: `SCHEDULE POST new-post ${time}` });
     expect((await scheduled.json()).result.structuredContent).toMatchObject({ postId: 'new-post', status: 'scheduled' });
     expect(publishingMutations.schedule).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'new-post', new Date(time));
-    const updated = await call('update_post', { postId: 'new-post', message: 'edited', targetIds: ['page-a'], confirmation: 'UPDATE POST new-post' });
+    const updated = await call('update_post', { postId: 'new-post', message: 'edited', firstCommentDelayMinutes: 50, targetIds: ['page-a'], confirmation: 'UPDATE POST new-post' });
     expect((await updated.json()).result.structuredContent).toEqual({ postId: 'new-post', updated: true, mcpAuditRecorded: true });
-    expect(publishingMutations.update).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ postId: 'new-post', targetIds: ['page-a'] }));
+    expect(publishingMutations.update).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ postId: 'new-post', targetIds: ['page-a'], firstCommentDelayMinutes: 50 }));
     expect(db.$executeRaw).toHaveBeenCalled();
   });
 

@@ -4,7 +4,7 @@ const state = vi.hoisted(() => ({
   queries: [] as Array<{ sql: string; values: unknown[] }>, executions: [] as Array<{ sql: string; values: unknown[] }>,
   authorize: vi.fn(), workspace: vi.fn(), failAudit: false, overrides: {} as Record<string, number>,
 }));
-const row = { id: 'tpl_a', name: 'Welcome', category: '', body: 'Hello {first_name}', hashtags: '#welcome', firstComment: '', labelId: null, createdAt: new Date('2026-01-01T00:00:00Z'), updatedAt: new Date('2026-01-02T00:00:00Z') };
+const row = { id: 'tpl_a', name: 'Welcome', category: '', body: 'Hello {first_name}', hashtags: '#welcome', firstComment: '', firstCommentDelayMinutes: 37, labelId: null, createdAt: new Date('2026-01-01T00:00:00Z'), updatedAt: new Date('2026-01-02T00:00:00Z') };
 const db = vi.hoisted(() => ({
   $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn(),
 }));
@@ -12,7 +12,7 @@ vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => state.overrides[key] ?? ({
   'publishing.templateLabelLimit': 200, 'publishing.templatePageSize': 25, 'publishing.templateMaxPerWorkspace': 500, 'publishing.templateSearchMaxCharacters': 120,
   'publishing.templateNameMaxCharacters': 120, 'publishing.templateCategoryMaxCharacters': 80, 'publishing.templateBodyMaxCharacters': 5000,
-  'publishing.templateHashtagsMaxCharacters': 1000, 'publishing.templateFirstCommentMaxCharacters': 2000,
+  'publishing.templateHashtagsMaxCharacters': 1000, 'publishing.templateFirstCommentMaxCharacters': 2000, 'publishing.maxFirstCommentDelayMinutes': 10080,
   'publishing.templateTransactionTimeoutMs': 5000, 'publishing.templateTransactionMaxWaitMs': 2000, 'data.workspaceOperationTimeoutMs': 30000,
   'data.workspaceOperationLockWaitMs': 2000,
 })[key] }));
@@ -47,7 +47,7 @@ beforeEach(() => {
   });
 });
 
-const draft = { name: 'Welcome', category: '', body: 'Hello {first_name}', hashtags: '#welcome', firstComment: '', labelId: null };
+const draft = { name: 'Welcome', category: '', body: 'Hello {first_name}', hashtags: '#welcome', firstComment: '', firstCommentDelayMinutes: 37, labelId: null };
 
 describe('workspace publishing templates', () => {
   it('requires exact confirmations and strict fields before any database access', async () => {
@@ -73,6 +73,8 @@ describe('workspace publishing templates', () => {
     expect(created.id).toBe('tpl_a');
     const insert = state.executions.find(query => query.sql.includes('INSERT INTO post_templates'))!;
     expect(insert.values).toContain(actor.workspaceId);
+    expect(insert.values).toContain(37);
+    expect(created.firstCommentDelayMinutes).toBe(37);
     const update = await updateTemplate(actor, { id: 'tpl_a', ...draft, name: 'Welcome again', confirmation: updateTemplateConfirmation('tpl_a') });
     expect(update.id).toBe('tpl_a');
     expect(state.executions.filter(query => query.sql.includes('activity_logs'))).toHaveLength(2);
@@ -98,6 +100,12 @@ describe('workspace publishing templates', () => {
     await expect(createTemplate(actor, { ...draft, confirmation: createTemplateConfirmation('Welcome') })).rejects.toMatchObject({ code: 'invalid_request' });
     state.overrides['publishing.templateNameMaxCharacters'] = 999999;
     await expect(readTemplatePage(actor)).rejects.toMatchObject({ code: 'unavailable' });
+  });
+
+  it('rejects a template delay above the active Root ceiling', async () => {
+    state.overrides['publishing.maxFirstCommentDelayMinutes'] = 36;
+    await expect(createTemplate(actor, { ...draft, confirmation: createTemplateConfirmation('Welcome') })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.executions.some(query => query.sql.includes('INSERT INTO post_templates'))).toBe(false);
   });
 
   it('refuses a label directory exceeding its Root cap without silently dropping choices', async () => {

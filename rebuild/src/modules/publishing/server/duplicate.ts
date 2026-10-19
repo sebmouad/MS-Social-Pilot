@@ -32,7 +32,7 @@ export async function duplicatePost(actor: PublishingActor, input: unknown): Pro
     const selectedIds = await selectedPublishingTargetIds(context.actor.workspaceId, entitlements, context.actor.allowedTargetIds);
     const source = await prisma.post.findFirst({
       where: { id: sourcePostId, ...publishingPostVisibilityWhere(context.actor.workspaceId, selectedIds, context.actor.allowedTargetIds !== undefined || context.role === 'contributor' ? context.actor.userId : undefined) },
-      select: { id: true, workspaceId: true, authorId: true, message: true, firstComment: true, format: true, link: true, media: true, status: true, scheduledAt: true, publishedAt: true,
+      select: { id: true, workspaceId: true, authorId: true, message: true, firstComment: true, firstCommentDelayMinutes: true, format: true, link: true, media: true, status: true, scheduledAt: true, publishedAt: true,
         targets: { select: { targetId: true, formatId: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true, publishedAt: true } } },
     });
     if (!source || (context.role === 'contributor' && source.authorId !== context.actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
@@ -62,7 +62,7 @@ export async function duplicatePost(actor: PublishingActor, input: unknown): Pro
     const now = new Date();
     try {
       await withPublishingTransaction(context.signal, async tx => {
-        await tx.post.create({ data: { id: requestId, workspaceId: context.actor.workspaceId, authorId: context.actor.userId, format: source.format, message, firstComment, link: attachments.link, media: attachments.media, status: 'draft', scheduledAt: null, publishedAt: null, createdAt: now, updatedAt: now,
+        await tx.post.create({ data: { id: requestId, workspaceId: context.actor.workspaceId, authorId: context.actor.userId, format: source.format, message, firstComment, firstCommentDelayMinutes: source.firstCommentDelayMinutes ?? 0, link: attachments.link, media: attachments.media, status: 'draft', scheduledAt: null, publishedAt: null, createdAt: now, updatedAt: now,
           targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
         await recordPostVersion(tx, requestId, context.actor.userId, retention);
         const detail = JSON.stringify({ workspaceId: context.actor.workspaceId, postId: requestId, sourcePostId, requestId });

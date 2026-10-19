@@ -377,3 +377,13 @@ ASYNC_PUBLICATION_RECEIPTS.md. Built-server HTTP/MCP probe and exact107-table/se
 three local mock GETs, zero provider writes, scratch removed, backup retained. No migration or production cutover. Native host,
 comment continuation, safe provider deletion, live-provider/whole-app UX and
 production-shaped rollback gates remain required; the overall goal stays active.
+
+
+### Batch94
+First-comment delays and neutral automatic continuation locally verified:
+3216 tests/364 files, build/typecheck,22-migration schema-only rehearsal,
+eight theme/viewport browser views plus MCP receipts, exact baseline cleanup.
+Checkpoint and evidence boundaries: FIRST_COMMENT_SCHEDULING.md. Complete
+native host integration and safe provider deletion/live proof next; retain full
+legacy parity, whole-app UX, authorization, media/data/service rollback and
+production cutover gates. Production remains legacy.

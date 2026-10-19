@@ -4,7 +4,7 @@ Updated: 2026-10-19. This is durable project context, not proof of current runti
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
 
-Current continuation: batch93 at the end of this document and ASYNC_PUBLICATION_RECEIPTS.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+Current continuation: batch94 at the end of this document and FIRST_COMMENT_SCHEDULING.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
 
 ## Historical verified batch —84
 
@@ -641,3 +641,20 @@ Production, the held photo canary and the current private native-format switch
 remain unchanged. Full customer browser matrix, first-comment continuation,
 automatic native host dispatch, safe deletion/live-provider evidence, broader
 legacy parity and production-shaped rollback/cutover remain open.
+
+
+## Batch94 — delayed first-comment continuation
+
+Requested delay is now carried through authoring, CSV, templates, duplication,
+recycle, version snapshots/restores, scoped reads and exports. Neutral automatic
+continuation follows confirmed publication with current owner and original-author
+access; uncertain/rejected sends cannot be automatically retried. Cancellation
+can preserve a valid comment receipt independently. Registry79, additive
+template/version migration22 and local evidence are recorded in
+[FIRST_COMMENT_SCHEDULING.md](FIRST_COMMENT_SCHEDULING.md). Final3216-test/364-file suite, build/typecheck,22-file schema-only rehearsal,
+eight-view Chromium/MCP probe and screenshot review passed. The local example
+preview received migration22; final107-table counts/settings matched, scratch
+removed, backup retained. Both Claude accounts and final independent review
+completed; scheduled inline owner-access and malformed resolved-receipt findings
+were fixed with database regressions. Verify origin/main when resuming.
+Production and held provider canary unchanged; full goal stays active.

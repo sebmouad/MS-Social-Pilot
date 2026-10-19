@@ -43,3 +43,11 @@ MCP tools `send_first_comment` and `record_first_comment_outcome` share these se
 - Actual localhost MCP probes verify read-only/current-grant refusal, exact confirmation, sanitized reads, atomic manual recording, already-confirmed no-repeat, and manual absence without dispatch. Temporary actors/keys/sessions/content/domain audits are cleaned; the effective Root MCP role policy is restored, retaining its configuration-change audits.
 
 See PREVIEW_QA.md for final suite/build results and visual-check scope. Delayed comments and their scheduling, full remote post/deletion journaling, automatic provider verification, first-comment link resolution/discovery, complete legacy features, provider formats/grants, real Facebook writes and production cutover remain required. No production traffic or worker was changed.
+
+
+## Batch94 continuation
+Delay authoring, neutral automatic continuation, fresh owner/author checks and
+cancellation-independent bounded receipt persistence are now locally verified.
+See [FIRST_COMMENT_SCHEDULING.md](FIRST_COMMENT_SCHEDULING.md) for current behavior,
+migration22, exact evidence and remaining native/live/release limitations.
+Earlier checkpoint gaps in this file are historical unless repeated there.

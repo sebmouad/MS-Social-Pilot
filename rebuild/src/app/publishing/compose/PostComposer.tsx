@@ -26,7 +26,7 @@ type TargetChoice = {
 };
 type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number; maxMessageCharacters: number; maxMedia: number };
 type Schedule = { date: string; time: string; timeZone: string };
-type ComposerTemplate = { id: string; name: string; category: string; body: string; hashtags: string; firstComment: string; labelId: string | null };
+type ComposerTemplate = { id: string; name: string; category: string; body: string; hashtags: string; firstComment: string; firstCommentDelayMinutes: number; labelId: string | null };
 
 const INITIAL_STATE: ComposerActionState = { status: 'idle', values: {} };
 const FORM_ID = 'post-composer-form';
@@ -106,7 +106,7 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items);
 }
 
-export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay }: { targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string }) {
+export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes }: { targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -116,6 +116,8 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
   const initial = state.values;
   const [message, setMessage] = useState(initial.message ?? '');
   const [firstComment, setFirstComment] = useState(initial.firstComment ?? '');
+  const [firstCommentDelayMinutes, setFirstCommentDelayMinutes] = useState(initial.firstCommentDelayMinutes ?? '0');
+  const [firstCommentDelayError, setFirstCommentDelayError] = useState('');
   const [labelId, setLabelId] = useState(initial.labelId ?? '');
   const [link, setLink] = useState(initial.link ?? '');
   const [selectedTargets, setSelectedTargets] = useState<string[]>(initial.targetIds ?? []);
@@ -159,6 +161,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
     const text = [template.body, template.hashtags].map(value => value.trim()).filter(Boolean).join('\n\n');
     setMessage(text);
     setFirstComment(template.firstComment);
+    setFirstCommentDelayMinutes(String(template.firstCommentDelayMinutes));
     setLabelId(template.labelId ?? '');
     setTemplateToApply(null);
   }
@@ -199,6 +202,14 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
       event.preventDefault(); setLocalError('Add post text, a link, or media before saving. A first comment alone is not a post.');
       form.elements.namedItem('message') instanceof HTMLElement && (form.elements.namedItem('message') as HTMLElement).focus(); return;
     }
+    const delayValue = firstCommentDelayMinutes === '' ? 0 : Number(firstCommentDelayMinutes);
+    if (!Number.isSafeInteger(delayValue) || delayValue < 0 || delayValue > maxFirstCommentDelayMinutes) {
+      event.preventDefault();
+      setFirstCommentDelayError(`Choose a whole number from 0 to ${maxFirstCommentDelayMinutes.toLocaleString()} minutes.`);
+      form.querySelector<HTMLInputElement>('#composer-first-comment-delay')?.focus();
+      return;
+    }
+    setFirstCommentDelayError('');
     if (message.length > imageRules.maxMessageCharacters) {
       event.preventDefault(); setLocalError(`Post text must be ${imageRules.maxMessageCharacters.toLocaleString()} characters or fewer.`); return;
     }
@@ -253,6 +264,10 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
       <div className={styles.fieldMeta} id="composer-message-count">{message.length.toLocaleString()} / {imageRules.maxMessageCharacters.toLocaleString()}</div>
       <label htmlFor="composer-first-comment">First comment <span>(optional)</span></label>
       <AutoTextarea id="composer-first-comment" name="firstComment" disabled={saved} value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder="Add a link or follow-up as the first comment…" />
+      <label htmlFor="composer-first-comment-delay">Wait before the first comment <span>(minutes; 0 sends it right after publication)</span></label>
+      <input id="composer-first-comment-delay" name="firstCommentDelayMinutes" type="number" inputMode="numeric" min={0} max={maxFirstCommentDelayMinutes} step={1} value={firstCommentDelayMinutes} disabled={saved} aria-invalid={Boolean(firstCommentDelayError)} aria-describedby={`composer-first-comment-delay-help${firstCommentDelayError ? ' composer-first-comment-delay-error' : ''}`} onChange={event => { setFirstCommentDelayMinutes(event.currentTarget.value); setFirstCommentDelayError(''); }} />
+      <p id="composer-first-comment-delay-help" className={styles.fieldHelp}>Choose a whole number from 0 to {maxFirstCommentDelayMinutes.toLocaleString()} minutes. This applies only when a first comment is saved.</p>
+      {firstCommentDelayError && <p id="composer-first-comment-delay-error" className={styles.error} role="alert">{firstCommentDelayError}</p>}
       <input type="hidden" name="labelId" value={labelId} />
       <input type="hidden" name="destinationFormatsJson" value={destinationFormatsJson} />
 
@@ -299,11 +314,11 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
         </fieldset>
       </aside>
     </SidebarDock>
-    <Dialog open={templateChooserOpen} title="Choose a post template" description="This copies saved message text and first comment into the current composer. It does not create or publish a post." onClose={() => setTemplateChooserOpen(false)} actions={<Button data-dialog-cancel onClick={() => setTemplateChooserOpen(false)}>Close</Button>}>
+    <Dialog open={templateChooserOpen} title="Choose a post template" description="This copies saved message text, first comment and its delay into the current composer. It does not create or publish a post." onClose={() => setTemplateChooserOpen(false)} actions={<Button data-dialog-cancel onClick={() => setTemplateChooserOpen(false)}>Close</Button>}>
       <label className={styles.templateSearch}>Search templates<input type="search" value={templateSearch} onChange={event => setTemplateSearch(event.target.value)} maxLength={120} /></label>
       {visibleTemplates.length ? <ul className={styles.templateList}>{visibleTemplates.map(template => <li key={template.id}><div><strong>{template.name}</strong><span>{template.category || 'Uncategorized'}</span><p>{template.body}{template.hashtags ? `\n${template.hashtags}` : ''}</p>{template.labelId && <small>Using this template will apply its workspace label to the new post.</small>}</div><Button type="button" size="sm" onClick={() => chooseTemplate(template)}>Use template</Button></li>)}</ul> : <p>No templates match this search.</p>}
     </Dialog>
-    <Dialog open={Boolean(templateToApply)} title="Replace the current draft text?" description="The template will replace the current message and first comment. Your selected destinations, attachments, link and schedule stay as they are." onClose={() => setTemplateToApply(null)} actions={<><Button data-dialog-cancel onClick={() => setTemplateToApply(null)}>Keep current draft</Button><Button variant="primary" onClick={() => templateToApply && applyTemplate(templateToApply)}>Replace message and first comment</Button></>}>
+    <Dialog open={Boolean(templateToApply)} title="Replace the current draft text?" description="The template will replace the current message, first comment and its delay. Your selected destinations, attachments, link and schedule stay as they are." onClose={() => setTemplateToApply(null)} actions={<><Button data-dialog-cancel onClick={() => setTemplateToApply(null)}>Keep current draft</Button><Button variant="primary" onClick={() => templateToApply && applyTemplate(templateToApply)}>Replace message and first comment</Button></>}>
       <p><strong>{templateToApply?.name}</strong></p><p>{templateToApply?.body}</p>{templateToApply?.hashtags && <p>{templateToApply.hashtags}</p>}
     </Dialog>
   </div>;

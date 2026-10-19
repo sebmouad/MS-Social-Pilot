@@ -4,23 +4,22 @@ import { useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
-import { TEMPLATE_DEFAULTS } from '@/modules/publishing/templates-config';
 import { SidebarDock } from '@/components/SidebarDock';
 import styles from './templates.module.css';
 
-export type Template = { id: string; name: string; category: string; body: string; hashtags: string; firstComment: string; labelId: string | null; createdAt: string; updatedAt: string };
+export type Template = { id: string; name: string; category: string; body: string; hashtags: string; firstComment: string; firstCommentDelayMinutes: number; labelId: string | null; createdAt: string; updatedAt: string };
 function validReceipt(value: unknown): value is Template {
   if (!value || typeof value !== 'object') return false;
   const item = value as Record<string, unknown>;
   return ['id', 'name', 'category', 'body', 'hashtags', 'firstComment', 'createdAt', 'updatedAt'].every(key => typeof item[key] === 'string') &&
-    (item.labelId === null || typeof item.labelId === 'string') && Boolean(item.id) &&
+    Number.isSafeInteger(item.firstCommentDelayMinutes) && (item.firstCommentDelayMinutes as number) >= 0 && (item.labelId === null || typeof item.labelId === 'string') && Boolean(item.id) &&
     Number.isFinite(Date.parse(item.createdAt as string)) && Number.isFinite(Date.parse(item.updatedAt as string));
 }
-const empty = { name: '', category: '', body: '', hashtags: '', firstComment: '', labelId: null as string | null };
+const empty = { name: '', category: '', body: '', hashtags: '', firstComment: '', firstCommentDelayMinutes: '0', labelId: null as string | null };
 function errorText(body: unknown) { return body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : 'The request could not be confirmed. Refresh the list and check the current template before trying again.'; }
 function time(value: string) { const parsed = new Date(value); return Number.isFinite(parsed.getTime()) ? new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: 'UTC' }).format(parsed) + ' UTC' : 'Unknown'; }
 
-export function TemplateManager({ initialTemplates, labels, page, hasMore, query, canWrite = true, limits = TEMPLATE_DEFAULTS }: { initialTemplates: Template[]; labels: Array<{ id: string; name: string }>; page: number; hasMore: boolean; query: string; canWrite?: boolean; limits?: { maxSearchCharacters: number; maxNameCharacters: number; maxCategoryCharacters: number; maxBodyCharacters: number; maxHashtagsCharacters: number; maxFirstCommentCharacters: number } }) {
+export function TemplateManager({ initialTemplates, labels, page, hasMore, query, canWrite = true, limits }: { initialTemplates: Template[]; labels: Array<{ id: string; name: string }>; page: number; hasMore: boolean; query: string; canWrite?: boolean; limits: { maxSearchCharacters: number; maxNameCharacters: number; maxCategoryCharacters: number; maxBodyCharacters: number; maxHashtagsCharacters: number; maxFirstCommentCharacters: number; maxFirstCommentDelayMinutes: number } }) {
   const [templates, setTemplates] = useState(initialTemplates);
   const [draft, setDraft] = useState<typeof empty>(empty);
   const [editing, setEditing] = useState<Template | null>(null);
@@ -32,7 +31,7 @@ export function TemplateManager({ initialTemplates, labels, page, hasMore, query
   const inFlight = useRef(false);
   const nextNotice = (text: string, error = false) => setNotice(value => ({ error, text, key: (value?.key ?? 0) + 1 }));
   const close = () => { if (!busy) setDialog(false); };
-  function begin(template?: Template) { setEditing(template ?? null); setDraft(template ? { name: template.name, category: template.category, body: template.body, hashtags: template.hashtags, firstComment: template.firstComment, labelId: template.labelId } : empty); setDialog(true); }
+  function begin(template?: Template) { setEditing(template ?? null); setDraft(template ? { name: template.name, category: template.category, body: template.body, hashtags: template.hashtags, firstComment: template.firstComment, firstCommentDelayMinutes: String(template.firstCommentDelayMinutes), labelId: template.labelId } : empty); setDialog(true); }
   const saveConfirmation = `${editing ? 'UPDATE' : 'CREATE'} TEMPLATE ${editing ? editing.id : draft.name.trim()}`;
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (inFlight.current) return;
@@ -43,9 +42,9 @@ export function TemplateManager({ initialTemplates, labels, page, hasMore, query
     if (inFlight.current || confirmation !== saveConfirmation) return;
     inFlight.current = true; setBusy(true); setNotice(null);
     try {
-      const response = await fetch(editing ? `/api/publishing/templates/${encodeURIComponent(editing.id)}` : '/api/publishing/templates', { method: editing ? 'PUT' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...draft, ...(editing ? { id: editing.id } : {}), confirmation: saveConfirmation }) });
+      const response = await fetch(editing ? `/api/publishing/templates/${encodeURIComponent(editing.id)}` : '/api/publishing/templates', { method: editing ? 'PUT' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...draft, firstCommentDelayMinutes: draft.firstCommentDelayMinutes === '' ? 0 : Number(draft.firstCommentDelayMinutes), ...(editing ? { id: editing.id } : {}), confirmation: saveConfirmation }) });
       const body = await response.json().catch(() => null);
-      if (!response.ok || !validReceipt(body) || (editing && body.id !== editing.id) || body.name !== draft.name.trim() || body.body !== draft.body.trim() || body.firstComment !== draft.firstComment.trim() || body.hashtags !== draft.hashtags.trim() || body.category !== draft.category.trim() || body.labelId !== draft.labelId) throw new Error(errorText(body));
+      if (!response.ok || !validReceipt(body) || (editing && body.id !== editing.id) || body.name !== draft.name.trim() || body.body !== draft.body.trim() || body.firstComment !== draft.firstComment.trim() || body.firstCommentDelayMinutes !== Number(draft.firstCommentDelayMinutes || 0) || body.hashtags !== draft.hashtags.trim() || body.category !== draft.category.trim() || body.labelId !== draft.labelId) throw new Error(errorText(body));
       const saved = body as Template;
       setTemplates(current => editing ? current.map(item => item.id === saved.id ? saved : item).sort((a, b) => a.name.localeCompare(b.name)) : [...current, saved].sort((a, b) => a.name.localeCompare(b.name)));
       setDialog(false); setReview(null); nextNotice(editing ? 'Template updated.' : 'Template created. It is ready to select in the post composer.');
@@ -85,6 +84,8 @@ export function TemplateManager({ initialTemplates, labels, page, hasMore, query
         <label>Message<textarea disabled={busy} required maxLength={limits.maxBodyCharacters} rows={6} value={draft.body} onChange={event => setDraft(current => ({ ...current, body: event.target.value }))} /></label>
         <label>Hashtags <span>(optional)</span><textarea disabled={busy} maxLength={limits.maxHashtagsCharacters} rows={2} value={draft.hashtags} onChange={event => setDraft(current => ({ ...current, hashtags: event.target.value }))} /></label>
         <label>First comment <span>(optional)</span><textarea disabled={busy} maxLength={limits.maxFirstCommentCharacters} rows={3} value={draft.firstComment} onChange={event => setDraft(current => ({ ...current, firstComment: event.target.value }))} /></label>
+        <label>Wait before the first comment <span>(minutes; 0 sends it right after publication)</span><input disabled={busy} type="number" inputMode="numeric" min={0} max={limits.maxFirstCommentDelayMinutes} step={1} value={draft.firstCommentDelayMinutes} onChange={event => setDraft(current => ({ ...current, firstCommentDelayMinutes: event.target.value }))} aria-describedby="template-first-comment-delay-help" /></label>
+        <p id="template-first-comment-delay-help" className={styles.help}>Choose a whole number from 0 to {limits.maxFirstCommentDelayMinutes.toLocaleString()} minutes.</p>
         <label>Label <span>(optional)</span><select disabled={busy} value={draft.labelId ?? ''} onChange={event => setDraft(current => ({ ...current, labelId: event.target.value || null }))}><option value="">No label</option>{labels.map(label => <option key={label.id} value={label.id}>{label.name}</option>)}</select></label>
         <p className={styles.help}>Media and links are selected separately in the composer.</p>
       </form>
@@ -92,7 +93,7 @@ export function TemplateManager({ initialTemplates, labels, page, hasMore, query
     <Dialog open={Boolean(review)} title={review?.kind === 'delete' ? 'Review template deletion' : 'Review template save'} description={review?.kind === 'delete' ? `This removes “${review.template?.name}” from your workspace. Posts already created from it remain unchanged.` : 'Review the template changes before saving them to your workspace.'} onClose={() => !busy && setReview(null)} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setReview(null)}>Cancel</Button><Button variant={review?.kind === 'delete' ? 'danger' : 'primary'} disabled={busy || confirmation !== (review?.kind === 'delete' ? `DELETE TEMPLATE ${review.template?.id}` : saveConfirmation)} onClick={() => review?.kind === 'delete' && review.template ? void performDelete(review.template) : void performSave()}>{busy ? 'Working…' : review?.kind === 'delete' ? 'Delete template' : 'Confirm save'}</Button></>}>
       {notice?.error && <RouteNotice error focusKey={`template-review-error:${notice.key}`}>{notice.text}</RouteNotice>}
       <p><strong>{review?.kind === 'delete' ? review.template?.name : draft.name || 'Untitled template'}</strong></p>
-      {review?.kind === 'save' && <p className={styles.reviewPreview}>{draft.body}{draft.hashtags ? `\n${draft.hashtags}` : ''}{draft.firstComment ? `\n\nFirst comment: ${draft.firstComment}` : ''}</p>}
+      {review?.kind === 'save' && <p className={styles.reviewPreview}>{draft.body}{draft.hashtags ? `\n${draft.hashtags}` : ''}{draft.firstComment ? `\n\nFirst comment: ${draft.firstComment}` : ''}{draft.firstComment ? `\nWait: ${draft.firstCommentDelayMinutes || '0'} minutes` : ''}</p>}
       <label className={styles.confirmLabel}>Type <code>{review?.kind === 'delete' ? `DELETE TEMPLATE ${review.template?.id}` : saveConfirmation}</code> to confirm<input autoComplete="off" value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label>
     </Dialog>
   </div>;

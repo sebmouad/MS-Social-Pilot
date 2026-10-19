@@ -18,7 +18,7 @@ const capabilities = vi.hoisted(() => ({ firstComment: true, defaultFormatId: 'p
 const provider = vi.hoisted(() => ({ publish: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({
-  'publishing.maxMessageCharacters': 10000, 'publishing.maxImportRows': 100,
+  'publishing.maxMessageCharacters': 10000, 'publishing.maxFirstCommentDelayMinutes': 10080, 'publishing.maxImportRows': 100,
   'publishing.maxImportBytes': 256000, 'publishing.maxTargetsPerPost': 20,
   'publishing.maxRemoteMediaPerPost': 4, 'publishing.maxImageAltCharacters': 500,
   'publishing.collab.versionRetention': 50,

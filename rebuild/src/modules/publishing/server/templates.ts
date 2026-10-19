@@ -10,7 +10,7 @@ import { TEMPLATE_CONFIG } from '../templates-config';
 import type { PublishingActor } from './types';
 
 type Tx = Prisma.TransactionClient;
-type TemplateRow = { id: string; name: string; category: string; body: string; hashtags: string; firstComment: string; labelId: string | null; createdAt: Date; updatedAt: Date };
+type TemplateRow = { id: string; name: string; category: string; body: string; hashtags: string; firstComment: string; firstCommentDelayMinutes: number; labelId: string | null; createdAt: Date; updatedAt: Date };
 const bad = () => new OperationError('invalid_request', 'Choose valid template details and confirm the exact action.');
 const unavailable = () => new OperationError('unavailable', 'Templates are temporarily unavailable. Refresh and try again.');
 const missing = () => new OperationError('not_found', 'This template is unavailable in the current workspace.');
@@ -19,23 +19,23 @@ async function protect<T>(operation: Promise<T>): Promise<T> { try { return awai
 
 export async function templateBounds() {
   try {
-    const [pageSize, maxRows, maxQuery, maxName, maxCategory, maxBody, maxHashtags, maxFirstComment, timeout, maxWait, workspaceTimeout] = await Promise.all([
+    const [pageSize, maxRows, maxQuery, maxName, maxCategory, maxBody, maxHashtags, maxFirstComment, maxFirstCommentDelayMinutes, timeout, maxWait, workspaceTimeout] = await Promise.all([
       runtimeConfig('publishing.templatePageSize'), runtimeConfig('publishing.templateMaxPerWorkspace'), runtimeConfig('publishing.templateSearchMaxCharacters'),
       runtimeConfig('publishing.templateNameMaxCharacters'), runtimeConfig('publishing.templateCategoryMaxCharacters'), runtimeConfig('publishing.templateBodyMaxCharacters'),
-      runtimeConfig('publishing.templateHashtagsMaxCharacters'), runtimeConfig('publishing.templateFirstCommentMaxCharacters'), runtimeConfig('publishing.templateTransactionTimeoutMs'),
+      runtimeConfig('publishing.templateHashtagsMaxCharacters'), runtimeConfig('publishing.templateFirstCommentMaxCharacters'), runtimeConfig('publishing.maxFirstCommentDelayMinutes'), runtimeConfig('publishing.templateTransactionTimeoutMs'),
       runtimeConfig('publishing.templateTransactionMaxWaitMs'), runtimeConfig('data.workspaceOperationTimeoutMs'),
     ]);
-    const values = [pageSize, maxRows, maxQuery, maxName, maxCategory, maxBody, maxHashtags, maxFirstComment, timeout, maxWait, workspaceTimeout];
+    const values = [pageSize, maxRows, maxQuery, maxName, maxCategory, maxBody, maxHashtags, maxFirstComment, maxFirstCommentDelayMinutes, timeout, maxWait, workspaceTimeout];
     for (const definition of TEMPLATE_CONFIG) {
       if (definition.key === 'publishing.templateLabelLimit') continue;
       if (!definition.schema.safeParse(await runtimeConfig(definition.key)).success) throw unavailable();
     }
     if (!values.every(value => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) || (timeout as number) + (maxWait as number) >= (workspaceTimeout as number)) throw unavailable();
-    return { pageSize: pageSize as number, maxRows: maxRows as number, maxQuery: maxQuery as number, maxName: maxName as number, maxCategory: maxCategory as number, maxBody: maxBody as number, maxHashtags: maxHashtags as number, maxFirstComment: maxFirstComment as number, timeout: timeout as number, maxWait: maxWait as number };
+    return { pageSize: pageSize as number, maxRows: maxRows as number, maxQuery: maxQuery as number, maxName: maxName as number, maxCategory: maxCategory as number, maxBody: maxBody as number, maxHashtags: maxHashtags as number, maxFirstComment: maxFirstComment as number, maxFirstCommentDelayMinutes: maxFirstCommentDelayMinutes as number, timeout: timeout as number, maxWait: maxWait as number };
   } catch (error) { if (error instanceof OperationError) throw error; throw unavailable(); }
 }
 function validateBounds(value: TemplateInput, limit: Awaited<ReturnType<typeof templateBounds>>) {
-  if (value.name.length > limit.maxName || value.category.length > limit.maxCategory || value.body.length > limit.maxBody || value.hashtags.length > limit.maxHashtags || value.firstComment.length > limit.maxFirstComment) throw bad();
+  if (value.name.length > limit.maxName || value.category.length > limit.maxCategory || value.body.length > limit.maxBody || value.hashtags.length > limit.maxHashtags || value.firstComment.length > limit.maxFirstComment || value.firstCommentDelayMinutes > limit.maxFirstCommentDelayMinutes) throw bad();
 }
 async function transact<T>(workspaceId: string, limit: Awaited<ReturnType<typeof templateBounds>>, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return withWorkspaceOperation(workspaceId, () => prisma.$transaction(async tx => {
@@ -62,8 +62,8 @@ export async function readTemplatePage(actor: PublishingActor, input: unknown = 
   const page = query.page ?? 1;
   const search = query.q ?? '';
   const pattern = `%${search}%`;
-  const rows = await protect(prisma.$queryRaw<TemplateRow[]>`SELECT id, name, category, body, hashtags, "firstComment", "labelId", "createdAt", "updatedAt" FROM post_templates WHERE "workspaceId" = ${actor.workspaceId} AND (${search} = '' OR name ILIKE ${pattern} OR category ILIKE ${pattern} OR body ILIKE ${pattern}) ORDER BY name ASC, id ASC LIMIT ${limit.pageSize + 1} OFFSET ${(page - 1) * limit.pageSize}`);
-  return { templates: rows.slice(0, limit.pageSize), page, pageSize: limit.pageSize, hasMore: rows.length > limit.pageSize, query: query.q ?? '', limits: { maxSearchCharacters: limit.maxQuery, maxNameCharacters: limit.maxName, maxCategoryCharacters: limit.maxCategory, maxBodyCharacters: limit.maxBody, maxHashtagsCharacters: limit.maxHashtags, maxFirstCommentCharacters: limit.maxFirstComment } };
+  const rows = await protect(prisma.$queryRaw<TemplateRow[]>`SELECT id, name, category, body, hashtags, "firstComment", "firstCommentDelayMinutes", "labelId", "createdAt", "updatedAt" FROM post_templates WHERE "workspaceId" = ${actor.workspaceId} AND (${search} = '' OR name ILIKE ${pattern} OR category ILIKE ${pattern} OR body ILIKE ${pattern}) ORDER BY name ASC, id ASC LIMIT ${limit.pageSize + 1} OFFSET ${(page - 1) * limit.pageSize}`);
+  return { templates: rows.slice(0, limit.pageSize), page, pageSize: limit.pageSize, hasMore: rows.length > limit.pageSize, query: query.q ?? '', limits: { maxSearchCharacters: limit.maxQuery, maxNameCharacters: limit.maxName, maxCategoryCharacters: limit.maxCategory, maxBodyCharacters: limit.maxBody, maxHashtagsCharacters: limit.maxHashtags, maxFirstCommentCharacters: limit.maxFirstComment, maxFirstCommentDelayMinutes: limit.maxFirstCommentDelayMinutes } };
 }
 
 /** Composer integration contract: select reusable content by workspace id; this read never creates a post. */
@@ -71,7 +71,7 @@ export async function readTemplateForComposer(actor: PublishingActor, id: unknow
   const checkedId = TEMPLATE_ID_SCHEMA.safeParse(id);
   if (!checkedId.success) throw bad();
   await authorizePublishing(actor, 'publishing/templates', 'read');
-  const rows = await protect(prisma.$queryRaw<TemplateRow[]>`SELECT id, name, category, body, hashtags, "firstComment", "labelId", "createdAt", "updatedAt" FROM post_templates WHERE id = ${checkedId.data} AND "workspaceId" = ${actor.workspaceId} LIMIT 1`);
+  const rows = await protect(prisma.$queryRaw<TemplateRow[]>`SELECT id, name, category, body, hashtags, "firstComment", "firstCommentDelayMinutes", "labelId", "createdAt", "updatedAt" FROM post_templates WHERE id = ${checkedId.data} AND "workspaceId" = ${actor.workspaceId} LIMIT 1`);
   if (!rows[0]) throw missing();
   return rows[0];
 }
@@ -104,8 +104,8 @@ export async function createTemplate(actor: PublishingActor, input: unknown) {
     const count = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM post_templates WHERE "workspaceId" = ${actor.workspaceId}`;
     if (Number(count[0]?.count ?? 0) >= limit.maxRows) throw new OperationError('conflict', 'This workspace has reached its template limit.');
     const id = `tpl_${randomUUID()}`;
-    await tx.$executeRaw`INSERT INTO post_templates (id, "workspaceId", name, category, body, hashtags, "firstComment", "labelId", "createdAt", "updatedAt") VALUES (${id}, ${actor.workspaceId}, ${template.name}, ${template.category}, ${template.body}, ${template.hashtags}, ${template.firstComment}, ${template.labelId}, NOW(), NOW())`;
-    const rows = await tx.$queryRaw<TemplateRow[]>`SELECT id, name, category, body, hashtags, "firstComment", "labelId", "createdAt", "updatedAt" FROM post_templates WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId}`;
+    await tx.$executeRaw`INSERT INTO post_templates (id, "workspaceId", name, category, body, hashtags, "firstComment", "firstCommentDelayMinutes", "labelId", "createdAt", "updatedAt") VALUES (${id}, ${actor.workspaceId}, ${template.name}, ${template.category}, ${template.body}, ${template.hashtags}, ${template.firstComment}, ${template.firstCommentDelayMinutes}, ${template.labelId}, NOW(), NOW())`;
+    const rows = await tx.$queryRaw<TemplateRow[]>`SELECT id, name, category, body, hashtags, "firstComment", "firstCommentDelayMinutes", "labelId", "createdAt", "updatedAt" FROM post_templates WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId}`;
     if (!rows[0]) throw unavailable(); await audit(tx, actor, 'publishing.template_created', { templateId: id, name: template.name }); await lockActor(tx, actor, true);
     return rows[0];
   }));
@@ -119,8 +119,8 @@ export async function updateTemplate(actor: PublishingActor, input: unknown) {
     await lockActor(tx, actor, true); await checkLabel(tx, actor, template.labelId);
     const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM post_templates WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     if (!locked[0]) throw missing();
-    await tx.$executeRaw`UPDATE post_templates SET name = ${template.name}, category = ${template.category}, body = ${template.body}, hashtags = ${template.hashtags}, "firstComment" = ${template.firstComment}, "labelId" = ${template.labelId}, "updatedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId}`;
-    const rows = await tx.$queryRaw<TemplateRow[]>`SELECT id, name, category, body, hashtags, "firstComment", "labelId", "createdAt", "updatedAt" FROM post_templates WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId}`;
+    await tx.$executeRaw`UPDATE post_templates SET name = ${template.name}, category = ${template.category}, body = ${template.body}, hashtags = ${template.hashtags}, "firstComment" = ${template.firstComment}, "firstCommentDelayMinutes" = ${template.firstCommentDelayMinutes}, "labelId" = ${template.labelId}, "updatedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId}`;
+    const rows = await tx.$queryRaw<TemplateRow[]>`SELECT id, name, category, body, hashtags, "firstComment", "firstCommentDelayMinutes", "labelId", "createdAt", "updatedAt" FROM post_templates WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId}`;
     if (!rows[0]) throw missing(); await audit(tx, actor, 'publishing.template_updated', { templateId: id, name: template.name }); await lockActor(tx, actor, true);
     return rows[0];
   }));

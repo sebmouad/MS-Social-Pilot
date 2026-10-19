@@ -23,12 +23,14 @@ type TestTarget = { id: string; name: string; type: string; provider: string | n
 const rules = { allowedMimeTypes: ['image/png'], maxUploadBytes: 5000, maxAltCharacters: 120, maxMessageCharacters: 500, maxMedia: 2 };
 const schedule = { date: '2026-10-20', time: '10:30', timeZone: 'UTC' };
 
-async function render(targetChoices: TestTarget[] = targets) {
-  await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: dock }, createElement(PostComposer, { targets: targetChoices, imageRules: rules, schedule, authorName: 'Your team', createdAt: new Date('2026-10-16T10:00:00.000Z'), createdAtDisplay: 'Oct 16, 2026, 10:00 AM' }))));
+async function render(targetChoices: TestTarget[] = targets, templates: Array<{ id: string; name: string; category: string; body: string; hashtags: string; firstComment: string; firstCommentDelayMinutes: number; labelId: string | null }> = []) {
+  await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: dock }, createElement(PostComposer, { targets: targetChoices, templates, imageRules: rules, maxFirstCommentDelayMinutes: 10080, schedule, authorName: 'Your team', createdAt: new Date('2026-10-16T10:00:00.000Z'), createdAtDisplay: 'Oct 16, 2026, 10:00 AM' }))));
 }
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
   container = document.createElement('div'); dock = document.createElement('div'); document.body.append(container, dock); root = createRoot(container);
   vi.clearAllMocks();
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ reference: 'media:123e4567-e89b-42d3-a456-426614174000' }) }));
@@ -38,6 +40,17 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); dock.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('dedicated post composer', () => {
+  it('exposes a bounded accessible minute field and applies the template delay', async () => {
+    await render(targets, [{ id: 'template-a', name: 'Welcome', category: '', body: 'Hello', hashtags: '', firstComment: 'Follow up', firstCommentDelayMinutes: 37, labelId: null }]);
+    const delay = container.querySelector<HTMLInputElement>('#composer-first-comment-delay')!;
+    expect(delay.labels?.[0]?.textContent).toMatch(/minutes/i);
+    expect(delay.min).toBe('0'); expect(delay.max).toBe('10080'); expect(delay.value).toBe('0');
+    await act(async () => dock.querySelector<HTMLButtonElement>('button')!.click());
+    const choose = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.trim() === 'Use template')!;
+    await act(async () => choose.click());
+    expect(container.querySelector<HTMLInputElement>('#composer-first-comment-delay')?.value).toBe('37');
+    expect(container.querySelector<HTMLTextAreaElement>('#composer-first-comment')?.value).toBe('Follow up');
+  });
   it('navigates only after confirmed save and prevents another submission while opening Posts', async () => {
     mocks.action.mockResolvedValueOnce({status:'success',destination:'/publishing/posts?notice=created',values:{}});
     await render();

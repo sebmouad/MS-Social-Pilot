@@ -127,6 +127,8 @@ describe('shared Publishing read service', () => {
     expect(state.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 25, where: expect.objectContaining({ AND: expect.arrayContaining([expect.objectContaining({ AND: expect.arrayContaining([expect.objectContaining({ workspaceId: 'workspace' })]) })]) }) }));
     expect(result[0]?.targets).toEqual([{ firstCommentError: 'review_required' }, { firstCommentError: FIRST_COMMENT_REJECTED }]);
     const query = state.findMany.mock.calls[0]?.[0];
+    expect(query.select.firstCommentDelayMinutes).toBe(true);
+    expect(query.select.targets.select.publishedAt).toBe(true);
     expect(query.where.AND[0].AND[0].OR[0].targets.every.targetId.in).toEqual(['selected-a', 'selected-b']);
     expect(query.where.AND[0].AND).toContainEqual({ OR: [
       { message: { contains: 'match', mode: 'insensitive' } },

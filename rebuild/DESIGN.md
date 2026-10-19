@@ -180,3 +180,12 @@ footer behavior intact. Root and customer status surfaces require separate
 verification. Root verification passed16 views across four themes at1440px
 and390px with screenshot inspection. Customer recovery component tests passed;
 its full browser matrix remains open. This is not whole-app UX clearance.
+
+
+### First-comment delay control (batch94)
+Use the existing full-width numeric input, visible label and associated muted
+12px helper/error text in composer and editor. Keep delay adjacent to its first
+comment; channel/format choices remain docked in the contextual sidebar. Saved
+delivery timing and early-send confirmation use existing status/dialog patterns,
+including Cancel-first focus, Escape and opener restoration. Four-theme desktop/
+phone probe evidence is scoped in docs/FIRST_COMMENT_SCHEDULING.md.

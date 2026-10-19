@@ -10,6 +10,7 @@ export type VersionSnapshot = {
   versionId: string;
   message: string;
   firstComment: string | null;
+  firstCommentDelayMinutes?: number;
   link: string | null;
   media: unknown;
   format: string;

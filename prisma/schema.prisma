@@ -657,6 +657,7 @@ model PostVersion {
   createdAt    DateTime  @default(now())
   message      String
   firstComment String?
+  firstCommentDelayMinutes Int @default(0)
   link         String?
   media        Json      @default("[]")
   format       String
@@ -1730,6 +1731,7 @@ model PostTemplate {
   body         String
   hashtags     String   @default("")
   firstComment String   @default("")
+  firstCommentDelayMinutes Int @default(0)
   labelId      String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
