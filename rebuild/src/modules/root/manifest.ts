@@ -13,6 +13,8 @@ export const rootManifest = {
       { title: 'Plans', href: '/root/plans' },
       { title: 'Privileges', href: '/root/privileges' },
       { title: 'Access lifecycle', href: '/root/lifecycle' },
+      { title: 'Sessions', href: '/root/sessions' },
+      { title: 'Connections', href: '/root/connections' },
       { title: 'Errors', href: '/root/errors' },
       { title: 'Backup records', href: '/root/backups' },
       { title: 'Operations', href: '/root/operations' },

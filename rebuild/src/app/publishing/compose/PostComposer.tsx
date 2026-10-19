@@ -14,6 +14,8 @@ import { useActionState, useEffect, useMemo, useRef, useState, type FormEvent } 
 import { flushSync } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { createPostWithRecoveryAction, type ComposerActionState } from '../posts/actions';
+import { crowdedDestinationPlatforms } from '@/modules/settings/workspace-operations';
+import { workspaceOperationsCopy } from '@/modules/settings/workspace-operations-copy';
 import styles from './PostComposer.module.css';
 
 type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
@@ -106,7 +108,7 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items);
 }
 
-export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes }: { targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number }) {
+export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0 }: { targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -135,6 +137,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
   const feedbackRef = useRef<HTMLParagraphElement>(null);
   const selected = useMemo(() => targets.filter(target => selectedTargets.includes(target.id) && target.canPublish), [targets, selectedTargets]);
   const uploadRules = localUploadRules(selected, imageRules);
+  const crowded = crowdedDestinationPlatforms(spacingGapMinutes, selected.map(target => target.provider)).length > 0;
   const destinationFormatsJson = useMemo(() => {
     const out: Record<string, string> = Object.create(null);
     for (const target of selected) { const value = effectiveDestinationFormat(target, formatChoices); if (value !== undefined) out[target.id] = value; }
@@ -301,6 +304,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
             <span>{target.name}</span>
           </label>) : <p>No destinations are ready to publish right now.</p>}
           <small>Drafts can be saved without a destination. Scheduling needs at least one.</small>
+          {crowded && <p className={styles.spacingWarning} role="status">{workspaceOperationsCopy.en.spacingWarning.replace('{minutes}', String(spacingGapMinutes))}</p>}
         </fieldset>
         {selected.some(target => target.publishingFormats?.length) && <fieldset className={styles.destinationList} disabled={pending || uploading || saved}>
           <legend>Formats</legend>

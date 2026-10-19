@@ -1,0 +1,15 @@
+.root{display:grid;gap:1.25rem}
+.panel{display:grid;gap:.75rem;padding:1rem;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--surface)}
+.panel h2{font-size:1.05rem;margin:0}
+.row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.form{display:grid;gap:.75rem}
+.form label{display:grid;gap:.3rem;font-weight:600}
+.form input[type=text],.form input[type=number],.form select,.form textarea{font:inherit;font-weight:400;border:1px solid var(--line-strong);border-radius:var(--radius-sm);padding:.55rem;background:var(--surface);color:var(--ink);max-width:100%}
+.form textarea{min-height:5rem;resize:vertical}
+.check{display:flex!important;align-items:center;gap:.5rem;font-weight:400!important}
+.hint,.meta{font-size:.85rem;color:var(--ink-soft);font-weight:400}
+.list{display:grid;gap:.5rem;margin:0;padding:0;list-style:none}
+.item{display:grid;gap:.35rem;padding:.75rem;border-radius:var(--radius-sm);background:var(--surface-muted);overflow-wrap:anywhere}
+.error{color:var(--danger)}
+.success{color:var(--ink)}
+.channels{display:grid;gap:.3rem;max-height:12rem;overflow:auto}

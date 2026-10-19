@@ -4,6 +4,7 @@ import { DestinationFormats, effectiveDestinationFormat } from '@/modules/publis
 import { usePreserveFormState } from '@/components/usePreserveFormState';
 import { AutoTextarea } from '@/components/AutoTextarea';
 
+import { retryableDestinationCount, bulkCopy } from "@/modules/publishing/bulk";
 import { cancelScheduledPostAction, deletePostWithRecoveryAction, importPostsAction, publishPostAction, recordFirstCommentOutcomeAction, schedulePostAction, sendFirstCommentAction, submitForApprovalAction, syncPostAction, updatePostWithRecoveryAction, type ComposerValues, type FirstCommentActionState, type PostDeleteActionState, type PostEditActionState } from "./actions";
 import { startTransition, useActionState, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { flushSync } from 'react-dom';
@@ -112,6 +113,8 @@ export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
 
 export function PostRowActions({ post, targets, canEdit, canPublish, imageRules, canDuplicate = false, canOrganize = false, canQueue = false, timeZone = 'UTC' }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules; canDuplicate?: boolean; canOrganize?: boolean; canQueue?: boolean; timeZone?: string }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [retryCopy, setRetryCopy] = useState<ReturnType<typeof bulkCopy>>(bulkCopy('en'));
+  useEffect(() => { setRetryCopy(bulkCopy(document.documentElement.lang || navigator.language)); }, []);
   const [editPending, setEditPending] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const [duplicatePending, setDuplicatePending] = useState(false);
@@ -134,6 +137,7 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules,
       <input type="hidden" name="postId" value={post.id} />
       <button className="ui-button ui-button--primary ui-button--sm" type="submit" disabled={rowPending}>Publish now</button>
     </form> : null}
+    {canPublish && retryableDestinationCount(post) > 0 ? <RetryFailedButton postId={post.id} count={retryableDestinationCount(post)} copy={retryCopy} disabled={rowPending} /> : null}
     {canEdit && isDraft && post.targets.length ? <>
       <form noValidate action={submitForApprovalAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={rowPending}>Submit for approval</button></form>
       <ScheduleForm postId={post.id} disabled={rowPending}/>
@@ -504,4 +508,22 @@ function TargetPicker({ targets, selected = new Set<string>(), onSelectionChange
     </label>) : <p>No enabled destinations can publish right now.</p>}
     <small>Only enabled destinations that support publishing are shown.</small>
   </fieldset>;
+}
+
+function RetryFailedButton({ postId, count, copy, disabled }: { postId: string; count: number; copy: { retryOne: string; retryOneHelp: (n: number) => string; cancel: string; confirm: string }; disabled: boolean }) {
+  const [open, setOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  return <form ref={formRef} noValidate action={publishPostAction}>
+    <input type="hidden" name="postId" value={postId} />
+    <input type="hidden" name="retryOnly" value="1" />
+    <button className="ui-button ui-button--secondary ui-button--sm" type="button" disabled={disabled} onClick={() => setOpen(true)}>{copy.retryOne}</button>
+    {open ? <ModalDialog className="ui-dialog" labelledBy={`retry-title-${postId}`} describedBy={`retry-help-${postId}`} onDismiss={() => setOpen(false)}>
+      <h2 id={`retry-title-${postId}`}>{copy.retryOne}</h2>
+      <p id={`retry-help-${postId}`}>{copy.retryOneHelp(count)}</p>
+      <div className="ui-dialog__actions">
+        <button className="ui-button ui-button--secondary" type="button" data-dialog-cancel onClick={() => setOpen(false)}>{copy.cancel}</button>
+        <button className="ui-button ui-button--primary" type="button" onClick={() => { setOpen(false); formRef.current?.requestSubmit(); }}>{copy.confirm}</button>
+      </div>
+    </ModalDialog> : null}
+  </form>;
 }

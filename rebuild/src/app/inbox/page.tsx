@@ -143,6 +143,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       <button className="ui-button ui-button--primary ui-button--md" type="submit">Apply filters</button>
       <a href="/inbox">Reset filters</a>
     </form>
+    <div className={styles.navigationGroup}>
+      <p className={styles.filterHeading}>Automation</p>
+      <a href="/inbox/moderation">Moderation rules</a>
+    </div>
     {listPage ? <div className={styles.navigationGroup}>
       <p className={styles.filterHeading}>Conversations</p>
       <nav className={styles.pagination} aria-label="Inbox list pages">

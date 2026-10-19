@@ -635,3 +635,18 @@ model RebuildReportRun {
   @@index([workspaceId,targetId,startedAt(sort:Desc),id], map:"report_runs_channel_history")
   @@map("report_runs")
 }
+
+/// Personal Posts/Calendar saved views. Table created by the shared migration
+/// 20261019090000_saved_views (no rebuild DDL needed). Accessed through
+/// src/modules/publishing/server/saved-views.ts with workspace+user binding.
+model SavedView {
+  id          String   @id
+  workspaceId String
+  userId      String
+  name        String
+  screen      String
+  query       String
+  createdAt   DateTime @default(now())
+  @@index([workspaceId, userId, screen])
+  @@map("saved_views")
+}

@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { PostFilters } from "./posts/PostFilters";
 import { CalendarFilters } from "./calendar/CalendarFilters";
+import { SavedViews } from "./SavedViews";
 
 /** Chooses the sidebar controls for the current publishing page. */
 export function PublishingSidebar({ channels, today, searchMaxCharacters, exportMaxPosts, exportMaxBytes }: { channels: Array<{ id: string; name: string }>; today: string; searchMaxCharacters: number; exportMaxPosts: number; exportMaxBytes: number }) {
@@ -14,6 +15,6 @@ export function PublishingSidebar({ channels, today, searchMaxCharacters, export
     : pathname === "/publishing/templates"
     ? <div aria-label="Template tools"><p className="shell-subnav__label">Templates</p><p className="help">Search workspace templates or create a reusable post message from here.</p></div>
     : pathname === "/publishing/calendar"
-    ? <CalendarFilters channels={channels} today={today} />
-    : <PostFilters channels={channels} currentMonth={today.slice(0, 7)} searchMaxCharacters={searchMaxCharacters} exportMaxPosts={exportMaxPosts} exportMaxBytes={exportMaxBytes} />;
+    ? <><CalendarFilters channels={channels} today={today} /><SavedViews screen="calendar" /></>
+    : <><PostFilters channels={channels} currentMonth={today.slice(0, 7)} searchMaxCharacters={searchMaxCharacters} exportMaxPosts={exportMaxPosts} exportMaxBytes={exportMaxBytes} />{pathname === "/publishing/posts" ? <SavedViews screen="posts" /> : null}</>;
 }

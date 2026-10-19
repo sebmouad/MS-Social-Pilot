@@ -7,6 +7,7 @@ import { PageHeading, PostMessage, PostTargets, formatDate } from "../publishing
 import styles from "../publishing.module.css";
 import previewStyles from '@/components/PostPreview.module.css';
 import { CsvImportForm, PostRowActions } from "./PostActions";
+import { BulkPostActions, BulkSelect } from "./BulkPostActions";
 import { runtimeConfig } from '@/server/config/store';
 import { RouteNotice } from '@/components/RouteNotice';
 import { PostStatus } from '../../../../generated/client';
@@ -100,11 +101,14 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     { key: "scheduled", label: "Publish time", render: post => <span className={styles.date}>{formatDate(post.scheduledAt ?? post.publishedAt, viewer.membership.workspace.timezone)}</span> },
   ];
   if (canAuthorDrafts) columns.push({ key: "actions", label: "Post actions", render: actionFor });
+  const canBulk = canWritePosts && canAuthorDrafts && view === 'table' && rows.length > 0;
+  if (canBulk) columns.unshift({ key: "select", label: "Select", render: post => <BulkSelect postId={post.id} label={post.message.slice(0, 60) || post.id} /> });
   return <>
     <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${listing.total} ${listing.total === 1 ? "post" : "posts"} · page ${listing.page} of ${listing.pages}`}/>
     {listing.channelUnavailable ? <p className={styles.errorNotice} role="status">The selected channel is unavailable. Choose another channel or reset the sidebar filters.</p> : null}
     {noticeText ? <RouteNotice className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} error={notice?.startsWith('failed')} focusKey={`${notice}:${recovery ?? ''}`}>{noticeText}</RouteNotice> : null}
     {canManageDrafts ? <div className={previewStyles.toolbar}><details className={previewStyles.importDisclosure}><summary>Import CSV</summary><section className={`${styles.card} ${styles.createCard}`}><p className={styles.help}>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section></details></div> : null}
+    {canBulk ? <BulkPostActions canRetry={canPublish} /> : null}
     <section className={styles.card} aria-label={`${view === 'table' ? 'Table' : view === 'feed' ? 'Feed' : 'Cards'} post view`}>
       {view === 'table' ? <DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage={selectedStatus || selectedChannel || q?.trim() ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}/> : rows.length ? <ul className={view === 'feed' ? previewStyles.feedList : previewStyles.cardsGrid}>
         {rows.map(post => <li key={post.id}>{previewFor(post, view === 'feed' ? 'feed' : 'card')}</li>)}

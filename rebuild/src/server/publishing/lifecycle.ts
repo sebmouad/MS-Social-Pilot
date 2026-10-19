@@ -18,6 +18,8 @@ import { readPublishingCredential } from '@/modules/publishing/server/credential
 import { publishDestinationInOperation } from '@/modules/publishing/server/publication';
 import { assertPublishingMediaSupport } from '@/modules/publishing/media-support';
 import { needsContributorApproval } from '@/modules/settings/workspace-policy';
+import { applyUtm, prepareCaptionLinks } from '@/modules/settings/workspace-operations';
+import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import { recordPostVersion, loadVersionRetention } from '@/modules/publishing/collaboration/server/versions';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
@@ -413,18 +415,19 @@ export async function restorePostVersion(input: { actor: PublishingActor; postId
 export { deletePostDurably as deletePost } from '@/modules/publishing/server/deletion';
 
 /** Claim each destination before the provider call. `processing` remains as a manual-reconciliation marker on ambiguous failures. */
-export async function publishPost(actor: PublishingActor, postId: string, expectedScheduledAt?: Date) {
+export async function publishPost(actor: PublishingActor, postId: string, expectedScheduledAt?: Date, options: { retryOnly?: boolean } = {}) {
   return withPublishingOperation(actor, { postId, allowPublicationRecovery: true }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
     const approvalRequired = !MANAGERS.has(role.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), role.role);
     await assertPostScope(actor, postId);
-    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, format: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, formatId: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true } } } } } } } });
+    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, format: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, formatId: true, status: true, remotePostId: true, target: { select: { id: true, name: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true } } } } } } } });
     if (expectedScheduledAt !== undefined && (!post || post.status !== 'scheduled' || !post.scheduledAt || post.scheduledAt.getTime() !== expectedScheduledAt.getTime())) return { published: 0, failed: 0, needsReconciliation: 0, firstCommentsNeedingReview: 0, firstCommentsNotSent: 0, skipped: true };
     if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
     if (approvalRequired) {
       const approval = await prisma.$queryRaw<Array<{ approvalStatus: string }>>`SELECT "approvalStatus"::text AS "approvalStatus" FROM posts WHERE id = ${post.id} AND "workspaceId" = ${actor.workspaceId}`;
       if (approval[0]?.approvalStatus !== 'approved') throw new OperationError('conflict', 'This workspace requires approval before this post can be published.');
     }
+    if (options.retryOnly && !['failed', 'partially_failed'].includes(post.status)) throw new OperationError('conflict', 'Only posts with failed destinations can be retried.');
     if (!['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status)) throw new OperationError('conflict', 'This post cannot be published in its current state.');
     if (post.status === 'scheduled' && (!post.scheduledAt || post.scheduledAt > new Date())) throw new OperationError('conflict', 'This post is scheduled for a future time.');
     if (!post.targets.length) throw new OperationError('invalid_request', 'Select at least one destination before publishing.');
@@ -444,6 +447,9 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
         assertLocalImageLimits(adapter, publishMedia);
       }
     }
+    // Workspace link preparation (legacy publish-time UTM tagging); stored content keeps the real destination.
+    let linkSettings: Awaited<ReturnType<typeof loadWorkspaceOperations>> | null = null;
+    const taggedAt = new Date();
     let published = 0;
     let failed = 0;
     let pending = 0;
@@ -458,9 +464,11 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       const credential = adapter ? readPublishingCredential(item.target, adapter, 'publishing') : null;
       const eligible = Boolean(credential && provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && (!post.firstComment?.trim() || adapter.publishFirstComment) && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
       if (!eligible) { failed++; await markTarget(actor, item.id, 'failed', signal); continue; }
+      linkSettings ??= await loadWorkspaceOperations(actor.workspaceId);
+      const preparedLinks = linkSettings;
       const outcome = await publishDestinationInOperation({ actor, signal }, {
         postId: post.id, postTargetId: item.id, targetId: item.target.id, provider: provider!, expectedStatus: item.status as 'pending' | 'failed',
-        dispatch: operationId => adapter!.publish!({ credential: credential!, target: { id: item.target.providerId, name: '', kind: item.target.type }, formatId: item.formatId ?? post.format, text: post.message, link: attachments.link, media: publishMedia, signal, operationId }),
+        dispatch: operationId => adapter!.publish!({ credential: credential!, target: { id: item.target.providerId, name: '', kind: item.target.type }, formatId: item.formatId ?? post.format, text: prepareCaptionLinks(post.message, preparedLinks, { targetName: item.target.name, date: taggedAt }), link: attachments.link ? applyUtm(attachments.link, preparedLinks, { targetName: item.target.name, date: taggedAt }) : attachments.link, media: publishMedia, signal, operationId }),
         classifyFailure: error => adapter!.classifyPublishingFailure?.(error) ?? 'uncertain',
       });
       if (outcome === 'failed') { failed++; continue; }

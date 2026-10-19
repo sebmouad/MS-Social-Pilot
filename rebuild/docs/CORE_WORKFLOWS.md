@@ -32,8 +32,35 @@ approval releases pending posts to draft or scheduled according to their stored
 time, with audit records. Contributor scheduling waits for review while the
 policy requires it; approved scheduled work resumes at its stored time. Any edit
 of approved content clears review metadata. Managers retain the existing bypass.
-This does not implement business hours, UTM defaults, link shortening, client
-approval, queue policies or every legacy workspace control.
+Client approval and per-channel queue policies are not part of this policy.
+
+## Workspace operations settings
+
+Owners/admins manage workspace operations values through the shared service
+(`modules/settings/server/workspace-operations.ts`), `/api/settings/workspace/operations`
+and MCP `get_/update_workspace_operations`, with the policy page's authorization,
+purge and membership locks, exact `UPDATE WORKSPACE OPERATIONS <workspaceId>`
+confirmation and an audit record that omits brand-voice/avoid-word text. Values
+use the existing legacy `workspaces` columns, so legacy values carry over without
+a migration; invalid stored values fall back per field to legacy defaults. Copy
+is catalogued in English and French (`modules/settings/workspace-operations-copy.ts`).
+
+Live consumers, and the only fields rendered on `/settings/workspace`:
+
+- UTM source/medium/campaign template: the shared publisher (`publishPost`)
+  tags every caption URL and the post link immediately before provider dispatch
+  (ported legacy `applyUtm`, `{date}/{month}/{year}/{target}` tokens, existing
+  tags kept). Stored post content keeps the original links.
+- Spacing gap: the composer shows a non-blocking warning when three or more
+  selected destinations share one installed platform and the gap is non-zero
+  (one post sends to all destinations at once). Grouping uses the neutral
+  platform id; there is no automatic staggering.
+
+Stored and exposed through API/MCP only, with no consumer yet, so not rendered:
+week start, business hours, best-time mode, link shortening (no short-link
+service), undo-send window, AI enablement/tone/brand voice/avoid words and the
+negative-comment alert. The form sends these back unchanged. Evidence is unit
+tests only (`tests/workspace-operations*.test.ts`); no browser or database run.
 
 ## Evidence and limits
 

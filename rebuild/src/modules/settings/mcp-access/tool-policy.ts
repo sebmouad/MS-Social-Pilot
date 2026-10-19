@@ -19,6 +19,7 @@ const resourceScopedTools: ReadonlySet<string> = new Set([
   // Inbox items are checked against the channel ceiling.
   'list_inbox', 'get_inbox_thread', 'reply_to_inbox', 'get_inbox_deletion', 'delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved',
   'moderate_inbox_comment', 'get_inbox_productivity', 'assign_inbox_item', 'add_inbox_private_note', 'delete_inbox_private_note',
+  'get_inbox_moderation', 'create_inbox_moderation_rule', 'update_inbox_moderation_rule', 'delete_inbox_moderation_rule', 'run_inbox_moderation_rules', 'undo_inbox_moderation_action',
   // Analytics and Ads reads and spend-bound writes that carry the ceiling.
   'get_analytics_overview', 'get_analytics_metric_details', 'get_analytics_demographics', 'compare_analytics', 'get_analytics_explorer',
   'list_report_schedules', 'manage_report_schedule', 'list_report_runs', 'generate_report',
@@ -42,11 +43,12 @@ const workspaceWideTools: ReadonlySet<string> = new Set([
   'list_workspace_images', 'get_workspace_image', 'delete_workspace_image', 'upload_workspace_image',
   'list_post_templates', 'create_post_template', 'update_post_template', 'delete_post_template',
   'list_post_labels', 'create_post_label', 'update_post_label', 'delete_post_label', 'list_post_label_choices',
+  'list_saved_views', 'create_saved_view', 'delete_saved_view', 'bulk_post_action',
   'list_custom_fields', 'create_custom_field', 'update_custom_field', 'delete_custom_field',
   'list_queue_times', 'replace_queue_times', 'get_content_mix', 'save_content_mix', 'set_content_mix_autofill',
   'list_workspace_team', 'add_workspace_member', 'update_workspace_member', 'remove_workspace_member',
   'list_workspace_invitations', 'invite_workspace_member', 'revoke_workspace_invitation',
-  'get_workspace_policies', 'update_workspace_policies',
+  'get_workspace_policies', 'update_workspace_policies', 'get_workspace_operations', 'update_workspace_operations',
   'get_notification_preferences', 'update_notification_preferences', 'list_notifications', 'mark_notification_read', 'delete_notification',
   'list_inbox_saved_replies', 'create_inbox_saved_reply', 'update_inbox_saved_reply', 'delete_inbox_saved_reply',
   'preview_workspace_data_deletion', 'export_workspace_data', 'delete_workspace_data',

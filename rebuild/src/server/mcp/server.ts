@@ -47,9 +47,12 @@ import { TASKS_FEATURE_ID } from '@/modules/tasks/semantics';
 import { teamToolDefinitions, teamTools, teamWriteTools, executeTeamTool, invitationAvailability } from '@/modules/settings/team-mcp';
 import { collaborationToolDefinitions, collaborationTools, collaborationWriteTools, availableCollaborationTools, executeCollaborationTool } from '@/modules/publishing/collaboration/mcp';
 import { labelToolDefinitions, labelTools, labelWriteTools, executeLabelTool } from '@/modules/publishing/labels-mcp';
+import { savedViewToolDefinitions, savedViewTools, savedViewWriteTools, executeSavedViewTool } from '@/modules/publishing/saved-views-mcp';
+import { bulkToolDefinitions, bulkTools, bulkWriteTools, executeBulkTool } from '@/modules/publishing/bulk-mcp';
 import { analyticsExplorerToolDefinitions, analyticsExplorerTools, executeAnalyticsExplorerTool } from '@/modules/analytics/explorer-mcp';
 import { templateToolDefinitions, templateTools, templateWriteTools, executeTemplateTool } from '@/modules/publishing/template-mcp';
 import { inboxProductivityToolDefinitions, inboxProductivityTools, inboxProductivityWriteTools, executeInboxProductivityTool } from '@/modules/inbox/productivity-mcp';
+import { inboxModerationToolDefinitions, inboxModerationTools, inboxModerationWriteTools, executeInboxModerationTool } from '@/modules/inbox/moderation-mcp';
 import { workspacePolicyToolDefinitions, workspacePolicyTools, workspacePolicyWriteTools, executeWorkspacePolicyTool } from '@/modules/settings/workspace-policy-mcp';
 import { notificationToolDefinitions, notificationTools, notificationWriteTools, executeNotificationTool } from '@/modules/settings/notifications/mcp';
 import { parseAdsPerformanceFilters } from '@/modules/ads/performance-filters';
@@ -113,9 +116,12 @@ const tools = [
   ...notificationToolDefinitions,
   ...templateToolDefinitions,
   ...labelToolDefinitions,
+  ...savedViewToolDefinitions,
+  ...bulkToolDefinitions,
   ...collaborationToolDefinitions,
   ...analyticsExplorerToolDefinitions,
   ...inboxProductivityToolDefinitions,
+  ...inboxModerationToolDefinitions,
   { name: 'list_workspace_images', description: 'List bounded workspace image metadata. Image bytes remain in workspace storage and are not included.', inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 200 }, cursor: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_workspace_image', description: 'Read metadata for one image stored in this workspace.', inputSchema: { type: 'object', required: ['imageId'], properties: { imageId: { type: 'string' } }, additionalProperties: false } },
   { name: 'delete_workspace_image', description: 'Permanently delete an unused workspace image. Images attached to posts cannot be deleted. Confirmation must exactly match DELETE WORKSPACE IMAGE <imageId>.', inputSchema: { type: 'object', required: ['imageId', 'confirmation'], properties: { imageId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -192,6 +198,8 @@ const toolFeatures: Record<string, string> = {
   revoke_workspace_invitation: 'settings/team',
   get_workspace_policies: 'settings/workspace',
   update_workspace_policies: 'settings/workspace',
+  get_workspace_operations: 'settings/workspace',
+  update_workspace_operations: 'settings/workspace',
   get_notification_preferences: 'settings/notifications',
   update_notification_preferences: 'settings/notifications',
   list_notifications: 'settings/notifications',
@@ -203,6 +211,10 @@ const toolFeatures: Record<string, string> = {
   create_post_label: 'publishing/labels',
   update_post_label: 'publishing/labels',
   delete_post_label: 'publishing/labels',
+  list_saved_views: 'publishing/posts',
+  create_saved_view: 'publishing/posts',
+  delete_saved_view: 'publishing/posts',
+  bulk_post_action: 'publishing/posts',
   list_post_templates: 'publishing/templates',
   create_post_template: 'publishing/templates',
   update_post_template: 'publishing/templates',
@@ -216,6 +228,12 @@ const toolFeatures: Record<string, string> = {
   list_inbox: 'inbox/conversations',
   get_inbox_thread: 'inbox/conversations',
   get_inbox_productivity: 'inbox/conversations',
+  get_inbox_moderation: 'inbox/conversations',
+  create_inbox_moderation_rule: 'inbox/conversations',
+  update_inbox_moderation_rule: 'inbox/conversations',
+  delete_inbox_moderation_rule: 'inbox/conversations',
+  run_inbox_moderation_rules: 'inbox/conversations',
+  undo_inbox_moderation_action: 'inbox/conversations',
   list_inbox_saved_replies: 'inbox/conversations',
   assign_inbox_item: 'inbox/conversations',
   add_inbox_private_note: 'inbox/conversations',
@@ -266,7 +284,7 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', ...templateWriteTools, ...labelWriteTools, ...collaborationWriteTools, ...analyticsPinWriteTools]);
+const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', ...templateWriteTools, ...labelWriteTools, ...savedViewWriteTools, ...bulkWriteTools, ...collaborationWriteTools, ...analyticsPinWriteTools]);
 /** Registered workspace feature scopes; customer key choices must not promise unimplemented tools. */
 export function workspaceMcpFeatureIds(): readonly string[] { return [...new Set(Object.values(toolFeatures))]; }
 
@@ -275,8 +293,11 @@ for (const name of teamWriteTools) writeTools.add(name);
 for (const name of analyticsPinWriteTools) writeTools.add(name);
 for (const name of collaborationWriteTools) writeTools.add(name);
 for (const name of labelWriteTools) writeTools.add(name);
+for (const name of savedViewWriteTools) writeTools.add(name);
+for (const name of bulkWriteTools) writeTools.add(name);
 for (const name of templateWriteTools) writeTools.add(name);
 for (const name of inboxProductivityWriteTools) writeTools.add(name);
+for (const name of inboxModerationWriteTools) writeTools.add(name);
 for (const name of workspacePolicyWriteTools) writeTools.add(name);
 for (const name of notificationWriteTools) writeTools.add(name);
 for (const name of adsManagementWriteTools) writeTools.add(name);
@@ -425,9 +446,12 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
   if (workspacePolicyTools.has(name)) return executeWorkspacePolicyTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
   if (notificationTools.has(name)) return executeNotificationTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
   if (templateTools.has(name as 'list_post_templates' | 'create_post_template' | 'update_post_template' | 'delete_post_template')) return executeTemplateTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name as 'list_post_templates' | 'create_post_template' | 'update_post_template' | 'delete_post_template', args);
+  if (bulkTools.has(name)) return executeBulkTool(publishingActor(viewer), name, args);
+  if (savedViewTools.has(name)) return executeSavedViewTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
   if (labelTools.has(name as 'list_post_labels' | 'create_post_label' | 'update_post_label' | 'delete_post_label')) return executeLabelTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args);
   if (analyticsExplorerTools.has(name)) return executeAnalyticsExplorerTool(analyticsActor, args, { allowedChannelIds: pageIdsFor(viewer), feature: 'analytics/explorer' }, cap);
   if (inboxProductivityTools.has(name)) return executeInboxProductivityTool(inboxActor(viewer), name, args, cap);
+  if (inboxModerationTools.has(name)) return executeInboxModerationTool(inboxActor(viewer), name, args);
   switch (name) {
     case 'list_workspace_images': {
       const limit = Math.max(1, Math.min(cap, 200, Math.trunc(Number(args.limit) || cap)));
@@ -916,7 +940,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       const args = (params.arguments ?? {}) as Record<string, unknown>;
       if (collaborationTools.has(name) && !availableCollaborationTools().some(tool => tool.name === name)) throw new OperationError('unavailable', 'This action is unavailable.');
       // Data deletion, local Inbox workflow and Tasks own their service-level lock.
-      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !serviceGuardedPublishingTools.has(name) && !teamTools.has(name) && !inboxProductivityWriteTools.has(name) && !workspacePolicyTools.has(name) && !notificationTools.has(name) && !tasksWriteTools.has(name) && !sharingWriteTools.has(name) && !analyticsReportWriteTools.has(name) && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
+      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !serviceGuardedPublishingTools.has(name) && !teamTools.has(name) && !inboxProductivityWriteTools.has(name) && !inboxModerationWriteTools.has(name) && !workspacePolicyTools.has(name) && !notificationTools.has(name) && !tasksWriteTools.has(name) && !sharingWriteTools.has(name) && !analyticsReportWriteTools.has(name) && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
         ? await withWorkspaceOperation(viewer.workspaceId, () => runTool(viewer, name, args))
         : await runTool(viewer, name, args);
       return reply(textResult(result));

@@ -99,3 +99,9 @@
 .mediaMore { display: flex; justify-content: center; }
 @media (max-width: 1100px) { .postWorkbench { grid-template-columns: minmax(0, 1fr); } .importCard { position: static; } }
 @media (max-width: 720px) { .heading { align-items: flex-start; flex-direction: column; } .calendar { display: none; } .agenda { display: block; } .formFooter { align-items: flex-start; flex-direction: column; } }
+.savedViewList { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.savedViewList li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.savedViewList a { min-width: 0; overflow-wrap: anywhere; }
+.savedViewList a[aria-current="page"] { font-weight: 700; }
+.bulkBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.bulkBar > p:empty { display: none; }

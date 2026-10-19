@@ -11,7 +11,7 @@ import { workspacePolicyConfirmation, workspacePolicySchema, type WorkspacePolic
 const unavailable = () => new OperationError('unavailable', 'Workspace policies are temporarily unavailable. Try again later.');
 const forbidden = () => new OperationError('forbidden', 'Workspace policy management is available to workspace owners and admins.');
 const validTimeZone = (value: string) => { try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; } };
-async function authorize(actor: WorkspacePolicyActor, write: boolean) {
+export async function authorizeWorkspaceManager(actor: WorkspacePolicyActor, write: boolean) {
   if (!actor || !actor.userId || !actor.workspaceId) throw new OperationError('unauthorized', 'Sign in with an active workspace account.');
   const [user, membership, entitlements, permissions] = await Promise.all([
     prisma.user.findUnique({ where: { id: actor.userId }, select: { disabledAt: true } }),
@@ -30,7 +30,7 @@ async function maxZoneLength() {
 
 export async function readWorkspacePolicy(actor: WorkspacePolicyActor) {
   try {
-    await authorize(actor, false);
+    await authorizeWorkspaceManager(actor, false);
     await assertWorkspaceNotPurging(actor.workspaceId);
     const rows = await prisma.$queryRaw<Array<{ timezone: string; requiresApproval: boolean }>>`SELECT timezone, "requiresApproval" FROM workspaces WHERE id = ${actor.workspaceId}`;
     if (!rows[0] || !validTimeZone(rows[0].timezone) || typeof rows[0].requiresApproval !== 'boolean') throw unavailable();
@@ -42,7 +42,7 @@ export async function readWorkspacePolicy(actor: WorkspacePolicyActor) {
 export async function updateWorkspacePolicy(actor: WorkspacePolicyActor, input: unknown) {
   const value = workspacePolicySchema.safeParse(input);
   if (!value.success) throw new OperationError('invalid_request', 'Choose a valid workspace time zone and policy.');
-  try { await authorize(actor, true); }
+  try { await authorizeWorkspaceManager(actor, true); }
   catch (error) { if (error instanceof OperationError) throw error; throw unavailable(); }
   const maxCharacters = await maxZoneLength();
   if (value.data.timezone.length > maxCharacters || !validTimeZone(value.data.timezone) || value.data.confirmation !== workspacePolicyConfirmation(actor.workspaceId)) throw new OperationError('invalid_request', 'Choose a valid workspace time zone and enter the exact confirmation.');

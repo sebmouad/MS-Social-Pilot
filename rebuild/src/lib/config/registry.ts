@@ -12,7 +12,7 @@ import { configurationOwner } from './ownership';
 import { WORKSPACE_JOB_ACCESS_DEFAULTS, WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, WORKSPACE_JOB_OWNER_POLICY_SCHEMA } from '@/server/jobs/access-policy';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 80;
+export const CONFIG_SCHEMA_VERSION = 81;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -27,6 +27,7 @@ import { SETTINGS_INVITATION_CONFIG } from '@/modules/settings/invitations-confi
 import { MAIL_CONFIG } from '@/server/mail/config';
 import { TEMPLATE_CONFIG } from '@/modules/publishing/templates-config';
 import { INBOX_PRODUCTIVITY_CONFIG } from '@/modules/inbox/productivity-config';
+import { INBOX_MODERATION_CONFIG } from '@/modules/inbox/moderation-config';
 import { SETTINGS_WORKSPACE_CONFIG } from '@/modules/settings/workspace-policy-config';
 import { LABEL_CONFIG } from '@/modules/publishing/labels-config';
 import { ACCOUNT_RECOVERY_CONFIG } from '@/modules/settings/account-recovery-config';
@@ -60,6 +61,7 @@ export const CONFIG_REGISTRY = [
   ...SETTINGS_INVITATION_CONFIG,
   ...TEMPLATE_CONFIG,
   ...INBOX_PRODUCTIVITY_CONFIG,
+  ...INBOX_MODERATION_CONFIG,
   ...SETTINGS_WORKSPACE_CONFIG,
   ...MAIL_CONFIG,
   ...LABEL_CONFIG,

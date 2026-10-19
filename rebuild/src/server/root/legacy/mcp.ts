@@ -5,6 +5,8 @@ import { changeRootMemberRole, exportRootPrivileges, listRootPrivileges } from '
 import { loadRootLifecycle, transferWorkspaceOwnership } from './lifecycle';
 import { getRootError, listRootErrors, setRootErrorResolved } from './errors';
 import { readRootBackupStatus, readRootDiagnosticsSummary } from './backups';
+import { listRootSessions, sessionSignOutConfirmation, signOutRootSession } from './sessions';
+import { listRootConnections } from './connections';
 
 const none = { type: 'object', properties: {}, additionalProperties: false } as const;
 const privateNote = ' Installation owner only; workspace API keys cannot use this tool.';
@@ -26,6 +28,9 @@ export const rootLegacyToolDefinitions = [
   { name: 'set_root_error_resolved', description: 'Resolve or reopen an error group (audited, reversible). Exact confirmation: RESOLVE ROOT ERROR <id> or REOPEN ROOT ERROR <id>.' + privateNote, inputSchema: { type: 'object', required: ['id', 'resolved', 'confirmation'], properties: { id: { type: 'string' }, resolved: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_root_backup_status', description: 'Backup and restore-test runs as recorded by the server scripts. Reports only recorded entries; does not verify archives, restore or run backups.' + privateNote, inputSchema: none },
   { name: 'get_root_diagnostics_summary', description: 'Open system alerts and error counts. Provider health is reported as not assessed; use run_root_diagnostics for module checks.' + privateNote, inputSchema: none },
+  { name: 'list_root_sessions', description: 'Unexpired browser sessions across the installation with their account; no tokens. Filter: q (email or name). Bounded and labelled truncated.' + privateNote, inputSchema: { type: 'object', properties: { q: { type: 'string' } }, additionalProperties: false } },
+  { name: 'sign_out_root_session', description: 'End one browser session (the account stays enabled). Confirmation must exactly match SIGN OUT SESSION <sessionId>. Audited.' + privateNote, inputSchema: { type: 'object', required: ['sessionId', 'confirmation'], properties: { sessionId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'list_root_connections', description: 'Read-only provider connections across every workspace: platform, workspace, state (connected|expired|revoked), token expiry, scope count and selected/discovered channels. No credentials. Filters: q, provider, state, page.' + privateNote, inputSchema: { type: 'object', properties: { q: { type: 'string' }, provider: { type: 'string' }, state: { type: 'string', enum: ['connected', 'expired', 'revoked'] }, page: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
 ] as const;
 
 export const rootLegacyResources = [
@@ -33,6 +38,8 @@ export const rootLegacyResources = [
   { uri: 'msp://root/privileges', name: 'Privileges', description: 'Private first page of the member and role audit.', mimeType: 'application/json', tool: 'list_root_privileges' },
   { uri: 'msp://root/lifecycle', name: 'Account and workspace lifecycle', description: 'Private disabled accounts and suspended workspaces.', mimeType: 'application/json', tool: 'get_root_lifecycle' },
   { uri: 'msp://root/errors', name: 'Error log', description: 'Private open application errors, redacted.', mimeType: 'application/json', tool: 'list_root_errors' },
+  { uri: 'msp://root/sessions', name: 'Sessions', description: 'Private unexpired browser sessions, without tokens.', mimeType: 'application/json', tool: 'list_root_sessions' },
+  { uri: 'msp://root/connections', name: 'Connections', description: 'Private first page of provider connections across workspaces, without credentials.', mimeType: 'application/json', tool: 'list_root_connections' },
   { uri: 'msp://root/backups', name: 'Backup status', description: 'Private recorded backup runs; unverified archives.', mimeType: 'application/json', tool: 'get_root_backup_status' },
 ] as const;
 
@@ -68,6 +75,13 @@ export async function callRootLegacyTool(viewer: RootMcpActor, name: string, arg
     }
     case 'get_root_backup_status': reject(args); return readRootBackupStatus(id, undefined, cap);
     case 'get_root_diagnostics_summary': reject(args); return readRootDiagnosticsSummary(id, undefined, cap);
+    case 'list_root_sessions': return listRootSessions(id, args, cap);
+    case 'sign_out_root_session': {
+      const { sessionId, confirmation, ...extra } = args; reject(extra);
+      if (typeof sessionId !== 'string' || confirmation !== sessionSignOutConfirmation(sessionId)) throw new OperationError('invalid_request', 'Enter the exact sign-out confirmation.');
+      return signOutRootSession(id, sessionId, { confirmation });
+    }
+    case 'list_root_connections': return listRootConnections(id, args, cap);
     default: throw new OperationError('not_found', 'Unknown tool.');
   }
 }

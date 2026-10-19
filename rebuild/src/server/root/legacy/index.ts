@@ -6,3 +6,5 @@ export * from './backups';
 export * from './config';
 export * from './mcp';
 export * from './shared';
+export * from './sessions';
+export * from './connections';

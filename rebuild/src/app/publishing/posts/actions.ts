@@ -174,7 +174,7 @@ export async function deletePostAction(data: FormData) {
 
 export async function publishPostAction(data: FormData) {
   await run(async viewer => {
-    const result = await publishPost(actor(viewer), stringField(data, 'postId'));
+    const result = await publishPost(actor(viewer), stringField(data, 'postId'), undefined, data.get('retryOnly') === '1' ? { retryOnly: true } : {});
     return result.needsReconciliation || result.failed || result.firstCommentsNeedingReview || result.firstCommentsNotSent ? 'publish-review' : 'published';
   });
 }

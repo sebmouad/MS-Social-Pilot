@@ -13,13 +13,14 @@ read only the browser session and MCP rejects any call carrying `apiKeyId`.
 
 | Area | Path |
 | --- | --- |
-| Services | `src/server/root/legacy/{plans,privileges,lifecycle,errors,backups}.ts` |
+| Services | `src/server/root/legacy/{plans,privileges,lifecycle,errors,backups,sessions,connections}.ts` |
+| Copy (en/fr) | `src/server/root/legacy/copy.ts` (Accept-Language selects; used by sessions/connections screens) |
 | Shared vocabulary (client-safe) | `src/server/root/legacy/shared.ts` (confirmations, schemas, per-module plan feature catalog) |
 | Config tuple | `src/server/root/legacy/config.ts` (`ROOT_LEGACY_CONFIG`); runtime policy in `policy.ts` |
 | MCP definitions | `src/server/root/legacy/mcp.ts` (`rootLegacyToolDefinitions`, `rootLegacyResources`, `callRootLegacyTool`) |
-| HTTP | `src/app/api/root/{plans,privileges,lifecycle,errors,backups}/**`, wrapper `server/root/legacy/http.ts` |
-| UI | `src/app/root/{plans,privileges,lifecycle,errors,backups}/**` |
-| Tests | `tests/root-legacy-services.test.ts`, `tests/root-legacy-http-mcp.test.ts` (mocked database) |
+| HTTP | `src/app/api/root/{plans,privileges,lifecycle,errors,backups,sessions,connections}/**`, wrapper `server/root/legacy/http.ts` |
+| UI | `src/app/root/{plans,privileges,lifecycle,errors,backups,sessions,connections}/**` |
+| Tests | `tests/root-legacy-services.test.ts`, `tests/root-legacy-http-mcp.test.ts`, `tests/root-legacy-sessions-connections.test.ts` (mocked database) |
 
 ## Behavior
 
@@ -45,6 +46,18 @@ read only the browser session and MCP rejects any call carrying `apiKeyId`.
   `backup_runs` (recent/stale/failed/never recorded against Root thresholds) plus open
   `system_alerts` and error counts. It always states that archive contents, restorability and
   provider health are not verified here. There is no start/restore API, MCP tool or button.
+- **Sessions** (2026-10-19): unexpired browser sessions across the installation with account, verification state,
+  expiry and a "this browser" marker; search by email/name; bounded by `root.legacy.lifecycleListLimit` and labelled
+  truncated. Token hashes and pending challenges are never returned. Sign out one browser with the exact
+  `SIGN OUT SESSION <sessionId>` confirmation (dialog, HTTP DELETE body, MCP `sign_out_root_session`); the actor and
+  session owner are locked and the delete is audited (`root.session_signed_out`) in one transaction. The account is
+  unchanged; disabling an account remains in Users/Lifecycle.
+- **Connections** (2026-10-19): read-only directory of every `social_accounts` row across workspaces, paged by
+  `root.legacy.privilegePageSize`, filtered by installed platform, state (connected/expired/revoked, from the shared
+  `connectionState`) and connection/workspace search. Shows platform name from the installed manifest (uninstalled
+  providers are labelled), selected/discovered channel counts, scope count and token expiry; never tokens or scope
+  names; invalidation reasons are redacted. Reconnect/disconnect stay in each workspace's own settings, so the Root
+  screen does not offer them. Uses existing Root bounds; no registry change.
 - **Per-module ownership**: plan features group by owning module; these screens are shared
   installation controls and sit under "Shared controls". Product and platform checks remain in
   each module's own Root pages and diagnostics.
@@ -67,6 +80,8 @@ No migration is needed or proposed.
 - Transfer of installation Root (legacy required password re-entry and mail) is omitted: it needs a
   password-verification service and a two-sided audit design before it is safe.
 - Deleting users or workspaces (legacy danger zone) is intentionally absent.
+- Legacy registration (open-registration switch, account and client invitations) is not ported here; workspace invitations live in Settings with `settings.invitationsEnabled`. Root connection health checks/refresh and installation-wide session revocation per account are not added.
+- Sessions/connections have mocked-database tests only; no real PostgreSQL, browser or phone verification was run for them.
 - Plan creation/removal and feature catalog editing are not provided (legacy edited only).
 - Changing plan assignment does not itself notify the user.
 - "Last sign-in" is the newest existing session start, not a login history.
