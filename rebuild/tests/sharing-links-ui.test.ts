@@ -2,10 +2,10 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LinksManager } from '../src/app/settings/sharing/LinksManager';
+import { LinksManager } from '../src/modules/sharing/ui/links/LinksManager';
 
-vi.mock('../src/app/settings/sharing/sharing.module.css', () => ({ default: {} }));
-vi.mock('../src/app/settings/settings.module.css', () => ({ default: {} }));
+vi.mock('../src/modules/sharing/ui/links/sharing.module.css', () => ({ default: {} }));
+vi.mock('../src/modules/settings/ui/settings.module.css', () => ({ default: {} }));
 
 const channels = [{ id: 'c1', name: 'Bakery page' }, { id: 'c2', name: 'Shop page' }, { id: 'c3', name: 'Blog page' }];
 const limits = { titleMax: 240, descriptionMax: 2000, defaultExpiryDays: 30, maxExpiryDays: 365 };

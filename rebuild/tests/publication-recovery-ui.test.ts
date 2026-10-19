@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const router = vi.hoisted(() => ({ refresh: vi.fn(), replace: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
-import { PublicationRecovery } from '../src/app/publishing/posts/PublicationRecovery';
+import { PublicationRecovery } from '../src/modules/publishing/ui/posts/PublicationRecovery';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
-import { InvitationControls } from '../src/app/settings/team/InvitationControls';
+import { InvitationControls } from '../src/modules/settings/ui/team/InvitationControls';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

@@ -9,9 +9,9 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { PostPreview } from '@/components/PostPreview';
-import { PostFilters } from '@/app/publishing/posts/PostFilters';
+import { PostFilters } from '@/modules/publishing/ui/posts/PostFilters';
 import { postContentSummary } from '@/modules/publishing/content-summary';
-import { PostMessage } from '@/app/publishing/publishing-ui';
+import { PostMessage } from '@/modules/publishing/ui/publishing-ui';
 
 const localImageId = '123e4567-e89b-42d3-a456-426614174000';
 const post = {

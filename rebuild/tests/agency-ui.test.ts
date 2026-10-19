@@ -2,8 +2,8 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { WorkspaceAction } from '../src/app/agency/WorkspaceAction';
-import { AgencyFilters, ClientFilters } from '../src/app/agency/AgencyFilters';
+import { WorkspaceAction } from '../src/modules/agency/ui/WorkspaceAction';
+import { AgencyFilters, ClientFilters } from '../src/modules/agency/ui/AgencyFilters';
 import { SidebarDockContext } from '../src/components/SidebarDock';
 
 let root: ReturnType<typeof createRoot>, container: HTMLDivElement, dock: HTMLDivElement;

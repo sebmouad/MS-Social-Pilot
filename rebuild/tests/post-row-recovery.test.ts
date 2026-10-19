@@ -12,15 +12,15 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
-vi.mock('../src/app/publishing/posts/actions', async importOriginal => ({
-  ...await importOriginal<typeof import('../src/app/publishing/posts/actions')>(),
+vi.mock('../src/modules/publishing/ui/posts/actions', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/modules/publishing/ui/posts/actions')>(),
   updatePostWithRecoveryAction: mocks.edit,
   deletePostWithRecoveryAction: mocks.remove,
   sendFirstCommentAction: mocks.sendComment,
   recordFirstCommentOutcomeAction: mocks.recordComment,
 }));
 
-import { PostRowActions, runDeletePostWithRecovery, runRecordFirstCommentWithRecovery, runSendFirstCommentWithRecovery, runUpdatePostWithRecovery } from '../src/app/publishing/posts/PostActions';
+import { PostRowActions, runDeletePostWithRecovery, runRecordFirstCommentWithRecovery, runSendFirstCommentWithRecovery, runUpdatePostWithRecovery } from '../src/modules/publishing/ui/posts/PostActions';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

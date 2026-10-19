@@ -4,12 +4,12 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
-vi.mock('../src/app/publishing/calendar/actions', () => ({ reschedulePostAction: vi.fn() }));
+vi.mock('../src/modules/publishing/ui/calendar/actions', () => ({ reschedulePostAction: vi.fn() }));
 
 import { SidebarDockContext } from '../src/components/SidebarDock';
-import { CalendarBoard } from '../src/app/publishing/calendar/CalendarBoard';
-import { reschedulePostAction } from '../src/app/publishing/calendar/actions';
-import type { BoardDay, BoardPost } from '../src/app/publishing/calendar/types';
+import { CalendarBoard } from '../src/modules/publishing/ui/calendar/CalendarBoard';
+import { reschedulePostAction } from '../src/modules/publishing/ui/calendar/actions';
+import type { BoardDay, BoardPost } from '../src/modules/publishing/ui/calendar/types';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

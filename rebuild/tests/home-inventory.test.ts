@@ -10,7 +10,7 @@ vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permitted 
 vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingSummary: state.summary }));
 vi.mock('@/modules/ads/server/queries', () => ({ getAdsAccountWhere: state.adWhere }));
 vi.mock('../src/server/data', () => ({ getTargets: state.selectedTargets, prisma: { target: { findMany: state.targets }, post: { count: state.posts }, adAccount: { count: state.ads } } }));
-import HomePage from '../src/app/home/page';
+import HomePage from '../src/modules/home/ui/HomeScreen';
 
 const workspaceId = 'workspace-a';
 const accountWhere = { workspaceId, enabled: true, socialAccount: { is: { workspaceId, invalidatedAt: null, provider: { in: ['facebook'] } } } };

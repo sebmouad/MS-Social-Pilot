@@ -21,7 +21,7 @@ vi.mock('@/modules/publishing/server/lifecycle', () => ({
 vi.mock('next/cache', () => ({ revalidatePath: deps.revalidatePath }));
 vi.mock('next/navigation', () => ({ redirect: deps.redirect }));
 
-import { createPostWithRecoveryAction } from '../src/app/publishing/posts/actions';
+import { createPostWithRecoveryAction } from '../src/modules/publishing/ui/posts/actions';
 
 const viewer = {
   user: { id: 'user-1' }, workspaceId: 'workspace-1',

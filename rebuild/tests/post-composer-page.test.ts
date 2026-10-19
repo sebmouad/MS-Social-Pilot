@@ -12,10 +12,10 @@ vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => 
   'publishing.maxRemoteMediaPerPost': 6, 'publishing.maxFirstCommentDelayMinutes': 45,
 }[key]) }));
 vi.mock('@/components/PostPreview', () => ({ formatPostPreviewTime: () => 'Example time' }));
-vi.mock('../src/app/publishing/publishing-ui', () => ({ PageHeading: () => null }));
-vi.mock('../src/app/publishing/compose/PostComposer', () => ({ PostComposer: () => null }));
-import ComposePage from '../src/app/publishing/compose/page';
-import { PostComposer } from '../src/app/publishing/compose/PostComposer';
+vi.mock('../src/modules/publishing/ui/publishing-ui', () => ({ PageHeading: () => null }));
+vi.mock('../src/modules/publishing/ui/compose/PostComposer', () => ({ PostComposer: () => null }));
+import ComposePage from '../src/modules/publishing/ui/compose/ComposeScreen';
+import { PostComposer } from '../src/modules/publishing/ui/compose/PostComposer';
 
 function propsFor(node: ReactNode): Record<string, any> | undefined {
   if (Array.isArray(node)) return node.map(propsFor).find(Boolean);

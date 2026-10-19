@@ -2,8 +2,8 @@
 import {act,createElement} from 'react';
 import {createRoot} from 'react-dom/client';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import {McpKeyManager} from '../src/app/settings/mcp/keys';
-vi.mock('../src/app/settings/settings.module.css',()=>({default:{}}));
+import {McpKeyManager} from '../src/modules/settings/ui/mcp/keys';
+vi.mock('../src/modules/settings/ui/settings.module.css',()=>({default:{}}));
 let root:ReturnType<typeof createRoot>,container:HTMLDivElement;
 const resources=[{id:'a',name:'Bakery',kind:'channel' as const},{id:'b',name:'Shop',kind:'channel' as const},{id:'ad',name:'Campaign account',kind:'adAccount' as const}];
 const props={features:[{id:'publishing/posts',name:'Posts',module:'publishing',canRead:true,canWrite:true}],initialKeys:[],maxLifetimeDays:180,defaultLifetimeDays:30,resources,resourcesTruncated:false};

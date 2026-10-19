@@ -4,8 +4,8 @@ import { requireViewer } from '@/server/context';
 import { getTargets } from '@/server/data';
 import { selectedPublishingTargetIds } from '@/modules/publishing/server/read-scope';
 import { workspaceDateKey } from '@/lib/calendar-dates';
-import { PublishingSidebar } from './PublishingSidebar';
-import styles from "./publishing.module.css";
+import { PublishingSidebar } from '@/modules/publishing/ui/PublishingSidebar';
+import styles from "@/modules/publishing/ui/publishing.module.css";
 import { runtimeConfig } from '@/server/config/store';
 
 export default async function PublishingLayout({ children }: { children: ReactNode }) {

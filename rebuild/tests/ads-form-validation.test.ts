@@ -2,9 +2,9 @@
 import { act, createElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AdsObjectActions } from '../src/app/ads/AdsObjectActions';
-import { AdSetCreateForm } from '../src/app/ads/AdSetCreateForm';
-import { CampaignCreateForm } from '../src/app/ads/CampaignCreateForm';
+import { AdsObjectActions } from '../src/modules/ads/ui/AdsObjectActions';
+import { AdSetCreateForm } from '../src/modules/ads/ui/AdSetCreateForm';
+import { CampaignCreateForm } from '../src/modules/ads/ui/CampaignCreateForm';
 import type { AdsUiSchema } from '../src/platforms/ads-ui';
 
 const common = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canCancelQueuedPost } from '../src/app/publishing/workflow-access';
+import { canCancelQueuedPost } from '../src/modules/publishing/ui/workflow-access';
 
 describe('queued post cancellation visibility', () => {
   const base = { canWritePosts: true, role: 'member', userId: 'viewer', authorId: 'author' };

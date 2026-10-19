@@ -8,9 +8,9 @@ const deps = vi.hoisted(() => ({
   randomUUID: vi.fn(() => 'request-copy-1'),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => deps.router }));
-vi.mock('../src/app/publishing/publishing.module.css', () => ({ default: { help: 'help', formError: 'formError' } }));
+vi.mock('../src/modules/publishing/ui/publishing.module.css', () => ({ default: { help: 'help', formError: 'formError' } }));
 
-import { DuplicatePost } from '../src/app/publishing/posts/DuplicatePost';
+import { DuplicatePost } from '../src/modules/publishing/ui/posts/DuplicatePost';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

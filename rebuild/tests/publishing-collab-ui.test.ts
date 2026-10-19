@@ -2,7 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FieldsManager } from '../src/app/publishing/collaboration/FieldsManager';
+import { FieldsManager } from '../src/modules/publishing/ui/collaboration/FieldsManager';
 let root: ReturnType<typeof createRoot>, container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

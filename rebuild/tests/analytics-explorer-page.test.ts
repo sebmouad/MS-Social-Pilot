@@ -9,7 +9,7 @@ vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children, sco
 vi.mock('../src/server/entitlements', () => ({ canUseFeature: () => true }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: () => true }));
 
-import AnalyticsPage from '../src/app/analytics/page';
+import AnalyticsPage from '../src/modules/analytics/ui/AnalyticsScreen';
 import type { AnalyticsReadResult } from '../src/modules/analytics/server/types';
 
 const valueMetric = {

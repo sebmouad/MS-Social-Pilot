@@ -19,7 +19,7 @@ Status: implemented source with unit tests; no browser, PostgreSQL or live-provi
   with an unresolved attempt (started, submitted, receipt recorded). So uncertain or
   submitted results are never sent again.
 - Surfaces: a Table-view checkbox column plus the `BulkPostActions` toolbar with a
-  confirmation dialog (`src/app/publishing/posts/BulkPostActions.tsx`); a per-post
+  confirmation dialog (`src/modules/publishing/ui/posts/BulkPostActions.tsx`); a per-post
   "Retry failed destinations" control in `PostActions.tsx`; `POST /api/publishing/posts/bulk`
   (same-origin only); MCP `bulk_post_action` (workspace-wide class, so keys limited to
   selected channels or ad accounts cannot use it).

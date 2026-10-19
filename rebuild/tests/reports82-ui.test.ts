@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const navigation = vi.hoisted(() => ({refresh:vi.fn()}));
 vi.mock('next/navigation',()=>({useRouter:()=>navigation}));
 import { SidebarDockContext } from '../src/components/SidebarDock';
-import { ReportsManager, type ReportUiLimits } from '../src/app/analytics/reports/ReportsManager';
+import { ReportsManager, type ReportUiLimits } from '../src/modules/analytics/ui/reports/ReportsManager';
 
 const policy = {
   sectionOptions: [{ id: 'analysis', label: 'Analysis' }, { id: 'audience', label: 'Audience' }, { id: 'published', label: 'Published posts' }],

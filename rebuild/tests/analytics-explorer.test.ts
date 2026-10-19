@@ -13,7 +13,7 @@ vi.mock('../src/server/permissions', () => ({ canAccessFeature: (_permissions: u
 import { readAnalyticsExplorer } from '../src/modules/analytics/server/explorer';
 import { executeAnalyticsExplorerTool, analyticsExplorerToolDefinitions } from '../src/modules/analytics/explorer-mcp';
 import { GET } from '../src/app/api/analytics/explorer/route';
-import AnalyticsExplorerPage from '../src/app/analytics/explorer/page';
+import AnalyticsExplorerPage from '../src/modules/analytics/ui/explorer/ExplorerScreen';
 import type { AnalyticsSnapshot } from '../src/modules/analytics/server/types';
 
 const metric = (key: string, label: string, sourceLabel: string, kind: 'flow' | 'stock' = 'flow') => ({

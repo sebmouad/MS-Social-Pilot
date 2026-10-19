@@ -2,8 +2,8 @@
 import { act, createElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AdSetCreateForm } from '../src/app/ads/AdSetCreateForm';
-import { CampaignCreateForm } from '../src/app/ads/CampaignCreateForm';
+import { AdSetCreateForm } from '../src/modules/ads/ui/AdSetCreateForm';
+import { CampaignCreateForm } from '../src/modules/ads/ui/CampaignCreateForm';
 import type { AdsUiSchema } from '../src/platforms/ads-ui';
 
 const common = {

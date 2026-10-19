@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBudgetMinor, parseBudgetAmount } from '../src/app/ads/budget';
+import { formatBudgetMinor, parseBudgetAmount } from '../src/modules/ads/ui/budget';
 
 describe('ads budget display and conversion', () => {
   it('converts decimal user amounts to currency minor units', () => {

@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SidebarDockContext } from '../src/components/SidebarDock';
-import { QueueTimes } from '../src/app/publishing/collaboration/QueueTimes';
+import { QueueTimes } from '../src/modules/publishing/ui/collaboration/QueueTimes';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

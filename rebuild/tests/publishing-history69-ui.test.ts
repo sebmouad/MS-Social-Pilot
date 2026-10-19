@@ -2,8 +2,8 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FieldsManager } from '../src/app/publishing/collaboration/FieldsManager';
-import { PostPanel } from '../src/app/publishing/collaboration/PostPanel';
+import { FieldsManager } from '../src/modules/publishing/ui/collaboration/FieldsManager';
+import { PostPanel } from '../src/modules/publishing/ui/collaboration/PostPanel';
 import { restoreVersionConfirmation } from '../src/modules/publishing/collaboration/schemas';
 
 let root: ReturnType<typeof createRoot>, container: HTMLDivElement;

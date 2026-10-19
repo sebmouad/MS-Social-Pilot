@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeDeletionCounts } from '@/app/settings/data/preview';
+import { summarizeDeletionCounts } from '@/modules/settings/ui/data/preview';
 
 describe('customer deletion preview', () => {
   it('accounts for every direct and older linked record without exposing table names', () => {

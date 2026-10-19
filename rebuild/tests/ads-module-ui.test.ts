@@ -1,8 +1,8 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { CampaignCreateForm } from '../src/app/ads/CampaignCreateForm';
-import { AdSetCreateForm } from '../src/app/ads/AdSetCreateForm';
+import { CampaignCreateForm } from '../src/modules/ads/ui/CampaignCreateForm';
+import { AdSetCreateForm } from '../src/modules/ads/ui/AdSetCreateForm';
 import type { AdsUiSchema } from '../src/platforms/ads-ui';
 
 const common = {

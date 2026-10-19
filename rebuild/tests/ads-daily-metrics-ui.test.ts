@@ -2,7 +2,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { DailyMetrics } from '../src/app/ads/DailyMetrics';
+import { DailyMetrics } from '../src/modules/ads/ui/DailyMetrics';
 import type { AdsSummary } from '@/modules/ads/server/summary';
 
 type DailyMetric = AdsSummary['dailyMetrics'][number];

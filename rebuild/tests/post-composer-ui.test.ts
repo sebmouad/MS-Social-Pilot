@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ComposerActionState } from '../src/app/publishing/posts/actions';
+import type { ComposerActionState } from '../src/modules/publishing/ui/posts/actions';
 import type { PublishingFormatDescriptor } from '../src/platforms/types';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -10,10 +10,10 @@ const mocks = vi.hoisted(() => ({
   action: vi.fn(async (_previous: unknown, _data: FormData): Promise<ComposerActionState> => ({ status: 'error', message: 'safe failure', values: {} })),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
-vi.mock('../src/app/publishing/posts/actions', () => ({ createPostWithRecoveryAction: mocks.action }));
+vi.mock('../src/modules/publishing/ui/posts/actions', () => ({ createPostWithRecoveryAction: mocks.action }));
 
 import { SidebarDockContext } from '../src/components/SidebarDock';
-import { PostComposer } from '../src/app/publishing/compose/PostComposer';
+import { PostComposer } from '../src/modules/publishing/ui/compose/PostComposer';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

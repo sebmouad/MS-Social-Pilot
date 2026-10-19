@@ -18,9 +18,9 @@ vi.mock('../src/server/platforms/registry', () => ({ platformAds: async () => nu
 vi.mock('../src/modules/ads/server/report-policy', () => ({ loadAdsReportPolicy: state.policy }));
 vi.mock('../src/modules/ads/server/output-policy', () => ({ loadAdsOutputPolicy: state.output }));
 
-import AdsPage from '../src/app/ads/page';
-import CampaignsPage from '../src/app/ads/campaigns/page';
-import { AdsFiltersSidebar } from '../src/app/ads/ads-filters';
+import AdsPage from '../src/modules/ads/ui/AdsScreen';
+import CampaignsPage from '../src/modules/ads/ui/campaigns/CampaignsScreen';
+import { AdsFiltersSidebar } from '../src/modules/ads/ui/ads-filters';
 import { parseAdsFilters } from '@/modules/ads/server/queries';
 import { ADS_REPORT_DEFAULT_POLICY } from '../src/modules/ads/report-policy';
 import { AdsReportLimitError } from '../src/modules/ads/read-policy';

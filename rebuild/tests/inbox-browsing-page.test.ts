@@ -8,8 +8,8 @@ vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children, sco
 vi.mock('@/modules/inbox/server/actions', () => ({ canManageInbox: state.manage, canManageInboxWorkflow: state.workflow }));
 vi.mock('@/modules/inbox/server/providers', () => ({ inboxCapabilities: async () => ({ reply: false, hide: false, remove: false }) }));
 vi.mock('@/modules/inbox/server/policy', () => ({ inboxReplyPolicy: async () => ({ allowed: false, headline: 'Read only' }) }));
-vi.mock('../src/app/inbox/InboxActions', () => ({ InboxSyncBar: () => null, ReplyBox: () => null, ThreadToolbar: (props: { canResolve: boolean; canHide: boolean; canDelete: boolean }) => { state.toolbar(props); return createElement('div', { 'data-workflow': props.canResolve }); } }));
-import InboxPage from '../src/app/inbox/page';
+vi.mock('../src/modules/inbox/ui/InboxActions', () => ({ InboxSyncBar: () => null, ReplyBox: () => null, ThreadToolbar: (props: { canResolve: boolean; canHide: boolean; canDelete: boolean }) => { state.toolbar(props); return createElement('div', { 'data-workflow': props.canResolve }); } }));
+import InboxPage from '../src/modules/inbox/ui/InboxScreen';
 import { OperationError } from '../src/lib/operation-error';
 const listPage = { items: [], total: 8, limit: 2, cursor: 'list-position', olderCursor: 'list-older', newerCursor: 'list-newer', filters: { channelId: 'channel', kind: 'message', state: 'all', hidden: 'all', q: 'literal' }, channels: [{ id: 'channel', name: 'Example' }], lastSynced: null, timeZone: 'UTC', limits: { listPageSize: 25, threadPageSize: 50, searchMaxCharacters: 200, cursorMaxCharacters: 4096 } };
 const threadPage = { thread: { kind: 'message', id: 'conversation', target: { id: 'channel', name: 'Example', providerId: 'remote', provider: 'facebook' }, resolved: false, hidden: false, postText: null, entries: [{ id: 'entry', author: 'Visitor', text: 'Stored history', time: new Date('2026-10-16T00:00:00Z'), fromChannel: false, sentBy: null }], lastInbound: null }, history: { total: 305, shown: 1, limit: 50, cursor: 'history-position', olderCursor: 'history-older', newerCursor: 'history-newer' } };

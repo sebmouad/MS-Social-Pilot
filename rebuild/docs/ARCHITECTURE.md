@@ -53,6 +53,27 @@ flowchart TD
 
 The rebuild uses Next.js App Router, React, TypeScript, Prisma, and PostgreSQL. A separate worker executes scheduled publishing and provider synchronization. UI, API, MCP, and worker entry points must converge on shared application services so that authorization and behavior do not diverge.
 
+### Self-contained module folders (2026-10-19)
+
+User decision, 2026-10-19: each module declares its own Root settings, MCP surface and screens so parallel work does not edit central files per capability.
+
+```text
+src/modules/<module>/
+  manifest.ts      routes, features, Root setting namespaces (client-safe)
+  config.ts        <MODULE>_MODULE_CONFIG: every Root registry entry the module owns
+  mcp.ts           <MODULE>_MCP: McpToolGroup[] (tools, features, write flags, confirmations,
+                   lock/manager rules, resources, restricted-credential scope classes)
+  server/          product services, queries and policies (no provider rules)
+  ui/              route screens and their components; app/<route>/page.tsx re-exports them
+src/modules/installed-config.ts   installed product-module config lists (one line per module)
+src/modules/installed-mcp.ts      installed product-module MCP groups (one line per module)
+src/platforms/<provider>/         platform modules; settings via PLATFORM_CONFIG
+```
+
+`lib/config/registry.ts` merges `PLATFORM_CONFIG`, `INSTALLED_MODULE_CONFIG`, `lib/config/shared-config.ts` (auth, jobs, sync, data, storage, MCP, Root) and generated availability entries; key names and `CONFIG_SCHEMA_VERSION` semantics are unchanged. `server/mcp/server.ts` and `modules/settings/mcp-access/tool-policy.ts` merge installed `McpToolGroup` declarations (`server/mcp/kit.ts`) with no per-tool lists; Root tools stay host-owned in `server/mcp/root-tools.ts`. A new capability edits only its module's `config.ts`/`mcp.ts`; `CONFIG_SCHEMA_VERSION` still bumps in `registry.ts` when a key or its stored shape changes.
+
+`src/server` keeps platform-neutral infrastructure only: authentication, permissions, entitlements, configuration store, jobs, mail, data control, diagnostics, Root and the platform host. Former `server/{ads,inbox,publishing,analytics}` code lives in `modules/<module>/server`; shared media storage/inspection lives in `modules/publishing/server/media` because Publishing owns its settings. Product route pages under `app/{publishing,inbox,analytics,ads,settings,agency,tasks,home}` and the public share/bio pages are thin re-exports of `modules/<module>/ui/**` screens, keeping only static Next segment config (`dynamic`). Root, authentication and shell routes remain in `app/`.
+
 ## Product modules
 
 Product modules describe what a customer can do. They are independent of social networks.

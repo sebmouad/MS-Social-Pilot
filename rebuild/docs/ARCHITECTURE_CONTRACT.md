@@ -19,6 +19,8 @@ Root is the private installation control plane. It is separate from customer mod
 
 User clarification, 2026-10-16: **Root manages every product and platform module; source stays in self-contained module folders.** Root is the private administration surface, not the parent source folder for customer features. Each module owns its implementation and declares its configuration, operations, entitlements and health/control metadata to the host. Shared infrastructure remains separate and platform-neutral. Root must provide a unified module-management flow for installed product and platform modules, using those declarations; scattered settings alone are not complete module management. The same ownership must be visible in Root design, menus and sections: shared installation controls stay separate, and each product/platform module groups its own settings, availability, capabilities and operational information. Customer navigation remains permission-aware and exposes usable features only. Physical moves or manifests alone do not prove encapsulation or working Root controls.
 
+User decision, 2026-10-19: **modules declare their own registry entries, MCP surface and screens.** Each product module keeps `manifest.ts`, `config.ts` (its Root registry entries), `mcp.ts` (its MCP tools/resources, confirmations and restricted-credential scope policy), `server/` (product logic) and `ui/` (route screens). The configuration registry, MCP host and MCP scope policy are aggregators over an installed-modules list and must not be edited per capability; `src/server` holds only platform-neutral infrastructure and `app/<route>/page.tsx` files stay thin. Reason: parallel sessions collided on hand-edited central files. Key names, tool names, confirmations and `CONFIG_SCHEMA_VERSION` semantics are unchanged.
+
 Product modules must work with any installed platform exposing the required capability. A platform may support content, messages, analytics, ads, or a subset. An unsupported operation is absent from customer choices; never show a working-looking stub or internal setup warning.
 
 ## 3. Strict platform ownership
@@ -29,7 +31,7 @@ Target physical home: `rebuild/src/platforms/<provider>/**`, including provider-
 
 ```text
 rebuild/src/
-  modules/                   product manifests: Publishing, Inbox, Analytics, Ads, Settings
+  modules/                   product modules: manifest, config, mcp, server/, ui/ per module
   app/                       thin routes and shared customer screens; private /root routes
   components/ + styles/      shared design system; no provider rules
   server/                    shared authorization, services, jobs, audit and configuration

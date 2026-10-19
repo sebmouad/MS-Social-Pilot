@@ -734,3 +734,15 @@ PostgreSQL so database tests run, pull before push, commit to main.
 
 Wave 3 afterwards: auth and onboarding, integrations (webhooks, API tokens,
 OAuth clients, v1 API), agency extras, owner export.
+
+## Module self-containment refactor (2026-10-19)
+
+Modules now declare their own Root settings (`modules/<x>/config.ts`), MCP tool
+groups (`modules/<x>/mcp.ts`) and screens (`modules/<x>/ui/`); product server code
+moved from `src/server/{ads,inbox,publishing,analytics,media}` into module
+`server/` folders. `registry.ts`, `server/mcp/server.ts` and `tool-policy.ts` are
+aggregators: parallel sessions no longer need to edit them per capability (only
+`CONFIG_SCHEMA_VERSION` when a key changes). Session B's requested shared edits now
+belong in `modules/publishing/mcp.ts` (media holder visibility) and
+`modules/publishing/config.ts` (optional quota key). See ARCHITECTURE.md Structure.
+No behavior change; production remains legacy.

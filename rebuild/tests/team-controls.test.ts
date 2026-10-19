@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
-import { TeamControls } from '../src/app/settings/team/TeamControls';
+import { TeamControls } from '../src/modules/settings/ui/team/TeamControls';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

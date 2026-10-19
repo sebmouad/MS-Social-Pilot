@@ -4,8 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({ randomUUID: vi.fn(() => 'ads-request-1') }));
-import { ObjectManager } from '../src/app/ads/objects/ObjectManager';
-import { ChangeHistory } from '../src/app/ads/objects/ChangeHistory';
+import { ObjectManager } from '../src/modules/ads/ui/objects/ObjectManager';
+import { ChangeHistory } from '../src/modules/ads/ui/objects/ChangeHistory';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

@@ -5,7 +5,7 @@ vi.mock('@/modules/publishing/server/lifecycle', () => ({ updatePost: state.upda
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: () => true }));
 vi.mock('next/cache', () => ({ revalidatePath: state.refresh }));
 vi.mock('next/navigation', () => ({ redirect: (url: string) => { throw Object.assign(new Error('redirect'), { digest: `NEXT_REDIRECT;${url}` }); } }));
-import { updatePostWithRecoveryAction, deletePostWithRecoveryAction } from '../src/app/publishing/posts/actions';
+import { updatePostWithRecoveryAction, deletePostWithRecoveryAction } from '../src/modules/publishing/ui/posts/actions';
 import { OperationError } from '../src/lib/operation-error';
 beforeEach(() => { vi.resetAllMocks(); state.viewer.mockResolvedValue({ user: { id: 'u' }, workspaceId: 'w', permissions: { pageScope: { all: false, ids: ['a'] } } }); });
 function values() { const data = new FormData(); for (const [k, v] of Object.entries({ postId: 'p', message: 'Retain text', firstComment: 'Retain comment', targetIds: 'a', imageUrl: 'https://example.test/image.jpg' })) data.set(k, v); return data; }

@@ -2,11 +2,11 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConnectionManager } from '../src/app/settings/connections/manager';
+import { ConnectionManager } from '../src/modules/settings/ui/connections/manager';
 
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
-vi.mock('../src/app/settings/settings.module.css', () => ({ default: {} }));
+vi.mock('../src/modules/settings/ui/settings.module.css', () => ({ default: {} }));
 const labels = { connected: 'Connected', expired: 'Reconnect needed', revoked: 'Reconnect needed' };
 const source = { id: 'source', provider: 'facebook', name: 'Example source', invalidatedAt: null, tokenExpiresAt: new Date('2020-01-01'), targets: [{ id: 'channel', name: 'Selected channel', type: 'page', enabled: true }, { id: 'other-channel', name: 'Unselected channel', type: 'page', enabled: false }], adAccounts: [{ id: 'ad', name: 'Selected ads', actId: 'example-ad', enabled: true }] };
 

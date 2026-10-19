@@ -2,7 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TaskBoard } from '../src/app/tasks/TaskBoard';
+import { TaskBoard } from '../src/modules/tasks/ui/TaskBoard';
 import { TASK_DEFAULT_LIMITS, type TaskView } from '../src/modules/tasks/tasks';
 const refresh=vi.hoisted(()=>vi.fn());
 vi.mock('next/navigation',()=>({useRouter:()=>({refresh})}));

@@ -4,9 +4,9 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('q=launch&status=published&channel=channel-7&page=4&view=cards') }));
-vi.mock('../src/app/publishing/publishing.module.css', () => ({ default: { help: 'help', successNotice: 'success', errorNotice: 'error' } }));
+vi.mock('../src/modules/publishing/ui/publishing.module.css', () => ({ default: { help: 'help', successNotice: 'success', errorNotice: 'error' } }));
 
-import { PostExport } from '../src/app/publishing/posts/PostExport';
+import { PostExport } from '../src/modules/publishing/ui/posts/PostExport';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

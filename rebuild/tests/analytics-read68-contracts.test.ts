@@ -4,8 +4,8 @@ import { analyticsDemographicsToolDefinitions } from '../src/modules/analytics/d
 import { comparisonInputSchema } from '../src/modules/analytics/comparison/contracts';
 import { analyticsComparisonToolDefinitions } from '../src/modules/analytics/comparison/mcp';
 import { pinActionSchema } from '../src/modules/analytics/pins/contracts';
-import { pinnedSearchSchema } from '../src/app/analytics/pins/search';
-import { comparisonSearchSchema } from '../src/app/analytics/compare/search';
+import { pinnedSearchSchema } from '../src/modules/analytics/ui/pins/search';
+import { comparisonSearchSchema } from '../src/modules/analytics/ui/compare/search';
 
 describe('Analytics parity contracts', () => {
   it('rejects duplicate Root demographic dimension IDs', () => {

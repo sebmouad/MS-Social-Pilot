@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
-vi.mock('../src/app/inbox/inbox.module.css', () => ({ default: {} }));
+vi.mock('../src/modules/inbox/ui/inbox.module.css', () => ({ default: {} }));
 vi.mock('../src/components', async () => ({ ...await import('../src/components/Button'), ...await import('../src/components/Dialog') }));
-import { ThreadToolbar } from '../src/app/inbox/InboxActions';
+import { ThreadToolbar } from '../src/modules/inbox/ui/InboxActions';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

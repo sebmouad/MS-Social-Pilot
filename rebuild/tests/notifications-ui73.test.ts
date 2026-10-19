@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SidebarDockContext } from '../src/components/SidebarDock';
-import { NotificationCenter } from '../src/app/settings/notifications/NotificationCenter';
+import { NotificationCenter } from '../src/modules/settings/ui/notifications/NotificationCenter';
 
 let root: ReturnType<typeof createRoot>, container: HTMLDivElement, dock: HTMLElement;
 const item = { id: 'private-row-id', kind: 'note_mention' as const, createdAt: new Date('2026-10-18T12:00:00.000Z'), updatedAt: new Date('2026-10-18T12:00:00.000Z'), readAt: null, emailSentAt: null, emailState: 'uncertain' as const, title: 'A teammate mentioned you', body: 'Review a note in your workspace.', available: true, postId: null, noteId: null, targetId: null, labelId: null };

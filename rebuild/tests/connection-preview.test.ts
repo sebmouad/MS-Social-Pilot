@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeDisconnectCounts } from '@/app/settings/connections/preview';
+import { summarizeDisconnectCounts } from '@/modules/settings/ui/connections/preview';
 
 describe('connection deletion preview', () => {
   it('accounts for related records without double-counting provider-scheduled posts', () => {

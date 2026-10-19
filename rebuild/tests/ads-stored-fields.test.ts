@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { storedFieldRows } from '@/app/ads/stored-fields';
-import { StoredFields } from '@/app/ads/stored-fields';
+import { storedFieldRows } from '@/modules/ads/ui/stored-fields';
+import { StoredFields } from '@/modules/ads/ui/stored-fields';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 

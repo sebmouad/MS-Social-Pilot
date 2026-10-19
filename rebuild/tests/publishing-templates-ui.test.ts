@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SidebarDockContext } from '../src/components/SidebarDock';
-import { TemplateManager } from '../src/app/publishing/templates/TemplateManager';
+import { TemplateManager } from '../src/modules/publishing/ui/templates/TemplateManager';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

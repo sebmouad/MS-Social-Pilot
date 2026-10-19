@@ -2,9 +2,9 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BioManager } from '../src/app/settings/bio/BioManager';
+import { BioManager } from '../src/modules/sharing/ui/bio-settings/BioManager';
 
-vi.mock('../src/app/settings/sharing/sharing.module.css', () => ({ default: {} }));
+vi.mock('../src/modules/sharing/ui/links/sharing.module.css', () => ({ default: {} }));
 
 const limits = { titleMax: 120, descriptionMax: 500, labelMax: 80, urlMax: 2000 };
 const page = (extra: Record<string, unknown> = {}) => ({ slug: 'bakery', title: 'Bakery', description: null, avatarUrl: null, enabled: true, ...extra });

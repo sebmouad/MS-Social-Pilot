@@ -14,7 +14,7 @@ named Posts/Calendar filter combinations. The rebuild reuses the existing `saved
   acting user and workspace; current Posts/Calendar read authorization is rechecked. Creation
   counts under a per-person advisory lock. Deletion needs `DELETE SAVED VIEW <id>`.
   A stored channel never grants access: the page re-applies channel scope on open.
-- Surfaces: sidebar `src/app/publishing/SavedViews.tsx` (Posts and Calendar only),
+- Surfaces: sidebar `src/modules/publishing/ui/SavedViews.tsx` (Posts and Calendar only),
   HTTP `GET/POST /api/publishing/saved-views`, `DELETE /api/publishing/saved-views/<id>`
   (same-origin), MCP `list_saved_views`, `create_saved_view`, `delete_saved_view`
   (classified workspace-wide, so selected-resource keys cannot use them).

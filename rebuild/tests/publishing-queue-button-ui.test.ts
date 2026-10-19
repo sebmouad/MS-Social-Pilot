@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const refresh = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
-import { QueuePostButton } from '../src/app/publishing/posts/QueuePostButton';
+import { QueuePostButton } from '../src/modules/publishing/ui/posts/QueuePostButton';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
