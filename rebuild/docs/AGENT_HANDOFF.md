@@ -765,7 +765,13 @@ Registry 85. Deferred: OAuth clients, v1 posts, post.scheduled/comment/page/repo
 webhook events. Session A owns wave 1 real-PostgreSQL and browser verification
 (see tests/wave1-postgres.integration.test.ts).
 
-Next: real-PostgreSQL and browser runs of waves 1–2; business-hours response time;
+Real PostgreSQL: tests/wave2-postgres.integration.test.ts (set REBUILD_PREVIEW_DATABASE_URL
+to the guarded loopback `_preview` database) passes goals upsert/clear and
+month measures, Goals/Destinations/Top posts/Response time report SQL, feed claim
+and exactly-once review posts held for approval, and webhook queue-once plus
+signed leased delivery; it removes every row it creates.
+
+Next: remaining real-PostgreSQL and browser runs of waves 1–2; business-hours response time;
 then wave 3 (auth/onboarding, feeds and integrations WIP, agency extras, owner
 export). The untracked feeds/integrations/webhooks/API-access WIP in the main
 checkout is still unintegrated; its media and AI parts are superseded by main.
