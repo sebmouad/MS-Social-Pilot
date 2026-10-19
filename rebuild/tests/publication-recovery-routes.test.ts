@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ viewer: vi.fn(), root: vi.fn(), status: vi.fn(), record: vi.fn(), finish: vi.fn(), adopt: vi.fn(), rootList: vi.fn(), rootRecord: vi.fn(), rootFinish: vi.fn(), rootAdopt: vi.fn() }));
+const state = vi.hoisted(() => ({ viewer: vi.fn(), root: vi.fn(), status: vi.fn(), record: vi.fn(), finish: vi.fn(), adopt: vi.fn(), sync: vi.fn(), rootList: vi.fn(), rootRecord: vi.fn(), rootFinish: vi.fn(), rootAdopt: vi.fn() }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/config/access', () => ({ currentRootActor: state.root }));
 vi.mock('../src/modules/publishing/server/publication', () => ({ getPublicationStatus: state.status, recordPublicationOutcome: state.record, finishPublicationProjection: state.finish, adoptLegacyPublication: state.adopt }));
+vi.mock('../src/modules/publishing/server/status', () => ({ syncPublicationStatus: state.sync }));
 vi.mock('../src/server/root/publication-attempts', () => ({ listRootPublicationAttempts: state.rootList, recordRootPublicationOutcome: state.rootRecord, finishRootPublicationProjection: state.rootFinish, adoptRootLegacyPublication: state.rootAdopt }));
 import * as customer from '../src/app/api/publishing/recovery/route';
 import * as root from '../src/app/api/root/publication-attempts/route';
@@ -12,7 +13,7 @@ const customerActor = { user: { id: 'member' }, workspaceId: 'workspace' };
 const sameOrigin = { origin: 'http://localhost' };
 beforeEach(() => {
   vi.clearAllMocks(); state.viewer.mockResolvedValue(customerActor); state.root.mockResolvedValue({ id: 'root', isInstanceOwner: true });
-  state.status.mockResolvedValue({ postId: 'post', operations: [], legacyProcessingCount: 0 }); state.record.mockResolvedValue({ state: 'receipt_recorded' }); state.finish.mockResolvedValue({ state: 'projected' }); state.adopt.mockResolvedValue({ state: 'uncertain' });
+  state.status.mockResolvedValue({ postId: 'post', operations: [], legacyProcessingCount: 0 }); state.record.mockResolvedValue({ state: 'receipt_recorded' }); state.finish.mockResolvedValue({ state: 'projected' }); state.adopt.mockResolvedValue({ state: 'uncertain' }); state.sync.mockResolvedValue({ postId: 'post', results: [] });
   state.rootList.mockResolvedValue({ timeZone: 'UTC', items: [], legacyProcessing: [], legacyTruncated: false }); state.rootRecord.mockResolvedValue({ state: 'receipt_recorded' }); state.rootFinish.mockResolvedValue({ state: 'projected' }); state.rootAdopt.mockResolvedValue({ state: 'uncertain' });
 });
 
@@ -29,6 +30,23 @@ describe('publication recovery HTTP surfaces', () => {
     expect(denied.status).toBe(403); expect(state.record).not.toHaveBeenCalled();
     const response = await customer.POST(new Request('http://localhost/api/publishing/recovery', { method: 'POST', headers: { ...sameOrigin, 'content-type': 'application/json' }, body: JSON.stringify(input) }));
     expect(response.status).toBe(200); expect(state.record).toHaveBeenCalledWith({ userId: 'member', workspaceId: 'workspace' }, expect.objectContaining({ postId: 'post', operationId: 'op', outcome: 'ABSENT', verifiedExternally: true }));
+  });
+  it('rejects cross-origin and unauthorized sync requests before invoking shared status sync', async () => {
+    const input = { action: 'sync', postId: 'post' };
+    const crossOrigin = await customer.POST(new Request('http://localhost/api/publishing/recovery', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://attacker.example' }, body: JSON.stringify(input) }));
+    expect(crossOrigin.status).toBe(403); expect(state.sync).not.toHaveBeenCalled();
+
+    state.viewer.mockRejectedValueOnce(new Error('unauthorized'));
+    const unauthorized = await customer.POST(new Request('http://localhost/api/publishing/recovery', { method: 'POST', headers: { ...sameOrigin, 'content-type': 'application/json' }, body: JSON.stringify(input) }));
+    expect(unauthorized.status).toBe(401); expect(state.sync).not.toHaveBeenCalled();
+  });
+  it('strictly validates sync input and forwards the authorized actor to shared status sync', async () => {
+    const invalid = await customer.POST(new Request('http://localhost/api/publishing/recovery', { method: 'POST', headers: { ...sameOrigin, 'content-type': 'application/json' }, body: JSON.stringify({ action: 'sync', postId: 'post', extra: true }) }));
+    expect(invalid.status).toBe(400); expect(state.sync).not.toHaveBeenCalled();
+
+    const response = await customer.POST(new Request('http://localhost/api/publishing/recovery', { method: 'POST', headers: { ...sameOrigin, 'content-type': 'application/json' }, body: JSON.stringify({ action: 'sync', postId: 'post' }) }));
+    expect(response.status).toBe(200); expect(state.sync).toHaveBeenCalledOnce();
+    expect(state.sync).toHaveBeenCalledWith({ userId: 'member', workspaceId: 'workspace' }, 'post');
   });
   it('uses private Root route actions and exact confirmation namespaces', async () => {
     const response = await root.GET(new Request('http://localhost/api/root/publication-attempts'));

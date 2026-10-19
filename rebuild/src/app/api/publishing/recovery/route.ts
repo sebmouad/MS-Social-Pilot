@@ -3,6 +3,8 @@ import { OperationError, operationFailure } from '@/lib/operation-error';
 import { z } from 'zod';
 import { adoptLegacyPublication, finishPublicationProjection, getPublicationStatus, recordPublicationOutcome } from '@/modules/publishing/server/publication';
 
+import { syncPublicationStatus } from '@/modules/publishing/server/status';
+
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 const actor = (viewer: Awaited<ReturnType<typeof requireViewer>>) => ({ userId: viewer.user.id, workspaceId: viewer.workspaceId });
@@ -36,6 +38,11 @@ export async function POST(request: Request) {
     const input = await request.json();
     if (!input || typeof input !== 'object' || Array.isArray(input) || typeof input.action !== 'string') throw new OperationError('invalid_request', 'Enter a valid publication recovery request.');
     const who = actor(current);
+    if (input.action === 'sync') {
+      const parsed = z.object({ action: z.literal('sync'), postId: z.string().min(1) }).strict().safeParse(input);
+      if (!parsed.success) throw new OperationError('invalid_request', 'Choose one valid post for a status check.');
+      return reply(await syncPublicationStatus(who, parsed.data.postId));
+    }
     if (input.action === 'record') {
       const parsed = z.object({ action: z.literal('record'), postId: z.string().min(1), operationId: z.string().min(1), outcome: z.enum(['PUBLISHED', 'ABSENT']), remotePostId: z.string().optional(), remoteUrl: z.string().optional(), confirmation: z.string(), verifiedExternally: z.literal(true) }).strict().safeParse(input);
       if (!parsed.success) throw new OperationError('invalid_request', 'Enter a valid externally checked publication outcome.');

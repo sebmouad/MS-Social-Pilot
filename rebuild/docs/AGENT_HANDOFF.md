@@ -4,7 +4,7 @@ Updated: 2026-10-19. This is durable project context, not proof of current runti
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
 
-Current continuation: batch92 at the end of this document and ASYNC_PUBLICATION_RECEIPTS.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+Current continuation: batch93 at the end of this document and ASYNC_PUBLICATION_RECEIPTS.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
 
 ## Historical verified batch —84
 
@@ -589,3 +589,55 @@ docs remain unassessed local work: do not discard them, silently stage them, or
 claim they passed this batch. Inspect and integrate them in their own complete
 capability batches. Full legacy parity and the production release gates remain
 part of the active goal.
+
+
+## Batch93 — submitted status reconciliation
+
+Shared UI, API and MCP status checks now reconcile durable submitted receipts
+using positive provider reads. The adapter must echo the exact remote post and
+channel identity. A submitted parent moves to provider receipt plus local
+projection atomically; a failed projection remains submitted and repeats only
+the read. The original receipt time/URL survive. Verification time is used when
+the provider cannot establish publication time; Facebook video created_time is
+upload time and is not presented as publication time. Unknown, processing,
+malformed or mismatched answers leave the claim held. No create, first comment
+or delete is dispatched by reconciliation.
+
+Authorization, selected-resource binding, grants, token validity, transport
+policy and current post format/content kind are checked again after the read.
+The installed native-proof guard remains required. Shared code contains no
+Facebook-specific status rules. The Facebook host includes a submitted-receipt
+worker with an ordered, wrapping cursor, current qualifying-owner job access,
+resource/post locks and a short final owner/settings/binding check. Root exposes
+`meta.submittedStatusCursor` in Facebook Publishing recovery; registry78. This
+is operational scan progress, not proof of publication or a feature switch.
+
+Facebook status reads request exact identity/Page evidence for feed and video.
+Ready plus explicitly published is required for a video. Graph100/sub33 is
+unknown, never absence. Path-like remote IDs are refused before transport.
+Official Meta SDK Post/AdVideo source confirms requested field names; Meta
+developer documentation returned429 during research. SDK source and local mocks
+do not establish live Graph version/permission behavior.
+
+Final candidate passed3,176 tests/359 files, zero skips, including
+actual PostgreSQL shared/worker reconciliation, mismatched identities, rollback
+and format/media races; production build and serial typecheck passed. Both
+Claude accounts completed bounded source reviews. Claimed scope/index/mapper
+gaps were checked against the whole-post visibility predicate, existing partial
+unique index and strict ready/published mapper. Identifier path validation and
+video publication-time handling were tightened. These are source/local tests,
+not live-provider proof. Built-server HTTP/MCP verification passed authorized API/tool reconciliation,
+anonymous API and read-only key denial, and mismatched Page identity held.
+Exactly3 local HTTPS-mock GETs and zero writes occurred; no live provider was
+contacted. A test-only cursor cleanup defect was corrected and the complete suite
+rerun. All107 table counts and exact Root settings then matched the backup;
+scratch was removed and the full backup retained. The local preview now serves
+batch93 against its original example database. No new browser matrix was run.
+
+Fresh full backup and scratch restore preserved107 prior public table counts.
+No migration was added or reapplied. Backup SHA-256:
+`2719ef4181a86be0fd2fa11a305c6c57ea9ef0775751d4f346b1d7e10a2a6049`.
+Production, the held photo canary and the current private native-format switch
+remain unchanged. Full customer browser matrix, first-comment continuation,
+automatic native host dispatch, safe deletion/live-provider evidence, broader
+legacy parity and production-shaped rollback/cutover remain open.

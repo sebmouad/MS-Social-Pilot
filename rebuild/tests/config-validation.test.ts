@@ -18,6 +18,10 @@ describe('configuration registry', () => {
   it('enforces each declared value schema at its boundary', () => {
     expect(CONFIG_BY_KEY.get('meta.graphVersion')!.schema.safeParse('v25.0').success).toBe(true);
     expect(CONFIG_BY_KEY.get('meta.graphVersion')!.schema.safeParse('25.0').success).toBe(false);
+    expect(CONFIG_BY_KEY.get('meta.submittedStatusCursor')!.schema.safeParse('').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('meta.submittedStatusCursor')!.schema.safeParse('["2026-10-19T00:00:00.000Z","operation-id"]').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('meta.submittedStatusCursor')!.schema.safeParse('x'.repeat(4097)).success).toBe(false);
+    expect(safeConfigShape().find(setting => setting.key === 'meta.submittedStatusCursor')).toMatchObject({ kind: 'text', defaultValue: '', consumption: 'active', group: 'Facebook · Publishing recovery' });
     expect(CONFIG_BY_KEY.get('meta.appSecret')!.schema.safeParse('x'.repeat(2048)).success).toBe(true);
     expect(CONFIG_BY_KEY.get('meta.appSecret')!.schema.safeParse('x'.repeat(2049)).success).toBe(false);
     expect(CONFIG_BY_KEY.get('jobs.enabled')!.schema.safeParse(true).success).toBe(true);
@@ -40,7 +44,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(77);
+    expect(CONFIG_SCHEMA_VERSION).toBe(78);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);

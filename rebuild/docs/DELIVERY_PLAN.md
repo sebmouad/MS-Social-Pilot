@@ -368,3 +368,12 @@ host dispatch. Facebook feed explicitly returns published; a video upload ID
 returns submitted while video remains in the current media descriptor. Native
 formats remain disabled. Live-provider and broader release gates remain open.
 Details: [ASYNC_PUBLICATION_RECEIPTS.md](ASYNC_PUBLICATION_RECEIPTS.md).
+
+
+### Batch93 continuation
+Submitted status reconciliation is implemented across the neutral service, UI/API/MCP
+callers and Facebook automatic jobs; local PostgreSQL/test/build evidence is in
+ASYNC_PUBLICATION_RECEIPTS.md. Built-server HTTP/MCP probe and exact107-table/settings cleanup passed;
+three local mock GETs, zero provider writes, scratch removed, backup retained. No migration or production cutover. Native host,
+comment continuation, safe provider deletion, live-provider/whole-app UX and
+production-shaped rollback gates remain required; the overall goal stays active.

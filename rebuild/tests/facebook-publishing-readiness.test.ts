@@ -126,7 +126,7 @@ describe('Facebook publishing credential readiness', () => {
   it('denies status and first-comment adapter entry points before network without grants', async () => {
     const fetcher = vi.fn();
     const adapter = createFacebookAdapter(config, fetcher as unknown as typeof fetch, { postReadScopes: ['read-post'], firstCommentScopes: ['comment-write'] });
-    await expect(adapter.getRemoteStatus!({ credential: granted([]), remoteId: 'p1_2' })).rejects.toThrow(/permission/i);
+    await expect(adapter.getRemoteStatus!({ credential: granted([]), remoteId: 'p1_2', target: { id: 'p1', name: 'Page', kind: 'page' } })).rejects.toThrow(/permission/i);
     await expect(adapter.publishFirstComment!({ credential: granted([]), remotePostId: 'p1_2', text: 'Comment' })).rejects.toThrow(/permission/i);
     expect(fetcher).not.toHaveBeenCalled();
   });

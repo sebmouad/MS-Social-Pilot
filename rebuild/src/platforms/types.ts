@@ -103,8 +103,17 @@ export interface FirstCommentRequest {
   text: string;
   signal?: AbortSignal;
 }
-export interface RemoteStatusRequest { credential: PlatformCredential; remoteId: string; signal?: AbortSignal }
-export interface RemoteStatus { state: 'published' | 'scheduled' | 'unknown'; publishedAt?: Date | null }
+export interface RemoteStatusRequest {
+  credential: PlatformCredential;
+  target: PlatformTarget;
+  remoteId: string;
+  formatId?: string;
+  contentKind?: 'text' | 'image' | 'video';
+  signal?: AbortSignal;
+}
+export type RemoteStatus =
+  | { state: 'unknown'; publishedAt?: Date | null }
+  | { state: 'published' | 'scheduled'; remoteId: string; targetId: string; publishedAt?: Date | null };
 export interface RemoteDeleteRequest { credential: PlatformCredential; remoteId: string; signal?: AbortSignal }
 export interface InboxRequest { credential: PlatformCredential; targetId: string }
 export interface InboxCommentsRequest extends InboxRequest { remotePostId: string }
@@ -166,6 +175,8 @@ export interface PlatformAdapter {
   readonly publishingMedia?: PublishingMediaSupport;
   readonly publishingFormats?: readonly PublishingFormatDescriptor[];
   readonly defaultPublishingFormatId?: string;
+  /** Server-only opaque policy epoch; never a customer capability or secret. */
+  readonly statusPolicyFingerprint?: string;
   /** Adapter limits for ephemeral server-supplied image bytes during publish. */
   readonly localImageUpload?: { maxBytes: number; mimeTypes: readonly string[] };
   canUseCredential?(credential: PlatformCredential, capability: 'publishing' | 'remoteStatus' | 'remoteDelete' | 'firstComment'): boolean;

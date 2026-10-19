@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
-import type { PublishResult } from '@/platforms/types';
+import type { PublishResult, RemoteStatus } from '@/platforms/types';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -21,7 +21,7 @@ async function validId(value: unknown) {
   const max = await runtimeConfig('publishing.identifierMaxCharacters');
   if (typeof value !== 'string' || !value.trim() || value !== value.trim() || value.length > max || /[\u0000-\u001f\u007f]/.test(value)) throw new OperationError('invalid_request', 'Choose a valid publication record.');
 }
-async function audit(tx: Prisma.TransactionClient, actorId: string, workspaceId: string, action: string, detail: object) {
+async function audit(tx: Prisma.TransactionClient, actorId: string | null, workspaceId: string, action: string, detail: object) {
   await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, ${action}, ${JSON.stringify({ workspaceId, ...detail })}::jsonb, NOW())`;
 }
 async function receipt(input: { remotePostId?: unknown; remoteUrl?: unknown }) {
@@ -64,7 +64,7 @@ export async function getPublicationStatus(actor: PublishingActor, input: { post
   await validId(input.postId);
   return status(actor, input.postId);
 }
-async function aggregate(tx: Prisma.TransactionClient, workspaceId: string, postId: string) {
+export async function aggregatePublicationPostInTransaction(tx: Prisma.TransactionClient, workspaceId: string, postId: string) {
   const rows = await tx.postTarget.findMany({ where: { postId, post: { workspaceId } }, select: { status: true, publishedAt: true } });
   if (!rows.length) return;
   const published = rows.filter(row => row.status === 'published' || row.status === 'scheduled_remote').length;
@@ -93,7 +93,7 @@ export async function recordPublicationOutcomeInTransaction(tx: Prisma.Transacti
   } else {
     await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='attested_absent', reason='external_human_attestation', "attestedAt"=CURRENT_TIMESTAMP, "attestedBy"=${actorId}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id} AND "workspaceId"=${input.workspaceId}`;
     await tx.postTarget.updateMany({ where: { id: row.postTargetId, postId: row.postId, targetId: row.targetId, post: { workspaceId: input.workspaceId }, status: 'processing', remotePostId: null }, data: { status: 'failed' } });
-    await aggregate(tx, input.workspaceId, row.postId);
+    await aggregatePublicationPostInTransaction(tx, input.workspaceId, row.postId);
   }
   await audit(tx, actorId, input.workspaceId, 'publishing.publication_outcome_recorded', { operationId: row.id, postId: row.postId, targetId: row.targetId, outcome: input.outcome, verification: 'external_human_attestation' });
   return { ok: true as const, operationId: row.id, state: confirmed ? 'receipt_recorded' as const : 'attested_absent' as const };
@@ -110,7 +110,7 @@ export async function projectPublicationInOperation(actor: PublishingActor, oper
 }
 
 /** Trusted local-only projection for Root and the guarded product service. */
-export async function projectPublicationInTransaction(tx: Prisma.TransactionClient, actor: PublishingActor, operationId: string): Promise<boolean> {
+export async function projectPublicationInTransaction(tx: Prisma.TransactionClient, actor: { userId: string | null; workspaceId: string }, operationId: string, observedPublishedAt?: Date): Promise<boolean> {
     const rows = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM rebuild_publication_attempts WHERE id=${operationId} AND "workspaceId"=${actor.workspaceId} FOR UPDATE`;
     const row = rows[0];
     if (!row) throw missing();
@@ -118,10 +118,10 @@ export async function projectPublicationInTransaction(tx: Prisma.TransactionClie
     if (row.state !== 'receipt_recorded' || !row.remotePostId) throw new OperationError('conflict', 'This publication needs a confirmed receipt before local recovery.');
     await assertPlatformPublicationOutcome(tx, row.provider, row.workspaceId, row.id, 'PUBLISHED', row.remotePostId);
     await assertReceiptIdentity(tx, row, row.remotePostId);
-    const changed = await tx.postTarget.updateMany({ where: { id: row.postTargetId, postId: row.postId, targetId: row.targetId, post: { workspaceId: actor.workspaceId }, status: 'processing', remotePostId: null }, data: { status: 'published', remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, publishedAt: row.attestedAt ?? row.receiptAt } });
+    const changed = await tx.postTarget.updateMany({ where: { id: row.postTargetId, postId: row.postId, targetId: row.targetId, post: { workspaceId: actor.workspaceId }, status: 'processing', remotePostId: null }, data: { status: 'published', remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, publishedAt: observedPublishedAt ?? row.attestedAt ?? row.receiptAt } });
     if (changed.count !== 1) throw new OperationError('conflict', 'This destination changed. Review its publication before continuing.');
     await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='projected', "projectedAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id}`;
-    await aggregate(tx, actor.workspaceId, row.postId);
+    await aggregatePublicationPostInTransaction(tx, actor.workspaceId, row.postId);
     await audit(tx, actor.userId, actor.workspaceId, 'publishing.target_published', { postId: row.postId, postTargetId: row.postTargetId, operationId });
     return true;
 }
@@ -199,6 +199,41 @@ export async function publishDestinationInOperation(context: { actor: Publishing
   if (!(operation as PublicationRow & { dispatchOwned?: boolean }).dispatchOwned) return 'needs_review';
   return dispatchAndRecord(actor, signal, operation, input);
 }
+/** Trusted read reconciliation. Caller owns current authorization, selected-resource,
+ * post/destination exclusion and fresh provider-policy/credential checks. No I/O. */
+export async function reconcileSubmittedPublicationInTransaction(
+  tx: Prisma.TransactionClient,
+  observer: { userId: string | null; workspaceId: string },
+  input: { operationId: string; postId: string; postTargetId: string; targetId: string; provider: string; remoteId: string; remoteTargetId: string },
+  status: RemoteStatus,
+): Promise<boolean> {
+  if (status.state !== 'published' || status.remoteId !== input.remoteId || status.targetId !== input.remoteTargetId) return false;
+  const rows = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM rebuild_publication_attempts
+    WHERE id=${input.operationId} AND "workspaceId"=${observer.workspaceId} FOR UPDATE`;
+  const row = rows[0];
+  if (!row || row.state !== 'submitted' || row.provider !== input.provider || row.postId !== input.postId ||
+    row.postTargetId !== input.postTargetId || row.targetId !== input.targetId || row.remotePostId !== input.remoteId) return false;
+  const destination = await tx.postTarget.findFirst({ where: { id: input.postTargetId, postId: input.postId, targetId: input.targetId,
+    status: 'processing', remotePostId: null, post: { workspaceId: observer.workspaceId },
+    target: { workspaceId: observer.workspaceId, enabled: true, providerId: input.remoteTargetId,
+      socialAccount: { is: { workspaceId: observer.workspaceId, provider: input.provider, invalidatedAt: null } } } }, select: { id: true } });
+  if (!destination) return false;
+  await assertPlatformPublicationOutcome(tx, row.provider, row.workspaceId, row.id, 'PUBLISHED', row.remotePostId!);
+  await assertReceiptIdentity(tx, row, row.remotePostId!);
+  const changed = await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='receipt_recorded',reason='provider_receipt',"updatedAt"=CURRENT_TIMESTAMP
+    WHERE id=${row.id} AND "workspaceId"=${row.workspaceId} AND state='submitted' AND "remotePostId"=${input.remoteId}`;
+  if (changed !== 1) return false;
+  const observedAt = new Date();
+  const providerTime = status.publishedAt instanceof Date && Number.isFinite(status.publishedAt.getTime()) &&
+    status.publishedAt.getTime() > 0 && status.publishedAt <= observedAt ? status.publishedAt : null;
+  // Receipt and projection are atomic: a failed projection leaves submitted held
+  // and the next attempt can repeat only the provider GET, never the create.
+  await projectPublicationInTransaction(tx, observer, row.id, providerTime ?? observedAt);
+  await audit(tx, observer.userId, row.workspaceId, 'publishing.publication_verified', { operationId: row.id, postId: row.postId,
+    targetId: row.targetId, verification: 'provider_read', publishedAtSource: providerTime ? 'provider' : 'observed' });
+  return true;
+}
+
 /** Receipt facts may outlive operation cancellation; this port never dispatches. */
 async function receiptTransaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
   const [timeout, maxWait] = await Promise.all([runtimeConfig('publishing.transactionTimeoutMs'), runtimeConfig('publishing.transactionMaxWaitMs')]);

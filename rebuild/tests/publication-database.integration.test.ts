@@ -6,7 +6,7 @@ import type { PublishingFormatDescriptor } from '../src/platforms/types';
 const databaseUrl = process.env.REBUILD_PREVIEW_DATABASE_URL;
 const integration = vi.hoisted(() => ({
   prisma: null as unknown as PrismaClient,
-  adapter: null as unknown as { publish: ReturnType<typeof vi.fn>; publishFirstComment: ReturnType<typeof vi.fn>; classifyPublishingFailure: ReturnType<typeof vi.fn>; supportsTargetKind: ReturnType<typeof vi.fn>; canUseCredential: ReturnType<typeof vi.fn>; publishingFormats: readonly PublishingFormatDescriptor[]; defaultPublishingFormatId: string },
+  adapter: null as unknown as { publish: ReturnType<typeof vi.fn>; publishFirstComment: ReturnType<typeof vi.fn>; getRemoteStatus: ReturnType<typeof vi.fn>; classifyPublishingFailure: ReturnType<typeof vi.fn>; supportsTargetKind: ReturnType<typeof vi.fn>; canUseCredential: ReturnType<typeof vi.fn>; statusPolicyFingerprint: string; publishingFormats: readonly PublishingFormatDescriptor[]; defaultPublishingFormatId: string },
   targetId: '',
   grantAllowed: true,
 }));
@@ -40,7 +40,7 @@ vi.mock('../src/modules/publishing/server/read-scope', () => ({
   }),
 }));
 
-import { publishPost } from '../src/server/publishing/lifecycle';
+import { publishPost, syncPostStatus } from '../src/server/publishing/lifecycle';
 import { projectPublicationInOperation, publishDestinationInOperation, recordPublicationOutcome, recordPublicationOutcomeInTransaction } from '../src/modules/publishing/server/publication';
 import { deleteWorkspaceData } from '../src/server/data-control';
 
@@ -70,6 +70,7 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
     integration.prisma = client;
     integration.adapter.publish.mockReset();
     integration.adapter.publishFirstComment.mockReset();
+    integration.adapter.getRemoteStatus.mockReset();
     integration.adapter.classifyPublishingFailure.mockReset();
     integration.adapter.supportsTargetKind.mockReset().mockReturnValue(true);
     for (const fixture of fixtures.splice(0)) await cleanup(fixture);
@@ -87,6 +88,8 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
       canUseCredential: vi.fn(() => integration.grantAllowed),
       publish: vi.fn(async () => ({ state: 'published', remoteId: `provider-post-${randomUUID()}`, url: 'https://example.test/post' })),
       publishFirstComment: vi.fn(async () => ({ remoteId: 'provider-comment' })),
+      getRemoteStatus: vi.fn(async () => ({ state: 'published' as const, remoteId: 'provider-status-id', targetId: 'provider-target-id', publishedAt: new Date() })),
+      statusPolicyFingerprint: 'synthetic-policy-v1',
       classifyPublishingFailure: vi.fn(() => 'uncertain'),
       supportsTargetKind: vi.fn(() => true),
       publishingFormats: [{ id: 'post', label: 'Post', media: { kinds: ['image', 'video'], maxImages: null, maxVideos: null, mixedKinds: false, linkWithMedia: false, imageAltText: true }, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }],
@@ -313,6 +316,104 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
       .toEqual([{ state: 'started', reason: null, remotePostId: null }]);
     expect(await observer.postTarget.findUnique({ where: { id: invalid.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
       .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+  });
+
+  it('reconciles a matching submitted receipt through one status GET without repeating create or first comment', async () => {
+    const fixture = await createFixture('synthetic');
+    const remoteId = 'provider-status-confirmed';
+    const providerTargetId = `${fixture.prefix}_provider_page`;
+    const observedAt = new Date('2026-10-19T12:34:56.000Z');
+    await client.post.update({ where: { id: fixture.postId }, data: { firstComment: 'Synthetic first comment' } });
+    integration.adapter.publish.mockResolvedValue({ state: 'submitted', remoteId, url: 'https://example.test/submitted-status' });
+    await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ published: 0, needsReconciliation: 1 });
+    integration.adapter.getRemoteStatus.mockResolvedValue({ state: 'published', remoteId, targetId: providerTargetId, publishedAt: observedAt });
+
+    await expect(syncPostStatus(fixture.actor, fixture.postId)).resolves.toMatchObject({ synced: 1 });
+    expect(integration.adapter.getRemoteStatus).toHaveBeenCalledTimes(1);
+    expect(integration.adapter.publish).toHaveBeenCalledTimes(1);
+    expect(integration.adapter.publishFirstComment).not.toHaveBeenCalled();
+    expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { status: true, remotePostId: true, remoteUrl: true, publishedAt: true } }))
+      .toEqual({ status: 'published', remotePostId: remoteId, remoteUrl: 'https://example.test/submitted-status', publishedAt: observedAt });
+    expect(await observer.$queryRaw<Array<{ state: string; remotePostId: string }>>`
+      SELECT state, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)
+      .toEqual([{ state: 'projected', remotePostId: remoteId }]);
+
+    await expect(syncPostStatus(fixture.actor, fixture.postId)).resolves.toBeDefined();
+    expect(integration.adapter.getRemoteStatus).toHaveBeenCalledTimes(2);
+    expect(integration.adapter.publish).toHaveBeenCalledTimes(1);
+    expect(integration.adapter.publishFirstComment).not.toHaveBeenCalled();
+  });
+
+  it.each(['unknown', 'missing-remote-id', 'wrong-remote-id', 'wrong-target-id'] as const)(
+    'keeps a submitted receipt held when provider status is %s', async resultKind => {
+      const fixture = await createFixture('synthetic');
+      const remoteId = 'provider-status-expected';
+      const providerTargetId = `${fixture.prefix}_provider_page`;
+      integration.adapter.publish.mockResolvedValue({ state: 'submitted', remoteId, url: null });
+      await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ needsReconciliation: 1 });
+      const result = resultKind === 'unknown' ? { state: 'unknown' }
+        : resultKind === 'missing-remote-id' ? { state: 'published', targetId: providerTargetId }
+          : resultKind === 'wrong-remote-id' ? { state: 'published', remoteId: 'provider-status-other', targetId: providerTargetId }
+            : { state: 'published', remoteId, targetId: 'different-provider-target' };
+      integration.adapter.getRemoteStatus.mockResolvedValue(result);
+
+      await expect(syncPostStatus(fixture.actor, fixture.postId)).resolves.toMatchObject({ synced: 0 });
+      expect(await observer.$queryRaw<Array<{ state: string; remotePostId: string }>>`
+        SELECT state, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)
+        .toEqual([{ state: 'submitted', remotePostId: remoteId }]);
+      expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
+        .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+      expect(integration.adapter.publish).toHaveBeenCalledTimes(1);
+      expect(integration.adapter.getRemoteStatus).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(['grant', 'token', 'policy'] as const)('refuses submitted-receipt reconciliation if %s changes during the status GET', async change => {
+    const fixture = await createFixture('synthetic');
+    const remoteId = 'provider-status-recheck';
+    integration.adapter.publish.mockResolvedValue({ state: 'submitted', remoteId, url: null });
+    await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ needsReconciliation: 1 });
+    integration.adapter.getRemoteStatus.mockImplementationOnce(async () => {
+      if (change === 'grant') integration.grantAllowed = false;
+      if (change === 'token') await client.target.update({ where: { id: fixture.targetId }, data: { accessToken: 'synthetic-token-rotated-during-get' } });
+      if (change === 'policy') integration.adapter.statusPolicyFingerprint = 'synthetic-policy-changed-during-get';
+      return { state: 'published', remoteId, targetId: `${fixture.prefix}_provider_page`, publishedAt: new Date() };
+    });
+
+    await expect(syncPostStatus(fixture.actor, fixture.postId)).rejects.toMatchObject({ code: 'conflict' });
+    expect(await observer.$queryRaw<Array<{ state: string; remotePostId: string }>>`
+      SELECT state, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)
+      .toEqual([{ state: 'submitted', remotePostId: remoteId }]);
+    expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
+      .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+    expect(integration.adapter.publish).toHaveBeenCalledTimes(1);
+    expect(integration.adapter.getRemoteStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('rolls back both parent receipt resolution and target projection on audit failure, then retries status only', async () => {
+    const fixture = await createFixture('synthetic');
+    const remoteId = 'provider-status-audit-retry';
+    integration.adapter.publish.mockResolvedValue({ state: 'submitted', remoteId, url: 'https://example.test/submitted-audit-retry' });
+    await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ needsReconciliation: 1 });
+    integration.adapter.getRemoteStatus.mockResolvedValue({ state: 'published', remoteId, targetId: `${fixture.prefix}_provider_page`, publishedAt: new Date() });
+    failProjectionAudit(fixture);
+    try {
+      await expect(syncPostStatus(fixture.actor, fixture.postId)).rejects.toThrow();
+    } finally {
+      integration.prisma = client;
+    }
+    expect(await observer.$queryRaw<Array<{ state: string; remotePostId: string; reason: string }>>`
+      SELECT state, "remotePostId", reason FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)
+      .toEqual([{ state: 'submitted', remotePostId: remoteId, reason: 'provider_submission' }]);
+    expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
+      .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+
+    await expect(syncPostStatus(fixture.actor, fixture.postId)).resolves.toMatchObject({ synced: 1 });
+    expect(integration.adapter.getRemoteStatus).toHaveBeenCalledTimes(2);
+    expect(integration.adapter.publish).toHaveBeenCalledTimes(1);
+    expect(await observer.$queryRaw<Array<{ state: string; remotePostId: string }>>`
+      SELECT state, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)
+      .toEqual([{ state: 'projected', remotePostId: remoteId }]);
   });
 
   it('keeps a usable receipt when its returned URL is unsafe, and records an abort after dispatch as submitted evidence', async () => {

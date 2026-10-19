@@ -177,7 +177,7 @@ describe('fair sync batches', () => {
     state.freshPostTarget.mockResolvedValue({ remotePostId: 'remote1', target: { workspaceId: 'w', enabled: true, providerId: 'page1', accessToken: 'page-token', socialAccount: { workspaceId: 'w', accessToken: 'user-token', scopes: 'pages_read_engagement', tokenExpiresAt: null, invalidatedAt: null } } });
     const { syncScheduledPostStatus } = await import('../src/platforms/facebook/jobs');
     expect(await syncScheduledPostStatus(new Date('2026-10-15T12:00:00Z'))).toEqual({ examined: 1, updated: 1, skipped: 0, failed: 0 });
-    expect(state.remoteStatus).toHaveBeenCalledWith('page-token', 'remote1');
+    expect(state.remoteStatus).toHaveBeenCalledWith('page-token', 'remote1', { targetId: 'page1', contentKind: 'text' });
     expect(state.targetUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'published' }) }));
     expect(state.operationQuery).toHaveBeenCalled();
     expect(state.freshPostTarget.mock.calls.every(call => call[0].where.post.workspaceId === 'w')).toBe(true);

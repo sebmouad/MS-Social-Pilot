@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto';
 import { FACEBOOK_FEED_FORMAT_LABEL } from './module';
 import type { FacebookConfig } from './config';
 import { validateFacebookConfig } from './config';
 import { PlatformApiError } from '../errors';
 import { facebookAppSecretProof, graphObjectUrl, isFacebookDefiniteRejection, isFacebookRetryable } from './protocol';
-import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingMediaSupport } from '../types';
+import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingMediaSupport, RemoteStatus } from '../types';
 import type { FacebookMediaJournal, FacebookMediaJournalFactory } from './media-journal-port';
 
 export type FacebookFetch = typeof fetch;
@@ -51,7 +52,7 @@ export interface FacebookEngine {
   discoverPages(accessToken: string): Promise<FacebookPage[]>;
   discoverAdAccounts(accessToken: string): Promise<FacebookAdAccount[]>;
   publish(input: FacebookPublishInput): Promise<FacebookPublished>;
-  getStatus(accessToken: string, remoteId: string): Promise<{ state: 'published' | 'scheduled' | 'unknown'; publishedAt: Date | null }>;
+  getStatus(accessToken: string, remoteId: string, context: { targetId: string; contentKind?: 'text' | 'image' | 'video' }): Promise<RemoteStatus>;
   deletePost(accessToken: string, remoteId: string): Promise<void>;
   getPhotoCleanupState(accessToken: string, remoteId: string): Promise<{ id: unknown; page_story_id?: unknown; can_delete: unknown }>;
   deletePhoto(accessToken: string, remoteId: string, onDispatch?: () => void, onConfirmed?: () => void): Promise<void>;
@@ -375,10 +376,54 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       if (typeof id !== 'string' || !id) throw new FacebookApiError('Facebook did not return a post id.', 200);
       return { remoteId: id, url: null };
     },
-    async getStatus(token, remoteId) {
-      const raw = object(await request(encodeURIComponent(remoteId), { token, params: { fields: 'is_published,created_time' } }));
-      const publishedAt = date(raw.created_time);
-      return { state: raw.is_published === true ? 'published' : raw.is_published === false ? 'scheduled' : 'unknown', publishedAt };
+    async getStatus(token, remoteId, context) {
+      const targetId = context?.targetId;
+      const contentKind = context?.contentKind ?? 'text';
+      const unknown = (): { state: 'unknown'; publishedAt: null } => ({ state: 'unknown', publishedAt: null });
+      if (typeof remoteId !== 'string' || !/^[A-Za-z0-9_:-]+$/.test(remoteId) ||
+          typeof targetId !== 'string' || !/^[A-Za-z0-9_:-]+$/.test(targetId) ||
+          !['text', 'image', 'video'].includes(contentKind)) return unknown();
+      const video = contentKind === 'video';
+      const fields = video
+        ? 'id,from,status,published,created_time,scheduled_publish_time'
+        : 'id,from,is_published,created_time,scheduled_publish_time';
+      let response: unknown;
+      try { response = await request(encodeURIComponent(remoteId), { token, params: { fields } }); }
+      catch (error) {
+        if (error instanceof FacebookApiError && error.code === 100 && error.subcode === 33) return unknown();
+        throw error;
+      }
+      const raw = object(response);
+      const source = raw.from;
+      if (!Object.hasOwn(raw, 'id') || raw.id !== remoteId || !Object.hasOwn(raw, 'from') ||
+          !source || typeof source !== 'object' || Array.isArray(source) || !Object.hasOwn(source, 'id') || object(source).id !== targetId) return unknown();
+      const publishedAt = Object.hasOwn(raw, 'created_time') ? date(raw.created_time) : null;
+      const scheduleSeconds = (() => {
+        if (!Object.hasOwn(raw, 'scheduled_publish_time')) return null;
+        const value = raw.scheduled_publish_time;
+        if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
+        if (typeof value === 'string' && /^\d{1,12}$/.test(value)) {
+          const parsed = Number(value);
+          return Number.isSafeInteger(parsed) ? parsed : null;
+        }
+        return null;
+      })();
+      const scheduledAt = scheduleSeconds !== null && scheduleSeconds * 1000 > Date.now() ? new Date(scheduleSeconds * 1000) : null;
+      if (video) {
+        const status = raw.status;
+        if (!Object.hasOwn(raw, 'status') || !status || typeof status !== 'object' || Array.isArray(status) ||
+            !Object.hasOwn(object(status), 'video_status') || !Object.hasOwn(raw, 'published')) return unknown();
+        const { mapFacebookVideoStatus } = await import('./formats/status');
+        const mapped = mapFacebookVideoStatus('video', raw);
+        // Video created_time is upload time, not verified publication time.
+        if (mapped.status === 'published') return { state: 'published', remoteId, targetId, publishedAt: null };
+        if (mapped.status === 'scheduled' && scheduledAt) return { state: 'scheduled', remoteId, targetId, publishedAt: scheduledAt };
+        return unknown();
+      }
+      if (!Object.hasOwn(raw, 'is_published') || typeof raw.is_published !== 'boolean') return unknown();
+      if (raw.is_published === true) return { state: 'published', remoteId, targetId, publishedAt };
+      if (scheduledAt) return { state: 'scheduled', remoteId, targetId, publishedAt: scheduledAt };
+      return unknown();
     },
     async deletePost(token, remoteId) {
       const result = object(await request(encodeURIComponent(remoteId), { method: 'DELETE', token }));
@@ -557,6 +602,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
   const requiredPostPublishScopes = policy?.postPublishScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
   const requiredPostDeleteScopes = policy?.postDeleteScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
   const requiredFirstCommentScopes = policy?.firstCommentScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
+  const statusPolicyFingerprint = createHash('sha256').update(JSON.stringify({ config, postReadScopes: [...requiredPostReadScopes].sort() })).digest('hex');
   const canUseCredential: NonNullable<PlatformAdapter['canUseCredential']> = (credential, capability) => {
       if (config.appSecretProofEnabled && !config.appSecret && ['publishing', 'remoteStatus', 'remoteDelete', 'firstComment'].includes(capability)) return false;
       if (capability === 'remoteStatus') {
@@ -579,6 +625,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
     };
   return {
     id: 'facebook',
+    statusPolicyFingerprint,
     localImageUpload: { maxBytes: config.maxImageUploadBytes, mimeTypes: config.allowedImageMimeTypes },
     publishingMedia: FACEBOOK_PUBLISHING_MEDIA,
     defaultPublishingFormatId: FACEBOOK_FEED_FORMAT_ID,
@@ -607,8 +654,14 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       return createFacebookFirstCommentPublisher(config, fetchImpl)(request);
     },
     async getRemoteStatus(request) {
+      if (!request.target || request.target.kind !== 'page' || typeof request.target.id !== 'string' || !request.target.id.trim()) {
+        throw new FacebookApiError('Facebook status reads require a Page target.', 0);
+      }
+      if (request.formatId !== undefined && request.formatId !== FACEBOOK_FEED_FORMAT_ID) {
+        throw new FacebookApiError('The selected publishing format has no status reader.', 0);
+      }
       if (!canUseCredential(request.credential, 'remoteStatus')) throw new FacebookApiError('Facebook Page status-read permission is missing or unavailable.', 0);
-      return createFacebookEngine(config, fetchImpl, request.signal).getStatus(request.credential.accessToken, request.remoteId);
+      return createFacebookEngine(config, fetchImpl, request.signal).getStatus(request.credential.accessToken, request.remoteId, { targetId: request.target.id, contentKind: request.contentKind });
     },
     async deleteRemote(request) {
       if (!canUseCredential(request.credential, 'remoteDelete')) throw new FacebookApiError('Facebook Page post deletion permission is missing or unavailable.', 0);

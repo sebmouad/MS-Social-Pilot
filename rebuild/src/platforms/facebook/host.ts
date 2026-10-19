@@ -7,6 +7,13 @@ import { facebookAdsOps } from './ads-ops';
 import { facebookAnalyticsHost } from './analytics';
 import { facebookReplyPolicy, canManageFacebookInbox, syncFacebookInbox, replyToFacebookInbox, moderateFacebookComment, prepareDeleteFacebookComment } from './inbox';
 import { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } from './jobs';
+import { syncFacebookSubmittedPosts } from './submitted-jobs';
+
+async function syncFacebookPosts(now?: Date, retryLimit?: number, retryBackoff?: Parameters<typeof syncScheduledPostStatus>[2]) {
+  const scheduled = await syncScheduledPostStatus(now, retryLimit, retryBackoff);
+  const submitted = await syncFacebookSubmittedPosts(now, retryLimit, retryBackoff);
+  return { examined: scheduled.examined + submitted.examined, updated: scheduled.updated + submitted.updated, skipped: scheduled.skipped + submitted.skipped, failed: scheduled.failed + submitted.failed };
+}
 
 /** Facebook-owned assembly; shared registration knows only the host contract. */
 export const facebookHost = {
@@ -21,7 +28,7 @@ export const facebookHost = {
     callback: finishFacebookConnection,
   },
   jobs: {
-    posts: syncScheduledPostStatus,
+    posts: syncFacebookPosts,
     analytics: async (now, retryLimit, retryBackoff) => {
       const page = await syncPageAnalytics(now, retryLimit, retryBackoff);
       const ads = await syncAdsAnalytics(now, retryLimit, retryBackoff);

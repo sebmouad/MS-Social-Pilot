@@ -483,44 +483,7 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
   });
 }
 
-export async function syncPostStatus(actor: PublishingActor, postId: string) {
-  return withPublishingOperation(actor, { postId }, async ({ actor, signal, lockTargets }) => {
-    const role = await membership(actor);
-    await assertPostScope(actor, postId);
-    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true, formatId: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } } } } } } });
-    if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
-    const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
-    if (!entitlements) throw new OperationError('unavailable', 'This workspace is unavailable.');
-    let synced = 0;
-    for (const item of post.targets) {
-      const provider = item.target.socialAccount?.provider;
-      const adapter = provider ? await platformFor(provider, 'remoteStatus') : null;
-      if (!item.remotePostId || !provider || !hasPlatformCapability(entitlements, provider) || !adapter?.getRemoteStatus || !item.target.accessToken || item.target.socialAccount?.invalidatedAt) continue;
-      const credential = readPublishingCredential(item.target, adapter, 'remoteStatus');
-      if (!credential) continue;
-      signal.throwIfAborted();
-      const status = await adapter.getRemoteStatus({ credential, remoteId: item.remotePostId, signal });
-      if (status.state === 'unknown') continue;
-      await publishingTransaction(signal, async tx => {
-        await tx.postTarget.update({ where: { id: item.id }, data: { status: status.state === 'published' ? 'published' : 'scheduled_remote', ...(status.publishedAt ? { publishedAt: status.publishedAt } : {}) } });
-        await audit(tx, actor, 'publishing.target_status_synced', { postId: post.id, postTargetId: item.id, state: status.state });
-      });
-      synced++;
-    }
-    if (synced === 0) return { synced };
-    const counts = await prisma.postTarget.groupBy({ by: ['status'], where: { postId: post.id }, _count: true });
-    const published = counts.find(row => row.status === 'published')?._count ?? 0;
-    const scheduled = counts.find(row => row.status === 'scheduled_remote')?._count ?? 0;
-    const failed = counts.find(row => row.status === 'failed')?._count ?? 0;
-    const processing = counts.find(row => row.status === 'processing')?._count ?? 0;
-    const overall = processing ? (published + scheduled ? 'partially_failed' : 'publishing') : published + scheduled === post.targets.length ? (scheduled ? 'scheduled' : 'published') : published ? 'partially_failed' : failed ? 'failed' : post.status;
-    await publishingTransaction(signal, async tx => {
-      await tx.post.update({ where: { id: post.id }, data: { status: overall, ...(published ? { publishedAt: new Date() } : {}), updatedAt: new Date() } });
-      await audit(tx, actor, 'publishing.post_status_synced', { postId: post.id, targetsSynced: synced });
-    });
-    return { synced };
-  });
-}
+export { syncPublicationStatus as syncPostStatus } from '@/modules/publishing/server/status';
 
 /** Strict CSV with readable, semicolon-separated channel labels. */
 export async function importPostsCsv(actor: PublishingActor, csv: string) {

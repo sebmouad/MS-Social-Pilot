@@ -213,9 +213,9 @@ describe('Facebook Graph adapter', () => {
 
   it('reads remote status and sends auth on delete', async () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => init?.method === 'DELETE'
-      ? response({ success: true }) : response({ is_published: false, created_time: '2026-01-01T00:00:00Z' })) as unknown as typeof fetch;
+      ? response({ success: true }) : response({ id: 'p1_2', from: { id: 'p1' }, is_published: false, scheduled_publish_time: String(Math.floor(Date.now() / 1000) + 3600) })) as unknown as typeof fetch;
     const engine = createFacebookEngine(config, fetcher);
-    expect((await engine.getStatus('token', 'p1_2')).state).toBe('scheduled');
+    expect((await engine.getStatus('token', 'p1_2', { targetId: 'p1' })).state).toBe('scheduled');
     await engine.deletePost('token', 'p1_2');
     expect(String((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[1][0])).toContain('access_token=token');
   });

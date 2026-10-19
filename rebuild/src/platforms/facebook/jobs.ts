@@ -73,7 +73,7 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
   const rows = await prisma.postTarget.findMany({
     where: { status: 'scheduled_remote', remotePostId: { not: null }, target: { enabled: true, type: 'page', socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } },
     orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }], take: limit,
-    select: { id: true, postId: true, remotePostId: true, post: { select: { workspaceId: true } }, target: { select: { id: true, workspaceId: true, providerId: true } } },
+    select: { id: true, postId: true, remotePostId: true, post: { select: { workspaceId: true, media: true } }, target: { select: { id: true, workspaceId: true, providerId: true } } },
   });
   const result: JobSummary = { examined: rows.length, updated: 0, skipped: 0, failed: 0 };
   if (!rows.length) return result;
@@ -96,7 +96,9 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
             if (!fresh || fresh.remotePostId !== row.remotePostId || fresh.target.workspaceId !== row.target.workspaceId || !fresh.target.enabled || fresh.target.providerId !== row.target.providerId || !freshAccount || !usable(freshAccount, row.target.workspaceId, currentTime(now)) || !granted(freshAccount.scopes, scopes) || !fresh.target.accessToken && !freshAccount.accessToken) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
             signal.throwIfAborted();
             const engine = await configuredFacebookEngine({ signal });
-            return engine.getStatus(decryptSecret(fresh.target.accessToken ?? freshAccount.accessToken), fresh.remotePostId!);
+            const media = row.post.media;
+            const contentKind = Array.isArray(media) && media.some(item => item && typeof item === 'object' && (item as { kind?: unknown }).kind === 'video') ? 'video' : Array.isArray(media) && media.some(item => item && typeof item === 'object' && (item as { kind?: unknown }).kind === 'image') ? 'image' : 'text';
+            return engine.getStatus(decryptSecret(fresh.target.accessToken ?? freshAccount.accessToken), fresh.remotePostId!, { targetId: row.target.providerId, contentKind });
           };
           const status = await withRetries(readStatus, retryLimit, retryBackoff);
           if (status.state !== 'published') return { updated: 0, skipped: 1 };

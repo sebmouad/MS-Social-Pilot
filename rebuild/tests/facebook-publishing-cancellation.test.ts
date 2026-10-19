@@ -131,7 +131,7 @@ describe('Facebook publishing cancellation', () => {
       })) as unknown as typeof fetch;
       const adapter = createFacebookAdapter(config, fetcher, policy);
       const pending = operation === 'status'
-        ? adapter.getRemoteStatus!({ credential, remoteId: 'post-1', signal: controller.signal })
+        ? adapter.getRemoteStatus!({ credential, remoteId: 'post-1', target: { id: 'page-1', name: 'Page', kind: 'page' }, signal: controller.signal })
         : adapter.deleteRemote!({ credential, remoteId: 'post-1', signal: controller.signal });
 
       controller.abort();
@@ -152,10 +152,10 @@ describe('Facebook publishing cancellation', () => {
 
   it('keeps successful remote status and deletion behavior unchanged without a signal', async () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => init?.method === 'DELETE'
-      ? response({ success: true }) : response({ is_published: true, created_time: '2026-01-01T00:00:00Z' })) as unknown as typeof fetch;
+      ? response({ success: true }) : response({ id: 'post-1', from: { id: 'page-1' }, is_published: true, created_time: '2026-01-01T00:00:00Z' })) as unknown as typeof fetch;
     const adapter = createFacebookAdapter(config, fetcher, policy);
 
-    await expect(adapter.getRemoteStatus!({ credential, remoteId: 'post-1' })).resolves.toMatchObject({ state: 'published' });
+    await expect(adapter.getRemoteStatus!({ credential, remoteId: 'post-1', target: { id: 'page-1', name: 'Page', kind: 'page' } })).resolves.toMatchObject({ state: 'published', remoteId: 'post-1', targetId: 'page-1' });
     await expect(adapter.deleteRemote!({ credential, remoteId: 'post-1' })).resolves.toBeUndefined();
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
