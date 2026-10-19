@@ -95,6 +95,13 @@ export async function connectionFlow(provider: string): Promise<PlatformHost['co
   return host.connection;
 }
 
+/** Customer-worded permission areas for one stored connection; empty when the module reports none. */
+export async function platformGrantHealth(provider: string, input: { scopes: string | null | undefined; hasAdAccounts: boolean; locale?: 'en' | 'fr' }) {
+  const grantHealth = hostFor(provider)?.connection.grantHealth;
+  if (!grantHealth || !await isPlatformEnabled(provider)) return [];
+  return grantHealth(input);
+}
+
 /** IDs of the installed modules that Root has switched on. */
 export async function enabledPlatformIds(): Promise<string[]> {
   const ids = (PLATFORM_MODULES as readonly PlatformModule[]).map((module) => module.id);

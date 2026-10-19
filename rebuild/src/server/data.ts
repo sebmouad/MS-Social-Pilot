@@ -168,6 +168,7 @@ export async function listConnections(workspaceId: string, allowedProviders: rea
       pictureUrl: true,
       invalidatedAt: true,
       tokenExpiresAt: true,
+      scopes: true,
       createdAt: true,
       targets: { select: { id: true, type: true, name: true, enabled: true } },
       adAccounts: { select: { id: true, actId: true, name: true, enabled: true } },

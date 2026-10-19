@@ -1,6 +1,7 @@
 import { facebookDiagnostics } from './diagnostics';
 import type { PlatformHost } from '@/server/platforms/host';
 import { configuredFacebookAdapter, configuredFacebookOAuth } from './runtime';
+import { facebookGrantHealth } from './connection-health';
 import { finishFacebookConnection, startFacebookConnection } from './connection';
 import { facebookAdsHost } from './ads';
 import { facebookAdsOps } from './ads-ops';
@@ -26,6 +27,7 @@ export const facebookHost = {
     isReady: () => configuredFacebookOAuth().then(() => true, () => false),
     start: startFacebookConnection,
     callback: finishFacebookConnection,
+    grantHealth: facebookGrantHealth,
   },
   jobs: {
     posts: syncFacebookPosts,

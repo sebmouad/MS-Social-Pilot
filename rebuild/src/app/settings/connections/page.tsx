@@ -5,7 +5,9 @@ import { requireViewer } from '@/server/context';
 import { getAdAccounts, listConnections } from '@/server/data';
 import { SettingsPage, SettingsPanel, Status, styles } from '../_components';
 import { ConnectionManager } from './manager';
-import { connectablePlatforms } from '@/server/platforms/registry';
+import { connectablePlatforms, platformGrantHealth } from '@/server/platforms/registry';
+import { summarizeConnectionHealth, connectionHealthText, type ConnectionHealthCopyKey } from '@/lib/connection-health';
+import { ReconnectButton } from './reconnect';
 import { platformModule } from '@/platforms';
 import { connectionState } from '@/lib/connection-status';
 import { runtimeConfig } from '@/server/config/store';
@@ -25,6 +27,11 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     return { ...ad, provider: social?.provider, owner: social?.name, state: social ? connectionState(social) : null };
   });
   const canManage = viewer.membership.role === 'owner' || viewer.membership.role === 'admin';
+  const locale = 'en' as const;
+  const now = new Date();
+  const healthById = new Map(await Promise.all(accounts.map(async account => [account.id, summarizeConnectionHealth(account, await platformGrantHealth(account.provider, { scopes: account.scopes, hasAdAccounts: account.adAccounts.length > 0, locale }), now)] as const)));
+  const text = (key: ConnectionHealthCopyKey, values?: Record<string, string>) => connectionHealthText(locale, key, values);
+  const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
 
   return <PageFrame module="settings"><SettingsPage active="settings/connections" title="Connections" description="Choose which discovered channels and advertising accounts this workspace uses.">
     <ConnectionManager statusLabels={statusLabels} sources={accounts} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
@@ -40,12 +47,16 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     </SettingsPanel> : <>
     <SettingsPanel title="Social accounts" detail={`${accounts.length} connected account${accounts.length === 1 ? '' : 's'} in this workspace`}>
       {accounts.length ? <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th scope="col">Account</th><th scope="col">Platform</th><th scope="col">Channels</th><th scope="col">Status</th>{canManage && <th scope="col">Actions</th>}</tr></thead><tbody>
-        {accounts.map(account => { const state = connectionState(account); const status = { label: statusLabels[state], tone: state === 'connected' ? 'good' as const : 'warning' as const }; return <tr key={account.id}>
+        {accounts.map(account => { const health = healthById.get(account.id)!; return <tr key={account.id}>
           <td><span className={styles['settings-table__primary']}>{account.name}</span><span className={styles['settings-table__secondary']}>Added {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(account.createdAt)}</span></td>
           <td>{providerName(account.provider)}</td>
           <td>{account.targets.length ? <><span className={styles['settings-table__secondary']}>{account.targets.filter(target => target.enabled).length} of {account.targets.length} selected</span><div className={styles['settings-inline-list']}>{account.targets.map(target => <div key={target.id} className={styles['settings-chip']} data-disabled={!target.enabled}><span className={styles['settings-chip__dot']} />{target.name || providerName(target.type)}{!target.enabled && ' · not selected'}</div>)}</div></> : <span className={styles['settings-table__secondary']}>No channels recorded</span>}</td>
-          <td><Status tone={status.tone}>{status.label}</Status></td>
-          {canManage && <td><div className={styles['settings-row-actions']}><a href={`/settings/connections?source=${encodeURIComponent(account.id)}&action=manage`}>Manage</a><a className={styles['settings-row-actions__danger']} href={`/settings/connections?source=${encodeURIComponent(account.id)}&action=disconnect`}>Disconnect</a></div></td>}
+          <td><Status tone={health.token === 'valid' ? 'good' : 'warning'}>{text(`token.${health.token}`)}</Status>
+            <span className={styles['settings-table__secondary']}>{account.tokenExpiresAt ? text('token.expiresOn', { date: dateFormat.format(account.tokenExpiresAt) }) : text('token.noExpiry')}</span>
+            {health.grants.length > 0 && <ul className={styles['settings-health-list']} aria-label={text('permissions')}>{health.grants.map(group => <li key={group.id}>{group.label}: {text(group.state)}</li>)}</ul>}
+            {health.missing.length > 0 && <span className={styles['settings-table__secondary']}>{text('missingSummary', { labels: health.missing.map(group => group.label).join(', ') })}</span>}
+            {health.grants.length > 0 && health.grants.every(group => group.state === 'unknown') && <span className={styles['settings-table__secondary']}>{text('unknownSummary')}</span>}</td>
+          {canManage && <td><div className={styles['settings-row-actions']}>{health.reconnectRecommended && <ReconnectButton platformId={account.provider} label={text('reconnect')} busyLabel={text('reconnecting')} failedLabel={text('reconnectFailed')} />}<a href={`/settings/connections?source=${encodeURIComponent(account.id)}&action=manage`}>Manage</a><a className={styles['settings-row-actions__danger']} href={`/settings/connections?source=${encodeURIComponent(account.id)}&action=disconnect`}>Disconnect</a></div></td>}
         </tr>; })}
       </tbody></table></div> : <div className={styles['settings-empty']}>No social accounts are connected to this workspace.</div>}
       {!canManage && <p className={styles['settings-note']}>Only workspace owners and admins can change these selections.</p>}

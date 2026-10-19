@@ -138,6 +138,8 @@ export interface PlatformHost {
     isReady(): Promise<boolean>;
     start(request: Request, viewer: ConnectionViewer): Promise<NextResponse>;
     callback(request: NextRequest, viewer: ConnectionViewer): Promise<NextResponse>;
+    /** Customer-worded permission areas (granted/missing/unknown) from grants recorded at connection time. */
+    grantHealth?(input: { scopes: string | null | undefined; hasAdAccounts: boolean; locale?: 'en' | 'fr' }): Promise<import('@/lib/connection-health').GrantGroupHealth[]>;
   };
 }
 

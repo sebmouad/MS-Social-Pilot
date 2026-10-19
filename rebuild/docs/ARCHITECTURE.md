@@ -1436,3 +1436,19 @@ of the synthetic preview database (the single failure is the known
 `config-validation` registry test already failing on main). No browser or
 provider run. Still open: video library/imports, a storage quota, Connections
 lifecycle callbacks and the remaining Ads report/export items.
+
+## Connection token and permission health — wave 2 session B, 2026-10-19
+
+`/settings/connections` shows per connection the credential state (valid, expires
+soon within 7 days, expired, reconnect needed), the access end date, permission
+areas in customer words (allowed / not allowed / not recorded) and a Reconnect
+action for owners/admins when the credential or a needed permission is lacking.
+Shared logic and en/fr copy: `src/lib/connection-health.ts`. The platform host
+contract gains optional `connection.grantHealth`; Facebook implements it in
+`src/platforms/facebook/connection-health.ts` by comparing stored grants with the
+Root `meta.*Scopes` lists, so scope names never reach shared code. Status is derived
+from stored data at render time, not a provider check; a revoked token appears only
+once something marks it invalidated. Open: a Root setting for the warning window
+(constant for now), a scheduled health check with a stored check time, re-requesting
+declined permissions on Reconnect, MCP exposure, locale plumbing, browser check.
+Evidence: unit tests and full suite (3,352/376) on a scratch synthetic database copy.
