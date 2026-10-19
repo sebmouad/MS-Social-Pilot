@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { TASK_STATUSES, taskConfirmations, type TasksActor } from './tasks';
-import { TASKS_TOOL_ACCESS } from './semantics';
+import { TASKS_TOOL_ACCESS, TASKS_FEATURE_ID } from './semantics';
+import { pageIdsFor, type McpToolGroup } from '@/server/mcp/kit';
 import { getTask, listTaskPostChoices, listTasks, performTaskAction } from './server/tasks';
 
 const id = { type: 'string', pattern: '^[A-Za-z0-9_-]{1,200}$' };
@@ -63,3 +64,30 @@ export async function executeTasksTool(actor: TasksActor, name: string, args: Re
     default: throw new OperationError('invalid_request', 'Unknown task action.');
   }
 }
+
+/** MCP tool groups this module installs. The host merges installed groups; edit only here. */
+export const TASKS_MCP: readonly McpToolGroup[] = [
+  {
+    id: 'tasks',
+    tools: tasksToolDefinitions,
+    features: {
+      list_tasks: 'tasks/board',
+      get_task: 'tasks/board',
+      list_task_post_choices: 'tasks/board',
+      create_task: 'tasks/board',
+      create_task_checklist: 'tasks/board',
+      update_task: 'tasks/board',
+      move_task: 'tasks/board',
+      delete_task: 'tasks/board',
+      add_task_comment: 'tasks/board',
+      delete_task_comment: 'tasks/board',
+    },
+    writeTools: ['create_task', 'create_task_checklist', 'update_task', 'move_task', 'delete_task', 'add_task_comment', 'delete_task_comment'],
+    selfLockedWrites: ['create_task', 'create_task_checklist', 'update_task', 'move_task', 'delete_task', 'add_task_comment', 'delete_task_comment'],
+    scope: { resourceTools: ['list_task_post_choices'], workspaceTools: ['list_tasks', 'get_task', 'create_task', 'create_task_checklist', 'update_task', 'move_task', 'delete_task', 'add_task_comment', 'delete_task_comment'] },
+    resources: [
+      { uri: 'msp://tasks', name: "Tasks", description: "First bounded page of workspace tasks with status counts. Continue pages with list_tasks.", mimeType: 'application/json', feature: TASKS_FEATURE_ID, readTool: 'list_tasks' },
+    ],
+    execute: (viewer, name, args, cap) => executeTasksTool({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer), ...(viewer.permissions ? { permissionCeiling: viewer.permissions } : {}) }, name, args, cap),
+  },
+];

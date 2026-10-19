@@ -3,7 +3,8 @@ import { OperationError } from '@/lib/operation-error';
 import { deleteBioPage, readBioPage, saveBioPage } from './server/bio';
 import { createShareLink, deleteShareLink, listShareFeedback, listShareLinks, listShareableChannels, revokeShareLink, rotateShareLink, updateShareLink } from './server/links';
 import { SHARE_KINDS, type SharingActor } from './contracts';
-import { SHARING_TOOL_ACCESS } from './semantics';
+import { SHARING_TOOL_ACCESS, SHARING_FEATURE_ID, BIO_FEATURE_ID } from './semantics';
+import { pageIdsFor, type McpToolGroup } from '@/server/mcp/kit';
 
 const id = { type: 'string', pattern: '^[A-Za-z0-9_-]{1,80}$' };
 const confirm = { type: 'string' };
@@ -50,3 +51,32 @@ export async function executeSharingTool(actor: SharingActor, name: string, args
     default: throw new OperationError('invalid_request', 'Choose a supported sharing action.');
   }
 }
+
+/** MCP tool groups this module installs. The host merges installed groups; edit only here. */
+export const SHARING_MCP: readonly McpToolGroup[] = [
+  {
+    id: 'sharing',
+    tools: sharingToolDefinitions,
+    features: {
+      list_share_links: 'settings/sharing',
+      list_shareable_channels: 'settings/sharing',
+      list_share_feedback: 'settings/sharing',
+      create_share_link: 'settings/sharing',
+      update_share_link: 'settings/sharing',
+      revoke_share_link: 'settings/sharing',
+      rotate_share_link: 'settings/sharing',
+      delete_share_link: 'settings/sharing',
+      get_bio_page: 'settings/bio',
+      save_bio_page: 'settings/bio',
+      delete_bio_page: 'settings/bio',
+    },
+    writeTools: ['create_share_link', 'update_share_link', 'revoke_share_link', 'rotate_share_link', 'delete_share_link', 'save_bio_page', 'delete_bio_page'],
+    selfLockedWrites: ['create_share_link', 'update_share_link', 'revoke_share_link', 'rotate_share_link', 'delete_share_link', 'save_bio_page', 'delete_bio_page'],
+    scope: { resourceTools: ['list_share_links', 'list_shareable_channels', 'list_share_feedback', 'create_share_link', 'update_share_link', 'revoke_share_link', 'rotate_share_link', 'delete_share_link'], workspaceTools: ['get_bio_page', 'save_bio_page', 'delete_bio_page'], resources: ['msp://settings/sharing'] },
+    resources: [
+      { uri: 'msp://settings/sharing', name: "Client links", description: "Bounded workspace client-link metadata; secrets are never listed.", mimeType: 'application/json', feature: SHARING_FEATURE_ID, readTool: 'list_share_links', guardedRead: true },
+      { uri: 'msp://settings/bio', name: "Link in bio", description: "Current workspace bio page and bounded public links.", mimeType: 'application/json', feature: BIO_FEATURE_ID, readTool: 'get_bio_page', guardedRead: true },
+    ],
+    execute: (viewer, name, args, cap) => executeSharingTool({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), allowedTargetIds: pageIdsFor(viewer), ...(viewer.permissions ? { permissionCeiling: viewer.permissions } : {}) }, name, args, cap),
+  },
+];
