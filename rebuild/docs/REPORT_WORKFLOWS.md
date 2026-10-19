@@ -84,8 +84,14 @@ precise limits. Actual HTTP/MCP/browser/SMTP probes and independent reviews are 
 The final corrections passed their post-change checks; publication must verify
 the exact main commit against origin/main.
 
-Remaining legacy report coverage includes goals, response time, destinations,
-top posts and AI recap; stored choices are preserved and generated output names
+Wave 2 (2026-10-19) adds Response time and Top posts sections, selectable by
+default in Root's enabled sections. Response time reads stored conversation
+messages (a reply is app-sent or from the channel's own identity), calendar
+time, capped at 20,000 messages with a partial flag. Top posts asks the
+channel's platform module through the optional `PlatformAnalyticsHost.postPerformance`
+hook (stored data only, no provider call); a module without it yields an empty,
+labelled section. Evidence: unit tests only, no PostgreSQL or browser run.
+Remaining legacy report coverage includes goals, destinations and AI recap; stored choices are preserved and generated output names
 unsupported sections honestly. This batch is not full report parity. Complete
 Facebook live coverage, the held photo cleanup, full Root configuration coverage,
 remaining legacy integrations and production-shaped data/media/service rollback

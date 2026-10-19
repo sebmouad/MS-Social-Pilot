@@ -90,7 +90,7 @@ describe('report generator', () => {
     expect(gen.calls).toBe(0);
   });
   it('refuses a report that lists only unsupported sections', async () => {
-    expect(await generator().generate({ actor, channelId: 'c1', sections: ['goals', 'topPosts'], period: { start: '2026-10-12', end: '2026-10-18' } })).toEqual({ ok: false, reason: 'no_supported_sections' });
+    expect(await generator().generate({ actor, channelId: 'c1', sections: ['goals', 'destinations'], period: { start: '2026-10-12', end: '2026-10-18' } })).toEqual({ ok: false, reason: 'no_supported_sections' });
   });
   it("bounds the generated rows themselves by the actor's result ceiling", async () => {
     const result = await generator().generate({ actor: { ...actor, maxResultItems: 3 }, channelId: 'c1', sections: ['analysis', 'audience', 'published'], period: { start: '2026-10-12', end: '2026-10-18' } });

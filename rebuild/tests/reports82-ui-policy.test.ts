@@ -7,7 +7,7 @@ import { loadReportUiPolicy } from '@/modules/analytics/server/report-ui-policy'
 describe('Root-managed Reports presentation policy',()=>{
   it('accepts defaults and never offers unsupported sections as usable choices',()=>{
     const policy=REPORT_UI_POLICY_SCHEMA.parse(DEFAULT_REPORT_UI_POLICY);
-    expect(policy.sectionOptions.map(item=>item.id)).toEqual(['analysis', 'responseTime', 'audience', 'published']);
+    expect(policy.sectionOptions.map(item=>item.id)).toEqual(['analysis', 'responseTime', 'audience', 'published', 'topPosts']);
     expect(REPORT_UI_POLICY_SCHEMA.safeParse({...DEFAULT_REPORT_UI_POLICY,enabledSections:['goals']}).success).toBe(false);
   });
   it('rejects duplicate choices and defaults absent from the offered choices',()=>{

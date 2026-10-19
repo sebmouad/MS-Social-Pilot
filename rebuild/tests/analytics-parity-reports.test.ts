@@ -51,7 +51,7 @@ describe('report templates', () => {
     // An existing template that already stores 'goals' may be renamed and keep it, but may not gain another unsupported section.
     state.templateSections = ['analysis', 'goals'];
     await expect(manageReportTemplate(actor, { action: 'update', id: 't1', name: 'Kept', sections: ['analysis', 'goals'], rangeKey: '7d', confirmation: reportConfirmation.updateTemplate('t1') })).resolves.toMatchObject({ ok: true });
-    await expect(manageReportTemplate(actor, { action: 'update', id: 't1', name: 'Kept', sections: ['analysis', 'topPosts'], rangeKey: '7d', confirmation: reportConfirmation.updateTemplate('t1') })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(manageReportTemplate(actor, { action: 'update', id: 't1', name: 'Kept', sections: ['analysis', 'destinations'], rangeKey: '7d', confirmation: reportConfirmation.updateTemplate('t1') })).rejects.toMatchObject({ code: 'invalid_request' });
   });
   it.each(['viewer', 'member'])('denies writes to role %s but allows listing', async role => {
     state.role = role;

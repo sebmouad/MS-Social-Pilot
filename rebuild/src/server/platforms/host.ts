@@ -80,8 +80,19 @@ export interface PlatformPublicationRecovery {
   executeRootAction?(userId: string, input: PlatformPublicationActionInput): Promise<PlatformPublicationActionResult>;
 }
 
+/** One published post on one channel, with module-normalized stored measures. Missing measures are null, never zero. */
+export type PostPerformance = {
+  postId: string; text: string; publishedAt: Date | null; url: string | null;
+  measures: Array<{ key: string; label: string; value: number | null }>;
+  /** The module's ranking measure for this post (null when unknown) and its customer label. */
+  rankValue: number | null; rankLabel: string;
+  measuredAt: Date | null;
+};
+
 export interface PlatformAnalyticsHost {
   load(request: AnalyticsProviderRequest): Promise<AnalyticsProviderData>;
+  /** Optional: stored per-post measures for one already-authorized channel, highest rank first. No provider request. */
+  postPerformance?(request: { workspaceId: string; targetId: string; from: Date; to: Date; limit: number }): Promise<PostPerformance[]>;
 }
 
 export interface PlatformAdsHost {
