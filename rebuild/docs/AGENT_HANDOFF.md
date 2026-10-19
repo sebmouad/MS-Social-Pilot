@@ -4,7 +4,7 @@ Updated: 2026-10-19. This is durable project context, not proof of current runti
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
 
-Current continuation: batch95 at the end of this document and MEDIA_INSPECTION.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+Current continuation: "legacy parity wave 2" at the end of this document. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
 
 ## Historical verified batch —84
 
@@ -693,3 +693,44 @@ synthetic video were removed, backup retained. Backup SHA256:
 `277764d3a486b3138f1bef5e017966fc0c9cc2c6e6d5a28c86b3ff9e6e67b143`.
 The final built preview uses the original example database at localhost:3200;
 /sign-in returned HTTP200. Production and its held photo canary are unchanged.
+
+
+## Current continuation: legacy parity wave 2 (supersedes earlier "next" notes)
+
+Wave 1 is on main (`eff2fa5`): Inbox moderation rules/log/undo, Posts saved
+views/bulk actions/failed-destination retry, workspace UTM tagging at publish and
+composer spacing warning, Root sessions and connections directory. Registry 81.
+Evidence is unit tests with mocked data only (3,123 pass, 205 database tests
+skipped): no PostgreSQL, browser or live-provider run yet.
+
+Wave 1 open items: real-PostgreSQL run of saved views, moderation and bulk;
+browser check of /inbox/moderation, /root/sessions, /root/connections and the
+Posts table checkboxes (four themes, 1440px and 390px); moderation does not run
+after sync; v1 Posts API (needs an API-key route seam) and async large exports;
+hidden workspace settings without consumers (week start, business hours,
+best-time, shortening, undo window, AI voice, negative-comment alert); Root
+registration, user/workspace deletion, audit export. Owner decision pending:
+publish currently fails if workspace UTM settings cannot be loaded.
+
+Scope: Facebook only; other platforms excluded. Reuse legacy code (root `src/`,
+messages, tests) and port it into rebuild modules.
+
+When told "continue", run wave 2 as two parallel sessions:
+
+- **Session A (main checkout): Analytics + Reports.** Ranked posts,
+  per-destination summaries, goals, response time, AI recap, other export
+  formats (see REPORT_WORKFLOWS.md). A owns the shared host files:
+  `src/server/mcp/server.ts`, `src/lib/config/registry.ts` (bumps
+  CONFIG_SCHEMA_VERSION), `src/modules/settings/mcp-access/tool-policy.ts`,
+  `docs/LEGACY_CAPABILITY_PARITY.md`. After B pushes, A applies B's listed
+  shared edits.
+- **Session B (separate worktree): Media library, Connections, Ads.** Provider
+  code in `src/platforms/facebook`. B does NOT edit A's shared files; it ends its
+  report with the exact shared edits it needs.
+
+Both: follow ARCHITECTURE_CONTRACT.md, en+fr copy, no provider branches in shared
+code, `npm test` + `npm run typecheck` from `rebuild/`, local synthetic
+PostgreSQL so database tests run, pull before push, commit to main.
+
+Wave 3 afterwards: auth and onboarding, integrations (webhooks, API tokens,
+OAuth clients, v1 API), agency extras, owner export.

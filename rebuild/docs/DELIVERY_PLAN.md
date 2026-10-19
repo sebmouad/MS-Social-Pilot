@@ -4,7 +4,7 @@ Updated 2026-10-19. Goal: [GOAL.md](GOAL.md). Mandatory target:
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md). Current evidence and gaps:
 [ARCHITECTURE.md](ARCHITECTURE.md), [LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md).
 
-Current continuation: batch92 at the end of this document and ASYNC_PUBLICATION_RECEIPTS.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+Current continuation: legacy parity wave 2 in AGENT_HANDOFF.md (end of file). Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
 
 ## Historical position before batch85 —2026-10-19
 
