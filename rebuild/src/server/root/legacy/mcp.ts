@@ -3,6 +3,7 @@ import type { RootMcpActor } from '@/server/mcp/types';
 import { assignRootPlan, listRootPlanHistory, listRootPlans, listRootSubscribers, updateRootPlan } from './plans';
 import { changeRootMemberRole, exportRootPrivileges, listRootPrivileges } from './privileges';
 import { loadRootLifecycle, transferWorkspaceOwnership } from './lifecycle';
+import { deleteRootWorkspace } from '../workspace-access';
 import { getRootError, listRootErrors, setRootErrorResolved } from './errors';
 import { readRootBackupStatus, readRootDiagnosticsSummary } from './backups';
 import { listRootSessions, sessionSignOutConfirmation, signOutRootSession } from './sessions';
@@ -21,8 +22,9 @@ export const rootLegacyToolDefinitions = [
   { name: 'list_root_privileges', description: 'Paged member, role and channel-scope audit across workspaces. Filters: q, role, workspaceId, page.' + privateNote, inputSchema: { type: 'object', properties: { q: { type: 'string' }, role: { type: 'string' }, workspaceId: { type: 'string' }, page: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'export_root_privileges', description: 'Complete CSV of the privilege audit, bounded by Root. Oversized results are refused.' + privateNote, inputSchema: { type: 'object', properties: { q: { type: 'string' }, role: { type: 'string' }, workspaceId: { type: 'string' } }, additionalProperties: false } },
   { name: 'change_root_member_role', description: 'Change one member role in a workspace. Confirmation must exactly match CHANGE ROLE <email> IN <workspaceId> TO <role>. The last active owner cannot be demoted.' + privateNote, inputSchema: { type: 'object', required: ['membershipId', 'role', 'confirmation'], properties: { membershipId: { type: 'string' }, role: { type: 'string', enum: ['owner', 'admin', 'editor', 'contributor', 'viewer', 'client'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
-  { name: 'get_root_lifecycle', description: 'Disabled accounts, suspended workspaces and queued deletions. Deletion is not available through Root lifecycle tools. Use manage_root_user and set_root_workspace_access to change access.' + privateNote, inputSchema: none },
+  { name: 'get_root_lifecycle', description: 'Disabled accounts, suspended workspaces and queued deletions. Use delete_root_workspace for a suspended workspace; manage_root_user and set_root_workspace_access to change access.' + privateNote, inputSchema: none },
   { name: 'transfer_root_workspace_ownership', description: 'Make an active existing account the owner of a workspace. previousOwners keep or demote_admin. Confirmation must exactly match TRANSFER WORKSPACE <workspaceId> TO <email>. Does not transfer installation Root.' + privateNote, inputSchema: { type: 'object', required: ['workspaceId', 'newOwnerEmail', 'previousOwners', 'confirmation'], properties: { workspaceId: { type: 'string' }, newOwnerEmail: { type: 'string' }, previousOwners: { type: 'string', enum: ['keep', 'demote_admin'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'delete_root_workspace', description: 'Permanently delete a suspended workspace: all its posts, inbox, analytics, settings, members and stored media. Accounts are kept. Cannot be undone; take a backup first. Confirmation must exactly match DELETE WORKSPACE <workspaceId>. Provider content already published is not removed.' + privateNote, inputSchema: { type: 'object', required: ['workspaceId', 'confirmation'], properties: { workspaceId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'list_root_errors', description: 'Grouped application errors, redacted and truncated. Filters: status open|resolved|all, source server|worker|browser, q, page.' + privateNote, inputSchema: { type: 'object', properties: { status: { type: 'string', enum: ['open', 'resolved', 'all'] }, source: { type: 'string', enum: ['server', 'worker', 'browser'] }, q: { type: 'string' }, page: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'get_root_error', description: 'One error group including a redacted, truncated stack.' + privateNote, inputSchema: { type: 'object', required: ['id'], properties: { id: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_root_error_resolved', description: 'Resolve or reopen an error group (audited, reversible). Exact confirmation: RESOLVE ROOT ERROR <id> or REOPEN ROOT ERROR <id>.' + privateNote, inputSchema: { type: 'object', required: ['id', 'resolved', 'confirmation'], properties: { id: { type: 'string' }, resolved: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -66,6 +68,11 @@ export async function callRootLegacyTool(viewer: RootMcpActor, name: string, arg
     case 'change_root_member_role': return changeRootMemberRole(id, args);
     case 'get_root_lifecycle': reject(args); return loadRootLifecycle(id, cap);
     case 'transfer_root_workspace_ownership': return transferWorkspaceOwnership(id, args);
+    case 'delete_root_workspace': {
+      const { workspaceId, confirmation, ...extra } = args; reject(extra);
+      if (typeof workspaceId !== 'string' || typeof confirmation !== 'string' || workspaceId.length > 200) throw new OperationError('invalid_request', 'Choose a workspace and enter the exact confirmation.');
+      return deleteRootWorkspace(id, workspaceId, confirmation);
+    }
     case 'list_root_errors': return listRootErrors(id, args, cap);
     case 'get_root_error': { const { id: errorId, ...extra } = args; reject(extra); return getRootError(id, typeof errorId === 'string' ? errorId : ''); }
     case 'set_root_error_resolved': {

@@ -13,7 +13,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
  * receipt; anything else tells the operator to check current state first.
  */
 export function ConfirmAction({ id, label, title, description, phrase, endpoint, method = 'POST', body, variant = 'danger', successText, disabled, children }: {
-  id: string; label: string; title: string; description: string; phrase: string; endpoint: string; method?: 'POST' | 'PATCH';
+  id: string; label: string; title: string; description: string; phrase: string; endpoint: string; method?: 'POST' | 'PATCH' | 'DELETE';
   body: Record<string, unknown>; variant?: 'primary' | 'danger'; successText: string; disabled?: boolean; children?: ReactNode;
 }) {
   const router = useRouter();

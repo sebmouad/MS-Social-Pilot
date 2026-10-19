@@ -290,13 +290,23 @@ function savedCounts(value: unknown): Record<string, number> {
 /** Queue a resumable purge, erase database rows, then remove the two workspace storage trees. */
 export async function deleteWorkspaceData(actor: DataControlActor, confirmation: string) {
   if (confirmation !== 'DELETE') throw new OperationError('invalid_request', 'Type DELETE to confirm this action.');
+  return purgeWorkspaceData(actor, async tx => {
+    const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
+    if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
+    if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage workspace data.');
+  });
+}
+
+/**
+ * Shared purge used by workspace owners and by Root. `authorize` runs inside the request transaction after the
+ * workspace row lock, so authority is checked against current state.
+ */
+export async function purgeWorkspaceData(actor: DataControlActor, authorize: (tx: DataControlTransaction) => Promise<void>) {
   validateWorkspaceId(actor.workspaceId);
   const timeout = await runtimeConfig('data.deleteTransactionTimeoutMs');
   await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
-    const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
-    if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
-    if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage workspace data.');
+    await authorize(tx);
     const workspace = await tx.workspace.findUnique({ where: { id: actor.workspaceId }, select: { id: true } });
     if (!workspace) throw new OperationError('unavailable', 'This workspace is unavailable.');
     const existing = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId } });

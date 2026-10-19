@@ -11,3 +11,7 @@ export function EnableUser({ id, email }: { id: string; email: string }) {
 export function RestoreWorkspace({ id, name, blocked }: { id: string; name: string; blocked: boolean }) {
   return <ConfirmAction id={`restore-${id}`} label="Restore" title={`Restore ${name}?`} description="Members regain access and new app operations resume." phrase={workspaceAccessConfirmation(id, false)} endpoint={`/api/root/lifecycle/workspaces/${encodeURIComponent(id)}`} method="PATCH" body={{ suspended: false }} variant="primary" successText="Workspace restored." disabled={blocked} />;
 }
+
+export function DeleteWorkspace({ id, name, blocked }: { id: string; name: string; blocked: boolean }) {
+  return <ConfirmAction id={`delete-${id}`} label="Delete" title={`Permanently delete ${name}?`} description="Every post, inbox item, analytics record, setting, member and stored file of this workspace is erased. Accounts stay. Content already published on social platforms is not removed. This cannot be undone; make sure a recent backup exists." phrase={`DELETE WORKSPACE ${id}`} endpoint={`/api/root/lifecycle/workspaces/${encodeURIComponent(id)}`} method="DELETE" body={{}} variant="danger" successText="Workspace deleted." disabled={blocked} />;
+}

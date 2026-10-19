@@ -28,3 +28,34 @@ export async function setRootWorkspaceAccess(actorId: string, workspaceId: strin
     return { changed: true, suspended, suspendedAt };
   }, { timeout, maxWait });
 }
+
+export const rootWorkspaceDeletionConfirmation = (workspaceId: string) => `DELETE WORKSPACE ${workspaceId}`;
+
+/**
+ * Root deletion of a whole workspace: only a suspended workspace, with an exact confirmation. Reuses the resumable
+ * workspace data purge (database rows, then stored media), then removes the emptied workspace row. A failure part way
+ * leaves the purge resumable and the workspace suspended, never half-visible to customers.
+ */
+export async function deleteRootWorkspace(actorId: string, workspaceId: string, confirmation: string) {
+  if (confirmation !== rootWorkspaceDeletionConfirmation(workspaceId)) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
+  const { purgeWorkspaceData } = await import('@/server/data-control');
+  const counts = await purgeWorkspaceData({ userId: actorId, workspaceId }, async tx => {
+    const actor = await tx.user.findUnique({ where: { id: actorId }, select: { isInstanceOwner: true, disabledAt: true } });
+    if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
+    const rows = await tx.$queryRaw<WorkspaceAccessRow[]>`SELECT id, name, "suspendedAt" FROM workspaces WHERE id = ${workspaceId}`;
+    if (!rows[0]) throw new OperationError('not_found', 'Workspace not found.');
+    if (!rows[0].suspendedAt) throw new OperationError('conflict', 'Suspend this workspace before deleting it.');
+  });
+  const timeout = await runtimeConfig('data.deleteTransactionTimeoutMs');
+  await prisma.$transaction(async tx => {
+    const actor = await tx.user.findUnique({ where: { id: actorId }, select: { isInstanceOwner: true, disabledAt: true } });
+    if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
+    const purge = await tx.workspaceDataPurge.findUnique({ where: { workspaceId }, select: { status: true } });
+    if (purge?.status !== 'completed') throw new OperationError('conflict', 'Workspace data deletion is still in progress.');
+    await tx.$executeRaw`DELETE FROM workspace_data_purges WHERE "workspaceId" = ${workspaceId}`;
+    await tx.$executeRaw`UPDATE users SET "lastActiveWorkspaceId" = NULL WHERE "lastActiveWorkspaceId" = ${workspaceId}`;
+    await tx.$executeRaw`DELETE FROM workspaces WHERE id = ${workspaceId}`;
+    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, 'root.workspace_deleted', ${JSON.stringify({ workspaceId, counts })}::jsonb, NOW())`;
+  }, { timeout });
+  return { deleted: true as const, workspaceId, counts };
+}
