@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { isValidElement, type ReactNode } from 'react';
 
 vi.mock('@/server/context', () => ({ requireViewer: async () => ({ permissions: {}, entitlements: {}, user: { id: 'user', name: 'Example author' }, workspaceId: 'workspace', membership: { workspace: { timezone: 'UTC' } } }) }));
+vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': 'fr-FR' }) }));
 vi.mock('@/server/permissions', () => ({ canAccessFeature: () => true }));
 vi.mock('@/server/entitlements', () => ({ canUseFeature: () => false }));
 vi.mock('@/modules/publishing/server/templates', () => ({ readTemplatePage: vi.fn() }));
@@ -30,5 +31,6 @@ describe('composer Root configuration wiring', () => {
     expect(props?.maxFirstCommentDelayMinutes).toBe(45);
     expect(props?.imageRules.maxMedia).toBe(6);
     expect(props?.imageRules.maxMessageCharacters).toBe(500);
+    expect(props?.aiLocale).toBe('fr');
   });
 });
