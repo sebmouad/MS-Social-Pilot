@@ -99,9 +99,9 @@ export interface PlatformAnalyticsHost {
   load(request: AnalyticsProviderRequest): Promise<AnalyticsProviderData>;
   /** Optional: stored per-post measures for one already-authorized channel, highest rank first. No provider request. */
   postPerformance?(request: { workspaceId: string; targetId: string; from: Date; to: Date; limit: number }): Promise<PostPerformance[]>;
-  /** Optional: goal measures for one already-authorized channel over [from, to). No provider request. */
   /** Optional: stored per-post measures summed for one already-authorized channel over [from, to). No provider request. */
   destinationMeasures?(request: { workspaceId: string; targetId: string; from: Date; to: Date }): Promise<DestinationMeasures>;
+  /** Optional: goal measures for one already-authorized channel over [from, to). No provider request. */
   goalMeasures?(request: { workspaceId: string; targetId: string; from: Date; to: Date }): Promise<GoalMeasures>;
 }
 

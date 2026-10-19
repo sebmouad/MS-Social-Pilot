@@ -7,7 +7,7 @@ import type { DestinationMeasures } from '@/server/platforms/host';
  * shows how many posts the sum is based on. Reads stored data only.
  */
 const MEASURES: Array<[key: string, label: string]> = [
-  ['impressions', 'Impressions'], ['reach', 'Reach'], ['reactions', 'Reactions'], ['comments', 'Comments'], ['shares', 'Shares'],
+  ['impressions', 'Impressions'], ['reach', 'Reach (sum per post; people may repeat)'], ['reactions', 'Reactions'], ['comments', 'Comments'], ['shares', 'Shares'],
 ];
 const num = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 
