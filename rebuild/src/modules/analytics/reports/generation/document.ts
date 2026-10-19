@@ -3,6 +3,7 @@ import { readAnalyticsSnapshot } from '../../server/read';
 import { REPORT_SECTION_IDS, REPORT_SUPPORTED_SECTIONS, type ReportGenerationPort, type ReportGenerationRequest, type ReportGenerationResult, type ReportOutput, type ReportSectionId } from '../contracts';
 import { authorizeReport, resultCeiling, usableChannelIds } from '../server/access';
 import { prisma } from '@/server/data';
+import { formatDuration, readResponseTime, type ResponseTimeSummary } from './response-time';
 
 export type ReportBounds = { maxRows: number; maxBytes: number };
 
@@ -41,7 +42,7 @@ type Snapshot = Awaited<ReturnType<typeof readAnalyticsSnapshot>>;
  * as-of times; a metric without data is "Not available", never zero. Every rendering is bounded in rows and UTF-8 bytes, and
  * anything cut is marked; when even the fixed parts exceed the bound a minimal notice is returned instead of an overflowing page.
  */
-export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date }, bounds: ReportBounds): ReportOutput {
+export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; responseTime?: ResponseTimeSummary | null }, bounds: ReportBounds): ReportOutput {
   const wanted = new Set(input.sections);
   const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s));
   const notIncluded = REPORT_SECTION_IDS.filter(s => wanted.has(s) && !included.includes(s));
@@ -49,12 +50,19 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const channelName = clamp(input.channelName, 200);
   const metrics = included.includes('analysis') ? snapshot.allMetrics.filter(m => m.resourceKind === 'channel') : [];
   const audience = included.includes('audience') ? snapshot.audience : null;
+  const response = included.includes('responseTime') ? input.responseTime ?? null : null;
+  const responseLine = response ? `Median first response ${formatDuration(response.medianMs)}; ${response.answered} answered, ${response.unanswered} waiting at period end. Calendar time, from stored Inbox messages${response.partial ? '; only the earliest messages were read' : ''}.` : '';
   const audienceAsOf = audience ? audience.entries.map(e => e.asOf).filter((d): d is Date => d instanceof Date).sort((a, b) => b.getTime() - a.getTime())[0] : undefined;
 
   // CSV: long form, one row per summary/point/resource, cut at the row and byte limits.
   const header = ['record_type', 'metric_key', 'metric', 'source', 'resource', 'date', 'value', 'unit', 'coverage', 'aggregation'];
   const rows: unknown[][] = [];
   if (audience) for (const e of audience.entries) rows.push(['audience', e.metric, e.metricLabel, e.sourceLabel, e.name, e.asOf, e.value, 'people', `${audience.covered} of ${audience.selected} channels`, 'Latest value per channel; not unique people']);
+  if (response) {
+    rows.push(['response_time', 'median_first_response_minutes', 'Median first response', 'Inbox', '', '', response.medianMs === null ? '' : Math.round(response.medianMs / 60_000), 'minutes', response.partial ? 'partial' : '', 'Median wait until the channel replied; calendar time']);
+    rows.push(['response_time', 'answered_waits', 'Answered waits', 'Inbox', '', '', response.answered, 'waits', '', 'Count in period']);
+    rows.push(['response_time', 'unanswered_waits', 'Waiting at period end', 'Inbox', '', '', response.unanswered, 'waits', '', 'Count at period end']);
+  }
   if (included.includes('published')) for (const [k, v] of Object.entries(snapshot.publishing)) rows.push(['publishing', k, k, '', '', '', v, 'posts', '', 'Count in period']);
   for (const m of metrics) {
     const agg = [m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. ');
@@ -79,6 +87,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:14px/1.5 system-ui,sans-serif;margin:2rem;color:#111}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #bbb;padding:.35rem .5rem;text-align:left}small{color:#555}@media print{body{margin:0}}</style></head><body>`
       + `<h1>${esc(title)}</h1><p><small>Generated ${esc(input.generatedAt.toISOString())}. Values come from stored analytics; "Not available" means no data, not zero.</small></p>`
       + (included.includes('published') ? `<h2>Published posts</h2><p>Published ${esc(snapshot.publishing.published)}, scheduled ${esc(snapshot.publishing.scheduled)}, failed ${esc(snapshot.publishing.failed)}.</p>` : '')
+      + (response ? `<h2>Response time</h2><p>${esc(responseLine)}</p>` : '')
       + audienceHtml
       + (metrics.length ? `<h2>Metrics</h2><table><thead><tr><th>Metric</th><th>Source</th><th>Value</th><th>Basis</th><th>Coverage</th><th>As of</th></tr></thead><tbody>${shown.map(m => `<tr><td>${esc(m.label)}</td><td>${esc(m.sourceLabel)}</td><td>${esc(valueText(m))}</td><td>${esc([m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. '))}</td><td>${esc(coverageText(m))}</td><td>${asOf(m.latestAt)}</td></tr>`).join('')}</tbody></table>` : '')
       + (marked ? `<p><strong>This report was shortened to fit its size limit.</strong></p>` : '')
@@ -93,6 +102,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     htmlTruncated = true;
   }
   const baseLines = [title, '', ...(included.includes('published') ? [`Published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`] : []),
+    ...(response ? [`Response time: ${responseLine}`] : []),
     ...(audience ? [`Audience: ${audience.covered ? audience.total : 'Not available'} (${audience.covered} of ${audience.selected} channels${audienceAsOf ? `; as of ${asOf(audienceAsOf)}` : ''}; not unique people)`] : [])];
   const metricLines = metrics.map(m => `${clamp(m.label, 200)} (${clamp(m.sourceLabel, 200)}): ${valueText(m)}; ${coverageText(m)}; as of ${asOf(m.latestAt)}`);
   const tail = (cut: boolean) => [...(cut ? ['Shortened to fit the size limit.'] : []), ...(notIncluded.length ? [`Not included: ${notIncluded.join(', ')}`] : [])];
@@ -125,7 +135,8 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
         const base = await deps.bounds();
         const ceiling = resultCeiling(actor);
         const bounds = { maxRows: ceiling === undefined ? base.maxRows : Math.min(base.maxRows, ceiling), maxBytes: base.maxBytes };
-        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? 'Channel', sections: request.sections, generatedAt: deps.now?.() ?? new Date() }, bounds) };
+        const responseTime = request.sections.includes('responseTime') ? await readResponseTime(actor.workspaceId, request.channelId, request.period) : null;
+        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? 'Channel', sections: request.sections, responseTime, generatedAt: deps.now?.() ?? new Date() }, bounds) };
       } catch (error) {
         const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
         return { ok: false, reason: code === 'unauthorized' || code === 'forbidden' ? 'access_unavailable' : 'generation_failed' };

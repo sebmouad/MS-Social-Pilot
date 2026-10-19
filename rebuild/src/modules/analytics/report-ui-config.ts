@@ -21,7 +21,7 @@ export const REPORT_UI_POLICY_SCHEMA = rawSchema.transform(policy=>({...policy,s
 export type ReportUiPolicy = z.infer<typeof REPORT_UI_POLICY_SCHEMA>;
 export const DEFAULT_REPORT_UI_POLICY = {
   sectionLabels:[{id:'analysis',label:'Analysis'},{id:'goals',label:'Goals'},{id:'responseTime',label:'Response time'},{id:'audience',label:'Audience'},{id:'published',label:'Published posts'},{id:'destinations',label:'Destinations'},{id:'topPosts',label:'Top posts'}],
-  enabledSections:['analysis','audience','published'],
+  enabledSections:['analysis','responseTime','audience','published'],
   rangeOptions:[{id:'today',label:'Today'},{id:'yesterday',label:'Yesterday'},{id:'7d',label:'Last 7 days'},{id:'30d',label:'Last 30 days'},{id:'90d',label:'Last 90 days'},{id:'thisMonth',label:'This month'},{id:'lastMonth',label:'Last month'},{id:'thisYear',label:'This year'},{id:'all',label:'All time'}],
   frequencyOptions:[{id:'weekly',label:'Weekly'},{id:'monthly',label:'Monthly'}],
   defaultSections:['analysis','audience','published'],defaultRange:'30d',defaultFrequency:'weekly',

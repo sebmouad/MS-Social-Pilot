@@ -22,6 +22,8 @@ class Stop extends Error { constructor(readonly outcome: FacebookNativeOutcome) 
 export async function executeFacebookNative(input: FacebookNativePlan, operationId: string,
   deps: { transport: FacebookNativeTransport; attempts: FacebookNativeAttemptStore }): Promise<FacebookNativeOutcome> {
   const { plan, payloadHash } = snapshotFacebookNativePlan(input);
+  // Byte plans need the binary port; refuse before claiming an attempt so nothing is recorded or sent.
+  if ((plan.format === 'video' || plan.format === 'story_photo') && plan.media?.bytes !== undefined && !deps.transport.postGraphFile) throw new Error('This upload path requires an HTTPS media URL.');
   let begun;
   try {
     begun = await deps.attempts.begin({ operationId, payloadHash, format: plan.format, state: 'started', knownIds: [], targetId: plan.targetId });
@@ -71,12 +73,12 @@ export async function executeFacebookNative(input: FacebookNativePlan, operation
     }
   }
   async function callFile(phase: string, path: string, body: Record<string, string>, media: FacebookNativeMedia): Promise<Record<string, unknown>> {
+    const upload = deps.transport.postGraphFile!; // checked before the attempt was claimed
     const step: FacebookNativeStep = { phase, dispatched: true, confirmed: false };
     steps.push(step);
     await checkpoint(phase);
     try {
-      if (!deps.transport.postGraphFile) throw new Error('Binary Graph upload is unavailable.');
-      const r = await deps.transport.postGraphFile(path, body, media);
+      const r = await upload.call(deps.transport, path, body, media);
       step.confirmed = true;
       return r;
     } catch (e) { throw new Stop(classify(phase, e)); }
