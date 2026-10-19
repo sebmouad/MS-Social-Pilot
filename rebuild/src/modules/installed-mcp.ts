@@ -6,6 +6,7 @@ import { ANALYTICS_MCP } from './analytics/mcp';
 import { SETTINGS_MCP } from './settings/mcp';
 import { PUBLISHING_MCP } from './publishing/mcp';
 import { INBOX_MCP } from './inbox/mcp';
+import { MEDIA_MCP } from './media/mcp';
 
 /**
  * MCP tool groups of every installed product module, in listing order. A module adds tools,
@@ -13,5 +14,5 @@ import { INBOX_MCP } from './inbox/mcp';
  * when a module is installed.
  */
 export function installedMcpGroups(): readonly McpToolGroup[] {
-  return [...ADS_MCP, ...TASKS_MCP, ...SHARING_MCP, ...ANALYTICS_MCP, ...SETTINGS_MCP, ...PUBLISHING_MCP, ...INBOX_MCP];
+  return [...ADS_MCP, ...TASKS_MCP, ...SHARING_MCP, ...ANALYTICS_MCP, ...SETTINGS_MCP, ...PUBLISHING_MCP, ...INBOX_MCP, ...MEDIA_MCP];
 }

@@ -1,1 +1,1 @@
-export { default } from '@/modules/publishing/ui/media/MediaScreen';
+export { default } from '@/modules/media/ui/MediaScreen';
