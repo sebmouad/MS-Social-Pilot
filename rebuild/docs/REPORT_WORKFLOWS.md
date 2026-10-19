@@ -103,7 +103,24 @@ name per day). Only metrics a channel can measure are offered. `/analytics/goals
 admins and editors) and a Goals report section for the month holding the report
 period's last day. Unit tests with mocked data only.
 
-Remaining legacy report coverage includes destinations and AI recap; stored choices are preserved and generated output names
+Destinations: the legacy per-destination table (posts, impressions, reach, reactions,
+comments, shares, lifetime link clicks) is now a section, for the report's one channel.
+Post counts and short-link clicks are neutral stored data; the measures come from the
+channel module's optional `PlatformAnalyticsHost.destinationMeasures` hook (Facebook sums
+stored `post_targets.insights`). A measure no post stored is Not available, with "stored for
+N of M posts" when partial, never zero. Lifetime link clicks count only posts that went
+solely to this channel in the period; legacy split a shared short link's clicks across
+destinations, which cannot be done honestly for a single-channel report, so shared posts
+are counted and disclosed instead. Export formats: legacy offered only JSON (report API),
+CSV and the browser-printed page, so JSON is added next to CSV and printable HTML. It is
+the same rows as records (empty cell = null), produced by the same generator, cut at the
+same row and byte bounds (a cut or oversize result stays valid JSON and sets
+`truncated`), stored with the prepared run (older retained runs lack it and the UI hides
+the button) and returned as `json` by the run route and `generate_report`. No XLSX/PDF:
+legacy had neither and no dependency is present. Default `maxStoredArtifactBytes` rose
+from 2.2 MB to 3.3 MB to hold the third rendering. Unit tests only.
+
+Remaining legacy report coverage includes AI recap; stored choices are preserved and generated output names
 unsupported sections honestly. This batch is not full report parity. Complete
 Facebook live coverage, the held photo cleanup, full Root configuration coverage,
 remaining legacy integrations and production-shaped data/media/service rollback

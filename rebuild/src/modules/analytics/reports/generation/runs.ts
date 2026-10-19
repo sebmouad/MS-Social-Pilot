@@ -281,11 +281,11 @@ function readStored(value: unknown): ReportStoredOutput | null {
   const v = value as Record<string, unknown>;
   const period = v.period as Record<string, unknown> | undefined;
   if (typeof v.csv !== 'string' || typeof v.html !== 'string' || typeof v.channelName !== 'string' || typeof v.rowCount !== 'number' || typeof v.truncated !== 'boolean' || !period || typeof period.start !== 'string' || typeof period.end !== 'string') return null;
-  return { channelName: v.channelName, period: { start: period.start, end: period.end }, generatedAt: typeof v.generatedAt === 'string' ? v.generatedAt : '', sections: Array.isArray(v.sections) ? v.sections as ReportSectionId[] : [], notIncluded: Array.isArray(v.notIncluded) ? v.notIncluded as ReportSectionId[] : [], csv: v.csv, html: v.html, rowCount: v.rowCount, truncated: v.truncated };
+  return { channelName: v.channelName, period: { start: period.start, end: period.end }, generatedAt: typeof v.generatedAt === 'string' ? v.generatedAt : '', sections: Array.isArray(v.sections) ? v.sections as ReportSectionId[] : [], notIncluded: Array.isArray(v.notIncluded) ? v.notIncluded as ReportSectionId[] : [], csv: v.csv, html: v.html, ...(typeof v.json === 'string' ? { json: v.json } : {}), rowCount: v.rowCount, truncated: v.truncated };
 }
 /** `bytes` is always the exact UTF-8 size of the CSV being returned. */
 const released = (runId: string, out: ReportStoredOutput, replayed: boolean) => ({
-  ok: true as const, runId, period: out.period, channelName: out.channelName, filename: `report-${out.period.start}-${out.period.end}`, csv: out.csv, html: out.html,
+  ok: true as const, runId, period: out.period, channelName: out.channelName, filename: `report-${out.period.start}-${out.period.end}`, csv: out.csv, html: out.html, json: out.json ?? null,
   rowCount: out.rowCount, bytes: Buffer.byteLength(out.csv, 'utf8'), truncated: out.truncated, notIncluded: out.notIncluded, outcome: 'prepared' as const, replayed,
 });
 
@@ -347,7 +347,7 @@ export async function runReportNow(actor: ReportActor, input: unknown, at?: Date
       if (existing.status !== 'completed') throw new OperationError('conflict', 'This request already ended without a report. Start a new request.');
       const stored = existing.outputExpiresAt && existing.outputExpiresAt.getTime() > now.getTime() ? readStored(existing.output) : null;
       if (!stored) throw new OperationError('unavailable', 'This prepared report is no longer available and will not be regenerated. Start a new request.');
-      if (!Number.isSafeInteger(stored.rowCount) || stored.rowCount < 0 || stored.rowCount > Math.min(limits.maxRows, auth.maxItems ?? limits.maxRows) || Buffer.byteLength(stored.csv, 'utf8') > limits.maxBytes || Buffer.byteLength(stored.html, 'utf8') > limits.maxBytes || Buffer.byteLength(JSON.stringify(stored), 'utf8') > limits.maxStoredBytes) throw new OperationError('unavailable', 'This prepared report exceeds your current report limits. Start a new request.');
+      if (!Number.isSafeInteger(stored.rowCount) || stored.rowCount < 0 || stored.rowCount > Math.min(limits.maxRows, auth.maxItems ?? limits.maxRows) || Buffer.byteLength(stored.csv, 'utf8') > limits.maxBytes || Buffer.byteLength(stored.html, 'utf8') > limits.maxBytes || (stored.json !== undefined && Buffer.byteLength(stored.json, 'utf8') > limits.maxBytes) || Buffer.byteLength(JSON.stringify(stored), 'utf8') > limits.maxStoredBytes) throw new OperationError('unavailable', 'This prepared report exceeds your current report limits. Start a new request.');
       return { kind: 'replay', runId: existing.id, channelId, stored };
     }
 
@@ -381,7 +381,7 @@ export async function runReportNow(actor: ReportActor, input: unknown, at?: Date
   // The content is released only if the person and channel still qualify now.
   const lost = await releaseBlocker(actor, prepared.channelId);
   if (lost) return fail(lost);
-  const stored: ReportStoredOutput = { channelName: output.channelName, period: output.period, generatedAt: output.generatedAt, sections: output.sections, notIncluded: output.notIncluded, csv: output.csv, html: output.html, rowCount: output.rowCount, truncated: output.truncated };
+  const stored: ReportStoredOutput = { channelName: output.channelName, period: output.period, generatedAt: output.generatedAt, sections: output.sections, notIncluded: output.notIncluded, csv: output.csv, html: output.html, ...(output.json === undefined ? {} : { json: output.json }), rowCount: output.rowCount, truncated: output.truncated };
   if (Buffer.byteLength(JSON.stringify(stored), 'utf8') > limits.maxStoredBytes) return fail('stored_output_too_large');
   // The artifact is stored in the same fenced completion + audit transaction, before anything is released over HTTP/MCP.
   const completedAt = clock();

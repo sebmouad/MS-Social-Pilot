@@ -4,10 +4,20 @@ import { REPORT_SECTION_IDS, REPORT_SUPPORTED_SECTIONS, type ReportGenerationPor
 import { authorizeReport, resultCeiling, usableChannelIds } from '../server/access';
 import { prisma } from '@/server/data';
 import { platformAnalytics } from '@/server/platforms/registry';
-import type { PostPerformance } from '@/server/platforms/host';
+import type { DestinationMeasures, PostPerformance } from '@/server/platforms/host';
 import { channelGoalProgress } from '../../goals/server/goals';
 import type { GoalMonth, GoalProgress } from '../../goals/contracts';
 import { formatDuration, readResponseTime, type ResponseTimeSummary } from './response-time';
+
+/** One channel's per-destination summary: neutral counts plus the platform module's stored measures (null = not stored). */
+export type DestinationSummary = {
+  name: string; type: string; posts: number;
+  /** Lifetime clicks on short links of posts that went only to this channel in the period; null when unknown. */
+  linkClicks: number | null;
+  /** Posts that also reached other destinations, whose shared short-link clicks cannot be split honestly. */
+  sharedPosts: number;
+  measures: DestinationMeasures['measures'];
+};
 
 export type ReportBounds = { maxRows: number; maxBytes: number };
 
@@ -46,7 +56,7 @@ type Snapshot = Awaited<ReturnType<typeof readAnalyticsSnapshot>>;
  * as-of times; a metric without data is "Not available", never zero. Every rendering is bounded in rows and UTF-8 bytes, and
  * anything cut is marked; when even the fixed parts exceed the bound a minimal notice is returned instead of an overflowing page.
  */
-export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null }, bounds: ReportBounds): ReportOutput {
+export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null }, bounds: ReportBounds): ReportOutput {
   const wanted = new Set(input.sections);
   const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s));
   const notIncluded = REPORT_SECTION_IDS.filter(s => wanted.has(s) && !included.includes(s));
@@ -57,6 +67,10 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const response = included.includes('responseTime') ? input.responseTime ?? null : null;
   const responseLine = response ? `Median first response ${formatDuration(response.medianMs)}; ${response.answered} answered, ${response.unanswered} waiting at period end. Calendar time, from stored Inbox messages${response.partial ? '; only the earliest messages were read' : ''}.` : '';
   const topPosts = included.includes('topPosts') ? input.topPosts ?? [] : null;
+  const destination = included.includes('destinations') ? input.destination ?? null : null;
+  const destinationNote = destination ? `Stored values summed over ${destination.posts} published post${destination.posts === 1 ? '' : 's'}; a measure no post has stored is Not available, not zero.` : '';
+  const linkClicksText = destination ? (destination.linkClicks === null ? 'Not available' : String(destination.linkClicks)) : '';
+  const measureText = (m: DestinationMeasures['measures'][number]) => m.value === null ? 'Not available' : `${m.value}${m.measuredPosts < (destination?.posts ?? 0) ? ` (stored for ${m.measuredPosts} of ${destination?.posts} posts)` : ''}`;
   const postTitle = (p: PostPerformance) => clamp(p.text || '(no text)', 120);
   const goals = included.includes('goals') ? input.goals ?? { month: { month: '', start: '', end: '', timeZone: '' }, goals: [] } : null;
   const goalText = (g: GoalProgress) => `${g.label}: ${g.actual === null ? 'No data' : g.actual} of ${g.target} (${g.percent}%, ${g.paceLabel})`;
@@ -72,6 +86,13 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     rows.push(['response_time', 'unanswered_waits', 'Waiting at period end', 'Inbox', '', '', response.unanswered, 'waits', '', 'Count at period end']);
   }
   if (goals) for (const g of goals.goals) rows.push(['goal', g.metric, g.label, 'Goals', '', goals.month.start, g.actual ?? '', 'target ' + g.target, `${g.percent}%`, `${g.paceLabel}; month ${goals.month.start} to ${goals.month.end} (${goals.month.timeZone})`]);
+  if (included.includes('destinations')) {
+    if (destination) {
+      rows.push(['destination', 'posts_published', 'Posts published', 'Published posts', destination.name, '', destination.posts, 'posts', '', `Channel type ${destination.type}; count in period`]);
+      for (const m of destination.measures) rows.push(['destination_measure', m.key, m.label, 'Stored post insights', destination.name, '', m.value ?? '', 'count', `${m.measuredPosts} of ${destination.posts} posts`, 'Sum of stored per-post values; missing is not zero']);
+      rows.push(['destination_measure', 'link_clicks_lifetime', 'Link clicks (lifetime)', 'Short links', destination.name, '', destination.linkClicks ?? '', 'clicks', '', `Lifetime clicks, not clicks in the period; posts that also went to other channels (${destination.sharedPosts}) are not counted`]);
+    } else rows.push(['destination', 'unavailable', 'Destination summary', '', '', '', '', '', '', 'Not available']);
+  }
   if (topPosts) topPosts.forEach((p, i) => {
     rows.push(['top_post', `rank_${i + 1}`, postTitle(p), p.rankLabel, p.url ?? '', p.publishedAt, p.rankValue ?? '', p.rankLabel.toLowerCase(), '', 'Stored per-post measures; missing is not zero']);
     for (const m of p.measures) rows.push(['top_post_measure', m.key, m.label, p.rankLabel, postTitle(p), p.publishedAt, m.value ?? '', '', '', `Rank ${i + 1}`]);
@@ -92,6 +113,14 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const csvRaw = csvOf(csvRows, csvTruncated);
   const csv = cutBytes(csvRaw, bounds.maxBytes);
 
+  // JSON: the same rows as records (empty cell = null), cut at the same row and byte limits; a cut never yields invalid JSON.
+  const records = (count: number) => rows.slice(0, count).map(row => Object.fromEntries(header.map((key, i) => [key, row[i] === '' || row[i] === undefined ? null : row[i]])));
+  const jsonOf = (count: number, marked: boolean) => JSON.stringify({ channel: channelName, period, generatedAt: input.generatedAt.toISOString(), sections: included, notIncluded, truncated: marked, columns: header, records: records(count) }) + '\n';
+  const jsonRows = fit(rowCap, bounds.maxBytes, c => jsonOf(c, true));
+  let jsonTruncated = jsonRows < rows.length;
+  let json = jsonOf(jsonRows, jsonTruncated);
+  if (bytes(json) > bounds.maxBytes) { json = '{"truncated":true}\n'; jsonTruncated = true; if (bytes(json) > bounds.maxBytes) json = ''; }
+
   // Printable HTML and plain text show the summary tier only (one row per metric).
   const title = `Analytics report: ${channelName}, ${period.start} to ${period.end}`;
   const audienceHtml = audience ? `<h2>Audience</h2><p>${esc(audience.covered)} of ${esc(audience.selected)} selected channels have audience data${audienceAsOf ? `, as of ${asOf(audienceAsOf)}` : ''}. This sum is not unique people across networks.</p><p><strong>${audience.covered ? esc(audience.total) : 'Not available'}</strong></p>` : '';
@@ -102,6 +131,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
       + (included.includes('published') ? `<h2>Published posts</h2><p>Published ${esc(snapshot.publishing.published)}, scheduled ${esc(snapshot.publishing.scheduled)}, failed ${esc(snapshot.publishing.failed)}.</p>` : '')
       + (response ? `<h2>Response time</h2><p>${esc(responseLine)}</p>` : '')
       + (goals ? `<h2>Goals</h2>${goals.goals.length ? `<p><small>Month ${esc(goals.month.start)} to ${esc(goals.month.end)} (${esc(goals.month.timeZone)}), up to generation for the current month.</small></p><table><thead><tr><th>Goal</th><th>Target</th><th>This month</th><th>Progress</th><th>Pace</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? 'No data' : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : '<p>No goals are set for this channel.</p>'}` : '')
+      + (included.includes('destinations') ? `<h2>Destinations</h2>${destination ? `<p><small>${esc(destinationNote)}</small></p><table><thead><tr><th>Destination</th><th>Type</th><th>Posts</th>${destination.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}<th>Link clicks (lifetime)</th></tr></thead><tbody><tr><td>${esc(destination.name)}</td><td>${esc(destination.type)}</td><td>${esc(destination.posts)}</td>${destination.measures.map(m => `<td>${esc(measureText(m))}</td>`).join('')}<td>${esc(linkClicksText)}</td></tr></tbody></table><p><small>Link clicks are lifetime totals for posts that went only to this channel${destination.sharedPosts ? `; ${esc(destination.sharedPosts)} shared post${destination.sharedPosts === 1 ? ' is' : 's are'} not counted` : ''}.</small></p>` : '<p>Destination summary not available.</p>'}` : '')
       + (topPosts ? `<h2>Top posts</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>Post</th><th>Published</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.url ? `<a href="${esc(p.url)}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}</td><td>${asOf(p.publishedAt)}</td><td>${p.rankValue === null ? 'Not available' : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? 'Not available' : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<p>No published posts with stored measures in this period.</p>'}` : '')
       + audienceHtml
       + (metrics.length ? `<h2>Metrics</h2><table><thead><tr><th>Metric</th><th>Source</th><th>Value</th><th>Basis</th><th>Coverage</th><th>As of</th></tr></thead><tbody>${shown.map(m => `<tr><td>${esc(m.label)}</td><td>${esc(m.sourceLabel)}</td><td>${esc(valueText(m))}</td><td>${esc([m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. '))}</td><td>${esc(coverageText(m))}</td><td>${asOf(m.latestAt)}</td></tr>`).join('')}</tbody></table>` : '')
@@ -119,6 +149,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const baseLines = [title, '', ...(included.includes('published') ? [`Published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`] : []),
     ...(response ? [`Response time: ${responseLine}`] : []),
     ...(goals ? [`Goals (month ${goals.month.start} to ${goals.month.end}):`, ...(goals.goals.length ? goals.goals.map(goalText) : ['No goals are set for this channel.'])] : []),
+    ...(included.includes('destinations') ? ['Destinations:', ...(destination ? [`${clamp(destination.name, 200)} (${destination.type}): ${destination.posts} posts; ${destination.measures.map(m => `${m.label} ${measureText(m)}`).join('; ')}; link clicks (lifetime) ${linkClicksText}`] : ['Destination summary not available.'])] : []),
     ...(topPosts ? ['Top posts:', ...(topPosts.length ? topPosts.map((p, i) => `${i + 1}. ${postTitle(p)} (${asOf(p.publishedAt)}): ${p.rankLabel} ${p.rankValue ?? 'Not available'}`) : ['No published posts with stored measures in this period.'])] : []),
     ...(audience ? [`Audience: ${audience.covered ? audience.total : 'Not available'} (${audience.covered} of ${audience.selected} channels${audienceAsOf ? `; as of ${asOf(audienceAsOf)}` : ''}; not unique people)`] : [])];
   const metricLines = metrics.map(m => `${clamp(m.label, 200)} (${clamp(m.sourceLabel, 200)}): ${valueText(m)}; ${coverageText(m)}; as of ${asOf(m.latestAt)}`);
@@ -128,7 +159,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   let textTruncated = textCount < metricLines.length;
   let text = textOf(textCount, textTruncated);
   if (bytes(text) > bounds.maxBytes) { text = cutBytes(text, bounds.maxBytes); textTruncated = true; }
-  return { channelName, period, generatedAt: input.generatedAt.toISOString(), sections: included, notIncluded, csv, html, text, rowCount: csvRows, bytes: bytes(csv), htmlBytes: bytes(html), textBytes: bytes(text), truncated: csvTruncated || htmlTruncated || textTruncated || csv !== csvRaw };
+  return { channelName, period, generatedAt: input.generatedAt.toISOString(), sections: included, notIncluded, csv, html, text, json, rowCount: csvRows, bytes: bytes(csv), htmlBytes: bytes(html), textBytes: bytes(text), jsonBytes: bytes(json), truncated: csvTruncated || htmlTruncated || textTruncated || jsonTruncated || csv !== csvRaw };
 }
 
 /**
@@ -154,8 +185,9 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
         const bounds = { maxRows: ceiling === undefined ? base.maxRows : Math.min(base.maxRows, ceiling), maxBytes: base.maxBytes };
         const responseTime = request.sections.includes('responseTime') ? await readResponseTime(actor.workspaceId, request.channelId, request.period) : null;
         const topPosts = request.sections.includes('topPosts') ? await readTopPosts(actor.workspaceId, request.channelId, request.period) : null;
+        const destination = request.sections.includes('destinations') ? await readDestination(actor.workspaceId, request.channelId, request.period) : null;
         const goals = request.sections.includes('goals') ? await channelGoalProgress(actor.workspaceId, request.channelId, request.period.end, deps.now?.() ?? new Date()) : null;
-        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? 'Channel', sections: request.sections, responseTime, topPosts, goals, generatedAt: deps.now?.() ?? new Date() }, bounds) };
+        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? 'Channel', sections: request.sections, responseTime, topPosts, destination, goals, generatedAt: deps.now?.() ?? new Date() }, bounds) };
       } catch (error) {
         const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
         return { ok: false, reason: code === 'unauthorized' || code === 'forbidden' ? 'access_unavailable' : 'generation_failed' };
@@ -174,4 +206,23 @@ async function readTopPosts(workspaceId: string, channelId: string, period: { st
   const from = new Date(`${period.start}T00:00:00.000Z`);
   const to = new Date(new Date(`${period.end}T00:00:00.000Z`).getTime() + 86_400_000);
   return analytics.postPerformance({ workspaceId, targetId: channelId, from, to, limit: TOP_POSTS_LIMIT });
+}
+
+/** Per-destination summary for one channel: neutral counts from stored publications and short links, platform measures through the module hook (stored data only). */
+async function readDestination(workspaceId: string, channelId: string, period: { start: string; end: string }): Promise<DestinationSummary | null> {
+  const from = new Date(`${period.start}T00:00:00.000Z`);
+  const to = new Date(new Date(`${period.end}T00:00:00.000Z`).getTime() + 86_400_000);
+  const rows = await prisma.$queryRaw<Array<{ name: string; type: string; provider: string }>>`SELECT t.name, t.type, a.provider FROM targets t JOIN social_accounts a ON a.id = t."socialAccountId" AND a."workspaceId" = t."workspaceId" WHERE t.id = ${channelId} AND t."workspaceId" = ${workspaceId} LIMIT 1`;
+  const target = rows[0];
+  if (!target) return null;
+  const counts = await prisma.$queryRaw<Array<{ posts: number | bigint; shared: number | bigint; clicks: number | bigint | null }>>`
+    WITH mine AS (SELECT DISTINCT pt."postId" FROM post_targets pt JOIN posts p ON p.id = pt."postId" WHERE pt."targetId" = ${channelId} AND p."workspaceId" = ${workspaceId} AND pt.status = 'published' AND pt."publishedAt" >= ${from} AND pt."publishedAt" < ${to}),
+    spread AS (SELECT m."postId", (SELECT COUNT(DISTINCT pt2."targetId") FROM post_targets pt2 WHERE pt2."postId" = m."postId" AND pt2.status = 'published' AND pt2."publishedAt" >= ${from} AND pt2."publishedAt" < ${to}) AS destinations FROM mine m)
+    SELECT (SELECT COUNT(*) FROM mine) AS posts,
+      (SELECT COUNT(*) FROM spread WHERE destinations > 1) AS shared,
+      (SELECT COALESCE(SUM(sl."clickCount"), 0) FROM short_links sl JOIN spread s ON s."postId" = sl."postId" WHERE sl."workspaceId" = ${workspaceId} AND s.destinations = 1) AS clicks`;
+  const count = counts[0];
+  const analytics = await platformAnalytics(target.provider);
+  const measured = analytics?.destinationMeasures ? await analytics.destinationMeasures({ workspaceId, targetId: channelId, from, to }) : { measures: [] };
+  return { name: clamp(target.name, 200), type: target.type, posts: Number(count?.posts ?? 0), sharedPosts: Number(count?.shared ?? 0), linkClicks: count ? Number(count.clicks ?? 0) : null, measures: measured.measures };
 }

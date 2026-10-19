@@ -62,7 +62,7 @@ export type ReportScheduleView = {
 };
 
 /** Sections the shared Analytics readers can honestly supply today; other stored section ids are listed as not included in a report. */
-export const REPORT_SUPPORTED_SECTIONS = ['analysis', 'goals', 'responseTime', 'audience', 'published', 'topPosts'] as const;
+export const REPORT_SUPPORTED_SECTIONS = ['analysis', 'goals', 'responseTime', 'audience', 'published', 'destinations', 'topPosts'] as const;
 
 export type ReportPeriod = { start: string; end: string };
 export type ReportGenerationRequest = {
@@ -71,9 +71,9 @@ export type ReportGenerationRequest = {
 };
 export type ReportOutput = {
   channelName: string; period: ReportPeriod; generatedAt: string; sections: ReportSectionId[]; notIncluded: ReportSectionId[];
-  csv: string; html: string; text: string; rowCount: number; bytes: number; truncated: boolean;
+  csv: string; html: string; text: string; /** Machine-readable rendering of the same rows, within the same bounds. */ json?: string; rowCount: number; bytes: number; truncated: boolean;
   /** Added: UTF-8 sizes of the other renderings. Every rendering is within Root's byte bound. */
-  htmlBytes: number; textBytes: number;
+  htmlBytes: number; textBytes: number; jsonBytes?: number;
 };
 export type ReportGenerationResult = { ok: true; output: ReportOutput } | { ok: false; reason: string };
 /** Host-registered report builder. Without one, schedules and run-now are not offered. */
@@ -112,6 +112,6 @@ export const reportRunChannelSchema = z.object({ channelId: id, templateId: id.n
 export const reportRunSchema = z.union([reportRunScheduleSchema, reportRunChannelSchema]);
 
 /** What a prepared manual report keeps for replay: the downloadable renderings only, never the plain-text email body. */
-export type ReportStoredOutput = Pick<ReportOutput, 'channelName' | 'period' | 'generatedAt' | 'sections' | 'notIncluded' | 'csv' | 'html' | 'rowCount' | 'truncated'>;
+export type ReportStoredOutput = Pick<ReportOutput, 'channelName' | 'period' | 'generatedAt' | 'sections' | 'notIncluded' | 'csv' | 'html' | 'rowCount' | 'truncated'> & { json?: string };
 
 export const REPORT_SEND_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;

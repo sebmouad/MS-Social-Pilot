@@ -92,11 +92,16 @@ export type PostPerformance = {
 /** Channel totals over one window that monthly goals track, from stored data. Null means not stored, never zero. */
 export type GoalMeasures = { audienceGained: number | null; views: number | null; engagements: number | null };
 
+/** Stored per-post measures summed over one channel's posts published in a window. `measuredPosts` is how many posts had that measure stored; null value means none did (unknown, never zero). */
+export type DestinationMeasures = { measures: Array<{ key: string; label: string; value: number | null; measuredPosts: number }> };
+
 export interface PlatformAnalyticsHost {
   load(request: AnalyticsProviderRequest): Promise<AnalyticsProviderData>;
   /** Optional: stored per-post measures for one already-authorized channel, highest rank first. No provider request. */
   postPerformance?(request: { workspaceId: string; targetId: string; from: Date; to: Date; limit: number }): Promise<PostPerformance[]>;
   /** Optional: goal measures for one already-authorized channel over [from, to). No provider request. */
+  /** Optional: stored per-post measures summed for one already-authorized channel over [from, to). No provider request. */
+  destinationMeasures?(request: { workspaceId: string; targetId: string; from: Date; to: Date }): Promise<DestinationMeasures>;
   goalMeasures?(request: { workspaceId: string; targetId: string; from: Date; to: Date }): Promise<GoalMeasures>;
 }
 

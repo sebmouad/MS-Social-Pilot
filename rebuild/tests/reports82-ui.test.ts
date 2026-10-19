@@ -100,7 +100,7 @@ describe('Reports workflow UI', () => {
     expect(first.requestId).toBe('11111111-1111-4111-8111-111111111111');
     expect(second.requestId).toBe(first.requestId);
     expect(second.confirmation).toBe('GENERATE REPORT sch-1');
-    expect(container.textContent).toContain('Report prepared. Download a CSV or printable page below. Nothing was emailed.');
+    expect(container.textContent).toContain('Report prepared. Download a CSV, JSON or printable page below. Nothing was emailed.');
   });
 
   it('prepares a channel report with an inclusive UTC range when email scheduling is unavailable', async () => {

@@ -19,7 +19,12 @@ export type ReportUiLimits = { nameMax: number; maxRecipients: number; maxRows: 
 type TemplateDraft = { name: string; rangeKey: string; sections: string[] };
 type ScheduleDraft = { channelId: string; frequency: string; recipients: string; templateId: string };
 type PendingAction = { url: string; body: Record<string, unknown>; title: string; detail: string; confirmLabel: string; successMessage: string; confirmation: string; destructive?: boolean; acknowledgement?: string; requestKey?: string; manual?: boolean };
-type Prepared = { filename: string; csv: string; html: string; truncated: boolean; notIncluded: string[]; rowCount: number; bytes: number };
+/** A JSON rendering is offered only when present and within the current download limit; older prepared runs have none. */
+function preparedJson(value: unknown, limits: { maxBytes: number } | null | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  return limits && new TextEncoder().encode(value).byteLength > limits.maxBytes ? null : value;
+}
+type Prepared = { filename: string; csv: string; html: string; json: string | null; truncated: boolean; notIncluded: string[]; rowCount: number; bytes: number };
 type DefaultPeriod = { start: string; end: string; maxDays: number };
 
 const DELIVERY: Record<string, string> = { attempting: 'not confirmed', sent: 'sent', failed: 'not sent', unavailable: 'not sent', uncertain: 'not confirmed' };
@@ -119,8 +124,8 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
         const bytes = new TextEncoder().encode(output.csv).byteLength;
         if (bytes !== output.bytes || bytes > limits.maxBytes) throw new Error('The prepared report size could not be verified. Check report history before trying again.');
         requestIds.current.delete(action.requestKey ?? '');
-        setPrepared({ filename: output.filename, csv: output.csv, html: output.html, truncated: output.truncated, notIncluded: output.notIncluded.filter((item): item is string => typeof item === 'string'), rowCount: Number(output.rowCount), bytes });
-        setPending(null); setForm(null); setAcknowledged(false); say('Report prepared. Download a CSV or printable page below. Nothing was emailed.');
+        setPrepared({ filename: output.filename, csv: output.csv, html: output.html, json: preparedJson(output.json, limits), truncated: output.truncated, notIncluded: output.notIncluded.filter((item): item is string => typeof item === 'string'), rowCount: Number(output.rowCount), bytes });
+        setPending(null); setForm(null); setAcknowledged(false); say('Report prepared. Download a CSV, JSON or printable page below. Nothing was emailed.');
         router.refresh();
         return;
       }
@@ -177,16 +182,17 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
       if (limits && bytes > limits.maxBytes) throw new Error('The prepared CSV is larger than the current download limit. Contact your workspace administrator.');
       if (Number.isSafeInteger(body.bytes) && body.bytes !== bytes) throw new Error('The prepared report size could not be verified. Check report history before trying again.');
       requestIds.current.delete(row.id);
-      setPrepared({ filename: body.filename, csv: body.csv, html: body.html, truncated: body.truncated, notIncluded: body.notIncluded.filter((item: unknown): item is string => typeof item === 'string'), rowCount: body.rowCount, bytes });
-      say('Report prepared. Download a CSV or printable page below. Nothing was emailed.');
+      setPrepared({ filename: body.filename, csv: body.csv, html: body.html, json: preparedJson(body.json, limits), truncated: body.truncated, notIncluded: body.notIncluded.filter((item: unknown): item is string => typeof item === 'string'), rowCount: body.rowCount, bytes });
+      say('Report prepared. Download a CSV, JSON or printable page below. Nothing was emailed.');
     } catch (error) { say(error instanceof Error && !(error instanceof TypeError) ? error.message : FALLBACK_ERROR, true); }
     finally { inFlight.current = false; setBusy(false); }
   }
 
-  function download(kind: 'csv' | 'html') {
+  function download(kind: 'csv' | 'html' | 'json') {
     if (!prepared) return;
-    const content = kind === 'csv' ? prepared.csv : prepared.html;
-    const url = URL.createObjectURL(new Blob([content], { type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/html;charset=utf-8' }));
+    const content = kind === 'csv' ? prepared.csv : kind === 'json' ? prepared.json : prepared.html;
+    if (content === null) return;
+    const url = URL.createObjectURL(new Blob([content], { type: kind === 'csv' ? 'text/csv;charset=utf-8' : kind === 'json' ? 'application/json;charset=utf-8' : 'text/html;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url; link.download = `${prepared.filename}.${kind}`; link.hidden = true; document.body.append(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
@@ -233,7 +239,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
         <td>{when(row.nextRunAt, timeZone)}<span className={styles.secondaryLine}>{timeZone}</span></td><td>{OUTCOME[row.lastOutcome] ?? 'Status unavailable'}</td>
         {canManage && <td><div className={styles.actions}>{canGenerate && <Button size="sm" variant="secondary" disabled={busy} onClick={() => void prepare(row)}>{busy ? 'Preparing…' : 'Prepare now'}</Button>}<Button size="sm" variant="secondary" disabled={busy} onClick={() => openSchedule(row)}>Edit</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => removeSchedule(row)}>Delete</Button></div></td>}
       </tr>)}</tbody></table></div> : <div className={styles.emptyState}><h3>{page > 1 ? 'No schedules on this page' : 'No scheduled reports'}</h3><p>{page > 1 ? 'Use Previous page to return to saved schedules.' : canSchedule && canManage ? 'Create a schedule to send reports to people who need them.' : canSchedule ? 'No report schedules are set up for channels you can access.' : 'No report schedules are set up for channels you can access.'}</p></div>}
-      {prepared && <div className={styles.prepared} role="region" aria-labelledby="prepared-title"><div><h3 id="prepared-title">Report prepared</h3><p>{prepared.rowCount} rows · {prepared.bytes.toLocaleString('en')} bytes{prepared.truncated ? ' · Shortened to fit the configured limit' : ''}</p>{prepared.notIncluded.length > 0 && <p>Not included yet: {prepared.notIncluded.map(section => sectionLabels.get(section) ?? 'Some sections').join(', ')}.</p>}</div><div className={styles.actions}><Button size="sm" onClick={() => download('csv')}>Download CSV</Button><Button size="sm" variant="secondary" onClick={() => download('html')}>Download printable page</Button></div></div>}
+      {prepared && <div className={styles.prepared} role="region" aria-labelledby="prepared-title"><div><h3 id="prepared-title">Report prepared</h3><p>{prepared.rowCount} rows · {prepared.bytes.toLocaleString('en')} bytes{prepared.truncated ? ' · Shortened to fit the configured limit' : ''}</p>{prepared.notIncluded.length > 0 && <p>Not included yet: {prepared.notIncluded.map(section => sectionLabels.get(section) ?? 'Some sections').join(', ')}.</p>}</div><div className={styles.actions}><Button size="sm" onClick={() => download('csv')}>Download CSV</Button>{prepared.json !== null && <Button size="sm" variant="secondary" onClick={() => download('json')}>Download JSON</Button>}<Button size="sm" variant="secondary" onClick={() => download('html')}>Download printable page</Button></div></div>}
       <p className={styles.note}>Reports use stored analytics. Missing data is shown as unavailable, not zero. “Prepare report” creates a download and does not email anyone; scheduled runs send to their saved recipients.</p>
     </section>
 

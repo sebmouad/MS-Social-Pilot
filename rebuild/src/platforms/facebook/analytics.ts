@@ -1,6 +1,7 @@
 import { prisma } from '@/server/data';
 import { readFacebookPostPerformance } from './post-performance';
 import { readFacebookGoalMeasures } from './goals';
+import { readFacebookDestinationMeasures } from './destination-measures';
 import type { AnalyticsAdAccount, AnalyticsAudienceEntry, AnalyticsKind, AnalyticsMetricInput, AnalyticsObservation, AnalyticsProviderData, AnalyticsProviderRequest, AnalyticsTarget } from '@/modules/analytics/server/catalog';
 import { safeNumber } from '@/modules/analytics/server/catalog';
 
@@ -232,6 +233,7 @@ export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienc
 export const facebookAnalyticsHost = {
   postPerformance: readFacebookPostPerformance,
   goalMeasures: readFacebookGoalMeasures,
+  destinationMeasures: readFacebookDestinationMeasures,
   async load(request: AnalyticsProviderRequest): Promise<AnalyticsProviderData> {
     const allowed = request.allowedTargetIds === undefined ? undefined : [...request.allowedTargetIds];
     const targets = await prisma.target.findMany({

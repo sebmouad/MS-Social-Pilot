@@ -21,6 +21,7 @@ import { createReportGenerator } from '../src/modules/analytics/reports/generati
 import { runReportNow } from '../src/modules/analytics/reports/generation/runs';
 import { requestHash } from '../src/modules/analytics/reports/generation/run-store';
 import { reportChannelRunConfirmation, reportRunConfirmation, type ReportActor, type ReportOutput } from '../src/modules/analytics/reports/contracts';
+import { withUnsupported } from './unsupported-section';
 import { executeAnalyticsReportTool } from '../src/modules/analytics/reports/mcp';
 
 const NOW = new Date('2026-10-21T10:00:00Z');
@@ -80,7 +81,7 @@ describe('standalone channel report (a download, no delivery needed)', () => {
   });
   it('uses the template sections and lists stored ones that cannot be supplied', async () => {
     state.templateSections = ['audience', 'destinations'];
-    const out = await runReportNow(actor, channelInput({ templateId: 't1' }), NOW);
+    const out = await withUnsupported('destinations', () => runReportNow(actor, channelInput({ templateId: 't1' }), NOW));
     expect(out.notIncluded).toEqual(['destinations']);
     expect(out.csv).toContain('audience'); expect(out.csv).not.toContain('summary');
     expect(inserts()[0]!.values).toContain(channelHash({ templateId: 't1' }));
@@ -152,7 +153,7 @@ describe('schedule report', () => {
   it('prepares the most recent complete period, never emails, and records Prepared', async () => {
     registerReportGeneration({ generation: real(), mail: mailPort, eligible: async () => true });
     state.scheduleSections = ['analysis', 'destinations'];
-    const out = await runReportNow(actor, scheduleInput(), NOW);
+    const out = await withUnsupported('destinations', () => runReportNow(actor, scheduleInput(), NOW));
     expect(out).toMatchObject({ ok: true, outcome: 'prepared', period: { start: '2026-10-12', end: '2026-10-18' }, truncated: false, notIncluded: ['destinations'], replayed: false });
     expect(mailPort.send).not.toHaveBeenCalled();
     expect(inserts()[0]!.values).toContain(`manual:w1:u1:${RID}`);

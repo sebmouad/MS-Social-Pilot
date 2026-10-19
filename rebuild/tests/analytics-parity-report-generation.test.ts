@@ -21,6 +21,7 @@ import { createReportGenerator, cutBytes, renderReport } from '../src/modules/an
 import { listReportRuns, runDueReportSchedules, runReportNow } from '../src/modules/analytics/reports/generation/runs';
 import { manageReportSchedule } from '../src/modules/analytics/reports/server/schedules';
 import { reportConfirmation, type ReportActor } from '../src/modules/analytics/reports/contracts';
+import { withUnsupported } from './unsupported-section';
 import { analyticsReportAvailableToolDefinitions, analyticsReportWriteTools, executeAnalyticsReportTool } from '../src/modules/analytics/reports/mcp';
 
 const actor: ReportActor = { userId: 'u1', workspaceId: 'w1' };
@@ -35,8 +36,8 @@ beforeEach(() => {
 });
 
 describe('report rendering', () => {
-  it('keeps channel metrics only, marks missing as not available, escapes HTML and spreadsheet formulas', () => {
-    const out = renderReport(snapshot() as never, { channelName: 'Page One', sections: ['analysis', 'audience', 'published', 'destinations'], generatedAt: new Date('2026-10-19T08:00:00Z') }, bounds);
+  it('keeps channel metrics only, marks missing as not available, escapes HTML and spreadsheet formulas', async () => {
+    const out = await withUnsupported('destinations', () => renderReport(snapshot() as never, { channelName: 'Page One', sections: ['analysis', 'audience', 'published', 'destinations'], generatedAt: new Date('2026-10-19T08:00:00Z') }, bounds));
     expect(out.csv).not.toContain('Spend');
     expect(out.csv).toContain(`"'=HYPERLINK(""x"")"`);
     expect(out.html).toContain('&lt;b&gt;Empty&lt;/b&gt;');
@@ -90,7 +91,7 @@ describe('report generator', () => {
     expect(gen.calls).toBe(0);
   });
   it('refuses a report that lists only unsupported sections', async () => {
-    expect(await generator().generate({ actor, channelId: 'c1', sections: ['destinations'], period: { start: '2026-10-12', end: '2026-10-18' } })).toEqual({ ok: false, reason: 'no_supported_sections' });
+    expect(await withUnsupported('destinations', () => generator().generate({ actor, channelId: 'c1', sections: ['destinations'], period: { start: '2026-10-12', end: '2026-10-18' } }))).toEqual({ ok: false, reason: 'no_supported_sections' });
   });
   it("bounds the generated rows themselves by the actor's result ceiling", async () => {
     const result = await generator().generate({ actor: { ...actor, maxResultItems: 3 }, channelId: 'c1', sections: ['analysis', 'audience', 'published'], period: { start: '2026-10-12', end: '2026-10-18' } });
