@@ -759,6 +759,12 @@ Registry 83. AI assist is off by default and needs an Anthropic key in Root.
 AI recap report section is on main (`summarize`/`summaryAvailable` in
 `modules/ai/server/ai.ts`; REPORT_WORKFLOWS.md).
 
+Round 2 also on main: RSS feeds (`63e0497c`, FEEDS.md) and signed webhooks plus
+REST v1 me/pages/webhooks on scoped `mcp_` keys (`b9f0c44b`, INTEGRATIONS.md).
+Registry 85. Deferred: OAuth clients, v1 posts, post.scheduled/comment/page/report
+webhook events. Session A owns wave 1 real-PostgreSQL and browser verification
+(see tests/wave1-postgres.integration.test.ts).
+
 Next: real-PostgreSQL and browser runs of waves 1–2; business-hours response time;
 then wave 3 (auth/onboarding, feeds and integrations WIP, agency extras, owner
 export). The untracked feeds/integrations/webhooks/API-access WIP in the main
