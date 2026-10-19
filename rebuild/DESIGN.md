@@ -149,3 +149,10 @@ the same tokens and dimensions.
 Batch85 review sources: installed Frontend Design/Premium UX plus freshly fetched official Vercel Web Interface Guidelines and React Best Practices. Apply the existing brand and UX contract when generic guidance differs. This is review guidance, not evidence that every screen passes.
 
 Root technical search headings and keys wrap within their content width. Preserve complete identifiers and existing internal table scrolling; never mask document overflow to hide an oversized heading. Batch87 corrects an observed phone overflow.
+
+
+Root publication evidence (batch89) supports module-declared compact summary
+columns. Keep technical row IDs and complete receipt fields in an accessible
+native details disclosure; retain separately confirmed module actions in their
+own column. Use theme tokens, visible summary focus, wrapped long identifiers
+and a locally scrollable table. This generic control contains no provider rules.

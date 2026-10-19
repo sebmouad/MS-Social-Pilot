@@ -38,6 +38,6 @@ export async function RootPlatformPublicationEvidence({ providerId, operationId 
       <h2 id="root-platform-publication-evidence-error-title">Publication evidence unavailable</h2>
       <p id="root-platform-publication-evidence-error">{errorMessage}</p>
     </section> : null}
-    {errorMessage || !evidence || 'providers' in evidence ? null : <RootPlatformPublicationTable evidence={evidence} providerId={providerId} filtered={Boolean(filterValue)} />}
+    {errorMessage || !evidence || 'providers' in evidence ? null : <RootPlatformPublicationTable evidence={evidence} providerId={providerId} filtered={Boolean(filterValue)} scopeKey={`${providerId}:${filterValue}`} />}
   </>;
 }

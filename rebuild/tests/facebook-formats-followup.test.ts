@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FacebookApiError } from '../src/platforms/facebook/publishing';
 import {
-  createMemoryAttemptStore, createPostgresAttemptStore, deleteFacebookNativeRemote, executeFacebookNative, planFacebookNative,
+  createMemoryAttemptStore, deleteFacebookNativeRemote, executeFacebookNative, planFacebookNative,
   postFacebookNativeFirstComment, readFacebookNativeStatus, reconcileFacebookNativeAttempt, mapFacebookVideoStatus,
   FacebookAttemptStoreUnavailableError, FACEBOOK_NATIVE_CONFIG, facebookNativePolicyFrom,
 } from '../src/platforms/facebook/formats';
-import type { FacebookNativeMedia, FacebookNativeReadTransport, FacebookSqlPort, FacebookNativeValidationError } from '../src/platforms/facebook/formats';
+import type { FacebookNativeMedia, FacebookNativeReadTransport, FacebookNativeValidationError } from '../src/platforms/facebook/formats';
 
 const now = new Date('2026-01-01T00:00:00Z');
 const vid: FacebookNativeMedia = { kind: 'video', url: 'https://cdn.example/v.mp4', sizeBytes: 1e6, durationSeconds: 30, width: 540, height: 960 };
@@ -34,43 +34,13 @@ describe('limits from Root config', () => {
   });
 });
 
-describe('Postgres attempt store', () => {
-  function fakeDb() {
-    const rows = new Map<string, Record<string, unknown>>();
-    const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
-    const db: FacebookSqlPort = {
-      async query(sql, params) {
-        calls.push({ sql, params });
-        if (sql.startsWith('INSERT')) {
-          if (rows.has(params[0] as string)) return { rows: [] };
-          rows.set(params[0] as string, { operation_id: params[0], format: params[1], state: params[2], known_ids: JSON.parse(params[3] as string), target_id: params[4], remote_id: null });
-          return { rows: [{ operation_id: params[0] }] };
-        }
-        if (sql.startsWith('UPDATE')) {
-          const r = rows.get(params[0] as string)!;
-          if (params[1]) r.state = params[1]; if (params[2]) r.known_ids = JSON.parse(params[2] as string); if (params[3]) r.remote_id = params[3];
-          return { rows: [] };
-        }
-        const r = rows.get(params[0] as string); return { rows: r ? [r] : [] };
-      },
-    };
-    return { db, calls, rows };
-  }
-  it('is atomic, parameterized and round-trips', async () => {
-    const { db, calls } = fakeDb(); const s = createPostgresAttemptStore(db);
-    expect(await s.begin({ operationId: "o'1; DROP", format: 'reel', state: 'started', knownIds: [], targetId: 'P' })).toEqual({ created: true });
-    const again = await s.begin({ operationId: "o'1; DROP", format: 'reel', state: 'started', knownIds: [] });
-    expect(again).toMatchObject({ created: false, existing: { state: 'started', targetId: 'P' } });
-    await s.update("o'1; DROP", { state: 'uncertain', knownIds: ['V'], remoteId: 'V' });
-    expect(await s.get("o'1; DROP")).toMatchObject({ state: 'uncertain', knownIds: ['V'], remoteId: 'V' });
-    expect(calls.every((c) => !c.sql.includes("DROP") && /\$1/.test(c.sql))).toBe(true);
-  });
-  it('fails closed: no Graph call when the store is down', async () => {
-    const db: FacebookSqlPort = { query: async () => { throw new Error('down'); } };
-    const post = vi.fn(); const t = { postGraph: post, upload: vi.fn() };
-    await expect(executeFacebookNative(planFacebookNative({ ...base, format: 'reel' }), 'x', { transport: t, attempts: createPostgresAttemptStore(db) }))
+describe('attempt storage refusal', () => {
+  it('fails closed before provider dispatch when the claim store is unavailable', async () => {
+    const attempts = { ...createMemoryAttemptStore(), begin: vi.fn(async () => { throw new Error('storage unavailable'); }) };
+    const postGraph = vi.fn();
+    await expect(executeFacebookNative(planFacebookNative({ ...base, format: 'reel' }), 'x', { transport: { postGraph, upload: vi.fn() }, attempts }))
       .rejects.toBeInstanceOf(FacebookAttemptStoreUnavailableError);
-    expect(post).not.toHaveBeenCalled();
+    expect(postGraph).not.toHaveBeenCalled();
   });
 });
 

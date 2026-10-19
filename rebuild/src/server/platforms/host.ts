@@ -10,10 +10,15 @@ import type { AdsUiSchema } from '@/platforms/ads-ui';
 import type { AdsOpsHost } from '@/modules/ads/management/types';
 import type { Prisma } from '../../../generated/client';
 
+/** Fixed wire-integrity bound for content-free operator evidence cells. */
+export const PLATFORM_PUBLICATION_EVIDENCE_CELL_LIMIT = 2048;
+
 export interface PlatformPublicationEvidence {
   title: string;
   description: string;
   columns: Array<{ key: string; label: string }>;
+  /** Optional compact table columns; all fields remain in row details. */
+  summaryColumnKeys?: string[];
   items: Array<Record<string, string | number | null>>;
   truncated: boolean;
   /** Module-owned actions refer only to rows included in this evidence panel. */

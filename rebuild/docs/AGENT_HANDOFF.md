@@ -4,7 +4,9 @@ Updated: 2026-10-19. This is durable project context, not proof of current runti
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
 
-## Latest verified batch —84
+Current continuation: batch89 at the end of this document and FACEBOOK_NATIVE_JOURNAL_PLAN.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+
+## Historical verified batch —84
 
 Neutral format catalog + legacy intent bridge: typed adapter metadata, safe
 per-destination projection with credential-grant narrowing, default validation,
@@ -443,3 +445,53 @@ The shared result is now submitted, distinct from verified live status. There
 was no new UI/browser, live provider, migration-application or production evidence
 in this batch. The local SQL proposal and its static test remain uncommitted and
 unapplied, pending the journal integration gates. Full goal remains active.
+
+
+## Batch89: scoped native receipts and Root evidence
+
+Facebook now owns a tenant-bound, payload-bound durable phase journal beneath the
+existing sole publication claim. Creator-only dispatch fencing, monotonic SQL
+receipts, retained late facts, installed erasure/outcome guards and redacted export
+are implemented; the unscoped SQL proposal is removed. Root/API/installation MCP
+read bounded evidence even while the platform is disabled. Compact module-owned
+summary columns and keyboard-accessible details replace the identifier-heavy
+Root table; filters remain in the contextual sidebar.
+
+The19th migration is applied only locally after full backup/scratch restore and
+PostgreSQL checks; all105 prior table counts and Root settings were preserved.
+The complete19-file schema-only rehearsal passed. See
+[FACEBOOK_NATIVE_JOURNAL_PLAN.md](FACEBOOK_NATIVE_JOURNAL_PLAN.md) for ownership,
+evidence and next integration gates. Native customer formats remain unavailable.
+Actual host authorization/status/comment/deletion and audited native recovery,
+live Meta coverage, remaining parity and production-shaped rollback stay open.
+Production and the held photo-cleanup canary remain unchanged.
+
+Final batch89 evidence: isolated synthetic PostgreSQL suite3059 tests/350 files,
+zero skips; final production build and serial typecheck passed. Fourteen actual
+PostgreSQL cases cover ownership/fencing, all four phase chains, retained late
+facts, strict constraints/purge gates and real export/erasure. The complete19-file
+schema-only rehearsal passed. Actual local HTTP/installation-MCP/Chromium checks
+passed anonymous/workspace-owner/scope denial, fence/credential privacy, unknown
+action/cross-origin refusal, evidence visibility while Facebook is disabled and
+eight Grove/Coast/Clay/Nightfall desktop1440/phone390 views. Receipt details open
+by keyboard, filters stay in the drawer/sidebar and document width stays within
+the viewport. All synthetic fixtures were removed; captured Root settings and
+scoped configuration audits were restored exactly. Lower-cost agents implemented
+SQL/recovery/UI slices; both Claude accounts supplied independent source reviews.
+
+The local preview is the isolated final build at localhost:3200. Complete native
+host authorization, verified status/comment/deletion, audited process-loss/native
+conflict recovery, cleaned live provider coverage and broader legacy/configuration/
+production rollback gates remain open. No live provider request or production
+deployment occurred. Whole-app UX/accessibility is not cleared by this matrix.
+
+Continuation mechanics: localhost:3200 now serves the reviewed isolated candidate
+`/private/tmp/native89-final/app/rebuild` (production-mode Next, synthetic local
+preview database). The two native89 scratch databases were removed after tests;
+their old temporary environment file must not be reused as a live database.
+Private backup/application metadata remains outside Git in
+`/private/tmp/native89-backup.json` and `native89-local-application.json`; no
+credentials or raw rows belong here. Final cleanup independently matched all105
+prior local table counts and Root settings against the restored baseline, with
+zero native fixture rows. Keep the full goal active and continue actual native
+host/status/recovery integration, then remaining parity and release gates.

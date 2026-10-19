@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FacebookApiError } from '../src/platforms/facebook/publishing';
 import {
-  createMemoryAttemptStore, createPostgresAttemptStore, deleteFacebookNativeRemote, executeFacebookNative, planFacebookNative,
+  createMemoryAttemptStore, deleteFacebookNativeRemote, executeFacebookNative, planFacebookNative,
   postFacebookNativeFirstComment, reconcileFacebookNativeAttempt, FacebookAttemptStoreUnavailableError,
 } from '../src/platforms/facebook/formats';
-import type { FacebookNativeAttemptStore, FacebookNativeMedia, FacebookNativeReadTransport, FacebookSqlPort } from '../src/platforms/facebook/formats';
+import type { FacebookNativeAttemptStore, FacebookNativeMedia, FacebookNativeReadTransport } from '../src/platforms/facebook/formats';
 
 const vid: FacebookNativeMedia = { kind: 'video', url: 'https://cdn.example/v.mp4', sizeBytes: 1e6, durationSeconds: 30, width: 540, height: 960 };
 const base = { targetId: 'P1', targetKind: 'page', media: [vid], now: new Date('2026-01-01T00:00:00Z') };
@@ -104,20 +104,7 @@ describe('terminal state compare-and-set', () => {
     const r = await reconcileFacebookNativeAttempt('op', { transport: t, attempts, sleep });
     expect(r.state).toBe('rejected');
   });
-  it('Postgres store sends the expected states as a parameter and reports whether a row changed', async () => {
-    const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
-    let affected = 1;
-    const db: FacebookSqlPort = { async query(sql, params) { calls.push({ sql, params }); return { rows: affected ? [{ operation_id: 'a' }] : [] }; } };
-    const s = createPostgresAttemptStore(db);
-    expect(await s.update('a', { state: 'confirmed' }, ['uncertain', 'started'])).toBe(true);
-    expect(calls[0].sql).toMatch(/state <> 'deleted'/);
-    expect(calls[0].sql).toMatch(/state = ANY\(\$5::text\[\]\)/);
-    expect(calls[0].params[4]).toEqual(['uncertain', 'started']);
-    affected = 0;
-    expect(await s.update('a', { state: 'confirmed' })).toBe(false);
-    expect(calls[1].params[4]).toBeNull();
-    expect(calls[1].sql).not.toMatch(/\$\d+\s*,\s*\$\d+\s*,/); // values are never interpolated
-  });
+
 });
 
 describe('rate limits and readback requirements', () => {

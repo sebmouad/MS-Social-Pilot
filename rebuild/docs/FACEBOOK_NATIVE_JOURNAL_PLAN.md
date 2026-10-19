@@ -1,65 +1,96 @@
-# Native Facebook journal: next integration gate
+# Native Facebook journal: foundation and remaining gates
 
-Status: required work; not a shipped durable engine. Native formats remain
-unavailable. Batch88 implements payload snapshots and truthful executor results.
-The local child-journal SQL proposal is unapplied and excluded from that batch.
-Do not run it or extend the cutover allowlist until the gates below pass.
+Status: batch89 implements private durable receipts and installed safety guards.
+Native customer formats remain unavailable. This is not the complete Facebook
+engine, live-provider proof or a production cutover.
 
-## Ownership and dispatch authority
+## Implemented boundary
 
-`rebuild_publication_attempts` remains the only claim that permits a publication.
-Its existing active-destination uniqueness must remain authoritative. A
-Facebook-owned child records protocol phase intents and receipts, not a second
-publication claim or a replay lease. Bind it immutably to workspace, parent,
-post/post-target/target, actor, remote Page, source format, native format and the
-versioned payload hash. No projection foreign keys: receipts must survive removal
-of local projections. A direct workspace FK supports export and erasure.
+`rebuild_publication_attempts` remains the only claim that permits publication.
+Its active-destination uniqueness is unchanged. The Facebook-owned raw SQL table
+`rebuild_facebook_native_journal` records protocol phase intents and receipts,
+not a second publication claim or a replay lease. Immutable scope covers workspace,
+parent, post/post-target/target, actor, remote Page, source/native format and the
+batch88 payload hash. Receipt aliases survive removal of local projections.
+Composite parent and direct workspace FKs support tenant integrity and erasure.
 
-The bound store must lock parent before child in each short transaction, without
-reacquiring the outer publishing operation's advisory locks. A child UPDATE
-trigger cannot establish that ordering: its row is already locked. Verify actual
-concurrency and deadlock behavior. Only the first worker owns an unexported fence
-token; every write checks token and revision. Restarts cannot take over or resend
-an uncertain phase automatically.
+`formats/journal.ts` locks parent before child in each short transaction, without
+reacquiring the outer publishing operation's advisory locks. Only the creator
+instance owns its unexported token; dispatch writes require its expected revision.
+Existing rows and restarted instances cannot acquire ownership or resend. A stale
+creator may append newly observed receipt facts, mark a conflict and return false;
+it cannot append another dispatch intent. SQL enforces phase chains, append-only
+IDs, irreversible confirmations/conflicts, immutable final identity, a transition
+matrix, initial live binding and the shared workspace purge write gate.
 
-## Receipt integrity and recovery
-
-Initial intent requires the live matching selected connection and processing
-destination, with no saved remote publication. Subsequent dispatch checkpoints
-must recheck current operation authority. Late provider facts must still be
-recordable after the parent becomes terminal or projections disappear; reject
-further dispatch and hold contradictory outcomes for review. Do not discard late
-IDs merely because the parent changed.
-
-Enforce bounded unique append-only IDs, exact per-format phase prefixes,
-irreversible confirmations, immutable bindings and an explicit state-transition
-matrix. Preserve final identity once established. Distinguish submitted from
-confirmed live status; an upload ID cannot substitute for a missing Story ID.
-Reel finish acknowledges the addressed video object only after explicit success.
+The bound store checks selected Page/connection, token expiry and saved format at
+checkpoint boundaries. It is a trusted private integration seam, not an API or a
+replacement for shared authorization. Initial and per-operation permissions,
+entitlements and module grants must still be enforced by the eventual host.
 Protocol intent means a request may have been sent, not proof of wire delivery.
+Final state never substitutes a staged object for an absent Story receipt. Reel
+finish acknowledges the addressed video object only after explicit success.
 
-All unresolved phase intents, known orphans and conflicting late receipts must
-block local deletion, disconnect-with-erasure and workspace purge through the
-existing neutral recovery hooks. Parent outcome attestation must not bypass this
-evidence. Expose bounded content-free Root evidence without the fence token.
-First comments, remote deletion and final readback use the existing authorized
-recovery services; do not enable independent `:comment`/`:delete` child claims.
+The old unscoped `formats/store.ts` proposal and fake-SQL tests are removed.
+Memory storage remains a test/single-process helper; the durable wrapper constructs
+its own scoped store. It rejects `:comment`/`:delete` aliases and cannot confirm or
+delete objects through the worker port. The existing first-comment/deletion
+recovery services remain the required integration path.
 
-## Evidence required before applying or enabling
+## Installed safety and Root UX
 
-- Fresh backup, actual scratch restore and table-count verification.
-- Actual PostgreSQL migration syntax and constraint tests, including rejected
-  invalid JSON, rewritten aliases, identity changes and regressing confirmations.
-- Concurrent begin: exactly one owner; stale tokens/revisions and foreign scope
-  refused; parent-state changes preserve late facts but stop the next dispatch.
-- Real export redacts fence tokens; unresolved erasure is refused; settled fixture
-  erasure follows FK order and preserves foreign workspace records.
-- Updated checksum-pinned cutover manifest and complete schema rehearsal.
-- Integrated publication/status/comment/deletion tests, UI/API/MCP authorization,
-  cleaned live-provider evidence, and the broader release/rollback gates before
-  advertising formats or cutting over production.
+Native unsettled intents, known orphans and conflicts block local deletion,
+disconnect-with-erasure and workspace purge through the installed neutral hooks,
+even when the platform is disabled. Parent outcome attestation cannot promote an
+unverified native submission to live or attest unresolved objects absent.
 
-Claude reviewed both the executor changes and the unapplied SQL proposal. Its
-findings are leads, not PostgreSQL evidence. In particular, late receipt retention,
-parent uniqueness and file-URL upload support must be assessed against the actual
-host and transport, rather than removed based on a partial source review.
+Root/API/installation MCP expose bounded content-free evidence. Fence tokens,
+credentials and payload content are absent. Complete identifiers remain stored
+and included in scoped redacted exports; oversized multi-ID display cells are
+explicitly summarized under the shared evidence wire bound. Stable hashed row IDs
+cannot overflow that bound. Submitted receipts are labelled submitted.
+
+The generic Root table accepts validated module-owned summary columns. Facebook
+shows state, record type, final identity and update time first. Keyboard-operable
+native details retain the complete declared evidence fields; existing confirmed
+module actions remain separate. Filters remain in the contextual sidebar/drawer.
+Unknown native recovery actions are refused rather than routed to cleanup.
+
+## Migration and evidence
+
+Migration `20261019030000_rebuild_facebook_native_journal`, SHA256
+`3ef505dccb5156ea1d84472998d19fb8427b1232669f57ca98a8ac6cd1e04d46`, is locally applied
+after a full preview backup, actual scratch restore, matching table counts, final
+scratch migration/constraint tests and exact SQL/backup identity checks. All105
+prior public table counts and Root settings stayed unchanged; the new table is
+empty outside disposable test fixtures. The complete19-file schema-only cutover
+rehearsal passed, including its independent backup/restore check. This is not
+production-shaped customer-data/media/service rollback proof. See CUTOVER.md.
+
+Actual PostgreSQL cases cover concurrent creators, stale revisions/tokens,
+immutable bindings, late parent/connection/revision receipts, all four phase
+chains, outer advisory locks, strict JSON, terminal late-ID conflicts, purge gates,
+real redacted export and children-first erasure with foreign-workspace survival.
+Final isolated suite:3059 tests/350 files, zero skips, production build and
+serial typecheck. Actual local API/MCP/browser checks passed eight four-theme
+desktop/phone views, keyboard details, privacy/scope/refusal checks and exact
+cleanup. The current handoff records the scoped evidence. Both Claude accounts and lower-cost native agents contributed
+implementation/reviews. Review findings were checked against actual host rules;
+partial-source reviews are not provider or PostgreSQL proof.
+
+## Required next integration
+
+1. Complete native host dispatch with current shared authorization, module/plan/
+   scope checks, actual media probing and immutable source handling. Keep only
+   the existing implemented feed format customer-visible until these pass.
+2. Implement verified final status and canonical shared first-comment/deletion
+   recovery. Root needs audited resolution for held native receipts and late
+   facts after process loss; irreversibly conflicted rows currently remain held.
+3. Verify eventual host/webhook recovery cannot acquire dispatch authority or
+   bypass unresolved-orphan guards. Test races at that actual service boundary.
+4. Complete UI/API/MCP authorization, local failure/retry UX and cleaned live
+   Meta receipts for supported formats before enabling them.
+5. Complete the broader legacy parity, configuration, production-shaped data/
+   media migration and application/service rollback gates before deployment.
+
+Production and the held photo-cleanup canary remain unchanged.

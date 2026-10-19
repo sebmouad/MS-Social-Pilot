@@ -54,8 +54,8 @@ exercised. Production and the held photo-cleanup canary were unchanged.
    media probing, verified version-specific contracts and Root configuration.
 3. Reviewed migration with workspace/target/publication binding, payload identity,
    leases/fencing, erasure/export coverage and real PostgreSQL concurrency checks.
-   The SQL in `store.ts` is a proposal only; caller-prefixed operation IDs are not
-   tenant isolation. Do not apply or register that table as a production design.
+   Batch89 replaces the unscoped proposal with a bound private journal; this
+   milestone alone does not enable formats or complete the native engine.
 4. Integrate existing publication/deletion/first-comment recovery guards. Never
    create a parallel side-effect path bypassing current authorization or claims.
 5. UI/API/MCP authorization, realistic local examples, responsive theme checks,
@@ -154,3 +154,42 @@ The shared result is now submitted, distinct from verified live status. There
 was no new UI/browser, live provider, migration-application or production evidence
 in this batch. The local SQL proposal and its static test remain uncommitted and
 unapplied, pending the journal integration gates. Full goal remains active.
+
+
+## Batch89: scoped native receipts and Root evidence
+
+Facebook now owns a tenant-bound, payload-bound durable phase journal beneath the
+existing sole publication claim. Creator-only dispatch fencing, monotonic SQL
+receipts, retained late facts, installed erasure/outcome guards and redacted export
+are implemented; the unscoped SQL proposal is removed. Root/API/installation MCP
+read bounded evidence even while the platform is disabled. Compact module-owned
+summary columns and keyboard-accessible details replace the identifier-heavy
+Root table; filters remain in the contextual sidebar.
+
+The19th migration is applied only locally after full backup/scratch restore and
+PostgreSQL checks; all105 prior table counts and Root settings were preserved.
+The complete19-file schema-only rehearsal passed. See
+[FACEBOOK_NATIVE_JOURNAL_PLAN.md](FACEBOOK_NATIVE_JOURNAL_PLAN.md) for ownership,
+evidence and next integration gates. Native customer formats remain unavailable.
+Actual host authorization/status/comment/deletion and audited native recovery,
+live Meta coverage, remaining parity and production-shaped rollback stay open.
+Production and the held photo-cleanup canary remain unchanged.
+
+Final batch89 evidence: isolated synthetic PostgreSQL suite3059 tests/350 files,
+zero skips; final production build and serial typecheck passed. Fourteen actual
+PostgreSQL cases cover ownership/fencing, all four phase chains, retained late
+facts, strict constraints/purge gates and real export/erasure. The complete19-file
+schema-only rehearsal passed. Actual local HTTP/installation-MCP/Chromium checks
+passed anonymous/workspace-owner/scope denial, fence/credential privacy, unknown
+action/cross-origin refusal, evidence visibility while Facebook is disabled and
+eight Grove/Coast/Clay/Nightfall desktop1440/phone390 views. Receipt details open
+by keyboard, filters stay in the drawer/sidebar and document width stays within
+the viewport. All synthetic fixtures were removed; captured Root settings and
+scoped configuration audits were restored exactly. Lower-cost agents implemented
+SQL/recovery/UI slices; both Claude accounts supplied independent source reviews.
+
+The local preview is the isolated final build at localhost:3200. Complete native
+host authorization, verified status/comment/deletion, audited process-loss/native
+conflict recovery, cleaned live provider coverage and broader legacy/configuration/
+production rollback gates remain open. No live provider request or production
+deployment occurred. Whole-app UX/accessibility is not cleared by this matrix.

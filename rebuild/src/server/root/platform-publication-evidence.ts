@@ -5,9 +5,10 @@ import { PLATFORM_MODULES } from '@/platforms';
 import { runtimeConfig } from '@/server/config/store';
 import { requireActiveRoot } from './operations';
 import type { PlatformPublicationAction, PlatformPublicationActionField, PlatformPublicationActionInput, PlatformPublicationActionResult, PlatformPublicationEvidence } from '@/server/platforms/host';
+import { PLATFORM_PUBLICATION_EVIDENCE_CELL_LIMIT } from '@/server/platforms/host';
 
 // Platform receipt identifiers are accepted up to this same integrity bound.
-const maxEvidenceCellCharacters = 2048;
+const maxEvidenceCellCharacters = PLATFORM_PUBLICATION_EVIDENCE_CELL_LIMIT;
 const inputSchema = z.object({
   providerId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).optional(),
   operationId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/).optional(),
@@ -29,6 +30,7 @@ export type RootPlatformPublicationEvidenceResult = RootPlatformPublicationEvide
 };
 
 const safeFallback = () => new OperationError('upstream_failure', 'Platform publication evidence could not be loaded.');
+const unconfirmedAction = () => new OperationError('upstream_failure', 'The platform action result could not be confirmed. Check the platform evidence before taking further action.');
 const validLimit = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 1 && (value as number) <= 1000;
 
 async function configuredEvidenceLimit() {
@@ -50,11 +52,15 @@ function safeEvidence(value: PlatformPublicationEvidence, providerId: string): R
     return { key: column.key, label: column.label };
   });
   if (!columns.length || value.title.length > 200 || value.description.length > 1000) throw safeFallback();
+  const summaryColumnKeys = value.summaryColumnKeys;
+  if (summaryColumnKeys !== undefined && (!Array.isArray(summaryColumnKeys) || !summaryColumnKeys.length ||
+    summaryColumnKeys.length > columns.length || new Set(summaryColumnKeys).size !== summaryColumnKeys.length ||
+    summaryColumnKeys.some(key => typeof key !== 'string' || !keys.has(key)))) throw safeFallback();
   const items = value.items.map(item => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) throw safeFallback();
     const clean: Record<string, string | number | null> = {};
     for (const column of columns) {
-      const cell = item[column.key];
+      const cell = Object.prototype.hasOwnProperty.call(item, column.key) ? item[column.key] : undefined;
       if (cell === undefined || cell === null || typeof cell === 'number' && Number.isFinite(cell)) clean[column.key] = cell ?? null;
       else if (typeof cell === 'string' && cell.length <= maxEvidenceCellCharacters && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(cell)) clean[column.key] = cell;
       else throw safeFallback();
@@ -65,7 +71,9 @@ function safeEvidence(value: PlatformPublicationEvidence, providerId: string): R
   let actions: PlatformPublicationAction[] | undefined;
   if (value.actions !== undefined) {
     if (!Array.isArray(value.actions) || typeof value.rowIdKey !== 'string' || !keys.has(value.rowIdKey)) throw safeFallback();
-    const visibleRows = new Set(items.map(item => item[value.rowIdKey!]).filter((id): id is string => typeof id === 'string'));
+    const rowIds = items.map(item => item[value.rowIdKey!]);
+    if (rowIds.some(id => typeof id !== 'string' || !id) || new Set(rowIds).size !== rowIds.length) throw safeFallback();
+    const visibleRows = new Set(rowIds as string[]);
     actions = value.actions.flatMap(action => {
       if (!action || typeof action !== 'object' ||
         typeof action.rowId !== 'string' || action.rowId.length > maxEvidenceCellCharacters ||
@@ -85,6 +93,7 @@ function safeEvidence(value: PlatformPublicationEvidence, providerId: string): R
     rowIdKey = value.rowIdKey;
   } else if (value.rowIdKey !== undefined) throw safeFallback();
   return { providerId, title: value.title, description: value.description, columns, items, truncated: value.truncated,
+    ...(summaryColumnKeys === undefined ? {} : { summaryColumnKeys: [...summaryColumnKeys] }),
     ...(rowIdKey === undefined ? {} : { rowIdKey }), ...(actions === undefined ? {} : { actions }) };
 }
 
@@ -140,9 +149,9 @@ function safeActionResult(value: PlatformPublicationActionResult, action: Platfo
   if (!value || typeof value !== 'object' || value.actionId !== action.actionId || value.subjectId !== action.subjectId ||
     typeof value.operationId !== 'string' || !value.operationId || value.operationId.length > maxEvidenceCellCharacters ||
     !/^[A-Za-z0-9_-]+$/.test(value.operationId) || !['confirmed', 'attested', 'rejected', 'needs_review'].includes(value.state) ||
-    typeof value.ok !== 'boolean' || typeof value.message !== 'string' || !value.message.trim() || value.message.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value.message)) throw safeFallback();
+    typeof value.ok !== 'boolean' || typeof value.message !== 'string' || !value.message.trim() || value.message.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value.message)) throw unconfirmedAction();
   // Only the module can affirm a matching provider receipt or explicit human report.
-  if (['confirmed', 'attested'].includes(value.state) !== value.ok) throw safeFallback();
+  if (['confirmed', 'attested'].includes(value.state) !== value.ok) throw unconfirmedAction();
   return { ok: value.ok, actionId: value.actionId, subjectId: value.subjectId, operationId: value.operationId, state: value.state, message: value.message };
 }
 

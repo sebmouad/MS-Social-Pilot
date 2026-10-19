@@ -11,6 +11,28 @@ const panel = { title: 'Upload receipts', description: 'Known receipt identifier
 beforeEach(() => { vi.clearAllMocks(); state.limit = 100; state.configFailure = false; state.active.mockResolvedValue(undefined); state.evidence.mockResolvedValue(panel); state.execute.mockResolvedValue({ ok: true, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_1', state: 'confirmed', message: 'Action receipt recorded.' }); });
 
 describe('Root platform publication evidence service', () => {
+  it('preserves validated compact columns without dropping the full receipt schema', async () => {
+    state.evidence.mockResolvedValueOnce({ ...panel, summaryColumnKeys: ['remoteId'] });
+    expect(await readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).toEqual({ providerId: 'installed_but_disabled', ...panel, summaryColumnKeys: ['remoteId'] });
+  });
+  it('refuses duplicate action-row identities before they can share controls', async () => {
+    state.evidence.mockResolvedValueOnce({ ...panel, items: [panel.items[0], panel.items[0]], rowIdKey: 'operationId', actions: [] });
+    await expect(readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).rejects.toMatchObject({ code: 'upstream_failure' });
+  });
+  it('treats absent prototype-named cells as missing rather than inherited functions', async () => {
+    state.evidence.mockResolvedValueOnce({ ...panel, columns: [{ key: 'constructor', label: 'Constructor receipt' }], items: [{}] });
+    expect(await readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).toMatchObject({ items: [{ constructor: null }] });
+  });
+  it('reports malformed post-action receipts as unconfirmed actions rather than failed reads', async () => {
+    state.execute.mockResolvedValueOnce({ ok: true, actionId: 'module_action', subjectId: 'row_1' });
+    await expect(runRootPlatformPublicationAction('root', { providerId: 'installed_but_disabled', actionId: 'module_action', subjectId: 'row_1', confirmation: 'CONFIRM', acknowledged: true }))
+      .rejects.toMatchObject({ code: 'upstream_failure', message: 'The platform action result could not be confirmed. Check the platform evidence before taking further action.' });
+  });
+  it.each([[], ['unknown'], ['remoteId', 'remoteId'], [7], 'remoteId'].map(summaryColumnKeys => ({ summaryColumnKeys })))(
+    'refuses malformed compact column metadata $summaryColumnKeys', async ({ summaryColumnKeys }) => {
+      state.evidence.mockResolvedValueOnce({ ...panel, summaryColumnKeys });
+      await expect(readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).rejects.toMatchObject({ code: 'upstream_failure' });
+    });
   it('rechecks active Root and reads an installed platform even when customer access is disabled', async () => {
     expect(await readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled', operationId: 'op_1', resultCap: 4 })).toEqual({ providerId: 'installed_but_disabled', ...panel });
     expect(state.active).toHaveBeenCalledWith('root');

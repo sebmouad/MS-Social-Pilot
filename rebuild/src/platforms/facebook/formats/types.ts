@@ -113,11 +113,6 @@ export interface FacebookNativeAttemptStore {
   get(operationId: string): Promise<FacebookNativeAttemptRecord | null>;
 }
 
-/** Minimal parameterized SQL port (e.g. a pg Pool/client adapter). Never interpolate values. */
-export interface FacebookSqlPort {
-  query(sql: string, params: readonly unknown[]): Promise<{ rows: Array<Record<string, unknown>> }>;
-}
-
 /** Graph transport port. Implementations must throw FacebookApiError on non-2xx. */
 export interface FacebookNativeTransport {
   postGraph(path: string, body: Record<string, string>): Promise<Record<string, unknown>>;

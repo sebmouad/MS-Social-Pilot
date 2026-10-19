@@ -405,3 +405,24 @@ Production and `socialpilot-deploy` remain legacy.
 ## Batch85 additive format migration (local only)
 
 The reviewed eighteenth migration `20261019020000_rebuild_destination_formats` adds nullable target format intent and version snapshot maps. SHA-256: `30325cdda1951cde93fab77a12bc349caa4422861fe133f68320ac3b979af6c6`. No existing target is backfilled or deleted. Before local application, a full private preview backup was restored into a disposable database and public table counts compared. Backup SHA-256: `468586569142294bf5d67ae96833c2951a74f78bfd4fce2be4f68a4d1f017b97`. Counts remained unchanged after application. The actual eighteen-file schema-only rehearsal passed, including its independent restore/count check. This does not prove production-shaped migration, media recovery or service rollback. No production migration or cutover occurred.
+
+
+## Batch89 additive native journal migration (local only)
+
+The19th checksum-pinned migration `20261019030000_rebuild_facebook_native_journal`
+adds a workspace/parent-bound raw Facebook receipt table, integrity/alias triggers
+and the shared purge write gate. SHA256:
+`3ef505dccb5156ea1d84472998d19fb8427b1232669f57ca98a8ac6cd1e04d46`.
+No existing rows are backfilled or deleted. Full private preview backup SHA256:
+`eeb212859bae35198b4aab1ac67b50a1cb5e472d27df4675cdd18856067b45d4`.
+An actual scratch restore matched all105 prior public table counts. Final SQL
+applied there and passed scoped PostgreSQL concurrency/constraint/export/erasure
+tests before local application. Exact backup/SQL identity, prior table counts and
+Root setting fingerprint checks passed before/after local application.
+
+The updated19-file schema-only rehearsal passed, including enabled guard/purge
+triggers,19 raw-table columns, tenant/composite-parent FKs and independent
+backup/restore comparison. No customer rows were present in that rehearsal. This
+does not establish production-shaped migration, media restoration or service
+rollback. Native customer formats remain disabled, and no production deployment
+or live provider content belongs to this batch.

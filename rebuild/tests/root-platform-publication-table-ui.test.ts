@@ -33,6 +33,20 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 
 describe('Root publication evidence table action feedback', () => {
+  it('shows compact module-selected columns while keeping complete labeled receipt details and actions', async () => {
+    const compact = { ...evidence(), summaryColumnKeys: ['state'] };
+    await act(async () => { root.render(createElement(RootPlatformPublicationTable, { evidence: compact, providerId: 'installed_module', filtered: false })); });
+    const headers = [...container.querySelectorAll('thead th')].map(el => el.textContent);
+    expect(headers).toEqual(['State', 'Details', 'Actions']);
+    const details = container.querySelector('details')!;
+    expect(details).not.toBeNull(); expect(details.open).toBe(false);
+    expect(details.querySelector('summary')?.textContent).toBe('View receipt details');
+    expect(details.querySelector('summary')?.getAttribute('aria-label')).toBe('View receipt details for row_1');
+    expect([...details.querySelectorAll('dt')].map(el => el.textContent)).toEqual(['Receipt', 'State']);
+    expect([...details.querySelectorAll('dd')].map(el => el.textContent)).toEqual(['row_1', 'pending']);
+    expect(container.querySelector('button')?.textContent).toContain('Resolve receipt');
+    expect(container.querySelector('button')?.closest('details')).toBeNull();
+  });
   it('keeps the confirmed receipt notice focused when refreshed evidence removes the completed action', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: true, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_2', state: 'attested', message: 'External observation saved.' }) }));
     await act(async () => { root.render(createElement(RootPlatformPublicationTable, { evidence: evidence(), providerId: 'installed_module', filtered: false })); });
@@ -56,5 +70,8 @@ describe('Root publication evidence table action feedback', () => {
     expect(refreshedNotice.textContent).toBe('Human report recorded. The platform did not independently confirm it. External observation saved.');
     expect(document.activeElement).toBe(refreshedNotice);
     expect(container.querySelector('tbody tr')).toBe(originalRow);
+    // A different sidebar filter must not carry a previous operation's success.
+    await act(async () => { root.render(createElement(RootPlatformPublicationTable, { evidence: evidence([], 'confirmed'), providerId: 'installed_module', filtered: true, scopeKey: 'another-operation' })); });
+    expect(container.querySelector('[role="status"]')).toBeNull();
   });
 });

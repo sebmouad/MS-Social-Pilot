@@ -58,12 +58,11 @@ redirect refusal, explicit success receipts and cancellation without retries.
 Separate Node HTTP tests exercise actual localhost sockets and request encoding;
 these are synthetic protocol tests, not live Meta proof.
 
-The old unscoped SQL attempt store in `formats/store.ts` remains an unregistered
-proposal and must not be applied. `rebuild_publication_attempts` is the sole
-publication claim authority. Next integration must add Facebook-owned phase
-receipts bound to its workspace/operation/publication/target, payload identity and
-current fencing/locks, with export/erasure and actual PostgreSQL concurrency
-coverage. Then integrate media probing, native dispatch, readback, first-comment
+Batch89 removes the old unscoped SQL proposal and adds a private tenant-bound
+child journal under the sole `rebuild_publication_attempts` claim, with worker
+fencing, installed recovery guards and actual PostgreSQL export/erasure checks.
+See [FACEBOOK_NATIVE_JOURNAL_PLAN.md](FACEBOOK_NATIVE_JOURNAL_PLAN.md) for exact
+local evidence and remaining native recovery/host integration. Then integrate media probing, native dispatch, readback, first-comment
 and deletion recovery through existing authorized services. Native availability
 requires UI/API/MCP and cleaned live-provider evidence. The held photo-cleanup
 canary and production remain unchanged.
