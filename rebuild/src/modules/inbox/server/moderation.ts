@@ -101,7 +101,7 @@ export async function performInboxModerationAction(actor: InboxReadActor, input:
     const fresh = await authorizeInbox(actor, ceiling(actor), 'write');
     const channelIds = fresh.channelIds.filter(id => access.channelIds.includes(id));
     return prisma.$transaction(async tx => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['inbox-moderation-rules', actor.workspaceId])}, 0))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['inbox-moderation-rules', actor.workspaceId])}, 0))::text`;
       if (value.action === 'rule.create') {
         const rule = validateRule(value.rule, channelIds, every);
         const count = await tx.$queryRaw<Array<{ count: bigint | number }>>`SELECT COUNT(*)::int AS count FROM moderation_rules WHERE "workspaceId" = ${actor.workspaceId}`;
