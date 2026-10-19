@@ -6,6 +6,19 @@
 
 Updated 2026-10-19. This document distinguishes the intended production architecture from the current rebuild. A component existing in source is not proof that its complete workflow is production-ready.
 
+## Format catalog and legacy intent bridge (batch84)
+
+Adapter formats are opaque neutral metadata. Scoped destination choices and MCP
+expose validated customer-safe catalogs, with credential-aware operation flags
+and per-destination invalid-catalog isolation. Facebook declares feed only and
+consumes its label from Root (registry75). Shared publication preflight checks
+stored format before any destination claim; schedule/queue/duplication also check
+format. The thin Prisma mapping now preserves the existing legacy Post.format.
+This is a post-level compatibility bridge, not the final per-destination intent
+model; complete authoring/CSV/template/export/native transport remain required.
+No new migration, customer format or live capability is claimed. See
+[FACEBOOK_NATIVE_FORMATS.md](FACEBOOK_NATIVE_FORMATS.md) for evidence and next work.
+
 ## Native-format safety checkpoint (batch83)
 
 Facebook native format scaffolding is versioned but remains unregistered and

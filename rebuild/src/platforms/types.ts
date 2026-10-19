@@ -66,6 +66,17 @@ export interface PublishingMediaSupport {
   imageAltText: boolean;
 }
 
+/** Customer-safe, provider-declared formats. Identifiers are opaque to product logic. */
+export interface PublishingFormatDescriptor {
+  id: string;
+  label: string;
+  media: PublishingMediaSupport;
+  firstComment: boolean;
+  remoteStatus: boolean;
+  remoteDelete: boolean;
+  scheduling: { application: boolean; native: boolean };
+}
+
 export interface DiscoveryRequest { credential: PlatformCredential }
 export interface DiscoveryResult { targets: PlatformTarget[]; adAccounts?: PlatformAdAccount[] }
 export interface PublishRequest {
@@ -73,6 +84,8 @@ export interface PublishRequest {
   target: PlatformTarget;
   /** Opaque correlation identity for this attempt; it does not imply provider idempotency. */
   operationId?: string;
+  /** Explicit format intent; omitted requests use the adapter-declared default. */
+  formatId?: string;
   text: string;
   link?: string | null;
   media?: PublishMedia[];
@@ -146,6 +159,8 @@ export interface PlatformAdapter {
   readonly capabilities: CapabilityDeclaration;
   /** Optional granular authoring support; absent metadata fails closed for media delivery. */
   readonly publishingMedia?: PublishingMediaSupport;
+  readonly publishingFormats?: readonly PublishingFormatDescriptor[];
+  readonly defaultPublishingFormatId?: string;
   /** Adapter limits for ephemeral server-supplied image bytes during publish. */
   readonly localImageUpload?: { maxBytes: number; mimeTypes: readonly string[] };
   canUseCredential?(credential: PlatformCredential, capability: 'publishing' | 'remoteStatus' | 'remoteDelete' | 'firstComment'): boolean;

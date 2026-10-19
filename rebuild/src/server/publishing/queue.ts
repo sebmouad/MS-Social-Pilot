@@ -35,7 +35,7 @@ export async function queuePost(actor: PublishingActor, postId: string) {
       prisma.post.findFirst({
         where: { id: postId, workspaceId: actor.workspaceId },
         select: {
-          id: true, authorId: true, status: true, publishedAt: true, message: true, firstComment: true, link: true, media: true,
+          id: true, authorId: true, status: true, publishedAt: true, message: true, firstComment: true, format: true, link: true, media: true,
           targets: { select: { id: true, targetId: true, status: true, remotePostId: true } },
         },
       }),
@@ -58,7 +58,7 @@ export async function queuePost(actor: PublishingActor, postId: string) {
     const attachments = validatePostAttachments({ link: post.link ?? undefined, media: (post.media ?? []) as unknown as import('@/platforms/types').PublishMedia[] }, publishingLimits.maxMedia, publishingLimits.maxAlt);
     const message = validatePostContent(post.message ?? '', publishingLimits.maxText, attachments);
     const resolvedMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
-    await validateTargets(context.actor, targetIds, publishingLimits.maxTargets, resolvedMedia, Boolean(firstComment), attachments.link);
+    await validateTargets(context.actor, targetIds, publishingLimits.maxTargets, resolvedMedia, Boolean(firstComment), attachments.link, post.format, true);
     const holdForApproval = !MANAGERS.has(role) && needsContributorApproval(policy[0].requiresApproval, role);
 
     return withPublishingTransaction(context.signal, async tx => {

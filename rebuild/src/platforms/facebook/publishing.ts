@@ -1,3 +1,4 @@
+import { FACEBOOK_FEED_FORMAT_LABEL } from './module';
 import type { FacebookConfig } from './config';
 import { validateFacebookConfig } from './config';
 import { PlatformApiError } from '../errors';
@@ -68,6 +69,8 @@ export interface FacebookEngine {
   deleteComment(accessToken: string, commentId: string): Promise<void>;
 }
 
+/** Legacy stored feed identity, isolated at the Facebook compatibility boundary. */
+const FACEBOOK_FEED_FORMAT_ID = 'post';
 const FACEBOOK_PUBLISHING_MEDIA: PublishingMediaSupport = {
   kinds: ['image', 'video'], maxImages: null, maxVideos: 1,
   mixedKinds: false, linkWithMedia: false, imageAltText: true,
@@ -525,6 +528,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
 /** Backward-compatible thin publisher used by the current neutral contract. */
 export function createFacebookPublisher(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, mediaJournalFactory?: FacebookMediaJournalFactory) {
   return async (request: PublishRequest): Promise<PublishResult> => {
+    if (request.formatId !== undefined && request.formatId !== FACEBOOK_FEED_FORMAT_ID) throw new FacebookApiError('The selected publishing format is unavailable.', 400, 100);
     if (request.target.kind !== 'page') throw new FacebookApiError('Facebook publishing currently supports Page targets only.', 0);
     const engine = createFacebookEngine(config, fetchImpl, request.signal, mediaJournalFactory);
     const result = await engine.publish({ targetId: request.target.id, accessToken: request.credential.accessToken, text: request.text, link: request.link,
@@ -545,7 +549,7 @@ function createFacebookFirstCommentPublisher(config: FacebookConfig, fetchImpl: 
   };
 }
 
-export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { postReadScopes?: readonly string[]; postPublishScopes?: readonly string[]; postDeleteScopes?: readonly string[]; firstCommentScopes?: readonly string[]; mediaJournalFactory?: FacebookMediaJournalFactory }): PlatformAdapter {
+export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { feedFormatLabel?: string; postReadScopes?: readonly string[]; postPublishScopes?: readonly string[]; postDeleteScopes?: readonly string[]; firstCommentScopes?: readonly string[]; mediaJournalFactory?: FacebookMediaJournalFactory }): PlatformAdapter {
   const engine = createFacebookEngine(config, fetchImpl);
   const requiredPostReadScopes = policy?.postReadScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
   const requiredPostPublishScopes = policy?.postPublishScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
@@ -575,6 +579,8 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
     id: 'facebook',
     localImageUpload: { maxBytes: config.maxImageUploadBytes, mimeTypes: config.allowedImageMimeTypes },
     publishingMedia: FACEBOOK_PUBLISHING_MEDIA,
+    defaultPublishingFormatId: FACEBOOK_FEED_FORMAT_ID,
+    publishingFormats: [{ id: FACEBOOK_FEED_FORMAT_ID, label: policy?.feedFormatLabel ?? FACEBOOK_FEED_FORMAT_LABEL, media: FACEBOOK_PUBLISHING_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }],
     capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
     canUseCredential,
     classifyPublishingFailure(error) {
@@ -590,6 +596,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       return { targets: pages.map(p => ({ id: p.id, name: p.name, kind: 'page' })), adAccounts: accounts.map(a => ({ id: a.id, name: a.name, currency: a.currency, status: a.status === null ? null : String(a.status) })) };
     },
     async publish(request) {
+      if (request.formatId !== undefined && request.formatId !== FACEBOOK_FEED_FORMAT_ID) throw new FacebookApiError('The selected publishing format is unavailable.', 400, 100);
       if (!canUseCredential(request.credential, 'publishing')) throw new FacebookApiError('Facebook Page publishing permission is missing or unavailable.', 0);
       return createFacebookPublisher(config, fetchImpl, policy?.mediaJournalFactory)(request);
     },

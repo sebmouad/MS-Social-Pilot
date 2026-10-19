@@ -4,6 +4,28 @@ Updated: 2026-10-19. This is durable project context, not proof of current runti
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
 
+## Latest verified batch —84
+
+Neutral format catalog + legacy intent bridge: typed adapter metadata, safe
+per-destination projection with credential-grant narrowing, default validation,
+malformed-module isolation and MCP tools/resources. Facebook advertises feed only;
+Root `meta.feedFormatLabel` is active, registry75. Thin Prisma now maps existing
+Post.format (no migration). Publish preserves it and preflights formats before
+any claim; schedule/reschedule/queue/duplicate validate it, duplicates preserve it.
+Direct Facebook publishing refuses unknown formats before transport.
+
+Clean candidate:2932 tests/337 files, zero skips with synthetic PostgreSQL;
+build/typecheck passed; final MCP140 tests passed. Both Claude accounts reviewed;
+preflight/catalog defects fixed. No new UI/browser/live/provider-write evidence.
+
+Next: replace the transitional post-level legacy format bridge with neutral
+per-destination intent storage and complete authoring/CSV/template/export/status/
+delete/worker/MCP propagation. Current legacy database default remains a documented
+compatibility boundary, not future-provider support. Then integrate signed native
+transport, tenant-bound durable phases/leases and Root controls with live proof.
+Native source stays unavailable. See FACEBOOK_NATIVE_FORMATS.md. No migration or
+production cutover occurred; held photo canary remains untouched.
+
 ## Current native-format checkpoint —83
 
 Native source and mocked tests are now owned/versioned, still `wired:false`.

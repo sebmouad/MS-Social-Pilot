@@ -5,7 +5,7 @@ import { PrismaClient } from '../generated/client';
 const databaseUrl = process.env.REBUILD_PREVIEW_DATABASE_URL;
 const integration = vi.hoisted(() => ({
   prisma: null as unknown as PrismaClient,
-  adapter: null as unknown as { publish: ReturnType<typeof vi.fn>; publishFirstComment: ReturnType<typeof vi.fn>; classifyPublishingFailure: ReturnType<typeof vi.fn>; supportsTargetKind: ReturnType<typeof vi.fn> },
+  adapter: null as unknown as { publish: ReturnType<typeof vi.fn>; publishFirstComment: ReturnType<typeof vi.fn>; classifyPublishingFailure: ReturnType<typeof vi.fn>; supportsTargetKind: ReturnType<typeof vi.fn>; publishingMedia: { kinds: readonly ('image' | 'video')[]; maxImages: number | null; maxVideos: number | null; mixedKinds: boolean; linkWithMedia: boolean; imageAltText: boolean }; publishingFormats: readonly unknown[]; defaultPublishingFormatId: string },
 }));
 
 vi.mock('../src/server/data', () => ({ get prisma() { return integration.prisma; } }));
@@ -76,6 +76,9 @@ describe.skipIf(!databaseUrl)('first-comment receipt safety on isolated PostgreS
       publishFirstComment: vi.fn(async () => ({ remoteId: 'provider-comment' })),
       classifyPublishingFailure: vi.fn(() => 'uncertain'),
       supportsTargetKind: vi.fn(() => true),
+      publishingMedia: { kinds: ['image', 'video'], maxImages: 4, maxVideos: 4, mixedKinds: true, linkWithMedia: true, imageAltText: true },
+      publishingFormats: [{ id: 'post', label: 'Post', media: { kinds: ['image', 'video'], maxImages: 4, maxVideos: 4, mixedKinds: true, linkWithMedia: true, imageAltText: true }, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }],
+      defaultPublishingFormatId: 'post',
     };
   }
 
@@ -103,7 +106,7 @@ describe.skipIf(!databaseUrl)('first-comment receipt safety on isolated PostgreS
       } });
       await client.post.create({ data: {
         id: fixture.postId, workspaceId: fixture.workspaceId, authorId: fixture.userId, message: 'Synthetic receipt post',
-        firstComment: options.withComment === false ? null : 'Synthetic first comment', media: [], status: options.published ? 'published' : 'draft',
+        format: 'post', firstComment: options.withComment === false ? null : 'Synthetic first comment', media: [], status: options.published ? 'published' : 'draft',
         scheduledAt: null, publishedAt: options.published ? now : null, createdAt: now, updatedAt: now,
       } });
       await client.postTarget.create({ data: {

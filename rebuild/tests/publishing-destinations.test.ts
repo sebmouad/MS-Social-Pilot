@@ -71,3 +71,25 @@ describe('shared publishing destination choices', () => {
   });
 
 });
+
+describe('granular format projection', () => {
+  const format = { id: 'note', label: 'Note', media: { kinds: [], maxImages: 0, maxVideos: 0, mixedKinds: false, linkWithMedia: false, imageAltText: false }, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } };
+  it('isolates a broken module catalog without taking away another destination', async () => {
+    deps.targets.mockResolvedValue([target('current'), target('expired')]);
+    deps.adapter.mockResolvedValueOnce({ publish: vi.fn(), supportsTargetKind: () => true, publishingFormats: [{ ...format, label: '' }], defaultPublishingFormatId: 'note' })
+      .mockResolvedValueOnce({ publish: vi.fn(), supportsTargetKind: () => true, publishingFormats: [format], defaultPublishingFormatId: 'note' });
+    const choices = await publishingDestinationChoices(viewer, now);
+    expect(choices.map(c => c.canPublish)).toEqual([false, true]);
+    expect(choices[0]).not.toHaveProperty('publishingFormats');
+    expect(choices[1]?.publishingFormats?.[0]?.id).toBe('note');
+  });
+  it('rejects a default outside its catalog and narrows operation grants before projection', async () => {
+    deps.targets.mockResolvedValue([target('current')]);
+    deps.adapter.mockResolvedValue({ publish: vi.fn(), supportsTargetKind: () => true, publishingFormats: [format], defaultPublishingFormatId: 'wrong' });
+    expect((await publishingDestinationChoices(viewer, now))[0]?.canPublish).toBe(false);
+    deps.adapter.mockResolvedValue({ publish: vi.fn(), supportsTargetKind: () => true, publishingFormats: [{ ...format, secret: 'private-adapter-value' }], defaultPublishingFormatId: 'note', canUseCredential: (_credential: unknown, op: string) => op === 'publishing' });
+    const choices = await publishingDestinationChoices(viewer, now);
+    expect(choices[0]?.publishingFormats?.[0]).toMatchObject({ firstComment: false, remoteStatus: false, remoteDelete: false });
+    expect(JSON.stringify(choices)).not.toContain('private-adapter-value');
+  });
+});

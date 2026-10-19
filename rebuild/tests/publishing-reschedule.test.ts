@@ -4,6 +4,11 @@ vi.mock('@/modules/publishing/server/guard', () => ({
   withPublishingTransaction: (_signal: AbortSignal, work: (tx: unknown) => Promise<unknown>) => db.$transaction(work),
   withPublishingOperation: (actor: unknown, _options: unknown, work: (context: unknown) => Promise<unknown>) => work({ actor, signal: new AbortController().signal, lockTargets: async () => {} }),
 }));
+vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({
+  publishingMedia: { kinds: ['image', 'video'], maxImages: 4, maxVideos: 4, mixedKinds: true, linkWithMedia: true, imageAltText: true },
+  publishingFormats: [{ id: 'post', label: 'Post', media: { kinds: ['image', 'video'], maxImages: 4, maxVideos: 4, mixedKinds: true, linkWithMedia: true, imageAltText: true }, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }],
+  defaultPublishingFormatId: 'post',
+}) }));
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
@@ -19,7 +24,7 @@ import { reschedulePost, reviewPost } from '../src/server/publishing/lifecycle';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const input = { postId: 'p1', date: '2026-10-20', time: '09:00', timeZone: 'America/New_York' };
-const scheduled = { id: 'p1', authorId: 'u1', message: 'Example scheduled post', link: null, media: [], status: 'scheduled', scheduledAt: new Date('2026-10-18T13:00:00Z'), targets: [{ status: 'pending', remotePostId: null }] };
+const scheduled = { id: 'p1', authorId: 'u1', format: 'post', message: 'Example scheduled post', link: null, media: [], status: 'scheduled', scheduledAt: new Date('2026-10-18T13:00:00Z'), targets: [{ status: 'pending', remotePostId: null, target: { socialAccount: { provider: 'synthetic' } } }] };
 
 beforeEach(() => {
   vi.useFakeTimers();

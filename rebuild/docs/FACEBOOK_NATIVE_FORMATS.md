@@ -61,3 +61,38 @@ exercised. Production and the held photo-cleanup canary were unchanged.
    live provider receipts and cleaned test content before availability.
 
 Keep the held photo-cleanup canary untouched. Production remains legacy.
+
+## Batch84: neutral catalog and legacy intent bridge
+
+The shared adapter contract now declares opaque format IDs, customer labels,
+media support, first-comment/status/delete support and independent application/
+native scheduling support. Shared validation accepts text-only modules, strips
+undeclared metadata, rejects duplicate/malformed catalogs and never substitutes
+an unknown explicit format. Destination catalogs validate their default and
+isolate a broken declaration to that destination; operation flags reflect current
+credential grants. The same safe metadata reaches MCP tools and target resources.
+Facebook declares only its implemented feed format. Its label is consumed from
+Root `meta.feedFormatLabel` (registry75). No native capability was enabled.
+
+The thin Prisma mapping now reads the existing legacy `posts.format` column.
+This adds no database column or migration. Guarded publication passes that stored
+identity unchanged; shared preflight validates every pending destination before
+any claim. Scheduling/rescheduling/queue and duplication validate stored intent;
+duplication preserves it. Both adapter and direct Facebook publisher reject an
+unsupported format before transport. An old Reel/Story is never silently sent
+as a feed post. Unsupported legacy data is retained for future integration.
+
+This is a transitional legacy bridge: `posts.format` is still one post-level
+legacy value with its existing database default. It is not the final independent
+per-destination intent model. New authoring, CSV, templates, exports and format
+selection still need the complete neutral per-destination contract and storage
+migration; do not infer future-provider compatibility from the legacy bridge.
+There is no new format picker or native scheduling UI in this batch.
+
+Evidence:2932 tests/337 files, zero skips with guarded local synthetic PostgreSQL;
+production build and typecheck passed. Tests include actual duplicate persistence
+and guarded opaque-format dispatch, pre-claim rejection, isolated malformed
+catalogs, credential narrowing and MCP tool/resource projection. Both Claude
+accounts reviewed; their preflight/catalog defects were corrected. The MCP suite
+passed again with the final projection assertions (140 tests). No new browser or
+live provider proof is claimed. Existing production remains legacy.

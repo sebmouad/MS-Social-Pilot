@@ -349,6 +349,8 @@ model Post {
   authorId    String
   message     String
   firstComment String?
+  /// Existing legacy column; opaque module format identity, not interpreted by the shared core.
+  format      String       @default("post")
   link        String?
   media       Json         @default("[]")
   status      PostStatus

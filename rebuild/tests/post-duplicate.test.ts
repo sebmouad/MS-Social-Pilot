@@ -25,7 +25,7 @@ vi.mock('../src/modules/publishing/server/read-scope', () => ({
 
 import { duplicatePost } from '../src/modules/publishing/server/duplicate';
 
-const source = (overrides: Record<string, unknown> = {}) => ({ id: 'source-1', workspaceId: 'workspace-1', authorId: 'user-1', message: 'Source message', firstComment: 'First comment', link: null, media: [], status: 'published', scheduledAt: null, publishedAt: new Date(), targets: [{ targetId: 'target-1', status: 'published', remotePostId: 'remote-1' }], ...overrides });
+const source = (overrides: Record<string, unknown> = {}) => ({ id: 'source-1', workspaceId: 'workspace-1', authorId: 'user-1', format: 'example-opaque-format', message: 'Source message', firstComment: 'First comment', link: null, media: [], status: 'published', scheduledAt: null, publishedAt: new Date(), targets: [{ targetId: 'target-1', status: 'published', remotePostId: 'remote-1' }], ...overrides });
 const args = (postId = 'source-1', requestId = '11111111-1111-4111-8111-111111111111') => ({ postId, requestId, confirmation: `DUPLICATE POST ${postId}` });
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
 
@@ -99,7 +99,7 @@ describe('duplicatePost', () => {
   it('passes the copied link into destination media compatibility checks', async () => {
     state.source = source({ link: 'https://example.test/story', media: [{ kind: 'image', url: 'https://example.test/image.jpg', altText: 'image' }] });
     await duplicatePost(actor, args());
-    expect(state.validateTargets).toHaveBeenCalledWith(state.actor, ['target-1'], 10, state.source.media, true, 'https://example.test/story');
+    expect(state.validateTargets).toHaveBeenCalledWith(state.actor, ['target-1'], 10, state.source.media, true, 'https://example.test/story', 'example-opaque-format');
   });
 
   it('duplicates link-only and media-only posts with an empty normalized caption', async () => {

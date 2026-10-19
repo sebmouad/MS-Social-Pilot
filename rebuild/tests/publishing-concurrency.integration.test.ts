@@ -47,6 +47,7 @@ vi.mock('../src/server/platforms/registry', () => ({
       if (!integration.publish) throw new Error('No controlled publishing outcome was configured.');
       return integration.publish(request.signal);
     },
+    publishingFormats: [{ id:'post',label:'Example format',media:{kinds:[],maxImages:0,maxVideos:0,mixedKinds:false,linkWithMedia:false,imageAltText:false},firstComment:true,remoteStatus:true,remoteDelete:true,scheduling:{application:true,native:false}}],
     supportsTargetKind: () => true,
   }),
 }));

@@ -15,7 +15,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
 }[key]) }));
 vi.mock('../src/modules/publishing/server/access', () => ({ authorizePublishing: async (actor: unknown) => ({ actor, role: 'owner', permissions: {}, entitlements: {} }) }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({ modules: { publishing: true } }), hasPlatformCapability: () => true }));
-vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: {}, publishFirstComment: {}, supportsTargetKind: () => true, publishingMedia: state.publishingMedia, localImageUpload: null }) }));
+vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: {}, publishFirstComment: {}, supportsTargetKind: () => true, publishingFormats: ['post', 'synthetic-opaque-format'].map(id => ({ id, label: id, media: state.publishingMedia, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } })), publishingMedia: state.publishingMedia, localImageUpload: null }) }));
 vi.mock('../src/server/platforms/resource-visibility', () => ({ selectedResourceConnectionWhere: async () => ({ selected: true }) }));
 vi.mock('../src/modules/publishing/server/read-scope', () => ({
   selectedPublishingTargetIds: async (_workspaceId: string, _entitlements: unknown, allowed?: readonly string[]) => allowed ? [...allowed] : [state.targetId],
@@ -75,6 +75,13 @@ describe.skipIf(!databaseUrl)('post duplication on isolated PostgreSQL', () => {
     await client.workspace.deleteMany({ where: { id: f.workspaceId } });
     await client.user.deleteMany({ where: { id: f.userId } });
   }
+  it('preserves an opaque stored format rather than resetting the copy to the schema default', async () => {
+    const f = await createFixture();
+    await client.post.update({where:{id:f.sourceId},data:{format:'synthetic-opaque-format'}});
+    const requestId=randomUUID();
+    await duplicatePost(f.actor,{postId:f.sourceId,requestId,confirmation:`DUPLICATE POST ${f.sourceId}`});
+    expect((await client.post.findUniqueOrThrow({where:{id:requestId}})).format).toBe('synthetic-opaque-format');
+  });
   it('copies content into a clean pending draft, replays one receipt, and rolls back a failed audit', async () => {
     const f = await createFixture(); const requestId = randomUUID();
     const result = await duplicatePost(f.actor, { postId: f.sourceId, requestId, confirmation: `DUPLICATE POST ${f.sourceId}` });

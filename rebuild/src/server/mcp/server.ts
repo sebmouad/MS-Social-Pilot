@@ -466,6 +466,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       return targets.map(target => {
         const choice = ready.get(target.id);
         return { ...target, canPublish: choice?.canPublish === true,
+          ...(choice?.canPublish && choice.publishingFormats ? { publishingFormats: choice.publishingFormats, defaultPublishingFormatId: choice.defaultPublishingFormatId } : {}),
           ...(choice?.canPublish && choice.publishingMedia ? { publishingMedia: choice.publishingMedia } : {}),
           ...(choice?.canPublish && choice.localImageUpload ? { localImageUpload: choice.localImageUpload } : {}),
         };

@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaClient } from '../generated/client';
+import type { PublishingFormatDescriptor } from '../src/platforms/types';
 
 const databaseUrl = process.env.REBUILD_PREVIEW_DATABASE_URL;
 const integration = vi.hoisted(() => ({
   prisma: null as unknown as PrismaClient,
-  adapter: null as unknown as { publish: ReturnType<typeof vi.fn>; publishFirstComment: ReturnType<typeof vi.fn>; classifyPublishingFailure: ReturnType<typeof vi.fn>; supportsTargetKind: ReturnType<typeof vi.fn>; canUseCredential: ReturnType<typeof vi.fn> },
+  adapter: null as unknown as { publish: ReturnType<typeof vi.fn>; publishFirstComment: ReturnType<typeof vi.fn>; classifyPublishingFailure: ReturnType<typeof vi.fn>; supportsTargetKind: ReturnType<typeof vi.fn>; canUseCredential: ReturnType<typeof vi.fn>; publishingFormats: readonly PublishingFormatDescriptor[]; defaultPublishingFormatId: string },
   targetId: '',
   grantAllowed: true,
 }));
@@ -87,6 +88,8 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
       publishFirstComment: vi.fn(async () => ({ remoteId: 'provider-comment' })),
       classifyPublishingFailure: vi.fn(() => 'uncertain'),
       supportsTargetKind: vi.fn(() => true),
+      publishingFormats: [{ id: 'post', label: 'Post', media: { kinds: ['image', 'video'], maxImages: null, maxVideos: null, mixedKinds: false, linkWithMedia: false, imageAltText: true }, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }],
+      defaultPublishingFormatId: 'post',
     };
   }
 
@@ -166,6 +169,14 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
     }) as PrismaClient;
   }
 
+  it('passes the stored opaque format unchanged through the guarded publication service', async () => {
+    const f=await createFixture();
+    await client.post.update({where:{id:f.postId},data:{format:'synthetic-opaque-format'}});
+    integration.adapter.publishingFormats = [...integration.adapter.publishingFormats, { id: 'synthetic-opaque-format', label: 'Synthetic format', media: { kinds: ['image', 'video'], maxImages: null, maxVideos: null, mixedKinds: false, linkWithMedia: false, imageAltText: true }, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }];
+    integration.adapter.publish.mockResolvedValue({remoteId:'synthetic-format-receipt',url:null});
+    await publishPost(f.actor,f.postId);
+    expect(integration.adapter.publish).toHaveBeenCalledWith(expect.objectContaining({formatId:'synthetic-opaque-format'}));
+  });
   it('commits and exposes intent before dispatch, then excludes duplicate concurrent dispatch', async () => {
     const fixture = await createFixture();
     let enter!: () => void;

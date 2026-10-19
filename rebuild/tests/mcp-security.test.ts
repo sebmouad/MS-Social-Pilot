@@ -882,17 +882,21 @@ describe('MCP workspace boundaries', () => {
 
   it('exposes current safe media capabilities through destination tools and resources only when ready', async () => {
     const publishingMedia = { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true };
+    const publishingFormats = [{ id: 'synthetic-format', label: 'Example format', media: publishingMedia, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }];
+    const defaultPublishingFormatId = 'synthetic-format';
     const localImageUpload = { maxBytes: 1024, mimeTypes: ['image/png'] };
-    destinationReadiness.mockResolvedValue([{ id: 'page-allowed', canPublish: true, publishingMedia, localImageUpload }]);
+    destinationReadiness.mockResolvedValue([{ id: 'page-allowed', canPublish: true, publishingMedia, localImageUpload, publishingFormats, defaultPublishingFormatId }]);
     const ready = (await (await call('list_pages')).json()).result.structuredContent.items[0];
-    expect(ready).toMatchObject({ canPublish: true, publishingMedia, localImageUpload });
+    expect(ready).toMatchObject({ canPublish: true, publishingMedia, localImageUpload, publishingFormats, defaultPublishingFormatId });
     const resource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 92, method: 'resources/read', params: { uri: 'msp://targets' } });
-    expect(JSON.parse((await resource.json()).result.contents[0].text)[0]).toMatchObject({ publishingMedia, localImageUpload });
-    destinationReadiness.mockResolvedValue([{ id: 'page-allowed', canPublish: false, publishingMedia, localImageUpload }]);
+    expect(JSON.parse((await resource.json()).result.contents[0].text)[0]).toMatchObject({ publishingMedia, localImageUpload, publishingFormats, defaultPublishingFormatId });
+    destinationReadiness.mockResolvedValue([{ id: 'page-allowed', canPublish: false, publishingMedia, localImageUpload, publishingFormats, defaultPublishingFormatId }]);
     const unavailable = (await (await call('list_pages')).json()).result.structuredContent.items[0];
     expect(unavailable.canPublish).toBe(false);
     expect(unavailable).not.toHaveProperty('publishingMedia');
     expect(unavailable).not.toHaveProperty('localImageUpload');
+    expect(unavailable).not.toHaveProperty('publishingFormats');
+    expect(unavailable).not.toHaveProperty('defaultPublishingFormatId');
   });
 
   it('constrains customer destination and Ads queries when platform access is absent', async () => {

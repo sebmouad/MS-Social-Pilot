@@ -6,6 +6,12 @@ Updated 2026-10-19. Goal: [GOAL.md](GOAL.md). Mandatory target:
 
 ## Current position —2026-10-19
 
+Batch84 adds the neutral format catalog/MCP projection and preserves/validates
+legacy format intent before publication claims and scheduling/duplication.
+2932 tests/337 files pass with local PostgreSQL; build/typecheck pass. Root
+registry75. Per-destination intent storage/authoring and native engine integration
+remain next; the post-level legacy bridge is not future-provider completion.
+
 Native safety checkpoint83 hardens source-only phase receipts and conservative
 status/deletion; it does not expose new formats. Next remains full native
 integration. See FACEBOOK_NATIVE_FORMATS.md.

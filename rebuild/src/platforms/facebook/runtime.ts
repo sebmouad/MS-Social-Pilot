@@ -32,11 +32,11 @@ export async function configuredFacebookEngine(options?: { signal?: AbortSignal 
   return createFacebookEngine(await configuredFacebookConfig(), transport, facebookMediaJournal);
 }
 export async function configuredFacebookAdapter() {
-  const [config, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes] = await Promise.all([
+  const [config, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, feedFormatLabel] = await Promise.all([
     configuredFacebookConfig(), configured<string[]>('meta.postReadScopes'), configured<string[]>('meta.postPublishScopes'),
-    configured<string[]>('meta.postDeleteScopes'), configured<string[]>('meta.firstCommentScopes'),
+    configured<string[]>('meta.postDeleteScopes'), configured<string[]>('meta.firstCommentScopes'), configured<string>('meta.feedFormatLabel'),
   ]);
-  return createFacebookAdapter(config, fetch, { postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal });
+  return createFacebookAdapter(config, fetch, { feedFormatLabel, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal });
 }
 
 export async function configuredFacebookOAuth() {

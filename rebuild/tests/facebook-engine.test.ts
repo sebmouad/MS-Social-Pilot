@@ -372,3 +372,19 @@ describe('Facebook Graph adapter', () => {
     await expect(adapter.listAds!({ credential: { accessToken: 'token' }, accountId: 'act_1' })).rejects.toThrow('explicit start and end date');
   });
 });
+
+ describe('Facebook format intent', () => {
+ it('declares only the implemented feed format and consumes the injected customer label', () => {
+ const adapter=createFacebookAdapter(config,mockFetch(),{feedFormatLabel:'Custom feed label'});
+ expect(adapter.defaultPublishingFormatId).toBe('post');
+ expect(adapter.publishingFormats?.map(f=>f.id)).toEqual(['post']);
+ expect(adapter.publishingFormats?.[0]?.label).toBe('Custom feed label');
+ expect(adapter.publishingFormats?.[0]?.scheduling).toEqual({application:true,native:false});
+ });
+ it.each(['reel','story','unknown',''])('never converts unsupported %s intent to a feed request', async formatId => {
+ const fetcher=mockFetch();
+ const adapter=createFacebookAdapter(config,fetcher,{postPublishScopes:['pages_manage_posts']});
+ await expect(adapter.publish!({credential:{accessToken:'synthetic',grantedScopes:['pages_manage_posts']},target:{id:'page',kind:'page',name:'Example'},formatId,text:'Example'})).rejects.toBeInstanceOf(FacebookApiError);
+ expect(fetcher).not.toHaveBeenCalled();
+ });
+ });

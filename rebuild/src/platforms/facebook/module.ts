@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { entry, url, stringList } from '@/lib/config/entry';
 import { enabledEntry, type PlatformModule } from '../module';
 
+export const FACEBOOK_FEED_FORMAT_LABEL = 'Feed post';
+
 /**
  * The Facebook platform module: Facebook Pages and Meta ad accounts.
  *
@@ -54,6 +56,7 @@ const facebookConfigEntries = [
   entry({ key: 'meta.oauthStateMinutes', group: 'Facebook · API credentials', label: 'Meta connection challenge lifetime', kind: 'number', description: 'Minutes allowed between opening Meta authorization and returning to the callback.', defaultValue: 10, schema: z.number().int().min(1).max(60), consumption: 'active' }),
   entry({ key: 'meta.oauthScopes', group: 'Facebook · API scopes', label: 'Facebook OAuth scopes', kind: 'json', description: 'JSON array of Facebook Page scopes requested during authorization. Keep aligned with app review approval.', defaultValue: ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'read_insights'], schema: stringList, consumption: 'active' }),
   entry({ key: 'meta.inboxReadScopes', group: 'Facebook · API scopes · inbox', label: 'Meta inbox read scopes', kind: 'json', description: 'JSON array of Meta scopes required to read Page conversations and comments.', defaultValue: ['pages_messaging', 'pages_read_engagement'], schema: stringList, consumption: 'configured' }),
+  entry({ key: 'meta.feedFormatLabel', group: 'Facebook · Publishing', label: 'Feed format label', kind: 'text', description: 'Customer-facing label for the implemented Page feed format. Does not enable native formats.', defaultValue: FACEBOOK_FEED_FORMAT_LABEL, schema: z.string().trim().min(1).max(120), consumption: 'active' }),
   entry({ key: 'meta.postReadScopes', group: 'Facebook · API scopes · publishing', label: 'Meta post status read scopes', kind: 'json', description: 'JSON array of Meta scopes required to refresh the status of Page posts.', defaultValue: ['pages_read_engagement'], schema: stringList.min(1), consumption: 'active' }),
   entry({ key: 'meta.postPublishScopes', group: 'Facebook · API scopes · publishing', label: 'Meta Page post publishing scopes', kind: 'json', description: 'JSON array of Meta scopes required before publishing Page posts. Keep aligned with app review approval.', defaultValue: ['pages_manage_posts'], schema: stringList.min(1), consumption: 'active' }),
   entry({ key: 'meta.postDeleteScopes', group: 'Facebook · API scopes · publishing', label: 'Meta Page post deletion scopes', kind: 'json', description: 'JSON array of Meta scopes required before deleting Page posts. Keep aligned with app review approval.', defaultValue: ['pages_manage_posts'], schema: stringList.min(1), consumption: 'active' }),
