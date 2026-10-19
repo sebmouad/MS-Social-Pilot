@@ -15,7 +15,7 @@ import { isNonPublicAddress, NetGuardError, type Fetcher, type FetchRequest } fr
  * content decoding (the byte cap in guardedFetch therefore bounds wire bytes), no proxy.
  */
 export type PinnedRequestOptions = {
-  protocol: 'http:' | 'https:'; host: string; port: number; path: string; method: 'GET'; headers: Record<string, string>; signal: AbortSignal;
+  protocol: 'http:' | 'https:'; host: string; port: number; path: string; method: 'GET' | 'POST'; body?: string; headers: Record<string, string>; signal: AbortSignal;
   servername?: string;
   lookup: (hostname: string, options: unknown, callback: (...args: unknown[]) => void) => void;
 };
@@ -56,7 +56,7 @@ export const nodeTransport: PinnedTransport = options => new Promise<PinnedRespo
     else markConnected();
   });
   request.on('error', reject);
-  request.end();
+  request.end(options.body);
 });
 
 const hostOf = (url: URL) => url.hostname.replace(/^\[|\]$/g, '');
@@ -93,13 +93,13 @@ export function createPinnedFetcher(options: PinnedFetcherOptions = {}): Fetcher
     if (!candidates.length || candidates.length !== request.resolved.length || candidates.some(isNonPublicAddress)) throw new NetGuardError('blocked_address', 'This address cannot be fetched.');
     const name = hostOf(url);
     const port = url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80;
-    const headers: Record<string, string> = { ...request.headers, host: url.host, 'accept-encoding': 'identity', connection: 'close' };
+    const headers: Record<string, string> = { ...request.headers, host: url.host, 'accept-encoding': 'identity', connection: 'close', ...(request.body === undefined ? {} : { 'content-length': String(Buffer.byteLength(request.body)) }) };
     let last: unknown;
     for (const address of candidates) {
       if (request.signal.aborted) break;
       try {
         const response = await transport({
-          protocol: url.protocol, host: name, port, path: `${url.pathname}${url.search}`, method: 'GET', headers, signal: request.signal,
+          protocol: url.protocol, host: name, port, path: `${url.pathname}${url.search}`, method: request.method ?? 'GET', ...(request.body === undefined ? {} : { body: request.body }), headers, signal: request.signal,
           ...(url.protocol === 'https:' && !isIP(name) ? { servername: name } : {}), lookup: pinnedLookup(address),
         });
         if (!response.peerAddress || normalizedPeer(response.peerAddress) !== normalizedPeer(address)) {

@@ -22,7 +22,7 @@ export class NetGuardError extends OperationError {
 }
 
 export type Resolver = (hostname: string, signal?: AbortSignal) => Promise<string[]>;
-export type FetchRequest = { url: string; headers: Record<string, string>; signal: AbortSignal; resolved: readonly string[] };
+export type FetchRequest = { url: string; headers: Record<string, string>; signal: AbortSignal; resolved: readonly string[]; /** Defaults to GET. POST is used by callers that deliver a small body (outbound webhooks). */ method?: 'GET' | 'POST'; body?: string };
 export type Fetcher = (request: FetchRequest) => Promise<Response>;
 export type FetchPolicy = { timeoutMs: number; maxBytes: number; maxRedirects: number; allowHttp: boolean; hostAllowlist: readonly string[] };
 export type FetchDeps = { resolve: Resolver; fetcher: Fetcher };

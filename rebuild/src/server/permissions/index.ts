@@ -59,6 +59,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'settings/sharing': 'settings/sharing',
   'settings/bio': 'settings/bio',
   'settings/mcp': 'settings/team',
+  'settings/webhooks': 'settings/team',
   'settings/account': null,
   'settings/notifications': null,
   'settings/data': null,
@@ -93,13 +94,13 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
   }
 
   if (role === 'viewer') {
-    if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp' || feature === 'settings/connections') return DENIED;
+    if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp' || feature === 'settings/webhooks' || feature === 'settings/connections') return DENIED;
     return { read: true, write: false };
   }
 
   if (role === 'editor') {
     if (feature === 'tasks/board') return { read: true, write: true };
-    if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp') return DENIED;
+    if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp' || feature === 'settings/webhooks') return DENIED;
     if (feature === 'settings/connections') return { read: true, write: false };
     return {
       read: true,
@@ -110,7 +111,7 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
   if (role === 'contributor') {
     // The Tasks service narrows a contributor to tasks they created or hold.
     if (feature === 'tasks/board') return { read: true, write: true };
-    if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp') return DENIED;
+    if (feature === 'settings/team' || feature === 'settings/workspace' || feature === 'settings/mcp' || feature === 'settings/webhooks') return DENIED;
     if (feature === 'settings/connections') return { read: true, write: false };
     return {
       read: true,

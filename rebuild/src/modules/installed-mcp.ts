@@ -9,6 +9,7 @@ import { INBOX_MCP } from './inbox/mcp';
 import { MEDIA_MCP } from './media/mcp';
 import { AI_MCP } from './ai/mcp';
 import { FEEDS_MCP } from './feeds/mcp';
+import { INTEGRATIONS_MCP } from './integrations/mcp';
 
 /**
  * MCP tool groups of every installed product module, in listing order. A module adds tools,
@@ -16,5 +17,5 @@ import { FEEDS_MCP } from './feeds/mcp';
  * when a module is installed.
  */
 export function installedMcpGroups(): readonly McpToolGroup[] {
-  return [...ADS_MCP, ...TASKS_MCP, ...SHARING_MCP, ...ANALYTICS_MCP, ...SETTINGS_MCP, ...PUBLISHING_MCP, ...INBOX_MCP, ...MEDIA_MCP, ...FEEDS_MCP, ...AI_MCP];
+  return [...ADS_MCP, ...TASKS_MCP, ...SHARING_MCP, ...ANALYTICS_MCP, ...SETTINGS_MCP, ...PUBLISHING_MCP, ...INBOX_MCP, ...MEDIA_MCP, ...FEEDS_MCP, ...AI_MCP, ...INTEGRATIONS_MCP];
 }

@@ -42,6 +42,11 @@ const dependencies: WorkerDependencies = {
       const result = await deliverNotifications(now);
       return `examined=${result.examined} sent=${result.sent} cancelled=${result.cancelled} failed=${result.failed} uncertain=${result.uncertain} skipped=${result.skipped} purged=${result.purged}`;
     }
+    if (job === 'webhooks') {
+      const { deliverDueWebhooks } = await import('@/modules/integrations/server/webhooks');
+      const result = await deliverDueWebhooks(undefined, now);
+      return `events=${result.events} delivered=${result.delivered} retrying=${result.retrying} failed=${result.failed} purged=${result.purged}`;
+    }
     if (job === 'mediaCleanup') {
       const { cleanupOrphanImages } = await import('@/modules/publishing/server/media/storage');
       const result = await cleanupOrphanImages(now);

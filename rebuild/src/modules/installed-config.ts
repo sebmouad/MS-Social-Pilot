@@ -4,6 +4,7 @@ import { AI_CONFIG } from './ai/config';
 import { ANALYTICS_MODULE_CONFIG } from './analytics/config';
 import { FEEDS_CONFIG } from './feeds/config';
 import { INBOX_MODULE_CONFIG } from './inbox/config';
+import { INTEGRATIONS_CONFIG } from './integrations/config';
 import { MEDIA_CONFIG } from './media/config';
 import { PUBLISHING_MODULE_CONFIG } from './publishing/config';
 import { SETTINGS_MODULE_CONFIG } from './settings/config';
@@ -26,4 +27,5 @@ export const INSTALLED_MODULE_CONFIG = [
   ...AGENCY_CONFIG,
   ...SHARING_CONFIG,
   ...AI_CONFIG,
+  ...INTEGRATIONS_CONFIG,
 ] as const;
