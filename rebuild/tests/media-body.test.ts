@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MediaBodyTooLarge, readBoundedImageForm } from '../src/server/media/body';
+import { MediaBodyTooLarge, readBoundedImageForm } from '@/modules/publishing/server/media/body';
 
 describe('bounded image multipart parsing', () => {
   it('parses a valid form within its complete envelope limit', async () => {

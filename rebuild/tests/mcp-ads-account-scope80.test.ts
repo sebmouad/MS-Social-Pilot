@@ -35,9 +35,9 @@ vi.mock('../src/modules/ads/management/server', async importOriginal => {
   return { ...real, performAdsManagement: mocks.perform };
 });
 
-import { getAdsAccountWhere, getAdsAccounts, getAdsDataset } from '../src/server/ads/queries';
+import { getAdsAccountWhere, getAdsAccounts, getAdsDataset } from '@/modules/ads/server/queries';
 import { authorizeAdsRead } from '../src/modules/ads/server/access';
-import { canManageWorkspaceAds, canReadWorkspaceAds, campaignCreationConfirmation, createWorkspaceAdCampaign, readWorkspaceAdObject, updateWorkspaceAd } from '../src/server/ads/actions';
+import { canManageWorkspaceAds, canReadWorkspaceAds, campaignCreationConfirmation, createWorkspaceAdCampaign, readWorkspaceAdObject, updateWorkspaceAd } from '@/modules/ads/server/actions';
 
 const base = { userId: 'u1', workspaceId: 'w1' };
 const filters = { since: new Date('2026-10-01'), until: new Date('2026-10-08') } as never;

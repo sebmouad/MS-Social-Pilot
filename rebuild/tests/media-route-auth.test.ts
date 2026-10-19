@@ -3,13 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ viewer: vi.fn(), config: vi.fn(), upload: vi.fn(), read: vi.fn(), list: vi.fn() }));
 vi.mock('../src/server/context', () => ({ requireViewer: mocks.viewer }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
-vi.mock('../src/server/media/storage', () => ({ uploadWorkspaceImage: mocks.upload, readWorkspaceImage: mocks.read, listWorkspaceImages: mocks.list }));
+vi.mock('@/modules/publishing/server/media/storage', () => ({ uploadWorkspaceImage: mocks.upload, readWorkspaceImage: mocks.read, listWorkspaceImages: mocks.list }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
 vi.mock('../src/modules/publishing/server/media-holders', () => ({ mediaHolderVisibility: async () => null }));
 
 import { GET as GETMediaLibrary, POST } from '../src/app/api/media/route';
 import { GET } from '../src/app/api/media/[id]/route';
-import { MediaStorageUnavailable, MediaValidationError } from '../src/server/media/errors';
+import { MediaStorageUnavailable, MediaValidationError } from '@/modules/publishing/server/media/errors';
 
 beforeEach(() => {
   vi.clearAllMocks();

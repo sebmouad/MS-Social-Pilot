@@ -1,6 +1,6 @@
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
-import type { MetricView } from '@/server/analytics/aggregate';
+import type { MetricView } from '@/modules/analytics/server/aggregate';
 import { compareAnalytics } from '../../server/comparison';
 import { readAnalyticsSnapshot } from '../../server/read';
 import type { AnalyticsSnapshot } from '../../server/types';

@@ -6,7 +6,7 @@ vi.mock('../src/server/root/operations', () => ({ loadRootOperations: state.oper
 vi.mock('../src/server/secret-crypto', () => ({ encryptSecret: state.encrypt, decryptSecret: state.decrypt }));
 vi.mock('node:fs/promises', () => ({ access: state.access, lstat: state.stat }));
 vi.mock('../src/server/platforms', () => ({ PLATFORM_HOSTS: { facebook: { diagnostics: { checks: state.hooks } } } }));
-vi.mock('../src/server/media/inspect', () => ({ checkMediaProbeAvailability: state.probe }));
+vi.mock('@/modules/publishing/server/media/inspect', () => ({ checkMediaProbeAvailability: state.probe }));
 import { diagnosticChecks } from '../src/server/diagnostics/checks';
 const checks = async (scope = 'shared') => Object.fromEntries((await diagnosticChecks('root', scope)).map(check => [check.id, check.run]));
 beforeEach(() => {

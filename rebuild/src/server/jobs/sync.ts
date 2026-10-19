@@ -1,7 +1,7 @@
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
-import { publishPost } from '@/server/publishing/lifecycle';
+import { publishPost } from '@/modules/publishing/server/lifecycle';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { loadEntitlements, canUseFeature } from '@/server/entitlements';

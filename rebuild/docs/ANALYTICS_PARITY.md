@@ -35,7 +35,7 @@ Status: HOST-WIRED SOURCE AND MOCKED TESTS ONLY (account-2 W5). Demographics, pe
 
 The prior proposed SQL and port-only instructions are superseded. Use
 [REPORT_WORKFLOWS.md](REPORT_WORKFLOWS.md), the installed Analytics manifest,
-`src/server/analytics/report-workflows.ts` and the two checksum-pinned report
+`src/modules/analytics/server/report-workflows.ts` and the two checksum-pinned report
 migrations in CUTOVER.md. The existing Analytics CSV exporter remains separate.
 
 Reports now have scoped UI/HTTP/MCP workflows, consumed Root settings, a distinct

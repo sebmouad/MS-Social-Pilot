@@ -1,4 +1,4 @@
-import { ensurePublishingCollaboration } from '@/server/publishing/collaboration';
+import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
 import { SidebarDock } from '@/components/SidebarDock';
 import { parsePostCollaborationSearch } from '@/modules/publishing/collaboration/search';
 import { OperationError } from '@/lib/operation-error';

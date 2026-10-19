@@ -1,6 +1,6 @@
 import { prisma } from '@/server/data';
-import type { AnalyticsAdAccount, AnalyticsAudienceEntry, AnalyticsKind, AnalyticsMetricInput, AnalyticsObservation, AnalyticsProviderData, AnalyticsProviderRequest, AnalyticsTarget } from '@/server/analytics/catalog';
-import { safeNumber } from '@/server/analytics/catalog';
+import type { AnalyticsAdAccount, AnalyticsAudienceEntry, AnalyticsKind, AnalyticsMetricInput, AnalyticsObservation, AnalyticsProviderData, AnalyticsProviderRequest, AnalyticsTarget } from '@/modules/analytics/server/catalog';
+import { safeNumber } from '@/modules/analytics/server/catalog';
 
 /** Provider vocabulary and interpretation for stored Facebook Page and Meta Ads metrics. */
 const metricNames: Record<string, string> = {

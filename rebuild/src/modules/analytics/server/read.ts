@@ -6,8 +6,8 @@ import { prisma } from '@/server/data';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
-import { buildAnalytics, type MetricView } from '@/server/analytics/aggregate';
-import { loadAnalytics, type AnalyticsAdScope } from '@/server/analytics/data';
+import { buildAnalytics, type MetricView } from '@/modules/analytics/server/aggregate';
+import { loadAnalytics, type AnalyticsAdScope } from '@/modules/analytics/server/data';
 import { AnalyticsComparisonError, analyticsDateRange, compareAnalytics } from './comparison';
 import type { AnalyticsReadActor, AnalyticsReadConstraints, AnalyticsReadResult, AnalyticsSnapshot } from './types';
 

@@ -4,7 +4,7 @@ import { OperationError } from '../src/lib/operation-error';
 const h = vi.hoisted(() => ({ authorize: vi.fn(), deletePost: vi.fn(), publishPost: vi.fn(), reschedulePost: vi.fn(), duplicatePost: vi.fn(), post: vi.fn(), workspace: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: { post: { findFirst: h.post }, workspace: { findUnique: h.workspace } } }));
 vi.mock('@/modules/publishing/server/access', () => ({ authorizePublishing: h.authorize }));
-vi.mock('@/server/publishing/lifecycle', () => ({ deletePost: h.deletePost, publishPost: h.publishPost, reschedulePost: h.reschedulePost }));
+vi.mock('@/modules/publishing/server/lifecycle', () => ({ deletePost: h.deletePost, publishPost: h.publishPost, reschedulePost: h.reschedulePost }));
 vi.mock('@/modules/publishing/server/duplicate', () => ({ duplicatePost: h.duplicatePost }));
 
 import { itemRequestId, runBulkPostAction } from '../src/modules/publishing/server/bulk';

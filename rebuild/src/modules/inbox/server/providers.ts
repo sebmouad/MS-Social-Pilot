@@ -1,4 +1,4 @@
-import type { TargetType } from '../../../generated/client';
+import type { TargetType } from '../../../../generated/client';
 import { platformModule } from '@/platforms';
 import { inboxPlatformIds, platformFor } from '@/server/platforms/registry';
 

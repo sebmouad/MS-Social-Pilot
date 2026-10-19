@@ -8,8 +8,8 @@ import { listReportRuns, reportFailureText } from '@/modules/analytics/reports/g
 import { reportCapabilities } from '@/modules/analytics/reports/generation/registry';
 import { reportLimits } from '@/modules/analytics/reports/server/limits';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
-import { ensureReportWorkflows, reportDefaultPeriod, reportTemplateOptions } from '@/server/analytics/report-workflows';
-import { loadReportUiPolicy } from '@/server/analytics/report-ui-policy';
+import { ensureReportWorkflows, reportDefaultPeriod, reportTemplateOptions } from '@/modules/analytics/server/report-workflows';
+import { loadReportUiPolicy } from '@/modules/analytics/server/report-ui-policy';
 import { ReportsManager } from './ReportsManager';
 import { WorkflowNav } from './WorkflowNav';
 import styles from './workflows.module.css';

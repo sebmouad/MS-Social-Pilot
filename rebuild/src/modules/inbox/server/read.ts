@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Prisma } from '../../../../generated/client';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
-import { conversationNeedsReply } from '@/server/inbox/threads';
+import { conversationNeedsReply } from '@/modules/inbox/server/threads';
 import { OperationError } from '@/lib/operation-error';
 import { authorizeInbox as readAccess } from './access';
 import { encodeInboxCursor, inboxFilterFingerprint, readInboxCursor, type InboxCursor } from './cursor';

@@ -1,5 +1,5 @@
 import { OperationError } from '@/lib/operation-error';
-import type { InsightRow } from '@/server/ads/summary';
+import type { InsightRow } from '@/modules/ads/server/summary';
 
 export type AdsDailyRow = {
   id: string;

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({ access: vi.fn(), accounts: vi.fn(), dataset: vi.fn(), reportPolicy: vi.fn(), readPolicy: vi.fn(), config: vi.fn(), live: vi.fn(), describe: vi.fn(), platformAds: vi.fn() }));
 vi.mock('../src/modules/ads/server/access', () => ({ authorizeAdsRead: state.access }));
-vi.mock('../src/server/ads/queries', () => ({ getAdsAccounts: state.accounts, getAdsDataset: state.dataset }));
-vi.mock('../src/server/ads/actions', () => ({ readWorkspaceAdObject: state.live }));
+vi.mock('@/modules/ads/server/queries', () => ({ getAdsAccounts: state.accounts, getAdsDataset: state.dataset }));
+vi.mock('@/modules/ads/server/actions', () => ({ readWorkspaceAdObject: state.live }));
 vi.mock('../src/modules/ads/server/report-policy', () => ({ loadAdsReportPolicy: state.reportPolicy }));
 vi.mock('../src/modules/ads/server/read-policy', () => ({ loadAdsReadPolicy: state.readPolicy }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));

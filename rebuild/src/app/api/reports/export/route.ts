@@ -1,7 +1,7 @@
 import { requireViewer } from '@/server/context';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
 import { analyticsQuery } from '@/modules/analytics/query';
-import { analyticsSnapshotCsv } from '@/server/analytics/reports';
+import { analyticsSnapshotCsv } from '@/modules/analytics/server/reports';
 import { runtimeConfig } from '@/server/config/store';
 import { operationFailure } from '@/lib/operation-error';
 export const dynamic = 'force-dynamic';

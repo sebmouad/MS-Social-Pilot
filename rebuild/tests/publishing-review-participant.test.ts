@@ -29,7 +29,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async () => 10000 
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}), hasPlatformCapability: () => true }));
 vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => null }));
 
-import { reviewPost, type ReviewParticipant } from '../src/server/publishing/lifecycle';
+import { reviewPost, type ReviewParticipant } from '@/modules/publishing/server/lifecycle';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 

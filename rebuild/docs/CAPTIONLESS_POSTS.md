@@ -6,7 +6,7 @@ production still runs the legacy application.
 
 ## Domain and ownership
 
-`server/publishing/lifecycle.ts` owns `validatePostContent`. Call it after
+`modules/publishing/server/lifecycle.ts` owns `validatePostContent`. Call it after
 `validatePostAttachments`: trim text, enforce the existing Root character ceiling,
 and require text, a validated link, or at least one validated attachment.
 A first comment is separate delivery content and cannot make an empty post valid.

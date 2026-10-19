@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../src/server/context', () => ({ requireViewer: mocks.requireViewer }));
-vi.mock('../src/server/inbox/actions', () => ({
+vi.mock('@/modules/inbox/server/actions', () => ({
   syncInbox: mocks.sync, replyToInbox: mocks.reply,
   setInboxResolved: mocks.resolve, moderateInboxComment: mocks.moderate, deleteInboxComment: mocks.remove,
 }));

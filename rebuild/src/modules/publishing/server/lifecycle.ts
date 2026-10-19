@@ -1,14 +1,14 @@
 import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
 import { validateSelectedPublishingFormat } from '@/modules/publishing/formats';
 import { randomBytes, randomUUID } from 'node:crypto';
-import type { Prisma } from '../../../generated/client';
+import type { Prisma } from '../../../../generated/client';
 import { prisma } from '@/server/data';
 import { platformFor } from '@/server/platforms/registry';
 import { runtimeConfig } from '@/server/config/store';
 import { hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
 import type { PlatformAdapter, PublishMedia } from '@/platforms/types';
 import { resolveCsvDestinationIds } from '@/lib/publishing/csv-destinations';
-import { readWorkspaceImage } from '@/server/media/storage';
+import { readWorkspaceImage } from '@/modules/publishing/server/media/storage';
 import { isValidTimeZone, wallTimeToInstant } from '@/lib/calendar-dates';
 import { withPublishingOperation, withPublishingTransaction as publishingTransaction } from '@/modules/publishing/server/guard';
 import { OperationError } from '@/lib/operation-error';

@@ -1,4 +1,4 @@
-import type { MetricView } from '@/server/analytics/aggregate';
+import type { MetricView } from '@/modules/analytics/server/aggregate';
 import type { AnalyticsComparisonValue } from '@/modules/analytics/server/types';
 
 function formatValue(value: number, unit: string) {

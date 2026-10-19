@@ -6,7 +6,7 @@ recycling, native-format coverage, live Facebook delivery or production cutover.
 ## Operation and ownership
 
 The Publishing module owns weekly shared/channel timetables and the neutral slot
-allocator. The host's `server/publishing/queue.ts` applies the ordinary publishing
+allocator. The host's `modules/publishing/server/queue.ts` applies the ordinary publishing
 validation and operation guards, then allocates and saves under the same workspace
 advisory key used by timetable replacement. Shared times apply to every selected
 channel; a channel-specific additional time is valid for a multi-channel post only

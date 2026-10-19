@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ viewer: vi.fn(), read: vi.fn(), snapshot: vi.fn(), csv: vi.fn(), config: vi.fn() }));
 vi.mock('../src/server/context', () => ({ requireViewer: mocks.viewer }));
 vi.mock('../src/modules/analytics/server/read', () => ({ readAnalytics: mocks.read, readAnalyticsSnapshot: mocks.snapshot }));
-vi.mock('../src/server/analytics/reports', () => ({ analyticsSnapshotCsv: mocks.csv }));
+vi.mock('@/modules/analytics/server/reports', () => ({ analyticsSnapshotCsv: mocks.csv }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
 import { GET } from '../src/app/api/analytics/route';
 import { GET as exportCsv } from '../src/app/api/reports/export/route';

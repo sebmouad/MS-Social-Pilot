@@ -1,6 +1,6 @@
 # Inbox
 
-The Inbox stores channel conversations plus comments attached to locally stored published posts. Today Facebook Pages are the only channel type; names, badges and capabilities on screen come from the platform registry (`src/platforms`, `src/server/inbox/providers.ts`), so the screen does not name a platform itself.
+The Inbox stores channel conversations plus comments attached to locally stored published posts. Today Facebook Pages are the only channel type; names, badges and capabilities on screen come from the platform registry (`src/platforms`, `src/modules/inbox/server/providers.ts`), so the screen does not name a platform itself.
 
 ## Screen
 
@@ -8,7 +8,7 @@ Two panes. The left list merges all stored conversations and top-level comments 
 
 Filters live in the sidebar and URL: channel, type (messages/comments), status (open/resolved/all), hidden comments, literal message/person search and page size. List and history positions are separate URL cursors; paging preserves the selected thread even outside the current list page. Filter changes reset positions. Invalid or changed positions have Latest recovery. Counts explicitly describe stored activity, not complete provider history. Empty states distinguish no channel, nothing synced yet, no open items, and no match for the filters.
 
-**Needs reply** means: open, and for a conversation the newest stored message is not from the channel; for a comment, visible and nobody on the channel side (this app or the channel's own account) has replied under it (`src/server/inbox/threads.ts`). It reflects only what is stored.
+**Needs reply** means: open, and for a conversation the newest stored message is not from the channel; for a comment, visible and nobody on the channel side (this app or the channel's own account) has replied under it (`src/modules/inbox/server/threads.ts`). It reflects only what is stored.
 
 **Last synced** is the newest of the stored refresh times for the visible channels and the latest `inbox.synced` audit entry for the workspace. Replies, resolve and hide no longer touch it. **Sync now** refreshes the selected channel or every visible channel and reports the outcome: channels checked, conversations, messages and comments, and how many channels could not be read (for example a connection that needs reconnecting). One unreadable channel no longer blocks the others; the request fails only when no channel could be read. Provider reads for a channel finish before its local transaction, so a read failure writes nothing for that channel.
 
@@ -20,7 +20,7 @@ UI and MCP Inbox reads use the same channel predicate: selected, in the current 
 
 ## Actions and checks
 
-Reply, resolve/reopen, hide/unhide and delete go through `/api/inbox/actions` and the functions in `src/server/inbox/actions.ts`. Local resolve/reopen now dispatches to the platform-neutral `modules/inbox/server/workflow.ts`; it rechecks current write/channel grants but does not require usable remote credentials. Its scoped state change and domain audit are atomic. The obsolete Facebook local-resolution implementation and host hook were removed. All actions enforce active membership, Inbox entitlement/feature permission, selected channel scope and ownership. Remote actions additionally require current token validity and configured provider grants. `meta.inboxReadScopes` gates reads and `meta.inboxWriteScopes` gates replies, moderation and deletion. Existing connections must reconnect and grant any missing configured scopes.
+Reply, resolve/reopen, hide/unhide and delete go through `/api/inbox/actions` and the functions in `src/modules/inbox/server/actions.ts`. Local resolve/reopen now dispatches to the platform-neutral `modules/inbox/server/workflow.ts`; it rechecks current write/channel grants but does not require usable remote credentials. Its scoped state change and domain audit are atomic. The obsolete Facebook local-resolution implementation and host hook were removed. All actions enforce active membership, Inbox entitlement/feature permission, selected channel scope and ownership. Remote actions additionally require current token validity and configured provider grants. `meta.inboxReadScopes` gates reads and `meta.inboxWriteScopes` gates replies, moderation and deletion. Existing connections must reconnect and grant any missing configured scopes.
 
 - Replies are sent to the platform first, then stored with the acting user and audited.
 - Resolve/reopen is local workflow state, including when credentials have expired and stored history remains available. UI, HTTP and MCP use one shared service with a single service-owned workspace operation lock; transports do not nest that lock. MCP additionally passes its current channel scope for intersection.

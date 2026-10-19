@@ -33,7 +33,7 @@ vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({
   defaultPublishingFormatId: capabilities.defaultFormatId, supportsTargetKind: () => true,
 }) }));
 
-import { cancelScheduledPost, createPost, publishPost, reschedulePost, restorePostVersion, reviewPost, schedulePost, submitPostForApproval, updatePost } from '../src/server/publishing/lifecycle';
+import { cancelScheduledPost, createPost, publishPost, reschedulePost, restorePostVersion, reviewPost, schedulePost, submitPostForApproval, updatePost } from '@/modules/publishing/server/lifecycle';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 

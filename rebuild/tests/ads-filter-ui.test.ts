@@ -12,8 +12,8 @@ vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/entitlements', () => ({ entitledPlatformIds: () => ['test-platform'], canUseFeature: state.feature }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.access }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children, sidebar }: { children: ReactNode; sidebar?: ReactNode }) => createElement('div', null, createElement('aside', null, sidebar), children) }));
-vi.mock('../src/server/ads/queries', async original => ({ ...await original<typeof import('../src/server/ads/queries')>(), getAdsAccounts: state.accounts, getAdsDataset: state.dataset }));
-vi.mock('../src/server/ads/actions', () => ({ canManageWorkspaceAds: state.readiness, canReadWorkspaceAds: state.canRead }));
+vi.mock('@/modules/ads/server/queries', async original => ({ ...await original<typeof import('@/modules/ads/server/queries')>(), getAdsAccounts: state.accounts, getAdsDataset: state.dataset }));
+vi.mock('@/modules/ads/server/actions', () => ({ canManageWorkspaceAds: state.readiness, canReadWorkspaceAds: state.canRead }));
 vi.mock('../src/server/platforms/registry', () => ({ platformAds: async () => null }));
 vi.mock('../src/modules/ads/server/report-policy', () => ({ loadAdsReportPolicy: state.policy }));
 vi.mock('../src/modules/ads/server/output-policy', () => ({ loadAdsOutputPolicy: state.output }));
@@ -21,7 +21,7 @@ vi.mock('../src/modules/ads/server/output-policy', () => ({ loadAdsOutputPolicy:
 import AdsPage from '../src/app/ads/page';
 import CampaignsPage from '../src/app/ads/campaigns/page';
 import { AdsFiltersSidebar } from '../src/app/ads/ads-filters';
-import { parseAdsFilters } from '../src/server/ads/queries';
+import { parseAdsFilters } from '@/modules/ads/server/queries';
 import { ADS_REPORT_DEFAULT_POLICY } from '../src/modules/ads/report-policy';
 import { AdsReportLimitError } from '../src/modules/ads/read-policy';
 

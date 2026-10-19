@@ -1,4 +1,4 @@
-import { ensureAdsManagement } from '@/server/ads/management';
+import { ensureAdsManagement } from '@/modules/ads/server/management';
 import '../ads.css';
 import './objects.css';
 import { PageFrame } from '@/server/PageFrame';
@@ -7,7 +7,7 @@ import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
 import { DataTable } from '@/components/DataTable';
 import { entitledPlatformIds } from '@/server/entitlements';
-import { getAdsAccounts, type AdsSearchParams } from '@/server/ads/queries';
+import { getAdsAccounts, type AdsSearchParams } from '@/modules/ads/server/queries';
 import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
 import { readAdsDirectory } from '@/modules/ads/directory/server';
 import { adsDirectoryManagementPort } from '@/modules/ads/directory/management-port';

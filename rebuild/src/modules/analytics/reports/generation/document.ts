@@ -1,4 +1,4 @@
-import type { MetricView } from '@/server/analytics/aggregate';
+import type { MetricView } from '@/modules/analytics/server/aggregate';
 import { readAnalyticsSnapshot } from '../../server/read';
 import { REPORT_SECTION_IDS, REPORT_SUPPORTED_SECTIONS, type ReportGenerationPort, type ReportGenerationRequest, type ReportGenerationResult, type ReportOutput, type ReportSectionId } from '../contracts';
 import { authorizeReport, resultCeiling, usableChannelIds } from '../server/access';

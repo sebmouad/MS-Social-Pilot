@@ -1,6 +1,6 @@
-import type { ReplyRule } from '@/server/inbox/threads';
-import { formatInboxTime } from '@/server/inbox/threads';
-import type { InboxReplyPolicyRequest } from '@/server/inbox/policy';
+import type { ReplyRule } from '@/modules/inbox/server/threads';
+import { formatInboxTime } from '@/modules/inbox/server/threads';
+import type { InboxReplyPolicyRequest } from '@/modules/inbox/server/policy';
 import { messengerReplyWindow, type MessengerReplyWindow } from './reply-window';
 
 /**

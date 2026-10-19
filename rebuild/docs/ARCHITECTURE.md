@@ -1100,7 +1100,7 @@ migration/media/service rollback remain required. Production stays legacy.
 ## Reports host integration — batch82
 
 Analytics owns the complete report workflow service boundary in
-`modules/analytics/reports`; host `server/analytics/report-workflows.ts` assembles
+`modules/analytics/reports`; host `modules/analytics/server/report-workflows.ts` assembles
 shared Analytics generation and transactional mail. `/analytics/reports`, thin
 HTTP routes, six authenticated MCP tools and three resources share these rules.
 A distinct manifest job and consumed Root registry74 controls govern delivery,

@@ -31,7 +31,7 @@ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
 vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => integration.adapter }));
 
-import { publishPost } from '../src/server/publishing/lifecycle';
+import { publishPost } from '@/modules/publishing/server/lifecycle';
 import { recordFirstCommentOutcome, sendFirstComment } from '../src/modules/publishing/server/first-comment';
 
 type Fixture = {

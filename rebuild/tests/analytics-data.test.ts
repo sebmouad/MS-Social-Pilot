@@ -6,7 +6,7 @@ vi.mock('../src/server/platforms/registry', () => ({
   platformAnalytics: state.analytics,
 }));
 
-import { loadAnalytics } from '../src/server/analytics/data';
+import { loadAnalytics } from '@/modules/analytics/server/data';
 
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 const facebookData = (request: { selectedTargetIds: readonly string[]; allowedTargetIds?: readonly string[]; selectedAdAccountIds?: readonly string[] }) => {

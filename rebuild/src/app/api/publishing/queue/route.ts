@@ -1,5 +1,5 @@
 import { handle, jsonBody } from '@/modules/publishing/collaboration/http';
-import { queuePostRequest } from '@/server/publishing/queue';
+import { queuePostRequest } from '@/modules/publishing/server/queue';
 export const dynamic = 'force-dynamic';
 
 export const POST = (request: Request) => handle(request, {

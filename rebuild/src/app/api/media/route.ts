@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
-import { listWorkspaceImages, uploadWorkspaceImage } from '@/server/media/storage';
+import { listWorkspaceImages, uploadWorkspaceImage } from '@/modules/publishing/server/media/storage';
 import { mediaHolderVisibility } from '@/modules/publishing/server/media-holders';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { runtimeConfig } from '@/server/config/store';
-import { MediaBodyTooLarge, readBoundedImageForm } from '@/server/media/body';
-import { MediaStorageUnavailable, MediaValidationError } from '@/server/media/errors';
+import { MediaBodyTooLarge, readBoundedImageForm } from '@/modules/publishing/server/media/body';
+import { MediaStorageUnavailable, MediaValidationError } from '@/modules/publishing/server/media/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

@@ -10,8 +10,8 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
 vi.mock('../src/modules/inbox/server/access', () => ({ authorizeInbox: mocks.authorize }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: mocks.workspace }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
-vi.mock('../src/server/inbox/providers', () => ({ inboxCapabilities: mocks.capabilities }));
-vi.mock('../src/server/inbox/actions', () => ({ moderateInboxComment: mocks.moderate, replyToInbox: mocks.reply }));
+vi.mock('@/modules/inbox/server/providers', () => ({ inboxCapabilities: mocks.capabilities }));
+vi.mock('@/modules/inbox/server/actions', () => ({ moderateInboxComment: mocks.moderate, replyToInbox: mocks.reply }));
 
 import { fillModerationReply, foldText, matchesModerationRule, moderationConfirmation, moderationCopy } from '../src/modules/inbox/moderation';
 import { performInboxModerationAction, readInboxModeration, runInboxModerationRules } from '../src/modules/inbox/server/moderation';

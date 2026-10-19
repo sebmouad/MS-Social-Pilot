@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CsvExportButton } from '../src/components/CsvExportButton';
 import { AdsReportExport } from '../src/app/ads/AdsReportExport';
-import { parseAdsFilters } from '../src/server/ads/queries';
+import { parseAdsFilters } from '@/modules/ads/server/queries';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;

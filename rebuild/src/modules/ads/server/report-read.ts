@@ -4,7 +4,7 @@ import { loadAdsReportPolicy } from './report-policy';
 import { loadAdsReadPolicy } from './read-policy';
 import { loadAdsOutputPolicy } from './output-policy';
 import { authorizeAdsRead, type AdsReadActor } from './access';
-import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/server/ads/queries';
+import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/modules/ads/server/queries';
 import { adsIsoDay } from '../report-filters';
 import { normalizeAdsDailyRow } from '../report-data';
 

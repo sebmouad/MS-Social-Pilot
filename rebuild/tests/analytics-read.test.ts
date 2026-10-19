@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AnalyticsProviderData, AnalyticsMetricInput } from '../src/server/analytics/catalog';
+import type { AnalyticsProviderData, AnalyticsMetricInput } from '@/modules/analytics/server/catalog';
 
 const state = vi.hoisted(() => ({
   user: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), feature: vi.fn(), permission: vi.fn(), purge: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: state.perm
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permission }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: state.purge }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
-vi.mock('../src/server/analytics/data', () => ({ loadAnalytics: state.load }));
+vi.mock('@/modules/analytics/server/data', () => ({ loadAnalytics: state.load }));
 
 import { readAnalytics, readAnalyticsSnapshot } from '../src/modules/analytics/server/read';
 

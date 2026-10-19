@@ -9,13 +9,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../src/server/config/store', () => ({ runtimeConfigBatch: mocks.runtimeConfigBatch }));
-vi.mock('../src/server/media/network/net-guard', () => ({ guardedFetch: mocks.guardedFetch }));
-vi.mock('../src/server/media/network/pinned-fetch', () => ({ pinnedFetcher: mocks.pinnedFetcher }));
-vi.mock('../src/server/media/inspect', () => ({ inspectMediaSnapshot: mocks.inspectMediaSnapshot }));
+vi.mock('@/modules/publishing/server/media/network/net-guard', () => ({ guardedFetch: mocks.guardedFetch }));
+vi.mock('@/modules/publishing/server/media/network/pinned-fetch', () => ({ pinnedFetcher: mocks.pinnedFetcher }));
+vi.mock('@/modules/publishing/server/media/inspect', () => ({ inspectMediaSnapshot: mocks.inspectMediaSnapshot }));
 vi.mock('node:dns/promises', () => ({ lookup: mocks.lookup }));
 
-import { MEDIA_INSPECTION_CONFIG } from '../src/server/media/inspection-config';
-import { resolveRemoteMediaSnapshot, RemoteMediaSnapshotError } from '../src/server/media/resolve-remote';
+import { MEDIA_INSPECTION_CONFIG } from '@/modules/publishing/server/media/inspection-config';
+import { resolveRemoteMediaSnapshot, RemoteMediaSnapshotError } from '@/modules/publishing/server/media/resolve-remote';
 
 const entries = Object.fromEntries(MEDIA_INSPECTION_CONFIG.map(entry => [entry.key, entry.defaultValue]));
 const sourceBytes = Buffer.from('fetched source bytes');

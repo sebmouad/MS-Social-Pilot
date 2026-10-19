@@ -1,9 +1,9 @@
 import { lookup } from 'node:dns/promises';
 import { runtimeConfigBatch } from '@/server/config/store';
-import { MEDIA_INSPECTION_CONFIG } from '@/server/media/inspection-config';
-import { inspectMediaSnapshot, type MediaSnapshot } from '@/server/media/inspect';
-import { guardedFetch, type FetchDeps, type FetchPolicy } from '@/server/media/network/net-guard';
-import { pinnedFetcher } from '@/server/media/network/pinned-fetch';
+import { MEDIA_INSPECTION_CONFIG } from '@/modules/publishing/server/media/inspection-config';
+import { inspectMediaSnapshot, type MediaSnapshot } from '@/modules/publishing/server/media/inspect';
+import { guardedFetch, type FetchDeps, type FetchPolicy } from '@/modules/publishing/server/media/network/net-guard';
+import { pinnedFetcher } from '@/modules/publishing/server/media/network/pinned-fetch';
 
 type RemoteMediaKind = 'image' | 'video';
 export type RemoteMediaSnapshot = Readonly<MediaSnapshot>;

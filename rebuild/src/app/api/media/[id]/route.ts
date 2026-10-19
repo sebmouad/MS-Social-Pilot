@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
-import { deleteUnusedWorkspaceImage, readWorkspaceImage } from '@/server/media/storage';
+import { deleteUnusedWorkspaceImage, readWorkspaceImage } from '@/modules/publishing/server/media/storage';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';

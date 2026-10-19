@@ -10,7 +10,7 @@ vi.mock('../src/server/data', () => ({ prisma: {
   adInsight: { findMany: db.insights },
 } }));
 
-import { getAdsAccounts, getAdsDataset, parseAdsFilters } from '../src/server/ads/queries';
+import { getAdsAccounts, getAdsDataset, parseAdsFilters } from '@/modules/ads/server/queries';
 
 describe('Ads channel scope', () => {
   beforeEach(() => {

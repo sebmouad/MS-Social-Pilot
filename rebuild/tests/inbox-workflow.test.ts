@@ -16,10 +16,10 @@ vi.mock('../src/server/data-control/guard', () => ({
   assertWorkspaceNotPurging: mocks.purge,
   withWorkspaceOperation: async (_workspace: string, operation: () => Promise<unknown>) => { await mocks.onLocked(); return operation(); },
 }));
-vi.mock('../src/server/inbox/providers', () => ({ inboxTargetWhere: mocks.where, inboxProviders: mocks.providers }));
+vi.mock('@/modules/inbox/server/providers', () => ({ inboxTargetWhere: mocks.where, inboxProviders: mocks.providers }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async key => key === 'inbox.workflowTransactionTimeoutMs' ? 5000 : key === 'inbox.workflowTransactionMaxWaitMs' ? 2000 : 500) }));
 
-import { canManageInboxWorkflow, setInboxResolved } from '../src/server/inbox/actions';
+import { canManageInboxWorkflow, setInboxResolved } from '@/modules/inbox/server/actions';
 const actor = { userId: 'actor', workspaceId: 'workspace' };
 const targetId = 'channel';
 const tx = {

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/server/config/store', () => ({runtimeConfig:vi.fn()}));
 import { DEFAULT_REPORT_UI_POLICY, REPORT_UI_POLICY_SCHEMA } from '../src/modules/analytics/report-ui-config';
 import { runtimeConfig } from '../src/server/config/store';
-import { loadReportUiPolicy } from '../src/server/analytics/report-ui-policy';
+import { loadReportUiPolicy } from '@/modules/analytics/server/report-ui-policy';
 
 describe('Root-managed Reports presentation policy',()=>{
   it('accepts defaults and never offers unsupported sections as usable choices',()=>{

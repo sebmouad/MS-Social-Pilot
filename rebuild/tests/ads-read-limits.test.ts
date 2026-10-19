@@ -16,7 +16,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: 
 
 import { ADS_CONFIG } from '../src/modules/ads/config';
 import { loadAdsReadPolicy } from '../src/modules/ads/server/read-policy';
-import { getAdsDataset, parseAdsFilters } from '../src/server/ads/queries';
+import { getAdsDataset, parseAdsFilters } from '@/modules/ads/server/queries';
 
 describe('bounded stored Ads reads', () => {
   beforeEach(() => {

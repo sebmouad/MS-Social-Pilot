@@ -6,7 +6,7 @@ import { buildAdsReportCsv } from '../report-csv';
 import { authorizeAdsRead, type AdsReadActor } from './access';
 import { loadAdsReportPolicy } from './report-policy';
 import { loadAdsOutputPolicy } from './output-policy';
-import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/server/ads/queries';
+import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/modules/ads/server/queries';
 
 export type AdsExportConstraints = { maxItems?: number };
 const LEVELS: readonly AdsInsightLevel[] = ['account', 'campaign', 'adset', 'ad'];

@@ -25,7 +25,7 @@ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
 vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => integration.adapter }));
 
-import { deletePost } from '../src/server/publishing/lifecycle';
+import { deletePost } from '@/modules/publishing/server/lifecycle';
 import { finishPostDeletion, getPostDeletion, recordPostDeletionOutcome } from '../src/modules/publishing/server/deletion';
 
 type Fixture = {

@@ -37,7 +37,7 @@ vi.mock('@/modules/publishing/collaboration/server/core', () => ({
 }));
 vi.mock('@/modules/publishing/collaboration/server/versions', () => ({ loadVersionRetention: async () => 25, recordPostVersion: h.record }));
 vi.mock('@/modules/publishing/collaboration/server/executors', () => ({ allocateQueueTime: h.allocate }));
-vi.mock('../src/server/publishing/lifecycle', () => ({
+vi.mock('@/modules/publishing/server/lifecycle', () => ({
   limits: h.limits, resolvePublishMedia: vi.fn(async (_workspaceId: string, media: unknown[]) => media),
   validatePostAttachments: vi.fn((value: unknown) => ({ link: null, media: [] })),
   validatePostContent: vi.fn((value: string) => value.trim()), validFirstComment: vi.fn((value: string) => value.trim() || null),
@@ -45,7 +45,7 @@ vi.mock('../src/server/publishing/lifecycle', () => ({
 }));
 vi.mock('@/lib/calendar-dates', () => ({ isValidTimeZone: (value: string) => value === 'America/Casablanca' }));
 
-import { queuePost, queuePostConfirmation, queuePostRequest } from '../src/server/publishing/queue';
+import { queuePost, queuePostConfirmation, queuePostRequest } from '@/modules/publishing/server/queue';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const post = () => ({ id: 'p1', authorId: 'u1', status: 'draft', publishedAt: null, message: 'A valid post', firstComment: null, link: null, media: [], targets: [{ id: 'pt1', targetId: 't1', status: 'pending', remotePostId: null }] });

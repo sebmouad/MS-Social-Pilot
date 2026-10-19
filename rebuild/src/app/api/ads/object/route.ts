@@ -1,8 +1,8 @@
-import { adsErrorResponse } from '@/server/ads/errors';
+import { adsErrorResponse } from '@/modules/ads/server/errors';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
-import { readWorkspaceAdObject } from '@/server/ads/actions';
+import { readWorkspaceAdObject } from '@/modules/ads/server/actions';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';

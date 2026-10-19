@@ -1,5 +1,5 @@
 import { PageFrame } from '@/server/PageFrame';
-import { getAdsAccountWhere } from '@/server/ads/queries';
+import { getAdsAccountWhere } from '@/modules/ads/server/queries';
 import { requireViewer } from '@/server/context';
 import { getTargets, prisma } from '@/server/data';
 import { canUseFeature, entitledPlatformIds } from '@/server/entitlements';

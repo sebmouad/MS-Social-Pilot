@@ -1,6 +1,6 @@
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
-import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/server/ads/queries';
+import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/modules/ads/server/queries';
 import { parseAdsPerformanceFilters } from '../performance-filters';
 import { adsIsoDay } from '../report-filters';
 import { authorizeAdsRead, type AdsReadActor } from '../server/access';

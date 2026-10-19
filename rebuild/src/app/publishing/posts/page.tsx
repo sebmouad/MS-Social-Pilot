@@ -2,7 +2,7 @@ import { DataTable, StatusChip, type TableColumn } from "@/components";
 import { PostPreview, type PostPreviewPost } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
 import { readPublishingPostPage } from "@/modules/publishing/server/read";
-import { publishingDestinationChoices } from '@/server/publishing/destinations';
+import { publishingDestinationChoices } from '@/modules/publishing/server/destinations';
 import { PageHeading, PostMessage, PostTargets, formatDate } from "../publishing-ui";
 import styles from "../publishing.module.css";
 import previewStyles from '@/components/PostPreview.module.css';

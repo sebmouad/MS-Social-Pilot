@@ -1,6 +1,6 @@
 import { OperationError } from '@/lib/operation-error';
 import { isResourceRestricted } from '@/modules/settings/mcp-access/tool-policy';
-import { ensureReportWorkflows } from '@/server/analytics/report-workflows';
+import { ensureReportWorkflows } from '@/modules/analytics/server/report-workflows';
 import { analyticsActorFor, pageIdsFor, requiredString, type McpToolGroup } from '@/server/mcp/kit';
 import type { McpViewer } from '@/server/mcp/types';
 import { readAnalyticsSnapshot } from './server/read';

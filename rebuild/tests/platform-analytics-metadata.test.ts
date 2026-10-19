@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { facebookAdMetricUnit, facebookMetricLabel, facebookPageMetricKind } from '../src/platforms/facebook/analytics';
 import { instagramMetricKind, instagramMetricLabel } from '../src/platforms/instagram/analytics';
-import { genericMetricLabel } from '../src/server/analytics/catalog';
+import { genericMetricLabel } from '@/modules/analytics/server/catalog';
 import { normalizeFacebookAnalytics } from '../src/platforms/facebook/analytics';
-import { buildAnalytics } from '../src/server/analytics/aggregate';
+import { buildAnalytics } from '@/modules/analytics/server/aggregate';
 
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 

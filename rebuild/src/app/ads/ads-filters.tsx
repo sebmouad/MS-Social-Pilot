@@ -1,4 +1,4 @@
-import type { AdsFilters } from "@/server/ads/queries";
+import type { AdsFilters } from "@/modules/ads/server/queries";
 import { AdsFilterForm } from './AdsFilterForm';
 import { AdsFilterError, type AdsSearchParams } from '@/modules/ads/report-filters';
 import { PageFrame } from '@/server/PageFrame';

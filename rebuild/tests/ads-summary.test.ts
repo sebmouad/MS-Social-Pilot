@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseAdsFilters } from '../src/server/ads/queries';
-import { summarizeInsights, type InsightRow } from '../src/server/ads/summary';
+import { parseAdsFilters } from '@/modules/ads/server/queries';
+import { summarizeInsights, type InsightRow } from '@/modules/ads/server/summary';
 
 const base: InsightRow = {
   id: 'row', adAccountId: 'account-1', level: 'campaign', objectId: 'campaign-1', objectName: 'Spring',

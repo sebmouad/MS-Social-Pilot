@@ -2,7 +2,7 @@
 
 Status: internal foundation and private Root diagnostic. This batch does not enable native customer formats or replace the current publishing host. Production remains legacy.
 
-Shared `server/media/` owns byte snapshots and metadata inspection; no Facebook rules live here. `resolveRemoteMediaSnapshot` uses a bounded public-source fetch, probes the exact fetched bytes and returns frozen metadata with defensive byte copies. Callers must already authorize the workspace, resource and media source. This helper provides no public endpoint and grants no access to stored files.
+Shared `modules/publishing/server/media/` owns byte snapshots and metadata inspection; no Facebook rules live here. `resolveRemoteMediaSnapshot` uses a bounded public-source fetch, probes the exact fetched bytes and returns frozen metadata with defensive byte copies. Callers must already authorize the workspace, resource and media source. This helper provides no public endpoint and grants no access to stored files.
 
 The network guard validates URL shape, every DNS answer and every redirect, pins the connection address and verifies the connected peer. Private/special-use IP addresses remain refused even with an allowlist or HTTP enabled. DNS, fetch and body reads share a deadline; caller cancellation is linked, late responses are canceled, and pre-aborted operations retain rejection handlers. Cross-origin redirects preserve only declared safe request headers. Compressed responses are refused; byte limits apply while streaming. Empty allowlist explicitly permits public hosts. This is a public-source resolver, not a credential-bearing private-storage reader.
 

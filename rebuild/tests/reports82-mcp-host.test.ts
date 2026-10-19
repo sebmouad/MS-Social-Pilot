@@ -1,8 +1,8 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 const reports=vi.hoisted(()=>({execute:vi.fn(),ensure:vi.fn(),generate:true,scopeSafe:['list_report_schedules','manage_report_schedule','list_report_runs','generate_report'],names:['list_report_templates','manage_report_template','list_report_schedules','manage_report_schedule','list_report_runs','generate_report']}));
 vi.mock('@/modules/analytics/reports/mcp',()=>({analyticsReportTools:new Set(reports.names),analyticsReportWriteTools:new Set(['manage_report_template','manage_report_schedule','generate_report']),analyticsReportToolDefinitions:reports.names.map(name=>({name,description:name,inputSchema:{type:'object',properties:{}}})),analyticsReportAvailableToolDefinitions:async()=>reports.names.filter(name=>reports.generate||!['list_report_runs','generate_report'].includes(name)).map(name=>({name})),executeAnalyticsReportTool:reports.execute}));
-vi.mock('@/server/analytics/report-workflows',()=>({ensureReportWorkflows:reports.ensure}));
-vi.mock('@/server/publishing/collaboration',()=>({ensurePublishingCollaboration:vi.fn()}));
+vi.mock('@/modules/analytics/server/report-workflows',()=>({ensureReportWorkflows:reports.ensure}));
+vi.mock('@/modules/publishing/server/collaboration',()=>({ensurePublishingCollaboration:vi.fn()}));
 vi.mock('@/server/data',()=>({prisma:{$queryRaw:vi.fn().mockResolvedValue([])}}));
 vi.mock('@/server/config/store',()=>({runtimeConfig:async()=>100,readConfig:vi.fn(),saveConfig:vi.fn()}));
 vi.mock('@/server/data-control/guard',()=>({assertWorkspaceNotPurging:vi.fn(),withWorkspaceOperation:()=>{throw new Error('Reports must own their workspace transaction');}}));

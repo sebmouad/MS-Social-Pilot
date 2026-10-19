@@ -13,7 +13,7 @@ vi.mock('../src/server/context', () => ({ requireViewer: deps.requireViewer }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: deps.canAccessFeature }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'publishing.maxFirstCommentDelayMinutes' ? 10080 : undefined }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: deps.withWorkspaceOperation }));
-vi.mock('../src/server/publishing/lifecycle', () => ({
+vi.mock('@/modules/publishing/server/lifecycle', () => ({
   createPost: deps.createPost,
   cancelScheduledPost: vi.fn(), deletePost: vi.fn(), importPostsCsv: vi.fn(), publishPost: vi.fn(),
   reviewPost: vi.fn(), schedulePost: vi.fn(), submitPostForApproval: vi.fn(), syncPostStatus: vi.fn(), updatePost: vi.fn(),

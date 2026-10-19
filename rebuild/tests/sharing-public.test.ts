@@ -298,7 +298,7 @@ describe('public share links', () => {
   });
 
   it('keeps the review note limit in step with the Publishing lifecycle', () => {
-    const source = readFileSync(new URL('../src/server/publishing/lifecycle.ts', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('../src/modules/publishing/server/lifecycle.ts', import.meta.url), 'utf8');
     expect(Number(/reviewNote\.length > (\d+)/.exec(source)?.[1])).toBe(REVIEW_NOTE_MAX);
     expect(reviewNote('approved').length).toBeLessThanOrEqual(REVIEW_NOTE_MAX); expect(reviewNote('rejected').length).toBeLessThanOrEqual(REVIEW_NOTE_MAX);
   });

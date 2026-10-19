@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { commentNeedsReply, conversationNeedsReply, formatInboxTime, isFromChannel } from '../src/server/inbox/threads';
+import { commentNeedsReply, conversationNeedsReply, formatInboxTime, isFromChannel } from '@/modules/inbox/server/threads';
 import { replyRule } from '../src/platforms/facebook/reply-policy';
 import { messengerReplyWindow } from '../src/platforms/facebook/reply-window';
 

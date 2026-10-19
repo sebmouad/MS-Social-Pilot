@@ -1,4 +1,4 @@
-import type { ReviewParticipant } from '@/server/publishing/lifecycle';
+import type { ReviewParticipant } from '@/modules/publishing/server/lifecycle';
 import type { SharingActor } from '../contracts';
 
 /**
@@ -8,7 +8,7 @@ import type { SharingActor } from '../contracts';
  * decide whether a client's answer takes effect. The participant joins the lifecycle's own
  * transaction, so the status change and the stored client answer commit or fail together.
  */
-/** Protocol constant of `reviewPost` (server/publishing/lifecycle.ts rejects longer notes); kept in step with it by a test. */
+/** Protocol constant of `reviewPost` (modules/publishing/server/lifecycle.ts rejects longer notes); kept in step with it by a test. */
 export const REVIEW_NOTE_MAX = 500;
 export type ReviewPort = {
   review(actor: SharingActor, postId: string, decision: 'approve' | 'reject', note?: string, participant?: ReviewParticipant): Promise<unknown>;
@@ -16,7 +16,7 @@ export type ReviewPort = {
 
 const lifecyclePort: ReviewPort = {
   async review(actor, postId, decision, note, participant) {
-    const { reviewPost } = await import('@/server/publishing/lifecycle');
+    const { reviewPost } = await import('@/modules/publishing/server/lifecycle');
     return reviewPost(actor, postId, decision, note, participant);
   },
 };

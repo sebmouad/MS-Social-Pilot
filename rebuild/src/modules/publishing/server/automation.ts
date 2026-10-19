@@ -2,7 +2,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay';
 import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
 import { randomUUID } from 'node:crypto';
-import type { Prisma } from '../../../generated/client';
+import type { Prisma } from '../../../../generated/client';
 import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
 import { isValidTimeZone } from '@/lib/calendar-dates';

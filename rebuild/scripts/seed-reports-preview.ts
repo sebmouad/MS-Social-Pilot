@@ -1,6 +1,6 @@
 /** Insert-only examples in the existing synthetic workspace. No provider or mail call. */
 import { PrismaClient } from '../generated/client';
-import { ensureReportWorkflows, reportDefaultPeriod } from '../src/server/analytics/report-workflows';
+import { ensureReportWorkflows, reportDefaultPeriod } from '@/modules/analytics/server/report-workflows';
 import { runReportNow } from '../src/modules/analytics/reports/generation/runs';
 
 async function main() {

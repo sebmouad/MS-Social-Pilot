@@ -1,6 +1,6 @@
 import { OperationError } from '@/lib/operation-error';
-import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/server/ads/queries';
-import { readWorkspaceAdObject } from '@/server/ads/actions';
+import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/modules/ads/server/queries';
+import { readWorkspaceAdObject } from '@/modules/ads/server/actions';
 import { loadAdsAnalysisPolicy } from '../analysis/server';
 import { OBJECT_SORT_KEYS, assessFreshness, sortObjects, totalsFromRows, type AdsObjectFigures, type AdsObjectSortKey } from '../analysis/metrics';
 import { parseAdsPerformanceFilters } from '../performance-filters';

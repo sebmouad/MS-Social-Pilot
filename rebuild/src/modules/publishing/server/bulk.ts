@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
-import { deletePost, publishPost, reschedulePost } from '@/server/publishing/lifecycle';
+import { deletePost, publishPost, reschedulePost } from '@/modules/publishing/server/lifecycle';
 import { authorizePublishing } from './access';
 import { duplicatePost } from './duplicate';
 import { BULK_SCHEMA, bulkConfirmation, summarizeBulk, type BulkItemResult, type BulkResult } from '../bulk';

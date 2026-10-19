@@ -3,7 +3,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { canAccessFeature } from '@/server/permissions';
 import { canUseFeature } from '@/server/entitlements';
 import { readTemplatePage } from '@/modules/publishing/server/templates';
-import { publishingDestinationChoices } from '@/server/publishing/destinations';
+import { publishingDestinationChoices } from '@/modules/publishing/server/destinations';
 import { isDateKey } from '@/lib/calendar-dates';
 import { formatPostPreviewTime } from '@/components/PostPreview';
 import { PageHeading } from '../publishing-ui';

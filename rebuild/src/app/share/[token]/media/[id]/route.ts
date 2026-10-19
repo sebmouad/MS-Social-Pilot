@@ -1,5 +1,5 @@
 import { clientIp } from '@/server/client-ip';
-import { readWorkspaceImage } from '@/server/media/storage';
+import { readWorkspaceImage } from '@/modules/publishing/server/media/storage';
 import { linkShowsImage, resolvePublicLink } from '@/modules/sharing/server/public';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

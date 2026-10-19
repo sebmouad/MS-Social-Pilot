@@ -1,6 +1,6 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
-import type { ReviewParticipant } from '@/server/publishing/lifecycle';
+import type { ReviewParticipant } from '@/modules/publishing/server/lifecycle';
 import { audit, authorizeSharing } from './access';
 import { KIND_PUBLISHING_FEATURES, SHARING_MANAGER_ROLES } from '../semantics';
 import { resourceAllowed } from './rate';

@@ -5,7 +5,7 @@ vi.mock('@/server/context', () => ({ requireViewer: async () => ({ permissions: 
 vi.mock('@/server/permissions', () => ({ canAccessFeature: () => true }));
 vi.mock('@/server/entitlements', () => ({ canUseFeature: () => false }));
 vi.mock('@/modules/publishing/server/templates', () => ({ readTemplatePage: vi.fn() }));
-vi.mock('@/server/publishing/destinations', () => ({ publishingDestinationChoices: async () => [] }));
+vi.mock('@/modules/publishing/server/destinations', () => ({ publishingDestinationChoices: async () => [] }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => ({
   'publishing.allowedImageMimeTypes': ['image/png'], 'publishing.maxImageUploadBytes': 5000,
   'publishing.maxImageAltCharacters': 120, 'publishing.maxMessageCharacters': 500,

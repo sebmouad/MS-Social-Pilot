@@ -5,7 +5,7 @@ vi.mock('../src/modules/publishing/server/read-scope', () => ({ selectedPublishi
 vi.mock('../src/server/entitlements', () => ({ hasPlatformCapability: deps.enabled, canUseFeature: deps.product }));
 vi.mock('../src/server/platforms/registry', () => ({ platformFor: deps.adapter }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
-import { publishingDestinationChoices } from '../src/server/publishing/destinations';
+import { publishingDestinationChoices } from '@/modules/publishing/server/destinations';
 import type { requireViewer } from '../src/server/context';
 
 const now = new Date('2026-10-16T09:00:00Z');

@@ -1,4 +1,4 @@
-import type { AdsFilters } from '@/server/ads/queries';
+import type { AdsFilters } from '@/modules/ads/server/queries';
 import { CsvExportButton } from '@/components/CsvExportButton';
 
 const DAY = 86_400_000;

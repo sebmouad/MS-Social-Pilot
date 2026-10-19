@@ -39,7 +39,7 @@ const adsQueries = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn() }));
 const adsReports = vi.hoisted(() => ({ rows: vi.fn(), export: vi.fn() }));
 vi.mock('../src/modules/ads/server/report-read', () => ({ readAdsDailyRows: adsReports.rows }));
 vi.mock('../src/modules/ads/server/export', () => ({ exportAdsReport: adsReports.export }));
-vi.mock('../src/server/ads/queries', () => ({ getAdsAccounts: adsQueries.accounts, getAdsDataset: adsQueries.dataset, getAdsAccountWhere: async (workspaceId: string, allowedTargetIds?: string[]) => ({ workspaceId, enabled: true, socialAccount: { is: { workspaceId, invalidatedAt: null, provider: { in: ['facebook'] } } }, ...(allowedTargetIds === undefined ? {} : { socialAccountId: { in: ['social-a'] } }) }) }));
+vi.mock('@/modules/ads/server/queries', () => ({ getAdsAccounts: adsQueries.accounts, getAdsDataset: adsQueries.dataset, getAdsAccountWhere: async (workspaceId: string, allowedTargetIds?: string[]) => ({ workspaceId, enabled: true, socialAccount: { is: { workspaceId, invalidatedAt: null, provider: { in: ['facebook'] } } }, ...(allowedTargetIds === undefined ? {} : { socialAccountId: { in: ['social-a'] } }) }) }));
 const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remove: vi.fn() }));
 vi.mock('../src/server/data-control', () => ({ previewWorkspaceDataDeletion: dataControls.preview, exportWorkspaceData: dataControls.export, deleteWorkspaceData: dataControls.remove }));
 const inboxReads = vi.hoisted(() => ({ list: vi.fn(), thread: vi.fn() }));
@@ -49,11 +49,11 @@ vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingPostList
 const postExport = vi.hoisted(() => vi.fn());
 vi.mock('../src/modules/publishing/server/export', () => ({ exportPublishingPosts: postExport }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
-vi.mock('../src/server/inbox/actions', () => ({ replyToInbox: inboxMutations.reply, setInboxResolved: inboxMutations.resolve, moderateInboxComment: inboxMutations.moderate }));
+vi.mock('@/modules/inbox/server/actions', () => ({ replyToInbox: inboxMutations.reply, setInboxResolved: inboxMutations.resolve, moderateInboxComment: inboxMutations.moderate }));
 const inboxDeletions = vi.hoisted(() => ({ get: vi.fn(), remove: vi.fn(), finish: vi.fn() }));
 vi.mock('../src/modules/inbox/server/deletion', () => ({ getInboxDeletion: inboxDeletions.get, deleteInboxCommentDurably: inboxDeletions.remove, finishInboxDeletion: inboxDeletions.finish }));
 const adsMutations = vi.hoisted(() => ({ create: vi.fn(), createAdSet: vi.fn(), update: vi.fn(), read: vi.fn() }));
-vi.mock('../src/server/ads/actions', () => ({
+vi.mock('@/modules/ads/server/actions', () => ({
   createWorkspaceAdCampaign: adsMutations.create,
   createWorkspaceAdSet: adsMutations.createAdSet,
   updateWorkspaceAd: adsMutations.update,
@@ -62,9 +62,9 @@ vi.mock('../src/server/ads/actions', () => ({
   campaignCreationConfirmation: (_workspaceId: string, adAccountId: string, name: string, objective: string) => `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT ${adAccountId} WITH OBJECTIVE ${objective}`,
 }));
 const destinationReadiness = vi.hoisted(() => vi.fn());
-vi.mock('../src/server/publishing/destinations', () => ({ publishingTargetChoices: destinationReadiness }));
+vi.mock('@/modules/publishing/server/destinations', () => ({ publishingTargetChoices: destinationReadiness }));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
-vi.mock('../src/server/publishing/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
+vi.mock('@/modules/publishing/server/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
 const postDuplicate = vi.hoisted(() => vi.fn());
 vi.mock('../src/modules/publishing/server/duplicate', () => ({ duplicatePost: postDuplicate }));
 const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), record: vi.fn() }));
@@ -74,7 +74,7 @@ vi.mock('../src/modules/publishing/server/deletion', () => ({ getPostDeletion: p
 const publicationRecovery = vi.hoisted(() => ({ get: vi.fn(), record: vi.fn(), finish: vi.fn(), adopt: vi.fn() }));
 vi.mock('../src/modules/publishing/server/publication', () => ({ getPublicationStatus: publicationRecovery.get, recordPublicationOutcome: publicationRecovery.record, finishPublicationProjection: publicationRecovery.finish, adoptLegacyPublication: publicationRecovery.adopt }));
 const media = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), remove: vi.fn(), upload: vi.fn() }));
-vi.mock('../src/server/media/storage', () => ({ listWorkspaceImages: media.list, getWorkspaceImageMetadata: media.get, deleteUnusedWorkspaceImage: media.remove, uploadWorkspaceImage: media.upload }));
+vi.mock('@/modules/publishing/server/media/storage', () => ({ listWorkspaceImages: media.list, getWorkspaceImageMetadata: media.get, deleteUnusedWorkspaceImage: media.remove, uploadWorkspaceImage: media.upload }));
 
 import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
 import { resolvePermissions } from '../src/server/permissions';

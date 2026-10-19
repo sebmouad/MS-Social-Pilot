@@ -13,7 +13,7 @@ vi.mock('../src/server/entitlements', () => ({
   canUseFeature: () => true,
   hasPlatformCapability: (_entitlements: unknown, provider: string) => provider === 'facebook',
 }));
-vi.mock('../src/server/inbox/providers', () => ({
+vi.mock('@/modules/inbox/server/providers', () => ({
   inboxProviders: async () => ['facebook'],
   inboxTargetWhere: async (workspaceId: string, allowedTargetIds?: readonly string[], allowedProviders?: readonly string[]) => ({
     workspaceId, enabled: true, type: 'page',

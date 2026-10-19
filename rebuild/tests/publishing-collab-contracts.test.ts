@@ -26,7 +26,7 @@ import { GET as recycleGet } from '../src/app/api/publishing/recycle/route';
 import { GET as versionsGet } from '../src/app/api/publishing/versions/route';
 import { executeCollaborationTool, collaborationToolDefinitions, collaborationWriteTools, availableCollaborationTools } from '../src/modules/publishing/collaboration/mcp';
 import { registerCollaborationPorts } from '../src/modules/publishing/collaboration/ports';
-import { ensurePublishingCollaboration } from '../src/server/publishing/collaboration';
+import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
 import { COLLAB_CONFIG, COLLAB_DEFAULTS } from '../src/modules/publishing/collaboration/config';
 import { effectiveMix, mentionedIn, nextRecycleAt, FIELD_CREATE, MIX_SAVE, slotKey } from '../src/modules/publishing/collaboration/schemas';
 

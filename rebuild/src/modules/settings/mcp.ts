@@ -3,7 +3,7 @@ import { prisma } from '@/server/data';
 import { canUseFeature, entitledPlatformIds, requireFeature } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
-import { publishingTargetChoices } from '@/server/publishing/destinations';
+import { publishingTargetChoices } from '@/modules/publishing/server/destinations';
 import { setConnectionSelections } from '@/server/connection-mutations';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '@/server/data-control';
 import { auditedReceipt, canManageData, pageIdsFor, requireConfirmation, type McpToolGroup } from '@/server/mcp/kit';

@@ -111,7 +111,7 @@ async function child(databaseUrl: string) {
     await addSchedule(uncertainSchedule, [uncertainTo]);
     await addSchedule(revokedSchedule, [revokedFirst, revokedSecond]);
 
-    const { ensureReportWorkflows, runScheduledReports } = await import('../src/server/analytics/report-workflows');
+    const { ensureReportWorkflows, runScheduledReports } = await import('@/modules/analytics/server/report-workflows');
     await ensureReportWorkflows();
     // Isolate scenarios by making exactly one schedule due at a time.
     const park = async (id: string) => db.$executeRaw`UPDATE report_schedules SET "nextRunAt"=${new Date(Date.now() + 86400_000)} WHERE id=${id}`;

@@ -21,7 +21,7 @@ export type VersionSnapshot = {
   timezone: string;
 };
 
-/** Implemented by server/publishing/lifecycle.ts. Restoring is an ordinary save: validation, destination
+/** Implemented by modules/publishing/server/lifecycle.ts. Restoring is an ordinary save: validation, destination
  * availability, approval reset, media checks, locks and a fresh version record all apply there. */
 export interface VersionRestorePort {
   restorePostVersion(input: { actor: PublishingActor; postId: string; snapshot: VersionSnapshot }): Promise<{ postId: string; status: string; approvalReset: boolean }>;

@@ -28,7 +28,7 @@ vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessF
 vi.mock('../src/server/platforms/registry', () => ({ platformInbox: mocks.platformInbox, inboxPlatformIds: mocks.inboxPlatformIds }));
 vi.mock('../src/modules/inbox/server/access', () => ({ authorizeInbox: mocks.authorizeInbox }));
 
-import { replyToInbox, syncInbox } from '../src/server/inbox/actions';
+import { replyToInbox, syncInbox } from '@/modules/inbox/server/actions';
 import { replyToFacebookInbox } from '../src/platforms/facebook/inbox';
 
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };

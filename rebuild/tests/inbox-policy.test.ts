@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ host: vi.fn(), providers: vi.fn(), policy: vi.fn() }));
 vi.mock('../src/server/platforms/registry', () => ({ platformInbox: state.host, inboxPlatformIds: state.providers, platformFor: vi.fn() }));
-import { inboxReplyPolicy } from '../src/server/inbox/policy';
-import { inboxTargetWhere } from '../src/server/inbox/providers';
+import { inboxReplyPolicy } from '@/modules/inbox/server/policy';
+import { inboxTargetWhere } from '@/modules/inbox/server/providers';
 
 const request = { kind: 'message' as const, channelRemoteId: 'example-channel', lastInbound: null, timeZone: 'UTC' };
 beforeEach(() => { vi.resetAllMocks(); state.host.mockResolvedValue({ replyPolicy: state.policy }); state.providers.mockResolvedValue(['facebook']); });

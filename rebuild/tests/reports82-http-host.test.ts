@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const stubs = vi.hoisted(() => ({ ensure: vi.fn(), actor: vi.fn(), run: vi.fn(), schedules: vi.fn(), templates: vi.fn(), history: vi.fn(), limit: 256 }));
-vi.mock('@/server/analytics/report-workflows', () => ({ ensureReportWorkflows: stubs.ensure }));
+vi.mock('@/modules/analytics/server/report-workflows', () => ({ ensureReportWorkflows: stubs.ensure }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => { if (key !== 'analytics.reports.requestMaxBytes') throw Error('Unexpected policy'); return stubs.limit; } }));
 vi.mock('@/modules/analytics/http', async original => ({ ...await original<typeof import('../src/modules/analytics/http')>(), viewerActor: stubs.actor }));
 vi.mock('@/modules/analytics/reports/generation/runs', () => ({ runReportNow: stubs.run, listReportRuns: stubs.history }));

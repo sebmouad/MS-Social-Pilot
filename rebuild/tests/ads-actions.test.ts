@@ -40,7 +40,7 @@ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitleme
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature }));
 
-import { canManageWorkspaceAds, canReadWorkspaceAds, createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '../src/server/ads/actions';
+import { canManageWorkspaceAds, canReadWorkspaceAds, createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '@/modules/ads/server/actions';
 import { platformAds } from '../src/server/platforms/registry';
 import { OperationError } from '../src/lib/operation-error';
 

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ viewer: vi.fn(), update: vi.fn(), campaign: vi.fn(), adSet: vi.fn(), read: vi.fn() }));
 vi.mock('../src/server/context', () => ({ requireViewer: mocks.viewer }));
-vi.mock('../src/server/ads/actions', () => ({ updateWorkspaceAd: mocks.update, createWorkspaceAdCampaign: mocks.campaign, createWorkspaceAdSet: mocks.adSet, readWorkspaceAdObject: mocks.read }));
+vi.mock('@/modules/ads/server/actions', () => ({ updateWorkspaceAd: mocks.update, createWorkspaceAdCampaign: mocks.campaign, createWorkspaceAdSet: mocks.adSet, readWorkspaceAdObject: mocks.read }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
 import { POST as update } from '../src/app/api/ads/actions/route';
 import { POST as campaign } from '../src/app/api/ads/campaigns/route';

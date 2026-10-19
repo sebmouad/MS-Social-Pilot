@@ -1,4 +1,4 @@
-import type { MetricView } from '@/server/analytics/aggregate';
+import type { MetricView } from '@/modules/analytics/server/aggregate';
 
 /** UTC milliseconds per calendar day; analytics boundaries are UTC dates, unlike publishing workspace-local times. */
 const UTC_DAY_MS = 24 * 60 * 60 * 1000;

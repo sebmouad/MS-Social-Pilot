@@ -6,7 +6,7 @@ not establish complete Publishing, Facebook, legacy parity or release readiness.
 ## Ownership and execution
 
 Publishing declares `publishingRecycle` and `publishingMix` jobs in its manifest.
-The existing leased worker dispatches them through server/publishing/automation.ts.
+The existing leased worker dispatches them through modules/publishing/server/automation.ts.
 Root owns their cron schedules and priority through the normal module controls.
 Customer pages, HTTP and workspace MCP independently initialize the installed
 collaboration ports; visiting a page first is never required.

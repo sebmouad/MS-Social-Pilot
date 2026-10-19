@@ -6,8 +6,8 @@ import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { loadPermissions } from '@/server/permissions/loader';
-import { inboxCapabilities } from '@/server/inbox/providers';
-import { moderateInboxComment, replyToInbox } from '@/server/inbox/actions';
+import { inboxCapabilities } from '@/modules/inbox/server/providers';
+import { moderateInboxComment, replyToInbox } from '@/modules/inbox/server/actions';
 import { authorizeInbox } from './access';
 import type { InboxReadActor } from './types';
 import {

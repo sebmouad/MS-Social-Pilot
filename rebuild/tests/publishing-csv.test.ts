@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePublishingCsv } from '../src/server/publishing/lifecycle';
+import { parsePublishingCsv } from '@/modules/publishing/server/lifecycle';
 import { csvDestinationLabel, resolveCsvDestinationIds } from '../src/lib/publishing/csv-destinations';
 
 describe('publishing CSV parser', () => {

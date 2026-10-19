@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireViewer } from "@/server/context";
 import { canAccessFeature } from "@/server/permissions";
-import { reviewPost } from "@/server/publishing/lifecycle";
+import { reviewPost } from "@/modules/publishing/server/lifecycle";
 
 const PATH = "/publishing/approvals";
 

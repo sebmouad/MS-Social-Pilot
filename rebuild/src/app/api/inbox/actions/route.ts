@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
-import { deleteInboxComment, moderateInboxComment, replyToInbox, setInboxResolved, syncInbox } from '@/server/inbox/actions';
+import { deleteInboxComment, moderateInboxComment, replyToInbox, setInboxResolved, syncInbox } from '@/modules/inbox/server/actions';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { finishInboxDeletion } from '@/modules/inbox/server/deletion';
 import { OperationError, operationFailure } from '@/lib/operation-error';

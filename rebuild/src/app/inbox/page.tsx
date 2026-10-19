@@ -6,10 +6,10 @@ import type { InboxFilters, InboxListPage, InboxThreadPage, OpenThread } from '@
 import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { canManageInbox, canManageInboxWorkflow } from '@/server/inbox/actions';
-import { inboxReplyPolicy } from '@/server/inbox/policy';
-import { inboxCapabilities } from '@/server/inbox/providers';
-import { formatInboxTime } from '@/server/inbox/threads';
+import { canManageInbox, canManageInboxWorkflow } from '@/modules/inbox/server/actions';
+import { inboxReplyPolicy } from '@/modules/inbox/server/policy';
+import { inboxCapabilities } from '@/modules/inbox/server/providers';
+import { formatInboxTime } from '@/modules/inbox/server/threads';
 import { InboxSyncBar, ThreadToolbar } from './InboxActions';
 import { ThreadTools } from './ThreadTools';
 import { InboxTag } from './InboxTags';

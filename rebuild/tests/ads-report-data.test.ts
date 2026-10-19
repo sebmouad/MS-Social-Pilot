@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeAdsDailyRow, sanitizeAdsReportJson } from '../src/modules/ads/report-data';
-import type { InsightRow } from '../src/server/ads/summary';
+import type { InsightRow } from '@/modules/ads/server/summary';
 
 const source: InsightRow = {
   id: 'daily-1', adAccountId: 'account-1', level: 'campaign', objectId: 'campaign-1', objectName: 'Spring',

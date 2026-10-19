@@ -10,7 +10,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { messengerReplyWindow } from './reply-window';
 import { withInboxChannelOperation, inboxCommentSuppressed, orderInboxCommentBatch } from '@/modules/inbox/server/comment-guard';
 
-import type { InboxReplyPolicyRequest } from '@/server/inbox/policy';
+import type { InboxReplyPolicyRequest } from '@/modules/inbox/server/policy';
 import { facebookReplyRule } from './reply-policy';
 
 export async function facebookReplyPolicy(input: InboxReplyPolicyRequest) {

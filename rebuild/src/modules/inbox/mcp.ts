@@ -1,5 +1,5 @@
 import { OperationError } from '@/lib/operation-error';
-import { moderateInboxComment, replyToInbox, setInboxResolved } from '@/server/inbox/actions';
+import { moderateInboxComment, replyToInbox, setInboxResolved } from '@/modules/inbox/server/actions';
 import { auditedReceipt, inboxActor, pageIdsFor, requireConfirmation, requiredString, type McpToolGroup } from '@/server/mcp/kit';
 import { deleteInboxCommentDurably, finishInboxDeletion, getInboxDeletion } from './server/deletion';
 import { readInboxList, readInboxThread } from './server/read';

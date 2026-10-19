@@ -4,7 +4,7 @@ import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
 import { loadEntitlements } from '@/server/entitlements';
 import type { PublishMedia } from '@/platforms/types';
-import { limits, validatePostContent, validFirstComment, validateTargets, resolvePublishMedia, validatePostAttachments } from '@/server/publishing/lifecycle';
+import { limits, validatePostContent, validFirstComment, validateTargets, resolvePublishMedia, validatePostAttachments } from '@/modules/publishing/server/lifecycle';
 import { withPublishingOperation, withPublishingTransaction } from './guard';
 import { selectedPublishingTargetIds, publishingPostVisibilityWhere } from './read-scope';
 import type { PublishingActor } from './types';

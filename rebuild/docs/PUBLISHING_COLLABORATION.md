@@ -10,7 +10,7 @@ integration notes remain in Git history; they must not be mistaken for current p
 
 `src/modules/publishing/collaboration/` owns schemas, limits, metadata, read/write
 services and automation candidate selection. Thin customer/API/MCP entry points
-use those services. `src/server/publishing/collaboration.ts` independently installs
+use those services. `src/modules/publishing/server/collaboration.ts` independently installs
 real lifecycle/worker ports in each server bundle. Missing ports remain hidden or
 refused; one route never relies on another route having initialized it first.
 
@@ -20,8 +20,8 @@ refused; one route never relies on another route having initialized it first.
 | Custom field definitions/values | server/custom-fields.ts | Typed bounds, tenant/cascade checks and phone CRUD proof |
 | Private notes | server/notes.ts | Author/manager mutation rules, bounded pagination; mention notification delivery remains hidden |
 | Retained history/content restore | server/versions.ts plus Publishing lifecycle | Transactional versions and confirmed restore; PUBLISHING_HISTORY.md |
-| Shared/channel queue timetables and placement | server/queue-slots.ts, server/executors.ts plus server/publishing/queue.ts | PUBLISHING_QUEUE.md |
-| Mix rules, workspace opt-in and repeating | server/content-mix.ts, recycle.ts, executors.ts plus server/publishing/automation.ts | PUBLISHING_AUTOMATION.md |
+| Shared/channel queue timetables and placement | server/queue-slots.ts, server/executors.ts plus modules/publishing/server/queue.ts | PUBLISHING_QUEUE.md |
+| Mix rules, workspace opt-in and repeating | server/content-mix.ts, recycle.ts, executors.ts plus modules/publishing/server/automation.ts | PUBLISHING_AUTOMATION.md |
 
 Customer routes use `/publishing/collaboration?view=assign|fields|queue|mix` and
 `/publishing/collaboration/post/[postId]`. Sidebar context owns route/scope pickers.

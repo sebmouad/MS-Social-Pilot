@@ -27,7 +27,7 @@ vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({
   publishingFormats: [{ id: 'post', label: 'post', media: { kinds: ['image'], maxImages: 4, maxVideos: 0, mixedKinds: false, linkWithMedia: true, imageAltText: true }, firstComment: false, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }],
   defaultPublishingFormatId: 'post', supportsTargetKind: () => true,
 }) }));
-import { publishPost } from '../src/server/publishing/lifecycle';
+import { publishPost } from '@/modules/publishing/server/lifecycle';
 
 describe('publish-time link preparation', () => {
   it('tags caption and link URLs with workspace UTM settings before provider dispatch, without changing stored content', async () => {

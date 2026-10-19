@@ -7,7 +7,7 @@ import { canonicalMediaRoot, validateWorkspaceId } from '@/server/data-control/s
 import { prisma } from '@/server/data';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { MediaStorageUnavailable, MediaValidationError } from './errors';
-import type { Prisma } from '../../../generated/client';
+import type { Prisma } from '../../../../../generated/client';
 
 export type MediaActor = { userId: string; workspaceId: string };
 export type WorkspaceImage = { id: string; mimeType: string; fileName: string };

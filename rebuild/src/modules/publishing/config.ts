@@ -5,7 +5,7 @@ import { LABEL_CONFIG } from './labels-config';
 import { COLLAB_CONFIG } from './collaboration/config';
 import { PUBLISHING_AUTOMATION_CONFIG } from './automation-config';
 import { QUEUE_CONFIG } from './queue-config';
-import { MEDIA_INSPECTION_CONFIG } from '@/server/media/inspection-config';
+import { MEDIA_INSPECTION_CONFIG } from '@/modules/publishing/server/media/inspection-config';
 import { FIRST_COMMENT_CONFIG } from './first-comment-config';
 
 /** Every Root setting this product module declares. The registry merges installed modules; edit only here. */

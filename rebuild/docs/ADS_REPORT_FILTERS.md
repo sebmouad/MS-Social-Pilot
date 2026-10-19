@@ -3,7 +3,7 @@
 ## Current behavior
 
 Ads owns pure filter interpretation in `src/modules/ads/report-filters.ts`.
-The database read boundary remains `server/ads/queries.ts`; its re-export keeps
+The database read boundary remains `modules/ads/server/queries.ts`; its re-export keeps
 existing internal consumers on the same parser. No provider rule was added.
 
 Both Ad accounts and Campaigns validate the selected account, date preset and

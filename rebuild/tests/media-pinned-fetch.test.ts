@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createPinnedFetcher, type PinnedTransport } from '../src/server/media/network/pinned-fetch';
+import { createPinnedFetcher, type PinnedTransport } from '@/modules/publishing/server/media/network/pinned-fetch';
 
 const request = (resolved: string[]) => ({
   url: 'https://example.com/file', headers: {}, signal: new AbortController().signal, resolved,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildReportOverview, reportOverviewCsv } from '../src/server/analytics/reports';
+import { buildReportOverview, reportOverviewCsv } from '@/modules/analytics/server/reports';
 
 describe('reports overview and CSV', () => {
   it('adds audience once for each selected channel and excludes unselected audience', () => {
@@ -34,7 +34,7 @@ describe('reports overview and CSV', () => {
 });
 
 it('exports complete metric detail and comparison provenance independently of visible pagination', async () => {
-  const { analyticsSnapshotCsv } = await import('../src/server/analytics/reports');
+  const { analyticsSnapshotCsv } = await import('@/modules/analytics/server/reports');
   const snapshot = {
     period: { start: '2026-10-01', end: '2026-10-02', comparison: { start: '2026-09-29', end: '2026-09-30', mode: 'previous' } },
     audience: { entries: [], total: 0, covered: 0, selected: 0 },

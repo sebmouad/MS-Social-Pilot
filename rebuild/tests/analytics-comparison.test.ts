@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AnalyticsComparisonError, analyticsDateRange, compareAnalytics } from '../src/modules/analytics/server/comparison';
-import type { MetricView } from '../src/server/analytics/aggregate';
+import type { MetricView } from '@/modules/analytics/server/aggregate';
 
 const metric = (overrides: Partial<MetricView> & { coveredResourceIds?: readonly string[] } = {}): MetricView & { coveredResourceIds?: readonly string[] } => ({
   key: 'views', label: 'Views', sourceLabel: 'Community', resourceKind: 'channel',

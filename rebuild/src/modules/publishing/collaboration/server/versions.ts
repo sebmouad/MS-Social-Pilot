@@ -36,7 +36,7 @@ export async function readPostVersions(actor: PublishingActor, input: unknown) {
 }
 
 /**
- * Helper for server/publishing/lifecycle.ts: record the post as it stands now inside the lifecycle transaction.
+ * Helper for modules/publishing/server/lifecycle.ts: record the post as it stands now inside the lifecycle transaction.
  * Skips the write when nothing changed since the latest version; prunes beyond the retention bound.
  */
 export async function recordPostVersion(tx: Tx, postId: string, authorId: string | null, retention: number): Promise<boolean> {

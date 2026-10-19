@@ -10,7 +10,7 @@ const db = vi.hoisted(() => ({ postFindFirst: vi.fn(), postCreate: vi.fn(), quer
 vi.mock('../src/modules/publishing/collaboration/server/versions', () => ({ loadVersionRetention: history.load, recordPostVersion: history.record }));
 vi.mock('../src/server/data', () => ({ prisma: { post: { findFirst: (...args: unknown[]) => db.postFindFirst(...args), create: (...args: unknown[]) => db.postCreate(...args) }, $queryRaw: (...args: unknown[]) => db.queryRaw(...args) } }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({ modules: { publishing: true } }) }));
-vi.mock('../src/server/publishing/lifecycle', () => ({
+vi.mock('@/modules/publishing/server/lifecycle', () => ({
   limits: (...args: unknown[]) => state.limits(...args), validatePostContent: (value: string, _max: number, attachments: { link?: string | null; media?: unknown[] }) => { const text = value.trim(); if (!text && !attachments.link && !attachments.media?.length) throw new Error('Add post text, a link, or media before saving.'); return text; }, validFirstComment: (value: string) => value.trim() || null,
   validatePostAttachments: (value: unknown) => value, resolvePublishMedia: async (_workspace: string, media: unknown) => media,
   validateTargets: (...args: unknown[]) => state.validateTargets(...args),

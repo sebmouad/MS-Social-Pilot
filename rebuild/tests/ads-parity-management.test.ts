@@ -26,7 +26,7 @@ import { executeAdsManagementTool } from '../src/modules/ads/management/mcp';
 import type { AdsNeutralOperation, AdsOpsHost } from '../src/modules/ads/management/types';
 import { OperationError } from '../src/lib/operation-error';
 import { AdsNoDispatchError, adsNoDispatchMetadata } from '../src/modules/ads/management/errors';
-import { withAdsErrorBoundary } from '../src/server/ads/errors';
+import { withAdsErrorBoundary } from '@/modules/ads/server/errors';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const pause: AdsNeutralOperation = { type: 'status.set', objectType: 'campaign', objectId: 'c1', status: 'paused' };

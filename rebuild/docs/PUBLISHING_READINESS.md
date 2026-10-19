@@ -37,7 +37,7 @@ unready destinations before its intent and preserves the local post. Existing
 uncertain operation recovery remains governed by its journal, not by a new
 credential check or automatic resend.
 
-`server/publishing/destinations.ts` projects readiness for composer/edit/import
+`modules/publishing/server/destinations.ts` projects readiness for composer/edit/import
 and already-authorized MCP destination IDs. It also checks Publishing feature
 availability, selected connection, platform entitlement, module capability and
 target kind. MCP `list_pages` and `msp://targets` retain their bounded selected

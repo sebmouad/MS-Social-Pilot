@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { checkUrlShape, guardedFetch, isNonPublicAddress, NetGuardError, type FetchDeps, type FetchPolicy } from '../src/server/media/network/net-guard';
+import { checkUrlShape, guardedFetch, isNonPublicAddress, NetGuardError, type FetchDeps, type FetchPolicy } from '@/modules/publishing/server/media/network/net-guard';
 
 const policy: FetchPolicy = { timeoutMs: 1000, maxBytes: 1000, maxRedirects: 2, allowHttp: false, hostAllowlist: [] };
 const body = (text: string, init: ResponseInit = {}) => new Response(text, { status: 200, ...init });

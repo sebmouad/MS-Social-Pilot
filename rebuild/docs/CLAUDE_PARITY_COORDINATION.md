@@ -29,7 +29,7 @@ records worker ownership only; it proves no capability.
 Lead: lib/config/registry.ts, server/mcp/server.ts, server/permissions/**,
 server/entitlements/**, module manifests, shared shell/navigation, sign-in/auth,
 existing canonical docs. Codex workers: password recovery, Analytics explorer,
-workspace policy, server/publishing/lifecycle.ts. Pending-integration batch:
+workspace policy, modules/publishing/server/lifecycle.ts. Pending-integration batch:
 modules/publishing/{templates*,template-mcp*,labels*,server/templates*,server/labels*},
 app/publishing/{templates,labels,compose}/**, app/api/publishing/{templates,labels}/**,
 app/inbox/**, modules/inbox/{productivity*,components/**,server/productivity*},

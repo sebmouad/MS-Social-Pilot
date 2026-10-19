@@ -1,4 +1,4 @@
-import type { Prisma } from '../../../generated/client';
+import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { enqueueNotification, loadNotificationPolicy } from '@/modules/settings/notifications/server';
 import type { MentionNotifierPort } from '@/modules/publishing/collaboration/ports';

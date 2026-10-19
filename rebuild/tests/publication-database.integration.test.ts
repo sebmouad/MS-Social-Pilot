@@ -40,7 +40,7 @@ vi.mock('../src/modules/publishing/server/read-scope', () => ({
   }),
 }));
 
-import { publishPost, syncPostStatus } from '../src/server/publishing/lifecycle';
+import { publishPost, syncPostStatus } from '@/modules/publishing/server/lifecycle';
 import { projectPublicationInOperation, publishDestinationInOperation, recordPublicationOutcome, recordPublicationOutcomeInTransaction } from '../src/modules/publishing/server/publication';
 import { deleteWorkspaceData } from '../src/server/data-control';
 

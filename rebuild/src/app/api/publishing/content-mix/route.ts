@@ -1,4 +1,4 @@
-import { ensurePublishingCollaboration } from '@/server/publishing/collaboration';
+import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
 import { handle, jsonBody } from '@/modules/publishing/collaboration/http';
 import { readContentMix, saveContentMix, setContentMixAutoFill } from '@/modules/publishing/collaboration/server/content-mix';
 export const dynamic = 'force-dynamic';

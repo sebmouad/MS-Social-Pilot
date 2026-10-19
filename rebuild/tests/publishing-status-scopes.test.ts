@@ -23,7 +23,7 @@ vi.mock('@/server/config/store', () => ({ runtimeConfig: vi.fn(async () => ['pag
 vi.mock('@/modules/publishing/server/access', () => ({ authorizePublishing: async (actor: unknown) => ({ actor, role: 'owner', entitlements: {} }) }));
 vi.mock('@/modules/publishing/server/read-scope', () => ({ selectedPublishingTargetIds: async () => ['target-1'], publishingPostVisibilityWhere: () => ({ workspaceId: 'workspace-1' }) }));
 
-import { syncPostStatus } from '@/server/publishing/lifecycle';
+import { syncPostStatus } from '@/modules/publishing/server/lifecycle';
 
 beforeEach(() => {
   vi.clearAllMocks();

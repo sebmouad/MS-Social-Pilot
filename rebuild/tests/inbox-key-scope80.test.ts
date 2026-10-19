@@ -26,7 +26,7 @@ vi.mock('../src/server/config/store', () => ({
   runtimeConfig: async (key: string) => ({ 'inbox.noteMaxCharacters': 1000, 'inbox.noteHistoryLimit': 50, 'inbox.savedReplyPageLimit': 50, 'inbox.savedReplyNameMaxCharacters': 100, 'inbox.savedReplyBodyMaxCharacters': 2000, 'inbox.productivityAssigneeLimit': 100, 'inbox.workflowTransactionTimeoutMs': 5000, 'inbox.workflowTransactionMaxWaitMs': 2000 })[key],
 }));
 
-import { moderateInboxComment, replyToInbox } from '../src/server/inbox/actions';
+import { moderateInboxComment, replyToInbox } from '@/modules/inbox/server/actions';
 import { listSavedReplies, performInboxProductivityAction, readInboxProductivity } from '../src/modules/inbox/server/productivity';
 import { confirmation } from '../src/modules/inbox/productivity';
 

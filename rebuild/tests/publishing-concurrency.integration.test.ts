@@ -53,7 +53,7 @@ vi.mock('../src/server/platforms/registry', () => ({
 }));
 
 import { disconnectSocialAccount } from '../src/server/connection-mutations';
-import { cancelScheduledPost, deletePost, publishPost, updatePost } from '../src/server/publishing/lifecycle';
+import { cancelScheduledPost, deletePost, publishPost, updatePost } from '@/modules/publishing/server/lifecycle';
 
 type Fixture = {
   prefix: string;

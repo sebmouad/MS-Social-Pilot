@@ -1,4 +1,4 @@
-import { ensureReportWorkflows } from '@/server/analytics/report-workflows';
+import { ensureReportWorkflows } from '@/modules/analytics/server/report-workflows';
 import { listReportRuns } from '@/modules/analytics/reports/generation/runs';
 import { failure, pageParam, reply, unauthorized, viewerActor } from '../_http';
 export const dynamic = 'force-dynamic';

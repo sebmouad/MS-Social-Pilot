@@ -5,9 +5,9 @@ const state = vi.hoisted(() => ({ viewer: vi.fn(), list: vi.fn(), thread: vi.fn(
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/modules/inbox/server/read', () => ({ readInboxList: state.list, readInboxThread: state.thread }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children, scopedAccess }: { sidebar: import('react').ReactNode; children: import('react').ReactNode; scopedAccess?: boolean }) => createElement('main', { 'data-scoped-access': scopedAccess }, createElement('aside', null, sidebar), children) }));
-vi.mock('../src/server/inbox/actions', () => ({ canManageInbox: state.manage, canManageInboxWorkflow: state.workflow }));
-vi.mock('../src/server/inbox/providers', () => ({ inboxCapabilities: async () => ({ reply: false, hide: false, remove: false }) }));
-vi.mock('../src/server/inbox/policy', () => ({ inboxReplyPolicy: async () => ({ allowed: false, headline: 'Read only' }) }));
+vi.mock('@/modules/inbox/server/actions', () => ({ canManageInbox: state.manage, canManageInboxWorkflow: state.workflow }));
+vi.mock('@/modules/inbox/server/providers', () => ({ inboxCapabilities: async () => ({ reply: false, hide: false, remove: false }) }));
+vi.mock('@/modules/inbox/server/policy', () => ({ inboxReplyPolicy: async () => ({ allowed: false, headline: 'Read only' }) }));
 vi.mock('../src/app/inbox/InboxActions', () => ({ InboxSyncBar: () => null, ReplyBox: () => null, ThreadToolbar: (props: { canResolve: boolean; canHide: boolean; canDelete: boolean }) => { state.toolbar(props); return createElement('div', { 'data-workflow': props.canResolve }); } }));
 import InboxPage from '../src/app/inbox/page';
 import { OperationError } from '../src/lib/operation-error';

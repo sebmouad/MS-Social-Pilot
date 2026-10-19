@@ -16,7 +16,7 @@ vi.mock('../src/server/permissions/loader', () => ({
   loadPermissions: async () => ({ pageScope: database.allChannels ? { all: true, ids: [] } : { all: false, ids: database.memberChannelIds } }),
 }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: () => true }));
-vi.mock('../src/server/inbox/providers', () => ({
+vi.mock('@/modules/inbox/server/providers', () => ({
   inboxProviders: async () => ['facebook'],
   inboxTargetWhere: async (workspaceId: string, allowedTargetIds?: readonly string[], allowedProviders?: readonly string[]) => ({
     workspaceId, enabled: true, type: 'page',
@@ -32,7 +32,7 @@ vi.mock('../src/server/data-control/guard', () => ({
   withWorkspaceOperation: async (_workspaceId: string, operation: () => Promise<unknown>) => operation(),
 }));
 
-import { setInboxResolved } from '../src/server/inbox/actions';
+import { setInboxResolved } from '@/modules/inbox/server/actions';
 
 describe.skipIf(!databaseUrl)('Inbox workflow atomicity against PostgreSQL', () => {
   let client: PrismaClient;

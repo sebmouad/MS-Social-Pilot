@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({ access: vi.fn(), accounts: vi.fn(), dataset: vi.fn(), reportPolicy: vi.fn(), config: vi.fn() }));
 vi.mock('../src/modules/ads/server/access', () => ({ authorizeAdsRead: state.access }));
-vi.mock('../src/server/ads/queries', () => ({ getAdsAccounts: state.accounts, getAdsDataset: state.dataset }));
+vi.mock('@/modules/ads/server/queries', () => ({ getAdsAccounts: state.accounts, getAdsDataset: state.dataset }));
 vi.mock('../src/modules/ads/server/report-policy', () => ({ loadAdsReportPolicy: state.reportPolicy }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
 

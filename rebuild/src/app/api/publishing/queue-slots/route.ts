@@ -1,4 +1,4 @@
-import { ensurePublishingCollaboration } from '@/server/publishing/collaboration';
+import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
 import { handle, jsonBody, query } from '@/modules/publishing/collaboration/http';
 import { readQueueSlots, replaceQueueSlots } from '@/modules/publishing/collaboration/server/queue-slots';
 export const dynamic = 'force-dynamic';

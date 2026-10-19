@@ -6,7 +6,7 @@ import { basename, isAbsolute, join } from 'node:path';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { runtimeConfigBatch } from '@/server/config/store';
-import { MEDIA_INSPECTION_CONFIG } from '@/server/media/inspection-config';
+import { MEDIA_INSPECTION_CONFIG } from '@/modules/publishing/server/media/inspection-config';
 
 export type MediaInspectionSettings = {
   inspectMaxBytes: number;

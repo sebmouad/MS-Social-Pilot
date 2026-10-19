@@ -20,7 +20,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
 
-import { reschedulePost, reviewPost } from '../src/server/publishing/lifecycle';
+import { reschedulePost, reviewPost } from '@/modules/publishing/server/lifecycle';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const input = { postId: 'p1', date: '2026-10-20', time: '09:00', timeZone: 'America/New_York' };

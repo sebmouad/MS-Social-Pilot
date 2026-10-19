@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/server/data', () => ({ prisma: {} }));
-import { assertLocalImageLimits, validatePostAttachments, validatePostContent } from '../src/server/publishing/lifecycle';
+import { assertLocalImageLimits, validatePostAttachments, validatePostContent } from '@/modules/publishing/server/lifecycle';
 
 describe('post attachment validation', () => {
   it('allows a trimmed empty caption only when a link or media makes the post contentful', () => {

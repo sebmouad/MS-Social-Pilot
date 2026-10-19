@@ -12,7 +12,7 @@ vi.mock('@/modules/analytics/reports/generation/document',()=>({createReportGene
 vi.mock('@/modules/analytics/reports/server/limits',()=>({reportLimits:mocks.limits}));
 vi.mock('@/modules/analytics/reports/server/templates',()=>({listReportTemplates:mocks.templates}));
 vi.mock('@/modules/analytics/reports/generation/runs',()=>({runDueReportSchedules:mocks.due}));
-import {ensureReportWorkflows,reportDeliveryReady,reportJobEligible,runScheduledReports,reportDefaultPeriod,reportTemplateOptions} from '../src/server/analytics/report-workflows';
+import {ensureReportWorkflows,reportDeliveryReady,reportJobEligible,runScheduledReports,reportDefaultPeriod,reportTemplateOptions} from '@/modules/analytics/server/report-workflows';
 
 beforeEach(()=>{vi.clearAllMocks();state.ports=null;state.delivery=true;state.jobs=true;state.smtp=true;state.target={id:'channel-a',socialAccount:{provider:'test-provider'}};mocks.generator.mockReturnValue({generate:vi.fn()});mocks.limits.mockResolvedValue({maxRows:321,maxBytes:45678});mocks.send.mockResolvedValue({status:'uncertain'});mocks.owners.mockResolvedValue(undefined);mocks.purge.mockResolvedValue(undefined);mocks.find.mockImplementation(async()=>state.target);mocks.workspace.mockResolvedValue([{id:"workspace-a"}]);});
 describe('Reports installed host assembly',()=>{

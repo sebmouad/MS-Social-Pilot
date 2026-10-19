@@ -1,4 +1,4 @@
-import type { AdsSummary } from '@/server/ads/summary';
+import type { AdsSummary } from '@/modules/ads/server/summary';
 import { StoredFields } from './stored-fields';
 
 type DailyMetric = AdsSummary['dailyMetrics'][number];

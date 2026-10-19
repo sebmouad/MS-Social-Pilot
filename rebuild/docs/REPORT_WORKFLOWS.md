@@ -10,8 +10,8 @@ workspace-timezone periods, report rendering, durable claims, recipient intent,
 run history, shared HTTP/MCP rules and workflow bounds. The shared Analytics
 reader owns metric normalization and platform dispatch; report code contains no
 provider-specific metric interpretation. The host assembly is
-`src/server/analytics/report-workflows.ts`; the preexisting
-`src/server/analytics/reports.ts` remains the independent Analytics CSV exporter.
+`src/modules/analytics/server/report-workflows.ts`; the preexisting
+`src/modules/analytics/server/reports.ts` remains the independent Analytics CSV exporter.
 
 The manifest installs `/analytics/reports` and a distinct `analyticsReports`
 worker job. UI, `/api/analytics/report-workflows/*`, and authenticated MCP call

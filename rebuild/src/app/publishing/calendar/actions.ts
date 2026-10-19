@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireViewer } from "@/server/context";
 import { canAccessFeature } from "@/server/permissions";
-import { reschedulePost } from "@/server/publishing/lifecycle";
+import { reschedulePost } from "@/modules/publishing/server/lifecycle";
 import { formatWhen, rescheduleFailureMessage } from "@/lib/reschedule";
 
 export type RescheduleResult = { ok: true; scheduledAt: string; displayTime?: string } | { ok: false; error: string };

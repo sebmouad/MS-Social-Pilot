@@ -15,7 +15,7 @@ vi.mock('../src/modules/inbox/server/deletion', () => ({
   getInboxDeletion: mocks.getDeletion,
   finishInboxDeletion: mocks.finishDeletion,
 }));
-vi.mock('../src/server/inbox/actions', () => ({
+vi.mock('@/modules/inbox/server/actions', () => ({
   syncInbox: vi.fn(), replyToInbox: vi.fn(), deleteInboxComment: mocks.deleteComment,
   moderateInboxComment: vi.fn(), setInboxResolved: vi.fn(),
 }));

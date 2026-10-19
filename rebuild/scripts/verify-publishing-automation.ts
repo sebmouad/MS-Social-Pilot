@@ -4,7 +4,7 @@ import { open, rename, unlink } from 'node:fs/promises';
 import { Prisma, PrismaClient } from '../generated/client';
 import { hashLegacySessionToken } from '../src/server/auth';
 import { encryptSecret } from '../src/server/secret-crypto';
-import { runPublishingMix, runPublishingRecycle } from '../src/server/publishing/automation';
+import { runPublishingMix, runPublishingRecycle } from '@/modules/publishing/server/automation';
 import { CONFIG_SCHEMA_VERSION } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}

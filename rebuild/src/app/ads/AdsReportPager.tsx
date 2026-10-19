@@ -1,4 +1,4 @@
-import type { AdsFilters } from '@/server/ads/queries';
+import type { AdsFilters } from '@/modules/ads/server/queries';
 import type { AdsPageSlice } from '@/modules/ads/report-page';
 import { adsQuery } from './ads-filters';
 

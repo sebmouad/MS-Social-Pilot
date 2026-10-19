@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildAnalytics } from '../src/server/analytics/aggregate';
-import type { AnalyticsMetricInput } from '../src/server/analytics/catalog';
+import { buildAnalytics } from '@/modules/analytics/server/aggregate';
+import type { AnalyticsMetricInput } from '@/modules/analytics/server/catalog';
 
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 const input = (overrides: Partial<AnalyticsMetricInput>): AnalyticsMetricInput => ({

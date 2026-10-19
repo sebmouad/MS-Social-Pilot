@@ -35,7 +35,7 @@ vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) =
 vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ supportsTargetKind: () => true }) }));
 
 import { OperationError } from '../src/lib/operation-error';
-import { reviewPost, type ReviewParticipant } from '../src/server/publishing/lifecycle';
+import { reviewPost, type ReviewParticipant } from '@/modules/publishing/server/lifecycle';
 
 type Fixture = {
   prefix: string;

@@ -13,12 +13,12 @@ const dependencies: WorkerDependencies = {
   readConfig: runtimeConfig,
   async execute(job: JobName, now: Date, retryLimit: number, retryBackoff: RetryBackoff) {
     if (job === 'publishingRecycle') {
-      const { runPublishingRecycle } = await import('../src/server/publishing/automation');
+      const { runPublishingRecycle } = await import('@/modules/publishing/server/automation');
       const result = await runPublishingRecycle(now);
       return Object.entries(result).map(([key, count]) => `${key}=${count}`).join(' ');
     }
     if (job === 'publishingMix') {
-      const { runPublishingMix } = await import('../src/server/publishing/automation');
+      const { runPublishingMix } = await import('@/modules/publishing/server/automation');
       const result = await runPublishingMix(now);
       return Object.entries(result).map(([key, count]) => `${key}=${count}`).join(' ');
     }
@@ -28,7 +28,7 @@ const dependencies: WorkerDependencies = {
       return `examined=${result.examined} completed=${result.completed} failed=${result.failed}`;
     }
     if (job === 'analyticsReports') {
-      const { runScheduledReports } = await import('../src/server/analytics/report-workflows');
+      const { runScheduledReports } = await import('@/modules/analytics/server/report-workflows');
       const result = await runScheduledReports(now);
       return Object.entries(result).map(([key, value]) => `${key}=${value}`).join(' ');
     }
@@ -38,7 +38,7 @@ const dependencies: WorkerDependencies = {
       return `examined=${result.examined} sent=${result.sent} cancelled=${result.cancelled} failed=${result.failed} uncertain=${result.uncertain} skipped=${result.skipped} purged=${result.purged}`;
     }
     if (job === 'mediaCleanup') {
-      const { cleanupOrphanImages } = await import('../src/server/media/storage');
+      const { cleanupOrphanImages } = await import('@/modules/publishing/server/media/storage');
       const result = await cleanupOrphanImages(now);
       return `removed=${result.removed} bytes=${result.bytes} failed=${result.errors}`;
     }

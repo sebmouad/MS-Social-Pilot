@@ -6,7 +6,7 @@ import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
 import { DataTable, type TableColumn } from '@/components/DataTable';
 import { entitledPlatformIds } from '@/server/entitlements';
-import { getAdsAccounts, type AdsSearchParams } from '@/server/ads/queries';
+import { getAdsAccounts, type AdsSearchParams } from '@/modules/ads/server/queries';
 import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
 import { readAdsComparison, type AdsComparisonResult } from '@/modules/ads/analysis/server';
 import { pageSearchRecord } from '@/modules/ads/analysis/query';

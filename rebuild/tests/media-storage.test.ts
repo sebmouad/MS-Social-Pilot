@@ -8,8 +8,8 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: 
 const db = vi.hoisted(() => ({ post: { findMany: vi.fn(async (): Promise<Array<{ media: unknown }>> => []) } }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
 
-import { listWorkspaceImages, readWorkspaceImage, selectOrphanImageIds, uploadWorkspaceImage } from '../src/server/media/storage';
-import { MediaStorageUnavailable, MediaValidationError } from '../src/server/media/errors';
+import { listWorkspaceImages, readWorkspaceImage, selectOrphanImageIds, uploadWorkspaceImage } from '@/modules/publishing/server/media/storage';
+import { MediaStorageUnavailable, MediaValidationError } from '@/modules/publishing/server/media/errors';
 
 let tempRoot = '';
 afterEach(async () => { if (tempRoot) await rm(tempRoot, { recursive: true, force: true }); tempRoot = ''; config.maxBytes = 1024; });

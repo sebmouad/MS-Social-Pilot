@@ -8,7 +8,7 @@ vi.mock('../src/server/platforms/registry', () => ({ enabledSocialAccountWhere: 
 vi.mock('../src/server/entitlements', () => ({ canUseFeature: () => true, entitledPlatformIds: (value: { platformCapabilities: Record<string, boolean> }) => Object.keys(value.platformCapabilities).filter(id => value.platformCapabilities[id]) }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permitted }));
 vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingSummary: state.summary }));
-vi.mock('../src/server/ads/queries', () => ({ getAdsAccountWhere: state.adWhere }));
+vi.mock('@/modules/ads/server/queries', () => ({ getAdsAccountWhere: state.adWhere }));
 vi.mock('../src/server/data', () => ({ getTargets: state.selectedTargets, prisma: { target: { findMany: state.targets }, post: { count: state.posts }, adAccount: { count: state.ads } } }));
 import HomePage from '../src/app/home/page';
 

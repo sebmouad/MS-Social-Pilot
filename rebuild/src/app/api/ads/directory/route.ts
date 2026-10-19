@@ -1,4 +1,4 @@
-import { ensureAdsManagement } from '@/server/ads/management';
+import { ensureAdsManagement } from '@/modules/ads/server/management';
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';

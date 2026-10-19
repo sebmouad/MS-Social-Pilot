@@ -6,12 +6,12 @@ import { describe, expect, it } from 'vitest';
 // These completed boundaries must stay reusable when a new provider is installed.
 // Other legacy-shaped boundaries remain documented work; this test does not certify them.
 const sharedFiles = [
-  'src/app/inbox/page.tsx', 'src/server/inbox/threads.ts', 'src/server/inbox/providers.ts',
-  'src/server/analytics/catalog.ts', 'src/server/analytics/data.ts',
-  'src/server/analytics/aggregate.ts', 'src/server/analytics/reports.ts',
-  'src/server/platforms/host.ts', 'src/server/ads/actions.ts', 'src/server/jobs/retry.ts', 'src/app/analytics/page.tsx',
+  'src/app/inbox/page.tsx', 'src/modules/inbox/server/threads.ts', 'src/modules/inbox/server/providers.ts',
+  'src/modules/analytics/server/catalog.ts', 'src/modules/analytics/server/data.ts',
+  'src/modules/analytics/server/aggregate.ts', 'src/modules/analytics/server/reports.ts',
+  'src/server/platforms/host.ts', 'src/modules/ads/server/actions.ts', 'src/server/jobs/retry.ts', 'src/app/analytics/page.tsx',
   'src/app/ads/CampaignCreateForm.tsx', 'src/app/ads/AdSetCreateForm.tsx',
-  'src/app/api/ads/actions/route.ts', 'src/app/api/ads/campaigns/route.ts', 'src/app/api/ads/adsets/route.ts', 'src/app/api/ads/object/route.ts', 'src/server/ads/errors.ts',
+  'src/app/api/ads/actions/route.ts', 'src/app/api/ads/campaigns/route.ts', 'src/app/api/ads/adsets/route.ts', 'src/app/api/ads/object/route.ts', 'src/modules/ads/server/errors.ts',
 ];
 
 describe('completed platform boundaries', () => {
@@ -59,10 +59,10 @@ describe('completed platform boundaries', () => {
   });
 
   it('keeps Messenger reply-window policy out of shared Inbox code', () => {
-    for (const file of ['src/app/inbox/page.tsx', 'src/server/inbox/threads.ts']) {
+    for (const file of ['src/app/inbox/page.tsx', 'src/modules/inbox/server/threads.ts']) {
       expect(readFileSync(resolve(file), 'utf8')).not.toMatch(/messengerReplyWindow|MessengerReplyWindow|inbox\.messengerReplyWindowHours/);
     }
-    expect(existsSync(resolve('src/server/inbox/reply-window.ts'))).toBe(false);
+    expect(existsSync(resolve('src/modules/inbox/server/reply-window.ts'))).toBe(false);
   });
 
 });

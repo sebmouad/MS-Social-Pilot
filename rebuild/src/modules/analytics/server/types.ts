@@ -1,5 +1,5 @@
-import type { MetricView } from '@/server/analytics/aggregate';
-import type { AnalyticsAdAccount, AnalyticsAudienceEntry, AnalyticsTarget } from '@/server/analytics/catalog';
+import type { MetricView } from '@/modules/analytics/server/aggregate';
+import type { AnalyticsAdAccount, AnalyticsAudienceEntry, AnalyticsTarget } from '@/modules/analytics/server/catalog';
 
 /** Fresh original-membership channel grants that authorize Ads data, independent of any credential's channel selection. */
 export type AdAccountTargetScope = { all: true } | { all: false; ids: readonly string[] };

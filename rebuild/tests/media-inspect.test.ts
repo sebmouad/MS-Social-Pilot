@@ -28,7 +28,7 @@ vi.mock('sharp', async importOriginal => {
   });
   return { ...actual, default: wrapped };
 });
-import { checkMediaProbeAvailability, inspectMediaSnapshot } from '../src/server/media/inspect';
+import { checkMediaProbeAvailability, inspectMediaSnapshot } from '@/modules/publishing/server/media/inspect';
 
 const readConfig = async (keys: readonly string[]) => Object.fromEntries(keys.map(key => [key, configValues[key as keyof typeof configValues]]));
 

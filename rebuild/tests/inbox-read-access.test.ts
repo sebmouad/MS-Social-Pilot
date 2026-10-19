@@ -5,7 +5,7 @@ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: state.entitleme
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: state.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permission }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: state.purge }));
-vi.mock('../src/server/inbox/providers', () => ({ inboxTargetWhere: state.where, inboxProviders: state.providers }));
+vi.mock('@/modules/inbox/server/providers', () => ({ inboxTargetWhere: state.where, inboxProviders: state.providers }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
 import { readInboxList, readInboxThread } from '../src/modules/inbox/server/read';
 const actor = { userId: 'reader', workspaceId: 'workspace' };

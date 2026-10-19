@@ -8,7 +8,7 @@ import { prisma } from '@/server/data';
 import { encryptSecret, decryptSecret } from '@/server/secret-crypto';
 import { loadRootOperations } from '@/server/root/operations';
 import { PLATFORM_HOSTS } from '@/server/platforms';
-import { checkMediaProbeAvailability } from '@/server/media/inspect';
+import { checkMediaProbeAvailability } from '@/modules/publishing/server/media/inspect';
 import { diagnosticScope } from '@/lib/diagnostics';
 import { fail, pass, skipped, type DiagnosticDefinition } from './types';
 

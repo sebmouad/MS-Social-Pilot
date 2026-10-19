@@ -34,7 +34,7 @@ vi.mock('@/modules/publishing/collaboration/server/executors', () => ({
   runRecycleCycle: (options: any) => { h.state.capturedRecycle = options; return h.runRecycle(options); },
   runContentMix: (options: any) => { h.state.capturedMix = options; return h.runMix(options); },
 }));
-vi.mock('@/server/publishing/lifecycle', () => ({
+vi.mock('@/modules/publishing/server/lifecycle', () => ({
   limits: async () => ({ maxMedia: 10, maxAlt: 500, maxText: 5000, maxTargets: 20 }),
   validatePostAttachments: () => ({ link: null, media: [] }),
   validatePostContent: (text: string) => text,
@@ -50,7 +50,7 @@ vi.mock('@/server/publishing/lifecycle', () => ({
 
 import { OperationError } from '../src/lib/operation-error';
 import { authorizePublishing } from '../src/modules/publishing/server/access';
-import { publishingAutomationLifecycle, runPublishingMix, runPublishingRecycle } from '../src/server/publishing/automation';
+import { publishingAutomationLifecycle, runPublishingMix, runPublishingRecycle } from '@/modules/publishing/server/automation';
 
 function post(status: string, overrides: Record<string, unknown> = {}) {
   return {

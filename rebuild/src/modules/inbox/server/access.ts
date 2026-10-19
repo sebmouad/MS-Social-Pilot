@@ -2,7 +2,7 @@ import { prisma } from '@/server/data';
 import { canUseFeature, hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
-import { inboxProviders, inboxTargetWhere } from '@/server/inbox/providers';
+import { inboxProviders, inboxTargetWhere } from '@/modules/inbox/server/providers';
 import { OperationError } from '@/lib/operation-error';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import type { InboxReadActor, InboxReadConstraints } from './types';

@@ -1,5 +1,5 @@
 import { queueDefaultSlotSchema } from '@/modules/publishing/queue-config';
-import { ensurePublishingCollaboration } from '@/server/publishing/collaboration';
+import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
 import { runtimeConfig } from '@/server/config/store';
 import { parseCollaborationSearch } from '@/modules/publishing/collaboration/search';
 import { OperationError } from '@/lib/operation-error';

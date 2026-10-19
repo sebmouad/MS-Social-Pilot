@@ -27,7 +27,7 @@ vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({
 
 import { OperationError } from '../src/lib/operation-error';
 import { createLocalDraft } from '../src/server/post-mutations';
-import { createPost, validatePostAttachments } from '../src/server/publishing/lifecycle';
+import { createPost, validatePostAttachments } from '@/modules/publishing/server/lifecycle';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 

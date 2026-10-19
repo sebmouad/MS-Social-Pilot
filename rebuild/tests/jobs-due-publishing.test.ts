@@ -9,7 +9,7 @@ vi.mock('@/server/config/store', () => ({ runtimeConfig: state.config }));
 vi.mock('@/server/permissions/loader', () => ({ loadPermissions: state.permissions }));
 vi.mock('@/server/permissions', () => ({ canAccessFeature: (value: { allowed: boolean }) => value.allowed }));
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: state.entitlements, canUseFeature: (value: { allowed: boolean }) => value.allowed }));
-vi.mock('@/server/publishing/lifecycle', () => ({ publishPost: state.publish }));
+vi.mock('@/modules/publishing/server/lifecycle', () => ({ publishPost: state.publish }));
 
 import { OperationError } from '../src/lib/operation-error';
 import { publishDuePosts } from '@/server/jobs/sync';

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
-import type { MetricView } from '@/server/analytics/aggregate';
+import type { MetricView } from '@/modules/analytics/server/aggregate';
 import { readAnalyticsSnapshot } from '../../server/read';
 import { authorize, type Actor } from '../../server/access';
 import { demographicDimensionsSchema, type DemographicDimension } from '../config';

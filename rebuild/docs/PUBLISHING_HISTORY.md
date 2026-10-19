@@ -12,7 +12,7 @@ Choice-field management receives the live Root option-count and per-option lengt
 
 ## Host integration
 
-`src/server/publishing/collaboration.ts` installs the lifecycle restore port
+`src/modules/publishing/server/collaboration.ts` installs the lifecycle restore port
 idempotently, preserving other registered ports. Its lazy lifecycle import avoids
 initialization cycles. Customer collaboration pages, the versions HTTP mutation
 and MCP handler each call this host composition before capability discovery/use;

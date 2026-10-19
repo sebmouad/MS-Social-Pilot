@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ viewer: vi.fn(), update: vi.fn(), remove: vi.fn(), refresh: vi.fn() }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
-vi.mock('../src/server/publishing/lifecycle', () => ({ updatePost: state.update, deletePost: state.remove }));
+vi.mock('@/modules/publishing/server/lifecycle', () => ({ updatePost: state.update, deletePost: state.remove }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: () => true }));
 vi.mock('next/cache', () => ({ revalidatePath: state.refresh }));
 vi.mock('next/navigation', () => ({ redirect: (url: string) => { throw Object.assign(new Error('redirect'), { digest: `NEXT_REDIRECT;${url}` }); } }));
