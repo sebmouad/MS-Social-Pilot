@@ -1,7 +1,7 @@
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 
-export const UNRESOLVED_PUBLICATION_STATES = ['started', 'uncertain', 'receipt_recorded'];
+export const UNRESOLVED_PUBLICATION_STATES = ['started', 'uncertain', 'submitted', 'receipt_recorded'];
 
 /** Durable evidence survives missing/corrupt legacy projection rows. */
 export async function assertPublicationAttemptsSettled(tx: Prisma.TransactionClient, workspaceId: string, targetIds?: readonly string[], postId?: string) {

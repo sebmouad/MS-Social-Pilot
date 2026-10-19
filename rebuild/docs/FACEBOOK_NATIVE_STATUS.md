@@ -136,3 +136,13 @@ The final build/typecheck and complete eight-view probe passed again, including
 an explicit one-line Cancel check; the corrected phone screenshot was inspected.
 No live Meta request or production change occurred. Native formats, Story support,
 deletion, host integration, first comments and live-provider gates remain open.
+
+
+Batch92 integrates this proof path with the neutral `submitted` receipt state.
+A submitted native parent retains its exact final identity while Root obtains a
+current accepted proof. Matching external attestation and local projection remain
+separate confirmed actions; wrong IDs and absence are refused. Actual PostgreSQL
+and built-server installation-MCP tests exercised the complete chain without any
+new provider write. The response-byte ceiling participates in current transport
+trust revalidation. See [ASYNC_PUBLICATION_RECEIPTS.md](ASYNC_PUBLICATION_RECEIPTS.md)
+for exact evidence and remaining automatic host/status/comment/deletion gates.

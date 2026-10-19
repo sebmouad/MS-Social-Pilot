@@ -50,7 +50,7 @@ function bindingValid(row: Candidate) {
   if (row.parentProvider !== 'facebook' || row.postId !== row.parentPostId || row.postTargetId !== row.parentPostTargetId ||
     row.targetId !== row.parentTargetId || row.actorId !== row.parentActorId ||
     !(['started', 'uncertain'].includes(row.parentState) && row.parentRemoteId === null ||
-      ['receipt_recorded', 'projected'].includes(row.parentState) && row.parentRemoteId === row.remoteId)) throw changed();
+      ['submitted', 'receipt_recorded', 'projected'].includes(row.parentState) && row.parentRemoteId === row.remoteId)) throw changed();
 }
 
 async function lockCandidate(tx: Prisma.TransactionClient, original: Candidate) {

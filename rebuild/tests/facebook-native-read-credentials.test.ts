@@ -28,7 +28,7 @@ function setup() {
   state.config = new Map<string, unknown>([
     ['facebook.native.statusRecoveryEnabled', true], ['meta.postReadScopes', ['pages_read_engagement']],
     ['meta.graphBaseUrl', 'https://graph.facebook.com'], ['meta.graphVersion', 'v24.0'],
-    ['meta.appSecretProofEnabled', true], ['meta.requestTimeoutMs', 15_000],
+    ['meta.appSecretProofEnabled', true], ['meta.requestTimeoutMs', 15_000], ['facebook.native.maxResponseBytes', 1048576],
   ]);
   state.secret = 'private-app-secret'; state.target = targetFixture(); state.create.mockClear();
 }
@@ -75,6 +75,13 @@ describe('Facebook native status read credentials', () => {
     const withGrant = await prepareFacebookNativeStatusRead({ workspaceId: 'workspace-1', targetId: 'target-1', remoteTargetId: 'page-1' });
     state.target.socialAccount.scopes = 'pages_read_engagement';
     await expect(withGrant.assertCurrent()).rejects.toMatchObject({ code: 'unavailable' });
+  });
+
+  it('rejects a response-limit change after transport preparation', async () => {
+    setup();
+    const prepared = await prepareFacebookNativeStatusRead({ workspaceId: 'workspace-1', targetId: 'target-1', remoteTargetId: 'page-1' });
+    state.config.set('facebook.native.maxResponseBytes', 2048);
+    await expect(prepared.assertCurrent()).rejects.toMatchObject({ code: 'unavailable' });
   });
 
   it('rejects a token or app-secret change after the provider read boundary', async () => {

@@ -20,7 +20,7 @@ vi.mock('../src/server/config/store', () => ({
     'publishing.publicationHistoryLimit': 100, 'publishing.publicationUrlMaxCharacters': 2048,
     'publishing.maxMessageCharacters': 10000, 'publishing.maxRemoteMediaPerPost': 4,
     'publishing.maxImageAltCharacters': 500, 'data.workspaceOperationTimeoutMs': 300000,
-    'data.workspaceOperationLockWaitMs': 30000,
+    'data.workspaceOperationLockWaitMs': 30000, 'data.deleteTransactionTimeoutMs': 300000,
   }[key]),
 }));
 vi.mock('../src/modules/publishing/server/access', () => ({
@@ -41,7 +41,8 @@ vi.mock('../src/modules/publishing/server/read-scope', () => ({
 }));
 
 import { publishPost } from '../src/server/publishing/lifecycle';
-import { projectPublicationInOperation, recordPublicationOutcome, recordPublicationOutcomeInTransaction } from '../src/modules/publishing/server/publication';
+import { projectPublicationInOperation, publishDestinationInOperation, recordPublicationOutcome, recordPublicationOutcomeInTransaction } from '../src/modules/publishing/server/publication';
+import { deleteWorkspaceData } from '../src/server/data-control';
 
 type Fixture = {
   prefix: string; workspaceId: string; userId: string; socialAccountId: string; targetId: string;
@@ -84,7 +85,7 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
     integration.grantAllowed = true;
     integration.adapter = {
       canUseCredential: vi.fn(() => integration.grantAllowed),
-      publish: vi.fn(async () => ({ remoteId: `provider-post-${randomUUID()}`, url: 'https://example.test/post' })),
+      publish: vi.fn(async () => ({ state: 'published', remoteId: `provider-post-${randomUUID()}`, url: 'https://example.test/post' })),
       publishFirstComment: vi.fn(async () => ({ remoteId: 'provider-comment' })),
       classifyPublishingFailure: vi.fn(() => 'uncertain'),
       supportsTargetKind: vi.fn(() => true),
@@ -93,7 +94,7 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
     };
   }
 
-  async function createFixture(): Promise<Fixture> {
+  async function createFixture(provider = 'facebook'): Promise<Fixture> {
     const prefix = `preview_publication_${randomUUID().replaceAll('-', '')}`;
     const now = new Date();
     const fixture: Fixture = {
@@ -108,7 +109,7 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
       await client.workspace.create({ data: { id: fixture.workspaceId, name: 'Publication fixture', slug: fixture.workspaceId, timezone: 'UTC' } });
       await client.membership.create({ data: { id: `${prefix}_membership`, userId: fixture.userId, workspaceId: fixture.workspaceId, role: 'owner' } });
       await client.socialAccount.create({ data: {
-        id: fixture.socialAccountId, workspaceId: fixture.workspaceId, provider: 'facebook', providerUserId: `${prefix}_provider`,
+        id: fixture.socialAccountId, workspaceId: fixture.workspaceId, provider, providerUserId: `${prefix}_provider`,
         name: 'Synthetic publication source', accessToken: 'synthetic-token', scopes: '',
       } });
       await client.target.create({ data: {
@@ -173,7 +174,7 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
     const f=await createFixture();
     await client.post.update({where:{id:f.postId},data:{format:'synthetic-opaque-format'}});
     integration.adapter.publishingFormats = [...integration.adapter.publishingFormats, { id: 'synthetic-opaque-format', label: 'Synthetic format', media: { kinds: ['image', 'video'], maxImages: null, maxVideos: null, mixedKinds: false, linkWithMedia: false, imageAltText: true }, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }];
-    integration.adapter.publish.mockResolvedValue({remoteId:'synthetic-format-receipt',url:null});
+    integration.adapter.publish.mockResolvedValue({state:'published',remoteId:'synthetic-format-receipt',url:null});
     await publishPost(f.actor,f.postId);
     expect(integration.adapter.publish).toHaveBeenCalledWith(expect.objectContaining({formatId:'synthetic-opaque-format'}));
   });
@@ -191,7 +192,7 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
         .toEqual({ status: 'processing', remotePostId: null });
       enter();
       await blocked;
-      return { remoteId: 'provider-post-concurrent', url: null };
+      return { state: 'published', remoteId: 'provider-post-concurrent', url: null };
     });
     const first = publishPost(fixture.actor, fixture.postId);
     try {
@@ -208,7 +209,7 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
 
   it('retains a durable receipt when projection fails and resumes locally without another provider create', async () => {
     const fixture = await createFixture();
-    integration.adapter.publish.mockResolvedValue({ remoteId: 'provider-post-recoverable', url: 'https://example.test/receipt' });
+    integration.adapter.publish.mockResolvedValue({ state: 'published', remoteId: 'provider-post-recoverable', url: 'https://example.test/receipt' });
     failProjectionAudit(fixture);
     try {
       await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ published: 0, needsReconciliation: 1 });
@@ -249,7 +250,7 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
     expect(await observer.$queryRaw<Array<{ state: string; remotePostId: string | null }>>`SELECT state, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId} AND id=${uncertain.id}`)
       .toEqual([{ state: 'attested_absent', remotePostId: null }]);
 
-    integration.adapter.publish.mockResolvedValueOnce({ remoteId: 'provider-post-after-absence', url: null });
+    integration.adapter.publish.mockResolvedValueOnce({ state: 'published', remoteId: 'provider-post-after-absence', url: null });
     await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ published: 1, needsReconciliation: 0 });
     expect(integration.adapter.publish).toHaveBeenCalledTimes(2);
     expect(await observer.$queryRaw<Array<{ state: string; remotePostId: string | null }>>`SELECT state, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId} ORDER BY "createdAt", id`)
@@ -259,13 +260,169 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
   it('records an explicit adapter rejection as rejected and permits the next deliberate call', async () => {
     const fixture = await createFixture();
     integration.adapter.publish.mockRejectedValueOnce(new Error('synthetic definitive rejection'))
-      .mockResolvedValueOnce({ remoteId: 'provider-post-retry', url: null });
+      .mockResolvedValueOnce({ state: 'published', remoteId: 'provider-post-retry', url: null });
     integration.adapter.classifyPublishingFailure.mockReturnValueOnce('rejected');
     await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ failed: 1, needsReconciliation: 0 });
     expect(await observer.$queryRaw<Array<{ state: string; reason: string }>>`SELECT state, reason FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)
       .toEqual([{ state: 'rejected', reason: 'provider_rejected' }]);
     await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ published: 1 });
     expect(integration.adapter.publish).toHaveBeenCalledTimes(2);
+  });
+
+  it('holds an explicitly submitted provider receipt without projecting it or retrying the create', async () => {
+    const fixture = await createFixture();
+    integration.adapter.publish.mockResolvedValue({ state: 'submitted', remoteId: 'provider-submitted-1', url: 'https://example.test/submitted/1' });
+
+    await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ published: 0, needsReconciliation: 1 });
+    expect(await observer.$queryRaw<Array<{ state: string; reason: string; remotePostId: string; remoteUrl: string; receiptAt: Date | null }>>`
+      SELECT state, reason, "remotePostId", "remoteUrl", "receiptAt" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)
+      .toMatchObject([{ state: 'submitted', reason: 'provider_submission', remotePostId: 'provider-submitted-1', remoteUrl: 'https://example.test/submitted/1' }]);
+    expect((await observer.$queryRaw<Array<{ receiptAt: Date | null }>>`SELECT "receiptAt" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)[0].receiptAt).toBeInstanceOf(Date);
+    expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
+      .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+
+    await expect(publishPost(fixture.actor, fixture.postId)).rejects.toMatchObject({ code: 'conflict' });
+    expect(integration.adapter.publish).toHaveBeenCalledTimes(1);
+
+    const missingState = await createFixture();
+    integration.adapter.publish.mockReset().mockResolvedValue({ remoteId: 'provider-missing-state', url: null });
+    await expect(publishPost(missingState.actor, missingState.postId)).resolves.toMatchObject({ published: 0, needsReconciliation: 1 });
+    expect(await observer.$queryRaw<Array<{ state: string; reason: string; remotePostId: string }>>`
+      SELECT state, reason, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${missingState.workspaceId}`)
+      .toEqual([{ state: 'submitted', reason: 'provider_submission', remotePostId: 'provider-missing-state' }]);
+    expect(await observer.postTarget.findUnique({ where: { id: missingState.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
+      .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+
+  });
+
+  it('retains an unknown explicit provider output as held submitted evidence, while an invalid receipt fails closed', async () => {
+    const fixture = await createFixture();
+    integration.adapter.publish.mockResolvedValue({ state: 'queued', remoteId: 'provider-unknown-state', url: null });
+    await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ published: 0, needsReconciliation: 1 });
+    expect(await observer.$queryRaw<Array<{ state: string; reason: string; remotePostId: string }>>`
+      SELECT state, reason, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)
+      .toEqual([{ state: 'submitted', reason: 'provider_submission', remotePostId: 'provider-unknown-state' }]);
+    expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
+      .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+
+    const invalid = await createFixture();
+    integration.adapter.publish.mockReset().mockResolvedValue({ state: 'published', remoteId: 'x'.repeat(201), url: null });
+    await expect(publishPost(invalid.actor, invalid.postId)).resolves.toMatchObject({ published: 0, needsReconciliation: 1 });
+    expect(await observer.$queryRaw<Array<{ state: string; reason: string | null; remotePostId: string | null }>>`
+      SELECT state, reason, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${invalid.workspaceId}`)
+      .toEqual([{ state: 'started', reason: null, remotePostId: null }]);
+    expect(await observer.postTarget.findUnique({ where: { id: invalid.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
+      .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+  });
+
+  it('keeps a usable receipt when its returned URL is unsafe, and records an abort after dispatch as submitted evidence', async () => {
+    const unsafeUrl = await createFixture();
+    integration.adapter.publish.mockResolvedValue({ state: 'published', remoteId: 'provider-unsafe-url-id', url: 'https://user:pass@example.test/post' });
+    await expect(publishPost(unsafeUrl.actor, unsafeUrl.postId)).resolves.toMatchObject({ published: 0, needsReconciliation: 1 });
+    expect(await observer.$queryRaw<Array<{ state: string; reason: string; remotePostId: string; remoteUrl: string | null }>>`
+      SELECT state, reason, "remotePostId", "remoteUrl" FROM rebuild_publication_attempts WHERE "workspaceId"=${unsafeUrl.workspaceId}`)
+      .toEqual([{ state: 'submitted', reason: 'provider_submission', remotePostId: 'provider-unsafe-url-id', remoteUrl: null }]);
+    expect(await observer.postTarget.findUnique({ where: { id: unsafeUrl.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
+      .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+
+    const aborted = await createFixture('synthetic');
+    const controller = new AbortController();
+    await expect(publishDestinationInOperation({ actor: aborted.actor, signal: controller.signal }, {
+      postId: aborted.postId, postTargetId: aborted.postTargetId, targetId: aborted.targetId, provider: 'synthetic', expectedStatus: 'pending',
+      dispatch: async () => { controller.abort(); return { state: 'published', remoteId: 'provider-receipt-after-abort', url: null }; },
+      classifyFailure: () => 'uncertain',
+    })).resolves.toBe('needs_review');
+    expect(await observer.$queryRaw<Array<{ state: string; reason: string; remotePostId: string }>>`
+      SELECT state, reason, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${aborted.workspaceId}`)
+      .toEqual([{ state: 'submitted', reason: 'provider_submission', remotePostId: 'provider-receipt-after-abort' }]);
+    expect(await observer.postTarget.findUnique({ where: { id: aborted.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
+      .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+  });
+
+  it('preserves the original submitted URL and receipt timestamp when a manager attests the same identity', async () => {
+    const fixture = await createFixture('synthetic');
+    integration.adapter.publish.mockResolvedValue({ state: 'submitted', remoteId: 'provider-attested-id', url: 'https://example.test/original-receipt' });
+    await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ needsReconciliation: 1 });
+    const [before] = await observer.$queryRaw<Array<{ receiptAt: Date; remoteUrl: string }>>`
+      SELECT "receiptAt", "remoteUrl" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`;
+
+    const [attempt] = await observer.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`;
+    await client.$transaction(tx => recordPublicationOutcomeInTransaction(tx, fixture.userId, {
+      workspaceId: fixture.workspaceId, operationId: attempt.id, outcome: 'PUBLISHED', remotePostId: 'provider-attested-id', remoteUrl: 'https://example.test/operator-claimed-url',
+    }));
+    const [after] = await observer.$queryRaw<Array<{ state: string; remoteUrl: string; receiptAt: Date; attestedAt: Date }>>`
+      SELECT state, "remoteUrl", "receiptAt", "attestedAt" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`;
+    expect(after).toMatchObject({ state: 'receipt_recorded', remoteUrl: before.remoteUrl, receiptAt: before.receiptAt });
+    expect(after.attestedAt).toBeInstanceOf(Date);
+
+    await expect(projectPublicationInOperation(fixture.actor, attempt.id, new AbortController().signal)).resolves.toBe(true);
+    expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { status: true, remotePostId: true, remoteUrl: true, publishedAt: true } }))
+      .toEqual({ status: 'published', remotePostId: 'provider-attested-id', remoteUrl: before.remoteUrl, publishedAt: after.attestedAt });
+  });
+
+  it('retains a colliding provider receipt without linking or overwriting the existing post', async () => {
+    const fixture = await createFixture('synthetic');
+    const shadowPostId = `${fixture.prefix}_shadow_post`;
+    const shadowPostTargetId = `${fixture.prefix}_shadow_post_target`;
+    const collisionId = 'provider-already-linked';
+    try {
+      await client.post.create({ data: {
+        id: shadowPostId, workspaceId: fixture.workspaceId, authorId: fixture.userId, message: 'Synthetic already-linked publication',
+        firstComment: null, media: [], status: 'published', scheduledAt: null, publishedAt: new Date(), createdAt: new Date(), updatedAt: new Date(),
+      } });
+      await client.postTarget.create({ data: {
+        id: shadowPostTargetId, postId: shadowPostId, targetId: fixture.targetId, status: 'published', remotePostId: collisionId,
+        remoteUrl: 'https://example.test/already-linked', publishedAt: new Date(),
+      } });
+      integration.adapter.publish.mockResolvedValue({ state: 'published', remoteId: collisionId, url: 'https://example.test/new-copy' });
+      await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ published: 0, needsReconciliation: 1 });
+      const [attempt] = await observer.$queryRaw<Array<{ id: string; state: string; reason: string; remotePostId: string }>>`
+        SELECT id, state, reason, "remotePostId" FROM rebuild_publication_attempts
+        WHERE "workspaceId"=${fixture.workspaceId} AND "postTargetId"=${fixture.postTargetId}`;
+      expect(attempt).toMatchObject({ state: 'submitted', reason: 'provider_submission', remotePostId: collisionId });
+      expect(await observer.$queryRaw<Array<{ identityConflict: boolean }>>`
+        SELECT detail->>'identityConflict'='true' AS "identityConflict" FROM root_activities
+        WHERE action='publishing.publication_submitted' AND detail->>'operationId'=${attempt.id}`)
+        .toEqual([{ identityConflict: true }]);
+      await expect(client.$transaction(tx => recordPublicationOutcomeInTransaction(tx, fixture.userId, {
+        workspaceId: fixture.workspaceId, operationId: attempt.id, outcome: 'PUBLISHED', remotePostId: collisionId,
+      }))).rejects.toMatchObject({ code: 'conflict' });
+      await expect(projectPublicationInOperation(fixture.actor, attempt.id, new AbortController().signal))
+        .rejects.toMatchObject({ code: 'conflict' });
+      expect(await observer.postTarget.findUnique({ where: { id: shadowPostTargetId }, select: { status: true, remotePostId: true, remoteUrl: true } }))
+        .toEqual({ status: 'published', remotePostId: collisionId, remoteUrl: 'https://example.test/already-linked' });
+      expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { status: true, remotePostId: true } }))
+        .toEqual({ status: 'processing', remotePostId: null });
+    } finally {
+      await client.postTarget.deleteMany({ where: { id: shadowPostTargetId } });
+      await client.post.deleteMany({ where: { id: shadowPostId } });
+    }
+  });
+
+  it('persists an uncertain outcome when dispatch aborts and throws', async () => {
+    const fixture = await createFixture('synthetic');
+    const controller = new AbortController();
+    await expect(publishDestinationInOperation({ actor: fixture.actor, signal: controller.signal }, {
+      postId: fixture.postId, postTargetId: fixture.postTargetId, targetId: fixture.targetId, provider: 'synthetic', expectedStatus: 'pending',
+      dispatch: async () => { controller.abort(); throw new Error('synthetic cancellation after dispatch'); },
+      classifyFailure: () => 'uncertain',
+    })).resolves.toBe('needs_review');
+    expect(await observer.$queryRaw<Array<{ state: string; reason: string; remotePostId: string | null }>>`
+      SELECT state, reason, "remotePostId" FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)
+      .toEqual([{ state: 'uncertain', reason: 'outcome_unknown', remotePostId: null }]);
+    expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { status: true, remotePostId: true, publishedAt: true } }))
+      .toEqual({ status: 'processing', remotePostId: null, publishedAt: null });
+  });
+
+  it('blocks actual workspace database erasure while a submitted receipt remains unresolved', async () => {
+    const fixture = await createFixture();
+    integration.adapter.publish.mockResolvedValue({ state: 'submitted', remoteId: 'provider-submitted-erasure', url: null });
+    await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ needsReconciliation: 1 });
+    await expect(deleteWorkspaceData(fixture.actor, 'DELETE'))
+      .rejects.toMatchObject({ code: 'conflict' });
+    expect(await observer.post.findUnique({ where: { id: fixture.postId }, select: { id: true } })).toEqual({ id: fixture.postId });
+    expect(await observer.$queryRaw<Array<{ state: string }>>`SELECT state FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`)
+      .toEqual([{ state: 'submitted' }]);
   });
   it.each(['missing-grant', 'expired', 'revoked', 'missing-token'])('does not create intent or dispatch with %s credentials', async condition => {
     const fixture = await createFixture();

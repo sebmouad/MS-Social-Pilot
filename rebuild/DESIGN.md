@@ -168,3 +168,15 @@ across four themes at desktop and phone sizes. Screenshot inspection caught and 
 single-column shared-dialog footer passed the final eight-view probe and phone
 screenshot inspection. This is scoped Root evidence, not whole-app
 UX clearance.
+
+
+Batch92 asynchronous receipt recovery keeps the shared Root dialog bounded and
+internally scrollable when its evidence fields exceed the viewport. Keep the
+saved remote submission ID read-only and selectable and preserve the action footer while the dialog content
+scrolls. A known submitted receipt exposes no “ABSENT” action and no control to
+replace its remote ID; confirmation must refer to the displayed identity. Use
+the shared dialog and Button tokens, with keyboard focus and narrow-screen
+footer behavior intact. Root and customer status surfaces require separate
+verification. Root verification passed16 views across four themes at1440px
+and390px with screenshot inspection. Customer recovery component tests passed;
+its full browser matrix remains open. This is not whole-app UX clearance.

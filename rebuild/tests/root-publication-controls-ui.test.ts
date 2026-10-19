@@ -42,4 +42,18 @@ describe('Root publication recovery controls', () => {
   it('cancel restores focus to the recovery opener', async () => {
     await click('Record external check'); await click('Cancel'); expect(container.querySelector('dialog')).toBeNull(); expect(document.activeElement?.textContent).toBe('Record external check');
   });
+  it('shows submitted as awaiting verification and permits only the known ID as a published attestation', async () => {
+    const submitted = { ...row, state: 'submitted', remotePostId: 'provider-final-1' };
+    await act(async () => root.render(createElement(RootPublicationControls, { row: submitted })));
+    expect(container.textContent).toContain('Verify submitted publication');
+    await click('Verify submitted publication');
+    expect(container.querySelector<HTMLInputElement>('input[value="ABSENT"]')).toBeNull();
+    const id = container.querySelector<HTMLInputElement>('[name="remotePostId"]')!;
+    expect(id.value).toBe('provider-final-1'); expect(id.readOnly).toBe(true);
+    const confirmation = container.querySelector<HTMLInputElement>('[name="confirmation"]')!;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(confirmation, 'ROOT RECORD PUBLICATION op-1 PUBLISHED'); confirmation.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    await click('Verify submitted publication');
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({ operationId: 'op-1', outcome: 'PUBLISHED', verifiedExternally: true, confirmation: 'ROOT RECORD PUBLICATION op-1 PUBLISHED', remotePostId: 'provider-final-1' });
+  });
 });

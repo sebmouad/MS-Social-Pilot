@@ -4,7 +4,7 @@ Updated: 2026-10-19. This is durable project context, not proof of current runti
 state. Recheck Git, code and external state before acting. Never copy credentials,
 session tokens, private environment contents, customer records or raw logs here.
 
-Current continuation: batch91 at the end of this document and FACEBOOK_NATIVE_STATUS.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+Current continuation: batch92 at the end of this document and ASYNC_PUBLICATION_RECEIPTS.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
 
 ## Historical verified batch —84
 
@@ -545,3 +545,47 @@ the corrected phone screenshot was inspected. No live Meta request or production
 Native customer formats remain unavailable; Story, deletion, host, first-comment,
 live-provider and production-shaped rollback gates remain open. Production and
 socialpilot-deploy remain legacy. See FACEBOOK_NATIVE_STATUS.md for current detail.
+
+
+## Batch92 — shared asynchronous publication receipts
+
+The shared result contract requires `state: 'published' | 'submitted'`.
+Missing/unknown state, unsafe URL and cancellation after a usable provider ID
+must stay held as submitted evidence, never project. After cancellation, a
+bounded receipt-only transaction may save the ID only if the original parent
+still has state `started` and the write succeeds. It cannot dispatch. On parent
+resolution/replacement or write failure, hold without projection. Keep the
+first receipt timestamp and provider URL when a matching Root attestation later
+projects; record `attestedAt` when verification is saved and use it for local publication time. Never attest a known submitted
+ID absent or replace it with another ID. Recheck provider outcome guards at
+projection, including current accepted native proof. General late-fact append
+for already-resolved shared parents remains future work; native Facebook facts
+remain in its private journal.
+
+Migration21 checksum is
+`91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931`.
+Full backup/scratch restore preserved107 prior counts/settings; applied to the
+synthetic local preview only; 21-file schema-only rehearsal passed. Actual PG
+proof → matching Root attestation → shared projection passed. Final suite:3,150 tests/356 files, zero skips, production build and serial
+typecheck passed. Root browser/API/MCP checks passed16 views across four themes
+and two widths, plus exact-ID proof/attestation/projection with two local
+HTTPS-mock GETs and no additional provider writes. Customer components are unit
+tested; full customer recovery browser coverage remains separate. Both Claude
+accounts reviewed source; verified receipt-retention findings were fixed/tested.
+Final cleanup matched all107 original counts and exact settings; scratch removed,
+backup preserved. See ASYNC_PUBLICATION_RECEIPTS.md for exact scope. Production
+and the held provider canary remain unchanged.
+
+Next verify the Root and customer UI surfaces separately. Finish automatic
+pending-status reconciliation, safe provider deletion, comment integration,
+native host dispatch, live-provider verification, then broader release gates.
+Facebook feed is explicitly published; video upload ID is submitted. Native
+formats remain disabled. See [ASYNC_PUBLICATION_RECEIPTS.md](ASYNC_PUBLICATION_RECEIPTS.md).
+
+
+Batch92 validation used an isolated tracked-code candidate plus the explicit
+owned files. Untracked AI/Feeds/Media/Integrations routes, modules, tests and draft
+docs remain unassessed local work: do not discard them, silently stage them, or
+claim they passed this batch. Inspect and integrate them in their own complete
+capability batches. Full legacy parity and the production release gates remain
+part of the active goal.

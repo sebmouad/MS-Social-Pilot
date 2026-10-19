@@ -4,7 +4,7 @@ Updated 2026-10-19. Goal: [GOAL.md](GOAL.md). Mandatory target:
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md). Current evidence and gaps:
 [ARCHITECTURE.md](ARCHITECTURE.md), [LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md).
 
-Current continuation: batch91 at the end of this document and FACEBOOK_NATIVE_STATUS.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
+Current continuation: batch92 at the end of this document and ASYNC_PUBLICATION_RECEIPTS.md. Earlier numbered batch sections are historical snapshots; they do not override the latest evidence or remaining gates.
 
 ## Historical position before batch85 —2026-10-19
 
@@ -331,3 +331,40 @@ open. Production and socialpilot-deploy remain legacy.
 
 Next: integrate native formats with the canonical host, status, first-comment and
 deletion services; then complete cleaned live-provider and broader release gates. Do not claim whole-app UX clearance or cutover readiness.
+
+
+## Batch92 — async publication receipt foundation
+
+The shared publisher now distinguishes explicit `published` from `submitted`.
+Missing/unknown state, unsafe URL and cancellation after a valid provider receipt
+are held as submitted and cannot project. A cancelled call can save only a
+receipt in a bounded transaction when its original parent is still `started`
+and the write succeeds; it does not dispatch again. If the parent resolved or
+was replaced, or the write fails, the outcome stays held. Preserve the first
+receipt time and provider URL through matching Root attestation, record
+`attestedAt` when verification is recorded, and disallow absent/replacement attestation for a
+known submitted ID. Projection reruns outcome guards, including the current
+accepted native proof where needed. General late-fact append/reconciliation for
+already-resolved shared parents remains future work; native Facebook receipts
+remain in the private journal.
+
+Migration21 `20261019050000_rebuild_publication_submissions` SHA-256:
+`91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931`. Fresh
+full backup/scratch restore kept107 prior counts and Root settings; applied to
+synthetic local preview only. Full21-file schema-only rehearsal and the actual
+PostgreSQL native proof → matching Root attestation → projection chain passed.
+Final suite:3,150 tests/356 files, zero skips; production build and serial
+typecheck passed. Root browser/API/MCP checks passed16 views across four themes
+at1440px/390px, exact-ID proof/attestation/separate projection and authorization
+refusals with two local HTTPS-mock GETs. Both Claude accounts reviewed source;
+cancellation, URL, required-state and duplicate-ID issues were fixed/tested.
+Final cleanup matched all107 prior counts and exact settings; scratch removed
+and full backup retained.
+Production remains legacy and the held provider canary remains unchanged.
+
+Complete full customer recovery browser coverage (component tests passed), then automatic pending-
+status reconciliation, safe provider deletion, comment integration and native
+host dispatch. Facebook feed explicitly returns published; a video upload ID
+returns submitted while video remains in the current media descriptor. Native
+formats remain disabled. Live-provider and broader release gates remain open.
+Details: [ASYNC_PUBLICATION_RECEIPTS.md](ASYNC_PUBLICATION_RECEIPTS.md).

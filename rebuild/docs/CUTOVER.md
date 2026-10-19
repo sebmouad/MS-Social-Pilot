@@ -426,3 +426,28 @@ backup/restore comparison. No customer rows were present in that rehearsal. This
 does not establish production-shaped migration, media restoration or service
 rollback. Native customer formats remain disabled, and no production deployment
 or live provider content belongs to this batch.
+
+
+## Native proof and asynchronous receipt migrations — batches91–92
+
+The reviewed sequence now pins21 files. Migration20,
+`20261019040000_rebuild_facebook_native_status_proofs`, SHA-256
+`253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4`, adds
+provider-owned, append-only Root observations without granting dispatch authority.
+Migration21, `20261019050000_rebuild_publication_submissions`, SHA-256
+`91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931`, extends
+only the shared publication state/reason/receipt CHECKs. A submitted identity is
+held until a matching verified outcome can be recorded and projected separately.
+Active-claim uniqueness and purge write gates remain in force.
+
+Both were applied only to the synthetic local preview after full backup and
+scratch restore checks. Batch92's fresh pre-application backup SHA-256 is
+`391f4067e5ba0b506b3d721be660a1abc2be6d94f5569c8629b19191368a410d`.
+All107 preexisting table counts and exact Root settings matched after migration
+and the final API/MCP/browser fixtures were removed. The disposable scratch was
+removed; the full backup was retained privately. The complete21-file schema-only
+rehearsal passed its independent backup/restore and valid/invalid submitted-row
+checks. These are local schema/data checks, not production-shaped customer,
+media, application or service rollback proof. Do not narrow allowed states on a
+rollback while submitted receipts exist or discard their remote identities.
+Production cutover remains blocked on the full release gates above.

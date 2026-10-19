@@ -5,27 +5,28 @@ import { Button } from '@/components/Button';
 import { ModalDialog } from '@/components/ModalDialog';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 
-type Context = { workspaceId: string; workspaceName: string; postId: string; targetId: string; targetName: string | null };
+type Context = { workspaceId: string; workspaceName: string; postId: string; targetId: string; targetName: string | null; remoteUrl?: string | null };
 type Row = Context & { operationId: string; state: string; remotePostId: string | null; remoteUrl: string | null };
 type Mode = 'record' | 'finish' | 'adopt';
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 export function RootPublicationControls({ row }: { row: Row }) {
-  const mode = row.state === 'receipt_recorded' ? 'finish' : ['started', 'uncertain'].includes(row.state) ? 'record' : null;
-  return <RecoveryControl mode={mode ?? 'record'} context={row} identity={row.operationId} available={mode !== null} />;
+  const submitted = row.state === 'submitted' && Boolean(row.remotePostId);
+  const mode = row.state === 'receipt_recorded' ? 'finish' : ['started', 'uncertain'].includes(row.state) || submitted ? 'record' : null;
+  return <RecoveryControl mode={mode ?? 'record'} context={row} identity={row.operationId} available={mode !== null} knownRemoteId={submitted ? row.remotePostId : null} />;
 }
 export function RootLegacyPublicationControl({ row }: { row: Context & { postTargetId: string } }) {
   return <RecoveryControl mode="adopt" context={row} identity={row.postTargetId} />;
 }
-function RecoveryControl({ mode, context, identity, available = true }: { mode: Mode; context: Context; identity: string; available?: boolean }) {
+function RecoveryControl({ mode, context, identity, available = true, knownRemoteId = null }: { mode: Mode; context: Context; identity: string; available?: boolean; knownRemoteId?: string | null }) {
   const router = useRouter();
   const validation = useFormValidation();
   const inFlight = useRef(false);
   const errorRef = useRef<HTMLParagraphElement>(null);
   const noticeRef = useRef<HTMLParagraphElement>(null);
   const [open, setOpen] = useState(false);
-  const [outcome, setOutcome] = useState<'PUBLISHED' | 'ABSENT' | ''>('');
-  const [remotePostId, setRemotePostId] = useState('');
+  const [outcome, setOutcome] = useState<'PUBLISHED' | 'ABSENT' | ''>(knownRemoteId ? 'PUBLISHED' : '');
+  const [remotePostId, setRemotePostId] = useState(knownRemoteId ?? '');
   const [remoteUrl, setRemoteUrl] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [verified, setVerified] = useState(false);
@@ -33,11 +34,11 @@ function RecoveryControl({ mode, context, identity, available = true }: { mode: 
   const [notice, setNotice] = useState('');
   const [pending, setPending] = useState(false);
   const phrase = mode === 'record' ? outcome ? `ROOT RECORD PUBLICATION ${identity} ${outcome}` : '' : `ROOT ${mode === 'finish' ? 'FINISH' : 'ADOPT'} PUBLICATION ${identity}`;
-  const label = mode === 'record' ? 'Record external check' : mode === 'finish' ? 'Finish local record' : 'Adopt for recovery';
+  const label = mode === 'record' ? knownRemoteId ? 'Verify submitted publication' : 'Record external check' : mode === 'finish' ? 'Finish local record' : 'Adopt for recovery';
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   useEffect(() => { if (notice && !open) noticeRef.current?.focus(); }, [notice, open]);
   function begin() {
-    setOutcome(''); setRemotePostId(''); setRemoteUrl(''); setConfirmation(''); setVerified(false); setError(''); setNotice(''); validation.clearAll(); setOpen(true);
+    setOutcome(knownRemoteId ? 'PUBLISHED' : ''); setRemotePostId(knownRemoteId ?? ''); setRemoteUrl(context.remoteUrl ?? ''); setConfirmation(''); setVerified(false); setError(''); setNotice(''); validation.clearAll(); setOpen(true);
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,21 +69,21 @@ function RecoveryControl({ mode, context, identity, available = true }: { mode: 
   return <>
     {available ? <Button variant="secondary" size="sm" onClick={begin}>{label}</Button> : <span>No operator action</span>}
     {notice && <p ref={noticeRef} tabIndex={-1} role="status">{notice}</p>}
-    {open && <ModalDialog className="ui-dialog" labelledBy={`root-publication-${identity}`} busy={pending} initialFocus="[data-publication-cancel]" onDismiss={() => { if (!pending) setOpen(false); }}>
+    {open && <ModalDialog className="ui-dialog root-platform-action-dialog" labelledBy={`root-publication-${identity}`} busy={pending} initialFocus="[data-publication-cancel]" onDismiss={() => { if (!pending) setOpen(false); }}>
       <div className="ui-dialog__header"><h2 id={`root-publication-${identity}`}>{label}</h2></div>
       <form method="post" noValidate onSubmit={event => void submit(event)}>
         <div className="ui-dialog__body">
           <p><strong>Workspace:</strong> {context.workspaceName} · {context.workspaceId}</p>
           <p><strong>Channel:</strong> {context.targetName || 'Channel removed'} · {context.targetId}</p>
           <p><strong>Local post:</strong> <code>{context.postId}</code></p>
-          <p>{mode === 'finish' ? 'This only updates local records from the saved receipt. It sends no publication or first comment.' : 'Check the destination directly first. This records a human external check and never contacts the platform. A delayed request may still complete after absence is recorded; check again before retrying.'}</p>
-          {mode === 'record' && <>
+          <p>{mode === 'finish' ? 'This only updates local records from the saved receipt. It sends no publication or first comment.' : knownRemoteId ? 'Check that this exact submitted publication is live. This records your external check without contacting the platform or finishing the local record.' : 'Check the destination directly first. This records a human external check and never contacts the platform. A delayed request may still complete after absence is recorded; check again before retrying.'}</p>
+      {mode === 'record' && <>
             <fieldset className="ui-field" disabled={pending}><legend>Verified result on destination</legend>
-              <label><input type="radio" name="outcome" value="ABSENT" checked={outcome === 'ABSENT'} onChange={() => { setOutcome('ABSENT'); setConfirmation(''); validation.clear('outcome'); validation.clear('confirmation'); }} /> The publication is absent</label>
+              {!knownRemoteId && <label><input type="radio" name="outcome" value="ABSENT" checked={outcome === 'ABSENT'} onChange={() => { setOutcome('ABSENT'); setConfirmation(''); validation.clear('outcome'); validation.clear('confirmation'); }} /> The publication is absent</label>}
               <label><input type="radio" name="outcome" value="PUBLISHED" checked={outcome === 'PUBLISHED'} onChange={() => { setOutcome('PUBLISHED'); setConfirmation(''); validation.clear('outcome'); validation.clear('confirmation'); }} /> The publication exists</label>
             </fieldset><FieldError {...validation.errorProps('outcome')} />
             {outcome === 'PUBLISHED' && <>
-              <label className="ui-field" htmlFor={remoteIdField.id}><span>Remote post ID</span><input {...remoteIdField} className="ui-input" name="remotePostId" value={remotePostId} disabled={pending} required onChange={event => { setRemotePostId(event.target.value); validation.clear('remotePostId'); }} /></label><FieldError {...validation.errorProps('remotePostId')} />
+              <label className="ui-field" htmlFor={remoteIdField.id}><span>Remote post ID</span><input {...remoteIdField} className="ui-input" name="remotePostId" value={remotePostId} disabled={pending} readOnly={Boolean(knownRemoteId)} required onChange={event => { setRemotePostId(event.target.value); validation.clear('remotePostId'); }} /></label><FieldError {...validation.errorProps('remotePostId')} />
               <label className="ui-field" htmlFor={remoteUrlField.id}><span>Public post link, if available</span><input {...remoteUrlField} className="ui-input" name="remoteUrl" type="url" value={remoteUrl} disabled={pending} onChange={event => { setRemoteUrl(event.target.value); validation.clear('remoteUrl'); }} /></label><FieldError {...validation.errorProps('remoteUrl')} />
             </>}
           </>}

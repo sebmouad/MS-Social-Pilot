@@ -19,6 +19,7 @@ vi.mock('../src/platforms/facebook/formats/read-credentials', () => ({ prepareFa
 import { refreshFacebookNativeStatus, facebookNativeStatusConfirmation } from '../src/platforms/facebook/formats/status-recovery';
 import { executeFacebookNativeWithJournal, type FacebookNativeJournalBinding } from '../src/platforms/facebook/formats/journal';
 import { assertFacebookNativeResolution, assertFacebookNativeSettled } from '../src/platforms/facebook/formats/journal-recovery';
+import { recordRootPublicationOutcome, finishRootPublicationProjection } from '../src/server/root/publication-attempts';
 import { exportWorkspaceData, deleteWorkspaceDatabaseRows } from '../src/server/data-control';
 
 function database(value: string) {
@@ -104,6 +105,25 @@ describe.skipIf(!url)('Native status recovery on actual synthetic PostgreSQL', (
     // Parent outcome is deliberately still unresolved; proof alone cannot release erasure.
     await expect(db.$transaction(tx => assertFacebookNativeSettled(tx, scope.workspaceId))).rejects.toMatchObject({ code: 'conflict' });
     expect(await db.$queryRaw`SELECT id FROM root_activities WHERE "actorId"=${root} AND action='facebook.native_status_observed' AND detail->>'operationId'=${scope.operationId}`).toHaveLength(1);
+  });
+  it('recovers a submitted native parent only after accepted proof and exact-identity Root attestation', async () => {
+    const scope = await fixture(); const child = await journal(scope);
+    await db.$executeRaw`UPDATE rebuild_publication_attempts SET state='submitted',reason='provider_submission',"remotePostId"=${child.remoteId},"receiptAt"=clock_timestamp() WHERE id=${scope.operationId}`;
+    const finish = { operationId: scope.operationId, confirmation: `ROOT FINISH PUBLICATION ${scope.operationId}` };
+    const record = { operationId: scope.operationId, outcome: 'PUBLISHED', remotePostId: child.remoteId,
+      verifiedExternally: true, confirmation: `ROOT RECORD PUBLICATION ${scope.operationId} PUBLISHED` };
+    await expect(finishRootPublicationProjection(root, finish)).rejects.toMatchObject({ code: 'conflict' });
+    await expect(recordRootPublicationOutcome(root, record)).rejects.toMatchObject({ code: 'conflict' });
+    expect(await refreshFacebookNativeStatus(root, await action(scope))).toMatchObject({ ok: true });
+    await expect(recordRootPublicationOutcome(root, { ...record, remotePostId: 'different-final-id' })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(recordRootPublicationOutcome(root, { operationId: scope.operationId, outcome: 'ABSENT', verifiedExternally: true,
+      confirmation: `ROOT RECORD PUBLICATION ${scope.operationId} ABSENT` })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(recordRootPublicationOutcome(root, record)).resolves.toMatchObject({ state: 'receipt_recorded' });
+    expect(await db.postTarget.findUnique({ where: { id: scope.postTargetId } })).toMatchObject({ status: 'processing', remotePostId: null });
+    await expect(finishRootPublicationProjection(root, finish)).resolves.toMatchObject({ ok: true, state: 'projected' });
+    expect(await db.postTarget.findUnique({ where: { id: scope.postTargetId } })).toMatchObject({ status: 'published', remotePostId: child.remoteId });
+    await expect(db.$transaction(tx => assertFacebookNativeSettled(tx, scope.workspaceId))).resolves.toBeUndefined();
+    expect(shared.reads).toBe(1);
   });
   it.each(['scheduled', 'wrong_page', 'error'])('retains %s observations without accepting or releasing the publication', async response => {
     const scope = await fixture(); shared.response = response;

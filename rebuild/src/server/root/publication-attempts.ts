@@ -49,7 +49,7 @@ export async function recordRootPublicationOutcome(userId: string, input: unknow
   const found = await prisma.$queryRaw<Array<{ id: string; workspaceId: string; postId: string; targetId: string; state: string }>>`SELECT id, "workspaceId", "postId", "targetId", state FROM rebuild_publication_attempts WHERE id = ${parsed.data.operationId}`;
   const initial = found[0];
   if (!initial) throw new OperationError('not_found', 'This publication operation is unavailable.');
-  if (!['started', 'uncertain'].includes(initial.state)) throw new OperationError('conflict', 'This publication can no longer be manually attested.');
+  if (!['started', 'uncertain', 'submitted'].includes(initial.state)) throw new OperationError('conflict', 'This publication can no longer be manually attested.');
   return rootWorkspaceOperation(userId, initial.workspaceId, initial.postId, initial.targetId, tx => recordPublicationOutcomeInTransaction(tx, userId, { workspaceId: initial.workspaceId, operationId: parsed.data.operationId, outcome: parsed.data.outcome, ...(parsed.data.remotePostId ? { remotePostId: parsed.data.remotePostId } : {}), ...(parsed.data.remoteUrl ? { remoteUrl: parsed.data.remoteUrl } : {}) }));
 }
 

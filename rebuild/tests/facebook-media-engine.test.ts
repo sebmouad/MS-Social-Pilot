@@ -32,6 +32,29 @@ function adapter(fetcher: typeof fetch, factory: FacebookMediaJournalFactory) {
 }
 
 describe('Facebook multi-photo journaling', () => {
+  it('declares feed receipt meaning and holds private video upload identities', async () => {
+    const albumJournal: FacebookMediaJournal = {
+      beginPhoto: vi.fn(), recordPhoto: vi.fn(), rejectPhoto: vi.fn(),
+      beginFeed: vi.fn(), recordFeed: vi.fn(), rejectFeed: vi.fn(),
+    };
+    const cases = [
+      { name: 'feed', media: [], replies: [{ id: 'feed-post' }] },
+      { name: 'video', media: [{ kind: 'video' as const, url: 'https://cdn.test/a.mp4' }], replies: [{ id: 'video-post' }] },
+      { name: 'single photo', media: [{ kind: 'image' as const, url: 'https://cdn.test/a.jpg' }], replies: [{ id: 'photo-post' }] },
+      { name: 'photo album', media, replies: [{ id: 'photo-1' }, { id: 'photo-2' }, { id: 'album-post' }] },
+    ];
+    for (const item of cases) {
+      const fetcher = vi.fn();
+      for (const reply of item.replies) fetcher.mockResolvedValueOnce(response(reply));
+      const subject = createFacebookAdapter(config, fetcher as unknown as typeof fetch, {
+        postPublishScopes: ['pages_manage_posts'], mediaJournalFactory: () => albumJournal,
+      });
+      await expect(subject.publish!({ credential, target, operationId: 'operation-current-feed', text: 'A current post', media: item.media }))
+        .resolves.toEqual({ remoteId: item.replies.at(-1)!.id, url: null, state: item.name === 'video' ? 'submitted' : 'published' });
+      expect(fetcher).toHaveBeenCalledTimes(item.replies.length);
+    }
+  });
+
   it('requires a durable publication operation id before the first remote upload', async () => {
     const fetcher = vi.fn();
     const harness = journalHarness();
@@ -51,7 +74,7 @@ describe('Facebook multi-photo journaling', () => {
       return response({ id: index < 2 ? `photo-${index + 1}` : 'page-post-1' });
     }) as unknown as typeof fetch;
     const subject = adapter(fetcher, harness.factory);
-    await expect(subject.publish!({ credential, target, operationId: 'operation-1', text: '', media })).resolves.toEqual({ remoteId: 'page-post-1', url: null });
+    await expect(subject.publish!({ credential, target, operationId: 'operation-1', text: '', media })).resolves.toEqual({ remoteId: 'page-post-1', url: null, state: 'published' });
     expect(events).toEqual([
       'beginPhoto:1', 'request:photo-1', 'recordPhoto:1:photo-1',
       'beginPhoto:2', 'request:photo-2', 'recordPhoto:2:photo-2',

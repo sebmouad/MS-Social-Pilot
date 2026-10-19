@@ -198,7 +198,7 @@ export async function readFacebookNativeEvidence(operationId?: string, resultCap
   const items = journalItems;
   const actions = statusRecoveryEnabled ? rows.slice(0, limit).flatMap(row => {
     if (!facebookNativeStatusEligible(row) || !(['started', 'uncertain'].includes(row.parentState) && row.parentRemoteId === null ||
-      ['receipt_recorded', 'projected'].includes(row.parentState) && row.parentRemoteId === row.remoteId)) return [];
+      ['submitted', 'receipt_recorded', 'projected'].includes(row.parentState) && row.parentRemoteId === row.remoteId)) return [];
     const rowId = facebookNativeEvidenceId(row.operationId);
     return [{ intent: 'inspect' as const, rowId, actionId: 'refresh_native_status', subjectId: row.operationId,
       label: 'Check final publication status',

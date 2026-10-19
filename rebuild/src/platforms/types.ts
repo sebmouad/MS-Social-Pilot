@@ -91,7 +91,12 @@ export interface PublishRequest {
   media?: PublishMedia[];
   signal?: AbortSignal;
 }
-export interface PublishResult { remoteId: string; url: string | null }
+export interface PublishResult {
+  remoteId: string;
+  url: string | null;
+  /** Required receipt meaning: a submission identity is not proof of live content. */
+  state: 'published' | 'submitted';
+}
 export interface FirstCommentRequest {
   credential: PlatformCredential;
   remotePostId: string;

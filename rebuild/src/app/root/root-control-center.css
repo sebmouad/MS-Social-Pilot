@@ -57,6 +57,7 @@
 .root-publication-evidence__context dd { min-width: 0; margin: 0; overflow-wrap: anywhere; word-break: break-word; }
 .root-platform-action-dialog.ui-dialog { display: flex; flex-direction: column; max-height: min(85vh, 740px); overflow: hidden; }
 .root-platform-action-dialog .ui-dialog__header, .root-platform-action-dialog .ui-dialog__actions { flex: 0 0 auto; }
+.root-platform-action-dialog > form { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
 .root-platform-action-dialog .ui-dialog__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .root-platform-action-dialog .ui-dialog__body > * { scroll-margin-block: 12px; }
 .root-control__module-grid .ui-button { margin-top: auto; }

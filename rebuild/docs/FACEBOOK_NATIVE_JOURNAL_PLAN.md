@@ -140,3 +140,43 @@ resend; host/webhook races that preserve dispatch fencing; cleaned live Meta
 coverage for any supported format; and broader parity plus production-shaped
 data/media/service rollback. Keep customer native formats unavailable. Production
 and the held photo-cleanup canary remain unchanged.
+
+
+## Batch92 shared publication submission boundary
+
+The parent attempt journal now admits `submitted`/`provider_submission`. This
+represents an accepted provider submission with an ID, not proof of live
+publication. The shared adapter result requires an explicit `published` or
+`submitted` state; missing/unknown state, unsafe returned URL and cancellation
+after a usable receipt stay submitted and are never projected. Receipt-only
+persistence after cancellation is permitted only while the original shared
+parent is still `started` and the bounded DB write succeeds. If resolved,
+replaced or unwritable, the result remains held. This write does not dispatch.
+
+Known submitted IDs cannot be recorded absent or replaced. First `receiptAt`
+and provider URL are preserved on matching Root attestation; `attestedAt` is
+set when verification is recorded and used by local projection. The projection path rechecks provider outcome guards
+and requires a current accepted native status proof when native work is involved.
+General late-fact append/reconciliation for already-resolved shared parents is
+not implemented; Facebook's private native journal retains its own phase facts.
+
+Migration21 `20261019050000_rebuild_publication_submissions` has SHA-256
+`91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931`. Full
+backup/scratch restore preserved107 prior table counts and Root settings; the
+additive migration was applied to the synthetic local preview only. The full
+21-file schema-only rehearsal passed. Actual PostgreSQL native proof → matching
+Root attestation → publication projection passed. Final suite:3,150 tests/356
+files, zero skips; build/typecheck passed. Root browser/API/MCP checks passed16
+views across four themes/two widths with two local HTTPS-mock GETs and exact-ID
+attestation/separate projection. Both Claude accounts reviewed source; concrete
+receipt-retention findings were fixed and tested. All107 original counts/settings
+matched after cleanup; scratch removed, full backup retained. Customer components
+passed tests; full customer recovery browser coverage remains separate.
+
+Facebook feed currently returns explicit `published`; video upload identity is
+`submitted`, with video still in the current media descriptor. Native formats
+remain disabled. Automatic native host dispatch, pending-status reconciliation,
+safe provider deletion, comment integration and live-provider proof remain open.
+Production and the held provider canary remain unchanged. See
+[ASYNC_PUBLICATION_RECEIPTS.md](ASYNC_PUBLICATION_RECEIPTS.md) for the shared
+receipt contract.

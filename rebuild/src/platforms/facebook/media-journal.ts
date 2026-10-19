@@ -442,7 +442,8 @@ export async function assertFacebookMediaResolution(
     FROM rebuild_publication_attempts a
     LEFT JOIN post_targets pt ON pt.id=a."postTargetId" AND pt."postId"=a."postId"
     WHERE a.id = ${operationId} AND a."workspaceId" = ${workspaceId} AND a.provider = 'facebook'
-      AND a.state IN ('started', 'uncertain')
+      AND (a.state IN ('started', 'uncertain') OR
+        (${outcome} = 'PUBLISHED' AND a.state IN ('submitted', 'receipt_recorded', 'projected') AND a."remotePostId" = ${remotePostId ?? null}))
     FOR UPDATE OF a`;
   const parent = parents[0];
   if (!parent) throw conflict('This Facebook publication operation is unavailable in the current workspace.');

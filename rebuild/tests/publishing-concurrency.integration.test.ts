@@ -5,7 +5,7 @@ import { PrismaClient } from '../generated/client';
 const databaseUrl = process.env.REBUILD_PREVIEW_DATABASE_URL;
 const integration = vi.hoisted(() => ({
   prisma: null as unknown as PrismaClient,
-  publish: null as null | ((signal?: AbortSignal) => Promise<{ remoteId: string; url: string | null }>),
+  publish: null as null | ((signal?: AbortSignal) => Promise<{ remoteId: string; url: string | null; state: 'published' | 'submitted' }>),
   publishCalls: 0,
 }));
 
@@ -151,7 +151,7 @@ describe.skipIf(!databaseUrl)('publishing operation concurrency on isolated Post
     integration.publish = async () => {
       enteredProvider();
       await providerRelease;
-      return { remoteId: 'synthetic-remote-post', url: 'https://example.test/post' };
+      return { state: 'published', remoteId: 'synthetic-remote-post', url: 'https://example.test/post' };
     };
 
     try {
@@ -185,7 +185,7 @@ describe.skipIf(!databaseUrl)('publishing operation concurrency on isolated Post
   it('skips a stale due-schedule candidate after the queue item was cancelled', async () => {
     const fixture = await createFixture();
     integration.publishCalls = 0;
-    integration.publish = async () => ({ remoteId: 'unexpected-remote-post', url: null });
+    integration.publish = async () => ({ state: 'published', remoteId: 'unexpected-remote-post', url: null });
     try {
       await expect(cancelScheduledPost(fixture.actor, fixture.postId)).resolves.toBeUndefined();
       await expect(publishPost(fixture.actor, fixture.postId, fixture.scheduledAt))

@@ -39,23 +39,25 @@ function scopes(value: unknown): string[] {
 }
 
 async function configTrust() {
-  const [enabled, readScopes, graphBaseUrl, graphVersion, appSecretProofEnabled, requestTimeoutMs, appSecret] = await Promise.all([
+  const [enabled, readScopes, graphBaseUrl, graphVersion, appSecretProofEnabled, requestTimeoutMs, maxResponseBytes, appSecret] = await Promise.all([
     runtimeConfig('facebook.native.statusRecoveryEnabled'),
     runtimeConfig('meta.postReadScopes'),
     runtimeConfig('meta.graphBaseUrl'),
     runtimeConfig('meta.graphVersion'),
     runtimeConfig('meta.appSecretProofEnabled'),
     runtimeConfig('meta.requestTimeoutMs'),
+    runtimeConfig('facebook.native.maxResponseBytes'),
     runtimeSecret('meta.appSecret').catch(() => null),
   ]);
   const requiredScopes = scopes(readScopes);
   if (enabled !== true || !requiredScopes.length || typeof graphBaseUrl !== 'string' || !graphBaseUrl ||
       typeof graphVersion !== 'string' || !graphVersion || typeof appSecretProofEnabled !== 'boolean' ||
       typeof requestTimeoutMs !== 'number' || !Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0 ||
+      typeof maxResponseBytes !== 'number' || !Number.isSafeInteger(maxResponseBytes) || maxResponseBytes <= 0 ||
       (appSecretProofEnabled && (typeof appSecret !== 'string' || !appSecret.trim()))) throw unavailable();
   return {
     requiredScopes,
-    fingerprint: digest({ graphBaseUrl, graphVersion, appSecretProofEnabled, requestTimeoutMs, appSecret: appSecret ?? null }),
+    fingerprint: digest({ graphBaseUrl, graphVersion, appSecretProofEnabled, requestTimeoutMs, maxResponseBytes, appSecret: appSecret ?? null }),
   };
 }
 

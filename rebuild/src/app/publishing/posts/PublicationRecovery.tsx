@@ -18,7 +18,7 @@ function isStatus(value: unknown): value is Status {
   const result = value as Partial<Status>;
   const textOrNull = (item: unknown) => item === null || typeof item === 'string';
   const safeLink = (item: unknown) => { if (item === null) return true; if (typeof item !== 'string') return false; try { const url = new URL(item); return url.protocol === 'https:' && !url.username && !url.password; } catch { return false; } };
-  return typeof result.postId === 'string' && Array.isArray(result.operations) && result.operations.every(operation => operation && typeof operation.id === 'string' && typeof operation.postTargetId === 'string' && typeof operation.targetId === 'string' && textOrNull(operation.targetName) && ['started', 'uncertain', 'receipt_recorded', 'projected', 'rejected', 'attested_absent'].includes(operation.state) && textOrNull(operation.remotePostId) && safeLink(operation.remoteUrl)) && Number.isSafeInteger(result.legacyProcessingCount) && Number(result.legacyProcessingCount) >= 0 && typeof result.truncated === 'boolean';
+  return typeof result.postId === 'string' && Array.isArray(result.operations) && result.operations.every(operation => operation && typeof operation.id === 'string' && typeof operation.postTargetId === 'string' && typeof operation.targetId === 'string' && textOrNull(operation.targetName) && ['started', 'uncertain', 'submitted', 'receipt_recorded', 'projected', 'rejected', 'attested_absent'].includes(operation.state) && textOrNull(operation.remotePostId) && safeLink(operation.remoteUrl)) && Number.isSafeInteger(result.legacyProcessingCount) && Number(result.legacyProcessingCount) >= 0 && typeof result.truncated === 'boolean';
 }
 
 async function readStatus(postId: string): Promise<Status> {
@@ -61,7 +61,8 @@ export function PublicationRecovery({ postId, excerpt, targets }: Props) {
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
 
   function open(next: Mode) {
-    validation.clearAll(); setNotice(''); setError(''); setOutcome(''); setVerified(false); setConfirmation(''); setRemotePostId(''); setRemoteUrl(''); setMode(next);
+    const submittedId = next.kind === 'record' && next.operation.state === 'submitted' ? next.operation.remotePostId : null;
+    validation.clearAll(); setNotice(''); setError(''); setOutcome(submittedId ? 'PUBLISHED' : ''); setVerified(false); setConfirmation(''); setRemotePostId(submittedId ?? ''); setRemoteUrl(next.kind === 'record' ? next.operation.remoteUrl ?? '' : ''); setMode(next);
   }
   const expected = mode?.kind === 'record' && outcome ? `RECORD PUBLICATION ${mode.operation.id} ${outcome}` : mode?.kind === 'finish' ? `FINISH PUBLICATION ${mode.operation.id}` : mode?.kind === 'adopt' ? `ADOPT PUBLICATION ${mode.target.id}` : '';
 
@@ -84,9 +85,9 @@ export function PublicationRecovery({ postId, excerpt, targets }: Props) {
       const body = await response.json().catch(() => null);
       if (!response.ok) throw new Error(body && typeof body.error === 'string' ? body.error : 'The recovery outcome could not be saved. Check current status before repeating it.');
       if (response.redirected || !isStatus(body) || body.postId !== postId) throw new Error('The outcome may have been saved, but the returned status was unreadable. Refresh publication status before repeating any action.');
-      const confirmed = mode.kind === 'record' ? body.operations.some(operation => operation.id === mode.operation.id && operation.state === (outcome === 'PUBLISHED' ? 'receipt_recorded' : 'attested_absent')) : mode.kind === 'finish' ? body.operations.some(operation => operation.id === mode.operation.id && operation.state === 'projected') : body.operations.some(operation => operation.postTargetId === mode.target.id && operation.state === 'uncertain');
+      const confirmed = mode.kind === 'record' ? body.operations.some(operation => operation.id === mode.operation.id && operation.state === (outcome === 'PUBLISHED' ? 'receipt_recorded' : 'attested_absent') && (mode.operation.state !== 'submitted' || operation.remotePostId === mode.operation.remotePostId)) : mode.kind === 'finish' ? body.operations.some(operation => operation.id === mode.operation.id && operation.state === 'projected') : body.operations.some(operation => operation.postTargetId === mode.target.id && operation.state === 'uncertain');
       if (!confirmed) throw new Error('The response did not confirm this operation. Refresh publication status before repeating it.');
-      setNotice(mode.kind === 'finish' ? 'Local publication record updated. No new publication was sent.' : mode.kind === 'adopt' ? 'Older destination adopted for outcome review.' : outcome === 'PUBLISHED' ? 'Human-verified receipt saved. Finish the local record separately.' : 'Human-verified absence recorded. No publication was sent.');
+      setNotice(mode.kind === 'finish' ? 'Local publication record updated. No new publication was sent.' : mode.kind === 'adopt' ? 'Older destination adopted for outcome review.' : mode.operation.state === 'submitted' ? 'Human-verified receipt saved. Finish the local record separately. No new publication was sent.' : outcome === 'PUBLISHED' ? 'Human-verified receipt saved. Finish the local record separately.' : 'Human-verified absence recorded. No publication was sent.');
       setStatus(body); setMode(null);
       if (mode.kind === 'finish' || mode.kind === 'record' && outcome === 'ABSENT') {
         const destination = new URL(window.location.href);
@@ -105,7 +106,7 @@ export function PublicationRecovery({ postId, excerpt, targets }: Props) {
     finally { setLoadPending(false); }
   }
 
-  const unresolvedTargets = targets.filter(target => target.status === 'processing' && !target.remotePostId);
+  const unresolvedTargets = targets.filter(target => target.status === 'processing');
   if (!unresolvedTargets.length) return notice ? <p ref={noticeRef} tabIndex={-1} role="status">{notice}</p> : null;
   const confirmationField = validation.fieldProps('confirmation');
   const remoteIdField = validation.fieldProps('remotePostId');
@@ -122,11 +123,11 @@ export function PublicationRecovery({ postId, excerpt, targets }: Props) {
         <p><strong>Post context:</strong> {excerpt || 'No post text is available.'}</p>
         {status.truncated ? <p role="status">This history is limited to recent operations. Older records are not shown here. Ask your workspace administrator if you need more history.</p> : null}
         {status.operations.map(operation => <article key={operation.id} className={styles.firstCommentRow}>
-          <div><strong>{operation.targetName || 'Destination'}</strong><p>Operation <code>{operation.id}</code> · {operation.state.replaceAll('_', ' ')}</p>
+          <div><strong>{operation.targetName || 'Destination'}</strong><p>Operation <code>{operation.id}</code> · {operation.state === 'submitted' ? 'Submitted; awaiting verification' : operation.state.replaceAll('_', ' ')}</p>
             {operation.remotePostId ? <p>Remote post ID: <code>{operation.remotePostId}</code></p> : null}
             {operation.remoteUrl ? <p><a href={operation.remoteUrl} target="_blank" rel="noreferrer">Open recorded publication</a></p> : null}
           </div>
-          {['started', 'uncertain'].includes(operation.state) ? <Button variant="secondary" size="sm" type="button" disabled={pending} onClick={() => open({ kind: 'record', operation })}>Record external check</Button> : operation.state === 'receipt_recorded' ? <Button variant="primary" size="sm" type="button" disabled={pending} onClick={() => open({ kind: 'finish', operation })}>Finish local record</Button> : null}
+          {['started', 'uncertain'].includes(operation.state) ? <Button variant="secondary" size="sm" type="button" disabled={pending} onClick={() => open({ kind: 'record', operation })}>Record external check</Button> : operation.state === 'submitted' && operation.remotePostId ? <Button variant="secondary" size="sm" type="button" disabled={pending} onClick={() => open({ kind: 'record', operation })}>Verify submitted publication</Button> : operation.state === 'receipt_recorded' ? <Button variant="primary" size="sm" type="button" disabled={pending} onClick={() => open({ kind: 'finish', operation })}>Finish local record</Button> : null}
         </article>)}
         {status.legacyProcessingCount > 0 ? <div><p>{status.legacyProcessingCount} older processing destination(s) have no recovery operation yet. Adopt only after checking the destination directly.</p>{unresolvedTargets.filter(target => !status.operations.some(op => op.postTargetId === target.id)).map(target => <Button key={target.id} variant="secondary" size="sm" type="button" disabled={pending} onClick={() => open({ kind: 'adopt', target })}>Adopt {target.name || 'destination'} for recovery</Button>)}</div> : null}
       </> : null}
@@ -137,11 +138,12 @@ export function PublicationRecovery({ postId, excerpt, targets }: Props) {
         <div className="ui-dialog__body">
           <p><strong>Post context:</strong> {excerpt || 'No post text is available.'}</p>
           {mode.kind === 'record' ? <>
+            {mode.operation.state === 'submitted' ? <p>Check that this exact submitted post is published. Its saved ID cannot be replaced. This records your external check; finish the local record separately.</p> : null}
             <fieldset className="ui-field" disabled={pending}><legend>What did you verify on the destination?</legend>
-              <label><input type="radio" name="outcome" value="ABSENT" checked={outcome === 'ABSENT'} onChange={() => { setOutcome('ABSENT'); setConfirmation(''); }} /> The post is absent</label>
+              {!(mode.operation.state === 'submitted' && mode.operation.remotePostId) ? <label><input type="radio" name="outcome" value="ABSENT" checked={outcome === 'ABSENT'} onChange={() => { setOutcome('ABSENT'); setConfirmation(''); }} /> The post is absent</label> : null}
               <label><input type="radio" name="outcome" value="PUBLISHED" checked={outcome === 'PUBLISHED'} onChange={() => { setOutcome('PUBLISHED'); setConfirmation(''); }} /> The post is published</label>
             </fieldset>
-            {outcome === 'PUBLISHED' ? <><FieldError {...validation.errorProps('outcome')} /><label className="ui-field" htmlFor={remoteIdField.id}><span>Remote post ID</span><input {...remoteIdField} className="ui-input" name="remotePostId" required value={remotePostId} onChange={event => { setRemotePostId(event.target.value); validation.clear('remotePostId'); }} disabled={pending} /></label><FieldError {...validation.errorProps('remotePostId')} /><label className="ui-field" htmlFor={remoteUrlField.id}><span>Public post link, if available</span><input {...remoteUrlField} className="ui-input" name="remoteUrl" type="url" value={remoteUrl} onChange={event => { setRemoteUrl(event.target.value); validation.clear('remoteUrl'); }} disabled={pending} /></label><FieldError {...validation.errorProps('remoteUrl')} /></> : null}
+            {outcome === 'PUBLISHED' ? <><FieldError {...validation.errorProps('outcome')} /><label className="ui-field" htmlFor={remoteIdField.id}><span>Remote post ID</span><input {...remoteIdField} className="ui-input" name="remotePostId" required value={remotePostId} onChange={event => { setRemotePostId(event.target.value); validation.clear('remotePostId'); }} disabled={pending} readOnly={Boolean(mode.operation.state === 'submitted' && mode.operation.remotePostId)} /></label><FieldError {...validation.errorProps('remotePostId')} /><label className="ui-field" htmlFor={remoteUrlField.id}><span>Public post link, if available</span><input {...remoteUrlField} className="ui-input" name="remoteUrl" type="url" value={remoteUrl} onChange={event => { setRemoteUrl(event.target.value); validation.clear('remoteUrl'); }} disabled={pending} /></label><FieldError {...validation.errorProps('remoteUrl')} /></> : null}
           </> : null}
           {mode.kind === 'record' || mode.kind === 'adopt' ? <><label className="ui-field"><span><input type="checkbox" name="verifiedExternally" required checked={verified} disabled={pending} onChange={event => { setVerified(event.target.checked); validation.clear('verifiedExternally'); }} /> I checked this exact destination myself. This is not automated verification, and a delayed request may still complete later.</span></label><FieldError {...validation.errorProps('verifiedExternally')} /></> : null}
           <p>{mode.kind === 'finish' ? 'This only projects a saved receipt into local post records. It will not send another publication request.' : 'The app will not contact the platform or retry the original request.'}</p>

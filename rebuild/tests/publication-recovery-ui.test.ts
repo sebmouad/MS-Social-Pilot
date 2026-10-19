@@ -66,4 +66,21 @@ describe('Publication recovery customer surface', () => {
     await act(async () => root.render(createElement(PublicationRecovery, { ...props, targets: [{ id: 'pt-1', status: 'published', remotePostId: 'remote-1' }] })));
     expect(container.textContent).toBe('');
   });
+  it('labels submitted receipts as awaiting verification and restricts attestation to the stored remote ID', async () => {
+    const submitted = { ...operation, state: 'submitted', remotePostId: 'provider-final-1' };
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => Response.json(init?.method === 'POST' ? { ...post, operations: [{ ...submitted, state: 'receipt_recorded' }] } : { ...post, operations: [submitted] })));
+    await click('Review publication result');
+    expect(container.textContent).toContain('Submitted; awaiting verification');
+    expect(container.textContent).not.toContain('Finish local record');
+    await click('Verify submitted publication');
+    expect(container.querySelector<HTMLInputElement>('input[value="ABSENT"]')).toBeNull();
+    const id = container.querySelector<HTMLInputElement>('[name="remotePostId"]')!;
+    expect(id.value).toBe('provider-final-1'); expect(id.readOnly).toBe(true);
+    await value('confirmation', 'RECORD PUBLICATION op-1 PUBLISHED');
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    await click('Record checked outcome');
+    const call = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === 'POST')!;
+    expect(JSON.parse(call[1]!.body as string)).toEqual({ postId: 'post-1', action: 'record', operationId: 'op-1', outcome: 'PUBLISHED', verifiedExternally: true, remotePostId: 'provider-final-1', confirmation: 'RECORD PUBLICATION op-1 PUBLISHED' });
+    expect(container.textContent).toContain('Human-verified receipt saved. Finish the local record separately.');
+  });
 });

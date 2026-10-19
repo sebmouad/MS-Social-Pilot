@@ -1287,3 +1287,39 @@ occurred. Native customer formats remain unavailable; Story, remote deletion,
 first-comment, canonical host integration, live provider coverage and
 production-shaped rollback remain release gaps. See
 [FACEBOOK_NATIVE_STATUS.md](FACEBOOK_NATIVE_STATUS.md).
+
+
+## Batch92 — asynchronous provider receipt state
+
+The shared publishing result now requires `state: 'published' | 'submitted'`.
+Missing or unknown state, unsafe returned URL, and cancellation after a valid
+provider receipt are held as durable `submitted` evidence and never projected.
+Receipt-only persistence after cancellation is conditional on the original
+parent remaining `started` and the bounded database write succeeding; it cannot
+dispatch another provider request. If the parent resolved/was replaced or the
+write fails, the service holds without projection. The original receipt time
+and provider URL survive matching Root attestation; `attestedAt` records verification time, used by local projection. Known submitted IDs cannot be attested absent or replaced.
+Projection rechecks provider outcome guards, including current accepted native
+proof where required. General late-fact append/reconciliation for already-
+resolved shared parents remains future work; Facebook's native journal retains
+its own private late facts.
+
+Migration21 (`20261019050000_rebuild_publication_submissions`, SHA-256
+`91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931`) preserves
+the active claim and purge gate. Fresh full backup/scratch restore preserved
+107 prior public table counts and Root settings; the file was applied only to
+the synthetic local preview. The complete21-file schema-only rehearsal passed.
+Actual PostgreSQL coverage passed native proof, matching Root attestation and
+publication projection. Final suite:3,150 tests/356 files, zero skips; build/typecheck passed.
+Root browser/API/MCP checks passed16 views across four themes/two widths and
+exact-ID recovery/projection with two HTTPS-mock GETs. Both Claude accounts
+reviewed source; receipt-retention findings were fixed and tested. All107 prior
+counts/settings matched after cleanup; scratch removed and backup preserved.
+Customer components are unit tested; full customer browser coverage is separate. See [ASYNC_PUBLICATION_RECEIPTS.md](ASYNC_PUBLICATION_RECEIPTS.md).
+
+Facebook feed publishing currently returns explicit `published`; video upload
+identity returns `submitted`, while video remains in the current media
+descriptor. Native formats remain disabled. Automatic native host dispatch,
+pending-status reconciliation, safe provider deletion, comment integration,
+live-provider coverage and broader release gates remain open. Production and
+the held provider canary remain unchanged.

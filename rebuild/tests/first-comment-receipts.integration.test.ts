@@ -72,7 +72,7 @@ describe.skipIf(!databaseUrl)('first-comment receipt safety on isolated PostgreS
 
   function resetAdapter() {
     integration.adapter = {
-      publish: vi.fn(async () => ({ remoteId: 'provider-post', url: null })),
+      publish: vi.fn(async () => ({ state: 'published', remoteId: 'provider-post', url: null })),
       publishFirstComment: vi.fn(async () => ({ remoteId: 'provider-comment' })),
       classifyPublishingFailure: vi.fn(() => 'uncertain'),
       supportsTargetKind: vi.fn(() => true),
@@ -229,7 +229,7 @@ describe.skipIf(!databaseUrl)('first-comment receipt safety on isolated PostgreS
   it('does not dispatch a comment when the post receipt cannot be persisted', async () => {
     const fixture = await createFixture();
     failReceiptWrite(fixture, 'post');
-    integration.adapter.publish.mockResolvedValue({ remoteId: 'provider-post' });
+    integration.adapter.publish.mockResolvedValue({ state: 'published', remoteId: 'provider-post', url: null });
 
     await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ published: 0, needsReconciliation: 1, firstCommentsNeedingReview: 0 });
     integration.prisma = client;
@@ -240,7 +240,7 @@ describe.skipIf(!databaseUrl)('first-comment receipt safety on isolated PostgreS
 
   it('treats missing or invalid provider identifiers as unresolved and keeps retry blocked', async () => {
     const postFixture = await createFixture();
-    integration.adapter.publish.mockResolvedValue({ remoteId: '   ', url: null });
+    integration.adapter.publish.mockResolvedValue({ state: 'published', remoteId: '   ', url: null });
     await expect(publishPost(postFixture.actor, postFixture.postId)).resolves.toMatchObject({ published: 0, needsReconciliation: 1 });
     expect(await observer.postTarget.findUnique({ where: { id: postFixture.postTargetId }, select: { status: true, remotePostId: true } }))
       .toEqual({ status: 'processing', remotePostId: null });

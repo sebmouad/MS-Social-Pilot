@@ -11,7 +11,7 @@ fail() { echo "cutover rehearsal: $*" >&2; exit 1; }
 : "${CUTOVER_DUMP_SANITIZED:?Set CUTOVER_DUMP_SANITIZED=YES only after confirming the dump is sanitized}"
 : "${CUTOVER_APPROVED_MIGRATION_SET:?Set CUTOVER_APPROVED_MIGRATION_SET to the reviewed migration set}"
 [ "$CUTOVER_DUMP_SANITIZED" = YES ] || fail "CUTOVER_DUMP_SANITIZED must be YES"
-approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs'
+approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs,20261019050000_rebuild_publication_submissions'
 [ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
 [ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
 
@@ -49,6 +49,7 @@ verify_migration 20261019011000_rebuild_report_purge_gate 122e813070361737ba1a89
 verify_migration 20261019020000_rebuild_destination_formats 30325cdda1951cde93fab77a12bc349caa4422861fe133f68320ac3b979af6c6
 verify_migration 20261019030000_rebuild_facebook_native_journal 3ef505dccb5156ea1d84472998d19fb8427b1232669f57ca98a8ac6cd1e04d46
 verify_migration 20261019040000_rebuild_facebook_native_status_proofs 253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4
+verify_migration 20261019050000_rebuild_publication_submissions 91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931
 
 # Only loopback TCP or the standard local PostgreSQL socket and database
 # /postgres are accepted. A copied production DATABASE_URL must fail closed.
@@ -106,6 +107,7 @@ BEGIN
      OR to_regclass('public.report_runs') IS NOT NULL
      OR to_regclass('public.rebuild_facebook_native_journal') IS NOT NULL
      OR to_regclass('public.rebuild_facebook_native_status_proofs') IS NOT NULL
+     OR to_regprocedure('public.rebuild_facebook_native_status_proofs_guard()') IS NOT NULL
      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_targets' AND column_name = 'formatId')
      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_versions' AND column_name = 'destinationFormats')
      OR EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'rebuild_workspace_purge_write_gate' AND tgrelid = to_regclass('public.report_runs'))
@@ -117,9 +119,9 @@ BEGIN
     RAISE EXCEPTION 'staging dump already contains reviewed migration objects; use a pre-migration sanitized baseline';
   END IF;
   IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
-    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
       INTO already_applied
-      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal', '20261019040000_rebuild_facebook_native_status_proofs';
+      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal', '20261019040000_rebuild_facebook_native_status_proofs', '20261019050000_rebuild_publication_submissions';
     IF already_applied THEN
       RAISE EXCEPTION 'staging dump migration history already contains an allowlisted migration';
     END IF;
@@ -149,6 +151,63 @@ psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019011000_rebui
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019020000_rebuild_destination_formats/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019030000_rebuild_facebook_native_journal/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019040000_rebuild_facebook_native_status_proofs/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019050000_rebuild_publication_submissions/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+DO $$
+DECLARE
+  workspace_id text;
+  token text := replace(gen_random_uuid()::text, '-', '');
+  rejected integer := 0;
+BEGIN
+  workspace_id := token || '_workspace_' || txid_current()::text;
+  INSERT INTO workspaces (id, name, slug, timezone, "createdAt", "updatedAt")
+  VALUES (workspace_id, 'Cutover submission rehearsal', workspace_id, 'UTC', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  INSERT INTO rebuild_publication_attempts
+    (id, "workspaceId", "postId", "postTargetId", "targetId", provider, "actorId", state, reason, "remotePostId", "remoteUrl", "receiptAt")
+  VALUES (token || 'valid', workspace_id, token || 'post', token || 'target-link', token || 'target', 'facebook', token || 'actor', 'submitted', 'provider_submission', token || 'remote', 'https://provider.invalid/post', CURRENT_TIMESTAMP);
+
+  -- Each malformed shape must fail the database CHECK inside its own subtransaction.
+  BEGIN
+    INSERT INTO rebuild_publication_attempts
+      (id, "workspaceId", "postId", "postTargetId", "targetId", provider, "actorId", state, reason, "remotePostId", "receiptAt")
+    VALUES (token || 'badreason', workspace_id, token || 'p1', token || 't1', token || 'x1', 'facebook', token || 'actor', 'submitted', 'provider_receipt', token || 'r1', CURRENT_TIMESTAMP);
+    RAISE EXCEPTION 'submitted without provider_submission reason was accepted';
+  EXCEPTION WHEN check_violation THEN rejected := rejected + 1;
+  END;
+  BEGIN
+    INSERT INTO rebuild_publication_attempts
+      (id, "workspaceId", "postId", "postTargetId", "targetId", provider, "actorId", state, reason, "receiptAt")
+    VALUES (token || 'badremote', workspace_id, token || 'p2', token || 't2', token || 'x2', 'facebook', token || 'actor', 'submitted', 'provider_submission', CURRENT_TIMESTAMP);
+    RAISE EXCEPTION 'submitted without remotePostId was accepted';
+  EXCEPTION WHEN check_violation THEN rejected := rejected + 1;
+  END;
+  BEGIN
+    INSERT INTO rebuild_publication_attempts
+      (id, "workspaceId", "postId", "postTargetId", "targetId", provider, "actorId", state, reason, "remotePostId")
+    VALUES (token || 'badreceipt', workspace_id, token || 'p3', token || 't3', token || 'x3', 'facebook', token || 'actor', 'submitted', 'provider_submission', token || 'r3');
+    RAISE EXCEPTION 'submitted without receiptAt was accepted';
+  EXCEPTION WHEN check_violation THEN rejected := rejected + 1;
+  END;
+  BEGIN
+    INSERT INTO rebuild_publication_attempts
+      (id, "workspaceId", "postId", "postTargetId", "targetId", provider, "actorId", state, reason, "remotePostId", "receiptAt", "projectedAt")
+    VALUES (token || 'badprojected', workspace_id, token || 'p4', token || 't4', token || 'x4', 'facebook', token || 'actor', 'submitted', 'provider_submission', token || 'r4', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    RAISE EXCEPTION 'submitted with projectedAt was accepted';
+  EXCEPTION WHEN check_violation THEN rejected := rejected + 1;
+  END;
+  BEGIN
+    INSERT INTO rebuild_publication_attempts
+      (id, "workspaceId", "postId", "postTargetId", "targetId", provider, "actorId", state, reason, "remotePostId", "receiptAt", "attestedAt", "attestedBy")
+    VALUES (token || 'badattest', workspace_id, token || 'p5', token || 't5', token || 'x5', 'facebook', token || 'actor', 'submitted', 'provider_submission', token || 'r5', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, token || 'attestor');
+    RAISE EXCEPTION 'submitted with attestation fields was accepted';
+  EXCEPTION WHEN check_violation THEN rejected := rejected + 1;
+  END;
+  IF rejected <> 5 THEN RAISE EXCEPTION 'expected five malformed submitted shapes to be rejected, got %', rejected; END IF;
+  RAISE NOTICE 'submitted state accepted; five malformed shapes rejected';
+END $$;
+ROLLBACK;
+SQL
 echo "reviewed additive migrations applied to local scratch database"
 
 # Required tables/columns are taken from rebuild/prisma/schema.prisma and

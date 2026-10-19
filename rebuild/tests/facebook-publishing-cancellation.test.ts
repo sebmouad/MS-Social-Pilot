@@ -146,7 +146,7 @@ describe('Facebook publishing cancellation', () => {
       ? response({ id: 'post-1' }) : response({})) as unknown as typeof fetch;
     const publish = createFacebookPublisher(config, fetcher);
 
-    await expect(publish({ ...publishRequest(), link: 'https://example.test' })).resolves.toEqual({ remoteId: 'post-1', url: null });
+    await expect(publish({ ...publishRequest(), link: 'https://example.test' })).resolves.toEqual({ remoteId: 'post-1', url: null, state: 'published' });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 

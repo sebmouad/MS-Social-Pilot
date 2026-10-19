@@ -525,7 +525,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
   };
 }
 
-/** Backward-compatible thin publisher used by the current neutral contract. */
+/** Provider-owned receipt translation for the neutral publishing contract. */
 export function createFacebookPublisher(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, mediaJournalFactory?: FacebookMediaJournalFactory) {
   return async (request: PublishRequest): Promise<PublishResult> => {
     if (request.formatId !== undefined && request.formatId !== FACEBOOK_FEED_FORMAT_ID) throw new FacebookApiError('The selected publishing format is unavailable.', 400, 100);
@@ -533,7 +533,9 @@ export function createFacebookPublisher(config: FacebookConfig, fetchImpl: Faceb
     const engine = createFacebookEngine(config, fetchImpl, request.signal, mediaJournalFactory);
     const result = await engine.publish({ targetId: request.target.id, accessToken: request.credential.accessToken, text: request.text, link: request.link,
       operationId: request.operationId, media: request.media });
-    return result;
+    // The private engine can return an upload ID before a video is live.
+    // Customer native formats remain unavailable; this receipt never implies readback.
+    return { ...result, state: request.media?.some(media => media.kind === 'video') ? 'submitted' : 'published' };
   };
 }
 

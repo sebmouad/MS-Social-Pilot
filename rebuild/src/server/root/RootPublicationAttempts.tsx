@@ -4,7 +4,7 @@ import { formatRootTimestamp } from '@/lib/root-time';
 import { listRootPublicationAttempts } from './publication-attempts';
 import { RootLegacyPublicationControl, RootPublicationControls } from './RootPublicationControls';
 
-const stateLabel: Record<string, string> = { started: 'Started', uncertain: 'Outcome unconfirmed', receipt_recorded: 'Receipt saved; local record pending', projected: 'Recorded locally', rejected: 'Provider rejected', attested_absent: 'Externally checked absent' };
+const stateLabel: Record<string, string> = { started: 'Started', uncertain: 'Outcome unconfirmed', submitted: 'Submitted; awaiting verification', receipt_recorded: 'Receipt saved; local record pending', projected: 'Recorded locally', rejected: 'Provider rejected', attested_absent: 'Externally checked absent' };
 
 export async function RootPublicationAttempts() {
   const actor = await requireRootPage();
@@ -26,7 +26,7 @@ export async function RootPublicationAttempts() {
   return <section className="root-jobs" aria-labelledby="root-publication-attempts-title">
     <p className="root-jobs__eyebrow">Publishing operations</p><h2 id="root-publication-attempts-title">Publication attempt recovery</h2>
     <p>History is bounded and contains no post content, credentials, or raw provider errors. For an unconfirmed attempt, check the destination directly before recording an outcome. This is a human external check, not automated verification. A delayed request may still complete after you record that it is absent.</p>
-    <p>Recording an outcome does not contact the platform. A saved receipt can be projected into the local post record without sending another publication request.</p>
+    <p>A submitted publication has a remote receipt but is not yet confirmed live. Recording an external check does not contact the platform.</p>
     <DataTable rows={history.items} columns={columns} rowKey={row => row.operationId} caption="Recent publication attempts" emptyMessage="No publication attempts are recorded." />
     <h3>Older processing destinations</h3><p>These records predate the recovery journal. Check the destination externally before adopting one.</p>
     <DataTable rows={history.legacyProcessing} columns={[

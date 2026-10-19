@@ -478,3 +478,16 @@ Screenshot inspection caught and fixed Cancel wrapping at390px. The responsive
 single-column footer passed the final build/typecheck, eight-view probe and
 corrected phone screenshot inspection.
 This is scoped Root evidence, not whole-app UX clearance.
+
+
+### Asynchronous publication receipt recovery (batch92)
+
+The shared Root recovery dialog keeps long evidence inside a bounded scrolling
+surface and leaves its actions reachable. The saved remote submission ID is read-only and selectable. When an
+attempt has a known submitted ID, the dialog provides no `ABSENT` outcome and no
+way to substitute a different ID; the confirmation is bound to the displayed
+identity. A matching accepted Root attestation and customer publication status
+are separate steps and surfaces. A provider submission, valid ID, or URL alone
+does not show a live post. Root browser verification passed16 views across four themes/two widths,
+including focus, fixed IDs and viewport fit. Customer recovery component tests
+passed; its full browser matrix remains separate; see [ASYNC_PUBLICATION_RECEIPTS.md](docs/ASYNC_PUBLICATION_RECEIPTS.md).
