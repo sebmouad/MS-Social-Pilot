@@ -44,6 +44,7 @@ import { goalsConfirmation } from '../src/modules/analytics/goals/contracts';
 import { createReportGenerator } from '../src/modules/analytics/reports/generation/document';
 import { runFeedPolling } from '../src/modules/feeds/server/polling';
 import { createWebhook, deliverDueWebhooks, emitWebhook } from '../src/modules/integrations/server/webhooks';
+import { emitRecentCommentEvents, emitRecentDisconnectEvents, emitRecentPostEvents, emitRecentReportEvents, emitRecentScheduledEvents } from '../src/modules/integrations/server/events';
 
 function isolated(value: string) {
   const parsed = new URL(value);
@@ -176,5 +177,17 @@ describe.skipIf(!url)('wave 2 SQL on real PostgreSQL', () => {
     expect(Object.entries(sent[0]!.headers).some(([k, v]) => k.toLowerCase() === 'x-msp-signature' && /^sha256=/.test(v))).toBe(true);
     const row = await db.$queryRaw<Array<{ status: string; attempts: number }>>`SELECT status, attempts FROM webhook_deliveries WHERE "endpointId" = ${endpointId}`;
     expect(row[0]).toMatchObject({ status: 'delivered', attempts: 1 });
+  });
+
+  it('runs every webhook event scanner against the real schema without error', async () => {
+    shared.overrides['integrations.webhooks.enabled'] = true;
+    const created = await createWebhook(actor, { name: `Synthetic all ${tag}`, url: 'https://hooks.example.com/all', events: ['post.published', 'post.failed', 'post.scheduled', 'comment.received', 'page.disconnected', 'report.ready'], confirmation: 'CREATE WEBHOOK' }, { deps: { resolve: async () => ['93.184.216.34'] }, skipConfirmation: true }) as { id?: string; webhook?: { id: string } };
+    made.endpoints.push(created.webhook?.id ?? created.id!);
+    for (const scan of [emitRecentPostEvents, emitRecentScheduledEvents, emitRecentCommentEvents, emitRecentDisconnectEvents, emitRecentReportEvents]) {
+      const first = await scan(new Date());
+      expect(first.examined).toBeGreaterThanOrEqual(0);
+      // A second pass over the same window queues nothing new.
+      expect((await scan(new Date())).queued).toBe(0);
+    }
   });
 });
