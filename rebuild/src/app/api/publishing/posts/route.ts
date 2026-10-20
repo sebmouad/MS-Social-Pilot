@@ -1,8 +1,30 @@
 import { requireViewer } from '@/server/context';
 import { readPublishingPostPage } from '@/modules/publishing/server/read';
 import { OperationError, operationFailure } from '@/lib/operation-error';
+import { createPost } from '@/modules/publishing/server/lifecycle';
+import { parsePublishingMedia } from '@/modules/publishing/media-support';
+import { parseScheduleMode } from '@/modules/publishing/remote-scheduling';
+import { bodyInstant, publishingWrite, requireBodyConfirmation } from '@/modules/publishing/server/rest';
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
+
+/**
+ * Create a post (MCP `create_post`, confirmation CREATE POST). Without scheduledAt it is a draft; with scheduledAt it is scheduled, and
+ * scheduleMode ('application' | 'remote') chooses whether this app or the destination's platform holds it until then.
+ */
+export async function POST(request: Request) {
+  return publishingWrite(request, async ({ actor, body }) => {
+    requireBodyConfirmation(body, 'CREATE POST');
+    if (!Array.isArray(body.targetIds) || body.targetIds.some(id => typeof id !== 'string')) throw new OperationError('invalid_request', 'targetIds must be an array of destination IDs.');
+    const scheduledAt = body.scheduledAt === undefined ? undefined : bodyInstant(body, 'scheduledAt').date;
+    const result = await createPost(actor, { message: typeof body.message === 'string' ? body.message : '', firstComment: typeof body.firstComment === 'string' ? body.firstComment : '',
+      ...(body.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: body.firstCommentDelayMinutes as number }),
+      destinationFormats: body.destinationFormats, targetIds: body.targetIds as string[], link: typeof body.link === 'string' ? body.link : undefined, media: parsePublishingMedia(body.media ?? []),
+      ...(typeof body.labelId === 'string' ? { labelId: body.labelId } : {}), ...(scheduledAt ? { scheduledAt } : {}),
+      ...(parseScheduleMode(body.scheduleMode) ? { scheduleMode: parseScheduleMode(body.scheduleMode) } : {}) });
+    return { ...result, status: scheduledAt ? 'scheduled' : 'draft' };
+  }, { status: 201, failure: 'The save result could not be confirmed. Check Posts before trying again.' });
+}
 export async function GET(request: Request) {
   let viewer;
   try { viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true }); }

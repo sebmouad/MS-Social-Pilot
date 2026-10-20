@@ -33,6 +33,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   const aiLocale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' as const : 'en' as const;
   const aiAssist = canCreate ? await aiStatus({ userId: viewer.user.id, workspaceId: viewer.workspaceId }).catch(() => undefined) : undefined;
   const profiles = await readChannelProfiles({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, 'publishing/posts').catch(() => null);
+  const remoteScheduling = { offered: await runtimeConfig('publishing.remoteScheduling.offered') === true, defaultMode: (await runtimeConfig('publishing.remoteScheduling.defaultMode') === 'remote' ? 'remote' : 'application') as 'application' | 'remote' };
   const createdAt = new Date();
   const schedule = {
     date: params.date && isDateKey(params.date) ? params.date : '',
@@ -41,7 +42,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   };
   return <>
     <PageHeading title="Create a post" description="Choose destinations, write your post, then save a draft or schedule it." />
-    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer profiles={profiles ?? undefined} queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={aiLocale} targets={choices} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
+    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer remoteScheduling={remoteScheduling} profiles={profiles ?? undefined} queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={aiLocale} targets={choices} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
       : <section className={styles.card}><p>You do not have permission to create posts in this workspace.</p></section>}
   </>;
 }

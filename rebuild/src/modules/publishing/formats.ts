@@ -25,7 +25,11 @@ function validDescriptor(value: unknown): value is PublishingFormatDescriptor {
       typeof item.remoteStatus !== 'boolean' || typeof item.remoteDelete !== 'boolean' ||
       !item.scheduling || typeof item.scheduling !== 'object' || Array.isArray(item.scheduling)) return false;
   const scheduling = item.scheduling as Record<string, unknown>;
-  return typeof scheduling.application === 'boolean' && typeof scheduling.native === 'boolean';
+  if (typeof scheduling.application !== 'boolean' || typeof scheduling.native !== 'boolean') return false;
+  if (scheduling.nativeLeadSeconds === undefined) return true;
+  const lead = scheduling.nativeLeadSeconds as Record<string, unknown> | null;
+  return Boolean(lead) && typeof lead === 'object' && Number.isSafeInteger(lead!.min) && Number.isSafeInteger(lead!.max) &&
+    Number(lead!.min) >= 0 && Number(lead!.max) > Number(lead!.min);
 }
 
 /** Validate module metadata once at the host boundary; malformed declarations fail closed. */
@@ -33,7 +37,7 @@ export function validatePublishingFormatDescriptors(value: unknown): PublishingF
   if (!Array.isArray(value) || value.some(item => !validDescriptor(item))) throw invalidMetadata();
   const descriptors = value as PublishingFormatDescriptor[];
   if (new Set(descriptors.map(item => item.id)).size !== descriptors.length) throw invalidMetadata();
-  return descriptors.map(item => ({ id: item.id, label: item.label, firstComment: item.firstComment, remoteStatus: item.remoteStatus, remoteDelete: item.remoteDelete, media: { kinds: [...item.media.kinds], maxImages: item.media.maxImages, maxVideos: item.media.maxVideos, mixedKinds: item.media.mixedKinds, linkWithMedia: item.media.linkWithMedia, imageAltText: item.media.imageAltText }, scheduling: { application: item.scheduling.application, native: item.scheduling.native } }));
+  return descriptors.map(item => ({ id: item.id, label: item.label, firstComment: item.firstComment, remoteStatus: item.remoteStatus, remoteDelete: item.remoteDelete, media: { kinds: [...item.media.kinds], maxImages: item.media.maxImages, maxVideos: item.media.maxVideos, mixedKinds: item.media.mixedKinds, linkWithMedia: item.media.linkWithMedia, imageAltText: item.media.imageAltText }, scheduling: { application: item.scheduling.application, native: item.scheduling.native, ...(item.scheduling.nativeLeadSeconds ? { nativeLeadSeconds: { min: item.scheduling.nativeLeadSeconds.min, max: item.scheduling.nativeLeadSeconds.max } } : {}) } }));
 }
 
 /** Return validated authoring choices. Missing declarations mean no format choices are available. */

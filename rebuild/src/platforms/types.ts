@@ -74,7 +74,11 @@ export interface PublishingFormatDescriptor {
   firstComment: boolean;
   remoteStatus: boolean;
   remoteDelete: boolean;
-  scheduling: { application: boolean; native: boolean };
+  /**
+   * `native` means the provider can hold the post itself. `nativeLeadSeconds` are the provider's accepted lead times
+   * (min/max seconds from now); a format without them is not offered the provider-held choice by shared authoring.
+   */
+  scheduling: { application: boolean; native: boolean; nativeLeadSeconds?: { min: number; max: number } };
 }
 
 export interface DiscoveryRequest { credential: PlatformCredential }
@@ -98,8 +102,13 @@ export interface PublishRequest {
 export interface PublishResult {
   remoteId: string;
   url: string | null;
-  /** Required receipt meaning: a submission identity is not proof of live content. */
-  state: 'published' | 'submitted';
+  /**
+   * Required receipt meaning: a submission identity is not proof of live content. `scheduled` means the provider accepted and
+   * now holds the post for the requested `scheduledAt`; it is not live until the provider reports it published.
+   */
+  state: 'published' | 'submitted' | 'scheduled';
+  /** Set when the provider now holds the post until this instant (provider-held scheduling). Implies `submitted`. */
+  heldUntil?: Date | null;
 }
 export interface FirstCommentRequest {
   credential: PlatformCredential;
@@ -125,6 +134,14 @@ export interface RemoteDeleteRequest {
   remoteId: string;
   /** Format intent of the destination being deleted; modules refuse formats that declare no remote delete. */
   formatId?: string;
+  signal?: AbortSignal;
+}
+export interface RemoteRescheduleRequest {
+  credential: PlatformCredential;
+  target: PlatformTarget;
+  remoteId: string;
+  formatId?: string;
+  scheduledAt: Date;
   signal?: AbortSignal;
 }
 export interface InboxRequest { credential: PlatformCredential; targetId: string }
@@ -210,6 +227,8 @@ export interface PlatformAdapter {
   classifyPublishingFailure?(error: unknown): 'rejected' | 'uncertain';
   getRemoteStatus?(request: RemoteStatusRequest): Promise<RemoteStatus>;
   deleteRemote?(request: RemoteDeleteRequest): Promise<void>;
+  /** Move a post the provider is holding to a new instant. Absent when the provider cannot change a held schedule. */
+  rescheduleRemote?(request: RemoteRescheduleRequest): Promise<void>;
   listInbox?(request: InboxRequest): Promise<InboxItem[]>;
   listComments?(request: InboxCommentsRequest): Promise<InboxItem[]>;
   /** Optional: only modules whose provider exposes public reviews declare it. */

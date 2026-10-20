@@ -120,11 +120,17 @@ export async function projectPublicationInTransaction(tx: Prisma.TransactionClie
     if (row.state !== 'receipt_recorded' || !row.remotePostId) throw new OperationError('conflict', 'This publication needs a confirmed receipt before local recovery.');
     await assertPlatformPublicationOutcome(tx, row.provider, row.workspaceId, row.id, 'PUBLISHED', row.remotePostId);
     await assertReceiptIdentity(tx, row, row.remotePostId);
-    const changed = await tx.postTarget.updateMany({ where: { id: row.postTargetId, postId: row.postId, targetId: row.targetId, post: { workspaceId: actor.workspaceId }, status: 'processing', remotePostId: null }, data: { status: 'published', remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, publishedAt: observedPublishedAt ?? row.attestedAt ?? row.receiptAt } });
+    // A destination claimed for provider-held scheduling carries its instant; the provider owns publication until a read proves it live.
+    const held = await tx.$queryRaw<Array<{ nativeScheduledFor: Date | null }>>`SELECT "nativeScheduledFor" FROM post_targets WHERE id=${row.postTargetId} AND "postId"=${row.postId}`;
+    // A read that already proved the post live (observedPublishedAt) overrides the requested hold.
+    const heldUntil = observedPublishedAt ? null : held[0]?.nativeScheduledFor ?? null;
+    const changed = await tx.postTarget.updateMany({ where: { id: row.postTargetId, postId: row.postId, targetId: row.targetId, post: { workspaceId: actor.workspaceId }, status: 'processing', remotePostId: null }, data: heldUntil
+      ? { status: 'scheduled_remote', remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, publishedAt: null }
+      : { status: 'published', remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, publishedAt: observedPublishedAt ?? row.attestedAt ?? row.receiptAt } });
     if (changed.count !== 1) throw new OperationError('conflict', 'This destination changed. Review its publication before continuing.');
     await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='projected', "projectedAt"=CURRENT_TIMESTAMP, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id}`;
     await aggregatePublicationPostInTransaction(tx, actor.workspaceId, row.postId);
-    await audit(tx, actor.userId, actor.workspaceId, 'publishing.target_published', { postId: row.postId, postTargetId: row.postTargetId, operationId });
+    await audit(tx, actor.userId, actor.workspaceId, heldUntil ? 'publishing.target_held_remotely' : 'publishing.target_published', { postId: row.postId, postTargetId: row.postTargetId, operationId, ...(heldUntil ? { heldUntil: heldUntil.toISOString() } : {}) });
     return true;
 }
 export async function recordPublicationOutcome(actor: PublishingActor, input: { postId: string; operationId: string; outcome: 'PUBLISHED' | 'ABSENT'; remotePostId?: string; remoteUrl?: string; confirmation: string; verifiedExternally: true }): Promise<PublicationStatus> {
@@ -178,7 +184,7 @@ export async function adoptLegacyPublicationInTransaction(tx: Prisma.Transaction
 }
 
 /** Must run inside the lifecycle's current-authorized workspace/post/destination guard. */
-export async function publishDestinationInOperation(context: { actor: PublishingActor; signal: AbortSignal }, input: { postId: string; postTargetId: string; targetId: string; provider: string; expectedStatus: 'pending' | 'failed'; dispatch(operationId: string): Promise<PublishResult>; classifyFailure(error: unknown): 'rejected' | 'uncertain' }): Promise<'published' | 'failed' | 'needs_review'> {
+export async function publishDestinationInOperation(context: { actor: PublishingActor; signal: AbortSignal }, input: { postId: string; postTargetId: string; targetId: string; provider: string; expectedStatus: 'pending' | 'failed'; /** Set when the destination asks its provider to hold the post until this instant. */ nativeScheduledFor?: Date; dispatch(operationId: string): Promise<PublishResult>; classifyFailure(error: unknown): 'rejected' | 'uncertain' }): Promise<'published' | 'failed' | 'needs_review'> {
   const { actor, signal } = context;
   const operation = await withPublishingTransaction(signal, async tx => {
     const existing = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM rebuild_publication_attempts WHERE "workspaceId"=${actor.workspaceId} AND "postTargetId"=${input.postTargetId} AND state NOT IN ('rejected','attested_absent') FOR UPDATE`;
@@ -186,6 +192,8 @@ export async function publishDestinationInOperation(context: { actor: Publishing
     await assertPlatformPublicationsSettled(tx, actor.workspaceId, [input.targetId]);
     const claim = await tx.postTarget.updateMany({ where: { id: input.postTargetId, postId: input.postId, targetId: input.targetId, post: { workspaceId: actor.workspaceId }, status: input.expectedStatus, remotePostId: null }, data: { status: 'processing' } });
     if (claim.count !== 1) return null;
+    // Recorded with the claim so a later recovery projects the same intent; cleared again whenever the destination is released.
+    await tx.$executeRaw`UPDATE post_targets SET "nativeScheduledFor"=${input.nativeScheduledFor ?? null} WHERE id=${input.postTargetId} AND "postId"=${input.postId}`;
     const id = randomUUID();
     const created = await tx.$queryRaw<PublicationRow[]>`INSERT INTO rebuild_publication_attempts (id,"workspaceId","postId","postTargetId","targetId",provider,"actorId",state) VALUES (${id},${actor.workspaceId},${input.postId},${input.postTargetId},${input.targetId},${input.provider},${actor.userId},'started') RETURNING *`;
     await audit(tx, actor.userId, actor.workspaceId, 'publishing.publication_started', { postId: input.postId, postTargetId: input.postTargetId, operationId: id });
@@ -244,7 +252,7 @@ async function receiptTransaction<T>(work: (tx: Prisma.TransactionClient) => Pro
   }
   return prisma.$transaction(work, { timeout, maxWait });
 }
-async function dispatchAndRecord(actor: PublishingActor, signal: AbortSignal, operation: PublicationRow, input: { dispatch(operationId: string): Promise<PublishResult>; classifyFailure(error: unknown): 'rejected' | 'uncertain' }): Promise<'published' | 'failed' | 'needs_review'> {
+async function dispatchAndRecord(actor: PublishingActor, signal: AbortSignal, operation: PublicationRow, input: { nativeScheduledFor?: Date; dispatch(operationId: string): Promise<PublishResult>; classifyFailure(error: unknown): 'rejected' | 'uncertain' }): Promise<'published' | 'failed' | 'needs_review'> {
   let output: PublishResult;
   try { signal.throwIfAborted(); output = await input.dispatch(operation.id); }
   catch (error) {
@@ -268,7 +276,8 @@ async function dispatchAndRecord(actor: PublishingActor, signal: AbortSignal, op
     // Keep usable returned identities as held facts. Unknown explicit states are held
     // as submissions, never promoted or discarded. Missing states also fail closed;
     // every adapter must explicitly declare published before local projection.
-    let submitted = signal.aborted || invalidUrl || output.state !== 'published';
+    // A provider-held receipt counts as a receipt only when a hold was actually requested for this destination.
+    let submitted = signal.aborted || invalidUrl || !(output.state === 'published' || output.state === 'scheduled' && Boolean(input.nativeScheduledFor));
     // A returned identity is a fact, even after cancellation. This bounded local
     // receipt-only transaction never dispatches or projects. Its conditional write
     // still requires the original held claim; purge guards remain enforced.
