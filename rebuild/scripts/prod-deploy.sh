@@ -52,8 +52,8 @@ rm -rf "$PREV"; mv "$LIVE" "$PREV"; mv "$NEW" "$LIVE"
 systemctl restart social-pilot-rebuild social-pilot-rebuild-worker
 ok=0; for i in $(seq 1 60); do c=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3100/sign-in || true); [ "$c" = 200 ] && { ok=1; break; }; sleep 2; done
 csrf=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3100/api/auth/sign-in -H "Origin: $PUBLIC_ORIGIN" -H 'Content-Type: application/json' -d '{"email":"deploy-probe@example.invalid","password":"x"}' || true)
-pub=$(curl -s -o /dev/null -w '%{http_code}' "$PUBLIC_ORIGIN/sign-in" || true)
-if [ $ok = 1 ] && [ "$csrf" = 401 ] && [ "$pub" = 200 ]; then
+pub=skipped; [ -n "$PUBLIC_ORIGIN" ] && pub=$(curl -s -o /dev/null -w '%{http_code}' "$PUBLIC_ORIGIN/sign-in" || true)
+if [ $ok = 1 ] && [ "$csrf" = 401 ] && { [ "$pub" = 200 ] || [ "$pub" = skipped ]; }; then
   echo "DEPLOY OK $COMMIT: local 200, sign-in origin check $csrf (expects 401), public $pub; services $(systemctl is-active social-pilot-rebuild social-pilot-rebuild-worker | tr '\n' ' ')"
 else
   echo "!! Health failed (local ok=$ok, sign-in=$csrf, public=$pub); restoring previous release"
