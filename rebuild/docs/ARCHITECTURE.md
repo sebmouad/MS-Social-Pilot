@@ -1611,3 +1611,13 @@ No database, browser, live-provider or production proof. Next: configure the pub
 origin and verify real PostgreSQL/concurrent requests and deployment routing in an
 authorized integration environment; the settings form shortening toggle and
 visitor/event analytics remain outside this owned batch. No push/deploy/server run.
+
+## Best-time branch — 2026-10-20
+
+Publishing-owned best-time ranking consumes only normalized stored
+`postPerformance` ranks, with current access/scope and unknown-data safeguards.
+Composer suggestions, HTTP/MCP reads and queue allocation-time preference share
+the service and locked allocator; the workspace setting is rendered. See
+[BEST_TIMES.md](BEST_TIMES.md) for sample bounds, Root keys and the deliberate
+absence of legacy weekly timetable insertion. Synthetic tests only; real
+PostgreSQL, browser, live-provider and release evidence remain open.

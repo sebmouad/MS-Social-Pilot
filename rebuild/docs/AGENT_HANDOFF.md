@@ -1019,3 +1019,23 @@ No database, browser, live-provider or production proof. Next: configure the pub
 origin and verify real PostgreSQL/concurrent requests and deployment routing in an
 authorized integration environment; the settings form shortening toggle and
 visitor/event analytics remain outside this owned batch. No push/deploy/server run.
+
+2026-10-20 `codex/best-time`: bounded stored-performance weekday/hour suggestions
+now feed the composer and apply-mode queue preference. See BEST_TIMES.md for
+ownership, six Publishing-owned Root keys, authorization and evidence limits.
+No migration, central registry edit, server, push or deployment. Runtime
+PostgreSQL/browser/provider proof and host configuration-version coordination
+remain open; the full rebuild goal remains active.
+
+Best-time verification: 485 targeted tests passed across 57 files; 12 opt-in
+PostgreSQL integration cases skipped. `npx tsc --noEmit -p .`, SQL guard and
+`git diff --check` passed. No actual database/browser/provider run was performed.
+
+Best-time commit blocker: `git add` failed creating
+`/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/.git/worktrees/msp-besttime/index.lock`
+with Operation not permitted. Shared worktree Git metadata is outside writable
+sandbox roots, and escalation is disabled. No commit/staging occurred; verified
+changes remain uncommitted on `codex/best-time`. Commit from an environment
+allowed to write the existing metadata, using `feat(publishing): suggest best times`.
+Preserve the pre-existing untracked root node_modules symlink. Do not push,
+deploy or run servers for this scoped branch batch.

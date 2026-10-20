@@ -526,3 +526,10 @@ No database, browser, live-provider or production proof. Next: configure the pub
 origin and verify real PostgreSQL/concurrent requests and deployment routing in an
 authorized integration environment; the settings form shortening toggle and
 visitor/event analytics remain outside this owned batch. No push/deploy/server run.
+
+2026-10-20 `codex/best-time`: bounded stored-performance weekday/hour suggestions
+now feed the composer and apply-mode queue preference. See BEST_TIMES.md for
+ownership, six Publishing-owned Root keys, authorization and evidence limits.
+No migration, central registry edit, server, push or deployment. Runtime
+PostgreSQL/browser/provider proof and host configuration-version coordination
+remain open; the full rebuild goal remains active.

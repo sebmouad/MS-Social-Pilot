@@ -1,3 +1,4 @@
+import { getBestTimeSuggestions } from './server/best-time';
 import { OperationError } from '@/lib/operation-error';
 import { requireFeature } from '@/server/entitlements';
 import { runtimeConfig } from '@/server/config/store';
@@ -50,6 +51,13 @@ function postMediaArguments(args: Record<string, unknown>) {
 
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
 export const PUBLISHING_MCP: readonly McpToolGroup[] = [
+  {
+    id: 'publishing-best-times',
+    tools: [{ name: 'get_best_times', description: 'Suggest weekday/hour times from stored performance on every selected channel in the workspace time zone. Unknown or insufficient evidence returns no suggestions. Current publishing and analytics read access required.', inputSchema: { type: 'object', required: ['targetIds'], properties: { targetIds: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string' } } }, additionalProperties: false } }],
+    features: { get_best_times: 'publishing/posts' },
+    scope: { resourceTools: ['get_best_times'] },
+    execute: (viewer, _name, args) => getBestTimeSuggestions(publishingActor(viewer), args),
+  },
   {
     id: 'publishing-templates',
     tools: templateToolDefinitions,

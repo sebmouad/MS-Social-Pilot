@@ -1,3 +1,4 @@
+import { getBestTimeSuggestions } from './best-time';
 import { randomUUID } from 'node:crypto';
 import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
@@ -33,7 +34,7 @@ export async function queuePost(actor: PublishingActor, postId: string) {
     // Queue access alone does not grant permission to publish or manage a post.
     await authorizePublishing(context.actor, 'publishing/posts', 'write');
     const [policy, collaborationBounds, retention, post] = await Promise.all([
-      prisma.$queryRaw<Array<{ timezone: string; requiresApproval: boolean }>>`SELECT timezone, "requiresApproval" FROM workspaces WHERE id = ${actor.workspaceId}`,
+      prisma.$queryRaw<Array<{ timezone: string; requiresApproval: boolean; bestTimeMode: string }>>`SELECT timezone, "requiresApproval", "bestTimeMode" FROM workspaces WHERE id = ${actor.workspaceId}`,
       bounds(), loadVersionRetention(),
       prisma.post.findFirst({
         where: { id: postId, workspaceId: actor.workspaceId },
@@ -65,6 +66,8 @@ export async function queuePost(actor: PublishingActor, postId: string) {
     await resolveAuthorizedDestinationFormats(destinations, undefined, publishingLimits.maxTargets, {media:resolvedMedia,link:attachments.link,firstComment,scheduled:true},{formats:new Map(post.targets.map(t=>[t.targetId,t.formatId ?? null])),legacyFormat:post.format});
     const holdForApproval = !MANAGERS.has(role) && needsContributorApproval(policy[0].requiresApproval, role);
 
+    const suggested = policy[0].bestTimeMode === 'apply'
+      ? (await getBestTimeSuggestions(context.actor, { targetIds })).suggestions : [];
     return withPublishingTransaction(context.signal, async tx => {
       // Match queue-slot replacement's advisory key and hold it through allocation and the post write.
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${actor.workspaceId}))::text`;
@@ -75,8 +78,8 @@ export async function queuePost(actor: PublishingActor, postId: string) {
       // The outer workspace-operation guard already holds FOR SHARE on this row;
       // taking FOR UPDATE in the inner transaction would deadlock against it.
       // FOR SHARE still fences concurrent edits to these policy fields.
-      const workspace = await tx.$queryRaw<Array<{ timezone: string; requiresApproval: boolean }>>`SELECT timezone, "requiresApproval" FROM workspaces WHERE id = ${actor.workspaceId} FOR SHARE`;
-      if (!workspace[0] || workspace[0].timezone !== policy[0]!.timezone || workspace[0].requiresApproval !== policy[0]!.requiresApproval) {
+      const workspace = await tx.$queryRaw<Array<{ timezone: string; requiresApproval: boolean; bestTimeMode: string }>>`SELECT timezone, "requiresApproval", "bestTimeMode" FROM workspaces WHERE id = ${actor.workspaceId} FOR SHARE`;
+      if (!workspace[0] || workspace[0].timezone !== policy[0]!.timezone || workspace[0].requiresApproval !== policy[0]!.requiresApproval || workspace[0].bestTimeMode !== policy[0]!.bestTimeMode) {
         throw new OperationError('conflict', 'Workspace scheduling settings changed. Refresh and try again.');
       }
       const current = await tx.post.findFirst({
@@ -88,7 +91,7 @@ export async function queuePost(actor: PublishingActor, postId: string) {
         JSON.stringify(current.media) !== JSON.stringify(post.media) || current.targets.some(t => t.status !== 'pending' || t.remotePostId || !targetIds.includes(t.targetId) || t.formatId !== post.targets.find(original => original.targetId === t.targetId)?.formatId)) {
         throw new OperationError('conflict', 'This post changed while it was being queued. Refresh and try again.');
       }
-      const scheduledAt = await allocateQueueTime(tx, actor.workspaceId, workspace[0].timezone, targetIds, new Date(), collaborationBounds.queueLookaheadDays);
+      const scheduledAt = await allocateQueueTime(tx, actor.workspaceId, workspace[0].timezone, targetIds, new Date(), collaborationBounds.queueLookaheadDays, ...(suggested.length ? [suggested] as const : []));
       if (!scheduledAt) throw new OperationError('conflict', 'No queue time is available for this post. Change the timetable or choose a publishing time.');
 
       await recordPostVersion(tx, postId, context.actor.userId, retention);
