@@ -97,6 +97,21 @@ const INDIRECT_WORKSPACE_TABLES = [
   { table: 'post_versions', where: ownedBy('postId', 'posts') },
   { table: 'review_decisions', where: `(${ownedBy('postId', 'posts')} OR ${ownedBy('shareLinkId', 'share_links')})` },
 ] as const;
+/** Inbox-owned tables and how the export reaches each; coverage reports any that the export did not include. */
+const INBOX_EXPORT_TABLES = [
+  { table: 'conversations', via: 'targets' }, { table: 'conversation_messages', via: 'targets' },
+  { table: 'page_reviews', via: 'indirect' }, { table: 'inbox_notes', via: 'workspace' },
+  { table: 'saved_replies', via: 'workspace' }, { table: 'moderation_rules', via: 'workspace' },
+  { table: 'moderation_actions', via: 'workspace' },
+] as const;
+
+export function inboxExportCoverage(exportedTables: ReadonlySet<string>) {
+  return {
+    included: INBOX_EXPORT_TABLES.filter(({ table }) => exportedTables.has(table)).map(({ table, via }) => ({ table, via })),
+    missing: INBOX_EXPORT_TABLES.filter(({ table }) => !exportedTables.has(table)).map(({ table }) => table),
+  };
+}
+
 /** Indirect tables that a direct table points at; they are removed once that direct table is empty. */
 const DELETED_AFTER_POSTS = new Set(['feed_items']);
 
@@ -203,6 +218,9 @@ export async function exportWorkspaceData(actor: DataControlActor) {
         ...INDIRECT_WORKSPACE_TABLES.map(({ table }) => table),
       ],
       indirectRowCounts: { ...mappedIndirectRowCounts, ...indirect.rowCounts, instagram_media: instagramMedia.length },
+      inbox: inboxExportCoverage(new Set([
+        'conversations', 'conversation_messages', ...legacy.tables, ...INDIRECT_WORKSPACE_TABLES.map(({ table }) => table),
+      ])),
       complete: false,
       omitted: ['instance-wide audit and authentication records', 'tables outside the current application Prisma schema'],
     },
