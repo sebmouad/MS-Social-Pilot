@@ -84,7 +84,7 @@ export async function ingestFeed(actor: FeedActor, feed: FeedRow, workspaceId: s
   let notModified = false;
   let validators: { etag: string | null; modified: string | null } = { etag: null, modified: null };
   try {
-    const target = feed.kind === 'wordpress' ? wordpressApiUrl(feed.url) : feed.url;
+    const target = feed.kind === 'wordpress' ? wordpressApiUrl(feed.url, l.wordpressPageSize) : feed.url;
     const headers: Record<string, string> = { accept: feed.kind === 'wordpress' ? 'application/json' : 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9', 'user-agent': 'MSSocialPilot-Feeds/1.0' };
     // Only a run that will take what it finds may use validators: a preview must see the real entries.
     if (options.automatic && feed.lastEtag) headers['if-none-match'] = feed.lastEtag;
@@ -93,7 +93,8 @@ export async function ingestFeed(actor: FeedActor, feed: FeedRow, workspaceId: s
     if (fetched.notModified) { notModified = true; entries = []; }
     else {
       const text = fetched.bytes.toString('utf8');
-      entries = feed.kind === 'wordpress' ? parseWordPressDocument(text, l.maxItems) : parseFeedDocument(text, l.maxItems);
+      const parserLimits = { title: l.entryTitle, guid: l.entryGuid, description: l.entryDescription };
+      entries = feed.kind === 'wordpress' ? parseWordPressDocument(text, l.maxItems, parserLimits) : parseFeedDocument(text, l.maxItems, parserLimits);
       validators = { etag: fetched.etag, modified: fetched.lastModified };
     }
   } catch (error) {

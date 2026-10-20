@@ -5,7 +5,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { prisma } from '@/server/data';
 import { exportWorkspaceData, type DataControlActor } from './index';
 import { readWorkspaceStorage, validateWorkspaceId } from './storage';
-import { ZipWriter } from './zip';
+import { ZipWriter, ZIP32_MAX_BYTES } from './zip';
 
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 
@@ -14,7 +14,8 @@ export async function exportWorkspaceArchive(actor: DataControlActor): Promise<B
   validateWorkspaceId(actor.workspaceId);
   const mediaRoot = await runtimeConfig('storage.mediaRoot');
   if (!mediaRoot) throw new Error('Set the media storage root in Root before exporting workspace media.');
-  const maxBytes = await runtimeConfig('data.maxArchiveBytes') as number;
+  const [archiveLimit, headroom] = await Promise.all([runtimeConfig('data.maxArchiveBytes'), runtimeConfig('data.zipSafetyHeadroomBytes')]);
+  const maxBytes = Math.min(archiveLimit as number, ZIP32_MAX_BYTES - (headroom as number));
 
   const data = await exportWorkspaceData(actor);
   const databaseJson = json(data);
@@ -39,7 +40,7 @@ export async function exportWorkspaceArchive(actor: DataControlActor): Promise<B
 
   const temp = await mkdtemp(path.join(os.tmpdir(), 'workspace-export-'));
   const zipPath = path.join(temp, 'workspace.zip');
-  const zip = new ZipWriter(zipPath);
+  const zip = new ZipWriter(zipPath, maxBytes);
   try {
     await zip.add('database/workspace.json', databaseJson);
     for (const file of files) await zip.add(file.path, file.content);

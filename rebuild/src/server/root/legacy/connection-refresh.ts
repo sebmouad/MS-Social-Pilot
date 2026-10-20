@@ -1,3 +1,4 @@
+import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
 import { PLATFORM_HOSTS } from '@/server/platforms';
@@ -11,8 +12,8 @@ import { writeRootAudit } from './audit';
 
 export const rootRefreshConfirmation = (id: string) => `REFRESH CONNECTION ${id}`;
 export const rootRefreshInput = z.object({
-  socialAccountId: z.string().min(1).max(200).regex(/^[^\u0000-\u001f\u007f]+$/),
-  confirmation: z.string().max(400),
+  socialAccountId: z.string().min(1).regex(/^[^\u0000-\u001f\u007f]+$/).refine(withinSynchronousLimit('root.identifierMaxCharacters')),
+  confirmation: z.string().refine(withinSynchronousLimit('root.confirmationMaxCharacters')),
 }).strict();
 export type ConnectionRefreshOutcome = 'renewed' | 'not_renewable' | 'failed';
 

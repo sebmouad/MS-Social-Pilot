@@ -1,4 +1,6 @@
 import { prisma } from '@/server/data';
+import { runtimeConfig } from '@/server/config/store';
+import { FEEDS_BOUNDS } from '../config';
 import { canUseFeature, loadEntitlements } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
@@ -47,7 +49,10 @@ export async function authorizeFeedWrite(actor: FeedActor): Promise<FeedAuthoriz
  * allow writing feeds (the workspace-owner worker policy; grants from different owners are never
  * combined, and `accept` must also pass for the chosen owner, e.g. destination qualification).
  */
-export async function qualifyingOwner(workspaceId: string, accept: (actor: FeedActor) => Promise<void> = async () => undefined, limit = 10): Promise<FeedAuthorization | null> {
+export async function qualifyingOwner(workspaceId: string, accept: (actor: FeedActor) => Promise<void> = async () => undefined, requestedLimit?: number): Promise<FeedAuthorization | null> {
+  const configuredLimit = requestedLimit ?? await runtimeConfig('feeds.qualifyingOwnerScanLimit');
+  const limit = typeof configuredLimit === 'number' && Number.isSafeInteger(configuredLimit) && configuredLimit >= FEEDS_BOUNDS.qualifyingOwnerScanLimit.min && configuredLimit <= FEEDS_BOUNDS.qualifyingOwnerScanLimit.max
+    ? configuredLimit : FEEDS_BOUNDS.qualifyingOwnerScanLimit.min;
   const owners = await prisma.$queryRaw<Array<{ userId: string }>>`SELECT m."userId" AS "userId" FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."workspaceId" = ${workspaceId} AND m.role::text = 'owner' AND u."disabledAt" IS NULL ORDER BY m.id ASC LIMIT ${limit}`;
   for (const owner of owners) {
     try {

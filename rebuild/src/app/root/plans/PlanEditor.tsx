@@ -8,7 +8,7 @@ export type PlanView = { id: string; key: string; name: string; currency: string
 const LIMITS = [['channels', 'Channels'], ['members', 'Members'], ['workspaces', 'Workspaces'], ['postsPerMonth', 'Posts per month'], ['aiCredits', 'AI credits']] as const;
 const PRICES = [['priceMonthly', 'Monthly price (minor units)'], ['priceYearly', 'Yearly price (minor units)'], ['extraChannelPrice', 'Extra channel price']] as const;
 
-export function PlanEditor({ plan, groups }: { plan: PlanView; groups: readonly PlanFeatureGroup[] }) {
+export function PlanEditor({ plan, groups, nameMaxCharacters }: { plan: PlanView; groups: readonly PlanFeatureGroup[]; nameMaxCharacters?: number }) {
   const [name, setName] = useState(plan.name);
   const [currency, setCurrency] = useState(plan.currency);
   const [numbers, setNumbers] = useState<Record<string, string>>(() => Object.fromEntries([...LIMITS, ...PRICES].map(([field]) => [field, plan[field] === null ? '' : String(plan[field])])));
@@ -45,7 +45,7 @@ export function PlanEditor({ plan, groups }: { plan: PlanView; groups: readonly 
   return <section className="root-ops__panel" aria-labelledby={`plan-${plan.id}`}>
     <h2 id={`plan-${plan.id}`}>{plan.name} <span className="root-ops__muted">({plan.key})</span></h2>
     <div className="root-ops__fields">
-      <label className="ui-field"><span>Name</span><input className="ui-input" value={name} onChange={event => setName(event.target.value)} maxLength={60} /></label>
+      <label className="ui-field"><span>Name</span><input className="ui-input" value={name} onChange={event => setName(event.target.value)} maxLength={nameMaxCharacters} /></label>
       <label className="ui-field"><span>Currency</span><input className="ui-input" value={currency} onChange={event => setCurrency(event.target.value)} maxLength={3} /></label>
       {PRICES.map(([field, label]) => <label key={field} className="ui-field"><span>{label}</span><input className="ui-input" inputMode="numeric" value={numbers[field]} onChange={event => setNumbers(current => ({ ...current, [field]: event.target.value }))} /></label>)}
       {LIMITS.map(([field, label]) => <label key={field} className="ui-field"><span>{label} (blank is unlimited)</span><input className="ui-input" inputMode="numeric" value={numbers[field]} onChange={event => setNumbers(current => ({ ...current, [field]: event.target.value }))} /></label>)}

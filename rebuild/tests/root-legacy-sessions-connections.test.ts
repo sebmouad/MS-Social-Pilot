@@ -5,10 +5,11 @@ const h = vi.hoisted(() => {
   return {
     tx,
     prisma: { user: { findUnique: vi.fn() }, session: { findMany: vi.fn() }, socialAccount: { count: vi.fn(), findMany: vi.fn() } },
-    actor: vi.fn(),
+    actor: vi.fn(), reasonLimit: 200,
   };
 });
 vi.mock('../src/server/data', () => ({ prisma: h.prisma }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: async () => h.reasonLimit }));
 vi.mock('../src/server/config/access', () => ({ currentRootActor: h.actor }));
 vi.mock('../src/server/root/legacy/policy', () => ({
   legacySetting: vi.fn(async (key: string) => (key === 'root.legacy.searchMaxCharacters' ? 50 : 2)),
@@ -27,7 +28,7 @@ const root = { isInstanceOwner: true, disabledAt: null };
 const future = new Date(Date.now() + 3600_000);
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.clearAllMocks(); h.reasonLimit = 200;
   h.prisma.user.findUnique.mockResolvedValue(root);
   h.tx.user.findUnique.mockResolvedValue(root);
   h.tx.$queryRaw.mockResolvedValue([]);
@@ -101,6 +102,13 @@ describe('Root connections', () => {
     expect(JSON.stringify(result)).not.toContain('SECRET');
   });
 
+  it('uses the configured invalidation reason ceiling', async () => {
+    h.reasonLimit = 4;
+    h.prisma.socialAccount.count.mockResolvedValue(1);
+    h.prisma.socialAccount.findMany.mockResolvedValue([{ id: 'c1', provider: 'other', name: 'X', scopes: '', tokenExpiresAt: null, invalidatedAt: new Date(), invalidReason: 'expired credential', createdAt: new Date(), workspace: { id: 'w', name: 'W' }, targets: [] }]);
+    expect((await listRootConnections('root')).items[0]?.invalidReason).toBe('expi…');
+  });
+
   it('redacts credential-shaped invalidation reasons and validates filters', async () => {
     h.prisma.socialAccount.count.mockResolvedValue(1);
     h.prisma.socialAccount.findMany.mockResolvedValue([{ id: 'c1', provider: 'other', name: 'X', scopes: '', tokenExpiresAt: null, invalidatedAt: new Date(), invalidReason: 'access_token=abcdef123456 rejected', createdAt: new Date(), workspace: { id: 'w', name: 'W' }, targets: [] }]);
@@ -135,5 +143,16 @@ describe('copy', () => {
     expect(rootCopyLocale('fr-CA,fr;q=0.9')).toBe('fr');
     expect(rootCopyLocale('de,en;q=0.5')).toBe('en');
     expect(rootCopyLocale(null)).toBe('en');
+  });
+});
+
+describe('shared Root confirmation ceilings', () => {
+  it('enforces a lowered policy in the direct session service, beyond HTTP parsing', async () => {
+    const { applySynchronousPolicy, SYNCHRONOUS_POLICY } = await import('@/lib/config/synchronous-policy');
+    applySynchronousPolicy('root.confirmationMaxCharacters', 3);
+    try {
+      await expect(signOutRootSession('root', 's1', { confirmation: 'SIGN OUT SESSION s1' })).rejects.toMatchObject({ code: 'invalid_request' });
+      expect(h.tx.session.deleteMany).not.toHaveBeenCalled();
+    } finally { applySynchronousPolicy('root.confirmationMaxCharacters', SYNCHRONOUS_POLICY['root.confirmationMaxCharacters'].defaultValue); }
   });
 });

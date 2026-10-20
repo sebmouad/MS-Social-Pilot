@@ -4,7 +4,7 @@ import { prisma } from '@/server/data';
 import { runtimeConfigBatch, runtimeSecret } from '@/server/config/store';
 import { AI_BOUNDS, AI_PROVIDERS, type AiProviderId } from '../config';
 import {
-  AI_KINDS, AI_REQUEST_SCHEMA, SUMMARIZE_SCHEMA, TONES, buildPrompt, buildSummaryPrompt, cleanOutput, parseHashtags,
+  AI_KINDS, AI_REQUEST_SCHEMA, summarizeSchema, TONES, buildPrompt, buildSummaryPrompt, cleanOutput, parseHashtags,
   type AiContext, type AiPort, type AiResult, type AiStatus, type SummarizeRequest, type SummaryResult,
 } from '../ai';
 import { authorizeAi, type AiActor } from './access';
@@ -28,27 +28,29 @@ const PROVIDER_KEYS: Record<AiProviderId, { secret: string; model: string; endpo
   gemini: { secret: 'ai.geminiApiKey', model: 'ai.geminiModel', endpoint: 'ai.geminiEndpoint', port: geminiPort },
 };
 
-type Settings = { port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; txTimeout: number; txWait: number };
+type Settings = { port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; hashtagBodyMax: number; outputInputMultiplier: number; languageMax: number; txTimeout: number; txWait: number };
 /** Resolve everything assist needs; null when anything is unconfigured, so customer surfaces stay hidden. */
 export async function settings(deps: AiDeps): Promise<Settings | null> {
   try {
-    const c = await runtimeConfigBatch(['ai.enabled', 'ai.provider', 'ai.model', 'ai.endpoint', 'ai.openaiModel', 'ai.openaiEndpoint', 'ai.geminiModel', 'ai.geminiEndpoint', 'ai.requestTimeoutMs', 'ai.maxOutputTokens', 'ai.maxInputCharacters', 'ai.hourlyRequestsPerWorkspace', 'ai.maxHashtags', 'ai.transactionTimeoutMs', 'ai.transactionMaxWaitMs']);
+    const c = await runtimeConfigBatch(['ai.enabled', 'ai.provider', 'ai.model', 'ai.endpoint', 'ai.openaiModel', 'ai.openaiEndpoint', 'ai.geminiModel', 'ai.geminiEndpoint', 'ai.requestTimeoutMs', 'ai.maxOutputTokens', 'ai.maxInputCharacters', 'ai.hourlyRequestsPerWorkspace', 'ai.maxHashtags', 'ai.hashtagBodyMaxCharacters', 'ai.outputInputMultiplier', 'ai.languageMaxCharacters', 'ai.transactionTimeoutMs', 'ai.transactionMaxWaitMs']);
     const B = AI_BOUNDS;
     const provider = c['ai.provider'] as AiProviderId;
     const keys = PROVIDER_KEYS[provider];
     const model = keys ? c[keys.model] : undefined; const endpoint = keys ? c[keys.endpoint] : undefined; const timeoutMs = c['ai.requestTimeoutMs']; const maxTokens = c['ai.maxOutputTokens'];
     const maxInput = c['ai.maxInputCharacters']; const hourly = c['ai.hourlyRequestsPerWorkspace']; const maxHashtags = c['ai.maxHashtags'];
+    const hashtagBodyMax = c['ai.hashtagBodyMaxCharacters']; const outputInputMultiplier = c['ai.outputInputMultiplier']; const languageMax = c['ai.languageMaxCharacters'];
     const txTimeout = c['ai.transactionTimeoutMs']; const txWait = c['ai.transactionMaxWaitMs'];
     if (c['ai.enabled'] !== true || !AI_PROVIDERS.includes(provider) || typeof model !== 'string' || !model || typeof endpoint !== 'string'
       || !inRange(timeoutMs, B.requestTimeoutMs) || !inRange(maxTokens, B.maxOutputTokens) || !inRange(maxInput, B.maxInputCharacters)
       || !inRange(hourly, B.hourlyRequestsPerWorkspace) || !inRange(maxHashtags, B.maxHashtags) || !inRange(txTimeout, B.transactionTimeoutMs) || !inRange(txWait, B.transactionMaxWaitMs)) return null;
+    if (!inRange(hashtagBodyMax, B.hashtagBodyMaxCharacters) || !inRange(outputInputMultiplier, B.outputInputMultiplier) || !inRange(languageMax, B.languageMaxCharacters)) return null;
     let port = deps.port;
     if (!port) {
       const apiKey = await runtimeSecret(keys.secret);
       if (!apiKey) return null;
       port = keys.port({ apiKey, endpoint });
     }
-    return { port, model, timeoutMs, maxTokens, maxInput, hourly, maxHashtags, txTimeout, txWait };
+    return { port, model, timeoutMs, maxTokens, maxInput, hourly, maxHashtags, hashtagBodyMax, outputInputMultiplier, languageMax, txTimeout, txWait };
   } catch { return null; }
 }
 
@@ -114,17 +116,18 @@ export async function runAssist(actor: AiActor, input: unknown, deps: AiDeps = {
   await authorizeAi(actor, COMPOSER_FEATURE, 'write');
   const [s, workspace] = await Promise.all([settings(deps), workspaceContext(actor.workspaceId)]);
   if (!s || !workspace?.enabled) throw unavailable();
+  if (request.language && request.language.length > s.languageMax) throw new OperationError('invalid_request', 'Use a shorter language name.');
   if (request.text.length > s.maxInput) throw new OperationError('invalid_request', 'Shorten the text for AI assist.');
   await claim(actor, s, request.kind, request.text.length, (deps.now ?? (() => new Date()))());
 
   const { system, prompt } = buildPrompt(request, s.maxHashtags, workspace);
   const raw = await complete(s, system, prompt);
   if (request.kind === 'hashtags') {
-    const hashtags = parseHashtags(raw, s.maxHashtags);
+    const hashtags = parseHashtags(raw, s.maxHashtags, s.hashtagBodyMax);
     if (!hashtags.length) throw new OperationError('upstream_failure', 'AI assist returned no usable hashtags. Try again.');
     return { kind: request.kind, text: hashtags.join(' '), hashtags };
   }
-  const text = cleanOutput(raw, s.maxInput * 2);
+  const text = cleanOutput(raw, s.maxInput * s.outputInputMultiplier);
   if (!text) throw new OperationError('upstream_failure', 'AI assist returned an empty answer. Try again.');
   return { kind: request.kind, text, hashtags: [] };
 }
@@ -138,7 +141,11 @@ export async function runAssist(actor: AiActor, input: unknown, deps: AiDeps = {
  * OperationError('unavailable') when AI is off so callers can omit the section.
  */
 export async function summarize(actor: AiActor, input: SummarizeRequest, options: { feature?: string } & AiDeps = {}): Promise<SummaryResult> {
-  const parsed = SUMMARIZE_SCHEMA.safeParse(input);
+  let summaryInputPolicy: Record<string, unknown>;
+  try { summaryInputPolicy = await runtimeConfigBatch(['ai.summarySubjectMaxCharacters', 'ai.languageMaxCharacters']); } catch { throw unavailable(); }
+  const subjectLimit = summaryInputPolicy['ai.summarySubjectMaxCharacters']; const languageLimit = summaryInputPolicy['ai.languageMaxCharacters'];
+  if (!inRange(subjectLimit, AI_BOUNDS.summarySubjectMaxCharacters) || !inRange(languageLimit, AI_BOUNDS.languageMaxCharacters)) throw unavailable();
+  const parsed = summarizeSchema(AI_BOUNDS.maxInputCharacters.max, subjectLimit, languageLimit).safeParse(input);
   if (!parsed.success) throw new OperationError('invalid_request', 'Provide the figures to summarise.');
   const request = parsed.data;
   await authorizeAi(actor, options.feature ?? SUMMARY_FEATURE, 'write');
@@ -147,7 +154,10 @@ export async function summarize(actor: AiActor, input: SummarizeRequest, options
   if (request.facts.length > s.maxInput) throw new OperationError('invalid_request', 'Provide fewer figures to summarise.');
   await claim(actor, s, 'summarize', request.facts.length, (options.now ?? (() => new Date()))());
   const { system, prompt } = buildSummaryPrompt(request);
-  const text = cleanOutput(await complete(s, system, prompt), 1200);
+  const recapMax = await runtimeConfigBatch(['ai.summaryMaxCharacters']);
+  const limit = recapMax['ai.summaryMaxCharacters'];
+  if (!inRange(limit, AI_BOUNDS.summaryMaxCharacters)) throw unavailable();
+  const text = cleanOutput(await complete(s, system, prompt), limit);
   if (!text) throw new OperationError('upstream_failure', 'AI assist returned an empty answer. Try again.');
   return { text };
 }

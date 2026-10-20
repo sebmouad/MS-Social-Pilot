@@ -16,7 +16,7 @@ import { buildPrompt, cleanOutput, parseHashtags } from '../src/modules/ai/ai';
 import { AI_MCP, aiToolDefinitions, executeAiTool } from '../src/modules/ai/mcp';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
-const port = (text = 'Suggested text') => ({ complete: vi.fn(async () => text) });
+const port = (text = 'Suggested text') => ({ complete: vi.fn(async (_input: { prompt: string }) => text) });
 const sql = (s: TemplateStringsArray, v: unknown[]) => ({ sql: s.join('?'), values: v });
 
 beforeEach(() => {
@@ -78,6 +78,17 @@ describe('generation', () => {
     await expect(runAssist(actor, { kind: 'caption', text: 'x' }, { port: p })).rejects.toMatchObject({ code: 'conflict' });
     expect(p.complete).not.toHaveBeenCalled();
   });
+  it('uses the configured output ceiling for generated recaps', async () => {
+    state.overrides['ai.summaryMaxCharacters'] = 100;
+    const result = await summarize(actor, { facts: 'reach 3400', language: 'French' }, { port: port('x'.repeat(140)) });
+    expect(result.text).toHaveLength(100);
+  });
+  it('uses the configured recap subject ceiling', async () => {
+    state.overrides['ai.summarySubjectMaxCharacters'] = 300;
+    const p = port();
+    await summarize(actor, { facts: 'reach 3400', language: 'French', subject: 's'.repeat(201) }, { port: p });
+    expect(p.complete.mock.calls[0]![0].prompt).toContain(`Subject: ${'s'.repeat(201)}`);
+  });
   it('does not call the provider when the claim cannot be audited', async () => {
     state.failAudit = true; const p = port();
     await expect(runAssist(actor, { kind: 'caption', text: 'x' }, { port: p })).rejects.toBeTruthy();
@@ -95,6 +106,16 @@ describe('generation', () => {
     const result = await runAssist(actor, { kind: 'hashtags', text: 'coffee shop' }, { port: port('#Coffee #coffee #shop\n#a #b') });
     expect(result.hashtags).toEqual(['#Coffee', '#shop', '#a']);
     await expect(runAssist(actor, { kind: 'hashtags', text: 'x' }, { port: port('no tags here') })).rejects.toMatchObject({ code: 'upstream_failure' });
+  });
+  it('applies configured language, hashtag-body and output-length ceilings', async () => {
+    state.overrides = { 'ai.languageMaxCharacters': 48, 'ai.hashtagBodyMaxCharacters': 80, 'ai.maxInputCharacters': 100, 'ai.outputInputMultiplier': 3 };
+    const language = 'L'.repeat(40);
+    const translation = port('translated');
+    await runAssist(actor, { kind: 'translate', text: 'hello', language }, { port: translation });
+    expect((translation.complete.mock.calls[0]![0] as { prompt: string }).prompt).toContain(`Translate the material into ${language}`);
+    const longTag = `#${'a'.repeat(72)}`;
+    await expect(runAssist(actor, { kind: 'hashtags', text: 'x' }, { port: port(longTag) })).resolves.toMatchObject({ hashtags: [longTag] });
+    await expect(runAssist(actor, { kind: 'caption', text: 'x' }, { port: port('o'.repeat(250)) })).resolves.toMatchObject({ text: 'o'.repeat(250) });
   });
 });
 
@@ -198,6 +219,12 @@ describe('summarize (reusable recap)', () => {
     expect(JSON.stringify(state.exec)).not.toContain('reach 3400');
     state.overrides['ai.hourlyRequestsPerWorkspace'] = 5; state.used = 5;
     await expect(summarize(actor, { facts: 'x' }, { port: p })).rejects.toMatchObject({ code: 'conflict' });
+  });
+  it('applies the configured language ceiling to recap input', async () => {
+    state.overrides['ai.languageMaxCharacters'] = 48;
+    await expect(summarize(actor, { facts: 'reach 3400', language: 'L'.repeat(40) }, { port: port('recap') })).resolves.toEqual({ text: 'recap' });
+    state.overrides['ai.languageMaxCharacters'] = 32;
+    await expect(summarize(actor, { facts: 'reach 3400', language: 'L'.repeat(40) }, { port: port('recap') })).rejects.toMatchObject({ code: 'invalid_request' });
   });
   it('is unavailable when AI is off and validates input', async () => {
     state.overrides['ai.enabled'] = false;

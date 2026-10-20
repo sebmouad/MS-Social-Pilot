@@ -7,6 +7,7 @@ const base = {
   smtpSecure: false, smtpRequireTls: true, smtpUsername: 'smtp-user', smtpPassword: 'top-secret',
   fromAddress: 'noreply@social.example', fromName: 'MS Social Pilot', connectionTimeoutMs: 10000,
   socketTimeoutMs: 30000, subjectMaxCharacters: 200, bodyMaxBytes: 1024,
+  recipientMaxCharacters: 320, workspaceIdMaxCharacters: 128, templateMaxCharacters: 100, providerIdMaxCharacters: 255,
 };
 const input = { to: 'person@example.test', subject: 'Invitation', text: 'Join the workspace', template: 'workspace_invitation', workspaceId: 'workspace-1' };
 
@@ -24,11 +25,23 @@ function service(options: { config?: Partial<typeof base>; send?: () => Promise<
 describe('transactional mail', () => {
   it('exposes the complete shared mail config tuple', () => {
     expect(MAIL_CONFIG.map((definition) => definition.key)).toEqual([
+      'mail.recipientMaxCharacters', 'mail.workspaceIdMaxCharacters', 'mail.templateMaxCharacters', 'mail.providerIdMaxCharacters',
       'mail.enabled', 'mail.publicOrigin', 'mail.smtpHost', 'mail.smtpPort', 'mail.smtpSecure', 'mail.smtpRequireTls',
       'mail.smtpUsername', 'mail.smtpPassword', 'mail.fromAddress', 'mail.fromName', 'mail.connectionTimeoutMs',
       'mail.socketTimeoutMs', 'mail.subjectMaxCharacters', 'mail.bodyMaxBytes',
     ]);
     expect(MAIL_CONFIG.find((definition) => definition.key === 'mail.smtpPassword')?.kind).toBe('secret');
+  });
+
+  it('applies Root recipient, workspace, template and receipt limits', async () => {
+    for (const config of [{ recipientMaxCharacters: 3 }, { workspaceIdMaxCharacters: 3 }, { templateMaxCharacters: 3 }]) {
+      const harness = service({ config });
+      expect(await harness.mail.sendTransactionalMail(input)).toEqual({ status: 'unavailable' });
+      expect(harness.createTransport).not.toHaveBeenCalled();
+    }
+    const harness = service({ config: { providerIdMaxCharacters: 3 } });
+    expect(await harness.mail.sendTransactionalMail(input)).toEqual({ status: 'sent' });
+    expect(harness.record).toHaveBeenCalledWith(expect.objectContaining({ providerId: undefined, status: 'sent' }));
   });
 
   it('reports disabled or invalid configuration as unavailable without SMTP IO', async () => {

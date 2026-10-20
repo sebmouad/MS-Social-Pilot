@@ -23,8 +23,12 @@ export function crc32(data: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-/** The ZIP limit without ZIP64, with room for the directory. */
-export const ZIP_MAX_BYTES = 0xffffffff - 64 * 1024 * 1024;
+/** ZIP32 unsigned field limit; ZIP64 requires a different writer, not a Root switch. */
+export const ZIP32_MAX_BYTES = 0xffffffff;
+const ZIP32_MAX_ENTRIES = 0xffff;
+const LOCAL_HEADER_BYTES = 30;
+const DIRECTORY_HEADER_BYTES = 46;
+const END_HEADER_BYTES = 22;
 
 interface Entry {
   name: Buffer;
@@ -48,8 +52,10 @@ export class ZipWriter {
   private readonly stream: WriteStream;
   private readonly entries: Entry[] = [];
   private offset = 0;
+  private directoryBytes = 0;
 
-  constructor(path: string) {
+  constructor(path: string, private readonly maxBytes = ZIP32_MAX_BYTES) {
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < END_HEADER_BYTES || maxBytes > ZIP32_MAX_BYTES) throw new Error('Invalid ZIP32 byte limit.');
     this.stream = createWriteStream(path);
   }
 
@@ -82,7 +88,13 @@ export class ZipWriter {
       time,
       date,
     };
-    const header = Buffer.alloc(30);
+    const directoryBytes = this.directoryBytes + DIRECTORY_HEADER_BYTES + entry.name.length;
+    if (entry.name.length > 0xffff || this.entries.length >= ZIP32_MAX_ENTRIES || data.length > ZIP32_MAX_BYTES || body.length > ZIP32_MAX_BYTES
+      || this.offset + LOCAL_HEADER_BYTES + entry.name.length + body.length + directoryBytes + END_HEADER_BYTES > this.maxBytes) {
+      throw new Error('Workspace archive exceeds the configured archive size limit.');
+    }
+    this.directoryBytes = directoryBytes;
+    const header = Buffer.alloc(LOCAL_HEADER_BYTES);
     header.writeUInt32LE(0x04034b50, 0);
     header.writeUInt16LE(20, 4);
     header.writeUInt16LE(0x0800, 6); // UTF-8 names.
@@ -102,7 +114,7 @@ export class ZipWriter {
   async close(): Promise<number> {
     const start = this.offset;
     for (const entry of this.entries) {
-      const header = Buffer.alloc(46);
+      const header = Buffer.alloc(DIRECTORY_HEADER_BYTES);
       header.writeUInt32LE(0x02014b50, 0);
       header.writeUInt16LE(20, 4);
       header.writeUInt16LE(20, 6);
@@ -117,7 +129,7 @@ export class ZipWriter {
       header.writeUInt32LE(entry.offset, 42);
       await this.write(Buffer.concat([header, entry.name]));
     }
-    const end = Buffer.alloc(22);
+    const end = Buffer.alloc(END_HEADER_BYTES);
     end.writeUInt32LE(0x06054b50, 0);
     end.writeUInt16LE(this.entries.length, 8);
     end.writeUInt16LE(this.entries.length, 10);

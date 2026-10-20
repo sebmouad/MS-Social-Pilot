@@ -183,6 +183,19 @@ describe('POST /api/v1/posts', () => {
     expect((await postsRoute.POST(keyed('/api/v1/posts', 'POST', valid, { 'content-length': '999999' }))).status).toBe(400);
     expect(publishing.createPost).not.toHaveBeenCalled();
   });
+  it('uses the current Root request body ceiling', async () => {
+    state.config['integrations.api.postsBodyMaxBytes'] = 1024;
+    expect((await post(`{"message":"${'x'.repeat(1500)}","targetIds":["t1"]}`)).status).toBe(400);
+    expect(publishing.createPost).not.toHaveBeenCalled();
+  });
+  it('uses current Root field and collection limits after contract parsing', async () => {
+    state.config['integrations.api.messageMaxCharacters'] = 3;
+    expect((await post({ message: 'Hello', targetIds: ['t1'] })).status).toBe(400);
+    state.config['integrations.api.messageMaxCharacters'] = 100;
+    state.config['integrations.api.targetIdsMaxItems'] = 1;
+    expect((await post({ message: 'Hi', targetIds: ['t1', 't2'] })).status).toBe(400);
+    expect(publishing.createPost).not.toHaveBeenCalled();
+  });
   it('maps a service failure to a safe error without internals', async () => {
     publishing.createPost.mockImplementation(async () => { throw new Error('INSERT INTO posts leaked'); });
     const response = await post(valid);

@@ -1,10 +1,11 @@
+import { withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { z } from 'zod';
 import { disconnectRootConnection, previewRootConnectionDeletion } from '@/server/root/legacy/connections';
 import { readBody, rootRoute } from '@/server/root/legacy/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const schema = z.object({ confirmation: z.string().min(1).max(400), mode: z.enum(['retain', 'delete']).optional() }).strict();
+const schema = z.object({ confirmation: z.string().min(1).refine(withinSynchronousLimit('root.confirmationMaxCharacters')), mode: z.enum(['retain', 'delete']).optional() }).strict();
 
 /** Read-only estimate of the local rows that delete mode would remove. */
 export const GET = rootRoute<{ params: Promise<{ id: string }> }>({ write: false }, async (_request, actorId, { params }) => previewRootConnectionDeletion(actorId, (await params).id));

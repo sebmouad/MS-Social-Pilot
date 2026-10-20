@@ -49,7 +49,7 @@ export async function emitRecentPostEvents(now = new Date()): Promise<{ examined
     const occurredAt = (published ? row.publishedAt : null) ?? row.updatedAt;
     const result = await emitWebhook(row.workspaceId, published ? 'post.published' : 'post.failed', {
       postId: row.postId, destinationId: row.targetId, destinationName: row.targetName,
-      ...(published ? { url: row.remoteUrl } : { errorCode: row.errorCode?.slice(0, 80) ?? null }),
+      ...(published ? { url: row.remoteUrl } : { errorCode: row.errorCode?.slice(0, rt.limits.eventErrorCodeMaxCharacters) ?? null }),
     }, { eventId: `post_target:${row.id}:${published ? 'published' : `failed:${row.attempts}`}`, now, occurredAt });
     queued += result.queued;
   }
@@ -79,7 +79,7 @@ export async function emitRecentScheduledEvents(now = new Date()): Promise<ScanR
     ORDER BY l."createdAt" ASC LIMIT ${rt.limits.webhookEventScanLimit}`;
   let queued = 0;
   for (const row of rows) {
-    queued += (await emitWebhook(row.workspaceId, 'post.scheduled', { postId: row.postId, scheduledAt: row.scheduledAt.toISOString(), destinationIds: row.destinationIds.slice(0, 50) }, { eventId: `post_scheduled:${row.id}`, now, occurredAt: row.createdAt })).queued;
+    queued += (await emitWebhook(row.workspaceId, 'post.scheduled', { postId: row.postId, scheduledAt: row.scheduledAt.toISOString(), destinationIds: row.destinationIds.slice(0, rt.limits.eventDestinationIdsMaxItems) }, { eventId: `post_scheduled:${row.id}`, now, occurredAt: row.createdAt })).queued;
   }
   return { examined: rows.length, queued };
 }
@@ -102,7 +102,7 @@ export async function emitRecentCommentEvents(now = new Date()): Promise<ScanRes
   for (const row of rows) {
     queued += (await emitWebhook(row.workspaceId, 'comment.received', {
       commentId: row.id, postId: row.postId, destinationId: row.targetId, destinationName: row.targetName,
-      authorName: row.fromName?.slice(0, 120) ?? null, text: row.message.slice(0, 500), createdAt: row.createdTime.toISOString(),
+      authorName: row.fromName?.slice(0, rt.limits.eventAuthorNameMaxCharacters) ?? null, text: row.message.slice(0, rt.limits.eventMessageMaxCharacters), createdAt: row.createdTime.toISOString(),
     }, { eventId: `comment:${row.id}`, now, occurredAt: row.firstSeenAt })).queued;
   }
   return { examined: rows.length, queued };
@@ -124,7 +124,7 @@ export async function emitRecentDisconnectEvents(now = new Date()): Promise<Scan
     ORDER BY a."invalidatedAt" ASC, t.id ASC LIMIT ${rt.limits.webhookEventScanLimit}`;
   let queued = 0;
   for (const row of rows) {
-    queued += (await emitWebhook(row.workspaceId, 'page.disconnected', { destinationId: row.targetId, destinationName: row.targetName, reason: row.reason?.slice(0, 120) ?? null }, { eventId: `target:${row.targetId}:disconnected:${row.invalidatedAt.getTime()}`, now, occurredAt: row.invalidatedAt })).queued;
+    queued += (await emitWebhook(row.workspaceId, 'page.disconnected', { destinationId: row.targetId, destinationName: row.targetName, reason: row.reason?.slice(0, rt.limits.eventDisconnectReasonMaxCharacters) ?? null }, { eventId: `target:${row.targetId}:disconnected:${row.invalidatedAt.getTime()}`, now, occurredAt: row.invalidatedAt })).queued;
   }
   return { examined: rows.length, queued };
 }

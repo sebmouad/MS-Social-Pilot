@@ -54,6 +54,20 @@ describe('every subscribable event has an honest source', () => {
       expect(values, fragment).toContain(7); expect(values, fragment).toContainEqual(new Date(now.getTime() - 30 * 60_000));
     }
   });
+  it('uses Root limits for event payload truncation and destination lists', async () => {
+    state.config['integrations.webhooks.eventAuthorNameMaxCharacters'] = 3;
+    state.config['integrations.webhooks.eventMessageMaxCharacters'] = 4;
+    state.config['integrations.webhooks.eventDestinationIdsMaxItems'] = 1;
+    const comment = { id: 'c-limit', workspaceId: 'workspace-a', postId: 'p1', targetId: 't1', targetName: 'Alpha', fromName: 'Samuel', message: 'message', createdTime: now, firstSeenAt: now };
+    when('FROM post_comments c', () => [comment]);
+    await emitRecentCommentEvents(now);
+    expect(payloadOf(inserts()[0]!).data).toMatchObject({ authorName: 'Sam', text: 'mess' });
+    state.queries.length = 0; state.executions.length = 0; state.handlers.length = 0;
+    const scheduled = { id: 'log-limit', workspaceId: 'workspace-a', postId: 'p1', scheduledAt: now, createdAt: now, destinationIds: ['t1', 't2'] };
+    when('FROM activity_logs l', () => [scheduled]);
+    await emitRecentScheduledEvents(now);
+    expect(payloadOf(inserts()[0]!).data.destinationIds).toEqual(['t1']);
+  });
   it('a failing source never stops the others', async () => {
     when('FROM activity_logs l', () => { throw new Error('boom'); });
     when('FROM report_runs r', () => [{ id: 'run1', workspaceId: 'workspace-a', targetId: 't1', kind: 'scheduled', periodStart: '2026-09-01', periodEnd: '2026-09-30', rowCount: 12, status: 'completed', finishedAt: new Date('2026-10-19T11:50:00Z') }]);

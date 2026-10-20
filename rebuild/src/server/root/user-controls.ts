@@ -106,6 +106,7 @@ export const rootUserDeletionConfirmation = (email: string) => `DELETE ACCOUNT $
  * are revoked and credited the same way; everything personal (sessions, tokens, saved views, memberships) cascades.
  */
 export async function deleteRootUser(actorId: string, userId: string, confirmation: string) {
+  if (!rootUserIdSchema.safeParse(userId).success || !rootUserConfirmationSchema.safeParse(confirmation).success) throw new OperationError('invalid_request', 'Enter a valid user and confirmation.');
   return prisma.$transaction(async tx => {
     const actors = await tx.$queryRaw<Array<{ isInstanceOwner: boolean; disabledAt: Date | null }>>`SELECT "isInstanceOwner", "disabledAt" FROM users WHERE id = ${actorId} FOR SHARE`;
     if (!actors[0]?.isInstanceOwner || actors[0].disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');

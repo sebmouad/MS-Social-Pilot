@@ -1,10 +1,12 @@
 import { OperationError } from '@/lib/operation-error';
 import { auditedReceipt, canManageData, type McpToolGroup } from '@/server/mcp/kit';
 import { WEBHOOK_EVENTS } from './contracts';
+import { INTEGRATIONS_INPUT_HARD_MAX } from './config';
 import { WEBHOOKS_FEATURE_ID } from './manifest';
 import { createWebhook, deleteWebhook, listDeliveries, listWebhooks, redeliverWebhook, rotateWebhookSecret, testWebhook, updateWebhook } from './server/webhooks';
 
-const id = { type: 'string', minLength: 1, maxLength: 80 } as const;
+// Advertise the parser ceiling; owning services enforce current Root limits.
+const id = { type: 'string', minLength: 1, maxLength: INTEGRATIONS_INPUT_HARD_MAX } as const;
 const confirmation = { type: 'string', description: 'Exact confirmation text named in the tool description.' } as const;
 const obj = (properties: object, required: string[] = []) => ({ type: 'object', required, properties, additionalProperties: false }) as const;
 const events = { type: 'array', items: { type: 'string', enum: [...WEBHOOK_EVENTS] }, minItems: 1 } as const;
@@ -16,7 +18,7 @@ const events = { type: 'array', items: { type: 'string', enum: [...WEBHOOK_EVENT
  */
 export const integrationsToolDefinitions = [
   { name: 'list_webhooks', description: 'Outbound webhook endpoints of this workspace with status and pending/failed delivery counts. Workspace owners and admins only. Addresses are shortened and secrets are never returned.', inputSchema: obj({}) },
-  { name: 'create_webhook', description: 'Add an endpoint that receives signed JSON events at a public https address. The signing secret is not returned here; show it in Settings > Webhooks. Confirmation must exactly match "CREATE WEBHOOK <name>".', inputSchema: obj({ name: { type: 'string', maxLength: 60 }, url: { type: 'string', maxLength: 500 }, events, confirmation }, ['name', 'url', 'events', 'confirmation']) },
+  { name: 'create_webhook', description: 'Add an endpoint that receives signed JSON events at a public https address. The signing secret is not returned here; show it in Settings > Webhooks. Confirmation must exactly match "CREATE WEBHOOK <name>".', inputSchema: obj({ name: { type: 'string', maxLength: INTEGRATIONS_INPUT_HARD_MAX }, url: { type: 'string', maxLength: INTEGRATIONS_INPUT_HARD_MAX }, events, confirmation }, ['name', 'url', 'events', 'confirmation']) },
   { name: 'update_webhook', description: 'Enable/disable an endpoint or change its events. Confirmation must exactly match "UPDATE WEBHOOK <id>".', inputSchema: obj({ id, enabled: { type: 'boolean' }, events, confirmation }, ['id', 'confirmation']) },
   { name: 'delete_webhook', description: 'Delete an endpoint and its delivery history. Confirmation must exactly match "DELETE WEBHOOK <id>".', inputSchema: obj({ id, confirmation }, ['id', 'confirmation']) },
   { name: 'rotate_webhook_secret', description: 'Replace the signing secret (the old one stops signing at once). The new secret is not returned here; show it in Settings > Webhooks. Confirmation must exactly match "ROTATE WEBHOOK SECRET <id>".', inputSchema: obj({ id, confirmation }, ['id', 'confirmation']) },

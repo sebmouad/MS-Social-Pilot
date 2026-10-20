@@ -1,44 +1,51 @@
 import { requireRootPage } from '@/server/config/access';
 import { RootFrame } from '@/server/root/RootFrame';
 import { readRootBackupStatus, readRootDiagnosticsSummary } from '@/server/root/legacy/backups';
+import { runtimeConfig } from '@/server/config/store';
+import { ROOT_BACKUPS_COPY, backupsCopyText } from '@/lib/config/root-backups-copy';
 import '../plans/legacy-ops.css';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Backups · Root' };
-
-const STATE_TEXT = { recent: 'Recorded recently', stale: 'Record is out of date', failed_latest: 'Latest run failed', never_recorded: 'Never recorded' } as const;
+export async function generateMetadata() {
+  const copy = await runtimeConfig('root.backupsCopy').catch(() => ROOT_BACKUPS_COPY);
+  return { title: copy.metadataTitle };
+}
 
 export default async function RootBackupsPage() {
   const actor = await requireRootPage();
-  const [backups, diagnostics] = await Promise.all([readRootBackupStatus(actor.id), readRootDiagnosticsSummary(actor.id)]).then(([b, d]) => [b, d] as const).catch(() => [null, null] as const);
+  const [copy, result] = await Promise.all([
+    runtimeConfig('root.backupsCopy').catch(() => ROOT_BACKUPS_COPY),
+    Promise.all([readRootBackupStatus(actor.id), readRootDiagnosticsSummary(actor.id)]).then(([b, d]) => [b, d] as const).catch(() => [null, null] as const)
+  ]);
+  const [backups, diagnostics] = result;
   return <RootFrame active="/root/backups"><div className="root-ops">
     <header className="root-control__heading">
-      <p className="root-config__eyebrow">Root · Shared controls</p>
-      <h1>Backups and diagnostics</h1>
-      <p>Read-only view of what the server backup scripts recorded. Root cannot start, restore or verify a backup from this screen.</p>
+      <p className="root-config__eyebrow">{copy.eyebrow}</p>
+      <h1>{copy.title}</h1>
+      <p>{copy.intro}</p>
     </header>
-    {!backups ? <section className="root-control__notice" role="alert"><h2>Status unavailable</h2><p>Backup records could not be read. Backup state is unverified.</p></section> : <>
-      <section className="root-control__notice" aria-label="What this does not prove"><h2>{backups.summary}</h2>
+    {!backups ? <section className="root-control__notice" role="alert"><h2>{copy.unavailable}</h2><p>{copy.recordsReadFailure}</p></section> : <>
+      <section className="root-control__notice" aria-label={copy.limitsLabel}><h2>{backups.summary}</h2>
         <ul>{backups.limits.map(limit => <li key={limit}>{limit}</li>)}</ul></section>
       {backups.checks.length > 0 && <div className="root-ops__tiles">{backups.checks.map(check => <div key={check.kind} className={`root-ops__tile${check.state === 'recent' ? '' : ' root-ops__tile--attention'}`}>
-        <strong>{check.label}</strong><span>{STATE_TEXT[check.state]}</span>
-        <span className="root-ops__muted">{check.lastSuccessAt ? `Last success ${new Date(check.lastSuccessAt).toLocaleString()} (${check.ageHours} h ago)` : 'No successful run recorded'}</span>
-        <span className="root-ops__muted">Flagged as out of date after {check.staleAfterHours} h. Archive contents unverified.</span>
+        <strong>{check.label}</strong><span>{copy.state[check.state]}</span>
+        <span className="root-ops__muted">{check.lastSuccessAt ? check.ageHours === null ? backupsCopyText(copy.lastSuccessAgeUnknown, { time: new Date(check.lastSuccessAt).toLocaleString() }) : backupsCopyText(copy.lastSuccess, { time: new Date(check.lastSuccessAt).toLocaleString(), age: check.ageHours }) : copy.noSuccess}</span>
+        <span className="root-ops__muted">{backupsCopyText(copy.staleAfter, { hours: check.staleAfterHours })}</span>
       </div>)}</div>}
-      <section className="root-ops__panel" aria-labelledby="runs"><h2 id="runs">Recorded runs</h2>
-        {backups.runs.length === 0 ? <p className="root-ops__muted">{backups.source === 'unavailable' ? 'This database has no backup record table.' : 'No runs have been recorded. Backup state is unverified.'}</p> : <div className="root-ops__table" role="region" aria-label="Recorded backup runs" tabIndex={0}><table>
-          <caption className="ui-visually-hidden">Recorded backup and restore-test runs</caption>
-          <thead><tr><th scope="col">Finished</th><th scope="col">Kind</th><th scope="col">Result reported</th><th scope="col">Note</th></tr></thead>
-          <tbody>{backups.runs.map(run => <tr key={run.id}><td><time dateTime={run.finishedAt}>{new Date(run.finishedAt).toLocaleString()}</time></td><td>{run.kind === 'offsite' ? 'Off-site backup' : run.kind === 'restore_test' ? 'Restore test' : run.kind}</td><td>{run.status === 'ok' ? 'Success' : 'Failed'}</td><td>{run.detail ?? ''}</td></tr>)}</tbody>
+      <section className="root-ops__panel" aria-labelledby="runs"><h2 id="runs">{copy.runsTitle}</h2>
+        {backups.runs.length === 0 ? <p className="root-ops__muted">{backups.source === 'unavailable' ? copy.noRunsUnavailable : copy.noRuns}</p> : <div className="root-ops__table" role="region" aria-label={copy.runsRegion} tabIndex={0}><table>
+          <caption className="ui-visually-hidden">{copy.runsCaption}</caption>
+          <thead><tr><th scope="col">{copy.finished}</th><th scope="col">{copy.kind}</th><th scope="col">{copy.result}</th><th scope="col">{copy.note}</th></tr></thead>
+          <tbody>{backups.runs.map(run => <tr key={run.id}><td><time dateTime={run.finishedAt}>{new Date(run.finishedAt).toLocaleString()}</time></td><td>{run.kind === 'offsite' ? copy.offsiteBackup : run.kind === 'restore_test' ? copy.restoreTest : run.kind}</td><td>{run.status === 'ok' ? copy.success : copy.failed}</td><td>{run.detail ?? ''}</td></tr>)}</tbody>
         </table></div>}
       </section>
     </>}
-    <section className="root-ops__panel" aria-labelledby="diag"><h2 id="diag">Installation diagnostics</h2>
-      {!diagnostics ? <p className="root-ops__muted">Diagnostics could not be read.</p> : <>
-        <p>Open errors: {diagnostics.errors ? `${diagnostics.errors.open} (${diagnostics.errors.openLast24h} seen in the last 24 hours)` : 'unknown (error log unavailable)'}. <a href="/root/errors">Open the error log</a></p>
-        <p>Open system alerts: {diagnostics.openAlerts === null ? 'unknown (alert records unavailable)' : diagnostics.openAlerts.length}</p>
-        {diagnostics.openAlerts && diagnostics.openAlerts.length > 0 && <ul>{diagnostics.openAlerts.map(alert => <li key={alert.id}>{alert.key} since {new Date(alert.openedAt).toLocaleString()}</li>)}</ul>}
-        <p className="root-ops__muted">Provider health: not assessed here. {diagnostics.providerHealth.note} Module checks run from each module&apos;s Root page and <a href="/root/operations">Operations</a>.</p>
+    <section className="root-ops__panel" aria-labelledby="diag"><h2 id="diag">{copy.diagnosticsTitle}</h2>
+      {!diagnostics ? <p className="root-ops__muted">{copy.diagnosticsFailure}</p> : <>
+        <p>{diagnostics.errors ? backupsCopyText(copy.openErrors, { count: diagnostics.errors.open, recent: diagnostics.errors.openLast24h }) : copy.errorsUnknown}. <a href="/root/errors">{copy.openErrorLog}</a></p>
+        <p>{diagnostics.openAlerts === null ? copy.alertsUnknown : backupsCopyText(copy.openAlerts, { count: diagnostics.openAlerts.length })}</p>
+        {diagnostics.openAlerts && diagnostics.openAlerts.length > 0 && <ul>{diagnostics.openAlerts.map(alert => <li key={alert.id}>{backupsCopyText(copy.alertOpened, { key: alert.key, time: new Date(alert.openedAt).toLocaleString() })}</li>)}</ul>}
+        <p className="root-ops__muted">{backupsCopyText(copy.providerHealth, { note: diagnostics.providerHealth.note })} <a href="/root/operations">{copy.operationsLink}</a>.</p>
       </>}
     </section>
   </div></RootFrame>;

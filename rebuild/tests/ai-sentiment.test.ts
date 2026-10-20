@@ -61,6 +61,13 @@ it('bounds candidates and input, excluding outbound comments and same-day retrie
   expect(values.at(-1)).toBe(3); expect(q).toContain('length(c.message) <='); expect(q).toContain('c."sentById" IS NULL');
   expect(q).toContain('c."fromId" IS DISTINCT FROM t."providerId"'); expect(q).toContain('"sentimentAttemptedAt" <');
 });
+it('uses the configured lookback window for candidate comments', async () => {
+  m.overrides['ai.sentimentLookbackDays'] = 7;
+  await classifyCommentSentiment(now, { port: port() });
+  const [sql, ...values] = m.query.mock.calls[0];
+  expect(sql.join('?')).toContain('c."createdTime" >=');
+  expect(values.some((value: unknown) => value instanceof Date && value.getTime() === new Date('2026-10-13T12:00:00.000Z').getTime())).toBe(true);
+});
 it('does not dispatch after a lost claim, denied entitlement, deselection or workspace opt-out', async () => {
   const p = port(); m.claimed = false; await classifyCommentSentiment(now, { port: p });
   m.claimed = true; m.access.mockRejectedValueOnce(new Error('denied')); await classifyCommentSentiment(now, { port: p });

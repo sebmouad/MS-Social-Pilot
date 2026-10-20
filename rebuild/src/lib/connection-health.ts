@@ -1,3 +1,6 @@
+import { SYNCHRONOUS_POLICY, synchronousPolicy } from '@/lib/config/synchronous-policy';
+import { copySchema } from '@/lib/config/copy-schema';
+import { z } from 'zod';
 /**
  * Provider-neutral connection health: how long the stored credential stays
  * usable, and which customer-facing permission groups the platform module says
@@ -6,8 +9,8 @@
  */
 export type ConnectionTokenStatus = 'valid' | 'expiring_soon' | 'expired' | 'reconnect_needed';
 
-/** Used until Root owns the warning window; callers can pass a configured value. */
-export const DEFAULT_EXPIRY_WARNING_DAYS = 7;
+/** Registered bootstrap default; server consumers read the refreshed Root snapshot below. */
+export const DEFAULT_EXPIRY_WARNING_DAYS = SYNCHRONOUS_POLICY['connections.expiryWarningDays'].defaultValue;
 
 export type GrantGroupState = 'granted' | 'missing' | 'unknown';
 /** One permission area in customer words, supplied by the platform module. */
@@ -15,7 +18,7 @@ export interface GrantGroupHealth { id: string; label: string; state: GrantGroup
 
 export interface TokenHealthInput { invalidatedAt: Date | null; tokenExpiresAt: Date | null }
 
-export function connectionTokenStatus(connection: TokenHealthInput, now = new Date(), warningDays = DEFAULT_EXPIRY_WARNING_DAYS): ConnectionTokenStatus {
+export function connectionTokenStatus(connection: TokenHealthInput, now = new Date(), warningDays = synchronousPolicy('connections.expiryWarningDays')): ConnectionTokenStatus {
   if (connection.invalidatedAt) return 'reconnect_needed';
   if (!connection.tokenExpiresAt) return 'valid';
   const remainingMs = connection.tokenExpiresAt.getTime() - now.getTime();
@@ -33,7 +36,7 @@ export interface ConnectionHealthSummary {
   checkedAt: Date;
 }
 
-export function summarizeConnectionHealth(connection: TokenHealthInput, grants: readonly GrantGroupHealth[], now = new Date(), warningDays = DEFAULT_EXPIRY_WARNING_DAYS): ConnectionHealthSummary {
+export function summarizeConnectionHealth(connection: TokenHealthInput, grants: readonly GrantGroupHealth[], now = new Date(), warningDays = synchronousPolicy('connections.expiryWarningDays')): ConnectionHealthSummary {
   const token = connectionTokenStatus(connection, now, warningDays);
   const missing = grants.filter(group => group.state === 'missing');
   return { token, grants: [...grants], missing, reconnectRecommended: token !== 'valid' || missing.length > 0, checkedAt: now };
@@ -60,5 +63,14 @@ export const connectionHealthCopy = {
 export type ConnectionHealthLocale = keyof typeof connectionHealthCopy;
 export type ConnectionHealthCopyKey = keyof typeof connectionHealthCopy.en;
 export function connectionHealthText(locale: ConnectionHealthLocale, key: ConnectionHealthCopyKey, values: Record<string, string | number> = {}): string {
-  return (connectionHealthCopy[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+  return ((healthCopyState.value ?? connectionHealthCopy)[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+}
+
+
+export const connectionHealthCopySchema = z.object({ en: copySchema(connectionHealthCopy.en), fr: copySchema(connectionHealthCopy.fr) }).strict();
+type HealthCopy = z.infer<typeof connectionHealthCopySchema>;
+const healthCopyState = ((globalThis as { __mspConnectionHealthCopy?: { value?: HealthCopy } }).__mspConnectionHealthCopy ??= {});
+/** Updated by the server's startup/periodic refresh and after a local Root save. */
+export function applyConnectionHealthCopy(value: unknown): void {
+  healthCopyState.value = connectionHealthCopySchema.parse(value);
 }

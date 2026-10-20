@@ -92,6 +92,12 @@ describe('webhook management', () => {
     expect(insert.values).not.toContain(made.secret);
     expect(audited('webhook.created')).toBe(true);
   });
+  it('enforces current Root webhook name and address limits after broad contract parsing', async () => {
+    state.config['integrations.webhooks.nameMaxCharacters'] = 3;
+    state.config['integrations.webhooks.urlMaxCharacters'] = 12;
+    await expect(createWebhook(actor, ok(), { deps: publicDeps() })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.queries.some(q => q.sql.includes('SELECT COUNT(*)'))).toBe(false);
+  });
   it('refuses unsafe addresses, wrong confirmation, extra fields, non-admins, the endpoint limit and a disabled capability', async () => {
     await expect(createWebhook(actor, ok({ url: 'https://10.0.0.5/x' }), { deps: publicDeps() })).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(createWebhook(actor, ok({ confirmation: 'x' }), { deps: publicDeps() })).rejects.toMatchObject({ code: 'invalid_request' });
@@ -135,6 +141,8 @@ describe('webhook management', () => {
     expect(rotated.secret).toMatch(/^whsec_/); expect(audited('webhook.secret_rotated')).toBe(true);
   });
   it('lists delivery history only for an endpoint of the caller workspace, paged', async () => {
+    state.config['integrations.webhooks.deliveryPageMaxNumber'] = 2;
+    await expect(listDeliveries(actor, { id: 'w1', page: 3 })).rejects.toMatchObject({ code: 'invalid_request' });
     when('FROM webhook_endpoints WHERE id', () => []);
     await expect(listDeliveries(actor, { id: 'w9' })).rejects.toMatchObject({ code: 'not_found' });
     state.handlers.length = 0;
@@ -195,6 +203,17 @@ describe('event emission and delivery runner', () => {
     const claim = state.queries.find(q => q.sql.includes('UPDATE webhook_deliveries d SET'))!;
     expect(claim.sql).toContain('SKIP LOCKED'); expect(claim.sql).toContain('e.enabled'); expect(claim.sql).toContain('"suspendedAt" IS NULL');
     expect(state.executions.find(q => q.sql.includes('SET attempts'))!.values).toContain('delivered');
+  });
+  it('applies Root error storage and purge batch limits at runtime', async () => {
+    state.config['integrations.webhooks.errorMaxCharacters'] = 4;
+    state.config['integrations.webhooks.purgeBatchSize'] = 3;
+    when('UPDATE webhook_deliveries d SET', () => [row()]); endpoint(); execCount('DELETE FROM webhook_deliveries', 2);
+    const result = await deliverDueWebhooks(publicDeps(500), now, () => now);
+    expect(result.retrying).toBe(1);
+    const settle = state.executions.find(q => q.sql.includes('SET attempts'))!;
+    expect(settle.values).toContain('Answ');
+    const purge = state.executions.find(q => q.sql.includes('DELETE FROM webhook_deliveries'))!;
+    expect(purge.values).toContain(3);
   });
   it('retries on the Root schedule, then gives up after the last wait; unsafe addresses never retry', async () => {
     endpoint();

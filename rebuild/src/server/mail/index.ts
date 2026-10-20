@@ -17,7 +17,7 @@ type MailDependencies = {
   record: (input: { to: string; subject: string; template: string; workspaceId?: string; providerId?: string; status: 'sent' | 'failed'; error?: string }) => Promise<void>;
 };
 
-const keys = ['enabled','publicOrigin','smtpHost','smtpPort','smtpSecure','smtpRequireTls','smtpUsername','smtpPassword','fromAddress','fromName','connectionTimeoutMs','socketTimeoutMs','subjectMaxCharacters','bodyMaxBytes'] as const;
+const keys = ['enabled','publicOrigin','smtpHost','smtpPort','smtpSecure','smtpRequireTls','smtpUsername','smtpPassword','fromAddress','fromName','connectionTimeoutMs','socketTimeoutMs','subjectMaxCharacters','bodyMaxBytes','recipientMaxCharacters','workspaceIdMaxCharacters','templateMaxCharacters','providerIdMaxCharacters'] as const;
 
 
 async function loadMailConfig(readConfig: MailConfigReader, readSecret: MailSecretReader): Promise<MailTransportConfig | null> {
@@ -33,12 +33,12 @@ async function loadMailConfig(readConfig: MailConfigReader, readSecret: MailSecr
 
 const safeRecipient = (value: string) => /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value);
 function validInput(input: TransactionalMailInput, config: MailTransportConfig): boolean {
-  return safeRecipient(input.to) && input.to.length <= 320 && typeof input.subject === 'string'
+  return safeRecipient(input.to) && input.to.length <= config.recipientMaxCharacters && typeof input.subject === 'string'
     && input.subject.length > 0 && input.subject.length <= config.subjectMaxCharacters && !/[\r\n]/.test(input.subject)
     && typeof input.text === 'string' && input.text.length > 0 && (input.html === undefined || typeof input.html === 'string')
     && Buffer.byteLength(input.text, 'utf8') + Buffer.byteLength(input.html ?? '', 'utf8') <= config.bodyMaxBytes
-    && /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,99}$/.test(input.template)
-    && (input.workspaceId === undefined || (typeof input.workspaceId === 'string' && input.workspaceId.length <= 128));
+    && /^[a-zA-Z0-9][a-zA-Z0-9_.:-]*$/.test(input.template) && input.template.length <= config.templateMaxCharacters
+    && (input.workspaceId === undefined || (typeof input.workspaceId === 'string' && input.workspaceId.length <= config.workspaceIdMaxCharacters));
 }
 
 function makeDefaultTransport(config: MailTransportConfig): MailTransport {
@@ -100,7 +100,7 @@ export function createTransactionalMailService(deps: MailDependencies = dependen
           return { status: 'failed' };
         }
         if (!accepted) return { status: 'uncertain' };
-        const deliveryId = typeof info.messageId === 'string' && info.messageId.length <= 255 ? info.messageId : undefined;
+        const deliveryId = typeof info.messageId === 'string' && info.messageId.length <= config.providerIdMaxCharacters ? info.messageId : undefined;
         try {
           await deps.record({ to: input.to, subject: input.subject, template: input.template, workspaceId: input.workspaceId, providerId: deliveryId, status: 'sent' });
         } catch { return { status: 'uncertain' }; }

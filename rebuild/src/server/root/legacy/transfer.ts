@@ -1,3 +1,4 @@
+import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -13,8 +14,8 @@ export async function transferInstallationOwnership(actorId: string, input: unkn
   const value = input && typeof input === 'object' ? input as Record<string, unknown> : {};
   const email = typeof value.email === 'string' ? value.email.trim().toLowerCase() : '';
   const confirmation = typeof value.confirmation === 'string' ? value.confirmation : '';
-  if (!email || email.length > 320) throw new OperationError('invalid_request', 'Enter the email of an existing active account.');
-  if (confirmation !== installationTransferConfirmation(email)) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
+  if (!email || email.length > synchronousPolicy('root.emailMaxCharacters')) throw new OperationError('invalid_request', 'Enter the email of an existing active account.');
+  if (confirmation.length > synchronousPolicy('root.confirmationMaxCharacters') || confirmation !== installationTransferConfirmation(email)) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
   return prisma.$transaction(async tx => {
     const target = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM users WHERE email = ${email}`;
     const targetId = target[0]?.id;

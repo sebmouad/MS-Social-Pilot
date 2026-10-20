@@ -1,3 +1,4 @@
+import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { requestOrigin } from '@/server/request-origin';
 import { createHash } from 'node:crypto';
 import { cookies } from 'next/headers';
@@ -15,9 +16,9 @@ import { hit } from './rate-limit';
 export type InvitationHttpAction = 'preview' | 'accept' | 'register' | 'enroll';
 const schemas = {
   preview: z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional() }).strict(),
-  accept: z.object({ confirmation: z.string().max(400) }).strict(),
-  enroll: z.object({ confirmation: z.string().max(400) }).strict(),
-  register: z.object({ name: z.string().trim().min(1).max(100), password: z.string().max(200), confirmation: z.string().max(400) }).strict(),
+  accept: z.object({ confirmation: z.string().refine(withinSynchronousLimit('root.confirmationMaxCharacters')) }).strict(),
+  enroll: z.object({ confirmation: z.string().refine(withinSynchronousLimit('root.confirmationMaxCharacters')) }).strict(),
+  register: z.object({ name: z.string().trim().min(1).refine(withinSynchronousLimit('settings.accountNameMaxLength')), password: z.string().refine(value => Buffer.byteLength(value, 'utf8') <= synchronousPolicy('auth.passwordMaxBytes')), confirmation: z.string().refine(withinSynchronousLimit('root.confirmationMaxCharacters')) }).strict(),
 };
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
 export async function handleInvitationHttp(request: Request, action: InvitationHttpAction) {

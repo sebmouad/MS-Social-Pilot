@@ -1,3 +1,4 @@
+import { synchronousPolicy } from './synchronous-policy';
 /**
  * A fixed-window counter for endpoints a stranger can reach.
  *
@@ -25,18 +26,18 @@ interface Window {
  * long as they kept going, which is the memory-exhaustion version of the attack
  * being prevented.
  */
-const MAX_KEYS = 10_000;
+// Capacity is loaded at startup and periodically refreshed by request-origin.ts.
 
 const windows = new Map<string, Window>();
 
-function prune(now: number): void {
+function prune(now: number, maxKeys: number): void {
   for (const [key, window] of windows) {
     if (window.resetAt <= now) windows.delete(key);
   }
 
   // Still full of live windows: drop the oldest, which are the closest to
   // expiring anyway. Map iterates in insertion order, so this is the front.
-  while (windows.size >= MAX_KEYS) {
+  while (windows.size >= maxKeys) {
     const oldest = windows.keys().next();
     if (oldest.done) break;
     windows.delete(oldest.value);
@@ -62,10 +63,11 @@ export function hit(
   options: { limit: number; windowMs: number; now?: number },
 ): RateLimitResult {
   const now = options.now ?? Date.now();
+  const maxKeys = synchronousPolicy('security.rateLimitMaxKeys');
   const existing = windows.get(key);
 
   if (!existing || existing.resetAt <= now) {
-    if (windows.size >= MAX_KEYS) prune(now);
+    if (windows.size >= maxKeys) prune(now, maxKeys);
     const window = { count: 1, resetAt: now + options.windowMs };
     windows.set(key, window);
     return { allowed: true, remaining: options.limit - 1, resetAt: window.resetAt };
