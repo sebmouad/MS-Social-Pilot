@@ -1,12 +1,13 @@
 'use client';
 import { AutoTextarea } from '@/components/AutoTextarea';
 
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Dialog } from '@/components';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { isOperationErrorCode } from '@/lib/operation-error';
 import styles from './inbox.module.css';
+import { REPLY_COPY } from './reply-copy';
 
 type Kind = 'message' | 'comment' | 'review';
 type Outcome = { ok: true; body: Record<string, number | string | boolean> } | { ok: false; error: string };
@@ -209,8 +210,10 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
 }
 
 /** Reply composer with a character count and the platform's reply rule in plain words. */
-export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000, value, onChange }: { id: string; kind: Kind; allowed: boolean; headline: string; detail?: string; maxLength?: number; value?: string; onChange?: (value: string) => void }) {
+export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000, value, onChange, locale = 'en' }: { locale?: 'en' | 'fr'; id: string; kind: Kind; allowed: boolean; headline: string; detail?: string; maxLength?: number; value?: string; onChange?: (value: string) => void }) {
   const validation = useFormValidation();
+  const copy = REPLY_COPY[locale];
+  const inFlight = useRef(false);
   const [localText, setLocalText] = useState('');
   const text = value ?? localText;
   const updateText = (next: string) => { if (value === undefined) setLocalText(next); onChange?.(next); };
@@ -226,25 +229,26 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (empty || busy || !allowed) return;
+    if (empty || inFlight.current || busy || !allowed) return;
     if (!validation.validate(event.currentTarget)) return;
+    inFlight.current = true;
     setBusy(true); setError(''); setSent('');
     const outcome = await send({ action: 'reply', id, kind, text });
-    setBusy(false);
-    if (!outcome.ok) { setError(outcome.error); return; }
-    updateText(''); setSent('Reply sent.');
+    inFlight.current = false; setBusy(false);
+    if (!outcome.ok) { setError(locale === 'fr' ? copy.unconfirmed : outcome.error); return; }
+    updateText(''); setSent(copy.sent);
     router.refresh();
   }
 
   return <form method="post" noValidate className={styles.reply} onSubmit={event => void submit(event)}>
     <p id={ruleId} className={allowed ? styles.ruleOpen : styles.ruleClosed}><span aria-hidden="true">{allowed ? '●' : '■'}</span> <strong>{headline}</strong>{detail ? <span className={styles.ruleDetail}> {detail}</span> : null}</p>
-    <label htmlFor={fieldId} className="ui-visually-hidden">Reply</label>
+    <label htmlFor={fieldId} className="ui-visually-hidden">{copy.reply}</label>
     <AutoTextarea id={fieldId} name="reply" rows={3} maxLength={maxLength} value={text} disabled={!allowed || busy} aria-describedby={[ruleId, countId, validation.fieldProps('reply')['aria-describedby']].filter(Boolean).join(' ')} aria-invalid={Boolean(error) || Boolean(validation.errors.reply) || undefined}
-      placeholder={allowed ? (kind === 'message' ? 'Write a reply…' : 'Write a public reply…') : 'Replies are not possible right now.'} onChange={event => { updateText(event.target.value); setSent(''); }} />
+      placeholder={allowed ? (kind === 'message' ? copy.privatePlaceholder : copy.publicPlaceholder) : copy.unavailable} onChange={event => { updateText(event.target.value); setSent(''); }} />
     <FieldError {...validation.errorProps('reply')} />
     <div className={styles.replyFoot}>
-      <span id={countId} className={remaining < 100 ? styles.countLow : styles.count}>{text.length.toLocaleString('en-US')} / {maxLength.toLocaleString('en-US')} characters{remaining < 100 ? ` · ${remaining} left` : ''}</span>
-      <Button type="submit" variant="primary" disabled={!allowed || busy || empty} aria-busy={busy}>{busy ? 'Sending…' : 'Send reply'}</Button>
+      <span id={countId} className={remaining < 100 ? styles.countLow : styles.count}>{text.length.toLocaleString(locale)} / {maxLength.toLocaleString(locale)} {copy.characters}{remaining < 100 ? ` · ${remaining} ${copy.left}` : ''}</span>
+      <Button type="submit" variant="primary" disabled={!allowed || busy || empty} aria-busy={busy}>{busy ? copy.sending : copy.send}</Button>
     </div>
     <div role="status" aria-live="polite" className={styles.replyStatus}>{sent}</div>
     {error && <p role="alert" className={styles.error}>{error}</p>}

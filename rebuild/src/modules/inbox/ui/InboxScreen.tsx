@@ -14,6 +14,7 @@ import { formatInboxTime } from '@/modules/inbox/server/threads';
 import { InboxSyncBar, ReplyBox, ThreadToolbar } from './InboxActions';
 import { reviewSummary, reviewText } from '@/modules/inbox/reviews-copy';
 import { ThreadTools } from './ThreadTools';
+import { NestedReply } from './NestedReply';
 import { InboxTag } from './InboxTags';
 import styles from './inbox.module.css';
 
@@ -108,6 +109,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           <div className={styles.entryHead}><strong>{entry.author}</strong>{entry.sentBy ? <span>sent by {entry.sentBy}</span> : null}{entry.hidden ? <InboxTag icon="hidden">Hidden</InboxTag> : null}<time dateTime={entry.time.toISOString()}>{formatInboxTime(entry.time, timeZone, true)}</time></div>
           <p>{entry.text || 'No text in this message.'}</p>
           {isReply && canWrite && (capabilities.hide || capabilities.remove) ? <ThreadToolbar reply id={entry.id} kind="comment" resolved={false} hidden={entry.hidden} canResolve={canWrite} canHide={capabilities.hide} canDelete={capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} /> : null}
+          {isReply && !entry.fromChannel ? <NestedReply id={entry.id} author={entry.author} canReply={canWrite && capabilities.reply} allowed={rule.allowed} /> : null}
         </div>
         {replies.length ? <ol className={styles.replies} aria-label={`Replies to ${entry.author}`}>{replies.map(reply => renderEntry(reply))}</ol> : null}
       </li>;

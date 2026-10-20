@@ -32,7 +32,7 @@ Audit details contain workspace and object identifiers but no message content or
 
 ## Known gaps
 
-Visitor replies nested under a comment are not synced (the sync reads top-level comments), so only replies sent here appear under a comment. Assignment, notes and saved replies remain absent. MCP deletion/status/local recovery now share the durable workflow described below. Delete and the other operations have only mocked provider tests; no live platform calls were made.
+Stored visitor replies are read recursively and rendered as nested threads, with moderation/deletion and direct public replies to each visitor entry through the same shared services as the opening comment. The Facebook module reads flattened comments and bounded reply expansions; this is not proof of complete provider history. Assignment, notes and saved replies have shared productivity services and UI. MCP deletion/status/local recovery now share the durable workflow described below. Delete and the other operations have only mocked provider tests; no live platform calls were made.
 
 Run the isolated checks from `app/rebuild` with `npm test` and `npm run typecheck`. Mocked provider tests do not send live messages or moderation operations.
 
@@ -44,7 +44,7 @@ Stable `(time, kind, id)` cursors bind normalized filters, workspace, current ch
 
 Registry version 36 supplies `inbox.listPageSize`, `inbox.threadPageSize`, `inbox.searchMaxCharacters` and `inbox.cursorMaxCharacters`; MCP result bounds can reduce page sizes further. The old duplicate overview/list read paths have been removed. `msp://inbox` returns a configured first page; use returned cursors with tools to continue. No DDL or provider writes were introduced.
 
-Evidence and limitations are recorded in `docs/PREVIEW_QA.md`. Stored browsing is paginated; nested visitor-reply discovery, assignment/notes/saved replies and automatic remote-write reconciliation remain unfinished.
+Evidence and limitations are recorded in `docs/PREVIEW_QA.md`. Stored browsing is paginated; complete provider visitor-reply discovery and automatic remote-write reconciliation remain unfinished.
 
 ## Failure and receipt handling
 
@@ -57,3 +57,25 @@ Ported from legacy `src/lib/moderation.ts`/`moderation-rules.ts` onto the existi
 Rules naming no channel apply to every channel and need full channel access; scoped members and resource-limited keys see and manage only rules whose channels are all visible to them. A run is started by a person and uses that person's current authority: it examines recent stored comments (Root `inbox.moderationFreshHours`, `inbox.moderationRunMaxComments`), skips the channel's own words and app-sent replies, honours the daily cap and once-per-person replies, claims a log row per rule/comment before acting, and dispatches through the shared `moderateInboxComment`/`replyToInbox` services only where the channel's module declares hide/reply. Failures are logged and the run continues. Undo restores a hidden comment; rule replies are removed with the normal durable comment deletion. "Record for the team" writes a log entry; legacy email alerts are not sent. Root bounds: `inbox.moderationRuleLimit`, `inbox.moderationLogLimit` (registry version not bumped in this change; the integrator owns that).
 
 Evidence: unit tests in `tests/inbox-moderation.test.ts` (matcher, copy parity, provider-neutrality, confirmations, scope, claim-once, capability skip, failure log, cap, undo, MCP). No PostgreSQL, browser or live-provider run. Open: automatic application after each sync, export/erasure coverage review of the moderation tables, Root diagnostics.
+
+
+## Direct nested replies — 2026-10-20
+
+`NestedReply` reuses `ReplyBox`, shared form validation and the module's existing
+HTTP action. Each visitor entry has its own retained draft addressed to that
+entry's ID. Channel-authored entries do not receive this composer. Current write
+authority and declared reply capability govern visibility; the neutral reply
+policy governs availability. English/French copy follows the document language,
+and a synchronous in-flight guard prevents racing submit events. Unknown or lost
+receipts retain the draft and never claim success. No new Root keys or migration.
+
+HTTP `/api/inbox/actions` and MCP `reply_to_inbox` already share `replyToInbox`,
+which intersects current channel grants and credential ceilings before module
+dispatch. The new UI uses that path without adding provider rules.
+
+Evidence: `tests/pubinbox-gap-ui.test.ts` covers descendant addressing, scope/
+capability presentation, French copy, retained drafts and duplicate submission;
+`tests/pubinbox-gap-surfaces.test.ts` executes HTTP/MCP through the existing
+services and checks current-authority refusal. These use synthetic data/mocked
+persistence and provider boundaries. PostgreSQL, live-provider, browser and MCP
+transport verification remain open; no servers were run for this branch batch.
