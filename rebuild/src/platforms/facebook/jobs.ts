@@ -175,6 +175,22 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
           const stillBound = await prisma.target.findFirst({ where: { id: target.id, workspaceId: target.workspaceId, providerId: target.providerId, type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } }, select: { id: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
           const currentScopes = ((await runtimeConfig('meta.pageInsightReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
           if (!stillBound?.socialAccount || !usable(stillBound.socialAccount, target.workspaceId, currentTime(now)) || !granted(stillBound.socialAccount.scopes, currentScopes) || !stillBound.accessToken && !stillBound.socialAccount.accessToken) return { updated: 0, skipped: 1, failed: 0 };
+          // History and cursor commit atomically under the selected-resource lock.
+          const historyBinding = await prisma.target.findFirst({ where: { id: target.id, workspaceId: target.workspaceId, providerId: target.providerId, enabled: true }, select: { accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
+          const historyScopes = await runtimeConfig('meta.pageInsightReadScopes') as string[];
+          if (!historyBinding?.socialAccount || !usable(historyBinding.socialAccount, target.workspaceId, currentTime(now)) || !granted(historyBinding.socialAccount.scopes, historyScopes)) throw new OperationError('forbidden', 'History access unavailable.');
+          const historyKey = `facebook.history.${target.workspaceId}.${target.id}.${target.providerId}`;
+          const savedHistory = await tx.appSetting.findUnique({ where: { key: historyKey }, select: { value: true } });
+          const historyEngine = await configuredFacebookEngine({ signal });
+          const history = await historyEngine.getPostHistory(decryptSecret(historyBinding.accessToken ?? historyBinding.socialAccount.accessToken), target.providerId, now, savedHistory?.value as import('./post-history').HistoryProgress | undefined);
+          if (history.failures.length) failedMetrics++;
+          for (const post of history.posts) {
+            await tx.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
+              VALUES (${`rebuild_${randomUUID()}`}, ${target.id}, ${post.remoteId}, ${post.message}, ${post.permalink}, ${post.statusType}, ${post.pictureUrl}, ${post.createdTime}, ${JSON.stringify(post.insights)}::jsonb, ${now}, ${now})
+              ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
+            persistedCount++;
+          }
+          await tx.appSetting.upsert({ where: { key: historyKey }, create: { key: historyKey, value: history.progress, updatedAt: now }, update: { value: history.progress } });
           for (const { metric, period, endTime, value, numeric } of observations) {
             signal.throwIfAborted();
             await tx.pageInsight.upsert({
@@ -236,16 +252,18 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
             signal.throwIfAborted();
             const date = validDate(row.date_start);
             if (!date) continue;
-            const objectId = typeof row.account_id === 'string' ? row.account_id : account.actId;
-            const objectName = typeof row.account_name === 'string' ? row.account_name : account.name;
+            const level = row.report_level === 'campaign' || row.report_level === 'adset' || row.report_level === 'ad' ? row.report_level : 'account';
+            const objectId = typeof row[`${level}_id`] === 'string' ? row[`${level}_id`] as string : account.actId;
+            if (level !== 'account' && objectId === account.actId) throw new Error('Ads hierarchy identity missing.');
+            const objectName = typeof row[`${level}_name`] === 'string' ? row[`${level}_name`] as string : account.name;
             const spend = finite(row.spend) ?? 0;
             const impressions = Math.max(0, Math.trunc(finite(row.impressions) ?? 0));
             const clicks = Math.max(0, Math.trunc(finite(row.clicks) ?? 0));
             const reach = Math.max(0, Math.trunc(finite(row.reach) ?? 0));
             const cpc = finite(row.cpc); const cpm = finite(row.cpm); const cpp = finite(row.cpp); const ctr = finite(row.ctr); const frequency = finite(row.frequency);
             await tx.adInsight.upsert({
-              where: { adAccountId_level_objectId_date: { adAccountId: account.id, level: 'account', objectId, date } },
-              create: { id: `rebuild_${randomUUID()}`, adAccountId: account.id, level: 'account', objectId, objectName, date, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
+              where: { adAccountId_level_objectId_date: { adAccountId: account.id, level, objectId, date } },
+              create: { id: `rebuild_${randomUUID()}`, adAccountId: account.id, level, objectId, objectName, date, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
               update: { objectName, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
             });
             persistedCount++;

@@ -104,3 +104,56 @@ No full suite, servers, deployments, push, database or live-provider reads.
    path. Product owners: content explorer and persisted metadata presentation.
 5. Live-provider, actual database, browser and MCP transport evidence remains open.
    Mock tests cannot prove exhaustive permission-readable coverage.
+
+## Round 2 — 2026-10-20 worker changes
+
+Page analytics now also collects `published_posts` (Root may choose `feed`) into
+`external_posts`, with an explicit lookback and per-target feed-page budget. A
+stable since/until interval and cursor are stored under a workspace/target/provider
+identity in `app_settings`. Cursor and post writes share the existing selected
+resource transaction; final current access/grant checks still guard commit. The
+collector uses cursor values, never stored provider URLs or tokens. Completed
+intervals restart at the latest window next run. Invalid/expired cursors fail
+without advancing; an operator must clear that progress record to restart.
+
+Per-post configured lifetime metrics preserve numeric/map values; known metrics
+normalize to reach, impressions, engagement, clicks and video views/watch time.
+Configured reaction types follow cursor pagination within `meta.maxPages`; failed
+or truncated counts are unknown, never invented zeros. Comments/shares summaries
+are retained when present. Partial metric failures are stored explicitly in
+`collectionFailures` and reported by the job; those posts are revisited in the
+next complete sweep, not retried automatically in the current interval.
+
+Post performance now unions external history with local published posts before
+sorting/pagination and suppresses duplicate remote identities. Parameterized SQL
+is used because this checkout's generated Prisma client lacks `externalPost`,
+although the root schema contains it. No schema/client generation was performed.
+The existing neutral `measures[].labelFr` contract carries configured bilingual
+extra metric labels. No neutral contract file was changed. Other dynamic analytics
+catalog labels still need neutral locale plumbing; this is not full French coverage.
+
+Ads adds separately paginated campaign/adset/ad daily reads with identity, raw
+actions/action-values and configurable action breakdowns. Rows persist with their
+actual level and object ID, preventing overwrite of account totals. The existing
+Analytics catalog still selects account rows only: hierarchy report presentation
+and selection remain an integration gap, not a completed customer capability.
+
+New Root keys (integrator must coordinate registry schema version):
+- `meta.postHistoryPolicy`: lookbackDays, pageBudget, edge, fields, metrics,
+  reactionTypes. Existing pageSize/maxPages/timeout/signing settings are reused.
+- `meta.adHierarchyPolicy`: levels and actionBreakdowns.
+- `meta.metricLabels`: normalized metric to `{ en, fr }` labels.
+
+Conversation participants/attachments/full metadata remain unchanged: engine
+`publishing.ts` is explicitly outside this lane, and existing Inbox persistence
+has no such fields. Its owner must extend engine responses and neutral Inbox
+storage/presentation together. Architecture/handoff updates also belong to the
+integrator, outside this lane. No live metric whitelist, grants, provider history,
+database SQL, browser/MCP transport or production proof is claimed. The default
+metric list remains subject to provider version/permission eligibility, with
+failed metrics explicitly recorded. Full requirement remains incomplete.
+
+Round-2 verification: `npx tsc --noEmit -p .` passed with zero errors;
+`npx vitest run tests/facebook-job-freshness.test.ts tests/facebook-post-history.test.ts tests/facebook-data-coverage.test.ts tests/facebook-analytics-selection.test.ts tests/facebook-signing-runtime.test.ts tests/facebook-engine.test.ts --no-cache` passed 76 tests across six files. `git diff --check` passed.
+The signing runtime test mock was updated for the existing runtimeConfigBatch
+consumer. Only mocked Graph/service evidence; no full suite or servers run.

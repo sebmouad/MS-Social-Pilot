@@ -130,3 +130,16 @@ it('emits top-level array categories with full stored snapshot history', () => {
   expect(result.metrics[0]!.breakdownHistory?.[0]?.rows).toContainEqual({ label: '1 · value', value: null });
   expect(result.metrics[0]!.breakdownHistory?.[0]?.rows).toContainEqual({ label: '0 · value', value: 9 });
 });
+
+describe('Ads hierarchy reports', () => {
+  it('keeps hierarchy identity and action dimensions with cursor pagination', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (!url.searchParams.has('after')) expect(url.searchParams.get('action_breakdowns')).toBe('action_type');
+      if (!url.searchParams.has('after')) expect(url.searchParams.get('fields')).toContain('ad_id');
+      return response({ data: [{ date_start: '2026-10-01', campaign_id: 'c', adset_id: 's', ad_id: url.searchParams.has('after') ? 'b' : 'a', actions: [{ action_type: 'link_click', value: '3' }] }], ...(url.searchParams.has('after') ? {} : { paging: { next: 'https://graph.facebook.test/v25.0/account/insights?after=next' } }) });
+    });
+    const result = await collector(fetcher).collectAdHierarchy('token', 'account', since, until, { levels: ['ad'], actionBreakdowns: ['action_type'] });
+    expect(result).toHaveLength(2); expect(result[1]).toMatchObject({ ad_id: 'b', report_level: 'ad', actions: [{ action_type: 'link_click', value: '3' }] });
+  });
+});
