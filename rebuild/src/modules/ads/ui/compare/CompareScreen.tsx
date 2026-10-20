@@ -1,5 +1,7 @@
 import '@/modules/ads/ui/ads.css';
 import '@/modules/ads/ui/objects/objects.css';
+import { ComparisonExport } from './ComparisonExport';
+import { loadAdsOutputPolicy } from '../../server/output-policy';
 import { headers } from 'next/headers';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -37,6 +39,7 @@ export default async function AdsComparePage({ searchParams }: { searchParams: P
   const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const show = (value: number | null) => (value === null ? t('unknown') : number.format(value));
   const policy = await loadAdsReportPolicy();
+  const outputPolicy = await loadAdsOutputPolicy();
   const accounts = await getAdsAccounts(viewer.workspaceId, viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, entitledPlatformIds(viewer.entitlements));
   const allowedKeys = ['period', 'since', 'until', 'account', 'compare', 'level', 'sort', 'direction'];
   const sidebarBase = <AdsFiltersSidebar accounts={accounts} input={params} action="/ads/compare" policy={policy} />;
@@ -63,7 +66,7 @@ export default async function AdsComparePage({ searchParams }: { searchParams: P
     return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack"><header className="page-heading"><div><p className="eyebrow">{t('eyebrow')}</p><h1>{t('title')}</h1></div></header>
       <section className="panel"><RouteNotice error className="ui-error" focusKey={error.message}>{error.message}</RouteNotice><p>{t('errorHint')}</p></section></div></PageFrame>;
   }
-  const exportQuery = new URLSearchParams({ format: 'csv' });
+  const exportQuery = new URLSearchParams({ format: 'csv', locale });
   for (const [key, mapped] of [['period', 'period'], ['since', 'start'], ['until', 'end'], ['account', 'accountId'], ['compare', 'compare'], ['level', 'level'], ['sort', 'sort'], ['direction', 'direction']] as const) {
     const value = values[key];
     if (value && !(key === 'account' && value === 'all')) exportQuery.set(mapped, value);
@@ -83,7 +86,7 @@ export default async function AdsComparePage({ searchParams }: { searchParams: P
   return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
     <header className="page-heading"><div><p className="eyebrow">{t('eyebrow')}</p><h1>{t('title')}</h1>
       <p>{t('rangeLine', { from: result.range.from, to: result.range.to })}{result.previousRange ? t('earlierLine', { from: result.previousRange.from, to: result.previousRange.to }) : ''}</p></div>
-      {result.groups.length ? <a className="btn" href={`/api/ads/compare?${exportQuery.toString()}`} download title={t('exportHint')}>{t('exportCsv')}</a> : null}</header>
+      {result.groups.length ? <ComparisonExport href={`/api/ads/compare?${exportQuery.toString()}`} locale={locale} maxBytes={outputPolicy.exportMaxBytes} /> : null}</header>
     {!result.groups.length ? <section className="panel empty-state"><h2>{t('emptyTitle')}</h2><p>{t('emptyHint')}</p></section> : result.groups.map(group => <section key={group.key} className="panel" aria-labelledby={`g-${group.key}`}>
       <h2 id={`g-${group.key}`}>{result.compare === 'accounts' ? group.accounts[0]?.name : `${group.currency ?? t('unknown')} · ${group.accounts.map(account => account.name).join(', ')}`}</h2>
       {!group.hasData ? <p>{t('noGroupData')}</p> : <>
