@@ -33,3 +33,22 @@ points at the guarded `_preview` database; authority ports stubbed, SQL real):
 Bulk reschedule and retry in the browser; moderation "Run rules now" against real
 comments; the four themes (only the default theme was viewed); keyboard-only runs;
 production build (dev server used); MCP calls with real keys; live Facebook.
+
+## Wave 3 additions (2026-10-20)
+
+- Open registration end to end in the browser (dev server, `_preview`): with Root
+  mail temporarily pointed at a loopback SMTP capture and `auth.openRegistration`
+  on, `/sign-up` accepted a synthetic account; a real SMTP message carried the
+  one-use link; `/verify-email` confirmed it; sign-in landed in the new owner
+  workspace with the connect-channels prompt; the sign-in page showed "Create an
+  account" only while open. Afterwards the account, workspace, tokens, sessions and
+  email log were deleted and the nine temporary `app_settings` rows removed
+  (preview had none before); `/api/auth/register` again reports unavailable.
+- Real PostgreSQL: registration (`tests/registration-postgres.integration.test.ts`),
+  Root workspace deletion incl. feeds/webhooks, Root account deletion, the automatic
+  moderation pass, and the async workspace export lifecycle
+  (`tests/workspace-export-postgres.integration.test.ts`, which caught a second
+  void-lock defect, fixed in `21fe110d`). `tests/raw-sql-void-guard.test.ts` now
+  blocks that defect class statically.
+- Not covered: team invitation email acceptance in the browser, Root deletion
+  buttons in the browser, themes other than the default, production build.
