@@ -44,7 +44,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(94);
+    expect(CONFIG_SCHEMA_VERSION).toBe(95);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);
@@ -210,7 +210,7 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('meta.adsManageScopes')!.schema.safeParse(['ads_management']).success).toBe(true);
     expect(CONFIG_BY_KEY.get('mcp.authenticatedRoles')!.schema.safeParse(['owner', 'admin']).success).toBe(true);
     expect(CONFIG_BY_KEY.get('mcp.authenticatedRoles')!.schema.safeParse(['root']).success).toBe(false);
-    expect(CONFIG_BY_KEY.get('theme.default')!.schema.safeParse('nightfall').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('theme.default')!.schema.safeParse('clean').success).toBe(true);
     expect(CONFIG_BY_KEY.get('theme.default')!.schema.safeParse('unknown').success).toBe(false);
     expect(CONFIG_BY_KEY.get('mcp.requestsPerMinute')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('sync.maxItemsPerJob')!.schema.safeParse(10000).success).toBe(true);

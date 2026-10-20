@@ -1,9 +1,19 @@
-/** Shared theme metadata, safe to import from server and client modules. */
+/** Shared theme metadata, safe to import from server and client modules.
+ * A theme is a palette; every theme has a light and a dark mode. Tokens live in src/styles/tokens.css. */
 export const THEME_COOKIE = 'social-pilot-theme';
+export const MODE_COOKIE = 'social-pilot-mode';
 export const THEMES = [
-  { id: 'grove', name: 'Grove', description: 'Soft greens with a calm, natural feel.', swatches: ['#f5f7f4', '#286b4b', '#e4f2e9'] },
-  { id: 'coast', name: 'Coast', description: 'Cool blues inspired by open water and sky.', swatches: ['#f2f7fa', '#17698a', '#dff0f7'] },
-  { id: 'clay', name: 'Clay', description: 'Warm terracotta with a soft, earthy canvas.', swatches: ['#fbf5f0', '#a54e2c', '#f6e5db'] },
-  { id: 'nightfall', name: 'Nightfall', description: 'A deep slate workspace with softened contrast.', swatches: ['#111a20', '#79c8a2', '#24483b'] },
+  { id: 'vivid', name: 'Vivid', description: 'Deep indigo navigation with a color for every module.', swatches: ['#26215C', '#7F77DD', '#D85A30', '#1D9E75'] },
+  { id: 'meta', name: 'Meta blue', description: 'Clean light navigation with a blue accent and colorful data.', swatches: ['#f3f6fa', '#185FA5', '#378ADD', '#1D9E75'] },
+  { id: 'warm', name: 'Warm', description: 'Cream and coral, rounded and friendly.', swatches: ['#FAEEDA', '#D85A30', '#FAC775', '#1D9E75'] },
+  { id: 'clean', name: 'Clean', description: 'Near-white and crisp gray; color only in icons and charts.', swatches: ['#ffffff', '#111318', '#2563eb', '#16a34a'] },
 ] as const;
 export type ThemeId = typeof THEMES[number]['id'];
+export const MODES = [
+  { id: 'light', name: 'Light' },
+  { id: 'dark', name: 'Dark' },
+  { id: 'system', name: 'Match device' },
+] as const;
+export type ModeId = typeof MODES[number]['id'];
+export const isThemeId = (value: unknown): value is ThemeId => THEMES.some(theme => theme.id === value);
+export const isModeId = (value: unknown): value is ModeId => MODES.some(mode => mode.id === value);

@@ -3,21 +3,9 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { usePathname } from "next/navigation";
 import { MODULES, PAGES, type ModuleId } from "@/lib/product";
 import { SidebarDockContext } from "./SidebarDock";
-
-function ModuleIcon({ name }: { name: string }) {
-  const shared = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  const paths: Record<string, ReactNode> = {
-    Home: <><path d="m3.5 11 8.5-7 8.5 7v8.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1Z" {...shared}/><path d="M9 20.5v-6h6v6" {...shared}/></>,
-    Publishing: <><rect x="4" y="3.5" width="16" height="17" rx="3" {...shared}/><path d="M8 8h8m-8 4h8m-8 4h5" {...shared}/></>,
-    Inbox: <><path d="M4 5.5h16l1 10.5h-5l-1.5 2h-5L8 16H3z" {...shared}/><path d="M8 11h8" {...shared}/></>,
-    Analytics: <><path d="M4 19V5m0 14h16" {...shared}/><path d="m7 15 4-4 3 2 5-6" {...shared}/><circle cx="19" cy="7" r="1" fill="currentColor"/></>,
-    Ads: <><path d="M4 19V5m0 14h16" {...shared}/><path d="m7 16 4-5 3 2 5-7" {...shared}/><path d="M15.5 6H19v3.5" {...shared}/></>,
-    Agency: <><rect x="3" y="7" width="18" height="14" rx="2" {...shared}/><path d="M8 7V3h8v4M3 12h18M10 12v3h4v-3" {...shared}/></>,
-    Tasks: <><rect x="4" y="4" width="16" height="16" rx="3" {...shared}/><path d="m8 12.5 2.6 2.6L16 9.5" {...shared}/></>,
-    Settings: <><circle cx="12" cy="12" r="3" {...shared}/><path d="m19 13.5 1.2 1-.9 1.6-1.5-.3a7.5 7.5 0 0 1-1.4 1l-.3 1.6h-1.9l-.5-1.5a7 7 0 0 1-1.7 0l-.8 1.2-1.7-.7.2-1.6a7 7 0 0 1-1.2-1.3l-1.6.1-.6-1.8 1.2-.9a7 7 0 0 1 0-1.7l-1.1-.8.7-1.8 1.5.2a7 7 0 0 1 1.3-1.2L10 5.1l1.8-.6.9 1.2a7 7 0 0 1 1.7 0l.8-1.1 1.8.7-.2 1.5A7 7 0 0 1 18 8l1.6-.1.6 1.8-1.2.9a7 7 0 0 1 0 1.7Z" {...shared}/></>,
-  };
-  return <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true">{paths[name]}</svg>;
-}
+import { ModuleGlyph, PageGlyph } from "./icons";
+import { ModeToggle } from "./ModeToggle";
+import { IconPlus } from "@tabler/icons-react";
 
 function Mark() {
   return <svg className="shell-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg>;
@@ -86,7 +74,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const moreMobileModules = navigationModules.length > 5 ? navigationModules.slice(4) : [];
   const moduleHref = (module: (typeof MODULES)[number]) => PAGES.find(page => page.module === module.id && page.navigation !== false && enabledFeatures.includes(page.id))?.href ?? module.href;
   const primaryAction = installationMode ? undefined : MODULES.map(module => module.primaryAction).find(action => action && enabledFeatures.includes(action.featureId) && writableFeatures.includes(action.featureId));
-  const moduleLink = (module: (typeof MODULES)[number]) => <a key={module.id} href={moduleHref(module)} className={`shell-nav__link${activeModule === module.id ? ' is-active' : ''}`} aria-current={activeModule === module.id ? 'page' : undefined}><span className="shell-nav__glyph"><ModuleIcon name={module.title}/></span><span>{module.mobileTitle ?? module.title}</span></a>;
+  const moduleLink = (module: (typeof MODULES)[number]) => <a key={module.id} href={moduleHref(module)} data-module={module.id} className={`shell-nav__link${activeModule === module.id ? ' is-active' : ''}`} aria-current={activeModule === module.id ? 'page' : undefined}><span className="shell-nav__glyph"><ModuleGlyph id={module.id}/></span><span>{module.mobileTitle ?? module.title}</span></a>;
   async function switchWorkspace(nextId: string) {
     if (switching || nextId === workspaceId) return;
     setSwitching(true); setWorkspaceError('');
@@ -105,7 +93,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       window.location.assign('/sign-in');
     } catch { setAccountError('Could not sign out. Try again.'); setSigningOut(false); }
   }
-  return <SidebarDockContext.Provider value={sidebarHost}><div className="shell" onSubmitCapture={event => {
+  return <SidebarDockContext.Provider value={sidebarHost}><div className="shell" data-module={installationMode ? 'root' : activeModule} onSubmitCapture={event => {
     // A drawer button may submit an associated editor form outside the drawer.
     // Reveal its progress and validation feedback instead of leaving it inert.
     if (filterOpen && event.target instanceof HTMLFormElement && event.target.closest('.shell-main')) {
@@ -117,13 +105,13 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     <aside className="shell-sidebar shell-module-rail" aria-label="Modules" inert={filterOpen || undefined}>
       <a className="shell-brand" href={installationMode ? '/root' : '/home'} aria-label={installationMode ? 'Social Pilot, Root controls' : 'Social Pilot, home'}><Mark/></a>
       <nav className="shell-nav shell-nav--desktop" aria-label="Main sections">
-        {installationMode ? <><a href="/home" className="shell-nav__link"><span className="shell-nav__glyph"><ModuleIcon name="Home"/></span><span>App</span></a><a href="/root" className="shell-nav__link is-active" aria-current="page"><span className="shell-nav__glyph"><ModuleIcon name="Settings"/></span><span>Root</span></a></> : navigationModules.map(moduleLink)}
+        {installationMode ? <><a href="/home" data-module="home" className="shell-nav__link"><span className="shell-nav__glyph"><ModuleGlyph id="home"/></span><span>App</span></a><a href="/root" data-module="root" className="shell-nav__link is-active" aria-current="page"><span className="shell-nav__glyph"><ModuleGlyph id="root"/></span><span>Root</span></a></> : navigationModules.map(moduleLink)}
       </nav>
       <nav className="shell-nav shell-nav--mobile" aria-label="Mobile sections">
-        {installationMode ? <><a href="/home" className="shell-nav__link"><span className="shell-nav__glyph"><ModuleIcon name="Home"/></span><span>App</span></a><a href="/root" className="shell-nav__link is-active" aria-current="page"><span className="shell-nav__glyph"><ModuleIcon name="Settings"/></span><span>Root</span></a></> : primaryMobileModules.map(moduleLink)}
-        {moreMobileModules.length > 0 && <details className="shell-nav-more"><summary className={`shell-nav__link${moreMobileModules.some(module => module.id === activeModule) ? ' is-active' : ''}`}><span aria-hidden="true">•••</span><span>More</span></summary><div className="shell-nav-more__menu">{moreMobileModules.map(module => <a key={module.id} href={moduleHref(module)} aria-current={activeModule === module.id ? 'page' : undefined}><ModuleIcon name={module.title}/>{module.title}</a>)}</div></details>}
+        {installationMode ? <><a href="/home" data-module="home" className="shell-nav__link"><span className="shell-nav__glyph"><ModuleGlyph id="home"/></span><span>App</span></a><a href="/root" data-module="root" className="shell-nav__link is-active" aria-current="page"><span className="shell-nav__glyph"><ModuleGlyph id="root"/></span><span>Root</span></a></> : primaryMobileModules.map(moduleLink)}
+        {moreMobileModules.length > 0 && <details className="shell-nav-more"><summary className={`shell-nav__link${moreMobileModules.some(module => module.id === activeModule) ? ' is-active' : ''}`}><span aria-hidden="true">•••</span><span>More</span></summary><div className="shell-nav-more__menu">{moreMobileModules.map(module => <a key={module.id} href={moduleHref(module)} data-module={module.id} aria-current={activeModule === module.id ? 'page' : undefined}><ModuleGlyph id={module.id}/>{module.title}</a>)}</div></details>}
       </nav>
-      {rootAccess && !installationMode && <a className="shell-rail-utility" href="/root"><ModuleIcon name="Settings"/><span>Root</span></a>}
+      {rootAccess && !installationMode && <a className="shell-rail-utility" data-module="root" href="/root"><ModuleGlyph id="root"/><span>Root</span></a>}
       <span className="shell-rail-avatar" aria-label={userName}>{userName.trim().slice(0, 1).toUpperCase() || '?'}</span>
     </aside>
     {filterOpen && <button className="shell-filter-scrim" type="button" aria-label="Close navigation and filters" onClick={closeFilters}/>}
@@ -135,14 +123,14 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
         {switching && <p className="shell-workspace-status" role="status">Switching workspace…</p>}
         {workspaceError && <p className="ui-error" role="alert">{workspaceError}</p>}
       </div>
-      {primaryAction && <a className="shell-create ui-button ui-button--primary" href={primaryAction.href}><span aria-hidden="true">＋</span>{primaryAction.label}</a>}
+      {primaryAction && <a className="shell-create ui-button ui-button--primary" href={primaryAction.href}><IconPlus size={17} stroke={2} aria-hidden="true"/>{primaryAction.label}</a>}
       <div className="shell-context-content" onSubmitCapture={() => setFilterOpen(false)} onClickCapture={event => { if ((event.target as Element).closest('a[href]')) setFilterOpen(false); }}>
-        {!installationMode && <nav className="shell-subnav" aria-label={`${active?.title} pages`}><p className="shell-subnav__label">{active?.title}</p>{modulePages.map(page => <a key={page.id} href={page.href} className={`shell-subnav__link${pathname === page.href ? ' is-active' : ''}`} aria-current={pathname === page.href ? 'page' : undefined}>{page.title}</a>)}</nav>}
+        {!installationMode && <nav className="shell-subnav" aria-label={`${active?.title} pages`}><p className="shell-subnav__label">{active?.title}</p>{modulePages.map(page => <a key={page.id} href={page.href} data-module={activeModule} className={`shell-subnav__link${pathname === page.href ? ' is-active' : ''}`} aria-current={pathname === page.href ? 'page' : undefined}><span className="shell-subnav__glyph"><PageGlyph href={page.href}/></span>{page.title}</a>)}</nav>}
         {visibleSidebar && <div className="shell-sidebar-filter">{sidebar}</div>}
         <div ref={setSidebarHost} className="shell-sidebar-tools"/>
       </div>
       <footer className="shell-context-footer"><span className="shell-context-user">{userName}</span>{enabledFeatures.includes('settings/account') && <a href="/settings/account">Account</a>}{rootAccess && !installationMode && <a href="/root">Root</a>}<button className="shell-signout" type="button" disabled={signingOut} aria-busy={signingOut} onClick={() => void signOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</button>{accountError && <p className="ui-error" role="alert">{accountError}</p>}</footer>
     </aside>
-    <div className="shell-main" inert={filterOpen || undefined}><header className="shell-topbar"><div className="shell-topbar__crumb"><button ref={filterToggleRef} className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => filterOpen ? closeFilters() : setFilterOpen(true)}>Menu &amp; filters</button><span>{installationMode ? 'Installation' : workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : active?.title}</strong></div><span className="shell-topbar__user">{PAGES.find(page => page.href === pathname)?.title ?? (installationMode ? 'Private control center' : 'Workspace')}</span></header><main id="main-content" className="shell-content" tabIndex={-1}>{children}</main></div>
+    <div className="shell-main" inert={filterOpen || undefined}><header className="shell-topbar"><div className="shell-topbar__crumb"><button ref={filterToggleRef} className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => filterOpen ? closeFilters() : setFilterOpen(true)}>Menu &amp; filters</button><span>{installationMode ? 'Installation' : workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : active?.title}</strong></div><div className="shell-topbar__tools"><ModeToggle/><span className="shell-topbar__user">{PAGES.find(page => page.href === pathname)?.title ?? (installationMode ? 'Private control center' : 'Workspace')}</span></div></header><main id="main-content" className="shell-content" tabIndex={-1}>{children}</main></div>
   </div></SidebarDockContext.Provider>;
 }

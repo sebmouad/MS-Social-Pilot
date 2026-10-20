@@ -1,21 +1,32 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { THEME_COOKIE, THEMES, type ThemeId } from '@/lib/themes';
-export { THEME_COOKIE, THEMES, type ThemeId } from '@/lib/themes';
+import { MODE_COOKIE, THEME_COOKIE, THEMES, isModeId, isThemeId, type ModeId, type ThemeId } from '@/lib/themes';
+export { MODE_COOKIE, MODES, THEME_COOKIE, THEMES, type ModeId, type ThemeId } from '@/lib/themes';
 
-const ThemeContext = createContext<{ theme: ThemeId; setTheme: (theme: ThemeId) => void } | null>(null);
-const isThemeId = (value: string): value is ThemeId => THEMES.some(theme => theme.id === value);
+type ThemeState = { theme: ThemeId; mode: ModeId; setTheme: (theme: ThemeId) => void; setMode: (mode: ModeId) => void };
+const ThemeContext = createContext<ThemeState | null>(null);
 
-export function ThemeProvider({ initialTheme, children }: { initialTheme: string; children: ReactNode }) {
+function remember(name: string, value: string) {
+  document.cookie = `${name}=${value}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
+}
+
+export function ThemeProvider({ initialTheme, initialMode, children }: { initialTheme: string; initialMode?: string; children: ReactNode }) {
   const [theme, setCurrentTheme] = useState<ThemeId>(isThemeId(initialTheme) ? initialTheme : THEMES[0].id);
+  const [mode, setCurrentMode] = useState<ModeId>(isModeId(initialMode) ? initialMode : 'system');
   const setTheme = useCallback((nextTheme: ThemeId) => {
     setCurrentTheme(nextTheme);
     document.documentElement.dataset.theme = nextTheme;
-    document.cookie = `${THEME_COOKIE}=${nextTheme}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
+    remember(THEME_COOKIE, nextTheme);
     window.dispatchEvent(new CustomEvent('theme-change', { detail: nextTheme }));
   }, []);
-  const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
+  const setMode = useCallback((nextMode: ModeId) => {
+    setCurrentMode(nextMode);
+    document.documentElement.dataset.mode = nextMode;
+    remember(MODE_COOKIE, nextMode);
+    window.dispatchEvent(new CustomEvent('theme-change', { detail: document.documentElement.dataset.theme }));
+  }, []);
+  const value = useMemo(() => ({ theme, mode, setTheme, setMode }), [theme, mode, setTheme, setMode]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
@@ -23,4 +34,9 @@ export function useTheme() {
   const value = useContext(ThemeContext);
   if (!value) throw new Error('useTheme must be used inside ThemeProvider');
   return value;
+}
+
+/** Same as useTheme, but null outside a provider (isolated renders, tests). */
+export function useOptionalTheme() {
+  return useContext(ThemeContext);
 }
