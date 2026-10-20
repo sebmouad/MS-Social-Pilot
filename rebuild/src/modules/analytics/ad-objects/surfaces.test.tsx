@@ -11,7 +11,7 @@ import Screen from './Screen';
 import { GET } from '@/app/api/analytics/ad-objects/route';
 import { adObjectsMcp } from './mcp';
 import { OperationError } from '@/lib/operation-error';
-const data = () => ({ input: { level: 'campaign', page: 1 }, period: { start: '2026-10-01', end: '2026-10-03' }, options: [{ id: 'a', name: 'Account' }], items: [{ key: 'key', accountId: 'a', accountName: 'Account', objectId: 'c', name: 'Campaign', currency: null, spend: null, impressions: 0, clicks: 2, reach: 20, reachDate: '2026-10-01', cpc: null, cpm: null, ctr: 2, coveredDays: 1, requestedDays: 3, lastFetchedAt: null, daily: [] }], coverage: { selectedAccounts: 1, coveredAccounts: 1, unknownParentObjects: 0 }, page: 1, nextPage: null, total: 1, csv: null });
+const data = () => ({ input: { level: 'campaign', page: 1, sort: 'spend', direction: 'desc' }, period: { start: '2026-10-01', end: '2026-10-03' }, options: [{ id: 'a', name: 'Account' }], items: [{ key: 'key', accountId: 'a', accountName: 'Account', objectId: 'c', name: 'Campaign', currency: null, spend: null, impressions: 0, clicks: 2, reach: 20, reachDate: '2026-10-01', cpc: null, cpm: null, ctr: 2, coveredDays: 1, requestedDays: 3, lastFetchedAt: null, daily: [] }], coverage: { selectedAccounts: 1, coveredAccounts: 1, unknownParentObjects: 0 }, page: 1, nextPage: null, total: 1, csv: null });
 beforeEach(() => { vi.clearAllMocks(); m.viewer.mockResolvedValue({ user: { id: 'u' }, workspaceId: 'w' }); m.headers.mockResolvedValue(new Headers()); m.read.mockResolvedValue(data()); });
 it('HTTP returns the shared read and CSV, masks storage errors and preserves typed denials', async () => {
   const response = await GET(new Request('https://example.test/api/analytics/ad-objects?accountId=a'));
@@ -45,4 +45,23 @@ it('HTTP turns session redirects into explicit authentication responses', async 
   m.viewer.mockRejectedValueOnce(redirect('/access-limited'));
   expect((await GET(new Request('https://example.test/api/analytics/ad-objects'))).status).toBe(403);
   expect(m.read).not.toHaveBeenCalled();
+});
+
+it('preserves metric ordering in HTTP/MCP, paging, drill-down and full CSV links', async () => {
+  const filters = { sort: 'spend', direction: 'desc', page: '2' };
+  await GET(new Request(`https://example.test/api/analytics/ad-objects?${new URLSearchParams(filters)}`));
+  expect(m.read).toHaveBeenLastCalledWith(expect.anything(), filters);
+  await adObjectsMcp.execute!({ userId: 'u', workspaceId: 'w' } as never, 'get_analytics_ad_objects', filters, 100);
+  expect(m.read).toHaveBeenLastCalledWith(expect.objectContaining({ maxResultItems: 100 }), filters);
+  const schema = adObjectsMcp.tools[0]!.inputSchema as { properties: { sort: { enum: string[] } } };
+  expect(schema.properties.sort.enum).toContain('spend');
+  m.read.mockResolvedValueOnce({ ...data(), nextPage: 2 });
+  const html = renderToStaticMarkup(await Screen({ searchParams: Promise.resolve(filters) }));
+  expect(html).toContain('name="sort"'); expect(html).toContain('name="direction"');
+  expect(html).toContain('Sorted within each account');
+  expect(html).toContain('sort=spend&amp;direction=desc&amp;format=csv');
+  expect(html).toContain('sort=spend&amp;direction=desc&amp;page=2');
+  m.headers.mockResolvedValueOnce(new Headers({ 'accept-language': 'fr' }));
+  const french = renderToStaticMarkup(await Screen({ searchParams: Promise.resolve(filters) }));
+  expect(french).toContain('Trier par'); expect(french).toContain('Décroissant');
 });

@@ -23,7 +23,7 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
     const q = new URLSearchParams();
     q.set('start', data?.period.start ?? value('start')); q.set('end', data?.period.end ?? value('end'));
     q.set('level', current?.level ?? (value('level') || 'campaign'));
-    for (const key of ['accountId', 'parentId', 'objectId'] as const) { const v = current?.[key] ?? value(key); if (v) q.set(key, v); }
+    for (const key of ['accountId', 'parentId', 'objectId', 'sort', 'direction'] as const) { const v = current?.[key] ?? value(key); if (v) q.set(key, v); }
     for (const [key, v] of Object.entries(patch)) { if (v === null) q.delete(key); else q.set(key, v); }
     return q.toString();
   };
@@ -45,6 +45,11 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
     <label className="ui-field">{t('Level', 'Niveau')}<select className="ui-input" name="level" defaultValue={level}><option value="campaign">{t('Campaigns', 'Campagnes')}</option><option value="adset">{t('Ad sets', 'Ensembles de publicités')}</option><option value="ad">{t('Ads', 'Publicités')}</option></select></label>
     <label className="ui-field">{t('Parent ID (optional; select one account)', 'ID parent (facultatif ; choisissez un compte)')}<input className="ui-input" name="parentId" defaultValue={current?.parentId ?? value('parentId')} /></label>
     <label className="ui-field">{t('Object ID (optional; select one account)', 'ID objet (facultatif ; choisissez un compte)')}<input className="ui-input" name="objectId" defaultValue={current?.objectId ?? value('objectId')} /></label>
+    <label className="ui-field">{t('Sort by', 'Trier par')}<select className="ui-input" name="sort" defaultValue={current?.sort ?? (value('sort') || 'name')}>
+      {([['name', t('Name', 'Nom')], ['spend', t('Spend', 'Dépenses')], ['impressions', 'Impressions'], ['clicks', t('Clicks', 'Clics')], ['ctr', t('Click rate', 'Taux de clic')], ['cpc', t('Cost per click', 'Coût par clic')], ['cpm', t('Cost per 1000 impressions', 'Coût pour 1000 impressions')], ['reach', t('Reach snapshot', 'Portée instantanée')], ['coveredDays', t('Stored days', 'Jours enregistrés')], ['lastFetchedAt', t('Last fetched UTC', 'Dernière collecte UTC')]]).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+    </select></label>
+    <label className="ui-field">{t('Order', 'Ordre')}<select className="ui-input" name="direction" defaultValue={current?.direction ?? (value('direction') || 'asc')}><option value="asc">{t('Ascending', 'Croissant')}</option><option value="desc">{t('Descending', 'Décroissant')}</option></select></label>
+    <p className="small-note">{t('Sorted within each account and currency. Missing values appear last.', 'Tri par compte et devise. Les valeurs manquantes apparaissent en dernier.')}</p>
     <Button type="submit" variant="primary">{t('Apply', 'Appliquer')}</Button>
     <a href="/analytics/ads">{t('Reset filters', 'Réinitialiser les filtres')}</a>
     {data && <><a href={`/api/analytics/ad-objects?${query({ format: 'csv', locale: fr ? 'fr' : 'en' })}`}>{t('Export selection (CSV)', 'Exporter la sélection (CSV)')}</a>

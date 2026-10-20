@@ -70,9 +70,9 @@ async function buildAdsComparison(actor: AdsReadActor, input: unknown, now: Date
   let previousRows: Row[] = [];
   if (compare === 'previous') {
     const window = previousWindow(filters.since, filters.until);
-    // Interactive reports keep their account-only baseline query; complete exports
-    // additionally load this level's stored rows for exact account/object deltas.
-    previousRows = (await getAdsDataset(actor.workspaceId, { ...filters, ...window }, access.allowedTargetIds, access.allowedProviders, { levels: complete ? levels : ['account'], allowedAdAccountIds: access.allowedAdAccountIds })).insights as unknown as Row[];
+    // Every surface uses the same account and exact-object baseline. Output
+    // pagination must not change which stored levels contribute to a comparison.
+    previousRows = (await getAdsDataset(actor.workspaceId, { ...filters, ...window }, access.allowedTargetIds, access.allowedProviders, { levels, allowedAdAccountIds: access.allowedAdAccountIds })).insights as unknown as Row[];
   }
 
   const previousByObject = new Map<string, Row[]>();

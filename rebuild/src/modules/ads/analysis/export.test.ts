@@ -127,3 +127,25 @@ it('enforces an MCP credential ceiling on nested exported object trend days', as
   mocks.dataset.mockResolvedValue({ accounts: [account], insights: [row('campaign', 'one', '2026-10-19', 10, 5), row('campaign', 'one', '2026-10-20', 20, 10)] });
   await expect(executeAdsAnalysisTool(actor, 'compare_ads_performance', { format: 'csv', compare: 'accounts' }, 1)).rejects.toMatchObject({ code: 'invalid_request' });
 });
+
+it.each(['campaign', 'adset', 'ad'])('interactive %s reads carry exact object deltas through HTTP and MCP', async level => {
+  const filters = { start: '2026-10-15', end: '2026-10-20', level };
+  const result = await readAdsComparison(actor, filters, now);
+  const object = result.groups[0]!.objects[0]!;
+  expect(object.previous?.spend).toBe(10);
+  expect(object.kpis.find(k => k.key === 'spend')).toMatchObject({ previous: 10, current: 20, changePercent: 100 });
+  const response = await GET(new Request(`https://example.test/api/ads/compare?${new URLSearchParams(filters)}`));
+  expect(response.status).toBe(200);
+  const http = await response.json();
+  expect(http.groups[0].objects[0].previous.spend).toBe(10);
+  const mcp = await executeAdsAnalysisTool(actor, 'compare_ads_performance', filters) as typeof result;
+  expect(mcp.groups[0]!.objects[0]!.previous?.spend).toBe(10);
+  for (const call of mocks.dataset.mock.calls) expect(call[4]).toMatchObject({ levels: ['account', level], allowedAdAccountIds: ['a1'] });
+});
+it('does not use an identically named object from another account as its baseline', async () => {
+  const other = { ...account, id: 'a2' };
+  mocks.dataset.mockImplementation(async (_w, filters) => ({ accounts: [account, other], insights: filters.since < new Date('2026-10-14')
+    ? [row('campaign', 'one', '2026-10-10', 999, 10, other)] : [row('campaign', 'one', '2026-10-19', 20, 10)] }));
+  const result = await readAdsComparison(actor, {}, now);
+  expect(result.groups[0]!.objects[0]!.previous).toBeNull();
+});
