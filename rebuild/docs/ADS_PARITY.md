@@ -58,7 +58,7 @@ Without this table every write fails closed (`unavailable`) before any provider 
 - Directory parent links depend on `campaign_id`/`adset_id` being present in stored row fields.
 - Creative support assigns an *existing* account creative to an ad; creating or editing creative content is not implemented and not advertised.
 - Facebook `delete` posts `status=DELETED` (irreversible) -- confirmed by text only; campaign budgets apply only to budget-owning campaigns, otherwise Graph rejects.
-- No live Facebook call, spend or browser check has been made. CSV export of comparison and per-day compare charts remain open.
+- No live Facebook call, spend or browser check has been made. Per-day compare charts remain open (the daily series is now exportable, see below).
 
 
 ## Batch 74 historical integration record (2026-10-18)
@@ -191,3 +191,29 @@ Added (read-only, stored data, no provider call, no new setting; the CSV reuses 
 Reach stays a peak single day, never a sum; unknown figures are empty or "Unknown", never zero. Tests: `tests/ads-comparison-parity.test.ts` (mocked data only: no PostgreSQL, browser or live provider run).
 
 Still open versus legacy: parent campaign name column for ad sets and ads (stored rows carry no parent name; needs a Facebook-owned resolver), clickable column-header sorting (sorting is by sidebar select), spend-share and daily charts (tables only), en/fr copy for the Campaigns/Objects/Directory screens, and a browser check of the Compare screen (four themes, 1440px/390px). The MCP csv result is capped by row count only.
+
+
+## Read/report/export gap list (2026-10-20, legacy vs rebuild)
+
+Legacy reads: `src/lib/ads.ts` (summary, campaigns by level, per-day metrics), `ads-analysis.ts`
+(KPIs, findings), the `kind=ads` branch of `/api/analytics/export` (`adsCsv`) and
+`(app)/ads/page.tsx`. Legacy stored no age/gender/placement/country breakdowns and had no saved
+or default report filters, so those are not gaps.
+
+| Legacy capability | Rebuild status |
+| --- | --- |
+| Spend/impressions/reach/clicks/CPC/CPM/CTR totals, deltas, findings, level switch (campaign/ad set/ad), campaign name on child rows | Done (comparison, W3). |
+| Account daily series in the legacy CSV (one row per day) | **Closed in this batch**: `GET /api/ads/compare?format=csv&section=daily`, MCP `compare_ads_performance {format: csv, section: daily}`, second download button. Ratios recomputed per day, unknown stays empty, one group (currency) per row set. |
+| Per-object aggregates CSV for campaign/ad set/ad | Done for comparison (54aa606c). **Fixed**: the CSV is no longer truncated to the on-screen `maxObjects` cap (all objects, bounded by `ads.exportMaxBytes`). |
+| Object list export with parent campaign and last delivery | **Closed**: `GET /api/ads/directory?format=csv`, MCP `list_ads_objects {format: csv}`, button on `/ads/objects`; refuses (never truncates) above the Ads row ceiling or byte limit. |
+| Per-day metrics for one object (`adDailyMetrics`) | Done: report rows/export with `objectId`+`level` (batch 59) and object detail daily series. |
+| All stored scalar metrics, actions, additional fields in a file | Done (daily CSV v1, batch 59). |
+| Ad-level creative fields | Stored fields are in `fields_json`; creative browsing exists in management. Creative content columns in a report are open. |
+| Breakdown dimensions (age, gender, placement, country) | Not stored by legacy nor rebuild sync; needs a Facebook-module sync and neutral breakdown rows first. Open. |
+| Previous-period delta columns in CSV, XLSX/other formats | Open (CSV only, as legacy). |
+| Per-day compare chart | Open (table only). |
+| Saved/default report filters | Not in legacy; open as an improvement. |
+| Objects screen copy | en/fr for the export button only; the rest of `/ads/objects` is English and needs a copy catalog. |
+
+All new surfaces reuse `authorizeAdsRead`, selected-account scope, the Root export byte ceiling and
+the MCP credential result ceiling; dates are formatted as UTC days on the server.

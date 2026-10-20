@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
-import { operationFailure } from '@/lib/operation-error';
+import { OperationError, operationFailure } from '@/lib/operation-error';
 import { exportAdsComparison, readAdsComparison } from '@/modules/ads/analysis/server';
 import { searchRecord } from '@/modules/ads/analysis/query';
 
@@ -10,10 +10,12 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   try {
     const viewer = await requireViewer({ feature: 'ads/compare', channelScoped: true });
-    const { format, ...filters } = searchRecord(request.url);
+    const { format, section, ...filters } = searchRecord(request.url);
+    if (section !== undefined && format !== 'csv') throw new OperationError('invalid_request', 'The section option applies to CSV exports only.');
+    if (section !== undefined && section !== 'objects' && section !== 'daily') throw new OperationError('invalid_request', 'Choose objects or daily.');
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
     if (format === 'csv') {
-      const exported = await exportAdsComparison(actor, filters);
+      const exported = await exportAdsComparison(actor, filters, new Date(), section === 'daily' ? 'daily' : 'objects');
       return new Response(exported.csv, { headers: {
         'content-type': 'text/csv; charset=utf-8',
         'content-disposition': `attachment; filename="${exported.fileName}"`,

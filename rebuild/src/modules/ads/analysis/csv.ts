@@ -38,3 +38,58 @@ export function buildAdsComparisonCsv(result: AdsComparisonResult, maxBytes: num
   if (byteLength > maxBytes) throw new OperationError('invalid_request', 'Advertising comparison exceeds the configured export size limit.');
   return { csv, rowCount, byteLength };
 }
+
+export const ADS_COMPARISON_DAILY_CSV_COLUMNS = [
+  'group', 'currency', 'accounts', 'date', 'spend', 'impressions', 'clicks', 'ctr_percent', 'cpc', 'cpm', 'range_from', 'range_to_exclusive',
+] as const;
+
+const round = (value: number) => Math.round(value * 100) / 100;
+
+/** Account-level daily series, one row per group and day. Ratios are recomputed from the day's flows; zero denominators stay empty. */
+export function buildAdsComparisonDailyCsv(result: AdsComparisonResult, maxBytes: number): { csv: string; rowCount: number; byteLength: number } {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new OperationError('invalid_request', 'Choose a valid export size limit.');
+  const lines = [`${ADS_COMPARISON_DAILY_CSV_COLUMNS.join(',')}\r\n`];
+  let rowCount = 0;
+  for (const group of result.groups) {
+    const accounts = group.accounts.map(account => account.name).join('; ');
+    for (const day of group.trend) {
+      lines.push(`${[
+        text(group.key), text(group.currency ?? ''), text(accounts), text(day.date), num(day.spend), num(day.impressions), num(day.clicks),
+        num(day.impressions > 0 ? round((day.clicks / day.impressions) * 100) : null), num(day.clicks > 0 ? round(day.spend / day.clicks) : null),
+        num(day.impressions > 0 ? round((day.spend / day.impressions) * 1000) : null), text(result.range.from), text(result.range.to),
+      ].join(',')}\r\n`);
+      rowCount += 1;
+    }
+  }
+  const csv = lines.join('');
+  const byteLength = encoder.encode(csv).byteLength;
+  if (byteLength > maxBytes) throw new OperationError('invalid_request', 'Advertising comparison exceeds the configured export size limit.');
+  return { csv, rowCount, byteLength };
+}
+
+export const ADS_DIRECTORY_CSV_COLUMNS = [
+  'account_id', 'account_name', 'currency', 'level', 'object_id', 'object_name', 'parent_id', 'spend', 'impressions', 'clicks', 'ctr_percent', 'cpc', 'cpm',
+  'last_delivery_day', 'last_fetched_at', 'range_from', 'range_to_exclusive',
+] as const;
+
+type DirectoryLike = { level: string; range: { from: string; to: string }; items: ReadonlyArray<{
+  accountId: string; accountName: string; currency: string | null; objectId: string; name: string; parentId: string | null;
+  spend: number; impressions: number; clicks: number; ctr: number | null; cpc: number | null; cpm: number | null;
+  lastDeliveryDate: string | null; lastFetchedAt: string | null }> };
+
+/** The object directory (one row per campaign, ad set or ad) with parent link and last delivery day. */
+export function buildAdsDirectoryCsv(result: DirectoryLike, maxBytes: number): { csv: string; rowCount: number; byteLength: number } {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new OperationError('invalid_request', 'Choose a valid export size limit.');
+  const lines = [`${ADS_DIRECTORY_CSV_COLUMNS.join(',')}\r\n`];
+  for (const item of result.items) {
+    lines.push(`${[
+      text(item.accountId), text(item.accountName), text(item.currency ?? ''), text(result.level), text(item.objectId), text(item.name), text(item.parentId ?? ''),
+      num(item.spend), num(item.impressions), num(item.clicks), num(item.ctr), num(item.cpc), num(item.cpm),
+      text(item.lastDeliveryDate ?? ''), text(item.lastFetchedAt ?? ''), text(result.range.from), text(result.range.to),
+    ].join(',')}\r\n`);
+  }
+  const csv = lines.join('');
+  const byteLength = encoder.encode(csv).byteLength;
+  if (byteLength > maxBytes) throw new OperationError('invalid_request', 'Advertising objects exceed the configured export size limit.');
+  return { csv, rowCount: result.items.length, byteLength };
+}

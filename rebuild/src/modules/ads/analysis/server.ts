@@ -7,7 +7,7 @@ import { authorizeAdsRead, type AdsReadActor } from '../server/access';
 import { loadAdsReportPolicy } from '../server/report-policy';
 import { loadAdsOutputPolicy } from '../server/output-policy';
 import { ADS_ANALYSIS_POLICY_SCHEMA } from './config';
-import { buildAdsComparisonCsv } from './csv';
+import { buildAdsComparisonCsv, buildAdsComparisonDailyCsv } from './csv';
 import {
   OBJECT_SORT_KEYS, assessFreshness, buildFindings, buildKpis, findingMessage, peakReach, previousWindow, sortObjects, spendSharePercent, sumActions, totalsFromRows,
   type AdsAnalysisPolicy, type AdsObjectFigures, type AdsObjectSortKey,
@@ -35,7 +35,7 @@ export type AdsComparisonResult = Awaited<ReturnType<typeof readAdsComparison>>;
  * Compare the same stored data across time (previous window) or across accounts.
  * Different currencies are never summed together: each currency forms its own group.
  */
-export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}, now = new Date()) {
+export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}, now = new Date(), options: { allObjects?: boolean } = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', 'Choose valid Ads comparison filters.');
   const values = input as Record<string, unknown>;
   if (Object.keys(values).some(key => !INPUT_KEYS.has(key))) throw new OperationError('invalid_request', 'Choose valid Ads comparison filters.');
@@ -116,7 +116,7 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
       accountTotalsAvailable: accountRows.length > 0,
       totals, previous, kpis: totals ? buildKpis(totals, previous) : [],
       findings: findings.map(finding => ({ ...finding, message: findingMessage(finding) })),
-      objects: sortObjects(objects, sort, direction).slice(0, policy.maxObjects), objectCount: objects.length,
+      objects: options.allObjects ? sortObjects(objects, sort, direction) : sortObjects(objects, sort, direction).slice(0, policy.maxObjects), objectCount: objects.length,
       trend: [...trendByDay.values()].sort((a, b) => a.date.localeCompare(b.date)).map(day => ({ ...day, spend: Math.round(day.spend * 100) / 100 })),
       freshness: assessFreshness((accountRows.length ? accountRows : objectRows).map(row => row.fetchedAt), now, policy.staleAfterHours),
     };
@@ -137,10 +137,15 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
   };
 }
 
-/** The comparison as one complete CSV, bounded by the Root export size limit (`ads.exportMaxBytes`). */
-export async function exportAdsComparison(actor: AdsReadActor, input: unknown = {}, now = new Date()) {
-  const [outputPolicy, result] = await Promise.all([loadAdsOutputPolicy(), readAdsComparison(actor, input, now)]);
-  const built = buildAdsComparisonCsv(result, outputPolicy.exportMaxBytes);
+/**
+ * The comparison as one complete CSV, bounded by the Root export size limit (`ads.exportMaxBytes`).
+ * `objects` (default) has one row per compared object, never truncated to the on-screen cap;
+ * `daily` has one row per group and day (the account-level daily series the legacy export carried).
+ */
+export async function exportAdsComparison(actor: AdsReadActor, input: unknown = {}, now = new Date(), section: 'objects' | 'daily' = 'objects') {
+  if (section !== 'objects' && section !== 'daily') throw new OperationError('invalid_request', 'Choose objects or daily.');
+  const [outputPolicy, result] = await Promise.all([loadAdsOutputPolicy(), readAdsComparison(actor, input, now, { allObjects: true })]);
+  const built = section === 'daily' ? buildAdsComparisonDailyCsv(result, outputPolicy.exportMaxBytes) : buildAdsComparisonCsv(result, outputPolicy.exportMaxBytes);
   const base = outputPolicy.exportFileName.replace(/\.csv$/i, '');
-  return { format: 'ms-social-pilot-ads-comparison-csv' as const, version: 1 as const, fileName: `${base}-comparison-${result.range.from}_${result.range.to}.csv`, ...built };
+  return { format: 'ms-social-pilot-ads-comparison-csv' as const, version: 1 as const, section, fileName: `${base}-comparison${section === 'daily' ? '-daily' : ''}-${result.range.from}_${result.range.to}.csv`, ...built };
 }

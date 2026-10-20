@@ -1,3 +1,5 @@
+import { headers } from 'next/headers';
+import { adsLocale, adsText } from '@/modules/ads/analysis/copy';
 import { ensureAdsManagement } from '@/modules/ads/server/management';
 import '@/modules/ads/ui/ads.css';
 import './objects.css';
@@ -56,9 +58,16 @@ export default async function AdsObjectsPage({ searchParams }: { searchParams: P
   const history = managementPort ? await managementPort.listChanges(actor).catch(() => null) : null;
   const query = new URLSearchParams(Object.entries(values).flatMap(([key, value]) => (value !== undefined && key !== 'offset' ? [[key, value]] : [])));
   const pageLink = (offset: number) => `/ads/objects?${new URLSearchParams([...query, ['offset', String(offset)]])}`;
+  const locale = adsLocale((await headers()).get('accept-language'));
+  const exportQuery = new URLSearchParams({ format: 'csv' });
+  for (const [key, mapped] of [['period', 'period'], ['since', 'start'], ['until', 'end'], ['account', 'accountId'], ['level', 'level'], ['parentId', 'parentId'], ['q', 'q'], ['sort', 'sort'], ['direction', 'direction']] as const) {
+    const value = values[key];
+    if (value && !(key === 'account' && value === 'all')) exportQuery.set(mapped, value);
+  }
   const accountName = new Map(accounts.map(account => [account.id, account.name]));
   return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">Ads / Objects</p><h1>Campaigns, ad sets and ads</h1><p>{directory.total} result(s) · {directory.range.from} to {directory.range.to}</p></div></header>
+    <header className="page-heading"><div><p className="eyebrow">Ads / Objects</p><h1>Campaigns, ad sets and ads</h1><p>{directory.total} result(s) · {directory.range.from} to {directory.range.to}</p></div>
+      {directory.total > 0 ? <a className="btn" href={`/api/ads/directory?${exportQuery.toString()}`} download title={adsText(locale, 'exportObjectsHint')}>{adsText(locale, 'exportObjects')}</a> : null}</header>
     <section className="panel">
       {directory.freshness.status === 'stale' ? <p className="small-note">Stored figures may be out of date.</p> : null}
       <DataTable caption="Ad objects" rows={directory.items} rowKey={row => `${row.accountId}:${row.objectId}`} emptyMessage="No matching objects. Adjust the filters or search." columns={[

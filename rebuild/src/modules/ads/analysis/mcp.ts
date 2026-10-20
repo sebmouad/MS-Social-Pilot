@@ -8,6 +8,7 @@ const filters = {
   accountId: { type: 'string' }, compare: { type: 'string', enum: ['previous', 'accounts'], description: 'previous compares with the preceding window of equal length; accounts compares each account.' },
   level: { type: 'string', enum: ['campaign', 'adset', 'ad'] },
   sort: { type: 'string', enum: ['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm', 'name'] }, direction: { type: 'string', enum: ['asc', 'desc'] },
+  section: { type: 'string', enum: ['objects', 'daily'], description: 'With format csv: objects (default) is one row per compared object; daily is the account-level daily series per group.' },
   format: { type: 'string', enum: ['json', 'csv'], description: 'json (default) returns structured results; csv returns one complete CSV export of the compared objects, or refuses when it exceeds the configured size limit.' },
 };
 export const adsAnalysisTools = new Set(['compare_ads_performance']);
@@ -20,10 +21,11 @@ export const adsAnalysisToolDefinitions = [{
 export async function executeAdsAnalysisTool(actor: AdsReadActor, name: string, args: Record<string, unknown>, maxResultItems?: number) {
   if (name !== 'compare_ads_performance') throw new OperationError('invalid_request', 'Unknown Ads analysis tool.');
   validateAdsResultCeiling(maxResultItems);
-  const { format, ...filterArgs } = args;
+  const { format, section, ...filterArgs } = args;
+  if (section !== undefined && (format !== 'csv' || (section !== 'objects' && section !== 'daily'))) throw new OperationError('invalid_request', 'Choose objects or daily, with format csv.');
   if (format !== undefined && format !== 'json' && format !== 'csv') throw new OperationError('invalid_request', 'Choose json or csv.');
   if (format === 'csv') {
-    const exported = await exportAdsComparison(actor, filterArgs);
+    const exported = await exportAdsComparison(actor, filterArgs, new Date(), section === 'daily' ? 'daily' : 'objects');
     // A capped credential must never receive an export larger than its item ceiling.
     if (maxResultItems !== undefined && exported.rowCount > maxResultItems) throw new OperationError('invalid_request', 'This export exceeds the result limit of this credential.');
     return exported;

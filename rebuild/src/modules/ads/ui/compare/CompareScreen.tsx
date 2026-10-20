@@ -83,7 +83,8 @@ export default async function AdsComparePage({ searchParams }: { searchParams: P
   return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
     <header className="page-heading"><div><p className="eyebrow">{t('eyebrow')}</p><h1>{t('title')}</h1>
       <p>{t('rangeLine', { from: result.range.from, to: result.range.to })}{result.previousRange ? t('earlierLine', { from: result.previousRange.from, to: result.previousRange.to }) : ''}</p></div>
-      {result.groups.length ? <a className="btn" href={`/api/ads/compare?${exportQuery.toString()}`} download title={t('exportHint')}>{t('exportCsv')}</a> : null}</header>
+      {result.groups.length ? <div className="page-actions"><a className="btn" href={`/api/ads/compare?${exportQuery.toString()}`} download title={t('exportHint')}>{t('exportCsv')}</a>{' '}
+        {result.groups.some(group => group.trend.length) ? <a className="btn" href={`/api/ads/compare?${new URLSearchParams([...exportQuery, ['section', 'daily']]).toString()}`} download title={t('exportDailyHint')}>{t('exportDaily')}</a> : null}</div> : null}</header>
     {!result.groups.length ? <section className="panel empty-state"><h2>{t('emptyTitle')}</h2><p>{t('emptyHint')}</p></section> : result.groups.map(group => <section key={group.key} className="panel" aria-labelledby={`g-${group.key}`}>
       <h2 id={`g-${group.key}`}>{result.compare === 'accounts' ? group.accounts[0]?.name : `${group.currency ?? t('unknown')} · ${group.accounts.map(account => account.name).join(', ')}`}</h2>
       {!group.hasData ? <p>{t('noGroupData')}</p> : <>

@@ -8,6 +8,8 @@ import { adsIsoDay } from '../report-filters';
 import { authorizeAdsRead, type AdsReadActor } from '../server/access';
 import { loadAdsReadPolicy } from '../server/read-policy';
 import { loadAdsReportPolicy } from '../server/report-policy';
+import { buildAdsDirectoryCsv } from '../analysis/csv';
+import { loadAdsOutputPolicy } from '../server/output-policy';
 import { adsDirectoryManagementPort } from './management-port';
 import { platformAds } from '@/server/platforms/registry';
 
@@ -100,6 +102,22 @@ export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {},
     freshness: assessFreshness(rows.map(row => row.fetchedAt), now, analysisPolicy.staleAfterHours),
     note: 'Figures come from stored daily reports. Levels overlap, so campaign, ad set and ad figures must not be added together.',
   };
+}
+
+/**
+ * The filtered directory as one complete CSV (all pages), bounded by `ads.exportMaxBytes`.
+ * Refuses rather than truncating when the list exceeds the Ads row ceiling or the byte limit.
+ */
+export async function exportAdsDirectory(actor: AdsReadActor, input: unknown = {}, now = new Date()) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', 'Choose valid Ads directory filters.');
+  const { offset, limit, ...filters } = input as Record<string, unknown>;
+  if (offset !== undefined || limit !== undefined) throw new OperationError('invalid_request', 'Exports include every matching object; remove the page options.');
+  const [outputPolicy, readPolicy] = await Promise.all([loadAdsOutputPolicy(), loadAdsReadPolicy()]);
+  const result = await readAdsDirectory(actor, { ...filters, offset: 0, limit: readPolicy.maxRows }, now);
+  if (result.nextOffset !== null) throw new OperationError('invalid_request', 'Too many objects to export at once. Narrow the filters and try again.');
+  const built = buildAdsDirectoryCsv(result, outputPolicy.exportMaxBytes);
+  const base = outputPolicy.exportFileName.replace(/\.csv$/i, '');
+  return { format: 'ms-social-pilot-ads-objects-csv' as const, version: 1 as const, fileName: `${base}-${result.level}s-${result.range.from}_${result.range.to}.csv`, ...built };
 }
 
 /** One object: stored period figures, daily series, best-effort live status and the changes the actor can make. */
