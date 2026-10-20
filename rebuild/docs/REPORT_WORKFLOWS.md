@@ -222,9 +222,15 @@ Pure arithmetic: `modules/analytics/reports/generation/business-hours.ts`; summa
 `median_first_response_business_minutes` (coverage `not set` and an empty value when
 no hours are set), the same rows in JSON, and the HTML/text line "Business hours
 (Mon-Fri 09:00-18:00 (zone)): ... Calendar time: ...", or a plain statement that
-business hours are not set. The AI recap facts mention both. Legacy also showed
-response time with per-page/per-member rows and resolve time on its analysis page;
-the rebuild report keeps its single median and does not add an Inbox screen figure
-(the Inbox screens are owned by another session). Evidence: unit tests
+business hours are not set. The AI recap facts mention both. The section also lists a
+per-member breakdown (`sentById` resolved to the member's name, never email; answered
+count and median first response in calendar time, at most 25 members, a sender no
+longer in the workspace shown as "Former member", replies not sent through the app
+as "Outside the app") and a resolve time: median from a conversation's first visitor
+message in the period to its `resolvedAt`, with resolved and not-resolved counts
+(unresolved, or resolved before that message, is counted, never zero; "Not available"
+without data). CSV rows `member_first_response_minutes`, `median_resolve_minutes`,
+`unresolved_conversations`, plus HTML/text lines, all within the existing bounds.
+The Inbox screens are owned by another session and gain no figure here. Evidence: unit tests
 (`tests/business-hours.test.ts`, `tests/report-response-time.test.ts`) with mocked
 database only; no PostgreSQL or browser run.
