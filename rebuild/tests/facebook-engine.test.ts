@@ -291,6 +291,8 @@ describe('Facebook Graph adapter', () => {
     expect(await engine.listComments('token', 'post-1')).toEqual([{ id: 'comment-1', message: 'Question', fromName: 'Visitor', fromId: 'person-1', createdAt: new Date('2026-01-02T00:00:00Z'), parentId: 'parent-1', likeCount: 2, replyCount: 1, isHidden: false }]);
     const calls = (fetcher as unknown as { mock: { calls: unknown[][] } }).mock.calls;
     expect(String(calls.find(call => String(call[0]).includes('/comments'))?.[0])).toContain('parent%7Bid%7D');
+    // Reply threads: the stream filter flattens replies beside top-level comments so each stored reply carries its parent.
+    expect(new URL(String(calls.find(call => String(call[0]).includes('/comments'))?.[0])).searchParams.get('filter')).toBe('stream');
     expect(await engine.getAdInsights('token', 'act_1', new Date('2026-01-01Z'), new Date('2026-01-02Z'))).toEqual([{ spend: '4.2' }]);
   });
 

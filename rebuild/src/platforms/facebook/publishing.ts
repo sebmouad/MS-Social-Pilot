@@ -467,7 +467,10 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       });
     },
     async listComments(token, postId) {
-      const raw = await pages<JsonObject>(collectionUrl(`${encodeURIComponent(postId)}/comments`, token, 'id,message,from{id,name},created_time,parent{id},like_count,comment_count,is_hidden'), token);
+      // filter=stream returns replies flattened beside top-level comments (each carries parent{id}), so stored threads can nest them.
+      const commentsUrl = new URL(collectionUrl(`${encodeURIComponent(postId)}/comments`, token, 'id,message,from{id,name},created_time,parent{id},like_count,comment_count,is_hidden'));
+      commentsUrl.searchParams.set('filter', 'stream');
+      const raw = await pages<JsonObject>(commentsUrl.toString(), token);
       return raw.flatMap(item => {
         const from = object(item.from); const parent = object(item.parent); const createdAt = date(item.created_time);
         if (typeof item.id !== 'string' || typeof item.message !== 'string' || !createdAt) return [];

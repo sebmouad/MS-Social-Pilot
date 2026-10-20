@@ -99,6 +99,25 @@ async function memberNames(workspaceId: string, ids: string[]) {
   return new Map(members.map(member => [member.user.id, member.user.name]));
 }
 
+/** Orders a page of stored replies as a tree under the opening comment, chronological among siblings.
+ * A reply whose parent is not on this page hangs directly under the opening comment. */
+export function nestReplies<T extends { id: string; remoteId?: string; parentRemoteId?: string | null }>(replies: T[], opening: { id: string; remoteId: string }, make: (item: T, parentId: string, depth: number) => ThreadEntry): ThreadEntry[] {
+  const idByRemote = new Map<string, string>([[opening.remoteId, opening.id]]);
+  for (const reply of replies) if (reply.remoteId) idByRemote.set(reply.remoteId, reply.id);
+  const children = new Map<string, T[]>();
+  for (const reply of replies) {
+    const parent = reply.parentRemoteId ? idByRemote.get(reply.parentRemoteId) : undefined;
+    const key = parent && parent !== reply.id ? parent : opening.id;
+    children.set(key, [...(children.get(key) ?? []), reply]);
+  }
+  const out: ThreadEntry[] = []; const seen = new Set<string>();
+  const walk = (parentId: string, depth: number) => {
+    for (const reply of children.get(parentId) ?? []) { if (seen.has(reply.id)) continue; seen.add(reply.id); out.push(make(reply, parentId, depth)); walk(reply.id, depth + 1); }
+  };
+  walk(opening.id, 1);
+  return out;
+}
+
 /** Newest stored history by default, with Earlier/Newer continuation and reply policy independent of the shown window. */
 export async function readInboxThread(actor: InboxReadActor, input: unknown, constraints: InboxReadConstraints = {}): Promise<InboxThreadPage> {
   const access = await readAccess(actor, constraints);
@@ -117,7 +136,12 @@ export async function readInboxThread(actor: InboxReadActor, input: unknown, con
   if (!conversation && !comment) throw new OperationError('not_found', 'This conversation is unavailable. Choose another Inbox item.');
   const target = conversation?.target ?? comment!.postTarget.target;
   const source = conversation ? Prisma.sql`SELECT id, 'message'::text AS kind, "createdTime" AS time FROM conversation_messages WHERE "conversationId" = ${id}`
-    : Prisma.sql`SELECT id, 'comment'::text AS kind, "createdTime" AS time FROM post_comments WHERE "postTargetId" = ${comment!.postTargetId} AND "parentRemoteId" = ${comment!.remoteId}`;
+    : Prisma.sql`SELECT id, 'comment'::text AS kind, "createdTime" AS time FROM post_comments WHERE "postTargetId" = ${comment!.postTargetId} AND "remoteId" IN (
+        WITH RECURSIVE descendants("remoteId") AS (
+          SELECT "remoteId" FROM post_comments WHERE "postTargetId" = ${comment!.postTargetId} AND "parentRemoteId" = ${comment!.remoteId}
+          UNION
+          SELECT c."remoteId" FROM post_comments c JOIN descendants d ON c."parentRemoteId" = d."remoteId" WHERE c."postTargetId" = ${comment!.postTargetId}
+        ) SELECT "remoteId" FROM descendants)`;
   const order = cursor?.direction === 'newer' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
   const [rows, counts, lastInbound] = await Promise.all([
     prisma.$queryRaw<Key[]>(Prisma.sql`SELECT id, kind, time FROM (${source}) AS history ${seek(cursor)} ORDER BY time ${order}, kind COLLATE "C" ${order}, id COLLATE "C" ${order} LIMIT ${take + 1}`),
@@ -127,14 +151,17 @@ export async function readInboxThread(actor: InboxReadActor, input: unknown, con
   const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters);
   const ids = keys.map(item => item.id);
   const select = { id: true, message: true, fromName: true, fromId: true, sentById: true, createdTime: true } as const;
-  const entries = !ids.length ? [] : conversation ? await prisma.conversationMessage.findMany({ where: { id: { in: ids }, conversationId: id }, select }) : await prisma.postComment.findMany({ where: { id: { in: ids }, postTargetId: comment!.postTargetId, parentRemoteId: comment!.remoteId }, select });
+  type Stored = { id: string; message: string | null; fromName: string | null; fromId: string | null; sentById: string | null; createdTime: Date; remoteId?: string; parentRemoteId?: string | null; isHidden?: boolean };
+  // Replies at any stored depth belong to the opening comment: the recursive source above is scoped to its post target.
+  const entries: Stored[] = !ids.length ? [] : conversation ? await prisma.conversationMessage.findMany({ where: { id: { in: ids }, conversationId: id }, select }) : await prisma.postComment.findMany({ where: { id: { in: ids }, postTargetId: comment!.postTargetId, remoteId: { not: comment!.remoteId } }, select: { ...select, remoteId: true, parentRemoteId: true, isHidden: true } });
   const names = await memberNames(actor.workspaceId, [...new Set([...entries, ...(comment ? [comment] : [])].flatMap(entry => entry.sentById ? [entry.sentById] : []))]);
-  const entry = (item: typeof entries[number]): ThreadEntry => {
+  const entry = (item: Stored, parentId: string | null = null, depth = 0): ThreadEntry => {
     const fromChannel = item.sentById !== null || item.fromId !== null && item.fromId === target.providerId;
-    return { id: item.id, author: fromChannel ? target.name : item.fromName || 'Visitor', text: item.message || '', time: item.createdTime, fromChannel, sentBy: item.sentById ? names.get(item.sentById) ?? 'A teammate' : null };
+    return { id: item.id, author: fromChannel ? target.name : item.fromName || 'Visitor', text: item.message || '', time: item.createdTime, fromChannel, sentBy: item.sentById ? names.get(item.sentById) ?? 'A teammate' : null, parentId, depth, hidden: item.isHidden === true };
   };
   const byId = new Map(entries.map(item => [item.id, item]));
-  const chronological = [...keys].reverse().flatMap(key => { const item = byId.get(key.id); return item ? [entry(item)] : []; });
+  const pageOrder = [...keys].reverse().flatMap(key => { const item = byId.get(key.id); return item ? [item] : []; });
+  const chronological = comment ? nestReplies(pageOrder, comment, entry) : pageOrder.map(item => entry(item));
   return { thread: { kind, id, target: { id: target.id, name: target.name, providerId: target.providerId, provider: target.socialAccount?.provider ?? null }, resolved: Boolean(conversation?.resolvedAt ?? comment?.resolvedAt), hidden: comment?.isHidden ?? false, postText: comment?.postTarget.post.message ?? null, entries: [...(comment ? [entry(comment)] : []), ...chronological], lastInbound }, history: { ...cursors, total: Number(counts[0]?.count ?? 0), shown: chronological.length, limit: take, cursor: encoded ?? null } };
 }
 

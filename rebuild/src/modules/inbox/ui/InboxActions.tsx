@@ -91,13 +91,16 @@ export function InboxSyncBar({ targetId, lastSynced, timeZone, disabled = false 
 }
 
 /** Resolve or reopen, hide or unhide, and delete, for the open thread. */
-export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide, canDelete, platformName, listHref }: { id: string; kind: Kind; resolved: boolean; hidden: boolean; canResolve: boolean; canHide: boolean; canDelete: boolean; platformName: string; listHref: string }) {
+export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide, canDelete, platformName, listHref, reply = false }: { reply?: boolean; id: string; kind: Kind; resolved: boolean; hidden: boolean; canResolve: boolean; canHide: boolean; canDelete: boolean; platformName: string; listHref: string }) {
   const [busy, setBusy] = useState<'resolve' | 'hide' | 'delete' | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
   const [deleteStatus, setDeleteStatus] = useState<DeleteStatus>({ kind: 'loading' });
   const router = useRouter();
+  // A deleted reply leaves the thread open; a deleted opening comment returns to the list.
+  const leave = () => { if (reply) router.refresh(); else router.replace(listHref); };
+  const noun = reply ? 'reply' : 'comment';
 
   async function run(kindOfAction: 'resolve' | 'hide' | 'delete', payload: Record<string, unknown>, message: string) {
     setBusy(kindOfAction); setError(''); setDone('');
@@ -110,7 +113,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       if (completeDeletion(receipt)) {
         setDone(message);
         setConfirming(false);
-        router.replace(listHref);
+        leave();
         return true;
       }
       setDeleteStatus({ kind: 'operation', receipt });
@@ -130,7 +133,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
         setDeleteStatus({ kind: 'operation', receipt });
         setDone('Comment deleted.');
         setConfirming(false);
-        router.replace(listHref);
+        leave();
       } else {
         setDeleteStatus(receipt ? { kind: 'operation', receipt } : { kind: 'none' });
       }
@@ -153,7 +156,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       return;
     }
     setDeleteStatus({ kind: 'operation', receipt });
-    setDone('Comment deleted.'); setConfirming(false); router.replace(listHref);
+    setDone('Comment deleted.'); setConfirming(false); leave();
   }
 
   async function openDeleteDialog() {
@@ -162,7 +165,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       const receipt = await readDeleteStatus(id);
       if (receipt && completeDeletion(receipt)) {
         setDeleteStatus({ kind: 'operation', receipt });
-        setDone('Comment deleted.'); setConfirming(false); router.replace(listHref);
+        setDone('Comment deleted.'); setConfirming(false); leave();
       } else {
         setDeleteStatus(receipt ? { kind: 'operation', receipt } : { kind: 'none' });
       }
@@ -180,19 +183,19 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   if (!canResolve) return <p className={styles.readOnly}>You can read this conversation but not change it.</p>;
   return <div className={styles.toolbar}>
     <div className={styles.toolbarButtons}>
-      <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? 'Reopened.' : 'Marked as resolved.')}>{resolved ? 'Reopen' : 'Mark resolved'}</Button>
-      {kind === 'comment' && canHide && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('hide', { action: 'moderate', id, hidden: !hidden }, hidden ? 'Comment is visible again.' : 'Comment hidden.')}>{hidden ? 'Unhide comment' : 'Hide comment'}</Button>}
-      {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => void openDeleteDialog()}>Delete comment</Button>}
+      {!reply && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? 'Reopened.' : 'Marked as resolved.')}>{resolved ? 'Reopen' : 'Mark resolved'}</Button>}
+      {kind === 'comment' && canHide && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('hide', { action: 'moderate', id, hidden: !hidden }, hidden ? `${reply ? 'Reply' : 'Comment'} is visible again.` : `${reply ? 'Reply' : 'Comment'} hidden.`)}>{hidden ? `Unhide ${noun}` : `Hide ${noun}`}</Button>}
+      {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => void openDeleteDialog()}>Delete {noun}</Button>}
     </div>
     <div role="status" aria-live="polite" className={styles.toolbarStatus}>{done}</div>
     {error && !confirming && <p role="alert" className={styles.error}>{error}</p>}
-    <Dialog open={confirming} busy={deleteBusy} title={canStartDelete ? "Delete this comment?" : "Comment deletion status"} description={canStartDelete ? `This removes the comment, and any replies under it, from ${platformName} and from your inbox. This cannot be undone.` : "Check the current deletion outcome. Closing this dialog does not undo an existing deletion request."} onClose={() => { if (!deleteBusy) { setConfirming(false); } }}
-      actions={<><Button variant="secondary" data-dialog-cancel disabled={deleteBusy} onClick={() => setConfirming(false)}>{canStartDelete ? 'Keep comment' : 'Close'}</Button>
+    <Dialog open={confirming} busy={deleteBusy} title={canStartDelete ? `Delete this ${noun}?` : "Comment deletion status"} description={canStartDelete ? `This removes the ${noun}, and any replies under it, from ${platformName} and from your inbox. This cannot be undone.` : "Check the current deletion outcome. Closing this dialog does not undo an existing deletion request."} onClose={() => { if (!deleteBusy) { setConfirming(false); } }}
+      actions={<><Button variant="secondary" data-dialog-cancel disabled={deleteBusy} onClick={() => setConfirming(false)}>{canStartDelete ? `Keep ${noun}` : 'Close'}</Button>
         {(operation || deleteStatus.kind === 'error') && <Button variant="secondary" disabled={deleteBusy} onClick={() => void checkDeletionStatus()}>{deleteBusy ? 'Checking…' : 'Check deletion status'}</Button>}
         {canFinishDelete && <Button variant="danger" disabled={deleteBusy} onClick={() => void finishDeletion()}>{deleteBusy ? 'Finishing…' : 'Finish removal from Inbox'}</Button>}
-        {canStartDelete && <Button variant="danger" disabled={deleteBusy} onClick={() => void run('delete', { action: 'delete', id, confirmation: `DELETE COMMENT ${id}` }, 'Comment deleted.')}>{deleteBusy ? 'Deleting…' : 'Delete comment'}</Button>}</>}>
+        {canStartDelete && <Button variant="danger" disabled={deleteBusy} onClick={() => void run('delete', { action: 'delete', id, confirmation: `DELETE COMMENT ${id}` }, 'Comment deleted.')}>{deleteBusy ? 'Deleting…' : `Delete ${noun}`}</Button>}</>}>
       {deleteStatus.kind === 'loading' && <p className={styles.dialogNote} role="status">Checking whether a deletion is already in progress…</p>}
-      {canStartDelete && <p className={styles.dialogNote}>Hiding the comment instead keeps it in your inbox and can be undone.</p>}
+      {canStartDelete && <p className={styles.dialogNote}>Hiding the {noun} instead keeps it in your inbox and can be undone.</p>}
       {operation?.state === 'started' || operation?.state === 'uncertain' ? <p className={styles.dialogNote} role="status">The platform outcome is unconfirmed. Check deletion status before taking another action.</p> : null}
       {operation?.state === 'remote_confirmed' ? <p className={styles.dialogNote} role="status">{operation.remoteConfirmed ? 'The platform confirmed deletion.' : 'The platform outcome is unconfirmed.'} Finish removal from Inbox only completes the local cleanup.</p> : null}
       {operation?.state === 'rejected' ? <p className={styles.dialogNote} role="alert">The platform rejected this deletion. Contact your administrator before trying again.</p> : null}
