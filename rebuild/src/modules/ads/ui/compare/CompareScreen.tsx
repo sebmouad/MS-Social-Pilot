@@ -1,5 +1,6 @@
 import '@/modules/ads/ui/ads.css';
 import '@/modules/ads/ui/objects/objects.css';
+import { ObjectPerformance } from './ObjectPerformance';
 import { ComparisonExport } from './ComparisonExport';
 import { loadAdsOutputPolicy } from '../../server/output-policy';
 import { headers } from 'next/headers';
@@ -73,6 +74,7 @@ export default async function AdsComparePage({ searchParams }: { searchParams: P
   }
   const columns = (currency: string | null): TableColumn<ObjectRow>[] => [
     { key: 'name', label: t('col.name'), render: row => <>{row.name}<br /><span className="small-note">{row.accountName}</span>
+      <ObjectPerformance row={row} locale={locale} currency={currency} compare={result.compare === 'previous'} />
       {Object.keys(row.actions).length ? <details><summary>{t('metricDetails')}</summary><p className="small-note">{t('periodActions')}</p><dl>{Object.entries(row.actions).map(([key, count]) => <div key={key}><dt>{key.replace(/_/g, ' ')}</dt><dd>{number.format(count)}</dd></div>)}</dl></details> : null}</> },
     { key: 'spend', label: t('col.spend'), align: 'end', render: row => `${currency ? `${currency} ` : ''}${show(row.spend)}` },
     { key: 'share', label: t('col.share'), align: 'end', render: row => row.sharePercent === null ? t('unknown') : <><meter min={0} max={100} value={row.sharePercent} aria-label={t('col.share')} /> {row.sharePercent}%</> },

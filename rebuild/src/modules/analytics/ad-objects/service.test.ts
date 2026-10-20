@@ -94,3 +94,20 @@ it('denies changed plan access and a workspace purge without returning stored da
 it('requires page scalars rather than JavaScript coercion of booleans or arrays', async () => {
   for (const page of [true, null, ['1']]) await expect(readAdObjects(actor, { page })).rejects.toMatchObject({ code: 'invalid_request' });
 });
+
+it('sorts the full filtered selection before paging and CSV with stable ties', async () => {
+  m.data.mockResolvedValue({ insights: [
+    { ...insight('campaign', 'a'), spend: 10 }, { ...insight('campaign', 'b'), spend: 90 },
+    { ...insight('campaign', 'c'), spend: 90 },
+  ] });
+  const first = await readAdObjects(actor, { sort: 'spend', direction: 'desc' });
+  expect(first.items.map(i => i.objectId)).toEqual(['b', 'c']);
+  const next = await readAdObjects(actor, { sort: 'spend', direction: 'desc', page: first.nextPage });
+  expect(next.items.map(i => i.objectId)).toEqual(['a']);
+  const csv = await readAdObjects(actor, { sort: 'spend', direction: 'desc', page: 2, format: 'csv' });
+  expect(csv.items.map(i => i.objectId)).toEqual(['b', 'c', 'a']);
+  expect(csv.csv!.split('\r\n').filter(line => line.startsWith('"summary"')).map(line => line.split(',')[8])).toEqual(['"b"', '"c"', '"a"']);
+  for (const input of [{ sort: 'token' }, { sort: ['spend'] }, { direction: 'sideways' }]) {
+    await expect(readAdObjects(actor, input)).rejects.toMatchObject({ code: 'invalid_request' });
+  }
+});

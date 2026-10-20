@@ -85,8 +85,8 @@ describe('Ads comparison service', () => {
         : [row('a1', 'account', 'a1', '2026-10-05', 100, 50)],
     }));
     const result = await readAdsComparison(actor, { period: 'custom', start: '2026-10-10', end: '2026-10-16' }, new Date('2026-10-17T12:00:00Z'));
-    expect(state.dataset).toHaveBeenCalledWith('w1', expect.anything(), ['t1'], ['facebook'], { levels: ['account', 'campaign'] });
-    expect(state.dataset).toHaveBeenCalledWith('w1', expect.anything(), ['t1'], ['facebook'], { levels: ['account'] });
+    expect(state.dataset).toHaveBeenNthCalledWith(1, 'w1', expect.objectContaining({ since: day('2026-10-10') }), ['t1'], ['facebook'], expect.objectContaining({ levels: ['account', 'campaign'] }));
+    expect(state.dataset).toHaveBeenNthCalledWith(2, 'w1', expect.anything(), ['t1'], ['facebook'], { levels: ['account', 'campaign'] });
     expect(result.groups.map(group => group.currency).sort()).toEqual(['EUR', 'USD']);
     const usd = result.groups.find(group => group.currency === 'USD')!;
     expect(usd.totals?.spend).toBe(100);

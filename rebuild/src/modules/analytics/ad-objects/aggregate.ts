@@ -25,6 +25,22 @@ export function aggregateObjects(rows: readonly Observation[], requestedDays: nu
   }).sort((a, b) => a.accountId.localeCompare(b.accountId) || a.name.localeCompare(b.name) || a.key.localeCompare(b.key));
 }
 export type AdObject = ReturnType<typeof aggregateObjects>[number];
+export const AD_OBJECT_SORTS = ['name', 'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm', 'reach', 'coveredDays', 'lastFetchedAt'] as const;
+export type AdObjectSort = typeof AD_OBJECT_SORTS[number];
+/** Order within each account/currency only. Unknowns stay last in both directions; identity breaks ties before paging. */
+export function sortAdObjects(items: readonly AdObject[], sort: AdObjectSort, direction: 'asc' | 'desc'): AdObject[] {
+  const sign = direction === 'asc' ? 1 : -1;
+  return [...items].sort((a, b) => {
+    const group = a.accountId.localeCompare(b.accountId) || (a.currency ?? '').localeCompare(b.currency ?? '');
+    if (group) return group;
+    const x = a[sort], y = b[sort];
+    const tie = () => a.key.localeCompare(b.key);
+    if (x === null && y === null) return tie();
+    if (x === null) return 1;
+    if (y === null) return -1;
+    return sign * (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) || tie();
+  });
+}
 export function adObjectsCsv(items: readonly AdObject[], start: string, end: string, locale: 'en' | 'fr') {
   const missing = locale === 'fr' ? 'Non disponible' : 'Not available';
   const cell = (v: unknown) => { const s = v === null || v === undefined ? missing : typeof v === 'object' ? JSON.stringify(v) : String(v); return `"${(/^[=+\-@\t\r\n]/.test(s) ? "'" : '') + s.replaceAll('"', '""')}"`; };

@@ -11,12 +11,12 @@ import { normalizeAdsDailyRow } from '@/modules/ads/report-data';
 import { analyticsDateRange } from '../server/comparison';
 import { platformAds } from '@/server/platforms/registry';
 import type { Actor } from '../server/access';
-import { aggregateObjects, adObjectsCsv, type Observation } from './aggregate';
+import { aggregateObjects, adObjectsCsv, sortAdObjects, AD_OBJECT_SORTS, type Observation } from './aggregate';
 
 const id = z.string().min(1).max(200).regex(/^[^\u0000-\u001f\u007f]+$/);
 const optionalId = z.preprocess(value => value === '' ? undefined : value, id.optional());
 const optionalDate = z.preprocess(value => value === '' ? undefined : value, z.string().optional());
-const schema = z.object({ start: optionalDate, end: optionalDate, accountId: optionalId, level: z.enum(['campaign', 'adset', 'ad']).default('campaign'), parentId: optionalId, objectId: optionalId, page: z.union([z.number().int().positive().max(100000), z.string().regex(/^[1-9]\d{0,5}$/).transform(Number).refine(value => value <= 100000)]).default(1), format: z.enum(['json', 'csv']).default('json'), locale: z.enum(['en', 'fr']).default('en') }).strict();
+const schema = z.object({ start: optionalDate, end: optionalDate, accountId: optionalId, level: z.enum(['campaign', 'adset', 'ad']).default('campaign'), parentId: optionalId, objectId: optionalId, page: z.union([z.number().int().positive().max(100000), z.string().regex(/^[1-9]\d{0,5}$/).transform(Number).refine(value => value <= 100000)]).default(1), sort: z.enum(AD_OBJECT_SORTS).default('name'), direction: z.enum(['asc', 'desc']).default('asc'), format: z.enum(['json', 'csv']).default('json'), locale: z.enum(['en', 'fr']).default('en') }).strict();
 const bad = () => new OperationError('invalid_request', 'Choose valid ad-object filters or a shorter period. / Choisissez des filtres valides ou une période plus courte.');
 const forbidden = () => new OperationError('forbidden', 'Ad-object analytics access is unavailable. / L’analyse des objets publicitaires est indisponible.');
 
@@ -67,7 +67,7 @@ export async function readAdObjects(actor: Actor, raw: unknown = {}) {
   const all = aggregateObjects(observations, requestedDays);
   if (input.parentId && !all.some(item => item.accountId === input.accountId && item.level === (input.level === 'adset' ? 'campaign' : 'adset') && item.objectId === input.parentId)) throw new OperationError('not_found', 'The parent has no stored data in this period. / Le parent ne contient aucune donnée pour cette période.');
   const atLevel = all.filter(item => item.level === input.level);
-  const matching = atLevel.filter(item => (!input.parentId || (item.parentConsistent && item.parentId === input.parentId)) && (!input.objectId || item.objectId === input.objectId));
+  const matching = sortAdObjects(atLevel.filter(item => (!input.parentId || (item.parentConsistent && item.parentId === input.parentId)) && (!input.objectId || item.objectId === input.objectId)), input.sort, input.direction);
   const size = Math.min(pageSize, actor.maxResultItems ?? pageSize);
   const page = Math.min(input.page, Math.max(1, Math.ceil(matching.length / size)));
   const items = input.format === 'csv' ? matching : matching.slice((page - 1) * size, page * size);

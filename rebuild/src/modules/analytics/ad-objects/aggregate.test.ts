@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { aggregateObjects, adObjectsCsv } from './aggregate';
+import { aggregateObjects, adObjectsCsv, sortAdObjects } from './aggregate';
 const row = (patch: Record<string, unknown> = {}) => ({ id: 'r', accountId: 'a', accountName: 'Account', currency: 'USD', level: 'campaign', objectId: 'c', objectName: '=Campaign', parentId: null, date: '2026-10-01', fetchedAt: '2026-10-02T00:00:00.000Z', spend: 10, impressions: 100, clicks: 2, reach: 80, frequency: 1.25, cpc: 5, cpm: 100, cpp: null, ctr: 2, actions: [], fields: {}, redactedPaths: [], ...patch });
 it('deduplicates days by latest fetch, weights ratios, keeps reach a dated snapshot and reports missing days', () => {
   const result = aggregateObjects([row({ id: 'old', spend: 999, fetchedAt: null }), row(), row({ id: 'next', date: '2026-10-02', spend: 20, impressions: 300, clicks: 8, reach: 200 })], 3);
@@ -28,4 +28,15 @@ it('exports each observation with its own parent and marks a conflicting summary
   const lines = adObjectsCsv(items, '2026-10-01', '2026-10-02', 'en').split('\r\n');
   expect(lines[1]).not.toContain('"new"'); expect(lines[1]).toContain('"Not available"');
   expect(lines[2]).toContain('"old"'); expect(lines[3]).toContain('"new"');
+});
+
+it('sorts unknowns last in either direction, breaks ties stably and keeps accounts separate', () => {
+  const items = aggregateObjects([
+    row({ objectId: 'unknown', spend: null }), row({ objectId: 'zero', spend: 0 }),
+    row({ objectId: 'high', spend: 40 }), row({ objectId: 'tie', spend: 40 }),
+    row({ objectId: 'other', accountId: 'b', currency: 'EUR', spend: 999 }),
+  ], 1);
+  expect(sortAdObjects(items, 'spend', 'desc').map(i => i.objectId)).toEqual(['high', 'tie', 'zero', 'unknown', 'other']);
+  expect(sortAdObjects(items, 'spend', 'asc').map(i => i.objectId)).toEqual(['zero', 'high', 'tie', 'unknown', 'other']);
+  expect(items[0]!.objectId).toBe('high');
 });

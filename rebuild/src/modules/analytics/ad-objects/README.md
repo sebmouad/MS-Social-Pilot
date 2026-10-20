@@ -3,7 +3,7 @@
 `/analytics/ads`, `GET /api/analytics/ad-objects`, MCP
 `get_analytics_ad_objects` and resource `msp://analytics/ad-objects` share
 `readAdObjects`. Read access uses `analytics/ads`, the Analytics overview
-permission/plan switch (central mapping is pending the requested ownership expansion). The service rechecks disabled accounts, membership,
+permission/plan switch (the current entitlement and permission maps include this route). The service rechecks disabled accounts, membership,
 entitlements (without installation-owner inspection), role permissions, purge
 state, current channel grants, credential target/account ceilings and selected
 connection visibility. It reuses Ads' neutral stored account/dataset readers and
@@ -73,28 +73,25 @@ transport and production evidence remain open. No servers, installation,
 generation, push or deployment belong to this batch. Root schema-version bump
 remains the integrator's work because registry.ts is outside ownership.
 
-Current integration blocker: `analytics/ads` must be added to
-`FEATURE_ROOT_SWITCH` in `src/server/entitlements/index.ts` and
-`FEATURE_MODULE_SWITCH` in `src/server/permissions/index.ts`, each mapped to
-`analytics/overview`; `tests/mcp-security.test.ts` needs the corresponding true
-feature fixture. These three edits were requested asynchronously and remain
-unapplied pending user approval because they exceed assigned ownership.
-Until integrated, the new feature is denied and TypeScript reports those three
-missing entries. This batch is not release-ready.
+Historical branch notes about missing `analytics/ads` feature mappings are
+superseded by the current tree: entitlement/permission maps now include the route.
+Fresh verification on `codex/gaps-anads` passes `npx tsc --noEmit -p .` and all
+28 module-local tests. The SQL void guard passes in the related targeted suite.
+No browser, real database or live-provider run was performed for this batch.
 
-Latest checks (2026-10-20): 25 module-local tests pass; SQL void guard plus
-existing Ads parent/scope/ceiling tests pass (19). `npx tsc --noEmit -p .` is
-blocked by the three missing central feature entries above, with no errors in
-owned source. The repository-wide Vitest run reported five loopback socket
-`EPERM` failures in `tests/facebook-native-http.test.ts` and the stale
-`tests/module-manifests.test.ts` Analytics navigation assertion (already missing
-the existing Posts route, now also needs Ad objects). The run was interrupted
-after output stopped rather than claiming a complete suite pass. Other suites
-logged missing database configuration; database tests were skipped. No full-suite
-success, real database execution or listening server is claimed.
+## Metric sorting (codex/gaps-anads)
 
-A read-only independent review found and prompted regression fixes for per-day
-CSV parent provenance and HTTP 401/403 session handling. Fresh targeted checks
-include both fixes. Integration should also update the stale navigation fixture,
-the parity/architecture/UX/shared handoff docs, and run full release-scope proof;
-those shared documentation files were outside this task's file ownership.
+The shared `readAdObjects` service accepts `sort` (`name`, `spend`,
+`impressions`, `clicks`, `ctr`, `cpc`, `cpm`, `reach`, `coveredDays`,
+`lastFetchedAt`) and `direction` (`asc`, `desc`). Defaults preserve name order.
+Sorting applies to the full filtered selection before pagination and to the full
+CSV export. Account/currency groups remain separate, unknown values sort last in
+either direction, and object identity breaks ties for stable continuation.
+The contextual sidebar, HTTP query and MCP schema expose the same controls;
+export, drill-down and pagination links retain the chosen order. Changing filters
+through the form starts at page one. Existing access checks and output bounds
+still apply; no new Root setting or migration is introduced.
+
+Module-local mocked service, render and surface tests cover ordering, stable ties,
+unknowns, account separation, pagination, full CSV and HTTP/MCP forwarding.
+These tests do not establish browser, database, live-provider or release proof.
