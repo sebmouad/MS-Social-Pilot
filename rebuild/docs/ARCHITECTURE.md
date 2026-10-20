@@ -1476,3 +1476,13 @@ once something marks it invalidated. Open: a Root setting for the warning window
 (constant for now), a scheduled health check with a stored check time, re-requesting
 declined permissions on Reconnect, MCP exposure, locale plumbing, browser check.
 Evidence: unit tests and full suite (3,352/376) on a scratch synthetic database copy.
+
+## Historical demographics (2026-10-20, codex/demographics)
+
+The demographics service now exposes full stored resource/date category snapshots,
+with measurement/fetch times, period coverage and complete-or-refused CSV through
+UI/HTTP/MCP. Facebook owns storage interpretation; the neutral Analytics catalog
+and aggregator carry an optional history field. No new Root keys or migration.
+See [module notes](../src/modules/analytics/demographics/README.md). Synthetic
+unit/render evidence only; browser, real database/provider and release verification
+remain open. This does not complete the other Analytics parity gaps.

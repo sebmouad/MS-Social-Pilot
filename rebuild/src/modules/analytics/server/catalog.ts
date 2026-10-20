@@ -7,6 +7,12 @@ export type AnalyticsAdAccount = { id: string; name: string; currency: string | 
 export type AnalyticsObservation = { date: Date; channelId: string; channelLabel: string; value: number };
 export type AnalyticsMetricRow = { label: string; value: number; asOf: Date | null };
 
+/** One stored category snapshot; never summed across dates or resources. */
+export type AnalyticsBreakdownSnapshot = {
+  resourceId: string; resourceLabel: string; asOf: Date; fetchedAt: Date;
+  rows: Array<{ label: string; value: number | null }>;
+};
+
 /** Provider-mapped input to the shared chart and total aggregator. */
 export type AnalyticsMetricInput = {
   key: string;
@@ -29,6 +35,7 @@ export type AnalyticsMetricInput = {
   totalObservations?: Array<{ date: Date; value: number }>;
   /** Provider-supplied account rows for weighted ratios or pre-normalized breakdowns. */
   rows?: AnalyticsMetricRow[];
+  breakdownHistory?: AnalyticsBreakdownSnapshot[];
   available: number;
   covered?: number;
   latestAt?: Date | null;

@@ -57,12 +57,25 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
     const updatedAt = new Date(Math.max(...group.map(row => row.fetchedAt.getTime())));
     const baseLabel = `${facebookLabel(first.metric)}${period !== 'day' ? ` · ${period}` : ''}`;
     if (numeric.length) metrics.push({ key, label: kind === 'stock' ? `${baseLabel} · Latest per channel` : baseLabel, sourceLabel: 'Page performance', kind, unit: 'count', observations: numeric, ...(/unique|reach/.test(first.metric) ? { aggregationNote: overlappingPeopleNote } : {}), coveredResourceIds, ...(kind === 'stock' || period !== 'day' ? { rollup: 'latest-per-channel' as const } : {}), available: selected.length, updatedAt });
+    // Keep each stored resource/time snapshot. Re-fetches at the same time
+    // select the newest fetch; categories absent from a snapshot stay absent.
+    const historyRows = new Map<string, PageRow>();
+    for (const row of group) {
+      if (!row.value || typeof row.value !== 'object' || Array.isArray(row.value)) continue;
+      const identity = JSON.stringify([row.target.id, row.endTime.toISOString()]);
+      const previous = historyRows.get(identity);
+      if (!previous || row.fetchedAt > previous.fetchedAt) historyRows.set(identity, row);
+    }
+    const breakdownHistory = [...historyRows.values()]
+      .sort((a, b) => a.endTime.getTime() - b.endTime.getTime() || a.target.id.localeCompare(b.target.id))
+      .map(row => ({ resourceId: row.target.id, resourceLabel: row.target.name, asOf: row.endTime, fetchedAt: row.fetchedAt,
+        rows: Object.entries(object(row.value)).map(([label, raw]) => ({ label, value: safeNumber(raw) })) }));
     const newest = new Map<string, PageRow>();
     for (const row of group) { if (!Object.keys(object(row.value)).length) continue; const old = newest.get(row.target.id); if (!old || old.endTime < row.endTime || (old.endTime.getTime() === row.endTime.getTime() && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }
     const values = new Map<string, number>();
     for (const row of newest.values()) for (const [label, raw] of Object.entries(object(row.value))) { const value = safeNumber(raw); if (value !== null) values.set(label, (values.get(label) ?? 0) + value); }
     const latest = [...newest.values()];
-    if (values.size) metrics.push({ key: numeric.length ? `${key}::breakdown` : key, label: `${baseLabel} · Categories`, sourceLabel: 'Page performance', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...newest.keys()].sort(), available: selected.length, covered: newest.size, latestAt: latest.length ? new Date(Math.max(...latest.map(row => row.endTime.getTime()))) : null, updatedAt: latest.length ? new Date(Math.max(...latest.map(row => row.fetchedAt.getTime()))) : null });
+    if (breakdownHistory.length) metrics.push({ breakdownHistory, key: numeric.length ? `${key}::breakdown` : key, label: `${baseLabel} · Categories`, sourceLabel: 'Page performance', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...newest.keys()].sort(), available: selected.length, covered: newest.size, latestAt: latest.length ? new Date(Math.max(...latest.map(row => row.endTime.getTime()))) : null, updatedAt: latest.length ? new Date(Math.max(...latest.map(row => row.fetchedAt.getTime()))) : null });
   }
   const newest = new Map<string, PageRow>();
   for (const row of audienceRows) { if (audienceAsOf && row.endTime > audienceAsOf) continue; const old = newest.get(row.target.id); if (!old || row.endTime > old.endTime || (row.endTime.getTime() === old.endTime.getTime() && row.metric === 'page_follows' && old.metric !== 'page_follows') || (row.endTime.getTime() === old.endTime.getTime() && row.metric === old.metric && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }

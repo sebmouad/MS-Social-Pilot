@@ -17,6 +17,7 @@ export type MetricView = {
   available: number;
   coveredResourceIds?: string[];
   points: Array<{ date: string; label: string; value: number }>;
+  breakdownHistory?: AnalyticsMetricInput['breakdownHistory'];
   rows: Array<{ label: string; value: number; asOf: Date | null }>;
 };
 
@@ -73,6 +74,7 @@ function metricView(input: AnalyticsMetricInput): MetricView {
     available: input.available,
     ...(coveredResourceIds ? { coveredResourceIds: [...coveredResourceIds] } : {}),
     points,
+    ...(input.breakdownHistory ? { breakdownHistory: input.breakdownHistory } : {}),
     rows: rows.slice().sort((a, b) => b.value - a.value),
   };
 }

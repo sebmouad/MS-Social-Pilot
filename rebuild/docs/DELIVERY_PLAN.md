@@ -422,3 +422,9 @@ synthetic video were removed, backup retained. Backup SHA256:
 `277764d3a486b3138f1bef5e017966fc0c9cc2c6e6d5a28c86b3ff9e6e67b143`.
 The final built preview uses the original example database at localhost:3200;
 /sign-in returned HTTP200. Production and its held photo canary are unchanged.
+
+Demographics branch follow-up (2026-10-20): stored snapshot history, scoped
+UI/HTTP/MCP and CSV are implemented with synthetic unit/render checks. Review
+`modules/analytics/demographics/README.md`; verify actual PostgreSQL and browser
+history/export across themes and widths before claiming runtime parity. No
+migration or new Root keys; no production/provider verification in this batch.
