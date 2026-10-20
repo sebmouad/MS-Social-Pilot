@@ -460,3 +460,71 @@ rehearsal, which passed the complete22-file schema-only path. Fresh local backup
 actual PostgreSQL workflow and browser/MCP evidence are recorded in
 FIRST_COMMENT_SCHEDULING.md. Local example application and exact107-table/settings cleanup passed; scratch
 removed and backup retained. The complete checkpoint is recorded there. No production migration, proxy/service change or cutover occurred.
+
+## Read-only legacy data verification
+
+Run `scripts/verify-legacy-migration.ts` from `rebuild/` against isolated restored
+copies, after reviewing the production dump's handling and restoring its media.
+It refuses every database URL except loopback TCP with a database name ending
+`_preview` or `_rehearsal`; routing/schema override query parameters are refused.
+It opens one repeatable-read, PostgreSQL-enforced **READ ONLY** transaction and
+never starts services, applies migrations, imports settings, or contacts providers.
+Use an account restricted to SELECT as an additional operational boundary.
+
+First capture source counts and the names of persisted Root registry settings
+from the local pre-migration copy (the command does not export their values):
+
+```sh
+# DATABASE_URL must already name the isolated source copy, never production.
+TSX_TSCONFIG_PATH=tsconfig.json node --import tsx scripts/verify-legacy-migration.ts --snapshot > /private/tmp/legacy-source-counts.json
+```
+
+Then set `DATABASE_URL` to the migrated isolated copy, rehearse the configuration
+import separately, and verify it against the source manifest and restored files:
+
+```sh
+TSX_TSCONFIG_PATH=tsconfig.json node --import tsx scripts/verify-legacy-migration.ts \
+  --baseline /private/tmp/legacy-source-counts.json \
+  --media-root /private/tmp/restored-legacy-media \
+  > /private/tmp/legacy-migration-report.json
+```
+
+The JSON report includes actual/source counts, aggregate checks and `ok`; any
+failure or unavailable check exits nonzero. Snapshot mode only captures a
+baseline and is **not** a verification pass. Counts cover every public table,
+a conservative superset of rebuild-used ORM and raw-SQL tables. New empty tables
+are accepted; missing tables, changed counts and new nonempty tables fail. For
+intentional additions (migration history, config-import audit/config rows), keep
+the original manifest and create a separately reviewed expected-count manifest
+with only documented exact deltas. Never capture a fresh target snapshot as the
+source baseline to hide unexplained changes. Quiesce both copies while gathering
+evidence; separate source/target runs cannot share a transaction snapshot.
+
+Checks cover compatibility-view required tables/columns/nulls/enums and declared
+relations even when FK constraints are absent, catalog FK orphans, workspace
+boundaries, post destinations, member Page access, workspace owner memberships,
+MCP feature/resource shapes and scoped resource ownership/current creator
+membership. Stored pre-scope NULL MCP scopes retain their supported legacy
+meaning. Root registry settings present in the source must remain present and
+valid; legacy import candidates must have destination settings (nonsecret values
+must match). Supply the same `APP_URL`, `SECURITY_TWO_STEP`, `LOGIN_ATTEMPTS` and
+`LOGIN_WINDOW_MINUTES` used by the importer to include environment-backed import
+requirements. Defaults need not all be persisted. Secret settings are checked
+for encrypted envelopes only; decryption/equality and live provider grants remain
+separate gates.
+
+Post media JSON must contain image/video entries with nonempty URLs. Local media
+storage keys and `media:` post references must resolve to regular files within
+the restored root, without traversal or symlink components. Library references
+must belong to the post's workspace; file-only images use
+`<workspace>/images/<uuid>`. External URLs are not fetched. Filesystem contents
+must remain stable during verification. This proves reference/file presence,
+not bytes/checksums, unreferenced-file cleanup, arbitrary provider JSON semantics,
+application authorization workflows, or real provider permission validity. The
+report contains no row IDs, contents, credentials or secret values. Existing
+migration, backup/media recovery, functional and cutover gates still apply.
+
+Tests: `npx vitest run tests/verify-legacy-migration*.test.ts tests/raw-sql-void-guard.test.ts`.
+The real PostgreSQL test requires `REBUILD_PREVIEW_DATABASE_URL`, applies the
+same URL guard, reads existing isolated fixtures and verifies count drift without
+mutating records. Without that variable it explicitly skips.
