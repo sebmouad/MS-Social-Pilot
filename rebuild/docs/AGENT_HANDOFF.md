@@ -774,7 +774,14 @@ signed leased delivery; it removes every row it creates.
 Wave 1 verification evidence: WAVE1_VERIFICATION.md (Session A, `215960db`).
 Business-hours response time is in the Reports Response time section (REPORT_WORKFLOWS.md).
 
-Next: browser runs of the wave 2 screens; OAuth clients and v1 posts (this session);
+REST v1 posts plus all six webhook events (`12260e3d`) and OAuth connectors for MCP
+clients are on main; registry 87. OAuth migration
+`20261026100000_rebuild_oauth_connectors` (two additive tables) is NOT applied to
+any database or pinned in cutover-rehearsal.sh: apply only after the documented
+backup/scratch-restore check. OAuth is off until Root sets
+`integrations.oauth.*` (enabled + issuer URL).
+
+Next: apply/pin the OAuth migration through the backup gate; browser runs of the wave 2 screens;
 auth/onboarding (Session A);
 then wave 3 (auth/onboarding, feeds and integrations WIP, agency extras, owner
 export). The untracked feeds/integrations/webhooks/API-access WIP in the main
