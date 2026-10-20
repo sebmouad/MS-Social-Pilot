@@ -413,3 +413,22 @@ adapter operation before any customer surface exists); applying and rehearsing m
 `20261030100000` and running PostgreSQL Story proof tests (none run yet; the existing PostgreSQL files
 skip without the guarded preview database); cleaned live coverage for every native format.
 Live-verification item 4 now also covers the Stories edge read used for reconciliation.
+
+
+## Batch101: Story proof PostgreSQL coverage (private, default off)
+
+`tests/facebook-native-story-proof-postgres.test.ts` covers the Story proof path on the guarded
+loopback `_preview` database: staged-media-plus-final-Story journal identities for `story_photo`
+and `story_video`, acceptance only from the Page Stories edge by exact final id (staged id refused
+at `assertFacebookNativeResolution`), unaccepted not-listed/archived/error observations, the SQL
+guard refusing an accepted Story proof without exactly two identities, and serialized concurrent
+refreshes. Provider transport is mocked. Every case returns early unless migration
+`20261030100000_rebuild_facebook_native_story_proofs` is applied to that database, and the whole
+file skips without `REBUILD_PREVIEW_DATABASE_URL`. **It has not been run against PostgreSQL in this
+batch** (no database or server was started); only the skip path, typecheck and the raw-SQL guard
+ran. Root keys: none. Migration: none (the migration above stays unapplied/unrehearsed).
+
+Still open (outside Facebook ownership, so unchanged here): `modules/publishing/server/deletion.ts`
+and `first-comment.ts` must pass `formatId`; shared stored-video resolution; a neutral
+cancel/reschedule adapter operation with its own tenant-bound table; applying and pinning the Story
+migration in `scripts/cutover-rehearsal.sh`; cleaned live coverage (list above).
