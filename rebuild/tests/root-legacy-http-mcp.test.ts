@@ -127,7 +127,7 @@ describe('Root MCP definitions', () => {
   });
 
   it('offers no tool that starts, restores or deletes backups, accounts or workspaces', () => {
-    expect(rootLegacyToolDefinitions.map(tool => tool.name).filter(name => /backup|restore|delete|purge/.test(name) && !name.startsWith('get_'))).toEqual(['delete_root_workspace']); // the one deliberate, confirmed, suspended-only deletion
+    expect(rootLegacyToolDefinitions.map(tool => tool.name).filter(name => /backup|restore|delete|purge/.test(name) && !name.startsWith('get_'))).toEqual(['delete_root_user', 'delete_root_workspace']); // deliberate, confirmed deletions of disabled accounts and suspended workspaces
   });
 });
 

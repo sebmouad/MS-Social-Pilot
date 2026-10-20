@@ -97,3 +97,33 @@ export async function revokeRootUserSessions(actorId: string, userId: string, co
 export async function resetRootUserTwoStep(actorId: string, userId: string, confirmation: string) {
   return controlRootUser(actorId, userId, 'reset-two-step', confirmation);
 }
+
+export const rootUserDeletionConfirmation = (email: string) => `DELETE ACCOUNT ${email}`;
+
+/**
+ * Root deletion of one account (legacy parity). Only a disabled, non-Root account that is not the sole owner of any
+ * workspace. Its posts and invitations stay with their workspaces, credited to the Root operator; API keys it created
+ * are revoked and credited the same way; everything personal (sessions, tokens, saved views, memberships) cascades.
+ */
+export async function deleteRootUser(actorId: string, userId: string, confirmation: string) {
+  return prisma.$transaction(async tx => {
+    const actors = await tx.$queryRaw<Array<{ isInstanceOwner: boolean; disabledAt: Date | null }>>`SELECT "isInstanceOwner", "disabledAt" FROM users WHERE id = ${actorId} FOR SHARE`;
+    if (!actors[0]?.isInstanceOwner || actors[0].disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
+    const rows = await tx.$queryRaw<Array<{ id: string; email: string; isInstanceOwner: boolean; disabledAt: Date | null }>>`SELECT id, email, "isInstanceOwner", "disabledAt" FROM users WHERE id = ${userId} FOR UPDATE`;
+    const user = rows[0];
+    if (!user) throw new OperationError('not_found', 'Account not found.');
+    if (confirmation !== rootUserDeletionConfirmation(user.email)) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
+    if (user.id === actorId || user.isInstanceOwner) throw new OperationError('conflict', 'The installation owner account cannot be deleted.');
+    if (!user.disabledAt) throw new OperationError('conflict', 'Disable this account before deleting it.');
+    const owned = await tx.$queryRaw<Array<{ workspaceId: string; owners: number }>>`SELECT m."workspaceId", (SELECT COUNT(*)::int FROM memberships o WHERE o."workspaceId" = m."workspaceId" AND o.role::text = 'owner') AS owners FROM memberships m WHERE m."userId" = ${userId} AND m.role::text = 'owner' ORDER BY m."workspaceId" FOR UPDATE OF m`;
+    if (owned.some(row => row.owners <= 1)) throw new OperationError('conflict', 'This account is the only owner of a workspace. Transfer ownership or delete that workspace first.');
+    await tx.$executeRaw`UPDATE posts SET "authorId" = ${actorId} WHERE "authorId" = ${userId}`;
+    await tx.$executeRaw`UPDATE posts SET "submittedById" = NULL WHERE "submittedById" = ${userId}`;
+    await tx.$executeRaw`UPDATE posts SET "reviewedById" = NULL WHERE "reviewedById" = ${userId}`;
+    await tx.$executeRaw`UPDATE invitations SET "invitedById" = ${actorId} WHERE "invitedById" = ${userId}`;
+    const revoked = await tx.$executeRaw`UPDATE mcp_api_keys SET "revokedAt" = COALESCE("revokedAt", NOW()), "createdById" = ${actorId} WHERE "createdById" = ${userId}`;
+    await tx.$executeRaw`DELETE FROM users WHERE id = ${userId}`;
+    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, 'root.user_deleted', ${JSON.stringify({ userId, revokedApiKeys: revoked })}::jsonb, NOW())`;
+    return { deleted: true as const, userId, revokedApiKeys: revoked };
+  });
+}

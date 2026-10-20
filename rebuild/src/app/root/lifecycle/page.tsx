@@ -1,7 +1,7 @@
 import { requireRootPage } from '@/server/config/access';
 import { RootFrame } from '@/server/root/RootFrame';
 import { loadRootLifecycle } from '@/server/root/legacy/lifecycle';
-import { DeleteWorkspace, EnableUser, RestoreWorkspace } from './AccessControls';
+import { DeleteUser, DeleteWorkspace, EnableUser, RestoreWorkspace } from './AccessControls';
 import { TransferOwnership } from './TransferOwnership';
 import '../plans/legacy-ops.css';
 
@@ -16,14 +16,14 @@ export default async function RootLifecyclePage() {
     <header className="root-control__heading">
       <p className="root-config__eyebrow">Root · Shared controls</p>
       <h1>Account and workspace lifecycle</h1>
-      <p>Review disabled accounts and suspended workspaces, restore access, or transfer workspace ownership. Disable and suspend actions live in <a href="/root/users">Users</a> and <a href="/root/workspaces">Workspaces</a>. A suspended workspace can be permanently deleted here.</p>
+      <p>Review disabled accounts and suspended workspaces, restore access, or transfer workspace ownership. Disable and suspend actions live in <a href="/root/users">Users</a> and <a href="/root/workspaces">Workspaces</a>. Disabled accounts and suspended workspaces can be permanently deleted here.</p>
     </header>
     {!data ? <section className="root-control__notice" role="alert"><h2>Lifecycle unavailable</h2><p>Lifecycle state could not be loaded. Check database availability and try again.</p></section> : <>
       <section className="root-ops__panel" aria-labelledby="disabled-users"><h2 id="disabled-users">Disabled accounts</h2>
         {data.disabledUsers.length === 0 ? <p className="root-ops__muted">No accounts are disabled.</p> : <div className="root-ops__table" role="region" aria-label="Disabled accounts" tabIndex={0}><table>
           <caption className="ui-visually-hidden">Disabled accounts</caption>
           <thead><tr><th scope="col">Account</th><th scope="col">Disabled</th><th scope="col">Action</th></tr></thead>
-          <tbody>{data.disabledUsers.map(user => <tr key={user.id}><td><strong>{user.name}</strong><br />{user.email}</td><td><time dateTime={user.disabledAt}>{new Date(user.disabledAt).toLocaleString()}</time></td><td>{user.id === actor.id ? 'Your account' : <EnableUser id={user.id} email={user.email} />}</td></tr>)}</tbody>
+          <tbody>{data.disabledUsers.map(user => <tr key={user.id}><td><strong>{user.name}</strong><br />{user.email}</td><td><time dateTime={user.disabledAt}>{new Date(user.disabledAt).toLocaleString()}</time></td><td>{user.id === actor.id ? 'Your account' : <><EnableUser id={user.id} email={user.email} /> <DeleteUser id={user.id} email={user.email} /></>}</td></tr>)}</tbody>
         </table></div>}
       </section>
       <section className="root-ops__panel" aria-labelledby="suspended"><h2 id="suspended">Suspended workspaces</h2>
