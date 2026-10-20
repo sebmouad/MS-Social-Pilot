@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { agencyOverview, listAgencyClients } from '@/modules/agency/server/agency';
+import { exportAgencyOverview } from '@/modules/agency/server/export';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
-const KEYS = ['view', 'q', 'sort', 'order', 'attention'];
+const KEYS = ['view', 'q', 'sort', 'order', 'attention', 'format', 'locale'];
 const invalid = () => new OperationError('invalid_request', 'Choose valid agency filters.');
 
 /** Person-wide read for a browser session only. Credentials presented as API keys or bearer tokens are refused. */
@@ -31,9 +32,12 @@ export async function GET(request: Request) {
     if (view !== 'overview') throw invalid();
     const attention = query.get('attention');
     if (attention !== null && attention !== 'true' && attention !== 'false') throw invalid();
-    return reply(await agencyOverview(actor, {
+    const filters = {
       ...(query.get('q') ? { q: query.get('q') } : {}), ...(query.get('sort') ? { sort: query.get('sort') } : {}),
       ...(query.get('order') ? { order: query.get('order') } : {}), ...(attention !== null ? { attentionOnly: attention === 'true' } : {}),
-    }));
+    };
+    if (query.has('format')) return reply(await exportAgencyOverview(actor, { ...filters, format: query.get('format'), ...(query.has('locale') ? { locale: query.get('locale') } : {}) }));
+    if (query.has('locale')) throw invalid();
+    return reply(await agencyOverview(actor, filters));
   } catch (error) { const failure = operationFailure(error, 'Agency data could not be loaded. Please try again.'); return reply({ error: failure.error, code: failure.code }, failure.status); }
 }

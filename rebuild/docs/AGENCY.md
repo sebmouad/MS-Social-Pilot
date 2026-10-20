@@ -134,3 +134,82 @@ is refreshed at entry, not serialized with concurrent access revocations.
 Read access is not separately audited. Agency is read-only; team changes use the
 existing selected-workspace Team service. Full person-scoped MCP parity, broader
 Agency writes and production-shaped runtime/release evidence remain open.
+
+## Wave 3: downloadable cross-workspace overview (2026-10-20)
+
+Chosen capability: an internal agency overview export, in CSV and JSON, available
+from `/agency` with the currently applied workspace-name search, sort, direction
+and attention filter. This packages useful existing cross-client oversight into a
+portable handoff without requiring a new permission model or public sharing token.
+
+Legacy comparison: `src/app/(app)/agency/page.tsx` and `src/lib/agency-access.ts`
+provide owned-client counts and a cross-client staff role matrix with grant/remove
+actions. The separate `src/lib/agency.ts` health reader includes followers,
+engagement and priced AI spend. `src/app/share/[token]/page.tsx` offers review,
+calendar and results tabs. The rebuild's authorized Agency overview and client
+lists already cover operational oversight, but lacked a downloadable overview.
+This batch adds that capability; it does not claim the legacy role matrix,
+performance metrics or portal results are complete.
+
+Implementation:
+
+- `src/modules/agency/server/export.ts` owns packaging and calls `agencyOverview`
+  afresh for every request. It accepts no workspace ids, supplied rows or saved
+  artifact ids. Memberships, current entitlements/permissions, per-module counts,
+  channel-scope withholding, suspension and erasure behavior stay in the existing
+  shared service. No new SQL, writes, migration or provider branch is introduced.
+- `GET /api/agency?format=csv|json&locale=en|fr` returns a versioned JSON receipt
+  containing filename, content type, UTF-8 byte count and file contents. Existing
+  overview query parameters apply. Duplicate/unknown parameters and export options
+  on the Clients view are refused. All responses are `no-store`; browser sessions
+  are required and presented bearer/API-key credentials are refused.
+- `get_agency_overview` accepts optional `format` and `locale` and calls the same
+  packaging service. The existing person-principal guard remains unchanged.
+  **No authenticator currently issues this principal**: real MCP availability is
+  still an open gap. Workspace/installation keys cannot export agency data.
+- `ui/AgencyExport.tsx` uses shared Buttons with English/French copy selected from
+  the request's primary Accept-Language. Both formats preserve filters, prevent
+  duplicate submissions, validate receipt type/version/filename/exact bytes, and
+  show focused preparation/failure feedback. A keyed filter change or unmount
+  aborts the old request. Prepared means a download was requested, not proof of a
+  file saved on disk. This read operation needs no destructive confirmation.
+- CSV is a rectangular long-form table (record type, workspace id/name, measure,
+  value, denominator), with context, matching totals, coverage and workspace rows.
+  It includes UTC generation time, failure window, filters, scan limit/truncation
+  and exported workspace count even for empty results. Context explains that
+  totals ignore the attention filter. Fields are quoted, spreadsheet formulas
+  neutralized, and a UTF-8 BOM supports accented spreadsheet copy. Unknown values
+  read “Not available” / “Non disponible”; measured zero stays zero. JSON retains
+  nulls, stable field names and the same context/coverage.
+
+Bounds: the existing Root `agency.workspaceLimit`, search bound, failure window
+and authority concurrency apply. No new Root keys; no registry changes. Exports
+cover the same capped scan as the overview, not an exhaustive all-client dataset.
+They contain workspace/team counts, not client emails, report analytics or public
+portal links. They are private internal exports, not client-safe report packages.
+
+Verification from `rebuild/`:
+
+```sh
+npx vitest run --config src/modules/agency/vitest.config.ts
+npx tsc --noEmit -p .
+```
+
+The module-local Vitest config includes existing agency service/route/MCP/UI/host
+tests, `tests/raw-sql-void-guard.test.ts`, and owned export service/HTTP/MCP/download
+component tests. New tests use synthetic mocked data; they do not establish real
+PostgreSQL, live credential MCP, browser download, provider or production behavior.
+An initial config merge unintentionally included the full suite: unrelated tests
+hit missing database configuration and denied loopback socket creation. The config
+was corrected to replace the include list; no full-suite pass is claimed.
+
+Remaining: cross-client staff role matrix and mutations through the Team service;
+analytics/AI-spend overview through neutral owning-module contracts; public portal
+results; branded client report bundles and delivery; full pagination beyond the
+workspace cap; person-scoped MCP authentication; real database and browser/theme/
+phone/failure-path checks, and production-shaped release evidence.
+
+Final local result: 63 tests across 8 files passed with the module-local command
+above (including the raw SQL void guard); `npx tsc --noEmit -p .` passed.
+The accidentally broadened suite was interrupted after unrelated environment
+failures; no server, deployment, push or database migration was performed.

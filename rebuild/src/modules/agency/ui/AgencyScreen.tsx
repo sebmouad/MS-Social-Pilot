@@ -1,3 +1,6 @@
+import { headers } from 'next/headers';
+import { AgencyExport } from './AgencyExport';
+import { agencyExportLocale } from '../export-copy';
 import { requireViewer } from '@/server/context';
 import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
@@ -57,12 +60,15 @@ export default async function AgencyPage({ searchParams }: { searchParams: Promi
   try {
     const searchLimit = await agencySearchLimit();
     const result = await agencyOverview({ userId: viewer.user.id }, { ...(filters.q ? { q: filters.q } : {}), sort: filters.sort, order: filters.order, attentionOnly: filters.attention });
+    const locale = agencyExportLocale((await headers()).get('accept-language'));
+    const exportQuery = new URLSearchParams({ q: filters.q, sort: filters.sort, order: filters.order, attention: String(filters.attention) }).toString();
     const totals = result.totals;
     const scope = result.filtered ? `${totals.workspaces} matching ${totals.workspaces === 1 ? 'workspace' : 'workspaces'}` : 'your workspaces';
     const count = (value: number | null) => value === null ? '–' : value;
     return <AgencyShell>
       <AgencyHeading description={`Compare the workspaces you own or administer. Failed posts cover the last ${result.windowDays} days.`} />
       <AgencyFilters values={filters} searchLimit={searchLimit} />
+      <AgencyExport key={`${locale}:${exportQuery}`} query={exportQuery} locale={locale} />
       {result.truncated && <RouteNotice focusKey="agency-truncated">
         {(result.filtered ? `More than ${result.limit} workspaces match this search; only the first ${result.limit} by name are shown. Search for more of the name to narrow them.`
           : `You manage more than ${result.limit} workspaces; only the first ${result.limit} by name are shown. Search by name to find another workspace.`)
