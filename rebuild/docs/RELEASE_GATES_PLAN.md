@@ -440,3 +440,10 @@ each gate is actually run; never claim a gate from this plan alone.
   person MCP keys, native schedule changes) run last and still need pinning there.
 - Not yet run: migration verifier and volume probe against the scratch copy, rollback
   drill (B6), live Facebook gate (A), cutover (C).
+- **Staging and rollback drill (B6): PASS** with `rebuild/scripts/prod-stage-drill.sh` at
+  `c802becc`: the rebuild was built on the production host, started as transient unit
+  `social-pilot-rebuild-drill` on 127.0.0.1:3110 against the scratch rehearsal database,
+  answered `/sign-in` 200 and its public API, then was stopped and removed. Legacy
+  `social-pilot` and `social-pilot-worker` stayed active with unchanged start times
+  (never restarted); the public site kept answering. The first drill found a production
+  `next build` type failure (`src/app/root/config/page.tsx`), fixed in `c802becc`.
