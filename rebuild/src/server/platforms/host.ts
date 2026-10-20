@@ -83,7 +83,7 @@ export interface PlatformPublicationRecovery {
 /** One published post on one channel, with module-normalized stored measures. Missing measures are null, never zero. */
 export type PostPerformance = {
   postId: string; text: string; publishedAt: Date | null; url: string | null;
-  measures: Array<{ key: string; label: string; value: number | null }>;
+  measures: Array<{ key: string; label: string; labelFr?: string; value: number | null }>;
   /** The module's ranking measure for this post (null when unknown) and its customer label. */
   rankValue: number | null; rankLabel: string;
   measuredAt: Date | null;
@@ -95,10 +95,12 @@ export type GoalMeasures = { audienceGained: number | null; views: number | null
 /** Stored per-post measures summed over one channel's posts published in a window. `measuredPosts` is how many posts had that measure stored; null value means none did (unknown, never zero). */
 export type DestinationMeasures = { measures: Array<{ key: string; label: string; value: number | null; measuredPosts: number }> };
 
+export type PostPerformanceRequest = { workspaceId: string; targetId: string; from: Date; to: Date; limit: number; offset?: number; sort?: string; direction?: 'asc' | 'desc' };
+
 export interface PlatformAnalyticsHost {
   load(request: AnalyticsProviderRequest): Promise<AnalyticsProviderData>;
-  /** Optional: stored per-post measures for one already-authorized channel, highest rank first. No provider request. */
-  postPerformance?(request: { workspaceId: string; targetId: string; from: Date; to: Date; limit: number }): Promise<PostPerformance[]>;
+  /** Stored measures for an authorized channel. Explicit sort uses unknown-last ordering and postId ties; omitted sort retains provider ranking. No provider request. */
+  postPerformance?(request: PostPerformanceRequest): Promise<PostPerformance[]>;
   /** Optional: stored per-post measures summed for one already-authorized channel over [from, to). No provider request. */
   destinationMeasures?(request: { workspaceId: string; targetId: string; from: Date; to: Date }): Promise<DestinationMeasures>;
   /** Optional: goal measures for one already-authorized channel over [from, to). No provider request. */
