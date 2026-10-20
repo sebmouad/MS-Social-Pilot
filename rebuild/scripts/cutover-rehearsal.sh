@@ -11,7 +11,7 @@ fail() { echo "cutover rehearsal: $*" >&2; exit 1; }
 : "${CUTOVER_DUMP_SANITIZED:?Set CUTOVER_DUMP_SANITIZED=YES only after confirming the dump is sanitized}"
 : "${CUTOVER_APPROVED_MIGRATION_SET:?Set CUTOVER_APPROVED_MIGRATION_SET to the reviewed migration set}"
 [ "$CUTOVER_DUMP_SANITIZED" = YES ] || fail "CUTOVER_DUMP_SANITIZED must be YES"
-approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs,20261019050000_rebuild_publication_submissions,20261019060000_rebuild_template_comment_delay,20261026100000_rebuild_oauth_connectors,20261027100000_rebuild_workspace_exports'
+approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs,20261019050000_rebuild_publication_submissions,20261019060000_rebuild_template_comment_delay,20261026100000_rebuild_oauth_connectors,20261027100000_rebuild_workspace_exports,20261028100000_rebuild_alert_delivery,20261029100000_rebuild_channel_profiles,20261030100000_rebuild_facebook_native_story_proofs,20261030100000_rebuild_review_resolution,20261030110000_rebuild_ads_creative_creation'
 [ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
 [ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
 
@@ -53,6 +53,11 @@ verify_migration 20261019050000_rebuild_publication_submissions 91011f00b776d402
 verify_migration 20261019060000_rebuild_template_comment_delay 4c2f5699a826b8008003718084ee13eb0e4ee37e8e861ffdaf4a8a0a292bcfc5
 verify_migration 20261026100000_rebuild_oauth_connectors 58514dc2c438333ac8fb74d632254e230d1d8e69967cc61b2076676eba9879d5
 verify_migration 20261027100000_rebuild_workspace_exports 1d154d62c8422a6f8ac99a92c2975da9e7d211dc018950cc4f3a411c4e96acac
+verify_migration 20261028100000_rebuild_alert_delivery ed079e77ebb54ab01b46811686237c72308a11e43b75dfc9b9c9b0304801f36b
+verify_migration 20261029100000_rebuild_channel_profiles eaad76b014a355047385425fee74caa5fd656c942f461016f98b96c32142f7f4
+verify_migration 20261030100000_rebuild_facebook_native_story_proofs a74d6f4c546dd7f36f464636171bfe61d850dc42cca7786340c0169119fc680e
+verify_migration 20261030100000_rebuild_review_resolution bf99bb579b7d989d3ec1ec2651d8db216cbcaa44d8fe7d0e10ccb1448e08e68e
+verify_migration 20261030110000_rebuild_ads_creative_creation 2109fc4f75cf1f528a6940a14979b1a5b60e6b79f3d9f269dc19507001703aec
 
 # Only loopback TCP or the standard local PostgreSQL socket and database
 # /postgres are accepted. A copied production DATABASE_URL must fail closed.
@@ -126,7 +131,7 @@ BEGIN
   IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
     EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
       INTO already_applied
-      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal', '20261019040000_rebuild_facebook_native_status_proofs', '20261019050000_rebuild_publication_submissions', '20261019060000_rebuild_template_comment_delay', '20261026100000_rebuild_oauth_connectors', '20261027100000_rebuild_workspace_exports';
+      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal', '20261019040000_rebuild_facebook_native_status_proofs', '20261019050000_rebuild_publication_submissions', '20261019060000_rebuild_template_comment_delay', '20261026100000_rebuild_oauth_connectors', '20261027100000_rebuild_workspace_exports', '20261028100000_rebuild_alert_delivery', '20261029100000_rebuild_channel_profiles', '20261030100000_rebuild_facebook_native_story_proofs', '20261030100000_rebuild_review_resolution', '20261030110000_rebuild_ads_creative_creation';
     IF already_applied THEN
       RAISE EXCEPTION 'staging dump migration history already contains an allowlisted migration';
     END IF;
@@ -160,6 +165,11 @@ psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019050000_rebui
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019060000_rebuild_template_comment_delay/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261026100000_rebuild_oauth_connectors/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261027100000_rebuild_workspace_exports/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261028100000_rebuild_alert_delivery/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261029100000_rebuild_channel_profiles/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261030100000_rebuild_facebook_native_story_proofs/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261030100000_rebuild_review_resolution/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261030110000_rebuild_ads_creative_creation/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
 DO $$

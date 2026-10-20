@@ -909,3 +909,14 @@ escalation is disabled. Changes are uncommitted, with no new commit created.
 Commit from an environment permitted to write the existing worktree metadata;
 intended message: `fix(publishing): validate version restores`. Do not include the
 pre-existing untracked root `node_modules` link. No push was attempted.
+
+## Preview migrations 25–29 applied (2026-10-20, Session A)
+
+Applied to the synthetic `_preview` database only, each in one transaction, after a
+full backup (SHA-256 `a4db7f282f138f73f0393f1f397a9d66e328066f118bea1dcb5f51ae581d1814`,
+outside Git) whose scratch restore matched every table count:
+`20261028100000_rebuild_alert_delivery`, `20261029100000_rebuild_channel_profiles`,
+`20261030100000_rebuild_facebook_native_story_proofs`,
+`20261030100000_rebuild_review_resolution` (shares a timestamp; name order applies),
+`20261030110000_rebuild_ads_creative_creation`. All five are pinned in
+`scripts/cutover-rehearsal.sh`; the full rehearsal still needs a sanitized staging dump.
