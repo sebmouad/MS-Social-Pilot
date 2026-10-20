@@ -2,7 +2,7 @@ import { FacebookApiError } from '../publishing';
 import { isFacebookDefiniteRejection } from '../protocol';
 import { FACEBOOK_NATIVE_CONFIG, facebookNativePolicyFrom } from '../native-config';
 import { interpretFacebookThrottle, type FacebookThrottle } from './throttle';
-import { FacebookAttemptStoreUnavailableError } from './types';
+import { guarded, record } from './attempt-io';
 import type {
   FacebookNativeAttemptRecord, FacebookNativeAttemptStore, FacebookNativePolicy, FacebookNativeReadTransport, FacebookStatusReadback,
 } from './types';
@@ -155,7 +155,7 @@ export async function reconcileFacebookNativeAttempt(operationId: string, deps: 
   if (!record) return { state: 'not_found', readback: null };
   // Child operation IDs currently use these suffixes. Their remote effects
   // cannot be inferred from the parent video's publication status.
-  if (operationId.endsWith(':comment') || operationId.endsWith(':delete')) {
+  if (/:(comment|delete|cancel)$|:reschedule:\d+$/.test(operationId)) {
     return { state: record.state, readback: null };
   }
   if (record.state !== 'uncertain' && record.state !== 'started') return { state: record.state, readback: null };
@@ -187,15 +187,6 @@ export async function reconcileFacebookNativeAttempt(operationId: string, deps: 
     if (current) return { state: current.state, readback, ...(aborted(signal) ? { cancelled: true as const } : {}) };
   } catch { /* unresolved CAS outcome stays uncertain */ }
   return { state: 'uncertain', readback };
-}
-
-/** Attempt-store reads/begins fail closed with the shared error; nothing is sent. */
-async function guarded<T>(fn: () => Promise<T>): Promise<T> {
-  try { return await fn(); } catch { throw new FacebookAttemptStoreUnavailableError(); }
-}
-/** Recording after a send is best-effort: a failed write must never change or hide a remote outcome. */
-async function record(attempts: FacebookNativeAttemptStore, id: string, patch: Parameters<FacebookNativeAttemptStore['update']>[1], expectedStates?: Parameters<FacebookNativeAttemptStore['update']>[2]): Promise<void> {
-  try { await attempts.update(id, patch, expectedStates); } catch { /* row stays in its last durable state; reconciliation treats it as uncertain */ }
 }
 
 export type FacebookCommentOutcome =
