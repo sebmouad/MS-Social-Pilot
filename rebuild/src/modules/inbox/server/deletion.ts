@@ -57,7 +57,7 @@ export async function getInboxDeletion(actor: InboxReadActor, input: { itemId: s
   let row = await findJournal(actor.workspaceId, parsed.data);
   if (row && !access.channelIds.includes(row.targetId)) throw missing();
   if (!row) {
-    const comment = await prisma.postComment.findFirst({ where: { id: parsed.data, parentRemoteId: null,
+    const comment = await prisma.postComment.findFirst({ where: { id: parsed.data,
       postTarget: { targetId: { in: access.channelIds }, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } },
       select: { id: true, remoteId: true, postTarget: { select: { targetId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
     if (!comment) throw missing();
@@ -113,7 +113,7 @@ export async function deleteInboxCommentDurably(actor: InboxReadActor, input: { 
         return { ...await finish(previous, actor), itemId: input.id };
       });
     }
-    const item = await prisma.postComment.findFirst({ where: { id: input.id, parentRemoteId: null,
+    const item = await prisma.postComment.findFirst({ where: { id: input.id,
       postTarget: { targetId: { in: access.channelIds }, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } },
       select: { remoteId: true, postTarget: { select: { targetId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
     const provider = item?.postTarget.target.socialAccount?.provider;
@@ -124,7 +124,7 @@ export async function deleteInboxCommentDurably(actor: InboxReadActor, input: { 
       if (!refreshed.channelIds.includes(targetId)) throw missing();
       const existingRemote = await findRemoteJournal(actor.workspaceId, provider, targetId, item.remoteId);
       if (existingRemote) return { ...await finish(existingRemote, actor), itemId: input.id };
-      const stillPresent = await prisma.postComment.findFirst({ where: { id: input.id, remoteId: item.remoteId, parentRemoteId: null,
+      const stillPresent = await prisma.postComment.findFirst({ where: { id: input.id, remoteId: item.remoteId,
         postTarget: { targetId, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } }, select: { id: true } });
       if (!stillPresent) {
         const concurrent = await findJournal(actor.workspaceId, input.id);

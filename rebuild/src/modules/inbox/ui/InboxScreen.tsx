@@ -2,7 +2,8 @@ import { ChannelBadge } from '@/components';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { channelBadgeInfo } from '@/lib/channel-badge';
 import { inboxHref, inboxListInput, type InboxLocation, type InboxSearchParams } from '@/modules/inbox/query';
-import type { InboxFilters, InboxListPage, InboxThreadPage, OpenThread } from '@/modules/inbox/server/types';
+import type { ReactNode } from 'react';
+import type { InboxFilters, InboxListPage, InboxThreadPage, OpenThread, ThreadEntry } from '@/modules/inbox/server/types';
 import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -93,6 +94,21 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     const badge = channelBadgeInfo(thread.target.provider);
     const first = thread.entries.find(entry => !entry.fromChannel);
     const history = threadPage!.history;
+    const childrenOf = new Map<string, ThreadEntry[]>();
+    for (const entry of thread.entries) if (entry.parentId) childrenOf.set(entry.parentId, [...(childrenOf.get(entry.parentId) ?? []), entry]);
+    // Replies are actionable through the same shared services as the opening comment; the channel module's declared capabilities decide which actions exist.
+    const renderEntry = (entry: ThreadEntry): ReactNode => {
+      const replies = childrenOf.get(entry.id) ?? [];
+      const isReply = entry.parentId !== null;
+      return <li key={entry.id} className={styles.entryNode}>
+        <div className={styles.entry} data-from={entry.fromChannel ? 'channel' : 'person'} data-reply={isReply || undefined}>
+          <div className={styles.entryHead}><strong>{entry.author}</strong>{entry.sentBy ? <span>sent by {entry.sentBy}</span> : null}{entry.hidden ? <InboxTag icon="hidden">Hidden</InboxTag> : null}<time dateTime={entry.time.toISOString()}>{formatInboxTime(entry.time, timeZone, true)}</time></div>
+          <p>{entry.text || 'No text in this message.'}</p>
+          {isReply && canWrite && (capabilities.hide || capabilities.remove) ? <ThreadToolbar reply id={entry.id} kind="comment" resolved={false} hidden={entry.hidden} canResolve={canWrite} canHide={capabilities.hide} canDelete={capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} /> : null}
+        </div>
+        {replies.length ? <ol className={styles.replies} aria-label={`Replies to ${entry.author}`}>{replies.map(reply => renderEntry(reply))}</ol> : null}
+      </li>;
+    };
     const historyName = thread.kind === 'comment' ? 'replies' : 'messages';
     const openingItemPresent = Boolean(listPage?.items.some(item => item.key === `${thread.kind}:${thread.id}`));
     threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? 'Open conversation' : 'Open comment'}>
@@ -115,10 +131,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       </div>
       {history.cursor && history.shown === 0 ? <p className={styles.contextNote}>No stored history at this position. Choose Latest in the sidebar to return to recent messages or replies.</p> : null}
       <ol className={styles.entries} aria-label="History">
-        {thread.entries.map(entry => <li key={entry.id} className={styles.entry} data-from={entry.fromChannel ? 'channel' : 'person'}>
-          <div className={styles.entryHead}><strong>{entry.author}</strong>{entry.sentBy ? <span>sent by {entry.sentBy}</span> : null}<time dateTime={entry.time.toISOString()}>{formatInboxTime(entry.time, timeZone, true)}</time></div>
-          <p>{entry.text || 'No text in this message.'}</p>
-        </li>)}
+        {(thread.kind === 'comment' ? thread.entries.filter(entry => entry.parentId === null) : thread.entries).map(entry => renderEntry(entry))}
       </ol>
       {canResolve ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canResolve} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} /> : null}
       <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} />
