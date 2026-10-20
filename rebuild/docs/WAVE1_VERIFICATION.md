@@ -63,3 +63,8 @@ production build (dev server used); MCP calls with real keys; live Facebook.
   Action column can sit past the scroll edge at narrow desktop widths.
 - Cleanup: Root grant reverted (one installation owner), invitation, email logs,
   test audit rows and nine temporary `app_settings` rows removed; 111 tables.
+- Legacy migration verifier (`scripts/verify-legacy-migration.ts`, Codex) run against
+  the synthetic `_preview` database as both source baseline and target: 602 checks,
+  601 pass; the one failure is `posts.media_reference_present` (4) because the run
+  deliberately used an empty media root, which proves missing restored media is
+  detected. Not yet run against a production-shaped restored copy.
