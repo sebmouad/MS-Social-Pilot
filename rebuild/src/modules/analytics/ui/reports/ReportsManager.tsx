@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatInZone } from './format';
 import { AutoTextarea } from '@/components/AutoTextarea';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
@@ -12,8 +13,8 @@ import type { ReportUiPolicy } from '@/modules/analytics/report-ui-config';
 import styles from './workflows.module.css';
 
 export type TemplateRow = { id: string; name: string; sections: string[]; rangeKey: string; scheduleCount: number };
-export type ScheduleRow = { id: string; channelId: string; channelName: string | null; templateId: string | null; templateName: string | null; frequency: string; recipientCount: number; recipients: string[]; nextRunAt: string; lastOutcome: string };
-export type RunRow = { id: string; channelId: string; kind: string; status: string; periodStart: string; periodEnd: string; startedAt: string; rowCount: number | null; truncated: boolean; note: string | null; deliveries: Array<{ mask: string; status: string }> };
+export type ScheduleRow = { id: string; channelId: string; channelName: string | null; templateId: string | null; templateName: string | null; frequency: string; recipientCount: number; recipients: string[]; nextRunAt: string; nextRunLabel?: string; lastOutcome: string };
+export type RunRow = { id: string; channelId: string; kind: string; status: string; periodStart: string; periodEnd: string; startedAt: string; startedLabel?: string; rowCount: number | null; truncated: boolean; note: string | null; deliveries: Array<{ mask: string; status: string }> };
 export type ReportUiLimits = { nameMax: number; maxRecipients: number; maxRows: number; maxBytes: number };
 
 type TemplateDraft = { name: string; rangeKey: string; sections: string[] };
@@ -32,11 +33,8 @@ const OUTCOME: Record<string, string> = { never: 'Not run yet', generated: 'Last
 const FALLBACK_ERROR = 'The result could not be confirmed. Refresh the page and check the current state before trying again.';
 const safeError = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : FALLBACK_ERROR;
 const safeFilename = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/.test(value);
-const when = (iso: string, timeZone: string) => {
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return 'Time unavailable';
-  try { return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(date); } catch { return 'Time unavailable'; }
-};
+/** Server-formatted label when given (avoids hydration mismatches from differing time-zone data), else format here. */
+const when = (iso: string, timeZone: string, label?: string) => label ?? formatInZone(iso, timeZone);
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 export function ReportsManager({ templates, templateOptions, schedules, runs, canSchedule, canManage, channels, policy, limits, defaultPeriod, timeZone, hasMoreTemplates, hasMoreSchedules, page, runsPage = 1, runsHasMore = false, canGenerate = canSchedule }: {
@@ -236,7 +234,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
       {schedules.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">Scheduled reports</caption><thead><tr><th scope="col">Channel and frequency</th><th scope="col">Report</th><th scope="col">Recipients</th><th scope="col">Next run</th><th scope="col">Last result</th>{canManage && <th scope="col">Actions</th>}</tr></thead><tbody>{schedules.map(row => <tr key={row.id}>
         <th scope="row"><strong>{row.channelName ?? 'Unavailable channel'}</strong><span className={styles.secondaryLine}>{policy.frequencyOptions.find(option => option.id === row.frequency)?.label ?? `Saved frequency (${row.frequency})`}</span></th>
         <td>{row.templateName ?? (row.templateId ? 'Saved template unavailable' : 'All selected sections')}</td><td>{row.recipientCount}{canManage && row.recipients.length > 0 && <span className={styles.secondaryLine}>{row.recipients.join(', ')}</span>}</td>
-        <td>{when(row.nextRunAt, timeZone)}<span className={styles.secondaryLine}>{timeZone}</span></td><td>{OUTCOME[row.lastOutcome] ?? 'Status unavailable'}</td>
+        <td>{when(row.nextRunAt, timeZone, row.nextRunLabel)}<span className={styles.secondaryLine}>{timeZone}</span></td><td>{OUTCOME[row.lastOutcome] ?? 'Status unavailable'}</td>
         {canManage && <td><div className={styles.actions}>{canGenerate && <Button size="sm" variant="secondary" disabled={busy} onClick={() => void prepare(row)}>{busy ? 'Preparing…' : 'Prepare now'}</Button>}<Button size="sm" variant="secondary" disabled={busy} onClick={() => openSchedule(row)}>Edit</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => removeSchedule(row)}>Delete</Button></div></td>}
       </tr>)}</tbody></table></div> : <div className={styles.emptyState}><h3>{page > 1 ? 'No schedules on this page' : 'No scheduled reports'}</h3><p>{page > 1 ? 'Use Previous page to return to saved schedules.' : canSchedule && canManage ? 'Create a schedule to send reports to people who need them.' : canSchedule ? 'No report schedules are set up for channels you can access.' : 'No report schedules are set up for channels you can access.'}</p></div>}
       {prepared && <div className={styles.prepared} role="region" aria-labelledby="prepared-title"><div><h3 id="prepared-title">Report prepared</h3><p>{prepared.rowCount} rows · {prepared.bytes.toLocaleString('en')} bytes{prepared.truncated ? ' · Shortened to fit the configured limit' : ''}</p>{prepared.notIncluded.length > 0 && <p>Not included yet: {prepared.notIncluded.map(section => sectionLabels.get(section) ?? 'Some sections').join(', ')}.</p>}</div><div className={styles.actions}><Button size="sm" onClick={() => download('csv')}>Download CSV</Button>{prepared.json !== null && <Button size="sm" variant="secondary" onClick={() => download('json')}>Download JSON</Button>}<Button size="sm" variant="secondary" onClick={() => download('html')}>Download printable page</Button></div></div>}
@@ -247,7 +245,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
       {!canGenerate && <p className={styles.info} role="status">Report preparation and history are temporarily unavailable. Existing templates and schedules remain available.</p>}
       {runs.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">Report history</caption><thead><tr><th scope="col">Result</th><th scope="col">Channel and period</th><th scope="col">Started</th><th scope="col">Rows</th><th scope="col">Delivery</th></tr></thead><tbody>{runs.map(run => <tr key={run.id}>
         <th scope="row">{runStatus(run)}<span className={styles.secondaryLine}>{run.kind === 'manual' ? 'Prepared for download' : 'Scheduled email'}</span></th>
-        <td>{channels.find(channel => channel.id === run.channelId)?.name ?? 'Channel unavailable'}<span className={styles.secondaryLine}>{run.periodStart} to {run.periodEnd}</span></td><td>{when(run.startedAt, timeZone)}<span className={styles.secondaryLine}>{timeZone}</span></td><td>{run.rowCount === null ? '—' : run.rowCount}{run.truncated ? ' · shortened' : ''}{run.note ? <span className={styles.secondaryLine}>{run.note}</span> : null}</td><td>{run.deliveries.length ? run.deliveries.map((delivery, index) => <span className={styles.deliveryLine} key={`${delivery.mask}-${index}`}>{delivery.mask} · {DELIVERY[delivery.status] ?? 'status unavailable'}</span>) : run.kind === 'manual' && run.status === 'completed' ? 'Download prepared' : 'No recipient details'}</td>
+        <td>{channels.find(channel => channel.id === run.channelId)?.name ?? 'Channel unavailable'}<span className={styles.secondaryLine}>{run.periodStart} to {run.periodEnd}</span></td><td>{when(run.startedAt, timeZone, run.startedLabel)}<span className={styles.secondaryLine}>{timeZone}</span></td><td>{run.rowCount === null ? '—' : run.rowCount}{run.truncated ? ' · shortened' : ''}{run.note ? <span className={styles.secondaryLine}>{run.note}</span> : null}</td><td>{run.deliveries.length ? run.deliveries.map((delivery, index) => <span className={styles.deliveryLine} key={`${delivery.mask}-${index}`}>{delivery.mask} · {DELIVERY[delivery.status] ?? 'status unavailable'}</span>) : run.kind === 'manual' && run.status === 'completed' ? 'Download prepared' : 'No recipient details'}</td>
       </tr>)}</tbody></table></div> : <div className={styles.emptyState}><h3>{runsPage > 1 ? 'No runs on this page' : 'No report runs yet'}</h3><p>{runsPage > 1 ? 'Use Previous history page to return to report history.' : 'Prepared downloads and scheduled deliveries will appear here after the first report runs.'}</p></div>}
     </section>
 

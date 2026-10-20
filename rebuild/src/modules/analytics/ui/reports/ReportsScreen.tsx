@@ -1,4 +1,5 @@
 import { PageFrame } from '@/server/PageFrame';
+import { formatInZone } from './format';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { canAccessFeature } from '@/server/permissions';
@@ -66,7 +67,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       defaultPeriod={data.defaultPeriod}
       timeZone={viewer.membership.workspace.timezone} channels={data.channels} templateOptions={data.templateOptions} hasMoreTemplates={data.templates.hasMore} hasMoreSchedules={data.schedules.hasMore}
       templates={data.templates.templates.map(t => ({ id: t.id, name: t.name, sections: t.sections, rangeKey: t.rangeKey, scheduleCount: t.scheduleCount }))}
-      schedules={data.schedules.schedules.map(s => ({ id: s.id, channelId: s.channelId, channelName: s.channelName, templateId: s.templateId, templateName: s.templateName, frequency: s.frequency, recipientCount: s.recipientCount, recipients: s.recipients, nextRunAt: s.nextRunAt.toISOString(), lastOutcome: s.lastOutcome }))}
-      runs={data.runs.runs.map(r => ({ id: r.id, channelId: r.channelId, kind: r.kind, status: r.status, periodStart: r.periodStart, periodEnd: r.periodEnd, startedAt: r.startedAt.toISOString(), rowCount: r.rowCount, truncated: r.truncated, note: reportFailureText(r.failureReason), deliveries: r.deliveries.map(d => ({ mask: d.mask, status: d.status })) }))} />}
+      schedules={data.schedules.schedules.map(s => ({ id: s.id, channelId: s.channelId, channelName: s.channelName, templateId: s.templateId, templateName: s.templateName, frequency: s.frequency, recipientCount: s.recipientCount, recipients: s.recipients, nextRunAt: s.nextRunAt.toISOString(), nextRunLabel: formatInZone(s.nextRunAt.toISOString(), viewer.membership.workspace.timezone), lastOutcome: s.lastOutcome }))}
+      runs={data.runs.runs.map(r => ({ id: r.id, channelId: r.channelId, kind: r.kind, status: r.status, periodStart: r.periodStart, periodEnd: r.periodEnd, startedAt: r.startedAt.toISOString(), startedLabel: formatInZone(r.startedAt.toISOString(), viewer.membership.workspace.timezone), rowCount: r.rowCount, truncated: r.truncated, note: reportFailureText(r.failureReason), deliveries: r.deliveries.map(d => ({ mask: d.mask, status: d.status })) }))} />}
   </div></PageFrame>;
 }

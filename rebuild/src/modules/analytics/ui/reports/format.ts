@@ -13,3 +13,12 @@ export function formatWhen(value: Date | null | undefined): string {
   return value ? new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(value) + ' UTC' : 'Never';
 }
 export const searchOf = (params: Record<string, string | string[] | undefined>): Record<string, unknown> => params as Record<string, unknown>;
+/**
+ * A date and time in a named zone, e.g. "Dec 3, 2026, 8:54 AM". Format on the server and pass the text to client
+ * components: Node and browsers can carry different time-zone data, so formatting the same instant twice can disagree.
+ */
+export function formatInZone(iso: string, timeZone: string): string {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return 'Time unavailable';
+  try { return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(date); } catch { return 'Time unavailable'; }
+}
