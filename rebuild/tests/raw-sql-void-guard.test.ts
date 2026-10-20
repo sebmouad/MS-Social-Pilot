@@ -20,8 +20,10 @@ describe('raw SQL void selects', () => {
     for (const file of files('src')) {
       const text = readFileSync(file, 'utf8');
       for (const match of text.matchAll(/\$queryRaw(?:<[^`]*>)?`\s*SELECT\s+(pg_advisory_xact_lock|pg_advisory_lock|pg_notify|pg_sleep)\(/g)) {
-        const rest = text.slice(match.index!, text.indexOf('`', match.index! + match[0].length));
-        if (!/\)\s*::\s*\w+/.test(rest)) offenders.push(`${file}: ${match[1]}`);
+        // The statement can nest template strings inside ${...}, so read to the end of the line.
+        const end = text.indexOf('\n', match.index!);
+        const rest = text.slice(match.index!, end < 0 ? undefined : end);
+        if (!/\)\s*::\s*\w+\s*`/.test(rest)) offenders.push(`${file}: ${match[1]}`);
       }
     }
     expect(offenders).toEqual([]);
