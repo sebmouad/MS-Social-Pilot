@@ -1,4 +1,5 @@
 import { CHANNEL_PROFILES_MCP } from './channel-profiles/mcp';
+import { WATERMARK_MCP } from './watermark/mcp';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { canUseFeature, entitledPlatformIds, requireFeature } from '@/server/entitlements';
@@ -19,6 +20,7 @@ import { connectionDirectoryFeatures, connectionDirectoryToolDefinitions, connec
 export const SETTINGS_MCP: readonly McpToolGroup[] = [
   WORKSPACE_EXPORT_MCP,
   CHANNEL_PROFILES_MCP,
+  WATERMARK_MCP,
   {
     id: 'settings-team',
     tools: teamToolDefinitions,

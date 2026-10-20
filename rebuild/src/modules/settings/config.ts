@@ -1,4 +1,5 @@
 import { CHANNEL_PROFILES_CONFIG } from './channel-profiles/config';
+import { WATERMARK_CONFIG } from './watermark/config';
 import { z } from 'zod';
 import { SETTINGS_INVITATION_CONFIG } from './invitations-config';
 import { SETTINGS_WORKSPACE_CONFIG } from './workspace-policy-config';
@@ -25,6 +26,7 @@ export const SETTINGS_MODULE_CONFIG = [
   entry({ key: 'data.exportSchedule', group: 'Data controls', label: 'Export worker schedule', kind: 'text', description: 'Five-field cron schedule for archive builds and expired file cleanup.', defaultValue: '* * * * *', schema: cron, consumption: 'active' }),
   ...SETTINGS_CONFIG,
   ...CHANNEL_PROFILES_CONFIG,
+  ...WATERMARK_CONFIG,
   ...SETTINGS_INVITATION_CONFIG,
   ...SETTINGS_WORKSPACE_CONFIG,
   ...ACCOUNT_RECOVERY_CONFIG,
