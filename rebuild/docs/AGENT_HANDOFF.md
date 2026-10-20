@@ -775,7 +775,7 @@ Wave 1 verification evidence: WAVE1_VERIFICATION.md (Session A, `215960db`).
 Business-hours response time is in the Reports Response time section (REPORT_WORKFLOWS.md).
 
 REST v1 posts plus all six webhook events (`12260e3d`) and OAuth connectors for MCP
-clients are on main; registry 87. OAuth migration
+clients are on main; registry 88 (87 for OAuth keys, 88 for inbox.moderationAuto*). OAuth migration
 `20261026100000_rebuild_oauth_connectors` (two additive tables) is NOT applied to
 any database or pinned in cutover-rehearsal.sh: apply only after the documented
 backup/scratch-restore check. OAuth is off until Root sets
