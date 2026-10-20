@@ -1516,3 +1516,14 @@ and aggregator carry an optional history field. No new Root keys or migration.
 See [module notes](../src/modules/analytics/demographics/README.md). Synthetic
 unit/render evidence only; browser, real database/provider and release verification
 remain open. This does not complete the other Analytics parity gaps.
+
+
+## Channel organization slice (2026-10-20)
+
+Settings owns channel-group CRUD and channel labels with current authorization,
+selected-resource locks and atomic workspace audit. UI, HTTP and MCP share one
+service; composer, Posts filters and Analytics overview reuse scoped groups and
+labels. See [CHANNEL_PROFILES.md](CHANNEL_PROFILES.md) for limits, migration, evidence and open work.
+The additive migration is unapplied; database/browser verification, broader
+profile/filter parity, watermarking and new-label export coverage remain open.
+This branch is local only; no push or deployment was authorized.

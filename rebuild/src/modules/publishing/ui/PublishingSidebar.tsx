@@ -1,12 +1,13 @@
 "use client";
 
+import type { ChannelGroup } from '@/modules/settings/channel-profiles/contracts';
 import { usePathname } from "next/navigation";
 import { PostFilters } from "./posts/PostFilters";
 import { CalendarFilters } from "./calendar/CalendarFilters";
 import { SavedViews } from "./SavedViews";
 
 /** Chooses the sidebar controls for the current publishing page. */
-export function PublishingSidebar({ channels, today, searchMaxCharacters, exportMaxPosts, exportMaxBytes }: { channels: Array<{ id: string; name: string }>; today: string; searchMaxCharacters: number; exportMaxPosts: number; exportMaxBytes: number }) {
+export function PublishingSidebar({ groups, locale, channels, today, searchMaxCharacters, exportMaxPosts, exportMaxBytes }: { groups?: ChannelGroup[]; locale?: 'en' | 'fr'; channels: Array<{ id: string; name: string }>; today: string; searchMaxCharacters: number; exportMaxPosts: number; exportMaxBytes: number }) {
   const pathname = usePathname();
   return pathname.startsWith("/publishing/collaboration")
     ? <div aria-label="Organization tools"><p className="shell-subnav__label">Organize</p><p className="help">Manage labels, custom fields and team notes.</p></div>
@@ -16,5 +17,5 @@ export function PublishingSidebar({ channels, today, searchMaxCharacters, export
     ? <div aria-label="Template tools"><p className="shell-subnav__label">Templates</p><p className="help">Search workspace templates or create a reusable post message from here.</p></div>
     : pathname === "/publishing/calendar"
     ? <><CalendarFilters channels={channels} today={today} /><SavedViews screen="calendar" /></>
-    : <><PostFilters channels={channels} currentMonth={today.slice(0, 7)} searchMaxCharacters={searchMaxCharacters} exportMaxPosts={exportMaxPosts} exportMaxBytes={exportMaxBytes} />{pathname === "/publishing/posts" ? <SavedViews screen="posts" /> : null}</>;
+    : <><PostFilters groups={groups} locale={locale} channels={channels} currentMonth={today.slice(0, 7)} searchMaxCharacters={searchMaxCharacters} exportMaxPosts={exportMaxPosts} exportMaxBytes={exportMaxBytes} />{pathname === "/publishing/posts" ? <SavedViews screen="posts" /> : null}</>;
 }

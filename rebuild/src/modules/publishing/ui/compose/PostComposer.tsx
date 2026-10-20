@@ -1,4 +1,6 @@
 'use client';
+import { GroupShortcut } from '@/modules/settings/ui/profiles/GroupShortcut';
+import { profileChannelName, type ProfileDirectory } from '@/modules/settings/channel-profiles/contracts';
 
 import { usePreserveFormState } from '@/components/usePreserveFormState';
 import { AutoTextarea } from '@/components/AutoTextarea';
@@ -113,7 +115,7 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items);
 }
 
-export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false }: { queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
+export function PostComposer({ profiles, targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false }: { profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -340,9 +342,10 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
         </section>}
         <fieldset className={styles.destinationList} disabled={pending || uploading || saved}>
           <legend>Destinations</legend>
+          {profiles && <GroupShortcut groups={profiles.groups} allowedIds={targets.filter(target => target.canPublish).map(target => target.id)} onSelect={setSelectedTargets} locale={aiLocale} disabled={pending || uploading || saved} />}
           {targets.filter(target => target.canPublish).length ? targets.filter(target => target.canPublish).map(target => <label key={target.id}>
             <input form={FORM_ID} type="checkbox" name="targetIds" value={target.id} checked={selectedTargets.includes(target.id)} onChange={event => { const checked = event.currentTarget.checked; setSelectedTargets(current => checked ? [...current, target.id] : current.filter(id => id !== target.id)); }} />
-            <span>{target.name}</span>
+            <span>{profiles?.channels.find(channel => channel.id === target.id) ? profileChannelName(profiles.channels.find(channel => channel.id === target.id)!) : target.name}</span>
           </label>) : <p>No destinations are ready to publish right now.</p>}
           <small>Drafts can be saved without a destination. Scheduling needs at least one.</small>
           {crowded && <p className={styles.spacingWarning} role="status">{workspaceOperationsCopy.en.spacingWarning.replace('{minutes}', String(spacingGapMinutes))}</p>}

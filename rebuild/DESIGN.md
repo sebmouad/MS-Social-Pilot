@@ -189,3 +189,11 @@ comment; channel/format choices remain docked in the contextual sidebar. Saved
 delivery timing and early-send confirmation use existing status/dialog patterns,
 including Cancel-first focus, Escape and opener restoration. Four-theme desktop/
 phone probe evidence is scoped in docs/FIRST_COMMENT_SCHEDULING.md.
+
+Channel organization (2026-10-20) reuses Settings panels, shared `.ui-field` /
+`.ui-input`, Button and `useConfirm`; it adds no palette or navigation system.
+The compact group/label forms retain values after failed or unconfirmed writes.
+Group shortcuts live beside the current channel controls in the existing sidebar
+and composer. Profile labels are text beside channel names, independent of post
+labels. English/French strings follow request language. Browser/theme/viewport
+verification remains open; DOM interaction evidence is in CHANNEL_PROFILES.md.

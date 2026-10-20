@@ -1,3 +1,5 @@
+import { headers } from 'next/headers';
+import { profileCopy } from '../../channel-profiles/copy';
 import { entitledPlatformIds } from '@/server/entitlements';
 import type { Metadata } from 'next';
 import { PageFrame } from '@/server/PageFrame';
@@ -34,6 +36,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
 
   return <PageFrame module="settings"><SettingsPage active="settings/connections" title="Connections" description="Choose which discovered channels and advertising accounts this workspace uses.">
+    <a href="/settings/profiles">{profileCopy[/^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en'].title}</a>
     <ConnectionManager statusLabels={statusLabels} sources={accounts} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
     {params.notice === 'connected_partial' && <p className={styles['settings-note']} role="status">Connected. Newly discovered channels and ad accounts are ready for selection. Items already linked to another profile were left unchanged.</p>}
     {params.notice === 'connected' && <p className={styles['settings-note']} role="status">Connected. Discovered channels and ad accounts are ready for your selection.</p>}

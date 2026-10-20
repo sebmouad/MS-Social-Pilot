@@ -1,0 +1,7 @@
+.stack { display: grid; gap: 1rem; min-width: 0; }
+.groups { display: grid; gap: 1rem; padding: 0; list-style: none; overflow-wrap: anywhere; }
+.groups li { padding-block: 1rem; border-bottom: 1px solid var(--line); }
+.actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+.check { display: flex; gap: .75rem; align-items: center; min-height: 44px; cursor: pointer; }
+.labelRow { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; }
+.labelRow label { flex: 1; min-width: min(100%, 14rem); }

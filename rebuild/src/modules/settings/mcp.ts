@@ -1,3 +1,4 @@
+import { CHANNEL_PROFILES_MCP } from './channel-profiles/mcp';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { canUseFeature, entitledPlatformIds, requireFeature } from '@/server/entitlements';
@@ -17,6 +18,7 @@ import { connectionDirectoryFeatures, connectionDirectoryToolDefinitions, connec
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
 export const SETTINGS_MCP: readonly McpToolGroup[] = [
   WORKSPACE_EXPORT_MCP,
+  CHANNEL_PROFILES_MCP,
   {
     id: 'settings-team',
     tools: teamToolDefinitions,

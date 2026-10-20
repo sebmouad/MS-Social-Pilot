@@ -1,3 +1,7 @@
+import { headers } from 'next/headers';
+import { readChannelProfiles } from '@/modules/settings/channel-profiles/service';
+import { profileChannelName, type ProfileDirectory } from '@/modules/settings/channel-profiles/contracts';
+import { GroupShortcut } from '@/modules/settings/ui/profiles/GroupShortcut';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { canUseFeature } from '@/server/entitlements';
@@ -57,7 +61,7 @@ function Pagination({ query, parameter, page, pages, label }: { query: string; p
   </nav>;
 }
 
-function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHref }: { data: AnalyticsReadResult; query: string; exportHref?: string; connectionsHref?: string; explorerHref?: string }) {
+function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHref, profiles, locale }: { profiles?: ProfileDirectory; locale: 'en' | 'fr'; data: AnalyticsReadResult; query: string; exportHref?: string; connectionsHref?: string; explorerHref?: string }) {
   const params = new URLSearchParams(query);
   const selectedChannels = new Set(data.selected.channelIds);
   const selectedAccounts = new Set(data.selected.adAccountIds);
@@ -82,9 +86,10 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHr
       </label>
       <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">Channels</legend>
         {freshPage('filter')}
+        {profiles && <GroupShortcut groups={profiles.groups} allowedIds={data.options.channels.map(channel => channel.id)} locale={locale} />}
         {data.options.channels.length ? data.options.channels.map(channel => <label key={channel.id}>
           <input type="checkbox" name="channel" value={channel.id} defaultChecked={selectedChannels.has(channel.id)} />
-          <span>{channel.name}</span>
+          <span>{profiles?.channels.find(profile => profile.id === channel.id) ? profileChannelName(profiles.channels.find(profile => profile.id === channel.id)!) : channel.name}</span>
         </label>) : <p className="small-note">No channels available.</p>}
       </fieldset>
       <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">Ad accounts</legend>
@@ -184,6 +189,8 @@ function audienceSection(data: AnalyticsReadResult) {
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const viewer = await requireViewer({ feature: 'analytics/overview', channelScoped: true });
   const params = await searchParams;
+  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
+  const profiles = await readChannelProfiles({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, 'analytics/overview').catch(() => undefined);
   let data: AnalyticsReadResult | null = null;
   let failure: ReturnType<typeof operationFailure> | null = null;
   try {
@@ -208,7 +215,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const retryQuery = rawQuery(params);
   const retryHref = `/analytics${retryQuery ? `?${retryQuery}` : ''}`;
 
-  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length && !data.options.adAccounts.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar retryHref={retryHref} /> : undefined}>
+  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length && !data.options.adAccounts.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar retryHref={retryHref} /> : undefined}>
     <div className="page-stack">
       <header className="page-heading"><div><p className="eyebrow">Analytics</p><h1>Performance</h1>
         {data && <><p title="These are inclusive stored calendar-date boundaries in UTC.">Stored calendar dates (UTC): {formatDay(data.period.start)} to {formatDay(data.period.end)}.</p>

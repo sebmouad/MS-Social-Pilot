@@ -1,3 +1,4 @@
+vi.mock('@/modules/settings/channel-profiles/service', () => ({ readChannelProfiles: async () => ({ channels: [], groups: [] }) }));
 import { describe, expect, it, vi } from 'vitest';
 import { isValidElement, type ReactNode } from 'react';
 

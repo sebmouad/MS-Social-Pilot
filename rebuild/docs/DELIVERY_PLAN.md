@@ -442,3 +442,14 @@ UI/HTTP/MCP and CSV are implemented with synthetic unit/render checks. Review
 `modules/analytics/demographics/README.md`; verify actual PostgreSQL and browser
 history/export across themes and widths before claiming runtime parity. No
 migration or new Root keys; no production/provider verification in this batch.
+
+
+## Channel profiles verification (2026-10-20)
+
+Settings owns channel-group CRUD and channel labels with current authorization,
+selected-resource locks and atomic workspace audit. UI, HTTP and MCP share one
+service; composer, Posts filters and Analytics overview reuse scoped groups and
+labels. See [CHANNEL_PROFILES.md](CHANNEL_PROFILES.md) for limits, migration, evidence and open work.
+The additive migration is unapplied; database/browser verification, broader
+profile/filter parity, watermarking and new-label export coverage remain open.
+This branch is local only; no push or deployment was authorized.

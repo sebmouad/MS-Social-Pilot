@@ -1,3 +1,4 @@
+import { readChannelProfiles } from '@/modules/settings/channel-profiles/service';
 import { headers } from 'next/headers';
 import { requireViewer } from '@/server/context';
 import { runtimeConfig } from '@/server/config/store';
@@ -31,6 +32,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   // Suggestion-only writing help; the status is empty (and the control hidden) when unavailable.
   const aiLocale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' as const : 'en' as const;
   const aiAssist = canCreate ? await aiStatus({ userId: viewer.user.id, workspaceId: viewer.workspaceId }).catch(() => undefined) : undefined;
+  const profiles = await readChannelProfiles({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, 'publishing/posts').catch(() => null);
   const createdAt = new Date();
   const schedule = {
     date: params.date && isDateKey(params.date) ? params.date : '',
@@ -39,7 +41,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   };
   return <>
     <PageHeading title="Create a post" description="Choose destinations, write your post, then save a draft or schedule it." />
-    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={aiLocale} targets={choices} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
+    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer profiles={profiles ?? undefined} queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={aiLocale} targets={choices} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
       : <section className={styles.card}><p>You do not have permission to create posts in this workspace.</p></section>}
   </>;
 }

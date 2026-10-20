@@ -1,5 +1,7 @@
 'use client';
 
+import type { ChannelGroup } from '@/modules/settings/channel-profiles/contracts';
+import { profileCopy } from '@/modules/settings/channel-profiles/copy';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { PublishingChannelOptions } from '@/modules/publishing/ui/PublishingChannelOptions';
 import styles from '@/modules/publishing/ui/publishing.module.css';
@@ -16,7 +18,7 @@ export function parsePostView(value: string | null | undefined): PostView {
   return value === 'feed' || value === 'cards' ? value : 'table';
 }
 
-export function PostFilters({ channels, currentMonth, searchMaxCharacters, exportMaxPosts, exportMaxBytes }: { channels: Array<{ id: string; name: string }>; currentMonth: string; searchMaxCharacters?: number; exportMaxPosts?: number; exportMaxBytes?: number }) {
+export function PostFilters({ groups = [], locale = 'en', channels, currentMonth, searchMaxCharacters, exportMaxPosts, exportMaxBytes }: { groups?: ChannelGroup[]; locale?: 'en' | 'fr'; channels: Array<{ id: string; name: string }>; currentMonth: string; searchMaxCharacters?: number; exportMaxPosts?: number; exportMaxBytes?: number }) {
   const pathname = usePathname();
   const params = useSearchParams();
   if (pathname === '/publishing/calendar') return <form noValidate action="/publishing/calendar" method="get" className={styles.postFilters} key={params.toString()}>
@@ -42,7 +44,8 @@ export function PostFilters({ channels, currentMonth, searchMaxCharacters, expor
     </select>
     <label htmlFor="post-channel-filter">Channel</label>
     <select id="post-channel-filter" name="channel" defaultValue={params.get('channel') ?? ''}>
-      <PublishingChannelOptions channels={channels} selected={params.get("channel")} />
+      <PublishingChannelOptions channels={channels} selected={params.get("channel")} groupIds={groups.map(group => group.id)} />
+      {groups.length > 0 && <optgroup label={profileCopy[locale].groups}>{groups.filter(group => group.channelIds.some(id => channels.some(channel => channel.id === id))).map(group => <option key={group.id} value={`channel-group:${group.id}`}>{group.name}</option>)}</optgroup>}
     </select>
     <label htmlFor="post-search-filter">Search posts</label>
     <input id="post-search-filter" type="search" name="q" maxLength={searchMaxCharacters} defaultValue={params.get('q') ?? ''} placeholder="Post text or first comment" aria-describedby="post-search-help" />

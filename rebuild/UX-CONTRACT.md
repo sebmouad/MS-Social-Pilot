@@ -510,3 +510,14 @@ and UTC as-of time; fetch time, original categories and within-snapshot shares
 appear inside. Missing values read Not available / Non disponible. English and
 French copy, failure filter retention and server rendering have synthetic tests;
 actual browser/theme/viewport and download interaction checks remain open.
+
+
+## Channel groups and profile labels (2026-10-20)
+
+Settings owns channel-group CRUD and channel labels with current authorization,
+selected-resource locks and atomic workspace audit. UI, HTTP and MCP share one
+service; composer, Posts filters and Analytics overview reuse scoped groups and
+labels. See [CHANNEL_PROFILES.md](docs/CHANNEL_PROFILES.md) for limits, migration, evidence and open work.
+The additive migration is unapplied; database/browser verification, broader
+profile/filter parity, watermarking and new-label export coverage remain open.
+This branch is local only; no push or deployment was authorized.

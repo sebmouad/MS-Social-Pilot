@@ -30,3 +30,8 @@ Continue from [DELIVERY_PLAN.md](DELIVERY_PLAN.md) and
 
 Reports batch82 is verified local progress, not achievement of this full goal.
 See REPORT_WORKFLOWS.md and the current handoff for evidence and next work.
+
+Channel organization continuation (2026-10-20): selected-channel groups and
+per-channel profile labels have a local implementation on `codex/page-profiles`.
+This does not close Settings parity or change the overall goal. See
+[CHANNEL_PROFILES.md](CHANNEL_PROFILES.md) for migration and verification gaps.

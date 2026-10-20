@@ -847,3 +847,22 @@ Full suite attempted but interrupted: missing DATABASE_URL, loopback listener
 failures and stale module-manifests Analytics route expectation (`/analytics/posts`
 exists but the assertion omits it). The manifest failure reproduces alone; its
 source and manifest are unchanged by this batch. No full-suite pass claimed.
+
+
+## Channel profiles branch handoff (2026-10-20)
+
+Settings owns channel-group CRUD and channel labels with current authorization,
+selected-resource locks and atomic workspace audit. UI, HTTP and MCP share one
+service; composer, Posts filters and Analytics overview reuse scoped groups and
+labels. See [CHANNEL_PROFILES.md](CHANNEL_PROFILES.md) for limits, migration, evidence and open work.
+The additive migration is unapplied; database/browser verification, broader
+profile/filter parity, watermarking and new-label export coverage remain open.
+This branch is local only; no push or deployment was authorized.
+
+Commit blocked in this session: `git add` cannot create
+`/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/.git/worktrees/msp-pageprofiles/index.lock`
+(`Operation not permitted`). Git metadata is outside the permitted writable
+roots and permission escalation is disabled. All verified source changes remain
+uncommitted on `codex/page-profiles`; no push/deployment occurred. Commit from an
+environment allowed to write the shared worktree metadata. Do not discard the
+worktree changes or include the pre-existing untracked root `node_modules` link.

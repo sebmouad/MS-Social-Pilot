@@ -1,3 +1,4 @@
+import { readChannelProfiles } from '@/modules/settings/channel-profiles/service';
 import { PostStatus, type Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
@@ -55,16 +56,21 @@ export async function publishingPostReadQuery(
   const access = await authorizePublishing(actor, feature, 'read');
   const targetIds = await selectedPublishingTargetIds(actor.workspaceId, access.entitlements, access.actor.allowedTargetIds);
   const authorId = access.actor.allowedTargetIds === undefined ? undefined : actor.userId;
+  let filterIds = channelId ? [channelId] : undefined;
+  if (channelId?.startsWith('channel-group:')) {
+    const profiles = await readChannelProfiles({ userId: actor.userId, workspaceId: actor.workspaceId, allowedChannelIds: targetIds }, 'publishing/posts');
+    filterIds = profiles.groups.find(group => group.id === channelId.slice('channel-group:'.length))?.channelIds ?? [];
+  }
   const where: Prisma.PostWhereInput = { AND: [
     publishingPostVisibilityWhere(actor.workspaceId, targetIds, authorId),
     ...(postStatus ? [{ status: postStatus } as Prisma.PostWhereInput] : []),
-    ...(channelId ? [{ targets: { some: { targetId: channelId } } } as Prisma.PostWhereInput] : []),
+    ...(filterIds ? [{ targets: { some: { targetId: channelId?.startsWith('channel-group:') ? { in: filterIds } : channelId } } } as Prisma.PostWhereInput] : []),
     ...(q ? [publishingPostSearchWhere(q)] : []),
   ] };
   return {
     where,
     filters: { ...(postStatus ? { status: postStatus } : {}), ...(channelId ? { channelId } : {}), q },
-    channelUnavailable: Boolean(channelId && !targetIds.includes(channelId)),
+    channelUnavailable: Boolean(channelId && !filterIds?.some(id => targetIds.includes(id))),
     scope: { targetIds, ...(authorId ? { authorId } : {}) },
   };
 }
