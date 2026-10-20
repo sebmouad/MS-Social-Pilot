@@ -1,3 +1,5 @@
+import { CONFIG_BY_KEY } from '@/lib/config/registry';
+import { redact } from '@/server/root/legacy/authz';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
@@ -265,6 +267,13 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
   return result;
 }
 
+/** Operator log line for a failed sync item: target id and redacted reason, never credentials. */
+async function logItemFailure(job: string, targetId: string, error: unknown) {
+  const max = await runtimeConfig('logging.errorDetailMaxCharacters').catch(() => null) as number | null;
+  const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  console.warn(`[${job}] target=${targetId} failed: ${redact(reason, max ?? Number(CONFIG_BY_KEY.get('logging.errorDetailMaxCharacters')?.defaultValue))}`);
+}
+
 /** Sync conversations/messages and post comments through the Facebook platform engine. */
 export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
   if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
@@ -332,7 +341,10 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
         });
       });
       result.updated += targetUpdated;
-    } catch (error) { if (isAccessDenied(error)) result.skipped++; else result.failed++; }
+    } catch (error) {
+      if (isAccessDenied(error)) result.skipped++;
+      else { result.failed++; await logItemFailure('inbox', target.id, error); }
+    }
   }
   return result;
 }
