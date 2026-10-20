@@ -104,6 +104,8 @@ export interface PublishResult {
 export interface FirstCommentRequest {
   credential: PlatformCredential;
   remotePostId: string;
+  /** Format intent of the destination being commented on; modules refuse formats that declare no first comment. */
+  formatId?: string;
   text: string;
   signal?: AbortSignal;
 }
@@ -118,7 +120,13 @@ export interface RemoteStatusRequest {
 export type RemoteStatus =
   | { state: 'unknown'; publishedAt?: Date | null }
   | { state: 'published' | 'scheduled'; remoteId: string; targetId: string; publishedAt?: Date | null };
-export interface RemoteDeleteRequest { credential: PlatformCredential; remoteId: string; signal?: AbortSignal }
+export interface RemoteDeleteRequest {
+  credential: PlatformCredential;
+  remoteId: string;
+  /** Format intent of the destination being deleted; modules refuse formats that declare no remote delete. */
+  formatId?: string;
+  signal?: AbortSignal;
+}
 export interface InboxRequest { credential: PlatformCredential; targetId: string }
 export interface InboxCommentsRequest extends InboxRequest { remotePostId: string }
 export interface InboxItem {

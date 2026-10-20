@@ -302,3 +302,39 @@ shared stored-video resolution (still images only) so stored Reel/Story video by
 reach the adapter; no UI/HTTP/MCP entry sets `nativeSchedule`; the shared comment and
 delete requests should carry the format id so Reel-specific handling is possible;
 cleaned live coverage for every native format.
+
+
+## Batch98: format-aware comment and delete (private, default off)
+
+Mocked transport only; nothing here is verified against live Graph.
+
+- **Neutral request field.** `FirstCommentRequest` and `RemoteDeleteRequest` in
+  `platforms/types.ts` gain an optional `formatId` (additive; shared callers that do
+  not send it behave exactly as before).
+- **Facebook gating** (`platforms/facebook/publishing.ts`, `assertFormatSupportsOperation`):
+  feed (`post`), `video` and `reel` pass; `story_photo`/`story_video` and any unknown id
+  are refused before credentials or transport (a Story declares neither operation and an
+  unknown id never falls back to feed). A native **comment** also needs the private
+  switch. Native **deletion** of an existing `video`/`reel` stays possible with the
+  switch off so published content can still be removed; Stories never.
+- **Deletion evidence.** `remoteId` must match the Graph id shape (no path/query
+  characters, at most 128 characters). A deletion resolves only when Facebook answers
+  an object with boolean `success: true`; `"true"`, `false`, an empty object, an array or
+  any other body throws, so the shared durable deletion journal records it as uncertain
+  and never resends. Graph100/sub33 is still not evidence of absence or deletion.
+- **Composer exposure.** The catalog needed no new code: `video`, `reel`, `story_photo`
+  and `story_video` already reach the neutral `availablePublishingFormats` projection
+  (and so composer, MCP and API) only while `facebook.native.publishingEnabled` is on;
+  a test now pins the five ids with the switch on and one with it off, and that Stories
+  declare no first comment or remote delete.
+
+Root keys: none new. Migration: none.
+
+Still open: the shared callers must send the format. `modules/publishing/server/deletion.ts`
+(`adapter.deleteRemote({ credential, remoteId, signal })`) and
+`modules/publishing/server/first-comment.ts` (`adapter.publishFirstComment({ ... })`,
+where `selectedFormat` is already resolved) need `formatId` passed through; until then
+Facebook sees `undefined` and treats the call as feed, which is the previous behavior.
+Shared stored-video resolution, `nativeSchedule` entry points, applying and rehearsing
+migration `20261030100000`, PostgreSQL Story proof tests and cleaned live coverage for
+every native format also remain open.
