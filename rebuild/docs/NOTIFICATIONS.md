@@ -39,3 +39,56 @@ This is not a production-shaped migration or rollback rehearsal.
 
 Production remains legacy. No external email or provider publication was used
 by this synthetic notification verifier.
+
+## Legacy alert comparison and personal preferences (2026-10-20)
+
+This branch adds personal preference persistence, HTTP/MCP schema coverage and
+English/French controls for the remaining legacy workspace switches. All writes
+use the existing current-authority transaction, personal/workspace scope and audit.
+The hourly inbox digest remains opt-in. Its cursor resets only when that switch
+actually changes, not when an unrelated preference is edited. Existing queue mutes
+remain unchanged. These preferences do **not** enable additional delivery yet;
+the UI states that limitation.
+
+| Legacy producer (`src/lib/email/notify.ts`) | Personal switch | Durable rebuild production/delivery |
+| --- | --- | --- |
+| Publication failure; connection expired | onPublishFailure | Open |
+| Token approaching expiry | onTokenExpiry | Open |
+| Approval request | onApprovalRequest | Open |
+| Approval decision (author only) | onApprovalDecision | Open |
+| Hourly inbox digest | onNewInbox (default off) | Open |
+| Empty queue transition | onQueueEmpty | Open |
+| Draft updated (author only) | onDraftUpdated | Open |
+| Moderation match; negative comment spike | onModerationAlert | Open |
+| Internal note mention | onNoteMention | Existing durable intent/email |
+| Content mix dry | onQueueEmpty | Existing durable intent/email |
+
+Root installation incidents in `src/lib/system-alerts.ts` (worker, publication
+failure aggregate, disconnected/expiring accounts, disk, backups and provider
+usage) are a distinct private operator workflow. They must not be exposed as
+ordinary member notifications or leak installation diagnostics into a workspace.
+
+### Integration blocker outside this branch's file ownership
+
+`prisma/migrations/20261018150000_rebuild_notifications/migration.sql` defines
+both a kind allowlist CHECK (only `note_mention`, `mix_dry`) and a context-shape
+CHECK restricted to those kinds. New event types cannot be inserted by changing
+TypeScript alone. Do not overload existing kinds or bypass these constraints.
+An additive migration must expand both constraints, define durable context
+references for connection/inbox incidents, and preserve current tenant/resource
+checks. No migration was written or applied in this branch.
+
+The subsequent integration batch must connect transaction-bound producers in
+Publishing, Inbox and connection lifecycle services; extend enqueue validation,
+resource locks, recipient eligibility and localized event/mail copy; resolve
+recipients with current role/feature/resource access; apply the corresponding
+personal switch and channel mute; and keep the existing idempotency, retry and
+uncertain-hold delivery semantics. Approval/draft decisions must remain author
+only; connection repair alerts admin/owner only; inbox digests need bounded
+transactional cursor claims. All of these producers are outside the explicitly
+owned paths. Full remaining-alert parity is therefore **incomplete**.
+
+No Root keys added. New tests cover independent switches, strict input validation
+and English/French label coverage. Targeted notification tests, SQL guard and
+TypeScript are local evidence only; no server, database, browser, SMTP or provider
+verification was run for these preference changes.

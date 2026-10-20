@@ -1,5 +1,7 @@
 'use client';
 
+import { ADDITIONAL_NOTIFICATION_PREFERENCES, notificationPreferenceLabels } from '@/modules/settings/notifications/catalog';
+import { useConfirm } from '@/components/useConfirm';
 import { useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { ModalDialog } from '@/components/ModalDialog';
@@ -10,7 +12,7 @@ import styles from './notifications.module.css';
 
 type Notice = { message: string; error: boolean; key: number } | null;
 type Action = { kind: 'read' | 'delete'; item: NotificationRow } | null;
-type EmailPrefs = Pick<NotificationPreferenceView['preferences'], 'onNoteMention' | 'onQueueEmpty'>;
+type EmailPrefs = NotificationPreferenceView['preferences'];
 
 const UPDATE_CONFIRMATION = 'UPDATE NOTIFICATION PREFERENCES';
 const eventName = (kind: NotificationRow['kind']) => kind === 'note_mention' ? 'Teammate note mention' : 'Content mix needs attention';
@@ -26,7 +28,9 @@ const emailOutcome = (state: NotificationRow['emailState']) => {
   }
 };
 
-export function NotificationCenter({ initialPreferences, initialPage }: { initialPreferences: NotificationPreferenceView | null; initialPage: NotificationPage | null }) {
+export function NotificationCenter({ initialPreferences, initialPage, locale = initialPreferences?.locale ?? 'en' }: { initialPreferences: NotificationPreferenceView | null; initialPage: NotificationPage | null; locale?: 'en' | 'fr' }) {
+  const labels = notificationPreferenceLabels[locale];
+  const [confirmPreferences, preferencesDialog] = useConfirm({ title: locale === 'fr' ? 'Préférences de notification' : 'Notification preferences', cancel: locale === 'fr' ? 'Annuler' : 'Cancel', confirm: locale === 'fr' ? 'Enregistrer' : 'Save', danger: false });
   const [preferences, setPreferences] = useState(initialPreferences);
   const [rows, setRows] = useState(initialPage?.items ?? []);
   const [page, setPage] = useState(initialPage?.page ?? 1);
@@ -113,9 +117,10 @@ export function NotificationCenter({ initialPreferences, initialPage }: { initia
   const tooManyMutes = Boolean(preferences && muteDraft.length > preferences.maxMutes);
 
   return <>
+    {preferencesDialog}
     <SidebarDock>
       <aside className={styles.sidebar} aria-label="Notification controls">
-        <form className={styles.preferences} onSubmit={event => { event.preventDefault(); setReviewPrefs(true); }}>
+        <form className={styles.preferences} onSubmit={event => { event.preventDefault(); if (!ADDITIONAL_NOTIFICATION_PREFERENCES.some(key => prefsDraft[key] !== preferences?.preferences[key])) { setReviewPrefs(true); return; } void confirmPreferences(locale === 'fr' ? 'Enregistrer vos préférences personnelles ?' : 'Save your personal email preferences?').then(ok => { if (ok) void savePreferences(); }); }}>
           <h2>Email alerts</h2>
           <p>Choose the personal email updates you want.</p>
           <label className={styles.check}><input type="checkbox" checked={prefsDraft.onNoteMention} onChange={event => { const checked = event.currentTarget.checked; setPrefsDraft(current => ({ ...current, onNoteMention: checked })); setPrefsChanged(true); }} disabled={!preferences || busy} /><span>When a teammate mentions you in a note</span></label>
@@ -126,6 +131,8 @@ export function NotificationCenter({ initialPreferences, initialPage }: { initia
             <small>You can mute up to {preferences.maxMutes} channel{preferences.maxMutes === 1 ? '' : 's'}.</small>
           </fieldset>}
           {preferences && preferences.channels.length === 0 && <p className={styles.hint}>No channels are currently available for channel-specific mutes.</p>}
+          <p>{labels.pending}</p>
+          {ADDITIONAL_NOTIFICATION_PREFERENCES.map(key => <label key={key} className={styles.check}><input type="checkbox" checked={prefsDraft[key] ?? (key !== 'onNewInbox')} onChange={event => { const checked = event.currentTarget.checked; setPrefsDraft(current => ({ ...current, [key]: checked })); setPrefsChanged(true); }} disabled={!preferences || busy} /><span>{labels[key]}</span></label>)}
           <Button type="submit" variant="primary" disabled={!preferences || !prefsChanged || busy || tooManyMutes}>Review changes</Button>
           {tooManyMutes && <p className={styles.error}>Choose no more than {preferences?.maxMutes} channel mutes.</p>}
         </form>
