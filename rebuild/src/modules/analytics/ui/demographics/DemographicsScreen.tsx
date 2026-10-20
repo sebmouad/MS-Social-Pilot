@@ -1,76 +1,73 @@
+import { headers } from 'next/headers';
 import { Button } from '@/components/Button';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { operationFailure } from '@/lib/operation-error';
 import { readDemographics } from '@/modules/analytics/demographics/server/demographics';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
-import type { DemographicMetric } from '@/modules/analytics/demographics/contracts';
 import { WorkflowNav } from '@/modules/analytics/ui/reports/WorkflowNav';
-import { formatDay, formatValue, formatWhen } from '@/modules/analytics/ui/reports/format';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 
 type Search = Record<string, string | string[] | undefined>;
-type Data = Awaited<ReturnType<typeof readDemographics>>;
-
-function Rows({ rows, hidden, unit, caption }: { rows: DemographicMetric['rows']; hidden: number; unit: string; caption: string }) {
-  const top = Math.max(1, ...rows.map(row => row.share ?? 0));
-  return <div className={styles.tableWrap}><table><caption>{caption}</caption><thead><tr><th scope="col">Category</th><th scope="col" className={styles.num}>Value</th><th scope="col">Share</th></tr></thead>
-    <tbody>{rows.map((row, index) => <tr key={`${row.label}:${index}`}><th scope="row">{row.label}</th><td className={styles.num}>{formatValue(row.value, unit)}</td>
-      <td>{row.share === null ? <span className={styles.note}>Not shown for this unit</span> : <><span>{row.share.toFixed(1)}%</span><span className={styles.barTrack} aria-hidden="true"><span className={styles.bar} style={{ width: `${Math.max(1, (row.share / top) * 100)}%` }} /></span></>}</td></tr>)}</tbody></table>
-    {hidden > 0 && <p className={styles.note} style={{ padding: '.6rem .75rem' }}>{hidden} smaller categories are not shown.</p>}</div>;
-}
-function Metric({ metric }: { metric: DemographicMetric }) {
-  return <div><h3>{metric.label}</h3><p>{metric.sourceLabel} · {metric.coverage} of {metric.available} selected channels reported · as of {formatWhen(metric.latestAt)}</p>
-    <p>{metric.aggregationLabel}{metric.aggregationNote ? `. ${metric.aggregationNote}` : ''}</p>
-    {metric.rows.length ? <Rows rows={metric.rows} hidden={metric.hiddenRows} unit={metric.unit} caption={`${metric.label} by category`} /> : <p className={styles.empty}>No categories are stored for this measure.</p>}</div>;
-}
-function values(value: string | string[] | undefined) {
-  return value === undefined ? [] : Array.isArray(value) ? value : [value];
-}
-function first(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] ?? '' : value ?? '';
-}
-function Filters({ data, options, params, failure }: { data: Data | null; options: Awaited<ReturnType<typeof readAnalyticsSnapshot>> | null; params: Search; failure: string }) {
-  const channels = data?.options.channels ?? options?.options.channels ?? [];
-  const hasExplicitSelection = params.filter === '1' || params.channel !== undefined;
-  const selected = new Set(hasExplicitSelection
-    ? values(params.channel)
-    : data?.selected.channelIds ?? options?.selected.channelIds ?? channels.map(channel => channel.id));
-  const visibleIds = new Set(channels.map(channel => channel.id));
-  const unavailableSelections = hasExplicitSelection ? values(params.channel).filter(id => !visibleIds.has(id)) : [];
-  const start = params.start !== undefined ? first(params.start) : data?.period.start ?? options?.period.start ?? '';
-  const end = params.end !== undefined ? first(params.end) : data?.period.end ?? options?.period.end ?? '';
-  const dateField = (name: string, label: string, value: string) => {
-    const isDate = /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
-    return <label>{label}<input type={isDate || !value ? 'date' : 'text'} name={name} defaultValue={value} placeholder={isDate || !value ? undefined : 'YYYY-MM-DD'} maxLength={isDate || !value ? undefined : 10} inputMode={isDate || !value ? undefined : 'numeric'} aria-describedby={failure ? 'demographics-read-error' : undefined} /></label>;
-  };
-  return <form noValidate action="/analytics/demographics" method="get" className={styles.filters}>
-    <fieldset><legend>Date range (UTC)</legend>{dateField('start', 'From', start)}{dateField('end', 'To', end)}</fieldset>
-    <fieldset><legend>Channels</legend><input type="hidden" name="filter" value="1" />{channels.length ? channels.map(channel => <label className={styles.check} key={channel.id}><input type="checkbox" name="channel" value={channel.id} defaultChecked={selected.has(channel.id)} /><span>{channel.name}</span></label>) : <p className={styles.note}>No channels available.</p>}
-      {unavailableSelections.map((id, index) => <label className={styles.check} key={`${id}:${index}`}><input type="checkbox" name="channel" value={id} defaultChecked /><span>Unavailable channel selection</span></label>)}</fieldset>
-    <Button type="submit" variant="primary">Apply filters</Button><a href="/analytics/demographics">Reset filters</a></form>;
-}
+const first = (v: Search[string]) => Array.isArray(v) ? v[0] ?? '' : v ?? '';
+const values = (v: Search[string]) => v === undefined ? [] : Array.isArray(v) ? v : [v];
 
 export default async function DemographicsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const viewer = await requireViewer({ feature: 'analytics/demographics', channelScoped: true });
-  const params = await searchParams; let data: Data | null = null; let failure = '';
-  try { data = await readDemographics({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, params); }
-  catch (error) { failure = operationFailure(error, 'Audience breakdowns could not be loaded. Change the filters or retry.').error; }
+  const fr = /\bfr\b/i.test((await headers()).get('accept-language') ?? '');
+  const t = (en: string, french: string) => fr ? french : en;
+  const number = new Intl.NumberFormat(fr ? 'fr' : 'en', { maximumFractionDigits: 1 });
+  const unknown = t('Not available', 'Non disponible');
+  const when = (date: Date | null) => date ? date.toISOString().replace('T', ' ').replace('.000Z', ' UTC') : unknown;
+  const params = await searchParams;
+  let data: Awaited<ReturnType<typeof readDemographics>> | null = null;
   let options: Awaited<ReturnType<typeof readAnalyticsSnapshot>> | null = null;
+  let failed = false;
+  try { data = await readDemographics({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, params); }
+  catch { failed = true; }
   if (!data) {
     try { options = await readAnalyticsSnapshot({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, {}, { feature: 'analytics/demographics' }); }
-    catch { /* Keep the correction form available even when scoped options cannot load. */ }
+    catch { /* Preserve the correction form. */ }
   }
-  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/demographics"><Filters data={data} options={options} params={params} failure={failure} /></WorkflowNav>}><div className={styles.root}>
-    <header className={styles.heading}><p className={styles.eyebrow}>Analytics</p><h1>Audience breakdowns</h1><p>Who your selected channels reach, by country, city, age, gender and language, from stored measurements. Missing data is unknown, not zero.</p></header>
-    {failure && <section id="demographics-read-error" className={styles.panel} role="alert"><h2>Breakdowns could not be loaded</h2><p>{failure}</p></section>}
-    {data && <section className={styles.panel} aria-labelledby="aud-total"><h2 id="aud-total">Audience size</h2>
-      <p><strong>{formatValue(data.audience.covered ? data.audience.total : null, 'count')}</strong> followers across {data.audience.covered} of {data.audience.selected} selected channels.</p><p>{data.audience.note}</p></section>}
-    {data?.empty && <section className={styles.panel}><h2>No breakdowns yet</h2><p>No audience breakdowns are stored for the selected channels and dates. Try a wider range or other channels; breakdowns appear after the next analytics sync.</p></section>}
-    {data?.groups.map(group => <section className={styles.panel} key={group.id} aria-labelledby={`g-${group.id}`}><h2 id={`g-${group.id}`}>{group.label}</h2>
-      {group.combined && <div><h3>All sources combined</h3><p>{group.combined.sources} sources · {group.combined.coverage === null ? 'channel coverage unknown' : `${group.combined.coverage} channels`} · data from {formatDay(group.combined.oldestAsOf)} to {formatDay(group.combined.newestAsOf)}</p><p>{group.combined.note}</p>
-        <Rows rows={group.combined.rows} hidden={group.combined.hiddenRows} unit="count" caption={`${group.label}, combined`} /></div>}
-      {group.metrics.map(metric => <Metric key={metric.key} metric={metric} />)}</section>)}
-    {!!data?.other.length && <section className={styles.panel}><h2>Other breakdowns</h2>{data.other.map(metric => <Metric key={metric.key} metric={metric} />)}</section>}
+  const channels = data?.options.channels ?? options?.options.channels ?? [];
+  const explicit = params.filter === '1' || params.channel !== undefined;
+  const selected = new Set(explicit ? values(params.channel) : data?.selected.channelIds ?? channels.map(c => c.id));
+  const unavailable = values(params.channel).filter(id => !channels.some(c => c.id === id));
+  const query = new URLSearchParams();
+  if (data) {
+    query.set('start', data.period.start); query.set('end', data.period.end); query.set('filter', '1');
+    data.selected.channelIds.forEach(id => query.append('channel', id)); query.set('format', 'csv');
+  }
+  const dateField = (name: 'start' | 'end', label: string) => {
+    const value = params[name] !== undefined ? first(params[name]) : data?.period[name] ?? options?.period[name] ?? '';
+    const valid = /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+    return <label className="ui-field">{label}<input className="ui-input" type={!value || valid ? 'date' : 'text'} name={name} defaultValue={value} aria-describedby={failed ? 'demographics-error' : undefined} /></label>;
+  };
+  const filters = <form noValidate action="/analytics/demographics" className={styles.filters}>
+    <fieldset><legend>{t('Date range (UTC)', 'Période (UTC)')}</legend>{dateField('start', t('From', 'Du'))}{dateField('end', t('To', 'Au'))}</fieldset>
+    <fieldset><legend>{t('Channels', 'Canaux')}</legend><input type="hidden" name="filter" value="1" />
+      {channels.map(channel => <label className={styles.check} key={channel.id}><input type="checkbox" name="channel" value={channel.id} defaultChecked={selected.has(channel.id)} />{channel.name}</label>)}
+      {!channels.length && <p>{t('No channels available.', 'Aucun canal disponible.')}</p>}
+      {unavailable.map(id => <label className={styles.check} key={id}><input type="checkbox" name="channel" value={id} defaultChecked />{t('Unavailable channel selection', 'Sélection de canal indisponible')}</label>)}
+    </fieldset><Button type="submit" variant="primary">{t('Apply filters', 'Appliquer les filtres')}</Button>
+    <a href="/analytics/demographics">{t('Reset filters', 'Réinitialiser les filtres')}</a>
+    {data && <a href={`/api/analytics/demographics?${query}`} download>{t('Export full history (CSV)', 'Exporter tout l’historique (CSV)')}</a>}
+  </form>;
+  const metrics = data ? [...data.groups.flatMap(group => group.metrics), ...data.other] : [];
+  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/demographics">{filters}</WorkflowNav>}><div className={styles.root}>
+    <header className={styles.heading}><p className={styles.eyebrow}>{t('Analytics', 'Statistiques')}</p><h1>{t('Audience history', 'Historique de l’audience')}</h1>
+      <p>{t('Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.', 'Catégories d’âge, de genre, de pays, de ville et de langue enregistrées telles que fournies. Chaque mesure reste distincte ; les nombres ne sont jamais additionnés entre dates ou sources.')}</p>
+      {data && <p>{data.period.start} — {data.period.end} UTC</p>}</header>
+    {failed && <section id="demographics-error" role="alert" className={styles.panel}><h2>{t('History could not be loaded', 'Impossible de charger l’historique')}</h2><p>{t('Review your dates and channels, narrow the period, or retry. Your filters have been retained.', 'Vérifiez les dates et les canaux, réduisez la période ou réessayez. Vos filtres sont conservés.')}</p></section>}
+    {data && <section className={styles.panel}><h2>{t('Audience size', 'Taille de l’audience')}</h2><p>{data.audience.covered ? number.format(data.audience.total) : unknown} · {data.audience.covered} / {data.audience.selected} {t('selected channels', 'canaux sélectionnés')}</p><p>{t('Latest valid figure per covered channel. This is not a count of unique people across networks.', 'Dernière valeur valide de chaque canal couvert. Ce total ne représente pas des personnes uniques entre réseaux.')}</p></section>}
+    {data?.empty && <section className={styles.panel}><h2>{t('No stored breakdowns', 'Aucune répartition enregistrée')}</h2><p>{t('Not available for these channels and dates. Try another period or channel.', 'Non disponible pour ces canaux et ces dates. Essayez une autre période ou un autre canal.')}</p></section>}
+    {metrics.map(metric => <section key={metric.key} className={styles.panel}><h2>{metric.label}</h2><p>{metric.sourceLabel} · {metric.unit}</p>
+      <p>{t('Channels with stored snapshots', 'Canaux avec des mesures enregistrées')} : {metric.historyCoverage.covered} / {metric.historyCoverage.selected} · {when(metric.historyCoverage.oldestAsOf)} — {when(metric.historyCoverage.newestAsOf)}</p>
+      {!metric.history.length && <p>{unknown}</p>}
+      {metric.history.map(item => <details key={`${item.resourceId}:${item.asOf.toISOString()}`}><summary>{item.resourceLabel} · {t('As of', 'Au')} {when(item.asOf)}</summary>
+        <p>{t('Fetched at', 'Collecté le')} {when(item.fetchedAt)}</p>
+        <div className={styles.tableWrap}><table><caption>{metric.label} · {item.resourceLabel} · {when(item.asOf)}</caption><thead><tr><th scope="col">{t('Category', 'Catégorie')}</th><th scope="col">{t('Value', 'Valeur')}</th><th scope="col">{t('Share of snapshot', 'Part de la mesure')}</th></tr></thead><tbody>
+          {item.rows.map(row => <tr key={row.label}><th scope="row">{row.label}</th><td>{row.value === null ? unknown : number.format(row.value)}</td><td>{row.share === null ? unknown : `${number.format(row.share)}%`}</td></tr>)}
+        </tbody></table></div></details>)}
+    </section>)}
   </div></PageFrame>;
 }

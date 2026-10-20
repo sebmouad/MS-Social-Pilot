@@ -832,3 +832,18 @@ Verification for this batch:49 targeted tests across10 files passed, including
 `raw-sql-void-guard.test.ts`; `npx tsc --noEmit -p .` passed from rebuild/.
 Broader check found a pre-existing `module-manifests.test.ts` expectation missing
 the Analytics `/analytics/posts` route already present in HEAD; left unchanged.
+
+Demographics branch checkpoint (2026-10-20): full stored audience snapshot history
+now travels from Facebook storage through the neutral catalog/aggregator into
+`readDemographics`, UI, HTTP and MCP (including `format=csv`). No provider-specific
+branch added to shared code. Existing report row ceiling refuses oversized history;
+missing categories are absent and invalid values remain null. No new Root keys or
+migration. See the module README and the two demographics history/surface test
+files. Browser, actual PostgreSQL and live-provider checks remain open. This batch
+is committed only on `codex/demographics`, without push/deploy/server execution,
+as explicitly requested; do not infer publication to main.
+Targeted validation: 72 tests/9 files including raw SQL guard, and TypeScript pass.
+Full suite attempted but interrupted: missing DATABASE_URL, loopback listener
+failures and stale module-manifests Analytics route expectation (`/analytics/posts`
+exists but the assertion omits it). The manifest failure reproduces alone; its
+source and manifest are unchanged by this batch. No full-suite pass claimed.

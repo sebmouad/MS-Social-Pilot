@@ -501,3 +501,12 @@ blocked for outcome recording. A successful local send replaces the prior
 scheduled label. Numeric bounds, keyboard focus, mobile navigation closure and
 themed layout have local probe evidence in docs/FIRST_COMMENT_SCHEDULING.md;
 live-provider/native-format and full-app UX clearance remain separate.
+
+## Stored audience history (2026-10-20)
+
+Demographics keeps channel/date controls and scoped full-history CSV in the
+contextual sidebar. Each keyboard-operable snapshot disclosure names its channel
+and UTC as-of time; fetch time, original categories and within-snapshot shares
+appear inside. Missing values read Not available / Non disponible. English and
+French copy, failure filter retention and server rendering have synthetic tests;
+actual browser/theme/viewport and download interaction checks remain open.

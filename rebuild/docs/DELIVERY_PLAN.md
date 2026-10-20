@@ -436,3 +436,9 @@ latest job runs, freshness and stored queues are grouped in Root with timing and
 status-only audit, sharing the operations HTTP/MCP service.49 targeted tests and
 TypeScript passed. Browser/PostgreSQL verification and provider-scoped job
 instrumentation remain separate; no live provider/production claim.
+
+Demographics branch follow-up (2026-10-20): stored snapshot history, scoped
+UI/HTTP/MCP and CSV are implemented with synthetic unit/render checks. Review
+`modules/analytics/demographics/README.md`; verify actual PostgreSQL and browser
+history/export across themes and widths before claiming runtime parity. No
+migration or new Root keys; no production/provider verification in this batch.

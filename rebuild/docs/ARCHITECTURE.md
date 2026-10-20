@@ -1506,3 +1506,13 @@ the existing global worker history does not establish provider-specific job
 outcomes. Queue counts alone have no failure SLA; nonempty queues remain unknown.
 This batch has mocked-service and server-render tests only; no browser, database,
 live-provider or production verification is claimed. No keys or migrations.
+
+## Historical demographics (2026-10-20, codex/demographics)
+
+The demographics service now exposes full stored resource/date category snapshots,
+with measurement/fetch times, period coverage and complete-or-refused CSV through
+UI/HTTP/MCP. Facebook owns storage interpretation; the neutral Analytics catalog
+and aggregator carry an optional history field. No new Root keys or migration.
+See [module notes](../src/modules/analytics/demographics/README.md). Synthetic
+unit/render evidence only; browser, real database/provider and release verification
+remain open. This does not complete the other Analytics parity gaps.
