@@ -423,3 +423,20 @@ All must be yes; any no is no-go.
 
 Empty. Record date, SHA, gate, pass/fail, evidence location and open issues here as
 each gate is actually run; never claim a gate from this plan alone.
+
+## Results log — 2026-10-20
+
+- **Backup (B5, part):** `/var/backups/socialpilot-precutover-20261020-164633` on the
+  production host: `social_pilot.dump`, `media.tgz` (240 MB), `release.tgz` (370 MB),
+  `app.env`, `SHA256SUMS`. Not yet restore-tested on a separate host.
+- **Production-copy migration rehearsal (B2–B3): PASS.** `rebuild/scripts/prod-rehearsal.sh`
+  restored a fresh `pg_dump` of live `social_pilot` into scratch `social_pilot_rehearsal`
+  on the server (row counts matched live), then applied every repository migration not
+  yet recorded in `_prisma_migrations`: 91 already present, **34 applied, 0 failed**,
+  116 tables after. Live services stayed active throughout; live data untouched.
+- **Finding fixed during rehearsal:** name order is not dependency order. The rebuild
+  migrations must follow the reviewed order in `cutover-rehearsal.sh`, after production's
+  missing legacy migrations; four newer rebuild migrations (watermark, comment sentiment,
+  person MCP keys, native schedule changes) run last and still need pinning there.
+- Not yet run: migration verifier and volume probe against the scratch copy, rollback
+  drill (B6), live Facebook gate (A), cutover (C).
