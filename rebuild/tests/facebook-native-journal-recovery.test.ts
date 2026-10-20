@@ -63,6 +63,27 @@ describe('Facebook native journal recovery guards', () => {
     expect(queryCapture(query).values).toEqual(['workspace-a']);
   });
 
+  it('holds removal while a schedule change may have reached Facebook', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ present: true }]).mockResolvedValueOnce([{ changeId: 'operation-a:cancel' }]);
+    await expect(assertFacebookNativeSettled(transaction(query), 'workspace-a', ['target-a']))
+      .rejects.toMatchObject({ name: 'OperationError', code: 'conflict' });
+    const captured = queryCapture(query, 2);
+    expect(captured.sql).toContain('FROM rebuild_facebook_native_schedule_changes c');
+    expect(captured.sql).toContain("c.state IN ('started', 'uncertain')");
+    expect(captured.sql).toContain('j."targetId" = ANY(?::text[])');
+    expect(captured.values).toEqual(['workspace-a', ['target-a']]);
+  });
+
+  it('ignores schedule changes when their table is absent or all are settled', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ present: false }]);
+    await expect(assertFacebookNativeSettled(transaction(query), 'workspace-a')).resolves.toBeUndefined();
+    expect(query).toHaveBeenCalledTimes(2);
+    query.mockReset();
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ present: true }]).mockResolvedValueOnce([]);
+    await expect(assertFacebookNativeSettled(transaction(query), 'workspace-a')).resolves.toBeUndefined();
+    expect(queryCapture(query, 2).values).toEqual(['workspace-a']);
+  });
+
   it('leaves publications without a child journal to the existing neutral outcome guard', async () => {
     query.mockResolvedValue([]);
     await expect(assertFacebookNativeResolution(transaction(query), 'workspace-a', 'operation-a', 'ABSENT')).resolves.toBeUndefined();
