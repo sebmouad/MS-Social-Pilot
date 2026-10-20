@@ -1,9 +1,9 @@
-.invitations { display: grid; gap: 16px; min-width: 0; }
+.invitations { display: grid; grid-template-columns: minmax(0, 1fr); overflow-wrap: anywhere; gap: 16px; min-width: 0; }
 .heading h2 { margin: 0; color: var(--ink); font-size: 17px; font-weight: 720; letter-spacing: -.25px; }
 .heading p { margin: 5px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
-.form { display: grid; gap: 14px; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.form { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 14px; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
 .fields { display: grid; grid-template-columns: minmax(220px, 1.35fr) minmax(160px, .65fr); gap: 14px; max-width: 760px; }
-.field { display: grid; align-content: start; gap: 7px; color: var(--ink); font-size: 12px; font-weight: 650; }
+.field { display: grid; min-width: 0; align-content: start; gap: 7px; color: var(--ink); font-size: 12px; font-weight: 650; }
 .field input, .field select, .confirmField input { width: 100%; min-width: 0; min-height: 42px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 450; }
 .field input:focus-visible, .field select:focus-visible, .confirmField input:focus-visible { outline: 3px solid color-mix(in srgb, var(--focus) 35%, transparent); outline-offset: 2px; border-color: var(--focus); }
 .field input[aria-invalid="true"] { border-color: var(--danger); }
@@ -13,7 +13,7 @@
 .unavailable { border-color: var(--line-strong); background: var(--surface-muted); }
 .actions { display: flex; justify-content: flex-end; }
 .empty { margin: 0; padding: 22px 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); color: var(--ink-soft); font-size: 13px; text-align: center; }
-.tableWrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.tableWrap { width: 100%; min-width: 0; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
 .table th, .table td { padding: 12px 13px; border-bottom: 1px solid var(--line-subtle); vertical-align: top; }
 .table thead th { background: var(--surface-raised); color: var(--ink-faint); font-size: 10px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; white-space: nowrap; }
