@@ -45,8 +45,10 @@ describe('Home overview screen', () => {
     expect(state.overview).toHaveBeenCalledWith({ userId: 'owner', workspaceId });
     expect(html).toContain('12,345');
     expect(html).toContain('5,000');
-    expect(html).toContain('+25% vs the previous 28 days');
-    expect(html).toContain('−10% vs the previous 28 days');
+    expect(html).toContain('<strong>+25%</strong><span>vs the previous 28 days</span>');
+    expect(html).toContain('<strong>−10%</strong><span>vs the previous 28 days</span>');
+    expect(html).toContain('ui-metric__delta is-good');
+    expect(html).toContain('ui-metric__delta is-bad');
     expect(html).toContain('[bar:Engagements by channel, last 28 days]');
     expect(html).toContain('[donut:Interactions by type, last 28 days]');
     expect(html).toContain('[heatmap:Typical engagement by weekday and hour]');

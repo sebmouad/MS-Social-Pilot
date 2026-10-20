@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button } from '@/components/Button';
-import { FieldError, useFormValidation } from '@/components/FormValidation';
+import { Field, TextInput } from '@/components/Forms';
+import { useFormValidation } from '@/components/FormValidation';
 import { AuthNotice, AuthShell, AuthStatus, authStyles } from '@/modules/home/auth/AuthShell';
 import { authCopy, type AuthLocale } from '@/modules/home/auth/copy';
 import type { AccountPasswordPolicy } from '@/server/account-settings';
@@ -70,7 +71,7 @@ export function JoinForm({ passwordPolicy, locale = 'en' }: { passwordPolicy: Ac
   }
   const matches = invitation?.signedInEmail?.toLowerCase() === invitation?.email.toLowerCase();
   const invite = invitation ? t.inviteAs(invitation.workspaceName, invitation.role) : null;
-  return <AuthShell title={created ? t.createdTitle : t.title} titleId="join-title" footer={!loading && !created ? <a className={authStyles.linkButton} href="/sign-in">{t.goSignIn}</a> : undefined}>
+  return <AuthShell locale={locale} title={created ? t.createdTitle : t.title} titleId="join-title" footer={!loading && !created ? <a className={authStyles.linkButton} href="/sign-in">{t.goSignIn}</a> : undefined}>
     {loading && <AuthStatus>{t.opening}</AuthStatus>}
     {message && <AuthNotice noticeRef={feedback}>{message}</AuthNotice>}
     {created ? <>
@@ -85,20 +86,13 @@ export function JoinForm({ passwordPolicy, locale = 'en' }: { passwordPolicy: Ac
       </> : <><p>{t.switchLead}</p><Button busy={busy} className={authStyles.fill} onClick={() => void switchAccount()}>{busy ? t.switching : t.switchAccount}</Button></> : invitation.existingAccount ? <>
         <p>{t.existing}</p><a className="ui-button ui-button--primary" href="/sign-in">{t.signInToAccept}</a>
       </> : <form className={authStyles.form} method="post" noValidate onSubmit={register}>
-        <div className={authStyles.field}>
-          <label className={authStyles.label} htmlFor={validation.fieldProps('name').id}>{t.name}</label>
-          <input className={authStyles.input} name="name" autoComplete="name" required maxLength={100} value={name} disabled={busy} onChange={event => { setName(event.currentTarget.value); validation.clear('name'); }} {...validation.fieldProps('name')} />
-          <FieldError {...validation.errorProps('name')} />
-        </div>
-        <div className={authStyles.field}>
-          <label className={authStyles.label} htmlFor={validation.fieldProps('password').id}>{t.password}</label>
-          <div className={authStyles.control}>
-            <input className={authStyles.input} name="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required minLength={passwordPolicy.minLength} maxLength={200} value={password} disabled={busy} onChange={event => { setPassword(event.currentTarget.value); validation.clear('password'); }} {...validation.fieldProps('password', 'join-password-hint')} />
-            <Button aria-label={showPassword ? t.hideLabel : t.showLabel} aria-pressed={showPassword} disabled={busy} onClick={() => setShowPassword(!showPassword)}>{showPassword ? t.hide : t.show}</Button>
-          </div>
-          <p id="join-password-hint" className={authStyles.hint}>{t.passwordHint(passwordPolicy.minLength)}</p>
-          <FieldError {...validation.errorProps('password')} />
-        </div>
+        <Field id={validation.fieldProps('name').id} label={t.name} error={validation.errors.name}>
+          <TextInput name="name" autoComplete="name" required maxLength={100} value={name} disabled={busy} onChange={event => { setName(event.currentTarget.value); validation.clear('name'); }} />
+        </Field>
+        <Field id={validation.fieldProps('password').id} label={t.password} help={t.passwordHint(passwordPolicy.minLength)} error={validation.errors.password}>
+          <TextInput name="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" required minLength={passwordPolicy.minLength} maxLength={200} value={password} disabled={busy} className="ui-input--action" onChange={event => { setPassword(event.currentTarget.value); validation.clear('password'); }}
+            trailing={<Button variant="quiet" size="sm" aria-label={showPassword ? t.hideLabel : t.showLabel} aria-pressed={showPassword} disabled={busy} onClick={() => setShowPassword(!showPassword)}>{showPassword ? t.hide : t.show}</Button>} />
+        </Field>
         <Button type="submit" variant="primary" busy={busy} className={authStyles.fill}>{busy ? t.creating : t.create}</Button>
       </form>}
     </>}

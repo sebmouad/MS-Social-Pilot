@@ -48,7 +48,7 @@ export function VerifyForm({ hasPasskey, locale = 'en' }: { hasPasskey: boolean;
     } catch (cause) { setError(cause instanceof Error && cause.name === 'Error' ? cause.message : t.passkeyCancelled); }
     setBusy(null);
   }
-  return <AuthShell title={t.title} lead={t.lead} footer={<a className={authStyles.linkButton} href="/sign-in">{copy.backToSignIn}</a>}>
+  return <AuthShell locale={locale} title={t.title} lead={t.lead} footer={<a className={authStyles.linkButton} href="/sign-in">{copy.backToSignIn}</a>}>
     {hasPasskey && <>
       <Button variant="primary" busy={busy === 'passkey'} disabled={busy !== null} onClick={verifyPasskey} className={authStyles.fill}>{busy === 'passkey' ? t.passkeyBusy : t.passkey}</Button>
       <p className={authStyles.divider} aria-hidden="true">{t.or}</p>

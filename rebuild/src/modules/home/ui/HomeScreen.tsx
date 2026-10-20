@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react';
-import { IconArrowUpRight, IconCalendarEvent, IconChartBar, IconChartDonut, IconClockHour4, IconEye, IconHeart, IconInbox, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
-import { BarChart, DonutChart, HeatmapChart, Sparkline } from '@/components/charts';
+import { IconArrowUpRight, IconCalendarEvent, IconChartBar, IconChartDonut, IconClockHour4, IconEye, IconHeart, IconInbox, IconPlugConnected, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
+import { Badge } from '@/components/Badge';
+import { EmptyState } from '@/components/EmptyState';
+import { MetricCard, type MetricDelta } from '@/components/MetricCard';
+import { PageHeader } from '@/components/PageHeader';
+import { BarChart, DonutChart, HeatmapChart } from '@/components/charts';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { getTargets } from '@/server/data';
@@ -28,12 +32,14 @@ function Card({ module, icon, title, t, span, children, id }: { module: Module; 
   </section>;
 }
 
+const CTA = 'ui-button ui-button--primary ui-button--md';
+
 function Empty({ title, body, action, href }: { title: string; body: string; action: string; href: string }) {
-  return <div className={styles.empty}><h3>{title}</h3><p>{body}</p><a className={styles.cta} href={href}>{action}</a></div>;
+  return <EmptyState title={title} action={<a className={CTA} href={href}><span>{action}</span></a>}>{body}</EmptyState>;
 }
 
 function Unavailable({ t }: { t: Copy }) {
-  return <div className={styles.empty} role="status"><h3>{t.unavailableTitle}</h3><p>{t.unavailableBody}</p></div>;
+  return <EmptyState tone="error" title={t.unavailableTitle}>{t.unavailableBody}</EmptyState>;
 }
 
 /** A card body for a section state; `ready` content is supplied by the caller. */
@@ -41,21 +47,27 @@ function Body<T>({ section, t, empty, children }: { section: Section<T>; t: Copy
   return section.state === 'ready' ? <>{children(section.data)}</> : section.state === 'empty' ? <>{empty}</> : <Unavailable t={t} />;
 }
 
-function Delta({ change, t, days, locale }: { change: number | null; t: Copy; days: number; locale: string }) {
-  if (change === null) return <span className={styles.delta}>{t.noComparison}</span>;
+function deltaOf(change: number | null, t: Copy, days: number, locale: string): MetricDelta | undefined {
+  if (change === null) return undefined;
   const direction = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
   const sign = change > 0 ? '+' : change < 0 ? '−' : '';
   const percent = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(Math.abs(change));
-  return <span className={styles.delta} data-direction={direction}>{sign}{percent} {fill(t.vsPrevious, { n: days })}</span>;
+  return { label: `${sign}${percent}`, direction, comparedTo: fill(t.vsPrevious, { n: days }) };
 }
 
-function Kpi({ title, icon, totals, overview, t, locale, id }: { title: string; icon: ReactNode; totals: NonNullable<Extract<HomeOverview['performance'], { state: 'ready' }>['data']>['views']; overview: HomeOverview; t: Copy; locale: string; id: string }) {
+/** Grid cell holding one KPI card and the link to its module. */
+function Tile({ span, children, href, linkLabel, module }: { span: 'span4' | 'span6' | 'span8'; children: ReactNode; href: string; linkLabel: string; module: Module }) {
+  return <div className={`${styles.tile} ${styles[span]}`} data-module={module}>{children}<a className={styles.link} href={href}>{linkLabel} <IconArrowUpRight size={14} aria-hidden="true" /></a></div>;
+}
+
+function Kpi({ title, icon, totals, overview, t, locale }: { title: string; icon: ReactNode; totals: NonNullable<Extract<HomeOverview['performance'], { state: 'ready' }>['data']>['views']; overview: HomeOverview; t: Copy; locale: string }) {
   const number = new Intl.NumberFormat(locale);
-  return <Card module="analytics" icon={icon} title={title} t={t} span="span4" id={id}>
-    <p className={styles.big}>{totals.current === null ? t.unknownFigure : number.format(totals.current)}</p>
-    <Delta change={totals.change} t={t} days={overview.lookbackDays} locale={locale} />
-    {totals.comparable > 0 && totals.comparable < totals.covered && <p className={styles.note}>{fill(t.comparableNote, { comparable: totals.comparable, covered: totals.covered })}</p>}
-  </Card>;
+  const delta = deltaOf(totals.change, t, overview.lookbackDays, locale);
+  const partial = totals.comparable > 0 && totals.comparable < totals.covered;
+  return <Tile module="analytics" span="span4" href={HREF.analytics} linkLabel={fill(t.openModule, { name: t.moduleNames.analytics })}>
+    <MetricCard module="analytics" icon={icon} label={title} value={totals.current === null ? null : number.format(totals.current)} unavailable={totals.current === null ? t.unknownFigure : undefined} delta={delta}
+      hint={!delta ? t.noComparison : partial ? fill(t.comparableNote, { comparable: totals.comparable, covered: totals.covered }) : undefined} />
+  </Tile>;
 }
 
 const MODE_COPY: Record<ScheduleMode, 'modeApp' | 'modePlatform' | 'modeMixed'> = { app: 'modeApp', platform: 'modePlatform', mixed: 'modeMixed' };
@@ -71,37 +83,30 @@ export default async function HomePage() {
   const number = new Intl.NumberFormat(locale);
   const dayFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
   const timeFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: overview.timeZone });
-  const dayLabel = (day: string) => { const date = new Date(`${day.slice(0, 10)}T12:00:00.000Z`); return Number.isNaN(date.getTime()) ? day : dayFormat.format(date); };
   const days = overview.lookbackDays;
   const performance = overview.performance;
   const ready = performance?.state === 'ready' ? performance.data : null;
 
   return <PageFrame module="home"><div className={styles.root}>
-    <header className={styles.hero}>
-      <div><p className={styles.eyebrow}>{t.eyebrow}</p><h1>{t.greeting}, {viewer.membership.workspace.name}</h1><p>{t.lead}</p></div>
-      <span className={styles.period}>{fill(t.period, { n: days })}</span>
-    </header>
+    <PageHeader module="home" title={`${t.greeting}, ${viewer.membership.workspace.name}`} description={t.lead}
+      actions={<Badge tone="module" module="home" icon={<IconCalendarEvent size={14} />}>{fill(t.period, { n: days })}</Badge>} />
 
-    {showConnections && visibleTargets.length === 0 && <section className="panel home-start" aria-labelledby="home-start-title">
-      <div><p className="eyebrow">{t.firstStep}</p><h2 id="home-start-title">{t.startTitle}</h2><p>{t.startBody}</p></div>
-      <a className="home-start__action" href="/settings/connections">{t.startAction} <span aria-hidden="true">→</span></a>
-    </section>}
+    {showConnections && visibleTargets.length === 0 && <EmptyState icon={<IconPlugConnected size={22} />} title={t.startTitle} action={<a className={CTA} href="/settings/connections"><span>{t.startAction}</span></a>}>{t.startBody}</EmptyState>}
 
     <div className={styles.grid}>
-      {overview.audience && <Card module="analytics" icon={<IconUsers size={20} />} title={t.audience} t={t} span="span4" id="home-audience">
-        <Body section={overview.audience} t={t} empty={<Empty title={t.audienceEmptyTitle} body={t.audienceEmptyBody} action={t.audienceEmptyAction} href={HREF.analytics} />}>
-          {audience => <>
-            <p className={styles.big}>{number.format(audience.total)}</p>
-            <p className={styles.note}>{fill(t.audienceOf, { covered: audience.covered, selected: audience.selected })}{audience.asOf ? ` · ${fill(t.audienceAsOf, { date: dayFormat.format(new Date(audience.asOf)) })}` : ''}</p>
-            {audience.trend.length > 1 && <Sparkline label={fill(t.audienceTrend, { n: days })} values={audience.trend.map(point => point.v)} labels={audience.trend.map(point => dayLabel(point.t))} area color={1} table={false} />}
-            <p className={styles.note}>{t.audienceNote}</p>
-          </>}
-        </Body>
-      </Card>}
+      {overview.audience && (overview.audience.state === 'ready'
+        ? <Tile module="analytics" span="span4" href={HREF.analytics} linkLabel={fill(t.openModule, { name: t.moduleNames.analytics })}>
+          <MetricCard module="analytics" icon={<IconUsers size={20} />} label={t.audience} value={number.format(overview.audience.data.total)}
+            hint={<>{fill(t.audienceOf, { covered: overview.audience.data.covered, selected: overview.audience.data.selected })}{overview.audience.data.asOf ? ` · ${fill(t.audienceAsOf, { date: dayFormat.format(new Date(overview.audience.data.asOf)) })}` : ''}<br />{t.audienceNote}</>}
+            sparkline={overview.audience.data.trend.length > 1 ? overview.audience.data.trend.map(point => point.v) : undefined} sparklineLabel={fill(t.audienceTrend, { n: days })} />
+        </Tile>
+        : <Card module="analytics" icon={<IconUsers size={20} />} title={t.audience} t={t} span="span4" id="home-audience">
+          <Body section={overview.audience} t={t} empty={<Empty title={t.audienceEmptyTitle} body={t.audienceEmptyBody} action={t.audienceEmptyAction} href={HREF.analytics} />}>{() => null}</Body>
+        </Card>)}
 
       {performance && (ready ? <>
-        <Kpi title={t.views} icon={<IconEye size={20} />} totals={ready.views} overview={overview} t={t} locale={locale} id="home-views" />
-        <Kpi title={t.engagements} icon={<IconHeart size={20} />} totals={ready.engagements} overview={overview} t={t} locale={locale} id="home-engagements" />
+        <Kpi title={t.views} icon={<IconEye size={20} />} totals={ready.views} overview={overview} t={t} locale={locale} />
+        <Kpi title={t.engagements} icon={<IconHeart size={20} />} totals={ready.engagements} overview={overview} t={t} locale={locale} />
       </> : <Card module="analytics" icon={<IconEye size={20} />} title={`${t.views} · ${t.engagements}`} t={t} span="span8" id="home-performance">
         <Body section={performance} t={t} empty={<Empty title={t.perfEmptyTitle} body={t.perfEmptyBody} action={t.perfEmptyAction} href={HREF.analytics} />}>{() => null}</Body>
       </Card>)}
@@ -133,7 +138,7 @@ export default async function HomePage() {
           {upcoming => <>
             <ul className={styles.list}>{upcoming.items.map(item => <li className={styles.item} key={item.id}>
               <strong>{item.text || '—'}</strong>
-              <span className={styles.meta}><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time><span className={styles.mode}>{t[MODE_COPY[item.mode]]}</span></span>
+              <span className={styles.meta}><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time><Badge tone="module" module="publishing">{t[MODE_COPY[item.mode]]}</Badge></span>
               <span className={styles.meta}>{item.channels.join(', ')}</span>
             </li>)}</ul>
             {upcoming.total > upcoming.items.length && <p className={styles.note}>{fill(t.upcomingMore, { n: upcoming.total })}</p>}
@@ -142,27 +147,21 @@ export default async function HomePage() {
         </Body>
       </Card>}
 
-      {overview.inbox && <Card module="inbox" icon={<IconInbox size={20} />} title={t.inbox} t={t} span="span4" id="home-inbox">
-        <Body section={overview.inbox} t={t} empty={null}>
-          {inbox => <>
-            <p className={styles.big}>{number.format(inbox.open)}</p>
-            <p className={styles.note}>{inbox.open > 0 ? t.inboxOpen : t.inboxZero}</p>
-            <a className={styles.link} href={HREF.inbox}>{t.inboxAction}</a>
-          </>}
-        </Body>
-      </Card>}
+      {overview.inbox && (overview.inbox.state === 'ready'
+        ? <Tile module="inbox" span="span4" href={HREF.inbox} linkLabel={t.inboxAction}>
+          <MetricCard module="inbox" icon={<IconInbox size={20} />} label={t.inbox} value={number.format(overview.inbox.data.open)} hint={overview.inbox.data.open > 0 ? t.inboxOpen : t.inboxZero} />
+        </Tile>
+        : overview.inbox.state === 'unavailable' ? <Card module="inbox" icon={<IconInbox size={20} />} title={t.inbox} t={t} span="span4" id="home-inbox"><Unavailable t={t} /></Card> : null)}
 
-      {overview.ads && <Card module="ads" icon={<IconSpeakerphone size={20} />} title={t.adSpend} t={t} span="span4" id="home-ads">
-        <Body section={overview.ads} t={t} empty={<Empty title={t.adsEmptyTitle} body={t.adsEmptyBody} action={t.adsEmptyAction} href={HREF.ads} />}>
-          {ads => <>
-            {ads.spend.map(group => <div key={group.currency ?? 'none'}>
-              <p className={styles.big}>{new Intl.NumberFormat(locale, group.currency ? { style: 'currency', currency: group.currency } : undefined).format(group.total)}</p>
-              {ads.spend.length === 1 && group.daily.length > 1 && <Sparkline label={fill(t.adSpendTrend, { n: days })} values={group.daily.map(day => day.v)} labels={group.daily.map(day => dayLabel(day.t))} area color={4} table={false} />}
-            </div>)}
-            <p className={styles.note}>{fill(t.adSpendNote, { n: days })}</p>
-          </>}
-        </Body>
-      </Card>}
+      {overview.ads && (overview.ads.state === 'ready'
+        ? overview.ads.data.spend.map((group, _index, all) => <Tile key={group.currency ?? 'none'} module="ads" span="span4" href={HREF.ads} linkLabel={fill(t.openModule, { name: t.moduleNames.ads })}>
+          <MetricCard module="ads" icon={<IconSpeakerphone size={20} />} label={all.length > 1 && group.currency ? `${t.adSpend} · ${group.currency}` : t.adSpend}
+            value={new Intl.NumberFormat(locale, group.currency ? { style: 'currency', currency: group.currency } : undefined).format(group.total)} hint={fill(t.adSpendNote, { n: days })}
+            sparkline={all.length === 1 && group.daily.length > 1 ? group.daily.map(day => day.v) : undefined} sparklineLabel={fill(t.adSpendTrend, { n: days })} />
+        </Tile>)
+        : <Card module="ads" icon={<IconSpeakerphone size={20} />} title={t.adSpend} t={t} span="span4" id="home-ads">
+          <Body section={overview.ads} t={t} empty={<Empty title={t.adsEmptyTitle} body={t.adsEmptyBody} action={t.adsEmptyAction} href={HREF.ads} />}>{() => null}</Body>
+        </Card>)}
     </div>
   </div></PageFrame>;
 }

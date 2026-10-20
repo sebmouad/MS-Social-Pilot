@@ -50,16 +50,16 @@ export function VerifyEmailForm({ locale = 'en' }: { locale?: AuthLocale }) {
     finally { setPending(false); }
   }
 
-  if (state === 'loading' || state === 'confirming') return <AuthShell title={t.title}><AuthStatus>{t.confirming}</AuthStatus></AuthShell>;
-  if (state === 'confirmed') return <AuthShell title={t.confirmedTitle}>
+  if (state === 'loading' || state === 'confirming') return <AuthShell locale={locale} title={t.title}><AuthStatus>{t.confirming}</AuthStatus></AuthShell>;
+  if (state === 'confirmed') return <AuthShell locale={locale} title={t.confirmedTitle}>
     <AuthNotice tone="success">{t.confirmed}</AuthNotice>
     <a className="ui-button ui-button--primary" href="/sign-in">{t.continue}</a>
   </AuthShell>;
-  if (state === 'resent') return <AuthShell title={t.sentTitle}>
+  if (state === 'resent') return <AuthShell locale={locale} title={t.sentTitle}>
     <AuthNotice tone="success">{t.sent}</AuthNotice>
     <p className={authStyles.links}><a href="/sign-in">{copy.backToSignIn}</a></p>
   </AuthShell>;
-  return <AuthShell title={t.title} lead={t.lead} footer={<a className={authStyles.linkButton} href="/sign-in">{copy.backToSignIn}</a>}>
+  return <AuthShell locale={locale} title={t.title} lead={t.lead} footer={<a className={authStyles.linkButton} href="/sign-in">{copy.backToSignIn}</a>}>
     <form className={authStyles.form} method="post" noValidate onSubmit={resend}>
       {error && <AuthNotice>{error}</AuthNotice>}
       <AuthField id="verify-email" name="email" type="email" label={t.email} required maxLength={320} autoComplete="email" spellCheck={false} error={fieldError} disabled={pending} />

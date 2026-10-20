@@ -33,3 +33,5 @@ export { Field, FieldGroup, TextInput, Switch, RadioCards, SegmentedControl, Fil
 export type { ChoiceOption } from "./Forms";
 export { FilterPanel, FilterSection, FilterChips, DatePresets } from "./FilterPanel";
 export type { ActiveFilter, DatePreset } from "./FilterPanel";
+export { Avatar, AvatarStack, avatarSlot, avatarInitials } from "./Avatar";
+export { computePopupPlacement } from "./usePopupPlacement";

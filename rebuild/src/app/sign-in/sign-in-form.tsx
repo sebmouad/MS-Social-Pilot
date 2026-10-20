@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { Button } from '@/components/Button';
+import type { ToastInput } from '@/components/Toast';
+import { AuthToast } from '@/modules/home/auth/AuthToast';
 import { validateFields } from '@/lib/ui/form-validation';
 import { AuthField, AuthNotice, AuthShell, authStyles } from '@/modules/home/auth/AuthShell';
 import { authCopy, type AuthLocale } from '@/modules/home/auth/copy';
@@ -15,13 +17,15 @@ export function SignInForm({ locale = 'en' }: { locale?: AuthLocale }) {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [signUpOpen, setSignUpOpen] = useState(false);
+  const [flash, setFlash] = useState<ToastInput | null>(null);
   useEffect(() => { void fetch('/api/auth/register', { cache: 'no-store' }).then(r => r.json()).then((b: { available?: boolean }) => setSignUpOpen(b.available === true)).catch(() => undefined); }, []);
 
   async function signOut() {
     setSigningOut(true); setMessage(null);
     try {
       const response = await fetch('/api/auth/sign-out', { method: 'POST' });
-      setMessage(response.ok ? { tone: 'info', text: t.signedOut } : { tone: 'error', text: t.signOutFailed });
+      if (response.ok) setFlash({ tone: 'success', title: t.signedOut });
+      else setMessage({ tone: 'error', text: t.signOutFailed });
     } catch { setMessage({ tone: 'error', text: t.signOutFailed }); }
     finally { setSigningOut(false); }
   }
@@ -58,11 +62,12 @@ export function SignInForm({ locale = 'en' }: { locale?: AuthLocale }) {
     }
   }
 
-  return <AuthShell title={t.title} lead={t.lead} footer={<button type="button" className={authStyles.linkButton} onClick={signOut} disabled={signingOut}>{signingOut ? t.signingOut : t.signOut}</button>}>
+  return <AuthShell locale={locale} title={t.title} lead={t.lead} footer={<button type="button" className={authStyles.linkButton} onClick={signOut} disabled={signingOut}>{signingOut ? t.signingOut : t.signOut}</button>}>
+    <AuthToast toast={flash} />
     <form className={authStyles.form} method="post" noValidate onSubmit={submit}>
       <AuthField id="email" name="email" type="email" label={t.email} autoComplete="username" required maxLength={320} spellCheck={false} error={errors.email} disabled={busy} />
       <AuthField id="password" name="password" type={showPassword ? 'text' : 'password'} label={t.password} autoComplete="current-password" required maxLength={200} error={errors.password} disabled={busy}
-        trailing={<Button aria-label={showPassword ? t.hideLabel : t.showLabel} aria-pressed={showPassword} disabled={busy} onClick={() => setShowPassword(value => !value)}>{showPassword ? t.hide : t.show}</Button>} />
+        trailing={<Button variant="quiet" size="sm" aria-label={showPassword ? t.hideLabel : t.showLabel} aria-pressed={showPassword} disabled={busy} onClick={() => setShowPassword(value => !value)}>{showPassword ? t.hide : t.show}</Button>} />
       {message && <AuthNotice tone={message.tone}>{message.text}</AuthNotice>}
       <Button type="submit" variant="primary" busy={busy} className={authStyles.fill}>{busy ? t.busy : t.submit}</Button>
     </form>
