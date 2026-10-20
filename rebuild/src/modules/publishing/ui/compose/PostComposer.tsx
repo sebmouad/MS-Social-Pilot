@@ -5,15 +5,17 @@ import { profileChannelName, type ProfileDirectory } from '@/modules/settings/ch
 
 import { usePreserveFormState } from '@/components/usePreserveFormState';
 import { AutoTextarea } from '@/components/AutoTextarea';
-import { Button } from '@/components';
+import { Badge, Button, Field, RadioCards, Select, TextInput } from '@/components';
 import { Dialog } from '@/components/Dialog';
+import { Avatar } from '@/modules/publishing/ui/kit/kit';
+import { composerCopy } from './composer-copy';
 import { PostPreview } from '@/components/PostPreview';
 import { SidebarDock } from '@/components/SidebarDock';
 import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
 import { publishingMediaIssue } from '@/modules/publishing/media-support';
 import { DestinationFormats, effectiveDestinationFormat } from '@/modules/publishing/components/DestinationFormats';
 import type { PublishingFormatDescriptor, PublishingMediaSupport } from '@/platforms/types';
-import { useActionState, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useActionState, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { createPostWithRecoveryAction } from '@/modules/publishing/ui/posts/actions';
@@ -21,7 +23,7 @@ import { crowdedDestinationPlatforms } from '@/modules/settings/workspace-operat
 import { workspaceOperationsCopy } from '@/modules/settings/workspace-operations-copy';
 import { AiAssist } from '@/modules/ai/components/AiAssist';
 import type { AiStatus } from '@/modules/ai/ai';
-import { previewQueueAction, saveQueueComposerAction, type QueueComposerState as ComposerActionState, type QueuePreviewState } from './queue-actions';
+import { autosaveDraftAction, previewQueueAction, saveQueueComposerAction, type QueueComposerState as ComposerActionState, type QueuePreviewState } from './queue-actions';
 import { fill, queueCopy } from './queue-copy';
 import { holdsRemotely, leadLabel, remoteScheduleCopy } from './remote-copy';
 import { formatDate } from '@/modules/publishing/ui/publishing-ui';
@@ -30,6 +32,8 @@ import styles from './PostComposer.module.css';
 type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
 type TargetChoice = {
   id: string; name: string; type: string; provider: string | null; canPublish: boolean;
+  /** The installed platform module's customer-facing name; null when unknown. */
+  platformName?: string | null;
   publishingMedia?: PublishingMediaSupport;
   publishingFormats?: readonly PublishingFormatDescriptor[];
   defaultPublishingFormatId?: string;
@@ -44,12 +48,22 @@ const FORM_ID = 'post-composer-form';
 const ALL_MEDIA_KINDS = ['image', 'video'] as const;
 
 async function saveWithTransportRecovery(previous: ComposerActionState, data: FormData): Promise<ComposerActionState> {
-  try { return await (data.get('intent') === 'queue' || previous.values.draftPostId ? saveQueueComposerAction(previous, data) : createPostWithRecoveryAction(previous, data)); }
+  try { return await (data.get('intent') === 'queue' || previous.values.draftPostId || data.get('draftPostId') ? saveQueueComposerAction(previous, data) : createPostWithRecoveryAction(previous, data)); }
   catch (error) {
     // Next redirects are framework control flow and must reach its action router.
     if (error && typeof error === 'object' && 'digest' in error && typeof error.digest === 'string' && error.digest.startsWith('NEXT_REDIRECT')) throw error;
     return { status: 'error', saveUnconfirmed: true, message: 'We could not confirm whether this post was saved. Check Posts before retrying.', values: previous.values };
   }
+}
+
+/** One numbered stage of the authoring flow: destinations, content, media, first comment, scheduling. */
+function Step({ n, title, help, children }: { n: number; title: string; help?: string; children: ReactNode }) {
+  const id = useId();
+  return <section className={styles.step} aria-labelledby={id}>
+    <header className={styles.stepHead}><span className={styles.stepNumber} aria-hidden="true">{n}</span><h2 id={id}>{title}</h2></header>
+    {help ? <p className={styles.fieldHelp}>{help}</p> : null}
+    {children}
+  </section>;
 }
 
 function initialMedia(value: unknown): PostMediaItem[] {
@@ -122,7 +136,7 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items);
 }
 
-export function PostComposer({ profiles, targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling }: { remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
+export function PostComposer({ profiles, targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling, autosaveSeconds = 0 }: { autosaveSeconds?: number; remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -155,12 +169,20 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
   const [uploading, setUploading] = useState(false);
   const submitGuard = useRef<'ready' | 'uploading' | 'submitting'>('ready');
   const feedbackRef = useRef<HTMLParagraphElement>(null);
+  const text = composerCopy[aiLocale];
+  // Background draft saving: the first save creates the draft, later saves update it, and a manual save reuses its id.
+  const [draftPostId, setDraftPostId] = useState(initial.draftPostId ?? '');
+  const [autosave, setAutosave] = useState<{ status: 'idle' | 'saving' | 'saved' | 'error'; at?: string }>({ status: 'idle' });
+  const autosaveInFlight = useRef<Promise<unknown> | null>(null);
+  const lastAutosaved = useRef('');
+  const draftIdRef = useRef(initial.draftPostId ?? '');
   const selected = useMemo(() => targets.filter(target => selectedTargets.includes(target.id) && target.canPublish), [targets, selectedTargets]);
   // The choice appears only when a selected destination's own module declares it can hold a scheduled post.
   const holdCopy = remoteScheduleCopy[aiLocale];
   const heldFormat = (target: TargetChoice) => target.publishingFormats?.find(format => format.id === effectiveDestinationFormat(target, formatChoices));
   const holdable = selected.filter(target => holdsRemotely(heldFormat(target)));
   const appOnly = selected.filter(target => !holdsRemotely(heldFormat(target)));
+  const holdablePlatforms = [...new Set(holdable.flatMap(target => target.platformName ? [target.platformName] : []))].join(' + ');
   const holdLeads = holdable.map(target => heldFormat(target)!.scheduling.nativeLeadSeconds!);
   const holdWindow = { min: leadLabel(Math.max(0, ...holdLeads.map(lead => lead.min)), aiLocale), max: leadLabel(Math.min(...holdLeads.map(lead => lead.max)), aiLocale) };
   const uploadRules = localUploadRules(selected, imageRules);
@@ -201,6 +223,32 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
     setLabelId(template.labelId ?? '');
     setTemplateToApply(null);
   }
+
+  const pendingFiles = attachments.items.some(item => item.source === 'upload' && item.file);
+  const autosaveSignature = JSON.stringify([message, firstComment, firstCommentDelayMinutes, labelId, link, selectedTargets, formatChoices, attachments.media]);
+  useEffect(() => {
+    if (!autosaveSeconds || saved || pending || uploading || pendingFiles || submitGuard.current !== 'ready') return;
+    if (autosaveSignature === lastAutosaved.current || (!message.trim() && !link.trim() && !attachments.media.length)) return;
+    const delay = firstCommentDelayMinutes === '' ? 0 : Number(firstCommentDelayMinutes);
+    if (!Number.isSafeInteger(delay) || delay < 0 || delay > maxFirstCommentDelayMinutes) return;
+    const timer = setTimeout(() => {
+      const data = new FormData();
+      data.set('message', message); data.set('firstComment', firstComment); data.set('firstCommentDelayMinutes', firstCommentDelayMinutes);
+      data.set('labelId', labelId); data.set('link', link); data.set('mediaJson', JSON.stringify(attachments.media)); data.set('destinationFormatsJson', destinationFormatsJson);
+      for (const id of selected.map(target => target.id)) data.append('targetIds', id);
+      setAutosave({ status: 'saving' });
+      const run = autosaveDraftAction(draftPostId || null, data).then(result => {
+        if (result.status === 'saved') {
+          lastAutosaved.current = autosaveSignature;
+          draftIdRef.current = result.draftPostId;
+          setDraftPostId(result.draftPostId);
+          setAutosave({ status: 'saved', at: new Intl.DateTimeFormat(aiLocale, { timeZone: schedule.timeZone, hour: '2-digit', minute: '2-digit' }).format(new Date(result.savedAt)) });
+        } else setAutosave(result.status === 'error' ? { status: 'error' } : { status: 'idle' });
+      }, () => setAutosave({ status: 'error' })).finally(() => { if (autosaveInFlight.current === run) autosaveInFlight.current = null; });
+      autosaveInFlight.current = run;
+    }, autosaveSeconds * 1000);
+    return () => clearTimeout(timer);
+  }, [autosaveSeconds, autosaveSignature, saved, pending, uploading, pendingFiles, message, firstComment, firstCommentDelayMinutes, labelId, link, attachments.media, destinationFormatsJson, selected, draftPostId, maxFirstCommentDelayMinutes, aiLocale, schedule.timeZone]);
 
   // The chosen queue time is shown before saving. A save that placed (or failed to place) a post changes what is free, so it refreshes too.
   const selectedKey = JSON.stringify(selected.map(target => target.id));
@@ -243,6 +291,14 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    // A background save still in flight must finish first so the manual save reuses its draft instead of creating a second one.
+    if (autosaveInFlight.current) {
+      event.preventDefault();
+      await autosaveInFlight.current;
+      flushSync(() => setDraftPostId(draftIdRef.current));
+      form.requestSubmit(submitter ?? undefined);
+      return;
+    }
     const intent = submitter?.value === 'schedule' ? 'schedule' : submitter?.value === 'queue' && queueAvailable ? 'queue' : 'draft';
     setMode(intent);
     setLocalError('');
@@ -310,10 +366,34 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
       {localError && <p ref={feedbackRef} className={styles.error} role="alert" tabIndex={-1}>{localError}</p>}
       {state.status === 'error' && <p ref={feedbackRef} className={styles.error} role="alert" data-composer-error tabIndex={-1}>{state.message} {copy.retained}{state.saveUnconfirmed ? <> <a href="/publishing/posts" target="_blank" rel="noopener noreferrer">{copy.checkPosts}</a>.</> : ` ${copy.retry}`}</p>}
       {uploadMessage && <p className={styles.uploadNotice} role="status">{uploadMessage}</p>}
+      <Step n={1} title={text.destinations} help={text.destinationsHelp}>
+        {selected.length ? <ul className={styles.chosen} aria-label={text.destinations}>{selected.map(target => {
+          const channelName = profiles?.channels.find(channel => channel.id === target.id) ? profileChannelName(profiles.channels.find(channel => channel.id === target.id)!) : target.name;
+          const format = heldFormat(target);
+          return <li key={target.id}>
+            <Avatar name={channelName} size={26} />
+            <span className={styles.chosenName}>{channelName}</span>
+            {target.platformName ? <Badge tone="neutral">{target.platformName}</Badge> : null}
+            {format && target.publishingFormats && target.publishingFormats.length > 1 ? <span className={styles.chosenMeta}>{text.formatLabel(format.label)}</span> : null}
+          </li>;
+        })}</ul> : <p className={styles.fieldHelp}>{text.noDestination}</p>}
+      </Step>
+      <Step n={2} title={text.content}>
       <label htmlFor="composer-message">Post text <span>(optional with a link or media)</span></label>
       <AutoTextarea id="composer-message" name="message" disabled={saved} value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={7} placeholder="Write a post for your team…" aria-describedby="composer-message-count" />
       <div className={styles.fieldMeta} id="composer-message-count">{message.length.toLocaleString()} / {imageRules.maxMessageCharacters.toLocaleString()}</div>
       <AiAssist status={aiStatus} locale={aiLocale} text={message} disabled={pending || saved} onUse={(suggestion, kind) => setMessage(current => (kind === 'hashtags' ? `${current.trimEnd()}${current.trim() ? '\n\n' : ''}${suggestion}` : suggestion).slice(0, imageRules.maxMessageCharacters))} />
+      </Step>
+      <Step n={3} title={text.media}>
+      <fieldset className={styles.attachments} disabled={uploading || pending || saved}>
+        <legend>Attachments <span>(optional)</span></legend>
+        <label htmlFor="composer-link">Link <span>(optional)</span></label>
+        <input id="composer-link" name="link" type="url" value={link} onChange={event => setLink(event.currentTarget.value)} placeholder="https://example.com" />
+        <PostAttachments controller={attachments} disabled={uploading || pending || saved} />
+        <small>Attachment support depends on the selected destinations.</small>
+      </fieldset>
+      </Step>
+      <Step n={4} title={text.firstComment}>
       <label htmlFor="composer-first-comment">First comment <span>(optional)</span></label>
       <AutoTextarea id="composer-first-comment" name="firstComment" disabled={saved} value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder="Add a link or follow-up as the first comment…" />
       <label htmlFor="composer-first-comment-delay">Wait before the first comment <span>(minutes; 0 sends it right after publication)</span></label>
@@ -323,14 +403,58 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
       <input type="hidden" name="labelId" value={labelId} />
       <input type="hidden" name="queueLocale" value={aiLocale} />
       <input type="hidden" name="destinationFormatsJson" value={destinationFormatsJson} />
+      <input type="hidden" name="draftPostId" value={draftPostId} />
+      </Step>
 
-      <fieldset className={styles.attachments} disabled={uploading || pending || saved}>
-        <legend>Attachments <span>(optional)</span></legend>
-        <label htmlFor="composer-link">Link <span>(optional)</span></label>
-        <input id="composer-link" name="link" type="url" value={link} onChange={event => setLink(event.currentTarget.value)} placeholder="https://example.com" />
-        <PostAttachments controller={attachments} disabled={uploading || pending || saved} />
-        <small>Attachment support depends on the selected destinations.</small>
-      </fieldset>
+      <Step n={5} title={text.scheduling} help={text.schedulingHelp(schedule.timeZone.replaceAll('_', ' '))}>
+        <fieldset className={styles.scheduleFields} disabled={pending || uploading || saved}>
+          <legend className="ui-visually-hidden">{text.scheduling}</legend>
+          <div className={styles.dateTime}>
+            <Field label={text.date}><TextInput type="date" name="scheduleDate" value={scheduleDate} onChange={event => setScheduleDate(event.currentTarget.value)} /></Field>
+            <Field label={text.time}><TextInput type="time" name="scheduleTime" value={scheduleTime} onChange={event => setScheduleTime(event.currentTarget.value)} /></Field>
+          </div>
+          <BestTimeSuggestions targetIds={selectedTargets} locale={aiLocale} disabled={pending || uploading || saved} onChoose={({ date, time }) => { setScheduleDate(date); setScheduleTime(time); setMode('schedule'); }} />
+          {remoteScheduling?.offered && holdable.length > 0 && <div className={styles.holdChoice}>
+            <strong id="composer-hold-legend">{text.whoSends}</strong>
+            <RadioCards legend={holdCopy.legend} name="scheduleMode" value={scheduleMode} onChange={value => setScheduleMode(value === 'remote' ? 'remote' : 'application')} options={[
+              { value: 'application', label: text.holdApp, description: text.holdAppHint },
+              { value: 'remote', label: text.holdPlatform(holdablePlatforms || text.platformFallback), description: `${text.holdPlatformHint(holdablePlatforms || text.platformFallback)} ${holdCopy.window.replace('{min}', holdWindow.min).replace('{max}', holdWindow.max)}` },
+            ]} />
+          </div>}
+          <input type="hidden" name="destinationScheduleModesJson" value={destinationScheduleModesJson} />
+          {selected.length > 0 && <ul className={styles.destinationModes} aria-label={text.whoSends}>
+            {selected.map(target => {
+              const canHold = remoteScheduling?.offered && holdable.some(item => item.id === target.id);
+              const effective = canHold ? destinationModes[target.id] ?? scheduleMode : 'application';
+              const platform = target.platformName || text.platformFallback;
+              return <li key={target.id}>
+                <div className={styles.modeRow}>
+                  <span className={styles.chosenName}>{target.name}</span>
+                  {canHold && selected.length > 1 ? <Select aria-label={`${text.perDestination}: ${target.name}`} value={destinationModes[target.id] ?? ''}
+                    onChange={value => setDestinationModes(current => { const next = { ...current }; if (value === 'application' || value === 'remote') next[target.id] = value; else delete next[target.id]; return next; })}
+                    options={[{ value: '', label: text.sameAsAbove }, { value: 'application', label: text.holdApp }, { value: 'remote', label: text.holdPlatform(platform) }]} /> : null}
+                </div>
+                <small>{effective === 'remote' ? text.destinationPlatform(platform) : canHold || !remoteScheduling?.offered ? text.destinationApp : text.destinationAppOnly}</small>
+              </li>;
+            })}
+          </ul>}
+          {remoteScheduling?.offered && scheduleMode === 'remote' && appOnly.length > 0 && <small role="status">{holdCopy.appOnly.replace('{names}', appOnly.map(target => target.name).join(', '))}</small>}
+          {queueAvailable && <section className={styles.queueSlot} aria-label={copy.legend} aria-live="polite">
+            <h3>{copy.legend}</h3>
+            {!selected.length ? <p>{copy.chooseDestination}</p>
+              : queuePreview === 'loading' || queuePreview === null || previewSelection !== selectedKey ? <p>{copy.loading}</p>
+              : queuePreview.status === 'error' ? <><p>{copy.unavailable}</p><Button type="button" size="sm" disabled={pending || uploading || saved} onClick={() => setPreviewRefresh(value => value + 1)}>{copy.retryPreview}</Button></>
+              : queuePreview.status === 'full' ? <p>{copy.full}</p>
+              : <>
+                <p><strong>{fill(copy.next, { time: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) })}</strong></p>
+                {selected.length > 1 && <ul>{queuePreview.channels.map(channel => { const name = selected.find(target => target.id === channel.targetId)?.name ?? ''; return <li key={channel.targetId}>{channel.nextAt ? fill(copy.channelLine, { name, time: formatDate(new Date(channel.nextAt), schedule.timeZone) }) : fill(copy.channelFull, { name })}</li>; })}</ul>}
+                <small>{copy.estimate}</small>
+              </>}
+            <small>{copy.hint}</small>
+          </section>}
+        </fieldset>
+        {autosaveSeconds > 0 && <p className={styles.autosave} aria-live="polite">{autosave.status === 'saving' ? text.autosaveSaving : autosave.status === 'saved' && autosave.at ? text.autosaveSaved(autosave.at) : autosave.status === 'error' ? text.autosaveFailed : text.autosaveOn}</p>}
+      </Step>
     </form>
 
     <section className={styles.previewPanel} aria-labelledby="composer-preview-title">
@@ -349,19 +473,6 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
           <Button form={FORM_ID} type="submit" name="intent" value="schedule" variant="primary" disabled={pending || uploading || saved} onClick={() => setMode('schedule')}>{uploading ? 'Uploading…' : saved ? 'Opening…' : pending ? 'Saving…' : 'Schedule post'}</Button>
           {queueAvailable && <Button form={FORM_ID} type="submit" name="intent" value="queue" disabled={pending || uploading || saved || !(queuePreview && typeof queuePreview === 'object' && queuePreview.status === 'ready' && previewSelection === selectedKey)} onClick={() => setMode('queue')}>{uploading ? 'Uploading…' : saved ? 'Opening…' : pending ? 'Saving…' : copy.button}</Button>}
         </div>
-        {queueAvailable && <section className={styles.queueSlot} aria-label={copy.legend} aria-live="polite">
-          <h3>{copy.legend}</h3>
-          {!selected.length ? <p>{copy.chooseDestination}</p>
-            : queuePreview === 'loading' || queuePreview === null || previewSelection !== selectedKey ? <p>{copy.loading}</p>
-            : queuePreview.status === 'error' ? <><p>{copy.unavailable}</p><Button type="button" size="sm" disabled={pending || uploading || saved} onClick={() => setPreviewRefresh(value => value + 1)}>{copy.retryPreview}</Button></>
-            : queuePreview.status === 'full' ? <p>{copy.full}</p>
-            : <>
-              <p><strong>{fill(copy.next, { time: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) })}</strong></p>
-              {selected.length > 1 && <ul>{queuePreview.channels.map(channel => { const name = selected.find(target => target.id === channel.targetId)?.name ?? ''; return <li key={channel.targetId}>{channel.nextAt ? fill(copy.channelLine, { name, time: formatDate(new Date(channel.nextAt), schedule.timeZone) }) : fill(copy.channelFull, { name })}</li>; })}</ul>}
-              <small>{copy.estimate}</small>
-            </>}
-          <small>{copy.hint}</small>
-        </section>}
         <fieldset className={styles.destinationList} disabled={pending || uploading || saved}>
           <legend>Destinations</legend>
           {profiles && <GroupShortcut groups={profiles.groups} allowedIds={targets.filter(target => target.canPublish).map(target => target.id)} onSelect={setSelectedTargets} locale={aiLocale} disabled={pending || uploading || saved} />}
@@ -376,33 +487,6 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
           <legend>Formats</legend>
           <DestinationFormats targets={targets} selectedIds={selected.map(target => target.id)} values={formatChoices} formId={FORM_ID} disabled={pending || uploading || saved} onChange={(id, value) => setFormatChoices(current => ({ ...current, [id]: value }))} />
         </fieldset>}
-        <BestTimeSuggestions targetIds={selectedTargets} locale={aiLocale} disabled={pending || uploading || saved} onChoose={({ date, time }) => { setScheduleDate(date); setScheduleTime(time); setMode('schedule'); }} />
-        <fieldset className={styles.scheduleFields} disabled={pending || uploading || saved}>
-          <legend>Schedule</legend>
-          <p>Times use {schedule.timeZone.replaceAll('_', ' ')}.</p>
-          <label htmlFor="composer-date">Date</label><input form={FORM_ID} id="composer-date" type="date" name="scheduleDate" value={scheduleDate} onChange={event => setScheduleDate(event.currentTarget.value)} />
-          <label htmlFor="composer-time">Time</label><input form={FORM_ID} id="composer-time" type="time" name="scheduleTime" value={scheduleTime} onChange={event => setScheduleTime(event.currentTarget.value)} />
-          {remoteScheduling?.offered && holdable.length > 0 && <div role="radiogroup" aria-labelledby="composer-hold-legend" className="ui-field">
-            <strong id="composer-hold-legend">{holdCopy.legend}</strong>
-            <label><input form={FORM_ID} type="radio" name="scheduleMode" value="application" checked={scheduleMode === 'application'} onChange={() => setScheduleMode('application')} /> {holdCopy.application}</label>
-            <small>{holdCopy.applicationHint}</small>
-            <label><input form={FORM_ID} type="radio" name="scheduleMode" value="remote" checked={scheduleMode === 'remote'} onChange={() => setScheduleMode('remote')} /> {holdCopy.remote}</label>
-            <small>{holdCopy.remoteHint} {holdCopy.window.replace('{min}', holdWindow.min).replace('{max}', holdWindow.max)}</small>
-            {scheduleMode === 'remote' && appOnly.length > 0 && <small role="status">{holdCopy.appOnly.replace('{names}', appOnly.map(target => target.name).join(', '))}</small>}
-          </div>}
-          <input form={FORM_ID} type="hidden" name="destinationScheduleModesJson" value={destinationScheduleModesJson} />
-          {remoteScheduling?.offered && holdable.length > 0 && selected.length > 1 && <div role="group" aria-labelledby="composer-hold-each-legend" className="ui-field">
-            <strong id="composer-hold-each-legend">{holdCopy.perDestination}</strong>
-            <small>{holdCopy.perDestinationHint}</small>
-            {holdable.map(target => <label key={target.id}>{target.name}
-              <select form={FORM_ID} value={destinationModes[target.id] ?? ''} onChange={event => { const value = event.currentTarget.value; setDestinationModes(current => { const next = { ...current }; if (value === 'application' || value === 'remote') next[target.id] = value; else delete next[target.id]; return next; }); }}>
-                <option value="">{holdCopy.sameAsAbove}</option>
-                <option value="application">{holdCopy.application}</option>
-                <option value="remote">{holdCopy.remote}</option>
-              </select>
-            </label>)}
-          </div>}
-        </fieldset>
       </aside>
     </SidebarDock>
     <Dialog open={templateChooserOpen} title="Choose a post template" description="This copies saved message text, first comment and its delay into the current composer. It does not create or publish a post." onClose={() => setTemplateChooserOpen(false)} actions={<Button data-dialog-cancel onClick={() => setTemplateChooserOpen(false)}>Close</Button>}>

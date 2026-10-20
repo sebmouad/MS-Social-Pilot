@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireViewer } from '@/server/context';
 import { previewQueueTimes, createQueuedPost, QueueAfterSaveError } from '@/modules/publishing/server/queue-compose';
-import { updatePost, schedulePost } from '@/modules/publishing/server/lifecycle';
+import { createPost, updatePost, schedulePost } from '@/modules/publishing/server/lifecycle';
 import { parseScheduleMode } from '@/modules/publishing/remote-scheduling';
 import { parseDestinationScheduleModesJson } from '@/modules/publishing/server/schedule-modes';
 import { parsePublishingMedia } from '@/modules/publishing/media-support';
@@ -39,7 +39,8 @@ export async function saveQueueComposerAction(previous: QueueComposerState, data
   const copy = queueCopy[field('queueLocale') === 'fr' ? 'fr' : 'en'];
   const values = { ...previous.values, ...Object.fromEntries([...data.entries()].filter(([, value]) => typeof value === 'string')), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') };
   // Recovery still goes through updatePost and its current whole-post authorization.
-  const draftPostId = previous.values.draftPostId;
+  // A draft started by autosave arrives as a hidden field; either way updatePost re-authorizes the whole post.
+  const draftPostId = previous.values.draftPostId || (/^[A-Za-z0-9_-]{1,200}$/.test(field('draftPostId')) ? field('draftPostId') : undefined);
   try {
     const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
     const input = {
@@ -69,6 +70,38 @@ export async function saveQueueComposerAction(previous: QueueComposerState, data
       return { status: 'error', message: copy.savedDraft, values: { ...values, draftPostId: error.draftPostId } };
     }
     return { status: 'error', message: copy.saveFailed, values: { ...values, ...(draftPostId ? { draftPostId } : {}) } };
+  }
+}
+
+export type AutosaveState = { status: 'saved'; draftPostId: string; savedAt: string } | { status: 'skipped' } | { status: 'error' };
+
+/**
+ * Background draft save for the composer. The first call creates a draft through the same lifecycle service
+ * as Save draft; later calls update that draft. Whole-post authorization applies to both, so a forged id
+ * can only touch a post the member may already edit. Only plain fields are accepted (no file uploads).
+ */
+export async function autosaveDraftAction(draftPostId: string | null, data: FormData): Promise<AutosaveState> {
+  const field = (key: string) => typeof data.get(key) === 'string' ? String(data.get(key)) : '';
+  try {
+    const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
+    const media = parsePublishingMedia(JSON.parse(field('mediaJson') || '[]'));
+    if (!field('message').trim() && !field('link').trim() && !media.length) return { status: 'skipped' };
+    const input = {
+      message: field('message'), firstComment: field('firstComment'), labelId: field('labelId') || null,
+      firstCommentDelayMinutes: parseFirstCommentDelay(field('firstCommentDelayMinutes'), Number(await runtimeConfig('publishing.maxFirstCommentDelayMinutes'))),
+      link: field('link'), media,
+      destinationFormats: JSON.parse(field('destinationFormatsJson') || '{}'), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string'),
+    };
+    const savedAt = new Date().toISOString();
+    if (draftPostId) {
+      if (!/^[A-Za-z0-9_-]{1,200}$/.test(draftPostId)) return { status: 'error' };
+      await updatePost(actor(viewer), { ...input, postId: draftPostId });
+      return { status: 'saved', draftPostId, savedAt };
+    }
+    const created = await createPost(actor(viewer), input);
+    return { status: 'saved', draftPostId: created.id, savedAt };
+  } catch {
+    return { status: 'error' };
   }
 }
 

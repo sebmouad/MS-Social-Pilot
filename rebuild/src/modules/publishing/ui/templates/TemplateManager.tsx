@@ -1,7 +1,9 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { IconPencil, IconTemplate, IconTrash } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
+import { DataTable } from '@/components/DataTable';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
 import { SidebarDock } from '@/components/SidebarDock';
@@ -73,7 +75,20 @@ export function TemplateManager({ initialTemplates, labels, page, hasMore, query
       <Button type="submit" variant="secondary">Search</Button>{query && <a href="/publishing/templates">Clear</a>}
       {canWrite && <Button type="button" variant="primary" onClick={() => begin()}>New template</Button>}
     </form></SidebarDock>
-    {templates.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Reusable post templates</caption><thead><tr><th scope="col">Template</th><th scope="col">Category</th><th scope="col">Message preview</th><th scope="col">Updated</th>{canWrite && <th scope="col">Actions</th>}</tr></thead><tbody>{templates.map(template => <tr key={template.id}><th scope="row"><span className={styles.name}>{template.name}</span><span className={styles.meta}>{template.hashtags || 'No hashtags'}{template.firstComment ? ' · Includes first comment' : ''}</span></th><td>{template.category || 'Uncategorized'}</td><td><span className={styles.preview}>{template.body}</span></td><td>{time(template.updatedAt)}</td>{canWrite && <td><div className={styles.actions}><Button size="sm" disabled={busy} onClick={() => begin(template)}>Edit</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => void remove(template)}>Delete</Button></div></td>}</tr>)}</tbody></table></div> : <p className={styles.empty}>{query ? 'No templates match this search.' : 'No templates yet. Create one to reuse message text, hashtags and a first comment in the post composer.'}</p>}
+    <DataTable caption="Reusable post templates" rows={templates} rowKey={template => template.id}
+      columns={[
+        { key: 'name', label: 'Template', render: template => <><span className={styles.name}>{template.name}</span><span className={styles.meta}>{template.hashtags || 'No hashtags'}{template.firstComment ? ' · Includes first comment' : ''}</span></> },
+        { key: 'category', label: 'Category', render: template => template.category || 'Uncategorized' },
+        { key: 'preview', label: 'Message preview', render: template => <span className={styles.preview}>{template.body}</span> },
+        { key: 'updated', label: 'Updated', render: template => time(template.updatedAt) },
+      ]}
+      rowActions={canWrite ? template => [
+        { key: 'edit', label: 'Edit', icon: <IconPencil size={16} />, disabled: busy, onSelect: () => begin(template) },
+        { key: 'delete', label: 'Delete', icon: <IconTrash size={16} />, danger: true, disabled: busy, onSelect: () => remove(template) },
+      ] : undefined}
+      rowActionsLabel={template => `Actions for ${template.name}`}
+      emptyIcon={<IconTemplate />} emptyMessage={query ? 'No templates match this search.' : 'No templates yet. Create one to reuse message text, hashtags and a first comment in the post composer.'}
+      emptyAction={query ? <a className="ui-button ui-button--secondary" href="/publishing/templates">Clear search</a> : canWrite ? <Button variant="primary" onClick={() => begin()}>New template</Button> : undefined} />
     <nav className={styles.pagination} aria-label="Template pages">{page > 1 && <a href={`/publishing/templates?page=${page - 1}${query ? `&q=${encodeURIComponent(query)}` : ''}`}>Previous page</a>}<span>Page {page}</span>{hasMore && <a href={`/publishing/templates?page=${page + 1}${query ? `&q=${encodeURIComponent(query)}` : ''}`}>Next page</a>}</nav>
     <p className={styles.help}>Templates are shared with workspace members who can create posts. They save message text, hashtags, first comment and an optional label; media and links are chosen separately in the composer.</p>
     <Dialog open={dialog} title={editing ? 'Edit template' : 'New template'} description="Templates save reusable post content. Saving a template does not create or publish a post." onClose={close} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={close}>Cancel</Button><Button type="submit" form="template-form" variant="primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Create template'}</Button></>}>

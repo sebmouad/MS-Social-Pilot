@@ -6,7 +6,7 @@ import { conversationNeedsReply } from '@/modules/inbox/server/threads';
 import { OperationError } from '@/lib/operation-error';
 import { authorizeInbox as readAccess } from './access';
 import { encodeInboxCursor, inboxFilterFingerprint, readInboxCursor, type InboxCursor } from './cursor';
-import type { InboxReadActor, InboxReadConstraints, InboxLimits, InboxListItem, InboxListPage, InboxPageCursors, InboxThreadPage, ThreadEntry } from './types';
+import type { InboxReadActor, InboxReadConstraints, InboxLimits, InboxListItem, InboxSentiment, InboxListPage, InboxPageCursors, InboxThreadPage, ThreadEntry } from './types';
 
 const targetSelect = { id: true, name: true, providerId: true, socialAccount: { select: { provider: true } } } as const;
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
@@ -91,13 +91,18 @@ async function readReviews(workspaceId: string, ids: string[], channelIds?: read
   return rows.flatMap(row => { const target = byId.get(row.targetId); return target ? [{ ...row, target }] : []; });
 }
 
+/** Only the three classifier outputs are shown; any other stored value is treated as unknown. */
+export function storedSentiment(value: string | null): InboxSentiment | null {
+  return value === 'positive' || value === 'neutral' || value === 'negative' ? value : null;
+}
+
 async function hydrateItems(workspaceId: string, keys: Key[]): Promise<InboxListItem[]> {
   const conversationIds = keys.filter(key => key.kind === 'message').map(key => key.id);
   const commentIds = keys.filter(key => key.kind === 'comment').map(key => key.id);
   const reviewIds = keys.filter(key => key.kind === 'review').map(key => key.id);
   const [conversations, comments, reviews] = await Promise.all([
     conversationIds.length ? prisma.conversation.findMany({ where: { id: { in: conversationIds }, target: { workspaceId } }, select: { id: true, snippet: true, unreadCount: true, updatedTime: true, resolvedAt: true, target: { select: targetSelect }, messages: { orderBy: [{ createdTime: 'desc' }, { id: 'desc' }], take: 1, select: { fromName: true, fromId: true, sentById: true, message: true } } } }) : [],
-    commentIds.length ? prisma.postComment.findMany({ where: { id: { in: commentIds }, postTarget: { target: { workspaceId }, post: { workspaceId } } }, select: { id: true, message: true, fromName: true, createdTime: true, resolvedAt: true, isHidden: true, postTarget: { select: { target: { select: targetSelect }, post: { select: { message: true } } } } } }) : [],
+    commentIds.length ? prisma.postComment.findMany({ where: { id: { in: commentIds }, postTarget: { target: { workspaceId }, post: { workspaceId } } }, select: { id: true, message: true, fromName: true, createdTime: true, resolvedAt: true, isHidden: true, sentiment: true, postTarget: { select: { target: { select: targetSelect }, post: { select: { message: true } } } } } }) : [],
     reviewIds.length ? readReviews(workspaceId, reviewIds) : [],
   ]);
   const answered = commentIds.length ? await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
@@ -108,10 +113,10 @@ async function hydrateItems(workspaceId: string, keys: Key[]): Promise<InboxList
   const mapped = new Map<string, InboxListItem>();
   for (const item of conversations) {
     const newest = item.messages[0];
-    mapped.set(`message:${item.id}`, { key: `message:${item.id}`, kind: 'message', id: item.id, author: newest?.sentById ? item.target.name : newest?.fromName || 'Conversation', preview: newest?.message || item.snippet || 'No message text available.', time: item.updatedTime, target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: item.unreadCount, needsReply: conversationNeedsReply(newest, item.target.providerId, Boolean(item.resolvedAt)), resolved: Boolean(item.resolvedAt), hidden: false, context: null, rating: null, recommendation: null });
+    mapped.set(`message:${item.id}`, { key: `message:${item.id}`, kind: 'message', id: item.id, author: newest?.sentById ? item.target.name : newest?.fromName || 'Conversation', preview: newest?.message || item.snippet || 'No message text available.', time: item.updatedTime, target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: item.unreadCount, needsReply: conversationNeedsReply(newest, item.target.providerId, Boolean(item.resolvedAt)), resolved: Boolean(item.resolvedAt), hidden: false, context: null, rating: null, recommendation: null, sentiment: null });
   }
-  for (const item of reviews) mapped.set(`review:${item.id}`, { key: `review:${item.id}`, kind: 'review', id: item.id, author: item.reviewerName || 'Visitor', preview: item.reviewText ?? '', time: item.createdTime, rating: item.rating, recommendation: recommendationOf(item.recommendationType), target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: 0, needsReply: false, resolved: Boolean(item.resolvedAt), hidden: false, context: null });
-  for (const item of comments) mapped.set(`comment:${item.id}`, { key: `comment:${item.id}`, kind: 'comment', id: item.id, author: item.fromName || 'Visitor', preview: item.message, time: item.createdTime, target: { id: item.postTarget.target.id, name: item.postTarget.target.name, provider: item.postTarget.target.socialAccount?.provider ?? null }, unread: 0, needsReply: !item.resolvedAt && !item.isHidden && !answeredIds.has(item.id), resolved: Boolean(item.resolvedAt), hidden: item.isHidden, context: item.postTarget.post.message, rating: null, recommendation: null });
+  for (const item of reviews) mapped.set(`review:${item.id}`, { key: `review:${item.id}`, kind: 'review', id: item.id, author: item.reviewerName || 'Visitor', preview: item.reviewText ?? '', time: item.createdTime, rating: item.rating, recommendation: recommendationOf(item.recommendationType), target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: 0, needsReply: false, resolved: Boolean(item.resolvedAt), hidden: false, context: null, sentiment: null });
+  for (const item of comments) mapped.set(`comment:${item.id}`, { key: `comment:${item.id}`, kind: 'comment', id: item.id, author: item.fromName || 'Visitor', preview: item.message, time: item.createdTime, target: { id: item.postTarget.target.id, name: item.postTarget.target.name, provider: item.postTarget.target.socialAccount?.provider ?? null }, unread: 0, needsReply: !item.resolvedAt && !item.isHidden && !answeredIds.has(item.id), resolved: Boolean(item.resolvedAt), hidden: item.isHidden, context: item.postTarget.post.message, rating: null, recommendation: null, sentiment: storedSentiment(item.sentiment) });
   return keys.flatMap(key => { const item = mapped.get(`${key.kind}:${key.id}`); return item ? [item] : []; });
 }
 

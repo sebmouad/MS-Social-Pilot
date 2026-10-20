@@ -8,7 +8,7 @@ type Media = { kind: string; url: string; altText?: string };
 type Row = {
   message: string; link: string | null; media: unknown; status: string;
   scheduledAt: Date | null; publishedAt: Date | null;
-  targets: Array<{ status: string; target: { id: string; name: string; pictureUrl: string | null } }>;
+  targets: Array<{ status: string; target: { id: string; name: string; pictureUrl: string | null; platformName?: string | null } }>;
 };
 
 const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -44,6 +44,12 @@ export function ChannelsCell({ post, locale = 'en' }: { post: Row; locale?: KitL
   return <AvatarStack channels={[...seen.values()]} locale={locale} />;
 }
 
+/** The platform names holding a post remotely, from the read model; empty when the module metadata is unknown. */
+export function remotePlatformName(post: Row) {
+  const names = [...new Set(post.targets.filter(row => row.status === 'scheduled_remote').flatMap(row => row.target.platformName ? [row.target.platformName] : []))];
+  return names.length ? names.join(' + ') : undefined;
+}
+
 /** Overall status plus the per-destination outcome summary and who schedules it. */
 export function StatusCell({ post, locale = 'en' }: { post: Row; locale?: KitLocale }) {
   const remote = post.targets.some(row => row.status === 'scheduled_remote');
@@ -52,7 +58,7 @@ export function StatusCell({ post, locale = 'en' }: { post: Row; locale?: KitLoc
   const done = post.targets.filter(row => row.status === 'published').length;
   return <div className={styles.statusCell}>
     <StatusChip status={post.status} />
-    {scheduled ? <ScheduleBadge mode={remote ? 'remote' : 'application'} locale={locale} /> : null}
+    {scheduled ? <ScheduleBadge mode={remote ? 'remote' : 'application'} locale={locale} platformName={remote ? remotePlatformName(post) : undefined} /> : null}
     {post.targets.length > 1 && (failed || done) ? <span className={styles.sub}>{done}/{post.targets.length}</span> : null}
     {failed ? <AttentionHint locale={locale} /> : null}
   </div>;

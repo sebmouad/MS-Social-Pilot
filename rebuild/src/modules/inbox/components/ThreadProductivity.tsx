@@ -1,40 +1,100 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import { IconPencil, IconTrash } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
+import { Menu } from '@/components/Menu';
+import { Select } from '@/components/Select';
+import { useToast } from '@/components/Toast';
+import { TextInput } from '@/components/Forms';
 import { useConfirm } from '@/components/useConfirm';
+import { EmptyState } from '@/components/EmptyState';
 import styles from './ThreadProductivity.module.css';
 
-type Props = { kind: 'message' | 'comment'; id: string; canWrite?: boolean; onUseSavedReply?: (body: string) => void };
+type Locale = 'en' | 'fr';
+type Props = { kind: 'message' | 'comment'; id: string; canWrite?: boolean; onUseSavedReply?: (body: string) => void; locale?: Locale };
 type Note = { id: string; authorId: string | null; authorName: string; body: string; createdAt: string; canDelete: boolean };
 type Reply = { id: string; name: string; body: string };
 type Data = { assignment: { assigneeId: string | null; members: { id: string; name: string | null }[] }; notes: Note[]; limits: { noteMaxCharacters: number; savedReplyNameMaxCharacters: number; savedReplyBodyMaxCharacters: number } };
-export function ThreadProductivity({ kind, id, canWrite = true, onUseSavedReply }: Props) {
+
+const COPY = {
+  en: {
+    region: 'Inbox productivity', assignment: 'Assignment', assignTo: 'Assign to', unassigned: 'Unassigned', teammate: 'Teammate', assignedTo: (name: string) => `Assigned to ${name}`,
+    notes: 'Private notes', note: 'Private note', notePlaceholder: 'Add a note for your team', addNote: 'Add note', notesHelp: 'Only your workspace team can see these notes.', deleteNote: 'Delete note',
+    savedReplies: 'Saved replies', noReplies: 'No saved replies yet', noRepliesBody: 'Save the answers you give often and insert them into a reply with one click.',
+    useReply: 'Use reply', replyActions: (name: string) => `Actions for ${name}`, edit: 'Edit', delete: 'Delete',
+    replyName: 'Saved reply name', replyNamePlaceholder: 'Reply name', replyText: 'Saved reply text', replyTextPlaceholder: 'Reply text', createReply: 'Create saved reply', saveReply: 'Save reply', cancelEdit: 'Cancel edit',
+    loadError: 'Inbox productivity could not be loaded.', unconfirmed: 'Action outcome is unconfirmed. Inspect before trying again.', unconfirmedShort: 'Action outcome is unconfirmed.',
+    confirmTitle: 'Please confirm', cancel: 'Cancel', deleteConfirm: 'Delete', deleteNoteAsk: 'Delete this private note? This cannot be undone.', deleteReplyAsk: 'Delete this saved reply for the whole team? This cannot be undone.',
+    done: { assign: 'Assignment updated.', noteAdded: 'Note added.', noteDeleted: 'Note deleted.', replyCreated: 'Saved reply created.', replyUpdated: 'Saved reply updated.', replyDeleted: 'Saved reply deleted.' },
+  },
+  fr: {
+    region: 'Outils de la boîte de réception', assignment: 'Attribution', assignTo: 'Attribuer à', unassigned: 'Non attribuée', teammate: 'Collègue', assignedTo: (name: string) => `Attribuée à ${name}`,
+    notes: 'Notes privées', note: 'Note privée', notePlaceholder: 'Ajoutez une note pour votre équipe', addNote: 'Ajouter la note', notesHelp: 'Seule l’équipe de votre espace de travail voit ces notes.', deleteNote: 'Supprimer la note',
+    savedReplies: 'Réponses enregistrées', noReplies: 'Aucune réponse enregistrée', noRepliesBody: 'Enregistrez les réponses que vous donnez souvent et insérez-les en un clic.',
+    useReply: 'Utiliser la réponse', replyActions: (name: string) => `Actions pour ${name}`, edit: 'Modifier', delete: 'Supprimer',
+    replyName: 'Nom de la réponse enregistrée', replyNamePlaceholder: 'Nom de la réponse', replyText: 'Texte de la réponse enregistrée', replyTextPlaceholder: 'Texte de la réponse', createReply: 'Créer la réponse enregistrée', saveReply: 'Enregistrer la réponse', cancelEdit: 'Annuler la modification',
+    loadError: 'Les outils de la boîte de réception n’ont pas pu être chargés.', unconfirmed: 'Le résultat de l’action n’est pas confirmé. Vérifiez avant de réessayer.', unconfirmedShort: 'Le résultat de l’action n’est pas confirmé.',
+    confirmTitle: 'Veuillez confirmer', cancel: 'Annuler', deleteConfirm: 'Supprimer', deleteNoteAsk: 'Supprimer cette note privée ? Cette action est irréversible.', deleteReplyAsk: 'Supprimer cette réponse enregistrée pour toute l’équipe ? Cette action est irréversible.',
+    done: { assign: 'Attribution mise à jour.', noteAdded: 'Note ajoutée.', noteDeleted: 'Note supprimée.', replyCreated: 'Réponse enregistrée créée.', replyUpdated: 'Réponse enregistrée mise à jour.', replyDeleted: 'Réponse enregistrée supprimée.' },
+  },
+} as const;
+
+/** Assignment, private notes and saved replies for the open conversation. Saved replies only fill the reply box; they never send. */
+export function ThreadProductivity({ kind, id, canWrite = true, onUseSavedReply, locale = 'en' }: Props) {
+  const copy = COPY[locale];
+  const toast = useToast();
   const [data, setData] = useState<Data | null>(null); const [replies, setReplies] = useState<Reply[]>([]); const [note, setNote] = useState(''); const [replyName, setReplyName] = useState(''); const [replyBody, setReplyBody] = useState(''); const [editing, setEditing] = useState<string | null>(null); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     const [productivity, saved] = await Promise.all([fetch(`/api/inbox/productivity?kind=${kind}&id=${encodeURIComponent(id)}`, { cache: 'no-store' }), fetch('/api/inbox/productivity?view=saved-replies', { cache: 'no-store' })]);
     const p = await productivity.json(); const r = await saved.json();
-    if (!productivity.ok || !saved.ok) throw new Error(p.error ?? r.error ?? 'Inbox productivity could not be loaded.');
+    if (!productivity.ok || !saved.ok) throw new Error(p.error ?? r.error ?? COPY.en.loadError);
     setData(p); setReplies(r.replies ?? []);
   }, [kind, id]);
-  useEffect(() => { let live = true; void load().catch(e => { if (live) setError(e instanceof Error ? e.message : 'Inbox productivity could not be loaded.'); }); return () => { live = false; }; }, [load]);
+  useEffect(() => { let live = true; void load().catch(e => { if (live) setError(e instanceof Error ? e.message : copy.loadError); }); return () => { live = false; }; }, [load, copy.loadError]);
   // Reversible actions send their exact confirmation after the explicit click; only deletions ask first, in plain words.
-  const [confirm, confirmDialog] = useConfirm({ title: 'Please confirm', cancel: 'Cancel', confirm: 'Delete' });
-  async function act(body: Record<string, unknown>, ask?: string) {
+  const [confirm, confirmDialog] = useConfirm({ title: copy.confirmTitle, cancel: copy.cancel, confirm: copy.deleteConfirm });
+  async function act(body: Record<string, unknown>, done: string, ask?: string) {
     if (ask && !(await confirm(ask))) return;
     setBusy(true); setError('');
-    try { const response = await fetch('/api/inbox/productivity', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); const result = await response.json(); if (!response.ok || result.ok !== true) throw new Error(result.error ?? 'Action outcome is unconfirmed. Inspect before trying again.'); await load(); return true; }
-    catch (e) { setError(e instanceof Error ? e.message : 'Action outcome is unconfirmed.'); return false; }
+    try {
+      const response = await fetch('/api/inbox/productivity', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      const result = await response.json();
+      if (!response.ok || result.ok !== true) throw new Error(result.error ?? copy.unconfirmed);
+      await load(); toast.notify({ title: done }); return true;
+    } catch (e) { setError(e instanceof Error ? e.message : copy.unconfirmedShort); return false; }
     finally { setBusy(false); }
   }
-  const saveReply = async () => { const action = editing ? 'reply.update' : 'reply.create'; const confirmation = editing ? `UPDATE SAVED REPLY ${editing}` : `CREATE SAVED REPLY ${replyName.trim()}`; const ok = await act({ action, ...(editing ? { id: editing } : {}), name: replyName.trim(), body: replyBody.trim(), confirmation }); if (ok) { setReplyName(''); setReplyBody(''); setEditing(null); } };
-  return <section className={styles.root} aria-label="Inbox productivity">
-    <div className={styles.section}><div className={styles.heading}><h3>Assignment</h3></div>
-      {data && <div className={styles.row}>{canWrite ? <select aria-label="Assign to" value={data.assignment.assigneeId ?? ''} disabled={busy} onChange={e => { const assigneeId = e.target.value || null; const confirmation = `ASSIGN INBOX ${kind} ${id} TO ${assigneeId ?? 'UNASSIGNED'}`; void act({ action: 'assign', kind, id, assigneeId, confirmation }); }}><option value="">Unassigned</option>{data.assignment.members.map(member => <option key={member.id} value={member.id}>{member.name || 'Teammate'}</option>)}</select> : <span className={styles.status}>Assigned to {data.assignment.members.find(member => member.id === data.assignment.assigneeId)?.name ?? 'Unassigned'}</span>}</div>}
+  const saveReply = async () => {
+    const action = editing ? 'reply.update' : 'reply.create';
+    const confirmation = editing ? `UPDATE SAVED REPLY ${editing}` : `CREATE SAVED REPLY ${replyName.trim()}`;
+    const ok = await act({ action, ...(editing ? { id: editing } : {}), name: replyName.trim(), body: replyBody.trim(), confirmation }, editing ? copy.done.replyUpdated : copy.done.replyCreated);
+    if (ok) { setReplyName(''); setReplyBody(''); setEditing(null); }
+  };
+  const memberName = (assigneeId: string | null) => data?.assignment.members.find(member => member.id === assigneeId)?.name ?? copy.unassigned;
+  return <section className={styles.root} aria-label={copy.region}>
+    <div className={styles.section}><div className={styles.heading}><h3>{copy.assignment}</h3></div>
+      {data && <div className={styles.row}>{canWrite
+        ? <Select aria-label={copy.assignTo} value={data.assignment.assigneeId ?? ''} disabled={busy}
+            options={[{ value: '', label: copy.unassigned }, ...data.assignment.members.map(member => ({ value: member.id, label: member.name || copy.teammate }))]}
+            onChange={value => { const assigneeId = value || null; const confirmation = `ASSIGN INBOX ${kind} ${id} TO ${assigneeId ?? 'UNASSIGNED'}`; void act({ action: 'assign', kind, id, assigneeId, confirmation }, copy.done.assign); }} />
+        : <span className={styles.status}>{copy.assignedTo(memberName(data.assignment.assigneeId))}</span>}</div>}
     </div>
-    <div className={styles.section}><div className={styles.heading}><h3>Private notes</h3></div>{canWrite && <><textarea className={styles.textarea} aria-label="Private note" maxLength={data?.limits.noteMaxCharacters} value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note for your team"/><div className={styles.row}><Button disabled={busy || !note.trim() || note.length > (data?.limits.noteMaxCharacters ?? 0)} onClick={async () => { const confirmation = `ADD PRIVATE NOTE ${kind} ${id}`; const ok = await act({ action: 'note.add', kind, id, body: note, confirmation }); if (ok) setNote(''); }}>Add note</Button><span className={styles.status}>Only your workspace team can see these notes.</span></div></>}
-      {data?.notes.map(item => <article className={styles.note} key={item.id}><div className={styles.meta}>{item.authorName} · {new Date(item.createdAt).toLocaleString()}</div><p>{item.body}</p>{canWrite && item.canDelete && <Button size="sm" variant="quiet" disabled={busy} onClick={() => { const confirmation = `DELETE PRIVATE NOTE ${item.id}`; void act({ action: 'note.delete', id: item.id, confirmation }, 'Delete this private note? This cannot be undone.'); }}>Delete note</Button>}</article>)}
+    <div className={styles.section}><div className={styles.heading}><h3>{copy.notes}</h3></div>{canWrite && <><textarea className={styles.textarea} aria-label={copy.note} maxLength={data?.limits.noteMaxCharacters} value={note} onChange={e => setNote(e.target.value)} placeholder={copy.notePlaceholder}/><div className={styles.row}><Button disabled={busy || !note.trim() || note.length > (data?.limits.noteMaxCharacters ?? 0)} onClick={async () => { const confirmation = `ADD PRIVATE NOTE ${kind} ${id}`; const ok = await act({ action: 'note.add', kind, id, body: note, confirmation }, copy.done.noteAdded); if (ok) setNote(''); }}>{copy.addNote}</Button><span className={styles.status}>{copy.notesHelp}</span></div></>}
+      {data?.notes.map(item => <article className={styles.note} key={item.id}><div className={styles.meta}>{item.authorName} · {new Date(item.createdAt).toLocaleString(locale)}</div><p>{item.body}</p>{canWrite && item.canDelete && <Button size="sm" variant="quiet" disabled={busy} onClick={() => { const confirmation = `DELETE PRIVATE NOTE ${item.id}`; void act({ action: 'note.delete', id: item.id, confirmation }, copy.done.noteDeleted, copy.deleteNoteAsk); }}>{copy.deleteNote}</Button>}</article>)}
     </div>
-    <div className={styles.section}><div className={styles.heading}><h3>Saved replies</h3></div><div className={styles.replylist}>{replies.map(item => <article className={styles.reply} key={item.id}><strong>{item.name}</strong><p>{item.body}</p><div className={styles.row}>{onUseSavedReply && <Button size="sm" onClick={() => onUseSavedReply(item.body)}>Use reply</Button>}{canWrite && <><Button size="sm" variant="quiet" disabled={busy} onClick={() => { setEditing(item.id); setReplyName(item.name); setReplyBody(item.body); }}>Edit</Button><Button size="sm" variant="quiet" disabled={busy} onClick={() => { const confirmation = `DELETE SAVED REPLY ${item.id}`; void act({ action: 'reply.delete', id: item.id, confirmation }, 'Delete this saved reply for the whole team? This cannot be undone.'); }}>Delete</Button></>}</div></article>)}</div>{canWrite && <><input className={styles.field} aria-label="Saved reply name" maxLength={data?.limits.savedReplyNameMaxCharacters} value={replyName} onChange={e => setReplyName(e.target.value)} placeholder="Reply name"/><textarea className={styles.textarea} aria-label="Saved reply text" maxLength={data?.limits.savedReplyBodyMaxCharacters} value={replyBody} onChange={e => setReplyBody(e.target.value)} placeholder="Reply text"/><div className={styles.row}><Button disabled={busy || !replyName.trim() || !replyBody.trim() || replyName.trim().length > (data?.limits.savedReplyNameMaxCharacters ?? 0) || replyBody.trim().length > (data?.limits.savedReplyBodyMaxCharacters ?? 0)} onClick={() => void saveReply()}>{editing ? 'Save reply' : 'Create saved reply'}</Button>{editing && <Button variant="quiet" disabled={busy} onClick={() => { setEditing(null); setReplyName(''); setReplyBody(''); }}>Cancel edit</Button>}</div></>}</div>
+    <div className={styles.section}><div className={styles.heading}><h3>{copy.savedReplies}</h3></div>
+      {data && !replies.length ? <EmptyState title={copy.noReplies}>{copy.noRepliesBody}</EmptyState> : null}
+      <div className={styles.replylist}>{replies.map(item => <article className={styles.reply} key={item.id}>
+        <div className={styles.replyHead}><strong>{item.name}</strong>
+          {canWrite && <Menu label={copy.replyActions(item.name)} items={[
+            { key: 'edit', label: copy.edit, icon: <IconPencil size={16} />, disabled: busy, onSelect: () => { setEditing(item.id); setReplyName(item.name); setReplyBody(item.body); } },
+            { key: 'delete', label: copy.delete, icon: <IconTrash size={16} />, danger: true, disabled: busy, onSelect: () => { const confirmation = `DELETE SAVED REPLY ${item.id}`; void act({ action: 'reply.delete', id: item.id, confirmation }, copy.done.replyDeleted, copy.deleteReplyAsk); } },
+          ]} />}
+        </div>
+        <p>{item.body}</p>
+        {onUseSavedReply && <div className={styles.row}><Button size="sm" onClick={() => onUseSavedReply(item.body)}>{copy.useReply}</Button></div>}
+      </article>)}</div>
+      {canWrite && <><TextInput aria-label={copy.replyName} maxLength={data?.limits.savedReplyNameMaxCharacters} value={replyName} onChange={e => setReplyName(e.target.value)} placeholder={copy.replyNamePlaceholder}/><textarea className={styles.textarea} aria-label={copy.replyText} maxLength={data?.limits.savedReplyBodyMaxCharacters} value={replyBody} onChange={e => setReplyBody(e.target.value)} placeholder={copy.replyTextPlaceholder}/><div className={styles.row}><Button disabled={busy || !replyName.trim() || !replyBody.trim() || replyName.trim().length > (data?.limits.savedReplyNameMaxCharacters ?? 0) || replyBody.trim().length > (data?.limits.savedReplyBodyMaxCharacters ?? 0)} onClick={() => void saveReply()}>{editing ? copy.saveReply : copy.createReply}</Button>{editing && <Button variant="quiet" disabled={busy} onClick={() => { setEditing(null); setReplyName(''); setReplyBody(''); }}>{copy.cancelEdit}</Button>}</div></>}</div>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {confirmDialog}
   </section>;

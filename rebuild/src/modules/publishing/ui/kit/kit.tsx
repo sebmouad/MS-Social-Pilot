@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
-import { IconAlertTriangle, IconClockHour4, IconPlayerPlay, IconSend, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconClockHour4, IconPlayerPlay, IconSend } from '@tabler/icons-react';
+import { Badge, EmptyState, PageHeader } from '@/components';
 import { ModuleGlyph, PageGlyph } from '@/components/icons';
 import { kitCopy, type KitLocale } from './copy';
 import styles from './kit.module.css';
 
 /**
- * Module-local UI primitives. TODO: swap to the shared PageHeader, Avatar, chip and
- * empty-state components once the shared set lands; props are kept compatible.
+ * Publishing display helpers built on the shared component library (PageHeader, EmptyState,
+ * Badge). Only domain-specific pieces live here: channel avatars, media thumbnails and the
+ * schedule-owner badge.
  */
 export function initials(value: string) {
   return value.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || '?';
@@ -45,27 +47,15 @@ export function AvatarStack({ channels, max = 4, locale = 'en' }: { channels: Ar
   </span>;
 }
 
-/** Page header with the module icon chip. Colours come from the [data-module] tokens. */
-export function ModuleHeader({ module = 'publishing', href, eyebrow, title, description, summary, actions }: { module?: string; href?: string; eyebrow?: string; title: string; description?: string; summary?: ReactNode; actions?: ReactNode }) {
-  return <header className={styles.header} data-module={module}>
-    <span className={styles.chip}>{href ? <PageGlyph href={href} size={22} /> : <ModuleGlyph id={module} size={22} />}</span>
-    <div className={styles.headerText}>
-      {eyebrow ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
-      <h1>{title}</h1>
-      {description ? <p className={styles.description}>{description}</p> : null}
-    </div>
-    {summary || actions ? <div className={styles.headerSide}>{summary ? <span className={styles.summary}>{summary}</span> : null}{actions}</div> : null}
-  </header>;
+/** Page header: the shared PageHeader with the module icon chip; the optional summary is a badge beside the actions. */
+export function ModuleHeader({ module = 'publishing', href, title, description, summary, actions }: { module?: string; href?: string; eyebrow?: string; title: string; description?: string; summary?: ReactNode; actions?: ReactNode }) {
+  const side = summary || actions ? <>{summary ? <Badge tone="neutral">{summary}</Badge> : null}{actions}</> : undefined;
+  return <PageHeader module={module} icon={href ? <PageGlyph href={href} size={22} /> : undefined} title={title} description={description} actions={side} />;
 }
 
 /** Empty or no-match state with an icon and one clear next action. */
 export function EmptyPanel({ module = 'publishing', icon, title, children, action }: { module?: string; icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
-  return <div className={styles.empty} data-module={module}>
-    <span className={styles.emptyIcon}>{icon ?? <ModuleGlyph id={module} size={26} />}</span>
-    <h2>{title}</h2>
-    {children ? <p>{children}</p> : null}
-    {action}
-  </div>;
+  return <div data-module={module}><EmptyState icon={icon ?? <ModuleGlyph id={module} size={26} />} title={title} action={action}>{children}</EmptyState></div>;
 }
 
 /** Who sends the post at the scheduled time: this app, or the platform itself. */
@@ -73,9 +63,8 @@ export function ScheduleBadge({ mode, locale = 'en', platformName }: { mode: 'ap
   const copy = kitCopy[locale];
   const remote = mode === 'remote';
   // The platform's own name comes from its module metadata; shared code never names a provider.
-  return <span className={styles.schedule} data-mode={mode} title={remote ? copy.scheduledRemoteHint : copy.scheduledAppHint}>
-    {remote ? <IconClockHour4 size={12} stroke={1.9} aria-hidden="true" /> : <IconSend size={12} stroke={1.9} aria-hidden="true" />}
-    <span>{remote ? platformName || copy.scheduledPlatform : copy.scheduledApp}</span>
+  return <span className={styles.schedule} title={remote ? copy.scheduledRemoteHint : copy.scheduledAppHint}>
+    <Badge tone={remote ? 'brand' : 'neutral'} icon={remote ? <IconClockHour4 size={12} stroke={1.9} /> : <IconSend size={12} stroke={1.9} />}>{remote ? platformName || copy.scheduledPlatform : copy.scheduledApp}</Badge>
     <span className="ui-visually-hidden"> — {remote ? copy.scheduledRemoteHint : copy.scheduledAppHint}</span>
   </span>;
 }
@@ -94,18 +83,5 @@ export function MediaThumb({ url, alt, count, video }: { url: string | null; alt
   </span>;
 }
 
-export type FilterChip = { key: string; label: string; value: string; removeHref: string };
-
-/** Active filters as removable chips; each removal is a plain link so it works without script. */
-export function FilterChips({ chips, resetHref, locale = 'en' }: { chips: FilterChip[]; resetHref: string; locale?: KitLocale }) {
-  if (!chips.length) return <span />;
-  const copy = kitCopy[locale];
-  return <ul className={styles.chips} aria-label={copy.activeFilters}>
-    {chips.map(chip => <li key={chip.key}>
-      <a className={styles.filterChip} href={chip.removeHref} aria-label={`${copy.removeFilter}: ${chip.label} ${chip.value}`}>
-        <span className={styles.filterKey}>{chip.label}</span><span>{chip.value}</span><IconX size={12} stroke={2} aria-hidden="true" />
-      </a>
-    </li>)}
-    <li><a className={styles.resetLink} href={resetHref}>{copy.resetFilters}</a></li>
-  </ul>;
-}
+export { UrlFilterChips as FilterChips } from './UrlFilterChips';
+export type { UrlFilterChip as FilterChip } from './UrlFilterChips';

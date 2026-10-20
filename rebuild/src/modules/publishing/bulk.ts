@@ -54,7 +54,7 @@ export const BULK_COPY = {
     summary: (r: { done: number; needsReview: number; skipped: number; failed: number }) => `${r.done} done, ${r.needsReview} need review, ${r.skipped} skipped, ${r.failed} failed.`,
     unconfirmed: 'The result could not be confirmed. Refresh Posts and check each post before trying again.',
     retryOne: 'Retry failed destinations', retryOneHelp: (n: number) => `${n} destination${n === 1 ? '' : 's'} failed and can be sent again.`,
-    whenRequired: 'Choose a future date and time.',
+    whenRequired: 'Choose a future date and time.', tryAgain: 'Try again',
   },
   fr: {
     select: (label: string) => `Sélectionner la publication ${label}`, selectAll: 'Sélectionner toutes les publications de cette page', selected: (n: number) => `${n} sélectionnée${n > 1 ? 's' : ''}`, clear: 'Effacer la sélection',
@@ -70,7 +70,7 @@ export const BULK_COPY = {
     summary: (r: { done: number; needsReview: number; skipped: number; failed: number }) => `${r.done} terminée(s), ${r.needsReview} à vérifier, ${r.skipped} ignorée(s), ${r.failed} en échec.`,
     unconfirmed: "Le résultat n'a pas pu être confirmé. Actualisez les publications et vérifiez chacune avant de réessayer.",
     retryOne: 'Relancer les destinations en échec', retryOneHelp: (n: number) => `${n} destination${n > 1 ? 's' : ''} en échec peu${n > 1 ? 'vent' : 't'} être renvoyée${n > 1 ? 's' : ''}.`,
-    whenRequired: 'Choisissez une date et une heure futures.',
+    whenRequired: 'Choisissez une date et une heure futures.', tryAgain: 'Réessayer',
   },
 } as const;
 export const bulkCopy = (locale: string | null | undefined) => BULK_COPY[locale?.toLowerCase().startsWith('fr') ? 'fr' : 'en'];
