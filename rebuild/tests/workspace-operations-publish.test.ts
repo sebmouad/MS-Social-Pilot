@@ -16,13 +16,14 @@ const db = vi.hoisted(() => ({
   $queryRaw: vi.fn(),
 }));
 const capabilities = vi.hoisted(() => ({ firstComment: true, defaultFormatId: 'post', media: null as null | { kinds: readonly ('image' | 'video')[]; maxImages: number | null; maxVideos: number | null; mixedKinds: boolean; linkWithMedia: boolean; imageAltText: boolean } }));
+const settings = vi.hoisted(() => ({ shortenerEnabled: false }));
 const provider = vi.hoisted(() => ({ publish: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({ 'publishing.maxMessageCharacters': 10000, 'publishing.maxRemoteMediaPerPost': 4, 'publishing.maxImageAltCharacters': 500 })[key] }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({ 'publishing.maxMessageCharacters': 10000, 'publishing.maxRemoteMediaPerPost': 4, 'publishing.maxImageAltCharacters': 500, 'publishing.shortLinkBaseUrl': 'https://short.example', 'publishing.shortLinkRetentionDays': 365, 'publishing.transactionTimeoutMs': 15000, 'publishing.transactionMaxWaitMs': 5000 })[key] }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}), hasPlatformCapability: () => true }));
 vi.mock('@/modules/publishing/server/credentials', () => ({ readPublishingCredential: () => ({ token: 'synthetic' }) }));
 vi.mock('@/modules/publishing/server/publication', () => ({ publishDestinationInOperation: async (_c: unknown, input: { dispatch(id: string): Promise<unknown> }) => { await input.dispatch('op-1'); return 'needs_review'; } }));
-vi.mock('@/modules/settings/server/workspace-operations', () => ({ loadWorkspaceOperations: async () => ({ utmSource: 'msp', utmMedium: 'social', utmCampaignTemplate: '{target}' }) }));
+vi.mock('@/modules/settings/server/workspace-operations', () => ({ loadWorkspaceOperations: async () => ({ utmSource: 'msp', utmMedium: 'social', utmCampaignTemplate: '{target}', shortenerEnabled: settings.shortenerEnabled }) }));
 vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({
   publish: provider.publish, publishingMedia: { kinds: ['image'], maxImages: 4, maxVideos: 0, mixedKinds: false, linkWithMedia: true, imageAltText: true },
   publishingFormats: [{ id: 'post', label: 'post', media: { kinds: ['image'], maxImages: 4, maxVideos: 0, mixedKinds: false, linkWithMedia: true, imageAltText: true }, firstComment: false, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } }],
@@ -31,7 +32,8 @@ vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({
 import { publishPost } from '@/modules/publishing/server/lifecycle';
 
 describe('publish-time link preparation', () => {
-  it('tags caption and link URLs with workspace UTM settings before provider dispatch, without changing stored content', async () => {
+  it.each([false, true])('prepares UTM and optional shortening (%s) before dispatch without changing stored content', async enabled => {
+    vi.clearAllMocks(); settings.shortenerEnabled = enabled;
     db.membership.findUnique.mockResolvedValue({ role: 'owner' });
     db.$queryRaw.mockResolvedValue([]); db.$executeRaw.mockResolvedValue(1); db.post.update.mockResolvedValue({}); db.post.updateMany.mockResolvedValue({ count: 1 });
     db.$transaction.mockImplementation(async (work: (tx: typeof db) => Promise<unknown>) => work(db));
@@ -41,8 +43,16 @@ describe('publish-time link preparation', () => {
     await publishPost({ userId: 'u1', workspaceId: 'w1' }, 'p1').catch(() => undefined);
     expect(provider.publish).toHaveBeenCalledTimes(1);
     const sent = provider.publish.mock.calls[0][0];
-    expect(sent.text).toBe('See https://example.com/a?x=1&utm_source=msp&utm_medium=social&utm_campaign=synthetic-caf now');
-    expect(sent.link).toBe('https://example.com/b?utm_source=msp&utm_medium=social&utm_campaign=synthetic-caf');
+    if (!enabled) {
+      expect(sent.text).toBe('See https://example.com/a?x=1&utm_source=msp&utm_medium=social&utm_campaign=synthetic-caf now');
+      expect(sent.link).toBe('https://example.com/b?utm_source=msp&utm_medium=social&utm_campaign=synthetic-caf');
+    } else {
+      expect(sent.text).toMatch(/^See https:\/\/short\.example\/s\/[\w-]+ now$/);
+      expect(sent.link).toMatch(/^https:\/\/short\.example\/s\/[\w-]+$/);
+      const inserts = db.$executeRaw.mock.calls.filter(call => call[0].join('').includes('INSERT INTO short_links'));
+      expect(inserts).toHaveLength(2);
+      expect(inserts[0].slice(1)).toContain('https://example.com/a?x=1&utm_source=msp&utm_medium=social&utm_campaign=synthetic-caf');
+    }
     expect(db.post.update).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ message: expect.anything() }) }));
   });
 });

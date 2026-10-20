@@ -23,7 +23,7 @@ import { readPublishingCredential } from '@/modules/publishing/server/credential
 import { publishDestinationInOperation } from '@/modules/publishing/server/publication';
 import { assertPublishingMediaSupport } from '@/modules/publishing/media-support';
 import { needsContributorApproval } from '@/modules/settings/workspace-policy';
-import { applyUtm, prepareCaptionLinks } from '@/modules/settings/workspace-operations';
+import { preparePublicationLinks } from './short-links';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import { recordPostVersion, loadVersionRetention } from '@/modules/publishing/collaboration/server/versions';
 
@@ -481,10 +481,11 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       const eligible = Boolean(credential && provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && (!post.firstComment?.trim() || adapter.publishFirstComment) && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
       if (!eligible) { failed++; await markTarget(actor, post.id, item.id, 'failed', signal); continue; }
       linkSettings ??= await loadWorkspaceOperations(actor.workspaceId);
-      const preparedLinks = linkSettings;
+      const preparedLinks = await preparePublicationLinks({ workspaceId: actor.workspaceId, postId: post.id, targetId: item.target.id,
+        message: post.message, link: attachments.link, settings: linkSettings, targetName: item.target.name, date: taggedAt });
       const outcome = await publishDestinationInOperation({ actor, signal }, {
         postId: post.id, postTargetId: item.id, targetId: item.target.id, provider: provider!, expectedStatus: item.status as 'pending' | 'failed',
-        dispatch: operationId => adapter!.publish!({ credential: credential!, target: { id: item.target.providerId, name: '', kind: item.target.type }, formatId: item.formatId ?? post.format, text: prepareCaptionLinks(post.message, preparedLinks, { targetName: item.target.name, date: taggedAt }), link: attachments.link ? applyUtm(attachments.link, preparedLinks, { targetName: item.target.name, date: taggedAt }) : attachments.link, media: publishMedia, signal, operationId,
+        dispatch: operationId => adapter!.publish!({ credential: credential!, target: { id: item.target.providerId, name: '', kind: item.target.type }, formatId: item.formatId ?? post.format, text: preparedLinks.message, link: preparedLinks.link, media: publishMedia, signal, operationId,
           publication: { workspaceId: actor.workspaceId, postId: post.id, postTargetId: item.id, targetId: item.target.id, actorId: actor.userId },
           ...(nativeScheduledAt ? { scheduledAt: nativeScheduledAt } : {}) }),
         classifyFailure: error => adapter!.classifyPublishingFailure?.(error) ?? 'uncertain',

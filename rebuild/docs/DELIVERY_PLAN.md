@@ -500,3 +500,29 @@ unapplied; registry schema version was deliberately not edited. PostgreSQL,
 browser, real MCP and migration/release proof remain open. This is a branch-only
 batch: no push, deploy, servers, install or client generation; the full rebuild
 objective remains incomplete.
+
+## Scoped link shortening — 2026-10-20
+
+`codex/link-shortening` adds `modules/publishing/server/short-links.ts` and the
+public `/s/[slug]` route. The current-authorized shared publisher prepares caption
+and attachment links after UTM tagging; stored draft content stays unchanged.
+Existing `short_links` rows store workspace/post/destination attribution, reused
+under a transaction advisory lock while unexpired. No schema change or migration.
+Root keys in the Publishing module: `publishing.shortLinkBaseUrl` (empty until
+configured to the public HTTPS origin) and `publishing.shortLinkRetentionDays`
+(default 365). Expiry is creation time plus the current retention setting; changing
+it can expire or reactivate existing links. Expiry does not erase lifetime counts.
+Redirects are public bearer URLs, refuse suspended workspaces and unsafe schemes/
+credentials, and use no-store 302 responses. GET counts non-crawler requests, HEAD
+and known crawlers do not; counts are visits, not unique people. No visitor data
+is collected and this batch does not populate `link_clicks` event breakdowns.
+Analytics Reports sum destination-attributed links (including shared posts) and
+unambiguous legacy links only, with lifetime labels and null for absent link data.
+
+Evidence: 22 targeted tests pass across five files (including the raw SQL void
+guard); `npx tsc --noEmit -p .` passes from `rebuild/`. Full-suite run was
+interrupted after it stopped producing output without a summary; inconclusive.
+No database, browser, live-provider or production proof. Next: configure the public
+origin and verify real PostgreSQL/concurrent requests and deployment routing in an
+authorized integration environment; the settings form shortening toggle and
+visitor/event analytics remain outside this owned batch. No push/deploy/server run.
