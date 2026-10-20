@@ -1,3 +1,4 @@
+import { ADDITIONAL_NOTIFICATION_PREFERENCES } from './catalog';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
@@ -108,7 +109,7 @@ function parseInput<S extends import('zod').ZodTypeAny>(schema: S, input: unknow
   return checked.data;
 }
 
-/** Personal choices in this workspace only. Existing legacy switches remain the source of the two event preferences. */
+/** Personal choices in this workspace only, using the existing legacy switches. */
 export async function readNotificationPreferences(actor: NotificationActor): Promise<NotificationPreferenceView> {
   const authority = await authorize(actor, false);
   const limit = await bounds();
@@ -116,12 +117,16 @@ export async function readNotificationPreferences(actor: NotificationActor): Pro
     reachableChannels(actor, authority, limit.maxPreferenceChannels),
     protect(prisma.$queryRaw<Array<{ onNoteMention: boolean | null; onQueueEmpty: boolean | null }>>`SELECT "onNoteMention", "onQueueEmpty" FROM notification_settings WHERE "userId" = ${actor.userId} AND "workspaceId" = ${actor.workspaceId} LIMIT 1`),
   ]);
+  const people = await protect(prisma.$queryRaw<Array<{ locale: string }>>`SELECT locale::text AS locale FROM users WHERE id = ${actor.userId} LIMIT 1`);
+  const person = people[0];
+  const extra = await protect(prisma.$queryRaw<Array<Record<string, boolean>>>`SELECT "onPublishFailure", "onTokenExpiry", "onApprovalRequest", "onApprovalDecision", "onNewInbox", "onDraftUpdated", "onModerationAlert" FROM notification_settings WHERE "userId" = ${actor.userId} AND "workspaceId" = ${actor.workspaceId} LIMIT 1`);
+  const extraPreferences = Object.fromEntries(ADDITIONAL_NOTIFICATION_PREFERENCES.map(key => [key, extra[0]?.[key] ?? (key !== 'onNewInbox')]));
   const targetIds = allowedChannels.map(channel => channel.id);
   const mutes = targetIds.length ? await protect(prisma.$queryRaw<NotificationMute[]>`SELECT m."targetId", 'queueEmpty'::text AS event FROM notification_mutes m JOIN targets t ON t.id = m."targetId" WHERE m."userId" = ${actor.userId} AND t."workspaceId" = ${actor.workspaceId} AND m.event = 'queueEmpty' AND m."targetId" = ANY(${targetIds}::text[]) ORDER BY m."targetId"`) : [];
-  return { preferences: { onNoteMention: settings[0]?.onNoteMention ?? limit.preferenceDefaults.onNoteMention, onQueueEmpty: settings[0]?.onQueueEmpty ?? limit.preferenceDefaults.onQueueEmpty }, configured: settings.length > 0, mutes, channels: allowedChannels, maxMutes: limit.maxMutes };
+  return { ...(person && 'locale' in person ? { locale: person.locale === 'fr' ? 'fr' as const : 'en' as const } : {}), preferences: { ...(extra.length ? extraPreferences : {}), onNoteMention: settings[0]?.onNoteMention ?? limit.preferenceDefaults.onNoteMention, onQueueEmpty: settings[0]?.onQueueEmpty ?? limit.preferenceDefaults.onQueueEmpty }, configured: settings.length > 0, mutes, channels: allowedChannels, maxMutes: limit.maxMutes };
 }
 
-/** Updates only the caller's two supported event switches and reachable queue-empty mutes. */
+/** Updates only the caller's event switches and reachable queue-empty mutes. */
 export async function updateNotificationPreferences(actor: NotificationActor, input: unknown): Promise<NotificationPreferenceView> {
   const value = parseInput(notificationPreferenceUpdateSchema, input);
   exact(value.confirmation, notificationConfirmation.updatePreferences());
@@ -135,6 +140,10 @@ export async function updateNotificationPreferences(actor: NotificationActor, in
     const currentAuthority = await authorize(actor, true);
     const n = await tx.$executeRaw`INSERT INTO notification_settings (id, "userId", "workspaceId", "onNoteMention", "onQueueEmpty") VALUES (${`ns_${randomUUID()}`}, ${actor.userId}, ${actor.workspaceId}, COALESCE(${value.onNoteMention ?? null}::boolean, ${limit.preferenceDefaults.onNoteMention}), COALESCE(${value.onQueueEmpty ?? null}::boolean, ${limit.preferenceDefaults.onQueueEmpty})) ON CONFLICT ("userId", "workspaceId") DO UPDATE SET "onNoteMention" = COALESCE(${value.onNoteMention ?? null}::boolean, notification_settings."onNoteMention"), "onQueueEmpty" = COALESCE(${value.onQueueEmpty ?? null}::boolean, notification_settings."onQueueEmpty")`;
     if (n !== 1) throw unavailable();
+    // Fixed column names only; all values remain bound and caller/workspace scoped.
+    const additionalChanged = await tx.$executeRaw`UPDATE notification_settings SET "onPublishFailure" = COALESCE(${value.onPublishFailure ?? null}::boolean, "onPublishFailure"), "onTokenExpiry" = COALESCE(${value.onTokenExpiry ?? null}::boolean, "onTokenExpiry"), "onApprovalRequest" = COALESCE(${value.onApprovalRequest ?? null}::boolean, "onApprovalRequest"), "onApprovalDecision" = COALESCE(${value.onApprovalDecision ?? null}::boolean, "onApprovalDecision"), "onNewInbox" = COALESCE(${value.onNewInbox ?? null}::boolean, "onNewInbox"), "onDraftUpdated" = COALESCE(${value.onDraftUpdated ?? null}::boolean, "onDraftUpdated"), "onModerationAlert" = COALESCE(${value.onModerationAlert ?? null}::boolean, "onModerationAlert"), "inboxDigestAt" = CASE WHEN ${value.onNewInbox ?? null}::boolean IS NOT NULL AND ${value.onNewInbox ?? null}::boolean IS DISTINCT FROM "onNewInbox" THEN NULL ELSE "inboxDigestAt" END WHERE "userId" = ${actor.userId} AND "workspaceId" = ${actor.workspaceId}`;
+    if (additionalChanged !== 1) throw unavailable();
+
     if (mutes) {
       const channels = await reachableChannels(actor, currentAuthority, limit.maxPreferenceChannels, tx);
       const ids = channels.map(channel => channel.id);
@@ -142,7 +151,7 @@ export async function updateNotificationPreferences(actor: NotificationActor, in
       if (ids.length) await tx.$executeRaw`DELETE FROM notification_mutes WHERE "userId" = ${actor.userId} AND event = 'queueEmpty' AND "targetId" = ANY(${ids}::text[])`;
       for (const mute of mutes) await tx.$executeRaw`INSERT INTO notification_mutes (id, "userId", "targetId", event) VALUES (${`nm_${randomUUID()}`}, ${actor.userId}, ${mute.targetId}, 'queueEmpty') ON CONFLICT ("userId", "targetId", event) DO NOTHING`;
     }
-    const changedFlags = [value.onNoteMention !== undefined ? 'onNoteMention' : null, value.onQueueEmpty !== undefined ? 'onQueueEmpty' : null].filter((flag): flag is string => Boolean(flag));
+    const changedFlags = [...ADDITIONAL_NOTIFICATION_PREFERENCES.filter(key => value[key] !== undefined), value.onNoteMention !== undefined ? 'onNoteMention' : null, value.onQueueEmpty !== undefined ? 'onQueueEmpty' : null].filter((flag): flag is string => Boolean(flag));
     await audit(tx, actor, 'notifications.preferences_updated', { flags: changedFlags, mutes: mutes?.length ?? null });
     await lockActor(tx, actor, true);
   }, { timeout: limit.transactionTimeoutMs, maxWait: limit.transactionMaxWaitMs })));

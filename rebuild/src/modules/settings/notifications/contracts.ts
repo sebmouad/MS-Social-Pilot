@@ -7,11 +7,18 @@ export type NotificationMute = { targetId: string; event: 'queueEmpty' };
 
 const identifier = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
 export const notificationPreferenceUpdateSchema = z.object({
+  onPublishFailure: z.boolean().optional(),
+  onTokenExpiry: z.boolean().optional(),
+  onApprovalRequest: z.boolean().optional(),
+  onApprovalDecision: z.boolean().optional(),
+  onNewInbox: z.boolean().optional(),
+  onDraftUpdated: z.boolean().optional(),
+  onModerationAlert: z.boolean().optional(),
   onNoteMention: z.boolean().optional(),
   onQueueEmpty: z.boolean().optional(),
   mutes: z.array(z.object({ targetId: identifier, event: z.literal('queueEmpty') }).strict()).max(5000).optional(),
   confirmation: z.string().max(500),
-}).strict().refine(value => value.onNoteMention !== undefined || value.onQueueEmpty !== undefined || value.mutes !== undefined);
+}).strict().refine(value => (value.onNoteMention !== undefined || value.onQueueEmpty !== undefined || value.mutes !== undefined || value.onPublishFailure !== undefined || value.onTokenExpiry !== undefined || value.onApprovalRequest !== undefined || value.onApprovalDecision !== undefined || value.onNewInbox !== undefined || value.onDraftUpdated !== undefined || value.onModerationAlert !== undefined));
 export type NotificationPreferenceUpdate = z.infer<typeof notificationPreferenceUpdateSchema>;
 
 export const notificationPageSchema = z.object({ page: z.number().int().min(1).max(10000).optional(), unreadOnly: z.boolean().optional() }).strict();
@@ -35,7 +42,8 @@ export const notificationConfirmation = {
 } as const;
 
 export type NotificationPreferenceView = {
-  preferences: { onNoteMention: boolean; onQueueEmpty: boolean };
+  locale?: 'en' | 'fr';
+  preferences: { onNoteMention: boolean; onQueueEmpty: boolean; onPublishFailure?: boolean; onTokenExpiry?: boolean; onApprovalRequest?: boolean; onApprovalDecision?: boolean; onNewInbox?: boolean; onDraftUpdated?: boolean; onModerationAlert?: boolean };
   configured: boolean;
   mutes: NotificationMute[];
   channels: Array<{ id: string; name: string }>;
