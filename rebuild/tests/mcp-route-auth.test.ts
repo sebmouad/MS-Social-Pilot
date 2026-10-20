@@ -212,7 +212,7 @@ describe('MCP route authentication', () => {
     const response = await POST(bearer);
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['list_saved_views', 'list_posts', 'export_posts', 'get_post_deletion_status', 'get_publication_status', 'get_ai_assist_status']);
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['get_best_times', 'list_saved_views', 'list_posts', 'export_posts', 'get_post_deletion_status', 'get_publication_status', 'get_ai_assist_status']);
     expect(state.executeRaw).toHaveBeenCalled();
     const writeAttempt = new Request('http://localhost/api/mcp', { method: 'POST', headers: { authorization: `Bearer mcp_${'a'.repeat(43)}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'create_draft', arguments: { message: 'nope', confirmation: 'CREATE DRAFT' } } }) });
     const denied = await POST(writeAttempt);
