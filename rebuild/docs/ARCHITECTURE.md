@@ -1621,3 +1621,6 @@ the service and locked allocator; the workspace setting is rendered. See
 [BEST_TIMES.md](BEST_TIMES.md) for sample bounds, Root keys and the deliberate
 absence of legacy weekly timetable insertion. Synthetic tests only; real
 PostgreSQL, browser, live-provider and release evidence remain open.
+
+
+2026-10-20 `codex/root-refresh`: Root connection token renewal shares a current-Root-checked, workspace/resource-locked service across `/root/connections`, POST `/api/root/connections/[id]/refresh` and installation MCP `refresh_root_connection`. Exact confirmation: `REFRESH CONNECTION <id>`. Neutral optional host renewal hook; Facebook calls its existing long-lived exchange. Encrypted persistence and safe renewed/not_renewable/failed audits, en/fr shared confirmation and honest outcome feedback. See [ROOT_CONNECTION_REFRESH.md](ROOT_CONNECTION_REFRESH.md) for three Root-owned config keys, scope and evidence limits. No migration or central registry edit. Host owner must coordinate configuration schema version; real PostgreSQL/browser/live-provider verification remains open. Branch-only batch: no push, deployment, servers, install or Prisma generation. Full rebuild goal remains active.

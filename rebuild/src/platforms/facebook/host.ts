@@ -1,3 +1,4 @@
+import { renewFacebookConnectionToken } from './token-renewal';
 import { facebookDiagnostics } from './diagnostics';
 import type { PlatformHost } from '@/server/platforms/host';
 import { configuredFacebookAdapter, configuredFacebookOAuth } from './runtime';
@@ -28,6 +29,7 @@ export const facebookHost = {
     start: startFacebookConnection,
     callback: finishFacebookConnection,
     grantHealth: facebookGrantHealth,
+    renewToken: renewFacebookConnectionToken,
   },
   jobs: {
     posts: syncFacebookPosts,

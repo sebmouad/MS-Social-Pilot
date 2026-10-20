@@ -1039,3 +1039,10 @@ changes remain uncommitted on `codex/best-time`. Commit from an environment
 allowed to write the existing metadata, using `feat(publishing): suggest best times`.
 Preserve the pre-existing untracked root node_modules symlink. Do not push,
 deploy or run servers for this scoped branch batch.
+
+
+2026-10-20 `codex/root-refresh`: Root connection token renewal shares a current-Root-checked, workspace/resource-locked service across `/root/connections`, POST `/api/root/connections/[id]/refresh` and installation MCP `refresh_root_connection`. Exact confirmation: `REFRESH CONNECTION <id>`. Neutral optional host renewal hook; Facebook calls its existing long-lived exchange. Encrypted persistence and safe renewed/not_renewable/failed audits, en/fr shared confirmation and honest outcome feedback. See [ROOT_CONNECTION_REFRESH.md](ROOT_CONNECTION_REFRESH.md) for three Root-owned config keys, scope and evidence limits. No migration or central registry edit. Host owner must coordinate configuration schema version; real PostgreSQL/browser/live-provider verification remains open. Branch-only batch: no push, deployment, servers, install or Prisma generation. Full rebuild goal remains active.
+
+Root refresh final verification:535 passed/13 opt-in PostgreSQL skips across69 Root and related Facebook/MCP files, including the raw SQL guard; `npx tsc --noEmit -p .` and `git diff --check` pass. No full-repository suite/build or live/browser/database evidence.
+
+Root refresh commit blocked: `git add rebuild` failed creating `/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/.git/worktrees/msp-rootrefresh/index.lock` with `Operation not permitted`. Shared Git metadata is outside writable sandbox roots; escalation is disabled. No staging or commit occurred. Changes remain uncommitted on `codex/root-refresh`; commit from an environment permitted to write the existing Git metadata, intended message `feat(root): add connection token refresh`. Preserve the pre-existing root node_modules symlink. No push/deploy/server run was attempted.

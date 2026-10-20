@@ -554,3 +554,6 @@ suggested slots only when workspace bestTimeMode is apply, then uses the saved
 timetable; previews remain estimates. Workspace operations exposes that choice
 with copy describing allocation-time preference. Unit/jsdom evidence only; see
 [BEST_TIMES.md](docs/BEST_TIMES.md) for bounds and remaining runtime checks.
+
+
+Root connection Refresh token (2026-10-20) uses shared Button/useConfirm, names the connection, requires exact `REFRESH CONNECTION <id>`, retains confirmation on unconfirmed errors and returns focus after an explicit renewed/not renewable/failed receipt. Copy is en/fr; unknown expiry is Not available. Provider/credential details never enter the dialog or feedback. DOM evidence and browser/live limits: docs/ROOT_CONNECTION_REFRESH.md.
