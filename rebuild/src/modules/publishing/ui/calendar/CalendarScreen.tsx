@@ -2,7 +2,8 @@ import { requireViewer } from "@/server/context";
 import { readPublishingCalendar } from "@/modules/publishing/server/read";
 import { canAccessFeature } from "@/server/permissions";
 import { PageHeading } from "@/modules/publishing/ui/publishing-ui";
-import { adjacentCalendarMonth, addDaysToKey, calendarMonth, instantToWall, isDateKey, postCalendarDate, wallTimeToInstant, weekStartKey, weekdayOfKey, workspaceDateKey } from "@/lib/calendar-dates";
+import { adjacentCalendarMonth, addDaysToKey, calendarMonth, instantToWall, isDateKey, postCalendarDate, wallTimeToInstant, weekOffsetOfKey, weekStartKey, workspaceDateKey } from "@/lib/calendar-dates";
+import { loadWorkspaceOperations } from "@/modules/settings/server/workspace-operations";
 import { channelBadgeInfo } from "@/lib/channel-badge";
 import { formatPostPreviewTime } from "@/components/PostPreview";
 import { moveCandidates } from "@/lib/reschedule";
@@ -34,12 +35,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const channelId = params.channel || undefined;
   const status = (STATUSES as readonly string[]).includes(params.status ?? "") ? params.status as (typeof STATUSES)[number] : undefined;
 
-  // The days on screen: a whole month grid (weeks start on Sunday) or one week.
+  // The days on screen: a whole month grid (weeks start on the workspace's first weekday) or one week.
   const selected = calendarMonth(anchor.slice(0, 7), now, timeZone);
   const firstOfMonth = `${selected.key}-01`;
   const daysInMonth = new Date(Date.UTC(selected.year, selected.month, 0)).getUTCDate();
-  const gridStart = view === "week" ? weekStartKey(anchor) : weekStartKey(firstOfMonth);
-  const count = view === "week" ? 7 : Math.ceil((weekdayOfKey(firstOfMonth) + daysInMonth) / 7) * 7;
+  const weekStartsOn = await loadWorkspaceOperations(viewer.workspaceId).then(value => value.weekStartsOn, () => 0);
+  const gridStart = view === "week" ? weekStartKey(anchor, weekStartsOn) : weekStartKey(firstOfMonth, weekStartsOn);
+  const count = view === "week" ? 7 : Math.ceil((weekOffsetOfKey(firstOfMonth, weekStartsOn) + daysInMonth) / 7) * 7;
   const keys = Array.from({ length: count }, (_, index) => addDaysToKey(gridStart, index));
 
   const from = new Date(utcNoon(keys[0]!).getTime() - 2 * DAY);
