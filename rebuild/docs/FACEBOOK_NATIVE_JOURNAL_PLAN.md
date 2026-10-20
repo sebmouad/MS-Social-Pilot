@@ -180,3 +180,19 @@ safe provider deletion, comment integration and live-provider proof remain open.
 Production and the held provider canary remain unchanged. See
 [ASYNC_PUBLICATION_RECEIPTS.md](ASYNC_PUBLICATION_RECEIPTS.md) for the shared
 receipt contract.
+
+
+## Batch96 host dispatch and remaining work
+
+`formats/publish.ts` is now the first caller of `executeFacebookNativeWithJournal`
+for customer-path publishing: the shared claim's `publication` identities
+(workspace, post, destination, actor) plus its operation id become the journal
+binding; remote Page id and source format id come from the request. The creator
+instance owns dispatch fencing as designed; a journal or conflict failure throws
+an ambiguous error so the shared claim stays held. The path is behind
+`facebook.native.publishingEnabled` (default off) and is covered by mocked tests
+only, with no PostgreSQL run of the host-to-journal chain yet.
+
+Still required: an actual PostgreSQL test of host → shared claim → journal →
+submitted receipt; native first-comment and delete routing for Reels; process-loss
+and late-fact recovery; shared stored-video resolution; live Meta coverage.

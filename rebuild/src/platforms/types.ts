@@ -51,7 +51,7 @@ export interface PublishMedia {
   kind: 'image' | 'video';
   url: string;
   altText?: string;
-  /** Ephemeral server-only bytes for uploading a locally stored image; never persisted with a draft. */
+  /** Ephemeral server-only bytes for uploading locally stored media; never persisted with a draft. */
   localFile?: { bytes: Uint8Array; mimeType: string; fileName: string };
 }
 
@@ -89,6 +89,10 @@ export interface PublishRequest {
   text: string;
   link?: string | null;
   media?: PublishMedia[];
+  /** Provider-held schedule instant. Set only for a format whose descriptor declares native scheduling. */
+  scheduledAt?: Date | null;
+  /** Local identities of the shared publication claim, for modules that keep their own tenant-bound child journal. */
+  publication?: { workspaceId: string; postId: string; postTargetId: string; targetId: string; actorId: string };
   signal?: AbortSignal;
 }
 export interface PublishResult {

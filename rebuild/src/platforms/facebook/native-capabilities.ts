@@ -2,6 +2,11 @@
  * Capability descriptors for native Facebook formats. RESERVED: not registered in
  * the manifest. The lead may advertise an entry only after the executor is wired to
  * a real transport, a durable attempt store, authorization, UI/API/MCP and live proof.
+ *
+ * `wired:false` stays: it means "not enabled by default and not live-verified". Video
+ * and Reel are privately dispatchable behind Root `facebook.native.publishingEnabled`
+ * (formats/publish.ts); the adapter's own format descriptors, not this list, declare
+ * what customers see, and only while that switch is on. Stories remain undispatched.
  */
 export interface FacebookNativeCapability {
   id: 'video' | 'reel' | 'story_photo' | 'story_video';

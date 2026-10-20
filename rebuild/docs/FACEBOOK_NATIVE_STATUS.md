@@ -146,3 +146,15 @@ and built-server installation-MCP tests exercised the complete chain without any
 new provider write. The response-byte ceiling participates in current transport
 trust revalidation. See [ASYNC_PUBLICATION_RECEIPTS.md](ASYNC_PUBLICATION_RECEIPTS.md)
 for exact evidence and remaining automatic host/status/comment/deletion gates.
+
+
+## Batch96 status reads for host-dispatched formats
+
+The adapter's `getRemoteStatus` accepts the `video` and `reel` format ids only
+while the private switch `facebook.native.publishingEnabled` is on. A Reel is read
+with the Reel mapper (`mapFacebookVideoStatus('reel', …)`), so a ready video whose
+`publishing_phase` is not `complete` stays unknown and is never projected as
+published; a native video uses the video mapper. A scheduled provider answer is
+`scheduled` and does not confirm publication. If the switch is turned off while
+native posts are in flight, their status reads are refused (held) rather than
+guessed. Evidence is mocked fetch only; no live Graph read was made.

@@ -420,7 +420,7 @@ export async function restorePostVersion(input: { actor: PublishingActor; postId
 export { deletePostDurably as deletePost } from '@/modules/publishing/server/deletion';
 
 /** Claim each destination before the provider call. `processing` remains as a manual-reconciliation marker on ambiguous failures. */
-export async function publishPost(actor: PublishingActor, postId: string, expectedScheduledAt?: Date, options: { retryOnly?: boolean } = {}) {
+export async function publishPost(actor: PublishingActor, postId: string, expectedScheduledAt?: Date, options: { retryOnly?: boolean; nativeSchedule?: boolean } = {}) {
   return withPublishingOperation(actor, { postId, allowPublicationRecovery: true }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
     const approvalRequired = !MANAGERS.has(role.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), role.role);
@@ -434,7 +434,9 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
     }
     if (options.retryOnly && !['failed', 'partially_failed'].includes(post.status)) throw new OperationError('conflict', 'Only posts with failed destinations can be retried.');
     if (!['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status)) throw new OperationError('conflict', 'This post cannot be published in its current state.');
-    if (post.status === 'scheduled' && (!post.scheduledAt || post.scheduledAt > new Date())) throw new OperationError('conflict', 'This post is scheduled for a future time.');
+    // Provider-held scheduling is an explicit opt-in: the destination formats must declare it (checked below).
+    const nativeScheduledAt = options.nativeSchedule === true && post.status === 'scheduled' && post.scheduledAt && post.scheduledAt > new Date() ? post.scheduledAt : null;
+    if (post.status === 'scheduled' && (!post.scheduledAt || post.scheduledAt > new Date()) && !nativeScheduledAt) throw new OperationError('conflict', 'This post is scheduled for a future time.');
     if (!post.targets.length) throw new OperationError('invalid_request', 'Select at least one destination before publishing.');
     if (!Array.isArray(post.media)) throw new OperationError('invalid_request', 'Stored post media needs review before publishing.');
     const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as unknown as PublishMedia[] }, Number(await runtimeConfig('publishing.maxRemoteMediaPerPost')), Number(await runtimeConfig('publishing.maxImageAltCharacters')));
@@ -447,7 +449,8 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       const provider = item.target.socialAccount?.provider;
       const adapter = provider ? await platformFor(provider, 'publishing') : null;
       if (adapter) {
-        validateSelectedPublishingFormat(adapter.publishingFormats, item.formatId ?? post.format, { media: publishMedia, link: attachments.link, firstComment: post.firstComment });
+        const descriptor = validateSelectedPublishingFormat(adapter.publishingFormats, item.formatId ?? post.format, { media: publishMedia, link: attachments.link, firstComment: post.firstComment });
+        if (nativeScheduledAt && !descriptor.scheduling.native) throw new OperationError('invalid_request', 'A selected destination cannot hold this post at the provider. Remove it or publish at the scheduled time.');
         assertPublishingMediaSupport(adapter, publishMedia, attachments.link);
         assertLocalImageLimits(adapter, publishMedia);
       }
@@ -473,7 +476,9 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       const preparedLinks = linkSettings;
       const outcome = await publishDestinationInOperation({ actor, signal }, {
         postId: post.id, postTargetId: item.id, targetId: item.target.id, provider: provider!, expectedStatus: item.status as 'pending' | 'failed',
-        dispatch: operationId => adapter!.publish!({ credential: credential!, target: { id: item.target.providerId, name: '', kind: item.target.type }, formatId: item.formatId ?? post.format, text: prepareCaptionLinks(post.message, preparedLinks, { targetName: item.target.name, date: taggedAt }), link: attachments.link ? applyUtm(attachments.link, preparedLinks, { targetName: item.target.name, date: taggedAt }) : attachments.link, media: publishMedia, signal, operationId }),
+        dispatch: operationId => adapter!.publish!({ credential: credential!, target: { id: item.target.providerId, name: '', kind: item.target.type }, formatId: item.formatId ?? post.format, text: prepareCaptionLinks(post.message, preparedLinks, { targetName: item.target.name, date: taggedAt }), link: attachments.link ? applyUtm(attachments.link, preparedLinks, { targetName: item.target.name, date: taggedAt }) : attachments.link, media: publishMedia, signal, operationId,
+          publication: { workspaceId: actor.workspaceId, postId: post.id, postTargetId: item.id, targetId: item.target.id, actorId: actor.userId },
+          ...(nativeScheduledAt ? { scheduledAt: nativeScheduledAt } : {}) }),
         classifyFailure: error => adapter!.classifyPublishingFailure?.(error) ?? 'uncertain',
       });
       if (outcome === 'failed') { failed++; continue; }
