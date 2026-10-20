@@ -1,3 +1,4 @@
+import { facebookInsightCategories } from './data-normalization';
 import { prisma } from '@/server/data';
 import { readFacebookPostPerformance } from './post-performance';
 import { readFacebookGoalMeasures } from './goals';
@@ -61,7 +62,7 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
     // select the newest fetch; categories absent from a snapshot stay absent.
     const historyRows = new Map<string, PageRow>();
     for (const row of group) {
-      if (!row.value || typeof row.value !== 'object' || Array.isArray(row.value)) continue;
+      if (!row.value || typeof row.value !== 'object') continue;
       const identity = JSON.stringify([row.target.id, row.endTime.toISOString()]);
       const previous = historyRows.get(identity);
       if (!previous || row.fetchedAt > previous.fetchedAt) historyRows.set(identity, row);
@@ -69,13 +70,13 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
     const breakdownHistory = [...historyRows.values()]
       .sort((a, b) => a.endTime.getTime() - b.endTime.getTime() || a.target.id.localeCompare(b.target.id))
       .map(row => ({ resourceId: row.target.id, resourceLabel: row.target.name, asOf: row.endTime, fetchedAt: row.fetchedAt,
-        rows: Object.entries(object(row.value)).map(([label, raw]) => ({ label, value: safeNumber(raw) })) }));
+        rows: facebookInsightCategories(row.value) }));
     const newest = new Map<string, PageRow>();
-    for (const row of group) { if (!Object.keys(object(row.value)).length) continue; const old = newest.get(row.target.id); if (!old || old.endTime < row.endTime || (old.endTime.getTime() === row.endTime.getTime() && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }
+    for (const row of group) { if (!row.value || typeof row.value !== 'object' || !Object.keys(row.value).length) continue; const old = newest.get(row.target.id); if (!old || old.endTime < row.endTime || (old.endTime.getTime() === row.endTime.getTime() && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }
     const values = new Map<string, number>();
-    for (const row of newest.values()) for (const [label, raw] of Object.entries(object(row.value))) { const value = safeNumber(raw); if (value !== null) values.set(label, (values.get(label) ?? 0) + value); }
+    for (const row of newest.values()) for (const { label, value } of facebookInsightCategories(row.value)) { if (value !== null) values.set(label, (values.get(label) ?? 0) + value); }
     const latest = [...newest.values()];
-    if (breakdownHistory.length) metrics.push({ breakdownHistory, key: numeric.length ? `${key}::breakdown` : key, label: `${baseLabel} · Categories`, sourceLabel: 'Page performance', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...newest.keys()].sort(), available: selected.length, covered: newest.size, latestAt: latest.length ? new Date(Math.max(...latest.map(row => row.endTime.getTime()))) : null, updatedAt: latest.length ? new Date(Math.max(...latest.map(row => row.fetchedAt.getTime()))) : null });
+    if (breakdownHistory.length) metrics.push({ ...(first.metric.startsWith('content:') ? { totalOverride: null } : {}), breakdownHistory, key: numeric.length ? `${key}::breakdown` : key, label: `${baseLabel} · Categories`, sourceLabel: 'Page performance', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...newest.keys()].sort(), available: selected.length, covered: newest.size, latestAt: latest.length ? new Date(Math.max(...latest.map(row => row.endTime.getTime()))) : null, updatedAt: latest.length ? new Date(Math.max(...latest.map(row => row.fetchedAt.getTime()))) : null });
   }
   const newest = new Map<string, PageRow>();
   for (const row of audienceRows) { if (audienceAsOf && row.endTime > audienceAsOf) continue; const old = newest.get(row.target.id); if (!old || row.endTime > old.endTime || (row.endTime.getTime() === old.endTime.getTime() && row.metric === 'page_follows' && old.metric !== 'page_follows') || (row.endTime.getTime() === old.endTime.getTime() && row.metric === old.metric && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }
@@ -203,7 +204,7 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
     add(key, row, raw, sourcePriority, knownAction);
   };
   for (const row of rows) {
-    for (const [key, raw] of Object.entries(object(row.fields))) readField(key, row, raw, 0);
+    for (const [key, raw] of Object.entries(object(row.fields))) if (key !== 'delivery_breakdowns') readField(key, row, raw, 0);
     if (Array.isArray(row.actions)) readField('actions', row, row.actions, 1);
     else for (const [key, raw] of Object.entries(object(row.actions))) readField(key, row, raw, 1);
   }
@@ -233,7 +234,58 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
     const latest = [...accounts.values()];
     if (values.size) metrics.push({ key: extras.has(key) ? `${key}::breakdown` : key, label: `${facebookLabel(key)} · Categories`, sourceLabel: 'Advertising', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...accounts.keys()].sort(), available: selectedAdAccounts.length, covered: accounts.size, latestAt: new Date(Math.max(...latest.map(item => item.date.getTime()))), updatedAt: new Date(Math.max(...latest.map(item => item.fetchedAt.getTime()))) });
   }
-  return metrics.map(metric => ({ ...metric, resourceKind: 'ad-account' }));
+  return [...metrics, ...deliveryBreakdownInputs(rows, selectedAdAccounts)].map(metric => ({ ...metric, resourceKind: 'ad-account' }));
+}
+
+/** Delivery dimensions retain daily/account/currency identity and never enter account totals. */
+function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[]): AnalyticsMetricInput[] {
+  const groups = new Map<string, { field: string; currency: string; history: NonNullable<AnalyticsMetricInput['breakdownHistory']> }>();
+  for (const row of rows) {
+    const payload = object(row.fields).delivery_breakdowns;
+    if (!Array.isArray(payload)) continue;
+    for (const raw of payload) {
+      const dataset = object(raw);
+      if (!Array.isArray(dataset.dimensions) || !dataset.dimensions.every(value => typeof value === 'string') || !Array.isArray(dataset.rows)) continue;
+      const dimensions = dataset.dimensions as string[];
+      const fields = new Map<string, Array<{ label: string; value: number | null }>>();
+      for (const rawItem of dataset.rows) {
+        const item = object(rawItem);
+        const category = dimensions.map(key => `${key}: ${String(item[key] ?? '')}`).join(' · ');
+        for (const [field, value] of Object.entries(item)) {
+          if (dimensions.includes(field) || ['date_start', 'date_stop', 'account_id', 'account_name', 'account_currency'].includes(field)) continue;
+          if (Array.isArray(value)) {
+            for (const rawAction of value) {
+              const action = object(rawAction);
+              if (typeof action.action_type !== 'string') continue;
+              const key = `${field}:${action.action_type}`;
+              const values = fields.get(key) ?? []; values.push({ label: category, value: safeNumber(action.value) }); fields.set(key, values);
+            }
+          } else {
+            const number = safeNumber(value);
+            if (number === null) continue;
+            const values = fields.get(field) ?? []; values.push({ label: category, value: number }); fields.set(field, values);
+          }
+        }
+      }
+      for (const [field, values] of fields) {
+        const currency = facebookAdMetricUnit(field) === 'currency' ? row.adAccount.currency ?? '' : '';
+        const key = JSON.stringify([dimensions, field, currency]);
+        const group = groups.get(key) ?? { field, currency, history: [] };
+        group.history.push({ resourceId: row.adAccount.id, resourceLabel: row.adAccount.name, asOf: row.date, fetchedAt: row.fetchedAt, rows: values }); groups.set(key, group);
+      }
+    }
+  }
+  return [...groups].map(([key, group]) => {
+    const latest = new Map<string, (typeof group.history)[number]>();
+    for (const snapshot of group.history) {
+      const previous = latest.get(snapshot.resourceId);
+      if (!previous || snapshot.asOf > previous.asOf || (snapshot.asOf.getTime() === previous.asOf.getTime() && snapshot.fetchedAt > previous.fetchedAt)) latest.set(snapshot.resourceId, snapshot);
+    }
+    return { key: `delivery:${key}`, label: `${facebookLabel(group.field)}${group.currency ? ` · ${group.currency}` : ''}`, sourceLabel: 'Advertising', kind: 'breakdown', unit: facebookAdMetricUnit(group.field), observations: [],
+      breakdownHistory: group.history, rows: [...latest.values()].flatMap(snapshot => snapshot.rows.flatMap(value => value.value === null ? [] : [{ label: `${snapshot.resourceLabel} · ${value.label}`, value: value.value, asOf: snapshot.asOf }])),
+      available: selected.length, coveredResourceIds: [...latest.keys()], covered: latest.size, totalOverride: null, aggregationNote: overlappingPeopleNote,
+      updatedAt: new Date(Math.max(...group.history.map(snapshot => snapshot.fetchedAt.getTime()))), latestAt: new Date(Math.max(...group.history.map(snapshot => snapshot.asOf.getTime()))) };
+  });
 }
 
 /** Pure mapper kept at the Facebook boundary so stored-row semantics can be tested without storage. */

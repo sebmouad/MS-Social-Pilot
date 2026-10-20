@@ -1,3 +1,4 @@
+import { FACEBOOK_DATA_CONFIG } from './config';
 import { z } from 'zod';
 import { FACEBOOK_NATIVE_CONFIG, FACEBOOK_NATIVE_TRANSPORT_CONFIG } from './native-config';
 import { entry, url, stringList } from '@/lib/config/entry';
@@ -30,6 +31,7 @@ export const facebookModule = {
 export const FACEBOOK_ANALYTICS_LOOKBACK_DAYS_SCHEMA = z.number().int().min(1).max(366);
 
 const facebookConfigEntries = [
+  ...FACEBOOK_DATA_CONFIG,
   entry({ key: 'facebook.native.publishingEnabled', group: 'Facebook · Publishing recovery', label: 'Allow native video, Reel and Story publishing (private)', kind: 'boolean', description: 'Private switch. When on, Facebook declares the Video post (native scheduling), Reel, photo Story and video Story formats and sends them through the durable native journal. Not live-provider verified: leave off in production until cleaned live coverage passes. Does not enable Groups (API removed) or any format Facebook has not been verified to accept.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'facebook.native.videoFormatLabel', group: 'Facebook · Publishing', label: 'Video post format label', kind: 'text', description: 'Customer-facing label for the native video post format. Visible only while native publishing is on.', defaultValue: 'Video post', schema: z.string().trim().min(1).max(120), consumption: 'active' }),
   entry({ key: 'facebook.native.reelFormatLabel', group: 'Facebook · Publishing', label: 'Reel format label', kind: 'text', description: 'Customer-facing label for the Reel format. Visible only while native publishing is on.', defaultValue: 'Reel', schema: z.string().trim().min(1).max(120), consumption: 'active' }),

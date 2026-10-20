@@ -1,3 +1,5 @@
+import { createFacebookDataCollector } from './data-collection';
+import { facebookAdBreakdownsSchema, facebookContentInsightsSchema, facebookInsightPeriodsSchema } from './config';
 import { createFacebookAdapter, createFacebookEngine, type FacebookNativePublishingPolicy } from '@/platforms/facebook/publishing';
 import { createFacebookNativePublisher } from './formats/publish';
 import { inspectMediaSnapshot } from '@/modules/publishing/server/media/inspect';
@@ -34,7 +36,20 @@ async function configuredFacebookConfig(): Promise<FacebookConfig> {
 export async function configuredFacebookEngine(options?: { signal?: AbortSignal }) {
   const signal = options?.signal;
   const transport: typeof fetch = signal ? (input, init) => fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal }) : fetch;
-  return createFacebookEngine(await configuredFacebookConfig(), transport, facebookMediaJournal);
+  const config = await configuredFacebookConfig();
+  const engine = createFacebookEngine(config, transport, facebookMediaJournal);
+  return { ...engine, async getAdInsights(token: string, accountId: string, since: Date, until: Date) {
+    const baseline = await engine.getAdInsights(token, accountId, since, until);
+    const combinations = facebookAdBreakdownsSchema.parse(await runtimeConfig('meta.adInsightBreakdowns'));
+    if (!combinations.length) return baseline;
+    return createFacebookDataCollector(config, { periods: facebookInsightPeriodsSchema.parse(await runtimeConfig('meta.pageInsightPeriods')), content: [] }, transport, signal)
+      .collectAdBreakdowns(token, accountId, since, until, combinations, baseline);
+  }, async getPageInsightObservations(token: string, pageId: string, since?: Date, until?: Date) {
+    const [periods, content] = await Promise.all([runtimeConfig('meta.pageInsightPeriods'), runtimeConfig('meta.contentInsightCollections')]);
+    return createFacebookDataCollector(config, { periods: facebookInsightPeriodsSchema.parse(periods), content: facebookContentInsightsSchema.parse(content) }, transport, signal)
+      .getPageInsightObservations(token, pageId, since, until);
+  } };
+
 }
 export async function configuredFacebookAdapter() {
   const [config, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, feedFormatLabel, native] = await Promise.all([
