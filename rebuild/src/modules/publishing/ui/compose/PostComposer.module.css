@@ -45,3 +45,29 @@
 .queueSlot p, .queueSlot ul { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
 .queueSlot ul { padding-left: 16px; }
 .queueSlot small { color: var(--ink-faint); font-size: 11px; line-height: 1.45; }
+
+/* Redesign: sectioned authoring surface with module colour accents (TODO: swap to shared Stepper/Section when available). */
+.composerLayout { grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); gap: 28px; }
+.form { gap: 12px; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.form > label { margin-top: 6px; color: var(--ink); font-size: var(--text-base); font-weight: 700; }
+.form textarea { border-radius: var(--radius-md); background: var(--surface-raised); }
+.form textarea:focus { border-color: var(--mod, var(--accent)); background: var(--surface); }
+.fieldMeta { padding: 2px 10px; border-radius: 999px; background: var(--surface-muted); font-weight: 650; }
+.attachments { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-raised); }
+.attachments input[type="file"] { padding: 18px 12px; border: 2px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface); color: var(--ink-soft); cursor: pointer; }
+.attachments input[type="file"]:hover { border-color: var(--mod, var(--accent)); background: var(--mod-soft, var(--accent-soft)); }
+.previewPanel { position: sticky; top: 16px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-muted); }
+.previewHeading h2 { font-size: var(--text-lg); }
+.unsavedLabel { display: inline-flex; align-items: center; gap: 7px; justify-self: start; padding: 3px 10px; border-radius: 999px; background: var(--warning-soft); color: var(--warning); font-size: var(--text-sm); font-weight: 650; }
+.unsavedLabel::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.schedulePreview { border-left: 3px solid var(--mod, var(--accent)); background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); font-weight: 650; }
+
+.sidebarControls { counter-reset: composer-step; }
+.destinationList, .scheduleFields { padding: 14px 12px 12px; border-radius: var(--radius-md); background: var(--surface); }
+.destinationList legend, .scheduleFields legend { display: inline-flex; align-items: center; gap: 8px; counter-increment: composer-step; }
+.destinationList legend::before, .scheduleFields legend::before { content: counter(composer-step); display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--mod, var(--accent)); color: var(--on-accent, #fff); font-size: 11px; font-weight: 750; }
+.destinationList label { padding: 6px 8px; border-radius: var(--radius-sm); }
+.destinationList label:hover { background: var(--mod-soft, var(--surface-hover)); }
+/* Primary actions stay reachable while the sidebar scrolls. */
+.actions { position: sticky; bottom: 0; z-index: 2; padding: 12px 0 4px; background: linear-gradient(to top, var(--surface) 78%, transparent); }
+@media (max-width: 900px) { .previewPanel { position: static; } .form { padding: 16px; } }

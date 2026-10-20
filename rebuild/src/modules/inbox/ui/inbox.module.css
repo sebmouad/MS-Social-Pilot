@@ -95,4 +95,23 @@
   .sync { justify-items: start; }
   .syncResult { text-align: left; }
 }
+/* Redesign: helpdesk list with avatars, unread dots, module-coloured selection and chat-style bubbles. */
+.split { --mod: var(--mod-inbox, var(--accent)); }
+.item { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; }
+.itemBody { display: grid; gap: 6px; min-width: 0; }
+.item[data-attention] .author::before { content: none; }
+.item[data-attention] .author { font-weight: 800; }
+.author { display: inline-flex; align-items: center; gap: 7px; }
+.unreadDot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--mod, var(--accent)); }
+.item:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.item[aria-current="true"] { border-left-color: var(--mod, var(--accent)); background: var(--mod-soft, var(--accent-soft)); }
+.listPane { box-shadow: 0 1px 0 var(--line-subtle); }
+.listHead { background: var(--surface-raised); }
+.threadHead { align-items: center; }
+.entry { border-radius: 14px 14px 14px 4px; }
+.entry[data-from="channel"] { border-color: color-mix(in srgb, var(--mod, var(--accent)) 45%, transparent); background: var(--mod-soft, var(--accent-soft)); border-radius: 14px 14px 4px 14px; }
+.reply { position: sticky; bottom: 0; margin: 0 -18px -18px; padding: 14px 18px 18px; border-radius: 0 0 var(--radius-lg) var(--radius-lg); background: var(--surface); box-shadow: 0 -8px 16px -12px color-mix(in srgb, var(--ink) 30%, transparent); }
+.reply textarea:focus { border-color: var(--mod, var(--accent)); outline: 2px solid var(--focus); outline-offset: 1px; }
+.pick { color: var(--ink-soft); }
+@media (max-width: 900px) { .reply { margin: 0; position: static; box-shadow: none; } }
 @media (forced-colors: active) { .item[aria-current="true"], .entry[data-from="channel"] { border-color: Highlight; } }

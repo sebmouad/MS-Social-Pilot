@@ -1,9 +1,15 @@
-import { DataTable, StatusChip, type TableColumn } from "@/components";
+import { DataTable, statusLabel, type TableColumn } from "@/components";
+import { IconLayoutGrid, IconLayoutList, IconPlus, IconTable } from "@tabler/icons-react";
 import { PostPreview, type PostPreviewPost } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
 import { readPublishingPostPage } from "@/modules/publishing/server/read";
 import { publishingDestinationChoices } from '@/modules/publishing/server/destinations';
-import { PageHeading, PostMessage, PostTargets, formatDate } from "@/modules/publishing/ui/publishing-ui";
+import { PageHeading, formatDate } from "@/modules/publishing/ui/publishing-ui";
+import { EmptyPanel, FilterChips, type FilterChip } from "../kit/kit";
+import { kitCopy } from "../kit/copy";
+import { pageLocale } from "../kit/locale";
+import { ChannelsCell, PostCell, StatusCell } from "./PostTableCells";
+import tableStyles from "./posts-table.module.css";
 import styles from "@/modules/publishing/ui/publishing.module.css";
 import previewStyles from '@/components/PostPreview.module.css';
 import { CsvImportForm, PostRowActions } from "./PostActions";
@@ -41,6 +47,8 @@ const NOTICE_TEXT: Record<string, string> = {
 export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; recovery?: string; page?: string; status?: string; channel?: string; q?: string; view?: string }> }) {
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
   const { notice, recovery, page: pageParam, status, channel, q, view: viewParam } = await searchParams;
+  const locale = await pageLocale();
+  const copy = kitCopy[locale];
   const view = viewParam === 'feed' || viewParam === 'cards' ? viewParam : 'table';
   const [allowedMimeTypes, maxUploadBytes, maxAltCharacters, maxMedia, maxFirstCommentDelayMinutes] = await Promise.all([
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'), runtimeConfig('publishing.maxRemoteMediaPerPost'), runtimeConfig('publishing.maxFirstCommentDelayMinutes'),
@@ -97,24 +105,51 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     actions={canAuthorDrafts ? actionFor(post) : undefined}
   />;
   const columns: TableColumn<(typeof rows)[number]>[] = [
-    { key: "post", label: "Post", render: post => <PostMessage message={post.message} media={post.media} link={post.link}/> },
-    { key: "channels", label: "Channels", render: post => <PostTargets post={post}/> },
-    { key: "status", label: "Status", render: post => <StatusChip status={post.status}/> },
+    { key: "post", label: "Post", render: post => <PostCell post={post} locale={locale}/> },
+    { key: "channels", label: "Channels", render: post => <ChannelsCell post={post} locale={locale}/> },
+    { key: "status", label: "Status", render: post => <StatusCell post={post} locale={locale}/> },
     { key: "scheduled", label: "Publish time", render: post => <span className={styles.date}>{formatDate(post.scheduledAt ?? post.publishedAt, viewer.membership.workspace.timezone)}</span> },
   ];
   if (canAuthorDrafts) columns.push({ key: "actions", label: "Post actions", render: actionFor });
   const canBulk = canWritePosts && canAuthorDrafts && view === 'table' && rows.length > 0;
   if (canBulk) columns.unshift({ key: "select", label: "Select", render: post => <BulkSelect postId={post.id} label={post.message.slice(0, 60) || post.id} /> });
+  const filterHref = (omit: 'status' | 'channel' | 'q') => {
+    const params = new URLSearchParams();
+    if (status && omit !== 'status') params.set('status', status);
+    if (channel && omit !== 'channel') params.set('channel', channel);
+    if (q && omit !== 'q') params.set('q', q);
+    if (viewParam === 'table' || viewParam === 'feed' || viewParam === 'cards') params.set('view', viewParam);
+    const query = params.toString();
+    return `/publishing/posts${query ? `?${query}` : ''}`;
+  };
+  const chips: FilterChip[] = [
+    ...(selectedStatus ? [{ key: 'status', label: copy.status, value: statusLabel(selectedStatus), removeHref: filterHref('status') }] : []),
+    ...(selectedChannel ? [{ key: 'channel', label: copy.channel, value: targetChoices.find(target => target.id === selectedChannel)?.name ?? selectedChannel, removeHref: filterHref('channel') }] : []),
+    ...(q?.trim() ? [{ key: 'q', label: copy.search, value: q.trim(), removeHref: filterHref('q') }] : []),
+  ];
+  const viewHref = (next: 'table' | 'feed' | 'cards') => { const params = new URLSearchParams({ view: next }); if (status) params.set('status', status); if (channel) params.set('channel', channel); if (q) params.set('q', q); return `/publishing/posts?${params}`; };
+  const newPostLink = canWritePosts ? <a className="ui-button ui-button--primary" href="/publishing/compose"><IconPlus size={16} aria-hidden="true" /> {copy.newPost}</a> : undefined;
+  const emptyState = chips.length
+    ? <EmptyPanel title={copy.postsNoMatchTitle} action={<a className="ui-button ui-button--secondary" href="/publishing/posts">{copy.resetFilters}</a>}>{copy.postsNoMatchBody}</EmptyPanel>
+    : <EmptyPanel title={copy.postsEmptyTitle} action={newPostLink}>{copy.postsEmptyBody}</EmptyPanel>;
   return <>
-    <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${listing.total} ${listing.total === 1 ? "post" : "posts"} · page ${listing.page} of ${listing.pages}`}/>
+    <PageHeading href="/publishing/posts" actions={newPostLink} title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${listing.total} ${listing.total === 1 ? "post" : "posts"} · page ${listing.page} of ${listing.pages}`}/>
     {listing.channelUnavailable ? <p className={styles.errorNotice} role="status">The selected channel is unavailable. Choose another channel or reset the sidebar filters.</p> : null}
     {noticeText ? <RouteNotice className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} error={notice?.startsWith('failed')} focusKey={`${notice}:${recovery ?? ''}`}>{noticeText}</RouteNotice> : null}
     {canManageDrafts ? <div className={previewStyles.toolbar}><details className={previewStyles.importDisclosure}><summary>Import CSV</summary><section className={`${styles.card} ${styles.createCard}`}><p className={styles.help}>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section></details></div> : null}
     {canBulk ? <BulkPostActions canRetry={canPublish} /> : null}
-    <section className={styles.card} aria-label={`${view === 'table' ? 'Table' : view === 'feed' ? 'Feed' : 'Cards'} post view`}>
-      {view === 'table' ? <DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage={selectedStatus || selectedChannel || q?.trim() ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}/> : rows.length ? <ul className={view === 'feed' ? previewStyles.feedList : previewStyles.cardsGrid}>
+    <section className={styles.card} data-module="publishing" aria-label={`${view === 'table' ? 'Table' : view === 'feed' ? 'Feed' : 'Cards'} post view`}>
+      <div className={tableStyles.toolbarRow}>
+        <FilterChips chips={chips} resetHref="/publishing/posts" locale={locale} />
+        <nav className={tableStyles.viewSwitch} aria-label={copy.viewLabel}>
+          <a href={viewHref('table')} aria-current={view === 'table' ? 'true' : undefined}><IconTable size={15} aria-hidden="true" /><span>{copy.viewTable}</span></a>
+          <a href={viewHref('feed')} aria-current={view === 'feed' ? 'true' : undefined}><IconLayoutList size={15} aria-hidden="true" /><span>{copy.viewFeed}</span></a>
+          <a href={viewHref('cards')} aria-current={view === 'cards' ? 'true' : undefined}><IconLayoutGrid size={15} aria-hidden="true" /><span>{copy.viewCards}</span></a>
+        </nav>
+      </div>
+      {view === 'table' && rows.length === 0 ? emptyState : view === 'table' ? <DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage=""/> : rows.length ? <ul className={view === 'feed' ? previewStyles.feedList : previewStyles.cardsGrid}>
         {rows.map(post => <li key={post.id}>{previewFor(post, view === 'feed' ? 'feed' : 'card')}</li>)}
-      </ul> : <p className={styles.empty}>{selectedStatus || selectedChannel || q?.trim() ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}</p>}
+      </ul> : emptyState}
       {listing.pages > 1 ? <nav className={styles.postPagination} aria-label="Post pages">
         {listing.page > 1 ? <a className="ui-button ui-button--secondary" href={pageLink(listing.page - 1)}>Previous page</a> : <span />}
         <span>Page {listing.page} of {listing.pages}</span>

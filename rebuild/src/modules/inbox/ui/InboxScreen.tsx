@@ -16,6 +16,8 @@ import { reviewSummary, reviewText } from '@/modules/inbox/reviews-copy';
 import { ThreadTools } from './ThreadTools';
 import { NestedReply } from './NestedReply';
 import { InboxTag } from './InboxTags';
+import { InboxHeader, PersonAvatar, ShortcutHint } from './InboxChrome';
+import { InboxShortcuts } from './InboxShortcuts';
 import styles from './inbox.module.css';
 
 // The Inbox page has no per-user language yet; moderation defaults the same way.
@@ -191,10 +193,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const noChannels = listPage !== null && visibleChannels.length === 0;
 
   return <PageFrame module="inbox" scopedAccess sidebar={sidebar}><div className={styles.page}>
-    <header className={styles.head}>
-      <div><p className="eyebrow">Inbox</p><h1>Conversations</h1><p>Messages, comments and reviews from the channels you can access.</p></div>
-      {visibleChannels.length > 0 && <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true) : null} timeZone={timeZone} />}
-    </header>
+    <InboxHeader eyebrow="Inbox" title="Conversations" description="Messages, comments and reviews from the channels you can access." actions={visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true) : null} timeZone={timeZone} /> : undefined} />
+    <InboxShortcuts />
+    {listPage && listPage.items.length > 0 ? <ShortcutHint locale={LOCALE} /> : null}
     {listError ? <div role="alert" className={styles.alert}><p>{listError.error}</p><a href={resetHref}>Reset filters and return to the latest Inbox items</a></div> : null}
     {threadOutcome.error ? <div role="alert" className={styles.alert}><p>{threadOutcome.error.error}</p><a href={clearThreadHref}>Return to the Inbox list</a></div> : null}
     {noChannels ? <section className="panel"><div className={styles.empty}>
@@ -207,8 +208,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         {listPage.items.length ? <ul className={styles.list}>{listPage.items.map(item => {
           const badge = channelBadgeInfo(item.target.provider);
           const selected = thread !== null && thread.kind === item.kind && thread.id === item.id;
-          return <li key={item.key}><a className={styles.item} href={inboxHref({ ...baseLocation, ...(listPage.cursor ? { cursor: listPage.cursor } : {}), thread: item.key })} aria-current={selected ? 'true' : undefined} data-attention={item.needsReply || item.unread > 0 || undefined}>
-            <div className={styles.itemTop}><span className={styles.author}>{item.author}</span><time dateTime={item.time.toISOString()}>{formatInboxTime(item.time, timeZone)}</time></div>
+          return <li key={item.key}><a className={styles.item} href={inboxHref({ ...baseLocation, ...(listPage.cursor ? { cursor: listPage.cursor } : {}), thread: item.key })} aria-current={selected ? 'true' : undefined} data-attention={item.needsReply || item.unread > 0 || undefined} data-inbox-item>
+            <PersonAvatar name={item.author} size={38} />
+            <div className={styles.itemBody}>
+            <div className={styles.itemTop}><span className={styles.author}>{item.unread > 0 || item.needsReply ? <span className={styles.unreadDot} role="img" aria-label="Unread" /> : null}{item.author}</span><time dateTime={item.time.toISOString()}>{formatInboxTime(item.time, timeZone)}</time></div>
             <p className={styles.preview}>{item.kind === 'review' && !item.preview ? reviewText(LOCALE, 'noText') : item.preview.length > 180 ? `${item.preview.slice(0, 180)}…` : item.preview}</p>
             <div className={styles.itemMeta}>
               <ChannelBadge name={item.target.name} platformName={badge.platformName} mark={badge.mark} compact />
@@ -218,6 +221,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
               {item.needsReply ? <InboxTag icon="needsReply" tone="warn">Needs reply</InboxTag> : null}
               {item.resolved ? <InboxTag icon="resolved" tone="ok">Resolved</InboxTag> : null}
               {item.hidden ? <InboxTag icon="hidden">Hidden</InboxTag> : null}
+            </div>
             </div>
           </a></li>;
         })}</ul> : <div className={styles.empty}>
