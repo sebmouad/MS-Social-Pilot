@@ -1,11 +1,14 @@
 /** allowedChannelIds is an optional credential ceiling; it narrows, never widens, current membership grants. */
 export type InboxReadActor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[] };
 export type InboxReadConstraints = { allowedChannelIds?: readonly string[]; maxItems?: number };
+export type InboxSentiment = 'positive' | 'neutral' | 'negative';
 export type InboxListItem = {
   key: string; kind: 'message' | 'comment' | 'review'; id: string; author: string; preview: string; time: Date;
   /** Reviews only; null when the provider gave none. Never defaulted to 0. */
   rating: number | null; recommendation: 'positive' | 'negative' | null;
   target: { id: string; name: string; provider: string | null }; unread: number; needsReply: boolean; resolved: boolean; hidden: boolean; context: string | null;
+  /** Stored classification of a comment; null (unknown) for messages, reviews and unclassified comments. Never defaulted to neutral. */
+  sentiment: InboxSentiment | null;
 };
 export type InboxFilters = { channelId: string | null; kind: 'all' | 'message' | 'comment' | 'review'; state: 'open' | 'resolved' | 'all'; hidden: 'visible' | 'all'; q: string };
 export type InboxPageCursors = { olderCursor: string | null; newerCursor: string | null };

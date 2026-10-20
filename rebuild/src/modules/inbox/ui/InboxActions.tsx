@@ -4,10 +4,13 @@ import { AutoTextarea } from '@/components/AutoTextarea';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Dialog } from '@/components';
+import { useToast } from '@/components/Toast';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { isOperationErrorCode } from '@/lib/operation-error';
 import styles from './inbox.module.css';
 import { REPLY_COPY } from './reply-copy';
+import { actionCopy } from './action-copy';
+import type { InboxLocale } from './copy';
 
 type Kind = 'message' | 'comment' | 'review';
 type Outcome = { ok: true; body: Record<string, number | string | boolean> } | { ok: false; error: string };
@@ -15,7 +18,6 @@ type DeleteState = 'started' | 'uncertain' | 'remote_confirmed' | 'completed' | 
 type DeleteReceipt = { ok: true; operationId: string; itemId: string; state: DeleteState; remoteConfirmed: boolean; localConfirmed: boolean };
 type DeleteStatus = { kind: 'loading' | 'none' | 'error' } | { kind: 'operation'; receipt: DeleteReceipt };
 
-const uncertainOutcome = 'The outcome is unconfirmed. Check the current Inbox and platform state before repeating this action.';
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const deleteStates = new Set<DeleteState>(['started', 'uncertain', 'remote_confirmed', 'completed', 'rejected']);
 
@@ -40,7 +42,8 @@ function completeDeletion(receipt: DeleteReceipt) {
   return receipt.state === 'completed' && receipt.remoteConfirmed && receipt.localConfirmed;
 }
 
-async function send(payload: Record<string, unknown>): Promise<Outcome> {
+async function send(payload: Record<string, unknown>, locale: InboxLocale = 'en'): Promise<Outcome> {
+  const uncertainOutcome = actionCopy[locale].uncertain;
   try {
     const response = await fetch('/api/inbox/actions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     let body: unknown;
@@ -56,64 +59,70 @@ async function send(payload: Record<string, unknown>): Promise<Outcome> {
   }
 }
 
-const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
-
 /** "Last synced" plus Sync now, reporting what the sync found. */
-export function InboxSyncBar({ targetId, lastSynced, timeZone, disabled = false }: { targetId?: string; lastSynced: string | null; timeZone: string; disabled?: boolean }) {
+export function InboxSyncBar({ targetId, lastSynced, timeZone, disabled = false, locale = 'en' }: { targetId?: string; lastSynced: string | null; timeZone: string; disabled?: boolean; locale?: InboxLocale }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [syncedNow, setSyncedNow] = useState<string | null>(null);
   const router = useRouter();
+  const copy = actionCopy[locale];
 
   async function sync() {
     setBusy(true); setResult(null);
-    const outcome = await send({ action: 'sync', ...(targetId ? { targetId } : {}) });
+    const outcome = await send({ action: 'sync', ...(targetId ? { targetId } : {}) }, locale);
     setBusy(false);
     if (!outcome.ok) { setResult({ kind: 'error', text: outcome.error }); return; }
     const fields = ['conversationCount', 'messageCount', 'commentCount', 'targetCount', 'failedCount'] as const;
     const countsValid = fields.every(key => Number.isSafeInteger(outcome.body[key]) && (outcome.body[key] as number) >= 0);
     const syncedAt = outcome.body.syncedAt;
     const dateValid = typeof syncedAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(syncedAt) && Number.isFinite(Date.parse(syncedAt)) && new Date(syncedAt).toISOString() === syncedAt;
-    if (!countsValid || !dateValid) { setResult({ kind: 'error', text: uncertainOutcome }); return; }
+    if (!countsValid || !dateValid) { setResult({ kind: 'error', text: copy.uncertain }); return; }
     const { conversationCount, messageCount, commentCount, targetCount, failedCount } = outcome.body as Record<typeof fields[number], number>;
-    const failed = failedCount;
     // Present only when the channel's module reads reviews.
     const reviewCount = outcome.body.reviewCount;
-    const reviewNote = typeof reviewCount === 'number' && Number.isSafeInteger(reviewCount) && reviewCount >= 0 ? ` ${plural(reviewCount, 'review')} up to date.` : '';
-    setResult({ kind: failed ? 'error' : 'ok', text: `Checked ${plural(Number(targetCount), 'channel')}: ${plural(Number(conversationCount), 'conversation')} (${plural(Number(messageCount), 'message')}) and ${plural(Number(commentCount), 'comment')} up to date.${reviewNote}${failed ? ` ${plural(failed, 'channel')} could not be read. Reconnect it in Connections, then sync again.` : ''}` });
-    setSyncedNow(new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(syncedAt)));
+    const reviews = typeof reviewCount === 'number' && Number.isSafeInteger(reviewCount) && reviewCount >= 0 ? reviewCount : null;
+    setResult({ kind: failedCount ? 'error' : 'ok', text: copy.synced({ targets: Number(targetCount), conversations: Number(conversationCount), messages: Number(messageCount), comments: Number(commentCount), reviews, failed: failedCount }) });
+    setSyncedNow(new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(syncedAt)));
     router.refresh();
   }
 
   const shown = syncedNow ?? lastSynced;
   return <div className={styles.sync}>
-    <p className={styles.syncTime}>{shown ? <>Last synced <strong>{shown}</strong></> : 'Not synced yet'}</p>
-    <Button variant="secondary" disabled={disabled || busy} aria-busy={busy} onClick={() => void sync()}>{busy ? 'Syncing…' : 'Sync now'}</Button>
+    <p className={styles.syncTime}>{shown ? <>{copy.lastSynced} <strong>{shown}</strong></> : copy.notSynced}</p>
+    <Button variant="secondary" disabled={disabled || busy} aria-busy={busy} onClick={() => void sync()}>{busy ? copy.syncing : copy.syncNow}</Button>
     <div role="status" aria-live="polite" className={styles.syncResult}>{result?.kind === 'ok' ? <span>{result.text}</span> : null}</div>
     {result?.kind === 'error' ? <p role="alert" className={styles.error}>{result.text}</p> : null}
   </div>;
 }
 
 /** Resolve or reopen, hide or unhide, and delete, for the open thread. */
-export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide, canDelete, platformName, listHref, reply = false }: { reply?: boolean; id: string; kind: Kind; resolved: boolean; hidden: boolean; canResolve: boolean; canHide: boolean; canDelete: boolean; platformName: string; listHref: string }) {
+export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide, canDelete, platformName, listHref, reply = false, locale = 'en' }: { reply?: boolean; id: string; kind: Kind; resolved: boolean; hidden: boolean; canResolve: boolean; canHide: boolean; canDelete: boolean; platformName: string; listHref: string; locale?: InboxLocale }) {
   const [busy, setBusy] = useState<'resolve' | 'hide' | 'delete' | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
   const [deleteStatus, setDeleteStatus] = useState<DeleteStatus>({ kind: 'loading' });
   const router = useRouter();
+  const toast = useToast();
+  const copy = actionCopy[locale];
   // A deleted reply leaves the thread open; a deleted opening comment returns to the list.
   const leave = () => { if (reply) router.refresh(); else router.replace(listHref); };
-  const noun = reply ? 'reply' : 'comment';
+  const noun = copy.noun(reply);
 
-  async function run(kindOfAction: 'resolve' | 'hide' | 'delete', payload: Record<string, unknown>, message: string) {
+  async function run(kindOfAction: 'resolve' | 'hide' | 'delete', payload: Record<string, unknown>, message: string, undo?: Record<string, unknown>, undoMessage?: string) {
     setBusy(kindOfAction); setError(''); setDone('');
-    const outcome = await send(payload);
+    const outcome = await send(payload, locale);
     setBusy(null);
-    if (!outcome.ok) { if (kindOfAction === 'delete') setDeleteStatus({ kind: 'error' }); setError(outcome.error); return false; }
+    if (!outcome.ok) {
+      if (kindOfAction === 'delete') setDeleteStatus({ kind: 'error' });
+      setError(outcome.error);
+      // A failed resolve or hide is safe to attempt again; deletion keeps its own status dialog.
+      if (kindOfAction !== 'delete') toast.failed(copy.failedTitle, () => { void run(kindOfAction, payload, message, undo, undoMessage); }, copy.retry, outcome.error);
+      return false;
+    }
     if (kindOfAction === 'delete') {
       const receipt = deleteReceipt(outcome.body, id);
-      if (!receipt) { setError(uncertainOutcome); setDeleteStatus({ kind: 'error' }); return false; }
+      if (!receipt) { setError(copy.uncertain); setDeleteStatus({ kind: 'error' }); return false; }
       if (completeDeletion(receipt)) {
         setDone(message);
         setConfirming(false);
@@ -125,6 +134,8 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       return false;
     }
     setDone(message);
+    // Resolve and hide are reversible, so they offer Undo instead of asking first.
+    if (undo) toast.undoable(message, () => { void send(undo, locale).then(result => { if (result.ok) { setDone(undoMessage ?? ''); router.refresh(); } else toast.notify({ tone: 'error', title: result.error }); }); }, copy.undo);
     router.refresh();
     return true;
   }
@@ -135,7 +146,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       const receipt = await readDeleteStatus(id);
       if (receipt && completeDeletion(receipt)) {
         setDeleteStatus({ kind: 'operation', receipt });
-        setDone('Comment deleted.');
+        setDone(copy.deletedDone);
         setConfirming(false);
         leave();
       } else {
@@ -143,24 +154,24 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       }
     } catch {
       setDeleteStatus({ kind: 'error' });
-      setError('Could not check deletion status. Keep this dialog open and check again.');
+      setError(copy.statusError);
     } finally { setBusy(null); }
   }
 
   async function finishDeletion() {
     if (deleteStatus.kind !== 'operation' || deleteStatus.receipt.state !== 'remote_confirmed') return;
     setBusy('delete'); setError('');
-    const outcome = await send({ action: 'finish_delete', operationId: deleteStatus.receipt.operationId, confirmation: `FINISH DELETION ${deleteStatus.receipt.operationId}` });
+    const outcome = await send({ action: 'finish_delete', operationId: deleteStatus.receipt.operationId, confirmation: `FINISH DELETION ${deleteStatus.receipt.operationId}` }, locale);
     setBusy(null);
     if (!outcome.ok) { setError(outcome.error); return; }
     const receipt = deleteReceipt(outcome.body, id, deleteStatus.receipt.operationId);
     if (!receipt || !completeDeletion(receipt)) {
       if (receipt) setDeleteStatus({ kind: 'operation', receipt });
-      setError(uncertainOutcome);
+      setError(copy.uncertain);
       return;
     }
     setDeleteStatus({ kind: 'operation', receipt });
-    setDone('Comment deleted.'); setConfirming(false); leave();
+    setDone(copy.deletedDone); setConfirming(false); leave();
   }
 
   async function openDeleteDialog() {
@@ -169,13 +180,13 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       const receipt = await readDeleteStatus(id);
       if (receipt && completeDeletion(receipt)) {
         setDeleteStatus({ kind: 'operation', receipt });
-        setDone('Comment deleted.'); setConfirming(false); leave();
+        setDone(copy.deletedDone); setConfirming(false); leave();
       } else {
         setDeleteStatus(receipt ? { kind: 'operation', receipt } : { kind: 'none' });
       }
     } catch {
       setDeleteStatus({ kind: 'error' });
-      setError('Could not check deletion status. Keep this dialog open and check again.');
+      setError(copy.statusError);
     }
   }
 
@@ -183,27 +194,28 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   const operation = deleteStatus.kind === 'operation' ? deleteStatus.receipt : null;
   const canStartDelete = deleteStatus.kind === 'none';
   const canFinishDelete = operation?.state === 'remote_confirmed' && operation.remoteConfirmed && !operation.localConfirmed;
+  const cap = copy.cap(reply);
 
-  if (!canResolve) return <p className={styles.readOnly}>You can read this conversation but not change it.</p>;
+  if (!canResolve) return <p className={styles.readOnly}>{copy.readOnly}</p>;
   return <div className={styles.toolbar}>
     <div className={styles.toolbarButtons}>
-      {!reply && <Button size="sm" variant="secondary" data-inbox-resolve disabled={busy !== null} onClick={() => void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? 'Reopened.' : 'Marked as resolved.')}>{resolved ? 'Reopen' : 'Mark resolved'}</Button>}
-      {kind === 'comment' && canHide && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('hide', { action: 'moderate', id, hidden: !hidden }, hidden ? `${reply ? 'Reply' : 'Comment'} is visible again.` : `${reply ? 'Reply' : 'Comment'} hidden.`)}>{hidden ? `Unhide ${noun}` : `Hide ${noun}`}</Button>}
-      {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => void openDeleteDialog()}>Delete {noun}</Button>}
+      {!reply && <Button size="sm" variant="secondary" data-inbox-resolve disabled={busy !== null} onClick={() => void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? copy.reopened : copy.resolvedDone, { action: 'resolve', id, kind, resolved }, resolved ? copy.resolvedDone : copy.reopened)}>{resolved ? copy.reopen : copy.markResolved}</Button>}
+      {kind === 'comment' && canHide && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('hide', { action: 'moderate', id, hidden: !hidden }, hidden ? copy.visibleDone(cap) : copy.hiddenDone(cap), { action: 'moderate', id, hidden }, hidden ? copy.hiddenDone(cap) : copy.visibleDone(cap))}>{hidden ? copy.unhide(noun) : copy.hide(noun)}</Button>}
+      {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => void openDeleteDialog()}>{copy.delete(noun)}</Button>}
     </div>
     <div role="status" aria-live="polite" className={styles.toolbarStatus}>{done}</div>
     {error && !confirming && <p role="alert" className={styles.error}>{error}</p>}
-    <Dialog open={confirming} busy={deleteBusy} title={canStartDelete ? `Delete this ${noun}?` : "Comment deletion status"} description={canStartDelete ? `This removes the ${noun}, and any replies under it, from ${platformName} and from your inbox. This cannot be undone.` : "Check the current deletion outcome. Closing this dialog does not undo an existing deletion request."} onClose={() => { if (!deleteBusy) { setConfirming(false); } }}
-      actions={<><Button variant="secondary" data-dialog-cancel disabled={deleteBusy} onClick={() => setConfirming(false)}>{canStartDelete ? `Keep ${noun}` : 'Close'}</Button>
-        {(operation || deleteStatus.kind === 'error') && <Button variant="secondary" disabled={deleteBusy} onClick={() => void checkDeletionStatus()}>{deleteBusy ? 'Checking…' : 'Check deletion status'}</Button>}
-        {canFinishDelete && <Button variant="danger" disabled={deleteBusy} onClick={() => void finishDeletion()}>{deleteBusy ? 'Finishing…' : 'Finish removal from Inbox'}</Button>}
-        {canStartDelete && <Button variant="danger" disabled={deleteBusy} onClick={() => void run('delete', { action: 'delete', id, confirmation: `DELETE COMMENT ${id}` }, 'Comment deleted.')}>{deleteBusy ? 'Deleting…' : `Delete ${noun}`}</Button>}</>}>
-      {deleteStatus.kind === 'loading' && <p className={styles.dialogNote} role="status">Checking whether a deletion is already in progress…</p>}
-      {canStartDelete && <p className={styles.dialogNote}>Hiding the {noun} instead keeps it in your inbox and can be undone.</p>}
-      {operation?.state === 'started' || operation?.state === 'uncertain' ? <p className={styles.dialogNote} role="status">The platform outcome is unconfirmed. Check deletion status before taking another action.</p> : null}
-      {operation?.state === 'remote_confirmed' ? <p className={styles.dialogNote} role="status">{operation.remoteConfirmed ? 'The platform confirmed deletion.' : 'The platform outcome is unconfirmed.'} Finish removal from Inbox only completes the local cleanup.</p> : null}
-      {operation?.state === 'rejected' ? <p className={styles.dialogNote} role="alert">The platform rejected this deletion. Contact your administrator before trying again.</p> : null}
-      {operation?.state === 'completed' && !completeDeletion(operation) ? <p className={styles.dialogNote} role="alert">Deletion is not fully confirmed. Check status or contact your administrator.</p> : null}
+    <Dialog open={confirming} busy={deleteBusy} title={canStartDelete ? copy.deleteTitle(noun) : copy.statusTitle} description={canStartDelete ? copy.deleteBody(noun, platformName) : copy.statusBody} onClose={() => { if (!deleteBusy) { setConfirming(false); } }}
+      actions={<><Button variant="secondary" data-dialog-cancel disabled={deleteBusy} onClick={() => setConfirming(false)}>{canStartDelete ? copy.keep(noun) : copy.close}</Button>
+        {(operation || deleteStatus.kind === 'error') && <Button variant="secondary" disabled={deleteBusy} onClick={() => void checkDeletionStatus()}>{deleteBusy ? copy.checking : copy.checkStatus}</Button>}
+        {canFinishDelete && <Button variant="danger" disabled={deleteBusy} onClick={() => void finishDeletion()}>{deleteBusy ? copy.finishing : copy.finish}</Button>}
+        {canStartDelete && <Button variant="danger" disabled={deleteBusy} onClick={() => void run('delete', { action: 'delete', id, confirmation: `DELETE COMMENT ${id}` }, copy.deletedDone)}>{deleteBusy ? copy.deleting : copy.delete(noun)}</Button>}</>}>
+      {deleteStatus.kind === 'loading' && <p className={styles.dialogNote} role="status">{copy.checkingInProgress}</p>}
+      {canStartDelete && <p className={styles.dialogNote}>{copy.hideInstead(noun)}</p>}
+      {operation?.state === 'started' || operation?.state === 'uncertain' ? <p className={styles.dialogNote} role="status">{copy.unconfirmedPlatform}</p> : null}
+      {operation?.state === 'remote_confirmed' ? <p className={styles.dialogNote} role="status">{operation.remoteConfirmed ? copy.remoteConfirmed : copy.remoteUnconfirmed} {copy.finishNote}</p> : null}
+      {operation?.state === 'rejected' ? <p className={styles.dialogNote} role="alert">{copy.rejected}</p> : null}
+      {operation?.state === 'completed' && !completeDeletion(operation) ? <p className={styles.dialogNote} role="alert">{copy.notFullyConfirmed}</p> : null}
       {error && <p role="alert" className={styles.error}>{error}</p>}
     </Dialog>
   </div>;
@@ -233,7 +245,7 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
     if (!validation.validate(event.currentTarget)) return;
     inFlight.current = true;
     setBusy(true); setError(''); setSent('');
-    const outcome = await send({ action: 'reply', id, kind, text });
+    const outcome = await send({ action: 'reply', id, kind, text }, locale);
     inFlight.current = false; setBusy(false);
     if (!outcome.ok) { setError(locale === 'fr' ? copy.unconfirmed : outcome.error); return; }
     updateText(''); setSent(copy.sent);

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Badge, type BadgeTone } from "@/components/Badge";
 
 const shape = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
@@ -9,13 +10,15 @@ const ICONS = {
   hidden: <><path d="M2 8s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4Z" {...shape} /><path d="m3 13 10-10" {...shape} /></>,
   message: <path d="M3 3.5h10v7H8.4L5.4 13v-2.5H3Z" {...shape} />,
   comment: <><path d="M3 3.5h10v7H8.4L5.4 13v-2.5H3Z" {...shape} /><path d="M5.6 6h4.8m-4.8 2h3" {...shape} /></>,
+  positive: <><circle cx="8" cy="8" r="5.5" {...shape} /><path d="M5.6 9.6a3.2 3.2 0 0 0 4.8 0M6 6.4h.01M10 6.4h.01" {...shape} /></>,
+  neutral: <><circle cx="8" cy="8" r="5.5" {...shape} /><path d="M6 10h4M6 6.4h.01M10 6.4h.01" {...shape} /></>,
+  negative: <><circle cx="8" cy="8" r="5.5" {...shape} /><path d="M5.6 10.4a3.2 3.2 0 0 1 4.8 0M6 6.4h.01M10 6.4h.01" {...shape} /></>,
 } satisfies Record<string, ReactNode>;
 
 type Tone = "ok" | "warn" | "danger" | "neutral";
+const BADGE_TONE: Record<Tone, BadgeTone> = { ok: "success", warn: "warning", danger: "danger", neutral: "neutral" };
 
-export function InboxTag({ icon, tone = "neutral", children }: { icon: keyof typeof ICONS; tone?: Tone; children: ReactNode }) {
-  return <span className={`ui-chip ui-chip--${tone} ui-chip--compact`}>
-    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">{ICONS[icon]}</svg>
-    <span>{children}</span>
-  </span>;
+/** Status or kind label for an Inbox item: the shared Badge with an Inbox glyph. The icon never carries meaning alone. */
+export function InboxTag({ icon, tone = "neutral", title, children }: { icon: keyof typeof ICONS; tone?: Tone; title?: string; children: ReactNode }) {
+  return <span title={title}><Badge tone={BADGE_TONE[tone]} icon={<svg viewBox="0 0 16 16" width="13" height="13" focusable="false">{ICONS[icon]}</svg>}>{children}</Badge></span>;
 }

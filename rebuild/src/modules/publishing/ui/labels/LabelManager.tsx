@@ -1,8 +1,11 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { IconPencil, IconTag, IconTrash } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
+import { DataTable } from '@/components/DataTable';
 import { Dialog } from '@/components/Dialog';
+import { Select } from '@/components/Select';
 import { RouteNotice } from '@/components/RouteNotice';
 import { SidebarDock } from '@/components/SidebarDock';
 import styles from './labels.module.css';
@@ -43,6 +46,7 @@ export function LabelManager({ initialLabels, colors, page, hasMore, query, canW
   const nextNotice = (text: string, error = false) => setNotice(value => ({ error, text, key: (value?.key ?? 0) + 1 }));
   const close = () => { if (!busy) setDialog(false); };
   const canChange = canWrite && workspaceWide;
+  const limitedReason = 'Your access is limited to some channels, so only members with access to all channels can rename or delete labels.';
   function begin(label?: Label) { setEditing(label ?? null); setDraft(label ? { name: label.name, color: label.color } : { name: '', color: colors[0] ?? 'blue' }); setDialog(true); }
   const saveConfirmation = editing ? `UPDATE LABEL ${editing.id}` : `CREATE LABEL ${draft.name.trim()}`;
   const deleteConfirmation = review?.label ? `DELETE LABEL ${review.label.id}` : '';
@@ -80,17 +84,26 @@ export function LabelManager({ initialLabels, colors, page, hasMore, query, canW
       <Button type="submit" variant="secondary">Search</Button>{query && <a href="/publishing/labels">Clear</a>}
       {canWrite && <Button type="button" variant="primary" onClick={() => begin()}>New label</Button>}
     </form></SidebarDock>
-    {labels.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Post labels</caption><thead><tr><th scope="col">Label</th><th scope="col">Posts</th><th scope="col">Templates</th><th scope="col">Content mix rules</th>{canWrite && <th scope="col">Actions</th>}</tr></thead><tbody>{labels.map(label => <tr key={label.id}>
-      <th scope="row"><span className={styles.chip}><span className={styles.swatch} data-color={label.color} aria-hidden="true" />{label.name}</span></th>
-      <td>{label.usage ? label.usage.posts : '—'}</td><td>{label.usage ? label.usage.templates : '—'}</td><td>{label.usage ? label.usage.contentMixRules : '—'}</td>
-      {canWrite && <td><div className={styles.actions}><Button size="sm" disabled={!workspaceWide} onClick={() => begin(label)}>Edit</Button><Button size="sm" variant="danger" disabled={busy || !workspaceWide} onClick={() => { if (!inFlight.current) { setConfirmation(''); setReview({ kind: 'delete', label }); } }}>Delete</Button></div></td>}
-    </tr>)}</tbody></table></div> : <p className={styles.empty}>{query ? 'No labels match this search.' : 'No labels yet. Create one to group posts by campaign, client or theme.'}</p>}
+    <DataTable caption="Post labels" rows={labels} rowKey={label => label.id}
+      columns={[
+        { key: 'label', label: 'Label', render: label => <span className={styles.chip}><span className={styles.swatch} data-color={label.color} aria-hidden="true" />{label.name}</span> },
+        { key: 'posts', label: 'Posts', align: 'end', render: label => label.usage ? label.usage.posts : '—' },
+        { key: 'templates', label: 'Templates', align: 'end', render: label => label.usage ? label.usage.templates : '—' },
+        { key: 'mix', label: 'Content mix rules', align: 'end', render: label => label.usage ? label.usage.contentMixRules : '—' },
+      ]}
+      rowActions={canWrite ? label => [
+        { key: 'edit', label: 'Edit', icon: <IconPencil size={16} />, disabled: !workspaceWide, disabledReason: limitedReason, onSelect: () => begin(label) },
+        { key: 'delete', label: 'Delete', icon: <IconTrash size={16} />, danger: true, disabled: busy || !workspaceWide, disabledReason: limitedReason, onSelect: () => { if (!inFlight.current) { setConfirmation(''); setReview({ kind: 'delete', label }); } } },
+      ] : undefined}
+      rowActionsLabel={label => `Actions for ${label.name}`}
+      emptyIcon={<IconTag />} emptyMessage={query ? 'No labels match this search.' : 'No labels yet. Create one to group posts by campaign, client or theme.'}
+      emptyAction={query ? <a className="ui-button ui-button--secondary" href="/publishing/labels">Clear search</a> : canWrite ? <Button variant="primary" onClick={() => begin()}>New label</Button> : undefined} />
     {canWrite && !workspaceWide && <p className={styles.note}>Your access is limited to some channels, so label counts are hidden and only members with access to all channels can rename or delete labels. You can still create labels.</p>}
     <nav className={styles.pagination} aria-label="Label pages">{page > 1 && <a href={href(page - 1)}>Previous page</a>}<span>Page {page}</span>{hasMore && <a href={href(page + 1)}>Next page</a>}</nav>
     <Dialog open={dialog} title={editing ? 'Edit label' : 'New label'} description="Labels tag posts for filtering and planning. Saving a label does not change or publish any post." onClose={close} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={close}>Cancel</Button><Button type="submit" form="label-form" variant="primary" disabled={busy}>{editing ? 'Review changes' : 'Review label'}</Button></>}>
       <form id="label-form" className={styles.form} onSubmit={save} noValidate>
         <label>Name<input required maxLength={maxNameCharacters} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label>
-        <label>Colour<select value={draft.color} onChange={event => setDraft(current => ({ ...current, color: event.target.value }))}>{colors.map(color => <option key={color} value={color}>{color[0]!.toUpperCase() + color.slice(1)}</option>)}</select></label>
+        <div className={styles.field}><span>Colour</span><Select aria-label="Colour" value={draft.color} onChange={color => setDraft(current => ({ ...current, color }))} options={colors.map(color => ({ value: color, label: color[0]!.toUpperCase() + color.slice(1), icon: <span className={styles.swatch} data-color={color} aria-hidden="true" /> }))} /></div>
         {editing && <p className={styles.help}>Renaming or recolouring changes this label on every post and template that uses it.</p>}
       </form>
     </Dialog>

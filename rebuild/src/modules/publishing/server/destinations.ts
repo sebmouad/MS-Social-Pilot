@@ -5,6 +5,7 @@ import { prisma, getTargets } from '@/server/data';
 import { selectedPublishingTargetIds } from '@/modules/publishing/server/read-scope';
 import { canUseFeature, hasPlatformCapability, type Entitlements } from '@/server/entitlements';
 import { platformFor } from '@/server/platforms/registry';
+import { platformModule } from '@/platforms';
 import type { requireViewer } from '@/server/context';
 
 /** One customer-safe publishing picker shared by creation, editing and import. */
@@ -43,6 +44,8 @@ export async function publishingTargetChoices(workspaceId: string, entitlements:
     }
     return {
       id: target.id, name: target.name, type: target.type, provider,
+      // Customer-facing platform name from the installed module registry; null when the module is gone.
+      platformName: provider ? platformModule(provider)?.name ?? null : null,
       canPublish,
       ...(canPublish && publishingFormats.length ? { publishingFormats, defaultPublishingFormatId: adapter?.defaultPublishingFormatId } : {}),
       ...(canPublish && adapter?.publishingMedia ? { publishingMedia: adapter.publishingMedia } : {}),

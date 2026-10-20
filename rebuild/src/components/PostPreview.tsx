@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { StatusChip } from '@/components/StatusChip';
 import styles from './PostPreview.module.css';
 import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
+import { ScheduleBadge } from '@/modules/publishing/ui/kit/kit';
+import type { KitLocale } from '@/modules/publishing/ui/kit/copy';
 
 export type PostPreviewPost = {
   id: string;
@@ -24,7 +26,8 @@ export type PostPreviewPost = {
     firstCommentId?: string | null;
     firstCommentAt?: Date | string | null;
     firstCommentError?: string | null;
-    target: { id: string; type: string; name: string; pictureUrl: string | null };
+    /** platformName is the installed module's customer-facing name, added by the Publishing read model. */
+    target: { id: string; type: string; name: string; pictureUrl: string | null; platformName?: string | null };
   }>;
 };
 
@@ -34,6 +37,8 @@ type Props = {
   timeZone: string;
   variant?: 'feed' | 'card';
   actions?: ReactNode;
+  /** Language of the schedule badges; the surrounding labels are still English. */
+  locale?: KitLocale;
   /** Trusted composer-only media rendering (for example, temporary File previews). */
   mediaOverride?: ReactNode;
 };
@@ -78,7 +83,7 @@ export function formatPostPreviewTime(date: Date, timeZone: string) {
   return new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
-export function PostPreview({ post, authorName, timeZone, variant = 'feed', actions, mediaOverride }: Props) {
+export function PostPreview({ post, authorName, timeZone, variant = 'feed', actions, mediaOverride, locale = 'en' }: Props) {
   const media = mediaItems(post.media).flatMap(item => {
     const url = mediaUrl(item);
     return url ? [{ ...item, url }] : [];
@@ -108,6 +113,8 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
           {picture ? <img className={styles.channelAvatar} src={picture} alt="" loading="lazy" /> : <span className={styles.channelFallback} aria-hidden="true">{initials(target.name)}</span>}
           <span className={styles.channelName}>{target.name}</span>
           <StatusChip status={status} compact />
+          {status === 'scheduled_remote' ? <ScheduleBadge mode="remote" locale={locale} platformName={target.platformName ?? undefined} />
+            : post.scheduledAt && post.status === 'scheduled' && status === 'pending' ? <ScheduleBadge mode="application" locale={locale} /> : null}
           {commentState !== 'not_requested' ? <span className={styles.noDestinations}>{FIRST_COMMENT_LABELS[commentState]}</span> : null}
           {destinationUrl ? <a href={destinationUrl} target="_blank" rel="noopener noreferrer">View post</a> : null}
         </li>;

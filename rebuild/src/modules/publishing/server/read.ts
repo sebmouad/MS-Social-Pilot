@@ -2,6 +2,7 @@ import { PostStatus, type Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { prisma, listPostPage, listCalendarRange, getTargets } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
+import { platformModule } from '@/platforms';
 import { FIRST_COMMENT_REJECTED } from '../first-comment-state';
 import { authorizePublishing } from './access';
 import { publishingPostReadQuery } from './read-query';
@@ -37,7 +38,18 @@ export async function readPublishingPostPage(actor: PublishingActor, input: { pa
   const query = await publishingPostReadQuery(actor, { status: input.status, channelId: input.channelId, q: input.q }, feature);
   const size = await runtimeConfig('publishing.postPageSize');
   const listing = await listPostPage(actor.workspaceId, integer(input.page, 1), size, query.scope.targetIds, query.scope.authorId, { where: query.where, order: input.order });
-  return { ...listing, channelUnavailable: query.channelUnavailable, filters: query.filters };
+  return { ...listing, posts: await withPlatformNames(actor.workspaceId, listing.posts), channelUnavailable: query.channelUnavailable, filters: query.filters };
+}
+
+/**
+ * Adds the installed platform module's customer-facing name to each destination so screens can say
+ * where a post is held without knowing any provider. Unknown or removed providers yield null.
+ */
+export async function withPlatformNames<T extends { targets: Array<{ target: { id: string } }> }>(workspaceId: string, posts: T[]): Promise<Array<Omit<T, 'targets'> & { targets: Array<T['targets'][number] & { target: T['targets'][number]['target'] & { platformName: string | null } }> }>> {
+  const ids = [...new Set(posts.flatMap(post => post.targets.map(({ target }) => target.id)))];
+  const rows = ids.length ? await prisma.target.findMany({ where: { workspaceId, id: { in: ids } }, select: { id: true, socialAccount: { select: { provider: true } } } }) : [];
+  const names = new Map(rows.map(row => [row.id, row.socialAccount?.provider ? platformModule(row.socialAccount.provider)?.name ?? null : null]));
+  return posts.map(post => ({ ...post, targets: post.targets.map(entry => ({ ...entry, target: { ...entry.target, platformName: names.get(entry.target.id) ?? null } })) }));
 }
 
 export async function readPublishingCalendar(actor: PublishingActor, input: { from: Date; to: Date; channelId?: string; status?: string }) {

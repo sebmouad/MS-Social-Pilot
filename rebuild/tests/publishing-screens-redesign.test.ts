@@ -38,9 +38,9 @@ describe('publishing screen kit', () => {
     expect(renderToStaticMarkup(createElement(ScheduleBadge, { mode: 'remote', platformName: 'Example' }))).toContain('>Example<');
   });
 
-  it('removes one filter at a time with plain links and offers a reset', () => {
+  it('removes one filter at a time with the shared chips and offers a reset', () => {
     const html = renderToStaticMarkup(createElement(FilterChips, { resetHref: '/publishing/posts', chips: [{ key: 'status', label: 'Status', value: 'Failed', removeHref: '/publishing/posts?q=a' }] }));
-    expect(html).toContain('href="/publishing/posts?q=a"');
+    expect(html).toContain('ui-filter-chip');
     expect(html).toContain('aria-label="Remove filter: Status Failed"');
     expect(html).toContain('Reset filters');
     expect(renderToStaticMarkup(createElement(FilterChips, { resetHref: '/x', chips: [] }))).not.toContain('Reset');

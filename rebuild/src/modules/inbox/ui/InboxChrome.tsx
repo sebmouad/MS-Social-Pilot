@@ -1,17 +1,12 @@
 import type { ReactNode } from 'react';
-import { ModuleGlyph, PageGlyph } from '@/components/icons';
+import { PageHeader } from '@/components/PageHeader';
+import { ShortcutHint as Keycap } from '@/components/ShortcutHint';
+import { PageGlyph } from '@/components/icons';
 import styles from './inbox-chrome.module.css';
 
-/**
- * Module-local header and avatar for the Inbox screens.
- * TODO: swap to the shared PageHeader and Avatar once the shared set lands.
- */
-export function InboxHeader({ href = '/inbox', eyebrow, title, description, actions }: { href?: string; eyebrow: string; title: string; description: string; actions?: ReactNode }) {
-  return <header className={styles.header} data-module="inbox">
-    <span className={styles.chip}>{href ? <PageGlyph href={href} size={22} /> : <ModuleGlyph id="inbox" size={22} />}</span>
-    <div className={styles.headerText}><p className={styles.eyebrow}>{eyebrow}</p><h1>{title}</h1><p className={styles.description}>{description}</p></div>
-    {actions ? <div className={styles.headerSide}>{actions}</div> : null}
-  </header>;
+/** Inbox page header: the shared PageHeader with the Inbox icon chip. */
+export function InboxHeader({ href = '/inbox', title, description, actions }: { href?: string; eyebrow?: string; title: string; description: string; actions?: ReactNode }) {
+  return <PageHeader module="inbox" icon={href ? <PageGlyph href={href} size={22} /> : undefined} title={title} description={description} actions={actions} />;
 }
 
 const initials = (name: string) => name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || '?';
@@ -32,9 +27,10 @@ export const SHORTCUT_COPY = {
   fr: { title: 'Raccourcis clavier', next: 'suivante', previous: 'précédente', reply: 'répondre', resolve: 'résoudre ou rouvrir', open: 'Ouvrez une conversation pour répondre ou la résoudre.' },
 } as const;
 
+/** The keys InboxShortcuts listens for, shown as shared keycaps next to what they do. */
 export function ShortcutHint({ locale = 'en' }: { locale?: 'en' | 'fr' }) {
   const copy = SHORTCUT_COPY[locale];
   return <p className={styles.shortcuts} aria-label={copy.title}>
-    <span><kbd>j</kbd> {copy.next}</span><span><kbd>k</kbd> {copy.previous}</span><span><kbd>r</kbd> {copy.reply}</span><span><kbd>e</kbd> {copy.resolve}</span>
+    <span><Keycap chord="j" /> {copy.next}</span><span><Keycap chord="k" /> {copy.previous}</span><span><Keycap chord="r" /> {copy.reply}</span><span><Keycap chord="e" /> {copy.resolve}</span>
   </p>;
 }
