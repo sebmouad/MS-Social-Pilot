@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { adsLocale } from '@/modules/ads/analysis/copy';
 import { ensureAdsManagement } from '@/modules/ads/server/management';
@@ -52,7 +53,7 @@ export default async function AdsObjectsPage({ searchParams }: { searchParams: P
     });
   } catch (error) {
     if (!(error instanceof OperationError)) throw error;
-    return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack"><header className="page-heading"><div><p className="eyebrow">Ads / Objects</p><h1>Campaigns, ad sets and ads</h1></div></header>
+    return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack"><PageHeader module="ads" title={"Campaigns, ad sets and ads"} />
       <section className="panel"><RouteNotice error className="ui-error" focusKey={error.message}>{error.message}</RouteNotice></section></div></PageFrame>;
   }
   const managementPort = adsDirectoryManagementPort();
@@ -61,7 +62,7 @@ export default async function AdsObjectsPage({ searchParams }: { searchParams: P
   const pageLink = (offset: number) => `/ads/objects?${new URLSearchParams([...query, ['offset', String(offset)]])}`;
   const accountName = new Map(accounts.map(account => [account.id, account.name]));
   return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">Ads / Objects</p><h1>Campaigns, ad sets and ads</h1><p>{directory.total} result(s) · {directory.range.from} to {directory.range.to}</p></div></header>
+    <PageHeader module="ads" title={"Campaigns, ad sets and ads"} description={<>{directory.total} result(s) · {directory.range.from} to {directory.range.to}</>} />
     <section className="panel">
       {directory.freshness.status === 'stale' ? <p className="small-note">Stored figures may be out of date.</p> : null}
       <DataTable caption="Ad objects" rows={directory.items} rowKey={row => `${row.accountId}:${row.objectId}`} emptyMessage="No matching objects. Adjust the filters or search." columns={[

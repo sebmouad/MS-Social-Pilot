@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import { RouteNotice } from '@/components/RouteNotice';
 import { goalsText, type GoalsCopyKey, type GoalsLocale } from '@/modules/analytics/goals/copy';
@@ -12,9 +13,14 @@ export function GoalEditor({ locale, channelId, channelName, metrics }: { locale
   const t = (key: GoalsCopyKey, values?: Record<string, string | number>) => goalsText(locale, key, values);
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(metrics.map(m => [m.metric, m.value === null ? '' : String(m.value)])));
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
   const [notice, setNotice] = useState<{ error: boolean; text: string; key: number } | null>(null);
   const inFlight = useRef(false);
-  const say = (text: string, error = false) => setNotice(v => ({ error, text, key: (v?.key ?? 0) + 1 }));
+  const say = (text: string, error = false) => {
+    setNotice(v => ({ error, text, key: (v?.key ?? 0) + 1 }));
+    if (error) toast.failed(text, () => window.location.reload(), locale === 'fr' ? 'Actualiser et vérifier' : 'Refresh and check');
+    else toast.notify({ title: text, tone: 'success' });
+  };
 
   async function save(event: React.FormEvent) {
     event.preventDefault();

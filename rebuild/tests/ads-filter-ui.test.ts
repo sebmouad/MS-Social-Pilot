@@ -61,7 +61,7 @@ describe('Ads report filter UX', () => {
     const node = dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({ period: 'custom', since: '2026-10-01', until: '2026-10-03', page: '2' }) })));
     expect(node.querySelectorAll('.ads-account-card')).toHaveLength(1);
     expect(node.querySelector('.ads-account-card h3')?.textContent).toBe('US account');
-    expect(node.querySelector('.page-heading')?.textContent).toContain('Showing 2–2 of 3 accounts · Page 2 of 3');
+    expect(node.querySelector('.ui-page-header')?.textContent).toContain('Showing 2–2 of 3 accounts · Page 2 of 3');
     expect(node.querySelector('.metric-card dd')?.textContent).toBe('3');
     const next = node.querySelector<HTMLAnchorElement>('nav[aria-label="Account report pages"] a[rel="next"]')!;
     expect(next.getAttribute('href')).toBe('/ads?period=custom&since=2026-10-01&until=2026-10-03&page=3');
@@ -105,7 +105,7 @@ describe('Ads report filter UX', () => {
     const row = (id: string, account: typeof accounts[number]) => ({ id, adAccountId: account.id, level: 'campaign', objectId: id, objectName: `Campaign ${id}`, date, spend: 2, impressions: 10, clicks: 1, reach: 5, cpc: 2, cpm: 200, cpp: null, ctr: 10, frequency: 1, actions: [], fields: {}, adAccount: { id: account.id, name: account.name, currency: account.currency } });
     state.dataset.mockResolvedValue({ accounts, insights: [row('a', accounts[0]), row('b', accounts[1])], pageSize: 1, maxRows: 2500 });
     const node = dom(renderToStaticMarkup(await CampaignsPage({ searchParams: Promise.resolve({ page: '2' }) })));
-    expect(node.querySelector('.page-heading')?.textContent).toContain('Showing 2–2 of 2 objects · Page 2 of 2');
+    expect(node.querySelector('.ui-page-header')?.textContent).toContain('Showing 2–2 of 2 objects · Page 2 of 2');
     expect(node.querySelectorAll('.ads-results-panel')).toHaveLength(1);
     expect(node.querySelector('.ads-results-panel h2')?.textContent).toBe('US account');
     expect(state.dataset).toHaveBeenCalledWith('workspace', expect.anything(), undefined, ['test-platform'], { levels: ['campaign', 'adset', 'ad'] });

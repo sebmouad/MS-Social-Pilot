@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { adsLocale } from '@/modules/ads/analysis/copy';
 import { describeAdsManagement } from '@/modules/ads/management/server';
@@ -64,7 +65,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   const exportPolicy = canExport ? await loadAdsOutputPolicy().catch(() => null) : null;
   const sidebar = <AdsReportSidebar accounts={accounts} filters={filters} action="/ads/campaigns" kind="objects" policy={policy} page={objectPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
   return <PageFrame module="ads" sidebar={accounts.length ? sidebar : undefined}><div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">Ads / Performance</p><h1>Campaign, ad set, and ad results</h1><p>{accounts.length ? `Showing ${objectPage.from}–${objectPage.to} of ${objectPage.resultCount} objects · Page ${objectPage.page} of ${objectPage.pageCount}. Stored daily insight records · ${dateRangeLabel(filters)}. Select an account and date range in the sidebar.` : 'Connect an advertising account to review and manage its campaigns.'}</p></div></header>
+    <PageHeader module="ads" title={"Campaign, ad set, and ad results"} description={<>{accounts.length ? `Showing ${objectPage.from}–${objectPage.to} of ${objectPage.resultCount} objects · Page ${objectPage.page} of ${objectPage.pageCount}. Stored daily insight records · ${dateRangeLabel(filters)}. Select an account and date range in the sidebar.` : 'Connect an advertising account to review and manage its campaigns.'}</>} />
     {!accounts.length ? <section className="panel empty-state"><h2>No ad accounts connected</h2><p>Connect and select an advertising account to see campaign results and available actions here.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <>
     {objectPage.resultCount ? [...byAccount].map(([accountId, rows]) => {
       const account = accounts.find(item => item.id === accountId);

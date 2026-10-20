@@ -4,6 +4,9 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatInZone } from './format';
 import { AutoTextarea } from '@/components/AutoTextarea';
+import { useToast } from '@/components/Toast';
+import { DataTable } from '@/components/DataTable';
+import { IconTrash } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
@@ -52,6 +55,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
   const [notice, setNotice] = useState<{ error: boolean; text: string; key: number } | null>(null);
   const [dialogError, setDialogError] = useState('');
   const [prepared, setPrepared] = useState<Prepared | null>(null);
@@ -66,7 +70,11 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
   const nameMax = limits.nameMax;
   const recipientMax = limits.maxRecipients;
 
-  const say = (text: string, error = false) => setNotice(current => ({ error, text, key: (current?.key ?? 0) + 1 }));
+  const say = (text: string, error = false) => {
+    setNotice(current => ({ error, text, key: (current?.key ?? 0) + 1 }));
+    if (error) toast.failed(text, () => window.location.reload(), 'Refresh and check');
+    else toast.notify({ title: text, tone: 'success' });
+  };
   const openTemplate = (row?: TemplateRow) => {
     const resumeDraft = Boolean(row && editingTemplate?.id === row.id);
     setEditingTemplate(row ?? null); setEditingSchedule(null);
@@ -130,7 +138,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
       setPending(null); setForm(null); setEditingTemplate(null); setEditingSchedule(null); setAcknowledged(false);
       say(action.successMessage);
       router.refresh();
-    } catch (error) { setDialogError(error instanceof Error && !(error instanceof TypeError) ? error.message : FALLBACK_ERROR); }
+    } catch (error) { const message = error instanceof Error && !(error instanceof TypeError) ? error.message : FALLBACK_ERROR; setDialogError(message); toast.failed(message, () => router.refresh(), 'Refresh and check'); }
     finally { inFlight.current = false; setBusy(false); }
   }
 
@@ -223,20 +231,24 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
 
     {notice && <RouteNotice error={notice.error} focusKey={`reports:${notice.key}`}>{notice.text}</RouteNotice>}
     <section className={styles.panel} aria-labelledby="tpl-h"><div className={styles.panelHeading}><div><h2 id="tpl-h">Report templates</h2><p>Save the sections and period your team reuses.</p></div></div>
-      {templates.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">Report templates</caption><thead><tr><th scope="col">Template</th><th scope="col">Period and sections</th><th scope="col">Schedules</th>{canManage && <th scope="col">Actions</th>}</tr></thead><tbody>{templates.map(row => <tr key={row.id}>
-        <th scope="row"><strong>{row.name}</strong></th><td>{policy.rangeOptions.find(option => option.id === row.rangeKey)?.label ?? 'Saved period'}<span className={styles.secondaryLine}>{row.sections.map(section => sectionLabels.get(section) ?? 'Saved section').join(', ') || 'No sections selected'}</span></td><td>{row.scheduleCount}</td>
-        {canManage && <td><div className={styles.actions}><Button size="sm" variant="secondary" disabled={busy} onClick={() => openTemplate(row)}>Edit</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => removeTemplate(row)}>Delete</Button></div></td>}
-      </tr>)}</tbody></table></div> : <div className={styles.emptyState}><h3>{page > 1 ? 'No templates on this page' : 'No templates yet'}</h3><p>{page > 1 ? 'Use Previous page to return to saved templates.' : canManage ? 'Create a template to reuse the report sections and period your team needs.' : 'A workspace editor can create a reusable report template.'}</p></div>}
+      {templates.length ? <DataTable caption="Report templates" rows={templates} rowKey={row => row.id} columns={[
+        { key: 'name', label: 'Template', render: row => <strong>{row.name}</strong> },
+        { key: 'period', label: 'Period and sections', render: row => <>{policy.rangeOptions.find(option => option.id === row.rangeKey)?.label ?? 'Saved period'}<span className={styles.secondaryLine}>{row.sections.map(section => sectionLabels.get(section) ?? 'Saved section').join(', ') || 'No sections selected'}</span></> },
+        { key: 'schedules', label: 'Schedules', render: row => row.scheduleCount },
+        ...(canManage ? [{ key: 'edit', label: 'Edit', render: (row: TemplateRow) => <Button size="sm" variant="secondary" disabled={busy} onClick={() => openTemplate(row)}>Edit</Button> }] : []),
+      ]} rowActions={canManage ? row => [{ key: 'delete', label: 'Delete', icon: <IconTrash />, danger: true, disabled: busy, onSelect: () => removeTemplate(row) }] : undefined} rowActionsLabel={row => `Actions for ${row.name}`} /> : <div className={styles.emptyState}><h3>{page > 1 ? 'No templates on this page' : 'No templates yet'}</h3><p>{page > 1 ? 'Use Previous page to return to saved templates.' : canManage ? 'Create a template to reuse the report sections and period your team needs.' : 'A workspace editor can create a reusable report template.'}</p></div>}
     </section>
 
     <section className={styles.panel} aria-labelledby="sch-h"><div className={styles.panelHeading}><div><h2 id="sch-h">Scheduled reports</h2><p>{canSchedule ? 'Reports go to the selected recipients on the workspace schedule.' : 'Existing schedules stay available for review and editing.'}</p></div></div>
       {!canSchedule && <p className={styles.info} role="status">Scheduled email is temporarily unavailable. You can still review and edit saved schedules.</p>}
-      {schedules.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="ui-visually-hidden">Scheduled reports</caption><thead><tr><th scope="col">Channel and frequency</th><th scope="col">Report</th><th scope="col">Recipients</th><th scope="col">Next run</th><th scope="col">Last result</th>{canManage && <th scope="col">Actions</th>}</tr></thead><tbody>{schedules.map(row => <tr key={row.id}>
-        <th scope="row"><strong>{row.channelName ?? 'Unavailable channel'}</strong><span className={styles.secondaryLine}>{policy.frequencyOptions.find(option => option.id === row.frequency)?.label ?? `Saved frequency (${row.frequency})`}</span></th>
-        <td>{row.templateName ?? (row.templateId ? 'Saved template unavailable' : 'All selected sections')}</td><td>{row.recipientCount}{canManage && row.recipients.length > 0 && <span className={styles.secondaryLine}>{row.recipients.join(', ')}</span>}</td>
-        <td>{when(row.nextRunAt, timeZone, row.nextRunLabel)}<span className={styles.secondaryLine}>{timeZone}</span></td><td>{OUTCOME[row.lastOutcome] ?? 'Status unavailable'}</td>
-        {canManage && <td><div className={styles.actions}>{canGenerate && <Button size="sm" variant="secondary" disabled={busy} onClick={() => void prepare(row)}>{busy ? 'Preparing…' : 'Prepare now'}</Button>}<Button size="sm" variant="secondary" disabled={busy} onClick={() => openSchedule(row)}>Edit</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => removeSchedule(row)}>Delete</Button></div></td>}
-      </tr>)}</tbody></table></div> : <div className={styles.emptyState}><h3>{page > 1 ? 'No schedules on this page' : 'No scheduled reports'}</h3><p>{page > 1 ? 'Use Previous page to return to saved schedules.' : canSchedule && canManage ? 'Create a schedule to send reports to people who need them.' : canSchedule ? 'No report schedules are set up for channels you can access.' : 'No report schedules are set up for channels you can access.'}</p></div>}
+      {schedules.length ? <DataTable caption="Scheduled reports" rows={schedules} rowKey={row => row.id} columns={[
+        { key: 'channel', label: 'Channel and frequency', render: row => <><strong>{row.channelName ?? 'Unavailable channel'}</strong><span className={styles.secondaryLine}>{policy.frequencyOptions.find(option => option.id === row.frequency)?.label ?? `Saved frequency (${row.frequency})`}</span></> },
+        { key: 'report', label: 'Report', render: row => row.templateName ?? (row.templateId ? 'Saved template unavailable' : 'All selected sections') },
+        { key: 'recipients', label: 'Recipients', render: row => <>{row.recipientCount}{canManage && row.recipients.length > 0 && <span className={styles.secondaryLine}>{row.recipients.join(', ')}</span>}</> },
+        { key: 'next', label: 'Next run', render: row => <>{when(row.nextRunAt, timeZone, row.nextRunLabel)}<span className={styles.secondaryLine}>{timeZone}</span></> },
+        { key: 'outcome', label: 'Last result', render: row => OUTCOME[row.lastOutcome] ?? 'Status unavailable' },
+        ...(canManage ? [{ key: 'edit', label: 'Actions', render: (row: ScheduleRow) => <div className={styles.actions}>{canGenerate && <Button size="sm" variant="secondary" disabled={busy} onClick={() => void prepare(row)}>{busy ? 'Preparing…' : 'Prepare now'}</Button>}<Button size="sm" variant="secondary" disabled={busy} onClick={() => openSchedule(row)}>Edit</Button></div> }] : []),
+      ]} rowActions={canManage ? row => [{ key: 'delete', label: 'Delete', icon: <IconTrash />, danger: true, disabled: busy, onSelect: () => removeSchedule(row) }] : undefined} rowActionsLabel={row => `Actions for ${row.channelName ?? 'Unavailable channel'}`} /> : <div className={styles.emptyState}><h3>{page > 1 ? 'No schedules on this page' : 'No scheduled reports'}</h3><p>{page > 1 ? 'Use Previous page to return to saved schedules.' : canSchedule && canManage ? 'Create a schedule to send reports to people who need them.' : canSchedule ? 'No report schedules are set up for channels you can access.' : 'No report schedules are set up for channels you can access.'}</p></div>}
       {prepared && <div className={styles.prepared} role="region" aria-labelledby="prepared-title"><div><h3 id="prepared-title">Report prepared</h3><p>{prepared.rowCount} rows · {prepared.bytes.toLocaleString('en')} bytes{prepared.truncated ? ' · Shortened to fit the configured limit' : ''}</p>{prepared.notIncluded.length > 0 && <p>Not included yet: {prepared.notIncluded.map(section => sectionLabels.get(section) ?? 'Some sections').join(', ')}.</p>}</div><div className={styles.actions}><Button size="sm" onClick={() => download('csv')}>Download CSV</Button>{prepared.json !== null && <Button size="sm" variant="secondary" onClick={() => download('json')}>Download JSON</Button>}<Button size="sm" variant="secondary" onClick={() => download('html')}>Download printable page</Button></div></div>}
       <p className={styles.note}>Reports use stored analytics. Missing data is shown as unavailable, not zero. “Prepare report” creates a download and does not email anyone; scheduled runs send to their saved recipients.</p>
     </section>

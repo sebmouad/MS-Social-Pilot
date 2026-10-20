@@ -1,3 +1,7 @@
+import { AnalyticsFilters, MetricPicker } from './AnalyticsFilters';
+import { EmptyState } from '@/components/EmptyState';
+import { IconChartBar } from '@tabler/icons-react';
+import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { readChannelProfiles } from '@/modules/settings/channel-profiles/service';
 import { profileChannelName, type ProfileDirectory } from '@/modules/settings/channel-profiles/contracts';
@@ -71,7 +75,7 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHr
 
   return <div className="analytics-sidebar">
     <form noValidate action="/analytics" method="get" className="analytics-sidebar-filter">
-      <p className="analytics-filter-heading">Report filters</p>
+      <AnalyticsFilters title="Report filters" query={query} path="/analytics" locale={locale}>
       <fieldset className="analytics-filter-section">
         <legend className="shell-subnav__label">Stored calendar dates (UTC)</legend>
         <label className="analytics-date-filter">From<input type="date" name="start" defaultValue={data.period.start} /></label>
@@ -102,16 +106,11 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHr
       <label className="analytics-select-filter">Search metrics
         <input type="search" name="search" maxLength={data.searchMaxLength} defaultValue={params.get('search') ?? ''} placeholder="Name or source" />
       </label>
-      <label className="analytics-select-filter">Metric detail
-        <select name="metric" defaultValue={selectedMetric}>
-          <option value="" disabled>All matching metrics</option>
-          {data.options.metrics.map(metric => <option value={metric.key} key={`${metric.sourceLabel}:${metric.key}`}>{metric.label} · {metric.sourceLabel}</option>)}
-        </select>
-      </label>
+      <MetricPicker label="Metric detail" options={data.options.metrics} initial={selectedMetric} />
       {freshPage('page')}{freshPage('pointPage')}{freshPage('rowPage')}
       <Button type="submit" variant="primary">Apply filters</Button>
       <a className="analytics-filter-reset" href="/analytics">Reset filters</a>
-    </form>
+    </AnalyticsFilters></form>
 
     <div className="analytics-sidebar-pages">
       <p className="shell-subnav__label">Browse results</p>
@@ -217,11 +216,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
   return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length && !data.options.adAccounts.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar retryHref={retryHref} /> : undefined}>
     <div className="page-stack">
-      <header className="page-heading"><div><p className="eyebrow">Analytics</p><h1>Performance</h1>
+      <PageHeader module="analytics" title={"Performance"} />
         {data && <><p title="These are inclusive stored calendar-date boundaries in UTC.">Stored calendar dates (UTC): {formatDay(data.period.start)} to {formatDay(data.period.end)}.</p>
           {data.period.comparison && <p>Compared with {data.period.comparison.mode === 'year' ? 'the same calendar dates last year' : 'the previous equal-length period'}: {formatDay(data.period.comparison.start)} to {formatDay(data.period.comparison.end)}.</p>}
         </>}
-      </div></header>
+
       {failure && <section className="panel analytics-state" role="alert"><h2>Analytics could not be loaded</h2><p>{failure.error}</p><p>Use the sidebar to retry with these filters or reset them.</p></section>}
       {data && <>
         {!data.options.channels.length && !data.options.adAccounts.length
@@ -239,7 +238,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <div className="analytics-panel-title"><div><h2>Available metrics</h2><p className="small-note">Stored measurements for the selected resources and range. Use the sidebar to open a metric's full series and resource detail.</p></div><span className="badge">{data.metrics.total} metrics</span></div>
           <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric key={`${metric.sourceLabel}:${metric.key}`} metric={metric} comparison={data.comparisons[metric.key]} chartPoints={data.chartPoints} />)}</div>
         </section> : data.selected.channelIds.length || data.selected.adAccountIds.length
-          ? <section className="panel analytics-state"><h2>No metrics match these filters</h2><p>Change the date range, metric search, or resource selection in the sidebar.</p></section>
+          ? <EmptyState title="No metrics match these filters" icon={<IconChartBar />} action={<a href="/analytics">Reset filters</a>}>Change the date range, metric search, or resource selection in the sidebar.</EmptyState>
           : null}
       </>}
     </div>

@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/PageHeader';
 import { PageFrame } from '@/server/PageFrame';
 import { formatInZone } from './format';
 import { requireViewer } from '@/server/context';
@@ -60,7 +61,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   } catch (error) { failure = operationFailure(error, 'Reports could not be loaded. Please try again.').error; }
 
   return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/reports" />}><div className={styles.root}>
-    <header className={styles.heading}><p className={styles.eyebrow}>Analytics</p><h1>Saved reports and schedules</h1><p>{canSchedule ? 'Reuse report layouts and have them prepared and emailed weekly or monthly for the channels you manage.' : canGenerate ? 'Reuse report layouts and prepare downloadable reports for the channels you manage.' : 'Reuse report layouts across your channels.'}</p></header>
+    <PageHeader module="analytics" title={"Saved reports and schedules"} description={<>{canSchedule ? 'Reuse report layouts and have them prepared and emailed weekly or monthly for the channels you manage.' : canGenerate ? 'Reuse report layouts and prepare downloadable reports for the channels you manage.' : 'Reuse report layouts across your channels.'}</>} />
     {failure && <section className={styles.panel} role="alert"><h2>Reports could not be loaded</h2><p>{failure}</p><a href="/analytics/reports">Return to the first page</a></section>}
     {data && <ReportsManager page={page!} runsPage={runsPage!} runsHasMore={data.runs.hasMore} canManage={canManage} canSchedule={canSchedule} canGenerate={canGenerate}
       policy={data.policy} limits={{ nameMax: data.limits.nameMax, maxRecipients: data.limits.maxRecipients, maxRows: data.limits.maxRows, maxBytes: data.limits.maxBytes }}

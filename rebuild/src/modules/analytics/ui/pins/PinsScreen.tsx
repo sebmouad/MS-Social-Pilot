@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/PageHeader';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';
@@ -22,7 +23,7 @@ export default async function PinnedPage({ searchParams }: { searchParams: Promi
   }
   catch (error) { failure = operationFailure(error, 'Pinned metrics could not be loaded. Please try again.').error; }
   return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/pins" />}><div className={styles.root}>
-    <header className={styles.heading}><p className={styles.eyebrow}>Analytics</p><h1>Pinned metrics</h1><p>Keep the measures you watch most in one place. Pins are personal; values come from stored analytics for the resources you can access.</p></header>
+    <PageHeader module="analytics" title={"Pinned metrics"} description={<>Keep the measures you watch most in one place. Pins are personal; values come from stored analytics for the resources you can access.</>} />
     {failure && <section className={styles.panel} role="alert"><h2>Pinned metrics could not be loaded</h2><p>{failure}</p><a href="/analytics/pins">Try again</a></section>}
     {data && <PinManager max={data.max} pinnable={data.pinnable} pins={data.pins.map(p => ({
       key: p.key, label: p.label, sourceLabel: p.sourceLabel, state: p.state, value: formatValue(p.total, p.unit, p.displayTotal),

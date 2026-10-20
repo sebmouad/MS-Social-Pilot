@@ -1,3 +1,5 @@
+import { TimeSeriesChart } from '@/components/charts';
+import { PageHeader } from '@/components/PageHeader';
 import '@/modules/ads/ui/ads.css';
 import '@/modules/ads/ui/objects/objects.css';
 import { ObjectPerformance } from './ObjectPerformance';
@@ -64,7 +66,7 @@ export default async function AdsComparePage({ searchParams }: { searchParams: P
     });
   } catch (error) {
     if (!(error instanceof OperationError)) throw error;
-    return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack"><header className="page-heading"><div><p className="eyebrow">{t('eyebrow')}</p><h1>{t('title')}</h1></div></header>
+    return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack"><PageHeader module="ads" title={t('title')} />
       <section className="panel"><RouteNotice error className="ui-error" focusKey={error.message}>{error.message}</RouteNotice><p>{t('errorHint')}</p></section></div></PageFrame>;
   }
   const exportQuery = new URLSearchParams({ format: 'csv', locale });
@@ -86,9 +88,8 @@ export default async function AdsComparePage({ searchParams }: { searchParams: P
     { key: 'reach', label: t('col.reach'), align: 'end', render: row => show(row.reachPeakDay) },
   ];
   return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">{t('eyebrow')}</p><h1>{t('title')}</h1>
-      <p>{t('rangeLine', { from: result.range.from, to: result.range.to })}{result.previousRange ? t('earlierLine', { from: result.previousRange.from, to: result.previousRange.to }) : ''}</p></div>
-      {result.groups.length ? <ComparisonExport href={`/api/ads/compare?${exportQuery.toString()}`} locale={locale} maxBytes={outputPolicy.exportMaxBytes} /> : null}</header>
+    <PageHeader module="ads" title={t('title')} description={<>{t('rangeLine', { from: result.range.from, to: result.range.to })}{result.previousRange ? t('earlierLine', { from: result.previousRange.from, to: result.previousRange.to }) : ''}</>} />
+      {result.groups.length ? <ComparisonExport href={`/api/ads/compare?${exportQuery.toString()}`} locale={locale} maxBytes={outputPolicy.exportMaxBytes} /> : null}
     {!result.groups.length ? <section className="panel empty-state"><h2>{t('emptyTitle')}</h2><p>{t('emptyHint')}</p></section> : result.groups.map(group => <section key={group.key} className="panel" aria-labelledby={`g-${group.key}`}>
       <h2 id={`g-${group.key}`}>{result.compare === 'accounts' ? group.accounts[0]?.name : `${group.currency ?? t('unknown')} · ${group.accounts.map(account => account.name).join(', ')}`}</h2>
       {!group.hasData ? <p>{t('noGroupData')}</p> : <>
@@ -97,6 +98,8 @@ export default async function AdsComparePage({ searchParams }: { searchParams: P
         <ul className="small-note" aria-label={t('updatedAt', { when: '' })}>{group.accounts.map(account => <li key={account.id}>{account.lastSyncedAt ? t('syncedLine', { account: account.name, when: new Date(account.lastSyncedAt).toLocaleString(locale) }) : t('neverSynced', { account: account.name })}</li>)}</ul>
         {group.accountTotalsAvailable ? <Kpis group={group} locale={locale} /> : <p className="small-note">{t('noAccountTotals')}</p>}
         {group.findings.length ? <ul aria-label={t('findingsLabel')}>{group.findings.map(finding => <li key={finding.key}>{adsFindingText(locale, finding.key, finding.params)}</li>)}</ul> : null}
+        {group.accountTotalsAvailable && <TimeSeriesChart locale={locale} label={`${group.accounts.map(account => account.name).join(', ')} · ${t('col.spend')}`} format={group.currency ? { style: 'currency', currency: group.currency } : undefined}
+          series={[{ id: 'spend', name: t('col.spend'), points: group.trend.map(day => ({ t: day.date, v: day.spend })) }]} />}
         {group.accountTotalsAvailable ? <details><summary>{t('dailyTrend')}</summary><DataTable caption={t('dailyCaption')} rows={group.trend} rowKey={row => row.date} columns={[
           { key: 'date', label: t('day'), render: row => row.date }, { key: 'spend', label: t('col.spend'), align: 'end', render: row => show(row.spend) }, { key: 'clicks', label: t('col.clicks'), align: 'end', render: row => show(row.clicks) }]} /></details>
           : null}

@@ -93,7 +93,7 @@ describe('Analytics explorer page', () => {
     expect(sidebar).toContain('name="search"');
     expect(sidebar).toContain('name="metric"');
     expect(sidebar).toContain('name="page"');
-    expect(sidebar).toContain('Views');
+    expect(sidebar).toContain('role="combobox"');
     expect(sidebar).toContain('Export CSV');
     expect(sidebar).toContain('Exports include up to 1000 data rows');
     const exportLink = links(html).find(url => url.pathname === '/api/reports/export');

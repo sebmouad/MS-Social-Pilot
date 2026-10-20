@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/PageHeader';
 import type { AdsFilters } from "@/modules/ads/server/queries";
 import { AdsFilterForm } from './AdsFilterForm';
 import { AdsFilterError, type AdsSearchParams } from '@/modules/ads/report-filters';
@@ -24,7 +25,7 @@ export function AdsFiltersSidebar({ accounts, filters, input, errors, action = "
 
 export function AdsFilterErrorView({ accounts, input, error, action, title, policy }: { accounts: AdsAccountOption[]; input: AdsSearchParams; error: AdsFilterError; action: string; title: string; policy: AdsReportPolicy }) {
   return <PageFrame module="ads" sidebar={<AdsFiltersSidebar accounts={accounts} input={input} errors={error.fields} action={action} policy={policy} />}><div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">Ads</p><h1>{title}</h1></div></header>
+    <PageHeader module="ads" title={title} />
     <section className="panel"><h2>Check your filters</h2><RouteNotice error className="ui-error" focusKey={JSON.stringify(input)}>{error.message}</RouteNotice><p>Correct your selection in Filters, or use Reset filters. No report was loaded.</p></section>
   </div></PageFrame>;
 }
@@ -35,7 +36,7 @@ export function AdsReportFailureView({ accounts, input, filters, error, action, 
   const message = error.message;
   const href = adsQuery(filters, action);
   return <PageFrame module="ads" sidebar={<><AdsFiltersSidebar accounts={accounts} filters={filters} action={action} policy={policy} /><a className="ads-page-reset" href={href}>{isPageError ? 'Return to page 1' : 'Retry from page 1'}</a></>}><div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">Ads</p><h1>{title}</h1></div></header>
+    <PageHeader module="ads" title={title} />
     <section className="panel"><h2>{isPageError ? 'Check the report page' : 'Report could not be loaded completely'}</h2><RouteNotice error className="ui-error" focusKey={`${action}:${String(input.page)}:${message}`}>{message}</RouteNotice><p>{isPageError ? 'Use the page controls in Filters or return to the first page. No report was loaded.' : 'No partial report is shown. Narrow the account or date range, then try again.'}</p></section>
   </div></PageFrame>;
 }
