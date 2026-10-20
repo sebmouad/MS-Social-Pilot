@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
@@ -10,7 +11,7 @@ async function handle(request: Request, write: boolean) {
     if (new URL(request.url).search) throw new OperationError('invalid_request', 'URL parameters are not accepted.');
     if (write) {
       let same = false;
-      try { same = new URL(request.headers.get('origin') ?? '').origin === new URL(request.url).origin; } catch {}
+      try { same = new URL(request.headers.get('origin') ?? '').origin === requestOrigin(request); } catch {}
       if (!same) throw new OperationError('forbidden', 'Cross-origin request denied.');
     }
     // Request authentication precedes bounded body parsing. The service chooses and rechecks feature authority.

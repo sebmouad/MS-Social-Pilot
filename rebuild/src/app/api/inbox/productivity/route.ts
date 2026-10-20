@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
@@ -7,7 +8,7 @@ import { listSavedReplies, performInboxProductivityAction, readInboxProductivity
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
-function sameOrigin(request: Request) { const origin = request.headers.get('origin'); if (!origin) return false; try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; } }
+function sameOrigin(request: Request) { const origin = request.headers.get('origin'); if (!origin) return false; try { return new URL(origin).origin === requestOrigin(request); } catch { return false; } }
 async function actor() { const viewer = await requireViewer({ feature: 'inbox/conversations', channelScoped: true }); return { userId: viewer.user.id, workspaceId: viewer.workspaceId }; }
 export async function GET(request: Request) {
   let current; try { current = await actor(); } catch (error) { const failure = operationFailure(error, 'Inbox productivity could not be loaded. Please try again.'); return reply({ error: failure.error, code: failure.code }, failure.status); }

@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { listNotifications, markNotificationRead, deleteNotification, readNotificationPreferences, updateNotificationPreferences } from '@/modules/settings/notifications/server';
@@ -73,5 +74,5 @@ export const DELETE = (request: Request) => resourceAction(request, 'DELETE');
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try { return new URL(origin).origin === requestOrigin(request); } catch { return false; }
 }

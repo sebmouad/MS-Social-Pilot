@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { requireViewer } from '@/server/context';
 import { deleteSavedView } from '@/modules/publishing/server/saved-views';
 import { operationFailure } from '@/lib/operation-error';
@@ -8,7 +9,7 @@ const reply = (body: unknown, status = 200) => Response.json(body, { status, hea
 /** Removes one of the viewer's own saved views. Body: { confirmation: "DELETE SAVED VIEW <id>" }. */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const origin = request.headers.get('origin');
-  let same = false; try { same = Boolean(origin) && new URL(origin as string).origin === new URL(request.url).origin; } catch { same = false; }
+  let same = false; try { same = Boolean(origin) && new URL(origin as string).origin === requestOrigin(request); } catch { same = false; }
   if (!same) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
   let viewer; try { viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true }); }
   catch { return reply({ error: 'Sign in to an authorized workspace.', code: 'unauthorized' }, 401); }

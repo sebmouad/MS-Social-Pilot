@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { currentRootActor } from '@/server/config/access';
 import { listRootDiagnostics, runRootDiagnostics } from '@/server/root/diagnostics';
 import { OperationError, operationFailure } from '@/lib/operation-error';
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const origin = request.headers.get('origin');
-    if (!origin || new URL(origin).origin !== new URL(request.url).origin) throw new OperationError('forbidden', 'Cross-origin request denied.');
+    if (!origin || new URL(origin).origin !== requestOrigin(request)) throw new OperationError('forbidden', 'Cross-origin request denied.');
     const current = await actor();
     return reply(await runRootDiagnostics(current.id, await request.json()));
   } catch (error) { return failure(error); }

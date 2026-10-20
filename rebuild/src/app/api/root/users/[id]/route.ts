@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { OperationError, operationFailure } from '@/lib/operation-error';
@@ -16,7 +17,7 @@ function json(body: unknown, status = 200) {
 
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
-  try { return Boolean(origin) && new URL(origin!).origin === new URL(request.url).origin; } catch { return false; }
+  try { return Boolean(origin) && new URL(origin!).origin === requestOrigin(request); } catch { return false; }
 }
 
 function mutationError(error: unknown) {

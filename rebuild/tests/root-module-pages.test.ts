@@ -45,7 +45,7 @@ describe('Root module screens', () => {
     expect(keys).not.toContain('publishing.maxMessageCharacters');
   });
   it('excludes product and provider settings from shared configuration', async () => {
-    renderToStaticMarkup(await SharedPage());
+    renderToStaticMarkup(await SharedPage({ searchParams: Promise.resolve({}) }));
     const props = state.form.mock.calls[0][0];
     expect(props.definitions.every((setting: { owner: { kind: string } }) => setting.owner.kind === 'shared')).toBe(true);
     expect(props.initialValues.map((setting: { key: string }) => setting.key)).toEqual(['auth.sessionDays']);
@@ -58,7 +58,7 @@ describe('Root module screens', () => {
   });
   it('authenticates all module entry routes before exposing controls', async () => {
     state.access.mockRejectedValue(new Error('Root required'));
-    for (const promise of [ProductPage({ params: Promise.resolve({ id: 'publishing' }) }), PlatformPage({ params: Promise.resolve({ id: 'facebook' }) }), ModulesPage(), SharedPage(), RootModuleSettings({ kind: 'product', id: 'publishing', title: 'Publishing', description: 'Controls' })]) await expect(promise).rejects.toThrow('Root required');
+    for (const promise of [ProductPage({ params: Promise.resolve({ id: 'publishing' }) }), PlatformPage({ params: Promise.resolve({ id: 'facebook' }) }), ModulesPage(), SharedPage({ searchParams: Promise.resolve({}) }), RootModuleSettings({ kind: 'product', id: 'publishing', title: 'Publishing', description: 'Controls' })]) await expect(promise).rejects.toThrow('Root required');
     expect(state.read).not.toHaveBeenCalled();
   });
   it('refuses uninstalled modules and lists only installed products', async () => {

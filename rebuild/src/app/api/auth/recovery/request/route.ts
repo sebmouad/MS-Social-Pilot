@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { createHash } from 'node:crypto';
 import { after, NextResponse } from 'next/server';
 import { requestPasswordRecovery } from '@/modules/settings/server/account-recovery';
@@ -26,7 +27,7 @@ async function readJson(request: Request) {
 
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
-  try { if (!origin || new URL(origin).origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Request denied.' }, { status: 403, headers }); }
+  try { if (!origin || new URL(origin).origin !== requestOrigin(request)) return NextResponse.json({ error: 'Request denied.' }, { status: 403, headers }); }
   catch { return NextResponse.json({ error: 'Request denied.' }, { status: 403, headers }); }
   let body: unknown;
   try { body = await readJson(request); } catch { return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400, headers }); }

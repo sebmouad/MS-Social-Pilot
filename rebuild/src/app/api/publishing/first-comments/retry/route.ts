@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { revalidatePath } from 'next/cache';
 import { requireViewer } from '@/server/context';
 import { retryFirstComment } from '@/modules/publishing/server/first-comment';
@@ -9,7 +10,7 @@ const reply = (body: unknown, status = 200) => Response.json(body, { status, hea
 
 export async function POST(request: Request) {
   let sameOrigin = false;
-  try { sameOrigin = new URL(request.headers.get('origin') ?? '').origin === new URL(request.url).origin; } catch { /* Missing or malformed origin. */ }
+  try { sameOrigin = new URL(request.headers.get('origin') ?? '').origin === requestOrigin(request); } catch { /* Missing or malformed origin. */ }
   if (!sameOrigin) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
   let viewer;
   try { viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true }); }

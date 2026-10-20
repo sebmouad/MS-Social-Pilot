@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import type { PublishingActor } from '../server/types';
@@ -7,7 +8,7 @@ const reply = (body: unknown, status = 200) => Response.json(body, { status, hea
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try { return new URL(origin).origin === requestOrigin(request); } catch { return false; }
 }
 type Feature = 'publishing/collaboration' | 'publishing/queue' | 'publishing/posts';
 

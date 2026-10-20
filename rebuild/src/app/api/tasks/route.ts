@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
@@ -8,7 +9,7 @@ import { TASKS_FEATURE_ID, TASKS_MODULE_ID } from '@/modules/tasks/semantics';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
-function sameOrigin(request: Request) { const origin = request.headers.get('origin'); if (!origin) return false; try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; } }
+function sameOrigin(request: Request) { const origin = request.headers.get('origin'); if (!origin) return false; try { return new URL(origin).origin === requestOrigin(request); } catch { return false; } }
 /** Entry-point gate (module + feature); the service repeats the full check, this only refuses early. */
 async function actor(write: boolean) {
   const viewer = await requireViewer({ module: TASKS_MODULE_ID, feature: TASKS_FEATURE_ID, channelScoped: true, ...(write ? { write: true } : {}) });

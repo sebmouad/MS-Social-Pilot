@@ -1,10 +1,11 @@
+import { requestOrigin } from '@/server/request-origin';
 import { requireViewer } from '@/server/context';
 import { prisma } from '@/server/data';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { issueMcpKey, revokeMcpKey } from '@/modules/settings/mcp-access/server';
 export const runtime = 'nodejs';
 const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store'}});
-function sameOrigin(request:Request){const origin=request.headers.get('origin');if(!origin)return false;try{return new URL(origin).origin===new URL(request.url).origin;}catch{return false;}}
+function sameOrigin(request:Request){const origin=request.headers.get('origin');if(!origin)return false;try{return new URL(origin).origin===requestOrigin(request);}catch{return false;}}
 async function manager(write=false){
  const viewer=await requireViewer({feature:'settings/mcp',...(write?{write:true}:{})});
  if(!['owner','admin'].includes(viewer.membership.role))throw new OperationError('forbidden','Only workspace owners and admins can manage API keys.');

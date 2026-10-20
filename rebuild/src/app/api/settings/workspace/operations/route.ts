@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
@@ -6,7 +7,7 @@ import { readWorkspaceOperations, updateWorkspaceOperations } from '@/modules/se
 
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
-function sameOrigin(request: Request) { const origin = request.headers.get('origin'); if (!origin) return false; try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; } }
+function sameOrigin(request: Request) { const origin = request.headers.get('origin'); if (!origin) return false; try { return new URL(origin).origin === requestOrigin(request); } catch { return false; } }
 export async function GET(request: Request) {
   if ([...new URL(request.url).searchParams.keys()].length) return reply({ error: 'Workspace operations reads do not accept URL parameters.', code: 'invalid_request' }, 400);
   let viewer; try { viewer = await requireViewer({ feature: 'settings/workspace' }); } catch { return reply({ error: 'Not authorized.', code: 'unauthorized' }, 401); }

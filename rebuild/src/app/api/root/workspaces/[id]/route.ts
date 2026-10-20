@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { currentRootActor } from '@/server/config/access';
@@ -9,7 +10,7 @@ const schema = z.object({ name: z.string().trim().min(1), confirmation: z.string
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const origin = request.headers.get('origin');
-  try { if (!origin || new URL(origin).origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 }); }
+  try { if (!origin || new URL(origin).origin !== requestOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 }); }
   catch { return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 }); }
   const actor = await currentRootActor();
   if (!actor?.isInstanceOwner) return NextResponse.json({ error: 'Not found.' }, { status: actor ? 404 : 401 });

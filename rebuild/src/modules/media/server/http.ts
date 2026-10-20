@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import type { ToolActor } from './access';
@@ -7,7 +8,7 @@ export const reply = (body: unknown, status = 200) => Response.json(body, { stat
 export function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try { return new URL(origin).origin === requestOrigin(request); } catch { return false; }
 }
 export const failure = (error: unknown, fallback: string) => { const f = operationFailure(error, fallback); return reply({ error: f.error, code: f.code }, f.status); };
 export async function viewerActor(feature: 'publishing/posts' | 'publishing/media', write: boolean): Promise<ToolActor | Response> {

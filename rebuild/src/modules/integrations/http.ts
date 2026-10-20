@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { WEBHOOKS_FEATURE_ID } from './manifest';
@@ -8,7 +9,7 @@ const reply = (body: unknown, status = 200, headers: Record<string, string> = {}
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try { return new URL(origin).origin === requestOrigin(request); } catch { return false; }
 }
 function failure(error: unknown, fallback: string) {
   if (error instanceof RateLimited) return reply({ error: error.message, code: 'rate_limited' }, 429, { 'retry-after': String(error.retryAfterSeconds) });

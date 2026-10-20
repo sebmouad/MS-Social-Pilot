@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import type { AnalyticsFeature } from '@/modules/analytics/server/access';
 import { operationFailure } from '@/lib/operation-error';
 import { requireViewer } from '@/server/context';
@@ -5,7 +6,7 @@ import { requireViewer } from '@/server/context';
 export const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
 export function sameOrigin(request: Request) {
   const origin = request.headers.get('origin'); if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try { return new URL(origin).origin === requestOrigin(request); } catch { return false; }
 }
 export async function viewerActor(feature: AnalyticsFeature, write: boolean) {
   try { const viewer = await requireViewer({ feature, channelScoped: true, ...(write ? { write: true } : {}) }); return { userId: viewer.user.id, workspaceId: viewer.workspaceId }; }

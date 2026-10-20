@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { OperationError } from '@/lib/operation-error';
 
 /** Convert URL search params to a strict record: no repeated keys, integer keys parsed strictly. */
@@ -16,7 +17,7 @@ export function searchRecord(url: string, integerKeys: readonly string[] = []): 
 export function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try { return new URL(origin).origin === requestOrigin(request); } catch { return false; }
 }
 
 /** Validate Next.js page searchParams without silently selecting or dropping values. */

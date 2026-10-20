@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { hit } from '@/server/rate-limit';
 import { authRateLimit } from '@/server/auth-flow';
@@ -5,7 +6,7 @@ import { beginEnrollment, confirmEnrollment, pendingUserId } from '@/server/two-
 
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
-  if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ code: 'INVALID_REQUEST' }, { status: 403 });
+  if (origin && origin !== requestOrigin(request)) return NextResponse.json({ code: 'INVALID_REQUEST' }, { status: 403 });
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ code: 'INVALID_REQUEST' }, { status: 400 }); }
   const action = body && typeof body === 'object' ? (body as Record<string, unknown>).action : null;

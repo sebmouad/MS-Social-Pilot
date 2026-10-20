@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { operationFailure } from '@/lib/operation-error';
 import { requireViewer } from '@/server/context';
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 const MAX_BODY_BYTES = 100_000;
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
-function sameOrigin(request: Request) { const origin = request.headers.get('origin'); if (!origin) return false; try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; } }
+function sameOrigin(request: Request) { const origin = request.headers.get('origin'); if (!origin) return false; try { return new URL(origin).origin === requestOrigin(request); } catch { return false; } }
 /** Entry-point gate (module + feature); the service repeats the full check, this only refuses early. */
 async function actor(write: boolean) {
   const viewer = await requireViewer({ module: 'publishing', feature: 'publishing/posts', channelScoped: true, ...(write ? { write: true } : {}) });

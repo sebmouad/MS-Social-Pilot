@@ -1,9 +1,10 @@
+import { requestOrigin } from '@/server/request-origin';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { requireViewer } from '@/server/context';
 import { AREA_FEATURE, type SharingArea } from '@/modules/sharing/semantics';
 
 export const reply = (body: unknown, status = 200, extra: Record<string, string> = {}) => Response.json(body, { status, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', ...extra } });
-export function sameOrigin(request: Request) { const origin = request.headers.get('origin'); if (!origin) return false; try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; } }
+export function sameOrigin(request: Request) { const origin = request.headers.get('origin'); if (!origin) return false; try { return new URL(origin).origin === requestOrigin(request); } catch { return false; } }
 /** Session actor for one sharing area. The page route only gates entry; the service re-checks everything per call. */
 export async function ownerActor(area: SharingArea, write: boolean) {
   try { const viewer = await requireViewer({ feature: AREA_FEATURE[area], ...(write ? { write: true } : {}) }); return { userId: viewer.user.id, workspaceId: viewer.workspaceId }; }
@@ -21,7 +22,7 @@ export function failure(error: unknown, fallback: string) {
   const result = operationFailure(typed, fallback); return reply({ error: result.error, code: result.code }, result.status);
 }
 /** Absolute address for a secret path, built from the request's own origin. */
-export const absolute = (request: Request, path: string) => new URL(path, new URL(request.url).origin).toString();
+export const absolute = (request: Request, path: string) => new URL(path, requestOrigin(request)).toString();
 
 /** Includes entry-gate failures as well as service failures; never turns an access refusal into a sign-in loop. */
 export function withSharingErrors<Args extends unknown[]>(handler: (...args: Args) => Promise<Response>) {

@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { authenticatePersonBearer } from '@/modules/settings/person-keys/service';
 import { authenticateBearerHeader } from '@/server/mcp/bearer';
 import { cookies } from 'next/headers';
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
 
 async function handlePost(request: Request) {
   const origin = request.headers.get('origin');
-  if (origin && origin !== new URL(request.url).origin) {
+  if (origin && origin !== requestOrigin(request)) {
     return json({ jsonrpc: '2.0', id: null, error: { code: -32003, message: 'Origin is not allowed.' } }, { status: 403 });
   }
   if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) {

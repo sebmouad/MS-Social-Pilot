@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { hashLegacyPassword, hashLegacySessionToken, LEGACY_SESSION_COOKIE, verifyLegacyPassword } from '@/server/auth';
@@ -11,7 +12,7 @@ export const runtime = 'nodejs';
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try { return new URL(origin).origin === requestOrigin(request); } catch { return false; }
 }
 function errorResponse(error: unknown) {
   if (error instanceof z.ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid account request.' }, { status: 400 });

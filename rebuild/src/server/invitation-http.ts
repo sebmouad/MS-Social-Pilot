@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { createHash } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -20,7 +21,7 @@ const schemas = {
 };
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
 export async function handleInvitationHttp(request: Request, action: InvitationHttpAction) {
-  if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
+  if (request.headers.get('origin') !== requestOrigin(request)) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
   try {
     const limits = await authRateLimit();
     if (!hit(`rebuild-invitation:${action}:${clientIp(request) ?? 'unidentified'}`, limits).allowed) return reply({ error: 'Too many attempts. Try again later.', code: 'rate_limited' }, 429);

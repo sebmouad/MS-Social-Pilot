@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { readBoundedJson, RequestBodyTooLarge } from '@/server/http/body';
 import { sharingLimits } from '@/modules/sharing/server/limits';
 import { clientIp } from '@/server/client-ip';
@@ -10,7 +11,7 @@ const json = (body: unknown, status: number) => Response.json(body, { status, he
 /** Unauthenticated client answer. The token is the credential; every unresolvable link answers the same 404. */
 export async function POST(request: Request, context: { params: Promise<{ token: string }> }) {
   const origin = request.headers.get('origin');
-  try { if (!origin || new URL(origin).origin !== new URL(request.url).origin) return json({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403); } catch { return json({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403); }
+  try { if (!origin || new URL(origin).origin !== requestOrigin(request)) return json({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403); } catch { return json({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403); }
   try {
     const { token } = await context.params;
     const body = await readBoundedJson(request, (await sharingLimits()).decisionBodyMaxBytes!);

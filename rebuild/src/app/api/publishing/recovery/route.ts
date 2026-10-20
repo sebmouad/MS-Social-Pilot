@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { z } from 'zod';
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
   try {
     const origin = request.headers.get('origin');
     let sameOrigin = false;
-    try { sameOrigin = Boolean(origin && new URL(origin).origin === new URL(request.url).origin); } catch { /* Invalid Origin is denied below. */ }
+    try { sameOrigin = Boolean(origin && new URL(origin).origin === requestOrigin(request)); } catch { /* Invalid Origin is denied below. */ }
     if (!sameOrigin) throw new OperationError('forbidden', 'Cross-origin request denied.');
     const current = await viewer();
     const input = await request.json();

@@ -114,6 +114,7 @@ export async function saveConfig(input: unknown, actorId: string) {
     });
     await audit(tx, actorId, definition.key, encrypted ? 'secret updated' : 'value updated');
   });
+  if (definition.key === 'app.publicOrigin') await (await import('@/server/request-origin')).refreshPublicOrigin();
 }
 
 async function audit(tx: Prisma.TransactionClient, actorId: string, key: string, change: string) {

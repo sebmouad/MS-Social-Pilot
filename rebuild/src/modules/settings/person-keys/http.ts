@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { personKeySessionActor } from './session';
 import { issuePersonKey, listPersonKeys, revokePersonKey } from './service';
@@ -9,7 +10,7 @@ async function handle(request: Request, action: 'list' | 'issue' | 'revoke') {
     if (request.headers.has('authorization') || request.headers.has('x-api-key')) throw new OperationError('unauthorized', 'Use a browser session.');
     if (new URL(request.url).search) throw new OperationError('invalid_request', 'URL parameters are not accepted.');
     if (action !== 'list') {
-      if (request.headers.get('origin') !== new URL(request.url).origin) throw new OperationError('forbidden', 'Same-origin confirmation is required.');
+      if (request.headers.get('origin') !== requestOrigin(request)) throw new OperationError('forbidden', 'Same-origin confirmation is required.');
       if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) throw new OperationError('invalid_request', 'JSON is required.');
     }
     const actor = await personKeySessionActor();

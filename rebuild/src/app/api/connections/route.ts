@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { operationFailure } from '@/lib/operation-error';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -57,7 +58,7 @@ export async function DELETE(request: Request) {
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try { return new URL(origin).origin === requestOrigin(request); } catch { return false; }
 }
 
 function connectionError(error: unknown, fallback: string) {

@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';
@@ -11,7 +12,7 @@ export async function GET() {
   catch (error) { return failure(error); }
 }
 async function write(request: Request, revoke: boolean) {
-  if (request.headers.get('origin') !== new URL(request.url).origin) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
+  if (request.headers.get('origin') !== requestOrigin(request)) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
   let viewer;
   try { viewer = await requireViewer({ feature: 'settings/team', write: true }); }
   catch { return reply({ error: 'Sign in with team access.', code: 'unauthorized' }, 401); }

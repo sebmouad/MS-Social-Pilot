@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { authRateLimit, signIn } from '@/server/auth-flow';
 import { hit, clear, forgive } from '@/server/rate-limit';
@@ -6,7 +7,7 @@ import { postAuthenticationPath } from '@/server/invitation-session';
 
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
-  if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ code: 'INVALID_REQUEST' }, { status: 403 });
+  if (origin && origin !== requestOrigin(request)) return NextResponse.json({ code: 'INVALID_REQUEST' }, { status: 403 });
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ code: 'INVALID_REQUEST' }, { status: 400 }); }
   if (!body || typeof body !== 'object') return NextResponse.json({ code: 'INVALID_REQUEST' }, { status: 400 });

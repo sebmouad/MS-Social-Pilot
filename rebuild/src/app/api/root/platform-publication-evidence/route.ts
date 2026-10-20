@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { currentRootActor } from '@/server/config/access';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { readRootPlatformPublicationEvidence, runRootPlatformPublicationAction } from '@/server/root/platform-publication-evidence';
@@ -37,8 +38,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const requestOrigin = new URL(request.url).origin;
-    if (request.headers.get('origin') !== requestOrigin) throw new OperationError('forbidden', 'Use this action from the installation control panel.');
+    const ownOrigin = requestOrigin(request);
+    if (request.headers.get('origin') !== ownOrigin) throw new OperationError('forbidden', 'Use this action from the installation control panel.');
     const current = await currentRootActor();
     if (!current?.isInstanceOwner) throw new OperationError(current ? 'forbidden' : 'unauthorized', 'Installation-owner access is required.');
     let body: unknown;

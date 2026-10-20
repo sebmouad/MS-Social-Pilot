@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';
@@ -18,7 +19,7 @@ export async function GET() {
 async function mutate(request: Request, action: 'add' | 'update' | 'remove') {
   const origin = request.headers.get('origin');
   try {
-    if (!origin || new URL(origin).origin !== new URL(request.url).origin) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
+    if (!origin || new URL(origin).origin !== requestOrigin(request)) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
   } catch { return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403); }
   let viewer;
   try { viewer = await requireViewer({ feature: 'settings/team', write: true }); }

@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { requireViewer } from '@/server/context';
 import { deleteLabel, updateLabel } from '@/modules/publishing/server/labels';
 import { OperationError, operationFailure } from '@/lib/operation-error';
@@ -29,5 +30,5 @@ export async function DELETE(request: Request, context: Context) {
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try { return new URL(origin).origin === requestOrigin(request); } catch { return false; }
 }

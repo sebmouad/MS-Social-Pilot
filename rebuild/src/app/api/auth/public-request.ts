@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 
@@ -6,7 +7,7 @@ export const noStore = { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cac
 export const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 export function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
-  try { return Boolean(origin) && new URL(origin!).origin === new URL(request.url).origin; } catch { return false; }
+  try { return Boolean(origin) && new URL(origin!).origin === requestOrigin(request); } catch { return false; }
 }
 export async function readPublicJson(request: Request, maxBytes: number, keys: readonly string[]): Promise<Record<string, unknown> | null> {
   const declared = Number(request.headers.get('content-length'));

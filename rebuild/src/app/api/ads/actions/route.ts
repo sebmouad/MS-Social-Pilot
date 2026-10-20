@@ -1,3 +1,4 @@
+import { requestOrigin } from '@/server/request-origin';
 import { adsErrorResponse } from '@/modules/ads/server/errors';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -36,5 +37,5 @@ export async function POST(request: Request) {
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
+  try { return new URL(origin).origin === requestOrigin(request); } catch { return false; }
 }
