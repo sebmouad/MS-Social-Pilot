@@ -113,11 +113,17 @@ async function currentMembership(actor: ConnectionMutationActor) {
 
 
 /** Locally disconnect a source while retaining its discovered records and history. */
-export async function disconnectSocialAccount(actor: ConnectionMutationActor, socialAccountId: string, mode: 'retain' | 'delete' = 'retain', confirmation?: string) {
+type DisconnectAuthorize = (tx: import('../../generated/client').Prisma.TransactionClient) => Promise<void>;
+const workspaceManager = (actor: ConnectionMutationActor): DisconnectAuthorize => async tx => {
+  const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
+  if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
+  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
+};
+
+/** `authorize` runs first inside the transaction; Root passes an installation-owner check instead of workspace membership. */
+export async function disconnectSocialAccount(actor: ConnectionMutationActor, socialAccountId: string, mode: 'retain' | 'delete' = 'retain', confirmation?: string, authorize: DisconnectAuthorize = workspaceManager(actor)) {
   return prisma.$transaction(async tx => {
-    const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
-    if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
-    if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
+    await authorize(tx);
     if (mode === 'delete' && confirmation !== 'DELETE') throw new OperationError('invalid_request', 'Type DELETE to confirm related data removal.');
     const account = await tx.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
     if (!account) throw new OperationError('unavailable', 'This source is unavailable in the current workspace.');

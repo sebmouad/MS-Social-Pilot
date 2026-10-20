@@ -5,11 +5,13 @@ import { THEMES } from '@/lib/themes';
 import { WORKSPACE_JOB_ACCESS_DEFAULTS, WORKSPACE_JOB_OWNER_POLICY_SCHEMA, WORKSPACE_JOB_OWNER_LIMIT_SCHEMA } from '@/server/jobs/access-policy';
 import { MAIL_CONFIG } from '@/server/mail/config';
 import { ROOT_LEGACY_CONFIG } from '@/server/root/legacy/config';
+import { ROOT_AUDIT_CONFIG } from '@/server/root/audit-config';
 
 /** Shared installation settings (auth, jobs, sync, data, storage, MCP, Root). Module settings live in each module's config.ts. */
 export const SHARED_CONFIG = [
   ...MAIL_CONFIG,
   ...ROOT_LEGACY_CONFIG,
+  ...ROOT_AUDIT_CONFIG,
   entry({ key: 'jobs.workspaceOwnerPolicy', group: 'Jobs · Authorization', label: 'Workspace sync owner access', kind: 'select', description: 'Automatic provider reads require qualifying feature and platform access from the same active workspace owner. Any owner is the default; All owners is stricter. Root inspection never bypasses customer suspension.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerPolicy, schema: WORKSPACE_JOB_OWNER_POLICY_SCHEMA, consumption: 'active', options: [{ value: 'any_active_owner', label: 'Any active owner qualifies' }, { value: 'all_active_owners', label: 'All active owners qualify' }] }),
   entry({ key: 'jobs.workspaceOwnerLimit', group: 'Jobs · Authorization', label: 'Workspace sync owner check limit', kind: 'number', description: 'Maximum active owners inspected per workspace synchronization check. Larger owner sets are refused rather than authorized from a partial subset.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerLimit, schema: WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, consumption: 'active' }),
   entry({ key: 'sync.resourceOperationTimeoutMs', group: 'Sync schedules · Resource locking', label: 'Sync resource operation deadline (ms)', kind: 'number', description: 'Time budget for a locked resource read and persistence. Must fit inside the workspace operation budget together with wait and finalization grace.', defaultValue: 60000, schema: z.number().int().min(1000).max(300000), consumption: 'active' }),

@@ -1,3 +1,4 @@
+import { ConfirmAction } from '../plans/ConfirmAction';
 import { headers } from 'next/headers';
 import { requireRootPage } from '@/server/config/access';
 import { pageSearchParamsObject } from '@/server/root/legacy/http';
@@ -38,7 +39,7 @@ export default async function RootConnectionsPage({ searchParams }: { searchPara
         <p className="root-activity__summary">{fill(t.total, { count: data.total })}</p>
         <div className="root-ops__table" role="region" aria-label={t.connectionsTitle} tabIndex={0}><table>
           <caption className="ui-visually-hidden">{t.connectionsTitle}</caption>
-          <thead><tr><th scope="col">{t.connection}</th><th scope="col">{t.workspace}</th><th scope="col">{t.state}</th><th scope="col">{t.channels}</th><th scope="col">{t.permissions}</th><th scope="col">{t.tokenExpiry}</th></tr></thead>
+          <thead><tr><th scope="col">{t.connection}</th><th scope="col">{t.workspace}</th><th scope="col">{t.state}</th><th scope="col">{t.channels}</th><th scope="col">{t.permissions}</th><th scope="col">{t.tokenExpiry}</th><th scope="col">{t.connectionAction}</th></tr></thead>
           <tbody>{data.items.map(item => <tr key={item.id}>
             <td><strong>{item.name}</strong><br /><span className="root-ops__muted">{item.platformName}{item.installed ? '' : ` (${t.notInstalled})`}</span></td>
             <td><a href={`/root/workspaces?q=${encodeURIComponent(item.workspace.name)}`}>{item.workspace.name}</a></td>
@@ -46,6 +47,7 @@ export default async function RootConnectionsPage({ searchParams }: { searchPara
             <td>{fill(t.selectedOf, { selected: item.channels.selected, discovered: item.channels.discovered })}</td>
             <td>{fill(t.permissionCount, { count: item.scopeCount })}</td>
             <td>{item.tokenExpiresAt ? <time dateTime={item.tokenExpiresAt}>{new Date(item.tokenExpiresAt).toLocaleString(locale)}</time> : t.never}</td>
+            <td>{item.state === 'revoked' ? '—' : <ConfirmAction id={`disconnect-${item.id}`} label={t.disconnect} title={fill(t.disconnectTitle, { name: item.name })} description={t.disconnectBody} phrase={`DISCONNECT CONNECTION ${item.id}`} endpoint={`/api/root/connections/${encodeURIComponent(item.id)}`} method="POST" body={{}} variant="danger" successText={t.disconnectDone} />}</td>
           </tr>)}</tbody>
         </table></div>
         <p className="root-directory__pager">{fill(t.page, { page: data.page, pages: Math.max(1, Math.ceil(data.total / data.pageSize)) })}

@@ -33,8 +33,10 @@ const dependencies: WorkerDependencies = {
     }
     if (job === 'purges') {
       const { resumePendingWorkspaceDataPurges } = await import('../src/server/data-control');
+      const { runAuditRetention } = await import('../src/server/root/audit-retention');
+      const audit = await runAuditRetention(now);
       const result = await resumePendingWorkspaceDataPurges();
-      return `examined=${result.examined} completed=${result.completed} failed=${result.failed}`;
+      return `examined=${result.examined} completed=${result.completed} failed=${result.failed} auditRootDeleted=${audit.rootDeleted} auditWorkspaceDeleted=${audit.workspaceDeleted}`;
     }
     if (job === 'analyticsReports') {
       const { runScheduledReports } = await import('@/modules/analytics/server/report-workflows');

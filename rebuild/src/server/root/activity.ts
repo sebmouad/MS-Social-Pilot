@@ -35,6 +35,16 @@ const escapeLike = (value: string) => value.replace(/[\\%_]/g, character => `\\$
 
 /** Installation-wide read, independent of workspace grants and module entitlements. */
 export async function listRootActivity(actorId: string, input: unknown, maxResultItems?: number) {
+  return readRootActivity(actorId, input, maxResultItems);
+}
+
+/** Complete bounded read: pagination arguments are deliberately rejected. */
+export async function readRootActivityForExport(actorId: string, input: unknown, cap: number) {
+  if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => !['q', 'workspaceId', 'from', 'to'].includes(key))) throw invalid();
+  return readRootActivity(actorId, input, cap, true);
+}
+
+async function readRootActivity(actorId: string, input: unknown, maxResultItems?: number, exporting = false) {
   const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { isInstanceOwner: true, disabledAt: true } });
   if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
   const [configuredLimit, searchCharacters, cursorCharacters] = await Promise.all([runtimeConfig('root.activityPageSize'), runtimeConfig('root.activitySearchMaxCharacters'), runtimeConfig('root.activityCursorMaxCharacters')]);
@@ -48,7 +58,7 @@ export async function listRootActivity(actorId: string, input: unknown, maxResul
   const filters = { q: parsed.data.q ?? '', workspaceId: parsed.data.workspaceId ?? '', from: parsed.data.from ?? '', to: parsed.data.to ?? '' };
   if (filters.from && filters.to && filters.from > filters.to) throw invalid();
   if (maxResultItems !== undefined && (!Number.isSafeInteger(maxResultItems) || maxResultItems < 1)) throw new Error('Invalid audit result cap.');
-  const limit = Math.min(parsed.data.limit ?? configuredLimit, configuredLimit, maxResultItems ?? configuredLimit);
+  const limit = exporting ? maxResultItems! : Math.min(parsed.data.limit ?? configuredLimit, configuredLimit, maxResultItems ?? configuredLimit);
   const filter = createHash('sha256').update(JSON.stringify(filters)).digest('hex');
   const cursor = readCursor(parsed.data.cursor, filter, cursorCharacters);
   const conditions: Prisma.Sql[] = [];
@@ -71,6 +81,7 @@ export async function listRootActivity(actorId: string, input: unknown, maxResul
     FROM root_activities AS a LEFT JOIN users AS u ON u.id = a."actorId"
     ${where} ORDER BY a."createdAt" ${order}, a.id ${order} LIMIT ${limit + 1}
   `);
+  if (exporting && rows.length > limit) throw new OperationError('invalid_request', 'Too many matching audit events. Narrow the filters before exporting.');
   const hasMore = rows.length > limit;
   const page = rows.slice(0, limit);
   if (cursor?.direction === 'newer') page.reverse();
