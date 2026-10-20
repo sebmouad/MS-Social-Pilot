@@ -430,3 +430,9 @@ and Inbox moderation/digest/spike producers; see [NOTIFICATIONS.md](NOTIFICATION
 The additive root Prisma migration is unapplied. Negative spikes depend on existing
 classified sentiment; rebuild classification and live delivery/concurrency proof
 remain open. Local branch-only commit requested; no push, servers or cutover.
+
+Root stored module-health batch (2026-10-20): declared configuration checks,
+latest job runs, freshness and stored queues are grouped in Root with timing and
+status-only audit, sharing the operations HTTP/MCP service.49 targeted tests and
+TypeScript passed. Browser/PostgreSQL verification and provider-scoped job
+instrumentation remain separate; no live provider/production claim.

@@ -1,3 +1,4 @@
+import { ModuleHealth } from '../ModuleHealth';
 import { notFound } from 'next/navigation';
 import { requireRootPage } from '@/server/config/access';
 import { RootModuleSettings } from '@/server/root/RootModuleSettings';
@@ -17,6 +18,7 @@ export default async function RootProductModulePage({ params }: { params: Promis
   const module = moduleManifests.find(item => item.id === id);
   if (!module) notFound();
   return <RootModuleSettings kind="product" id={module.id} title={module.title} description={`Installation controls for ${module.title}. Availability is an installation limit; workspace access and implemented platform operations still determine what customers can use.`}>
+    {await ModuleHealth({ scope: `product:${module.id}` })}
     {module.id === 'inbox' ? await RootInboxDeletions() : null}
     {module.id === 'publishing' ? <>{await RootPublicationAttempts()}{await RootPostDeletions()}</> : null}
   </RootModuleSettings>;

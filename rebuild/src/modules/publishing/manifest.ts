@@ -4,6 +4,7 @@ import { FEEDS_JOBS, FEEDS_PAGES, FEEDS_ROOT_KEYS } from '../feeds/manifest';
 
 export const publishingManifest = {
   id: 'publishing',
+  health: { configuration: true, jobHistory: true, pendingQueues: ['scheduledPosts', 'publicationAttempts'] },
   jobs: [
     { name: 'posts', label: 'Post delivery and status', configKey: 'sync.posts.schedule' },
     { name: 'mediaCleanup', label: 'Orphan image cleanup', configKey: 'storage.orphanMediaCleanupSchedule' },

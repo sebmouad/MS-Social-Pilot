@@ -1,3 +1,4 @@
+import type { ModuleHealthDeclaration } from '@/server/root/module-health-types';
 import type { Entry } from '@/lib/config/entry';
 import type { CapabilityDeclaration } from './types';
 
@@ -12,6 +13,7 @@ import type { CapabilityDeclaration } from './types';
  * module is invisible to customers and its connected data stays stored.
  */
 export interface PlatformModule {
+  readonly health: ModuleHealthDeclaration;
   /** Stable provider ID stored with connections and channels. */
   readonly id: string;
   /** Customer-facing name. */

@@ -1,3 +1,4 @@
+import type { ModuleHealthDeclaration } from '@/server/root/module-health-types';
 /** A customer-facing feature declared by a module manifest. */
 export interface ModulePageManifest {
   readonly id: string;
@@ -9,6 +10,7 @@ export interface ModulePageManifest {
 
 /** Source of truth for one independently available customer module. */
 export interface ModuleManifest {
+  readonly health: ModuleHealthDeclaration;
   /** Core setting namespaces owned by this product module; platform ownership takes precedence. */
   readonly rootSettingsPrefixes: readonly string[];
   readonly rootSettingKeys: readonly string[];

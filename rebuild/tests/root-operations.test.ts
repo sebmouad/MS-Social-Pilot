@@ -1,8 +1,10 @@
+vi.mock('../src/server/root/module-health', () => ({ loadRootModuleHealth: vi.fn(async () => ({ modules: [] })) }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ actor: vi.fn(), query: vi.fn(), config: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.actor }, $queryRaw: state.query } }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
 import { loadRootOperations, operationJobs } from '../src/server/root/operations';
+import { loadRootModuleHealth } from '../src/server/root/module-health';
 import { workerConfigKeys } from '../src/server/jobs/worker';
 beforeEach(() => {
   vi.clearAllMocks(); state.actor.mockResolvedValue({ isInstanceOwner: true, disabledAt: null });
@@ -29,6 +31,8 @@ describe('Root rebuild-only operations', () => {
     const startedAt = new Date(Date.now() - 60000);
     state.query.mockResolvedValueOnce([{ id: 'r', job: 'inbox', startedAt, finishedAt: new Date(startedAt.getTime() + 1000), outcome: 'failed', attempts: 1, hasError: true }]).mockResolvedValueOnce([{ seenAt: new Date() }]);
     const health = await loadRootOperations('root', 'inbox', 2);
+    expect(loadRootModuleHealth).toHaveBeenCalledWith('root', 'product:inbox');
+    expect(health.moduleHealth).toEqual({ modules: [] });
     expect(health).toMatchObject({ jobs: [{ name: 'inbox', moduleId: 'inbox' }], worker: { state: 'fresh' }, runs: [{ durationMs: 1000, hasError: true, outcome: 'failed' }] });
     const runSql = state.query.mock.calls[0][0];
     expect(runSql.sql).toContain('FROM rebuild_sync_runs'); expect(runSql.sql).not.toContain('worker_job_runs');

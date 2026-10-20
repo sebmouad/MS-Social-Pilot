@@ -1484,3 +1484,25 @@ and Inbox moderation/digest/spike producers; see [NOTIFICATIONS.md](NOTIFICATION
 The additive root Prisma migration is unapplied. Negative spikes depend on existing
 classified sentiment; rebuild classification and live delivery/concurrency proof
 remain open. Local branch-only commit requested; no push, servers or cutover.
+
+## Stored per-module Root health (2026-10-20)
+
+Installed product/platform declarations now opt into configuration validation,
+job-history inspection and named stored queues. `/root/modules` groups health
+under Shared controls, Product modules and Platform modules; product detail
+screens show their own evidence. The existing Root operations HTTP/MCP service
+also returns `moduleHealth` from the same current-Root-authorized service.
+Inspection records `modules.health.inspected` with status metadata only. No
+configuration values, run summaries, stored errors or provider requests escape
+this boundary. Each job selects its latest rebuild run independently of the
+recent-history page limit. Schedule-aware freshness uses worker timezone and the
+existing worker stale grace, with a bounded one-day search; older sparse
+schedules are unknown. Shared heartbeat, configuration validity, due publication
+queues, held publication attempts and pending exports use stored evidence.
+Platform publication queues are filtered by declared platform identity.
+
+Missing/unattributed telemetry remains Unknown / Not available. In particular,
+the existing global worker history does not establish provider-specific job
+outcomes. Queue counts alone have no failure SLA; nonempty queues remain unknown.
+This batch has mocked-service and server-render tests only; no browser, database,
+live-provider or production verification is claimed. No keys or migrations.

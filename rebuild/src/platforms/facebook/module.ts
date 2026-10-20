@@ -14,6 +14,7 @@ export const FACEBOOK_FEED_FORMAT_LABEL = 'Feed post';
  */
 export const facebookModule = {
   id: 'facebook',
+  health: { configuration: true, jobHistory: true, pendingQueues: ['publicationAttempts'] },
   name: 'Facebook',
   description: 'Facebook Pages: publishing, comments and messages, Page insights, and Meta ad accounts.',
   mark: { text: 'f', color: '#1877f2' },
