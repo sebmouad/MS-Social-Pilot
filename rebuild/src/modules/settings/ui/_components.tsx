@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
 import type { FeatureId } from '@/lib/product';
 import styles from './settings.module.css';
+import { shellCopy } from './shell-copy';
 
 export { styles };
 
-export function SettingsPage({ active, title, description, children }: {
+export function SettingsPage({ active, title, description, children, locale = 'en' }: {
+  locale?: 'en' | 'fr';
   active: FeatureId;
   title: string;
   description: string;
@@ -12,7 +14,7 @@ export function SettingsPage({ active, title, description, children }: {
 }) {
   return <div className={styles['settings-page']}>
     <header className={styles['settings-heading']}>
-      <div><p className={styles['settings-eyebrow']}>Workspace settings</p><h1>{title}</h1><p>{description}</p></div>
+      <div><p className={styles['settings-eyebrow']}>{shellCopy[locale].eyebrow}</p><h1>{title}</h1><p>{description}</p></div>
     </header>
     {children}
   </div>;

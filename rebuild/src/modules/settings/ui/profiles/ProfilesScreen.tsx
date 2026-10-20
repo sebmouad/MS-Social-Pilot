@@ -11,7 +11,7 @@ export default async function ProfilesScreen() {
   const copy = profileCopy[locale];
   let directory = null;
   try { directory = await readChannelProfiles({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); } catch {}
-  return <PageFrame module="settings"><SettingsPage active="settings/connections" title={copy.title} description={copy.description}>
+  return <PageFrame module="settings"><SettingsPage active="settings/connections" title={copy.title} description={copy.description} locale={locale}>
     <a href="/settings/connections">{copy.back}</a>
     <SettingsPanel title={copy.groups}>{directory ? <ProfilesManager initial={directory} locale={locale} canManage={['owner', 'admin'].includes(viewer.membership.role)} /> : <p role="alert">{copy.unavailable}</p>}</SettingsPanel>
   </SettingsPage></PageFrame>;
