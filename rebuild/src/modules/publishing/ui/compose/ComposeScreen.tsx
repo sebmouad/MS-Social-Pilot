@@ -22,6 +22,8 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
     runtimeConfig('publishing.maxImageAltCharacters'), runtimeConfig('publishing.maxMessageCharacters'), runtimeConfig('publishing.maxRemoteMediaPerPost'),
     runtimeConfig('publishing.maxFirstCommentDelayMinutes'), publishingDestinationChoices(viewer),
   ]);
+  // Add to queue needs both the queue feature and post writing; the server re-checks both.
+  const queueAvailable = canCreate && canUseFeature(viewer.entitlements, 'publishing/queue') && canAccessFeature(viewer.permissions, 'publishing/queue', 'write');
   const canUseTemplates = canUseFeature(viewer.entitlements, 'publishing/templates') && canAccessFeature(viewer.permissions, 'publishing/templates', 'read');
   const templates = canUseTemplates ? await readTemplatePage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, {}).then(result => result.templates.map(({ id, name, category, body, hashtags, firstComment, firstCommentDelayMinutes, labelId }) => ({ id, name, category, body, hashtags, firstComment, firstCommentDelayMinutes, labelId }))) : [];
   // Advisory only: an unavailable setting hides the warning rather than blocking composition.
@@ -37,7 +39,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   };
   return <>
     <PageHeading title="Create a post" description="Choose destinations, write your post, then save a draft or schedule it." />
-    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer aiStatus={aiAssist} aiLocale={aiLocale} targets={choices} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
+    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={aiLocale} targets={choices} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
       : <section className={styles.card}><p>You do not have permission to create posts in this workspace.</p></section>}
   </>;
 }

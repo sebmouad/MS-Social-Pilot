@@ -40,3 +40,8 @@
 @media (max-width: 900px) { .composerLayout { grid-template-columns: minmax(0, 1fr); } .previewPanel { max-width: 650px; } }
 @media (max-width: 540px) { .attachments { padding: 12px; } }
 .spacingWarning{margin:.5rem 0 0;padding:.55rem .7rem;border:1px solid var(--line-strong);border-left:3px solid var(--warning);background:var(--warning-soft);border-radius:8px;color:var(--ink);font-size:.85rem;overflow-wrap:anywhere}
+.queueSlot { display: grid; gap: 6px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.queueSlot h3 { margin: 0; color: var(--ink); font-size: 13px; font-weight: 750; }
+.queueSlot p, .queueSlot ul { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.queueSlot ul { padding-left: 16px; }
+.queueSlot small { color: var(--ink-faint); font-size: 11px; line-height: 1.45; }
