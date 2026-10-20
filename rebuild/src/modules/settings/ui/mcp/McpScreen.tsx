@@ -19,7 +19,8 @@ import { mcpCopy } from './copy';
 export const metadata = { title: 'MCP API keys' };
 
 
-export default async function McpKeysPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
+export default async function McpKeysPage(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const searchParams = props?.searchParams ?? Promise.resolve({});
   const viewer = await requireViewer({ feature: 'settings/mcp' });
   const locale = await settingsLocale();
   const t = mcpCopy[locale];
