@@ -41,7 +41,13 @@ vi.mock('@/modules/publishing/collaboration/server/core', () => ({
 }));
 vi.mock('@/modules/publishing/collaboration/server/versions', () => ({ loadVersionRetention: async () => 25, recordPostVersion: h.record }));
 vi.mock('@/modules/publishing/collaboration/server/executors', () => ({ allocateQueueTime: h.allocate }));
+vi.mock('@/modules/publishing/server/schedule-modes', async importOriginal => ({
+  ...await importOriginal<typeof import('@/modules/publishing/server/schedule-modes')>(),
+  resolveScheduleModes: vi.fn(async (ids: string[], post?: 'application' | 'remote', over?: Record<string, 'application' | 'remote'>) => ({ postMode: post ?? 'application', byTarget: new Map(ids.map(id => [id, over?.[id] ?? post ?? 'application'])) })),
+  storeScheduleModes: vi.fn(async () => undefined),
+}));
 vi.mock('@/modules/publishing/server/lifecycle', () => ({
+  holdScheduledPostAtProvider: vi.fn(async () => null),
   limits: h.limits, resolvePublishMedia: vi.fn(async (_workspaceId: string, media: unknown[]) => media),
   validatePostAttachments: vi.fn((value: unknown) => ({ link: null, media: [] })),
   validatePostContent: vi.fn((value: string) => value.trim()), validFirstComment: vi.fn((value: string) => value.trim() || null),
@@ -96,7 +102,7 @@ describe('queuePost', () => {
 
   it('allocates under the shared workspace lock, writes approval state, snapshots both sides and audits', async () => {
     const result = await queuePost(actor, 'p1');
-    expect(result).toEqual({ postId: 'p1', scheduledAt: h.at, status: 'scheduled' });
+    expect(result).toEqual({ postId: 'p1', scheduledAt: h.at, status: 'scheduled', scheduleMode: 'application', destinationScheduleModes: { t1: 'application' }, remoteHold: { held: 0, deferred: 0, reasons: [] } });
     expect(h.authorize).toHaveBeenCalledWith(actor, 'publishing/posts', 'write');
     expect(h.authorize).toHaveBeenCalledTimes(2);
     expect(h.lockActor).toHaveBeenCalledTimes(1);

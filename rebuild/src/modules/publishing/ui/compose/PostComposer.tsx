@@ -63,6 +63,11 @@ function initialMedia(value: unknown): PostMediaItem[] {
   } catch { return []; }
 }
 
+function parseModes(value: unknown): Record<string, 'application' | 'remote'> {
+  const out: Record<string, 'application' | 'remote'> = {};
+  for (const [id, mode] of Object.entries(parseFormats(value))) if (mode === 'application' || mode === 'remote') out[id] = mode;
+  return out;
+}
 function parseFormats(value: unknown): Record<string, string> {
   if (typeof value !== 'string' || !value) return {};
   try {
@@ -137,6 +142,7 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
   const [scheduleTime, setScheduleTime] = useState(initial.scheduleTime ?? schedule.time);
   const [mode, setMode] = useState<'draft' | 'schedule' | 'queue'>((initial.intent as 'draft' | 'schedule' | 'queue') ?? 'draft');
   const [scheduleMode, setScheduleMode] = useState<'application' | 'remote'>(initial.scheduleMode === 'remote' || initial.scheduleMode === 'application' ? initial.scheduleMode : remoteScheduling?.defaultMode ?? 'application');
+  const [destinationModes, setDestinationModes] = useState<Record<string, 'application' | 'remote'>>(() => parseModes(initial.destinationScheduleModesJson));
   const [previewRefresh, setPreviewRefresh] = useState(0);
   const [previewSelection, setPreviewSelection] = useState('');
   const [queuePreview, setQueuePreview] = useState<QueuePreviewState | 'loading' | null>(null);
@@ -159,6 +165,12 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
   const holdWindow = { min: leadLabel(Math.max(0, ...holdLeads.map(lead => lead.min)), aiLocale), max: leadLabel(Math.min(...holdLeads.map(lead => lead.max)), aiLocale) };
   const uploadRules = localUploadRules(selected, imageRules);
   const crowded = crowdedDestinationPlatforms(spacingGapMinutes, selected.map(target => target.provider)).length > 0;
+  // Only destinations that can hold a post on their platform may override the choice; others always stay with the app.
+  const destinationScheduleModesJson = useMemo(() => {
+    const out: Record<string, 'application' | 'remote'> = Object.create(null);
+    if (remoteScheduling?.offered) for (const target of holdable) { const value = destinationModes[target.id]; if (value) out[target.id] = value; }
+    return JSON.stringify(out);
+  }, [holdable, destinationModes, remoteScheduling?.offered]);
   const destinationFormatsJson = useMemo(() => {
     const out: Record<string, string> = Object.create(null);
     for (const target of selected) { const value = effectiveDestinationFormat(target, formatChoices); if (value !== undefined) out[target.id] = value; }
@@ -377,6 +389,18 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
             <label><input form={FORM_ID} type="radio" name="scheduleMode" value="remote" checked={scheduleMode === 'remote'} onChange={() => setScheduleMode('remote')} /> {holdCopy.remote}</label>
             <small>{holdCopy.remoteHint} {holdCopy.window.replace('{min}', holdWindow.min).replace('{max}', holdWindow.max)}</small>
             {scheduleMode === 'remote' && appOnly.length > 0 && <small role="status">{holdCopy.appOnly.replace('{names}', appOnly.map(target => target.name).join(', '))}</small>}
+          </div>}
+          <input form={FORM_ID} type="hidden" name="destinationScheduleModesJson" value={destinationScheduleModesJson} />
+          {remoteScheduling?.offered && holdable.length > 0 && selected.length > 1 && <div role="group" aria-labelledby="composer-hold-each-legend" className="ui-field">
+            <strong id="composer-hold-each-legend">{holdCopy.perDestination}</strong>
+            <small>{holdCopy.perDestinationHint}</small>
+            {holdable.map(target => <label key={target.id}>{target.name}
+              <select form={FORM_ID} value={destinationModes[target.id] ?? ''} onChange={event => { const value = event.currentTarget.value; setDestinationModes(current => { const next = { ...current }; if (value === 'application' || value === 'remote') next[target.id] = value; else delete next[target.id]; return next; }); }}>
+                <option value="">{holdCopy.sameAsAbove}</option>
+                <option value="application">{holdCopy.application}</option>
+                <option value="remote">{holdCopy.remote}</option>
+              </select>
+            </label>)}
           </div>}
         </fieldset>
       </aside>

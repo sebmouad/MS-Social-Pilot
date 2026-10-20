@@ -21,6 +21,9 @@ import { runContentMix, runRecycleCycle, type AutomationLifecycle } from '@/modu
 import { limits, resolvePublishMedia, validFirstComment, validatePostAttachments, validatePostContent, validateTargets } from './lifecycle';
 import type { PublishMedia } from '@/platforms/types';
 import { enqueueMixDryNotifications } from './notifications';
+import { storeScheduleModes, summaryMode, systemScheduleModes } from './schedule-modes';
+import { handOffRemoteSchedules } from './remote-handoff';
+import type { ScheduleMode } from '@/modules/publishing/remote-scheduling';
 
 type Tx = Prisma.TransactionClient;
 type Feature = 'publishing/queue' | 'publishing/collaboration';
@@ -121,10 +124,13 @@ export const publishingAutomationLifecycle: AutomationLifecycle = {
     await recordPostVersion(tx, post.id, null, ready.retention);
     const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: input.workspaceId, status: 'draft' }, data: { status: 'scheduled', scheduledAt: input.scheduledAt, updatedAt: new Date() } });
     if (changed.count !== 1) throw unavailable();
-    const metadata = await tx.$executeRaw`UPDATE posts SET timezone=${policy.timezone}, "publishMode"='worker'::"PublishMode" WHERE id=${post.id} AND "workspaceId"=${input.workspaceId}`;
+    const metadata = await tx.$executeRaw`UPDATE posts SET timezone=${policy.timezone} WHERE id=${post.id} AND "workspaceId"=${input.workspaceId}`;
     if (metadata !== 1) throw unavailable();
+    // The Root default decides where each destination waits; platform-held ones are handed over after this run (handOffRemoteSchedules).
+    const modes = await systemScheduleModes(post.targets.map(t => t.targetId));
+    await storeScheduleModes(tx, input.workspaceId, post.id, modes);
     await recordPostVersion(tx, post.id, null, ready.retention);
-    await systemAudit(tx, input.workspaceId, 'publishing.post_scheduled_by_mix', { postId: post.id, authorId: post.authorId, scheduledAt: input.scheduledAt.toISOString() });
+    await systemAudit(tx, input.workspaceId, 'publishing.post_scheduled_by_mix', { postId: post.id, authorId: post.authorId, scheduledAt: input.scheduledAt.toISOString(), scheduleMode: summaryMode(modes) });
     return true;
   },
   async recycle(tx, input) {
@@ -141,8 +147,12 @@ export const publishingAutomationLifecycle: AutomationLifecycle = {
       firstComment: ready.firstComment, firstCommentDelayMinutes: stored.firstCommentDelayMinutes, link: ready.attachments.link, media: ready.attachments.media,
       status: hold ? 'pending_approval' : 'scheduled', scheduledAt: input.scheduledAt, createdAt: new Date(), updatedAt: new Date(),
       targets: { create: post.targets.map(target => ({ id: randomUUID(), targetId: target.targetId, formatId: ready.destinationFormats[target.targetId], status: 'pending' as const })) } } });
-    const metadata = await tx.$executeRaw`UPDATE posts SET timezone=${policy.timezone}, "publishMode"='worker'::"PublishMode", "originPostId"=${post.id}, "approvalStatus"=${hold ? 'pending' : reviewed ? 'approved' : 'not_required'}::"ApprovalStatus", "submittedById"=${hold ? post.authorId : null}, "submittedAt"=${hold ? new Date() : null} WHERE id=${input.copyId} AND "workspaceId"=${input.workspaceId}`;
+    const metadata = await tx.$executeRaw`UPDATE posts SET timezone=${policy.timezone}, "originPostId"=${post.id}, "approvalStatus"=${hold ? 'pending' : reviewed ? 'approved' : 'not_required'}::"ApprovalStatus", "submittedById"=${hold ? post.authorId : null}, "submittedAt"=${hold ? new Date() : null} WHERE id=${input.copyId} AND "workspaceId"=${input.workspaceId}`;
     if (metadata !== 1) throw unavailable();
+    // Repeat the author's own per-destination choices from the original; destinations without one follow the Root default.
+    const earlier = await tx.$queryRaw<Array<{ targetId: string; scheduleMode: string | null }>>`SELECT "targetId", "scheduleMode" FROM post_targets WHERE "postId"=${post.id} AND "scheduleMode" IS NOT NULL`;
+    const modes = await systemScheduleModes(post.targets.map(t => t.targetId), Object.fromEntries(earlier.map(row => [row.targetId, row.scheduleMode as ScheduleMode])));
+    await storeScheduleModes(tx, input.workspaceId, input.copyId, modes);
     const badLabels = await tx.$queryRaw<Array<{ labelId: string }>>`SELECT pl."labelId" FROM post_labels pl LEFT JOIN labels l ON l.id=pl."labelId" WHERE pl."postId"=${post.id} AND (l.id IS NULL OR l."workspaceId"<>${input.workspaceId}) LIMIT 1`;
     if (badLabels.length) throw unavailable();
     await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") SELECT ${input.copyId}, pl."labelId" FROM post_labels pl JOIN labels l ON l.id=pl."labelId" WHERE pl."postId"=${post.id} AND l."workspaceId"=${input.workspaceId}`;
@@ -162,9 +172,14 @@ async function workspaceEligible(workspaceId: string, feature: Feature, includeD
   }
   return false;
 }
-export function runPublishingRecycle(now = new Date(), workspaceId?: string) {
-  return runRecycleCycle({ now, workspaceId, eligible: workspaceId => workspaceEligible(workspaceId, 'publishing/collaboration', true), lifecycle: publishingAutomationLifecycle });
+/** Scheduling runs only save the choice; the hand-off to the platform happens right after, outside their transactions. */
+export async function runPublishingRecycle(now = new Date(), workspaceId?: string) {
+  const result = await runRecycleCycle({ now, workspaceId, eligible: workspaceId => workspaceEligible(workspaceId, 'publishing/collaboration', true), lifecycle: publishingAutomationLifecycle });
+  await handOffRemoteSchedules(workspaceId).catch(() => undefined);
+  return result;
 }
-export function runPublishingMix(now = new Date(), workspaceId?: string) {
-  return runContentMix({ now, workspaceId, eligible: workspaceId => workspaceEligible(workspaceId, 'publishing/queue'), lifecycle: publishingAutomationLifecycle, enqueueNotice: enqueueMixDryNotifications });
+export async function runPublishingMix(now = new Date(), workspaceId?: string) {
+  const result = await runContentMix({ now, workspaceId, eligible: workspaceId => workspaceEligible(workspaceId, 'publishing/queue'), lifecycle: publishingAutomationLifecycle, enqueueNotice: enqueueMixDryNotifications });
+  await handOffRemoteSchedules(workspaceId).catch(() => undefined);
+  return result;
 }

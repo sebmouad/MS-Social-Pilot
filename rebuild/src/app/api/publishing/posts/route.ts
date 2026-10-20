@@ -4,6 +4,7 @@ import { OperationError, operationFailure } from '@/lib/operation-error';
 import { createPost } from '@/modules/publishing/server/lifecycle';
 import { parsePublishingMedia } from '@/modules/publishing/media-support';
 import { parseScheduleMode } from '@/modules/publishing/remote-scheduling';
+import { parseDestinationScheduleModes } from '@/modules/publishing/server/schedule-modes';
 import { bodyInstant, publishingWrite, requireBodyConfirmation } from '@/modules/publishing/server/rest';
 export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
@@ -21,7 +22,8 @@ export async function POST(request: Request) {
       ...(body.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: body.firstCommentDelayMinutes as number }),
       destinationFormats: body.destinationFormats, targetIds: body.targetIds as string[], link: typeof body.link === 'string' ? body.link : undefined, media: parsePublishingMedia(body.media ?? []),
       ...(typeof body.labelId === 'string' ? { labelId: body.labelId } : {}), ...(scheduledAt ? { scheduledAt } : {}),
-      ...(parseScheduleMode(body.scheduleMode) ? { scheduleMode: parseScheduleMode(body.scheduleMode) } : {}) });
+      ...(parseScheduleMode(body.scheduleMode) ? { scheduleMode: parseScheduleMode(body.scheduleMode) } : {}),
+      ...(parseDestinationScheduleModes(body.destinationScheduleModes) ? { destinationScheduleModes: parseDestinationScheduleModes(body.destinationScheduleModes) } : {}) });
     return { ...result, status: scheduledAt ? 'scheduled' : 'draft' };
   }, { status: 201, failure: 'The save result could not be confirmed. Check Posts before trying again.' });
 }

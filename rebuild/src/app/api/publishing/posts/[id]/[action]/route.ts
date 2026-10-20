@@ -1,6 +1,7 @@
 import { OperationError } from '@/lib/operation-error';
 import { cancelScheduledPost, publishPost, reschedulePostToInstant, reviewPost, schedulePost, submitPostForApproval, syncPostStatus } from '@/modules/publishing/server/lifecycle';
 import { parseScheduleMode } from '@/modules/publishing/remote-scheduling';
+import { parseDestinationScheduleModes } from '@/modules/publishing/server/schedule-modes';
 import { bodyInstant, bodyString, publishingWrite, requireBodyConfirmation } from '@/modules/publishing/server/rest';
 
 export const runtime = 'nodejs';
@@ -32,7 +33,8 @@ export async function POST(request: Request, context: Context) {
         const when = bodyInstant(body, 'scheduledAt');
         requireBodyConfirmation(body, `SCHEDULE POST ${id} ${when.text}`);
         const scheduleMode = parseScheduleMode(body.scheduleMode);
-        const result = await schedulePost(actor, id, when.date, scheduleMode ? { scheduleMode } : {});
+        const destinationScheduleModes = parseDestinationScheduleModes(body.destinationScheduleModes);
+        const result = await schedulePost(actor, id, when.date, { ...(scheduleMode ? { scheduleMode } : {}), ...(destinationScheduleModes ? { destinationScheduleModes } : {}) });
         return { postId: id, scheduledAt: when.date.toISOString(), ...result };
       }
       case 'reschedule': {

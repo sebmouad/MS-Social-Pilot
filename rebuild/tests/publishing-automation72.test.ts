@@ -12,8 +12,14 @@ const h = vi.hoisted(() => ({
     executeRaw: vi.fn(), queryRaw: vi.fn(), capturedRecycle: null as any, capturedMix: null as any,
   },
   recordVersion: vi.fn(), loadRetention: vi.fn(),
-  runRecycle: vi.fn(), runMix: vi.fn(),
+  runRecycle: vi.fn(), runMix: vi.fn(), store: vi.fn((..._args: unknown[]) => undefined), handOff: vi.fn(async (..._args: unknown[]) => ({ examined: 0, handedOver: 0, skipped: 0 })),
 }));
+vi.mock('@/modules/publishing/server/schedule-modes', async importOriginal => ({
+  ...await importOriginal<typeof import('@/modules/publishing/server/schedule-modes')>(),
+  systemScheduleModes: async (ids: string[]) => new Map(ids.map(id => [id, 'remote' as const])),
+  storeScheduleModes: (...args: unknown[]) => h.store(...args),
+}));
+vi.mock('@/modules/publishing/server/remote-handoff', () => ({ handOffRemoteSchedules: (...args: unknown[]) => h.handOff(...args) }));
 
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'publishing.maxFirstCommentDelayMinutes' ? 10080 : undefined }));
 vi.mock('@/server/data', () => ({ prisma: { $queryRaw: (...args: any[]) => h.state.queryRaw(...args) } }));
@@ -151,6 +157,8 @@ describe('Publishing automatic lifecycle', () => {
     expect(h.recordVersion).toHaveBeenCalledTimes(2);
     expect(h.state.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'draft1', workspaceId: 'w1', status: 'draft' }) }));
     expect(h.state.executeRaw).toHaveBeenCalledTimes(2); // schedule metadata and system audit
+    // Scheduling place follows the Root default per destination (stubbed here as platform-held); the hand-off runs after the transaction.
+    expect(h.store).toHaveBeenCalledWith(expect.anything(), 'w1', 'draft1', new Map([['t1', 'remote']]));
 
     vi.clearAllMocks(); h.state.updateCount = 0;
     await expect(publishingAutomationLifecycle.schedule(makeTx(), scheduleInput())).rejects.toMatchObject({ code: 'conflict' });
@@ -164,6 +172,7 @@ describe('Publishing automatic lifecycle', () => {
     expect(h.state.executeRaw.mock.calls[0]![0].join('?')).toContain('"approvalStatus"');
     expect(h.state.executeRaw.mock.calls[0]).toContain('pending');
     expect(JSON.parse(h.state.executeRaw.mock.calls[2]![4] as string)).toMatchObject({ approvalRequired: true });
+    expect(h.store).toHaveBeenCalledWith(expect.anything(), 'w1', expect.any(String), new Map([['t1', 'remote']]));
 
     vi.clearAllMocks(); await publishingAutomationLifecycle.recycle(makeTx(), recycleInput());
     expect(h.state.create.mock.calls[0]![0].data.status).toBe('scheduled');

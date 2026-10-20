@@ -376,6 +376,8 @@ model PostTarget {
   status       PostTargetStatus
   /// Opaque module format identity; null means existing legacy intent.
   formatId String?
+  /// Where this destination's schedule waits: 'application' or 'remote'. Null follows the post-level choice (posts.publishMode).
+  scheduleMode String?
   remotePostId String?
   remoteUrl    String?
   firstCommentId String?

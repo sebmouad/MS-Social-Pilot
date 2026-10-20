@@ -13,6 +13,7 @@ import { parsePublishingMedia } from '@/modules/publishing/media-support';
 import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay';
 import { runtimeConfig } from '@/server/config/store';
 import { parseScheduleMode } from '@/modules/publishing/remote-scheduling';
+import { parseDestinationScheduleModesJson } from '@/modules/publishing/server/schedule-modes';
 
 const PATH = '/publishing/posts';
 type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published' | 'publish-review' | 'synced' | 'failed';
@@ -38,6 +39,8 @@ export type ComposerValues = {
   scheduleTime: string;
   /** Who holds the schedule: 'application' or 'remote' (the destination's platform). Empty means the Root default. */
   scheduleMode: string;
+  /** JSON object of destination ID to 'application' | 'remote' for destinations that override the choice above. */
+  destinationScheduleModesJson: string;
 };
 export type ComposerActionState = { message?: string; saveUnconfirmed?: boolean; values: Partial<ComposerValues> } & ({ status: 'idle' | 'error'; destination?: never } | { status: 'success'; destination: string });
 
@@ -130,6 +133,7 @@ export async function createPostWithRecoveryAction(previous: ComposerActionState
       targetIds: values.targetIds,
       scheduledAt,
       ...(scheduledAt && parseScheduleMode(values.scheduleMode) ? { scheduleMode: parseScheduleMode(values.scheduleMode) } : {}),
+      ...(scheduledAt && parseDestinationScheduleModesJson(values.destinationScheduleModesJson) ? { destinationScheduleModes: parseDestinationScheduleModesJson(values.destinationScheduleModesJson) } : {}),
     });
   } catch (error) {
     if (isRedirect(error)) throw error;
@@ -152,7 +156,7 @@ export async function createPostAction(data: FormData) {
       if (!result.ok) throw new Error('Choose a valid publishing time in your workspace time zone.');
       return result.instant;
     })() : undefined;
-    await createPost(postActor, { message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), firstCommentDelayMinutes: await parsedCommentDelay(stringField(data, 'firstCommentDelayMinutes', true)), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string'), scheduledAt, ...(scheduledAt && parseScheduleMode(stringField(data, 'scheduleMode', true)) ? { scheduleMode: parseScheduleMode(stringField(data, 'scheduleMode', true)) } : {}) });
+    await createPost(postActor, { message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), firstCommentDelayMinutes: await parsedCommentDelay(stringField(data, 'firstCommentDelayMinutes', true)), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string'), scheduledAt, ...(scheduledAt && parseScheduleMode(stringField(data, 'scheduleMode', true)) ? { scheduleMode: parseScheduleMode(stringField(data, 'scheduleMode', true)) } : {}), ...(scheduledAt && parseDestinationScheduleModesJson(stringField(data, 'destinationScheduleModesJson', true)) ? { destinationScheduleModes: parseDestinationScheduleModesJson(stringField(data, 'destinationScheduleModesJson', true)) } : {}) });
     return scheduledAt ? 'scheduled' : 'created';
   });
 }
@@ -258,7 +262,8 @@ export async function schedulePostAction(data: FormData) {
     const date = new Date(value);
     if (!Number.isFinite(date.getTime())) throw new Error('Choose a valid publishing time.');
     const scheduleMode = parseScheduleMode(stringField(data, 'scheduleMode', true));
-    await schedulePost(actor(viewer), stringField(data, 'postId'), date, scheduleMode ? { scheduleMode } : {});
+    const destinationScheduleModes = parseDestinationScheduleModesJson(stringField(data, 'destinationScheduleModesJson', true));
+    await schedulePost(actor(viewer), stringField(data, 'postId'), date, { ...(scheduleMode ? { scheduleMode } : {}), ...(destinationScheduleModes ? { destinationScheduleModes } : {}) });
     return 'scheduled';
   });
 }
@@ -353,7 +358,7 @@ function composerValues(data: FormData): ComposerValues {
     intent: values('intent'), attachmentKind: values('attachmentKind'), mediaJson: values('mediaJson'), destinationFormatsJson: values('destinationFormatsJson'), message: values('message'), firstComment: values('firstComment'), firstCommentDelayMinutes: values('firstCommentDelayMinutes') || '0',
     link: values('link'), imageUrl: values('imageUrl'), videoUrl: values('videoUrl'), uploadedImageRef: values('uploadedImageRef'),
     altText: values('altText'), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string'),
-    scheduleDate: values('scheduleDate'), scheduleTime: values('scheduleTime'), scheduleMode: values('scheduleMode'), labelId: values('labelId'),
+    scheduleDate: values('scheduleDate'), scheduleTime: values('scheduleTime'), scheduleMode: values('scheduleMode'), destinationScheduleModesJson: values('destinationScheduleModesJson'), labelId: values('labelId'),
   };
 }
 
