@@ -23,7 +23,7 @@ import { GET as notesGet } from '../src/app/api/publishing/notes/route';
 import { PUT as slotsPut, GET as slotsGet } from '../src/app/api/publishing/queue-slots/route';
 import { GET as mixGet, PUT as mixPut } from '../src/app/api/publishing/content-mix/route';
 import { GET as recycleGet } from '../src/app/api/publishing/recycle/route';
-import { GET as versionsGet } from '../src/app/api/publishing/versions/route';
+import { GET as versionsGet, POST as versionsPost } from '../src/app/api/publishing/versions/route';
 import { executeCollaborationTool, collaborationToolDefinitions, collaborationWriteTools, availableCollaborationTools } from '../src/modules/publishing/collaboration/mcp';
 import { registerCollaborationPorts } from '../src/modules/publishing/collaboration/ports';
 import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
@@ -81,6 +81,19 @@ describe('collaboration HTTP', () => {
     expect((await versionsGet(new Request(`${base}/versions?postId=p&page=2`))).status).toBe(200);
     expect(h.ops.readVersions).toHaveBeenCalledWith(expect.anything(), { postId: 'p', page: 2 });
     expect((await assignGet(new Request(`${base}/assignments?postId=p`))).status).toBe(200);
+  });
+
+  it('passes preview and closest consent unchanged through HTTP and MCP to one service', async () => {
+    const actor = { userId: 'u', workspaceId: 'w', allowedTargetIds: ['now'] };
+    for (const mode of ['preview', 'closest']) {
+      const input = { postId: 'p1', versionId: 'v1', mode, reviewToken: 'a'.repeat(64), confirmation: 'RESTORE VERSION v1' };
+      expect((await versionsPost(post(`${base}/versions`, JSON.stringify(input)))).status).toBe(200);
+      expect(h.ops.restore).toHaveBeenLastCalledWith({ userId: 'u', workspaceId: 'w' }, input);
+      await executeCollaborationTool(actor, 'restore_post_version', input);
+      expect(h.ops.restore).toHaveBeenLastCalledWith(actor, input);
+    }
+    const tool = collaborationToolDefinitions.find(t => t.name === 'restore_post_version')!;
+    expect(tool.inputSchema.properties).toMatchObject({ mode: { enum: ['preview', 'exact', 'closest'] }, reviewToken: { type: 'string' } });
   });
 
   it('turns service failures into safe typed responses', async () => {

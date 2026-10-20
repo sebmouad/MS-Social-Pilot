@@ -887,3 +887,25 @@ Commit blocker: this sandbox cannot write the linked worktree's Git metadata at
 registration commit was created. Verified changes remain uncommitted in this
 worktree. Commit them on `codex/root-registration` from a session allowed to write
 that existing Git metadata; do not push or deploy this branch batch.
+
+## Version restore worktree (2026-10-20)
+
+`codex/version-restore`: catalog-based preview/exact/closest restoration now shares
+one guarded lifecycle path across UI, HTTP and MCP. Available historical formats
+can be restored on current destinations; unavailable formats fall back only with
+explicit review. Historical destinations are not re-added. Media/comment/delay
+losses are disclosed; proposal tokens reject changed adaptations. See
+PUBLISHING_HISTORY.md for verification and limits. No Root keys or migration;
+no push, deploy, servers, install or Prisma generation authorized in this batch.
+Next verification: actual PostgreSQL, browser themes/viewports/keyboard and
+live provider/MCP transport. Full rebuild objective remains open.
+
+Verification: 391 tests passed across 44 files, including the raw SQL guard;
+12 database integration cases skipped (opt-in environment absent).
+`npx tsc --noEmit -p .` passed. Commit blocked: `git add` cannot create
+`/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/.git/worktrees/msp-versionrestore/index.lock`
+(`Operation not permitted`); linked Git metadata is outside writable roots and
+escalation is disabled. Changes are uncommitted, with no new commit created.
+Commit from an environment permitted to write the existing worktree metadata;
+intended message: `fix(publishing): validate version restores`. Do not include the
+pre-existing untracked root `node_modules` link. No push was attempted.

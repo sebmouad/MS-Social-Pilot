@@ -533,3 +533,13 @@ input/error on failure; only a matching receipt closes the dialog. Unconfirmed
 mail delivery stays explicit. Shared useConfirm supports optional asynchronous
 exact confirmation while preserving simple callers. DOM/render checks pass; real
 browser theme/viewport verification remains open. See ROOT_REGISTRATION_ADMIN.md.
+
+Version restoration (local `codex/version-restore` batch): Restore first loads a
+server review, showing current destinations, selected available format labels,
+retained content/media/comment/delay and en/fr explanations of omissions.
+Available historical formats are restored; unavailable ones need an explicit
+closest-valid choice. The shared `useConfirm` supplies final confirmation.
+An empty adapted post cannot be applied. Recoverable failures preserve the
+review, with Review again for a changed proposal; approval reset is announced.
+DOM checks cover review/confirmation/failure/retry and French empty-result
+blocking. Actual browser themes, widths and keyboard verification remain open.

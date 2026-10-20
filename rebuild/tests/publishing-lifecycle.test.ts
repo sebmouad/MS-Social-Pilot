@@ -1,3 +1,4 @@
+vi.mock('@/modules/publishing/server/version-restore', () => ({ prepareVersionRestore: async (_actor: unknown, _postId: string, snapshot: import('../src/modules/publishing/collaboration/ports').VersionSnapshot) => ({ exact: true, canRestore: true, issues: [], token: 'a'.repeat(64), content: { ...snapshot, firstComment: snapshot.firstComment ?? '', firstCommentDelayMinutes: snapshot.firstCommentDelayMinutes ?? 0, destinationFormats: { 'target-1': 'post' } } }) }));
 vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: vi.fn().mockResolvedValue(undefined) }));
 // Operation-lock/authority behavior is exercised by publishing-guard and PostgreSQL suites.
 vi.mock('@/modules/publishing/server/guard', () => ({
@@ -195,10 +196,10 @@ describe('publishing lifecycle transitions', () => {
 
   it('restores an earlier snapshot through the ordinary save path and changes labels atomically', async () => {
     const result = await restorePostVersion({ actor, postId: 'p1', snapshot: {
-      message: 'Earlier text', firstComment: 'First reply', link: null,
+      versionId: 'v1', format: 'post', scheduledAt: null, timezone: 'UTC', message: 'Earlier text', firstComment: 'First reply', link: null,
       media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }], targetIds: ['target-1'], labelIds: ['label-1'],
     } });
-    expect(result).toEqual({ postId: 'p1', status: 'draft', approvalReset: true });
+    expect(result).toMatchObject({ postId: 'p1', status: 'draft', approvalReset: true, restored: true });
     expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'p1' }, data: expect.objectContaining({ message: 'Earlier text', firstComment: 'First reply', link: null, media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }] }),
     }));
@@ -209,14 +210,14 @@ describe('publishing lifecycle transitions', () => {
 
   it('does not restore scheduled or in-flight posts', async () => {
     db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', status: 'scheduled', scheduledAt: new Date(Date.now() + 60_000), targets: [{ id: 'pt1', status: 'pending', remotePostId: null }] });
-    await expect(restorePostVersion({ actor, postId: 'p1', snapshot: { message: 'Earlier', firstComment: null, link: null, media: [], targetIds: ['target-1'], labelIds: [] } })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(restorePostVersion({ actor, postId: 'p1', snapshot: { versionId: 'v1', format: 'post', scheduledAt: null, timezone: 'UTC', message: 'Earlier', firstComment: null, link: null, media: [], targetIds: ['target-1'], labelIds: [] } })).rejects.toMatchObject({ code: 'conflict' });
     expect(db.post.update).not.toHaveBeenCalled();
     expect(db.$executeRaw.mock.calls.some(call => call[0]?.join('').includes('INSERT INTO post_labels'))).toBe(false);
   });
 
   it('refuses a historical label set that exceeds the current Root bound', async () => {
     await expect(restorePostVersion({ actor, postId: 'p1', snapshot: {
-      message: 'Earlier', firstComment: null, link: null, media: [], targetIds: ['target-1'],
+      versionId: 'v1', format: 'post', scheduledAt: null, timezone: 'UTC', message: 'Earlier', firstComment: null, link: null, media: [], targetIds: ['target-1'],
       labelIds: Array.from({ length: 21 }, (_, index) => `label-${index}`),
     } })).rejects.toMatchObject({ code: 'invalid_request' });
     expect(db.post.update).not.toHaveBeenCalled();

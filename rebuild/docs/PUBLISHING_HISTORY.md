@@ -4,7 +4,7 @@ Post history snapshots are stored in the existing legacy-compatible `post_versio
 
 The lifecycle reads the validated Root setting `publishing.collab.versionRetention` once per operation. Create records the newly persisted post in its create transaction. Update records the current persisted post before mutation and the saved post after mutation; the helper skips a duplicate latest snapshot and prunes only after a new insert. Local draft create/edit and new duplicated drafts also record snapshots atomically; duplicate retries reuse their receipt and do not add history. Schedule, reschedule and local cancellation record the saved schedule in the same transaction as the status/time change. A failed snapshot, audit, or prune aborts the lifecycle transaction with its post mutation.
 
-Restore reads a workspace-and-post-scoped snapshot in the collaboration service and releases that transaction before calling the lifecycle. The lifecycle then starts the ordinary guarded Publishing operation, rechecks membership, role, page scope and current destination authority, validates content and media against current platform support, and refuses scheduled, published, publishing, partially failed, or otherwise non-editable posts. It snapshots the current content, applies the saved text, first comment, link, media and destinations through the regular save path, resets an approved post's review, replaces labels in that same transaction, and records the restored state. Missing labels or invalid destinations fail the transaction without a partial restore. A historical schedule is not replayed: restoring never schedules or publishes content.
+Restore reads a workspace-and-post-scoped snapshot in the collaboration service and releases that transaction before calling the lifecycle. The lifecycle then starts the ordinary guarded Publishing operation, rechecks membership, role, page scope and current destination authority, validates content and media against current platform support, and refuses scheduled, published, publishing, partially failed, or otherwise non-editable posts. It snapshots the current content, applies validated saved text, first comment, link, media and available formats to the current destinations through the regular save path, resets an approved post's review, replaces labels in that same transaction, and records the restored state. Missing labels or invalid destinations fail the transaction without a partial restore. A historical schedule is not replayed: restoring never schedules or publishes content.
 
 `createdAt` for internal notes is returned by PostgreSQL `INSERT ... RETURNING` and is used for the immediate UI row. The browser no longer substitutes its own clock.
 
@@ -24,9 +24,9 @@ The restore dialog explicitly reviews content and consequences, sending the
 exact domain confirmation only after the user chooses Restore version. It does
 not require typing an opaque internal identifier for this reversible local edit.
 Failure keeps the review open with feedback; success confirms the saved outcome.
-Current schedule and timezone stay unchanged. Different-format snapshots are
-refused rather than silently claiming a complete restore. Cross-format/native
-format editing remains part of the unfinished provider/composer coverage.
+Current schedule and timezone stay unchanged. The version-restore branch adds
+neutral catalog validation and explicitly reviewed adaptation as described below;
+this does not implement new provider formats.
 
 ## Ordering and retention
 
@@ -57,3 +57,47 @@ the whole working tree. Wider phone/theme/keyboard/offline and
 revocation-concurrency coverage, all legacy workflows, native formats, real
 Facebook operations, migration/rollback rehearsal and production cutover remain
 open. Production remains legacy.
+
+
+## Current-destination restore review (2026-10-20 branch batch)
+
+`server/version-restore.ts` checks the current selected destinations, resource
+scope, editability and credential grants under the lifecycle's post/destination
+locks. `version-restore-plan.ts` interprets only validated neutral catalog
+metadata: use the historical per-destination format if still available, otherwise
+the current available format or module default. Historical destination IDs never
+reappear. Existing format IDs remain opaque; no provider branches were added.
+
+The proposal keeps an ordered compatible media subset and supported image
+descriptions, omits missing local files and unsupported first comments, and
+clamps a still-supported comment delay to the current Root ceiling (clears delay
+when the comment is omitted). Unknown storage failures fail the operation rather
+than silently losing attachments. A content-empty proposal cannot be applied.
+Ordinary text/link/label limits and media checks still run before the atomic save;
+no automatic truncation or deletion of unavailable labels is promised.
+
+HTTP POST `/api/publishing/versions` and MCP `restore_post_version` accept
+`mode: preview | exact | closest` and optional `reviewToken`, with the existing
+exact `RESTORE VERSION <versionId>` confirmation. Preview returns `restored:
+false`, `status: review_required`, and `review` with `exact`, `canRestore`, en/fr
+`issues`, safe destination names/format labels, proposed `content` and `token`.
+Default/exact writes return that review without mutation when adaptation is
+needed. Closest requires the matching token; the proposal is recalculated under
+locks before every save. No restored audit is emitted for a preview/refusal.
+The UI reviews first, offers Restore closest valid version only explicitly,
+confirms through shared `useConfirm`, and keeps failures reviewable with a
+Review again action. Normal history retention and approval reset remain atomic.
+
+No Root keys, registry edit, migration, server execution, push or deployment.
+Evidence for this branch: mocked service, catalog algorithm, UI DOM and
+HTTP/MCP delegation checks; the real HTTP/PostgreSQL/browser evidence above
+belongs to the earlier restore implementation and does not verify this change.
+Actual PostgreSQL/concurrency, real browser themes/viewports/keyboard and
+live-provider/MCP transport verification remain open.
+
+Final branch checks from `rebuild/`: `npx vitest run
+ tests/version-restore-plan.test.ts tests/version-restore-service.test.ts
+ tests/publishing-*.test.ts tests/destination-formats-ui.test.ts
+ tests/raw-sql-void-guard.test.ts` passed 391 tests in 44 files; 12 database
+integration tests in 3 files skipped because their opt-in database environment
+was not configured. `npx tsc --noEmit -p .` and `git diff --check` passed.

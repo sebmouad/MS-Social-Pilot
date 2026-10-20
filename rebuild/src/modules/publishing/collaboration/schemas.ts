@@ -58,7 +58,7 @@ export function mentionedIn<T extends { id: string; name: string }>(body: string
 
 // ---- versions ---------------------------------------------------------------
 export const VERSION_LIST = z.object({ postId: ID, page: z.number().int().min(1).max(100000).optional() }).strict();
-export const VERSION_RESTORE = z.object({ postId: ID, versionId: ID, confirmation: z.string() }).strict();
+export const VERSION_RESTORE = z.object({ postId: ID, versionId: ID, confirmation: z.string(), mode: z.enum(['preview', 'exact', 'closest']).optional(), reviewToken: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict();
 export const restoreVersionConfirmation = (versionId: string) => `RESTORE VERSION ${versionId}`;
 
 // ---- queue times ------------------------------------------------------------

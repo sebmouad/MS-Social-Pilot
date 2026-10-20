@@ -1540,3 +1540,17 @@ implemented; no keys/migration/registry edit. MCP definitions and dispatch mappi
 are documented, deliberately not registered in this worktree. See
 [ROOT_REGISTRATION_ADMIN.md](ROOT_REGISTRATION_ADMIN.md) for behavior and evidence
 limits. Actual PostgreSQL, browser, SMTP and MCP transport verification remain open.
+
+## Version restore branch checkpoint (2026-10-20)
+
+`codex/version-restore` adds a neutral catalog-based restore review in Publishing
+`server/version-restore*.ts`. The shared lifecycle holds its existing operation
+locks for preview and save, checks current selected destination scope and
+credentials, restores available saved per-destination formats, and proposes the
+current/default available format when a saved format is unavailable. It never
+reintroduces historical destinations. Incompatible/missing media, unsupported
+first comments and obsolete delay values are disclosed in en/fr. An adjusted
+save requires the reviewed proposal token; normal validation, label checks,
+approval reset and atomic history still apply. UI, HTTP and MCP share this path.
+No new Root keys, registry edit or migration. See PUBLISHING_HISTORY.md for
+unit/DOM evidence and remaining verification; no production readiness claim.

@@ -35,3 +35,8 @@ Channel organization continuation (2026-10-20): selected-channel groups and
 per-channel profile labels have a local implementation on `codex/page-profiles`.
 This does not close Settings parity or change the overall goal. See
 [CHANNEL_PROFILES.md](CHANNEL_PROFILES.md) for migration and verification gaps.
+
+2026-10-20 scoped checkpoint: `codex/version-restore` implements cross-format
+version review and explicit adaptation against current destinations. This closes
+a source-level Publishing gap only; database/browser/live verification and the
+full objective remain open. See PUBLISHING_HISTORY.md.
