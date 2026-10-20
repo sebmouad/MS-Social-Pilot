@@ -4,6 +4,7 @@ import { cron, entry } from '@/lib/config/entry';
 const A = 'Integrations · REST API';
 const W = 'Integrations · Outbound webhooks';
 const O = 'Integrations · Operations';
+const C = 'Integrations · OAuth connectors';
 const int = (min: number, max: number) => z.number().int().min(min).max(max);
 
 /** Maps each Root key to the field it fills in {@link IntegrationsLimits}. */
@@ -18,6 +19,7 @@ export type IntegrationsLimits = {
   webhookMaxEndpoints: number; webhookSendTimeoutMs: number; webhookLeaseSeconds: number; webhookBatchSize: number; webhookRetentionDays: number;
   webhookMaxPayloadBytes: number; webhookDeliveriesPageSize: number; webhookEventLookbackMinutes: number; webhookEventScanLimit: number; webhookRevealsPerHour: number;
   transactionTimeoutMs: number; transactionMaxWaitMs: number;
+  oauthCodeTtlSeconds: number; oauthKeyLifetimeDays: number; oauthMaxClients: number; oauthClientIdleDays: number; oauthRegistrationsPerHour: number; oauthTokenAttemptsPerMinute: number; oauthConsentsPerHour: number;
 };
 
 /**
@@ -42,6 +44,15 @@ export const INTEGRATIONS_CONFIG = [
   num('webhookRevealsPerHour', 'integrations.webhooks.revealsPerHour', W, 'Secret reveals per hour', 'Times one person may show webhook signing secrets per hour.', 20, int(1, 1000)),
   entry({ key: 'integrations.webhooks.deliverySchedule', group: W, label: 'Delivery schedule', kind: 'text', description: 'Five-field cron schedule of the shared webhook delivery job.', defaultValue: '* * * * *', schema: cron, consumption: 'active' }),
   entry({ key: 'integrations.webhooks.hostAllowlist', group: W, label: 'Webhook host allowlist', kind: 'json', description: 'When not empty, webhooks may only target these hosts (and their subdomains). Public addresses only either way.', defaultValue: [], schema: z.array(z.string().trim().min(1).max(200)).max(100), consumption: 'active' }),
+  entry({ key: 'integrations.oauth.enabled', group: C, label: 'OAuth connectors available', kind: 'boolean', description: 'When off, MCP clients cannot register, be authorized or exchange codes. Keys already issued keep working until revoked or expired.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
+  entry({ key: 'integrations.oauth.issuerUrl', group: C, label: 'OAuth issuer URL', kind: 'text', description: 'Public origin of this installation, such as https://app.example.com (no path). Advertised in discovery documents and used to check consent form origins. Connectors stay unavailable while empty. http is accepted only for localhost.', defaultValue: '', schema: z.string().trim().max(200).refine(value => { if (!value) return true; try { const u = new URL(value); return (u.protocol === 'https:' || (u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname))) && u.origin === value && !u.username && !u.password; } catch { return false; } }, 'Use an origin only: https://host (http only for localhost), no path or trailing slash.'), consumption: 'active' }),
+  num('oauthCodeTtlSeconds', 'integrations.oauth.codeTtlSeconds', C, 'Authorization code lifetime (seconds)', 'A consent code can be exchanged once within this time.', 60, int(10, 600)),
+  num('oauthKeyLifetimeDays', 'integrations.oauth.keyLifetimeDays', C, 'Connector key lifetime (days)', 'Lifetime of the scoped key issued to a connector; never longer than the maximum API key lifetime. There are no refresh tokens: the client asks again when it expires.', 30, int(1, 365)),
+  num('oauthMaxClients', 'integrations.oauth.maxClients', C, 'Registered clients', 'Most dynamically registered clients kept; registration is refused beyond this after idle clients are removed.', 500, int(1, 100000)),
+  num('oauthClientIdleDays', 'integrations.oauth.clientIdleDays', C, 'Idle client retention (days)', 'Registered clients never authorized for this long are removed when new clients register.', 14, int(1, 365)),
+  num('oauthRegistrationsPerHour', 'integrations.oauth.registrationsPerHour', C, 'Registrations per hour', 'Client registrations one caller address (or, behind no trusted proxy, the whole installation) may make per hour.', 30, int(1, 10000)),
+  num('oauthTokenAttemptsPerMinute', 'integrations.oauth.tokenAttemptsPerMinute', C, 'Token requests per minute', 'Token endpoint requests per client and caller address per minute.', 30, int(1, 10000)),
+  num('oauthConsentsPerHour', 'integrations.oauth.consentsPerHour', C, 'Consent decisions per hour', 'Authorization decisions one person may submit per hour.', 30, int(1, 1000)),
   num('transactionTimeoutMs', 'integrations.transactionTimeoutMs', O, 'Mutation timeout (ms)', 'Longest one integrations change may run.', 5000, int(500, 30000)),
   num('transactionMaxWaitMs', 'integrations.transactionMaxWaitMs', O, 'Mutation wait (ms)', 'Longest wait for a slot before an integrations change.', 2000, int(100, 10000)),
 ] as const;
