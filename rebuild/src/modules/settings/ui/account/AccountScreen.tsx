@@ -8,6 +8,7 @@ import { SettingsPage, SettingsPanel, styles } from '@/modules/settings/ui/_comp
 import { AccountManager } from './manager';
 import { accountPasswordPolicy } from '@/server/account-settings';
 import { accountCopy } from './copy';
+import { listPersonKeys } from '@/modules/settings/person-keys/service';
 
 export const metadata: Metadata = { title: 'Account' };
 
@@ -21,6 +22,10 @@ export default async function AccountPage() {
   }
   const t = accountCopy[locale];
   const passwordPolicy = await accountPasswordPolicy();
+  // Read on the server so an unavailable credential store shows an in-page retry instead of a failing browser request.
+  const personKeys = await listPersonKeys({ userId: viewer.user.id })
+    .then(result => ({ ...result, keys: result.keys.map(key => ({ ...key, expiresAt: key.expiresAt.toISOString(), createdAt: key.createdAt.toISOString() })) }))
+    .catch(() => null);
   const values = [
     { label: t.workspace, value: viewer.membership.workspace.name },
     { label: t.role, value: viewer.membership.role },
@@ -30,7 +35,7 @@ export default async function AccountPage() {
 
   return <PageFrame module="settings" scopedAccess><SettingsPage active="settings/account" title={t.title} description={t.description} locale={locale}>
     <AccountManager locale={locale} initialName={viewer.user.name} email={viewer.user.email} passwordPolicy={passwordPolicy} />
-    <PersonKeysManager locale={locale} />
+    <PersonKeysManager locale={locale} initial={personKeys} />
     <SettingsPanel title={t.contextTitle}>
       <dl className={styles['settings-account-grid']}>{values.map(item => <div className={styles['settings-account-item']} key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>
     </SettingsPanel>

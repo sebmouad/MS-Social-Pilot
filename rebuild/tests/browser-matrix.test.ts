@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { THEMES } from '../src/lib/themes';
-import { allowRequest, browserFinding, customerRoute, discoverRoutes, FAMILIES, finishReport, guardBaseUrl, runMatrix, VIEWPORTS, type Cell } from '../scripts/verify-browser-matrix';
+import { allowRequest, browserFinding, customerRoute, DRAWER_MAIN_ACTION_SELECTOR, MAIN_ACTION_SELECTORS, discoverRoutes, FAMILIES, finishReport, guardBaseUrl, runMatrix, VIEWPORTS, type Cell } from '../scripts/verify-browser-matrix';
 
 function complete() {
   const routes = FAMILIES.map(route => route === '/publishing' ? '/publishing/posts' : route);
@@ -95,6 +95,17 @@ describe('browser matrix report', () => {
     expect(inventory.routes.some(route => route.startsWith('/root') || route.includes('['))).toBe(false);
     expect(customerRoute('/settings-evil')).toBe(false);
     expect(customerRoute('/sign-in')).toBe(false);
+  });
+});
+
+describe('main action discovery', () => {
+  it('keeps the sidebar primary action as the page action and verifies it in the phone drawer', () => {
+    expect(MAIN_ACTION_SELECTORS).toEqual(['main .ui-button--primary:not(:disabled)', '#shell-filters .ui-button--primary', 'main button:not(:disabled)', 'main a[href]']);
+    expect(MAIN_ACTION_SELECTORS).toContain(DRAWER_MAIN_ACTION_SELECTOR);
+  });
+  it('still reports a page with no verified main action', () => {
+    const input = complete(); input.cells[1].keyboard.mainAction = 'Not available';
+    expect(finishReport(input).cells[1].findings).toContainEqual({ code: 'MAIN_ACTION_UNVERIFIED' });
   });
 });
 

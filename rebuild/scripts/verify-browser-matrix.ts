@@ -9,6 +9,10 @@ import { THEME_COOKIE, THEMES } from '../src/lib/themes';
 
 export const VIEWPORTS = [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const;
 export const FAMILIES = ['/home', '/publishing', '/inbox', '/analytics', '/ads', '/settings', '/tasks', '/agency'];
+/** Main-area candidates, tried in order; on desktop the sidebar's primary (filter apply) button is the page's main action. */
+export const MAIN_ACTION_SELECTORS = ['main .ui-button--primary:not(:disabled)', '#shell-filters .ui-button--primary', 'main button:not(:disabled)', 'main a[href]'] as const;
+/** On phones the sidebar is a closed drawer, so its primary action is verified after opening the drawer by keyboard. */
+export const DRAWER_MAIN_ACTION_SELECTOR = '#shell-filters .ui-button--primary';
 export type Finding = { code: string; count?: number; fingerprint?: string; control?: number; route?: string; theme?: string; viewport?: { width: number; height: number } };
 export type Cell = {
   route: string; theme: string; viewport: { width: number; height: number };
@@ -145,13 +149,39 @@ async function auditControls(page: Page, cell: Cell) {
   }
 }
 
+/** Phone: the closed drawer hides the sidebar action, so open it by keyboard, Tab to the action, then close it again. */
+async function checkDrawerMainAction(page: Page, drawer: Locator, cell: Cell) {
+  if (!await tabTo(page, drawer)) { cell.keyboard.mainAction = 'failed'; return; }
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog');
+  await dialog.first().waitFor({ state: 'visible', timeout: 3000 });
+  await page.waitForTimeout(100);
+  const candidates = page.locator(DRAWER_MAIN_ACTION_SELECTOR);
+  let target: Locator | undefined;
+  for (let i = 0; i < await candidates.count(); i++) if (await candidates.nth(i).isVisible()) { target = candidates.nth(i); break; }
+  if (target) {
+    cell.keyboard.mainActionTarget = `drawer: ${DRAWER_MAIN_ACTION_SELECTOR}`;
+    // Only real Tab presses move focus, which starts inside the open drawer and must stay trapped there.
+    let reached = false;
+    for (let i = 0; i < 100 && !reached; i++) {
+      await page.keyboard.press('Tab');
+      reached = await target.evaluate(element => element === document.activeElement);
+    }
+    cell.keyboard.mainAction = reached && await visibleFocus(target) ? 'passed' : 'failed';
+  }
+  await page.keyboard.press('Escape');
+  await dialog.first().waitFor({ state: 'hidden', timeout: 3000 });
+  await page.waitForTimeout(100);
+  if (!await drawer.evaluate(element => element === document.activeElement)) cell.findings.push({ code: 'DRAWER_FOCUS_NOT_RESTORED' });
+}
+
 async function checkKeyboard(page: Page, cell: Cell) {
   // The phone drawer is a real shared dialog and holds the sidebar main action.
   const drawer = page.locator('.shell-filter-toggle');
   if (await drawer.isVisible()) {
     cell.keyboard.dialog = await checkDialog(page, drawer, cell) ? 'passed' : 'failed';
   }
-  const selectors = ['main .ui-button--primary:not(:disabled)', '#shell-filters .ui-button--primary', 'main button:not(:disabled)', 'main a[href]'];
+  const selectors = MAIN_ACTION_SELECTORS;
   let target: Locator | undefined;
   for (const selector of selectors) {
     const candidates = page.locator(selector);
@@ -159,6 +189,7 @@ async function checkKeyboard(page: Page, cell: Cell) {
     if (target) break;
   }
   if (target) cell.keyboard.mainAction = await tabTo(page, target) ? 'passed' : 'failed';
+  else if (await drawer.isVisible()) await checkDrawerMainAction(page, drawer, cell);
   // Open only the known local task editor; never activate arbitrary customer writes.
   if (cell.route === '/tasks') {
     const opener = page.getByRole('button', { name: 'New task', exact: true });
