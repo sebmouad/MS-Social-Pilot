@@ -12,6 +12,7 @@ import { withInboxChannelOperation, inboxCommentSuppressed, orderInboxCommentBat
 
 import type { InboxReplyPolicyRequest } from '@/modules/inbox/server/policy';
 import { facebookReplyRule } from './reply-policy';
+import { storeFacebookReviews } from './reviews-store';
 
 export async function facebookReplyPolicy(input: InboxReplyPolicyRequest) {
   return facebookReplyRule(input, await runtimeConfig('inbox.messengerReplyWindowHours') as number);
@@ -210,4 +211,33 @@ export async function prepareDeleteFacebookComment(actor: InboxActor, input: { t
     signal.throwIfAborted();
     await engine.deleteComment(channel.token, input.remoteId);
   };
+}
+
+/** Store a Page's current reviews/recommendations. Read-only toward Facebook; resolution stays local. */
+export async function syncFacebookReviews(actor: InboxActor, targetId?: string) {
+  const { permissions } = await access(actor);
+  if (await runtimeConfig('platforms.facebook.enabled') !== true) throw new OperationError('unavailable', 'This channel is unavailable in the inbox.');
+  const targets = await prisma.target.findMany({
+    where: { workspaceId: actor.workspaceId, type: 'page', enabled: true, ...(targetId ? { id: targetId } : {}), socialAccount: { is: { workspaceId: actor.workspaceId, provider: 'facebook', invalidatedAt: null } } },
+    select: { id: true }, orderBy: { name: 'asc' },
+  });
+  const visible = targets.filter(item => canAccessPage(permissions, item.id));
+  if (targetId && !visible.length) throw new OperationError('not_found', 'This Facebook Page is unavailable in the current workspace.');
+  const engine = await configuredFacebookEngine();
+  const failures: unknown[] = []; const syncedTargetIds: string[] = [];
+  let reviewCount = 0;
+  for (const item of visible) {
+    try {
+      const channel = await page(actor, item.id, false);
+      const reviews = await engine.listReviews(channel.token, channel.providerId);
+      const stored = await withInboxChannelOperation(actor.workspaceId, item.id, async signal => {
+        signal.throwIfAborted();
+        return prisma.$transaction(tx => storeFacebookReviews(tx, item.id, reviews));
+      });
+      reviewCount += stored; syncedTargetIds.push(item.id);
+    } catch (error) { failures.push(error); }
+  }
+  if (failures.length && !syncedTargetIds.length) throw failures[0];
+  await audit(actor, 'inbox.reviews_synced', { targetIds: syncedTargetIds, targetCount: syncedTargetIds.length, failedCount: failures.length, reviewCount });
+  return { targetCount: syncedTargetIds.length, failedCount: failures.length, reviewCount, syncedAt: new Date().toISOString() };
 }

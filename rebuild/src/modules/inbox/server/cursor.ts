@@ -4,7 +4,7 @@ import { OperationError } from '@/lib/operation-error';
 export type InboxCursor = {
   v: 1;
   at: string;
-  kind: 'message' | 'comment';
+  kind: 'message' | 'comment' | 'review';
   id: string;
   direction: 'older' | 'newer';
   filter: string;
@@ -35,7 +35,7 @@ function validCursor(value: unknown): value is InboxCursor {
   const keys = Object.keys(cursor);
   if (keys.length !== CURSOR_FIELDS.length || CURSOR_FIELDS.some(key => !Object.hasOwn(cursor, key))) return false;
   return cursor.v === 1 && validTimestamp(cursor.at) &&
-    (cursor.kind === 'message' || cursor.kind === 'comment') &&
+    (cursor.kind === 'message' || cursor.kind === 'comment' || cursor.kind === 'review') &&
     typeof cursor.id === 'string' && ID_PATTERN.test(cursor.id) &&
     (cursor.direction === 'older' || cursor.direction === 'newer') &&
     typeof cursor.filter === 'string' && FILTER_PATTERN.test(cursor.filter);
@@ -54,7 +54,7 @@ export function inboxFilterFingerprint(input: unknown): string {
 
 /** Encode a stable tuple anchor. SQL applies (time, kind, id) ordering. */
 export function encodeInboxCursor(
-  anchor: { time: Date; kind: 'message' | 'comment'; id: string },
+  anchor: { time: Date; kind: 'message' | 'comment' | 'review'; id: string },
   direction: 'older' | 'newer',
   filter: string,
   maxCharacters: number,
@@ -62,7 +62,7 @@ export function encodeInboxCursor(
   try {
     if (!validLimit(maxCharacters) || !anchor || !(anchor.time instanceof Date) ||
         !validTimestamp(anchor.time.toISOString()) ||
-        (anchor.kind !== 'message' && anchor.kind !== 'comment') ||
+        (anchor.kind !== 'message' && anchor.kind !== 'comment' && anchor.kind !== 'review') ||
         typeof anchor.id !== 'string' || !ID_PATTERN.test(anchor.id) ||
         (direction !== 'older' && direction !== 'newer') ||
         typeof filter !== 'string' || !FILTER_PATTERN.test(filter)) throw invalidCursor();

@@ -8,7 +8,7 @@ import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { isOperationErrorCode } from '@/lib/operation-error';
 import styles from './inbox.module.css';
 
-type Kind = 'message' | 'comment';
+type Kind = 'message' | 'comment' | 'review';
 type Outcome = { ok: true; body: Record<string, number | string | boolean> } | { ok: false; error: string };
 type DeleteState = 'started' | 'uncertain' | 'remote_confirmed' | 'completed' | 'rejected';
 type DeleteReceipt = { ok: true; operationId: string; itemId: string; state: DeleteState; remoteConfirmed: boolean; localConfirmed: boolean };
@@ -76,7 +76,10 @@ export function InboxSyncBar({ targetId, lastSynced, timeZone, disabled = false 
     if (!countsValid || !dateValid) { setResult({ kind: 'error', text: uncertainOutcome }); return; }
     const { conversationCount, messageCount, commentCount, targetCount, failedCount } = outcome.body as Record<typeof fields[number], number>;
     const failed = failedCount;
-    setResult({ kind: failed ? 'error' : 'ok', text: `Checked ${plural(Number(targetCount), 'channel')}: ${plural(Number(conversationCount), 'conversation')} (${plural(Number(messageCount), 'message')}) and ${plural(Number(commentCount), 'comment')} up to date.${failed ? ` ${plural(failed, 'channel')} could not be read. Reconnect it in Connections, then sync again.` : ''}` });
+    // Present only when the channel's module reads reviews.
+    const reviewCount = outcome.body.reviewCount;
+    const reviewNote = typeof reviewCount === 'number' && Number.isSafeInteger(reviewCount) && reviewCount >= 0 ? ` ${plural(reviewCount, 'review')} up to date.` : '';
+    setResult({ kind: failed ? 'error' : 'ok', text: `Checked ${plural(Number(targetCount), 'channel')}: ${plural(Number(conversationCount), 'conversation')} (${plural(Number(messageCount), 'message')}) and ${plural(Number(commentCount), 'comment')} up to date.${reviewNote}${failed ? ` ${plural(failed, 'channel')} could not be read. Reconnect it in Connections, then sync again.` : ''}` });
     setSyncedNow(new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(syncedAt)));
     router.refresh();
   }

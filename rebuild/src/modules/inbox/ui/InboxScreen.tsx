@@ -11,11 +11,14 @@ import { canManageInbox, canManageInboxWorkflow } from '@/modules/inbox/server/a
 import { inboxReplyPolicy } from '@/modules/inbox/server/policy';
 import { inboxCapabilities } from '@/modules/inbox/server/providers';
 import { formatInboxTime } from '@/modules/inbox/server/threads';
-import { InboxSyncBar, ThreadToolbar } from './InboxActions';
+import { InboxSyncBar, ReplyBox, ThreadToolbar } from './InboxActions';
+import { reviewSummary, reviewText } from '@/modules/inbox/reviews-copy';
 import { ThreadTools } from './ThreadTools';
 import { InboxTag } from './InboxTags';
 import styles from './inbox.module.css';
 
+// The Inbox page has no per-user language yet; moderation defaults the same way.
+const LOCALE = 'en' as const;
 const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'all', state: 'open', hidden: 'visible', q: '' };
 const singleValue = (value: string | string[] | undefined) => typeof value === 'string' ? value : undefined;
 
@@ -88,8 +91,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     const [canWrite, canResolve, capabilities, rule] = await Promise.all([
       canManageInbox(actor, thread.target.id),
       canManageInboxWorkflow(actor, thread.target.id),
-      thread.target.provider ? inboxCapabilities(thread.target.provider) : Promise.resolve({ reply: false, hide: false, remove: false }),
-      inboxReplyPolicy(thread.target.provider, { kind: thread.kind, channelRemoteId: thread.target.providerId, lastInbound: thread.lastInbound, timeZone }),
+      thread.target.provider ? inboxCapabilities(thread.target.provider) : Promise.resolve({ reply: false, hide: false, remove: false, reviews: false, replyToReviews: false }),
+      thread.kind === 'review' ? Promise.resolve({ allowed: false, headline: '', detail: undefined }) : inboxReplyPolicy(thread.target.provider, { kind: thread.kind, channelRemoteId: thread.target.providerId, lastInbound: thread.lastInbound, timeZone }),
     ]);
     const badge = channelBadgeInfo(thread.target.provider);
     const first = thread.entries.find(entry => !entry.fromChannel);
@@ -111,22 +114,23 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     };
     const historyName = thread.kind === 'comment' ? 'replies' : 'messages';
     const openingItemPresent = Boolean(listPage?.items.some(item => item.key === `${thread.kind}:${thread.id}`));
-    threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? 'Open conversation' : 'Open comment'}>
+    threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? 'Open conversation' : thread.kind === 'review' ? reviewText(LOCALE, 'openReview') : 'Open comment'}>
       <a className={styles.back} href={clearThreadHref}>← All conversations</a>
       {!openingItemPresent && listPage ? <p className={styles.contextNote}>This conversation is outside the current list page. It stays open while you browse.</p> : null}
       <header className={styles.threadHead}>
-        <h2>{thread.kind === 'message' ? `Conversation with ${first?.author ?? 'a visitor'}` : `Comment by ${thread.entries[0]?.author ?? 'a visitor'}`}</h2>
+        <h2>{thread.kind === 'message' ? `Conversation with ${first?.author ?? 'a visitor'}` : thread.kind === 'review' ? reviewText(LOCALE, 'reviewBy', { name: thread.entries[0]?.author ?? 'a visitor' }) : `Comment by ${thread.entries[0]?.author ?? 'a visitor'}`}</h2>
         <div className={styles.threadTags}>
           <ChannelBadge name={thread.target.name} platformName={badge.platformName} mark={badge.mark} />
-          <InboxTag icon={thread.kind === 'message' ? 'message' : 'comment'}>{thread.kind === 'message' ? 'Message' : 'Comment'}</InboxTag>
+          <InboxTag icon={thread.kind === 'message' ? 'message' : 'comment'}>{thread.kind === 'message' ? 'Message' : thread.kind === 'review' ? reviewText(LOCALE, 'review') : 'Comment'}</InboxTag>
+          {thread.kind === 'review' ? <InboxTag icon="comment">{reviewSummary(LOCALE, thread)}</InboxTag> : null}
           {thread.resolved ? <InboxTag icon="resolved" tone="ok">Resolved</InboxTag> : <InboxTag icon="needsReply" tone="warn">Open</InboxTag>}
           {thread.hidden ? <InboxTag icon="hidden">Hidden</InboxTag> : null}
         </div>
       </header>
       {thread.postText ? <p className={styles.postContext}><strong>On your post</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}</p> : null}
-      <p className={styles.contextNote}>This is activity already synced to the app. Earlier messages or replies on the platform may not have been fetched yet.</p>
+      <p className={styles.contextNote}>{thread.kind === 'review' ? reviewText(LOCALE, 'note') : 'This is activity already synced to the app. Earlier messages or replies on the platform may not have been fetched yet.'}</p>
       <div className={styles.historyHead}>
-        <h3>{thread.kind === 'comment' ? 'Comment history' : 'Conversation history'}</h3>
+        <h3>{thread.kind === 'comment' ? 'Comment history' : thread.kind === 'review' ? reviewText(LOCALE, 'reviewHistory') : 'Conversation history'}</h3>
         <span>{history.shown} of {history.total} stored {historyName} shown</span>
       </div>
       {history.cursor && history.shown === 0 ? <p className={styles.contextNote}>No stored history at this position. Choose Latest in the sidebar to return to recent messages or replies.</p> : null}
@@ -134,7 +138,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         {(thread.kind === 'comment' ? thread.entries.filter(entry => entry.parentId === null) : thread.entries).map(entry => renderEntry(entry))}
       </ol>
       {canResolve ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canResolve} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} /> : null}
-      <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} />
+      {thread.kind === 'review'
+        ? (canWrite && capabilities.replyToReviews ? <ReplyBox key={thread.id} id={thread.id} kind="review" allowed headline="" /> : <p>{reviewText(LOCALE, 'replyUnavailable')}</p>)
+        : <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} />}
     </section>;
   }
 
@@ -149,7 +155,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       {requestedThread ? <input type="hidden" name="thread" value={requestedThread} /> : null}
       <label>Search messages and people<input className={styles.searchInput} type="search" name="q" maxLength={listPage?.limits.searchMaxCharacters} defaultValue={filters.q} placeholder="Name or message text" /></label>
       <label>Channel<select name="channel" defaultValue={selectedChannel}><option value="all">All channels</option>{visibleChannels.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label>Type<select name="type" defaultValue={filters.kind}><option value="all">All types</option><option value="message">Messages</option><option value="comment">Comments</option></select></label>
+      <label>Type<select name="type" defaultValue={filters.kind}><option value="all">All types</option><option value="message">Messages</option><option value="comment">Comments</option><option value="review">{reviewText(LOCALE, 'reviews')}</option></select></label>
       <label>Status<select name="status" defaultValue={filters.state}><option value="open">Open</option><option value="resolved">Resolved</option><option value="all">All</option></select></label>
       <label>Hidden comments<select name="hidden" defaultValue={filters.hidden}><option value="visible">Hide them</option><option value="all">Show them</option></select></label>
       <label>Items per page<input type="number" name="limit" min={1} max={listPage?.limits.listPageSize} defaultValue={listPage?.limit} disabled={!listPage} /></label>
@@ -184,7 +190,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   return <PageFrame module="inbox" scopedAccess sidebar={sidebar}><div className={styles.page}>
     <header className={styles.head}>
-      <div><p className="eyebrow">Inbox</p><h1>Conversations</h1><p>Messages and comments from the channels you can access.</p></div>
+      <div><p className="eyebrow">Inbox</p><h1>Conversations</h1><p>Messages, comments and reviews from the channels you can access.</p></div>
       {visibleChannels.length > 0 && <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true) : null} timeZone={timeZone} />}
     </header>
     {listError ? <div role="alert" className={styles.alert}><p>{listError.error}</p><a href={resetHref}>Reset filters and return to the latest Inbox items</a></div> : null}
@@ -201,10 +207,11 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           const selected = thread !== null && thread.kind === item.kind && thread.id === item.id;
           return <li key={item.key}><a className={styles.item} href={inboxHref({ ...baseLocation, ...(listPage.cursor ? { cursor: listPage.cursor } : {}), thread: item.key })} aria-current={selected ? 'true' : undefined} data-attention={item.needsReply || item.unread > 0 || undefined}>
             <div className={styles.itemTop}><span className={styles.author}>{item.author}</span><time dateTime={item.time.toISOString()}>{formatInboxTime(item.time, timeZone)}</time></div>
-            <p className={styles.preview}>{item.preview.length > 180 ? `${item.preview.slice(0, 180)}…` : item.preview}</p>
+            <p className={styles.preview}>{item.kind === 'review' && !item.preview ? reviewText(LOCALE, 'noText') : item.preview.length > 180 ? `${item.preview.slice(0, 180)}…` : item.preview}</p>
             <div className={styles.itemMeta}>
               <ChannelBadge name={item.target.name} platformName={badge.platformName} mark={badge.mark} compact />
-              <InboxTag icon={item.kind === 'message' ? 'message' : 'comment'}>{item.kind === 'message' ? 'Message' : 'Comment'}</InboxTag>
+              <InboxTag icon={item.kind === 'message' ? 'message' : 'comment'}>{item.kind === 'message' ? 'Message' : item.kind === 'review' ? reviewText(LOCALE, 'review') : 'Comment'}</InboxTag>
+              {item.kind === 'review' ? <InboxTag icon="comment">{reviewSummary(LOCALE, item)}</InboxTag> : null}
               {item.unread > 0 ? <InboxTag icon="unread" tone="warn">{item.unread} unread</InboxTag> : null}
               {item.needsReply ? <InboxTag icon="needsReply" tone="warn">Needs reply</InboxTag> : null}
               {item.resolved ? <InboxTag icon="resolved" tone="ok">Resolved</InboxTag> : null}

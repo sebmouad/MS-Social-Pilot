@@ -4,7 +4,8 @@ import type { FacebookConfig } from './config';
 import { validateFacebookConfig } from './config';
 import { PlatformApiError } from '../errors';
 import { facebookAppSecretProof, graphObjectUrl, isFacebookDefiniteRejection, isFacebookRetryable } from './protocol';
-import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingMediaSupport, RemoteStatus } from '../types';
+import { FACEBOOK_RATINGS_FIELDS, mapFacebookReview, ratingsReadVersion } from './reviews';
+import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, InboxReview, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingMediaSupport, RemoteStatus } from '../types';
 import type { FacebookMediaJournal, FacebookMediaJournalFactory } from './media-journal-port';
 
 export type FacebookFetch = typeof fetch;
@@ -58,6 +59,8 @@ export interface FacebookEngine {
   deletePhoto(accessToken: string, remoteId: string, onDispatch?: () => void, onConfirmed?: () => void): Promise<void>;
   listInbox(accessToken: string, pageId: string): Promise<FacebookConversation[]>;
   listComments(accessToken: string, postId: string): Promise<FacebookComment[]>;
+  /** Empty when Meta no longer serves Page ratings on any version. */
+  listReviews(accessToken: string, pageId: string): Promise<InboxReview[]>;
   getPageAnalytics(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<Record<string, number | null>>;
   getPageInsightObservations(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<FacebookPageInsightObservations>;
   getAdInsights(accessToken: string, accountId: string, since: Date, until: Date): Promise<Array<Record<string, unknown>>>;
@@ -466,6 +469,14 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
           unreadCount: typeof c.unread_count === 'number' ? c.unread_count : 0, messageCount: typeof c.message_count === 'number' ? c.message_count : messages.length, messages }];
       });
     },
+    async listReviews(token, pageId) {
+      const version = ratingsReadVersion(config.graphVersion);
+      if (!version) return [];
+      // The edge only exists on an older version, so it is read through an engine pinned to it (pagination links must stay on that version).
+      if (version !== config.graphVersion) return createFacebookEngine({ ...rawConfig, graphVersion: version }, fetchImpl, operationSignalOrJournalFactory, suppliedJournalFactory).listReviews(token, pageId);
+      const raw = await pages<JsonObject>(collectionUrl(`${encodeURIComponent(pageId)}/ratings`, token, FACEBOOK_RATINGS_FIELDS), token);
+      return raw.flatMap(item => { const review = mapFacebookReview(item); return review ? [review] : []; });
+    },
     async listComments(token, postId) {
       // filter=stream returns replies flattened beside top-level comments (each carries parent{id}), so stored threads can nest them.
       const commentsUrl = new URL(collectionUrl(`${encodeURIComponent(postId)}/comments`, token, 'id,message,from{id,name},created_time,parent{id},like_count,comment_count,is_hidden'));
@@ -695,6 +706,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
         authorId: message.fromId, authorName: message.fromName, kind: 'message' as const,
       })));
     },
+    async listReviews(request) { return engine.listReviews(request.credential.accessToken, request.targetId); },
     async listComments(request) {
       const comments = await engine.listComments(request.credential.accessToken, request.remotePostId);
       return comments.map(comment => ({

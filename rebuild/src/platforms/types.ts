@@ -132,6 +132,15 @@ export interface InboxItem {
   authorName?: string | null;
   kind?: 'comment' | 'message';
 }
+/** A public review or recommendation left on a channel. Rating is 1 to 5 when the provider uses stars; recommendation covers providers that use a yes/no recommendation instead. */
+export interface InboxReview {
+  id: string;
+  createdAt: Date;
+  authorName: string | null;
+  rating: number | null;
+  recommendation: 'positive' | 'negative' | null;
+  text: string | null;
+}
 export interface InboxActionRequest {
   credential: PlatformCredential;
   targetId: string;
@@ -195,6 +204,8 @@ export interface PlatformAdapter {
   deleteRemote?(request: RemoteDeleteRequest): Promise<void>;
   listInbox?(request: InboxRequest): Promise<InboxItem[]>;
   listComments?(request: InboxCommentsRequest): Promise<InboxItem[]>;
+  /** Optional: only modules whose provider exposes public reviews declare it. */
+  listReviews?(request: InboxRequest): Promise<InboxReview[]>;
   replyToInbox?(request: InboxActionRequest): Promise<{ remoteId: string }>;
   hideInboxItem?(request: InboxActionRequest & { hidden: boolean }): Promise<void>;
   deleteInboxItem?(request: InboxActionRequest): Promise<void>;

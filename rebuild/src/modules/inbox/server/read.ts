@@ -11,7 +11,7 @@ import type { InboxReadActor, InboxReadConstraints, InboxLimits, InboxListItem, 
 const targetSelect = { id: true, name: true, providerId: true, socialAccount: { select: { provider: true } } } as const;
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
 const invalid = () => new OperationError('invalid_request', 'Choose valid Inbox filters, or reset to the latest items.');
-type Key = { id: string; kind: 'message' | 'comment'; time: Date };
+type Key = { id: string; kind: 'message' | 'comment' | 'review'; time: Date };
 
 async function readLimits(): Promise<InboxLimits> {
   const [listPageSize, threadPageSize, searchMaxCharacters, cursorMaxCharacters] = await Promise.all([
@@ -38,7 +38,7 @@ const literalSearch = (value: string) => `%${value.replace(/[\\%_]/g, character 
 export async function readInboxList(actor: InboxReadActor, input: unknown = {}, constraints: InboxReadConstraints = {}): Promise<InboxListPage> {
   const access = await readAccess(actor, constraints);
   const limits = await readLimits();
-  const parsed = z.object({ channelId: idSchema.optional(), kind: z.enum(['all', 'message', 'comment']).default('all'), state: z.enum(['open', 'resolved', 'all']).default('open'), hidden: z.enum(['visible', 'all']).default('visible'), q: z.string().trim().max(limits.searchMaxCharacters).default(''), cursor: z.string().max(limits.cursorMaxCharacters).optional(), limit: z.number().int().positive().safe().optional() }).strict().safeParse(input);
+  const parsed = z.object({ channelId: idSchema.optional(), kind: z.enum(['all', 'message', 'comment', 'review']).default('all'), state: z.enum(['open', 'resolved', 'all']).default('open'), hidden: z.enum(['visible', 'all']).default('visible'), q: z.string().trim().max(limits.searchMaxCharacters).default(''), cursor: z.string().max(limits.cursorMaxCharacters).optional(), limit: z.number().int().positive().safe().optional() }).strict().safeParse(input);
   if (!parsed.success) throw invalid();
   const { channelId, kind, state, hidden, q, limit: requestedLimit } = parsed.data;
   if (channelId && !access.channelIds.includes(channelId)) throw new OperationError('forbidden', 'Selected channel is unavailable. Choose another channel or reset the filters.');
@@ -49,18 +49,22 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
   const filters = { channelId: channelId ?? null, kind, state, hidden, q };
   const base = { filters, channels: access.channels, timeZone: access.timeZone, limits, limit: take, cursor: parsed.data.cursor ?? null };
   if (!channelIds.length) return { ...base, items: [], total: 0, olderCursor: null, newerCursor: null, lastSynced: null };
-  const status = (alias: 'c' | 'pc') => state === 'all' ? Prisma.empty : state === 'open' ? Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NULL` : Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NOT NULL`;
+  const status = (alias: 'c' | 'pc' | 'r') => state === 'all' ? Prisma.empty : state === 'open' ? Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NULL` : Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NOT NULL`;
   const pattern = literalSearch(q);
   const activity = Prisma.sql`
     SELECT c.id, 'message'::text AS kind, c."updatedTime" AS time FROM conversations c JOIN targets t ON t.id = c."targetId"
-    WHERE ${kind !== 'comment'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('c')}
+    WHERE ${kind === 'all' || kind === 'message'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('c')}
       ${q ? Prisma.sql`AND (c.snippet ILIKE ${pattern} ESCAPE ${'\\'} OR EXISTS (SELECT 1 FROM conversation_messages m WHERE m."conversationId" = c.id AND (m.message ILIKE ${pattern} ESCAPE ${'\\'} OR m."fromName" ILIKE ${pattern} ESCAPE ${'\\'})))` : Prisma.empty}
     UNION ALL
     SELECT pc.id, 'comment'::text AS kind, pc."createdTime" AS time FROM post_comments pc
       JOIN post_targets pt ON pt.id = pc."postTargetId" JOIN targets t ON t.id = pt."targetId" JOIN posts p ON p.id = pt."postId"
-    WHERE ${kind !== 'message'} AND pc."parentRemoteId" IS NULL AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('pc')}
+    WHERE ${kind === 'all' || kind === 'comment'} AND pc."parentRemoteId" IS NULL AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('pc')}
       ${hidden === 'visible' ? Prisma.sql`AND pc."isHidden" = false` : Prisma.empty}
-      ${q ? Prisma.sql`AND (pc.message ILIKE ${pattern} ESCAPE ${'\\'} OR pc."fromName" ILIKE ${pattern} ESCAPE ${'\\'})` : Prisma.empty}`;
+      ${q ? Prisma.sql`AND (pc.message ILIKE ${pattern} ESCAPE ${'\\'} OR pc."fromName" ILIKE ${pattern} ESCAPE ${'\\'})` : Prisma.empty}
+    UNION ALL
+    SELECT r.id, 'review'::text AS kind, r."createdTime" AS time FROM page_reviews r JOIN targets t ON t.id = r."targetId"
+    WHERE ${kind === 'all' || kind === 'review'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('r')}
+      ${q ? Prisma.sql`AND (r."reviewText" ILIKE ${pattern} ESCAPE ${'\\'} OR r."reviewerName" ILIKE ${pattern} ESCAPE ${'\\'})` : Prisma.empty}`;
   const order = cursor?.direction === 'newer' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
   const [rows, counts, lastSynced] = await Promise.all([
     prisma.$queryRaw<Key[]>(Prisma.sql`SELECT id, kind, time FROM (${activity}) AS activity ${seek(cursor)} ORDER BY time ${order}, kind COLLATE "C" ${order}, id COLLATE "C" ${order} LIMIT ${take + 1}`),
@@ -72,12 +76,29 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
   return { ...base, ...cursors, items, total: Number(counts[0]?.count ?? 0), lastSynced };
 }
 
+type ReviewRow = { id: string; targetId: string; reviewerName: string | null; rating: number | null; recommendationType: string | null; reviewText: string | null; createdTime: Date; resolvedAt: Date | null };
+const recommendationOf = (value: string | null): 'positive' | 'negative' | null => value === 'positive' || value === 'negative' ? value : null;
+
+/** Stored reviews of one workspace (the join to targets is the tenant check), with their channel. The rebuild client does not map this table, hence raw SQL. */
+async function readReviews(workspaceId: string, ids: string[], channelIds?: readonly string[]) {
+  if (!ids.length) return [];
+  const rows = await prisma.$queryRaw<ReviewRow[]>(Prisma.sql`
+    SELECT r.id, r."targetId", r."reviewerName", r.rating, r."recommendationType", r."reviewText", r."createdTime", r."resolvedAt"
+    FROM page_reviews r JOIN targets t ON t.id = r."targetId"
+    WHERE r.id IN (${Prisma.join(ids)}) AND t."workspaceId" = ${workspaceId} ${channelIds ? Prisma.sql`AND t.id IN (${Prisma.join(channelIds)})` : Prisma.empty}`);
+  const targets = rows.length ? await prisma.target.findMany({ where: { id: { in: [...new Set(rows.map(row => row.targetId))] }, workspaceId }, select: targetSelect }) : [];
+  const byId = new Map(targets.map(target => [target.id, target]));
+  return rows.flatMap(row => { const target = byId.get(row.targetId); return target ? [{ ...row, target }] : []; });
+}
+
 async function hydrateItems(workspaceId: string, keys: Key[]): Promise<InboxListItem[]> {
   const conversationIds = keys.filter(key => key.kind === 'message').map(key => key.id);
   const commentIds = keys.filter(key => key.kind === 'comment').map(key => key.id);
-  const [conversations, comments] = await Promise.all([
+  const reviewIds = keys.filter(key => key.kind === 'review').map(key => key.id);
+  const [conversations, comments, reviews] = await Promise.all([
     conversationIds.length ? prisma.conversation.findMany({ where: { id: { in: conversationIds }, target: { workspaceId } }, select: { id: true, snippet: true, unreadCount: true, updatedTime: true, resolvedAt: true, target: { select: targetSelect }, messages: { orderBy: [{ createdTime: 'desc' }, { id: 'desc' }], take: 1, select: { fromName: true, fromId: true, sentById: true, message: true } } } }) : [],
     commentIds.length ? prisma.postComment.findMany({ where: { id: { in: commentIds }, postTarget: { target: { workspaceId }, post: { workspaceId } } }, select: { id: true, message: true, fromName: true, createdTime: true, resolvedAt: true, isHidden: true, postTarget: { select: { target: { select: targetSelect }, post: { select: { message: true } } } } } }) : [],
+    reviewIds.length ? readReviews(workspaceId, reviewIds) : [],
   ]);
   const answered = commentIds.length ? await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
     SELECT pc.id FROM post_comments pc JOIN post_targets pt ON pt.id = pc."postTargetId" JOIN targets t ON t.id = pt."targetId" JOIN posts p ON p.id = pt."postId"
@@ -87,9 +108,10 @@ async function hydrateItems(workspaceId: string, keys: Key[]): Promise<InboxList
   const mapped = new Map<string, InboxListItem>();
   for (const item of conversations) {
     const newest = item.messages[0];
-    mapped.set(`message:${item.id}`, { key: `message:${item.id}`, kind: 'message', id: item.id, author: newest?.sentById ? item.target.name : newest?.fromName || 'Conversation', preview: newest?.message || item.snippet || 'No message text available.', time: item.updatedTime, target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: item.unreadCount, needsReply: conversationNeedsReply(newest, item.target.providerId, Boolean(item.resolvedAt)), resolved: Boolean(item.resolvedAt), hidden: false, context: null });
+    mapped.set(`message:${item.id}`, { key: `message:${item.id}`, kind: 'message', id: item.id, author: newest?.sentById ? item.target.name : newest?.fromName || 'Conversation', preview: newest?.message || item.snippet || 'No message text available.', time: item.updatedTime, target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: item.unreadCount, needsReply: conversationNeedsReply(newest, item.target.providerId, Boolean(item.resolvedAt)), resolved: Boolean(item.resolvedAt), hidden: false, context: null, rating: null, recommendation: null });
   }
-  for (const item of comments) mapped.set(`comment:${item.id}`, { key: `comment:${item.id}`, kind: 'comment', id: item.id, author: item.fromName || 'Visitor', preview: item.message, time: item.createdTime, target: { id: item.postTarget.target.id, name: item.postTarget.target.name, provider: item.postTarget.target.socialAccount?.provider ?? null }, unread: 0, needsReply: !item.resolvedAt && !item.isHidden && !answeredIds.has(item.id), resolved: Boolean(item.resolvedAt), hidden: item.isHidden, context: item.postTarget.post.message });
+  for (const item of reviews) mapped.set(`review:${item.id}`, { key: `review:${item.id}`, kind: 'review', id: item.id, author: item.reviewerName || 'Visitor', preview: item.reviewText ?? '', time: item.createdTime, rating: item.rating, recommendation: recommendationOf(item.recommendationType), target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: 0, needsReply: false, resolved: Boolean(item.resolvedAt), hidden: false, context: null });
+  for (const item of comments) mapped.set(`comment:${item.id}`, { key: `comment:${item.id}`, kind: 'comment', id: item.id, author: item.fromName || 'Visitor', preview: item.message, time: item.createdTime, target: { id: item.postTarget.target.id, name: item.postTarget.target.name, provider: item.postTarget.target.socialAccount?.provider ?? null }, unread: 0, needsReply: !item.resolvedAt && !item.isHidden && !answeredIds.has(item.id), resolved: Boolean(item.resolvedAt), hidden: item.isHidden, context: item.postTarget.post.message, rating: null, recommendation: null });
   return keys.flatMap(key => { const item = mapped.get(`${key.kind}:${key.id}`); return item ? [item] : []; });
 }
 
@@ -122,10 +144,17 @@ export function nestReplies<T extends { id: string; remoteId?: string; parentRem
 export async function readInboxThread(actor: InboxReadActor, input: unknown, constraints: InboxReadConstraints = {}): Promise<InboxThreadPage> {
   const access = await readAccess(actor, constraints);
   const limits = await readLimits();
-  const parsed = z.object({ key: z.string().regex(/^(message|comment):[A-Za-z0-9_-]{1,200}$/), cursor: z.string().max(limits.cursorMaxCharacters).optional(), limit: z.number().int().positive().safe().optional() }).strict().safeParse(input);
+  const parsed = z.object({ key: z.string().regex(/^(message|comment|review):[A-Za-z0-9_-]{1,200}$/), cursor: z.string().max(limits.cursorMaxCharacters).optional(), limit: z.number().int().positive().safe().optional() }).strict().safeParse(input);
   if (!parsed.success) throw invalid();
   const { key, cursor: encoded, limit: requestedLimit } = parsed.data;
-  const [kind, id] = key.split(':') as ['message' | 'comment', string];
+  const [kind, id] = key.split(':') as ['message' | 'comment' | 'review', string];
+  if (kind === 'review') {
+    if (encoded !== undefined) throw invalid();
+    const [review] = access.channelIds.length ? await readReviews(actor.workspaceId, [id], access.channelIds) : [];
+    if (!review) throw new OperationError('not_found', 'This review is unavailable. Choose another Inbox item.');
+    const entry: ThreadEntry = { id: review.id, author: review.reviewerName || 'Visitor', text: review.reviewText ?? '', time: review.createdTime, fromChannel: false, sentBy: null, parentId: null, depth: 0, hidden: false };
+    return { thread: { kind, id, rating: review.rating, recommendation: recommendationOf(review.recommendationType), target: { id: review.target.id, name: review.target.name, providerId: review.target.providerId, provider: review.target.socialAccount?.provider ?? null }, resolved: Boolean(review.resolvedAt), hidden: false, postText: null, entries: [entry], lastInbound: null }, history: { olderCursor: null, newerCursor: null, total: 1, shown: 1, limit: 1, cursor: null } };
+  }
   const take = Math.min(requestedLimit ?? limits.threadPageSize, limits.threadPageSize, constraints.maxItems ?? limits.threadPageSize);
   const fingerprint = inboxFilterFingerprint({ workspaceId: actor.workspaceId, channelIds: [...access.channelIds].sort(), thread: key });
   const cursor = readInboxCursor(encoded, fingerprint, limits.cursorMaxCharacters);
@@ -162,17 +191,18 @@ export async function readInboxThread(actor: InboxReadActor, input: unknown, con
   const byId = new Map(entries.map(item => [item.id, item]));
   const pageOrder = [...keys].reverse().flatMap(key => { const item = byId.get(key.id); return item ? [item] : []; });
   const chronological = comment ? nestReplies(pageOrder, comment, entry) : pageOrder.map(item => entry(item));
-  return { thread: { kind, id, target: { id: target.id, name: target.name, providerId: target.providerId, provider: target.socialAccount?.provider ?? null }, resolved: Boolean(conversation?.resolvedAt ?? comment?.resolvedAt), hidden: comment?.isHidden ?? false, postText: comment?.postTarget.post.message ?? null, entries: [...(comment ? [entry(comment)] : []), ...chronological], lastInbound }, history: { ...cursors, total: Number(counts[0]?.count ?? 0), shown: chronological.length, limit: take, cursor: encoded ?? null } };
+  return { thread: { kind, id, rating: null, recommendation: null, target: { id: target.id, name: target.name, providerId: target.providerId, provider: target.socialAccount?.provider ?? null }, resolved: Boolean(conversation?.resolvedAt ?? comment?.resolvedAt), hidden: comment?.isHidden ?? false, postText: comment?.postTarget.post.message ?? null, entries: [...(comment ? [entry(comment)] : []), ...chronological], lastInbound }, history: { ...cursors, total: Number(counts[0]?.count ?? 0), shown: chronological.length, limit: take, cursor: encoded ?? null } };
 }
 
 /** Refresh timestamps only: replies and local workflow actions do not claim provider synchronization. */
 export async function inboxLastSynced(workspaceId: string, channelIds: string[]): Promise<Date | null> {
   if (!channelIds.length) return null;
-  const [conversations, comments, audited] = await Promise.all([
+  const [conversations, comments, audited, reviewed] = await Promise.all([
     prisma.conversation.aggregate({ where: { targetId: { in: channelIds }, target: { workspaceId } }, _max: { fetchedAt: true } }),
     prisma.postComment.aggregate({ where: { postTarget: { targetId: { in: channelIds }, target: { workspaceId }, post: { workspaceId } } }, _max: { fetchedAt: true } }),
     prisma.$queryRaw<Array<{ at: Date | null }>>`SELECT MAX("createdAt") AS at FROM root_activities WHERE action = 'inbox.synced' AND detail->>'workspaceId' = ${workspaceId} AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(detail->'targetIds') = 'array' THEN detail->'targetIds' ELSE '[]'::jsonb END) AS channel(id) WHERE channel.id = ANY(${channelIds}::text[]))`,
+    prisma.$queryRaw<Array<{ at: Date | null }>>(Prisma.sql`SELECT MAX(r."fetchedAt") AS at FROM page_reviews r JOIN targets t ON t.id = r."targetId" WHERE t."workspaceId" = ${workspaceId} AND t.id IN (${Prisma.join(channelIds)})`),
   ]);
-  const times = [conversations._max.fetchedAt, comments._max.fetchedAt, audited[0]?.at ?? null].filter((value): value is Date => value instanceof Date);
+  const times = [conversations._max.fetchedAt, comments._max.fetchedAt, audited[0]?.at ?? null, reviewed[0]?.at ?? null].filter((value): value is Date => value instanceof Date);
   return times.length ? new Date(Math.max(...times.map(value => value.getTime()))) : null;
 }
