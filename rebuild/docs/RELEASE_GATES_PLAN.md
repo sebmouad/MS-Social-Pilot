@@ -468,3 +468,12 @@ each gate is actually run; never claim a gate from this plan alone.
 - **Cleanup (22:40):** scratch DB `social_pilot_rehearsal` dropped; rehearsal/cutover temp files and drill folder removed.
 - **Legacy deploy guarded:** `/usr/local/sbin/socialpilot-deploy` now refuses (exit 2) while `social-pilot-rebuild` is enabled, except `--status` or `SOCIALPILOT_LEGACY_OVERRIDE=yes` (a deliberate legacy rollback). Original kept as `socialpilot-deploy.legacy-20261020`. A dedicated rebuild release command is still to be written.
 - **Owner sign-in:** no app errors since the fix; the form rejects the password. The owner runs `rebuild/scripts/prod-owner-reset-link.sh` (link shown only in their terminal) until mail is configured.
+
+### Post-cutover fixes — 2026-10-20 23:00–23:30 CEST
+
+- **Same-origin refusal (all writes, sign-in, reset):** behind LiteSpeed, `next start -H 127.0.0.1` reports `request.url` as `http://localhost:3100`. 65 origin checks now use `requestOrigin()`, backed by the new Root setting `app.publicOrigin` (+ `app.publicOriginRefreshSeconds`, registry 90), loaded at startup via `instrumentation.ts` and kept on a process global (Next bundles routes separately). Set to the live origin through the audited Root path. Owner sign-in confirmed in Chrome.
+- **Facebook settings not imported:** every Graph call failed ("Facebook app secret required for signed Graph requests"); inbox sync failed 10/10 and, with retries, held DB transactions/locks ~311 s per run, slowing pages. `scripts/import-legacy-config.ts --apply` imported 6 legacy settings (appId, appSecret, graphVersion, oauthScopes, requestTimeoutMs, oauthRedirectUri) with audit. Inbox sync: 10/10 OK in 11 s.
+- **Failure visibility:** inbox sync now logs a redacted reason per failed channel; Root `logging.errorDetailMaxCharacters` (registry 91).
+- **Performance after fixes (owner session, Chrome):** /home 0.63 s, /ads 0.56 s, /settings/account 0.27 s, /inbox 0.31 s, /analytics 0.63 s (were 1–7.5 s). Slow-query log at 100 ms during these loads recorded nothing; setting reverted.
+- **Release command:** `rebuild/scripts/prod-deploy.sh` (backup, build, migrations + ownership, swap, health checks incl. same-origin probe, automatic swap-back). Legacy `socialpilot-deploy` refuses while the rebuild is live.
+- **Open:** mail settings; live Facebook write tests (needs a test Page); post-cutover rollback drill; inbox sync still holds one transaction across provider calls (refactor to fetch-then-write); worker does not stop within systemd's timeout on restart.
