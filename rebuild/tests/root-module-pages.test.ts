@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), form: vi.fn() }));
+vi.mock('../src/app/root/modules/ModuleHealth', () => ({ ModuleHealth: async () => createElement('section', null, 'Stored module health') }));
 vi.mock('../src/server/root/RootDiagnostics', () => ({ RootDiagnostics: async () => null }));
 vi.mock('../src/server/root/RootInboxDeletions', () => ({ RootInboxDeletions: async () => createElement('section', null, 'Inbox deletion recovery') }));
 vi.mock('../src/server/root/RootPostDeletions', () => ({ RootPostDeletions: async () => createElement('section', null, 'Post deletion recovery') }));

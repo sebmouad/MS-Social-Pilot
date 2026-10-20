@@ -812,3 +812,15 @@ Clean-main full suite at `6d25791b` with real PostgreSQL (set both
 `REBUILD_PREVIEW_DATABASE_URL` and `DATABASE_URL`): 3,724 tests, 0 skips, typecheck
 clean; 7 failures in the parallel run all pass with `--no-file-parallelism`
 (shared-database collisions, not product defects).
+
+Root health worktree batch (2026-10-20): declarations and stored health are in
+`server/root/module-health*.ts`, rendered under `/root/modules`, and returned by
+the existing operations HTTP/MCP service. Status-only inspection audit; no live
+calls. Latest run per declared job, configured schedule freshness and stored
+queues; missing provider-scoped job history is explicitly unknown. No new Root
+keys/migration. Follow-up: real PostgreSQL and browser checks, provider-specific
+job instrumentation if needed (global runs cannot prove platform health).
+Verification for this batch:49 targeted tests across10 files passed, including
+`raw-sql-void-guard.test.ts`; `npx tsc --noEmit -p .` passed from rebuild/.
+Broader check found a pre-existing `module-manifests.test.ts` expectation missing
+the Analytics `/analytics/posts` route already present in HEAD; left unchanged.

@@ -3,6 +3,7 @@ import { INTEGRATIONS_JOBS, INTEGRATIONS_PAGES, INTEGRATIONS_ROOT_PREFIX } from 
 
 export const settingsManifest = {
   id: 'settings',
+  health: { configuration: true, jobHistory: true, pendingQueues: ['workspaceExports'] },
   jobs: [
     { name: 'workspaceExports', label: 'Workspace ZIP exports', configKey: 'data.exportSchedule' },
     { name: 'purges', label: 'Data deletion recovery', configKey: 'data.purgeRecoverySchedule' },

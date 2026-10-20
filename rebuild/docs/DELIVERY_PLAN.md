@@ -422,3 +422,9 @@ synthetic video were removed, backup retained. Backup SHA256:
 `277764d3a486b3138f1bef5e017966fc0c9cc2c6e6d5a28c86b3ff9e6e67b143`.
 The final built preview uses the original example database at localhost:3200;
 /sign-in returned HTTP200. Production and its held photo canary are unchanged.
+
+Root stored module-health batch (2026-10-20): declared configuration checks,
+latest job runs, freshness and stored queues are grouped in Root with timing and
+status-only audit, sharing the operations HTTP/MCP service.49 targeted tests and
+TypeScript passed. Browser/PostgreSQL verification and provider-scoped job
+instrumentation remain separate; no live provider/production claim.

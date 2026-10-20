@@ -2,6 +2,7 @@ import type { ModuleManifest } from '../types';
 
 export const inboxManifest = {
   id: 'inbox',
+  health: { configuration: true, jobHistory: true, pendingQueues: [] },
   jobs: [{ name: 'inbox', label: 'Inbox synchronization', configKey: 'sync.inbox.schedule' }],
   rootSettingsPrefixes: ['inbox.'],
   rootSettingKeys: ['sync.inbox.schedule'],
