@@ -146,6 +146,11 @@ export interface PlatformInboxHost {
   reply(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; text: string }): Promise<{ ok: boolean }>;
   moderate(actor: InboxActor, input: { id: string; hidden: boolean }): Promise<{ ok: boolean }>;
   prepareDeleteComment(actor: InboxActor, input: { targetId: string; remoteId: string }): Promise<(signal: AbortSignal) => Promise<void>>;
+  /** Optional: present only when the module reads public reviews. `reply` is present only when the provider lets a channel answer one. */
+  reviews?: {
+    sync(actor: InboxActor, targetId?: string): Promise<{ targetCount: number; failedCount: number; reviewCount: number; syncedAt: string }>;
+    reply?(actor: InboxActor, input: { id: string; text: string }): Promise<{ ok: boolean }>;
+  };
 }
 
 export interface PlatformHost {

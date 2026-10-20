@@ -11,8 +11,8 @@ export const dynamic = 'force-dynamic';
 
 const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('sync'), targetId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).optional() }).strict(),
-  z.object({ action: z.literal('reply'), kind: z.enum(['message', 'comment']), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), text: z.string().max(2000) }).strict(),
-  z.object({ action: z.literal('resolve'), kind: z.enum(['message', 'comment']), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), resolved: z.boolean() }).strict(),
+  z.object({ action: z.literal('reply'), kind: z.enum(['message', 'comment', 'review']), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), text: z.string().max(2000) }).strict(),
+  z.object({ action: z.literal('resolve'), kind: z.enum(['message', 'comment', 'review']), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), resolved: z.boolean() }).strict(),
   z.object({ action: z.literal('delete'), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), confirmation: z.string().max(240) }).strict(),
   z.object({ action: z.literal('finish_delete'), operationId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), confirmation: z.string().max(240) }).strict(),
   z.object({ action: z.literal('moderate'), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), hidden: z.boolean() }).strict(),

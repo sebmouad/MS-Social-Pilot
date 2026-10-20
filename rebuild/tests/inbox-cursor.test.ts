@@ -48,7 +48,7 @@ describe('Inbox cursor codec', () => {
 
   it('rejects wrong version, unknown fields, and malformed values', () => {
     for (const patch of [
-      { v: 2 }, { extra: true }, { kind: 'review' }, { direction: 'latest' }, { id: 'not valid' },
+      { v: 2 }, { extra: true }, { kind: 'draft' }, { direction: 'latest' }, { id: 'not valid' },
       { id: 'x'.repeat(201) }, { filter: 'A'.repeat(64) }, { filter: 'short' },
     ]) {
       expectInvalid(() => readInboxCursor(encode({ ...validCursor, ...patch }), filter, MAX));

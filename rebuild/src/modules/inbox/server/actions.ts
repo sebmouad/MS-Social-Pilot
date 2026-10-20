@@ -9,6 +9,8 @@ import type { InboxReadConstraints } from '@/modules/inbox/server/types';
 
 export type InboxActor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[] };
 export type InboxActionKind = 'message' | 'comment';
+/** Reviews are resolvable and, where the module supports it, repliable; they cannot be hidden or deleted here. */
+export type InboxItemKind = InboxActionKind | 'review';
 
 async function providerForTarget(targetId: string, workspaceId: string): Promise<string> {
   const target = await prisma.target.findFirst({ where: { id: targetId, workspaceId }, select: { socialAccount: { select: { provider: true } } } });
@@ -17,7 +19,12 @@ async function providerForTarget(targetId: string, workspaceId: string): Promise
   return provider;
 }
 
-async function providerForItem(kind: InboxActionKind, id: string, workspaceId: string): Promise<{ provider: string; targetId: string }> {
+async function providerForItem(kind: InboxItemKind, id: string, workspaceId: string): Promise<{ provider: string; targetId: string }> {
+  if (kind === 'review') {
+    const rows = await prisma.$queryRaw<Array<{ targetId: string }>>`SELECT r."targetId" FROM page_reviews r JOIN targets t ON t.id = r."targetId" WHERE r.id = ${id} AND t."workspaceId" = ${workspaceId}`;
+    if (!rows[0]) throw new OperationError('not_found', 'This review is unavailable in the current workspace.');
+    return { provider: await providerForTarget(rows[0].targetId, workspaceId), targetId: rows[0].targetId };
+  }
   const row = kind === 'message'
     ? await prisma.conversation.findFirst({ where: { id, target: { workspaceId } }, select: { target: { select: { id: true, socialAccount: { select: { provider: true } } } } } })
     : await prisma.postComment.findFirst({ where: { id, postTarget: { post: { workspaceId }, target: { workspaceId } } }, select: { postTarget: { select: { target: { select: { id: true, socialAccount: { select: { provider: true } } } } } } } });
@@ -53,17 +60,23 @@ export async function syncInbox(actor: InboxActor, targetId?: string) {
   const access = await authorizeInbox(actor, actor.allowedChannelIds === undefined ? {} : { allowedChannelIds: actor.allowedChannelIds });
   if (targetId) {
     if (!access.channelIds.includes(targetId)) throw new OperationError('not_found', 'This Inbox channel is unavailable in the current workspace.');
-    return (await host(await providerForTarget(targetId, actor.workspaceId))).sync(actor, targetId);
+    const providerHost = await host(await providerForTarget(targetId, actor.workspaceId));
+    const result = await providerHost.sync(actor, targetId);
+    if (!providerHost.reviews) return result;
+    return { ...result, reviewCount: await providerHost.reviews.sync(actor, targetId).then(reviewed => reviewed.reviewCount, () => 0) };
   }
   const eligibleTargets = access.channelIds.length ? await prisma.target.findMany({ where: { workspaceId: actor.workspaceId, id: { in: access.channelIds } }, select: { id: true, socialAccount: { select: { provider: true } } } }) : [];
   const eligibleProviders = new Set(eligibleTargets.map(target => target.socialAccount?.provider).filter((provider): provider is string => Boolean(provider)));
   const providers = (await inboxPlatformIds()).filter(provider => eligibleProviders.has(provider));
   if (!providers.length) throw new OperationError('unavailable', 'This channel is unavailable in the inbox.');
-  const totals = { targetCount: 0, failedCount: 0, conversationCount: 0, messageCount: 0, commentCount: 0, syncedAt: new Date().toISOString() };
+  const totals = { targetCount: 0, failedCount: 0, conversationCount: 0, messageCount: 0, commentCount: 0, syncedAt: new Date().toISOString() } as { targetCount: number; failedCount: number; conversationCount: number; messageCount: number; commentCount: number; reviewCount?: number; syncedAt: string };
   const errors: unknown[] = [];
   for (const provider of providers) {
     try {
-      const result = await (await host(provider)).sync(actor);
+      const providerHost = await host(provider);
+      const result = await providerHost.sync(actor);
+      // Reviews are optional: a failure reading them must not undo the conversations and comments just synced.
+      if (providerHost.reviews) totals.reviewCount = (totals.reviewCount ?? 0) + await providerHost.reviews.sync(actor).then(reviewed => reviewed.reviewCount, () => 0);
       totals.targetCount += result.targetCount; totals.failedCount += result.failedCount;
       totals.conversationCount += result.conversationCount; totals.messageCount += result.messageCount; totals.commentCount += result.commentCount;
       totals.syncedAt = result.syncedAt;
@@ -73,12 +86,17 @@ export async function syncInbox(actor: InboxActor, targetId?: string) {
   return totals;
 }
 
-export async function replyToInbox(actor: InboxActor, input: { kind: InboxActionKind; id: string; text: string }, constraints: InboxReadConstraints = {}) {
+export async function replyToInbox(actor: InboxActor, input: { kind: InboxItemKind; id: string; text: string }, constraints: InboxReadConstraints = {}) {
   const item = await providerForItem(input.kind, input.id, actor.workspaceId);
   await requireVisibleChannel(actor, item.targetId, 'write', constraints);
-  return (await host(item.provider)).reply(actor, input);
+  if (input.kind === 'review') {
+    const reply = (await host(item.provider)).reviews?.reply;
+    if (!reply) throw new OperationError('unavailable', 'Replies to reviews are not available for this channel.');
+    return reply(actor, { id: input.id, text: input.text });
+  }
+  return (await host(item.provider)).reply(actor, { ...input, kind: input.kind });
 }
-export async function setInboxResolved(actor: InboxActor, input: { kind: InboxActionKind; id: string; resolved: boolean; action?: 'resolve' }, constraints: InboxReadConstraints = {}) {
+export async function setInboxResolved(actor: InboxActor, input: { kind: InboxItemKind; id: string; resolved: boolean; action?: 'resolve' }, constraints: InboxReadConstraints = {}) {
   return setInboxWorkflowResolved(actor, { kind: input.kind, id: input.id, resolved: input.resolved }, constraints);
 }
 export { canManageInboxWorkflow };

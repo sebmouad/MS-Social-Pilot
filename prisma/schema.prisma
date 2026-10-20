@@ -1376,6 +1376,8 @@ model PageReview {
   reviewText         String?
   createdTime        DateTime
   fetchedAt          DateTime @default(now())
+  /// Marked done in the inbox; local only.
+  resolvedAt         DateTime?
 
   target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
