@@ -25,7 +25,7 @@ echo "PORT=$DEV_PORT" >> "$D/rebuild/.env.development.local"
 chmod 600 "$D/rebuild/.env.development.local"
 chown -R socialpilot:socialpilot "$D"
 echo "Installing dependencies at low priority…"
-sudo -u socialpilot bash -c "cd $D && nice -n 19 npm ci --no-audit --no-fund >/tmp/dev-npm.log 2>&1 && cd rebuild && nice -n 19 npx prisma generate >/dev/null" || { tail -20 /tmp/dev-npm.log; exit 1; }
+sudo -u socialpilot bash -c "cd $D && nice -n 19 npm ci --no-audit --no-fund >/tmp/dev-npm.log 2>&1 && cd rebuild && nice -n 19 npm ci --no-audit --no-fund >>/tmp/dev-npm.log 2>&1 && nice -n 19 npx prisma generate >/dev/null" || { tail -20 /tmp/dev-npm.log; exit 1; }
 cat > /etc/systemd/system/msp-dev.service <<UNIT
 [Unit]
 Description=MS Social Pilot rebuild DEV server (next dev, capped, no worker)

@@ -37,11 +37,11 @@ BUILD=/srv/ms-social-pilot-rebuild-build; mkdir -p "$BUILD"
 rsync -a --delete --exclude node_modules --exclude 'rebuild/node_modules' --exclude 'rebuild/.next' --exclude 'rebuild/generated' /var/tmp/deploy-src/ "$BUILD/"
 cp "$ENVF" "$BUILD/rebuild/.env.production.local"; chmod 600 "$BUILD/rebuild/.env.production.local"
 chown -R socialpilot:socialpilot "$BUILD"
-LOCK_SUM="$(sha256sum "$BUILD/package-lock.json" | cut -d' ' -f1)"
-INSTALL=1; [ -d "$BUILD/node_modules" ] && [ "$(cat "$BUILD/.lock-sum" 2>/dev/null)" = "$LOCK_SUM" ] && INSTALL=0
+LOCK_SUM="$(cat "$BUILD/package-lock.json" "$BUILD/rebuild/package-lock.json" 2>/dev/null | sha256sum | cut -d' ' -f1)"
+INSTALL=1; [ -d "$BUILD/node_modules" ] && [ -d "$BUILD/rebuild/node_modules" ] && [ "$(cat "$BUILD/.lock-sum" 2>/dev/null)" = "$LOCK_SUM" ] && INSTALL=0
 start=$(date +%s)
 systemd-run --quiet --wait --collect --uid=socialpilot --gid=socialpilot -p CPUQuota="$BUILD_CPU_QUOTA" -p Nice="$BUILD_NICE" -p IOSchedulingClass=idle --working-directory="$BUILD" \
-  /bin/bash -c "set -e; if [ $INSTALL = 1 ]; then npm ci --no-audit --no-fund >/tmp/deploy-npm.log 2>&1; fi; cd rebuild; npx prisma generate >/dev/null; npx next build >/tmp/deploy-build.log 2>&1" \
+  /bin/bash -c "set -e; if [ $INSTALL = 1 ]; then npm ci --no-audit --no-fund >/tmp/deploy-npm.log 2>&1; (cd rebuild && npm ci --no-audit --no-fund >>/tmp/deploy-npm.log 2>&1); fi; cd rebuild; npx prisma generate >/dev/null; npx next build >/tmp/deploy-build.log 2>&1" \
   || { echo "Build failed; nothing changed"; tail -n 25 /tmp/deploy-build.log; exit 1; }
 echo "$LOCK_SUM" > "$BUILD/.lock-sum"
 echo "Build: OK in $(( $(date +%s) - start ))s (dependencies $( [ $INSTALL = 1 ] && echo reinstalled || echo reused ))"
