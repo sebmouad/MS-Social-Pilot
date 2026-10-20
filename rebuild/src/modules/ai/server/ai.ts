@@ -2,13 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfigBatch, runtimeSecret } from '@/server/config/store';
-import { AI_BOUNDS } from '../config';
+import { AI_BOUNDS, AI_PROVIDERS, type AiProviderId } from '../config';
 import {
   AI_KINDS, AI_REQUEST_SCHEMA, SUMMARIZE_SCHEMA, TONES, buildPrompt, buildSummaryPrompt, cleanOutput, parseHashtags,
   type AiContext, type AiPort, type AiResult, type AiStatus, type SummarizeRequest, type SummaryResult,
 } from '../ai';
 import { authorizeAi, type AiActor } from './access';
 import { anthropicPort } from './anthropic';
+import { openaiPort } from './openai';
+import { geminiPort } from './gemini';
 
 /** Composer assist is available to members who may write posts. */
 export const COMPOSER_FEATURE = 'publishing/posts';
@@ -19,23 +21,32 @@ export type AiDeps = { port?: AiPort; now?: () => Date };
 const unavailable = () => new OperationError('unavailable', 'AI writing assist is not available.');
 const inRange = (v: unknown, r: { min: number; max: number }): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= r.min && v <= r.max;
 
+/** Each provider's Root keys and adapter; adding a provider means one adapter plus one entry here. */
+const PROVIDER_KEYS: Record<AiProviderId, { secret: string; model: string; endpoint: string; port: (s: { apiKey: string; endpoint: string }) => AiPort }> = {
+  anthropic: { secret: 'ai.apiKey', model: 'ai.model', endpoint: 'ai.endpoint', port: anthropicPort },
+  openai: { secret: 'ai.openaiApiKey', model: 'ai.openaiModel', endpoint: 'ai.openaiEndpoint', port: openaiPort },
+  gemini: { secret: 'ai.geminiApiKey', model: 'ai.geminiModel', endpoint: 'ai.geminiEndpoint', port: geminiPort },
+};
+
 type Settings = { port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; txTimeout: number; txWait: number };
 /** Resolve everything assist needs; null when anything is unconfigured, so customer surfaces stay hidden. */
 export async function settings(deps: AiDeps): Promise<Settings | null> {
   try {
-    const c = await runtimeConfigBatch(['ai.enabled', 'ai.provider', 'ai.model', 'ai.endpoint', 'ai.requestTimeoutMs', 'ai.maxOutputTokens', 'ai.maxInputCharacters', 'ai.hourlyRequestsPerWorkspace', 'ai.maxHashtags', 'ai.transactionTimeoutMs', 'ai.transactionMaxWaitMs']);
+    const c = await runtimeConfigBatch(['ai.enabled', 'ai.provider', 'ai.model', 'ai.endpoint', 'ai.openaiModel', 'ai.openaiEndpoint', 'ai.geminiModel', 'ai.geminiEndpoint', 'ai.requestTimeoutMs', 'ai.maxOutputTokens', 'ai.maxInputCharacters', 'ai.hourlyRequestsPerWorkspace', 'ai.maxHashtags', 'ai.transactionTimeoutMs', 'ai.transactionMaxWaitMs']);
     const B = AI_BOUNDS;
-    const model = c['ai.model']; const endpoint = c['ai.endpoint']; const timeoutMs = c['ai.requestTimeoutMs']; const maxTokens = c['ai.maxOutputTokens'];
+    const provider = c['ai.provider'] as AiProviderId;
+    const keys = PROVIDER_KEYS[provider];
+    const model = keys ? c[keys.model] : undefined; const endpoint = keys ? c[keys.endpoint] : undefined; const timeoutMs = c['ai.requestTimeoutMs']; const maxTokens = c['ai.maxOutputTokens'];
     const maxInput = c['ai.maxInputCharacters']; const hourly = c['ai.hourlyRequestsPerWorkspace']; const maxHashtags = c['ai.maxHashtags'];
     const txTimeout = c['ai.transactionTimeoutMs']; const txWait = c['ai.transactionMaxWaitMs'];
-    if (c['ai.enabled'] !== true || c['ai.provider'] !== 'anthropic' || typeof model !== 'string' || !model || typeof endpoint !== 'string'
+    if (c['ai.enabled'] !== true || !AI_PROVIDERS.includes(provider) || typeof model !== 'string' || !model || typeof endpoint !== 'string'
       || !inRange(timeoutMs, B.requestTimeoutMs) || !inRange(maxTokens, B.maxOutputTokens) || !inRange(maxInput, B.maxInputCharacters)
       || !inRange(hourly, B.hourlyRequestsPerWorkspace) || !inRange(maxHashtags, B.maxHashtags) || !inRange(txTimeout, B.transactionTimeoutMs) || !inRange(txWait, B.transactionMaxWaitMs)) return null;
     let port = deps.port;
     if (!port) {
-      const apiKey = await runtimeSecret('ai.apiKey');
+      const apiKey = await runtimeSecret(keys.secret);
       if (!apiKey) return null;
-      port = anthropicPort({ apiKey, endpoint });
+      port = keys.port({ apiKey, endpoint });
     }
     return { port, model, timeoutMs, maxTokens, maxInput, hourly, maxHashtags, txTimeout, txWait };
   } catch { return null; }

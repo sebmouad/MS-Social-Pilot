@@ -15,7 +15,11 @@ const mappings = [
 export const legacyFacebookSettingKeys = [
   ...mappings.map(([source]) => source),
   'facebook.requestTimeoutSeconds',
+  'ai.openaiKey', 'ai.geminiKey', 'ai.provider', 'ai.model', 'ai.rateLimitPerHour',
 ] as const;
+
+/** Legacy stored one model for the selected provider; the rebuild keeps one model per provider. */
+const AI_MODEL_KEY: Record<string, ConfigKey> = { anthropic: 'ai.model', openai: 'ai.openaiModel', gemini: 'ai.geminiModel' };
 
 export function legacyConfigCandidates(
   rows: readonly LegacySettingRow[],
@@ -55,6 +59,20 @@ export function legacyConfigCandidates(
     const policy = ['off', 'admins', 'everyone'].includes(options.authPolicy) ? options.authPolicy : 'everyone';
     candidates.push({ key: 'security.twoStep', source: 'SECURITY_TWO_STEP', value: policy, secret: false });
   }
+  for (const [source, key] of [['ai.openaiKey', 'ai.openaiApiKey'], ['ai.geminiKey', 'ai.geminiApiKey']] as const) {
+    const row = byKey.get(source);
+    if (!row || row.value === null || row.value === '') continue;
+    if (typeof row.value !== 'string' || !row.encrypted) throw new Error(`Legacy ${source} is not stored in the expected encrypted format.`);
+    candidates.push({ key, source, value: options.decrypt(row.value), secret: true });
+  }
+  const provider = byKey.get('ai.provider')?.value;
+  if (typeof provider === 'string' && AI_MODEL_KEY[provider]) {
+    candidates.push({ key: 'ai.provider', source: 'ai.provider', value: provider, secret: false });
+    const model = byKey.get('ai.model')?.value;
+    if (typeof model === 'string' && model) candidates.push({ key: AI_MODEL_KEY[provider], source: 'ai.model', value: model, secret: false });
+  }
+  const hourly = byKey.get('ai.rateLimitPerHour')?.value;
+  if (hourly !== undefined && hourly !== null && hourly !== '') candidates.push({ key: 'ai.hourlyRequestsPerWorkspace', source: 'ai.rateLimitPerHour', value: Number(hourly), secret: false });
   if (options.loginAttempts) candidates.push({ key: 'auth.loginAttempts', source: 'LOGIN_ATTEMPTS', value: Number(options.loginAttempts), secret: false });
   if (options.loginWindowMinutes) candidates.push({ key: 'auth.loginWindowMinutes', source: 'LOGIN_WINDOW_MINUTES', value: Number(options.loginWindowMinutes), secret: false });
   return candidates;
