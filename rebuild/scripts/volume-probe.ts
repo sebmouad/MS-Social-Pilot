@@ -70,7 +70,7 @@ async function main() {
       for (const entry of CONFIG_REGISTRY) {
         if (entry.kind === 'secret') continue;
         const value = entry.key.startsWith('entitlements.') || entry.key === 'platforms.facebook.enabled' || entry.key === 'platforms.facebook.includedByDefault' ? true : entry.defaultValue;
-        await tx.appSetting.upsert({ where: { key: entry.key }, create: { key: entry.key, value: value as import('../generated/client').Prisma.InputJsonValue, encrypted: false }, update: { value: value as import('../generated/client').Prisma.InputJsonValue, encrypted: false } });
+        await tx.appSetting.upsert({ where: { key: entry.key }, create: { key: entry.key, value: value as import('../generated/client').Prisma.InputJsonValue, encrypted: false, updatedAt: new Date() }, update: { value: value as import('../generated/client').Prisma.InputJsonValue, encrypted: false } });
       }
       await tx.$executeRaw`INSERT INTO root_activities (id,"actorId",action,detail,"createdAt")
         SELECT ${prefix} || '_a' || n, ${userId}, CASE WHEN n % 1000 = 0 THEN 'volume.needle' ELSE 'volume.read' END,
