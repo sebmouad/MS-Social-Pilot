@@ -283,3 +283,62 @@ export async function readFacebookNativeProofEvidence(operationId?: string, resu
     items, rowIdKey: 'id', actions: [], truncated: rows.length > limit,
   };
 }
+
+type NativeScheduleChangeEvidenceRow = {
+  changeId: string; workspaceId: string; publishOperationId: string; kind: string;
+  scheduledUnix: bigint | number | null; remoteId: string; remoteTargetId: string;
+  revision: number; state: string; createdAt: Date; updatedAt: Date;
+};
+
+/**
+ * Read bounded Root-only, content-free provider-held schedule change records
+ * (cancel / reschedule of a native Video). A deployment that has not applied the
+ * schedule-change migration yet reports an empty list instead of failing the
+ * whole evidence read.
+ */
+export async function readFacebookNativeScheduleEvidence(operationId?: string, resultCap?: number): Promise<PlatformPublicationEvidence> {
+  if (resultCap !== undefined && (!Number.isSafeInteger(resultCap) || resultCap < 1)) {
+    throw new OperationError('invalid_request', 'Choose a valid Facebook media history limit.');
+  }
+  if (operationId !== undefined && (!operationId.trim() || operationId.length > 2048 || /[\u0000-\u001f\u007f]/.test(operationId))) {
+    throw new OperationError('invalid_request', 'Choose a valid Facebook publication operation.');
+  }
+  const configuredLimit = await runtimeConfig('meta.mediaHistoryLimit');
+  if (typeof configuredLimit !== 'number' || !Number.isSafeInteger(configuredLimit) || configuredLimit < 1) throw unavailable();
+  const limit = Math.min(configuredLimit, resultCap ?? configuredLimit);
+  const present = await prisma.$queryRaw<{ present: boolean }[]>`
+    SELECT to_regclass('rebuild_facebook_native_schedule_changes') IS NOT NULL AS present`;
+  const rows = present[0]?.present !== true ? [] : operationId === undefined
+    ? await prisma.$queryRaw<NativeScheduleChangeEvidenceRow[]>`
+      SELECT c."changeId", c."workspaceId", c."publishOperationId", c.kind, c."scheduledUnix", c."remoteId",
+        c."remoteTargetId", c.revision, c.state, c."createdAt", c."updatedAt"
+      FROM rebuild_facebook_native_schedule_changes c
+      ORDER BY c."updatedAt" DESC, c."changeId" DESC LIMIT ${limit + 1}`
+    : await prisma.$queryRaw<NativeScheduleChangeEvidenceRow[]>`
+      SELECT c."changeId", c."workspaceId", c."publishOperationId", c.kind, c."scheduledUnix", c."remoteId",
+        c."remoteTargetId", c.revision, c.state, c."createdAt", c."updatedAt"
+      FROM rebuild_facebook_native_schedule_changes c
+      WHERE c."publishOperationId" = ${operationId}
+      ORDER BY c."updatedAt" DESC, c."changeId" DESC LIMIT ${limit + 1}`;
+  const items = rows.slice(0, limit).map(row => ({
+    id: `native-schedule:${createHash('sha256').update(`${row.workspaceId}:${row.changeId}`).digest('hex')}`,
+    operationId: row.publishOperationId, workspaceId: row.workspaceId, format: 'video',
+    state: row.state, recordType: 'native_schedule_change', remoteId: row.remoteId, remoteTargetId: row.remoteTargetId,
+    changeKind: row.kind === 'cancel' ? 'Cancel scheduled publication' : 'Reschedule',
+    newScheduleUnix: row.scheduledUnix === null ? 'Not applicable' : String(row.scheduledUnix),
+    revision: row.revision, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+  }));
+  return {
+    title: 'Facebook native schedule changes',
+    description: 'Content-free records of provider-held schedule cancellations and reschedules. An uncertain change is never repeated automatically.',
+    columns: [
+      { key: 'id', label: 'Evidence row' }, { key: 'operationId', label: 'Publication operation' },
+      { key: 'workspaceId', label: 'Workspace' }, { key: 'format', label: 'Format' },
+      { key: 'state', label: 'Change state' }, { key: 'recordType', label: 'Record type' },
+      { key: 'changeKind', label: 'Change' }, { key: 'newScheduleUnix', label: 'New schedule (Unix)' },
+      { key: 'remoteId', label: 'Final publication ID' }, { key: 'remoteTargetId', label: 'Facebook Page ID' },
+      { key: 'revision', label: 'Revision' }, { key: 'createdAt', label: 'Started (UTC)' }, { key: 'updatedAt', label: 'Updated (UTC)' },
+    ],
+    items, rowIdKey: 'id', actions: [], truncated: rows.length > limit,
+  };
+}
