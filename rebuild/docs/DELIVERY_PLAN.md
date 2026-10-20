@@ -470,3 +470,9 @@ Version restore branch checkpoint (2026-10-20): current-destination catalog
 validation and explicit closest-valid restore implemented in Publishing;
 UI/HTTP/MCP use one guarded service. Unit/DOM evidence and verification gaps are
 recorded in PUBLISHING_HISTORY.md. No provider expansion or cutover is implied.
+
+2026-10-20 first-comment retry checkpoint: `codex/first-comment-retry` adds
+confirmed rejected-only retry through shared service/UI/HTTP/MCP. Continue with
+isolated PostgreSQL, actual browser matrix and cleaned live-provider proof when
+those environments are authorized; no server or push was permitted in this
+branch task. See FIRST_COMMENT_SCHEDULING.md. Broader P1/release work remains open.

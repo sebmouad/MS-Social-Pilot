@@ -16,7 +16,7 @@ import { withPublishingOperation, withPublishingTransaction } from './guard';
 import type { PublishingActor } from './types';
 
 type Input = { postId: string; postTargetId: string };
-type Context = { actor: PublishingActor; role: string; signal: AbortSignal; dueAt?: Date; automatic?: boolean };
+type Context = { actor: PublishingActor; role: string; signal: AbortSignal; dueAt?: Date; automatic?: boolean; retryRejected?: boolean };
 type CommentReceipt = { ok: true; postId: string; postTargetId: string; state: 'sent' | 'needs_review' | 'ready' | 'scheduled' };
 const receipt = (input: Input, state: CommentReceipt['state']): CommentReceipt => ({ ok: true, postId: input.postId, postTargetId: input.postTargetId, state });
 
@@ -49,6 +49,11 @@ export async function attemptFirstCommentInOperation(context: Context, input: In
   const { actor, signal } = context;
   const row = await delivery(context, input);
   const state = firstCommentState(row.post.firstComment, row);
+  if (context.retryRejected) {
+    if (state !== 'ready' || row.firstCommentError !== FIRST_COMMENT_REJECTED || row.firstCommentAt || row.firstCommentId) throw new OperationError('conflict', 'Only a definitely rejected first comment can be retried. Refresh this post and review its current outcome.');
+  } else if (row.firstCommentError === FIRST_COMMENT_REJECTED && state === 'ready') {
+    throw new OperationError('conflict', 'This first comment was rejected. Use the separately confirmed retry action.');
+  }
   if (state === 'sent') return receipt(input, 'sent');
   if (state !== 'ready') return receipt(input, 'needs_review');
   if (context.automatic && (row.post.authorId !== actor.userId || row.firstCommentError !== null)) throw new OperationError('conflict', 'This first comment requires a manual decision before retrying.');
@@ -98,7 +103,7 @@ export async function attemptFirstCommentInOperation(context: Context, input: In
       !availablePublishingFormats(currentAdapter.publishingFormats).some(format => format.id === selectedFormat.id && format.firstComment)) throw new OperationError('conflict', 'This first comment or connection changed. Refresh before continuing.');
     const result = await tx.postTarget.updateMany({ where: { id: row.id, postId: input.postId, status: 'published', remotePostId: row.remotePostId,
       firstCommentId: null, firstCommentAt: null, firstCommentError: row.firstCommentError }, data: { firstCommentAt: attemptedAt, firstCommentError: null } });
-    if (result.count === 1) await audit(tx, actor, 'publishing.first_comment_started', input);
+    if (result.count === 1) await audit(tx, actor, context.retryRejected ? 'publishing.first_comment_retry_started' : 'publishing.first_comment_started', { ...input, ...(context.retryRejected ? { previousOutcome: 'rejected' } : {}) });
     return result;
   });
   if (claim.count !== 1) throw new OperationError('conflict', 'The first comment changed. Refresh this post before continuing.');
@@ -143,6 +148,18 @@ export async function sendDueFirstComment(actor: PublishingActor, input: Input, 
 
 export async function sendFirstComment(actor: PublishingActor, input: Input): Promise<CommentReceipt> {
   return withPublishingOperation(actor, { postId: input.postId }, context => attemptFirstCommentInOperation(context, input));
+}
+
+/** A separate human decision; never clears an uncertain attempt or resends the post. */
+export async function retryFirstComment(actor: PublishingActor, input: unknown): Promise<CommentReceipt> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', 'Choose one failed first comment and confirm its retry.');
+  const values = input as Record<string, unknown>;
+  if (Object.keys(values).some(key => !['postId', 'postTargetId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Choose one failed first comment and confirm its retry.');
+  await validId(values.postId);
+  await validId(values.postTargetId);
+  if (values.confirmation !== `RETRY FIRST COMMENT ${values.postTargetId}`) throw new OperationError('invalid_request', 'Confirm retrying this exact first comment.');
+  const ids = { postId: values.postId as string, postTargetId: values.postTargetId as string };
+  return withPublishingOperation(actor, { postId: ids.postId }, context => attemptFirstCommentInOperation({ ...context, retryRejected: true }, ids));
 }
 
 /** Explicit human attestation, never a claim of automatic provider verification. */

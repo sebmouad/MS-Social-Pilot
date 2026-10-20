@@ -193,7 +193,7 @@ export async function sendFirstCommentAction(previous: FirstCommentActionState, 
     if (!result || result.ok !== true || result.postId !== postId || result.postTargetId !== postTargetId || !['sent', 'needs_review', 'ready', 'scheduled'].includes(result.state)) {
       return { status: 'error', postId, postTargetId, state: 'needs_review', message: 'The send result could not be confirmed. Check the platform and current post before another action.' };
     }
-    if (result.state !== 'sent') return { status: 'error', postId, postTargetId, state: result.state, message: result.state === 'needs_review' ? 'The comment result is uncertain. Check the platform before recording an outcome or sending again.' : result.state === 'scheduled' ? 'The saved delay has not passed yet. You can send it now or wait until its scheduled time.' : 'The platform refused this request. The saved comment is ready for a separate send request.' };
+    if (result.state !== 'sent') return { status: 'error', postId, postTargetId, state: result.state, message: result.state === 'needs_review' ? 'The comment result is uncertain. Check the platform before recording an outcome or sending again.' : result.state === 'scheduled' ? 'The saved delay has not passed yet. You can send it now or wait until its scheduled time.' : 'The platform refused this request. Close this dialog and use Retry failed first comment for a separately confirmed retry.' };
     return { status: 'success', postId, postTargetId, state: 'sent', message: 'The first comment was recorded as sent.' };
   } catch (error) {
     if (isRedirect(error)) throw error;

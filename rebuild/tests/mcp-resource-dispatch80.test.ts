@@ -67,8 +67,8 @@ const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(),
 vi.mock('@/modules/publishing/server/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
 const postDuplicate = vi.hoisted(() => vi.fn());
 vi.mock('../src/modules/publishing/server/duplicate', () => ({ duplicatePost: postDuplicate }));
-const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), record: vi.fn() }));
-vi.mock('../src/modules/publishing/server/first-comment', () => ({ sendFirstComment: firstCommentMutations.send, recordFirstCommentOutcome: firstCommentMutations.record }));
+const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), retry: vi.fn(), record: vi.fn() }));
+vi.mock('../src/modules/publishing/server/first-comment', () => ({ sendFirstComment: firstCommentMutations.send, retryFirstComment: firstCommentMutations.retry, recordFirstCommentOutcome: firstCommentMutations.record }));
 const postDeletions = vi.hoisted(() => ({ get: vi.fn(), finish: vi.fn(), record: vi.fn() }));
 vi.mock('../src/modules/publishing/server/deletion', () => ({ getPostDeletion: postDeletions.get, finishPostDeletion: postDeletions.finish, recordPostDeletionOutcome: postDeletions.record }));
 const publicationRecovery = vi.hoisted(() => ({ get: vi.fn(), record: vi.fn(), finish: vi.fn(), adopt: vi.fn() }));
@@ -101,6 +101,7 @@ beforeEach(() => {
   for (const mock of Object.values(publishingMutations)) mock.mockResolvedValue({ id: 'post-a' });
   inboxMutations.reply.mockResolvedValue({ ok: true });
   inboxMutations.moderate.mockResolvedValue({ ok: true });
+  firstCommentMutations.retry.mockResolvedValue({ ok: true, postId: 'post-a', postTargetId: 'post-target-a', state: 'sent' });
   firstCommentMutations.send.mockResolvedValue({ state: 'sent' });
   firstCommentMutations.record.mockResolvedValue({ state: 'ready' });
   postDeletions.get.mockResolvedValue({ state: 'completed' });
@@ -206,6 +207,7 @@ describe('Publishing operations carry the key ceiling in an explicit actor', () 
     ['cancel_scheduled_post', { postId: 'post-a', confirmation: 'CANCEL SCHEDULE post-a' }, () => publishingMutations.cancel],
     ['duplicate_post', { postId: 'post-a', requestId: '5a985a8a-8234-494c-a2f7-a269ea50d111', confirmation: 'DUPLICATE POST post-a' }, () => postDuplicate],
     ['send_first_comment', { postId: 'post-a', postTargetId: 'pt-a', confirmation: 'SEND FIRST COMMENT pt-a' }, () => firstCommentMutations.send],
+    ['retry_first_comment', { postId: 'post-a', postTargetId: 'pt-a', confirmation: 'RETRY FIRST COMMENT pt-a' }, () => firstCommentMutations.retry],
     ['record_first_comment_outcome', { postId: 'post-a', postTargetId: 'pt-a', outcome: 'not_sent', confirmation: 'RECORD FIRST COMMENT pt-a NOT SENT' }, () => firstCommentMutations.record],
     ['get_post_deletion_status', { postId: 'post-a' }, () => postDeletions.get],
     ['finish_post_deletion', { postId: 'post-a', confirmation: 'FINISH POST DELETION post-a' }, () => postDeletions.finish],

@@ -14,8 +14,9 @@ import styles from "@/modules/publishing/ui/publishing.module.css";
 import { csvDestinationLabel } from '@/lib/publishing/csv-destinations';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { validateFields } from '@/lib/ui/form-validation';
-import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
+import { FIRST_COMMENT_LABELS, FIRST_COMMENT_REJECTED, firstCommentState } from '@/modules/publishing/first-comment-state';
 import { PublicationRecovery } from './PublicationRecovery';
+import { FirstCommentRetry } from './FirstCommentRetry';
 import { DuplicatePost } from './DuplicatePost';
 import { QueuePostButton } from './QueuePostButton';
 import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
@@ -171,7 +172,8 @@ function FirstCommentControl({ postId, postComment, delayMinutes, timeZone, targ
   const displayState = localState ?? state;
   const publishedAt = target.publishedAt ? new Date(target.publishedAt) : null;
   const dueAt = publishedAt && Number.isFinite(publishedAt.getTime()) ? new Date(publishedAt.getTime() + delayMinutes * 60_000) : null;
-  const isScheduled = displayState === 'ready' && delayMinutes > 0;
+  const rejected = displayState === 'ready' && target.firstCommentError === FIRST_COMMENT_REJECTED;
+  const isScheduled = !rejected && displayState === 'ready' && delayMinutes > 0;
   const stateText = displayState === 'scheduled' ? 'First comment is scheduled'
     : isScheduled && dueAt ? `First comment scheduled for ${formatPostPreviewTime(dueAt, timeZone)} (${timeZone.replaceAll('_', ' ')})`
       : isScheduled ? `First comment waits ${delayMinutes.toLocaleString()} minutes after publication`
@@ -179,8 +181,9 @@ function FirstCommentControl({ postId, postComment, delayMinutes, timeZone, targ
   const open = (next: 'send' | 'record') => setMode(next);
 
   return <div ref={controlRef} className={styles.firstCommentRow} role="group" aria-label={`First comment delivery for ${target.target.name ?? 'this destination'}`} tabIndex={-1} data-first-comment-control>
-    <span>{target.target.name ?? 'Destination'}: {stateText}</span>
-    {displayState === 'ready' ? <Button type="button" size="sm" onClick={() => open('send')}>{delayMinutes > 0 ? 'Send now' : 'Send first comment'}</Button> : null}
+    <span>{target.target.name ?? 'Destination'}{rejected ? ':' : `: ${stateText}`}</span>
+    {rejected ? <FirstCommentRetry postId={postId} postTargetId={target.id} destinationName={target.target.name} onSettled={next => { setLocalState(next); if (next !== 'ready') requestAnimationFrame(() => controlRef.current?.focus()); }} /> : null}
+    {displayState === 'ready' && !rejected ? <Button type="button" size="sm" onClick={() => open('send')}>{delayMinutes > 0 ? 'Send now' : 'Send first comment'}</Button> : null}
     {displayState === 'needs_review' ? <Button type="button" size="sm" onClick={() => open('record')}>Record comment outcome</Button> : null}
     {mode ? <FirstCommentDialog key={`${target.id}:${mode}`} mode={mode} postId={postId} postComment={postComment} delayMinutes={delayMinutes} target={target} onDismiss={() => setMode(null)} onProgress={setLocalState} onComplete={state => { focusAfterComplete.current = true; setLocalState(state); setMode(null); }} /> : null}
   </div>;
@@ -216,7 +219,7 @@ function FirstCommentDialog({ mode, postId, postComment, delayMinutes, target, o
         <label className={styles.confirmCheck}><input type="checkbox" name="acknowledged" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.currentTarget.checked)} /> I understand the result may be delayed and I will check status before repeating.</label>
         {sendState.status === 'error' ? <p className="ui-error" role="alert" data-first-comment-error tabIndex={-1}>{sendState.message ?? 'The send result could not be confirmed. Check its current state before another action.'}</p> : null}
       </div>
-      <div className="ui-dialog__actions"><Button type="button" data-first-comment-cancel disabled={pending} onClick={onDismiss}>Cancel</Button><Button variant="primary" type="submit" disabled={pending || !acknowledged}>Send now</Button></div>
+      <div className="ui-dialog__actions"><Button type="button" data-first-comment-cancel disabled={pending} onClick={onDismiss}>Cancel</Button><Button variant="primary" type="submit" disabled={pending || !acknowledged || sendState.state === 'ready'}>Send now</Button></div>
     </form> : <form noValidate onSubmit={event => {
       event.preventDefault();
       if (!acknowledged || pending || (outcome === 'sent' && !remoteId.trim())) return;

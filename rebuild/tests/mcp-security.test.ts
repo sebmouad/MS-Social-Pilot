@@ -67,8 +67,8 @@ const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(),
 vi.mock('@/modules/publishing/server/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
 const postDuplicate = vi.hoisted(() => vi.fn());
 vi.mock('../src/modules/publishing/server/duplicate', () => ({ duplicatePost: postDuplicate }));
-const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), record: vi.fn() }));
-vi.mock('../src/modules/publishing/server/first-comment', () => ({ sendFirstComment: firstCommentMutations.send, recordFirstCommentOutcome: firstCommentMutations.record }));
+const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), retry: vi.fn(), record: vi.fn() }));
+vi.mock('../src/modules/publishing/server/first-comment', () => ({ sendFirstComment: firstCommentMutations.send, retryFirstComment: firstCommentMutations.retry, recordFirstCommentOutcome: firstCommentMutations.record }));
 const postDeletions = vi.hoisted(() => ({ get: vi.fn(), finish: vi.fn(), record: vi.fn() }));
 vi.mock('../src/modules/publishing/server/deletion', () => ({ getPostDeletion: postDeletions.get, finishPostDeletion: postDeletions.finish, recordPostDeletionOutcome: postDeletions.record }));
 const publicationRecovery = vi.hoisted(() => ({ get: vi.fn(), record: vi.fn(), finish: vi.fn(), adopt: vi.fn() }));
@@ -149,6 +149,7 @@ beforeEach(() => {
   publishingMutations.review.mockResolvedValue(undefined);
   publishingMutations.schedule.mockResolvedValue(undefined);
   publishingMutations.cancel.mockResolvedValue(undefined);
+  firstCommentMutations.retry.mockResolvedValue({ ok: true, postId: 'post-a', postTargetId: 'post-target-a', state: 'sent' });
   firstCommentMutations.send.mockResolvedValue({ ok: true, postId: 'post-a', postTargetId: 'post-target-a', state: 'sent' });
   firstCommentMutations.record.mockResolvedValue({ ok: true, postId: 'post-a', postTargetId: 'post-target-a', state: 'ready' });
   postDeletions.get.mockResolvedValue({ ok: true, postId: 'post-a', localConfirmed: false, remoteDeletionRequested: true, state: 'needs_review', operations: [] });
@@ -1170,6 +1171,40 @@ describe('MCP workspace boundaries', () => {
     expect((await notSent.json()).result.structuredContent).toMatchObject({ ok: true, state: 'ready' });
     expect(firstCommentMutations.record).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { postId: 'post-a', postTargetId: 'post-target-a', outcome: 'not_sent', confirmation: 'RECORD FIRST COMMENT post-target-a NOT SENT' });
     expect(workspaceGuard).not.toHaveBeenCalled();
+  });
+
+  it('exposes a separately confirmed retry through the shared scoped service', async () => {
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('retry_first_comment');
+    const denied = await call('retry_first_comment', { postId: 'post-a', postTargetId: 'post-target-a', confirmation: 'SEND FIRST COMMENT post-target-a' });
+    expect((await denied.json()).result.isError).toBe(true);
+    expect(firstCommentMutations.retry).not.toHaveBeenCalled();
+    const input = { postId: 'post-a', postTargetId: 'post-target-a', confirmation: 'RETRY FIRST COMMENT post-target-a' };
+    const sent = await call('retry_first_comment', input);
+    expect((await sent.json()).result.structuredContent).toMatchObject({ ok: true, state: 'sent', mcpAuditRecorded: true });
+    expect(firstCommentMutations.retry).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, input);
+    expect(workspaceGuard).not.toHaveBeenCalled();
+  });
+
+  it('denies first-comment retries to read-only keys before calling the service', async () => {
+    const readOnly = { ...viewer, permissions: { ...viewer.permissions!, features: { ...viewer.permissions!.features, 'publishing/posts': { read: true, write: false } } } };
+    const args = { postId: 'post-a', postTargetId: 'post-target-a', confirmation: 'RETRY FIRST COMMENT post-target-a' };
+    const listed = await handleMcpMessage(readOnly, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).not.toContain('retry_first_comment');
+    const denied = await handleMcpMessage(readOnly, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'retry_first_comment', arguments: args } });
+    expect((await denied.json()).result.isError).toBe(true);
+    expect(firstCommentMutations.retry).not.toHaveBeenCalled();
+  });
+
+  it('advertises retry availability only for a definite rejection in scoped post reads', async () => {
+    publishingReads.list.mockResolvedValueOnce([{ id: 'post-a', firstComment: 'Saved comment', targets: [
+      { id: 'rejected', status: 'published', remotePostId: 'remote-post', firstCommentId: null, firstCommentAt: null, firstCommentError: 'rebuild:first_comment_rejected' },
+      { id: 'uncertain', status: 'published', remotePostId: 'remote-post', firstCommentId: null, firstCommentAt: new Date(), firstCommentError: 'rebuild:first_comment_rejected' },
+    ] }]);
+    const response = await call('list_posts');
+    const targets = (await response.json()).result.structuredContent.items[0].targets;
+    expect(targets[0].firstComment.retryAvailable).toBe(true);
+    expect(targets[1].firstComment.retryAvailable).toBe(false);
   });
 
   it('normalizes first-comment state in list_posts and never returns stored error text', async () => {

@@ -32,7 +32,7 @@ vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) =
 vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => integration.adapter }));
 
 import { publishPost } from '@/modules/publishing/server/lifecycle';
-import { recordFirstCommentOutcome, sendFirstComment } from '../src/modules/publishing/server/first-comment';
+import { recordFirstCommentOutcome, retryFirstComment, sendFirstComment } from '../src/modules/publishing/server/first-comment';
 
 type Fixture = {
   prefix: string; workspaceId: string; userId: string; socialAccountId: string; targetId: string;
@@ -221,7 +221,8 @@ describe.skipIf(!databaseUrl)('first-comment receipt safety on isolated PostgreS
     await expect(sendFirstComment(fixture.actor, { postId: fixture.postId, postTargetId: fixture.postTargetId })).resolves.toMatchObject({ state: 'ready' });
     expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { firstCommentId: true, firstCommentAt: true, firstCommentError: true } }))
       .toEqual({ firstCommentId: null, firstCommentAt: null, firstCommentError: 'rebuild:first_comment_rejected' });
-    await expect(sendFirstComment(fixture.actor, { postId: fixture.postId, postTargetId: fixture.postTargetId })).resolves.toMatchObject({ state: 'sent' });
+    await expect(sendFirstComment(fixture.actor, { postId: fixture.postId, postTargetId: fixture.postTargetId })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(retryFirstComment(fixture.actor, { postId: fixture.postId, postTargetId: fixture.postTargetId, confirmation: `RETRY FIRST COMMENT ${fixture.postTargetId}` })).resolves.toMatchObject({ state: 'sent' });
     await expect(sendFirstComment(fixture.actor, { postId: fixture.postId, postTargetId: fixture.postTargetId })).resolves.toMatchObject({ state: 'sent' });
     expect(integration.adapter.publishFirstComment).toHaveBeenCalledTimes(2);
     expect(await observer.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { firstCommentId: true, firstCommentError: true } }))

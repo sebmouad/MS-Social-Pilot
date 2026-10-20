@@ -91,3 +91,57 @@ Native-format host integration, native comments/deletion, cleaned live-provider
 evidence, broader legacy parity, whole-app UX and production-shaped data/media/
 service rollback remain required. Completing this workflow does not complete the
 Facebook engine or authorize production cutover without the other release gates.
+
+## Confirmed rejected-comment retries (2026-10-20)
+
+The Posts panel distinguishes a definitively rejected first comment from an
+unsent scheduled comment. **Retry failed first comment** / **Réessayer le premier
+commentaire échoué** uses the shared `useConfirm` dialog and requires exact typed
+`RETRY FIRST COMMENT <postTargetId>`. It sends the saved comment immediately,
+explicitly overriding the saved delay. Cancel sends nothing. Recoverable failures
+retain confirmation input; transport loss, malformed receipts and uncertain
+outcomes hold the action for review without a second request from that dialog.
+A repeated definite rejection requires a fresh confirmation.
+
+UI calls `POST /api/publishing/first-comments/retry`; MCP exposes the write tool
+`retry_first_comment`. Both call `retryFirstComment` in the existing shared
+first-comment service. Scoped post/MCP reads expose `firstComment.retryAvailable`
+only for a confirmed published destination with the recognized rejection marker
+and no comment ID or held attempt. The service accepts only postId,
+postTargetId and the exact confirmation. Normal `sendFirstComment` and automatic
+continuations refuse rejected comments, so generic send cannot bypass this
+separate decision. Unknown legacy errors, uncertain/in-flight attempts and sent
+comments cannot use retry. Existing external human outcome recording remains a
+separate attestation workflow.
+
+Retry uses the existing post/workspace/destination operation locks, current
+membership/permission/resource checks, author/manager rules, selected connection,
+provider grants, entitlement and format revalidation. The conditional claim and
+`publishing.first_comment_retry_started` audit commit before dispatch. Rejection
+and uncertainty are classified by the platform adapter; shared code adds no
+provider rules. Receipt persistence and cancellation retain the existing held
+attempt guarantees. A retry never republishes the parent post.
+
+No new Root keys or migrations. Synthetic service, HTTP, DOM and MCP tests cover
+confirmation, cancellation, repeated/concurrent claims, delay override, current
+authority/scope/grant changes, rejected versus uncertain outcomes, malformed
+receipts, retained input, English/French copy and read-only/restricted MCP keys.
+PostgreSQL integration tests require `REBUILD_PREVIEW_DATABASE_URL`; without it
+they are skipped. Actual browser/theme/viewport, database and live-provider proof
+for this branch remain open. No server, provider call, deployment or push is part
+of this batch.
+
+Branch verification: targeted Vitest checks pass258 tests across11 files;
+15 PostgreSQL cases in2 files are skipped without the preview database URL.
+`npx tsc --noEmit -p .` and `tests/raw-sql-void-guard.test.ts` pass. The complete
+suite stalls at the unrelated existing
+`tests/facebook-diagnostic-transport.test.ts` cancellation test; it was interrupted
+without a completion claim. Git staging is blocked by sandbox write restrictions
+on the external worktree Git metadata; this batch remains uncommitted.
+The bounded full-suite rerun excluding only that stalled diagnostic file completed:
+3,946 passed,226 skipped,6 failed across455 files. Five failures are the existing
+`facebook-native-http.test.ts` loopback listeners denied by the sandbox
+(`listen EPERM ::1`); the sixth is the unrelated Analytics route expectation in
+`module-manifests.test.ts`. Neither test nor its source was changed in this batch.
+No listening server was successfully started. These failures remain open rather
+than being presented as a clean full-suite pass.

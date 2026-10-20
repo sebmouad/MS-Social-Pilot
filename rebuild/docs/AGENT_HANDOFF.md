@@ -920,3 +920,23 @@ outside Git) whose scratch restore matched every table count:
 `20261030100000_rebuild_review_resolution` (shares a timestamp; name order applies),
 `20261030110000_rebuild_ads_creative_creation`. All five are pinned in
 `scripts/cutover-rehearsal.sh`; the full rehearsal still needs a sanitized staging dump.
+
+2026-10-20 `codex/first-comment-retry`: rejected-only first-comment retry is a
+separate exact-confirmed service action, used by the Posts panel's shared
+useConfirm, POST /api/publishing/first-comments/retry and MCP retry_first_comment.
+Normal send and worker paths refuse rejection; uncertain claims stay held.
+Scoped reads expose retryAvailable. No Root key, migration, provider branch,
+server, push or deployment. Synthetic service/HTTP/DOM/MCP verification is scoped
+in FIRST_COMMENT_SCHEDULING.md; PostgreSQL/browser/live-provider proof remains
+open. Preserve the untracked dependency symlink. This user explicitly requires
+committing on this branch without pushing; historical main/push rules do not
+apply to this scoped task.
+
+Git publication blocker for this worktree: `git add` failed creating index.lock
+because the shared Git metadata is outside the sandbox's writable roots. No
+commit could be created; completed changes remain unstaged on the requested
+branch. Do not claim a commit or push. The dependency symlink remains untouched.
+Final checks: targeted258 pass/15 database skips; tsc and raw-SQL guard pass.
+Full suite stalls in facebook-diagnostic-transport.test.ts. Excluding that file:
+3946 pass/226 skips/6 failures (five sandbox loopback EPERM in native HTTP tests,
+one unrelated Analytics manifest expectation). Do not claim a clean full suite.
