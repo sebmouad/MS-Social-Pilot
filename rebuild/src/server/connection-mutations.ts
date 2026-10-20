@@ -23,6 +23,13 @@ export async function previewSocialAccountDeletion(actor: ConnectionMutationActo
   return countDisconnectRows(prisma, actor.workspaceId, account);
 }
 
+/** Installation-owner estimate of the rows delete mode removes; the caller must already have checked Root. */
+export async function previewSocialAccountDeletionAsRoot(socialAccountId: string) {
+  const account = await prisma.socialAccount.findUnique({ where: { id: socialAccountId }, select: { id: true, workspaceId: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
+  if (!account) throw new OperationError('not_found', 'Connection not found.');
+  return { workspaceId: account.workspaceId, counts: await countDisconnectRows(prisma, account.workspaceId, account) };
+}
+
 async function countDisconnectRows(tx: typeof prisma | import('../../generated/client').Prisma.TransactionClient, workspaceId: string, account: { id: string; targets: Array<{ id: string }>; adAccounts: Array<{ id: string }> }) {
   const targetIds = account.targets.map(item => item.id);
   const adAccountIds = account.adAccounts.map(item => item.id);

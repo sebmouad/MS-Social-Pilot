@@ -14,7 +14,7 @@ import { transferInstallationOwnership } from './transfer';
 import { getRootError, listRootErrors, setRootErrorResolved } from './errors';
 import { readRootBackupStatus, readRootDiagnosticsSummary } from './backups';
 import { listRootSessions, sessionSignOutConfirmation, signOutRootSession } from './sessions';
-import { disconnectRootConnection, listRootConnections } from './connections';
+import { disconnectRootConnection, listRootConnections, previewRootConnectionDeletion } from './connections';
 
 const none = { type: 'object', properties: {}, additionalProperties: false } as const;
 const privateNote = ' Installation owner only; workspace API keys cannot use this tool.';
@@ -43,7 +43,8 @@ export const rootLegacyToolDefinitions = [
   { name: 'transfer_root_workspace_ownership', description: 'Make an active existing account the owner of a workspace. previousOwners keep or demote_admin. Confirmation must exactly match TRANSFER WORKSPACE <workspaceId> TO <email>. Does not transfer installation Root.' + privateNote, inputSchema: { type: 'object', required: ['workspaceId', 'newOwnerEmail', 'previousOwners', 'confirmation'], properties: { workspaceId: { type: 'string' }, newOwnerEmail: { type: 'string' }, previousOwners: { type: 'string', enum: ['keep', 'demote_admin'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'export_root_activity', description: 'Complete redacted Root audit CSV with workspace, inclusive UTC dates and literal search filters. Oversized results are refused.' + privateNote, inputSchema: { type: 'object', properties: { q: { type: 'string' }, workspaceId: { type: 'string' }, from: { type: 'string', description: 'Inclusive UTC YYYY-MM-DD' }, to: { type: 'string', description: 'Inclusive UTC YYYY-MM-DD' } }, additionalProperties: false } },
   { name: 'refresh_root_connection', description: 'Attempt token renewal using the installed platform module. Returns renewed, not_renewable or failed with audit, without credentials. Confirmation must exactly match REFRESH CONNECTION <socialAccountId>.' + privateNote, annotations: { readOnlyHint: false }, inputSchema: { type: 'object', required: ['socialAccountId', 'confirmation'], properties: { socialAccountId: { type: 'string', minLength: 1, maxLength: 200 }, confirmation: confirmationProperty }, additionalProperties: false } },
-  { name: 'disconnect_root_connection', description: 'Disconnect one workspace connection: its stored credentials stop working and its channels and ad accounts are switched off; posts, messages and metrics are kept and nothing is revoked at the platform. Confirmation must exactly match DISCONNECT CONNECTION <socialAccountId>.' + privateNote, inputSchema: { type: 'object', required: ['socialAccountId', 'confirmation'], properties: { socialAccountId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'preview_root_connection_deletion', description: 'Read-only estimate of the local records that disconnect_root_connection with mode delete would remove (channels, ad accounts, posts, comments, conversations, metrics). Changes nothing and contacts no platform.' + privateNote, annotations: { readOnlyHint: true }, inputSchema: { type: 'object', required: ['socialAccountId'], properties: { socialAccountId: { type: 'string', minLength: 1, maxLength: 200 } }, additionalProperties: false } },
+  { name: 'disconnect_root_connection', description: 'Disconnect one workspace connection. mode retain (default): stored credentials stop working and its channels and ad accounts are switched off; posts, messages and metrics are kept. mode delete: also permanently removes the related local records (see preview_root_connection_deletion); refused while posts are still scheduled at the platform. Nothing is revoked at the platform in either mode. Confirmation must exactly match DISCONNECT CONNECTION <socialAccountId> (retain) or DELETE CONNECTION DATA <socialAccountId> (delete).' + privateNote, inputSchema: { type: 'object', required: ['socialAccountId', 'confirmation'], properties: { socialAccountId: { type: 'string' }, confirmation: { type: 'string' }, mode: { type: 'string', enum: ['retain', 'delete'] } }, additionalProperties: false } },
   { name: 'transfer_root_installation', description: 'Hand installation ownership (Root) to another active account; you lose Root. Confirmation must exactly match TRANSFER INSTALLATION TO <email>.' + privateNote, inputSchema: { type: 'object', required: ['email', 'confirmation'], properties: { email: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'delete_root_user', description: 'Permanently delete a disabled account that is not Root and not the only owner of any workspace. Its posts and invitations stay, credited to you; API keys it created are revoked. Confirmation must exactly match DELETE ACCOUNT <email>.' + privateNote, inputSchema: { type: 'object', required: ['userId', 'confirmation'], properties: { userId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'delete_root_workspace', description: 'Permanently delete a suspended workspace: all its posts, inbox, analytics, settings, members and stored media. Accounts are kept. Cannot be undone; take a backup first. Confirmation must exactly match DELETE WORKSPACE <workspaceId>. Provider content already published is not removed.' + privateNote, inputSchema: { type: 'object', required: ['workspaceId', 'confirmation'], properties: { workspaceId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -106,10 +107,15 @@ export async function callRootLegacyTool(viewer: RootMcpActor, name: string, arg
     case 'transfer_root_workspace_ownership': return transferWorkspaceOwnership(id, args);
     case 'export_root_activity': return exportRootActivity(id, args);
     case 'refresh_root_connection': return refreshRootConnection(id, args);
+    case 'preview_root_connection_deletion': {
+      const { socialAccountId, ...extra } = args; reject(extra);
+      if (typeof socialAccountId !== 'string') throw new OperationError('invalid_request', 'Choose a connection.');
+      return previewRootConnectionDeletion(id, socialAccountId);
+    }
     case 'disconnect_root_connection': {
-      const { socialAccountId, confirmation, ...extra } = args; reject(extra);
-      if (typeof socialAccountId !== 'string' || typeof confirmation !== 'string') throw new OperationError('invalid_request', 'Choose a connection and enter the exact confirmation.');
-      return disconnectRootConnection(id, socialAccountId, confirmation);
+      const { socialAccountId, confirmation, mode, ...extra } = args; reject(extra);
+      if (typeof socialAccountId !== 'string' || typeof confirmation !== 'string' || (mode !== undefined && mode !== 'retain' && mode !== 'delete')) throw new OperationError('invalid_request', 'Choose a connection, retain or delete, and enter the exact confirmation.');
+      return disconnectRootConnection(id, socialAccountId, confirmation, mode);
     }
     case 'transfer_root_installation': return transferInstallationOwnership(id, args);
     case 'delete_root_user': {

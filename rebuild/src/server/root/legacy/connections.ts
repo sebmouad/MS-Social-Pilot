@@ -55,19 +55,33 @@ export async function listRootConnections(actorId: string, input: unknown = {}, 
 }
 
 export const rootDisconnectConfirmation = (socialAccountId: string) => `DISCONNECT CONNECTION ${socialAccountId}`;
+export const rootDisconnectDeleteConfirmation = (socialAccountId: string) => `DELETE CONNECTION DATA ${socialAccountId}`;
+const validId = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 200;
+
+/** What delete mode would remove, as local row counts. Read-only; nothing is changed and nothing is asked of the platform. */
+export async function previewRootConnectionDeletion(actorId: string, socialAccountId: string) {
+  await assertRootActor(prisma, actorId);
+  if (!validId(socialAccountId)) throw new OperationError('invalid_request', 'Choose a connection.');
+  const { previewSocialAccountDeletionAsRoot } = await import('@/server/connection-mutations');
+  const { workspaceId, counts } = await previewSocialAccountDeletionAsRoot(socialAccountId);
+  return { socialAccountId, workspaceId, counts, providerRevoked: false as const };
+}
 
 /**
- * Root disconnect of one workspace connection, retain mode only: local credentials are invalidated and its channels
- * and ad accounts disabled, while every post, message and metric stays. Deleting related data remains the workspace's
- * own choice. Nothing is revoked at the provider; the result says so.
+ * Root disconnect of one workspace connection. Retain mode (default) invalidates local credentials and disables its
+ * channels and ad accounts while every post, message and metric stays. Delete mode also removes the related local
+ * records through the same transactional service the workspace uses, with its own exact confirmation, and refuses
+ * while posts are still scheduled at the provider. Nothing is revoked at the provider; the result says so.
  */
-export async function disconnectRootConnection(actorId: string, socialAccountId: string, confirmation: string) {
-  if (typeof socialAccountId !== 'string' || !socialAccountId || socialAccountId.length > 200) throw new OperationError('invalid_request', 'Choose a connection.');
-  if (confirmation !== rootDisconnectConfirmation(socialAccountId)) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
+export async function disconnectRootConnection(actorId: string, socialAccountId: string, confirmation: string, mode: 'retain' | 'delete' = 'retain') {
+  if (!validId(socialAccountId)) throw new OperationError('invalid_request', 'Choose a connection.');
+  if (mode !== 'retain' && mode !== 'delete') throw new OperationError('invalid_request', 'Choose retain or delete.');
+  const expected = mode === 'delete' ? rootDisconnectDeleteConfirmation(socialAccountId) : rootDisconnectConfirmation(socialAccountId);
+  if (confirmation !== expected) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
   const owner = await prisma.socialAccount.findUnique({ where: { id: socialAccountId }, select: { workspaceId: true } });
   if (!owner) throw new OperationError('not_found', 'Connection not found.');
   const { disconnectSocialAccount } = await import('@/server/connection-mutations');
-  const result = await disconnectSocialAccount({ userId: actorId, workspaceId: owner.workspaceId }, socialAccountId, 'retain', undefined, async tx => {
+  const result = await disconnectSocialAccount({ userId: actorId, workspaceId: owner.workspaceId }, socialAccountId, mode, mode === 'delete' ? 'DELETE' : undefined, async tx => {
     const actor = await tx.user.findUnique({ where: { id: actorId }, select: { isInstanceOwner: true, disabledAt: true } });
     if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
   });
