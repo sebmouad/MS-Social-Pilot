@@ -13,11 +13,14 @@ import type { PublishingFormatDescriptor, PublishingMediaSupport } from '@/platf
 import { useActionState, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { createPostWithRecoveryAction, type ComposerActionState } from '@/modules/publishing/ui/posts/actions';
+import { createPostWithRecoveryAction } from '@/modules/publishing/ui/posts/actions';
 import { crowdedDestinationPlatforms } from '@/modules/settings/workspace-operations';
 import { workspaceOperationsCopy } from '@/modules/settings/workspace-operations-copy';
 import { AiAssist } from '@/modules/ai/components/AiAssist';
 import type { AiStatus } from '@/modules/ai/ai';
+import { previewQueueAction, saveQueueComposerAction, type QueueComposerState as ComposerActionState, type QueuePreviewState } from './queue-actions';
+import { fill, queueCopy } from './queue-copy';
+import { formatDate } from '@/modules/publishing/ui/publishing-ui';
 import styles from './PostComposer.module.css';
 
 type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
@@ -37,7 +40,7 @@ const FORM_ID = 'post-composer-form';
 const ALL_MEDIA_KINDS = ['image', 'video'] as const;
 
 async function saveWithTransportRecovery(previous: ComposerActionState, data: FormData): Promise<ComposerActionState> {
-  try { return await createPostWithRecoveryAction(previous, data); }
+  try { return await (data.get('intent') === 'queue' || previous.values.draftPostId ? saveQueueComposerAction(previous, data) : createPostWithRecoveryAction(previous, data)); }
   catch (error) {
     // Next redirects are framework control flow and must reach its action router.
     if (error && typeof error === 'object' && 'digest' in error && typeof error.digest === 'string' && error.digest.startsWith('NEXT_REDIRECT')) throw error;
@@ -110,7 +113,7 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items);
 }
 
-export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en' }: { aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
+export function PostComposer({ targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false }: { queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -128,7 +131,11 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
   const [formatChoices, setFormatChoices] = useState<Record<string, string>>(() => parseFormats(initial.destinationFormatsJson));
   const [scheduleDate, setScheduleDate] = useState(initial.scheduleDate ?? schedule.date);
   const [scheduleTime, setScheduleTime] = useState(initial.scheduleTime ?? schedule.time);
-  const [mode, setMode] = useState<'draft' | 'schedule'>((initial.intent as 'draft' | 'schedule') ?? 'draft');
+  const [mode, setMode] = useState<'draft' | 'schedule' | 'queue'>((initial.intent as 'draft' | 'schedule' | 'queue') ?? 'draft');
+  const [previewRefresh, setPreviewRefresh] = useState(0);
+  const [previewSelection, setPreviewSelection] = useState('');
+  const [queuePreview, setQueuePreview] = useState<QueuePreviewState | 'loading' | null>(null);
+  const copy = queueCopy[aiLocale];
   const [localError, setLocalError] = useState('');
   const [uploadMessage, setUploadMessage] = useState('');
   const [templateChooserOpen, setTemplateChooserOpen] = useState(false);
@@ -171,6 +178,20 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
     setTemplateToApply(null);
   }
 
+  // The chosen queue time is shown before saving. A save that placed (or failed to place) a post changes what is free, so it refreshes too.
+  const selectedKey = JSON.stringify(selected.map(target => target.id));
+  useEffect(() => {
+    if (!queueAvailable || selectedKey === '[]') { setQueuePreview(null); return; }
+    let current = true;
+    setQueuePreview('loading');
+    const timer = setTimeout(() => {
+      previewQueueAction(JSON.parse(selectedKey)).then(
+        result => { if (current) { setPreviewSelection(selectedKey); setQueuePreview(result); } },
+        () => { if (current) { setPreviewSelection(selectedKey); setQueuePreview({ status: 'error', message: queueCopy[aiLocale].unavailable }); } },
+      );
+    }, 250);
+    return () => { current = false; clearTimeout(timer); };
+  }, [queueAvailable, selectedKey, aiLocale, state, previewRefresh]);
   useEffect(() => {
     if (state.status === 'success' && state.destination && navigated.current !== state) {
       navigated.current = state;
@@ -198,7 +219,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-    const intent = submitter?.value === 'schedule' ? 'schedule' : 'draft';
+    const intent = submitter?.value === 'schedule' ? 'schedule' : submitter?.value === 'queue' && queueAvailable ? 'queue' : 'draft';
     setMode(intent);
     setLocalError('');
     setUploadMessage('');
@@ -226,6 +247,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
     if (intent === 'schedule' && (!scheduleDate || !scheduleTime || !selected.length)) {
       event.preventDefault(); setLocalError(!selected.length ? 'Choose at least one destination before scheduling.' : 'Choose a date and time before scheduling.'); return;
     }
+    if (intent === 'queue' && (!selected.length || !queuePreview || typeof queuePreview !== 'object' || queuePreview.status !== 'ready' || previewSelection !== selectedKey)) { event.preventDefault(); setLocalError(!selected.length ? copy.needDestination : copy.unavailable); return; }
     if (!attachments.validate()) { event.preventDefault(); setLocalError('Fix the attachment issues before saving.'); form.querySelector<HTMLElement>('[role="alert"]')?.focus(); return; }
 
     const supportIssue = selectedMediaIssue(selected, formatChoices, attachments.media, link, attachments.items);
@@ -260,9 +282,9 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
 
   return <div className={styles.composerLayout}>
     <form id={FORM_ID} ref={formRef} action={formAction} onSubmit={onSubmit} className={styles.form} noValidate>
-      {saved && <p ref={feedbackRef} tabIndex={-1} className={styles.uploadNotice} role="status">Post saved. Opening Posts… {state.destination && <a href={state.destination}>View saved posts</a>}</p>}
+      {saved && <p ref={feedbackRef} tabIndex={-1} className={styles.uploadNotice} role="status">{state.queued ? fill(state.queued.status === 'pending_approval' ? copy.addedApproval : copy.added, { time: formatDate(new Date(state.queued.scheduledAt), schedule.timeZone) }) : 'Post saved.'} {copy.opening} {state.destination && <a href={state.destination}>{copy.viewSaved}</a>}</p>}
       {localError && <p ref={feedbackRef} className={styles.error} role="alert" tabIndex={-1}>{localError}</p>}
-      {state.status === 'error' && <p ref={feedbackRef} className={styles.error} role="alert" data-composer-error tabIndex={-1}>{state.message} Your post details are still here.{state.saveUnconfirmed ? <> <a href="/publishing/posts" target="_blank" rel="noopener noreferrer">Check Posts in a new tab</a>.</> : ' You can retry.'}</p>}
+      {state.status === 'error' && <p ref={feedbackRef} className={styles.error} role="alert" data-composer-error tabIndex={-1}>{state.message} {copy.retained}{state.saveUnconfirmed ? <> <a href="/publishing/posts" target="_blank" rel="noopener noreferrer">{copy.checkPosts}</a>.</> : ` ${copy.retry}`}</p>}
       {uploadMessage && <p className={styles.uploadNotice} role="status">{uploadMessage}</p>}
       <label htmlFor="composer-message">Post text <span>(optional with a link or media)</span></label>
       <AutoTextarea id="composer-message" name="message" disabled={saved} value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={7} placeholder="Write a post for your team…" aria-describedby="composer-message-count" />
@@ -275,6 +297,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
       <p id="composer-first-comment-delay-help" className={styles.fieldHelp}>Choose a whole number from 0 to {maxFirstCommentDelayMinutes.toLocaleString()} minutes. This applies only when a first comment is saved.</p>
       {firstCommentDelayError && <p id="composer-first-comment-delay-error" className={styles.error} role="alert">{firstCommentDelayError}</p>}
       <input type="hidden" name="labelId" value={labelId} />
+      <input type="hidden" name="queueLocale" value={aiLocale} />
       <input type="hidden" name="destinationFormatsJson" value={destinationFormatsJson} />
 
       <fieldset className={styles.attachments} disabled={uploading || pending || saved}>
@@ -291,6 +314,7 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
       <div className={styles.unsavedLabel}>{saved ? 'Saved post preview' : 'Unsaved preview'} · no destination response is available yet</div>
       <PostPreview post={previewPost} authorName={authorName || 'Your team'} timeZone={schedule.timeZone} variant="card" mediaOverride={<AuthoringMediaPreview controller={attachments} />} />
       {mode === 'schedule' && scheduleDate && scheduleTime && <p className={styles.schedulePreview}>Will schedule for {scheduleDate} at {scheduleTime} ({schedule.timeZone.replaceAll('_', ' ')}).</p>}
+      {mode === 'queue' && typeof queuePreview === 'object' && queuePreview?.status === 'ready' && previewSelection === selectedKey && <p className={styles.schedulePreview}>{fill(copy.next, { time: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) })}</p>}
     </section>
 
     <SidebarDock>
@@ -299,7 +323,21 @@ export function PostComposer({ targets, templates = [], imageRules, schedule, au
         <div className={styles.actions}>
           <Button form={FORM_ID} type="submit" name="intent" value="draft" disabled={pending || uploading || saved} onClick={() => setMode('draft')}>{uploading ? 'Uploading…' : saved ? 'Opening…' : pending ? 'Saving…' : 'Save draft'}</Button>
           <Button form={FORM_ID} type="submit" name="intent" value="schedule" variant="primary" disabled={pending || uploading || saved} onClick={() => setMode('schedule')}>{uploading ? 'Uploading…' : saved ? 'Opening…' : pending ? 'Saving…' : 'Schedule post'}</Button>
+          {queueAvailable && <Button form={FORM_ID} type="submit" name="intent" value="queue" disabled={pending || uploading || saved || !(queuePreview && typeof queuePreview === 'object' && queuePreview.status === 'ready' && previewSelection === selectedKey)} onClick={() => setMode('queue')}>{uploading ? 'Uploading…' : saved ? 'Opening…' : pending ? 'Saving…' : copy.button}</Button>}
         </div>
+        {queueAvailable && <section className={styles.queueSlot} aria-label={copy.legend} aria-live="polite">
+          <h3>{copy.legend}</h3>
+          {!selected.length ? <p>{copy.chooseDestination}</p>
+            : queuePreview === 'loading' || queuePreview === null || previewSelection !== selectedKey ? <p>{copy.loading}</p>
+            : queuePreview.status === 'error' ? <><p>{copy.unavailable}</p><Button type="button" size="sm" disabled={pending || uploading || saved} onClick={() => setPreviewRefresh(value => value + 1)}>{copy.retryPreview}</Button></>
+            : queuePreview.status === 'full' ? <p>{copy.full}</p>
+            : <>
+              <p><strong>{fill(copy.next, { time: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) })}</strong></p>
+              {selected.length > 1 && <ul>{queuePreview.channels.map(channel => { const name = selected.find(target => target.id === channel.targetId)?.name ?? ''; return <li key={channel.targetId}>{channel.nextAt ? fill(copy.channelLine, { name, time: formatDate(new Date(channel.nextAt), schedule.timeZone) }) : fill(copy.channelFull, { name })}</li>; })}</ul>}
+              <small>{copy.estimate}</small>
+            </>}
+          <small>{copy.hint}</small>
+        </section>}
         <fieldset className={styles.destinationList} disabled={pending || uploading || saved}>
           <legend>Destinations</legend>
           {targets.filter(target => target.canPublish).length ? targets.filter(target => target.canPublish).map(target => <label key={target.id}>

@@ -93,3 +93,43 @@ across the whole app. Content mix/recycling remain hidden until their workers us
 lifecycle-safe validation, approval, history and current job authorization. Real
 Facebook delivery, complete legacy parity, production-shaped migration and exact
 release rollback/cutover checks remain open. Production remains legacy.
+
+## Composer queue mode (2026-10-20)
+
+The dedicated composer offers **Add to queue** when the current viewer can write
+posts and use the queue. Before saving, it displays the next common workspace
+queue time and each selected channel's individual next free time, in the workspace
+timezone. This preserves legacy `src/lib/posts.ts` behavior: one post has one
+scheduled instant, so its timetable must be valid for every selected channel;
+an occupied minute on any selected channel blocks that instant, while unrelated
+channels do not. Shared times and the intersection of channel-specific times are
+handled by the existing allocator. This change does not add seasonal adjustments.
+
+Read-only previews check current authorization, scoped usable destinations and
+workspace timezone. Loading, no slots, unavailable and stale-selection previews
+cannot be submitted. Unavailable previews have a refresh action. Previews are
+estimates: a concurrent save may consume a time before this post is saved, so the
+queue service allocates again under its existing workspace lock and success
+reports the actual time, including an approval hold when required.
+
+`server/queue-compose.ts` saves through the ordinary draft lifecycle, then calls
+`queuePost`, the same queue mutation used by HTTP and MCP. It checks queue write
+access before creating a draft, and queuePost rechecks current permissions,
+content, scope and approval policy at placement. There are no provider branches,
+new Root keys, schema changes or remote provider calls.
+
+If placement fails after draft creation, the composer retains the saved draft ID,
+message, media order/descriptions, destination formats, first comment/delay and
+selection. Queue retries update that draft instead of creating a duplicate.
+The retained draft can also be saved as a draft or explicitly scheduled through
+the existing lifecycle services. Unconfirmed transport outcomes tell the user to
+check Posts before retrying. Cache refresh failure cannot turn a confirmed save
+into a failed save. Queue copy and recovery messages have English/French variants.
+
+Verification: 44 tests across composer queue service/actions/UI, existing composer,
+queue placement/button/timetable UI and raw-SQL void guard passed; TypeScript
+`npx tsc --noEmit -p .` passed. Tests use mocked data and jsdom; no server, real
+browser, database, live provider or production verification was performed.
+The broader P1 composer parity row remains partial. Phone/theme/keyboard browser
+coverage and seasonal queue behavior remain open. The central parity/architecture
+and handoff files are outside this task's file ownership and were not changed.
