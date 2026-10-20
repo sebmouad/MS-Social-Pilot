@@ -1,0 +1,16 @@
+import { z } from 'zod';
+import { entry } from '@/lib/config/entry';
+
+/** Root-owned Home dashboard settings (prefix `home.`). Registered by the installed module host. */
+export const HOME_CONFIG = [
+  entry({ key: 'home.lookbackDays', group: 'Home', label: 'Overview period (days)', kind: 'number', description: 'Days shown on the Home overview and compared with the same number of days before.', defaultValue: 28, schema: z.number().int().min(7).max(90), consumption: 'active' }),
+  entry({ key: 'home.maxChannels', group: 'Home', label: 'Channels read per overview', kind: 'number', description: 'Maximum selected channels whose stored figures feed the overview cards. Further channels are left out and the card says so.', defaultValue: 50, schema: z.number().int().min(1).max(500), consumption: 'active' }),
+  entry({ key: 'home.topChannelsLimit', group: 'Home', label: 'Top channels shown', kind: 'number', description: 'Channels listed in the top channels chart.', defaultValue: 6, schema: z.number().int().min(1).max(20), consumption: 'active' }),
+  entry({ key: 'home.upcomingLimit', group: 'Home', label: 'Upcoming posts shown', kind: 'number', description: 'Scheduled posts listed on the overview.', defaultValue: 5, schema: z.number().int().min(1).max(20), consumption: 'active' }),
+  entry({ key: 'home.snippetCharacters', group: 'Home', label: 'Post preview length', kind: 'number', description: 'Characters of post text shown for an upcoming post.', defaultValue: 90, schema: z.number().int().min(20).max(500), consumption: 'active' }),
+  entry({ key: 'home.interactionMeasureKeys', group: 'Home', label: 'Interaction mix measures', kind: 'json', description: 'Stored per-channel measure keys, as named by the channel modules, that make up the interaction mix chart. Only additive measures belong here.', defaultValue: ['reactions', 'comments', 'shares'], schema: z.array(z.string().trim().min(1).max(100)).max(12), consumption: 'active' }),
+  entry({ key: 'home.heatmapLookbackDays', group: 'Home', label: 'Best-time history (days)', kind: 'number', description: 'Days of stored post performance behind the best-time heatmap.', defaultValue: 90, schema: z.number().int().min(14).max(365), consumption: 'active' }),
+  entry({ key: 'home.heatmapMaxPostsPerChannel', group: 'Home', label: 'Best-time posts per channel', kind: 'number', description: 'Most recent stored posts read per channel for the best-time heatmap.', defaultValue: 500, schema: z.number().int().min(10).max(5000), consumption: 'active' }),
+  entry({ key: 'home.heatmapMinPosts', group: 'Home', label: 'Best-time minimum measured posts', kind: 'number', description: 'Measured posts, over all channels, needed before the heatmap is shown; fewer is reported as not enough history.', defaultValue: 10, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'home.adsMaxPages', group: 'Home', label: 'Ad spend pages read', kind: 'number', description: 'Maximum pages of stored ad rows read for the spend snapshot. When more exist the snapshot is withheld rather than shown incomplete.', defaultValue: 5, schema: z.number().int().min(1).max(50), consumption: 'active' }),
+] as const;
