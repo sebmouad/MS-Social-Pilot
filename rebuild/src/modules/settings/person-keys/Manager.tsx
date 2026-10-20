@@ -7,13 +7,16 @@ import { personKeyCopy } from './copy';
 import { personKeyCreateConfirmation, personKeyRevokeConfirmation, type PersonKeySummary } from './types';
 
 const endpoint = '/api/settings/account/person-keys';
-export function PersonKeysManager({ locale = 'en' }: { locale?: 'en' | 'fr' }) {
+type Directory = { keys: PersonKeySummary[]; truncated: boolean; policy: { nameMaxLength: number; maxLifetimeDays: number } };
+/** `initial` is the server-read directory; `null` means that read failed, so no failing request is made on mount. */
+export function PersonKeysManager({ locale = 'en', initial }: { locale?: 'en' | 'fr'; initial?: Directory | null }) {
   const t = personKeyCopy[locale];
-  const [directory, setDirectory] = useState<{ keys: PersonKeySummary[]; truncated: boolean; policy: { nameMaxLength: number; maxLifetimeDays: number } } | null>(null);
+  const preloaded = initial !== undefined;
+  const [directory, setDirectory] = useState<Directory | null>(initial ?? null);
   const [name, setName] = useState('');
-  const [days, setDays] = useState('');
+  const [days, setDays] = useState(initial ? String(initial.policy.maxLifetimeDays) : '');
   const [secret, setSecret] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(initial === null ? t.failed : '');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);
@@ -27,7 +30,7 @@ export function PersonKeysManager({ locale = 'en' }: { locale?: 'en' | 'fr' }) {
       if (alive.current && !signal?.aborted) { setDirectory(result); setDays(current => current || String(result.policy.maxLifetimeDays)); }
     } catch { if (alive.current && !signal?.aborted) setError(t.failed); }
   }, [t.failed]);
-  useEffect(() => { alive.current = true; const controller = new AbortController(); void reload(controller.signal); return () => { alive.current = false; controller.abort(); }; }, [reload]);
+  useEffect(() => { alive.current = true; const controller = new AbortController(); if (!preloaded) void reload(controller.signal); return () => { alive.current = false; controller.abort(); }; }, [reload, preloaded]);
   async function change(method: 'POST' | 'DELETE', input: unknown) {
     try {
       const response = await fetch(endpoint, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
