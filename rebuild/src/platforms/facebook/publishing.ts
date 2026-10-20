@@ -44,6 +44,20 @@ export type FacebookPageInsightObservations = FacebookPageInsightObservation[] &
 export interface FacebookInboxMessage { id: string; text: string | null; createdAt: Date; fromName: string | null; fromId: string | null }
 export interface FacebookConversation { id: string; snippet: string | null; updatedAt: Date; unreadCount: number; messageCount: number; messages: FacebookInboxMessage[] }
 export interface FacebookComment { id: string; message: string; fromName: string | null; fromId: string | null; createdAt: Date; parentId: string | null; likeCount: number; replyCount: number; isHidden: boolean }
+/** Root-owned read bounds for Inbox discovery; absent values keep the strict single-listing behaviour. */
+export interface FacebookInboxBounds { conversationPages?: number; messagePages?: number; replyExpansions?: number }
+/** `incomplete` is set when a bound stopped discovery early or an expansion read failed. */
+export type FacebookDiscovered<T> = T[] & { incomplete?: boolean };
+const COMMENT_FIELDS = 'id,message,from{id,name},created_time,parent{id},like_count,comment_count,is_hidden';
+function mapComments(raw: readonly JsonObject[]): FacebookComment[] {
+  return raw.flatMap(item => {
+    const from = object(item.from); const parent = object(item.parent); const createdAt = date(item.created_time);
+    if (typeof item.id !== 'string' || typeof item.message !== 'string' || !createdAt) return [];
+    return [{ id: item.id, message: item.message, fromName: typeof from.name === 'string' ? from.name : null, fromId: typeof from.id === 'string' ? from.id : null,
+      createdAt, parentId: typeof parent.id === 'string' ? parent.id : null, likeCount: typeof item.like_count === 'number' ? item.like_count : 0,
+      replyCount: typeof item.comment_count === 'number' ? item.comment_count : 0, isHidden: item.is_hidden === true }];
+  });
+}
 export interface FacebookEngine {
   getAuthorizationUrl(input: OAuthStartRequest): string;
   exchangeCode(input: OAuthExchangeRequest): Promise<{ accessToken: string; expiresAt: Date | null }>;
@@ -57,8 +71,8 @@ export interface FacebookEngine {
   deletePost(accessToken: string, remoteId: string): Promise<void>;
   getPhotoCleanupState(accessToken: string, remoteId: string): Promise<{ id: unknown; page_story_id?: unknown; can_delete: unknown }>;
   deletePhoto(accessToken: string, remoteId: string, onDispatch?: () => void, onConfirmed?: () => void): Promise<void>;
-  listInbox(accessToken: string, pageId: string): Promise<FacebookConversation[]>;
-  listComments(accessToken: string, postId: string): Promise<FacebookComment[]>;
+  listInbox(accessToken: string, pageId: string, bounds?: FacebookInboxBounds): Promise<FacebookDiscovered<FacebookConversation>>;
+  listComments(accessToken: string, postId: string, bounds?: FacebookInboxBounds): Promise<FacebookDiscovered<FacebookComment>>;
   /** Empty when Meta no longer serves Page ratings on any version. */
   listReviews(accessToken: string, pageId: string): Promise<InboxReview[]>;
   getPageAnalytics(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<Record<string, number | null>>;
@@ -168,8 +182,13 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
   }
 
   async function pages<T>(first: string, token: string): Promise<T[]> {
-    const results: T[] = []; let next: string | undefined = first; const seen = new Set<string>();
-    for (let page = 0; page < config.maxPages && next; page++) {
+    return (await pagesCore<T>(first, token, config.maxPages, true)).items;
+  }
+  /** Reads at most `limit` Graph pages. `strict` throws when more remain; otherwise it stops and reports `truncated`. */
+  async function pagesCore<T>(first: string, token: string, limit: number, strict: boolean): Promise<{ items: T[]; truncated: boolean }> {
+    const results: T[] = []; let next: string | undefined = first; const seen = new Set<string>(); let truncated = false;
+    const pageLimit = Math.min(limit, config.maxPages);
+    for (let page = 0; page < pageLimit && next; page++) {
       assertOperationActive();
       const nextUrl = new URL(next);
       const configuredBase = new URL(config.graphBaseUrl);
@@ -199,9 +218,12 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       if (!link) { next = undefined; break; }
       if (seen.has(link)) throw new FacebookApiError('Facebook pagination returned a repeated next URL.', 0);
       seen.add(link); next = link;
-      if (page === config.maxPages - 1) throw new FacebookApiError('Facebook pagination exceeded the configured page limit.', 0);
+      if (page === pageLimit - 1) {
+        if (strict) throw new FacebookApiError('Facebook pagination exceeded the configured page limit.', 0);
+        truncated = true;
+      }
     }
-    return results;
+    return { items: results, truncated };
   }
   function collectionUrl(path: string, token: string, fields: string): string {
     const url = graphObjectUrl(config, path); url.searchParams.set('access_token', token); url.searchParams.set('fields', fields); url.searchParams.set('limit', String(config.pageSize)); return url.toString();
@@ -471,15 +493,30 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const result = object(await request(encodeURIComponent(commentId), { method: 'DELETE', token }));
       if (result.success !== true) throw new FacebookApiError('Facebook did not confirm comment deletion.', 200);
     },
-    async listInbox(token, pageId) {
-      const raw = await pages<JsonObject>(collectionUrl(`${encodeURIComponent(pageId)}/conversations`, token, 'id,snippet,updated_time,unread_count,message_count,messages.limit(20){id,message,created_time,from{id,name}}'), token);
-      return raw.flatMap(c => {
-        if (typeof c.id !== 'string') return [];
-        const data = object(c.messages).data;
-        const messages = Array.isArray(data) ? data.flatMap(m => { const x = object(m); const createdAt = date(x.created_time); const from = object(x.from); return typeof x.id === 'string' && createdAt ? [{ id: x.id, text: typeof x.message === 'string' ? x.message : null, createdAt, fromName: typeof from.name === 'string' ? from.name : null, fromId: typeof from.id === 'string' ? from.id : null }] : []; }) : [];
-        return [{ id: c.id, snippet: typeof c.snippet === 'string' ? c.snippet : null, updatedAt: date(c.updated_time) ?? new Date(0),
-          unreadCount: typeof c.unread_count === 'number' ? c.unread_count : 0, messageCount: typeof c.message_count === 'number' ? c.message_count : messages.length, messages }];
-      });
+    async listInbox(token, pageId, bounds) {
+      const url = collectionUrl(`${encodeURIComponent(pageId)}/conversations`, token, 'id,snippet,updated_time,unread_count,message_count,messages.limit(20){id,message,created_time,from{id,name}}');
+      let incomplete = false;
+      let raw: JsonObject[];
+      if (bounds?.conversationPages) { const read = await pagesCore<JsonObject>(url, token, bounds.conversationPages, false); raw = read.items; incomplete = read.truncated; }
+      else raw = await pages<JsonObject>(url, token);
+      const mapMessage = (m: unknown) => { const x = object(m); const createdAt = date(x.created_time); const from = object(x.from); return typeof x.id === 'string' && createdAt ? [{ id: x.id, text: typeof x.message === 'string' ? x.message : null, createdAt, fromName: typeof from.name === 'string' ? from.name : null, fromId: typeof from.id === 'string' ? from.id : null }] : []; };
+      const conversations: FacebookConversation[] = [];
+      for (const c of raw) {
+        if (typeof c.id !== 'string') continue;
+        const inline = object(c.messages);
+        const data: unknown[] = Array.isArray(inline.data) ? [...inline.data] : [];
+        // A conversation busier than one response page keeps its other messages behind paging.next; follow it within the Root bound.
+        const next = object(inline.paging).next;
+        if (bounds?.messagePages && typeof next === 'string') {
+          const more = await pagesCore<unknown>(next, token, bounds.messagePages, false);
+          data.push(...more.items);
+          if (more.truncated) incomplete = true;
+        }
+        const messages = [...new Map(data.flatMap(mapMessage).map(message => [message.id, message])).values()];
+        conversations.push({ id: c.id, snippet: typeof c.snippet === 'string' ? c.snippet : null, updatedAt: date(c.updated_time) ?? new Date(0),
+          unreadCount: typeof c.unread_count === 'number' ? c.unread_count : 0, messageCount: typeof c.message_count === 'number' ? c.message_count : messages.length, messages });
+      }
+      return Object.assign(conversations, incomplete ? { incomplete } : {});
     },
     async listReviews(token, pageId) {
       const version = ratingsReadVersion(config.graphVersion);
@@ -489,18 +526,38 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const raw = await pages<JsonObject>(collectionUrl(`${encodeURIComponent(pageId)}/ratings`, token, FACEBOOK_RATINGS_FIELDS), token);
       return raw.flatMap(item => { const review = mapFacebookReview(item); return review ? [review] : []; });
     },
-    async listComments(token, postId) {
+    async listComments(token, postId, bounds) {
       // filter=stream returns replies flattened beside top-level comments (each carries parent{id}), so stored threads can nest them.
-      const commentsUrl = new URL(collectionUrl(`${encodeURIComponent(postId)}/comments`, token, 'id,message,from{id,name},created_time,parent{id},like_count,comment_count,is_hidden'));
+      const commentsUrl = new URL(collectionUrl(`${encodeURIComponent(postId)}/comments`, token, COMMENT_FIELDS));
       commentsUrl.searchParams.set('filter', 'stream');
-      const raw = await pages<JsonObject>(commentsUrl.toString(), token);
-      return raw.flatMap(item => {
-        const from = object(item.from); const parent = object(item.parent); const createdAt = date(item.created_time);
-        if (typeof item.id !== 'string' || typeof item.message !== 'string' || !createdAt) return [];
-        return [{ id: item.id, message: item.message, fromName: typeof from.name === 'string' ? from.name : null, fromId: typeof from.id === 'string' ? from.id : null,
-          createdAt, parentId: typeof parent.id === 'string' ? parent.id : null, likeCount: typeof item.like_count === 'number' ? item.like_count : 0,
-          replyCount: typeof item.comment_count === 'number' ? item.comment_count : 0, isHidden: item.is_hidden === true }];
-      });
+      const comments = mapComments(await pages<JsonObject>(commentsUrl.toString(), token));
+      const budget = bounds?.replyExpansions ?? 0;
+      if (budget < 1) return comments;
+      // The stream can omit replies to a reply (including a visitor answering the Page's own reply). A comment reporting more replies than were
+      // listed is read through its own edge, newest first, within the Root budget; replies found there may be expanded in turn.
+      const byId = new Map(comments.map(comment => [comment.id, comment]));
+      let incomplete = false; let used = 0;
+      const deficit = (comment: FacebookComment) => comment.replyCount - [...byId.values()].filter(other => other.parentId === comment.id).length;
+      const attempted = new Set<string>();
+      for (;;) {
+        const candidate = [...byId.values()].filter(comment => !attempted.has(comment.id) && deficit(comment) > 0)
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id))[0];
+        if (!candidate) break;
+        if (used >= budget) { incomplete = true; break; }
+        attempted.add(candidate.id); used++;
+        try {
+          const edge = new URL(collectionUrl(`${encodeURIComponent(candidate.id)}/comments`, token, COMMENT_FIELDS));
+          edge.searchParams.set('filter', 'stream');
+          for (const reply of mapComments(await pages<JsonObject>(edge.toString(), token))) {
+            if (!byId.has(reply.id)) byId.set(reply.id, { ...reply, parentId: reply.parentId ?? candidate.id });
+          }
+        } catch (error) {
+          // Cancellation ends the whole read; any other failure leaves this thread partly discovered, never silently complete.
+          if (operationSignal?.aborted) throw error;
+          incomplete = true;
+        }
+      }
+      return Object.assign([...byId.values()], incomplete ? { incomplete } : {});
     },
     async getPageAnalytics(token, pageId, since, until) {
       if (!config.pageInsightMetrics.length) return {};

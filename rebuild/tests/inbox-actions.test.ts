@@ -211,6 +211,23 @@ describe('workspace Facebook inbox actions', () => {
     expect(mocks.suppressed).toHaveBeenCalledWith(mocks.prisma, actor.workspaceId, 'target-1', 'reply-1', 'parent-1');
   });
 
+  it('passes the Root discovery bounds to every module read and reports channels whose discovery stopped early', async () => {
+    mocks.config.mockImplementation(async key => ({ 'platforms.facebook.enabled': true, 'meta.pageSize': 25, 'meta.maxPages': 2, 'meta.inboxReadScopes': ['pages_messaging'], 'inbox.syncConversationPages': 7, 'inbox.syncMessagePages': 4, 'inbox.syncReplyExpansions': 9 } as Record<string, unknown>)[key] ?? []);
+    mocks.prisma.target.findMany.mockResolvedValue([{ id: 'target-1' }]);
+    mocks.prisma.$transaction.mockImplementation(async (work: (tx: typeof mocks.prisma) => Promise<unknown>) => work(mocks.prisma));
+    mocks.engine.listInbox.mockResolvedValue(Object.assign([], { incomplete: true }));
+    mocks.prisma.postTarget.findMany.mockResolvedValue([{ id: 'post-target-1', remotePostId: 'post-remote-1' }]);
+    mocks.engine.listComments.mockResolvedValue([]);
+    const result = await syncFacebookInbox(actor, 'target-1');
+    const bounds = { conversationPages: 7, messagePages: 4, replyExpansions: 9 };
+    expect(mocks.engine.listInbox).toHaveBeenCalledWith('page-secret', 'page-1', bounds);
+    expect(mocks.engine.listComments).toHaveBeenCalledWith('page-secret', 'post-remote-1', bounds);
+    expect(result).toMatchObject({ targetCount: 1, incompleteCount: 1 });
+
+    mocks.engine.listInbox.mockResolvedValue([]);
+    expect(await syncFacebookInbox(actor, 'target-1')).toMatchObject({ incompleteCount: 0 });
+  });
+
   it('orders each manual comment batch parent-first before checking tombstones', async () => {
     mocks.config.mockImplementation(async key => key === 'platforms.facebook.enabled' ? true : key === 'meta.pageSize' ? 25 : key === 'meta.maxPages' ? 2 : key === 'meta.inboxReadScopes' ? ['pages_messaging'] : []);
     mocks.prisma.target.findMany.mockResolvedValue([{ id: 'target-1' }]);

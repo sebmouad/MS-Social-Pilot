@@ -9,6 +9,7 @@ import { loadPermissions } from '@/server/permissions/loader';
 import { runtimeConfig } from '@/server/config/store';
 import { messengerReplyWindow } from './reply-window';
 import { withInboxChannelOperation, inboxCommentSuppressed, orderInboxCommentBatch } from '@/modules/inbox/server/comment-guard';
+import { inboxSyncBounds, discoveryIncomplete } from '@/modules/inbox/server/sync-bounds';
 
 import type { InboxReplyPolicyRequest } from '@/modules/inbox/server/policy';
 import { facebookReplyRule } from './reply-policy';
@@ -76,7 +77,8 @@ export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
   const visibleTargets = targets.filter(item => canAccessPage(permissions, item.id));
   if (targetId && !visibleTargets.length) throw new OperationError('forbidden', 'You do not have access to this Facebook Page.');
   const engine = await configuredFacebookEngine();
-  const batches: Array<{ targetId: string; conversations: Awaited<ReturnType<typeof engine.listInbox>>; comments: Array<{ postTargetId: string; items: Awaited<ReturnType<typeof engine.listComments>> }> }> = [];
+  const bounds = await inboxSyncBounds();
+  const batches: Array<{ targetId: string; incomplete: boolean; conversations: Awaited<ReturnType<typeof engine.listInbox>>; comments: Array<{ postTargetId: string; items: Awaited<ReturnType<typeof engine.listComments>> }> }> = [];
   const failures: unknown[] = [];
   for (const item of visibleTargets) {
     // One channel that needs reconnecting must not block the others. Provider
@@ -84,17 +86,17 @@ export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
     try {
       const channel = await page(actor, item.id, false);
       const [conversations, publishedPosts] = await Promise.all([
-        engine.listInbox(channel.token, channel.providerId),
+        engine.listInbox(channel.token, channel.providerId, bounds),
         prisma.postTarget.findMany({ where: { targetId: item.id, remotePostId: { not: null }, status: 'published' }, orderBy: { publishedAt: 'desc' }, take: postSyncLimit, select: { id: true, remotePostId: true } }),
       ]);
       const comments: Array<{ postTargetId: string; items: Awaited<ReturnType<typeof engine.listComments>> }> = [];
-      for (const post of publishedPosts) if (post.remotePostId) comments.push({ postTargetId: post.id, items: await engine.listComments(channel.token, post.remotePostId) });
-      batches.push({ targetId: item.id, conversations, comments });
+      for (const post of publishedPosts) if (post.remotePostId) comments.push({ postTargetId: post.id, items: await engine.listComments(channel.token, post.remotePostId, bounds) });
+      batches.push({ targetId: item.id, incomplete: discoveryIncomplete(conversations, ...comments.map(entry => entry.items)), conversations, comments });
     } catch (error) { failures.push(error); }
   }
   if (failures.length && !batches.length) throw failures[0];
   let conversationCount = 0; let messageCount = 0; let commentCount = 0;
-  const syncedTargetIds: string[] = [];
+  const syncedTargetIds: string[] = []; const incompleteTargetIds: string[] = [];
   for (const batch of batches) {
     try {
       let batchConversationCount = 0; let batchMessageCount = 0; let batchCommentCount = 0;
@@ -132,12 +134,13 @@ export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
         });
       });
       syncedTargetIds.push(batch.targetId);
+      if (batch.incomplete) incompleteTargetIds.push(batch.targetId);
       conversationCount += batchConversationCount; messageCount += batchMessageCount; commentCount += batchCommentCount;
     } catch (error) { failures.push(error); }
   }
   if (failures.length && !syncedTargetIds.length) throw failures[0];
-  await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`inbox_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'inbox.synced', ${JSON.stringify({ workspaceId: actor.workspaceId, targetIds: syncedTargetIds, targetCount: syncedTargetIds.length, failedCount: failures.length, conversationCount, messageCount, commentCount })}::jsonb, NOW())`;
-  return { targetCount: syncedTargetIds.length, failedCount: failures.length, conversationCount, messageCount, commentCount, syncedAt: new Date().toISOString() };
+  await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`inbox_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'inbox.synced', ${JSON.stringify({ workspaceId: actor.workspaceId, targetIds: syncedTargetIds, targetCount: syncedTargetIds.length, failedCount: failures.length, incompleteTargetIds, conversationCount, messageCount, commentCount })}::jsonb, NOW())`;
+  return { targetCount: syncedTargetIds.length, failedCount: failures.length, incompleteCount: incompleteTargetIds.length, conversationCount, messageCount, commentCount, syncedAt: new Date().toISOString() };
 }
 
 export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; text: string }) {

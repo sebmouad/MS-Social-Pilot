@@ -8,6 +8,7 @@ import { withRetries } from '@/server/jobs/retry';
 import type { RetryBackoff } from '@/server/jobs/retry';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { lockInboxChannel, inboxCommentSuppressed, orderInboxCommentBatch } from '@/modules/inbox/server/comment-guard';
+import { inboxSyncBounds } from '@/modules/inbox/server/sync-bounds';
 import { lockPublishingTargets } from '@/modules/publishing/server/guard';
 import { assertNoPostDeletionForRemoteIdentity } from '@/modules/publishing/server/post-deletion-guard';
 import type { JobSummary } from '@/server/jobs/types';
@@ -268,6 +269,7 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
 export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
   if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
+  const bounds = await inboxSyncBounds();
   const targetWhere = { type: 'page' as const, enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } };
   const targets = await fairBatch('inbox', limit, (cursor, direction, take) => prisma.target.findMany({
     where: { AND: [targetWhere, ...(cursor ? [{ id: { [direction === 'after' ? 'gt' : 'lte']: cursor } }] : [])] },
@@ -289,10 +291,10 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
             if (!fresh?.socialAccount || !usable(fresh.socialAccount, target.workspaceId, currentTime(now)) || !granted(fresh.socialAccount.scopes, scopes) || !fresh.accessToken && !fresh.socialAccount.accessToken) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
             return { providerId: fresh.providerId, token: decryptSecret(fresh.accessToken ?? fresh.socialAccount.accessToken) };
           };
-          const conversations = await withRetries(async () => { const binding = await freshTarget(); const engine = await configuredFacebookEngine({ signal }); return engine.listInbox(binding.token, binding.providerId); }, retryLimit, retryBackoff);
+          const conversations = await withRetries(async () => { const binding = await freshTarget(); const engine = await configuredFacebookEngine({ signal }); return engine.listInbox(binding.token, binding.providerId, bounds); }, retryLimit, retryBackoff);
           const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, status: 'published', remotePostId: { not: null }, post: { workspaceId: target.workspaceId } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: limit, select: { id: true, remotePostId: true } });
           const commentBatches: Array<{ postTargetId: string; comments: FacebookComments }> = [];
-          for (const post of posts) if (post.remotePostId) commentBatches.push({ postTargetId: post.id, comments: await withRetries(async () => { const binding = await freshTarget(); const engine = await configuredFacebookEngine({ signal }); return engine.listComments(binding.token, post.remotePostId!); }, retryLimit, retryBackoff) });
+          for (const post of posts) if (post.remotePostId) commentBatches.push({ postTargetId: post.id, comments: await withRetries(async () => { const binding = await freshTarget(); const engine = await configuredFacebookEngine({ signal }); return engine.listComments(binding.token, post.remotePostId!, bounds); }, retryLimit, retryBackoff) });
           await freshTarget();
             const latestPosts = await prisma.postTarget.findMany({ where: { id: { in: commentBatches.map(batch => batch.postTargetId) }, targetId: target.id, status: 'published', remotePostId: { not: null }, post: { workspaceId: target.workspaceId } }, select: { id: true, remotePostId: true } });
           const latestById = new Map(latestPosts.map(post => [post.id, post.remotePostId]));
