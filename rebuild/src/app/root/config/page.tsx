@@ -6,7 +6,7 @@ import { RootConfigForm } from './root-config-form';
 
 export const metadata = { title: 'Shared configuration · Root' };
 
-export default async function RootConfigPage({ searchParams }: { searchParams?: Promise<{ search?: string | string[] }> } = {}) {
+export default async function RootConfigPage({ searchParams }: { searchParams: Promise<{ search?: string | string[] }> }) {
   // Root access is checked before rendering the shared shell. This route must
   // not depend on workspace membership: an installation owner may have none.
   await requireRootPage();
