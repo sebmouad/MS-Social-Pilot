@@ -1,6 +1,6 @@
 # Ads parity: comparison, directory and management (W3)
 
-Status: **integrated stored reports and durable object-operation services, with scoped local verification; incomplete live-provider/creation/release coverage.** Management is off by default. The current proof and remaining gaps are recorded below. Target: [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md).
+Status: **integrated stored reports, durable object/creation services and stored-image creative creation, with scoped mocked verification; incomplete browser/database/live-provider/release coverage.** Management is off by default. The current proof and remaining gaps are recorded below. Target: [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md).
 
 ## What exists
 
@@ -48,7 +48,7 @@ Without this table every write fails closed (`unavailable`) before any provider 
 - Shared service paths back the Objects/Campaigns UI, management HTTP API and MCP tools.
 - The older status/budget API/MCP shape delegates to the same durable service.
 - The checksum-pinned additive ledger migration is in the cutover allowlist; it has been applied only to local preview after backup/scratch verification.
-- Complete creation journaling, provider/live evidence and the release cutover remain pending.
+- Campaign/ad-set and creative creation share the durable journal; the 2026-10-20 creative checkpoint below adds independently committed remote receipts. Database/browser/provider evidence and release cutover remain pending.
 
 ## Limitations
 
@@ -56,7 +56,7 @@ Without this table every write fails closed (`unavailable`) before any provider 
 
 - Stored data only; no new sync. Previous-period coverage is shown via day counts and "no earlier data", not a sync-window check. Comparison totals and daily trends require account-level insight rows; when those rows are missing, the UI shows object evidence while stating account totals are unavailable.
 - Directory parent links depend on `campaign_id`/`adset_id` being present in stored row fields.
-- Creative support assigns an *existing* account creative to an ad; creating or editing creative content is not implemented and not advertised.
+- Creative support creates unattached image/link creatives from stored workspace images and assigns existing account creatives to ads. Editing creative content, automatic orphan cleanup and live-provider verification remain open. Assignment is spend changing because it may affect a delivering ad.
 - Facebook `delete` posts `status=DELETED` (irreversible) -- confirmed by text only; campaign budgets apply only to budget-owning campaigns, otherwise Graph rejects.
 - No live Facebook call or spend belongs to the report/export work. Stored comparison object trends/deltas and findings CSV are implemented in the local coverage update below; browser/provider/release evidence remains separate.
 
@@ -243,3 +243,87 @@ live provider, browser, production or PostgreSQL integration run was performed.
 Stored windows are bounded queries, not an atomic snapshot across requests. Async
 exports, live freshness/sync proof, broader management/creative parity and release
 gates remain open.
+
+
+## Stored-image creative creation — 2026-10-20 (`codex/ads-creative`)
+
+`creative.create` is a neutral, strictly parsed operation: `objectType: creative`,
+name, selected `targetId`, stored workspace `mediaId`, `format: image|link`, message,
+title, and an HTTPS destination for link creatives. It accepts no delivery status,
+remote channel identity, image URL or account credentials. The selected account's
+operations host validates and maps it; all Facebook protocol rules stay in
+`src/platforms/facebook/ads-ops/{index,creative}.ts`.
+
+UI (`CampaignsScreen` / `CreativeCreateForm`), HTTP (`/api/ads/management`) and MCP
+(`preview_ads_change` / `apply_ads_change`) call the same management service.
+`list_ads_creative_sources` and HTTP `view=creative-sources` return paged selected
+channels and stored images, with resource/key ceilings and private preview reads.
+The form uses shared validation, Button, AutoTextarea and `useConfirm`, with en/fr
+copy, retained failed input, typed exact confirmation and no automatic resend.
+A reviewed request is saved per user/workspace/account before sending; reload and
+lost responses keep its original identity and payload. Successful replays do not
+claim current delivery state. Unpersisted settlement stays held; human attestation
+never invents a creative identity. Exact Facebook confirmations bind all creative
+content through a digest, including destination, title and message.
+
+Creation stays **unattached**: standalone Facebook creatives have no `PAUSED`
+delivery status. This flow creates no ad, assigns nothing and starts no delivery
+or spend. Existing campaign/ad-set creation still explicitly sends `PAUSED`.
+Assignment to an existing ad is now correctly advertised as spend changing and
+uses its separate exact confirmation. This is a protocol distinction, not a new
+ability to bypass delivery confirmation.
+
+The durable pending intent precedes the first provider write. Account and selected
+channel locks cover current authority checks and dispatch. Facebook uploads the
+stored bytes to the account, then independently commits the image-hash receipt
+before creating the creative. The final creative receipt commits independently
+before normal settlement. These bounded receipts live in the existing
+`root_activities` journal as `ads.creation_receipt`, tied to workspace/account/
+operation, and appear in scoped history/recovery reads. No bytes or credentials
+are journaled. Campaign/ad-set final receipts also use this checkpoint.
+
+Any unknown upload/final response, failed receipt checkpoint, or failure after a
+successful upload remains uncertain and held, including a definite rejection of
+the second write. Nothing is retried or remotely cleaned up automatically. A
+manager must inspect both any uploaded image and creative before attesting an
+outcome. A replay may return its recorded outcome after the local image has been
+removed, without uploading again. Creative history and recovery additionally
+check the exact channel ceiling, rather than merely another channel on the same
+connection.
+
+Migration: `prisma/migrations/20261030110000_rebuild_ads_creative_creation/migration.sql`
+adds creative operation/object checks and the receipt lookup index. **Authored,
+not applied**; no Prisma schema/client regeneration is required. Apply it through
+the documented migration gates before enabling writes. Without the journal checks
+in place, intent insertion fails closed before provider dispatch.
+
+**New Root keys: none.** Existing `ads.managementEnabled` remains false by default;
+`ads.managementPolicy` supplies name/page limits, the canonical stored-image reader
+consumes Publishing storage policies, and Facebook consumes its existing
+`meta.maxImageUploadBytes` / `meta.allowedImageMimeTypes`. The central registry was
+not edited. Creative input safety bounds are 5,000 message characters and 200 headline
+characters; they do not claim provider acceptance of every such creative.
+
+Mapping reference: Meta's [standalone creative example](https://www.postman.com/meta/facebook-marketing-api/request/2y4pkug/creating-standalone-adcreative-l-1)
+and [account image endpoint](https://www.postman.com/meta/facebook-marketing-api/request/i9eqz9q/get-image-hash).
+These sources guide the mapping; only mocked transport is exercised here.
+
+Verification and remaining work: final commands/results are recorded below. No
+server, provider mutation, migration application or deployment belongs to this
+checkpoint. Browser themes/phone/keyboard checks, PostgreSQL concurrency and
+migration execution, live grants/creation/cleanup and production release remain
+open. This checkpoint does not declare complete Ads or legacy parity. Its next
+action is integration review followed by those explicitly separate verification
+gates; no production service or existing held remote object was changed.
+
+Final local verification from `rebuild/`:
+
+- `npx vitest run tests/ads-*.test.ts tests/facebook-ads-*.test.ts tests/mcp-security.test.ts tests/mcp-ads-account-scope80.test.ts tests/raw-sql-void-guard.test.ts` — **571 passed, 5 skipped** (40 passing files; guarded database integration skipped).
+- `npx tsc --noEmit -p .` — passed.
+- `git diff --check` — passed.
+- Frontend strict static audit — 44 repository findings, including existing shared
+  Button/form detections; no finding in the new creative form or copy. This is
+  static evidence only, not a passing whole-application UX audit.
+
+No install, client generation, server, push or deployment was run. Browser,
+PostgreSQL migration/concurrency and live-provider evidence remain unverified.

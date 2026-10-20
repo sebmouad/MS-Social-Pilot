@@ -110,3 +110,10 @@
 .ads-campaign-create__fields label { display: grid; gap: .3rem; min-width: 12rem; }
 .ads-campaign-create__fields input, .ads-campaign-create__fields select { min-height: 2.5rem; padding: .4rem .55rem; }
 .ads-campaign-create__fields button { min-height: 2.5rem; }
+
+.ads-creative-image { display: block; object-fit: contain; max-width: 100%; margin-block: var(--space-3); }
+
+.ads-creative-create .ads-campaign-create__fields > label { flex: 1 1 12rem; min-width: 0; }
+.ads-creative-create input, .ads-creative-create select, .ads-creative-create textarea { width: 100%; min-width: 0; max-width: 100%; }
+.ads-creative-create p, .ads-creation-receipts { overflow-wrap: anywhere; }
+.ads-creation-receipts { white-space: pre-wrap; }

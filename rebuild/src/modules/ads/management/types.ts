@@ -4,7 +4,8 @@
  * services validate, confirm, record and dispatch without provider knowledge.
  */
 export type AdsObjectType = 'campaign' | 'adset' | 'ad';
-export type AdsOperationId = 'status.set' | 'budget.set' | 'rename' | 'creative.assign' | 'delete' | 'campaign.create' | 'adset.create';
+export type AdsManagedObjectType = AdsObjectType | 'creative';
+export type AdsOperationId = 'status.set' | 'budget.set' | 'rename' | 'creative.assign' | 'delete' | 'campaign.create' | 'adset.create' | 'creative.create';
 
 export type AdsNeutralOperation =
   | { type: 'status.set'; objectType: AdsObjectType; objectId: string; status: 'active' | 'paused' }
@@ -15,7 +16,9 @@ export type AdsNeutralOperation =
   /** Creation carries no objectId and no status: the platform module always creates the object paused. */
   | { type: 'campaign.create'; objectType: 'campaign'; name: string; objective: string }
   /** parentId is an existing campaign remote id; the shared service verifies it belongs to the account from stored history. */
-  | { type: 'adset.create'; objectType: 'adset'; parentId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string };
+  | { type: 'adset.create'; objectType: 'adset'; parentId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }
+  /** Stored workspace image and selected channel identity; never an arbitrary image URL or remote identity. No delivery or assignment. */
+  | { type: 'creative.create'; objectType: 'creative'; name: string; targetId: string; mediaId: string; format: 'image' | 'link'; message: string; title: string; linkUrl?: string };
 
 /** Neutral description of one input an operation needs, so shared UI/MCP can render a form without provider knowledge. */
 export type AdsOperationInput =
@@ -29,7 +32,7 @@ export type AdsOpsLimits = { nameMaxCharacters: number; maxBudgetMinor: number }
 
 export type AdsOperationSupport = {
   id: AdsOperationId;
-  objectTypes: readonly AdsObjectType[];
+  objectTypes: readonly AdsManagedObjectType[];
   /** True when the operation can start or increase spend; surfaced as a stronger warning. */
   spendChanging: boolean;
   label: string;
@@ -41,11 +44,12 @@ export type AdsOperationSupport = {
 
 export type AdsCreativeSummary = { id: string; name: string | null; status: string | null; title: string | null; body: string | null; thumbnailUrl: string | null };
 export type AdsOpsCredential = { accessToken: string };
-export type AdsOpsContext = { credential: AdsOpsCredential; accountId: string; signal?: AbortSignal };
+export type AdsOpsContext = { credential: AdsOpsCredential; accountId: string; signal?: AbortSignal; creative?: { identityId: string; identityKind: string; image: { bytes: Buffer; mimeType: string } }; recordReceipt?: (receipt: Record<string, string>) => Promise<void> };
 export type AdsOpsFailureKind = 'rejected' | 'uncertain';
 
 export interface AdsOpsHost {
   readonly provider: string;
+  readonly creativeIdentityKinds?: readonly string[];
   readonly operations: readonly AdsOperationSupport[];
   /** Throws OperationError('invalid_request') for malformed input. */
   validate(operation: AdsNeutralOperation, limits?: AdsOpsLimits): void;
@@ -61,7 +65,7 @@ export interface AdsOpsHost {
 }
 
 export const AD_OBJECT_TYPES: readonly AdsObjectType[] = ['campaign', 'adset', 'ad'];
-export const AD_OPERATION_IDS: readonly AdsOperationId[] = ['status.set', 'budget.set', 'rename', 'creative.assign', 'delete', 'campaign.create', 'adset.create'];
+export const AD_OPERATION_IDS: readonly AdsOperationId[] = ['status.set', 'budget.set', 'rename', 'creative.assign', 'delete', 'campaign.create', 'adset.create', 'creative.create'];
 
-export type AdsCreationOperation = Extract<AdsNeutralOperation, { type: 'campaign.create' | 'adset.create' }>;
-export function isCreationOperation(operation: AdsNeutralOperation): operation is AdsCreationOperation { return operation.type === 'campaign.create' || operation.type === 'adset.create'; }
+export type AdsCreationOperation = Extract<AdsNeutralOperation, { type: 'campaign.create' | 'adset.create' | 'creative.create' }>;
+export function isCreationOperation(operation: AdsNeutralOperation): operation is AdsCreationOperation { return operation.type === 'campaign.create' || operation.type === 'adset.create' || operation.type === 'creative.create'; }

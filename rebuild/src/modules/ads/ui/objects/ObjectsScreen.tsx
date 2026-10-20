@@ -1,3 +1,5 @@
+import { headers } from 'next/headers';
+import { adsLocale } from '@/modules/ads/analysis/copy';
 import { ensureAdsManagement } from '@/modules/ads/server/management';
 import '@/modules/ads/ui/ads.css';
 import './objects.css';
@@ -23,6 +25,7 @@ const show = (value: number | null) => (value === null ? 'Unknown' : number.form
 
 export default async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> }) {
   ensureAdsManagement();
+  const locale = adsLocale((await headers()).get('accept-language'));
   const viewer = await requireViewer({ feature: 'ads/objects', channelScoped: true });
   const params = await searchParams;
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
@@ -72,6 +75,6 @@ export default async function AdsObjectsPage({ searchParams }: { searchParams: P
       <nav aria-label="Pages">{directory.offset > 0 ? <a href={pageLink(Math.max(0, directory.offset - directory.limit))}>Previous</a> : null}{' '}{directory.nextOffset !== null ? <a href={pageLink(directory.nextOffset)}>Next</a> : null}</nav>
       <p className="small-note">{directory.note}</p>
     </section>
-    {history ? <section className="panel" id="changes" aria-labelledby="changes-title"><h2 id="changes-title">Change history</h2><ChangeHistory items={history} /></section> : null}
+    {history ? <section className="panel" id="changes" aria-labelledby="changes-title"><h2 id="changes-title">Change history</h2><ChangeHistory locale={locale} items={history} /></section> : null}
   </div></PageFrame>;
 }

@@ -4,11 +4,13 @@ import { createHash } from 'node:crypto';
 const calls: string[] = [];
 const state = vi.hoisted(() => ({
   prisma: {
+    target: { findFirst: vi.fn(), findMany: vi.fn() },
     user: { findUnique: vi.fn() }, membership: { findUnique: vi.fn() }, adAccount: { findFirst: vi.fn(), findMany: vi.fn() }, adInsight: { findFirst: vi.fn() },
     $executeRaw: vi.fn(), $queryRaw: vi.fn(), $transaction: vi.fn(),
   },
-  entitlements: vi.fn(), permissions: vi.fn(), canUse: vi.fn(), canAccess: vi.fn(), hasPlatform: vi.fn(), purge: vi.fn(), config: vi.fn(), platformAds: vi.fn(), decrypt: vi.fn(), selectedLock: vi.fn(), selectedOperation: vi.fn(),
+  image: vi.fn(), images: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUse: vi.fn(), canAccess: vi.fn(), hasPlatform: vi.fn(), purge: vi.fn(), config: vi.fn(), platformAds: vi.fn(), decrypt: vi.fn(), selectedLock: vi.fn(), selectedOperation: vi.fn(),
 }));
+vi.mock('../src/modules/publishing/server/media/storage', () => ({ readWorkspaceImage: state.image, listWorkspaceImages: state.images }));
 vi.mock('../src/server/data', () => ({ prisma: state.prisma }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: state.decrypt }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: state.entitlements, canUseFeature: state.canUse, hasPlatformCapability: state.hasPlatform }));
@@ -21,7 +23,7 @@ vi.mock('../src/server/platforms/resource-lock', () => ({ lockSelectedResources:
 
 import { clearAdsOpsHosts, registerAdsOpsHost } from '../src/modules/ads/management/registry';
 import { ADS_MANAGEMENT_DEFAULT_POLICY } from '../src/modules/ads/management/config';
-import { describeAdsManagement, listAdsCreatives, listAdsOperations, parseNeutralOperation, performAdsManagement as performAdsManagementService, pendingRecoveryConfirmation, previewAdsManagement, resolveAdsOperation, resolutionConfirmation } from '../src/modules/ads/management/server';
+import { describeAdsManagement, listAdsCreatives, listAdsOperations, parseNeutralOperation, performAdsManagement as performAdsManagementService, pendingRecoveryConfirmation, listAdsCreativeSources, previewAdsManagement, resolveAdsOperation, resolutionConfirmation } from '../src/modules/ads/management/server';
 import { executeAdsManagementTool } from '../src/modules/ads/management/mcp';
 import type { AdsNeutralOperation, AdsOpsHost } from '../src/modules/ads/management/types';
 import { OperationError } from '../src/lib/operation-error';
@@ -40,7 +42,7 @@ const host: AdsOpsHost = {
   operations: [{ id: 'status.set', objectTypes: ['campaign', 'ad'], spendChanging: true, label: 'Pause or resume' }, { id: 'rename', objectTypes: ['campaign'], spendChanging: false, label: 'Rename' },
     { id: 'campaign.create', objectTypes: ['campaign'], spendChanging: true, label: 'Create campaign' }, { id: 'adset.create', objectTypes: ['adset'], spendChanging: true, label: 'Create ad set' }],
   validate: op => { if (op.type === 'rename' && !op.name) throw new OperationError('invalid_request', 'Enter a name.'); },
-  confirmation: op => op.type === 'campaign.create' ? `CREATE PAUSED CAMPAIGN ${op.name}` : op.type === 'adset.create' ? `CREATE PAUSED AD SET ${op.name} UNDER ${op.parentId}` : `CONFIRM ${op.type === 'status.set' ? (op.status === 'paused' ? 'pause' : 'resume') : op.type} ${op.objectId}`,
+  confirmation: op => op.type === 'campaign.create' ? `CREATE PAUSED CAMPAIGN ${op.name}` : op.type === 'adset.create' ? `CREATE PAUSED AD SET ${op.name} UNDER ${op.parentId}` : op.type === 'creative.create' ? `CREATE CREATIVE ${op.name}` : `CONFIRM ${op.type === 'status.set' ? (op.status === 'paused' ? 'pause' : 'resume') : op.type} ${op.objectId}`,
   execute: (...args) => execute(...args), classifyFailure: error => classify(error),
   listCreatives: vi.fn(async () => ({ items: [], next: null })),
 };
@@ -593,5 +595,100 @@ describe('paused campaign and ad set creation through the shared journal', () =>
     execute.mockResolvedValue({ remoteId: 'camp-new' });
     const result = await executeAdsManagementTool(actor, 'apply_ads_change', { adAccountId: 'acc1', operation: campaign, confirmation: CAMPAIGN_CONFIRM, requestId: 'request-mcp-001' });
     expect(result).toMatchObject({ outcome: 'succeeded', created: { objectType: 'campaign', remoteId: 'camp-new' } });
+  });
+});
+
+
+describe('neutral stored-media creative creation', () => {
+  const creative = { type: 'creative.create', objectType: 'creative', name: 'Summer offer', targetId: 't1', mediaId: '8260d067-4caf-41c6-b129-c6558fbe0865', format: 'link', message: 'A new season', title: 'See the offer', linkUrl: 'https://example.test/offer' } as const;
+  const confirmation = 'CREATE CREATIVE Summer offer';
+  beforeEach(() => {
+    clearAdsOpsHosts(); registerAdsOpsHost({ ...host, creativeIdentityKinds: ['channel'], operations: [...host.operations, { id: 'creative.create', objectTypes: ['creative'], spendChanging: false, label: 'Create creative' }] });
+    state.prisma.target.findFirst.mockResolvedValue({ providerId: 'remote-t1', type: 'channel' });
+    state.prisma.target.findMany.mockResolvedValue([{ id: 't1', name: 'Example' }]);
+    state.image.mockReset().mockResolvedValue({ bytes: Buffer.from('image'), mimeType: 'image/png' });
+    state.images.mockResolvedValue({ items: [{ id: creative.mediaId, mimeType: 'image/png', heldBy: ['private holder'], size: 5 }], nextCursor: null });
+  });
+  const apply = (overrides = {}) => performAdsManagement(actor, { adAccountId: 'acc1', operation: creative, confirmation, ...overrides });
+  it('parses a neutral normalized operation and rejects delivery, arbitrary image URLs and raw provider identity', () => {
+    expect(parseNeutralOperation({ ...creative, name: ' Summer offer ' })).toEqual(creative);
+    for (const extra of [{ status: 'active' }, { imageUrl: 'https://private.test' }, { pageId: 'raw-provider' }, { objectId: 'ad' }]) expect(() => parseNeutralOperation({ ...creative, ...extra })).toThrow();
+    for (const linkUrl of ['http://example.test', 'https://user:password@example.test', 'javascript:alert(1)']) expect(() => parseNeutralOperation({ ...creative, linkUrl })).toThrow();
+    expect(() => parseNeutralOperation({ ...creative, objectType: 'ad' })).toThrow();
+    expect(() => parseNeutralOperation({ ...creative, format: 'image' })).toThrow();
+  });
+  it('persists intent before dispatch and independently commits intermediate receipts before settlement', async () => {
+    execute.mockImplementation(async (context) => { calls.push('REMOTE'); await context.recordReceipt({ imageHash: 'hash' }); return { remoteId: 'creative-new' }; });
+    const result = await apply();
+    expect(result).toMatchObject({ outcome: 'succeeded', created: { objectType: 'creative', remoteId: 'creative-new' } });
+    expect(calls[0]).toMatch(/^INSERT INTO ads_management_operations/);
+    expect(calls[1]).toBe('REMOTE');
+    expect(calls[2]).toMatch(/^INSERT INTO root_activities/);
+    expect(execute.mock.calls[0][0].creative).toMatchObject({ identityId: 'remote-t1', identityKind: 'channel', image: { mimeType: 'image/png' } });
+    expect(state.selectedLock).toHaveBeenCalledWith(state.prisma, 'w1', [{ kind: 'target', id: 't1' }]);
+    expect(JSON.stringify(state.prisma.$executeRaw.mock.calls)).not.toContain('aW1hZ2U=');
+  });
+  it('never resolves arbitrary channel identities or foreign workspace media', async () => {
+    state.prisma.target.findFirst.mockResolvedValueOnce(null);
+    await expect(apply()).rejects.toMatchObject({ code: 'not_found' });
+    expect(execute).not.toHaveBeenCalled(); expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
+    state.image.mockRejectedValueOnce(new Error('foreign file path'));
+    await expect(apply()).rejects.toMatchObject({ code: 'not_found' });
+    expect(state.prisma.target.findFirst.mock.calls[0][0].where).toMatchObject({ workspaceId: 'w1', enabled: true, socialAccount: { is: { provider: 'testnet', adAccounts: { some: { id: 'acc1' } } } } });
+    expect(state.image).toHaveBeenCalledWith('w1', creative.mediaId);
+  });
+  it('enforces independent key account and channel ceilings before media or provider access', async () => {
+    await expect(performAdsManagement({ ...actor, allowedTargetIds: [] }, { adAccountId: 'acc1', operation: creative, confirmation })).rejects.toMatchObject({ code: 'forbidden' });
+    state.prisma.adAccount.findFirst.mockResolvedValueOnce(null);
+    await expect(performAdsManagement({ ...actor, allowedAdAccountIds: [] }, { adAccountId: 'acc1', operation: creative, confirmation })).rejects.toMatchObject({ code: 'reconnect_required' });
+    expect(state.image).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+  });
+  it('rechecks deselection and current channel permission under the dispatch lock', async () => {
+    state.prisma.target.findFirst.mockResolvedValueOnce({ providerId: 'remote-t1', type: 'channel' }).mockResolvedValueOnce(null);
+    await expect(apply()).resolves.toMatchObject({ outcome: 'rejected' });
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it('fails closed when management is disabled or confirmation is stale', async () => {
+    await expect(apply({ confirmation: 'stale' })).rejects.toMatchObject({ code: 'invalid_request' });
+    state.config.mockImplementation(async key => key === 'ads.managementEnabled' ? false : ADS_MANAGEMENT_DEFAULT_POLICY);
+    await expect(apply()).rejects.toMatchObject({ code: 'unavailable' });
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it('holds ambiguous and missing-id outcomes without inventing creation receipts', async () => {
+    execute.mockRejectedValueOnce(new Error('timeout'));
+    await expect(apply()).resolves.toMatchObject({ outcome: 'uncertain' });
+    execute.mockResolvedValueOnce({});
+    const result = await apply({ requestId: 'request-second' });
+    expect(result).toMatchObject({ outcome: 'uncertain' }); expect(result).not.toHaveProperty('created');
+  });
+  it('replays a successful request before requiring an image that may since have been removed', async () => {
+    const hash = createHash('sha256').update(JSON.stringify({ adAccountId: 'acc1', operation: creative })).digest('hex');
+    state.prisma.$queryRaw.mockResolvedValueOnce([{ id: 'recorded', requestHash: hash, status: 'succeeded', remoteId: 'creative-new', operationType: 'creative.create' }]);
+    state.image.mockRejectedValueOnce(new Error('removed'));
+    await expect(apply()).resolves.toMatchObject({ replay: true, created: { objectType: 'creative', remoteId: 'creative-new' } });
+    expect(state.image).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+  });
+  it('replays human attestations without inventing a creative identity or a delivery state', async () => {
+    const hash = createHash('sha256').update(JSON.stringify({ adAccountId: 'acc1', operation: creative })).digest('hex');
+    state.prisma.$queryRaw.mockResolvedValueOnce([{ id: 'reviewed', requestHash: hash, status: 'resolved_applied', remoteId: null, operationType: 'creative.create' }]);
+    const result = await apply();
+    expect(result).toMatchObject({ outcome: 'succeeded', status: 'resolved_applied', replay: true });
+    expect(result).not.toHaveProperty('created'); expect(execute).not.toHaveBeenCalled();
+  });
+  it('refuses a changed payload under the same durable request identity', async () => {
+    state.prisma.$queryRaw.mockResolvedValueOnce([{ id: 'recorded', requestHash: 'different', status: 'succeeded' }]);
+    await expect(apply()).rejects.toMatchObject({ code: 'conflict' });
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it('lists scoped bounded sources with storage and holder details excluded', async () => {
+    const result = await listAdsCreativeSources({ ...actor, allowedTargetIds: ['t1'] }, { adAccountId: 'acc1' });
+    expect(result.images).toEqual([{ id: creative.mediaId, mimeType: 'image/png' }]);
+    expect(state.prisma.target.findMany.mock.calls[0][0]).toMatchObject({ where: { workspaceId: 'w1', id: { in: ['t1'] }, type: { in: ['channel'] } }, take: 26 });
+    expect(JSON.stringify(result)).not.toContain('holder');
+  });
+  it('MCP apply uses the same journal and authenticated actor scope', async () => {
+    const result = await executeAdsManagementTool(actor, 'apply_ads_change', { adAccountId: 'acc1', operation: creative, confirmation, requestId: 'request-mcp-creative' });
+    expect(result).toMatchObject({ outcome: 'succeeded', created: { objectType: 'creative' } });
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 });

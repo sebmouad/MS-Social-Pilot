@@ -1,3 +1,7 @@
+import { headers } from 'next/headers';
+import { adsLocale } from '@/modules/ads/analysis/copy';
+import { describeAdsManagement } from '@/modules/ads/management/server';
+import { CreativeCreateForm } from '@/modules/ads/ui/CreativeCreateForm';
 import { entitledPlatformIds } from '@/server/entitlements';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -23,6 +27,7 @@ const date = (value: Date) => new Intl.DateTimeFormat(undefined, { dateStyle: 'm
 export default async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[] }> }) {
   const viewer = await requireViewer({ feature: 'ads/campaigns', channelScoped: true });
   const { workspaceId } = viewer;
+  const locale = adsLocale((await headers()).get('accept-language'));
   const policy = await loadAdsReportPolicy();
   const allowedProviders = entitledPlatformIds(viewer.entitlements);
   const allowedTargetIds = viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids;
@@ -49,6 +54,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
     await canReadWorkspaceAds({ userId: viewer.user.id, workspaceId }, accountId, allowedTargetIds),
   ] as const)));
   const createAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
+  const creativeAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, (await describeAdsManagement({ userId: viewer.user.id, workspaceId }, account.id)).operations.some(op => op.id === 'creative.create')] as const)));
   const adsUi = new Map(await Promise.all(accounts.map(async account => {
     const host = account.socialAccount ? await platformAds(account.socialAccount.provider) : null;
     const ui = host?.creationUi ? await host.creationUi().catch(() => null) : host?.ui ?? null;
@@ -98,6 +104,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
     {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>Create a campaign</h2><p className="small-note">Each campaign is created paused under one enabled ad account.</p>
       {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={{ userId: viewer.user.id, workspaceId }} />)}
     </section> : null}
+    {accounts.filter(account => (!filters.accountId || account.id === filters.accountId) && creativeAvailability.get(account.id)).map(account => <section className="panel" key={`creative:${account.id}`}><CreativeCreateForm adAccountId={account.id} accountName={account.name} ownerScope={{ userId: viewer.user.id, workspaceId }} locale={locale} /></section>)}
     <p className="ads-read-only-note">Review delivery and adjust eligible campaigns, ad sets, and ads. Changes require confirmation before they are sent.</p>
     </>}
   </div></PageFrame>;

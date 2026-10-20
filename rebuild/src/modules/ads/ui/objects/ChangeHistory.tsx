@@ -5,13 +5,13 @@ import { Button } from '@/components/Button';
 import { ModalDialog } from '@/components/ModalDialog';
 import { RouteNotice } from '@/components/RouteNotice';
 
-type Change = { id: string; operationType: string; objectType: string; objectId: string; status: string; createdAt: string; needsResolution: boolean; resolutionKind?: 'pending_recovery' | 'uncertain'; onHold?: boolean; resolutionNote: string | null };
+type Change = { receipts?: unknown; id: string; operationType: string; objectType: string; objectId: string; status: string; createdAt: string; needsResolution: boolean; resolutionKind?: 'pending_recovery' | 'uncertain'; onHold?: boolean; resolutionNote: string | null };
 type Resolution = 'applied' | 'not_applied';
 const STATUS_TEXT: Record<string, string> = { pending: 'In progress (on hold)', succeeded: 'Applied', rejected: 'Not applied', uncertain: 'Unknown result', resolved_applied: 'Confirmed applied', resolved_not_applied: 'Confirmed not applied' };
-const TYPE_TEXT: Record<string, string> = { 'status.set': 'Pause or resume', 'budget.set': 'Budget change', rename: 'Rename', 'creative.assign': 'Creative change', delete: 'Delete', 'campaign.create': 'New campaign', 'adset.create': 'New ad set' };
-const isCreation = (type: string) => type === 'campaign.create' || type === 'adset.create';
+const TYPE_TEXT: Record<string, string> = { 'status.set': 'Pause or resume', 'budget.set': 'Budget change', rename: 'Rename', 'creative.assign': 'Creative change', delete: 'Delete', 'campaign.create': 'New campaign', 'adset.create': 'New ad set', 'creative.create': 'New unattached creative' };
+const isCreation = (type: string) => type === 'campaign.create' || type === 'adset.create' || type === 'creative.create';
 
-export function ChangeHistory({ items }: { items: Change[] }) {
+export function ChangeHistory({ items, locale = 'en' }: { items: Change[]; locale?: 'en' | 'fr' }) {
   const [rows, setRows] = useState(items);
   const [resolving, setResolving] = useState<{ change: Change; resolution: Resolution } | null>(null);
   const [note, setNote] = useState('');
@@ -57,7 +57,7 @@ export function ChangeHistory({ items }: { items: Change[] }) {
     {message && !resolving ? <RouteNotice error={message.error} className={message.error ? 'ui-error' : 'small-note'} focusKey={message.key}>{message.text}</RouteNotice> : null}
     <Button onClick={() => void refreshHistory()} disabled={refreshing || busy}>{refreshing ? 'Refreshing…' : 'Refresh change history'}</Button>
     {!rows.length ? <p className="small-note">No changes have been made through this workspace yet.</p> : <ul className="ads-change-history">{rows.map(change => <li key={change.id}>
-      <strong>{TYPE_TEXT[change.operationType] ?? 'Ads change'}</strong> · {isCreation(change.operationType) ? null : <>{change.objectType} · </>}{STATUS_TEXT[change.status] ?? 'Needs review'} · <time dateTime={change.createdAt}>{new Date(change.createdAt).toLocaleString()}</time>
+      <strong>{change.operationType === 'creative.create' && locale === 'fr' ? 'Nouveau visuel sans affectation' : TYPE_TEXT[change.operationType] ?? 'Ads change'}</strong> · {isCreation(change.operationType) ? null : <>{change.objectType} · </>}{STATUS_TEXT[change.status] ?? 'Needs review'} · <time dateTime={change.createdAt}>{new Date(change.createdAt).toLocaleString()}</time>
       {change.onHold && !change.needsResolution ? <p className="small-note">This change may still be in progress. It stays on hold until the result is recorded. Do not repeat it. The service will not allow a review while its request is still in flight.</p> : null}
       {change.needsResolution ? <>
         {change.resolutionKind === 'pending_recovery'
@@ -66,6 +66,7 @@ export function ChangeHistory({ items }: { items: Change[] }) {
         <Button variant="secondary" disabled={busy} onClick={() => beginResolution(change, 'applied')}>I checked: it was applied</Button>{' '}
         <Button variant="secondary" disabled={busy} onClick={() => beginResolution(change, 'not_applied')}>I checked: it was not applied</Button>
       </> : null}
+      {isCreation(change.operationType) && Array.isArray(change.receipts) && change.receipts.length ? <details><summary>{locale === 'fr' ? 'Reçus de création' : 'Creation receipts'}</summary><pre className="ads-creation-receipts">{JSON.stringify(change.receipts, null, 2)}</pre><p className="small-note">{locale === 'fr' ? 'Une création partielle peut laisser une image importée. Vérifiez les objets sur la plateforme avant d’enregistrer le résultat.' : 'A partial creation may leave an uploaded image. Review the objects in the platform before recording an outcome.'}</p></details> : null}
       {change.resolutionNote ? <p className="small-note">Review note: {change.resolutionNote}</p> : null}
     </li>)}</ul>}
 

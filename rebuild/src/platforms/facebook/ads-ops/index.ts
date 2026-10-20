@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { executeFacebookCreative } from './creative';
 import { FACEBOOK_ADS_CREATION_UI_SCHEMA } from '../ads-ui-config';
 import type { AdsUiSchema } from '@/platforms/ads-ui';
 import { OperationError } from '@/lib/operation-error';
@@ -16,8 +18,9 @@ export const FACEBOOK_ADS_OPERATIONS: readonly AdsOperationSupport[] = [
   { id: 'status.set', objectTypes: ['campaign', 'adset', 'ad'], spendChanging: true, label: 'Pause or resume', inputs: [{ name: 'status', kind: 'choice', options: [{ value: 'paused', label: 'Pause' }, { value: 'active', label: 'Resume' }] }] },
   { id: 'budget.set', objectTypes: ['campaign', 'adset'], spendChanging: true, label: 'Change budget', inputs: [{ name: 'budget', kind: 'money-minor', budgetKinds: ['daily', 'lifetime'] }] },
   { id: 'rename', objectTypes: ['campaign', 'adset', 'ad'], spendChanging: false, label: 'Rename', inputs: [{ name: 'name', kind: 'text' }] },
-  { id: 'creative.assign', objectTypes: ['ad'], spendChanging: false, label: 'Assign an existing creative', inputs: [{ name: 'creativeId', kind: 'creative-ref' }] },
+  { id: 'creative.assign', objectTypes: ['ad'], spendChanging: true, label: 'Assign an existing creative', inputs: [{ name: 'creativeId', kind: 'creative-ref' }] },
   { id: 'delete', objectTypes: ['campaign', 'adset', 'ad'], spendChanging: false, irreversible: true, label: 'Delete' },
+  { id: 'creative.create', objectTypes: ['creative'], spendChanging: false, label: 'Create unattached creative' },
   { id: 'campaign.create', objectTypes: ['campaign'], spendChanging: true, label: 'Create paused campaign', inputs: [{ name: 'name', kind: 'text' }, { name: 'objective', kind: 'choice', options: FACEBOOK_CAMPAIGN_OBJECTIVES }] },
   { id: 'adset.create', objectTypes: ['adset'], spendChanging: true, label: 'Create paused ad set', inputs: [
     { name: 'name', kind: 'text' }, { name: 'budget', kind: 'money-minor', budgetKinds: ['daily'] },
@@ -49,6 +52,14 @@ export function validateFacebookAdsOperation(operation: AdsNeutralOperation, lim
   const support = FACEBOOK_ADS_OPERATIONS.find(item => item.id === operation.type);
   if (!support || !support.objectTypes.includes(operation.objectType)) throw new OperationError('unavailable', 'This change is not available.');
   if (operation.type === 'campaign.create' || operation.type === 'adset.create') return validateCreation(operation, nameMax, limits);
+  if (operation.type === 'creative.create') {
+    if (!validName(operation.name, nameMax) || !SAFE_ID.test(operation.targetId) || !/^[A-Za-z0-9_.-]{1,150}$/.test(operation.mediaId) || !['image', 'link'].includes(operation.format) || operation.message.length > 5000 || operation.title.length > 200) throw new OperationError('invalid_request', 'Enter valid creative details.');
+    if (operation.format === 'link') {
+      let url: URL; try { url = new URL(operation.linkUrl ?? ''); } catch { throw new OperationError('invalid_request', 'Enter an HTTPS destination.'); }
+      if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 2048) throw new OperationError('invalid_request', 'Enter an HTTPS destination without credentials.');
+    } else if (operation.linkUrl !== undefined || operation.title) throw new OperationError('invalid_request', 'Image creatives use message text only.');
+    return;
+  }
   if (!SAFE_ID.test(operation.objectId)) throw new OperationError('invalid_request', 'Invalid ad object.');
   if (operation.type === 'rename' && (!operation.name || operation.name.length > nameMax || /[\u0000-\u001f\u007f]/.test(operation.name))) throw new OperationError('invalid_request', `Names must contain 1 to ${nameMax} printable characters.`);
   if (operation.type === 'budget.set' && limits && operation.budget.minor > limits.maxBudgetMinor) throw new OperationError('invalid_request', 'This budget is above the limit allowed for a single change.');
@@ -57,6 +68,10 @@ export function validateFacebookAdsOperation(operation: AdsNeutralOperation, lim
 }
 
 export function facebookAdsConfirmation(operation: AdsNeutralOperation, context: { adAccountId: string; currency: string | null }): string {
+  if (operation.type === 'creative.create') {
+    const content = createHash('sha256').update(JSON.stringify({ name: operation.name, targetId: operation.targetId, mediaId: operation.mediaId, format: operation.format, message: operation.message, title: operation.title, linkUrl: operation.linkUrl ?? null })).digest('hex');
+    return `CREATE UNATTACHED FACEBOOK ${operation.format.toUpperCase()} CREATIVE ${JSON.stringify(operation.name)} IN ACCOUNT ${context.adAccountId} AS CHANNEL ${operation.targetId} FROM MEDIA ${operation.mediaId} WITH CONTENT ${content} WITHOUT DELIVERY OR SPEND`;
+  }
   const where = `IN ACCOUNT ${context.adAccountId}`;
   if (operation.type === 'campaign.create') return `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(operation.name.trim())} ${where} WITH OBJECTIVE ${operation.objective}`;
   if (operation.type === 'adset.create') return `CREATE PAUSED FACEBOOK AD SET ${JSON.stringify(operation.name.trim())} UNDER CAMPAIGN ${operation.parentId} ${where} WITH DAILY BUDGET ${operation.dailyBudgetMinor} MINOR UNITS${context.currency ? ` ${context.currency}` : ''} TARGETING ${operation.countryCode} OPTIMIZED FOR ${operation.optimizationGoal}`;
@@ -103,6 +118,7 @@ async function executeCreation(transport: FacebookAdsTransport, token: string, c
   const result = await transport.post(`${encodeURIComponent(context.accountId)}/${edge}`, token, body, context.signal);
   // The write was sent: a missing or malformed id leaves the outcome unknown, never "rejected".
   if (typeof result.id !== 'string' || !SAFE_ID.test(result.id)) throw new FacebookAdsOpsError('Facebook did not confirm the new object.', { status: 200 });
+  await context.recordReceipt?.({ remoteId: result.id });
   return { remoteId: result.id };
 }
 
@@ -122,6 +138,7 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
   };
   return {
     provider: 'facebook',
+    creativeIdentityKinds: ['page'],
     operations: FACEBOOK_ADS_OPERATIONS,
     validate: validateFacebookAdsOperation,
     /** Pre-journal check: current Root creation-policy failures are explicit product errors, never raw adapter errors. */
@@ -140,6 +157,7 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
       const transport = await loadTransport();
       const token = context.credential.accessToken;
       if (!SAFE_ID.test(context.accountId)) throw new FacebookAdsOpsError('Invalid ad account.', { status: 0, beforeWrite: true });
+      if (operation.type === 'creative.create') return executeFacebookCreative(transport, context, operation);
       if (operation.type === 'campaign.create' || operation.type === 'adset.create') return executeCreation(transport, token, context, operation);
       await verifyOwned(transport, token, context.accountId, operation.objectId, 'object', context.signal);
       const path = encodeURIComponent(operation.objectId);

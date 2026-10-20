@@ -8,6 +8,8 @@ const customPolicy = {
   defaultPreset: '14d', maxRangeDays: 14, maxFilterCharacters: 80,
 };
 const state = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn(), viewer: vi.fn(), readiness: vi.fn(), canRead: vi.fn(), policy: vi.fn(), output: vi.fn(), feature: vi.fn(), access: vi.fn() }));
+vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': 'en' }) }));
+vi.mock('@/modules/ads/management/server', () => ({ describeAdsManagement: async () => ({ canManage: false, operations: [] }) }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/entitlements', () => ({ entitledPlatformIds: () => ['test-platform'], canUseFeature: state.feature }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.access }));

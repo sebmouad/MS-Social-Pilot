@@ -12,14 +12,14 @@ export type StoredCreation<T extends object> = { requestId: string; request: T; 
 export type CreationOwnerScope = { userId: string; workspaceId: string };
 const REQUEST_ID = /^[A-Za-z0-9._:-]{8,128}$/;
 
-const keyOf = (kind: 'campaign' | 'adset', owner: CreationOwnerScope, scope: string) =>
+const keyOf = (kind: 'campaign' | 'adset' | 'creative', owner: CreationOwnerScope, scope: string) =>
   `ads-creation-pending:v2:${kind}:${encodeURIComponent(owner.userId)}:${encodeURIComponent(owner.workspaceId)}:${scope}`;
 
 function storage(): Storage | null {
   try { return typeof window === 'undefined' ? null : window.sessionStorage; } catch { return null; }
 }
 
-export function saveCreation<T extends object>(kind: 'campaign' | 'adset', owner: CreationOwnerScope, scope: string, requestId: string, request: T, transmissions: number) {
+export function saveCreation<T extends object>(kind: 'campaign' | 'adset' | 'creative', owner: CreationOwnerScope, scope: string, requestId: string, request: T, transmissions: number) {
   try {
     const store = storage();
     if (!store) return false;
@@ -30,12 +30,12 @@ export function saveCreation<T extends object>(kind: 'campaign' | 'adset', owner
   } catch { return false; }
 }
 
-export function clearCreation(kind: 'campaign' | 'adset', owner: CreationOwnerScope, scope: string) {
+export function clearCreation(kind: 'campaign' | 'adset' | 'creative', owner: CreationOwnerScope, scope: string) {
   try { storage()?.removeItem(keyOf(kind, owner, scope)); } catch { /* nothing to clear */ }
 }
 
 /** Returns the stored record only when its shape validates; malformed data is discarded. */
-export function loadCreation<T extends object>(kind: 'campaign' | 'adset', owner: CreationOwnerScope, scope: string, valid: (value: Record<string, unknown>) => boolean): StoredCreation<T> | null {
+export function loadCreation<T extends object>(kind: 'campaign' | 'adset' | 'creative', owner: CreationOwnerScope, scope: string, valid: (value: Record<string, unknown>) => boolean): StoredCreation<T> | null {
   const store = storage();
   if (!store) return null;
   try {
