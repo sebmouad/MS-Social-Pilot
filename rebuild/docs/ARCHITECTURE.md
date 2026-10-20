@@ -1527,3 +1527,16 @@ labels. See [CHANNEL_PROFILES.md](CHANNEL_PROFILES.md) for limits, migration, ev
 The additive migration is unapplied; database/browser verification, broader
 profile/filter parity, watermarking and new-label export coverage remain open.
 This branch is local only; no push or deployment was authorized.
+
+## Root registration administration branch — 2026-10-20
+
+`/root/registration` and its private HTTP routes use
+`server/root/registration-admin.ts`, with Settings-owned invitation revoke and
+registration eligibility/mail helpers. Read-only registration configuration,
+installation invitation statuses/scopes and unverified self-registration resend/
+delete use current Root checks, exact confirmations and transactional audits.
+English/French shared table/dialog controls and bounded independent pages are
+implemented; no keys/migration/registry edit. MCP definitions and dispatch mapping
+are documented, deliberately not registered in this worktree. See
+[ROOT_REGISTRATION_ADMIN.md](ROOT_REGISTRATION_ADMIN.md) for behavior and evidence
+limits. Actual PostgreSQL, browser, SMTP and MCP transport verification remain open.

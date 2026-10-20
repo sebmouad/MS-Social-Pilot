@@ -521,3 +521,15 @@ labels. See [CHANNEL_PROFILES.md](docs/CHANNEL_PROFILES.md) for limits, migratio
 The additive migration is unapplied; database/browser verification, broader
 profile/filter parity, watermarking and new-label export coverage remain open.
 This branch is local only; no push or deployment was authorized.
+
+### Root registration administration (2026-10-20 branch)
+
+`/root/registration` uses shared DataTable/Button/useConfirm with English/French
+copy. Sidebar controls own search, invitation status/workspace filters and
+independent directory paging. Registration state is read-only, with a configuration
+search link; missing values say unavailable. Accepted invitations expose no revoke.
+Mutations require exact typed phrases, disable duplicate submission and keep
+input/error on failure; only a matching receipt closes the dialog. Unconfirmed
+mail delivery stays explicit. Shared useConfirm supports optional asynchronous
+exact confirmation while preserving simple callers. DOM/render checks pass; real
+browser theme/viewport verification remains open. See ROOT_REGISTRATION_ADMIN.md.

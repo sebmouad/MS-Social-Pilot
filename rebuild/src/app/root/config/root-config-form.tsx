@@ -9,7 +9,7 @@ type Definition = ReturnType<typeof safeConfigShape>[number];
 type Values = Array<{ key: string; value: unknown; isSet: boolean; source: string }>;
 type Catalog = typeof AVAILABILITY_CATALOG;
 
-export function RootConfigForm({ definitions, initialValues, availability, groupPrefix }: { definitions: Definition[]; initialValues: Values; availability: Catalog; groupPrefix?: string }) {
+export function RootConfigForm({ definitions, initialValues, availability, groupPrefix, initialSearch = '' }: { definitions: Definition[]; initialValues: Values; availability: Catalog; groupPrefix?: string; initialSearch?: string }) {
   const [values, setValues] = useState(initialValues);
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
@@ -18,7 +18,7 @@ export function RootConfigForm({ definitions, initialValues, availability, group
   const categoryFor = (item: Definition) => (groupPrefix && item.group.startsWith(`${groupPrefix} · `) ? item.group.slice(groupPrefix.length + 3) : item.group).split(' · ')[0];
   const sections = Array.from(new Set(definitions.map(categoryFor)));
   const [section, setSection] = useState(sections[0] ?? '');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const visible = definitions.filter((item) => {
     if (search.trim()) return `${item.label} ${item.key} ${item.description} ${item.group}`.toLowerCase().includes(search.trim().toLowerCase());
     return categoryFor(item) === section;

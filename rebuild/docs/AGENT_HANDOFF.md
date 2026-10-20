@@ -866,3 +866,24 @@ roots and permission escalation is disabled. All verified source changes remain
 uncommitted on `codex/page-profiles`; no push/deployment occurred. Commit from an
 environment allowed to write the shared worktree metadata. Do not discard the
 worktree changes or include the pre-existing untracked root `node_modules` link.
+
+## Root registration worktree — 2026-10-20
+
+Branch `codex/root-registration`: Root registration/invitation UI, HTTP and shared
+service are implemented with Settings-owned domain helpers, current authority,
+scoped exact confirmations, audits and en/fr shared controls. No new Root keys or
+migration; no registry or legacy MCP edits. MCP tool schemas/dispatch and evidence
+limits are in ROOT_REGISTRATION_ADMIN.md. Next: host registration of those tools,
+actual PostgreSQL/FK/concurrency and SMTP checks, then browser theme/viewport and
+MCP transport verification. Unit/render/DOM checks do not close those gates.
+This worktree is branch-commit only by explicit instruction: no push, deployment,
+servers, install or client generation. Full project goal remains active.
+Verification for registration batch: 133 targeted tests/15 files (including the
+raw SQL guard) and `npx tsc --noEmit -p .` passed from rebuild/. No full suite,
+build, actual PostgreSQL, SMTP or browser/MCP transport run was performed.
+Commit blocker: this sandbox cannot write the linked worktree's Git metadata at
+`/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/.git/worktrees/msp-rootreg/index.lock`.
+`git add` failed with `Operation not permitted`; no files were staged and no
+registration commit was created. Verified changes remain uncommitted in this
+worktree. Commit them on `codex/root-registration` from a session allowed to write
+that existing Git metadata; do not push or deploy this branch batch.

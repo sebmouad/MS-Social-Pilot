@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -46,12 +47,13 @@ async function ttl(deps: RegistrationDeps) {
   return value;
 }
 
-async function issueVerification(userId: string, now: Date, minutes: number) {
+async function issueVerification(userId: string, now: Date, minutes: number, db?: Prisma.TransactionClient) {
   const token = randomBytes(32).toString('base64url');
-  await prisma.$transaction(async tx => {
+  const issue = async (tx: Prisma.TransactionClient) => {
     await tx.$executeRaw`DELETE FROM email_tokens WHERE "userId" = ${userId} AND purpose = 'verify' AND "usedAt" IS NULL`;
     await tx.$executeRaw`INSERT INTO email_tokens (id, "userId", purpose, "tokenHash", "expiresAt", "usedAt", "createdAt") VALUES (${randomUUID()}, ${userId}, 'verify', ${tokenHash(token)}, ${new Date(now.getTime() + minutes * 60_000)}, NULL, ${now})`;
-  });
+  };
+  if (db) await issue(db); else await prisma.$transaction(issue);
   return token;
 }
 
@@ -165,3 +167,40 @@ const service = createRegistrationService();
 export const registerAccount = service.register;
 export const resendVerification = service.resend;
 export const verifyEmail = service.verify;
+
+/** Evidence distinguishes self-registration from legacy/invited unverified accounts. Alias must be `u`. */
+export const unverifiedRegistrationWhere = Prisma.sql`
+  u."emailVerifiedAt" IS NULL AND u."isInstanceOwner" = false
+  AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m."userId" = u.id)
+  AND EXISTS (SELECT 1 FROM root_activities r WHERE r."actorId" = u.id
+    AND r.action = 'account.registered' AND r.detail->>'method' = 'open_registration')`;
+
+/** Caller holds the target user lock and current installation authority in this transaction. */
+export async function requireUnverifiedRegistration(tx: Prisma.TransactionClient, userId: string) {
+  const rows = await tx.$queryRaw<Array<{ id: string; email: string; disabledAt: Date | null }>>`
+    SELECT u.id, u.email, u."disabledAt" FROM users u WHERE u.id = ${userId} AND ${unverifiedRegistrationWhere} FOR UPDATE OF u`;
+  if (!rows[0]) throw new OperationError('conflict', 'This account is no longer an unverified self-registration without workspace access.');
+  return rows[0];
+}
+
+/** Reuses registration availability, TTL, token replacement and mail. Never claims a generic public resend sent mail. */
+export async function resendUnverifiedRegistration(tx: Prisma.TransactionClient, userId: string, deps: RegistrationDeps = defaults) {
+  const user = await requireUnverifiedRegistration(tx, userId);
+  if (user.disabledAt || !(await registrationAvailable(deps))) throw new OperationError('unavailable', 'Verification mail is unavailable. Check registration and mail configuration.');
+  const minutes = await ttl(deps);
+  const origin = await deps.mailOrigin();
+  if (!origin) throw unavailable();
+  const token = await issueVerification(user.id, deps.now(), minutes, tx);
+  // A send with an uncertain receipt stays uncertain; it must never be labelled sent by the operator UI.
+  try { return { delivery: (await deps.send(verifyMail(user.email, `${origin}/verify-email#token=${encodeURIComponent(token)}`))).status }; }
+  catch { return { delivery: 'uncertain' as const }; }
+}
+
+export async function deleteUnverifiedRegistration(tx: Prisma.TransactionClient, userId: string) {
+  await requireUnverifiedRegistration(tx, userId);
+  // Production FKs cascade personal authentication material and detach historical Root activity.
+  // Restrictive foreign keys refuse unexpected owned content rather than deleting workspace data.
+  const removed = await tx.$executeRaw`DELETE FROM users WHERE id = ${userId}`;
+  if (removed !== 1) throw new OperationError('conflict', 'This account changed. Reload before trying again.');
+  return { deleted: true as const, userId };
+}
