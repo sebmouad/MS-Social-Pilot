@@ -10,11 +10,13 @@ import { runtimeConfig } from '@/server/config/store';
  * by `instrumentation.ts`, refreshed every `app.publicOriginRefreshSeconds` and right
  * after a Root save. Empty means: use the address the server received (local development).
  */
-let publicOrigin = '';
-let timer: ReturnType<typeof setTimeout> | undefined;
+// Next bundles instrumentation and each route separately; module variables are not shared,
+// so the value lives on the process-wide global.
+type OriginState = { value: string; timer?: ReturnType<typeof setTimeout> };
+const state = ((globalThis as { __mspPublicOrigin?: OriginState }).__mspPublicOrigin ??= { value: '' });
 
 export async function refreshPublicOrigin(): Promise<void> {
-  try { publicOrigin = String(await runtimeConfig('app.publicOrigin') ?? ''); }
+  try { state.value = String(await runtimeConfig('app.publicOrigin') ?? ''); }
   catch { /* keep the last known value */ }
 }
 
@@ -23,12 +25,12 @@ export async function startPublicOriginRefresh(): Promise<void> {
   const schedule = async () => {
     let seconds = Number(CONFIG_BY_KEY.get('app.publicOriginRefreshSeconds')?.defaultValue);
     try { seconds = Number(await runtimeConfig('app.publicOriginRefreshSeconds')); } catch { /* keep the registry default */ }
-    timer = setTimeout(async () => { await refreshPublicOrigin(); void schedule(); }, seconds * 1000);
-    timer.unref?.();
+    state.timer = setTimeout(async () => { await refreshPublicOrigin(); void schedule(); }, seconds * 1000);
+    state.timer.unref?.();
   };
-  if (!timer) void schedule();
+  if (!state.timer) void schedule();
 }
 
 export function requestOrigin(request: Request): string {
-  return publicOrigin || new URL(request.url).origin;
+  return state.value || new URL(request.url).origin;
 }
