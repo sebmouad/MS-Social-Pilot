@@ -37,12 +37,18 @@ export async function configuredFacebookEngine(options?: { signal?: AbortSignal 
   return createFacebookEngine(await configuredFacebookConfig(), transport, facebookMediaJournal);
 }
 export async function configuredFacebookAdapter() {
-  const [config, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, feedFormatLabel, native] = await Promise.all([
+  const [config, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, feedFormatLabel, native, scheduleValues] = await Promise.all([
     configuredFacebookConfig(), configured<string[]>('meta.postReadScopes'), configured<string[]>('meta.postPublishScopes'),
     configured<string[]>('meta.postDeleteScopes'), configured<string[]>('meta.firstCommentScopes'), configured<string>('meta.feedFormatLabel'),
     configuredFacebookNativePublishing(),
+    runtimeConfigBatch(['facebook.schedule.providerHeldEnabled', 'facebook.schedule.minLeadSeconds', 'facebook.schedule.maxLeadSeconds']),
   ]);
-  return createFacebookAdapter(config, fetch, { feedFormatLabel, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal, ...(native ? { native } : {}) });
+  const minLeadSeconds = scheduleValues['facebook.schedule.minLeadSeconds'] as number;
+  const maxLeadSeconds = scheduleValues['facebook.schedule.maxLeadSeconds'] as number;
+  // An inconsistent window fails closed: Facebook-held scheduling is simply not declared.
+  const feedSchedule = scheduleValues['facebook.schedule.providerHeldEnabled'] === true && Number.isSafeInteger(minLeadSeconds) && Number.isSafeInteger(maxLeadSeconds) && minLeadSeconds < maxLeadSeconds
+    ? { minLeadSeconds, maxLeadSeconds } : undefined;
+  return createFacebookAdapter(config, fetch, { feedFormatLabel, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal, ...(native ? { native } : {}), ...(feedSchedule ? { feedSchedule } : {}) });
 }
 
 /** Private switch: native formats are declared only while it is on and the native policy is valid. */

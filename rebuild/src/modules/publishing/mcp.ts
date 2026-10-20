@@ -3,7 +3,8 @@ import { OperationError } from '@/lib/operation-error';
 import { requireFeature } from '@/server/entitlements';
 import { runtimeConfig } from '@/server/config/store';
 import { createLocalDraft, deleteLocalDraft, updateLocalDraft } from '@/server/post-mutations';
-import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '@/modules/publishing/server/lifecycle';
+import { cancelScheduledPost, createPost, deletePost, importPostsCsv, publishPost, reschedulePostToInstant, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '@/modules/publishing/server/lifecycle';
+import { parseScheduleMode } from './remote-scheduling';
 import { queuePostRequest } from '@/modules/publishing/server/queue';
 import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
 import { withMediaErrorBoundary } from '@/modules/publishing/server/media/mcp-errors';
@@ -31,6 +32,12 @@ const postMediaInputSchema = {
 };
 
 /** Caption may be empty; the shared service requires usable post content. */
+function isoInstant(value: unknown, key: string): Date {
+  const date = new Date(String(value));
+  if (typeof value !== 'string' || !Number.isFinite(date.getTime()) || !/^\d{4}-\d\d-\d\dT/.test(value)) throw new OperationError('invalid_request', `${key} must be an ISO date-time.`);
+  return date;
+}
+
 function postMessageArgument(args: Record<string, unknown>) {
   if (typeof args.message !== 'string') throw new OperationError('invalid_request', 'message must be a string; use an empty string for a post without a caption.');
   return args.message;
@@ -232,13 +239,15 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
     { name: 'finish_publication_projection', description: 'Finish a saved publication receipt in local records only. Never sends another provider request. Confirmation must exactly match FINISH PUBLICATION <operationId>.', inputSchema: { type: 'object', required: ['postId', 'operationId', 'confirmation'], properties: { postId: { type: 'string' }, operationId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'adopt_legacy_publication', description: 'Adopt an older processing destination into recovery after checking its current platform state. This does not contact or verify the platform. Confirmation must exactly match ADOPT PUBLICATION <postTargetId>.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'duplicate_post', description: 'Copy an authorized post into one new unscheduled local draft with its content, first comment, media and selected destinations. Remote publications, schedules and delivery history are not copied. Use a new lowercase UUID as requestId; reuse that same UUID after an unconfirmed response to retrieve the existing draft. Confirmation must exactly match DUPLICATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'requestId', 'confirmation'], properties: { postId: { type: 'string' }, requestId: { type: 'string', format: 'uuid' }, confirmation: { type: 'string' } }, additionalProperties: false } },
-    { name: 'create_post', description: 'Create a local draft with selected destinations, first comment, optional delay in whole minutes, and an ordered media list with per-image descriptions. Use media instead of scalar imageUrl/videoUrl. message may be empty when a link or media supplies the post content; firstComment alone is insufficient. Root and selected destination rules apply. Confirmation must exactly match CREATE POST.', inputSchema: { type: 'object', required: ['message', 'targetIds', 'confirmation'], properties: { destinationFormats: { type: 'object', additionalProperties: { type: 'string' }, description: 'Selected destination ID to opaque format ID; omitted new destinations use their module default.' }, message: { type: 'string' }, firstComment: { type: 'string' }, firstCommentDelayMinutes: { type: 'integer', minimum: 0 }, link: { type: 'string' }, media: postMediaInputSchema, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'create_post', description: 'Create a local draft with selected destinations, first comment, optional delay in whole minutes, and an ordered media list with per-image descriptions. Use media instead of scalar imageUrl/videoUrl. message may be empty when a link or media supplies the post content; firstComment alone is insufficient. Root and selected destination rules apply. Confirmation must exactly match CREATE POST.', inputSchema: { type: 'object', required: ['message', 'targetIds', 'confirmation'], properties: { destinationFormats: { type: 'object', additionalProperties: { type: 'string' }, description: 'Selected destination ID to opaque format ID; omitted new destinations use their module default.' }, scheduledAt: { type: 'string', description: 'Optional future ISO timestamp; the post is then scheduled instead of kept as a draft.' }, scheduleMode: { type: 'string', enum: ['application', 'remote'], description: 'With scheduledAt: who holds the schedule. See schedule_post.' }, message: { type: 'string' }, firstComment: { type: 'string' }, firstCommentDelayMinutes: { type: 'integer', minimum: 0 }, link: { type: 'string' }, media: postMediaInputSchema, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'update_post', description: 'Replace an unpublished post content and complete ordered media list. An empty media list removes attachments. Use media instead of scalar imageUrl/videoUrl; message may be empty with a link or media, but removing all content is refused. Optional firstCommentDelayMinutes is a whole number of minutes; Root bounds apply. Confirmation must exactly match UPDATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'message', 'targetIds', 'confirmation'], properties: { destinationFormats: { type: 'object', additionalProperties: { type: 'string' }, description: 'Selected destination ID to opaque format ID; omitted existing choices are preserved.' }, postId: { type: 'string' }, message: { type: 'string' }, firstComment: { type: 'string' }, firstCommentDelayMinutes: { type: 'integer', minimum: 0 }, link: { type: 'string' }, media: postMediaInputSchema, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'submit_post_for_approval', description: 'Submit a draft for review. Confirmation must exactly match SUBMIT POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'review_post', description: 'Approve or reject a pending post. Confirmation must exactly match APPROVE POST <postId> or REJECT POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'decision', 'confirmation'], properties: { postId: { type: 'string' }, decision: { type: 'string', enum: ['approve', 'reject'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'queue_post', description: 'Assign a local draft to the next free saved queue time for all its destinations, in the workspace time zone. Required approvals still apply; no immediate publication. Confirmation must exactly match QUEUE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
-    { name: 'schedule_post', description: 'Schedule a draft for a future ISO timestamp. Confirmation must exactly match SCHEDULE POST <postId> <timestamp>.', inputSchema: { type: 'object', required: ['postId', 'scheduledAt', 'confirmation'], properties: { postId: { type: 'string' }, scheduledAt: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
-    { name: 'cancel_scheduled_post', description: 'Return a queued post to drafts before delivery. Confirmation must exactly match CANCEL SCHEDULE <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'schedule_post', description: 'Schedule a draft for a future ISO timestamp. scheduleMode "application" (default unless Root changed it) has this app publish at the time; "remote" asks each destination\'s platform to hold and publish it itself, even if this app is offline, for destinations that support it within their allowed lead time. Others stay with the app; the result lists remoteHold {held, deferred, reasons}. Confirmation must exactly match SCHEDULE POST <postId> <timestamp>.', inputSchema: { type: 'object', required: ['postId', 'scheduledAt', 'confirmation'], properties: { postId: { type: 'string' }, scheduledAt: { type: 'string' }, scheduleMode: { type: 'string', enum: ['application', 'remote'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'reschedule_post', description: 'Move a scheduled post to a new future ISO timestamp. A destination whose platform is holding the post is moved on the platform first; if it cannot hold the new time nothing changes and you are told to pick another time or cancel. Confirmation must exactly match RESCHEDULE POST <postId> <timestamp>.', inputSchema: { type: 'object', required: ['postId', 'scheduledAt', 'confirmation'], properties: { postId: { type: 'string' }, scheduledAt: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'import_posts', description: 'Create draft posts from CSV text with header message,firstComment,channels and optional destinationFormats,firstCommentDelayMinutes. Root row and size limits apply; nothing is published. Confirmation must exactly match IMPORT POSTS.', inputSchema: { type: 'object', required: ['csv', 'confirmation'], properties: { csv: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'cancel_scheduled_post', description: 'Return a queued post to drafts before delivery. A copy held by the platform is removed from the platform first (only while it is still scheduled there). Confirmation must exactly match CANCEL SCHEDULE <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     ],
     features: {
       list_posts: 'publishing/posts',
@@ -267,10 +276,12 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
       queue_post: 'publishing/queue',
       schedule_post: 'publishing/posts',
       cancel_scheduled_post: 'publishing/posts',
+      reschedule_post: 'publishing/posts',
+      import_posts: 'publishing/posts',
     },
-    writeTools: ['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'retry_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post'],
-    selfLockedWrites: ['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'retry_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post'],
-    scope: { resourceTools: ['list_posts', 'export_posts', 'publish_post', 'send_first_comment', 'retry_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post'], workspaceTools: ['create_draft', 'update_draft', 'delete_draft'], resources: ['msp://posts'] },
+    writeTools: ['import_posts', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'retry_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post', 'reschedule_post'],
+    selfLockedWrites: ['import_posts', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'retry_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post', 'reschedule_post'],
+    scope: { resourceTools: ['list_posts', 'export_posts', 'publish_post', 'send_first_comment', 'retry_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post', 'reschedule_post'], workspaceTools: ['import_posts', 'create_draft', 'update_draft', 'delete_draft'], resources: ['msp://posts'] },
     resources: [
       { uri: 'msp://posts', name: "Posts", description: "Recent workspace posts.", mimeType: 'application/json', feature: 'publishing/posts', readTool: 'list_posts', readArgs: { limit: 100 } },
     ],
@@ -421,8 +432,10 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
         requireConfirmation(args, 'CREATE POST');
         if (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string')) throw new OperationError('invalid_request', 'targetIds must be an array of destination IDs.');
         const media = postMediaArguments(args);
-        const result = await createPost(publishingActor(viewer), { message: postMessageArgument(args), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', ...(args.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: args.firstCommentDelayMinutes }), destinationFormats: args.destinationFormats, targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media });
-        return auditedReceipt(viewer, name, { postId: result.id, targetCount: args.targetIds.length }, { id: result.id, status: 'draft' });
+        const scheduledAt = args.scheduledAt === undefined ? undefined : isoInstant(args.scheduledAt, 'scheduledAt');
+        const scheduleMode = parseScheduleMode(args.scheduleMode);
+        const result = await createPost(publishingActor(viewer), { message: postMessageArgument(args), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', ...(args.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: args.firstCommentDelayMinutes }), destinationFormats: args.destinationFormats, targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media, ...(scheduledAt ? { scheduledAt } : {}), ...(scheduleMode ? { scheduleMode } : {}) });
+        return auditedReceipt(viewer, name, { postId: result.id, targetCount: args.targetIds.length, ...(scheduledAt ? { scheduledAt: scheduledAt.toISOString(), scheduleMode: result.scheduleMode } : {}) }, { id: result.id, status: scheduledAt ? 'scheduled' : 'draft', ...(scheduledAt ? { scheduleMode: result.scheduleMode, remoteHold: result.remoteHold } : {}) });
       }
       case 'update_post': {
         const postId = requiredString(args, 'postId');
@@ -455,8 +468,23 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
         const date = new Date(scheduledAt);
         if (!Number.isFinite(date.getTime()) || !/^\d{4}-\d\d-\d\dT/.test(scheduledAt)) throw new OperationError('invalid_request', 'scheduledAt must be an ISO date-time.');
         requireConfirmation(args, `SCHEDULE POST ${postId} ${scheduledAt}`);
-        await schedulePost(publishingActor(viewer), postId, date);
-        return auditedReceipt(viewer, name, { postId, scheduledAt: date.toISOString() }, { postId, status: 'scheduled', scheduledAt: date.toISOString() });
+        const scheduleMode = parseScheduleMode(args.scheduleMode);
+        const outcome = await schedulePost(publishingActor(viewer), postId, date, scheduleMode ? { scheduleMode } : {});
+        return auditedReceipt(viewer, name, { postId, scheduledAt: date.toISOString(), scheduleMode: outcome.scheduleMode }, { postId, status: 'scheduled', scheduledAt: date.toISOString(), scheduleMode: outcome.scheduleMode, remoteHold: outcome.remoteHold });
+      }
+      case 'reschedule_post': {
+        const postId = requiredString(args, 'postId');
+        const scheduledAt = requiredString(args, 'scheduledAt');
+        const date = isoInstant(scheduledAt, 'scheduledAt');
+        requireConfirmation(args, `RESCHEDULE POST ${postId} ${scheduledAt}`);
+        const result = await reschedulePostToInstant(publishingActor(viewer), postId, date);
+        return auditedReceipt(viewer, name, { postId, scheduledAt: result.scheduledAt.toISOString() }, { postId, status: 'scheduled', scheduledAt: result.scheduledAt.toISOString() });
+      }
+      case 'import_posts': {
+        requireConfirmation(args, 'IMPORT POSTS');
+        if (typeof args.csv !== 'string' || !args.csv.trim()) throw new OperationError('invalid_request', 'csv is required.');
+        const result = await importPostsCsv(publishingActor(viewer), args.csv);
+        return auditedReceipt(viewer, name, { count: result.count }, { imported: result.count, status: 'draft' });
       }
       case 'cancel_scheduled_post': {
         const postId = requiredString(args, 'postId');

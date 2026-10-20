@@ -23,6 +23,7 @@ import { AiAssist } from '@/modules/ai/components/AiAssist';
 import type { AiStatus } from '@/modules/ai/ai';
 import { previewQueueAction, saveQueueComposerAction, type QueueComposerState as ComposerActionState, type QueuePreviewState } from './queue-actions';
 import { fill, queueCopy } from './queue-copy';
+import { holdsRemotely, leadLabel, remoteScheduleCopy } from './remote-copy';
 import { formatDate } from '@/modules/publishing/ui/publishing-ui';
 import styles from './PostComposer.module.css';
 
@@ -116,7 +117,7 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items);
 }
 
-export function PostComposer({ profiles, targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false }: { profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
+export function PostComposer({ profiles, targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling }: { remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -135,6 +136,7 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
   const [scheduleDate, setScheduleDate] = useState(initial.scheduleDate ?? schedule.date);
   const [scheduleTime, setScheduleTime] = useState(initial.scheduleTime ?? schedule.time);
   const [mode, setMode] = useState<'draft' | 'schedule' | 'queue'>((initial.intent as 'draft' | 'schedule' | 'queue') ?? 'draft');
+  const [scheduleMode, setScheduleMode] = useState<'application' | 'remote'>(initial.scheduleMode === 'remote' || initial.scheduleMode === 'application' ? initial.scheduleMode : remoteScheduling?.defaultMode ?? 'application');
   const [previewRefresh, setPreviewRefresh] = useState(0);
   const [previewSelection, setPreviewSelection] = useState('');
   const [queuePreview, setQueuePreview] = useState<QueuePreviewState | 'loading' | null>(null);
@@ -148,6 +150,13 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
   const submitGuard = useRef<'ready' | 'uploading' | 'submitting'>('ready');
   const feedbackRef = useRef<HTMLParagraphElement>(null);
   const selected = useMemo(() => targets.filter(target => selectedTargets.includes(target.id) && target.canPublish), [targets, selectedTargets]);
+  // The choice appears only when a selected destination's own module declares it can hold a scheduled post.
+  const holdCopy = remoteScheduleCopy[aiLocale];
+  const heldFormat = (target: TargetChoice) => target.publishingFormats?.find(format => format.id === effectiveDestinationFormat(target, formatChoices));
+  const holdable = selected.filter(target => holdsRemotely(heldFormat(target)));
+  const appOnly = selected.filter(target => !holdsRemotely(heldFormat(target)));
+  const holdLeads = holdable.map(target => heldFormat(target)!.scheduling.nativeLeadSeconds!);
+  const holdWindow = { min: leadLabel(Math.max(0, ...holdLeads.map(lead => lead.min)), aiLocale), max: leadLabel(Math.min(...holdLeads.map(lead => lead.max)), aiLocale) };
   const uploadRules = localUploadRules(selected, imageRules);
   const crowded = crowdedDestinationPlatforms(spacingGapMinutes, selected.map(target => target.provider)).length > 0;
   const destinationFormatsJson = useMemo(() => {
@@ -361,6 +370,14 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
           <p>Times use {schedule.timeZone.replaceAll('_', ' ')}.</p>
           <label htmlFor="composer-date">Date</label><input form={FORM_ID} id="composer-date" type="date" name="scheduleDate" value={scheduleDate} onChange={event => setScheduleDate(event.currentTarget.value)} />
           <label htmlFor="composer-time">Time</label><input form={FORM_ID} id="composer-time" type="time" name="scheduleTime" value={scheduleTime} onChange={event => setScheduleTime(event.currentTarget.value)} />
+          {remoteScheduling?.offered && holdable.length > 0 && <div role="radiogroup" aria-labelledby="composer-hold-legend" className="ui-field">
+            <strong id="composer-hold-legend">{holdCopy.legend}</strong>
+            <label><input form={FORM_ID} type="radio" name="scheduleMode" value="application" checked={scheduleMode === 'application'} onChange={() => setScheduleMode('application')} /> {holdCopy.application}</label>
+            <small>{holdCopy.applicationHint}</small>
+            <label><input form={FORM_ID} type="radio" name="scheduleMode" value="remote" checked={scheduleMode === 'remote'} onChange={() => setScheduleMode('remote')} /> {holdCopy.remote}</label>
+            <small>{holdCopy.remoteHint} {holdCopy.window.replace('{min}', holdWindow.min).replace('{max}', holdWindow.max)}</small>
+            {scheduleMode === 'remote' && appOnly.length > 0 && <small role="status">{holdCopy.appOnly.replace('{names}', appOnly.map(target => target.name).join(', '))}</small>}
+          </div>}
         </fieldset>
       </aside>
     </SidebarDock>

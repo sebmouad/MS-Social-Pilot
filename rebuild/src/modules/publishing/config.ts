@@ -7,6 +7,7 @@ import { PUBLISHING_AUTOMATION_CONFIG } from './automation-config';
 import { QUEUE_CONFIG } from './queue-config';
 import { MEDIA_INSPECTION_CONFIG } from '@/modules/publishing/server/media/inspection-config';
 import { FIRST_COMMENT_CONFIG } from './first-comment-config';
+import { REMOTE_SCHEDULING_CONFIG } from './remote-scheduling';
 
 /** Every Root setting this product module declares. The registry merges installed modules; edit only here. */
 export const PUBLISHING_MODULE_CONFIG = [
@@ -17,6 +18,7 @@ export const PUBLISHING_MODULE_CONFIG = [
   ...QUEUE_CONFIG,
   ...MEDIA_INSPECTION_CONFIG,
   ...FIRST_COMMENT_CONFIG,
+  ...REMOTE_SCHEDULING_CONFIG,
   entry({ key: 'publishing.shortLinkBaseUrl', group: 'Publishing · Links', label: 'Short link public origin', kind: 'text', description: 'Public HTTPS origin serving /s redirects. Required when workspace shortening is enabled; localhost HTTP is allowed for isolated testing.', defaultValue: '', schema: z.string().refine(value => value === '' || (() => { try { const url = new URL(value); return url.origin === value && !url.username && !url.password && (url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')); } catch { return false; } })(), 'Use an exact HTTPS origin.'), consumption: 'active' }),
   entry({ key: 'publishing.shortLinkRetentionDays', group: 'Publishing · Links', label: 'Short link expiry (days)', kind: 'number', description: 'Redirect lifetime from creation, including existing links. Expired links retain lifetime click totals; changing this value applies immediately.', defaultValue: 365, schema: z.number().int().min(1).max(36500), consumption: 'active' }),
   entry({ key: 'publishing.bestTimeLookbackDays', group: 'Publishing · Best times', label: 'History window (days)', kind: 'number', description: 'Recent stored posts used for best-time suggestions.', defaultValue: 90, schema: z.number().int().min(1).max(365), consumption: 'active' }),

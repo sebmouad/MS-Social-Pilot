@@ -48,8 +48,8 @@ const publishingReads = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingPostList: publishingReads.list }));
 const postExport = vi.hoisted(() => vi.fn());
 vi.mock('../src/modules/publishing/server/export', () => ({ exportPublishingPosts: postExport }));
-const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
-vi.mock('@/modules/inbox/server/actions', () => ({ replyToInbox: inboxMutations.reply, setInboxResolved: inboxMutations.resolve, moderateInboxComment: inboxMutations.moderate }));
+const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn(), sync: vi.fn() }));
+vi.mock('@/modules/inbox/server/actions', () => ({ syncInbox: inboxMutations.sync, replyToInbox: inboxMutations.reply, setInboxResolved: inboxMutations.resolve, moderateInboxComment: inboxMutations.moderate }));
 const inboxDeletions = vi.hoisted(() => ({ get: vi.fn(), remove: vi.fn(), finish: vi.fn() }));
 vi.mock('../src/modules/inbox/server/deletion', () => ({ getInboxDeletion: inboxDeletions.get, deleteInboxCommentDurably: inboxDeletions.remove, finishInboxDeletion: inboxDeletions.finish }));
 const adsMutations = vi.hoisted(() => ({ create: vi.fn(), createAdSet: vi.fn(), update: vi.fn(), read: vi.fn() }));
@@ -63,8 +63,8 @@ vi.mock('@/modules/ads/server/actions', () => ({
 }));
 const destinationReadiness = vi.hoisted(() => vi.fn());
 vi.mock('@/modules/publishing/server/destinations', () => ({ publishingTargetChoices: destinationReadiness }));
-const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
-vi.mock('@/modules/publishing/server/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
+const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn(), reschedule: vi.fn(), importCsv: vi.fn() }));
+vi.mock('@/modules/publishing/server/lifecycle', () => ({ reschedulePostToInstant: publishingMutations.reschedule, importPostsCsv: publishingMutations.importCsv, publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
 const postDuplicate = vi.hoisted(() => vi.fn());
 vi.mock('../src/modules/publishing/server/duplicate', () => ({ duplicatePost: postDuplicate }));
 const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), retry: vi.fn(), record: vi.fn() }));
@@ -141,13 +141,15 @@ beforeEach(() => {
   adsMutations.read.mockResolvedValue({ id: 'campaign-a', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
   publishingMutations.publish.mockResolvedValue({ published: 1, failed: 0, needsReconciliation: 0 });
   publishingMutations.sync.mockResolvedValue({ synced: 1 });
+  publishingMutations.schedule.mockResolvedValue({ scheduleMode: 'application', remoteHold: { held: 0, deferred: 0, reasons: [] } });
+  publishingMutations.reschedule.mockResolvedValue({ scheduledAt: new Date('2030-01-03T12:00:00.000Z') });
+  publishingMutations.importCsv.mockResolvedValue({ count: 3 });
   publishingMutations.remove.mockResolvedValue({ ok: true, postId: 'post-a', localConfirmed: true, remoteDeletionRequested: false, state: 'completed', operations: [] });
   publishingMutations.create.mockResolvedValue({ id: 'new-post' });
   postDuplicate.mockResolvedValue({ sourcePostId: 'post-a', postId: '5a985a8a-8234-494c-a2f7-a269ea50d111', draftCreated: true, replayed: false });
   publishingMutations.update.mockResolvedValue(undefined);
   publishingMutations.submit.mockResolvedValue(undefined);
   publishingMutations.review.mockResolvedValue(undefined);
-  publishingMutations.schedule.mockResolvedValue(undefined);
   publishingMutations.cancel.mockResolvedValue(undefined);
   firstCommentMutations.retry.mockResolvedValue({ ok: true, postId: 'post-a', postTargetId: 'post-target-a', state: 'sent' });
   firstCommentMutations.send.mockResolvedValue({ ok: true, postId: 'post-a', postTargetId: 'post-target-a', state: 'sent' });
@@ -1266,6 +1268,18 @@ describe('MCP workspace boundaries', () => {
     expect(workspaceGuard).not.toHaveBeenCalled();
   });
 
+  it('syncs the Inbox through the same service as the app, only after exact confirmation', async () => {
+    inboxMutations.sync.mockResolvedValue({ targetCount: 1, failedCount: 0, conversationCount: 2, messageCount: 5, commentCount: 3, syncedAt: '2030-01-01T00:00:00.000Z' });
+    expect((await (await call('sync_inbox', {})).json()).result.isError).toBe(true);
+    expect((await (await call('sync_inbox', { channelId: 'page-a', confirmation: 'SYNC INBOX' })).json()).result.isError).toBe(true);
+    expect(inboxMutations.sync).not.toHaveBeenCalled();
+    const all = await call('sync_inbox', { confirmation: 'SYNC INBOX' });
+    expect((await all.json()).result.structuredContent).toMatchObject({ conversationCount: 2, commentCount: 3, mcpAuditRecorded: true });
+    expect(inboxMutations.sync).toHaveBeenLastCalledWith(expect.objectContaining({ userId: 'user-a', workspaceId: 'workspace-a' }), undefined);
+    await call('sync_inbox', { channelId: 'page-a', confirmation: 'SYNC INBOX page-a' });
+    expect(inboxMutations.sync).toHaveBeenLastCalledWith(expect.objectContaining({ workspaceId: 'workspace-a' }), 'page-a');
+  });
+
   it('confirms configured post creation and scheduling, with workspace actor passed to lifecycle', async () => {
     const denied = await call('create_post', { message: 'hello', targetIds: ['page-a'] });
     expect((await denied.json()).result.isError).toBe(true);
@@ -1278,7 +1292,25 @@ describe('MCP workspace boundaries', () => {
     const time = '2030-01-02T12:00:00.000Z';
     const scheduled = await call('schedule_post', { postId: 'new-post', scheduledAt: time, confirmation: `SCHEDULE POST new-post ${time}` });
     expect((await scheduled.json()).result.structuredContent).toMatchObject({ postId: 'new-post', status: 'scheduled' });
-    expect(publishingMutations.schedule).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'new-post', new Date(time));
+    expect(publishingMutations.schedule).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'new-post', new Date(time), {});
+
+    // Platform-held scheduling is requested explicitly and reported back per destination.
+    publishingMutations.schedule.mockResolvedValueOnce({ scheduleMode: 'remote', remoteHold: { held: 1, deferred: 1, reasons: ['too_soon'] } });
+    const held = await call('schedule_post', { postId: 'new-post', scheduledAt: time, scheduleMode: 'remote', confirmation: `SCHEDULE POST new-post ${time}` });
+    expect((await held.json()).result.structuredContent).toMatchObject({ scheduleMode: 'remote', remoteHold: { held: 1, deferred: 1 } });
+    expect(publishingMutations.schedule).toHaveBeenLastCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'new-post', new Date(time), { scheduleMode: 'remote' });
+    const badMode = await call('schedule_post', { postId: 'new-post', scheduledAt: time, scheduleMode: 'platform', confirmation: `SCHEDULE POST new-post ${time}` });
+    expect((await badMode.json()).result.isError).toBe(true);
+
+    // Reschedule and CSV import are confirmed writes through the same lifecycle services as the app.
+    const later = '2030-01-03T12:00:00.000Z';
+    expect((await (await call('reschedule_post', { postId: 'new-post', scheduledAt: later })).json()).result.isError).toBe(true);
+    const moved = await call('reschedule_post', { postId: 'new-post', scheduledAt: later, confirmation: `RESCHEDULE POST new-post ${later}` });
+    expect((await moved.json()).result.structuredContent).toMatchObject({ postId: 'new-post', scheduledAt: later });
+    expect(publishingMutations.reschedule).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'new-post', new Date(later));
+    expect((await (await call('import_posts', { csv: 'message,firstComment,channels\nA,,Page' })).json()).result.isError).toBe(true);
+    const imported = await call('import_posts', { csv: 'message,firstComment,channels\nA,,Page', confirmation: 'IMPORT POSTS' });
+    expect((await imported.json()).result.structuredContent).toMatchObject({ imported: 3, status: 'draft' });
     const updated = await call('update_post', { postId: 'new-post', message: 'edited', firstCommentDelayMinutes: 50, targetIds: ['page-a'], confirmation: 'UPDATE POST new-post' });
     expect((await updated.json()).result.structuredContent).toEqual({ postId: 'new-post', updated: true, mcpAuditRecorded: true });
     expect(publishingMutations.update).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ postId: 'new-post', targetIds: ['page-a'], firstCommentDelayMinutes: 50 }));

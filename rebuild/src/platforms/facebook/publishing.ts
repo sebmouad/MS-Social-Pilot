@@ -5,7 +5,7 @@ import { validateFacebookConfig } from './config';
 import { PlatformApiError } from '../errors';
 import { facebookAppSecretProof, graphObjectUrl, isFacebookDefiniteRejection, isFacebookRetryable } from './protocol';
 import { FACEBOOK_RATINGS_FIELDS, mapFacebookReview, ratingsReadVersion } from './reviews';
-import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, InboxReview, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingMediaSupport, RemoteStatus } from '../types';
+import type { RemoteRescheduleRequest, AdCampaignCreateRequest,AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, InboxReview, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingMediaSupport, RemoteStatus } from '../types';
 import type { FacebookMediaJournal, FacebookMediaJournalFactory } from './media-journal-port';
 
 export type FacebookFetch = typeof fetch;
@@ -37,6 +37,8 @@ export type FacebookMedia = { kind: 'image' | 'video'; url: string; altText?: st
 export interface FacebookPublishInput {
   targetId: string; accessToken: string; text?: string; link?: string | null; operationId?: string;
   media?: readonly FacebookMedia[];
+  /** Whole unix seconds: Facebook holds the post (`published=false` + `scheduled_publish_time`) until then. */
+  scheduledUnix?: number;
 }
 export interface FacebookPublished { remoteId: string; url: string | null }
 export interface FacebookPageInsightObservation { metric: string; period: string; endTime: Date; value: unknown; numeric: number | null }
@@ -69,6 +71,8 @@ export interface FacebookEngine {
   publish(input: FacebookPublishInput): Promise<FacebookPublished>;
   getStatus(accessToken: string, remoteId: string, context: { targetId: string; contentKind?: 'text' | 'image' | 'video'; nativeFormat?: 'video' | 'reel' | 'story_photo' | 'story_video' }): Promise<RemoteStatus>;
   deletePost(accessToken: string, remoteId: string): Promise<void>;
+  /** Move a post Facebook is holding (`is_published=false`) to a new publish instant. Reads first; never writes a live post. */
+  rescheduleScheduledPost(accessToken: string, remoteId: string, scheduledUnix: number): Promise<void>;
   getPhotoCleanupState(accessToken: string, remoteId: string): Promise<{ id: unknown; page_story_id?: unknown; can_delete: unknown }>;
   deletePhoto(accessToken: string, remoteId: string, onDispatch?: () => void, onConfirmed?: () => void): Promise<void>;
   listInbox(accessToken: string, pageId: string, bounds?: FacebookInboxBounds): Promise<FacebookDiscovered<FacebookConversation>>;
@@ -324,13 +328,16 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
         if (!signatureMatches) throw new FacebookApiError('Local image content does not match its allowed MIME type.', 0);
         if (!/^[A-Za-z0-9._-]{1,120}$/.test(file.fileName)) throw new FacebookApiError('Local image filename is invalid.', 0);
       }
+      if (input.scheduledUnix !== undefined && (!Number.isSafeInteger(input.scheduledUnix) || input.scheduledUnix <= 0)) throw new FacebookApiError('Facebook received an invalid schedule time.', 0);
+      // Provider-held scheduling: Facebook keeps the unpublished object until the instant, so it publishes even if this server is down.
+      const hold: Record<string, string> = input.scheduledUnix === undefined ? {} : { published: 'false', scheduled_publish_time: String(input.scheduledUnix) };
       let payload: JsonObject;
       if (videos.length) {
         payload = await request(`${encodeURIComponent(input.targetId)}/videos`, { method: 'POST', token: input.accessToken,
-          body: { file_url: videos[0].url, description: input.text?.trim() || undefined } });
+          body: { file_url: videos[0].url, description: input.text?.trim() || undefined, ...hold } });
       } else if (images.length === 1) {
         payload = await request(`${encodeURIComponent(input.targetId)}/photos`, { method: 'POST', token: input.accessToken,
-          body: { url: images[0].localFile ? undefined : images[0].url, caption: input.text?.trim() || undefined, alt_text_custom: images[0].altText }, file: images[0].localFile });
+          body: { url: images[0].localFile ? undefined : images[0].url, caption: input.text?.trim() || undefined, alt_text_custom: images[0].altText, ...hold }, file: images[0].localFile });
         if (Object.prototype.hasOwnProperty.call(payload, 'post_id') && (typeof payload.post_id !== 'string' || !payload.post_id.trim())) {
           throw new FacebookApiError('Facebook returned an invalid photo post id.', 200);
         }
@@ -368,7 +375,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
             photoIds.push(photoId);
           }
           if (journal) await journal.beginFeed(photoIds);
-          const body: Record<string, string | undefined> = { message: input.text?.trim() || undefined, link: input.link || undefined };
+          const body: Record<string, string | undefined> = { message: input.text?.trim() || undefined, link: input.link || undefined, ...hold };
           photoIds.forEach((photoId, i) => { body[`attached_media[${i}]`] = JSON.stringify({ media_fbid: photoId }); });
           let feedId: string | null = null;
           try {
@@ -395,7 +402,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
         }
       } else {
         payload = await request(`${encodeURIComponent(input.targetId)}/feed`, { method: 'POST', token: input.accessToken,
-          body: { message: input.text?.trim() || undefined, link: input.link || undefined } });
+          body: { message: input.text?.trim() || undefined, link: input.link || undefined, ...hold } });
       }
       const id = payload.id;
       if (typeof id !== 'string' || !id) throw new FacebookApiError('Facebook did not return a post id.', 200);
@@ -468,6 +475,15 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     },
     async getPhotoCleanupState(token, remoteId) {
       return object(await request(encodeURIComponent(remoteId), { token, params: { fields: 'id,page_story_id,can_delete' } })) as { id: unknown; page_story_id?: unknown; can_delete: unknown };
+    },
+    async rescheduleScheduledPost(token, remoteId, scheduledUnix) {
+      if (typeof remoteId !== 'string' || !/^[A-Za-z0-9_:-]{1,128}$/.test(remoteId)) throw new FacebookApiError('A Facebook post id is required to change its schedule.', 0);
+      if (!Number.isSafeInteger(scheduledUnix) || scheduledUnix <= 0) throw new FacebookApiError('Facebook received an invalid schedule time.', 0);
+      // Read first: only an object Facebook still reports as unpublished may be moved. An already-live post is never rewritten.
+      const held = object(await request(encodeURIComponent(remoteId), { token, params: { fields: 'id,is_published,scheduled_publish_time' } }));
+      if (held.id !== remoteId || held.is_published !== false) throw new FacebookApiError('Facebook no longer holds this post, so its schedule cannot be changed.', 400, 100);
+      const result = object(await request(encodeURIComponent(remoteId), { method: 'POST', token, body: { scheduled_publish_time: String(scheduledUnix) } }));
+      if (result.success !== true) throw new FacebookApiError('Facebook did not confirm the new schedule.', 200);
     },
     async deletePhoto(token, remoteId, onDispatch, onConfirmed) {
       await request<unknown>(encodeURIComponent(remoteId), { method: 'DELETE', token, onDispatch,
@@ -654,13 +670,31 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
 }
 
 /** Provider-owned receipt translation for the neutral publishing contract. */
-export function createFacebookPublisher(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, mediaJournalFactory?: FacebookMediaJournalFactory) {
+/** Root-managed window in which Facebook accepts a held post. Absent means provider-held scheduling is not offered. */
+export interface FacebookFeedSchedulePolicy { minLeadSeconds: number; maxLeadSeconds: number }
+
+/** Whole unix seconds for a held post, or a definite rejection (nothing was sent) when the instant is outside the window. */
+export function facebookHeldScheduleUnix(scheduledAt: Date, policy: FacebookFeedSchedulePolicy | undefined, now: Date): number {
+  if (!policy) throw new FacebookApiError('Facebook-held scheduling is not available.', 400, 100);
+  const time = scheduledAt instanceof Date ? scheduledAt.getTime() : NaN;
+  if (!Number.isFinite(time) || !Number.isFinite(now.getTime())) throw new FacebookApiError('Choose a valid publishing date.', 400, 100);
+  const lead = Math.floor((time - now.getTime()) / 1000);
+  if (lead < policy.minLeadSeconds) throw new FacebookApiError('Facebook requires scheduled posts to be further ahead.', 400, 100);
+  if (lead > policy.maxLeadSeconds) throw new FacebookApiError('Facebook cannot hold a post that far ahead.', 400, 100);
+  return Math.floor(time / 1000);
+}
+
+export function createFacebookPublisher(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, mediaJournalFactory?: FacebookMediaJournalFactory, schedule?: { policy?: FacebookFeedSchedulePolicy; now?: () => Date }) {
   return async (request: PublishRequest): Promise<PublishResult> => {
     if (request.formatId !== undefined && request.formatId !== FACEBOOK_FEED_FORMAT_ID) throw new FacebookApiError('The selected publishing format is unavailable.', 400, 100);
     if (request.target.kind !== 'page') throw new FacebookApiError('Facebook publishing currently supports Page targets only.', 0);
+    // Validate the window before any I/O so a refusal can never leave a half-created remote object.
+    const scheduledUnix = request.scheduledAt ? facebookHeldScheduleUnix(request.scheduledAt, schedule?.policy, (schedule?.now ?? (() => new Date()))()) : undefined;
     const engine = createFacebookEngine(config, fetchImpl, request.signal, mediaJournalFactory);
     const result = await engine.publish({ targetId: request.target.id, accessToken: request.credential.accessToken, text: request.text, link: request.link,
-      operationId: request.operationId, media: request.media });
+      operationId: request.operationId, media: request.media, ...(scheduledUnix !== undefined ? { scheduledUnix } : {}) });
+    // A held post is not live: Facebook now holds it, and a later readback (scheduled → published) is the only proof of delivery.
+    if (scheduledUnix !== undefined) return { ...result, state: 'scheduled', heldUntil: new Date(scheduledUnix * 1000) };
     // The private engine can return an upload ID before a video is live.
     // Customer native formats remain unavailable; this receipt never implies readback.
     return { ...result, state: request.media?.some(media => media.kind === 'video') ? 'submitted' : 'published' };
@@ -693,7 +727,7 @@ const FACEBOOK_STORY_PHOTO_MEDIA: PublishingMediaSupport = { kinds: ['image'], m
 const FACEBOOK_STORY_VIDEO_MEDIA: PublishingMediaSupport = { kinds: ['video'], maxImages: 0, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: false };
 type FacebookNativeFormatId = NonNullable<NonNullable<Parameters<FacebookEngine['getStatus']>[2]>['nativeFormat']>;
 
-export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { feedFormatLabel?: string; postReadScopes?: readonly string[]; postPublishScopes?: readonly string[]; postDeleteScopes?: readonly string[]; firstCommentScopes?: readonly string[]; mediaJournalFactory?: FacebookMediaJournalFactory; native?: FacebookNativePublishingPolicy }): PlatformAdapter {
+export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { feedFormatLabel?: string; postReadScopes?: readonly string[]; postPublishScopes?: readonly string[]; postDeleteScopes?: readonly string[]; firstCommentScopes?: readonly string[]; mediaJournalFactory?: FacebookMediaJournalFactory; native?: FacebookNativePublishingPolicy; feedSchedule?: FacebookFeedSchedulePolicy; now?: () => Date }): PlatformAdapter {
   const native = policy?.native;
   const nativeFormat = (id: unknown): FacebookNativeFormatId | null =>
     native && (id === 'video' || id === 'reel' || id === 'story_photo' || id === 'story_video') ? id : null;
@@ -740,7 +774,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
     localImageUpload: { maxBytes: config.maxImageUploadBytes, mimeTypes: config.allowedImageMimeTypes },
     publishingMedia: FACEBOOK_PUBLISHING_MEDIA,
     defaultPublishingFormatId: FACEBOOK_FEED_FORMAT_ID,
-    publishingFormats: [{ id: FACEBOOK_FEED_FORMAT_ID, label: policy?.feedFormatLabel ?? FACEBOOK_FEED_FORMAT_LABEL, media: FACEBOOK_PUBLISHING_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } },
+    publishingFormats: [{ id: FACEBOOK_FEED_FORMAT_ID, label: policy?.feedFormatLabel ?? FACEBOOK_FEED_FORMAT_LABEL, media: FACEBOOK_PUBLISHING_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, ...(policy?.feedSchedule ? { native: true, nativeLeadSeconds: { min: policy.feedSchedule.minLeadSeconds, max: policy.feedSchedule.maxLeadSeconds } } : { native: false }) } },
       ...(native ? [
         { id: 'video', label: native.videoLabel, media: FACEBOOK_NATIVE_VIDEO_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: true } },
         { id: 'reel', label: native.reelLabel, media: FACEBOOK_NATIVE_VIDEO_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } },
@@ -767,7 +801,8 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       if (request.formatId !== undefined && request.formatId !== FACEBOOK_FEED_FORMAT_ID && !nativeId) throw new FacebookApiError('The selected publishing format is unavailable.', 400, 100);
       if (!canUseCredential(request.credential, 'publishing')) throw new FacebookApiError('Facebook Page publishing permission is missing or unavailable.', 0);
       if (nativeId) return native!.publish(request);
-      return createFacebookPublisher(config, fetchImpl, policy?.mediaJournalFactory)(request);
+      if (request.scheduledAt && !policy?.feedSchedule) throw new FacebookApiError('Facebook-held scheduling is not available.', 400, 100);
+      return createFacebookPublisher(config, fetchImpl, policy?.mediaJournalFactory, { policy: policy?.feedSchedule, now: policy?.now })(request);
     },
     async publishFirstComment(request) {
       assertFormatSupportsOperation(request.formatId, 'first comment');
@@ -791,6 +826,15 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       if (!canUseCredential(request.credential, 'remoteDelete')) throw new FacebookApiError('Facebook Page post deletion permission is missing or unavailable.', 0);
       await createFacebookEngine(config, fetchImpl, request.signal).deletePost(request.credential.accessToken, request.remoteId);
     },
+    ...(policy?.feedSchedule ? {
+      async rescheduleRemote(request: RemoteRescheduleRequest) {
+        // The native Video schedule change has its own durable journal; only feed-format holds are moved here.
+        if (request.formatId !== undefined && request.formatId !== FACEBOOK_FEED_FORMAT_ID) throw new FacebookApiError('The selected publishing format cannot change a held schedule.', 400, 100);
+        if (!canUseCredential(request.credential, 'publishing')) throw new FacebookApiError('Facebook Page publishing permission is missing or unavailable.', 0);
+        const unix = facebookHeldScheduleUnix(request.scheduledAt, policy.feedSchedule, (policy.now ?? (() => new Date()))());
+        await createFacebookEngine(config, fetchImpl, request.signal).rescheduleScheduledPost(request.credential.accessToken, request.remoteId, unix);
+      },
+    } : {}),
     async listInbox(request) {
       const conversations = await engine.listInbox(request.credential.accessToken, request.targetId);
       return conversations.flatMap(conversation => conversation.messages.map(message => ({
