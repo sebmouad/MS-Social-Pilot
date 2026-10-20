@@ -67,11 +67,11 @@ describe('Tasks contracts', () => {
     expect(addCalendarDays('not-a-date', 1)).toBeNull();
   });
   it('validates action and filter shapes strictly', () => {
-    expect(TASK_ACTION_SCHEMA.safeParse({ action: 'task.createMany', titles: ['A'] })).toMatchObject({ success: true, data: { gapDays: 1 } });
-    expect(TASK_ACTION_SCHEMA.safeParse({ action: 'task.createMany', titles: [] }).success).toBe(false);
-    expect(TASK_ACTION_SCHEMA.safeParse({ action: 'task.createMany', titles: ['A'], gapDays: -1 }).success).toBe(false);
-    expect(TASK_ACTION_SCHEMA.safeParse({ action: 'task.createMany', titles: ['A'], workspaceId: 'x' }).success).toBe(false);
-    expect(TASK_ACTION_SCHEMA.safeParse({ action: 'task.update', id: 't1', expectedUpdatedAt: 'yesterday' }).success).toBe(false);
+    expect(TASK_ACTION_SCHEMA.safeParse({ action: 'task.createMany', confirmation: 'CREATE 1 TASKS', titles: ['A'] })).toMatchObject({ success: true, data: { gapDays: 1 } });
+    expect(TASK_ACTION_SCHEMA.safeParse({ action: 'task.createMany', confirmation: 'CREATE 0 TASKS', titles: [] }).success).toBe(false);
+    expect(TASK_ACTION_SCHEMA.safeParse({ action: 'task.createMany', confirmation: 'CREATE 1 TASKS', titles: ['A'], gapDays: -1 }).success).toBe(false);
+    expect(TASK_ACTION_SCHEMA.safeParse({ action: 'task.createMany', confirmation: 'CREATE 1 TASKS', titles: ['A'], workspaceId: 'x' }).success).toBe(false);
+    expect(TASK_ACTION_SCHEMA.safeParse({ action: 'task.update', confirmation: 'UPDATE TASK t1', id: 't1', expectedUpdatedAt: 'yesterday' }).success).toBe(false);
     expect(TASK_FILTER_SCHEMA.safeParse({ assignee: 'me', overdue: true }).success).toBe(true);
     expect(TASK_FILTER_SCHEMA.safeParse({ workspaceId: 'w2' }).success).toBe(false);
     expect(taskConfirmations.createMany(3)).toBe('CREATE 3 TASKS');

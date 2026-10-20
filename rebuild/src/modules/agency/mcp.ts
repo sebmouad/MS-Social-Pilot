@@ -2,6 +2,9 @@ import { OperationError } from '@/lib/operation-error';
 import { AGENCY_SORTS, type AgencyActor } from './agency';
 import { exportAgencyOverview } from './server/export';
 import { agencyOverview, listAgencyClients } from './server/agency';
+import type { McpToolGroup } from '@/server/mcp/kit';
+import { accountSessionActor } from '@/modules/settings/server/account-session';
+import { assertAgencySession, selectWorkspace } from './server/workspace-selection';
 
 /**
  * Agency reads span every workspace one person administers. A workspace-scoped MCP key is bound to one
@@ -34,3 +37,29 @@ export async function executeAgencyTool(identity: unknown, name: string, args: R
   if (name === 'list_agency_clients') return listAgencyClients(actor, args);
   throw new OperationError('invalid_request', 'Unknown agency tool.');
 }
+
+/** Browser session catalog. Person overview credentials and workspace keys never enter this group. */
+export const AGENCY_SESSION_MCP: McpToolGroup = {
+  id: 'agency-session',
+  tools: [
+    agencyToolDefinitions.find(tool => tool.name === 'list_agency_clients')!,
+    { name: 'select_workspace', description: 'Select a workspace you currently belong to in this browser session. Subsequent requests use that workspace. Confirmation: SELECT WORKSPACE <workspaceId>. Browser sessions only.', inputSchema: { type: 'object', properties: { workspaceId: { type: 'string' }, confirmation: { type: 'string' } }, required: ['workspaceId', 'confirmation'], additionalProperties: false } },
+  ],
+  features: { list_agency_clients: 'agency/clients', select_workspace: 'settings/account' },
+  writeTools: ['select_workspace'], selfLockedWrites: ['select_workspace'], purgeCheckExempt: ['select_workspace'],
+  scope: { workspaceTools: ['list_agency_clients', 'select_workspace'] },
+  available: async viewer => () => !viewer.apiKeyId,
+  beforeCall: viewer => { if (viewer.apiKeyId) throw new OperationError('forbidden', 'Use a signed-in browser session.'); },
+  execute: async (viewer, name, args) => {
+    if (viewer.apiKeyId) throw new OperationError('forbidden', 'Use a signed-in browser session.');
+    const actor = await accountSessionActor(viewer.userId, viewer.workspaceId);
+    await assertAgencySession(actor);
+    if (name === 'list_agency_clients') return listAgencyClients({ userId: actor.userId }, args);
+    if (name === 'select_workspace') {
+      // The service enforces a supplied confirmation; tools also require its presence.
+      if (typeof args.confirmation !== 'string') throw new OperationError('invalid_request', 'Confirm the workspace selection.');
+      return selectWorkspace(actor, args);
+    }
+    throw new OperationError('invalid_request', 'Unknown agency session tool.');
+  },
+};

@@ -9,7 +9,8 @@ const state = vi.hoisted(() => ({
   targets: [] as Array<{ id: string; name: string; type: string }>, targetWhere: null as unknown,
 }));
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn(), user: { findUnique: vi.fn() }, membership: { findUnique: vi.fn() }, target: { findMany: vi.fn() } }));
-vi.mock('@/server/data', () => ({ prisma: db }));
+vi.mock('@/server/data', () => ({ prisma: db, getSessionByTokenHash: async () => state.session ? { userId: 'user-a', user: { id: 'user-a', disabledAt: null }, expiresAt: new Date('2099-01-01'), pending: null } : null }));
+vi.mock('@/modules/settings/server/account-session', () => ({ accountSessionActor: async (userId: string, workspaceId: string) => ({ userId, workspaceId, sessionTokenHash: 'synthetic-hash' }) }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (key in state.config ? state.config[key] : key === 'data.workspaceOperationTimeoutMs' ? 30000 : DEFAULTS[key]) }));
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, cb: () => Promise<unknown>) => cb(), assertWorkspaceNotPurging: async () => undefined }));
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: async (_u: string, w: string) => ({ workspaceId: w }), canUseFeature: () => true, entitledPlatformIds: () => ['facebook'] }));
@@ -20,7 +21,7 @@ vi.mock('@/server/client-ip', () => ({ clientIp: (request: Request) => request.h
 vi.mock('@/server/secret-crypto', () => ({ encryptSecret: (v: string) => `enc(${v})`, decryptSecret: (v: string) => v.replace(/^enc\((.*)\)$/, '$1') }));
 vi.mock('@/server/mcp/bearer', () => ({ authenticateBearerHeader: async () => state.key }));
 vi.mock('@/server/context', () => ({
-  requireViewer: async () => { if (!state.session) throw new Error('NEXT_REDIRECT'); return { user: { id: 'user-a' }, workspaceId: state.sessionWorkspace }; },
+  requireViewer: async () => { if (!state.session) throw { digest: 'NEXT_REDIRECT;/sign-in' }; return { user: { id: 'user-a' }, workspaceId: state.sessionWorkspace }; },
 }));
 
 import { INTEGRATIONS_CONFIG } from '../src/modules/integrations/config';

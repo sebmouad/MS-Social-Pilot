@@ -100,7 +100,7 @@ describe.skipIf(!databaseUrl)('Tasks single-transaction writes on isolated Postg
 
   it('completes a Task create, audit included, on a one-connection pool', async () => {
     state.client = single as unknown as Record<string, unknown>; state.skipPurgeGuard = false;
-    const created = await performTaskAction(actor, { action: 'task.create', title: 'Single connection task', notes: 'synthetic' });
+    const created = await performTaskAction(actor, { action: 'task.create', confirmation: 'CREATE TASK Single connection task', title: 'Single connection task', notes: 'synthetic' });
     expect(created).toMatchObject({ ok: true, action: 'task.create' });
     const rows = await db.$queryRaw<Array<{ title: string; createdById: string; status: string }>>`SELECT title, "createdById", status FROM tasks WHERE id = ${(created as { id: string }).id}`;
     expect(rows).toEqual([{ title: 'Single connection task', createdById: userId, status: 'todo' }]);
@@ -110,9 +110,9 @@ describe.skipIf(!databaseUrl)('Tasks single-transaction writes on isolated Postg
 
   it('completes a checklist and a comment on the same one-connection pool', async () => {
     state.client = single as unknown as Record<string, unknown>; state.skipPurgeGuard = false;
-    const many = await performTaskAction(actor, { action: 'task.createMany', titles: ['One', 'Two', 'Three'], startOn: '2026-11-01', gapDays: 2 }) as { ids: string[] };
+    const many = await performTaskAction(actor, { action: 'task.createMany', confirmation: 'CREATE 3 TASKS', titles: ['One', 'Two', 'Three'], startOn: '2026-11-01', gapDays: 2 }) as { ids: string[] };
     expect(many.ids).toHaveLength(3);
-    const commented = await performTaskAction(actor, { action: 'comment.add', taskId: many.ids[0]!, body: 'Synthetic comment' });
+    const commented = await performTaskAction(actor, { action: 'comment.add', confirmation: `COMMENT ON TASK ${many.ids[0]!}`, taskId: many.ids[0]!, body: 'Synthetic comment' });
     expect(commented).toMatchObject({ ok: true, action: 'comment.add' });
     const dues = await db.$queryRaw<Array<{ dueOn: string }>>`SELECT "dueOn" FROM tasks WHERE id = ANY(${many.ids}::text[]) ORDER BY "dueOn"`;
     expect(dues.map(row => row.dueOn)).toEqual(['2026-11-01', '2026-11-03', '2026-11-05']);
@@ -120,10 +120,10 @@ describe.skipIf(!databaseUrl)('Tasks single-transaction writes on isolated Postg
 
   it('lets exactly one of two simultaneous updates with the same expected version win', async () => {
     state.client = pooled as unknown as Record<string, unknown>; state.skipPurgeGuard = false;
-    const created = await performTaskAction(actor, { action: 'task.create', title: 'Contended task' }) as { id: string };
+    const created = await performTaskAction(actor, { action: 'task.create', confirmation: 'CREATE TASK Contended task', title: 'Contended task' }) as { id: string };
     const loaded = await db.$queryRaw<Array<{ updatedAt: Date }>>`SELECT "updatedAt" FROM tasks WHERE id = ${created.id}`;
     const expectedUpdatedAt = loaded[0]!.updatedAt.toISOString();
-    const settled = await Promise.allSettled(['Winner A', 'Winner B'].map(title => performTaskAction(actor, { action: 'task.update', id: created.id, title, expectedUpdatedAt })));
+    const settled = await Promise.allSettled(['Winner A', 'Winner B'].map(title => performTaskAction(actor, { action: 'task.update', confirmation: `UPDATE TASK ${created.id}`, id: created.id, title, expectedUpdatedAt })));
     const fulfilled = settled.filter(item => item.status === 'fulfilled');
     const rejected = settled.filter((item): item is PromiseRejectedResult => item.status === 'rejected');
     expect(fulfilled).toHaveLength(1);
@@ -145,7 +145,7 @@ describe.skipIf(!databaseUrl)('Tasks single-transaction writes on isolated Postg
       const [tasks, audits] = [await count('tasks'), await count('activity_logs')];
       await request();
       try {
-        await expect(performTaskAction(actor, { action: 'task.create', title: 'Must not exist' })).rejects.toMatchObject({ code: 'conflict' });
+        await expect(performTaskAction(actor, { action: 'task.create', confirmation: 'CREATE TASK Must not exist', title: 'Must not exist' })).rejects.toMatchObject({ code: 'conflict' });
       } finally { await release(); }
       expect([await count('tasks'), await count('activity_logs')]).toEqual([tasks, audits]);
     }, 30000);
@@ -155,14 +155,14 @@ describe.skipIf(!databaseUrl)('Tasks single-transaction writes on isolated Postg
       const [tasks, audits] = [await count('tasks'), await count('activity_logs')];
       await request();
       try {
-        await expect(performTaskAction(actor, { action: 'task.create', title: 'Must not exist either' })).rejects.toMatchObject({ code: 'conflict' });
+        await expect(performTaskAction(actor, { action: 'task.create', confirmation: 'CREATE TASK Must not exist either', title: 'Must not exist either' })).rejects.toMatchObject({ code: 'conflict' });
       } finally { state.skipPurgeGuard = false; await release(); }
       expect([await count('tasks'), await count('activity_logs')]).toEqual([tasks, audits]);
     }, 30000);
 
     it('accepts writes again once the purge row is gone', async () => {
       state.client = single as unknown as Record<string, unknown>; state.skipPurgeGuard = false;
-      await expect(performTaskAction(actor, { action: 'task.create', title: 'After release' })).resolves.toMatchObject({ ok: true });
+      await expect(performTaskAction(actor, { action: 'task.create', confirmation: 'CREATE TASK After release', title: 'After release' })).resolves.toMatchObject({ ok: true });
     }, 30000);
   });
 });

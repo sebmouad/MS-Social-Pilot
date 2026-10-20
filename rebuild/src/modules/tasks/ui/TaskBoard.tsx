@@ -57,7 +57,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
     if (!draft.title.trim()) { setFormError('Enter a task title.'); return; }
     if (mode?.kind !== 'form') return;
     const fields = { title: draft.title.trim(), notes: draft.notes.trim() || null, assigneeId: draft.assigneeId || null, dueOn: draft.dueOn || null, ...(postChange === undefined ? {} : { postId: postChange }) };
-    if (await send(mode.task ? { action: 'task.update', id: mode.task.id, expectedUpdatedAt: mode.task.updatedAt, ...fields } : { action: 'task.create', ...fields })) {
+    if (await send(mode.task ? { action: 'task.update', confirmation: taskConfirmations.update(mode.task.id), id: mode.task.id, expectedUpdatedAt: mode.task.updatedAt, ...fields } : { action: 'task.create', confirmation: taskConfirmations.create(fields.title), ...fields })) {
       setMode(null); say(mode.task ? 'Task updated.' : 'Task created.'); router.refresh();
     }
   }
@@ -81,13 +81,13 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
     if (tooLong >= 0) { setFormError(`Line ${tooLong + 1} is longer than ${limits.titleMaxCharacters} characters.`); return; }
     const gap = Number(checklist.gapDays || 0);
     if (!Number.isInteger(gap) || gap < 0 || gap > limits.workflowGapMaxDays) { setFormError(`Days between due dates must be a whole number from 0 to ${limits.workflowGapMaxDays}.`); return; }
-    if (await send({ action: 'task.createMany', titles, assigneeId: checklist.assigneeId || null, startOn: checklist.startOn || null, gapDays: gap })) {
+    if (await send({ action: 'task.createMany', confirmation: taskConfirmations.createMany(titles.length), titles, assigneeId: checklist.assigneeId || null, startOn: checklist.startOn || null, gapDays: gap })) {
       setMode(null); say(`${titles.length} ${titles.length === 1 ? 'task' : 'tasks'} created.`); router.refresh();
     }
   }
   async function move(task: TaskView, status: TaskStatus) {
     setNotice(null);
-    if (await send({ action: 'task.transition', id: task.id, status })) { say(`Moved to ${TASK_STATUS_LABELS[status]}.`); router.refresh(); }
+    if (await send({ action: 'task.transition', confirmation: taskConfirmations.transition(task.id, status), id: task.id, status })) { say(`Moved to ${TASK_STATUS_LABELS[status]}.`); router.refresh(); }
   }
   async function remove(task: TaskView) {
     if (!deleteConfirmed) return;
@@ -109,7 +109,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
   async function addComment(task: TaskView) {
     if (!commentDraft.trim()) { setFormError('Enter a comment.'); return; }
     setFormError('');
-    if (await send({ action: 'comment.add', taskId: task.id, body: commentDraft.trim() })) { setCommentDraft(''); if (!(await loadComments(task, 0))) setFormError('The comment was saved, but the list could not be refreshed.'); router.refresh(); }
+    if (await send({ action: 'comment.add', confirmation: taskConfirmations.comment(task.id), taskId: task.id, body: commentDraft.trim() })) { setCommentDraft(''); if (!(await loadComments(task, 0))) setFormError('The comment was saved, but the list could not be refreshed.'); router.refresh(); }
   }
   async function removeComment(task: TaskView, comment: TaskCommentView) {
     setFormError('');

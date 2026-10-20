@@ -30,11 +30,11 @@ describe('tasks API', () => {
     expect(mocks.act).not.toHaveBeenCalled();
   });
   it('passes the session actor to writes and maps service failures to safe errors', async () => {
-    expect((await post({ action: 'task.create', title: 'x' })).status).toBe(200);
-    expect(mocks.act).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1' }, { action: 'task.create', title: 'x' });
-    mocks.act.mockRejectedValue(new OperationError('forbidden', 'No.')); const denied = await post({ action: 'task.create', title: 'x' });
+    expect((await post({ action: 'task.create', confirmation: 'CREATE TASK x', title: 'x' })).status).toBe(200);
+    expect(mocks.act).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1' }, { action: 'task.create', confirmation: 'CREATE TASK x', title: 'x' });
+    mocks.act.mockRejectedValue(new OperationError('forbidden', 'No.')); const denied = await post({ action: 'task.create', confirmation: 'CREATE TASK x', title: 'x' });
     expect(denied.status).toBe(403); expect(await denied.json()).toMatchObject({ code: 'forbidden' });
-    mocks.act.mockRejectedValue(new Error('SELECT secret FROM db')); const failed = await post({ action: 'task.create', title: 'x' });
+    mocks.act.mockRejectedValue(new Error('SELECT secret FROM db')); const failed = await post({ action: 'task.create', confirmation: 'CREATE TASK x', title: 'x' });
     expect(JSON.stringify(await failed.json())).not.toContain('secret');
   });
   it('answers unauthenticated reads with the viewer failure and reads one task for the session workspace', async () => {
@@ -45,12 +45,12 @@ describe('tasks API', () => {
   });
   it('gates every entry point on the Tasks module and feature before calling the service', async () => {
     mocks.get.mockResolvedValue({ ok: true }); mocks.choices.mockResolvedValue({ ok: true });
-    await GET(new Request(url)); await post({ action: 'task.create', title: 'x' });
+    await GET(new Request(url)); await post({ action: 'task.create', confirmation: 'CREATE TASK x', title: 'x' });
     await GET_ONE(new Request(`${url}/t1`), { params: Promise.resolve({ id: 't1' }) }); await GET_POSTS(new Request(`${url}/posts`));
     for (const [access] of mocks.viewer.mock.calls) expect(access).toMatchObject({ module: 'tasks', feature: 'tasks/board', channelScoped: true });
     expect(mocks.viewer.mock.calls.filter(([access]) => access.write === true)).toHaveLength(1);
     mocks.viewer.mockRejectedValue(new Error('redirect'));
-    for (const response of [await GET(new Request(url)), await post({ action: 'task.create', title: 'x' }), await GET_ONE(new Request(`${url}/t1`), { params: Promise.resolve({ id: 't1' }) }), await GET_POSTS(new Request(`${url}/posts`))]) expect(response.status).toBe(401);
+    for (const response of [await GET(new Request(url)), await post({ action: 'task.create', confirmation: 'CREATE TASK x', title: 'x' }), await GET_ONE(new Request(`${url}/t1`), { params: Promise.resolve({ id: 't1' }) }), await GET_POSTS(new Request(`${url}/posts`))]) expect(response.status).toBe(401);
     expect(mocks.list).toHaveBeenCalledTimes(1); expect(mocks.act).toHaveBeenCalledTimes(1);
   });
   it('pages comments and post choices with strict parameters', async () => {

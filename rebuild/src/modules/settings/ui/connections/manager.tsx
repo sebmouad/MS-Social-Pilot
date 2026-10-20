@@ -40,7 +40,7 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
   async function connect(platform: Connectable) {
     setConnecting(platform.id); setNotice('');
     try {
-      const response = await fetch(`/api/connections/${encodeURIComponent(platform.id)}/start`, { method: 'POST' });
+      const response = await fetch(`/api/oauth/connections/${encodeURIComponent(platform.id)}/start`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation: `START CONNECTION ${platform.id}` }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || typeof result.authorizationUrl !== 'string') throw new Error(result.error ?? fill(t.startFailed, { platform: platform.name }));
       const authorizationUrl = new URL(result.authorizationUrl);

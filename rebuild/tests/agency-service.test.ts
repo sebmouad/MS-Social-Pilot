@@ -22,6 +22,7 @@ import { agencyManifest } from '../src/modules/agency/manifest';
 
 const actor = { userId: 'user-a' };
 const defaults: Record<string, number> = {
+  'agency.workspaceIdMaxLength': 200,
   'agency.workspaceLimit': 3, 'agency.failureWindowDays': 30, 'agency.clientListLimit': 1, 'agency.searchMaxLength': 20, 'agency.accessConcurrency': 8,
   'agency.attentionWeightUnavailable': 1000, 'agency.attentionWeightDisconnected': 100, 'agency.attentionWeightFailed': 10, 'agency.attentionWeightOverdue': 1,
 };

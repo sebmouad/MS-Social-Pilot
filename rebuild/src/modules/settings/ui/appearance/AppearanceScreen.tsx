@@ -4,17 +4,22 @@ import { requireViewer } from '@/server/context';
 import { SettingsPage, SettingsPanel, styles as settingsStyles } from '@/modules/settings/ui/_components';
 import { settingsLocale } from '@/modules/settings/ui/locale';
 import { AppearancePicker } from './picker';
-import { appearanceCopy } from './copy';
+import type { AppearanceCopy } from './copy';
+import { runtimeConfig } from '@/server/config/store';
+import { accountSessionActor } from '@/modules/settings/server/account-session';
+import { appearanceSession } from '@/modules/settings/server/appearance';
+import { canAccessFeature } from '@/server/permissions';
 
 export const metadata: Metadata = { title: 'Appearance' };
 
 export default async function AppearancePage() {
-  await requireViewer({ feature: 'settings/appearance' });
+  const viewer = await requireViewer({ feature: 'settings/appearance', channelScoped: true });
   const locale = await settingsLocale();
-  const t = appearanceCopy[locale];
-  return <PageFrame module="settings"><SettingsPage active="settings/appearance" title={t.title} description={t.description} locale={locale}>
+  const t = (await runtimeConfig('settings.appearanceCopy'))[locale] as AppearanceCopy;
+  const appearance = await appearanceSession(await accountSessionActor(viewer.user.id, viewer.workspaceId));
+  return <PageFrame module="settings" scopedAccess><SettingsPage active="settings/appearance" title={t.title} description={t.description} locale={locale}>
     <SettingsPanel title={t.panel} detail={t.panelDetail}>
-      <AppearancePicker locale={locale} />
+      <AppearancePicker initialTheme={appearance.theme} initialMode={appearance.mode} copy={t} canWrite={canAccessFeature(viewer.permissions, 'settings/appearance', 'write')} />
     </SettingsPanel>
     <p className={settingsStyles['settings-note']}>{t.note}</p>
   </SettingsPage></PageFrame>;

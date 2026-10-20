@@ -5,6 +5,10 @@ const state = vi.hoisted(() => ({
   cookieSet: vi.fn(),
   getSessionByTokenHash: vi.fn(),
   listWorkspaces: vi.fn(),
+  membership: vi.fn(),
+  lockedMembership: vi.fn(),
+  audit: vi.fn(),
+  guard: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({
@@ -13,7 +17,11 @@ vi.mock('next/headers', () => ({
 vi.mock('@/server/data', () => ({
   getSessionByTokenHash: state.getSessionByTokenHash,
   listWorkspaces: state.listWorkspaces,
+  prisma: { membership: { findUnique: state.membership }, $transaction: async (run: (tx: unknown) => unknown) => run({ $queryRaw: state.lockedMembership }) },
 }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => 200 }));
+vi.mock('@/server/account-settings', () => ({ auditAccountMutation: state.audit }));
+vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: state.guard }));
 
 import { POST } from '../src/app/api/workspaces/select/route';
 
@@ -41,6 +49,10 @@ describe('workspace selection route', () => {
       user: { id: 'user', disabledAt: null },
     });
     state.listWorkspaces.mockResolvedValue(selectedWorkspaces);
+    state.membership.mockImplementation(async ({ where }) => selectedWorkspaces.some(item => item.workspace.id === where.userId_workspaceId.workspaceId) ? { id: 'membership' } : null);
+    state.lockedMembership.mockResolvedValue([{ id: 'membership' }]);
+    state.guard.mockImplementation(async (_id, run) => run());
+    state.audit.mockResolvedValue(undefined);
   });
 
   it('rejects cross-origin requests before authenticating or mutating', async () => {
@@ -90,10 +102,19 @@ describe('workspace selection route', () => {
     const response = await POST(request({ workspaceId: 'workspace-b' }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(state.getSessionByTokenHash).toHaveBeenCalledTimes(1);
-    expect(state.listWorkspaces).toHaveBeenCalledWith('user');
+    expect(state.getSessionByTokenHash).toHaveBeenCalledTimes(3);
+    expect(state.membership).toHaveBeenCalledWith({ where: { userId_workspaceId: { userId: 'user', workspaceId: 'workspace-b' } }, select: { id: true } });
+    expect(state.guard).toHaveBeenCalledWith('workspace-b', expect.any(Function));
+    expect(state.audit).toHaveBeenCalledWith(expect.anything(), 'user', 'account.workspace_selected', { workspaceId: 'workspace-b' });
     expect(state.cookieSet).toHaveBeenCalledWith('sp_workspace', 'workspace-b', {
       httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/',
     });
+  });
+
+  it('rejects mixed bearer credentials before reading cookies', async () => {
+    const input = request({ workspaceId: 'workspace-b' });
+    input.headers.set('authorization', 'Bearer workspace-key');
+    expect((await POST(input)).status).toBe(403);
+    expect(state.cookieGet).not.toHaveBeenCalled();
   });
 });
