@@ -191,7 +191,7 @@ export async function runMatrix(env: Readonly<Record<string, string | undefined>
     const login = await auth.newPage();
     login.on('console', message => { const finding = browserFinding('console', message.type(), message.text()); if (finding) fatal.push(finding); });
     login.on('pageerror', error => { const finding = browserFinding('pageerror', 'error', error.message); if (finding) fatal.push(finding); });
-    await login.goto(`${base}/sign-in`, { waitUntil: 'networkidle', timeout: 30000 });
+    await login.goto(`${base}/sign-in`, { waitUntil: 'load', timeout: 30000 });
     await login.locator('input[name=email]').fill(env.QA_EMAIL);
     await login.locator('input[name=password]').fill(env.QA_PASSWORD);
     await login.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -215,7 +215,7 @@ export async function runMatrix(env: Readonly<Record<string, string | undefined>
           page.on('console', message => { const finding = browserFinding('console', message.type(), message.text()); if (finding) cell.findings.push(finding); });
           page.on('pageerror', error => { const finding = browserFinding('pageerror', 'error', error.message); if (finding) cell.findings.push(finding); });
           try {
-            const response = await page.goto(`${base}${route}`, { waitUntil: 'networkidle', timeout: 30000 });
+            const response = await page.goto(`${base}${route}`, { waitUntil: 'load', timeout: 30000 });
             if (!response || response.status() >= 400) cell.findings.push({ code: 'HTTP_FAILURE', count: response?.status() });
             await page.locator('main#main-content').waitFor();
             // Allow hydration/effects and font layout to settle before inspection.
