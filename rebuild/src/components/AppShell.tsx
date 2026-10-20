@@ -5,6 +5,7 @@ import { MODULES, PAGES, type ModuleId } from "@/lib/product";
 import { SidebarDockContext } from "./SidebarDock";
 import { ModuleGlyph, PageGlyph } from "./icons";
 import { ModeToggle } from "./ModeToggle";
+import { ToastProvider } from "./Toast";
 import { IconPlus } from "@tabler/icons-react";
 
 function Mark() {
@@ -93,7 +94,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       window.location.assign('/sign-in');
     } catch { setAccountError('Could not sign out. Try again.'); setSigningOut(false); }
   }
-  return <SidebarDockContext.Provider value={sidebarHost}><div className="shell" data-module={installationMode ? 'root' : activeModule} onSubmitCapture={event => {
+  return <SidebarDockContext.Provider value={sidebarHost}><ToastProvider><div className="shell" data-module={installationMode ? 'root' : activeModule} onSubmitCapture={event => {
     // A drawer button may submit an associated editor form outside the drawer.
     // Reveal its progress and validation feedback instead of leaving it inert.
     if (filterOpen && event.target instanceof HTMLFormElement && event.target.closest('.shell-main')) {
@@ -132,5 +133,5 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       <footer className="shell-context-footer"><span className="shell-context-user">{userName}</span>{enabledFeatures.includes('settings/account') && <a href="/settings/account">Account</a>}{rootAccess && !installationMode && <a href="/root">Root</a>}<button className="shell-signout" type="button" disabled={signingOut} aria-busy={signingOut} onClick={() => void signOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</button>{accountError && <p className="ui-error" role="alert">{accountError}</p>}</footer>
     </aside>
     <div className="shell-main" inert={filterOpen || undefined}><header className="shell-topbar"><div className="shell-topbar__crumb"><button ref={filterToggleRef} className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => filterOpen ? closeFilters() : setFilterOpen(true)}>Menu &amp; filters</button><span>{installationMode ? 'Installation' : workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : active?.title}</strong></div><div className="shell-topbar__tools">{installationMode && <span className="shell-root-badge"><ModuleGlyph id="root" size={15}/>Root · private installation controls</span>}<ModeToggle/><span className="shell-topbar__user">{PAGES.find(page => page.href === pathname)?.title ?? (installationMode ? 'Private control center' : 'Workspace')}</span></div></header><main id="main-content" className="shell-content" tabIndex={-1}>{children}</main></div>
-  </div></SidebarDockContext.Provider>;
+  </div></ToastProvider></SidebarDockContext.Provider>;
 }
