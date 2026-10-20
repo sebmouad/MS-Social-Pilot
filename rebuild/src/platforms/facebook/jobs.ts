@@ -211,7 +211,7 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
         result.skipped += outcome.skipped;
         result.failed += outcome.failed;
       });
-    } catch (error) { if (isAccessDenied(error)) result.skipped++; else result.failed++; }
+    } catch (error) { if (isAccessDenied(error)) result.skipped++; else { result.failed++; await logItemFailure('pageAnalytics', target.id, error); } }
   }
   return result;
 }
@@ -280,7 +280,7 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
         result.updated += outcome.updated;
         result.skipped += outcome.skipped;
       });
-    } catch (error) { if (isAccessDenied(error)) result.skipped++; else result.failed++; }
+    } catch (error) { if (isAccessDenied(error)) result.skipped++; else { result.failed++; await logItemFailure('adsAnalytics', account.id, error); } }
   }
   return result;
 }

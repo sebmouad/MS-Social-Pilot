@@ -315,7 +315,8 @@ export async function reschedulePostToInstant(actor: PublishingActor, postId: st
     const retention = await loadVersionRetention();
     // Destinations the platform is holding move first, on the platform; the post's own time follows only when they all moved.
     const before = await prisma.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { authorId: true, status: true } });
-    if (!before || !canManage(role.role, before.authorId, actor.userId) || before.status !== 'scheduled') throw new OperationError('conflict', 'This post cannot be rescheduled.');
+    if (!before || !canManage(role.role, before.authorId, actor.userId)) throw new OperationError('conflict', 'This post cannot be rescheduled.');
+    if (before.status !== 'scheduled') throw new OperationError('conflict', 'Only posts that are still waiting to publish can be rescheduled.');
     await rescheduleHeldDestinations(actor, signal, input.postId, scheduledAt);
     await publishingTransaction(signal, async tx => {
       const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, message: true, firstComment: true, format: true, link: true, media: true, targets: { select: { status: true, formatId: true, remotePostId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });

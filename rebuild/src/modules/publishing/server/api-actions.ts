@@ -4,6 +4,7 @@ import { auditedReceipt, publishingActor } from '@/server/mcp/kit';
 import type { McpViewer } from '@/server/mcp/types';
 import { REST_POST_CREATE_SCHEMA } from '@/modules/integrations/contracts';
 import { parse } from '@/modules/integrations/server/core';
+import { assertRestPostLimits } from '@/modules/integrations/server/rest';
 import { SCHEDULE_MODES } from '../remote-scheduling';
 import { createPostForApi } from './api';
 import { cancelScheduledPost, reschedulePostToInstant, schedulePost } from './lifecycle';
@@ -15,7 +16,7 @@ import { queuePostRequest } from './queue';
  * by those services. Writes beyond creation ask for the same exact confirmation strings as the MCP tools of the same name.
  */
 const MODE = z.enum(SCHEDULE_MODES);
-const DESTINATION_MODES = z.record(z.string().min(1).max(200), MODE).refine(value => Object.keys(value).length <= 50);
+const DESTINATION_MODES = z.record(z.string().min(1), MODE);
 const CREATE = REST_POST_CREATE_SCHEMA.extend({ scheduleMode: MODE.optional(), destinationScheduleModes: DESTINATION_MODES.optional() }).strict();
 const INSTANT = z.string().datetime({ offset: true });
 const WHEN = z.object({ scheduledAt: INSTANT, confirmation: z.string() }).strict();
@@ -30,6 +31,7 @@ const confirmed = (actual: string, expected: string) => {
 export async function keyCreatePost(viewer: McpViewer, input: unknown) {
   const data = parse(CREATE, input, 'Check the post details: message, targetIds, an optional future scheduledAt and optional scheduleMode.');
   if (!data.scheduledAt && (data.scheduleMode || data.destinationScheduleModes)) throw new OperationError('invalid_request', 'Choose a scheduledAt before choosing where the schedule is held.');
+  await assertRestPostLimits(data);
   const result = await createPostForApi(publishingActor(viewer), {
     message: data.message, targetIds: data.targetIds, ...(data.firstComment === undefined ? {} : { firstComment: data.firstComment }),
     ...(data.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: data.firstCommentDelayMinutes }),

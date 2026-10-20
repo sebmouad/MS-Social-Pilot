@@ -5,6 +5,7 @@ import type { FacebookConfig } from '../src/platforms/facebook/config';
 const runtime = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
 vi.mock('../src/server/config/store', () => ({
   runtimeConfig: async (key: string) => runtime.values.get(key),
+  runtimeConfigBatch: async (keys: readonly string[]) => Object.fromEntries(keys.map(key => [key, runtime.values.get(key)])),
   runtimeSecret: async () => 'synthetic-app-secret',
 }));
 

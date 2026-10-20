@@ -10,7 +10,7 @@ const state = vi.hoisted(() => ({
   executeRaw: vi.fn(), transaction: vi.fn(),
 }));
 state.transaction.mockImplementation((callback: (tx: unknown) => unknown) => callback({ ...state, $queryRaw: vi.fn(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: false }]), $executeRaw: state.executeRaw }));
-vi.mock('@/server/data', () => ({ prisma: { membership: state.membership, $transaction: state.transaction } }));
+vi.mock('@/server/data', () => ({ prisma: { membership: state.membership, $transaction: state.transaction, appSetting: { findUnique: vi.fn(async () => null), findMany: vi.fn(async () => []) } } }));
 
 import { setConnectionSelections } from '@/server/connection-mutations';
 

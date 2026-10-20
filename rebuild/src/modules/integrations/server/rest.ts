@@ -156,8 +156,8 @@ export async function restListPosts(ctx: ApiKeyContext, query: Record<string, st
  * media validation, workspace approval holds (a held post is returned as `pending_approval`), versioning and audit all apply as in the
  * app and MCP. A key-level audit record is written like the MCP write receipt.
  */
-export async function restCreatePost(ctx: ApiKeyContext, input: unknown) {
-  const data = parse(REST_POST_CREATE_SCHEMA, input, 'Check the post details: message, targetIds and an optional future scheduledAt.');
+/** Current Root field and collection limits for a key-created post (shared by every REST v1 create path). */
+export async function assertRestPostLimits(data: { message: string; targetIds: string[]; firstComment?: string; firstCommentDelayMinutes?: number; link?: string; media?: Array<{ url: string; altText?: string }>; destinationFormats?: Record<string, string>; destinationScheduleModes?: Record<string, string> }) {
   const limits = (await runtime()).limits;
   within(data.message.length <= limits.restMessageMaxCharacters
     && data.targetIds.length <= limits.restTargetIdsMaxItems
@@ -167,6 +167,15 @@ export async function restCreatePost(ctx: ApiKeyContext, input: unknown) {
     && (data.link === undefined || data.link.length <= limits.restLinkMaxCharacters)
     && (data.media === undefined || data.media.length <= limits.restMediaMaxItems && data.media.every(item => item.url.length <= limits.restMediaUrlMaxCharacters && (item.altText === undefined || item.altText.length <= limits.restMediaAltTextMaxCharacters)))
     && (data.destinationFormats === undefined || Object.keys(data.destinationFormats).length <= limits.restFormatEntriesMaxItems && Object.entries(data.destinationFormats).every(([key, value]) => key.length <= limits.restFormatKeyMaxCharacters && value.length <= limits.restFormatValueMaxCharacters)));
+  if (data.destinationScheduleModes) {
+    const limits = (await runtime()).limits;
+    within(Object.keys(data.destinationScheduleModes).length <= limits.restTargetIdsMaxItems && Object.keys(data.destinationScheduleModes).every(id => id.length <= limits.restTargetIdMaxCharacters));
+  }
+}
+
+export async function restCreatePost(ctx: ApiKeyContext, input: unknown) {
+  const data = parse(REST_POST_CREATE_SCHEMA, input, 'Check the post details: message, targetIds and an optional future scheduledAt.');
+  await assertRestPostLimits(data);
   const { viewer } = ctx;
   const result = await createPostForApi(publishingActor(viewer), {
     message: data.message, targetIds: data.targetIds, ...(data.firstComment === undefined ? {} : { firstComment: data.firstComment }),

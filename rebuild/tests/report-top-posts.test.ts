@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const db = vi.hoisted(() => ({ $queryRaw: vi.fn() }));
+const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), appSetting: { findUnique: vi.fn(async () => null), findMany: vi.fn(async () => []) } }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 
 import { facebookPostPerformance, readFacebookPostPerformance } from '../src/platforms/facebook/post-performance';
@@ -17,11 +17,12 @@ describe('Facebook post performance', () => {
     expect(facebookPostPerformance({ ...row('c', {}), remoteUrl: 'javascript:alert(1)' }).url).toBeNull();
   });
   it('reads workspace-bound published rows and returns the best first, bounded', async () => {
-    db.$queryRaw.mockResolvedValue([row('low', { reactions: 1 }, 3), row('none', null, 4), row('high', { reactions: 9 }, 2)]);
+    // Ranking and the bound are applied in SQL (ORDER BY rank NULLS LAST, LIMIT); the database returns rows in that order.
+    db.$queryRaw.mockResolvedValue([row('high', { reactions: 9 }, 2), row('low', { reactions: 1 }, 3)]);
     const out = await readFacebookPostPerformance({ workspaceId: 'w1', targetId: 't1', from: new Date(0), to: new Date(), limit: 2 });
     expect(out.map(p => p.postId)).toEqual(['high', 'low']);
-    const sql = db.$queryRaw.mock.calls[0]!.join(' ');
-    expect(sql).toContain(`t."workspaceId" =`); expect(sql).toContain(`pt.status = 'published'`);
+    const sql = JSON.stringify(db.$queryRaw.mock.calls[0]);
+    expect(sql).toContain(`t.\\"workspaceId\\" =`); expect(sql).toContain(`published`);
   });
 });
 

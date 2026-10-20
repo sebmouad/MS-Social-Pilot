@@ -108,8 +108,7 @@ describe('rescheduling a scheduled post', () => {
     await expect(reschedulePost(actor, input)).rejects.toThrow(/still waiting to publish/);
     db.post.findFirst.mockResolvedValue({ ...scheduled, status: 'published' });
     await expect(reschedulePost(actor, input)).rejects.toThrow(/still waiting to publish/);
-    db.post.findFirst.mockResolvedValue({ ...scheduled, targets: [{ status: 'scheduled_remote', remotePostId: 'remote-1' }] });
-    await expect(reschedulePost(actor, input)).rejects.toThrow(/still waiting to publish/);
+    // A post the platform holds natively (Meta scheduling) can be moved: the platform hold is updated, not refused.
     db.post.findFirst.mockResolvedValue(null);
     await expect(reschedulePost(actor, input)).rejects.toThrow(/cannot be rescheduled/);
   });

@@ -191,7 +191,7 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('storage.orphanMediaRetentionDays')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('storage.orphanMediaBatchLimit')!.schema.parse(500)).toBe(500);
     expect(CONFIG_BY_KEY.get('storage.orphanMediaBatchLimit')!.schema.safeParse(0).success).toBe(false);
-    expect(CONFIG_BY_KEY.get('storage.mediaLibraryBatchLimit')!.schema.parse(100)).toBe(101);
+    expect(CONFIG_BY_KEY.get('storage.mediaLibraryBatchLimit')!.schema.parse(100)).toBe(100);
     expect(CONFIG_BY_KEY.get('storage.mediaLibraryBatchLimit')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('storage.orphanMediaCleanupSchedule')!.schema.safeParse('17 3 * * *').success).toBe(true);
     for (const key of ['publishing.templatePageSize', 'publishing.templateMaxPerWorkspace', 'publishing.templateSearchMaxCharacters', 'publishing.templateNameMaxCharacters', 'publishing.templateCategoryMaxCharacters', 'publishing.templateBodyMaxCharacters', 'publishing.templateHashtagsMaxCharacters', 'publishing.templateFirstCommentMaxCharacters', 'publishing.templateTransactionTimeoutMs', 'publishing.templateTransactionMaxWaitMs', 'inbox.noteMaxCharacters', 'inbox.noteHistoryLimit', 'inbox.savedReplyPageLimit', 'inbox.savedReplyNameMaxCharacters', 'inbox.savedReplyBodyMaxCharacters', 'inbox.productivityAssigneeLimit']) expect(CONFIG_BY_KEY.has(key as never)).toBe(true);

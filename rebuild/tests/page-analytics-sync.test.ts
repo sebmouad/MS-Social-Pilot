@@ -3,12 +3,12 @@ vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_w
 
 const state = vi.hoisted(() => ({ targets: vi.fn(), freshTarget: vi.fn(), upsert: vi.fn(), observations: vi.fn(), settingRead: vi.fn(), settingWrite: vi.fn(), access: vi.fn() }));
 vi.mock('../src/server/jobs/access', () => ({ assertWorkspaceJobAccess: state.access }));
-vi.mock('../src/server/platforms/resource-lock', () => ({ withSelectedResourceOperation: async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => run({ pageInsight: { upsert: state.upsert } }, new AbortController().signal) }));
+vi.mock('../src/server/platforms/resource-lock', () => ({ withSelectedResourceOperation: async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => run({ pageInsight: { upsert: state.upsert }, appSetting: { findUnique: async () => null, upsert: async () => ({}) }, externalPost: { upsert: async () => ({}) } }, new AbortController().signal) }));
 vi.mock('../src/server/data', () => ({ prisma: { target: { findMany: state.targets, findFirst: state.freshTarget }, pageInsight: { upsert: state.upsert }, appSetting: { findUnique: state.settingRead, upsert: state.settingWrite } } }));
-vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({ getPageInsightObservations: state.observations }), configuredFacebookAdapter: vi.fn() }));
+vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({ getPageInsightObservations: state.observations, getPostHistory: async () => ({ posts: [], failures: [], progress: {} }) }), configuredFacebookAdapter: vi.fn() }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
 let facebookEnabled = true;
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'platforms.facebook.enabled' ? facebookEnabled : key === 'meta.pageInsightReadScopes' ? ['read_insights', 'pages_read_engagement'] : key === 'meta.pageAnalyticsLookbackDays' ? 7 : 100 }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'platforms.facebook.enabled' ? facebookEnabled : key === 'meta.pageInsightReadScopes' ? ['read_insights', 'pages_read_engagement'] : key === 'meta.pageAnalyticsLookbackDays' ? 7 : ((await import('../src/lib/config/registry')).CONFIG_BY_KEY.get(key as never)?.defaultValue ?? 100) }));
 
 import { syncPageAnalytics } from '../src/platforms/facebook/jobs';
 import { OperationError } from '../src/lib/operation-error';
@@ -70,7 +70,7 @@ describe('Page analytics ingestion', () => {
     state.observations.mockRejectedValueOnce(new TypeError('temporary network issue')).mockResolvedValueOnce([]);
     await syncPageAnalytics(new Date('2026-01-04T12:00:00Z'), 1, { baseDelayMs: 0, maxDelayMs: 0 });
     expect(state.observations.mock.calls.map(call => call[0])).toEqual(['expired-token', 'new-token']);
-    expect(state.freshTarget).toHaveBeenCalledTimes(4); // two provider attempts, then pre-write and final persistence checks
+    expect(state.freshTarget).toHaveBeenCalledTimes(5); // +1: post-history re-reads the binding before its own request; // two provider attempts, then pre-write and final persistence checks
   });
 
   it('does not reuse the old grant after a retry observes scope loss', async () => {
