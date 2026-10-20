@@ -10,7 +10,7 @@ export const settingsManifest = {
     { name: 'notifications', label: 'Notification delivery', configKey: 'notifications.deliverySchedule' },
     ...INTEGRATIONS_JOBS,
   ],
-  rootSettingsPrefixes: ['settings.', 'connections.', 'mcp.keys.', 'notifications.', 'sharing.', 'bio.', INTEGRATIONS_ROOT_PREFIX],
+  rootSettingsPrefixes: ['settings.', 'connections.', 'mcp.keys.', 'mcp.personKeys.', 'notifications.', 'sharing.', 'bio.', INTEGRATIONS_ROOT_PREFIX],
   rootSettingKeys: ['data.exportMaxJobs', 'data.exportExpiryHours', 'data.exportWorkerBatch', 'data.exportLeaseSeconds', 'data.exportSchedule', 'data.purgeRecoverySchedule', 'data.deleteTransactionTimeoutMs', 'data.maxArchiveBytes'],
   title: 'Settings',
   href: '/settings/connections',

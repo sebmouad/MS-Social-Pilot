@@ -1,3 +1,4 @@
+import { handleAgencyPersonMessage } from '@/modules/agency/person-mcp';
 import { OperationError, operationFailure, type OperationErrorCode } from '@/lib/operation-error';
 import { adsNoDispatchMetadata } from '@/modules/ads/management/errors';
 import { installedMcpGroups } from '@/modules/installed-mcp';
@@ -106,7 +107,6 @@ async function availability(viewer: McpViewer, pick: 'available' | 'listFilter')
 }
 
 export async function handleMcpMessage(viewer: McpIdentity, message: Record<string, unknown>) {
-  for (const group of host().groups) group.init?.();
   const validId = message.id === undefined || message.id === null || typeof message.id === 'string' || (typeof message.id === 'number' && Number.isFinite(message.id));
   const id = (validId ? message.id ?? null : null) as JsonRpcId;
   const method = message.method;
@@ -115,6 +115,8 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
   const error = (code: number, text: string, operationCode?: OperationErrorCode) => Response.json({ jsonrpc: '2.0', id, error: { code, message: text, ...(operationCode ? { data: { code: operationCode } } : {}) } }, { headers: { 'cache-control': 'no-store' } });
   if (message.jsonrpc !== '2.0' || typeof method !== 'string' || !validId || (message.params !== undefined && (!message.params || typeof message.params !== 'object' || Array.isArray(message.params)))) return error(-32600, 'Invalid request.');
   if (message.id === undefined && method !== 'initialize') return new Response(null, { status: 202, headers: { 'cache-control': 'no-store' } });
+  if (viewer.scope === 'person') return handleAgencyPersonMessage(viewer, message);
+  for (const group of host().groups) group.init?.();
   if (method === 'ping') return reply({});
   if (method === 'initialize') {
     const requested = String(params.protocolVersion ?? '');

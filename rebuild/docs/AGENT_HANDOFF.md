@@ -940,3 +940,36 @@ Final checks: targeted258 pass/15 database skips; tsc and raw-SQL guard pass.
 Full suite stalls in facebook-diagnostic-transport.test.ts. Excluding that file:
 3946 pass/226 skips/6 failures (five sandbox loopback EPERM in native HTTP tests,
 one unrelated Analytics manifest expectation). Do not claim a clean full suite.
+
+
+## Agency person-credential worktree (2026-10-20)
+
+`codex/agency-mcp` adds a separate read-only person credential for the Agency
+overview, exact-confirmed account issuance/revocation and a disjoint MCP host
+path. Current workspace membership, entitlements, permissions and resource scope
+remain in the shared Agency service; there are no workspace writes or Root/
+Clients credential grants. Account-only revocation survives loss of memberships.
+See [AGENCY.md](AGENCY.md) for scope, new Settings-owned Root keys, commands and
+limits. The additive `20261030130000_rebuild_person_mcp_keys` migration is
+unapplied; registry schema version was deliberately not edited. PostgreSQL,
+browser, real MCP and migration/release proof remain open. This is a branch-only
+batch: no push, deploy, servers, install or client generation; the full rebuild
+objective remains incomplete.
+
+
+Agency credential final verification:147 Agency tests/16 files and211 related
+MCP/account tests/8 files passed, including the SQL guard in both runs;
+`npx tsc --noEmit -p .` and `git diff --check` passed. Independent source review
+found no critical/important security issue. No full-repository suite, build,
+actual PostgreSQL, browser or live MCP run was performed.
+
+Commit blocker: `git add` failed to create
+`/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/.git/worktrees/msp-agencymcp/index.lock`
+with `Operation not permitted`. The linked Git metadata is outside the sandbox
+writable roots; escalation is disabled. No new commit or staging was possible.
+Verified work remains uncommitted on `codex/agency-mcp`; commit it from an
+environment allowed to write that existing metadata, using
+`feat(agency): add person-scoped MCP keys`. Do not include the pre-existing root
+`node_modules` symlink. Do not push or deploy this branch batch. Apply the new
+migration only after the documented backup/restore gates; coordinate the four
+new Root keys and configuration schema version with the central host owner.

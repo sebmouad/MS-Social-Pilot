@@ -16,7 +16,8 @@ It is not Root, not a workspace feature and not a way to widen one workspace's a
 | Root settings (9 consumed limits, search bound and attention weights) | `src/modules/agency/config.ts` |
 | Membership scope and per-workspace entitlement | `src/modules/agency/server/access.ts` |
 | Overview and clients services | `src/modules/agency/server/agency.ts` |
-| MCP definitions and person-only guard | `src/modules/agency/mcp.ts` |
+| MCP definitions, person guard and credential dispatcher | `src/modules/agency/{mcp,person-mcp}.ts` |
+| Account credential lifecycle, UI and HTTP | `src/modules/settings/person-keys/**` |
 | HTTP (session only) | `src/app/api/agency/route.ts` |
 | UI | `src/app/agency/{layout,page,AgencyChrome,AgencyFilters,WorkspaceAction}.tsx`, `clients/page.tsx`, `agency.module.css` |
 | Tests | `tests/agency-service.test.ts`, `agency-mcp.test.ts`, `agency-route.test.ts` |
@@ -52,13 +53,13 @@ It is not Root, not a workspace feature and not a way to widen one workspace's a
 
 ### Workspace-scoped MCP keys cannot read other workspaces
 
-- No Agency tool is in the workspace MCP catalog and none is wired to `McpViewer`. Do **not** add
-  `agencyToolDefinitions` to `src/server/mcp/server.ts`.
+- No Agency tool is in the workspace MCP catalog or wired to `McpViewer`. The host chooses a disjoint
+  person dispatcher before workspace/installation handling; never add Agency to a workspace tool group.
 - `executeAgencyTool` accepts only `{ scope: 'person', userId }` and refuses any identity carrying `apiKeyId`,
-  `workspaceId`, `workspace`, `permissions` or `isInstanceOwner`, plus every workspace/installation identity.
-  Today no authenticator issues a person-wide principal, so the tools are intentionally unreachable.
-  A future person-wide MCP credential is a separate architecture decision (Root-visible, audited, with its own
-  key ceiling); until then Agency MCP parity is an open release gap, not full support.
+  `personKeyId`, `readFeature`, `workspaceId`, `workspace`, `permissions` or `isInstanceOwner`, plus every
+  workspace/installation identity. Credential identities must pass through `person-mcp.ts`, which revalidates
+  the stored person key and permits only the overview before calling the internal person service.
+  The overview now has credential authentication; the Clients tool remains unavailable to credentials.
 - The HTTP route refuses `Authorization` and `X-API-Key` headers and relies on the browser session cookie only.
   Pages and the route use `requireViewer({ channelScoped: true })` so the selected workspace's role does not decide
   person-wide access; the service checks every membership.
@@ -103,8 +104,8 @@ API reads require a browser session. Anonymous redirects become safe 401/403
 responses; presented bearer/API-key headers are refused. Installation availability
 is checked before data reads, including suspended rows. Suspended metadata also
 requires current workspace/member switches and plan access; metrics stay withheld.
-MCP tools remain absent from workspace/installation catalogs; unsupported
-person-wide credentials are not invented. This is an explicit MCP parity gap.
+Agency MCP tools remain absent from workspace/installation catalogs. The separate person credential
+dispatcher exposes only the overview, as documented below; this is not complete Agency MCP parity.
 
 ## Evidence and limits
 
@@ -132,7 +133,7 @@ Entitlement/permission queries remain per workspace and require scale measuremen
 Unavailable metric groups show withheld coverage rather than zero. Read authority
 is refreshed at entry, not serialized with concurrent access revocations.
 Read access is not separately audited. Agency is read-only; team changes use the
-existing selected-workspace Team service. Full person-scoped MCP parity, broader
+existing selected-workspace Team service. Clients credential MCP parity, broader
 Agency writes and production-shaped runtime/release evidence remain open.
 
 ## Wave 3: downloadable cross-workspace overview (2026-10-20)
@@ -164,9 +165,9 @@ Implementation:
   on the Clients view are refused. All responses are `no-store`; browser sessions
   are required and presented bearer/API-key credentials are refused.
 - `get_agency_overview` accepts optional `format` and `locale` and calls the same
-  packaging service. The existing person-principal guard remains unchanged.
-  **No authenticator currently issues this principal**: real MCP availability is
-  still an open gap. Workspace/installation keys cannot export agency data.
+  packaging service. The internal person guard continues to refuse credential identities.
+  The person credential dispatcher now authenticates overview-only keys and uses this same packaging
+  service. Workspace/installation keys cannot export agency data. Live transport proof remains open.
 - `ui/AgencyExport.tsx` uses shared Buttons with English/French copy selected from
   the request's primary Accept-Language. Both formats preserve filters, prevent
   duplicate submissions, validate receipt type/version/filename/exact bytes, and
@@ -206,10 +207,136 @@ was corrected to replace the include list; no full-suite pass is claimed.
 Remaining: cross-client staff role matrix and mutations through the Team service;
 analytics/AI-spend overview through neutral owning-module contracts; public portal
 results; branded client report bundles and delivery; full pagination beyond the
-workspace cap; person-scoped MCP authentication; real database and browser/theme/
+workspace cap; Clients credential MCP access; real database and browser/theme/
 phone/failure-path checks, and production-shaped release evidence.
 
 Final local result: 63 tests across 8 files passed with the module-local command
 above (including the raw SQL void guard); `npx tsc --noEmit -p .` passed.
 The accidentally broadened suite was interrupted after unrelated environment
 failures; no server, deployment, push or database migration was performed.
+
+
+## Person-scoped overview credentials (2026-10-20, codex/agency-mcp)
+
+The user authorized a separate personal credential for the cross-workspace overview.
+It has a fixed `agency/overview` read ceiling. Workspace credentials and installation
+sessions retain their existing catalogs. No provider rule or registry edit is added.
+
+### Lifecycle and account access
+
+`settings/person-keys/service.ts` owns list, issuance, revocation, authentication
+and stored-key revalidation. `/settings/account` renders its shared-design Manager;
+if workspace account settings redirect (including after losing every membership),
+a session-checked account-only fallback still exposes credential revocation. That
+fallback grants no workspace or Root authority. The management HTTP endpoint is
+`/api/settings/account/person-keys` (GET, POST, DELETE), accepts browser sessions
+only, refuses any Authorization/X-API-Key headers and URL scope parameters, and
+requires same-origin JSON for mutations. It takes the account id only from the
+verified, non-pending, unexpired browser session and rechecks the enabled user.
+
+Issuance requires an enabled account, enabled MCP/person-key controls and at least
+one currently available workspace with Agency overview authority, checked through
+the existing per-workspace Agency policy. It records no workspace list or saved
+permission snapshot. Revocation and active-key listing do not require continued
+Agency access or enabled issuance switches. Thus losing membership or turning off
+MCP does not prevent personal key revocation. The active-key directory is bounded;
+if Root reduces the ceiling below the existing count it discloses truncation and
+revoking listed keys makes subsequent entries accessible.
+
+Exact confirmations are stable protocol strings in both locales:
+
+- `CREATE AGENCY KEY <trimmed name> <days> DAYS` binds both editable choices.
+- `REVOKE AGENCY KEY <key id>` binds the specific credential; the dialog also shows
+  its name and safe prefix.
+
+The UI uses `components/useConfirm.tsx`, locks the form while confirmation is open,
+does not submit on cancel or mismatched text, and preserves confirmation/input on
+failure for retry. English/French copy covers loading, empty, unavailable, pending,
+retry, success and failure states. A new secret is shown once in component memory;
+creation stays disabled until it is hidden. It is never persisted in browser storage.
+
+### Storage and authority
+
+An additive raw-SQL table, `person_mcp_keys`, is intentionally separate from
+`mcp_api_keys`; no Prisma client regeneration is needed. Migration:
+`prisma/migrations/20261030130000_rebuild_person_mcp_keys/migration.sql`, ordered
+after the existing watermark migration. It is **unapplied**. The table has a
+user foreign key with deletion cascade, unique SHA-256 token hash, safe prefix,
+expiry/revocation timestamps and a database CHECK fixing `readFeature` to
+`agency/overview`. There are no workspace ids, resource ceilings or write grants.
+The secret is `mcp_person_` plus 32 random bytes encoded as base64url and is
+returned only by issuance. Lists/audits exclude hashes and secrets.
+
+Issuance/revocation lock the enabled person and serialize their key changes with a
+person-namespaced transaction advisory lock (`::text`). Active-count enforcement,
+the mutation and a checked `root_activities` audit insert share the transaction;
+failed inserts/audits abort the operation. Account disabling is checked again at
+transaction entry. Reads are current-at-entry, not serialized with concurrent
+workspace membership/entitlement changes; no stronger concurrent-revocation
+linearization is claimed.
+
+Send the key as `Authorization: Bearer mcp_person_…` to `POST /api/mcp` with no
+scope query parameter. An explicit workspace or installation scope refuses it.
+The workspace bearer parser explicitly excludes this prefix, including for other
+workspace-key APIs. Presented invalid/revoked person keys never fall back to
+workspace authentication or cookies. Each key uses the existing
+`mcp.keys.requestsPerMinute` budget under its own person-key rate identity.
+
+A `PersonMcpIdentity` contains user id, person-key id and the fixed overview ceiling;
+it carries no workspace, permissions or installation-owner flag. The MCP host
+validates the common JSON-RPC envelope and selects `agency/person-mcp.ts` before
+workspace tool initialization/dispatch. That dispatcher rechecks the enabled
+account, stored unrevoked/unexpired key, global switches and stored ceiling for
+every invocation. Its only tool is `get_agency_overview` (including existing CSV/
+JSON packaging), and its only resource is `msp://agency/overview`. All workspace,
+Root, Clients, key-management, unknown tools and other resources are refused.
+
+Every overview/export calls the existing Agency service afresh. Its membership
+query requires the current enabled person's owner/admin role; every workspace
+gets its own current Agency/module/plan/permission checks without installation
+inspection. Revoked/demoted memberships and denied/failed access evaluations
+cannot borrow another workspace's grants. Channel-limited metrics stay null,
+suspended/purging workspace data stays withheld, and unknown values remain
+“Not available” / “Non disponible”. Newly eligible workspaces are included
+without reissuing the key, as explicitly disclosed at issuance. No write is added.
+
+### Root controls and verification
+
+Settings owns these auto-aggregated declarations in `person-keys/config.ts`:
+`mcp.personKeys.enabled`, `mcp.personKeys.maxActivePerPerson`,
+`mcp.personKeys.maxLifetimeDays`, `mcp.personKeys.nameMaxLength`.
+The Settings manifest declares their prefix; no `registry.ts` change or schema
+version bump was made, per the worktree instruction. The host owner must account
+for the new keys in the next centrally managed configuration version. Existing
+`mcp.keys.transactionTimeoutMs`, `transactionMaxWaitMs`, `requestsPerMinute` and
+Agency read limits retain their live consumers.
+
+Owned `person-*.test.ts` files exercise service, host, transport, per-workspace
+access, HTTP/session/CSRF, Root config ownership and real shared confirmation
+components with synthetic mocked storage/jsdom. Targeted checks from `rebuild/`:
+
+```sh
+npx vitest run --config src/modules/agency/vitest.config.ts
+npx vitest run tests/mcp-route-auth.test.ts tests/mcp-installation-context.test.ts tests/mcp-security.test.ts tests/mcp-key-service80.test.ts tests/mcp-resource-scope80.test.ts tests/mcp-resource-dispatch80.test.ts tests/account-settings.test.ts tests/raw-sql-void-guard.test.ts
+npx tsc --noEmit -p .
+```
+
+These are local code/test checks only. The migration needs the documented backup/
+scratch-restore gates before application. Actual PostgreSQL constraints, rollback,
+locking/concurrency, HTTP/MCP with real credentials, browser themes/viewports and
+live release evidence remain open. No servers, installation, client generation,
+push, deployment or production change is authorized for this batch. Clients
+credential access and broader Agency parity remain unimplemented.
+
+
+Final local test evidence for this batch: 147 tests/16 files passed in the Agency
+suite, and 211 tests/8 files passed in the related MCP/account suite (the SQL
+guard is counted in each run). Independent read-only source review found no
+critical or important security defect. Exact confirmation strings deliberately
+remain stable protocol strings in both UI locales. No full repository suite,
+build, actual PostgreSQL, browser or live MCP verification is claimed.
+
+TypeScript (`npx tsc --noEmit -p .`) and `git diff --check` also passed.
+Commit remains blocked because Git cannot create the linked worktree's
+`index.lock` outside this sandbox (`Operation not permitted`). No new commit
+was created; verified source stays uncommitted on `codex/agency-mcp`.

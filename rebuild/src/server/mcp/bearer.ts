@@ -24,7 +24,7 @@ export function restrictPermissions(permissions: ScopedPermissions, readFeatures
   return { ...permissions, features, modules, visibleFeatures: permissions.visibleFeatures.filter(feature => reads.has(feature)), visibleModules: permissions.visibleModules.filter(module => modules[module].read) };
 }
 
-export const BEARER_SHAPE = /^Bearer\s+(mcp_[A-Za-z0-9_-]{40,})$/;
+export const BEARER_SHAPE = /^Bearer\s+(mcp_(?!person_)[A-Za-z0-9_-]{40,})$/;
 
 /**
  * Workspace viewer for a scoped API key (`mcp_...`), or null. Shared by the MCP endpoint and the REST API:

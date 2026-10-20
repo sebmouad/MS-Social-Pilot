@@ -6,8 +6,8 @@ import { agencyOverview, listAgencyClients } from './server/agency';
 /**
  * Agency reads span every workspace one person administers. A workspace-scoped MCP key is bound to one
  * workspace and must never reach them, so these tools are NOT part of the workspace tool catalog and
- * `executeAgencyTool` accepts only an explicit person-wide principal that no current authenticator
- * issues (workspace keys, sessions bound to a workspace and installation identities are all refused).
+ * `executeAgencyTool` accepts only an explicit person principal. The separate person dispatcher
+ * validates person credentials and enforces its overview-only ceiling before entering here.
  */
 export type AgencyPersonPrincipal = { scope: 'person'; userId: string };
 
@@ -21,7 +21,7 @@ export const agencyToolDefinitions = [
 /** Refuses anything that is workspace-bound, key-backed or not an exact person principal. */
 export function agencyActorFor(identity: unknown): AgencyActor {
   const value = identity && typeof identity === 'object' ? identity as Record<string, unknown> : {};
-  const forbiddenKeys = ['apiKeyId', 'workspaceId', 'workspace', 'permissions', 'isInstanceOwner'];
+  const forbiddenKeys = ['apiKeyId', 'personKeyId', 'readFeature', 'workspaceId', 'workspace', 'permissions', 'isInstanceOwner'];
   if (value.scope !== 'person' || typeof value.userId !== 'string' || !value.userId || forbiddenKeys.some(key => key in value)) {
     throw new OperationError('forbidden', 'Agency tools are available only to a signed-in person, not to a workspace key.');
   }

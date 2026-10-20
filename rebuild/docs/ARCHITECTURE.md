@@ -1561,3 +1561,18 @@ retry through the Posts panel, HTTP and module-owned MCP. Current authorization,
 resource scope, conditional attempt claims and receipt holds remain shared;
 uncertain attempts cannot retry. No provider branch, Root key or migration was
 added. See FIRST_COMMENT_SCHEDULING.md for evidence and remaining runtime checks.
+
+
+## Agency person-credential worktree (2026-10-20)
+
+`codex/agency-mcp` adds a separate read-only person credential for the Agency
+overview, exact-confirmed account issuance/revocation and a disjoint MCP host
+path. Current workspace membership, entitlements, permissions and resource scope
+remain in the shared Agency service; there are no workspace writes or Root/
+Clients credential grants. Account-only revocation survives loss of memberships.
+See [AGENCY.md](AGENCY.md) for scope, new Settings-owned Root keys, commands and
+limits. The additive `20261030130000_rebuild_person_mcp_keys` migration is
+unapplied; registry schema version was deliberately not edited. PostgreSQL,
+browser, real MCP and migration/release proof remain open. This is a branch-only
+batch: no push, deploy, servers, install or client generation; the full rebuild
+objective remains incomplete.
