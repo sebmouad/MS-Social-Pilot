@@ -79,7 +79,7 @@ export async function requestWorkspaceExport(actor: DataControlActor, confirmati
     const mediaRoot = await canonicalMediaRoot(String(configuredRoot ?? ''));
     // Serialize requests separately from the workspace SHARE gate; never upgrade that gate.
     return prisma.$transaction(async tx => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`workspace-export:${actor.workspaceId}`}, 0))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`workspace-export:${actor.workspaceId}`}, 0))::text`;
       const pending = await tx.$queryRaw<Job[]>`SELECT * FROM rebuild_workspace_exports WHERE "workspaceId" = ${actor.workspaceId} AND status IN ('requested','running') LIMIT 1`;
       if (pending[0]) return publicJob(pending[0]);
       await tx.$executeRaw`DELETE FROM rebuild_workspace_exports WHERE "workspaceId" = ${actor.workspaceId} AND status IN ('expired','failed')`;
