@@ -13,6 +13,7 @@ export const analyticsManifest = {
     { id: 'analytics/explorer', title: 'Metric explorer', href: '/analytics/explorer', navigation: false, description: 'Inspect every available stored metric, source and resource.' },
     { id: 'analytics/demographics', title: 'Audience', href: '/analytics/demographics', description: 'Understand available audience breakdowns and coverage.' },
     { id: 'analytics/compare', title: 'Compare', href: '/analytics/compare', description: 'Compare periods and selected resource groups with honest metric semantics.' },
+    { id: 'analytics/ads', title: 'Ad objects', href: '/analytics/ads', description: 'Analyze stored campaigns, ad sets and ads with coverage and export.' },
     { id: 'analytics/posts', title: 'Posts', href: '/analytics/posts', description: 'Explore and export stored per-post measures.' },
     { id: 'analytics/goals', title: 'Goals', href: '/analytics/goals', description: 'Set monthly goals per channel and track progress.' },
     { id: 'analytics/pins', title: 'Pinned metrics', href: '/analytics/pins', description: 'Keep a personal view of available metrics.' },
