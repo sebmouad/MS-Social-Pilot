@@ -13,7 +13,7 @@ echo "Cutover commit: $COMMIT"
 ORDER_FILE="$(mktemp)"; APPROVED="$(mktemp)"; ALL="$(mktemp)"
 grep -o 'migration_dir/[0-9a-z_]*/migration.sql' rebuild/scripts/cutover-rehearsal.sh | sed 's#migration_dir/##;s#/migration.sql##' > "$APPROVED"
 ls prisma/migrations | grep -E '^[0-9]{14}_' | sort > "$ALL"
-{ grep -vxF -f "$APPROVED" "$ALL" | grep -v '_rebuild_'; cat "$APPROVED"; grep -vxF -f "$APPROVED" "$ALL" | grep '_rebuild_'; } > "$ORDER_FILE"
+{ grep -vxF -f "$APPROVED" "$ALL" | grep -v '_rebuild_' || true; cat "$APPROVED"; grep -vxF -f "$APPROVED" "$ALL" | grep '_rebuild_' || true; } > "$ORDER_FILE"
 
 # Ship migrations (one archive) and the release archive.
 tar -C prisma/migrations -cf - $(cat "$ORDER_FILE") | ssh -i "$KEY" "$HOST" 'rm -rf /var/tmp/cutover-migrations && mkdir -m 755 /var/tmp/cutover-migrations && tar -x -C /var/tmp/cutover-migrations'

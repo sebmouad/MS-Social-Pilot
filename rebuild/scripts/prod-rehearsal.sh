@@ -17,7 +17,7 @@ grep -o 'migration_dir/[0-9a-z_]*/migration.sql' rebuild/scripts/cutover-rehears
 ALL="$(mktemp)"; ls prisma/migrations | grep -E '^[0-9]{14}_' | sort > "$ALL"
 # Dependency-correct order: legacy migrations first (name order), then the reviewed rebuild
 # order from cutover-rehearsal.sh, then any newer rebuild migrations not yet pinned there.
-{ grep -vxF -f "$APPROVED" "$ALL" | grep -v '_rebuild_'; cat "$APPROVED"; grep -vxF -f "$APPROVED" "$ALL" | grep '_rebuild_'; } > "$ORDER_FILE"
+{ grep -vxF -f "$APPROVED" "$ALL" | grep -v '_rebuild_' || true; cat "$APPROVED"; grep -vxF -f "$APPROVED" "$ALL" | grep '_rebuild_' || true; } > "$ORDER_FILE"
 echo "Repository migrations: $(wc -l < "$ORDER_FILE")"
 
 # 1. Copy only the rebuild migration SQL files to a private temp folder on the server.
