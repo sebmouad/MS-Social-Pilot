@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../src/server/config/store', () => ({
   runtimeConfig: async (key: string) => state.config.get(key),
+  runtimeConfigBatch: async (keys: string[]) => Object.fromEntries(keys.map(key => [key, state.config.get(key)])),
   runtimeSecret: async (key: string) => {
     if (key === 'meta.appSecret' && state.appSecretError) throw state.appSecretError;
     return key === 'meta.appSecret' ? state.appSecret : null;

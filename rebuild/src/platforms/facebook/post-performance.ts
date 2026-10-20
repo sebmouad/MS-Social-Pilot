@@ -1,3 +1,4 @@
+import { runtimeConfig } from '@/server/config/store';
 import { Prisma } from '../../../generated/client';
 import { prisma } from '@/server/data';
 import type { PostPerformance, PostPerformanceRequest } from '@/server/platforms/host';
@@ -27,28 +28,22 @@ export function facebookPostPerformance(row: Row): PostPerformance {
 }
 
 export async function readFacebookPostPerformance(request: PostPerformanceRequest): Promise<PostPerformance[]> {
-  if (request.sort !== undefined) {
-    const key = request.sort;
-    const direction = request.direction === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-    const value = key === 'publishedAt' ? Prisma.sql`EXTRACT(EPOCH FROM pt."publishedAt")` : Prisma.sql`CASE WHEN jsonb_typeof(pt.insights::jsonb -> ${key}) = 'number' THEN CASE WHEN (pt.insights::jsonb ->> ${key})::numeric >= 0 THEN (pt.insights::jsonb ->> ${key})::numeric END END`;
-    const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
+  const key = request.sort ?? 'engagement';
+  const direction = request.direction === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+  const value = key === 'publishedAt' ? Prisma.sql`EXTRACT(EPOCH FROM r."publishedAt")` : key === 'engagement' ? Prisma.sql`(SELECT SUM((v #>> '{}')::numeric) FROM jsonb_each(COALESCE(r.insights::jsonb, '{}'::jsonb)) e(k,v) WHERE k IN ('reactions','comments','shares') AND jsonb_typeof(v) = 'number')` : Prisma.sql`CASE WHEN jsonb_typeof(r.insights::jsonb -> ${key}) = 'number' THEN (r.insights::jsonb ->> ${key})::numeric END`;
+  const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
+    SELECT * FROM (
       SELECT p.id AS "postId", p.message, pt."publishedAt", pt."remoteUrl", pt.insights, pt."insightsSyncedAt"
       FROM post_targets pt JOIN posts p ON p.id = pt."postId" JOIN targets t ON t.id = pt."targetId"
-      WHERE pt."targetId" = ${request.targetId} AND t."workspaceId" = ${request.workspaceId} AND p."workspaceId" = ${request.workspaceId}
+      WHERE t.id = ${request.targetId} AND t."workspaceId" = ${request.workspaceId} AND p."workspaceId" = ${request.workspaceId}
         AND pt.status = 'published' AND pt."publishedAt" >= ${request.from} AND pt."publishedAt" < ${request.to}
-      ORDER BY ${value} ${direction} NULLS LAST, p.id ASC
-      LIMIT ${request.limit} OFFSET ${request.offset ?? 0}`);
-    return rows.map(facebookPostPerformance);
-  }
-  const limit = Math.max(1, Math.min(100, Math.trunc(request.limit)));
-  const rows = await prisma.$queryRaw<Row[]>`
-    SELECT p.id AS "postId", p.message, pt."publishedAt", pt."remoteUrl", pt.insights, pt."insightsSyncedAt"
-    FROM post_targets pt JOIN posts p ON p.id = pt."postId" JOIN targets t ON t.id = pt."targetId"
-    WHERE pt."targetId" = ${request.targetId} AND t."workspaceId" = ${request.workspaceId} AND p."workspaceId" = ${request.workspaceId}
-      AND pt.status = 'published' AND pt."publishedAt" >= ${request.from} AND pt."publishedAt" < ${request.to}
-    ORDER BY pt."publishedAt" DESC
-    LIMIT 2000`;
-  return rows.map(facebookPostPerformance)
-    .sort((a, b) => (b.rankValue ?? -1) - (a.rankValue ?? -1) || (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0))
-    .slice(0, limit);
+      UNION ALL
+      SELECT ep.id AS "postId", COALESCE(ep.message, '') AS message, ep."createdTime" AS "publishedAt", ep.permalink AS "remoteUrl", ep.insights, ep."insightsSyncedAt"
+      FROM external_posts ep JOIN targets t ON t.id = ep."targetId"
+      WHERE t.id = ${request.targetId} AND t."workspaceId" = ${request.workspaceId}
+        AND ep."createdTime" >= ${request.from} AND ep."createdTime" < ${request.to}
+        AND NOT EXISTS (SELECT 1 FROM post_targets pt JOIN posts p ON p.id = pt."postId" WHERE pt."targetId" = t.id AND p."workspaceId" = t."workspaceId" AND pt."remotePostId" = ep."remoteId" AND pt.status = 'published')
+    ) r ORDER BY ${value} ${direction} NULLS LAST, r."postId" ASC LIMIT ${request.limit} OFFSET ${request.offset ?? 0}`);
+  const labels = await runtimeConfig('meta.metricLabels') as Record<string, { en: string; fr: string }>;
+  return rows.map(row => { const result = facebookPostPerformance(row); result.measures = result.measures.map(measure => ({ ...measure, ...(labels[measure.key] ? { label: labels[measure.key].en, labelFr: labels[measure.key].fr } : {}) })); return result; });
 }

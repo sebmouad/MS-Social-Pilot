@@ -1,3 +1,5 @@
+import { createFacebookPostHistory, type HistoryProgress } from './post-history';
+import { facebookAdHierarchySchema, facebookHistoryPolicySchema } from './config';
 import { createFacebookDataCollector } from './data-collection';
 import { facebookAdBreakdownsSchema, facebookContentInsightsSchema, facebookInsightPeriodsSchema } from './config';
 import { createFacebookAdapter, createFacebookEngine, type FacebookNativePublishingPolicy } from '@/platforms/facebook/publishing';
@@ -38,12 +40,16 @@ export async function configuredFacebookEngine(options?: { signal?: AbortSignal 
   const transport: typeof fetch = signal ? (input, init) => fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal }) : fetch;
   const config = await configuredFacebookConfig();
   const engine = createFacebookEngine(config, transport, facebookMediaJournal);
-  return { ...engine, async getAdInsights(token: string, accountId: string, since: Date, until: Date) {
+  return { ...engine, async getPostHistory(token: string, pageId: string, now: Date, progress?: HistoryProgress | null) {
+    return createFacebookPostHistory(config, facebookHistoryPolicySchema.parse(await runtimeConfig('meta.postHistoryPolicy')), transport, signal).collect(token, pageId, now, progress);
+  }, async getAdInsights(token: string, accountId: string, since: Date, until: Date) {
     const baseline = await engine.getAdInsights(token, accountId, since, until);
     const combinations = facebookAdBreakdownsSchema.parse(await runtimeConfig('meta.adInsightBreakdowns'));
-    if (!combinations.length) return baseline;
-    return createFacebookDataCollector(config, { periods: facebookInsightPeriodsSchema.parse(await runtimeConfig('meta.pageInsightPeriods')), content: [] }, transport, signal)
+    const collector = createFacebookDataCollector(config, { periods: facebookInsightPeriodsSchema.parse(await runtimeConfig('meta.pageInsightPeriods')), content: [] }, transport, signal);
+    const hierarchy = await collector.collectAdHierarchy(token, accountId, since, until, facebookAdHierarchySchema.parse(await runtimeConfig('meta.adHierarchyPolicy')));
+    const accountRows = !combinations.length ? baseline : await createFacebookDataCollector(config, { periods: facebookInsightPeriodsSchema.parse(await runtimeConfig('meta.pageInsightPeriods')), content: [] }, transport, signal)
       .collectAdBreakdowns(token, accountId, since, until, combinations, baseline);
+    return [...accountRows, ...hierarchy];
   }, async getPageInsightObservations(token: string, pageId: string, since?: Date, until?: Date) {
     const [periods, content] = await Promise.all([runtimeConfig('meta.pageInsightPeriods'), runtimeConfig('meta.contentInsightCollections')]);
     return createFacebookDataCollector(config, { periods: facebookInsightPeriodsSchema.parse(periods), content: facebookContentInsightsSchema.parse(content) }, transport, signal)

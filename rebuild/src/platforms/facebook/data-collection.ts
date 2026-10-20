@@ -48,6 +48,18 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
     return values;
   }
   return {
+    async collectAdHierarchy(token: string, accountId: string, since: Date, until: Date, policy: { levels: Array<'campaign' | 'adset' | 'ad'>; actionBreakdowns: string[] }): Promise<Array<Record<string, unknown>>> {
+      const result: Array<Record<string, unknown>> = [];
+      for (const level of new Set(policy.levels)) {
+        const data = await rows(`${encodeURIComponent(accountId)}/insights`, token, {
+          fields: [...new Set([...config.adInsightFields, 'account_id', 'account_name', 'campaign_id', 'campaign_name', ...(level !== 'campaign' ? ['adset_id', 'adset_name'] : []), ...(level === 'ad' ? ['ad_id', 'ad_name'] : []), 'actions', 'action_values', 'date_start', 'date_stop'])].join(','),
+          level, time_increment: '1', ...(policy.actionBreakdowns.length ? { action_breakdowns: policy.actionBreakdowns.join(',') } : {}),
+          time_range: JSON.stringify({ since: since.toISOString().slice(0, 10), until: until.toISOString().slice(0, 10) }),
+        });
+        result.push(...data.map(raw => ({ ...object(raw), report_level: level })));
+      }
+      return result;
+    },
     async collectAdBreakdowns(token: string, accountId: string, since: Date, until: Date, combinations: z.infer<typeof facebookAdBreakdownsSchema>, baseline: Array<Record<string, unknown>>): Promise<Array<Record<string, unknown>>> {
       const snapshots = new Map<string, Array<{ dimensions: string[]; rows: unknown[] }>>();
       // Read every configured combination independently. Refuse a partial Ads sync

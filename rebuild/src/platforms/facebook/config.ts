@@ -54,3 +54,19 @@ export const FACEBOOK_DATA_CONFIG = [
   entry({ key: 'meta.pageInsightPeriods', group: 'Facebook · Analytics collection', label: 'Page insight periods', kind: 'json', description: 'Request each configured metric separately for each period. Unsupported combinations are reported as partial failures.', defaultValue: ['day'], schema: facebookInsightPeriodsSchema, consumption: 'active' }),
   entry({ key: 'meta.contentInsightCollections', group: 'Facebook · Analytics collection', label: 'Content insight collections', kind: 'json', description: 'Version-verified posts, videos, Reels and Stories metrics and periods. Empty until verified against the configured Graph version. Uses existing insight read grants; does not grant permissions.', defaultValue: [], schema: facebookContentInsightsSchema, consumption: 'active' }),
 ] as const;
+
+export const facebookHistoryPolicySchema = z.object({
+  lookbackDays: z.number().int().min(1).max(36500),
+  pageBudget: z.number().int().min(1).max(100),
+  edge: z.enum(['published_posts', 'feed']),
+  fields: z.array(z.string().min(1)).min(1).max(100),
+  metrics: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(100),
+  reactionTypes: z.array(z.string().regex(/^[A-Z_]+$/)).max(30),
+});
+export const FACEBOOK_HISTORY_CONFIG = [entry({ key: 'meta.postHistoryPolicy', group: 'Facebook · Analytics collection', label: 'Page post history policy', kind: 'json', description: 'Resumable Page history window, per-run feed page budget, fields, lifetime metrics and reaction types. Metric eligibility depends on Graph version and grants.', defaultValue: { lookbackDays: 365, pageBudget: 2, edge: 'published_posts', fields: ['id', 'message', 'created_time', 'permalink_url', 'status_type', 'full_picture', 'shares', 'comments.limit(0).summary(true)'], metrics: ['post_impressions', 'post_impressions_unique', 'post_engaged_users', 'post_clicks', 'post_video_views', 'post_video_view_time'], reactionTypes: ['LIKE', 'LOVE', 'WOW', 'HAHA', 'SAD', 'ANGRY', 'CARE'] }, schema: facebookHistoryPolicySchema, consumption: 'active' })] as const;
+
+export const facebookAdHierarchySchema = z.object({ levels: z.array(z.enum(['campaign', 'adset', 'ad'])).max(3), actionBreakdowns: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(10) });
+export const FACEBOOK_DATA_DETAIL_CONFIG = [
+ entry({ key: 'meta.adHierarchyPolicy', group: 'Facebook · Analytics collection', label: 'Ads hierarchy and action dimensions', kind: 'json', description: 'Additional daily campaign, ad set and ad reports. Action dimensions apply to these reports.', defaultValue: { levels: ['campaign', 'adset', 'ad'], actionBreakdowns: ['action_type'] }, schema: facebookAdHierarchySchema, consumption: 'active' }),
+ entry({ key: 'meta.metricLabels', group: 'Facebook · Analytics collection', label: 'Bilingual metric labels', kind: 'json', description: 'English and French labels keyed by normalized metric name.', defaultValue: { engagement: { en: 'Engagement', fr: 'Interactions' }, video_views: { en: 'Video views', fr: 'Vues de vidéo' }, video_watch_time: { en: 'Video watch time (milliseconds)', fr: 'Durée de visionnage (millisecondes)' }, reactions_like: { en: 'Likes', fr: 'Mentions J’aime' }, reactions_love: { en: 'Love reactions', fr: 'Réactions J’adore' }, reactions_wow: { en: 'Wow reactions', fr: 'Réactions Wouah' }, reactions_haha: { en: 'Haha reactions', fr: 'Réactions Haha' }, reactions_sad: { en: 'Sad reactions', fr: 'Réactions Triste' }, reactions_angry: { en: 'Angry reactions', fr: 'Réactions Grrr' }, reactions_care: { en: 'Care reactions', fr: 'Réactions Solidaire' } }, schema: z.record(z.string(), z.object({ en: z.string().min(1), fr: z.string().min(1) })), consumption: 'active' }),
+] as const;
