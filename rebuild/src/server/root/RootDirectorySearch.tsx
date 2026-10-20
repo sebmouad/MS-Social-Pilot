@@ -1,10 +1,11 @@
+import { RootFilters } from './RootFilters';
 import { SidebarDock } from '@/components/SidebarDock';
 
 export function RootDirectorySearch({ kind, query }: { kind: 'users' | 'workspaces'; query: string }) {
-  return <SidebarDock><form noValidate className="root-directory__search" action={`/root/${kind}`}>
+  return <SidebarDock><RootFilters title="Directory filters" route={`/root/${kind}`} filters={query ? [{ key: 'q', label: 'Search', value: query }] : []}><form key={query} noValidate className="root-directory__search" action={`/root/${kind}`}>
     <p className="shell-subnav__label">Directory filters</p>
     <label className="ui-field">Search {kind}<input className="ui-input" name="q" defaultValue={query} placeholder={kind === 'users' ? 'Name or email' : 'Name or slug'} /></label>
     <button type="submit" className="ui-button ui-button--secondary">Search</button>
     {query && <a href={`/root/${kind}`}>Reset search</a>}
-  </form></SidebarDock>;
+  </form></RootFilters></SidebarDock>;
 }

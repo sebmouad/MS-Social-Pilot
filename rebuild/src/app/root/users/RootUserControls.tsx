@@ -1,7 +1,10 @@
 'use client';
+import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Menu } from '@/components/Menu';
+import { IconLogout, IconShieldOff } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
 import { ModalDialog } from '@/components/ModalDialog';
 import { rootUserConfirmation, type RootUserAction } from '@/lib/root-user-controls';
@@ -20,6 +23,7 @@ export function RootUserControls({ id, email, disabled, root, self }: { id: stri
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  useRootActionFeedback(error, notice, () => router.refresh());
   const inFlight = useRef(false);
   const phrase = action ? rootUserConfirmation(action, email) : '';
 
@@ -71,8 +75,10 @@ export function RootUserControls({ id, email, disabled, root, self }: { id: stri
   return <>
     <div className="root-directory__actions" aria-label={`Account actions for ${email}`}>
       <Button type="button" size="sm" onClick={() => begin(disabled ? 'enable' : 'disable')}>{disabled ? 'Enable' : 'Disable'}</Button>
-      <Button type="button" size="sm" onClick={() => begin('sign-out')}>Sign out</Button>
-      {!root && <Button type="button" size="sm" onClick={() => begin('reset-two-step')}>Reset two-step</Button>}
+      <Menu label={`Account actions for ${email}`} items={[
+        { key: 'sign-out', label: 'Sign out', icon: <IconLogout size={16} />, danger: true, onSelect: () => begin('sign-out') },
+        ...(!root ? [{ key: 'reset-two-step', label: 'Reset two-step', icon: <IconShieldOff size={16} />, danger: true, onSelect: () => begin('reset-two-step') }] : []),
+      ]} />
     </div>
     {notice && <p className="root-config__status" role="status" aria-live="polite">{notice}</p>}
     {action && <ModalDialog className="ui-dialog" labelledBy={`root-user-${id}`} busy={busy} onDismiss={() => { if (!busy) setAction(null); }}>

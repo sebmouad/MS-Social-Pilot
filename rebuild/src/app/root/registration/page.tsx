@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { requireRootPage } from '@/server/config/access';
 import { RootFrame } from '@/server/root/RootFrame';
@@ -37,7 +38,7 @@ export default async function RootRegistrationPage({ searchParams }: { searchPar
   };
   const controls = <>{filtersControl}{data && <section className="root-ops-sidebar">{paging('page', data.page, data.moreInvitations)}{paging('accountsPage', data.accountsPage, data.moreAccounts)}</section>}</>;
   return <RootFrame active="/root/registration" controls={controls}><div className="root-ops" lang={locale}>
-    <header><h1>{t.title}</h1><p>{t.intro}</p></header>
+    <PageHeader module="root" title={t.title} description={<>{t.intro}</>} />
     <section className="root-ops__panel"><h2>{t.registration}</h2><p>{data ? data.openRegistration ? t.enabled : t.disabled : t.unavailable}</p><a href="/root/config?search=auth.openRegistration">{t.config}</a></section>
     {!data ? <section className="root-ops__panel" role="alert"><p>{t.loadFailed}</p><a href="/root/registration">{t.retry}</a></section> : <>
       <section className="root-ops__panel"><h2>{t.invitations}</h2><DataTable rows={data.invitations} rowKey={row => row.id} caption={t.invitations} emptyMessage={t.emptyInvitations} columns={[

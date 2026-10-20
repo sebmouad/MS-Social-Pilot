@@ -2,6 +2,7 @@ import { ROOT_AUDIT_CONTROLS_COPY, ROOT_AUDIT_DOWNLOAD } from '@/lib/config/root
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 const state = vi.hoisted(() => ({ list: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, refresh() {} }) }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: async () => ({ id: 'root' }) }));
 vi.mock('../src/server/root/activity', () => ({ listRootActivity: state.list }));
 // Audit policy has its own reader; keep this page unit test independent of Prisma.

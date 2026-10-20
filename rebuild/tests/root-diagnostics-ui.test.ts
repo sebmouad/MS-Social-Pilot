@@ -31,10 +31,12 @@ describe('Root diagnostic run recovery', () => {
   });
   it('retains selected connection after recoverable service failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'Wait before retrying.' }, { status: 409 })));
-    const select = container.querySelector('select')!;
-    await act(async () => { select.value = 'source'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    const select = container.querySelector<HTMLButtonElement>('[role=combobox]')!;
+    await act(async () => select.click());
+    const option = [...container.querySelectorAll<HTMLElement>('[role=option]')].find(item => item.textContent?.includes('Example source'))!;
+    await act(async () => option.click());
     await act(async () => button().click());
-    expect(select.value).toBe('source'); expect(container.querySelector('[role=alert]')?.textContent).toContain('Wait before retrying'); expect(deps.refresh).not.toHaveBeenCalled();
+    expect(select.textContent).toContain('Example source'); expect(container.querySelector('[role=alert]')?.textContent).toContain('Wait before retrying'); expect(deps.refresh).not.toHaveBeenCalled();
   });
   it.each([{ ...receipt, scope: 'shared' }, { ...receipt, connectionId: 'wrong' }, { ...receipt, auditRecorded: undefined }])('refuses mismatching or incomplete receipts', async invalid => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(invalid))); await act(async () => button().click());

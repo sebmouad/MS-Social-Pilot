@@ -1,3 +1,4 @@
+import { ROOT_INTERFACE_COPY } from './root-interface-copy';
 import { ROOT_EVIDENCE_COPY } from './root-evidence-copy';
 import { ROOT_EVIDENCE_POLICY } from './root-evidence-policy';
 import { ROOT_AUDIT_CONTROLS_COPY, ROOT_AUDIT_DOWNLOAD } from './root-audit-controls';
@@ -20,6 +21,7 @@ import { ROOT_AUDIT_CONFIG } from '@/server/root/audit-config';
 
 /** Shared installation settings (auth, jobs, sync, data, storage, MCP, Root). Module settings live in each module's config.ts. */
 export const SHARED_CONFIG = [
+  entry({ key: 'root.interfaceCopy', group: 'Root · Interface', label: 'Shared Root interface copy (English and French)', kind: 'json', description: 'Plain-text control center, configuration filters, confirmation and change-history labels. Preserve named placeholders.', defaultValue: ROOT_INTERFACE_COPY, schema: z.object({ en: copySchema(ROOT_INTERFACE_COPY.en), fr: copySchema(ROOT_INTERFACE_COPY.fr) }).strict(), consumption: 'active' }),
   entry({ key: 'auth.passwordVerificationMaxBytes', group: 'Security · passwords', label: 'Password verification byte limit', kind: 'number', description: 'Existing-password UTF-8 verification ceiling. Effective limit is at least the new-password byte ceiling so new hashes can always be verified. Lowering only the new-password policy preserves existing legacy passwords.', ...SYNCHRONOUS_POLICY['auth.passwordVerificationMaxBytes'], consumption: 'active' }),
   entry({ key: 'root.platformEvidenceCopy', group: 'Root · Operations', label: 'Platform publication evidence operator copy', kind: 'json', description: 'Plain-text headings, field feedback and receipt messages for the shared private platform evidence service and controls.', defaultValue: ROOT_EVIDENCE_COPY, schema: copySchema(ROOT_EVIDENCE_COPY), consumption: 'active' }),
   entry({ key: 'root.registrationIdentifierMaxCharacters', group: 'Root · Validation', label: 'Registration identifier character limit', kind: 'number', description: 'Maximum Root registration identifier characters within the Settings invitation and registration service supported ceiling.', ...SYNCHRONOUS_POLICY['root.registrationIdentifierMaxCharacters'], consumption: 'active' }),

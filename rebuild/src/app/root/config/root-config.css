@@ -59,7 +59,7 @@
   color: var(--ink);
 }
 .root-config__controls textarea { min-width: min(520px, 100%); font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.root-config__controls button {
+.root-config__controls > button:not(.ui-button) {
   min-height: 38px;
   padding: 0 13px;
   border: 1px solid var(--line-strong);
@@ -68,7 +68,7 @@
   color: var(--ink);
   cursor: pointer;
 }
-.root-config__card small { display: block; margin-top: var(--space-2); color: var(--ink-faint); }
+.root-config__card > small { display: block; margin-top: var(--space-2); color: var(--ink-faint); }
 .root-config__catalog li { margin: 6px 0; }
 @media (max-width: 760px) {
   .root-config__content-head { align-items: flex-start; flex-direction: column; gap: 4px; }
@@ -98,3 +98,8 @@
 .root-diagnostics__history li { margin-block: var(--space-3); overflow-wrap: anywhere; }
 .root-diagnostics__history small { display: block; color: var(--ink-soft); }
 .root-jobs caption { text-align: left; padding-block: var(--space-2); }
+
+.root-config__controls > .ui-input-wrap, .root-config__controls > .ui-select { flex: 1 1 260px; min-width: 0; max-width: 100%; }
+.root-config__controls .ui-input { min-width: 0; width: 100%; }
+.root-config__controls .ui-button { flex: 0 0 auto; }
+.root-config__controls textarea { width: 100%; min-width: 0; }

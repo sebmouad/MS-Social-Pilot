@@ -67,3 +67,15 @@
   .root-platform-action-dialog .ui-dialog__actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .root-platform-action-dialog .ui-dialog__actions .ui-button { width: 100%; min-width: 0; }
 }
+
+.root-control__metric-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: var(--space-3); margin-block: var(--space-5); }
+.root-directory .ui-table-shell { margin-block: var(--space-4); min-width: 0; }
+.root-directory .ui-table td { overflow-wrap: anywhere; }
+.root-control__capabilities { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: 0; list-style: none; }
+@media (max-width: 480px) {
+  .root-directory .ui-table .root-directory__actions,
+  .root-directory .ui-table .root-directory__workspace-actions { min-width: 0; }
+}
+.root-filter-controls form { display: grid; gap: var(--space-3); align-items: stretch; }
+.root-filter-controls .ui-field { min-width: 0; }
+.root-filter-controls .ui-select { width: 100%; min-width: 0; }

@@ -1,3 +1,5 @@
+import { Badge } from '@/components/Badge';
+import { IconCircleCheck } from '@tabler/icons-react';
 import { notFound } from 'next/navigation';
 import { requireRootPage } from '@/server/config/access';
 import { RootModuleSettings } from '@/server/root/RootModuleSettings';
@@ -18,7 +20,7 @@ export default async function RootPlatformModulePage({ params, searchParams }: {
   const declared = Object.entries(module.capabilities).filter(([, state]) => state === 'supported');
   return <RootModuleSettings kind="platform" id={module.id} title={module.name} description={module.description} groupPrefix={module.settingsGroup}>
     <section className="root-control__panel"><h2>Declared operations</h2><p>These declarations describe the installed adapter interface. Configuration is not a live provider health check; complete operation coverage and remote verification remain required.</p>
-      <ul>{declared.map(([capability]) => <li key={capability}>{capability.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, letter => letter.toUpperCase())}</li>)}</ul>
+      <ul className="root-control__capabilities">{declared.map(([capability]) => <li key={capability}><Badge tone="brand" icon={<IconCircleCheck size={14} />}>{capability.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, letter => letter.toUpperCase())}</Badge></li>)}</ul>
     </section>
     <RootPlatformPublicationEvidence providerId={module.id} operationId={query.operationId} />
   </RootModuleSettings>;
