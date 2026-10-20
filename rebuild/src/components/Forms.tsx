@@ -15,11 +15,14 @@ type FieldProps = {
   /** Text after the label such as "(optional)". */
   hint?: string;
   className?: string;
+  /** Stable control id for pages whose tests, links or autofill refer to it; generated when omitted. */
+  id?: string;
 };
 
 /** Label + control + help/error wiring. Controls inside (TextInput, or any element given `useFieldProps()`) pick up id, aria-describedby and aria-invalid. */
-export function Field({ label, children, help, error, required = false, hint, className = "" }: FieldProps) {
-  const id = useId();
+export function Field({ label, children, help, error, required = false, hint, className = "", id: fixedId }: FieldProps) {
+  const generated = useId();
+  const id = fixedId ?? generated;
   const helpId = help ? `${id}-help` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [helpId, errorId].filter(Boolean).join(" ") || undefined;

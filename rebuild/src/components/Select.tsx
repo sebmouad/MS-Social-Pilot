@@ -1,5 +1,6 @@
 "use client";
 import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
+import { usePopupPlacement } from "./usePopupPlacement";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 export type SelectOption = { value: string; label: string; icon?: ReactNode; description?: string; disabled?: boolean };
@@ -38,12 +39,14 @@ export function Select({ options, value, onChange, id, name, placeholder = "Sele
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
   const typed = useRef({ text: "", at: 0 });
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return needle ? options.filter(option => option.label.toLowerCase().includes(needle)) : options;
   }, [options, query]);
+  usePopupPlacement(open, triggerRef, popupRef);
   const selected = options.find(option => option.value === value);
 
   const openList = () => {
@@ -105,7 +108,7 @@ export function Select({ options, value, onChange, id, name, placeholder = "Sele
       <span className={`ui-select__value${selected ? "" : " is-placeholder"}`}>{selected?.label ?? placeholder}</span>
       <IconChevronDown size={16} stroke={1.75} aria-hidden="true" className="ui-select__chevron" />
     </button>
-    {open && <div className="ui-select__popup">
+    {open && <div ref={popupRef} className="ui-select__popup">
       {searchable && <div className="ui-select__search"><IconSearch size={15} aria-hidden="true" />
         <input ref={searchRef} role="combobox" aria-expanded="true" aria-controls={listId} aria-activedescendant={activeId} aria-autocomplete="list" aria-label={searchLabel} value={query} autoComplete="off" spellCheck={false}
           onChange={event => { setQuery(event.target.value); setActive(0); }} /></div>}

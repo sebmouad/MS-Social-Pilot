@@ -1,29 +1,26 @@
 import type { InputHTMLAttributes, ReactNode, Ref } from 'react';
+import { Field, TextInput } from '@/components/Forms';
+import { ToastProvider } from '@/components/Toast';
+import type { AuthLocale } from './copy';
 import styles from './auth.module.css';
 
-/** Shared frame for every signed-out page: brand, one card, one heading. */
-export function AuthShell({ title, titleId = 'auth-title', lead, brand = 'Social Pilot', children, footer }: { title: string; titleId?: string; lead?: ReactNode; brand?: string; children?: ReactNode; footer?: ReactNode }) {
-  return <main className={styles.page}>
+/** Shared frame for every signed-out page: brand, one card, one heading, and the toast region. */
+export function AuthShell({ title, titleId = 'auth-title', lead, brand = 'Social Pilot', children, footer, locale = 'en' }: { title: string; titleId?: string; lead?: ReactNode; brand?: string; children?: ReactNode; footer?: ReactNode; locale?: AuthLocale }) {
+  return <ToastProvider dismissLabel={locale === 'fr' ? 'Fermer' : 'Dismiss'}><main className={styles.page}>
     <a className={styles.brand} href="/sign-in"><span className={styles.brandMark} aria-hidden="true">SP</span>{brand}</a>
     <section className={styles.card} aria-labelledby={titleId}>
       <header className={styles.heading}><h1 id={titleId}>{title}</h1>{lead && <p className={styles.lead}>{lead}</p>}</header>
       <div className={styles.body}>{children}</div>
     </section>
     {footer && <p className={styles.footer}>{footer}</p>}
-  </main>;
+  </main></ToastProvider>;
 }
 
 type FieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'id' | 'className'> & { id: string; label: string; error?: string; hint?: string; trailing?: ReactNode };
 
-/** Labelled input with its hint and error associated for assistive technology. */
+/** Labelled input on the shared Field/TextInput; hint and error are associated for assistive technology. */
 export function AuthField({ id, label, error, hint, trailing, ...input }: FieldProps) {
-  const describedBy = [hint ? `${id}-hint` : null, error ? `${id}-error` : null].filter(Boolean).join(' ') || undefined;
-  return <div className={styles.field}>
-    <label className={styles.label} htmlFor={id}>{label}</label>
-    <div className={styles.control}><input id={id} className={styles.input} aria-invalid={error ? true : undefined} aria-describedby={describedBy} {...input} />{trailing}</div>
-    {hint && <p id={`${id}-hint`} className={styles.hint}>{hint}</p>}
-    {error && <p id={`${id}-error`} className={styles.error}>{error}</p>}
-  </div>;
+  return <Field id={id} label={label} help={hint} error={error}><TextInput {...input} trailing={trailing} className={trailing ? 'ui-input--action' : ''} /></Field>;
 }
 
 /** Errors are announced immediately; success and progress politely. */

@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
+import { IconLock } from '@tabler/icons-react';
 import { AppShell } from '@/components/AppShell';
+import { EmptyState } from '@/components/EmptyState';
+import { PageHeader } from '@/components/PageHeader';
 import { authCopy } from '@/modules/home/auth/copy';
 import { authLocale } from '@/modules/home/auth/locale';
 import { requireViewer } from '@/server/context';
@@ -13,6 +16,7 @@ export default async function AccessLimitedPage() {
   return <AppShell activeModule="home" enabledModules={[]} enabledFeatures={[]} rootAccess={viewer.user.isInstanceOwner}
     userName={viewer.user.name} workspaceName={viewer.membership.workspace.name} workspaceId={viewer.workspaceId}
     workspaces={viewer.workspaces.map(item => ({ id: item.workspace.id, name: item.workspace.name }))}>
-    <section className="route-state"><h1>{t.title}</h1><p>{t.body}</p><p>{t.help}</p></section>
+    <PageHeader title={t.title} module="home" />
+    <EmptyState icon={<IconLock size={22} />} title={t.body}>{t.help}</EmptyState>
   </AppShell>;
 }

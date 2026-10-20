@@ -1,40 +1,62 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { Button } from '@/components/Button';
+import { validateFields } from '@/lib/ui/form-validation';
+import { AuthField, AuthNotice, AuthShell, authStyles } from '@/modules/home/auth/AuthShell';
+import { authCopy, type AuthLocale } from '@/modules/home/auth/copy';
 
-export function SignUpForm() {
+/** Sign-up page body: the open form, the confirmation, or the closed notice. */
+export function SignUpForm({ open, locale = 'en' }: { open: boolean; locale?: AuthLocale }) {
+  const copy = authCopy(locale);
+  const t = copy.signUp;
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(null);
-    const form = new FormData(event.currentTarget);
-    const password = String(form.get('password') ?? '');
-    if (password !== String(form.get('confirm') ?? '')) { setError('The passwords do not match.'); return; }
+    const form = event.currentTarget;
+    const fieldErrors = validateFields(form, {
+      name: { empty: t.nameEmpty }, email: { empty: t.emailEmpty, invalid: t.emailInvalid },
+      password: { empty: t.passwordEmpty }, confirm: { empty: t.confirmEmpty },
+    });
+    const data = new FormData(form);
+    const password = String(data.get('password') ?? '');
+    if (!fieldErrors.confirm && !fieldErrors.password && password !== String(data.get('confirm') ?? '')) fieldErrors.confirm = t.mismatch;
+    setErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length) return;
     setPending(true);
     try {
       const response = await fetch('/api/auth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store',
-        body: JSON.stringify({ name: String(form.get('name') ?? ''), email: String(form.get('email') ?? ''), password }) });
+        body: JSON.stringify({ name: String(data.get('name') ?? ''), email: String(data.get('email') ?? ''), password }) });
       const body = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) { setError(body.error ?? 'Could not create your account. Try again.'); return; }
+      if (!response.ok) { setError(response.status === 429 ? copy.tooMany : body.error ?? t.failed); return; }
       setDone(true);
-    } catch { setError('The request could not be confirmed. Check your connection and try again.'); }
+    } catch { setError(copy.offline); }
     finally { setPending(false); }
   }
 
-  if (done) return <div className="card space-y-4 p-6 text-sm text-slate-700" role="status">
-    <p>Check your email. We sent a link to confirm your address and create your workspace. The link works once.</p>
-    <a href="/verify-email" className="text-brand-700 hover:underline">Didn’t get it? Send a new link</a>
-  </div>;
+  if (!open) return <AuthShell locale={locale} title={t.closedTitle} lead={t.closedLead}>
+    <a className="ui-button ui-button--primary ui-button--md" href="/sign-in"><span>{t.goSignIn}</span></a>
+  </AuthShell>;
 
-  return <form onSubmit={submit} className="card space-y-4 p-6" noValidate>
-    <div><label className="label" htmlFor="signup-name">Your name</label><input className="input" id="signup-name" name="name" required maxLength={120} autoComplete="name" /></div>
-    <div><label className="label" htmlFor="signup-email">Email address</label><input className="input" id="signup-email" name="email" type="email" required maxLength={320} autoComplete="email" /></div>
-    <div><label className="label" htmlFor="signup-password">Password</label><input className="input" id="signup-password" name="password" type="password" required maxLength={200} autoComplete="new-password" /></div>
-    <div><label className="label" htmlFor="signup-confirm">Confirm password</label><input className="input" id="signup-confirm" name="confirm" type="password" required maxLength={200} autoComplete="new-password" /></div>
-    {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-    <button className="btn-primary w-full" type="submit" disabled={pending}>{pending ? 'Creating…' : 'Create account'}</button>
-    <a href="/sign-in" className="block text-center text-sm text-brand-700 hover:underline">I already have an account</a>
-  </form>;
+  if (done) return <AuthShell locale={locale} title={t.doneTitle}>
+    <AuthNotice tone="success">{t.done}</AuthNotice>
+    <p className={authStyles.links}><a href="/verify-email">{t.resend}</a></p>
+  </AuthShell>;
+
+  const toggle = <Button variant="quiet" size="sm" aria-label={showPasswords ? t.hideLabel : t.showLabel} aria-pressed={showPasswords} disabled={pending} onClick={() => setShowPasswords(value => !value)}>{showPasswords ? t.hide : t.show}</Button>;
+  return <AuthShell locale={locale} title={t.title} lead={t.lead} footer={<a className={authStyles.linkButton} href="/sign-in">{t.haveAccount}</a>}>
+    <form className={authStyles.form} method="post" noValidate onSubmit={submit}>
+      <AuthField id="signup-name" name="name" label={t.name} required maxLength={120} autoComplete="name" error={errors.name} disabled={pending} />
+      <AuthField id="signup-email" name="email" type="email" label={t.email} required maxLength={320} autoComplete="email" spellCheck={false} error={errors.email} disabled={pending} />
+      <AuthField id="signup-password" name="password" type={showPasswords ? 'text' : 'password'} label={t.password} required maxLength={200} autoComplete="new-password" error={errors.password} disabled={pending} trailing={toggle} />
+      <AuthField id="signup-confirm" name="confirm" type={showPasswords ? 'text' : 'password'} label={t.confirm} required maxLength={200} autoComplete="new-password" error={errors.confirm} disabled={pending} />
+      {error && <AuthNotice>{error}</AuthNotice>}
+      <Button type="submit" variant="primary" busy={pending} className={authStyles.fill}>{pending ? t.busy : t.submit}</Button>
+    </form>
+  </AuthShell>;
 }

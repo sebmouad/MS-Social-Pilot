@@ -1,5 +1,6 @@
 "use client";
 import { IconDotsVertical } from "@tabler/icons-react";
+import { usePopupPlacement } from "./usePopupPlacement";
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 export type MenuItem = {
@@ -32,6 +33,7 @@ export function Menu({ items, label, trigger, align = "end", className = "" }: M
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  usePopupPlacement(open, triggerRef, menuRef);
 
   const enabled = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])') ?? []);
   const close = useCallback((restoreFocus: boolean) => { setOpen(false); if (restoreFocus) triggerRef.current?.focus(); }, []);

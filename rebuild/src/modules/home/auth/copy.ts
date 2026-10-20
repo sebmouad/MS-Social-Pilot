@@ -61,6 +61,13 @@ const en = {
     name: 'Your name', nameEmpty: 'Enter your name.', password: 'Create a password', passwordShort: (n: number) => `Use at least ${n} characters.`, passwordHint: (n: number) => `At least ${n} characters. Creating an account accepts this invitation.`,
     show: 'Show', hide: 'Hide', showLabel: 'Show password', hideLabel: 'Hide password', create: 'Create account and join', creating: 'Creating account…', goSignIn: 'Go to sign in',
   },
+  signUp: {
+    title: 'Create your account', lead: 'You will get your own workspace once you confirm your email.', closedTitle: 'Sign-up is closed', closedLead: 'Ask a workspace owner to invite you, or sign in if you already have an account.', goSignIn: 'Go to sign in',
+    name: 'Your name', email: 'Email address', password: 'Password', confirm: 'Confirm password', show: 'Show', hide: 'Hide', showLabel: 'Show passwords', hideLabel: 'Hide passwords',
+    nameEmpty: 'Enter your name.', emailEmpty: 'Enter your email address.', emailInvalid: 'Enter a valid email address.', passwordEmpty: 'Enter a password.', confirmEmpty: 'Confirm your password.', mismatch: 'The passwords do not match.',
+    submit: 'Create account', busy: 'Creating…', failed: 'Could not create your account. Try again.',
+    doneTitle: 'Check your email', done: 'We sent a link to confirm your address and create your workspace. The link works once.', resend: 'Didn’t get it? Send a new link', haveAccount: 'I already have an account',
+  },
   accessLimited: { title: 'Workspace access unavailable', body: 'This workspace or feature is unavailable with your current access.', help: 'Choose another workspace from the menu, or contact the workspace owner for help.' },
   noWorkspace: { title: 'No workspace yet', body: 'Ask a workspace owner to invite your account. You can sign out from the menu to use another account.', label: 'No workspace' },
 };
@@ -127,6 +134,13 @@ const fr: Copy = {
     existing: 'Connectez-vous avec votre compte existant, vérification comprise. Vous reviendrez ici pour accepter l’invitation.', signInToAccept: 'Se connecter pour accepter',
     name: 'Votre nom', nameEmpty: 'Saisissez votre nom.', password: 'Créez un mot de passe', passwordShort: (n: number) => `Utilisez au moins ${n} caractères.`, passwordHint: (n: number) => `Au moins ${n} caractères. La création du compte accepte cette invitation.`,
     show: 'Afficher', hide: 'Masquer', showLabel: 'Afficher le mot de passe', hideLabel: 'Masquer le mot de passe', create: 'Créer le compte et rejoindre', creating: 'Création du compte…', goSignIn: 'Aller à la connexion',
+  },
+  signUp: {
+    title: 'Créez votre compte', lead: 'Vous aurez votre propre espace dès que vous aurez confirmé votre e-mail.', closedTitle: 'Les inscriptions sont fermées', closedLead: 'Demandez à un propriétaire d’espace de vous inviter, ou connectez-vous si vous avez déjà un compte.', goSignIn: 'Aller à la connexion',
+    name: 'Votre nom', email: 'Adresse e-mail', password: 'Mot de passe', confirm: 'Confirmez le mot de passe', show: 'Afficher', hide: 'Masquer', showLabel: 'Afficher les mots de passe', hideLabel: 'Masquer les mots de passe',
+    nameEmpty: 'Saisissez votre nom.', emailEmpty: 'Saisissez votre adresse e-mail.', emailInvalid: 'Saisissez une adresse e-mail valide.', passwordEmpty: 'Saisissez un mot de passe.', confirmEmpty: 'Confirmez votre mot de passe.', mismatch: 'Les mots de passe ne correspondent pas.',
+    submit: 'Créer le compte', busy: 'Création…', failed: 'Votre compte n’a pas pu être créé. Réessayez.',
+    doneTitle: 'Consultez votre boîte mail', done: 'Nous avons envoyé un lien pour confirmer votre adresse et créer votre espace. Le lien ne fonctionne qu’une fois.', resend: 'Pas reçu ? Envoyer un nouveau lien', haveAccount: 'J’ai déjà un compte',
   },
   accessLimited: { title: 'Accès à l’espace indisponible', body: 'Cet espace ou cette fonctionnalité n’est pas disponible avec votre accès actuel.', help: 'Choisissez un autre espace dans le menu ou contactez le propriétaire de l’espace.' },
   noWorkspace: { title: 'Aucun espace pour le moment', body: 'Demandez à un propriétaire d’espace d’inviter votre compte. Vous pouvez vous déconnecter depuis le menu pour utiliser un autre compte.', label: 'Aucun espace' },

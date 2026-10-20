@@ -39,11 +39,11 @@ export default function EnrollSecondStepPage({ continuePath, locale = 'en' }: { 
     } catch { setError(t.rejected); }
     finally { setBusy(false); }
   }
-  if (codes.length) return <AuthShell title={t.savedTitle} lead={t.savedLead}>
+  if (codes.length) return <AuthShell locale={locale} title={t.savedTitle} lead={t.savedLead}>
     <ul className={authStyles.codes} aria-label={t.savedTitle}>{codes.map(code => <li key={code}><code>{code}</code></li>)}</ul>
     <a className="ui-button ui-button--primary" href={continuePath}>{t.continue}</a>
   </AuthShell>;
-  return <AuthShell title={t.title} lead={secret ? t.secretLead : t.intro}>
+  return <AuthShell locale={locale} title={t.title} lead={secret ? t.secretLead : t.intro}>
     {secret ? <>
       <p className={authStyles.secret} aria-label={t.secretLabel}><code>{secret}</code></p>
       <form className={authStyles.form} method="post" noValidate onSubmit={confirm}>

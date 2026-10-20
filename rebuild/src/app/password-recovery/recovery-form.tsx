@@ -67,17 +67,17 @@ export function PasswordRecoveryForm({ locale = 'en' }: { locale?: AuthLocale })
     setToken(null); setReset(true);
   }
 
-  if (!ready) return <AuthShell title={t.title}><AuthStatus>{t.loading}</AuthStatus></AuthShell>;
-  if (reset) return <AuthShell title={t.doneTitle}>
+  if (!ready) return <AuthShell locale={locale} title={t.title}><AuthStatus>{t.loading}</AuthStatus></AuthShell>;
+  if (reset) return <AuthShell locale={locale} title={t.doneTitle}>
     <AuthNotice tone="success">{t.done}</AuthNotice>
     <a className="ui-button ui-button--primary" href="/sign-in">{t.continue}</a>
   </AuthShell>;
-  if (requested) return <AuthShell title={t.sentTitle}>
+  if (requested) return <AuthShell locale={locale} title={t.sentTitle}>
     <AuthNotice tone="success">{t.sent}</AuthNotice>
     <p className={authStyles.links}><a href="/sign-in">{copy.backToSignIn}</a></p>
   </AuthShell>;
 
-  return <AuthShell title={t.title} lead={token ? t.resetLead : t.requestLead} footer={token ? undefined : <a className={authStyles.linkButton} href="/sign-in">{copy.backToSignIn}</a>}>
+  return <AuthShell locale={locale} title={t.title} lead={token ? t.resetLead : t.requestLead} footer={token ? undefined : <a className={authStyles.linkButton} href="/sign-in">{copy.backToSignIn}</a>}>
     {token ? <form className={authStyles.form} method="post" noValidate onSubmit={setNewPassword}>
       <AuthField id="new-password" name="password" type="password" label={t.password} required maxLength={200} autoComplete="new-password" error={errors.password} disabled={pending} />
       <AuthField id="confirm-password" name="confirm" type="password" label={t.confirm} required maxLength={200} autoComplete="new-password" error={errors.confirm} disabled={pending} />
