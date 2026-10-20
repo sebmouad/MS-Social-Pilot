@@ -54,6 +54,7 @@ const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
   'analytics/pins': 'analytics/overview',
   'analytics/goals': 'analytics/overview',
   'analytics/posts': 'analytics/overview',
+  'analytics/ads': 'analytics/overview',
   'analytics/reports': 'analytics/overview',
   'ads/overview': 'ads/performance',
   'ads/compare': 'ads/performance',
