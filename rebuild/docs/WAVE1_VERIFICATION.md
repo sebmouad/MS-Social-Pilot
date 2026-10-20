@@ -68,3 +68,10 @@ production build (dev server used); MCP calls with real keys; live Facebook.
   601 pass; the one failure is `posts.media_reference_present` (4) because the run
   deliberately used an empty media root, which proves missing restored media is
   detected. Not yet run against a production-shaped restored copy.
+- Whole-app browser matrix (`scripts/verify-browser-matrix.ts`, dev server, synthetic
+  QA owner, `_preview`): 43 routes × 4 themes × 1440/390 = 328 cells, all completed.
+  First clean run found Settings pages broken only by stale untracked drafts (moved out),
+  overflow on 3 routes, a console error on /settings/account and 13 routes without a
+  verifiable keyboard main action. After round-9 fixes: remaining real finding is
+  page-level horizontal overflow on /settings/team (8 cells); /settings/profiles errors
+  in that run came from a merge in progress and the route returns 200 now.
