@@ -182,15 +182,18 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
           const historyKey = `facebook.history.${target.workspaceId}.${target.id}.${target.providerId}`;
           const savedHistory = await tx.appSetting.findUnique({ where: { key: historyKey }, select: { value: true } });
           const historyEngine = await configuredFacebookEngine({ signal });
-          const history = await historyEngine.getPostHistory(decryptSecret(historyBinding.accessToken ?? historyBinding.socialAccount.accessToken), target.providerId, now, savedHistory?.value as import('./post-history').HistoryProgress | undefined);
-          if (history.failures.length) failedMetrics++;
-          for (const post of history.posts) {
+          // Post history is best-effort: a provider refusal is counted and logged, Page insights still persist.
+          let history: Awaited<ReturnType<typeof historyEngine.getPostHistory>> | null = null;
+          try { history = await historyEngine.getPostHistory(decryptSecret(historyBinding.accessToken ?? historyBinding.socialAccount.accessToken), target.providerId, now, savedHistory?.value as import('./post-history').HistoryProgress | undefined); }
+          catch (historyError) { signal.throwIfAborted(); failedMetrics++; await logItemFailure('postHistory', target.id, historyError); }
+          if (history?.failures.length) failedMetrics++;
+          for (const post of history?.posts ?? []) {
             await tx.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
               VALUES (${`rebuild_${randomUUID()}`}, ${target.id}, ${post.remoteId}, ${post.message}, ${post.permalink}, ${post.statusType}, ${post.pictureUrl}, ${post.createdTime}, ${JSON.stringify(post.insights)}::jsonb, ${now}, ${now})
               ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
             persistedCount++;
           }
-          await tx.appSetting.upsert({ where: { key: historyKey }, create: { key: historyKey, value: history.progress, updatedAt: now }, update: { value: history.progress } });
+          if (history) await tx.appSetting.upsert({ where: { key: historyKey }, create: { key: historyKey, value: history.progress, updatedAt: now }, update: { value: history.progress } });
           for (const { metric, period, endTime, value, numeric } of observations) {
             signal.throwIfAborted();
             await tx.pageInsight.upsert({

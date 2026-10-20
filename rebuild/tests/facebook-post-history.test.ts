@@ -31,6 +31,6 @@ describe('Page history', () => {
   expect(result.posts[0].insights.reactions).toBeUndefined(); expect(result.failures).toContain('reactions_LIKE');
  });
  it('redacts provider errors', async () => {
-  await expect(createFacebookPostHistory(config, policy, async () => response({ error: { message: 'secret' } })).collect('secret', 'page', now)).rejects.toThrow('History collection rejected.');
+  await expect(createFacebookPostHistory(config, policy, async () => response({ error: { message: 'secret' } })).collect('secret', 'page', now)).rejects.toThrow('History collection rejected');
  });
 });

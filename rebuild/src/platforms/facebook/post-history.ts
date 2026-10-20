@@ -25,7 +25,10 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
     try { response = await fetcher(url, { redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout }); }
     catch { signal?.throwIfAborted(); throw new Error('History transport failed.'); }
     const data = obj(await response.json().catch(() => null));
-    if (!response.ok || data.error || !Array.isArray(data.data)) throw new Error('History collection rejected.');
+    if (!response.ok || data.error || !Array.isArray(data.data)) {
+      const error = obj(data.error);
+      throw new Error(`History collection rejected (HTTP ${response.status}${error.code !== undefined ? `, code ${String(error.code)}` : ''}${error.error_subcode !== undefined ? `/${String(error.error_subcode)}` : ''}${typeof error.type === 'string' ? `, ${error.type}` : ''}): ${typeof error.message === 'string' ? error.message.slice(0, 300) : 'no provider message'}`);
+    }
     signal?.throwIfAborted();
     const paging = obj(data.paging); const after = obj(paging.cursors).after;
     if (paging.next && (typeof after !== 'string' || !after)) throw new Error('History continuation missing.');
