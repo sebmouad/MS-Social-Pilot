@@ -12,7 +12,7 @@ import type { InboxReadActor, InboxReadConstraints } from './types';
 
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
 type DeletionState = 'started' | 'uncertain' | 'remote_confirmed' | 'completed' | 'rejected';
-type Journal = { id: string; workspaceId: string; targetId: string; provider: string; remoteId: string; localItemId: string; state: DeletionState };
+export type Journal = { id: string; workspaceId: string; targetId: string; provider: string; remoteId: string; localItemId: string; state: DeletionState };
 function receipt(row: Journal) {
   return { ok: true as const, operationId: row.id, itemId: row.localItemId, state: row.state,
     remoteConfirmed: row.state === 'remote_confirmed' || row.state === 'completed', localConfirmed: row.state === 'completed' };
@@ -69,7 +69,7 @@ export async function getInboxDeletion(actor: InboxReadActor, input: { itemId: s
   return { operation: row ? { ...receipt(row), itemId: parsed.data } : null };
 }
 
-async function finish(row: Journal, actor: InboxReadActor) {
+export async function finish(row: Journal, actor: InboxReadActor, auditExtra: Record<string, unknown> = {}) {
   if (row.state !== 'remote_confirmed') return receipt(row);
   const [timeout, maxWait] = await Promise.all([runtimeConfig('inbox.workflowTransactionTimeoutMs'), runtimeConfig('inbox.workflowTransactionMaxWaitMs')]);
   // All local aliases and recursively stored replies belong to this channel.
@@ -89,7 +89,7 @@ async function finish(row: Journal, actor: InboxReadActor) {
       "localAliases" = ARRAY(SELECT DISTINCT unnest("localAliases" || ${family.aliases}::text[])),
       "suppressedRemoteIds" = ARRAY(SELECT DISTINCT unnest("suppressedRemoteIds" || ${family.remoteIds}::text[]))
       WHERE id = ${current.id} AND "workspaceId" = ${actor.workspaceId}`;
-    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.userId}, 'inbox.comment_deleted', ${JSON.stringify({ workspaceId: actor.workspaceId, targetId: current.targetId, itemId: current.localItemId, operationId: current.id })}::jsonb, NOW())`;
+    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.userId}, 'inbox.comment_deleted', ${JSON.stringify({ workspaceId: actor.workspaceId, targetId: current.targetId, itemId: current.localItemId, operationId: current.id, ...auditExtra })}::jsonb, NOW())`;
     return receipt({ ...current, state: 'completed' });
   }, { timeout, maxWait });
 }

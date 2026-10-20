@@ -213,6 +213,28 @@ export async function prepareDeleteFacebookComment(actor: InboxActor, input: { t
   };
 }
 
+/** System (worker) read for deletion reconciliation. Only a complete, successful listing of the comment's post that omits it counts as absence;
+ * an object-not-found error, a missing grant or a partial/failed read is `unknown`, because Graph reports the same error for lost access. */
+export async function readFacebookCommentPresence(input: { workspaceId: string; targetId: string; remoteId: string; postRemoteId: string }, signal: AbortSignal): Promise<'present' | 'absent' | 'unknown'> {
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.remoteId) || !/^[A-Za-z0-9_-]{1,200}$/.test(input.postRemoteId)) return 'unknown';
+  if (await runtimeConfig('platforms.facebook.enabled') !== true) return 'unknown';
+  const target = await prisma.target.findFirst({
+    where: { id: input.targetId, workspaceId: input.workspaceId, type: 'page', enabled: true, socialAccount: { is: { workspaceId: input.workspaceId, provider: 'facebook', invalidatedAt: null } } },
+    select: { accessToken: true, socialAccount: { select: { scopes: true, tokenExpiresAt: true } } },
+  });
+  if (!target?.accessToken || !target.socialAccount || (target.socialAccount.tokenExpiresAt && target.socialAccount.tokenExpiresAt <= new Date())) return 'unknown';
+  const required = ((await runtimeConfig('meta.inboxReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
+  const granted = new Set(target.socialAccount.scopes.split(',').map(scope => scope.trim()).filter(Boolean));
+  if (!required.length || required.some(scope => !granted.has(scope))) return 'unknown';
+  signal.throwIfAborted();
+  try {
+    const engine = await configuredFacebookEngine({ signal });
+    const comments = await engine.listComments(decryptSecret(target.accessToken), input.postRemoteId);
+    signal.throwIfAborted();
+    return comments.some(comment => comment.id === input.remoteId) ? 'present' : 'absent';
+  } catch { return 'unknown'; }
+}
+
 /** Store a Page's current reviews/recommendations. Read-only toward Facebook; resolution stays local. */
 export async function syncFacebookReviews(actor: InboxActor, targetId?: string) {
   const { permissions } = await access(actor);

@@ -146,6 +146,8 @@ export interface PlatformInboxHost {
   reply(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; text: string }): Promise<{ ok: boolean }>;
   moderate(actor: InboxActor, input: { id: string; hidden: boolean }): Promise<{ ok: boolean }>;
   prepareDeleteComment(actor: InboxActor, input: { targetId: string; remoteId: string }): Promise<(signal: AbortSignal) => Promise<void>>;
+  /** Optional read-only worker check for an uncertain deletion. `absent` is positive evidence the module's own rules accept; `present` and `unknown` keep the deletion held. Never writes remotely. */
+  readCommentPresence?(input: { workspaceId: string; targetId: string; remoteId: string; postRemoteId: string }, signal: AbortSignal): Promise<'present' | 'absent' | 'unknown'>;
   /** Optional: present only when the module reads public reviews. `reply` is present only when the provider lets a channel answer one. */
   reviews?: {
     sync(actor: InboxActor, targetId?: string): Promise<{ targetCount: number; failedCount: number; reviewCount: number; syncedAt: string }>;

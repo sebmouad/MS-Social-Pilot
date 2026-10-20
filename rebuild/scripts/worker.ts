@@ -78,8 +78,10 @@ const dependencies: WorkerDependencies = {
     const moderation = await runAutomaticInboxModeration(new Date()).catch(() => null);
     const { runInboxAlertProducers } = await import('../src/modules/inbox/server/notification-events');
     await runInboxAlertProducers(now);
-    const rules = moderation ? `rules=${moderation.workspaces}/${moderation.acted} rulesFailed=${moderation.failed}` : 'rules=unavailable';
-    return `examined=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed} ${rules}`;
+    const { reconcileInboxDeletions } = await import('../src/modules/inbox/server/deletion-reconcile');
+    const deletions = await reconcileInboxDeletions(now).catch(() => null);
+    const rules =moderation ? `rules=${moderation.workspaces}/${moderation.acted} rulesFailed=${moderation.failed}` : 'rules=unavailable';
+    return `examined=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed} ${rules} deletions=${deletions ? `${deletions.examined}/${deletions.updated}` : 'unavailable'}`;
   },
   async tryLease(job, leaseOwner, token, until) {
     const rows = await prisma.$queryRaw<Array<{ name: string }>>`
