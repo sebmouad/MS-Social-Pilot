@@ -40,7 +40,9 @@ export type HomeActor = { userId: string; workspaceId: string };
 
 const KEYS = ['home.lookbackDays', 'home.maxChannels', 'home.topChannelsLimit', 'home.upcomingLimit', 'home.snippetCharacters', 'home.interactionMeasureKeys',
   'home.heatmapLookbackDays', 'home.heatmapMaxPostsPerChannel', 'home.heatmapMinPosts', 'home.adsMaxPages'] as const;
-const DAY = 86_400_000; // Fixed UTC calendar duration, not an operational setting.
+const DAY = 86_400_000;
+/** Calendar day key (YYYY-MM-DD) from a day string, ISO timestamp or Date. */
+const dayKey = (value: unknown): string => { if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10); const date = value instanceof Date ? value : new Date(String(value)); return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10); }; // Fixed UTC calendar duration, not an operational setting.
 
 async function settled<T>(read: () => Promise<Section<T>>): Promise<Section<T>> {
   try { return await read(); } catch { return { state: 'unavailable' }; }
@@ -80,7 +82,7 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
     const series = metricKeys.size === 1 ? snapshot.allMetrics.find(metric => metric.key === [...metricKeys][0] && metric.kind === 'stock' && metric.resourceKind === 'channel') : undefined;
     const asOf = snapshot.audience.entries.reduce<Date | null>((latest, entry) => !latest || entry.asOf > latest ? entry.asOf : latest, null);
     return { state: 'ready', data: { total: snapshot.audience.total, covered: snapshot.audience.covered, selected: snapshot.audience.selected, asOf: asOf?.toISOString() ?? null,
-      trend: series && series.points.length > 1 ? series.points.map(point => ({ t: point.date, v: point.value })) : [] } };
+      trend: series && series.points.length > 1 ? series.points.map(point => ({ t: dayKey(point.date), v: point.value })) : [] } };
   });
 
   const performance = !wantsAnalytics ? null : await settled<Data<'performance'>>(async () => {
@@ -148,7 +150,7 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
       rows.push(...result.rows.map(row => ({ currency: row.currency, spend: row.spend, date: row.date })));
       if (result.nextOffset === null) {
         if (!rows.length) return { state: 'empty' };
-        return { state: 'ready', data: { spend: spendByCurrency(rows).map(group => ({ currency: group.currency, total: group.total, daily: group.daily.map(day => ({ t: day.date, v: day.value })) })) } };
+        return { state: 'ready', data: { spend: spendByCurrency(rows).map(group => ({ currency: group.currency, total: group.total, daily: group.daily.map(day => ({ t: dayKey(day.date), v: day.value })) })) } };
       }
       offset = result.nextOffset;
     }

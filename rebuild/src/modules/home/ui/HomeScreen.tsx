@@ -71,6 +71,7 @@ export default async function HomePage() {
   const number = new Intl.NumberFormat(locale);
   const dayFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
   const timeFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: overview.timeZone });
+  const dayLabel = (day: string) => { const date = new Date(`${day.slice(0, 10)}T12:00:00.000Z`); return Number.isNaN(date.getTime()) ? day : dayFormat.format(date); };
   const days = overview.lookbackDays;
   const performance = overview.performance;
   const ready = performance?.state === 'ready' ? performance.data : null;
@@ -92,7 +93,7 @@ export default async function HomePage() {
           {audience => <>
             <p className={styles.big}>{number.format(audience.total)}</p>
             <p className={styles.note}>{fill(t.audienceOf, { covered: audience.covered, selected: audience.selected })}{audience.asOf ? ` · ${fill(t.audienceAsOf, { date: dayFormat.format(new Date(audience.asOf)) })}` : ''}</p>
-            {audience.trend.length > 1 && <Sparkline label={fill(t.audienceTrend, { n: days })} values={audience.trend.map(point => point.v)} labels={audience.trend.map(point => dayFormat.format(new Date(`${point.t}T12:00:00.000Z`)))} area color={1} table={false} />}
+            {audience.trend.length > 1 && <Sparkline label={fill(t.audienceTrend, { n: days })} values={audience.trend.map(point => point.v)} labels={audience.trend.map(point => dayLabel(point.t))} area color={1} table={false} />}
             <p className={styles.note}>{t.audienceNote}</p>
           </>}
         </Body>
@@ -132,7 +133,7 @@ export default async function HomePage() {
           {upcoming => <>
             <ul className={styles.list}>{upcoming.items.map(item => <li className={styles.item} key={item.id}>
               <strong>{item.text || '—'}</strong>
-              <span className={styles.meta}><time dateTime={item.scheduledAt}>{timeFormat.format(new Date(item.scheduledAt))}</time><span className={styles.mode}>{t[MODE_COPY[item.mode]]}</span></span>
+              <span className={styles.meta}><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time><span className={styles.mode}>{t[MODE_COPY[item.mode]]}</span></span>
               <span className={styles.meta}>{item.channels.join(', ')}</span>
             </li>)}</ul>
             {upcoming.total > upcoming.items.length && <p className={styles.note}>{fill(t.upcomingMore, { n: upcoming.total })}</p>}
@@ -156,7 +157,7 @@ export default async function HomePage() {
           {ads => <>
             {ads.spend.map(group => <div key={group.currency ?? 'none'}>
               <p className={styles.big}>{new Intl.NumberFormat(locale, group.currency ? { style: 'currency', currency: group.currency } : undefined).format(group.total)}</p>
-              {ads.spend.length === 1 && group.daily.length > 1 && <Sparkline label={fill(t.adSpendTrend, { n: days })} values={group.daily.map(day => day.v)} labels={group.daily.map(day => dayFormat.format(new Date(`${day.t}T12:00:00.000Z`)))} area color={4} table={false} />}
+              {ads.spend.length === 1 && group.daily.length > 1 && <Sparkline label={fill(t.adSpendTrend, { n: days })} values={group.daily.map(day => day.v)} labels={group.daily.map(day => dayLabel(day.t))} area color={4} table={false} />}
             </div>)}
             <p className={styles.note}>{fill(t.adSpendNote, { n: days })}</p>
           </>}
