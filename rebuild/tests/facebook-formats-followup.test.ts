@@ -74,7 +74,7 @@ describe('status readback and polling', () => {
     expect((await readFacebookNativeStatus({ format: 'video', remoteId: 'V', knownIds: [] }, { transport: m.t, sleep })).status).toBe('unknown');
     const f = reader([new FacebookApiError('x', 500)]);
     expect(await readFacebookNativeStatus({ format: 'video', remoteId: 'V', knownIds: [] }, { transport: f.t, sleep })).toMatchObject({ status: 'unknown', detail: 'read_failed', polls: 6 });
-    expect((await readFacebookNativeStatus({ format: 'story_photo', remoteId: 'S', knownIds: [] }, { transport: f.t, sleep })).detail).toBe('readback_unsupported');
+    expect(await readFacebookNativeStatus({ format: 'story_photo', remoteId: 'S', knownIds: [], targetId: 'PAGE' }, { transport: f.t, sleep })).toMatchObject({ status: 'unknown', detail: 'read_failed', polls: 1 });
     expect((await readFacebookNativeStatus({ format: 'reel', remoteId: null, knownIds: [] }, { transport: f.t, sleep })).detail).toBe('no_remote_id');
   });
 });
