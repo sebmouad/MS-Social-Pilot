@@ -465,3 +465,6 @@ each gate is actually run; never claim a gate from this plan alone.
 - **Fix:** `rebuild/scripts/prod-fix-ownership.sh` (commit `0dac4dc1`) transferred them; now `social_pilot=116` tables, 0 postgres-owned functions. `prod-cutover.sh` now does this step itself. Services restarted; worker jobs run with 0 permission errors.
 - **Root settings (audited, as owner):** `auth.passkeyOrigin=https://social.newsgeet.com` (was empty, so passkey accounts were sent to enrollment); `storage.mediaRoot=/var/lib/ms-social-pilot/media` (legacy `MEDIA_DIR`).
 - **Open:** owner sign-in confirmation; mail settings; live Facebook test gate; post-cutover rollback drill; drop scratch DB; rewire `socialpilot-deploy`.
+- **Cleanup (22:40):** scratch DB `social_pilot_rehearsal` dropped; rehearsal/cutover temp files and drill folder removed.
+- **Legacy deploy guarded:** `/usr/local/sbin/socialpilot-deploy` now refuses (exit 2) while `social-pilot-rebuild` is enabled, except `--status` or `SOCIALPILOT_LEGACY_OVERRIDE=yes` (a deliberate legacy rollback). Original kept as `socialpilot-deploy.legacy-20261020`. A dedicated rebuild release command is still to be written.
+- **Owner sign-in:** no app errors since the fix; the form rejects the password. The owner runs `rebuild/scripts/prod-owner-reset-link.sh` (link shown only in their terminal) until mail is configured.
