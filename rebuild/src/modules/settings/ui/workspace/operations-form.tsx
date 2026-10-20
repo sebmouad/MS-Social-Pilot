@@ -1,7 +1,7 @@
 'use client';
 // Renders only settings with live consumers: calendar week start, report business hours, UTM tagging,
-// composer spacing, undo send, AI voice and the negative-comment alert. Link shortening and best-time
-// mode have no consumer yet and are sent back unchanged.
+// composer spacing, best-time suggestions/queue preference, undo send, AI voice and the negative-comment alert.
+// Link shortening has no consumer yet and is sent back unchanged.
 import { useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { workspaceOperationsCopy } from '@/modules/settings/workspace-operations-copy';
@@ -43,6 +43,7 @@ export function WorkspaceOperationsForm({ workspaceId, initial }: { workspaceId:
         <small className={styles.hint}>{t.businessHoursHint}</small>
       </fieldset>
     </fieldset>
+    <label className={styles.field}><span>{t.bestTimeMode}</span><select disabled={busy} value={draft.bestTimeMode} onChange={event => set('bestTimeMode', event.target.value as Draft['bestTimeMode'])}><option value="suggest">{t.bestTimeSuggest}</option><option value="apply">{t.bestTimeApply}</option></select></label>
     <fieldset className={styles.group} disabled={busy}><legend>{t.linksLegend}</legend>
       {text('utmSource', B.utmPart, t.utmSource)}{text('utmMedium', B.utmPart, t.utmMedium)}{text('utmCampaignTemplate', B.utmCampaign, t.utmCampaign)}
       <small className={styles.hint}>{t.utmHint}</small>

@@ -1,3 +1,4 @@
+import { getBestTimeSuggestions } from './best-time';
 import { isValidTimeZone } from '@/lib/calendar-dates';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -28,14 +29,16 @@ export async function previewQueueTimes(actor: PublishingActor, targetIds: reado
   const allowed = auth.actor.allowedTargetIds;
   if (allowed && ids.some(id => !allowed.includes(id))) throw new OperationError('forbidden', 'One or more destinations are outside your channel access.');
   await validateTargets(auth.actor, ids, max);
-  const rows = await prisma.$queryRaw<Array<{ timezone: string }>>`SELECT timezone FROM workspaces WHERE id = ${actor.workspaceId}`;
+  const rows = await prisma.$queryRaw<Array<{ timezone: string; bestTimeMode: string }>>`SELECT timezone, "bestTimeMode" FROM workspaces WHERE id = ${actor.workspaceId}`;
   const timezone = rows[0]?.timezone;
   if (typeof timezone !== 'string' || !isValidTimeZone(timezone)) throw new OperationError('unavailable', 'Workspace scheduling settings are unavailable.');
   const days = (await bounds()).queueLookaheadDays;
   const now = new Date();
+  const suggested = rows[0]?.bestTimeMode === 'apply' ? (await getBestTimeSuggestions(auth.actor, { targetIds: ids }, now)).suggestions : [];
+  const preference = suggested.length ? [suggested] as const : [];
   const [scheduledAt, ...channels] = await Promise.all([
-    allocateQueueTime(prisma, actor.workspaceId, timezone, ids, now, days),
-    ...ids.map(id => allocateQueueTime(prisma, actor.workspaceId, timezone, [id], now, days)),
+    allocateQueueTime(prisma, actor.workspaceId, timezone, ids, now, days, ...preference),
+    ...ids.map(id => allocateQueueTime(prisma, actor.workspaceId, timezone, [id], now, days, ...preference)),
   ]);
   return { scheduledAt: scheduledAt ?? null, channels: ids.map((targetId, index) => ({ targetId, nextAt: channels[index] ?? null })) };
 }

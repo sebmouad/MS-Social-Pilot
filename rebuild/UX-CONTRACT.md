@@ -543,3 +543,14 @@ An empty adapted post cannot be applied. Recoverable failures preserve the
 review, with Review again for a changed proposal; approval reset is announced.
 DOM checks cover review/confirmation/failure/retry and French empty-result
 blocking. Actual browser themes, widths and keyboard verification remain open.
+
+
+Best-time suggestions (2026-10-20 branch): the composer sidebar reads stored
+performance for the selected destinations and shows en/fr loading, unavailable,
+retry and suggested-time controls. Unknown history displays Not available / Non
+disponible. Obsolete destination responses cannot fill the schedule. A click
+fills workspace-local date/time without submitting. Queue mode prefers free
+suggested slots only when workspace bestTimeMode is apply, then uses the saved
+timetable; previews remain estimates. Workspace operations exposes that choice
+with copy describing allocation-time preference. Unit/jsdom evidence only; see
+[BEST_TIMES.md](docs/BEST_TIMES.md) for bounds and remaining runtime checks.

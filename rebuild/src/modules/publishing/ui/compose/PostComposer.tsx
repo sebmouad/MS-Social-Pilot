@@ -1,4 +1,5 @@
 'use client';
+import { BestTimeSuggestions } from './BestTimeSuggestions';
 import { GroupShortcut } from '@/modules/settings/ui/profiles/GroupShortcut';
 import { profileChannelName, type ProfileDirectory } from '@/modules/settings/channel-profiles/contracts';
 
@@ -354,6 +355,7 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
           <legend>Formats</legend>
           <DestinationFormats targets={targets} selectedIds={selected.map(target => target.id)} values={formatChoices} formId={FORM_ID} disabled={pending || uploading || saved} onChange={(id, value) => setFormatChoices(current => ({ ...current, [id]: value }))} />
         </fieldset>}
+        <BestTimeSuggestions targetIds={selectedTargets} locale={aiLocale} disabled={pending || uploading || saved} onChoose={({ date, time }) => { setScheduleDate(date); setScheduleTime(time); setMode('schedule'); }} />
         <fieldset className={styles.scheduleFields} disabled={pending || uploading || saved}>
           <legend>Schedule</legend>
           <p>Times use {schedule.timeZone.replaceAll('_', ' ')}.</p>

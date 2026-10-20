@@ -89,15 +89,18 @@ export function nextAvailableSlot(o: { slots: readonly Slot[]; timeZone: string;
 const OCCUPYING = ['scheduled', 'pending_approval', 'publishing'];
 /**
  * For lifecycle: the next free queue time for a post going to `targetIds`. Call inside the transaction that also writes the
- * post, after taking the workspace lock, so two writers are never handed the same time. Null means no queue times or none free.
+ * post, after taking the workspace lock, so two writers are never handed the same time. Optional authorized best-time
+ * slots are tried first, then the saved timetable. Null means neither has a free time in the horizon.
  */
-export async function allocateQueueTime(tx: Tx, workspaceId: string, timeZone: string, targetIds: readonly string[], now = new Date(), horizonDays?: number): Promise<Date | null> {
+export async function allocateQueueTime(tx: Tx, workspaceId: string, timeZone: string, targetIds: readonly string[], now = new Date(), horizonDays?: number, preferredSlots: readonly Slot[] = []): Promise<Date | null> {
   const days = horizonDays ?? (await bounds()).queueLookaheadDays;
   const [rows, taken] = await Promise.all([
     tx.$queryRaw<SlotRow[]>`SELECT "targetId", "dayOfWeek", hour, minute FROM queue_slots WHERE "workspaceId" = ${workspaceId} AND ("targetId" IS NULL OR "targetId" = ANY(${[...targetIds]}::text[]))`,
     tx.$queryRaw<Array<{ scheduledAt: Date }>>`SELECT DISTINCT p."scheduledAt" FROM posts p JOIN post_targets pt ON pt."postId" = p.id WHERE p."workspaceId" = ${workspaceId} AND p.status::text = ANY(${OCCUPYING}::text[]) AND p."scheduledAt" >= ${now} AND pt."targetId" = ANY(${[...targetIds]}::text[])`,
   ]);
-  return nextAvailableSlot({ slots: slotsForPages(rows, targetIds), timeZone, takenUtc: taken.map(t => t.scheduledAt), now, horizonDays: days });
+  const occupancy = { timeZone, takenUtc: taken.map(t => t.scheduledAt), now, horizonDays: days };
+  const preferred = [...preferredSlots].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.hour - b.hour || a.minute - b.minute);
+  return nextAvailableSlot({ ...occupancy, slots: preferred }) ?? nextAvailableSlot({ ...occupancy, slots: slotsForPages(rows, targetIds) });
 }
 
 async function systemAudit(tx: Tx, workspaceId: string, action: string, detail: object) {

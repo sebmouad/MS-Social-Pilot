@@ -3,7 +3,7 @@ import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
-  policy: [{ timezone: 'America/Casablanca', requiresApproval: false }] as Array<{ timezone: string; requiresApproval: boolean }>,
+  policy: [{ timezone: 'America/Casablanca', requiresApproval: false }] as Array<{ timezone: string; requiresApproval: boolean; bestTimeMode?: string }>,
   post: null as null | Record<string, unknown>, current: null as null | Record<string, unknown>,
   at: new Date('2026-10-20T08:00:00.000Z') as Date | null,
   writes: [] as Array<{ sql: string; values: unknown[] }>,
@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   approvalRows: 1,
   authorize: vi.fn(),
   allocate: vi.fn(),
+  best: vi.fn(),
   record: vi.fn(),
   audit: vi.fn(),
   validateTargets: vi.fn(),
@@ -23,6 +24,7 @@ const h = vi.hoisted(() => ({
 }));
 const db = vi.hoisted(() => ({ post: { findFirst: vi.fn(), updateMany: vi.fn() }, $queryRaw: vi.fn(), $executeRaw: vi.fn() }));
 
+vi.mock('@/modules/publishing/server/best-time', () => ({ getBestTimeSuggestions: h.best }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/modules/publishing/server/access', () => ({ authorizePublishing: h.authorize }));
 vi.mock('@/modules/publishing/server/guard', () => ({
@@ -71,6 +73,20 @@ beforeEach(() => {
 });
 
 describe('queuePost', () => {
+  it('consumes apply mode in the shared locked queue path', async () => {
+    h.policy[0]!.bestTimeMode = 'apply';
+    const suggestions = [{ dayOfWeek: 2, hour: 8, minute: 0 }]; h.best.mockResolvedValue({ suggestions });
+    await queuePost(actor, 'p1');
+    expect(h.best).toHaveBeenCalledWith(actor, { targetIds: ['t1'] });
+    expect(h.allocate).toHaveBeenCalledWith(db, 'w1', 'America/Casablanca', ['t1'], expect.any(Date), 21, suggestions);
+  });
+  it('rejects a setting change under the allocation lock', async () => {
+    h.policy[0]!.bestTimeMode = 'apply'; h.best.mockResolvedValue({ suggestions: [] });
+    db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => strings.join('').includes('SELECT timezone') ? [{ ...h.policy[0], bestTimeMode: strings.join('').includes('FOR SHARE') ? 'suggest' : 'apply' }] : []);
+    await expect(queuePost(actor, 'p1')).rejects.toThrow(/settings changed/);
+    expect(h.allocate).not.toHaveBeenCalled(); expect(db.post.updateMany).not.toHaveBeenCalled();
+  });
+
   it('requires a strict request and exact post-bound confirmation', async () => {
     expect(queuePostConfirmation('p1')).toBe('QUEUE POST p1');
     await expect(queuePostRequest(actor, { postId: 'p1', confirmation: 'QUEUE POST p2' })).rejects.toThrow(/exact confirmation/);

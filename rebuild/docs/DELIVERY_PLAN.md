@@ -500,3 +500,11 @@ unapplied; registry schema version was deliberately not edited. PostgreSQL,
 browser, real MCP and migration/release proof remain open. This is a branch-only
 batch: no push, deploy, servers, install or client generation; the full rebuild
 objective remains incomplete.
+
+
+2026-10-20 `codex/best-time`: bounded stored-performance weekday/hour suggestions
+now feed the composer and apply-mode queue preference. See BEST_TIMES.md for
+ownership, six Publishing-owned Root keys, authorization and evidence limits.
+No migration, central registry edit, server, push or deployment. Runtime
+PostgreSQL/browser/provider proof and host configuration-version coordination
+remain open; the full rebuild goal remains active.

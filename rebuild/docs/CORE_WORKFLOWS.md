@@ -59,10 +59,17 @@ Live consumers, and the only fields rendered on `/settings/workspace`:
 Business hours are consumed by the Reports Response time section (see
 REPORT_WORKFLOWS.md). Stored and exposed through API/MCP only, with no consumer
 yet, so not rendered:
-week start, best-time mode, link shortening (no short-link
+week start, link shortening (no short-link
 service), undo-send window, AI enablement/tone/brand voice/avoid words and the
 negative-comment alert. The form sends these back unchanged. Evidence is unit
 tests only (`tests/workspace-operations*.test.ts`); no browser or database run.
+
+Best-time mode now has a live consumer and a settings selector. Stored neutral
+per-post ranks produce composer suggestions by workspace-local weekday/hour;
+`apply` makes shared queue allocation prefer those free slots, with ordinary
+timetable fallback. UI, HTTP and MCP use the same service. This does not insert
+weekly timetable rows. See [BEST_TIMES.md](BEST_TIMES.md) for current access,
+unknown-data semantics, Root bounds and synthetic verification limits.
 
 ## Evidence and limits
 

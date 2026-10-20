@@ -2,13 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
   authorize: vi.fn(),
+  best: vi.fn(),
   allocate: vi.fn(),
   createPost: vi.fn(),
   updatePost: vi.fn(),
   queuePost: vi.fn(),
   validateTargets: vi.fn(),
-  tz: [{ timezone: 'Africa/Casablanca' }] as Array<{ timezone: unknown }>,
+  tz: [{ timezone: 'Africa/Casablanca' }] as Array<{ timezone: unknown; bestTimeMode?: string }>,
 }));
+vi.mock('@/modules/publishing/server/best-time', () => ({ getBestTimeSuggestions: h.best }));
 vi.mock('@/server/data', () => ({ prisma: { $queryRaw: async () => h.tz } }));
 vi.mock('@/modules/publishing/server/access', () => ({ authorizePublishing: h.authorize }));
 vi.mock('@/modules/publishing/collaboration/server/executors', () => ({ allocateQueueTime: h.allocate }));
@@ -28,6 +30,16 @@ beforeEach(() => {
 });
 
 describe('previewQueueTimes', () => {
+  it('uses the same apply suggestions for combined and per-channel queue previews', async () => {
+    h.tz = [{ timezone: 'Africa/Casablanca', bestTimeMode: 'apply' }];
+    const suggestions = [{ dayOfWeek: 2, hour: 8, minute: 0 }];
+    h.best.mockResolvedValue({ suggestions }); h.allocate.mockResolvedValue(null);
+    await previewQueueTimes(actor, ['t1', 't2']);
+    expect(h.best).toHaveBeenCalledWith(actor, { targetIds: ['t1', 't2'] }, expect.any(Date));
+    expect(h.allocate).toHaveBeenCalledWith(expect.anything(), 'w1', 'Africa/Casablanca', ['t1', 't2'], expect.any(Date), 21, suggestions);
+    expect(h.allocate).toHaveBeenCalledTimes(3);
+  });
+
   it('returns the shared next free time and each channel own time, read-only', async () => {
     const shared = new Date('2026-10-21T09:00:00Z');
     h.allocate.mockImplementation(async (_tx: unknown, _w: string, _z: string, ids: string[]) => ids.length > 1 ? shared : new Date(ids[0] === 't1' ? '2026-10-21T09:00:00Z' : '2026-10-22T09:00:00Z'));

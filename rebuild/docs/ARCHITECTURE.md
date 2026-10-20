@@ -1585,3 +1585,14 @@ unapplied; registry schema version was deliberately not edited. PostgreSQL,
 browser, real MCP and migration/release proof remain open. This is a branch-only
 batch: no push, deploy, servers, install or client generation; the full rebuild
 objective remains incomplete.
+
+
+## Best-time branch — 2026-10-20
+
+Publishing-owned best-time ranking consumes only normalized stored
+`postPerformance` ranks, with current access/scope and unknown-data safeguards.
+Composer suggestions, HTTP/MCP reads and queue allocation-time preference share
+the service and locked allocator; the workspace setting is rendered. See
+[BEST_TIMES.md](BEST_TIMES.md) for sample bounds, Root keys and the deliberate
+absence of legacy weekly timetable insertion. Synthetic tests only; real
+PostgreSQL, browser, live-provider and release evidence remain open.
