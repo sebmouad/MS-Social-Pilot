@@ -1,3 +1,4 @@
+import { postsMcp } from './explorer-posts/mcp';
 import { OperationError } from '@/lib/operation-error';
 import { isResourceRestricted } from '@/modules/settings/mcp-access/tool-policy';
 import { ensureReportWorkflows } from '@/modules/analytics/server/report-workflows';
@@ -42,6 +43,7 @@ function analyticsPageArgs(args: Record<string, unknown>, cap: number, fallback:
 
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
 export const ANALYTICS_MCP: readonly McpToolGroup[] = [
+  postsMcp,
   {
     id: 'analytics-reports',
     tools: analyticsReportToolDefinitions,

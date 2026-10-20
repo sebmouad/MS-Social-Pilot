@@ -9,6 +9,7 @@ import { ANALYTICS_EXPLORER_CONFIG } from './explorer-config';
 
 /** Every Root setting this product module declares. The registry merges installed modules; edit only here. */
 export const ANALYTICS_MODULE_CONFIG = [
+  entry({ key: 'analytics.postsPageSize', group: 'Analytics · Posts', label: 'Posts per page', kind: 'number', description: 'Published post rows per explorer page.', defaultValue: 25, schema: z.number().int().min(1).max(200), consumption: 'active' }),
   ...DEMOGRAPHICS_CONFIG,
   ...PINNED_METRIC_CONFIG,
   ...COMPARISON_CONFIG,
