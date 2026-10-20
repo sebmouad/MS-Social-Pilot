@@ -197,3 +197,11 @@ The shared native status helper reads Stories through the Page's Stories edge (o
 id, no polling), so reconciliation of Story attempts is no longer `readback_unsupported`. Results other
 than an exact published entry are `unknown`; a read never confirms or mutates an attempt. Mocked fetch
 only. See FACEBOOK_NATIVE_FORMATS.md (Batch100).
+
+
+## Batch102 schedule-change journal
+
+Cancel/reschedule child operations are now persisted by `formats/schedule-journal.ts` in their own
+tenant-bound table; status reconciliation still reads those child ids as child operations, never as
+publications. Static and validation tests pass; the PostgreSQL proof is written but not yet run, and the
+migration is unapplied. See FACEBOOK_NATIVE_FORMATS.md (Batch102).

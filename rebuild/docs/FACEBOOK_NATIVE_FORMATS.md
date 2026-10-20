@@ -432,3 +432,33 @@ Still open (outside Facebook ownership, so unchanged here): `modules/publishing/
 and `first-comment.ts` must pass `formatId`; shared stored-video resolution; a neutral
 cancel/reschedule adapter operation with its own tenant-bound table; applying and pinning the Story
 migration in `scripts/cutover-rehearsal.sh`; cleaned live coverage (list above).
+
+
+## Batch102: durable store for native schedule changes (private, default off)
+
+`formats/schedule-journal.ts` (`createFacebookNativeScheduleStore`) is a tenant-bound implementation
+of the attempt port for `cancelFacebookNativeSchedule` / `rescheduleFacebookNativeSchedule`, so those
+helpers now have a durable idempotency record (no helper change). The publication operation id reads
+the parent journal row; `<op>:cancel` and `<op>:reschedule:<unix>` read and write rows in the new
+`rebuild_facebook_native_schedule_changes` table (migration `20261030140000_rebuild_facebook_native_schedule_changes`).
+
+- Each change is bound to workspace, parent journal row and the parent's immutable remote id and Page.
+  A begin is allowed only while the parent is a native `video`, `published`/`confirmed` and unconflicted;
+  the first caller wins, a repeat returns the existing row (`already_attempted`), and only the creating
+  instance (owner token + revision) may settle it.
+- Child states: cancel may end `deleted`, reschedule `published`; both may end `rejected`/`uncertain`
+  from `started`; terminal states never change. SQL triggers enforce binding immutability, one-step
+  revisions, id shapes and the purge write gate; FKs cascade with the workspace and the journal.
+- The parent journal moves to `deleted` only through this store, in the same transaction that finds the
+  `<op>:cancel` row already `deleted` (the journal trigger still requires confirmed protocol steps).
+- Export/erasure: the table cascades from the journal and workspace and carries ids and states only. It is
+  not yet added to the data-export bundle.
+
+Tests: `facebook-native-schedule-journal.test.ts` (static SQL + validation, no database) and
+`facebook-native-schedule-journal-postgres.test.ts` (guarded `_preview` database; skips without
+`REBUILD_PREVIEW_DATABASE_URL` and returns early until the migration is applied). **The PostgreSQL file
+has not been run and the migration is unapplied/unrehearsed** (no database was started). Root keys: none.
+
+Still open: shared callers passing `formatId`; stored-video resolution; a neutral cancel/reschedule
+adapter operation and UI/HTTP/MCP entry; pinning the new migration in `scripts/cutover-rehearsal.sh` and its
+test after backup/scratch-restore; adding the table to export; cleaned live coverage.
