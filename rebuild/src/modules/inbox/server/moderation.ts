@@ -205,3 +205,30 @@ export async function undoInboxModerationAction(actor: InboxReadActor, actionId:
   await audit(actor, 'inbox.moderation_action_undone', { actionId: row.id, targetId: row.targetId, commentId: comment.id });
   return { ok: true as const, action: 'action.undo' as const, id: row.id, recorded: changed > 0 };
 }
+
+/**
+ * Automatic pass after the Inbox sync job (legacy parity: rules ran on every sync). For each non-suspended workspace
+ * with enabled rules, rules run with the authority of one active owner whose current access qualifies (the automatic
+ * sync policy); an owner whose access no longer qualifies is skipped and the next one is tried. Oldest-checked first
+ * is not tracked; workspaces are taken in a stable order, bounded by Root.
+ */
+export async function runAutomaticInboxModeration(now = new Date()): Promise<{ workspaces: number; examined: number; acted: number; failed: number; skipped: number }> {
+  const total = { workspaces: 0, examined: 0, acted: 0, failed: 0, skipped: 0 };
+  const [enabled, limit] = await Promise.all([runtimeConfig('inbox.moderationAutoRun'), runtimeConfig('inbox.moderationAutoWorkspaceLimit')]);
+  if (enabled !== true || !Number.isSafeInteger(limit) || (limit as number) < 1) return total;
+  const workspaces = await prisma.$queryRaw<Array<{ workspaceId: string }>>`SELECT DISTINCT r."workspaceId" FROM moderation_rules r JOIN workspaces w ON w.id = r."workspaceId" WHERE r.enabled = true AND w."suspendedAt" IS NULL ORDER BY r."workspaceId" LIMIT ${limit as number}`;
+  for (const { workspaceId } of workspaces) {
+    const owners = await prisma.$queryRaw<Array<{ userId: string }>>`SELECT m."userId" FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."workspaceId" = ${workspaceId} AND m.role::text = 'owner' AND u."disabledAt" IS NULL ORDER BY m."userId"`;
+    for (const { userId } of owners) {
+      try {
+        const result = await runInboxModerationRules({ userId, workspaceId }, null, now);
+        total.workspaces++; total.examined += result.examined; total.acted += result.acted; total.failed += result.failed; total.skipped += result.skipped;
+        break;
+      } catch (error) {
+        // This owner's current access does not qualify (or the workspace is unavailable); try the next owner.
+        if (!(error instanceof OperationError)) { total.failed++; break; }
+      }
+    }
+  }
+  return total;
+}

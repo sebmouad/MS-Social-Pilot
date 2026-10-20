@@ -15,11 +15,11 @@ vi.mock('@/modules/publishing/server/access', () => ({ authorizePublishing: asyn
 vi.mock('../src/modules/publishing/server/access', () => ({ authorizePublishing: async (actor: unknown) => ({ actor }) }));
 vi.mock('../src/modules/inbox/server/access', () => ({ authorizeInbox: async () => ({ channelIds: shared.channelIds, channels: [] }) }));
 vi.mock('@/server/permissions/loader', () => ({ loadPermissions: async () => ({ pageScope: { all: true, ids: [] } }) }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => ({ 'inbox.moderationRuleLimit': 50, 'inbox.moderationLogLimit': 100, 'inbox.moderationFreshHours': 48, 'inbox.moderationRunMaxComments': 500 } as Record<string, number>)[key] }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => ({ 'inbox.moderationRuleLimit': 50, 'inbox.moderationLogLimit': 100, 'inbox.moderationFreshHours': 48, 'inbox.moderationRunMaxComments': 500, 'inbox.moderationAutoRun': true, 'inbox.moderationAutoWorkspaceLimit': 5000 } as Record<string, unknown>)[key] }));
 
 import { createSavedView, deleteSavedView, listSavedViews } from '../src/modules/publishing/server/saved-views';
 import { deleteSavedViewConfirmation } from '../src/modules/publishing/saved-views';
-import { performInboxModerationAction, readInboxModeration } from '../src/modules/inbox/server/moderation';
+import { performInboxModerationAction, readInboxModeration, runAutomaticInboxModeration } from '../src/modules/inbox/server/moderation';
 import { moderationConfirmation } from '../src/modules/inbox/moderation';
 
 function isolated(value: string) {
@@ -75,9 +75,14 @@ describe.skipIf(!url)('wave 1 services on real PostgreSQL', () => {
     await performInboxModerationAction(actor, { action: 'rule.update', id: made.id, rule: { ...rule, keywords: ['synthetic-wave1', 'second'] }, confirmation: moderationConfirmation.update(made.id) });
     const row = await db.$queryRaw<Array<{ keywords: string[] }>>`SELECT keywords FROM moderation_rules WHERE id = ${made.id}`;
     expect(row[0]!.keywords).toEqual(['synthetic-wave1', 'second']);
+    // Automatic pass after sync: an enabled rule makes its workspace eligible and runs as an active owner.
+    await performInboxModerationAction(actor, { action: 'rule.update', id: made.id, rule: { ...rule, enabled: true, keywords: ['synthetic-wave1-never-matches'] }, confirmation: moderationConfirmation.update(made.id) });
+    const auto = await runAutomaticInboxModeration(new Date());
+    expect(auto.workspaces).toBeGreaterThanOrEqual(1);
+    expect(auto.acted).toBe(0);
     await performInboxModerationAction(actor, { action: 'rule.delete', id: made.id, confirmation: moderationConfirmation.remove(made.id) });
     expect(await db.$queryRaw<unknown[]>`SELECT id FROM moderation_rules WHERE id = ${made.id}`).toHaveLength(0);
     const audits = await db.$queryRaw<Array<{ action: string }>>`SELECT action FROM activity_logs WHERE "workspaceId" = ${actor.workspaceId} AND detail->>'ruleId' = ${made.id} ORDER BY "createdAt"`;
-    expect(audits.map(a => a.action)).toEqual(['inbox.moderation_rule_created', 'inbox.moderation_rule_updated', 'inbox.moderation_rule_deleted']);
+    expect(audits.map(a => a.action)).toEqual(['inbox.moderation_rule_created', 'inbox.moderation_rule_updated', 'inbox.moderation_rule_updated', 'inbox.moderation_rule_deleted']);
   });
 });

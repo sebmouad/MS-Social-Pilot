@@ -66,7 +66,10 @@ const dependencies: WorkerDependencies = {
       return `examined=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed}`;
     }
     const result = await runEnabledPlatformJob('inbox', now, retryLimit, retryBackoff);
-    return `examined=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed}`;
+    const { runAutomaticInboxModeration } = await import('../src/modules/inbox/server/moderation');
+    const moderation = await runAutomaticInboxModeration(new Date()).catch(() => null);
+    const rules = moderation ? `rules=${moderation.workspaces}/${moderation.acted} rulesFailed=${moderation.failed}` : 'rules=unavailable';
+    return `examined=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed} ${rules}`;
   },
   async tryLease(job, leaseOwner, token, until) {
     const rows = await prisma.$queryRaw<Array<{ name: string }>>`
