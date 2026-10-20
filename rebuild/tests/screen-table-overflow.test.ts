@@ -63,6 +63,12 @@ it('constrains each screen grid and its table wrapper without clipping the page'
   }
 });
 
+it('gives team roots zero intrinsic inline size so the shared auto settings grid track cannot widen the page', () => {
+  for (const path of ['modules/settings/ui/team/team.module.css', 'modules/settings/ui/team/invitations.module.css']) {
+    expect(read(path)).toMatch(/^\.(?:team|invitations) \{[^}]*contain: inline-size;/m);
+  }
+});
+
 // Opt-in real layout evidence using installed Chromium; no app server or DB.
 it.skipIf(process.env.OVERFLOW_BROWSER_CHECK !== '1')('keeps synthetic table/form layouts within the viewport in Chromium', async () => {
   const { chromium } = await import('playwright');

@@ -1,4 +1,4 @@
-.invitations { display: grid; grid-template-columns: minmax(0, 1fr); overflow-wrap: anywhere; gap: 16px; min-width: 0; }
+.invitations { contain: inline-size; display: grid; grid-template-columns: minmax(0, 1fr); overflow-wrap: anywhere; gap: 16px; min-width: 0; }
 .heading h2 { margin: 0; color: var(--ink); font-size: 17px; font-weight: 720; letter-spacing: -.25px; }
 .heading p { margin: 5px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
 .form { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 14px; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
