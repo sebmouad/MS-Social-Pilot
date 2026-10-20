@@ -1,5 +1,5 @@
 import { prisma } from '@/server/data';
-import { FIRST_COMMENT_LABELS, firstCommentState } from '../first-comment-state';
+import { FIRST_COMMENT_LABELS, FIRST_COMMENT_REJECTED, firstCommentState } from '../first-comment-state';
 import { parsePublishingMedia } from '../media-support';
 import { createPost } from './lifecycle';
 import { readPublishingPostList } from './read';
@@ -17,7 +17,7 @@ export async function listPostsWithFirstComment(actor: PublishingActor, input: u
   return posts.map(post => ({ ...post, targets: post.targets.map(row => {
     const state = firstCommentState(post.firstComment, row);
     return { id: row.id, status: row.status, remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, publishedAt: row.publishedAt, target: row.target,
-      firstComment: { state, label: FIRST_COMMENT_LABELS[state], ...(row.firstCommentAt ? { attemptedAt: row.firstCommentAt } : {}), ...(row.firstCommentId ? { remoteCommentId: row.firstCommentId } : {}), errorPresent: Boolean(row.firstCommentError) } };
+      firstComment: { state, retryAvailable: state === 'ready' && row.firstCommentError === FIRST_COMMENT_REJECTED, label: FIRST_COMMENT_LABELS[state], ...(row.firstCommentAt ? { attemptedAt: row.firstCommentAt } : {}), ...(row.firstCommentId ? { remoteCommentId: row.firstCommentId } : {}), errorPresent: Boolean(row.firstCommentError) } };
   }) }));
 }
 

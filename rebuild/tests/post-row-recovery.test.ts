@@ -98,6 +98,18 @@ describe('post row recovery', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/check its current state/i);
   });
 
+  it('offers the separately confirmed retry only for a definite rejection, never an uncertain attempt', async () => {
+    const rejected = { ...publishedWithReadyComment, firstCommentDelayMinutes: 60, targets: [{ ...publishedWithReadyComment.targets[0]!, firstCommentAt: null, firstCommentError: 'rebuild:first_comment_rejected' }] };
+    await act(async () => root.render(createElement(PostRowActions, { post: rejected, targets, canEdit: true, canPublish: true, imageRules: rules })));
+    expect(container.textContent).toContain('Retry failed first comment');
+    expect(container.textContent).not.toContain('First comment scheduled for');
+    expect([...container.querySelectorAll('button')].some(button => ['Send now', 'Send first comment'].includes(button.textContent ?? ''))).toBe(false);
+    const uncertain = { ...rejected, targets: [{ ...rejected.targets[0]!, firstCommentAt: new Date() }] };
+    await act(async () => root.render(createElement(PostRowActions, { post: uncertain, targets, canEdit: true, canPublish: true, imageRules: rules })));
+    expect(container.textContent).not.toContain('Retry failed first comment');
+    expect(container.textContent).toContain('Record comment outcome');
+  });
+
   it('shows a future first-comment due time and makes the immediate manual send explicit', async () => {
     const dueLater = { ...publishedWithReadyComment, firstCommentDelayMinutes: 15, targets: [{ ...publishedWithReadyComment.targets[0]!, publishedAt: new Date(Date.now() + 60 * 60_000) }] };
     await act(async () => root.render(createElement(PostRowActions, { post: dueLater, targets, canEdit: true, canPublish: true, imageRules: rules, timeZone: 'UTC' })));

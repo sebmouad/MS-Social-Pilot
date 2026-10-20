@@ -1554,3 +1554,10 @@ save requires the reviewed proposal token; normal validation, label checks,
 approval reset and atomic history still apply. UI, HTTP and MCP share this path.
 No new Root keys, registry edit or migration. See PUBLISHING_HISTORY.md for
 unit/DOM evidence and remaining verification; no production readiness claim.
+
+First-comment retry checkpoint (2026-10-20, `codex/first-comment-retry`): the
+existing first-comment service now owns a separately confirmed rejected-only
+retry through the Posts panel, HTTP and module-owned MCP. Current authorization,
+resource scope, conditional attempt claims and receipt holds remain shared;
+uncertain attempts cannot retry. No provider branch, Root key or migration was
+added. See FIRST_COMMENT_SCHEDULING.md for evidence and remaining runtime checks.

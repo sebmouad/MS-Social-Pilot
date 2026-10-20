@@ -8,7 +8,7 @@ import { ensurePublishingCollaboration } from '@/modules/publishing/server/colla
 import { withMediaErrorBoundary } from '@/modules/publishing/server/media/mcp-errors';
 import { deleteUnusedWorkspaceImage, getWorkspaceImageMetadata, listWorkspaceImages, uploadWorkspaceImage } from '@/modules/publishing/server/media/storage';
 import { auditedReceipt, pageIdsFor, publishingActor, requireConfirmation, requiredString, type McpToolGroup } from '@/server/mcp/kit';
-import { recordFirstCommentOutcome, sendFirstComment } from './server/first-comment';
+import { recordFirstCommentOutcome, retryFirstComment, sendFirstComment } from './server/first-comment';
 import { finishPostDeletion, getPostDeletion, recordPostDeletionOutcome } from './server/deletion';
 import { adoptLegacyPublication, finishPublicationProjection, getPublicationStatus, recordPublicationOutcome } from './server/publication';
 import { duplicatePost } from './server/duplicate';
@@ -211,7 +211,8 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
     { name: 'update_draft', description: 'Edit an unconnected local draft. Confirmation must be exactly UPDATE DRAFT followed by its ID.', inputSchema: { type: 'object', required: ['postId', 'message', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string', minLength: 1, maxLength: 10000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'delete_draft', description: 'Permanently delete an unconnected local draft. Confirmation must be exactly DELETE DRAFT followed by its ID.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'publish_post', description: 'Publish a workspace post now to its configured destinations. This contacts social platforms. Confirmation must exactly match PUBLISH POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
-    { name: 'send_first_comment', description: 'Send the saved first comment once to a confirmed remote post. This contacts the platform. If the result is uncertain, inspect list_posts and do not repeat until the outcome has been manually checked. Confirmation must exactly match SEND FIRST COMMENT <postTargetId>.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'send_first_comment', description: 'Send the saved first comment once to a confirmed remote post. Recorded rejections require retry_first_comment instead. This contacts the platform. If the result is uncertain, inspect list_posts and do not repeat until the outcome has been manually checked. Confirmation must exactly match SEND FIRST COMMENT <postTargetId>.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'retry_first_comment', description: 'Deliberately retry one saved first comment only after a recorded definite rejection. Uncertain, legacy unknown, in-flight and sent comments are refused. Sends immediately, overriding the saved delay. Confirmation must exactly match RETRY FIRST COMMENT <postTargetId>.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'record_first_comment_outcome', description: 'Record an outcome verified manually on the platform. This tool does not contact or verify the platform. NOT SENT permits a separate later send request; SENT requires the platform comment ID. A late request may still appear. Confirmation must exactly match RECORD FIRST COMMENT <postTargetId> SENT or RECORD FIRST COMMENT <postTargetId> NOT SENT.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'outcome', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, outcome: { type: 'string', enum: ['sent', 'not_sent'] }, remoteId: { type: 'string', minLength: 1 }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'sync_post_status', description: 'Refresh a post status from supported social platforms. Confirmation must exactly match SYNC POST STATUS <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'delete_post', description: 'Start one post deletion request. Set deleteRemote to true to request remote deletion too. Inspect the returned per-destination receipt; uncertain results must be checked or manually attested before any separate retry. Confirmation must exactly match DELETE POST <postId> LOCAL or DELETE POST <postId> REMOTE.', inputSchema: { type: 'object', required: ['postId', 'deleteRemote', 'confirmation'], properties: { postId: { type: 'string' }, deleteRemote: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -239,6 +240,7 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
       delete_draft: 'publishing/posts',
       publish_post: 'publishing/posts',
       send_first_comment: 'publishing/posts',
+      retry_first_comment: 'publishing/posts',
       record_first_comment_outcome: 'publishing/posts',
       sync_post_status: 'publishing/posts',
       delete_post: 'publishing/posts',
@@ -258,9 +260,9 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
       schedule_post: 'publishing/posts',
       cancel_scheduled_post: 'publishing/posts',
     },
-    writeTools: ['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post'],
-    selfLockedWrites: ['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post'],
-    scope: { resourceTools: ['list_posts', 'export_posts', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post'], workspaceTools: ['create_draft', 'update_draft', 'delete_draft'], resources: ['msp://posts'] },
+    writeTools: ['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'retry_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post'],
+    selfLockedWrites: ['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'retry_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post'],
+    scope: { resourceTools: ['list_posts', 'export_posts', 'publish_post', 'send_first_comment', 'retry_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'queue_post', 'schedule_post', 'cancel_scheduled_post'], workspaceTools: ['create_draft', 'update_draft', 'delete_draft'], resources: ['msp://posts'] },
     resources: [
       { uri: 'msp://posts', name: "Posts", description: "Recent workspace posts.", mimeType: 'application/json', feature: 'publishing/posts', readTool: 'list_posts', readArgs: { limit: 100 } },
     ],
@@ -312,6 +314,13 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
         if (Object.keys(args).some(key => !['postId', 'postTargetId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Choose one post destination.');
         requireConfirmation(args, `SEND FIRST COMMENT ${postTargetId}`);
         const result = await sendFirstComment(publishingActor(viewer), { postId, postTargetId });
+        return auditedReceipt(viewer, name, { postId, postTargetId, state: result.state }, result);
+      }
+      case 'retry_first_comment': {
+        const postId = requiredString(args, 'postId');
+        const postTargetId = requiredString(args, 'postTargetId');
+        requireConfirmation(args, `RETRY FIRST COMMENT ${postTargetId}`);
+        const result = await retryFirstComment(publishingActor(viewer), args);
         return auditedReceipt(viewer, name, { postId, postTargetId, state: result.state }, result);
       }
       case 'record_first_comment_outcome': {
