@@ -10,6 +10,9 @@ export const remoteScheduleCopy = {
     remoteHint: 'The post is sent now and the platform publishes it at the chosen time, even if this app is offline. To change its content you cancel the schedule and schedule again.',
     window: 'Allowed between {min} and {max} ahead.',
     appOnly: 'Published by the app instead: {names}.',
+    perDestination: 'Choose for each destination',
+    perDestinationHint: 'Each destination can hold its schedule in the app or on its platform.',
+    sameAsAbove: 'Same as above',
     minutes: '{n} minutes', hours: '{n} hours', days: '{n} days',
   },
   fr: {
@@ -20,6 +23,9 @@ export const remoteScheduleCopy = {
     remoteHint: 'La publication est envoyée maintenant et la plateforme la publie à l’heure choisie, même si cette application est hors ligne. Pour modifier son contenu, annulez la programmation puis reprogrammez.',
     window: 'Possible entre {min} et {max} à l’avance.',
     appOnly: 'Publié par l’application à la place : {names}.',
+    perDestination: 'Choisir pour chaque destination',
+    perDestinationHint: 'Chaque destination peut conserver sa programmation dans l’application ou sur sa plateforme.',
+    sameAsAbove: 'Comme ci-dessus',
     minutes: '{n} minutes', hours: '{n} heures', days: '{n} jours',
   },
 } as const;

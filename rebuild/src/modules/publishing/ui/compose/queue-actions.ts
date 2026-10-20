@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { requireViewer } from '@/server/context';
 import { previewQueueTimes, createQueuedPost, QueueAfterSaveError } from '@/modules/publishing/server/queue-compose';
 import { updatePost, schedulePost } from '@/modules/publishing/server/lifecycle';
+import { parseScheduleMode } from '@/modules/publishing/remote-scheduling';
+import { parseDestinationScheduleModesJson } from '@/modules/publishing/server/schedule-modes';
 import { parsePublishingMedia } from '@/modules/publishing/media-support';
 import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay';
 import { runtimeConfig } from '@/server/config/store';
@@ -46,14 +48,17 @@ export async function saveQueueComposerAction(previous: QueueComposerState, data
       link: field('link'), media: parsePublishingMedia(JSON.parse(field('mediaJson') || '[]')),
       destinationFormats: JSON.parse(field('destinationFormatsJson') || '{}'), targetIds: values.targetIds,
     };
+    const chosenMode = parseScheduleMode(field('scheduleMode'));
+    const chosenDestinations = parseDestinationScheduleModesJson(field('destinationScheduleModesJson'));
+    const modes = { ...(chosenMode ? { scheduleMode: chosenMode } : {}), ...(chosenDestinations ? { destinationScheduleModes: chosenDestinations } : {}) };
     let receipt: Awaited<ReturnType<typeof createQueuedPost>> | undefined;
-    if (field('intent') === 'queue') receipt = await createQueuedPost(actor(viewer), input, draftPostId);
+    if (field('intent') === 'queue') receipt = await createQueuedPost(actor(viewer), { ...input, ...modes }, draftPostId);
     else if (draftPostId && ['draft', 'schedule'].includes(field('intent'))) {
       await updatePost(actor(viewer), { ...input, postId: draftPostId });
       if (field('intent') === 'schedule') {
         const at = wallTimeToInstant(field('scheduleDate'), field('scheduleTime'), viewer.membership.workspace.timezone);
         if (!at.ok) throw new Error('schedule');
-        await schedulePost(actor(viewer), draftPostId, at.instant);
+        await schedulePost(actor(viewer), draftPostId, at.instant, modes);
       }
     } else throw new Error('intent');
     refresh();

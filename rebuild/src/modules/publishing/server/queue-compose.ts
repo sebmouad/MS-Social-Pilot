@@ -58,12 +58,13 @@ export class QueueAfterSaveError extends Error {
  */
 export async function createQueuedPost(actor: PublishingActor, input: Omit<ComposedPost, 'scheduledAt'>, draftPostId?: string) {
   await authorizePublishing(actor, 'publishing/queue', 'write');
+  const { scheduleMode, destinationScheduleModes, ...content } = input;
   let postId = draftPostId;
-  if (postId) await updatePost(actor, { ...input, postId });
-  else postId = (await createPost(actor, input)).id;
+  if (postId) await updatePost(actor, { ...content, postId });
+  else postId = (await createPost(actor, content)).id;
   try {
-    const receipt = await queuePost(actor, postId);
-    return { postId, scheduledAt: receipt.scheduledAt, status: receipt.status };
+    const receipt = await queuePost(actor, postId, { ...(scheduleMode ? { scheduleMode } : {}), ...(destinationScheduleModes ? { destinationScheduleModes } : {}) });
+    return { postId, scheduledAt: receipt.scheduledAt, status: receipt.status, scheduleMode: receipt.scheduleMode, remoteHold: receipt.remoteHold };
   } catch (error) {
     throw new QueueAfterSaveError(postId, error);
   }

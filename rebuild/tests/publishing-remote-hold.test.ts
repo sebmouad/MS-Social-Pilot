@@ -92,6 +92,35 @@ describe('handing a scheduled post to the platform', () => {
     expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'scheduled' }) }));
   });
 
+  it('hands over only the destinations that chose the platform; the others stay with the application and the post stays scheduled', async () => {
+    const when = at(3 * 3600);
+    db.post.findFirst.mockResolvedValue(scheduled(when));
+    adapters.holding.publish.mockResolvedValue({ remoteId: 'r1', url: null, state: 'scheduled' });
+    db.$queryRaw.mockResolvedValue([{ id: 'pt-a', scheduleMode: 'remote' }, { id: 'pt-b', scheduleMode: 'application' }]);
+    const result = await publishPost(actor, 'p1', undefined, { nativeSchedule: true, nativeFallback: true });
+    expect(adapters.holding.publish).toHaveBeenCalledTimes(1);
+    expect(adapters.plain.publish).not.toHaveBeenCalled();
+    // The destination that chose the application is not reported as a platform refusal.
+    expect(result.remoteHold).toEqual({ held: 1, deferred: 0, reasons: [] });
+  });
+
+  it('keeps everything with the application when every destination chose it, without ever calling a platform or finishing the post', async () => {
+    db.post.findFirst.mockResolvedValue(scheduled(at(3 * 3600)));
+    db.$queryRaw.mockResolvedValue([{ id: 'pt-a', scheduleMode: 'application' }, { id: 'pt-b', scheduleMode: 'application' }]);
+    const result = await publishPost(actor, 'p1', undefined, { nativeSchedule: true, nativeFallback: true });
+    expect(adapters.holding.publish).not.toHaveBeenCalled();
+    expect(result.remoteHold).toEqual({ held: 0, deferred: 0, reasons: [] });
+    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'scheduled' }) }));
+  });
+
+  it('treats a destination without a stored choice as following the post-level platform-held choice', async () => {
+    db.post.findFirst.mockResolvedValue(scheduled(at(3 * 3600)));
+    adapters.holding.publish.mockResolvedValue({ remoteId: 'r1', url: null, state: 'scheduled' });
+    db.$queryRaw.mockResolvedValue([{ id: 'pt-a', scheduleMode: null }, { id: 'pt-b', scheduleMode: null }]);
+    const result = await publishPost(actor, 'p1', undefined, { nativeSchedule: true, nativeFallback: true });
+    expect(result.remoteHold).toEqual({ held: 1, deferred: 1, reasons: ['unsupported'] });
+  });
+
   it('keeps a post that is too close for the platform entirely with the application', async () => {
     db.post.findFirst.mockResolvedValue(scheduled(at(300)));
     const result = await publishPost(actor, 'p1', undefined, { nativeSchedule: true, nativeFallback: true });

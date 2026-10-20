@@ -77,10 +77,18 @@ describe('createQueuedPost', () => {
   it('creates a draft then queues it through the queue service', async () => {
     h.createPost.mockResolvedValue({ id: 'p1' });
     const at = new Date('2026-10-21T09:00:00Z');
-    h.queuePost.mockResolvedValue({ postId: 'p1', scheduledAt: at, status: 'scheduled' });
-    expect(await createQueuedPost(actor, input)).toEqual({ postId: 'p1', scheduledAt: at, status: 'scheduled' });
+    h.queuePost.mockResolvedValue({ postId: 'p1', scheduledAt: at, status: 'scheduled', scheduleMode: 'application', remoteHold: { held: 0, deferred: 0, reasons: [] } });
+    expect(await createQueuedPost(actor, input)).toEqual({ postId: 'p1', scheduledAt: at, status: 'scheduled', scheduleMode: 'application', remoteHold: { held: 0, deferred: 0, reasons: [] } });
     expect(h.createPost.mock.calls[0]![1]).not.toHaveProperty('scheduledAt');
-    expect(h.queuePost).toHaveBeenCalledWith(actor, 'p1');
+    expect(h.queuePost).toHaveBeenCalledWith(actor, 'p1', {});
+  });
+
+  it('passes the per-destination scheduling choice to the queue service, not to the draft save', async () => {
+    h.createPost.mockResolvedValue({ id: 'p1' });
+    h.queuePost.mockResolvedValue({ postId: 'p1', scheduledAt: new Date('2026-10-21T09:00:00Z'), status: 'scheduled', scheduleMode: 'remote', remoteHold: { held: 1, deferred: 0, reasons: [] } });
+    await createQueuedPost(actor, { ...input, scheduleMode: 'application', destinationScheduleModes: { t1: 'remote' } } as typeof input);
+    expect(h.createPost.mock.calls.at(-1)![1]).not.toHaveProperty('destinationScheduleModes');
+    expect(h.queuePost).toHaveBeenLastCalledWith(actor, 'p1', { scheduleMode: 'application', destinationScheduleModes: { t1: 'remote' } });
   });
 
   it('keeps the saved draft id when queueing fails, and a retry reuses that draft', async () => {

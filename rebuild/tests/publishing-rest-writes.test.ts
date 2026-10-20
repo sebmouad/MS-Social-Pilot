@@ -71,6 +71,9 @@ describe('Publishing REST writes share one entry contract', () => {
     expect(mocks.lifecycle.publishPost).toHaveBeenCalledWith(actor, 'p1', undefined, {});
     expect((await call('schedule', { scheduledAt: AT, scheduleMode: 'remote', confirmation: `SCHEDULE POST p1 ${AT}` })).status).toBe(200);
     expect(mocks.lifecycle.schedulePost).toHaveBeenCalledWith(actor, 'p1', new Date(AT), { scheduleMode: 'remote' });
+    expect((await call('schedule', { scheduledAt: AT, destinationScheduleModes: { channel: 'remote' }, confirmation: `SCHEDULE POST p1 ${AT}` })).status).toBe(200);
+    expect(mocks.lifecycle.schedulePost).toHaveBeenLastCalledWith(actor, 'p1', new Date(AT), { destinationScheduleModes: { channel: 'remote' } });
+    expect((await call('schedule', { scheduledAt: AT, destinationScheduleModes: { channel: 'platform' }, confirmation: `SCHEDULE POST p1 ${AT}` })).status).toBe(400);
     expect((await call('schedule', { scheduledAt: AT, confirmation: 'wrong' })).status).toBe(400);
     expect((await call('reschedule', { scheduledAt: AT, confirmation: `RESCHEDULE POST p1 ${AT}` })).status).toBe(200);
     expect(mocks.lifecycle.reschedulePostToInstant).toHaveBeenCalledWith(actor, 'p1', new Date(AT));

@@ -14,10 +14,13 @@ import { allocateQueueTime } from '@/modules/publishing/collaboration/server/exe
 import { audit as collabAudit, bounds, exact, lockActor, parse } from '@/modules/publishing/collaboration/server/core';
 import { loadVersionRetention, recordPostVersion } from '@/modules/publishing/collaboration/server/versions';
 import { ID } from '@/modules/publishing/collaboration/schemas';
-import { limits, resolvePublishMedia, validatePostAttachments, validatePostContent, validFirstComment, validateTargets } from './lifecycle';
+import { holdScheduledPostAtProvider, limits, resolvePublishMedia, validatePostAttachments, validatePostContent, validFirstComment, validateTargets } from './lifecycle';
+import { SCHEDULE_MODES, type ScheduleMode } from '@/modules/publishing/remote-scheduling';
+import { anyRemote, resolveScheduleModes, storeScheduleModes, summaryMode, type DestinationScheduleModes } from './schedule-modes';
 
 const MANAGERS = new Set(['owner', 'admin', 'editor']);
-const QUEUE_REQUEST = z.object({ postId: ID, confirmation: z.string() }).strict();
+const MODE = z.enum(SCHEDULE_MODES);
+const QUEUE_REQUEST = z.object({ postId: ID, confirmation: z.string(), scheduleMode: MODE.optional(), destinationScheduleModes: z.record(z.string().min(1).max(200), MODE).refine(value => Object.keys(value).length <= 50).optional() }).strict();
 
 export const queuePostConfirmation = (postId: string) => `QUEUE POST ${postId}`;
 
@@ -25,11 +28,25 @@ export const queuePostConfirmation = (postId: string) => `QUEUE POST ${postId}`;
 export async function queuePostRequest(actor: PublishingActor, input: unknown) {
   const data = parse(QUEUE_REQUEST, input);
   exact(data.confirmation, queuePostConfirmation(data.postId));
-  return queuePost(actor, data.postId);
+  return queuePost(actor, data.postId, { ...(data.scheduleMode ? { scheduleMode: data.scheduleMode } : {}), ...(data.destinationScheduleModes ? { destinationScheduleModes: data.destinationScheduleModes } : {}) });
 }
 
-/** Schedule an editable local post at its next available weekly queue time. */
-export async function queuePost(actor: PublishingActor, postId: string) {
+export type QueueScheduleOptions = { scheduleMode?: ScheduleMode; destinationScheduleModes?: DestinationScheduleModes };
+
+/**
+ * Schedule an editable local post at its next available weekly queue time. Where each destination's schedule waits follows the same
+ * choice as an ordinary schedule: its own override, the post-level choice, or the Root default; platform-held destinations are handed
+ * to their platform right after the queue time is saved.
+ */
+export async function queuePost(actor: PublishingActor, postId: string, options: QueueScheduleOptions = {}) {
+  const queued = await queuePostInOperation(actor, postId, options);
+  const remoteHold = queued.status === 'scheduled' && anyRemote(queued.modes)
+    ? await holdScheduledPostAtProvider(actor, postId).then(result => result?.remoteHold ?? NO_REMOTE_HOLD, () => NO_REMOTE_HOLD) : NO_REMOTE_HOLD;
+  return { postId: queued.postId, scheduledAt: queued.scheduledAt, status: queued.status, scheduleMode: summaryMode(queued.modes), destinationScheduleModes: Object.fromEntries(queued.modes), remoteHold };
+}
+const NO_REMOTE_HOLD = { held: 0, deferred: 0, reasons: [] as string[] };
+
+async function queuePostInOperation(actor: PublishingActor, postId: string, options: QueueScheduleOptions) {
   return withPublishingOperation(actor, { postId, feature: 'publishing/queue' }, async context => {
     // Queue access alone does not grant permission to publish or manage a post.
     await authorizePublishing(context.actor, 'publishing/posts', 'write');
@@ -56,6 +73,7 @@ export async function queuePost(actor: PublishingActor, postId: string) {
     if (!Array.isArray(post.media)) throw new OperationError('invalid_request', 'Stored post attachments need review before queueing.');
 
     const targetIds = post.targets.map(t => t.targetId);
+    const modes = await resolveScheduleModes(targetIds, options.scheduleMode, options.destinationScheduleModes);
     await context.lockTargets(targetIds);
     const publishingLimits = await limits();
     const firstComment = validFirstComment(post.firstComment ?? '', publishingLimits.maxText);
@@ -100,6 +118,7 @@ export async function queuePost(actor: PublishingActor, postId: string) {
         data: { status: holdForApproval ? 'pending_approval' : 'scheduled', scheduledAt, updatedAt: new Date() },
       });
       if (changed.count !== 1) throw new OperationError('conflict', 'This post changed while it was being queued. Refresh and try again.');
+      await storeScheduleModes(tx, actor.workspaceId, postId, modes.byTarget);
       const timezoneUpdated = await tx.$executeRaw`UPDATE posts SET timezone = ${workspace[0].timezone} WHERE id = ${postId} AND "workspaceId" = ${actor.workspaceId}`;
       if (timezoneUpdated !== 1) throw new OperationError('conflict', 'This post changed while it was being queued. Refresh and try again.');
       if (holdForApproval) {
@@ -109,7 +128,7 @@ export async function queuePost(actor: PublishingActor, postId: string) {
       }
       await recordPostVersion(tx, postId, context.actor.userId, retention);
       await collabAudit(tx, context.actor, 'publishing.post_queued', { postId, scheduledAt: scheduledAt.toISOString(), status: holdForApproval ? 'pending_approval' : 'scheduled', approvalReset: holdForApproval });
-      return { postId, scheduledAt, status: holdForApproval ? 'pending_approval' : 'scheduled' };
+      return { postId, scheduledAt, status: holdForApproval ? 'pending_approval' as const : 'scheduled' as const, modes: modes.byTarget };
     });
   });
 }

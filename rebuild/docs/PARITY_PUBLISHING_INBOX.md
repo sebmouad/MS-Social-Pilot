@@ -14,7 +14,7 @@ Session-authenticated REST also requires a same-origin `Origin` header.
 | --- | --- | --- | --- | --- |
 | Compose: save draft | `createPost` | `POST /api/publishing/posts` | `create_post` | `CREATE POST` |
 | Compose: schedule (app or platform-held) | `createPost` (`scheduledAt`, `scheduleMode`) | `POST /api/publishing/posts` | `create_post` | `CREATE POST` |
-| Compose: add to queue | `queuePostRequest` | `POST /api/publishing/queue` | `queue_post` | `QUEUE POST <id>` |
+| Compose: add to queue (optional `scheduleMode` / `destinationScheduleModes`) | `queuePostRequest` | `POST /api/publishing/queue`; key: `POST /api/v1/posts/{id}/queue` | `queue_post` | `QUEUE POST <id>` |
 | Quick local draft (create/edit/delete) | `createLocalDraft` … | — (use posts routes) | `create_draft` `update_draft` `delete_draft` | `CREATE DRAFT` / `UPDATE DRAFT <id>` / `DELETE DRAFT <id>` |
 | Edit unpublished post | `updatePost` | `PATCH /api/publishing/posts/{id}` | `update_post` | `UPDATE POST <id>` |
 | Schedule an existing draft | `schedulePost` | `POST /api/publishing/posts/{id}/schedule` | `schedule_post` | `SCHEDULE POST <id> <iso>` |
@@ -55,22 +55,53 @@ Session-authenticated REST also requires a same-origin `Origin` header.
 
 ## Platform-held ("on Facebook") scheduling
 
-Where a scheduled post waits is the author's choice per post, offered only when a selected destination's own module declares it
-can hold a post (`scheduling.native` plus `nativeLeadSeconds` on its publishing format).
+Where a scheduled post waits is the author's choice **per destination**, offered only when a selected destination's own module
+declares it can hold a post (`scheduling.native` plus `nativeLeadSeconds` on its publishing format). A post-level `scheduleMode`
+is the default for destinations without their own entry; the Root default fills in when neither is given.
 
 | Surface | How the choice is made |
 | --- | --- |
-| UI composer | "Where to hold the schedule" radio group (In the app / On the platform), shown only for such destinations, with the module's allowed lead window and a note naming destinations that stay with the app. English and French. |
-| REST | `scheduleMode: 'application' \| 'remote'` on `POST /api/publishing/posts` (with `scheduledAt`) and on `…/{id}/schedule` |
-| MCP | `scheduleMode` on `create_post` (with `scheduledAt`) and `schedule_post` |
-| Result | `scheduleMode` and `remoteHold: { held, deferred, reasons[] }` (reasons: `unsupported`, `too_soon`, `too_far`, `invalid`) |
+| UI composer | "Where to hold the schedule" radio group (In the app / On the platform) as the default, shown only for such destinations, with the module's allowed lead window and a note naming destinations that stay with the app. When several destinations are selected and at least one can be held, a "Choose for each destination" list (Same as above / In the app / On the platform) overrides it per destination. English and French. Applies to Schedule and Add to queue. |
+| REST (session) | `scheduleMode` and `destinationScheduleModes: { <destinationId>: 'application' \| 'remote' }` on `POST /api/publishing/posts` (with `scheduledAt`), `…/{id}/schedule` and `POST /api/publishing/queue` |
+| REST v1 (scoped API key) | The same fields on `POST /api/v1/posts` and `POST /api/v1/posts/{id}/{schedule\|reschedule\|cancel-schedule\|queue}` (below) |
+| MCP | `scheduleMode` and `destinationScheduleModes` on `create_post` (with `scheduledAt`), `schedule_post` and `queue_post` |
+| Result | `scheduleMode` (platform-held as soon as any destination is), `destinationScheduleModes` (the stored choice per destination) and `remoteHold: { held, deferred, reasons[] }` (reasons: `unsupported`, `too_soon`, `too_far`, `invalid`). A destination that chose the application is never counted as deferred. |
 
-Behaviour (one implementation, `modules/publishing/server/lifecycle.ts` + `remote-hold.ts`):
+### Key-authenticated REST v1
 
-- The choice is stored in the existing legacy `posts."publishMode"` column (`native` = platform-held, `worker` = app). No migration.
-- On schedule (and again on approval), each destination whose module accepts the time is sent immediately as a provider-held post;
-  the target becomes `scheduled_remote` with its remote id and `nativeScheduledFor`. Others (unsupported, too soon, too far) stay
-  `pending` for the app worker; the post stays `scheduled`. The first comment waits until the platform reports the post live.
+Handled by `modules/publishing/server/api-actions.ts` through `handleKey` (the same scoped `mcp_` keys, rate limits and workspace
+guard as the other v1 routes). The key needs the Publishing posts **write** grant; its channel ceiling becomes the actor scope, and
+the shared services re-check tenant, role, feature and scope.
+
+| Route | Service | Confirmation (same strings as the app and MCP) |
+| --- | --- | --- |
+| `POST /api/v1/posts` | `createPost` | none (unchanged v1 contract) |
+| `POST /api/v1/posts/{id}/schedule` | `schedulePost` | `SCHEDULE POST <id> <scheduledAt>` |
+| `POST /api/v1/posts/{id}/reschedule` | `reschedulePostToInstant` | `RESCHEDULE POST <id> <scheduledAt>` |
+| `POST /api/v1/posts/{id}/cancel-schedule` | `cancelScheduledPost` | `CANCEL SCHEDULE <id>` |
+| `POST /api/v1/posts/{id}/queue` | `queuePostRequest` | `QUEUE POST <id>` |
+
+Each write also records the key-level audit receipt (`rest.<action>`). `scheduledAt` is an ISO date-time with offset.
+
+Behaviour (one implementation, `modules/publishing/server/lifecycle.ts` + `schedule-modes.ts` + `remote-hold.ts`):
+
+- The choice is stored per destination in `post_targets."scheduleMode"` (migration `20261031100000_rebuild_destination_schedule_mode`:
+  nullable text, constrained to `application`/`remote`; `NULL` on existing rows follows the post-level value). Every scheduled
+  destination gets an explicit value. The legacy `posts."publishMode"` column records `native` when any destination is platform-held
+  (it triggers the hand-off) and `worker` otherwise. Cancel returns the post to `worker` and clears the destination values.
+- On schedule (and again on approval), each destination that chose the platform **and** whose module accepts the time is sent
+  immediately as a provider-held post; the target becomes `scheduled_remote` with its remote id and `nativeScheduledFor`. Destinations
+  that chose the application stay `pending` for the app worker without being reported as refused; those that chose the platform but
+  cannot be held (unsupported, too soon, too far) also stay `pending` and are listed in `remoteHold`. The post stays `scheduled`
+  while any destination is waiting. The first comment waits until the platform reports the post live.
+- **Queue** (`queue_post`, composer "Add to queue"): after the queue time is saved under the workspace lock, destinations that
+  chose the platform (or follow a platform-held Root default) are handed over right away; the result carries `scheduleMode` and `remoteHold`.
+- **Content mix and recycle** (system schedulers): a post they schedule follows the Root default per destination
+  (`publishing.remoteScheduling.offered` + `defaultMode`); a recycled copy repeats the original post's own per-destination
+  choices. The saving transaction cannot call a platform, so `handOffRemoteSchedules` (`server/remote-handoff.ts`) runs straight
+  after each mix/recycle run: it takes up to `publishing.remoteScheduling.handOffBatch` scheduled posts that still have platform-chosen
+  `pending` destinations and hands them over as the author with the author's current access. It is idempotent; destinations the platform
+  cannot hold yet are retried on the next run, and the app worker publishes them at their time if they never become holdable.
 - Reschedule moves each held copy on the platform first (the module validates its own lead window) and only then updates local
   records; a time the platform cannot hold is refused with nothing changed.
 - Cancel removes each held copy from the platform only while the platform still reports it scheduled (a live post is never deleted),
@@ -78,7 +109,8 @@ Behaviour (one implementation, `modules/publishing/server/lifecycle.ts` + `remot
 - Detecting that the platform published it: the existing status reconciliation (`syncPostStatus` and the module's scheduled-post job)
   flips `scheduled_remote` → `published` on a positive provider read.
 - Root (Publishing module): `publishing.remoteScheduling.offered` (default on), `publishing.remoteScheduling.defaultMode`
-  (default `application`), `publishing.remoteScheduling.leadMarginSeconds` (default 60). The platform's own min/max lead bounds are
+  (default `application`), `publishing.remoteScheduling.leadMarginSeconds` (default 60), `publishing.remoteScheduling.handOffBatch`
+  (default 25, posts handed over per mix/recycle run). The platform's own min/max lead bounds are
   declared by the platform module (Facebook: owned by that module's config).
 
 ## Inbox
@@ -99,11 +131,16 @@ Behaviour (one implementation, `modules/publishing/server/lifecycle.ts` + `remot
 
 ## Remaining gaps (not closed here)
 
-- **Per-destination** schedule place: the choice is per post and applied to every destination that supports it; destinations are not
-  individually overridden (that needs a new column or the existing `formatId` space; no migration was made).
-- Queue (`queue_post`, "Add to queue") and recycle/content-mix auto-scheduling always use app scheduling; they do not yet offer the choice.
+- The new `post_targets."scheduleMode"` migration is pinned in `scripts/cutover-rehearsal.sh` but has **not been applied** to any
+  database and the full rehearsal was not run; PostgreSQL, browser and live-Graph checks of per-destination holding are still open.
+- Mix/recycle hand-off is a pass after each run, not a dedicated job: posts whose platform-chosen destinations can never be held
+  (module without native scheduling) are re-examined every run until their time (bounded by `handOffBatch`, oldest first), and a
+  hand-over only happens when a mix/recycle run occurs. A dedicated worker job in `src/server/jobs` would remove that coupling.
+- Rescheduling does not re-offer the platform hold to a destination that was `too_soon` at schedule time (it stays with the app).
+- `POST /api/v1/posts` keeps its original no-confirmation contract; the integrations module's `REST_POST_CREATE_SCHEMA` (not owned by
+  Publishing) does not itself list the new fields, they are added on top in `api-actions.ts`. `restCreatePost` in
+  `modules/integrations/server/rest.ts` is no longer used by the route and could be removed by that module's owner.
 - Video attachments: whether Facebook can hold a scheduled video with verified read-back is decided by that module, not here.
-- REST has no key-authenticated variant for these routes (session only); `/api/v1` is another lane.
 - Nothing here was exercised against PostgreSQL, a browser, or the live Graph API. `rebuild_publication_attempts` keeps the receipt
   as an ordinary `provider_receipt`; a destination released by cancel is recreated with a new id, so the old journal row stays as history.
 - Single-post `GET` and Saved-view update are not exposed on any surface (UI also has none).

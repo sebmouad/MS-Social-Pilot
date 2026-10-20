@@ -1299,6 +1299,8 @@ describe('MCP workspace boundaries', () => {
     const held = await call('schedule_post', { postId: 'new-post', scheduledAt: time, scheduleMode: 'remote', confirmation: `SCHEDULE POST new-post ${time}` });
     expect((await held.json()).result.structuredContent).toMatchObject({ scheduleMode: 'remote', remoteHold: { held: 1, deferred: 1 } });
     expect(publishingMutations.schedule).toHaveBeenLastCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'new-post', new Date(time), { scheduleMode: 'remote' });
+    await call('schedule_post', { postId: 'new-post', scheduledAt: time, destinationScheduleModes: { t1: 'remote', t2: 'application' }, confirmation: `SCHEDULE POST new-post ${time}` });
+    expect(publishingMutations.schedule).toHaveBeenLastCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'new-post', new Date(time), { destinationScheduleModes: { t1: 'remote', t2: 'application' } });
     const badMode = await call('schedule_post', { postId: 'new-post', scheduledAt: time, scheduleMode: 'platform', confirmation: `SCHEDULE POST new-post ${time}` });
     expect((await badMode.json()).result.isError).toBe(true);
 

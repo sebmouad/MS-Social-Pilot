@@ -28,6 +28,7 @@ import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-ope
 import { recordPostVersion, loadVersionRetention } from '@/modules/publishing/collaboration/server/versions';
 import { cancelHeldDestinations, rescheduleHeldDestinations } from '@/modules/publishing/server/remote-hold';
 import { parseScheduleMode, remoteHoldDecision, type RemoteFallbackReason, type ScheduleMode } from '@/modules/publishing/remote-scheduling';
+import { anyRemote, clearScheduleModes, destinationMode, resolveScheduleModes, storeScheduleModes, summaryMode, type DestinationScheduleModes } from '@/modules/publishing/server/schedule-modes';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
@@ -265,28 +266,28 @@ async function reviewPostDecision(actor: PublishingActor, postId: string, decisi
 }
 
 /** Schedule a local queued post for a future time. */
-export async function schedulePost(actor: PublishingActor, postId: string, scheduledAt: Date, options: { scheduleMode?: ScheduleMode } = {}) {
-  const mode = await effectiveScheduleMode(options.scheduleMode);
-  const handOff = await withPublishingOperation(actor, { postId }, async ({ actor, signal, lockTargets }) => {
+export async function schedulePost(actor: PublishingActor, postId: string, scheduledAt: Date, options: { scheduleMode?: ScheduleMode; destinationScheduleModes?: DestinationScheduleModes } = {}) {
+  const outcome = await withPublishingOperation(actor, { postId }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
     const holdForApproval = !MANAGERS.has(role.role) && needsContributorApproval(await workspaceRequiresApproval(actor.workspaceId), role.role);
     await assertPostScope(actor, postId);
     if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
     const retention = await loadVersionRetention();
-    await publishingTransaction(signal, async tx => {
-      const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, message: true, firstComment: true, format: true, link: true, media: true, targets: { select: { status: true, formatId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
+    return publishingTransaction(signal, async tx => {
+      const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, message: true, firstComment: true, format: true, link: true, media: true, targets: { select: { targetId: true, status: true, formatId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length || post.targets.some(target => target.status !== 'pending')) throw new OperationError('conflict', 'This post cannot be scheduled.');
+      const resolved = await resolveScheduleModes(post.targets.map(target => target.targetId), options.scheduleMode, options.destinationScheduleModes);
       await assertStoredPostMediaCompatible(actor.workspaceId, post);
       await recordPostVersion(tx, post.id, actor.userId, retention);
       await tx.post.update({ where: { id: post.id }, data: { status: holdForApproval ? 'pending_approval' : 'scheduled', scheduledAt, updatedAt: new Date() } });
-      await storeScheduleMode(tx, actor.workspaceId, post.id, mode);
+      await storeScheduleModes(tx, actor.workspaceId, post.id, resolved.byTarget);
       if (holdForApproval) await setApprovalPending(tx, actor, post.id);
       await recordPostVersion(tx, post.id, actor.userId, retention);
-      await audit(tx, actor, 'publishing.post_scheduled', { postId: post.id, scheduledAt: scheduledAt.toISOString(), scheduleMode: mode });
+      await audit(tx, actor, 'publishing.post_scheduled', { postId: post.id, scheduledAt: scheduledAt.toISOString(), scheduleMode: summaryMode(resolved.byTarget), ...(options.destinationScheduleModes ? { destinationScheduleModes: Object.fromEntries(resolved.byTarget) } : {}) });
+      return { handOff: !holdForApproval, modes: resolved.byTarget };
     });
-    return !holdForApproval;
   });
-  return { scheduleMode: mode, remoteHold: handOff && mode === 'remote' ? await holdScheduledPostAtProvider(actor, postId).then(result => result?.remoteHold ?? NO_HOLD, () => NO_HOLD) : NO_HOLD };
+  return { scheduleMode: summaryMode(outcome.modes), destinationScheduleModes: Object.fromEntries(outcome.modes), remoteHold: outcome.handOff && anyRemote(outcome.modes) ? await holdScheduledPostAtProvider(actor, postId).then(result => result?.remoteHold ?? NO_HOLD, () => NO_HOLD) : NO_HOLD };
 }
 
 export type RescheduleInput = { postId: string; date: string; time: string; timeZone: string };
@@ -345,7 +346,7 @@ export async function cancelScheduledPost(actor: PublishingActor, postId: string
       const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { status: true, remotePostId: true } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId) || post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new OperationError('conflict', 'This queued post can no longer be cancelled locally.');
       await recordPostVersion(tx, post.id, actor.userId, retention);
-      await storeScheduleMode(tx, actor.workspaceId, post.id, 'application');
+      await clearScheduleModes(tx, actor.workspaceId, post.id);
       const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'scheduled' }, data: { status: 'draft', scheduledAt: null, updatedAt: new Date() } });
       if (changed.count !== 1) throw new OperationError('conflict', 'This queued post can no longer be cancelled locally.');
       await recordPostVersion(tx, post.id, actor.userId, retention);
@@ -354,8 +355,8 @@ export async function cancelScheduledPost(actor: PublishingActor, postId: string
   });
 }
 
-export async function createPost(actor: PublishingActor, input: { message: string; firstComment: string; targetIds: string[]; scheduledAt?: Date; scheduleMode?: ScheduleMode; labelId?: string | null } & PostAttachments) {
-  const mode = input.scheduledAt ? await effectiveScheduleMode(input.scheduleMode) : 'application';
+export async function createPost(actor: PublishingActor, input: { message: string; firstComment: string; targetIds: string[]; scheduledAt?: Date; scheduleMode?: ScheduleMode; destinationScheduleModes?: DestinationScheduleModes; labelId?: string | null } & PostAttachments) {
+  if (!input.scheduledAt && input.destinationScheduleModes && Object.keys(input.destinationScheduleModes).length) throw new OperationError('invalid_request', 'Choose a publishing time before choosing where each destination holds its schedule.');
   const created = await withPublishingOperation(actor, { targetIds: input.targetIds }, async ({ actor, signal, lockTargets }) => {
     const member = await membership(actor);
     if (input.labelId !== undefined && input.labelId !== null && (!/^[A-Za-z0-9_-]{1,200}$/.test(input.labelId))) throw new OperationError('invalid_request', 'Choose a valid post label.');
@@ -369,6 +370,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
     const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
     if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new OperationError('invalid_request', 'Choose a future publishing time and at least one destination.');
     const destinationFormats = await resolveAuthorizedDestinationFormats(targets, input.destinationFormats, config.maxTargets, { media: uploadMedia, link: attachments.link, firstComment, scheduled: Boolean(input.scheduledAt) });
+    const modes = input.scheduledAt ? await resolveScheduleModes(targets.map(target => target.id), input.scheduleMode, input.destinationScheduleModes) : null;
     const retention = await loadVersionRetention();
     const now = new Date();
     const id = randomUUID();
@@ -380,16 +382,17 @@ export async function createPost(actor: PublishingActor, input: { message: strin
       await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, firstCommentDelayMinutes: firstCommentDelayMinutes ?? 0, link: attachments.link, media: attachments.media, status: holdForApproval ? 'pending_approval' : input.scheduledAt ? 'scheduled' : 'draft', scheduledAt: input.scheduledAt ?? null, publishedAt: null, createdAt: now, updatedAt: now,
         targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
       if (input.labelId) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") VALUES (${id}, ${input.labelId})`;
-      if (input.scheduledAt) await storeScheduleMode(tx, actor.workspaceId, id, mode);
+      if (modes) await storeScheduleModes(tx, actor.workspaceId, id, modes.byTarget);
       if (holdForApproval) await setApprovalPending(tx, actor, id);
       await recordPostVersion(tx, id, actor.userId, retention);
       await audit(tx, actor, 'publishing.post_created', { postId: id, targetCount: targets.length });
-      if (input.scheduledAt) await audit(tx, actor, 'publishing.post_scheduled', { postId: id, scheduledAt: input.scheduledAt.toISOString(), scheduleMode: mode });
+      if (input.scheduledAt && modes) await audit(tx, actor, 'publishing.post_scheduled', { postId: id, scheduledAt: input.scheduledAt.toISOString(), scheduleMode: summaryMode(modes.byTarget), ...(input.destinationScheduleModes ? { destinationScheduleModes: Object.fromEntries(modes.byTarget) } : {}) });
     });
-    return { id, holdForApproval };
+    return { id, holdForApproval, modes: modes?.byTarget ?? null };
   });
-  const remoteHold = input.scheduledAt && mode === 'remote' && !created.holdForApproval ? await holdScheduledPostAtProvider(actor, created.id).then(result => result?.remoteHold ?? NO_HOLD, () => NO_HOLD) : NO_HOLD;
-  return { id: created.id, scheduleMode: mode, remoteHold };
+  const remote = created.modes ? anyRemote(created.modes) : false;
+  const remoteHold = remote && !created.holdForApproval ? await holdScheduledPostAtProvider(actor, created.id).then(result => result?.remoteHold ?? NO_HOLD, () => NO_HOLD) : NO_HOLD;
+  return { id: created.id, scheduleMode: created.modes ? summaryMode(created.modes) : 'application' as ScheduleMode, ...(created.modes ? { destinationScheduleModes: Object.fromEntries(created.modes) } : {}), remoteHold };
 }
 
 export async function updatePost(actor: PublishingActor, input: { postId: string; message: string; firstComment: string; targetIds: string[] } & PostAttachments, restoreLabelIds?: readonly string[]) {
@@ -499,6 +502,12 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
     const holdIds = new Set<string>();
     const hold: RemoteHoldSummary = { held: 0, deferred: 0, reasons: [] };
     const holdMargin = nativeScheduledAt && options.nativeFallback ? Number(await runtimeConfig('publishing.remoteScheduling.leadMarginSeconds')) : 0;
+    // Hand-off is per destination: only those whose stored choice is platform-held (null = follows the post, which is platform-held here).
+    const storedModes = new Map<string, string | null>();
+    if (nativeScheduledAt && options.nativeFallback) {
+      for (const row of await prisma.$queryRaw<Array<{ id: string; scheduleMode: string | null }>>`SELECT id, "scheduleMode" FROM post_targets WHERE "postId" = ${post.id}`) storedModes.set(row.id, row.scheduleMode);
+    }
+    const wantsRemote = (targetRowId: string) => destinationMode(storedModes.get(targetRowId), 'remote') === 'remote';
     for (const item of post.targets) {
       if (item.status === 'published' || item.remotePostId || !['pending', 'failed'].includes(item.status)) continue;
       const provider = item.target.socialAccount?.provider;
@@ -507,9 +516,11 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
         const descriptor = validateSelectedPublishingFormat(adapter.publishingFormats, item.formatId ?? post.format, { media: publishMedia, link: attachments.link, firstComment: post.firstComment });
         if (nativeScheduledAt && options.nativeFallback) {
           // Each destination's own module decides from its declared rules; the rest wait for the application worker.
-          const decision = remoteHoldDecision(descriptor, nativeScheduledAt, new Date(), holdMargin);
-          if (decision.hold) holdIds.add(item.id);
-          else { hold.deferred++; if (!hold.reasons.includes(decision.reason)) hold.reasons.push(decision.reason); }
+          if (wantsRemote(item.id)) {
+            const decision = remoteHoldDecision(descriptor, nativeScheduledAt, new Date(), holdMargin);
+            if (decision.hold) holdIds.add(item.id);
+            else { hold.deferred++; if (!hold.reasons.includes(decision.reason)) hold.reasons.push(decision.reason); }
+          }
         } else if (nativeScheduledAt && !descriptor.scheduling.native) throw new OperationError('invalid_request', 'A selected destination cannot hold this post at the provider. Remove it or publish at the scheduled time.');
         assertPublishingMediaSupport(adapter, publishMedia, attachments.link);
         assertLocalImageLimits(adapter, publishMedia);
@@ -524,13 +535,14 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
     let firstCommentsNeedingReview = 0;
     let firstCommentsNotSent = 0;
     let heldExisting = 0;
+    let keptWithApplication = 0;
     for (const item of post.targets) {
       if (item.status === 'scheduled_remote') { heldExisting++; continue; }
       if (item.status === 'published' || item.remotePostId) { published++; continue; }
       if (item.status === 'processing') { pending++; continue; }
       if (!['pending', 'failed'].includes(item.status)) { failed++; continue; }
       // Destinations that cannot hold this time wait for the application worker, untouched.
-      if (nativeScheduledAt && options.nativeFallback && !holdIds.has(item.id)) continue;
+      if (nativeScheduledAt && options.nativeFallback && !holdIds.has(item.id)) { keptWithApplication++; continue; }
       const provider = item.target.socialAccount?.provider;
       const adapter = provider ? await platformFor(provider, 'publishing') : null;
       const credential = adapter ? readPublishingCredential(item.target, adapter, 'publishing') : null;
@@ -563,13 +575,13 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       }
     }
     const heldTotal = hold.held + heldExisting;
-    const waiting = heldTotal > 0 || hold.deferred > 0;
+    const waiting = heldTotal > 0 || hold.deferred > 0 || keptWithApplication > 0;
     const done = published + heldTotal;
     const status = pending ? (done ? 'partially_failed' : 'publishing') : failed ? (done ? 'partially_failed' : 'failed') : waiting ? 'scheduled' : 'published';
     await publishingTransaction(signal, async tx => {
       await tx.post.update({ where: { id: post.id }, data: { status, publishedAt: status === 'published' ? new Date() : undefined, updatedAt: new Date() } });
       if (post.status === 'scheduled' && !nativeScheduledAt) await enqueueEmptyQueueNotifications(tx, actor.workspaceId, post.id, post.targets.map(item => item.target.id));
-      await audit(tx, actor, nativeScheduledAt ? 'publishing.remote_hold_finished' : 'publishing.publish_finished', { postId: post.id, published, failed, needsReconciliation: pending, firstCommentsNeedingReview, firstCommentsNotSent, ...(heldTotal || hold.deferred ? { heldAtProvider: heldTotal, keptWithApplication: hold.deferred } : {}) });
+      await audit(tx, actor, nativeScheduledAt ? 'publishing.remote_hold_finished' : 'publishing.publish_finished', { postId: post.id, published, failed, needsReconciliation: pending, firstCommentsNeedingReview, firstCommentsNotSent, ...(heldTotal || keptWithApplication ? { heldAtProvider: heldTotal, keptWithApplication } : {}) });
     });
     return { published, failed, needsReconciliation: pending, firstCommentsNeedingReview, firstCommentsNotSent, skipped: false, remoteHold: { held: hold.held, deferred: hold.deferred, reasons: hold.reasons } satisfies RemoteHoldSummary };
   });
@@ -642,20 +654,6 @@ export function parsePublishingCsv(source: string): string[][] {
   row.push(cell);
   if (row.some(value => value.trim())) rows.push(row);
   return rows;
-}
-
-/** Requested mode, falling back to the Root default; platform holding is refused outright when Root withdrew the choice. */
-async function effectiveScheduleMode(requested: ScheduleMode | undefined): Promise<ScheduleMode> {
-  parseScheduleMode(requested);
-  const offered = await runtimeConfig('publishing.remoteScheduling.offered') === true;
-  if (requested === 'remote' && !offered) throw new OperationError('invalid_request', 'Platform-held scheduling is not available. Choose application scheduling.');
-  if (requested) return requested;
-  return offered && await runtimeConfig('publishing.remoteScheduling.defaultMode') === 'remote' ? 'remote' : 'application';
-}
-
-/** The existing legacy column keeps the author's choice; 'native' is its stored name for platform-held scheduling. */
-async function storeScheduleMode(tx: Prisma.TransactionClient, workspaceId: string, postId: string, mode: ScheduleMode) {
-  await tx.$executeRaw`UPDATE posts SET "publishMode" = ${mode === 'remote' ? 'native' : 'worker'}::"PublishMode" WHERE id = ${postId} AND "workspaceId" = ${workspaceId}`;
 }
 
 async function markTarget(actor: PublishingActor, postId: string, id: string, status: 'failed', signal: AbortSignal) {

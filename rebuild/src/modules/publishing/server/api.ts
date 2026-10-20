@@ -1,6 +1,8 @@
 import { prisma } from '@/server/data';
 import { FIRST_COMMENT_LABELS, FIRST_COMMENT_REJECTED, firstCommentState } from '../first-comment-state';
 import { parsePublishingMedia } from '../media-support';
+import type { ScheduleMode } from '../remote-scheduling';
+import type { DestinationScheduleModes } from './schedule-modes';
 import { createPost } from './lifecycle';
 import { readPublishingPostList } from './read';
 import type { PublishingActor } from './types';
@@ -24,6 +26,7 @@ export async function listPostsWithFirstComment(actor: PublishingActor, input: u
 export type ApiPostInput = {
   message: string; targetIds: string[]; firstComment?: string; firstCommentDelayMinutes?: number; link?: string;
   media?: unknown; destinationFormats?: Record<string, string>; scheduledAt?: Date;
+  scheduleMode?: ScheduleMode; destinationScheduleModes?: DestinationScheduleModes;
 };
 
 /**
@@ -32,12 +35,14 @@ export type ApiPostInput = {
  */
 export async function createPostForApi(actor: PublishingActor, input: ApiPostInput) {
   const media = parsePublishingMedia(input.media ?? []);
-  const { id } = await createPost(actor, {
+  const created = await createPost(actor, {
     message: input.message, firstComment: input.firstComment ?? '',
     ...(input.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: input.firstCommentDelayMinutes }),
     destinationFormats: input.destinationFormats, targetIds: input.targetIds, link: input.link, media,
-    ...(input.scheduledAt ? { scheduledAt: input.scheduledAt } : {}),
+    ...(input.scheduledAt ? { scheduledAt: input.scheduledAt, ...(input.scheduleMode ? { scheduleMode: input.scheduleMode } : {}), ...(input.destinationScheduleModes ? { destinationScheduleModes: input.destinationScheduleModes } : {}) } : {}),
   });
+  const { id } = created;
   const row = await prisma.post.findFirst({ where: { id, workspaceId: actor.workspaceId }, select: { status: true, scheduledAt: true } });
-  return { id, status: row?.status ?? (input.scheduledAt ? 'scheduled' : 'draft'), scheduledAt: row?.scheduledAt ?? null };
+  return { id, status: row?.status ?? (input.scheduledAt ? 'scheduled' : 'draft'), scheduledAt: row?.scheduledAt ?? null,
+    ...(input.scheduledAt ? { scheduleMode: created.scheduleMode, destinationScheduleModes: created.destinationScheduleModes, remoteHold: created.remoteHold } : {}) };
 }
