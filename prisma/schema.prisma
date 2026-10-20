@@ -1355,6 +1355,8 @@ model PostComment {
   /// The member who wrote this reply from the app (H11); null otherwise.
   sentById       String?
   /// negative · neutral · positive, read by AI when the workspace watches comments (H15).
+  sentimentAttemptedAt DateTime?
+  sentimentProvenance Json?
   sentiment      String?
 
   postTarget PostTarget @relation(fields: [postTargetId], references: [id], onDelete: Cascade)

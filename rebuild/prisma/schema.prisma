@@ -410,6 +410,8 @@ model PostComment {
   resolvedAt     DateTime?
   assigneeId     String?
   sentById       String?
+  sentimentAttemptedAt DateTime?
+  sentimentProvenance Json?
   sentiment      String?
   postTarget     PostTarget @relation(fields: [postTargetId], references: [id])
 

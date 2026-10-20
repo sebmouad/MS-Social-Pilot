@@ -1,13 +1,16 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), execute: vi.fn(), transaction: vi.fn(), emit: vi.fn() }));
-vi.mock('@/server/data', () => ({ prisma: { $transaction: mocks.transaction } }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), execute: vi.fn(), transaction: vi.fn(), emit: vi.fn(), sentiment: vi.fn(), available: vi.fn(), access: vi.fn(), target: vi.fn() }));
+vi.mock('@/server/data', () => ({ prisma: { target: { findFirst: mocks.target }, $transaction: mocks.transaction } }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: vi.fn().mockResolvedValue(20) }));
 vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: mocks.emit }));
+vi.mock('@/modules/ai/server/sentiment', () => ({ classifyCommentSentiment: mocks.sentiment, sentimentAvailable: mocks.available }));
+vi.mock('@/server/jobs/access', () => ({ assertWorkspaceJobAccess: mocks.access }));
+vi.mock('@/modules/inbox/server/providers', () => ({ inboxTargetWhere: vi.fn().mockResolvedValue({}) }));
 import { notificationEnqueueSchema } from '@/modules/settings/notifications/contracts';
 import { runInboxAlertProducers } from '@/modules/inbox/server/notification-events';
 const tx = { $queryRaw: mocks.query, $executeRaw: mocks.execute };
 const now = new Date('2026-10-20T12:00:00Z');
-beforeEach(() => { vi.clearAllMocks(); mocks.transaction.mockImplementation(fn => fn(tx)); mocks.execute.mockResolvedValue(1); });
+beforeEach(() => { vi.clearAllMocks(); mocks.sentiment.mockResolvedValue({ available: true, classified: 0 }); mocks.available.mockResolvedValue(true); mocks.target.mockResolvedValue({ id: 't' }); mocks.access.mockResolvedValue(undefined); mocks.transaction.mockImplementation(fn => fn(tx)); mocks.execute.mockResolvedValue(1); });
 it('starts new digest cursors without sending history', async () => {
   mocks.query.mockResolvedValueOnce([{ id: 's', userId: 'u', workspaceId: 'w', inboxDigestAt: null }]).mockResolvedValueOnce([]);
   await expect(runInboxAlertProducers(now)).resolves.toEqual({ digests: 0, spikes: 0 });
@@ -36,4 +39,27 @@ it('claims bounded due settings and spike targets with skip-locked locks', async
 it('refuses oversized channel batches before advancing the digest cursor', async () => {
  mocks.query.mockResolvedValueOnce([{ id: 's', userId: 'u', workspaceId: 'w', inboxDigestAt: new Date(now.getTime()-3600000) }]).mockResolvedValueOnce(Array.from({ length: 21 }, (_, i) => ({ id: `t${i}` })));
  await expect(runInboxAlertProducers(now)).rejects.toMatchObject({ code: 'unavailable' }); expect(mocks.execute).not.toHaveBeenCalled(); expect(mocks.emit).not.toHaveBeenCalled();
+});
+
+it('skips spike SQL and reports unknown when AI is unavailable', async () => {
+  mocks.sentiment.mockResolvedValue({ available: false, classified: null }); mocks.query.mockResolvedValue([]);
+  await expect(runInboxAlertProducers(now)).resolves.toEqual({ digests: 0, spikes: null });
+  expect(mocks.query).toHaveBeenCalledOnce();
+});
+it('requires coverage and an observed baseline rather than treating unknown as zero', async () => {
+  mocks.query.mockResolvedValue([]); await runInboxAlertProducers(now);
+  const sql = mocks.query.mock.calls[1][0].join('?');
+  expect(sql).toContain('AND NOT EXISTS'); expect(sql).toContain('AND EXISTS');
+  expect(sql).toContain('"sentimentProvenance" IS NULL');
+});
+it('rechecks Root availability after classification', async () => {
+  mocks.available.mockResolvedValue(false); mocks.query.mockResolvedValue([]);
+  await expect(runInboxAlertProducers(now)).resolves.toMatchObject({ spikes: null });
+  expect(mocks.query).toHaveBeenCalledOnce();
+});
+it('does not emit spikes after owner access is revoked or channel deselected', async () => {
+  mocks.query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 't', workspaceId: 'w', provider: 'test' }]);
+  mocks.access.mockRejectedValueOnce(new Error('denied'));
+  await expect(runInboxAlertProducers(now)).resolves.toMatchObject({ spikes: 0 });
+  expect(mocks.emit).not.toHaveBeenCalled();
 });

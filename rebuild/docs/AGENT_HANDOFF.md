@@ -940,3 +940,24 @@ Final checks: targeted258 pass/15 database skips; tsc and raw-SQL guard pass.
 Full suite stalls in facebook-diagnostic-transport.test.ts. Excluding that file:
 3946 pass/226 skips/6 failures (five sandbox loopback EPERM in native HTTP tests,
 one unrelated Analytics manifest expectation). Do not claim a clean full suite.
+
+
+2026-10-20 sentiment branch checkpoint: AI-owned bounded stored-comment classification
+feeds the existing Inbox spike producer, with durable UTC-day usage claims,
+current owner/resource authority, provenance and text-change invalidation. Root
+keys: `ai.sentimentBatchSize`, `ai.sentimentDailyCap` (module config only).
+See NOTIFICATIONS.md for coverage/unknown semantics and verification scope.
+Migration `20261030130000_rebuild_comment_sentiment` is additive and unapplied;
+next evidence is isolated PostgreSQL trigger/concurrency and live AI verification.
+No production readiness, server, push or deployment is claimed.
+
+Sentiment branch verification: 303 tests passed / 8 database integration skips
+across 40 targeted AI/Inbox/notification/SQL-guard files; TypeScript passed.
+Migration application, real PostgreSQL concurrency/trigger proof and live AI
+remain unverified. Dependency symlink preserved; no install/client generation.
+
+Sentiment branch commit blocked: staging failed because Git cannot create
+`index.lock` in the shared worktree metadata outside the writable sandbox
+(`/Users/mouad/Documents/ChatGPT/MS Social Pilot/app/.git/worktrees/msp-sentiment`).
+No sentiment commit was created; completed changes remain unstaged on
+`codex/sentiment`. No push was attempted or authorized.

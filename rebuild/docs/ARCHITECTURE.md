@@ -1561,3 +1561,13 @@ retry through the Posts panel, HTTP and module-owned MCP. Current authorization,
 resource scope, conditional attempt claims and receipt holds remain shared;
 uncertain attempts cannot retry. No provider branch, Root key or migration was
 added. See FIRST_COMMENT_SCHEDULING.md for evidence and remaining runtime checks.
+
+
+2026-10-20 sentiment branch checkpoint: AI-owned bounded stored-comment classification
+feeds the existing Inbox spike producer, with durable UTC-day usage claims,
+current owner/resource authority, provenance and text-change invalidation. Root
+keys: `ai.sentimentBatchSize`, `ai.sentimentDailyCap` (module config only).
+See NOTIFICATIONS.md for coverage/unknown semantics and verification scope.
+Migration `20261030130000_rebuild_comment_sentiment` is additive and unapplied;
+next evidence is isolated PostgreSQL trigger/concurrency and live AI verification.
+No production readiness, server, push or deployment is claimed.

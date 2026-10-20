@@ -21,7 +21,7 @@ const inRange = (v: unknown, r: { min: number; max: number }): v is number => ty
 
 type Settings = { port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; txTimeout: number; txWait: number };
 /** Resolve everything assist needs; null when anything is unconfigured, so customer surfaces stay hidden. */
-async function settings(deps: AiDeps): Promise<Settings | null> {
+export async function settings(deps: AiDeps): Promise<Settings | null> {
   try {
     const c = await runtimeConfigBatch(['ai.enabled', 'ai.provider', 'ai.model', 'ai.endpoint', 'ai.requestTimeoutMs', 'ai.maxOutputTokens', 'ai.maxInputCharacters', 'ai.hourlyRequestsPerWorkspace', 'ai.maxHashtags', 'ai.transactionTimeoutMs', 'ai.transactionMaxWaitMs']);
     const B = AI_BOUNDS;
@@ -84,7 +84,7 @@ async function claim(actor: AiActor, s: Settings, kind: string, inputLength: num
   }, { timeout: s.txTimeout, maxWait: s.txWait });
 }
 
-async function complete(s: Settings, system: string, prompt: string): Promise<string> {
+export async function complete(s: Settings, system: string, prompt: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), s.timeoutMs);
   try { return await s.port.complete({ system, prompt, model: s.model, maxTokens: s.maxTokens, signal: controller.signal }); }

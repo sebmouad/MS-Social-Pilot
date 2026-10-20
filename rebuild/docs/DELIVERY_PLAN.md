@@ -476,3 +476,13 @@ confirmed rejected-only retry through shared service/UI/HTTP/MCP. Continue with
 isolated PostgreSQL, actual browser matrix and cleaned live-provider proof when
 those environments are authorized; no server or push was permitted in this
 branch task. See FIRST_COMMENT_SCHEDULING.md. Broader P1/release work remains open.
+
+
+2026-10-20 sentiment branch checkpoint: AI-owned bounded stored-comment classification
+feeds the existing Inbox spike producer, with durable UTC-day usage claims,
+current owner/resource authority, provenance and text-change invalidation. Root
+keys: `ai.sentimentBatchSize`, `ai.sentimentDailyCap` (module config only).
+See NOTIFICATIONS.md for coverage/unknown semantics and verification scope.
+Migration `20261030130000_rebuild_comment_sentiment` is additive and unapplied;
+next evidence is isolated PostgreSQL trigger/concurrency and live AI verification.
+No production readiness, server, push or deployment is claimed.
