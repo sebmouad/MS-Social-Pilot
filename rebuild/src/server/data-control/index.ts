@@ -344,6 +344,7 @@ export async function purgeWorkspaceData(actor: DataControlActor, authorize: (tx
 
 /** Resume an already-confirmed purge using the identity captured when it was requested. */
 async function finishWorkspaceDataPurge(actor: DataControlActor, timeout: number) {
+  const errorLimit = await runtimeConfig('logging.purgeErrorMaxCharacters');
   const counts = await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
     const job = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId } });
@@ -370,7 +371,7 @@ async function finishWorkspaceDataPurge(actor: DataControlActor, timeout: number
   let storage;
   try { storage = await removeWorkspaceStorage(job.mediaRoot, actor.workspaceId); }
   catch (error) {
-    await prisma.workspaceDataPurge.update({ where: { workspaceId: actor.workspaceId }, data: { error: (error instanceof Error ? error.message : String(error)).slice(0, 1000) } });
+    await prisma.workspaceDataPurge.update({ where: { workspaceId: actor.workspaceId }, data: { error: (error instanceof Error ? error.message : String(error)).slice(0, errorLimit) } });
     throw error;
   }
   const result = { ...counts, storedFiles: storage.files, storedBytes: storage.bytes };
@@ -389,6 +390,7 @@ async function finishWorkspaceDataPurge(actor: DataControlActor, timeout: number
 export async function resumePendingWorkspaceDataPurges(): Promise<{ examined: number; completed: number; failed: number }> {
   const limit = await runtimeConfig('sync.maxItemsPerJob');
   const timeout = await runtimeConfig('data.deleteTransactionTimeoutMs');
+  const errorLimit = await runtimeConfig('logging.purgeErrorMaxCharacters');
   const jobs = await prisma.workspaceDataPurge.findMany({
     where: { status: { in: ['requested', 'db_deleted'] } },
     orderBy: [{ requestedAt: 'asc' }, { workspaceId: 'asc' }], take: limit,
@@ -402,7 +404,7 @@ export async function resumePendingWorkspaceDataPurges(): Promise<{ examined: nu
       completed++;
     } catch (error) {
       failed++;
-      await prisma.workspaceDataPurge.update({ where: { workspaceId: job.workspaceId }, data: { error: (error instanceof Error ? error.message : String(error)).slice(0, 1000) } }).catch(() => undefined);
+      await prisma.workspaceDataPurge.update({ where: { workspaceId: job.workspaceId }, data: { error: (error instanceof Error ? error.message : String(error)).slice(0, errorLimit) } }).catch(() => undefined);
     }
   }
   return { examined: jobs.length, completed, failed };

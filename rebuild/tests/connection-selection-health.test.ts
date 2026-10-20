@@ -3,6 +3,7 @@ vi.mock('@/modules/publishing/server/guard', () => ({ lockPublishingTargets: asy
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
+  config: vi.fn(),
   membership: { findUnique: vi.fn() },
   target: { findFirst: vi.fn(), updateMany: vi.fn() },
   adAccount: { findFirst: vi.fn(), updateMany: vi.fn() },
@@ -12,15 +13,23 @@ const state = vi.hoisted(() => ({
 vi.mock('../src/server/data', () => ({ prisma: { membership: state.membership, $transaction: state.transaction } }));
 vi.mock('../src/server/entitlements', async importOriginal => ({ ...await importOriginal<typeof import('../src/server/entitlements')>(), loadEntitlements: state.entitlements }));
 vi.mock('../src/server/platforms/registry', () => ({ isPlatformEnabled: state.platformEnabled }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
 import { setConnectionSelections } from '../src/server/connection-mutations';
 
 const actor = { userId: 'owner', workspaceId: 'workspace' };
 const now = new Date('2026-10-16T10:00:00Z');
 
 describe('connection selection readiness', () => {
+  it('refuses oversized changes using the current shared Root ceiling', async () => {
+    state.config.mockResolvedValue(1);
+    await expect(setConnectionSelections(actor, [{ kind: 'target', id: 'one', enabled: false }, { kind: 'adAccount', id: 'two', enabled: false }])).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.transaction).not.toHaveBeenCalled();
+    expect(state.config).toHaveBeenCalledWith('data.connectionSelectionMaxItems');
+  });
   afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     vi.resetAllMocks();
+    state.config.mockResolvedValue(250);
     vi.useFakeTimers();
     vi.setSystemTime(now);
     state.membership.findUnique.mockResolvedValue({ role: 'owner' });

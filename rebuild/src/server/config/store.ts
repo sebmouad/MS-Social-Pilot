@@ -4,16 +4,23 @@ import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, type ConfigKey, 
 import { prisma } from '@/server/data';
 import { Prisma } from '../../../generated/client';
 
+// AES-256-GCM envelope v1 invariants: key width and recommended nonce width.
+// These cannot vary without a separately versioned encryption format.
+const CONFIG_SECRET_KEY_BYTES = 32;
+const CONFIG_SECRET_IV_BYTES = 12;
+// Audit identifiers use random entropy rather than an operational record limit.
+const CONFIG_AUDIT_ID_BYTES = 12;
+
 const secretKey = () => {
   const encoded = process.env.ENCRYPTION_KEY;
   if (!encoded) throw new Error('ENCRYPTION_KEY is required before saving secret configuration.');
   const key = Buffer.from(encoded, 'base64');
-  if (key.length !== 32) throw new Error('ENCRYPTION_KEY must decode to 32 bytes.');
+  if (key.length !== CONFIG_SECRET_KEY_BYTES) throw new Error('ENCRYPTION_KEY must decode to 32 bytes.');
   return key;
 };
 
 function encrypt(value: string): string {
-  const iv = randomBytes(12);
+  const iv = randomBytes(CONFIG_SECRET_IV_BYTES);
   const cipher = createCipheriv('aes-256-gcm', secretKey(), iv);
   const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
   return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join(':');
@@ -120,7 +127,7 @@ export async function saveConfig(input: unknown, actorId: string) {
 async function audit(tx: Prisma.TransactionClient, actorId: string, key: string, change: string) {
   // Existing installation-wide audit table from the legacy schema. Parameterized
   // values keep the query safe; the secret itself is never included in detail.
-  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`cfg_${randomBytes(12).toString('hex')}`}, ${actorId}, 'config.changed', ${JSON.stringify(configAuditDetail(key, change))}::jsonb, NOW())`;
+  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`cfg_${randomBytes(CONFIG_AUDIT_ID_BYTES).toString('hex')}`}, ${actorId}, 'config.changed', ${JSON.stringify(configAuditDetail(key, change))}::jsonb, NOW())`;
 }
 
 /** Stable, value-free audit payload for validating Root setting changes. */

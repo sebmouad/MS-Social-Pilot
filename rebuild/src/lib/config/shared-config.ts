@@ -1,3 +1,4 @@
+import { ROOT_CONFIG_COPY } from '@/lib/config/root-config-copy';
 import { moduleManifests } from '@/modules';
 import { z } from 'zod';
 import { entry, optionList, options } from '@/lib/config/entry';
@@ -9,6 +10,21 @@ import { ROOT_AUDIT_CONFIG } from '@/server/root/audit-config';
 
 /** Shared installation settings (auth, jobs, sync, data, storage, MCP, Root). Module settings live in each module's config.ts. */
 export const SHARED_CONFIG = [
+  entry({ key: 'sync.workerDrainPollMs', group: 'Sync schedules', label: 'Worker shutdown poll interval (ms)', kind: 'number', description: 'Delay between checks for in-flight jobs while shutting down.', defaultValue: 250, schema: z.number().int().min(1).max(60000), consumption: 'active' }),
+  entry({ key: 'sync.workerLeaseRenewalDivisor', group: 'Sync schedules', label: 'Lease renewal frequency divisor', kind: 'number', description: 'Renew each lease after its duration divided by this value.', defaultValue: 3, schema: z.number().int().min(2).max(100), consumption: 'active' }),
+  entry({ key: 'logging.workerErrorMaxCharacters', group: 'Logging', label: 'Worker run error character limit', kind: 'number', description: 'Maximum error characters retained for a worker run.', defaultValue: 2000, schema: z.number().int().min(1).max(50000), consumption: 'active' }),
+  entry({ key: 'logging.workerSummaryMaxCharacters', group: 'Logging', label: 'Worker run summary character limit', kind: 'number', description: 'Maximum summary characters retained for a worker run.', defaultValue: 2000, schema: z.number().int().min(1).max(50000), consumption: 'active' }),
+  entry({ key: 'logging.purgeErrorMaxCharacters', group: 'Logging', label: 'Workspace purge error character limit', kind: 'number', description: 'Maximum error characters retained for workspace purge recovery.', defaultValue: 1000, schema: z.number().int().min(1).max(50000), consumption: 'active' }),
+  entry({ key: 'root.jobHealthLookbackMinutes', group: 'Root · Operations', label: 'Job freshness inspection window (minutes)', kind: 'number', description: 'Maximum schedule history inspected to establish job freshness; older sparse runs remain unknown.', defaultValue: 1440, schema: z.number().int().min(1).max(10080), consumption: 'active' }),
+  entry({ key: 'root.configSearchMaxCharacters', group: 'Root · Configuration', label: 'Configuration search character limit', kind: 'number', description: 'Maximum configuration search characters accepted from a linked query.', defaultValue: 2000, schema: z.number().int().min(1).max(20000), consumption: 'active' }),
+  entry({ key: 'data.postPageMaxItems', group: 'Data controls', label: 'Post query page ceiling', kind: 'number', description: 'Maximum records returned by the shared post-page query.', defaultValue: 100, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
+  entry({ key: 'data.insightDefaultDays', group: 'Data controls', label: 'Stored insight default range (days)', kind: 'number', description: 'Default date range of the legacy-compatible stored insight read helpers.', defaultValue: 30, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
+  entry({ key: 'data.audienceCandidateLimit', group: 'Data controls', label: 'Stored audience candidate rows', kind: 'number', description: 'Maximum stored audience candidates inspected per channel by the legacy-compatible read helper.', defaultValue: 20, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'data.connectionSelectionMaxItems', group: 'Shared · Connections', label: 'Connection selection write limit', kind: 'number', description: 'Maximum resources changed in a single connection-selection request.', defaultValue: 250, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
+  entry({ key: 'root.errorNameMaxCharacters', group: 'Root · Errors', label: 'Error name character limit', kind: 'number', description: 'Maximum redacted error-name characters returned to operators.', defaultValue: 200, schema: z.number().int().min(1).max(5000), consumption: 'active' }),
+  entry({ key: 'root.errorLocationMaxCharacters', group: 'Root · Errors', label: 'Error location character limit', kind: 'number', description: 'Maximum redacted error-location characters returned to operators.', defaultValue: 300, schema: z.number().int().min(1).max(5000), consumption: 'active' }),
+  entry({ key: 'root.errorReleaseMaxCharacters', group: 'Root · Errors', label: 'Error release character limit', kind: 'number', description: 'Maximum printable release identifier characters returned to operators.', defaultValue: 64, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'root.configCopy', group: 'Root · Configuration', label: 'Configuration operator copy', kind: 'json', description: 'Plain-text labels and feedback for the configuration index and forms. Keep {search}, {count} and {label} placeholders where needed.', defaultValue: ROOT_CONFIG_COPY, schema: z.object(Object.fromEntries(Object.keys(ROOT_CONFIG_COPY).map(key => [key, z.string().trim().min(1).max(4000)])) as { [K in keyof typeof ROOT_CONFIG_COPY]: z.ZodString }).strict(), consumption: 'active' }),
   ...MAIL_CONFIG,
   ...ROOT_LEGACY_CONFIG,
   ...ROOT_AUDIT_CONFIG,

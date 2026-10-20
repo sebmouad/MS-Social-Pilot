@@ -8,15 +8,19 @@ const now = new Date('2026-10-20T12:00:00Z');
 const run = { id: 'safe-run', startedAt: new Date('2026-10-20T11:00:00Z'), finishedAt: new Date('2026-10-20T11:00:01Z'), outcome: 'ok' };
 beforeEach(() => {
   vi.clearAllMocks(); db.auth.mockResolvedValue(undefined); db.settings.mockResolvedValue([]); db.run.mockResolvedValue(null); db.count.mockResolvedValue(0); db.audit.mockResolvedValue(1); db.secret.mockResolvedValue(null); db.heartbeat.mockResolvedValue([]);
-  db.config.mockImplementation(async key => key === 'root.workerStaleSeconds' ? 180 : key === 'jobs.enabled' ? true : '* * * * *');
+  db.config.mockImplementation(async key => key === 'root.jobHealthLookbackMinutes' ? 1440 : key === 'root.workerStaleSeconds' ? 180 : key === 'jobs.enabled' ? true : '* * * * *');
 });
 describe('stored module health', () => {
   it('distinguishes missing evidence, failed outcomes, schedule freshness and unknown outcomes', () => {
-    expect(jobHealth(null, '* * * * *', now, 180)).toMatchObject({ freshness: 'unknown', outcome: 'unknown', durationMs: null });
-    expect(jobHealth(run, '* * * * *', now, 180)).toMatchObject({ freshness: 'fail', outcome: 'pass', durationMs: 1000 });
-    expect(jobHealth({ ...run, outcome: 'failed' }, '0 * * * *', now, 180)).toMatchObject({ freshness: 'pass', outcome: 'fail' });
-    expect(jobHealth({ ...run, outcome: 'raw-secret' }, 'invalid', now, 180)).toMatchObject({ freshness: 'unknown', outcome: 'unknown' });
-    expect(jobHealth({ ...run, finishedAt: null }, null, now, 180)).toMatchObject({ freshness: 'unknown', outcome: 'unknown', durationMs: null });
+    expect(jobHealth(null, '* * * * *', now, 180, 1440)).toMatchObject({ freshness: 'unknown', outcome: 'unknown', durationMs: null });
+    expect(jobHealth(run, '* * * * *', now, 180, 1440)).toMatchObject({ freshness: 'fail', outcome: 'pass', durationMs: 1000 });
+    expect(jobHealth({ ...run, outcome: 'failed' }, '0 * * * *', now, 180, 1440)).toMatchObject({ freshness: 'pass', outcome: 'fail' });
+    expect(jobHealth({ ...run, outcome: 'raw-secret' }, 'invalid', now, 180, 1440)).toMatchObject({ freshness: 'unknown', outcome: 'unknown' });
+    expect(jobHealth({ ...run, finishedAt: null }, null, now, 180, 1440)).toMatchObject({ freshness: 'unknown', outcome: 'unknown', durationMs: null });
+  });
+  it('uses the supplied freshness lookback instead of a fixed day', () => {
+    expect(jobHealth(run, '0 * * * *', now, 180, 15).freshness).toBe('unknown');
+    expect(jobHealth(run, '0 * * * *', now, 180, 120).freshness).toBe('pass');
   });
   it('refuses non-Root and uninstalled scopes before reading data', async () => {
     db.auth.mockRejectedValueOnce(new Error('denied'));

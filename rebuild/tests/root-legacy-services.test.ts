@@ -307,6 +307,14 @@ describe('lifecycle', () => {
 describe('error browser', () => {
   const err = (over: object = {}) => ({ id: 'e1', source: 'server', name: 'TypeError', message: 'failed with Bearer abcdefghijklmnop and token=SECRETVALUE', stack: 'at x '.repeat(2000), location: '/api/posts', release: 'abc', count: 3, firstSeenAt: new Date('2026-10-01'), lastSeenAt: new Date('2026-10-02'), resolvedAt: null, total: 1, ...over });
 
+  it('uses Root name, location and release limits for operator error output', async () => {
+    const defaults = h.config.getMockImplementation()!;
+    h.config.mockImplementation(async key => ['root.errorNameMaxCharacters', 'root.errorLocationMaxCharacters', 'root.errorReleaseMaxCharacters'].includes(key) ? 3 : defaults(key));
+    when(/FROM error_events/, [err({ name: 'LongError', location: '/long/path?secret=hidden', release: 'release-version' })]);
+    const result = await listRootErrors('root');
+    expect(result.items[0]).toMatchObject({ name: 'Lon…', location: '/lo…', release: 'rel' });
+    for (const key of ['root.errorNameMaxCharacters', 'root.errorLocationMaxCharacters', 'root.errorReleaseMaxCharacters']) expect(h.config.mock.calls.filter(([requested]) => requested === key)).toHaveLength(1);
+  });
   it('redacts credential-like text and omits stacks from the list', async () => {
     when(/FROM error_events/, [err()]);
     const result = await listRootErrors('root', { status: 'all', source: 'server', q: '100%' });

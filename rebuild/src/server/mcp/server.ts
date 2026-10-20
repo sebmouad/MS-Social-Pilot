@@ -1,3 +1,4 @@
+import { runtimeConfig } from '@/server/config/store';
 import { handleAgencyPersonMessage } from '@/modules/agency/person-mcp';
 import { OperationError, operationFailure, type OperationErrorCode } from '@/lib/operation-error';
 import { adsNoDispatchMetadata } from '@/modules/ads/management/errors';
@@ -13,7 +14,8 @@ import { rootToolDefinitions, rootTools, canUseRootTool, rootResources, rootReso
 
 type JsonRpcId = string | number | null;
 
-const versions = ['2025-06-18', '2025-03-26', '2024-11-05'];
+// Supported wire versions require implemented protocol handling, rather than a Root switch.
+const SUPPORTED_MCP_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const textResult = (value: unknown) => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
   structuredContent: Array.isArray(value) ? { items: value } : value,
@@ -86,7 +88,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
   if (writeTools.has(name) && !purgeCheckExempt.has(name) && !rootTools.has(name)) {
     await assertWorkspaceNotPurging(viewer.workspaceId);
   }
-  const cap = viewer.maxResultItems ?? 100;
+  const cap = viewer.maxResultItems ?? await runtimeConfig('mcp.maxResultItems');
   const group = groupOf.get(name);
   if (!group) throw new OperationError('invalid_request', `Unknown tool: ${name}`);
   return group.execute(viewer, name, args, cap);
@@ -120,7 +122,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
   if (method === 'ping') return reply({});
   if (method === 'initialize') {
     const requested = String(params.protocolVersion ?? '');
-    return reply({ protocolVersion: versions.includes(requested) ? requested : versions[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'ms-social-pilot', version: '0.1.0' }, instructions: viewer.scope === 'installation' ? 'Private installation access. Only Root controls are available here. Workspace operations require an authorized workspace context. Every write requires an exact confirmation; shared domain services record changes in the audit history.' : `Workspace-scoped access for ${viewer.workspace.name}. Writes can manage local posts, publish posts, sync provider status, change channel/ad account selections, or manage connected-platform Inbox items. Publishing, remote post deletion, Inbox replies, and comment moderation contact social platforms. Every write requires an explicit confirmation string. Times use ${viewer.workspace.timezone}.` });
+    return reply({ protocolVersion: SUPPORTED_MCP_PROTOCOL_VERSIONS.includes(requested) ? requested : SUPPORTED_MCP_PROTOCOL_VERSIONS[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'ms-social-pilot', version: '0.1.0' }, instructions: viewer.scope === 'installation' ? 'Private installation access. Only Root controls are available here. Workspace operations require an authorized workspace context. Every write requires an exact confirmation; shared domain services record changes in the audit history.' : `Workspace-scoped access for ${viewer.workspace.name}. Writes can manage local posts, publish posts, sync provider status, change channel/ad account selections, or manage connected-platform Inbox items. Publishing, remote post deletion, Inbox replies, and comment moderation contact social platforms. Every write requires an explicit confirmation string. Times use ${viewer.workspace.timezone}.` });
   }
   if (method === 'tools/list') {
     if (viewer.scope === 'installation') return reply({ tools: canUseRootTool(viewer) ? rootToolDefinitions : [] });

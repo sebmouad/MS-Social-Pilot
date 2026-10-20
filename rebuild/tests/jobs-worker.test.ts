@@ -16,6 +16,9 @@ function dependencies(overrides: Partial<WorkerDependencies> = {}) {
     logger: () => undefined,
     ...overrides,
   };
+  const read = deps.readConfig;
+  const shared: Record<string, number> = { 'sync.workerLeaseRenewalDivisor': 3, 'logging.workerErrorMaxCharacters': 2000, 'logging.workerSummaryMaxCharacters': 2000 };
+  deps.readConfig = async key => key in shared ? shared[key] : read(key);
   return { deps, started, runs };
 }
 
@@ -116,5 +119,34 @@ describe('replacement worker scheduling', () => {
     await worker.tick(new Date(2026, 0, 1, 3, 17));
     await drain(worker);
     expect(state.started).toEqual(['mediaCleanup']);
+  });
+});
+
+
+describe('Root worker telemetry limits', () => {
+  it('applies current error and summary bounds to the saved run', async () => {
+    const state = dependencies({ execute: async () => 'checked=123456789 failed=1' });
+    const read = state.deps.readConfig;
+    state.deps.readConfig = async key => key === 'logging.workerErrorMaxCharacters' ? 9 : key === 'logging.workerSummaryMaxCharacters' ? 7 : read(key);
+    const worker = createWorker(state.deps, 'bounded-worker');
+    await worker.tick(new Date(2026, 0, 1, 12, 5)); await drain(worker);
+    expect(state.runs[0]).toMatchObject({ summary: 'checked', error: 'Some work', outcome: 'failed' });
+  });
+  it('renews at the configured fraction of the lease', async () => {
+    vi.useFakeTimers();
+    try {
+      let finish!: (value: string) => void;
+      const gate = new Promise<string>(resolve => { finish = resolve; });
+      const renewLease = vi.fn(async () => true);
+      const state = dependencies({ execute: () => gate, renewLease });
+      const read = state.deps.readConfig;
+      state.deps.readConfig = async key => key === 'sync.workerLeaseRenewalDivisor' ? 10 : read(key);
+      const worker = createWorker(state.deps, 'renewal-worker');
+      await worker.tick(new Date(2026, 0, 1, 12, 5));
+      await vi.advanceTimersByTimeAsync(29_999); expect(renewLease).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1); expect(renewLease).toHaveBeenCalledTimes(1);
+      finish('done'); await vi.advanceTimersByTimeAsync(0);
+      expect(worker.running.size).toBe(0);
+    } finally { vi.useRealTimers(); }
   });
 });
