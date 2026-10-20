@@ -12,11 +12,14 @@ import { runtimeConfig } from '@/server/config/store';
  */
 // Next bundles instrumentation and each route separately; module variables are not shared,
 // so the value lives on the process-wide global.
-type OriginState = { value: string; timer?: ReturnType<typeof setTimeout> };
-const state = ((globalThis as { __mspPublicOrigin?: OriginState }).__mspPublicOrigin ??= { value: '' });
+type OriginState = { value: string; development: string[]; timer?: ReturnType<typeof setTimeout> };
+const state = ((globalThis as { __mspPublicOrigin?: OriginState }).__mspPublicOrigin ??= { value: '', development: [] });
+state.development ??= [];
 
 export async function refreshPublicOrigin(): Promise<void> {
   try { state.value = String(await runtimeConfig('app.publicOrigin') ?? ''); }
+  catch { /* keep the last known value */ }
+  try { state.development = (await runtimeConfig('app.developmentOrigins') as string[]) ?? []; }
   catch { /* keep the last known value */ }
 }
 
@@ -31,6 +34,10 @@ export async function startPublicOriginRefresh(): Promise<void> {
   if (!state.timer) void schedule();
 }
 
+/** The origin a same-origin check must match: a Root-trusted development origin when the
+ * browser sends one, otherwise the Root public origin, otherwise the received address. */
 export function requestOrigin(request: Request): string {
+  const sent = request.headers.get('origin');
+  if (sent && state.development.includes(sent)) return sent;
   return state.value || new URL(request.url).origin;
 }
