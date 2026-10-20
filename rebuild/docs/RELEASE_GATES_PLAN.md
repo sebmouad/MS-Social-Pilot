@@ -457,3 +457,11 @@ each gate is actually run; never claim a gate from this plan alone.
 - **Services:** `social-pilot-rebuild` + `social-pilot-rebuild-worker` active/enabled; legacy `social-pilot` + worker inactive/disabled. Legacy release kept at `/srv/ms-social-pilot` for rollback.
 - **Post-check (orchestrator, public):** `/sign-in`, `/home`, `/api/auth/register` all 200.
 - **Open:** owner sign-in check; Root `storage.mediaRoot` + mail settings; live Facebook test gate (needs owner test Page); post-cutover rollback drill; pin 4 newer migrations in `cutover-rehearsal.sh`; drop scratch `social_pilot_rehearsal`; rewire `socialpilot-deploy` to the rebuild.
+
+### Post-cutover fix — 2026-10-20 22:20 CEST
+
+- **Symptom:** owner password and passkey sign-in failed. Logs: `permission denied for table workspace_data_purges` / `rebuild_sync_runs` (42501).
+- **Cause:** cutover applied migrations as `postgres`; 24 new tables and 9 functions were owned by `postgres`, not the app role `social_pilot`.
+- **Fix:** `rebuild/scripts/prod-fix-ownership.sh` (commit `0dac4dc1`) transferred them; now `social_pilot=116` tables, 0 postgres-owned functions. `prod-cutover.sh` now does this step itself. Services restarted; worker jobs run with 0 permission errors.
+- **Root settings (audited, as owner):** `auth.passkeyOrigin=https://social.newsgeet.com` (was empty, so passkey accounts were sent to enrollment); `storage.mediaRoot=/var/lib/ms-social-pilot/media` (legacy `MEDIA_DIR`).
+- **Open:** owner sign-in confirmation; mail settings; live Facebook test gate; post-cutover rollback drill; drop scratch DB; rewire `socialpilot-deploy`.
