@@ -2,6 +2,7 @@ import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
 import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/modules/ads/server/queries';
 import { parseAdsPerformanceFilters } from '../performance-filters';
+import { assertAdsResultCeiling } from '../result-ceiling';
 import { adsIsoDay } from '../report-filters';
 import { authorizeAdsRead, type AdsReadActor } from '../server/access';
 import { loadAdsReportPolicy } from '../server/report-policy';
@@ -10,7 +11,7 @@ import { ADS_ANALYSIS_POLICY_SCHEMA } from './config';
 import { buildAdsComparisonCsv } from './csv';
 import {
   OBJECT_SORT_KEYS, assessFreshness, buildFindings, buildKpis, findingMessage, peakReach, previousWindow, sortObjects, spendSharePercent, sumActions, totalsFromRows,
-  type AdsAnalysisPolicy, type AdsObjectFigures, type AdsObjectSortKey,
+  type AdsAnalysisPolicy, type AdsObjectSortKey,
 } from './metrics';
 
 const INPUT_KEYS = new Set(['period', 'start', 'end', 'accountId', 'compare', 'level', 'sort', 'direction']);
@@ -36,6 +37,10 @@ export type AdsComparisonResult = Awaited<ReturnType<typeof readAdsComparison>>;
  * Different currencies are never summed together: each currency forms its own group.
  */
 export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}, now = new Date()) {
+  return buildAdsComparison(actor, input, now, false);
+}
+
+async function buildAdsComparison(actor: AdsReadActor, input: unknown, now: Date, complete: boolean) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', 'Choose valid Ads comparison filters.');
   const values = input as Record<string, unknown>;
   if (Object.keys(values).some(key => !INPUT_KEYS.has(key))) throw new OperationError('invalid_request', 'Choose valid Ads comparison filters.');
@@ -65,7 +70,17 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
   let previousRows: Row[] = [];
   if (compare === 'previous') {
     const window = previousWindow(filters.since, filters.until);
-    previousRows = (await getAdsDataset(actor.workspaceId, { ...filters, ...window }, access.allowedTargetIds, access.allowedProviders, { levels: ['account'], allowedAdAccountIds: access.allowedAdAccountIds })).insights as unknown as Row[];
+    // Interactive reports keep their account-only baseline query; complete exports
+    // additionally load this level's stored rows for exact account/object deltas.
+    previousRows = (await getAdsDataset(actor.workspaceId, { ...filters, ...window }, access.allowedTargetIds, access.allowedProviders, { levels: complete ? levels : ['account'], allowedAdAccountIds: access.allowedAdAccountIds })).insights as unknown as Row[];
+  }
+
+  const previousByObject = new Map<string, Row[]>();
+  const identity = (row: Row) => JSON.stringify([row.adAccountId, row.objectId]);
+  for (const row of previousRows) if (row.level === level) {
+    const key = identity(row);
+    if (!previousByObject.has(key)) previousByObject.set(key, []);
+    previousByObject.get(key)!.push(row);
   }
 
   const accountMeta = new Map(currentSet.accounts.map(account => [account.id, account]));
@@ -84,14 +99,28 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
     const accountRows = current.filter(row => row.level === 'account' && groupKey(row) === group.key);
     const objectRows = current.filter(row => row.level === level && groupKey(row) === group.key);
     const totals = accountRows.length ? totalsFromRows(accountRows.map(flow)) : null;
-    const prevRows = previousRows.filter(row => groupKey(row) === group.key);
+    const prevRows = previousRows.filter(row => row.level === 'account' && groupKey(row) === group.key);
     const previous = compare === 'previous' && prevRows.length ? totalsFromRows(prevRows.map(flow)) : null;
     const byObject = new Map<string, Row[]>();
-    for (const row of objectRows) byObject.set(`${row.adAccountId}:${row.objectId}`, [...(byObject.get(`${row.adAccountId}:${row.objectId}`) ?? []), row]);
-    const objects: Array<AdsObjectFigures & { accountId: string; accountName: string; sharePercent: number | null; reachPeakDay: number | null; actions: Record<string, number> }> = [...byObject.values()].map(rows => {
+    for (const row of objectRows) {
+      const key = identity(row);
+      if (!byObject.has(key)) byObject.set(key, []);
+      byObject.get(key)!.push(row);
+    }
+    const objects = [...byObject.values()].map(rows => {
       const t = totalsFromRows(rows.map(flow));
       const latest = [...rows].sort((a, b) => b.date.getTime() - a.date.getTime())[0]!;
+      const earlier = previousByObject.get(identity(latest)) ?? [];
+      const previous = earlier.length ? totalsFromRows(earlier.map(flow)) : null;
+      const byDay = new Map<string, ReturnType<typeof flow>[]>();
+      for (const row of rows) {
+        const date = adsIsoDay(row.date);
+        if (!byDay.has(date)) byDay.set(date, []);
+        byDay.get(date)!.push(flow(row));
+      }
       return {
+        previous, kpis: buildKpis(t, previous),
+        trend: [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, rows]) => ({ date, ...totalsFromRows(rows) })),
         objectId: latest.objectId, name: latest.objectName || latest.objectId, accountId: latest.adAccountId, accountName: latest.adAccount.name,
         spend: t.spend, impressions: t.impressions, clicks: t.clicks, cpc: t.cpc, ctr: t.ctr, cpm: t.cpm,
         sharePercent: spendSharePercent(t.spend, totals?.spend ?? null),
@@ -116,7 +145,7 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
       accountTotalsAvailable: accountRows.length > 0,
       totals, previous, kpis: totals ? buildKpis(totals, previous) : [],
       findings: findings.map(finding => ({ ...finding, message: findingMessage(finding) })),
-      objects: sortObjects(objects, sort, direction).slice(0, policy.maxObjects), objectCount: objects.length,
+      objects: sortObjects(objects, sort, direction).slice(0, complete ? undefined : policy.maxObjects), objectCount: objects.length,
       trend: [...trendByDay.values()].sort((a, b) => a.date.localeCompare(b.date)).map(day => ({ ...day, spend: Math.round(day.spend * 100) / 100 })),
       freshness: assessFreshness((accountRows.length ? accountRows : objectRows).map(row => row.fetchedAt), now, policy.staleAfterHours),
     };
@@ -137,10 +166,16 @@ export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}
   };
 }
 
-/** The comparison as one complete CSV, bounded by the Root export size limit (`ads.exportMaxBytes`). */
-export async function exportAdsComparison(actor: AdsReadActor, input: unknown = {}, now = new Date()) {
-  const [outputPolicy, result] = await Promise.all([loadAdsOutputPolicy(), readAdsComparison(actor, input, now)]);
-  const built = buildAdsComparisonCsv(result, outputPolicy.exportMaxBytes);
+/** Complete stored objects or findings; dataset row and UTF-8 export byte limits both apply. */
+export async function exportAdsComparison(actor: AdsReadActor, input: unknown = {}, now = new Date(), options: { kind?: unknown; locale?: unknown; resultLimit?: number } = {}) {
+  const kind = options.kind ?? 'objects';
+  const locale = options.locale ?? 'en';
+  if (kind !== 'objects' && kind !== 'findings') throw new OperationError('invalid_request', 'Choose objects or findings.');
+  if (locale !== 'en' && locale !== 'fr') throw new OperationError('invalid_request', 'Choose en or fr.');
+  const [outputPolicy, result] = await Promise.all([loadAdsOutputPolicy(), buildAdsComparison(actor, input, now, true)]);
+  if (result.groups.some(group => group.objectCount !== group.objects.length)) throw new OperationError('invalid_request', 'Too many objects to export completely. Choose fewer accounts or a shorter date range.');
+  if (kind === 'objects') assertAdsResultCeiling(result, options.resultLimit);
+  const built = buildAdsComparisonCsv(result, outputPolicy.exportMaxBytes, kind, locale);
   const base = outputPolicy.exportFileName.replace(/\.csv$/i, '');
-  return { format: 'ms-social-pilot-ads-comparison-csv' as const, version: 1 as const, fileName: `${base}-comparison-${result.range.from}_${result.range.to}.csv`, ...built };
+  return { format: 'ms-social-pilot-ads-comparison-csv' as const, version: 1 as const, fileName: `${base}-comparison${kind === 'findings' ? '-findings' : ''}-${result.range.from}_${result.range.to}.csv`, ...built };
 }

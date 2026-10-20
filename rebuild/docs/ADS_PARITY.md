@@ -58,7 +58,7 @@ Without this table every write fails closed (`unavailable`) before any provider 
 - Directory parent links depend on `campaign_id`/`adset_id` being present in stored row fields.
 - Creative support assigns an *existing* account creative to an ad; creating or editing creative content is not implemented and not advertised.
 - Facebook `delete` posts `status=DELETED` (irreversible) -- confirmed by text only; campaign budgets apply only to budget-owning campaigns, otherwise Graph rejects.
-- No live Facebook call, spend or browser check has been made. CSV export of comparison and per-day compare charts remain open.
+- No live Facebook call or spend belongs to the report/export work. Stored comparison object trends/deltas and findings CSV are implemented in the local coverage update below; browser/provider/release evidence remains separate.
 
 
 ## Batch 74 historical integration record (2026-10-18)
@@ -191,3 +191,55 @@ Added (read-only, stored data, no provider call, no new setting; the CSV reuses 
 Reach stays a peak single day, never a sum; unknown figures are empty or "Unknown", never zero. Tests: `tests/ads-comparison-parity.test.ts` (mocked data only: no PostgreSQL, browser or live provider run).
 
 Still open versus legacy: parent campaign name column for ad sets and ads (stored rows carry no parent name; needs a Facebook-owned resolver), clickable column-header sorting (sorting is by sidebar select), spend-share and daily charts (tables only), en/fr copy for the Campaigns/Objects/Directory screens, and a browser check of the Compare screen (four themes, 1440px/390px). The MCP csv result is capped by row count only.
+
+## Local report/export coverage — 2026-10-20
+
+Legacy review: `src/app/(app)/ads/page.tsx` exposes account/date-scoped CSV,
+level selection, sorting, account trends and previous-window KPIs; `src/lib/ads-analysis.ts`
+produces threshold-gated findings. The rebuild already had a comparison CSV, but
+it exported only the display slice and omitted object baselines, deltas, daily
+trends and findings.
+
+`analysis/server.ts` now exports every matching campaign, ad set or ad within the
+existing stored report row ceiling (`ads.reportMaxRows` per dataset query), independent
+of the interactive `ads.analysisPolicy.maxObjects` display cap. Export reads include
+previous-period rows for the selected object level; interactive reports retain their
+account-only baseline query. Object identities include account and object ID. The
+CSV adds previous values, percentage changes for spend/impressions/clicks/CTR/CPC/CPM,
+and `daily_trend_json` (stored days only, recomputed ratios). Missing scalar values
+are **Not available**; unknown JSON ratio values remain null. A zero baseline has
+no percentage change. Previous-only objects are not invented as current zero rows.
+Reach remains highest single day, and currencies remain separate.
+
+UI downloads, `GET /api/ads/compare?format=csv`, and MCP
+`compare_ads_performance` with `format: "csv"` share `exportAdsComparison`.
+They accept the same report filters and current Ads read authorization, selected
+resources and credential account/channel scope. `exportKind: "findings"` selects
+a separate CSV with group/currency/account IDs, level, current/previous ranges,
+finding key, tone, parameters and localized message; `locale` accepts `en` or `fr`
+(default `en`). HTTP uses query parameters with the same names. Export options
+are rejected for JSON requests. The comparison screen exposes both downloads
+with shared Button/RouteNotice components, en/fr pending/success/error copy and its
+current filters. Refused downloads retain those filters; response format, filename
+and byte receipts are checked before download, and obsolete requests are aborted. No provider calls were added.
+
+Both exports refuse the complete request above `ads.exportMaxBytes`, measured in
+UTF-8 including headers. Text cells use existing spreadsheet escaping. MCP applies
+its credential row ceiling, including nested object trends for object exports.
+Existing `ads.exportFileName` supplies the filename stem. **No new Root keys.**
+
+Local verification from `rebuild/`:
+
+- `npx vitest run --config src/modules/ads/analysis/export.vitest.config.ts src/modules/ads/analysis/export.test.ts src/modules/ads/analysis/export-ui.test.ts tests/ads tests/raw-sql-void-guard.test.ts` — **359 passed, 5 skipped** (33 passing files, one skipped database integration file).
+- `npx tsc --noEmit -p .` — passed.
+- Full suite with the module config — **3,538 passed, 220 skipped** (366 passing
+  files), before the final four download UI tests; those four passed in the final
+  targeted run above.
+
+Module-local regression tests/config stay within the assigned Ads ownership boundary.
+The dedicated Vitest config includes those fixtures plus the normal repository tests.
+This is mocked service/HTTP/MCP and automated UI regression evidence only. No server,
+live provider, browser, production or PostgreSQL integration run was performed.
+Stored windows are bounded queries, not an atomic snapshot across requests. Async
+exports, live freshness/sync proof, broader management/creative parity and release
+gates remain open.
