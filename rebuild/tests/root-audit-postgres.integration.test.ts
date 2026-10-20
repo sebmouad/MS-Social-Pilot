@@ -19,7 +19,9 @@ describe.skipIf(!url)('Root audit real PostgreSQL (temporary tables only)', () =
         await tx.$executeRaw`CREATE TEMP TABLE root_activities (id text PRIMARY KEY, "actorId" text, action text, detail jsonb, "createdAt" timestamp(3)) ON COMMIT DROP`;
         await tx.$executeRaw`CREATE TEMP TABLE activity_logs (id text PRIMARY KEY, "createdAt" timestamp(3)) ON COMMIT DROP`;
         await tx.$executeRaw`CREATE TEMP TABLE users (id text PRIMARY KEY, "isInstanceOwner" boolean, "disabledAt" timestamp, name text, email text) ON COMMIT DROP`;
-        shared.client = new Proxy(tx as unknown as Record<string, unknown>, { get: (target, key) => key === '$transaction' ? (fn: (client: typeof tx) => unknown) => fn(tx) : Reflect.get(target, key) });
+        // Prisma model queries schema-qualify "public"."users" and bypass the temp shadow, so serve the actor lookup from it.
+        const user = { findUnique: async ({ where }: { where: { id: string } }) => (await tx.$queryRaw<{ isInstanceOwner: boolean; disabledAt: Date | null }[]>`SELECT "isInstanceOwner", "disabledAt" FROM pg_temp.users WHERE id = ${where.id}`)[0] ?? null };
+        shared.client = new Proxy(tx as unknown as Record<string, unknown>, { get: (target, key) => key === '$transaction' ? (fn: (client: typeof tx) => unknown) => fn(tx) : key === 'user' ? user : Reflect.get(target, key) });
         await tx.$executeRaw`INSERT INTO users VALUES ('root', true, NULL, '=Synthetic', 'root@example.invalid')`;
         await tx.$executeRaw`INSERT INTO root_activities SELECT 'old' || n, 'root', 'synthetic.old', '{"token":"secret"}'::jsonb, '2025-01-01'::timestamp FROM generate_series(1, 3) n`;
         await tx.$executeRaw`INSERT INTO activity_logs SELECT 'old' || n, '2025-01-01'::timestamp FROM generate_series(1, 3) n`;
