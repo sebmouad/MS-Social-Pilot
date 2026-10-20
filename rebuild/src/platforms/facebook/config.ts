@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { entry } from '@/lib/config/entry';
 /** Facebook operational settings are supplied by the host application. */
 export interface FacebookConfig {
   graphBaseUrl: string;
@@ -36,3 +38,19 @@ export function validateFacebookConfig(config: FacebookConfig): FacebookConfig {
   if (base.username || base.password || oauth.username || oauth.password || oauth.search || oauth.hash) throw new Error('Facebook endpoints cannot contain credentials, query strings, or fragments.');
   return config;
 }
+
+/** Root owns collection policy; empty content lists make no speculative metric requests. */
+export const facebookInsightPeriodsSchema = z.array(z.enum(['day', 'week', 'days_28', 'month', 'lifetime', 'total_over_range'])).min(1).max(6);
+export const facebookContentInsightsSchema = z.array(z.object({
+  edge: z.enum(['posts', 'videos', 'video_reels', 'stories']),
+  insightEdge: z.enum(['insights', 'video_insights']),
+  fields: z.array(z.string().trim().min(1).max(2000)).max(100).optional(),
+  metrics: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(100),
+  periods: facebookInsightPeriodsSchema,
+})).max(20);
+export const facebookAdBreakdownsSchema = z.array(z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).min(1).max(10)).max(20);
+export const FACEBOOK_DATA_CONFIG = [
+  entry({ key: 'meta.adInsightBreakdowns', group: 'Facebook · Analytics collection', label: 'Ads insight breakdown combinations', kind: 'json', description: 'Separate delivery breakdown requests, for example [["age","gender"],["publisher_platform","platform_position"]]. Only combinations supported by the configured Graph version and fields succeed. Empty disables breakdown collection.', defaultValue: [], schema: facebookAdBreakdownsSchema, consumption: 'active' }),
+  entry({ key: 'meta.pageInsightPeriods', group: 'Facebook · Analytics collection', label: 'Page insight periods', kind: 'json', description: 'Request each configured metric separately for each period. Unsupported combinations are reported as partial failures.', defaultValue: ['day'], schema: facebookInsightPeriodsSchema, consumption: 'active' }),
+  entry({ key: 'meta.contentInsightCollections', group: 'Facebook · Analytics collection', label: 'Content insight collections', kind: 'json', description: 'Version-verified posts, videos, Reels and Stories metrics and periods. Empty until verified against the configured Graph version. Uses existing insight read grants; does not grant permissions.', defaultValue: [], schema: facebookContentInsightsSchema, consumption: 'active' }),
+] as const;
