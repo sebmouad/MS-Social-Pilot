@@ -75,3 +75,8 @@ production build (dev server used); MCP calls with real keys; live Facebook.
   verifiable keyboard main action. After round-9 fixes: remaining real finding is
   page-level horizontal overflow on /settings/team (8 cells); /settings/profiles errors
   in that run came from a merge in progress and the route returns 200 now.
+- Final browser matrix at `28e3050e` (dev server, synthetic `_preview`, synthetic QA
+  owner): **PASS, 328/328 cells**: 41 routes × Grove/Coast/Clay/Nightfall × 1440/390,
+  with zero console errors, hydration warnings, page overflow, missing accessible names
+  or keyboard main-action/dialog failures. Production build, Root routes and live
+  provider data were not part of this run.
