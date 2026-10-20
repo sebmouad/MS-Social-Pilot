@@ -31,7 +31,7 @@ export function InboxFilterPanel({ action, filters, channels, locale, thread, li
         <TextInput type="search" name="q" aria-label={copy.search} maxLength={searchMaxCharacters} defaultValue={filters.q} placeholder={copy.searchPlaceholder} />
       </FilterSection>
       <FilterSection label={copy.channel}>
-        <Select name="channel" aria-label={copy.channel} value={channel} searchableonChange={value => { setChannel(value); apply(); }}
+        <Select name="channel" aria-label={copy.channel} value={channel} searchable onChange={value => { setChannel(value); apply(); }}
           options={[{ value: 'all', label: copy.allChannels }, ...channels.map(item => ({ value: item.id, label: item.name }))]} />
       </FilterSection>
       <FilterSection label={copy.type}>
