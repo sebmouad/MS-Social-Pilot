@@ -5,6 +5,8 @@ import { agencySearchLimit, listAgencyClients } from '@/modules/agency/server/ag
 import { ClientFilters } from '@/modules/agency/ui/AgencyFilters';
 import { AgencyHeading, AgencyShell, formatDate } from '@/modules/agency/ui/AgencyChrome';
 import { WorkspaceAction } from '@/modules/agency/ui/WorkspaceAction';
+import { DataTable, Badge, EmptyState } from '@/components';
+import { IconUsersGroup } from '@tabler/icons-react';
 import styles from '@/modules/agency/ui/agency.module.css';
 
 export default async function AgencyClientsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -26,7 +28,7 @@ export default async function AgencyClientsPage({ searchParams }: { searchParams
       </RouteNotice>}
       {result.filtered && result.workspaces.length > 0 && <p className={styles.help}>Search matches workspace names only. All client accounts and pending invitations are listed for the matching workspaces.</p>}
       {result.workspaces.length === 0
-        ? <p className={styles.empty}>{result.filtered ? 'No workspaces match this search.' : 'You do not own or administer any workspace with Agency access yet.'} {result.filtered && <a href="/agency/clients">Reset filters</a>}</p>
+        ? <EmptyState title={result.filtered ? 'No workspaces match this search.' : 'You do not own or administer any workspace with Agency access yet.'} icon={<IconUsersGroup />} action={<a href={result.filtered ? '/agency/clients' : '/settings/team'}>{result.filtered ? 'Reset filters' : 'View team'}</a>} />
         : result.workspaces.map(item => <section key={item.workspaceId} className={styles.section} aria-labelledby={`client-${item.workspaceId}`}>
           <div className={styles.sectionHead}>
             <h2 id={`client-${item.workspaceId}`}>{item.workspaceName}</h2>
@@ -39,9 +41,9 @@ export default async function AgencyClientsPage({ searchParams }: { searchParams
               : <>
                 {item.clients.length === 0 ? <p className={styles.help}>{result.filtered ? 'No client accounts match this search.' : 'No client accounts yet.'}</p> : <>
                   <p className={styles.help}>{item.clientCount > item.clients.length ? `Showing ${item.clients.length} of ${item.clientCount} ${result.filtered ? 'matching ' : ''}client accounts.` : `${item.clientCount} ${result.filtered ? 'matching ' : ''}client ${item.clientCount === 1 ? 'account' : 'accounts'}.`}</p>
-                  <ul className={styles.list}>{item.clients.map(client => <li key={client.userId}><strong>{client.name}</strong> <span className={styles.meta}>{client.email}</span></li>)}</ul></>}
+                  <DataTable caption={item.workspaceName} rows={item.clients} rowKey={client => client.userId} columns={[{ key: 'name', label: 'Client', render: client => <strong>{client.name}</strong> }, { key: 'email', label: 'Email', render: client => client.email }]} /></>}
                 {item.invitationsAvailable
-                  ? item.invitations.length > 0 && <><h3>Pending invitations</h3><ul className={styles.list}>{item.invitations.map(invite => <li key={invite.id}>{invite.email} <span className={styles.flag} data-tone={invite.status === 'expired' ? 'warn' : 'ok'}>{invite.status === 'expired' ? 'Expired' : 'Pending'}</span> <span className={styles.meta}>Until {formatDate(invite.expiresAt)}</span></li>)}</ul></>
+                  ? item.invitations.length > 0 && <><h3>Pending invitations</h3><DataTable caption="Pending invitations" rows={item.invitations} rowKey={invite => invite.id} columns={[{ key: 'email', label: 'Email', render: invite => invite.email }, { key: 'status', label: 'Status', render: invite => <Badge tone={invite.status === 'expired' ? 'warning' : 'module'}>{invite.status === 'expired' ? 'Expired' : 'Pending'}</Badge> }, { key: 'expires', label: 'Expires', render: invite => formatDate(invite.expiresAt) }]} /></>
                   : <p className={styles.help}>Invitations cannot be shown here. Manage them from the workspace team settings.</p>}
               </>}
         </section>)}

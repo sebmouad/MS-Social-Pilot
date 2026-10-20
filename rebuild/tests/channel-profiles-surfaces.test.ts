@@ -66,16 +66,19 @@ describe('shared channel profile entry points', () => {
   it('applies only available group members to Analytics form checkboxes', async () => {
     const host = document.createElement('div'); document.body.appendChild(host); const root = createRoot(host);
     await act(async () => root.render(React.createElement('form', null, React.createElement(GroupShortcut, { groups: directory.groups, allowedIds: ['a', 'b'] }), React.createElement('input', { type: 'checkbox', name: 'channel', value: 'a' }), React.createElement('input', { type: 'checkbox', name: 'channel', value: 'b', defaultChecked: true }))));
-    await act(async () => { const select = host.querySelector('select')!; select.value = 'g'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    await act(async () => host.querySelector<HTMLButtonElement>('[role=combobox]')!.click());
+    await act(async () => { const option = [...host.querySelectorAll<HTMLElement>('[role=option]')].find(item => item.textContent === directory.groups[0]!.name)!; option.click(); });
     expect(host.querySelector<HTMLInputElement>('input[value="a"]')!.checked).toBe(true);
     expect(host.querySelector<HTMLInputElement>('input[value="b"]')!.checked).toBe(false);
-    expect(host.innerHTML).not.toContain('hidden');
+    expect(host.textContent).not.toContain('hidden');
+    expect(host.querySelector('input[name=channel][value=hidden]')).toBeNull();
     await act(async () => root.unmount());
   });
   it('passes scoped group selections to a controlled composer', async () => {
     const host = document.createElement('div'); document.body.appendChild(host); const root = createRoot(host); const selectIds = vi.fn();
     await act(async () => root.render(React.createElement(GroupShortcut, { groups: directory.groups, allowedIds: ['a'], onSelect: selectIds, locale: 'fr' })));
-    await act(async () => { const select = host.querySelector('select')!; select.value = 'g'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    await act(async () => host.querySelector<HTMLButtonElement>('[role=combobox]')!.click());
+    await act(async () => { const option = [...host.querySelectorAll<HTMLElement>('[role=option]')].find(item => item.textContent === directory.groups[0]!.name)!; option.click(); });
     expect(selectIds).toHaveBeenCalledWith(['a']);
     await act(async () => root.unmount());
   });

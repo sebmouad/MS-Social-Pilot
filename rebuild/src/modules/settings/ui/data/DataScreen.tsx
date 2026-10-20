@@ -18,7 +18,7 @@ export default async function DataSettingsPage() {
   return <PageFrame module="settings"><SettingsPage active="settings/data" title={t.title} locale={locale} description={fill(t.description, { workspace: viewer.membership.workspace.name })}>
     <SettingsPanel title={t.exportPanel} detail={t.exportDetail}>
       <p className={styles['settings-note']}>{t.exportNote}</p>
-      {manager ? <WorkspaceExports key={viewer.workspaceId} workspaceId={viewer.workspaceId} locale={locale} /> : <p className={styles['settings-note']}>{t.managersOnly}</p>}
+      {manager ? <WorkspaceExports key={viewer.workspaceId} workspaceId={viewer.workspaceId} workspaceName={viewer.membership.workspace.name} locale={locale} /> : <p className={styles['settings-note']}>{t.managersOnly}</p>}
     </SettingsPanel>
     <SettingsPanel title={t.deletePanel} detail={t.deleteDetail}>
       <p className={styles['settings-note']}>{t.deleteNote}</p>

@@ -53,7 +53,7 @@ describe('Team controls lifecycle', () => {
   it('uses Root defaults for new members and accepts only a complete add receipt', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => respond({ ok: true, id: 'new-membership', added: true })));
     await render({ defaultRole: 'viewer', defaultAllPages: true });
-    expect(container.querySelector<HTMLSelectElement>('form select')?.value).toBe('viewer');
+    expect(container.querySelector<HTMLInputElement>('form input[name=role]')?.value).toBe('viewer');
     expect(container.querySelector<HTMLInputElement>('form input[type="checkbox"]')?.checked).toBe(true);
 
     const dialog = await addDialog();
@@ -135,7 +135,8 @@ describe('Team controls lifecycle', () => {
     await click(button('Remove'));
     const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
     expect(dialog.textContent).toContain('Their account and access to other workspaces stay available.');
-    await confirm(dialog, 'REMOVE', 'REMOVE MEMBER member-1');
+    expect(dialog.querySelector('strong')?.textContent).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
     await click(button('Remove from workspace', dialog));
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body))).toMatchObject({ membershipId: 'member-1', confirmation: 'REMOVE MEMBER member-1' });
     expect(router.refresh).toHaveBeenCalledOnce();

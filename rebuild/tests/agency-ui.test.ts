@@ -69,8 +69,8 @@ describe('Agency sidebar filters', () => {
     expect(form.getAttribute('method')).toBe('get');
     const search = form.querySelector<HTMLInputElement>('input[name="q"]')!;
     expect(search.value).toBe('acm'); expect(search.maxLength).toBe(40); expect(search.placeholder).toBe('Workspace name');
-    expect(form.querySelector<HTMLSelectElement>('select[name="sort"]')!.value).toBe('failed');
-    expect(form.querySelector<HTMLSelectElement>('select[name="order"]')!.value).toBe('asc');
+    expect(form.querySelector<HTMLInputElement>('input[name="sort"]')!.value).toBe('failed');
+    expect(form.querySelector<HTMLInputElement>('input[name="order"]')!.value).toBe('asc');
     expect(form.querySelector<HTMLInputElement>('input[name="attention"]')!.checked).toBe(true);
     expect(form.querySelector('a[href="/agency"]')).not.toBeNull();
   });

@@ -36,29 +36,23 @@ async function check(target: HTMLInputElement, value: boolean) {
 }
 
 describe('notification inbox and personal settings', () => {
-  it('keeps edited preferences after a failed save, retries, and serializes only supported settings', async () => {
-    const fetch = vi.fn().mockResolvedValueOnce(respond({ error: 'Preferences could not be saved.' }, false)).mockResolvedValueOnce(respond({ preferences: { ...preferences, preferences: { onNoteMention: false, onQueueEmpty: true }, mutes: [{ targetId: 'private-channel-id', event: 'queueEmpty' }] } }));
+  it('saves Switch changes immediately, preserves a failed draft, and retries the reviewed values', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(respond({ error: 'Preferences could not be saved.' }, false)).mockResolvedValueOnce(respond({ preferences: { ...preferences, preferences: { onNoteMention: false, onQueueEmpty: false }, mutes: [] } }));
     vi.stubGlobal('fetch', fetch);
     await render();
-    expect(dock.textContent).toContain('Mute empty-queue emails by channel');
-    expect(dock.textContent).not.toContain('publish failure');
-    const controls = Array.from(dock.querySelectorAll<HTMLInputElement>('input[type=checkbox]'));
-    await check(controls[0]!, false);
-    await check(controls[1]!, true);
-    await check(controls[2]!, true);
+    const mention = dock.querySelector<HTMLButtonElement>('[role=switch]')!;
+    expect(mention.getAttribute('aria-checked')).toBe('true');
+    await click(mention);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(mention.getAttribute('aria-checked')).toBe('false');
+    expect(container.textContent).toContain('Preferences could not be saved.');
     await click(button('Review changes', dock));
-    let dialog = container.querySelector<HTMLDialogElement>('dialog')!;
+    const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
     expect(dialog.textContent).toContain('Note mention email: Off');
-    expect(dialog.textContent).toContain('Empty-queue email: On');
-    await click(button('Save preferences', dialog));
-    expect(dialog.open).toBe(true);
-    expect(dialog.querySelector('[role=alert]')?.textContent).toContain('Preferences could not be saved.');
-    expect(dialog.contains(document.activeElement)).toBe(true);
-    expect(controls[0]?.checked).toBe(false);
     await click(button('Save preferences', dialog));
     expect(fetch).toHaveBeenCalledTimes(2);
-    const [, request] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-    expect(JSON.parse(String(request.body))).toEqual({ onNoteMention: false, onQueueEmpty: true, mutes: [{ targetId: 'private-channel-id', event: 'queueEmpty' }], confirmation: 'UPDATE NOTIFICATION PREFERENCES' });
+    const [, request] = fetch.mock.calls[1] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(request.body))).toEqual({ onNoteMention: false, onQueueEmpty: false, mutes: [], confirmation: 'UPDATE NOTIFICATION PREFERENCES' });
     expect(container.querySelector('dialog')).toBeNull();
     expect(container.querySelector('[role=status]')?.textContent).toContain('saved');
   });

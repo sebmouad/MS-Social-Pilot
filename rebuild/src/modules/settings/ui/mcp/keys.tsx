@@ -1,6 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { DataTable, Badge, ConfirmDialog, useToast } from '@/components';
+import { IconKey } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
 import { AutoTextarea } from '@/components/AutoTextarea';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
@@ -12,6 +14,7 @@ type Feature = { id: string; name: string; module: string; moduleLabel?:string; 
 type ApiKey = { id: string; name: string; tokenPrefix: string; readFeatures: string[]; writeFeatures: string[]; resourceScope?: {mode:string;ids?:string[];adAccountIds?:string[]}|null; expiresAt: string; revokedAt: string | null; createdAt: string; lastUsedAt: string | null };
 
 export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultLifetimeDays, resources, resourcesTruncated, locale = 'en' }: { features: Feature[]; initialKeys: ApiKey[]; maxLifetimeDays: number; defaultLifetimeDays:number; resources:Array<{id:string;name:string;kind:'channel'|'adAccount'}>; resourcesTruncated:boolean; locale?: 'en' | 'fr' }) {
+  const toast = useToast();
   const t = mcpCopy[locale];
   const [keys, setKeys] = useState(initialKeys);
   const [allResources,setAllResources]=useState(false); const [selectedResources,setSelectedResources]=useState<string[]>([]); const [consent,setConsent]=useState(false); const [pendingRevoke,setPendingRevoke]=useState<string|null>(null); const inFlight=useRef(false);
@@ -48,8 +51,8 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
       setNewToken(result.token);
       setKeys(current => [{ ...result.key, revokedAt: null, createdAt: new Date().toISOString(), lastUsedAt: null }, ...current]);
       setName(''); setReadFeatures([]); setWriteFeatures([]);setConsent(false);setSelectedResources([]);setAllResources(false);
-      setNotice(t.created);
-    } catch (error) { setNotice(error instanceof Error ? error.message : t.createFailed); }
+      setNotice(t.created); toast.notify({ title: t.created });
+    } catch (error) { const message = error instanceof Error ? error.message : t.createFailed; setNotice(message); toast.failed(message, () => document.querySelector<HTMLInputElement>('[name="name"]')?.focus(), t.createKey); }
     finally { inFlight.current=false;setBusy(false); }
   }
   async function revoke(id: string) {
@@ -60,16 +63,16 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? t.revokeFailed);
       setKeys(current => current.map(key => key.id === id ? { ...key, revokedAt: new Date().toISOString() } : key));
-      setNotice(t.revoked);setPendingRevoke(null);
-    } catch (error) { setNotice(error instanceof Error ? error.message : t.revokeFailed); }
+      setNotice(t.revoked);setPendingRevoke(null); toast.notify({ title: t.revoked }); return null;
+    } catch (error) { const message = error instanceof Error ? error.message : t.revokeFailed; setNotice(message); toast.failed(message, () => setPendingRevoke(id), t.revoke); return message; }
     finally { inFlight.current=false;setBusy(false); }
   }
   async function copyToken() {
     try {
       await navigator.clipboard.writeText(newToken);
-      setCopyNotice(t.copied);
+      setCopyNotice(t.copied); toast.notify({ title: t.copied });
     } catch {
-      setCopyNotice(t.copyFailed);
+      setCopyNotice(t.copyFailed); toast.failed(t.copyFailed, () => void copyToken(), t.copyToken);
     }
   }
   return <>
@@ -98,15 +101,14 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
     </form>
     {notice && <p role="status" className={styles['settings-note']}>{notice}</p>}
     {newToken && <div className={styles['mcp-key-token']}><label htmlFor="new-api-token">{t.copyNow}</label><AutoTextarea id="new-api-token" readOnly value={tokenVisible ? newToken : '•'.repeat(Math.min(newToken.length, 48))} rows={1} autoComplete="off" aria-label={tokenVisible ? t.bearer : t.maskedBearer} onFocus={event => { if (tokenVisible) event.currentTarget.select(); }} /><Button type="button" aria-pressed={tokenVisible} aria-controls="new-api-token" onClick={() => setTokenVisible(value => !value)}>{tokenVisible ? t.hideToken : t.showToken}</Button><Button type="button" onClick={() => void copyToken()}>{t.copyToken}</Button><span id="new-api-token-copy-status" role="status">{copyNotice}</span></div>}
-    {pendingRevoke && <div role="group" aria-label={t.confirmRevoke}><p>{t.revokeWarning}</p><Button type="button" disabled={busy} variant="danger" onClick={()=>void revoke(pendingRevoke)}>{t.confirmRevokeButton}</Button><Button type="button" disabled={busy} onClick={()=>setPendingRevoke(null)}>{t.cancel}</Button></div>}
-    <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th>{t.name}</th><th>{t.scopes}</th><th>{t.expires}</th><th>{t.lastUsed}</th><th>{t.status}</th><th /></tr></thead><tbody>
-      {keys.map(key => { const inactive = Boolean(key.revokedAt) || new Date(key.expiresAt).getTime() <= Date.now(); return <tr key={key.id}>
-        <td><span className={styles['settings-table__primary']}>{key.name}</span><span className={styles['settings-table__secondary']}>{fill(t.createdOn, { prefix: key.tokenPrefix, date: new Date(key.createdAt).toLocaleDateString(locale) })}</span></td>
-        <td><span className={styles['settings-table__secondary']}>{!key.resourceScope?t.legacyScope:key.resourceScope.mode==='all'?t.allScope:fill(t.countScope, { channels: key.resourceScope.ids?.length??0, adAccounts: key.resourceScope.adAccountIds?.length??0 })}</span>{key.readFeatures.map(id => fill(key.writeFeatures.includes(id) ? t.featureWrite : t.featureRead, { name: features.find(feature => feature.id === id)?.name ?? id })).join(', ')}</td>
-        <td>{new Date(key.expiresAt).toLocaleDateString(locale)}</td><td>{key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString(locale) : t.never}</td>
-        <td>{key.revokedAt ? t.statusRevoked : inactive ? t.statusExpired : t.statusActive}</td><td>{!inactive && <Button type="button" variant="danger" aria-label={fill(t.revokeKey, { name: key.name })} onClick={() => setPendingRevoke(key.id)} disabled={busy}>{t.revoke}</Button>}</td>
-      </tr>; })}
-      {!keys.length && <tr><td colSpan={6}>{t.none}</td></tr>}
-    </tbody></table></div>
+    {pendingRevoke && <ConfirmDialog open title={t.confirmRevoke} objectName={keys.find(key => key.id === pendingRevoke)?.name ?? pendingRevoke} consequence={t.revokeWarning} confirmLabel={t.confirmRevokeButton} cancelLabel={t.cancel} failureLabel={t.revokeFailed} onClose={() => setPendingRevoke(null)} onConfirm={async () => (await revoke(pendingRevoke)) ?? null} />}
+    <DataTable caption={t.allowedFeatures} rows={keys} rowKey={key => key.id} emptyMessage={t.none} emptyIcon={<IconKey />} emptyAction={<Button onClick={() => document.querySelector<HTMLInputElement>('[name="name"]')?.focus()}>{t.createKey}</Button>} columns={[
+      { key: 'name', label: t.name, render: key => <><strong>{key.name}</strong><span className={styles['settings-table__secondary']}>{fill(t.createdOn, { prefix: key.tokenPrefix, date: new Date(key.createdAt).toLocaleDateString(locale) })}</span></> },
+      { key: 'scopes', label: t.scopes, render: key => <><span className={styles['settings-table__secondary']}>{!key.resourceScope ? t.legacyScope : key.resourceScope.mode === 'all' ? t.allScope : fill(t.countScope, { channels: key.resourceScope.ids?.length ?? 0, adAccounts: key.resourceScope.adAccountIds?.length ?? 0 })}</span>{key.readFeatures.map(id => fill(key.writeFeatures.includes(id) ? t.featureWrite : t.featureRead, { name: features.find(feature => feature.id === id)?.name ?? id })).join(', ')}</> },
+      { key: 'expires', label: t.expires, render: key => new Date(key.expiresAt).toLocaleDateString(locale) },
+      { key: 'used', label: t.lastUsed, render: key => key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString(locale) : t.never },
+      { key: 'status', label: t.status, render: key => <Badge tone={key.revokedAt || Date.parse(key.expiresAt) <= Date.now() ? 'neutral' : 'success'}>{key.revokedAt ? t.statusRevoked : Date.parse(key.expiresAt) <= Date.now() ? t.statusExpired : t.statusActive}</Badge> },
+      { key: 'actions', label: t.revoke, render: key => !key.revokedAt && Date.parse(key.expiresAt) > Date.now() && <Button variant="danger" disabled={busy} aria-label={fill(t.revokeKey, { name: key.name })} onClick={() => setPendingRevoke(key.id)}>{t.revoke}</Button> },
+    ]} />
   </>;
 }

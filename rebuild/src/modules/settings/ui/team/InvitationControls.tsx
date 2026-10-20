@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
-import { Dialog } from '@/components/Dialog';
+import { DataTable, Badge, Select, Drawer, ConfirmDialog, useToast } from '@/components';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { fill } from '@/modules/settings/ui/shell-copy';
 import { invitationCopy, teamRoleLabel } from './copy';
@@ -24,6 +24,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
   available: boolean;
   locale?: 'en' | 'fr';
 }) {
+  const toast = useToast();
   const t = invitationCopy[locale];
   const roleLabel = (role: string) => teamRoleLabel(locale, role);
   const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
@@ -62,7 +63,6 @@ export function InvitationControls({ invitations, actorRole, available, locale =
 
   const canonicalEmail = email.trim().toLowerCase();
   const inviteConfirmation = confirmationForInvite(canonicalEmail);
-  const revokeConfirmation = revoking ? confirmationForRevoke(revoking.id) : '';
   const canManage = actorRole === 'owner' || actorRole === 'admin';
   const pendingForEmail = invitations.find(item => item.status === 'pending' && item.email.trim().toLowerCase() === canonicalEmail);
 
@@ -132,7 +132,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
       const message = responseReceived
         ? error instanceof Error ? error.message : t.changeFailed
         : t.unconfirmedNetwork;
-      setFeedback({ text: message, error: true });
+      setFeedback({ text: message, error: true }); toast.failed(message, () => router.refresh(), t.list);
       return null;
     } finally {
       if (pendingRequest.current === controller) pendingRequest.current = null;
@@ -152,6 +152,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
         : result.delivery === 'failed'
           ? fill(t.failed, values)
           : fill(t.unavailableDelivery, values);
+    toast.notify({ title: text, tone: result.delivery === 'sent' ? 'success' : 'error' });
     setFeedback({ text, error: result.delivery === 'failed' || result.delivery === 'uncertain' || result.delivery === 'unavailable' });
     setInviteReview(false);
     setReissuing(null);
@@ -163,9 +164,10 @@ export function InvitationControls({ invitations, actorRole, available, locale =
   async function revokeInvitation() {
     if (!revoking) return;
     const invitation = revoking;
-    const result = await request('DELETE', { id: invitation.id, confirmation: revokeConfirmation }, invitation.id);
-    if (!result || !mounted.current) return;
-    setFeedback({ text: fill(t.revokedDone, { email: invitation.email }), error: false });
+    const result = await request('DELETE', { id: invitation.id, confirmation: confirmationForRevoke(invitation.id) }, invitation.id);
+    if (!result || !mounted.current) return t.revokeUnconfirmed;
+    const text = fill(t.revokedDone, { email: invitation.email });
+    setFeedback({ text, error: false }); toast.notify({ title: text });
     setRevoking(null);
     setConfirmation('');
     router.refresh();
@@ -188,9 +190,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
           {validation.errors.email ? <FieldError id="team-invitation-email-error">{validation.errors.email}</FieldError> : <span id="team-invitation-email-help" className={styles.hint}>{t.emailHint}</span>}
         </label>
         <label className={styles.field}>{t.workspaceRole}
-          <select value={role} disabled={busy} onChange={event => { setRole(event.currentTarget.value as (typeof ROLES)[number]); setConfirmation(''); }}>
-            {ROLES.filter(option => !(actorRole === 'admin' && option === 'owner')).map(option => <option key={option} value={option}>{roleLabel(option)}</option>)}
-          </select>
+          <Select aria-label={t.workspaceRole} value={role} disabled={busy} onChange={value => { setRole(value as (typeof ROLES)[number]); setConfirmation(''); }} options={ROLES.filter(option => !(actorRole === 'admin' && option === 'owner')).map(option => ({ value: option, label: roleLabel(option) }))} />
         </label>
       </div>
       <p className={styles.scopeNote}>{t.scopeNote}</p>
@@ -200,33 +200,26 @@ export function InvitationControls({ invitations, actorRole, available, locale =
 
     {feedback && !inviteReview && !revoking && <p ref={feedbackRef} tabIndex={-1} role={feedback.error ? 'alert' : 'status'} className={feedback.error ? styles.error : styles.success}>{feedback.text}</p>}
 
-    {invitations.length === 0 ? <p className={styles.empty}>{t.none}</p> : <div className={styles.tableWrap} role="region" aria-label={t.list} tabIndex={0}>
-      <table className={styles.table}>
-        <caption className={styles.visuallyHidden}>{t.caption}</caption>
-        <thead><tr><th scope="col">{t.email}</th><th scope="col">{t.role}</th><th scope="col">{t.status}</th><th scope="col">{t.expires}</th><th scope="col"><span className={styles.visuallyHidden}>{t.actions}</span></th></tr></thead>
-        <tbody>{invitations.map(invitation => <tr key={invitation.id}>
-          <th scope="row">{invitation.email}</th>
-          <td>{roleLabel(invitation.role)}</td>
-          <td><span className={`${styles.status} ${styles[`status_${invitation.status}`]}`}>{t.statuses[invitation.status]}</span>{invitation.acceptedAt && <span className={styles.acceptedAt}>{fill(t.accepted, { date: utcDate(invitation.acceptedAt) })}</span>}</td>
-          <td>{utcDate(invitation.expiresAt)}</td>
-          <td><div className={styles.rowActions}>
-            {canManage && invitation.status !== 'accepted' && (actorRole === 'owner' || invitation.role !== 'owner') && <Button size="sm" disabled={busy || !available} onClick={() => beginReissue(invitation)}>{t.reissue}</Button>}
-            {canManage && invitation.status === 'pending' && <Button size="sm" variant="quiet" disabled={busy} onClick={() => { setRevoking(invitation); setConfirmation(''); setFeedback(null); }}>{t.revoke}</Button>}
-            {!canManage && <span className={styles.hint}>{t.viewOnly}</span>}
-          </div></td>
-        </tr>)}</tbody>
-      </table>
-    </div>}
+    <DataTable caption={t.caption} rows={invitations} rowKey={invitation => invitation.id} emptyMessage={t.none} columns={[
+      { key: 'email', label: t.email, render: invitation => invitation.email },
+      { key: 'role', label: t.role, render: invitation => roleLabel(invitation.role) },
+      { key: 'status', label: t.status, render: invitation => <><Badge tone={invitation.status === 'expired' ? 'warning' : invitation.status === 'accepted' ? 'success' : 'module'}>{t.statuses[invitation.status]}</Badge>{invitation.acceptedAt && <span className={styles.acceptedAt}>{fill(t.accepted, { date: utcDate(invitation.acceptedAt) })}</span>}</> },
+      { key: 'expires', label: t.expires, render: invitation => utcDate(invitation.expiresAt) },
+      { key: 'actions', label: t.actions, render: invitation => <div className={styles.rowActions}>
+        {canManage && invitation.status !== 'accepted' && (actorRole === 'owner' || invitation.role !== 'owner') && <Button size="sm" disabled={busy || !available} onClick={() => beginReissue(invitation)}>{t.reissue}</Button>}
+        {canManage && invitation.status === 'pending' && <Button size="sm" variant="quiet" disabled={busy} onClick={() => { setRevoking(invitation); setConfirmation(''); setFeedback(null); }}>{t.revoke}</Button>}
+        {!canManage && <span className={styles.hint}>{t.viewOnly}</span>}
+      </div> },
+    ]} />
 
-    <Dialog open={inviteReview} title={reissuing ? t.reviewReissueTitle : t.reviewTitle} description={fill(t.reviewDetail, { email: canonicalEmail, role: roleLabel(role) })} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>{t.back}</Button><Button variant="primary" disabled={busy || confirmation !== inviteConfirmation} onClick={() => void createInvitation()}>{busy ? t.creating : reissuing ? t.reissueInvitation : t.createInvitation}</Button></>}>
+    <Drawer closeLabel={t.back} open={inviteReview} title={reissuing ? t.reviewReissueTitle : t.reviewTitle} description={fill(t.reviewDetail, { email: canonicalEmail, role: roleLabel(role) })} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>{t.back}</Button><Button variant="primary" disabled={busy || confirmation !== inviteConfirmation} onClick={() => void createInvitation()}>{busy ? t.creating : reissuing ? t.reissueInvitation : t.createInvitation}</Button></>}>
       <div className={styles.review}><p><span>{t.email}</span><strong>{canonicalEmail}</strong></p><p><span>{t.workspaceRole}</span><strong>{roleLabel(role)}</strong></p><p><span>{t.channelAccess}</span><strong>{managerRole(role) ? t.allIncluded : t.noChannels}</strong></p></div>
       {reissuing && <p className={styles.warning}>{t.reissueWarning}</p>}
       <label className={styles.confirmField}><span>{t.confirmType.split('{code}')[0]}<code>{inviteConfirmation}</code>{t.confirmType.split('{code}')[1]}</span><input autoComplete="off" value={confirmation} disabled={busy} aria-label={t.inviteAria} onChange={event => setConfirmation(event.currentTarget.value)} /></label>
       {feedback?.error && <p ref={dialogFeedbackRef} tabIndex={-1} className={styles.error} role="alert">{feedback.text}</p>}
-    </Dialog>
+    </Drawer>
 
-    <Dialog open={Boolean(revoking)} title={t.revokeTitle} description={revoking ? fill(t.revokeDetail, { email: revoking.email }) : undefined} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>{t.keepInvitation}</Button><Button variant="danger" disabled={busy || !revoking || confirmation !== revokeConfirmation} onClick={() => void revokeInvitation()}>{busy ? t.revoking : t.revokeInvitation}</Button></>}>
-      {revoking && <><p className={styles.copy}>{t.revokeCopy}</p><label className={styles.confirmField}><span>{t.confirmType.split('{code}')[0]}<code>{revokeConfirmation}</code>{t.confirmType.split('{code}')[1]}</span><input autoComplete="off" value={confirmation} disabled={busy} aria-label={t.revokeAria} onChange={event => setConfirmation(event.currentTarget.value)} /></label>{feedback?.error && <p ref={dialogFeedbackRef} tabIndex={-1} className={styles.error} role="alert">{feedback.text}</p>}</>}
-    </Dialog>
+    {revoking && <ConfirmDialog open title={t.revokeTitle} objectName={revoking.email} consequence={t.revokeCopy} confirmLabel={t.revokeInvitation} cancelLabel={t.keepInvitation} pendingLabel={t.revoking} failureLabel={t.revokeUnconfirmed} onClose={() => { if (!busy) { setRevoking(null); setConfirmation(''); } }} onConfirm={async () => (await revokeInvitation()) ?? null} />}
+
   </section>;
 }
