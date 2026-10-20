@@ -77,21 +77,20 @@ export async function requestVersionRestore(actor: PublishingActor, input: unkno
     const post = await visiblePost(tx, auth, data.postId, true);
     assertMayEdit(auth, post);
     if (LOCKED_STATUSES.has(post.status)) throw new OperationError('conflict', 'This post can no longer be edited, so an earlier version cannot be restored.');
-    const rows = await tx.$queryRaw<Array<Omit<VersionSnapshot, 'versionId'> & { id: string; currentFormat: string }>>`SELECT p.format AS "currentFormat", v.id, v.message, v."firstComment", v."firstCommentDelayMinutes", v.link, v.media, v.format, v."destinationFormats", v."targetIds", v."labelIds", v."scheduledAt", v.timezone FROM post_versions v JOIN posts p ON p.id = v."postId" WHERE v.id = ${data.versionId} AND v."postId" = ${data.postId} AND p."workspaceId" = ${actor.workspaceId}`;
+    const rows = await tx.$queryRaw<Array<Omit<VersionSnapshot, 'versionId'> & { id: string }>>`SELECT v.id, v.message, v."firstComment", v."firstCommentDelayMinutes", v.link, v.media, v.format, v."destinationFormats", v."targetIds", v."labelIds", v."scheduledAt", v.timezone FROM post_versions v JOIN posts p ON p.id = v."postId" WHERE v.id = ${data.versionId} AND v."postId" = ${data.postId} AND p."workspaceId" = ${actor.workspaceId}`;
     const row = rows[0];
     if (!row) throw new OperationError('not_found', 'This version is unavailable for the post.');
-    if (row.currentFormat !== row.format) throw new OperationError('conflict', 'This version uses a different post format and cannot be restored here. No content was changed.');
     await audit(tx, actor, 'publishing.version_restore_requested', { postId: data.postId, versionId: row.id });
-    const { id, currentFormat: _currentFormat, ...rest } = row;
+    const { id, ...rest } = row;
     return { versionId: id, ...rest } satisfies VersionSnapshot;
   }));
   // The save itself runs outside this transaction in the lifecycle (its own locks and provider-aware checks).
   let outcome;
-  try { outcome = await port.restorePostVersion({ actor, postId: data.postId, snapshot }); }
+  try { outcome = await port.restorePostVersion({ actor, postId: data.postId, snapshot, ...(data.mode ? { mode: data.mode } : {}), ...(data.reviewToken ? { reviewToken: data.reviewToken } : {}) }); }
   catch (error) {
     if (error instanceof OperationError) throw error;
     throw new OperationError('upstream_failure', 'The restore could not be confirmed. Open the post and check its current content before trying again.');
   }
-  try { await transact(actor.workspaceId, limit, tx => audit(tx, actor, 'publishing.version_restored', { postId: data.postId, versionId: snapshot.versionId, status: outcome.status, approvalReset: outcome.approvalReset })); } catch { /* the lifecycle has its own audit; the request was audited above */ }
-  return { postId: outcome.postId, versionId: snapshot.versionId, status: outcome.status, approvalReset: outcome.approvalReset };
+  if (outcome.restored !== false) try { await transact(actor.workspaceId, limit, tx => audit(tx, actor, 'publishing.version_restored', { postId: data.postId, versionId: snapshot.versionId, status: outcome.status, approvalReset: outcome.approvalReset })); } catch { /* the lifecycle has its own audit; the request was audited above */ }
+  return { postId: outcome.postId, versionId: snapshot.versionId, status: outcome.status, approvalReset: outcome.approvalReset, ...(outcome.restored === undefined ? {} : { restored: outcome.restored }), ...(outcome.review ? { review: outcome.review } : {}) };
 }

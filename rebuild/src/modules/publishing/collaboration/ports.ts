@@ -1,3 +1,4 @@
+import type { RestoreOptions, RestoreReview } from '../server/version-restore-plan';
 import type { PublishingActor } from '../server/types';
 import type { Prisma } from '../../../../generated/client';
 
@@ -24,7 +25,7 @@ export type VersionSnapshot = {
 /** Implemented by modules/publishing/server/lifecycle.ts. Restoring is an ordinary save: validation, destination
  * availability, approval reset, media checks, locks and a fresh version record all apply there. */
 export interface VersionRestorePort {
-  restorePostVersion(input: { actor: PublishingActor; postId: string; snapshot: VersionSnapshot }): Promise<{ postId: string; status: string; approvalReset: boolean }>;
+  restorePostVersion(input: { actor: PublishingActor; postId: string; snapshot: VersionSnapshot } & RestoreOptions): Promise<{ postId: string; status: string; approvalReset: boolean; restored?: boolean; review?: RestoreReview }>;
 }
 
 /** Marks that a worker executes recycle rules (creates the repeats). Without it the recycle controls stay hidden. */

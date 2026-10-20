@@ -3,6 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FieldsManager } from '../src/modules/publishing/ui/collaboration/FieldsManager';
+import { VersionHistory } from '../src/modules/publishing/ui/collaboration/VersionHistory';
 import { PostPanel } from '../src/modules/publishing/ui/collaboration/PostPanel';
 import { restoreVersionConfirmation } from '../src/modules/publishing/collaboration/schemas';
 
@@ -13,7 +14,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); document.documentElement.lang = ''; vi.unstubAllGlobals(); });
 function button(label: string) { const node = [...container.querySelectorAll('button')].find(item => item.textContent?.trim() === label); if (!node) throw new Error(`Missing ${label}`); return node as HTMLButtonElement; }
 async function click(node: HTMLElement) { await act(async () => node.click()); }
 async function setValue(node: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
@@ -56,9 +57,11 @@ describe('Publishing history batch 69 organization UX', () => {
 
   it('reviews restored content without typing an opaque id, preserves a failed dialog for retry, and announces approval reset on success', async () => {
     const version = { id: 'ver_opaque-uuid-1234', authorName: 'Editor', createdAt: '2026-10-18T12:00:00.000Z', message: 'Reviewed earlier copy', scheduledAt: null };
+    const review = { exact: false, canRestore: true, token: 'a'.repeat(64), issues: [{ code: 'format', en: 'The saved format cannot be replayed. Use Current.', fr: 'Le format enregistré ne peut pas être rétabli.' }], content: { message: version.message, targetIds: ['now'], destinationFormats: { now: 'current' }, firstComment: '', firstCommentDelayMinutes: 0, media: [], link: null } };
     const fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ postId: 'post-1', versionId: version.id, restored: false, review }) })
       .mockResolvedValueOnce({ ok: false, status: 409, json: async () => ({ error: 'A destination changed. No content was changed.' }) })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ postId: 'post-1', versionId: version.id, status: 'draft', approvalReset: true }) });
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ postId: 'post-1', versionId: version.id, status: 'draft', approvalReset: true, restored: true }) });
     vi.stubGlobal('fetch', fetch);
     await act(async () => root.render(createElement(PostPanel, {
       postId: 'post-1', canWrite: true, labels: [], assigned: [], fields: [], notes: [], mentionable: [], noteMax: 2000,
@@ -70,20 +73,36 @@ describe('Publishing history batch 69 organization UX', () => {
     let dialog = container.querySelector<HTMLDialogElement>('dialog');
     expect(dialog?.textContent).toContain('Reviewed earlier copy');
     expect(dialog?.querySelector('input')).toBeNull();
-    const restore = button('Restore version');
+    expect(dialog?.textContent).toContain('The saved format cannot be replayed');
+    const restore = button('Restore closest valid version');
     expect(restore.disabled).toBe(false);
 
     await click(restore);
+    await click(button('Confirm restore'));
     dialog = container.querySelector<HTMLDialogElement>('dialog');
     expect(dialog?.open).toBe(true);
     expect(dialog?.textContent).toContain('Reviewed earlier copy');
     expect(dialog?.querySelector('[role="alert"]')?.textContent).toContain('A destination changed');
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetch.mock.calls[0]![1]!.body as string)).toEqual({ postId: 'post-1', versionId: version.id, confirmation: restoreVersionConfirmation(version.id) });
-
-    await click(button('Restore version'));
     expect(fetch).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetch.mock.calls[1]![1]!.body as string)).toEqual({ postId: 'post-1', versionId: version.id, mode: 'closest', reviewToken: review.token, confirmation: restoreVersionConfirmation(version.id) });
+
+    await click(button('Restore closest valid version'));
+    await click(button('Confirm restore'));
+    expect(fetch).toHaveBeenCalledTimes(3);
     expect(container.querySelector('dialog')).toBeNull();
     expect(container.querySelector('[role="status"]')?.textContent).toContain('Version restored. The post needs approval again.');
   });
+  it('offers French copy and blocks an empty closest restore', async () => {
+    document.documentElement.lang = 'fr';
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ postId: 'p1', versionId: 'v1', restored: false, review: { exact: false, canRestore: false, token: 'a'.repeat(64), issues: [{ code: 'media', en: 'Media omitted.', fr: 'Médias omis.' }], content: { message: '', targetIds: [], destinationFormats: {}, firstComment: '', firstCommentDelayMinutes: 0, media: [], link: null } } }) });
+    vi.stubGlobal('fetch', fetch);
+    await act(async () => root.render(createElement(VersionHistory, { postId: 'p1', versions: [{ id: 'v1', authorName: null, createdAt: '2026-10-18T12:00:00Z', message: '' }], restore: true, canWrite: true, canRestoreNow: true, timeZone: 'UTC' })));
+    expect(container.textContent).toContain('Historique des versions');
+    expect(container.textContent).toContain('Non disponible');
+    await click(button('Restaurer'));
+    expect(container.querySelector('dialog')?.textContent).toContain('Médias omis.');
+    expect(button('Restaurer la version valide la plus proche').disabled).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
 });

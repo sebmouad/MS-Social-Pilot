@@ -1,3 +1,6 @@
+import { prepareVersionRestore } from './version-restore';
+import type { RestoreOptions } from './version-restore-plan';
+import type { VersionSnapshot } from '../collaboration/ports';
 import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { enqueueEmptyQueueNotifications } from './notification-events';
 import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
@@ -359,61 +362,66 @@ export async function createPost(actor: PublishingActor, input: { message: strin
 }
 
 export async function updatePost(actor: PublishingActor, input: { postId: string; message: string; firstComment: string; targetIds: string[] } & PostAttachments, restoreLabelIds?: readonly string[]) {
-  return withPublishingOperation(actor, { postId: input.postId, targetIds: input.targetIds }, async ({ actor, signal, lockTargets }) => {
-    const role = await membership(actor);
-    await assertPostScope(actor, input.postId);
-    const config = await limits();
-    const firstComment = validFirstComment(input.firstComment, config.maxText);
-    const firstCommentDelayMinutes = input.firstCommentDelayMinutes === undefined ? undefined : parseFirstCommentDelay(input.firstCommentDelayMinutes, await runtimeConfig('publishing.maxFirstCommentDelayMinutes'));
-    const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
-    const text = validatePostContent(input.message, config.maxText, attachments);
-    const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
-    const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
-    const retention = await loadVersionRetention();
-    const restoreLabelLimit = restoreLabelIds ? await runtimeConfig('publishing.collab.labelsPerPostLimit') : null;
-    if (restoreLabelIds && (!Number.isSafeInteger(restoreLabelLimit) || Number(restoreLabelLimit) < 1 || Number(restoreLabelLimit) > 100)) throw new OperationError('unavailable', 'Post label limits are temporarily unavailable.');
-    const saved = await publishingTransaction(signal, async tx => {
-      const existing = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, format: true, status: true, publishedAt: true, targets: { select: { id: true, targetId: true, formatId: true, status: true, remotePostId: true } } } });
-      if (!existing || (role.role === 'contributor' && existing.authorId !== actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
-      if (existing.publishedAt || ['publishing', 'published', 'partially_failed', 'scheduled'].includes(existing.status) || existing.targets.some(target => target.remotePostId || target.status === 'processing' || target.status === 'published' || target.status === 'scheduled_remote')) throw new OperationError('conflict', 'This post can no longer be edited.');
-      const destinationFormats = await resolveAuthorizedDestinationFormats(targets, input.destinationFormats, config.maxTargets, { media: uploadMedia, link: attachments.link, firstComment }, { formats: new Map(existing.targets.map(target => [target.targetId, target.formatId ?? null])), legacyFormat: existing.format });
-      await recordPostVersion(tx, existing.id, actor.userId, retention);
-      if (restoreLabelIds) {
-        if (new Set(restoreLabelIds).size !== restoreLabelIds.length || restoreLabelIds.length > Number(restoreLabelLimit)) throw new OperationError('invalid_request', `This version exceeds the current limit of ${restoreLabelLimit} post labels.`);
-        if (restoreLabelIds.length) {
-          const labels = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM labels WHERE "workspaceId" = ${actor.workspaceId} AND id = ANY(${[...restoreLabelIds]}::text[]) FOR SHARE`;
-          if (labels.length !== restoreLabelIds.length) throw new OperationError('conflict', 'A label in this version is no longer available. Nothing was changed.');
-        }
-      }
-      await tx.postTarget.deleteMany({ where: { postId: existing.id } });
-      await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, ...(firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes }), link: attachments.link, media: attachments.media, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
-      if (restoreLabelIds) {
-        await tx.$executeRaw`DELETE FROM post_labels WHERE "postId" = ${existing.id}`;
-        if (restoreLabelIds.length) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") SELECT ${existing.id}, restore_ids.label_id FROM unnest(${[...restoreLabelIds]}::text[]) AS restore_ids(label_id)`;
-      }
-      // Review covers the exact content and destinations that were reviewed.
-      // The guarded raw update only changes previously approved posts; managers
-      // retain their publishing bypass while contributors need fresh review.
-      const reset = await tx.$executeRaw`UPDATE posts SET "approvalStatus" = 'pending', "reviewedById" = NULL, "reviewedAt" = NULL, "reviewNote" = NULL WHERE id = ${existing.id} AND "workspaceId" = ${actor.workspaceId} AND "approvalStatus" = 'approved'`;
-      await recordPostVersion(tx, existing.id, actor.userId, retention);
-      if (existing.authorId !== actor.userId) await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: randomUUID(), kind: 'draft_updated', postId: existing.id });
-      await audit(tx, actor, 'publishing.post_updated', { postId: existing.id, targetCount: targets.length });
-      return { status: existing.status, approvalReset: reset === 1 };
-    });
-    return restoreLabelIds ? saved : undefined;
+  return withPublishingOperation(actor, { postId: input.postId, targetIds: input.targetIds }, async ({ actor, signal }) => {
+    return updatePostInOperation(actor, input, signal, restoreLabelIds);
   });
 }
 
-/** Lifecycle port for version restoration. The save path rechecks current rights and only restores local draft/rejected content. */
-export async function restorePostVersion(input: { actor: PublishingActor; postId: string; snapshot: { message: string; firstComment: string | null; firstCommentDelayMinutes?: number; link: string | null; media: unknown; format?: string; destinationFormats?: Record<string,string>; targetIds: string[]; labelIds: string[] } }) {
-  if (!Array.isArray(input.snapshot.media)) throw new OperationError('invalid_request', 'This saved version has invalid media and cannot be restored.');
-  const result = await updatePost(input.actor, {
-    postId: input.postId, message: input.snapshot.message, firstComment: input.snapshot.firstComment ?? '', firstCommentDelayMinutes: input.snapshot.firstCommentDelayMinutes ?? 0, link: input.snapshot.link ?? undefined,
-    media: input.snapshot.media as PublishMedia[], targetIds: input.snapshot.targetIds,
-    destinationFormats: input.snapshot.format !== undefined || input.snapshot.destinationFormats !== undefined ? Object.fromEntries(input.snapshot.targetIds.map(id=>[id,input.snapshot.destinationFormats?.[id] ?? input.snapshot.format])) : undefined,
-  }, input.snapshot.labelIds);
-  if (!result) throw new OperationError('upstream_failure', 'The restore could not be confirmed. Open the post and check its current content before trying again.');
-  return { postId: input.postId, status: result.status, approvalReset: result.approvalReset };
+async function updatePostInOperation(actor: PublishingActor, input: { postId: string; message: string; firstComment: string; targetIds: string[] } & PostAttachments, signal: AbortSignal, restoreLabelIds?: readonly string[]) {
+  const role = await membership(actor);
+  await assertPostScope(actor, input.postId);
+  const config = await limits();
+  const firstComment = validFirstComment(input.firstComment, config.maxText);
+  const firstCommentDelayMinutes = input.firstCommentDelayMinutes === undefined ? undefined : parseFirstCommentDelay(input.firstCommentDelayMinutes, await runtimeConfig('publishing.maxFirstCommentDelayMinutes'));
+  const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
+  const text = validatePostContent(input.message, config.maxText, attachments);
+  const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
+  const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment), attachments.link);
+  const retention = await loadVersionRetention();
+  const restoreLabelLimit = restoreLabelIds ? await runtimeConfig('publishing.collab.labelsPerPostLimit') : null;
+  if (restoreLabelIds && (!Number.isSafeInteger(restoreLabelLimit) || Number(restoreLabelLimit) < 1 || Number(restoreLabelLimit) > 100)) throw new OperationError('unavailable', 'Post label limits are temporarily unavailable.');
+  const saved = await publishingTransaction(signal, async tx => {
+    const existing = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, format: true, status: true, publishedAt: true, targets: { select: { id: true, targetId: true, formatId: true, status: true, remotePostId: true } } } });
+    if (!existing || (role.role === 'contributor' && existing.authorId !== actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
+    if (existing.publishedAt || ['publishing', 'published', 'partially_failed', 'scheduled'].includes(existing.status) || existing.targets.some(target => target.remotePostId || target.status === 'processing' || target.status === 'published' || target.status === 'scheduled_remote')) throw new OperationError('conflict', 'This post can no longer be edited.');
+    const destinationFormats = await resolveAuthorizedDestinationFormats(targets, input.destinationFormats, config.maxTargets, { media: uploadMedia, link: attachments.link, firstComment }, { formats: new Map(existing.targets.map(target => [target.targetId, target.formatId ?? null])), legacyFormat: existing.format });
+    await recordPostVersion(tx, existing.id, actor.userId, retention);
+    if (restoreLabelIds) {
+      if (new Set(restoreLabelIds).size !== restoreLabelIds.length || restoreLabelIds.length > Number(restoreLabelLimit)) throw new OperationError('invalid_request', `This version exceeds the current limit of ${restoreLabelLimit} post labels.`);
+      if (restoreLabelIds.length) {
+        const labels = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM labels WHERE "workspaceId" = ${actor.workspaceId} AND id = ANY(${[...restoreLabelIds]}::text[]) FOR SHARE`;
+        if (labels.length !== restoreLabelIds.length) throw new OperationError('conflict', 'A label in this version is no longer available. Nothing was changed.');
+      }
+    }
+    await tx.postTarget.deleteMany({ where: { postId: existing.id } });
+    await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, ...(firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes }), link: attachments.link, media: attachments.media, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, formatId: destinationFormats[target.id], status: 'pending' as const })) } } });
+    if (restoreLabelIds) {
+      await tx.$executeRaw`DELETE FROM post_labels WHERE "postId" = ${existing.id}`;
+      if (restoreLabelIds.length) await tx.$executeRaw`INSERT INTO post_labels ("postId", "labelId") SELECT ${existing.id}, restore_ids.label_id FROM unnest(${[...restoreLabelIds]}::text[]) AS restore_ids(label_id)`;
+    }
+    // Review covers the exact content and destinations that were reviewed.
+    // The guarded raw update only changes previously approved posts; managers
+    // retain their publishing bypass while contributors need fresh review.
+    const reset = await tx.$executeRaw`UPDATE posts SET "approvalStatus" = 'pending', "reviewedById" = NULL, "reviewedAt" = NULL, "reviewNote" = NULL WHERE id = ${existing.id} AND "workspaceId" = ${actor.workspaceId} AND "approvalStatus" = 'approved'`;
+    await recordPostVersion(tx, existing.id, actor.userId, retention);
+    if (existing.authorId !== actor.userId) await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: randomUUID(), kind: 'draft_updated', postId: existing.id });
+    await audit(tx, actor, 'publishing.post_updated', { postId: existing.id, targetCount: targets.length });
+    return { status: existing.status, approvalReset: reset === 1 };
+  });
+  return restoreLabelIds ? saved : undefined;
+}
+
+/** Preview and save share the post/destination operation locks. No saved destination is reintroduced. */
+export async function restorePostVersion(input: { actor: PublishingActor; postId: string; snapshot: VersionSnapshot } & RestoreOptions) {
+  return withPublishingOperation(input.actor, { postId: input.postId }, async ({ actor, signal }) => {
+    const review = await prepareVersionRestore(actor, input.postId, input.snapshot);
+    if (input.mode === 'preview' || (!review.exact && input.mode !== 'closest')) return { postId: input.postId, status: 'review_required', approvalReset: false, restored: false, review };
+    if (!review.canRestore) throw new OperationError('invalid_request', 'No valid content remains. Edit the post to add text, a link or compatible media.');
+    if (input.mode === 'closest' && input.reviewToken !== review.token) throw new OperationError('conflict', 'The restore proposal changed. Review it again before restoring.');
+    const result = await updatePostInOperation(actor, { postId: input.postId, ...review.content, link: review.content.link ?? undefined }, signal, input.snapshot.labelIds);
+    if (!result) throw new OperationError('upstream_failure', 'The restore could not be confirmed. Open the post and check its current content before trying again.');
+    return { postId: input.postId, status: result.status, approvalReset: result.approvalReset, restored: true, review };
+  });
 }
 
 /** Shared durable deletion service owns dispatch, receipts and local recovery. */

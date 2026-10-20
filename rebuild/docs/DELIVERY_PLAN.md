@@ -465,3 +465,8 @@ actual PostgreSQL/FK/concurrency and SMTP checks, then browser theme/viewport an
 MCP transport verification. Unit/render/DOM checks do not close those gates.
 This worktree is branch-commit only by explicit instruction: no push, deployment,
 servers, install or client generation. Full project goal remains active.
+
+Version restore branch checkpoint (2026-10-20): current-destination catalog
+validation and explicit closest-valid restore implemented in Publishing;
+UI/HTTP/MCP use one guarded service. Unit/DOM evidence and verification gaps are
+recorded in PUBLISHING_HISTORY.md. No provider expansion or cutover is implied.

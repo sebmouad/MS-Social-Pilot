@@ -279,13 +279,13 @@ describe('version history', () => {
     expect(port.restorePostVersion).not.toHaveBeenCalled();
   });
 
-  it('refuses a version whose saved format differs instead of silently losing it', async () => {
-    const port = { restorePostVersion: vi.fn() };
+  it('delegates cross-format validation to the shared lifecycle restore service', async () => {
+    const port = { restorePostVersion: vi.fn().mockResolvedValue({ postId: 'p1', status: 'review_required', approvalReset: false, restored: false }) };
     registerCollaborationPorts({ versions: port });
     when('FROM post_versions v JOIN posts p', () => [{ ...version, format: 'other-format' }]);
-    await expect(requestVersionRestore(actor, restore)).rejects.toMatchObject({ code: 'conflict' });
-    expect(port.restorePostVersion).not.toHaveBeenCalled();
-    expect(audited('publishing.version_restore_requested')).toBe(false);
+    await expect(requestVersionRestore(actor, { ...restore, mode: 'preview' })).resolves.toMatchObject({ restored: false });
+    expect(port.restorePostVersion).toHaveBeenCalledWith(expect.objectContaining({ mode: 'preview', snapshot: expect.objectContaining({ format: 'other-format' }) }));
+    expect(audited('publishing.version_restored')).toBe(false);
   });
 
   it('records versions through a lifecycle helper, pruning only after an insert', async () => {

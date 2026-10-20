@@ -1,10 +1,11 @@
 'use client';
 
+import { VersionHistory } from './VersionHistory';
 import { AutoTextarea } from '@/components/AutoTextarea';
 
 import { useState } from 'react';
 import { Button } from '@/components/Button';
-import { addNoteConfirmation, assignConfirmation, deleteNoteConfirmation, restoreVersionConfirmation, setFieldValuesConfirmation, setRecycleConfirmation } from '@/modules/publishing/collaboration/schemas';
+import { addNoteConfirmation, assignConfirmation, deleteNoteConfirmation, setFieldValuesConfirmation, setRecycleConfirmation } from '@/modules/publishing/collaboration/schemas';
 import { ConfirmDialog, send, useAction } from './collab-client';
 import styles from './collaboration.module.css';
 
@@ -20,7 +21,7 @@ export function PostPanel(p: { postId: string; canWrite: boolean; labels: Label[
     <LabelsSection {...p} />
     <FieldsSection {...p} valueMax={p.fieldValueMax} />
     <NotesSection {...p} canAdd={p.notesCanAdd !== false} />
-    {(p.restore || p.versions.length > 0) && <VersionsSection {...p} />}
+    {(p.restore || p.versions.length > 0) && <VersionHistory {...p} />}
     {p.recycle && <RecycleSection timeZone={p.timeZone} postId={p.postId} canWrite={p.canWrite} initial={p.recycle} />}
   </div>;
 }
@@ -116,26 +117,6 @@ function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, 
   </section>;
 }
 
-function VersionsSection({ postId, versions, restore, canWrite, canRestoreNow, timeZone }: { postId: string; versions: Version[]; restore: boolean; canWrite: boolean; canRestoreNow: boolean; timeZone: string }) {
-  const [target, setTarget] = useState<Version | null>(null);
-  const action = useAction();
-  async function apply(v: Version) {
-    const ok = await action.run(async () => {
-      const result = await send<{ postId: string; versionId: string; approvalReset: boolean }>('POST', '/api/publishing/versions', { postId, versionId: v.id, confirmation: restoreVersionConfirmation(v.id) });
-      if (result.postId !== postId || result.versionId !== v.id) throw new Error('The restore could not be verified. Open the post and check its content.');
-      return result.approvalReset ? 'Version restored. The post needs approval again.' : 'Version restored.';
-    });
-    if (ok) setTarget(null);
-  }
-  return <section className={styles.section} aria-labelledby="versions-title"><h2 id="versions-title">Version history</h2>
-    {action.banner}
-    {versions.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Saved versions</caption><thead><tr><th scope="col">Saved</th><th scope="col">By</th><th scope="col">Text</th>{restore && canWrite && canRestoreNow && <th scope="col">Actions</th>}</tr></thead>
-      <tbody>{versions.map(v => <tr key={v.id}><th scope="row">{when(v.createdAt, timeZone)}</th><td>{v.authorName ?? 'Unknown'}</td><td><span className={styles.msg}>{v.message || 'No text'}</span></td>{restore && canWrite && canRestoreNow && <td><Button size="sm" disabled={action.busy} onClick={() => setTarget(v)}>Restore</Button></td>}</tr>)}</tbody></table></div>
-      : <p className={styles.empty}>No earlier versions are stored for this post yet.</p>}
-    <ConfirmDialog feedback={action.feedback} open={Boolean(target)} title="Restore this version" confirmationMode="review" description="Restore this version's text, first comment, link, media, destinations and labels. The current schedule, time zone and post format stay unchanged. Usual checks and approvals apply; nothing is published. Your current content stays in history." confirmation={target ? restoreVersionConfirmation(target.id) : ''} actionLabel="Restore version" busy={action.busy} onCancel={() => setTarget(null)} onConfirm={() => target && void apply(target)}>
-      {target && <p className={styles.note}>{target.message || 'No text'}</p>}</ConfirmDialog>
-  </section>;
-}
 
 function RecycleSection({ postId, canWrite, initial, timeZone }: { postId: string; canWrite: boolean; initial: Recycle; timeZone: string }) {
   const [state, setState] = useState(initial);
