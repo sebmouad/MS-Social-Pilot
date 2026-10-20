@@ -76,6 +76,9 @@ vi.mock('../src/modules/publishing/server/publication', () => ({ getPublicationS
 const media = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), remove: vi.fn(), upload: vi.fn() }));
 vi.mock('@/modules/publishing/server/media/storage', () => ({ listWorkspaceImages: media.list, getWorkspaceImageMetadata: media.get, deleteUnusedWorkspaceImage: media.remove, uploadWorkspaceImage: media.upload }));
 
+// Host tests isolate the shared read boundary; service authority has dedicated parity tests.
+vi.mock('../src/modules/ads/server/read-policy', () => ({ loadAdsReadPolicy: async () => ({ pageSize: 100, maxRows: 100000 }) }));
+vi.mock('../src/modules/ads/server/access', () => ({ authorizeAdsRead: async (actor: { userId: string; workspaceId: string; allowedTargetIds?: string[]; allowedAdAccountIds?: string[]; allowedPlatformIds?: string[] }) => ({ actor: { userId: actor.userId, workspaceId: actor.workspaceId, allowedTargetIds: actor.allowedTargetIds, ...(actor.allowedAdAccountIds === undefined ? {} : { allowedAdAccountIds: actor.allowedAdAccountIds }) }, allowedTargetIds: actor.allowedTargetIds, allowedAdAccountIds: actor.allowedAdAccountIds, allowedProviders: actor.allowedPlatformIds ?? ['facebook'] }) }));
 import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
 import { resolvePermissions } from '../src/server/permissions';
 import { OperationError } from '../src/lib/operation-error';
@@ -711,8 +714,7 @@ describe('MCP workspace boundaries', () => {
   });
   it('paginates the manager-only ad account directory beyond the Root result cap', async () => {
     const limited = { ...viewer, maxResultItems: 1 };
-    db.adAccount.findMany.mockResolvedValueOnce([{ id: 'account-a' }]).mockResolvedValueOnce([{ id: 'account-b' }]);
-    db.adAccount.count.mockResolvedValue(2);
+    adsQueries.accounts.mockResolvedValue([{ id: 'account-a' }, { id: 'account-b' }]);
     const readPage = (offset: number) => handleMcpMessage(limited, { jsonrpc: '2.0', id: 61 + offset, method: 'tools/call', params: { name: 'list_ad_accounts', arguments: { offset, limit: 1 } } });
     const first = (await (await readPage(0)).json()).result.structuredContent;
     expect(first.accounts).toEqual([{ id: 'account-a' }]);
@@ -720,7 +722,7 @@ describe('MCP workspace boundaries', () => {
     const second = (await (await readPage(1)).json()).result.structuredContent;
     expect(second.accounts).toEqual([{ id: 'account-b' }]);
     expect(second.nextOffset).toBeNull();
-    expect(db.adAccount.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ workspaceId: 'workspace-a', enabled: true, socialAccount: { is: expect.objectContaining({ workspaceId: 'workspace-a', invalidatedAt: null, provider: { in: ['facebook'] } }) } }), skip: 1, take: 1 }));
+    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', undefined, ['facebook'], undefined);
   });
   it('paginates every point and row for an authorized Analytics metric', async () => {
     const limited = { ...viewer, maxResultItems: 1, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };

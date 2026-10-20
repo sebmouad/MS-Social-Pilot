@@ -1,3 +1,4 @@
+import { SESSION_ONLY_MCP_FEATURES } from './session-policy';
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { PAGES } from '@/lib/product';
@@ -22,9 +23,9 @@ async function policy(){
  if(!parsed.success)throw new OperationError('unavailable','API key policy is unavailable.');
  return parsed.data;
 }
-async function authorize(actor:Actor){
+async function authorize(actor:Actor,write=true){
  const [user,permissions,entitlements]=await Promise.all([prisma.user.findUnique({where:{id:actor.userId},select:{disabledAt:true}}),loadPermissions(actor.userId,actor.workspaceId),loadEntitlements(actor.userId,actor.workspaceId,{allowInstallationInspection:false})]);
- if(!user||user.disabledAt||!permissions||!entitlements||!canUseFeature(entitlements,'settings/mcp')||!canAccessFeature(permissions,'settings/mcp','write'))throw denied();
+ if(!user||user.disabledAt||!permissions||!entitlements||!canUseFeature(entitlements,'settings/mcp')||!canAccessFeature(permissions,'settings/mcp',write?'write':'read'))throw denied();
  return {permissions,entitlements};
 }
 type Tx=Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -44,6 +45,7 @@ async function audit(tx:Tx,actor:Actor,action:string,detail:Record<string,unknow
 export async function issueMcpKey(actor:Actor,input:unknown){
  const parsed=createSchema.safeParse(input);if(!parsed.success)throw bad();const data=parsed.data;
  if(data.confirmation!==`CREATE MCP KEY ${data.name}`||data.writeFeatures.some(f=>!data.readFeatures.includes(f)))throw bad();
+ if(data.readFeatures.some(feature=>SESSION_ONLY_MCP_FEATURES.has(feature)))throw denied();
  const [auth,bounds]=await Promise.all([authorize(actor),policy()]);
  let scope;try{scope=parseResourceScope(data.resourceScope,bounds['mcp.keys.maxResourceIds']);}catch{throw bad();}if(!scope)throw bad();
  if(data.expiresInDays>bounds['mcp.keys.maxLifetimeDays'])throw new OperationError('invalid_request',`Key lifetime cannot exceed ${bounds['mcp.keys.maxLifetimeDays']} days.`);
@@ -87,4 +89,19 @@ export async function revokeMcpKey(actor:Actor,input:unknown){
   if(changed!==1)throw new OperationError('not_found','Active API key not found in this workspace.');
   await audit(tx,actor,'mcp.key_revoked',{keyId:parsed.data.id});return {revoked:true};
  },{timeout:bounds['mcp.keys.transactionTimeoutMs'],maxWait:bounds['mcp.keys.transactionMaxWaitMs']});
+}
+
+/** Shared bounded directory; raw token hashes and credentials are never selected. */
+export async function listMcpKeys(actor:Actor,input:unknown={},maxItems?:number) {
+ const parsed=z.object({offset:z.number().int().safe().nonnegative().optional()}).strict().safeParse(input);
+ if(!parsed.success)throw bad();
+ await authorize(actor,false);
+ const membership=await prisma.membership.findUnique({where:{userId_workspaceId:{userId:actor.userId,workspaceId:actor.workspaceId}},select:{role:true}});
+ if(!membership||!['owner','admin'].includes(membership.role))throw denied();
+ const offset=parsed.data.offset??0;
+ const configured=await runtimeConfigBatch(['mcp.keys.historyPageSize']).then(values=>z.number().int().positive().parse(values['mcp.keys.historyPageSize']));
+ const limit=maxItems===undefined?configured:Math.min(configured,z.number().int().positive().parse(maxItems));
+ type KeyRow={id:string;name:string;tokenPrefix:string;readFeatures:string[];writeFeatures:string[];resourceScope:{mode:string;ids?:string[];adAccountIds?:string[]}|null;expiresAt:Date;revokedAt:Date|null;createdAt:Date;lastUsedAt:Date|null};
+ const rows=await prisma.$queryRaw<KeyRow[]>`SELECT id,name,"tokenPrefix","readFeatures","writeFeatures","resourceScope","expiresAt","revokedAt","createdAt","lastUsedAt" FROM mcp_api_keys WHERE "workspaceId"=${actor.workspaceId} ORDER BY "createdAt" DESC,id LIMIT ${limit+1} OFFSET ${offset}`;
+ return {keys:rows.slice(0,limit),nextOffset:rows.length>limit?offset+limit:null};
 }

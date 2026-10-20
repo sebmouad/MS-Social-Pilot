@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 
+import { accountConfirmationCopy } from '../src/modules/settings/account-confirmation-copy';
 import { AccountManager } from '../src/modules/settings/ui/account/manager';
 import { McpKeyManager } from '../src/modules/settings/ui/mcp/keys';
 import { TeamControls } from '../src/modules/settings/ui/team/TeamControls';
@@ -35,7 +36,7 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 
 describe('settings form validation', () => {
   it('associates and focuses a missing profile name without sending a request', async () => {
-    await render(createElement(AccountManager, { initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 12, maxBytes: 800 } }));
+    await render(createElement(AccountManager, { canWrite: true, nameMaxLength: 100, confirmationCopy: accountConfirmationCopy.en, initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 12, maxBytes: 800 } }));
     const form = container.querySelector('form')!;
     const name = form.querySelector<HTMLInputElement>('[name="name"]')!;
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
@@ -64,7 +65,7 @@ describe('settings form validation', () => {
   });
 
   it('shows and focuses the missing current password before changing credentials', async () => {
-    await render(createElement(AccountManager, { initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 12, maxBytes: 800 } }));
+    await render(createElement(AccountManager, { canWrite: true, nameMaxLength: 100, confirmationCopy: accountConfirmationCopy.en, initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 12, maxBytes: 800 } }));
     const form = container.querySelectorAll('form')[1]!;
     const password = form.querySelector<HTMLInputElement>('[name="currentPassword"]')!;
     vi.mocked(fetch).mockClear();
@@ -76,7 +77,7 @@ describe('settings form validation', () => {
   });
 
   it('checks the password byte limit in UTF-8 before sending credentials', async () => {
-    await render(createElement(AccountManager, { initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 2, maxBytes: 4 } }));
+    await render(createElement(AccountManager, { canWrite: true, nameMaxLength: 100, confirmationCopy: accountConfirmationCopy.en, initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 2, maxBytes: 4 } }));
     const form = container.querySelectorAll('form')[1]!;
     const current = form.querySelector<HTMLInputElement>('[name="currentPassword"]')!;
     const next = form.querySelector<HTMLInputElement>('[name="newPassword"]')!;
@@ -172,4 +173,23 @@ describe('settings form validation', () => {
     expect(container.querySelector('#new-api-token-copy-status')?.textContent).not.toContain('clipboard denied');
     expect(container.querySelector('#new-api-token-copy-status')?.textContent).not.toContain('sp_secret_token_value');
   });
+});
+
+it('confirms a profile write before sending the shared-service confirmation', async () => {
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value() { this.open = true; } });
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value() { this.open = false; } });
+  await render(createElement(AccountManager, { canWrite: true, nameMaxLength: 100, confirmationCopy: accountConfirmationCopy.en, initialName: 'Samira', email: 'samira@example.test', passwordPolicy: { minLength: 12, maxBytes: 800 } }));
+  const form = container.querySelector('form')!;
+  const input = form.querySelector<HTMLInputElement>('[name="name"]')!;
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  await act(async () => { setter.call(input, 'New name'); input.dispatchEvent(new Event('input', { bubbles: true })); });
+  vi.mocked(fetch).mockClear();
+  await submit(form);
+  expect(fetch).not.toHaveBeenCalled();
+  const dialog = document.querySelector('dialog')!;
+  expect(dialog.textContent).toContain('Save this profile name?');
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ name: 'New name' }) } as Response);
+  const button = [...dialog.querySelectorAll('button')].find(item => item.textContent === 'Confirm')!;
+  await act(async () => button.click());
+  expect(fetch).toHaveBeenCalledWith('/api/settings/account', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ name: 'New name', confirmation: 'UPDATE ACCOUNT PROFILE' }) }));
 });

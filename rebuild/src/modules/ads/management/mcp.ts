@@ -1,11 +1,13 @@
 import { assertAdsResultCeiling, validateAdsResultCeiling } from '../result-ceiling';
 import { OperationError } from '@/lib/operation-error';
-import { listAdsCreativeSources, listAdsCreatives, listAdsOperations, performAdsManagement, previewAdsManagement, resolveAdsOperation, type AdsManageActor } from './server';
+import { describeAdsManagement, readAdsCreativeImage, listAdsCreativeSources, listAdsCreatives, listAdsOperations, performAdsManagement, previewAdsManagement, resolveAdsOperation, type AdsManageActor } from './server';
 
 const operation = { type: 'object', description: 'A neutral change: {type: status.set|budget.set|rename|creative.assign|delete, objectType, objectId, ...fields} or a paused creation: {type:"campaign.create", objectType:"campaign", name, objective} / {type:"adset.create", objectType:"adset", parentId (existing campaign id), name, dailyBudgetMinor, countryCode, optimizationGoal}. Creative creation: {type:"creative.create", objectType:"creative", name, targetId (selected channel), mediaId (stored workspace image filename), format:"image"|"link", message, title, linkUrl (HTTPS, required only for link)}. Creatives are unattached and cannot deliver or spend. Creations carry no objectId or status. Campaigns and ad sets start paused; creatives have no delivery state and stay unattached. Only changes the account advertises will succeed.' };
-export const adsManagementTools = new Set(['preview_ads_change', 'apply_ads_change', 'list_ads_changes', 'resolve_ads_change', 'list_ads_creatives', 'list_ads_creative_sources']);
+export const adsManagementTools = new Set(['get_ads_management_options', 'get_ads_creative_image', 'preview_ads_change', 'apply_ads_change', 'list_ads_changes', 'resolve_ads_change', 'list_ads_creatives', 'list_ads_creative_sources']);
 export const adsManagementWriteTools = new Set(['apply_ads_change', 'resolve_ads_change']);
 export const adsManagementToolDefinitions = [
+  { name: 'get_ads_management_options', description: 'Read currently usable management operations and Root-managed limits for an account. Unavailable operations are omitted.', inputSchema: { type: 'object', required: ['adAccountId'], properties: { adAccountId: { type: 'string' } }, additionalProperties: false } },
+  { name: 'get_ads_creative_image', description: 'Read a bounded stored workspace image available for creative creation as base64 with its MIME type. Requires current account management access.', inputSchema: { type: 'object', required: ['adAccountId', 'mediaId'], properties: { adAccountId: { type: 'string' }, mediaId: { type: 'string' } }, additionalProperties: false } },
   { name: 'list_ads_creative_sources', description: 'List selected channel identities and stored workspace images for creative creation. Continue with imageAfter or targetOffset.', inputSchema: { type: 'object', required: ['adAccountId'], properties: { adAccountId: { type: 'string' }, imageAfter: { type: 'string' }, targetOffset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'preview_ads_change', description: 'Validate an ad change and return the exact confirmation text and whether it can change spend. Makes no change.', inputSchema: { type: 'object', required: ['adAccountId', 'operation'], properties: { adAccountId: { type: 'string' }, operation }, additionalProperties: false } },
   { name: 'apply_ads_change', description: 'Apply an object change, create an unattached creative, or create a paused campaign/ad set after repeating the exact confirmation from preview_ads_change. An unknown outcome is recorded and must be resolved; it is never retried automatically. An error may include attempt:"not_dispatched": that describes only that one call. It does not prove an earlier call with the same requestId was not recorded, so after any lost or failed response keep reusing the same requestId and check list_ads_changes before creating anything new.', inputSchema: { type: 'object', required: ['adAccountId', 'operation', 'confirmation', 'requestId'], properties: { adAccountId: { type: 'string' }, operation, confirmation: { type: 'string' }, requestId: { type: 'string', description: 'Unique client request ID; reuse exactly for retries of this same confirmed change.' } }, additionalProperties: false } },
@@ -15,6 +17,7 @@ export const adsManagementToolDefinitions = [
 ];
 export async function executeAdsManagementTool(actor: AdsManageActor, name: string, args: Record<string, unknown>, maxResultItems?: number) {
   const allowed: Record<string, string[]> = {
+    get_ads_management_options: ['adAccountId'], get_ads_creative_image: ['adAccountId', 'mediaId'],
     list_ads_creative_sources: ['adAccountId', 'imageAfter', 'targetOffset', 'limit'], preview_ads_change: ['adAccountId', 'operation'], apply_ads_change: ['adAccountId', 'operation', 'confirmation', 'requestId'], list_ads_changes: ['adAccountId', 'status', 'offset', 'limit'],
     resolve_ads_change: ['operationId', 'resolution', 'note', 'confirmation'], list_ads_creatives: ['adAccountId', 'after', 'limit'],
   };
@@ -32,6 +35,14 @@ export async function executeAdsManagementTool(actor: AdsManageActor, name: stri
   };
   const a = input as never;
   switch (name) {
+    case 'get_ads_management_options':
+      if (typeof input.adAccountId !== 'string' || !input.adAccountId) throw new OperationError('invalid_request', 'Choose an advertising account.');
+      return describeAdsManagement(actor, input.adAccountId);
+    case 'get_ads_creative_image': {
+      if (typeof input.adAccountId !== 'string' || !input.adAccountId || typeof input.mediaId !== 'string' || !input.mediaId) throw new OperationError('invalid_request', 'Choose an advertising account and image.');
+      const image = await readAdsCreativeImage(actor, { adAccountId: input.adAccountId, mediaId: input.mediaId });
+      return { mimeType: image.mimeType, byteLength: image.bytes.length, base64: Buffer.from(image.bytes).toString('base64') };
+    }
     case 'list_ads_creative_sources': {
       const result = await listAdsCreativeSources(actor, a);
       if (maxResultItems !== undefined && (result.targets.length > maxResultItems || result.images.length > maxResultItems)) throw new OperationError('invalid_request', 'The sources page exceeds the current result limit.');
