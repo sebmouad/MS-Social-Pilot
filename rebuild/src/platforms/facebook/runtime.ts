@@ -1,4 +1,7 @@
-import { createFacebookAdapter, createFacebookEngine } from '@/platforms/facebook/publishing';
+import { createFacebookAdapter, createFacebookEngine, type FacebookNativePublishingPolicy } from '@/platforms/facebook/publishing';
+import { createFacebookNativePublisher } from './formats/publish';
+import { inspectMediaSnapshot } from '@/modules/publishing/server/media/inspect';
+import { resolveRemoteMediaSnapshot } from '@/modules/publishing/server/media/resolve-remote';
 import type { FacebookConfig } from '@/platforms/facebook/config';
 import { runtimeConfig, runtimeConfigBatch, runtimeSecret } from '@/server/config/store';
 import { facebookMediaJournal } from './media-journal';
@@ -34,11 +37,38 @@ export async function configuredFacebookEngine(options?: { signal?: AbortSignal 
   return createFacebookEngine(await configuredFacebookConfig(), transport, facebookMediaJournal);
 }
 export async function configuredFacebookAdapter() {
-  const [config, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, feedFormatLabel] = await Promise.all([
+  const [config, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, feedFormatLabel, native] = await Promise.all([
     configuredFacebookConfig(), configured<string[]>('meta.postReadScopes'), configured<string[]>('meta.postPublishScopes'),
     configured<string[]>('meta.postDeleteScopes'), configured<string[]>('meta.firstCommentScopes'), configured<string>('meta.feedFormatLabel'),
+    configuredFacebookNativePublishing(),
   ]);
-  return createFacebookAdapter(config, fetch, { feedFormatLabel, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal });
+  return createFacebookAdapter(config, fetch, { feedFormatLabel, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal, ...(native ? { native } : {}) });
+}
+
+/** Private switch: native formats are declared only while it is on and the native policy is valid. */
+export async function configuredFacebookNativePublishing(): Promise<FacebookNativePublishingPolicy | null> {
+  try {
+    const enabled = await configured<boolean>('facebook.native.publishingEnabled');
+    if (enabled !== true) return null;
+    const [{ policy }, videoLabel, reelLabel] = await Promise.all([
+      configuredFacebookNativeSettings(), configured<string>('facebook.native.videoFormatLabel'), configured<string>('facebook.native.reelFormatLabel'),
+    ]);
+    const inspected = (snapshot: Awaited<ReturnType<typeof inspectMediaSnapshot>> | Awaited<ReturnType<typeof resolveRemoteMediaSnapshot>>) => ({
+      bytes: snapshot.bytes, mimeType: snapshot.mimeType, sizeBytes: snapshot.sizeBytes, width: snapshot.width, height: snapshot.height,
+      ...(snapshot.durationSeconds !== undefined ? { durationSeconds: snapshot.durationSeconds } : {}),
+    });
+    return {
+      videoLabel, reelLabel,
+      publish: createFacebookNativePublisher({
+        policy,
+        transport: async (accessToken, signal) => configuredFacebookNativeTransport(accessToken, { signal }),
+        inspect: async (bytes, signal) => inspected(await inspectMediaSnapshot(bytes, 'video', { signal })),
+        resolveRemote: async (url, signal) => inspected(await resolveRemoteMediaSnapshot(url, 'video', { signal })),
+      }),
+    };
+  } catch {
+    return null; // Invalid native policy fails closed: no native format is declared.
+  }
 }
 
 export async function configuredFacebookOAuth() {

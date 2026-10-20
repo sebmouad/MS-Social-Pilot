@@ -193,3 +193,53 @@ host authorization, verified status/comment/deletion, audited process-loss/nativ
 conflict recovery, cleaned live provider coverage and broader legacy/configuration/
 production rollback gates remain open. No live provider request or production
 deployment occurred. Whole-app UX/accessibility is not cleared by this matrix.
+
+
+## Batch96: native host integration for video and Reel (private, default off)
+
+Facebook now dispatches **Video post** (stored bytes or remote URL, optional
+provider-held schedule) and **Reel** (stored bytes or guarded remote snapshot)
+through the canonical shared publish service and the batch89 durable journal.
+Everything provider-specific lives in `platforms/facebook/**`:
+
+- `formats/publish.ts` — `createFacebookNativePublisher`: probes media (trusted
+  metadata comes only from `inspectMediaSnapshot` / `resolveRemoteMediaSnapshot`,
+  never from the caller), plans with the Root `facebook.native.*` policy, then
+  calls `executeFacebookNativeWithJournal` bound to the shared claim's workspace,
+  post, destination, actor and operation id. Pre-dispatch validation throws a
+  definite rejection (claim released, nothing sent); anything that may have
+  reached Facebook, journal unavailability, payload conflicts and rejections that
+  left staged objects throw an ambiguous error (claim held, never resent). A
+  success is `state: 'submitted'`, never `published`; the existing submitted
+  reconciliation proves live status.
+- `publishing.ts` — the adapter declares `video` (native schedule, first comment,
+  status, delete as for feed video) and `reel` (status only; no first comment or
+  delete) **only** while the private switch is on; with it off the catalog is the
+  unchanged feed format and native ids are refused. `getStatus` takes an optional
+  `nativeFormat` so a Reel is read with the Reel mapper (requires
+  `publishing_phase: complete`).
+- `runtime.ts` — `configuredFacebookNativePublishing()` reads the switch and the
+  validated native policy; an invalid policy fails closed (no native format).
+
+Neutral hooks (no provider names in shared code): `PublishRequest.scheduledAt`
+and `PublishRequest.publication` (shared claim identities for module journals) in
+`platforms/types.ts`; `publishPost(actor, id, undefined, { nativeSchedule: true })`
+may dispatch a future-scheduled post only when every pending destination's format
+descriptor declares `scheduling.native`, passes the schedule instant, and leaves
+the destination pending (`submitted`) for reconciliation. Without the option, or
+for a format that does not declare native scheduling, behavior is unchanged.
+
+Root keys (all in the Facebook module config): `facebook.native.publishingEnabled`
+(default false), `facebook.native.videoFormatLabel`, `facebook.native.reelFormatLabel`.
+
+Evidence: mocked Graph transport, in-memory attempt store and mocked shared
+claim only (`facebook-native-publish-host.test.ts`, `publishing-native-schedule.test.ts`).
+No PostgreSQL journal run for this path, no browser, no live Meta, no production.
+
+Not done: stored **video** attachments cannot yet reach the adapter — shared
+authoring/`resolvePublishMedia` resolve only stored images (`media:<id>`), so
+`localFile` bytes for video need a shared media resolver (modules/media storage →
+publishing attachments); there is no UI/HTTP/MCP entry that sets `nativeSchedule`;
+Reel first comment and deletion, Stories, application of the switch to the composer
+format picker, native-schedule cancel/reschedule at the provider, and live proof
+remain open. Groups stay unsupported (API removed).
