@@ -76,8 +76,10 @@ describe.skipIf(!url)('OAuth connectors on real PostgreSQL', () => {
 
     const viewer = await authenticateBearerHeader(`Bearer ${token.access_token}`);
     expect(viewer).toMatchObject({ scope: 'workspace', workspaceId: actor.workspaceId, userId: actor.userId });
-    expect(viewer!.permissions.features['analytics/overview']?.write).toBe(false);
-    expect(viewer!.permissions.features['settings/team']?.read).toBe(false);
+    const features = viewer?.permissions?.features;
+    if (!features) throw new Error('The issued key carries no permissions.');
+    expect(features['analytics/overview']?.write).toBe(false);
+    expect(features['settings/team']?.read).toBe(false);
 
     // Presenting the used code again is refused and revokes the key it produced.
     await expect(exchangeCode({ code: second.code, clientId: client.client_id, redirectUri: redirect, verifier: good.verifier }, '127.0.0.1')).rejects.toMatchObject({ code: 'invalid_grant' });
