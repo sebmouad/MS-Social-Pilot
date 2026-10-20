@@ -1,4 +1,5 @@
 'use client';
+import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
 
 import { useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
@@ -22,6 +23,7 @@ export function ConfirmAction({ id, label, title, description, phrase, endpoint,
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  useRootActionFeedback(error, notice, () => router.refresh());
   const inFlight = useRef(false);
 
   async function save() {

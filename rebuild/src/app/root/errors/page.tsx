@@ -1,3 +1,7 @@
+import { RootEmptyState } from '@/server/root/RootEmptyState';
+import { RootFilters, RootFilterSelect } from '@/server/root/RootFilters';
+import { DataTable } from '@/components/DataTable';
+import { PageHeader } from '@/components/PageHeader';
 import { requireRootPage } from '@/server/config/access';
 import { pageSearchParamsObject } from '@/server/root/legacy/http';
 import { RootFrame } from '@/server/root/RootFrame';
@@ -18,32 +22,26 @@ export default async function RootErrorsPage({ searchParams }: { searchParams: P
   let message: string | null = null;
   try { input = pageSearchParamsObject(params, ['q', 'status', 'source', 'page']); data = await listRootErrors(actor.id, input); } catch (error) { message = error instanceof OperationError ? error.message : 'The error log could not be loaded. Try again.'; }
   const pageUrl = (page: number) => `/root/errors?${new URLSearchParams({ ...input, page: String(page) })}`;
-  const controls = <section className="root-ops-sidebar" aria-label="Error filters">    <form action="/root/errors" className="root-ops__filters" method="get" role="search" aria-label="Filter errors">
-      <label className="ui-field"><span>Status</span><select className="ui-input" name="status" defaultValue={typeof params.status === 'string' ? params.status : 'open'}><option value="open">Open</option><option value="resolved">Resolved</option><option value="all">All</option></select></label>
-      <label className="ui-field"><span>Source</span><select className="ui-input" name="source" defaultValue={typeof params.source === 'string' ? params.source : ''}><option value="">All sources</option><option value="server">Server</option><option value="worker">Worker</option><option value="browser">Browser</option></select></label>
+  const controls = <RootFilters title="Error filters" route="/root/errors" filters={Object.entries(params).filter(([key, value]) => key !== 'page' && typeof value === 'string' && value !== '').map(([key, value]) => ({ key, label: key, value: String(value) }))}>    <form key={JSON.stringify(params)} action="/root/errors" className="root-ops__filters" method="get" role="search" aria-label="Filter errors">
+      <label className="ui-field"><span>Status</span><RootFilterSelect name="status" label="Status" initialValue={typeof params.status === 'string' ? params.status : 'open'} options={[{ value: 'open', label: 'Open' }, { value: 'resolved', label: 'Resolved' }, { value: 'all', label: 'All' }]} /></label>
+      <label className="ui-field"><span>Source</span><RootFilterSelect name="source" label="Source" initialValue={typeof params.source === 'string' ? params.source : ''} options={[{ value: '', label: 'All sources' }, ...['server', 'worker', 'browser'].map(value => ({ value, label: value[0].toUpperCase() + value.slice(1) }))]} /></label>
       <label className="ui-field"><span>Search</span><input className="ui-input" name="q" maxLength={data?.limits.searchMaxCharacters} defaultValue={typeof params.q === 'string' ? params.q : ''} /></label>
       <button className="ui-button" type="submit">Filter</button>
-    </form></section>;
+    </form></RootFilters>;
   return <RootFrame active="/root/errors" controls={controls}><div className="root-ops">
-    <header className="root-control__heading">
-      <p className="root-config__eyebrow">Root · Shared controls</p>
-      <h1>Errors</h1>
-      <p>Application errors grouped by occurrence. Messages are shortened and credential-like text is hidden. A new occurrence reopens a resolved group.</p>
-    </header>
+    <PageHeader module="root" title="Errors" description={<>Application errors grouped by occurrence. Messages are shortened and credential-like text is hidden. A new occurrence reopens a resolved group.</>} />
 
     {!data ? <section className="root-control__notice" role="alert"><h2>Errors unavailable</h2><p>{message}</p><a href="/root/errors">Reset filters</a></section>
-      : data.items.length === 0 ? <section className="root-control__panel"><h2>No errors</h2><p>No error groups match these filters.</p></section>
+      : data.items.length === 0 ? <RootEmptyState route="/root/errors" title="No errors">No error groups match these filters.</RootEmptyState>
       : <>
         <p className="root-activity__summary">{data.total} {data.total === 1 ? 'error group' : 'error groups'}</p>
-        <div className="root-ops__table" role="region" aria-label="Error log" tabIndex={0}><table>
-          <caption className="ui-visually-hidden">Application errors</caption>
-          <thead><tr><th scope="col">Error</th><th scope="col">Source</th><th scope="col">Count</th><th scope="col">Last seen</th><th scope="col">Action</th></tr></thead>
-          <tbody>{data.items.map(item => <tr key={item.id}>
-            <td><a href={`/root/errors/${encodeURIComponent(item.id)}`}><strong>{item.name}</strong></a><br />{item.message}{item.location ? <><br /><span className="root-ops__muted">{item.location}</span></> : null}</td>
-            <td>{item.source}</td><td>{item.count}</td><td><time dateTime={item.lastSeenAt}>{new Date(item.lastSeenAt).toLocaleString()}</time>{item.resolvedAt ? <><br />Resolved</> : null}</td>
-            <td><ResolveError id={item.id} resolved={Boolean(item.resolvedAt)} /></td>
-          </tr>)}</tbody>
-        </table></div>
+        <DataTable caption={'Application errors'} rows={data.items} rowKey={item => item.id} columns={[
+          { key: 'column0', label: 'Error', render: (item) => <><a href={`/root/errors/${encodeURIComponent(item.id)}`}><strong>{item.name}</strong></a><br />{item.message}{item.location ? <><br /><span className="root-ops__muted">{item.location}</span></> : null}</> },
+          { key: 'column1', label: 'Source', render: (item) => <>{item.source}</> },
+          { key: 'column2', label: 'Count', render: (item) => <>{item.count}</> },
+          { key: 'column3', label: 'Last seen', render: (item) => <><time dateTime={item.lastSeenAt}>{new Date(item.lastSeenAt).toLocaleString()}</time>{item.resolvedAt ? <><br />Resolved</> : null}</> },
+          { key: 'column4', label: 'Action', render: (item) => <><ResolveError id={item.id} resolved={Boolean(item.resolvedAt)} /></> }
+        ]} />
         <p className="root-directory__pager">Page {data.page} of {Math.max(1, Math.ceil(data.total / data.pageSize))}
           {data.page > 1 && <> · <a href={pageUrl(data.page - 1)}>Previous</a></>}{data.page * data.pageSize < data.total && <> · <a href={pageUrl(data.page + 1)}>Next</a></>}</p>
       </>}

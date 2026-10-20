@@ -1,4 +1,5 @@
 'use client';
+import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -13,6 +14,7 @@ export function WorkspaceAccessControl({ id, name, suspended, deleting }: { id: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  useRootActionFeedback(error, notice, () => router.refresh());
   const inFlight = useRef(false);
   const nextSuspended = !suspended;
   const phrase = workspaceAccessConfirmation(id, nextSuspended);

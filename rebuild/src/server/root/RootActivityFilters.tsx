@@ -1,3 +1,4 @@
+import { RootFilters } from './RootFilters';
 import { SidebarDock } from '@/components/SidebarDock';
 import { Button } from '@/components/Button';
 import { rootActivityUrl, type RootActivitySearch } from '@/lib/root-activity';
@@ -8,8 +9,8 @@ export function RootActivityFilters({ values, page, policy }: { values: RootActi
   const text = (key: string) => typeof values[key] === 'string' ? values[key] as string : '';
   const query = page ? { ...page.filters, limit: page.limit } : {};
   return <SidebarDock><section className="root-audit-filters" aria-label="Activity filters">
-    <p className="shell-subnav__label">Activity filters</p>
-    {policy && <form noValidate action="/root/activity">
+    <RootFilters title="Activity filters" route="/root/activity" filters={['q', 'workspaceId', 'from', 'to'].map(key => ({ key, label: key, value: text(key) })).filter(item => item.value)}>
+    {policy && <form key={JSON.stringify(values)} noValidate action="/root/activity">
       <label className="ui-field">Action or person<input className="ui-input" name="q" defaultValue={text('q')} maxLength={policy.searchCharacters} placeholder="Action, name or email" /></label>
       <label className="ui-field">Workspace ID<input className="ui-input" name="workspaceId" defaultValue={text('workspaceId')} maxLength={policy.searchCharacters} placeholder="All workspaces" /></label>
       <label className="ui-field">From date (UTC)<input className="ui-input" type="date" name="from" defaultValue={text('from')} /></label>
@@ -23,5 +24,5 @@ export function RootActivityFilters({ values, page, policy }: { values: RootActi
       {page?.newerCursor && <a href={rootActivityUrl(query, page.newerCursor)}>Newer activity</a>}
       {page?.olderCursor && <a href={rootActivityUrl(query, page.olderCursor)}>Older activity</a>}
     </nav>
-  </section></SidebarDock>;
+  </RootFilters></section></SidebarDock>;
 }

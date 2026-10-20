@@ -1,4 +1,5 @@
 'use client';
+import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
 
 import { useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
@@ -23,6 +24,7 @@ export function RootInboxDeletionControls({ row }: { row: DeletionRow }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  useRootActionFeedback(error, notice, () => router.refresh());
   const phrase = `CONFIRM REMOTE DELETION ${row.operationId}`;
   const recoverable = row.state === 'started' || row.state === 'uncertain';
   const confirmationField = validation.fieldProps('confirmation');

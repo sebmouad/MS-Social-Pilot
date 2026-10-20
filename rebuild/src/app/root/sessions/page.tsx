@@ -1,3 +1,7 @@
+import { RootEmptyState } from '@/server/root/RootEmptyState';
+import { RootFilters } from '@/server/root/RootFilters';
+import { DataTable } from '@/components/DataTable';
+import { PageHeader } from '@/components/PageHeader';
 import { cookies, headers } from 'next/headers';
 import { requireRootPage } from '@/server/config/access';
 import { hashLegacySessionToken, LEGACY_SESSION_COOKIE } from '@/server/auth';
@@ -28,27 +32,23 @@ export default async function RootSessionsPage({ searchParams }: { searchParams:
   let data: Awaited<ReturnType<typeof listRootSessions>> | null = null;
   let message: string | null = null;
   try { data = await listRootSessions(actor.id, pageSearchParamsObject(params, ['q']), undefined, await currentSessionId()); } catch (error) { message = error instanceof OperationError ? error.message : t.loadFailed; }
-  const controls = <section className="root-ops-sidebar" aria-label={t.filters}>
-    <form action="/root/sessions" className="root-ops__filters" method="get" role="search" aria-label={t.filters}>
+  const controls = <RootFilters title={t.filters} route="/root/sessions" filters={Object.entries(params).filter(([key, value]) => key !== 'page' && typeof value === 'string' && value !== '').map(([key, value]) => ({ key, label: key, value: String(value) }))}>
+    <form key={JSON.stringify(params)} action="/root/sessions" className="root-ops__filters" method="get" role="search" aria-label={t.filters}>
       <label className="ui-field"><span>{t.search}</span><input className="ui-input" name="q" maxLength={data?.limits.searchMaxCharacters} defaultValue={typeof params.q === 'string' ? params.q : ''} /></label>
       <button className="ui-button" type="submit">{t.filter}</button>
-    </form></section>;
+    </form></RootFilters>;
   return <RootFrame active="/root/sessions" controls={controls}><div className="root-ops" lang={locale}>
-    <header className="root-control__heading"><p className="root-config__eyebrow">{t.eyebrow}</p><h1>{t.sessionsTitle}</h1><p>{t.sessionsIntro}</p></header>
+    <PageHeader module="root" title={t.sessionsTitle} description={<>{t.sessionsIntro}</>} />
     {!data ? <section className="root-control__notice" role="alert"><h2>{t.sessionsUnavailable}</h2><p>{message}</p><a href="/root/sessions">{t.reset}</a></section>
-      : data.items.length === 0 ? <section className="root-control__panel"><h2>{t.sessionsEmpty}</h2><p>{t.sessionsEmptyHint}</p></section>
+      : data.items.length === 0 ? <RootEmptyState route="/root/sessions" title={t.sessionsEmpty}>{t.sessionsEmptyHint}</RootEmptyState>
       : <>
         {data.truncated && <p className="root-activity__summary" role="status">{fill(t.truncated, { count: data.limit })}</p>}
-        <div className="root-ops__table" role="region" aria-label={t.sessionsTitle} tabIndex={0}><table>
-          <caption className="ui-visually-hidden">{t.sessionsTitle}</caption>
-          <thead><tr><th scope="col">{t.account}</th><th scope="col">{t.status}</th><th scope="col">{t.expires}</th><th scope="col">{t.action}</th></tr></thead>
-          <tbody>{data.items.map(item => <tr key={item.id}>
-            <td><strong>{item.user.name}</strong><br /><span className="root-ops__muted">{item.user.email}</span>{item.user.installationOwner ? <><br />{t.owner}</> : null}</td>
-            <td>{item.verified ? t.verified : t.pending}{item.user.disabled ? <><br />{t.disabledAccount}</> : null}{item.current ? <><br /><strong>{t.thisBrowser}</strong></> : null}</td>
-            <td><time dateTime={item.expiresAt}>{new Date(item.expiresAt).toLocaleString(locale)}</time></td>
-            <td><SignOutSession id={item.id} copy={t} /></td>
-          </tr>)}</tbody>
-        </table></div>
+        <DataTable caption={t.sessionsTitle} rows={data.items} rowKey={item => item.id} columns={[
+          { key: 'column0', label: t.account, render: (item) => <><strong>{item.user.name}</strong><br /><span className="root-ops__muted">{item.user.email}</span>{item.user.installationOwner ? <><br />{t.owner}</> : null}</> },
+          { key: 'column1', label: t.status, render: (item) => <>{item.verified ? t.verified : t.pending}{item.user.disabled ? <><br />{t.disabledAccount}</> : null}{item.current ? <><br /><strong>{t.thisBrowser}</strong></> : null}</> },
+          { key: 'column2', label: t.expires, render: (item) => <><time dateTime={item.expiresAt}>{new Date(item.expiresAt).toLocaleString(locale)}</time></> },
+          { key: 'column3', label: t.action, render: (item) => <><SignOutSession id={item.id} copy={t} /></> }
+        ]} />
       </>}
   </div></RootFrame>;
 }

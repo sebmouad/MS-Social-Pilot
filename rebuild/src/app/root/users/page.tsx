@@ -1,3 +1,6 @@
+import { RootEmptyState } from '@/server/root/RootEmptyState';
+import { DataTable } from '@/components/DataTable';
+import { PageHeader } from '@/components/PageHeader';
 import { StatusChip } from '@/components/StatusChip';
 import { OperationError } from '@/lib/operation-error';
 import { requireRootPage } from '@/server/config/access';
@@ -28,11 +31,7 @@ export default async function RootUsersPage({ searchParams }: { searchParams: Pr
 
   const filtered = Boolean(params.q || params.status && params.status !== 'all');
   return <RootFrame active="/root/users">
-    <header className="root-control__heading">
-      <p className="root-config__eyebrow">Root · Directory</p>
-      <h1>Users</h1>
-      <p>Manage installation account access and recovery. API keys do not grant Root access. Account changes are recorded in installation activity.</p>
-    </header>
+    <PageHeader module="root" title="Users" description={<>Manage installation account access and recovery. API keys do not grant Root access. Account changes are recorded in installation activity.</>} />
     <RootUserFilters values={params} page={data} searchMaxCharacters={searchMaxCharacters} />
     {data === null ? <section className="root-control__notice" role="alert">
       <h2>{invalid ? 'Check user filters' : 'User directory unavailable'}</h2>
@@ -40,28 +39,19 @@ export default async function RootUsersPage({ searchParams }: { searchParams: Pr
       <a href="/root/users">Reset filters</a>
     </section> : <>
       <p className="root-activity__summary">{data.total} {filtered ? 'matching ' : ''}{data.total === 1 ? 'user' : 'users'} · {data.installationTotal} in this installation</p>
-      {data.users.length === 0 ? <section className="root-control__panel">
-        <h2>{filtered ? 'No users match these filters' : 'No users found'}</h2>
-        <p>{filtered ? 'Try another name, email or account status.' : 'There are no user accounts in this installation.'}</p>
-      </section> : <>
-        <div className="root-directory__table-wrap root-user-table" role="region" aria-label="User directory" tabIndex={0}>
-          <table>
-            <caption className="ui-visually-hidden">Users in this installation</caption>
-            <thead><tr><th scope="col">User</th><th scope="col">Account status</th><th scope="col">Workspaces</th><th scope="col">Active sessions</th><th scope="col">Two-step verification</th><th scope="col">Created</th><th scope="col">Account actions</th></tr></thead>
-            <tbody>{data.users.map(user => <tr key={user.id}>
-              <td><strong>{user.name}</strong><br /><span>{user.email}</span></td>
-              <td><div className="root-user__status"><StatusChip status={user.disabledAt ? 'disabled' : 'active'} />{user.isInstanceOwner && <span className="root-user__owner">Installation owner</span>}</div></td>
-              <td>{user._count.memberships}</td>
-              <td>{user._count.sessions}</td>
-              <td><ul className="root-user__factors" aria-label={`Two-step factors for ${user.email}`}>
+      {data.users.length === 0 ? <RootEmptyState route="/root/users" title={filtered ? 'No users match these filters' : 'No users found'}>{filtered ? 'Try another name, email or account status.' : 'There are no user accounts in this installation.'}</RootEmptyState> : <>
+        <DataTable caption="User directory" rows={data.users} rowKey={user => user.id} columns={[
+        { key: 'column0', label: 'User', render: user => <><strong>{user.name}</strong><br /><span>{user.email}</span></> },
+        { key: 'column1', label: 'Account status', render: user => <><div className="root-user__status"><StatusChip status={user.disabledAt ? 'disabled' : 'active'} />{user.isInstanceOwner && <span className="root-user__owner">Installation owner</span>}</div></> },
+        { key: 'column2', label: 'Workspaces', render: user => <>{user._count.memberships}</> },
+        { key: 'column3', label: 'Active sessions', render: user => <>{user._count.sessions}</> },
+        { key: 'column4', label: 'Two-step verification', render: user => <><ul className="root-user__factors" aria-label={`Two-step factors for ${user.email}`}>
                 <li>Authenticator: {user.totpEnabledAt ? 'Enabled' : 'Not set up'}</li>
                 <li>Passkeys: {user._count.passkeys}</li>
-              </ul></td>
-              <td><time dateTime={user.createdAt.toISOString()}>{user.createdAt.toLocaleDateString()}</time></td>
-              <td><RootUserControls id={user.id} email={user.email} disabled={Boolean(user.disabledAt)} root={user.isInstanceOwner} self={user.id === actor.id} /></td>
-            </tr>)}</tbody>
-          </table>
-        </div>
+              </ul></> },
+        { key: 'column5', label: 'Created', render: user => <><time dateTime={user.createdAt.toISOString()}>{user.createdAt.toLocaleDateString()}</time></> },
+        { key: 'column6', label: 'Account actions', render: user => <><RootUserControls id={user.id} email={user.email} disabled={Boolean(user.disabledAt)} root={user.isInstanceOwner} self={user.id === actor.id} /></> }
+      ]} />
         <p className="root-directory__pager">Page {data.page} of {Math.max(1, Math.ceil(data.total / data.take))}</p>
       </>}
     </>}

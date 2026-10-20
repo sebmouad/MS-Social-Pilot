@@ -1,4 +1,5 @@
 'use client';
+import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
@@ -27,6 +28,7 @@ export function RootPostDeletionControls({ row }: { row: DeletionRow }) {
   const previousIdentity = useRef(`${row.operationId}:${row.state}`);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  useRootActionFeedback(error, notice, () => router.refresh());
   const phrase = outcome ? `ROOT RECORD POST DELETION ${row.operationId} ${outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}` : '';
   const recoverable = row.state === 'started' || row.state === 'uncertain';
   const confirmationField = validation.fieldProps('confirmation');

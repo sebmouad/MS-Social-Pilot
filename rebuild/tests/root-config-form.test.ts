@@ -18,6 +18,8 @@ const values = [
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); this.tabIndex = -1; };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -116,7 +118,8 @@ it('makes every registered setting reachable through owner-aware search', async 
   await fill(search, 'Platform · facebook');
   expect(container.querySelectorAll('.root-config__card').length).toBe(all.filter(item => item.owner.kind === 'platform' && item.owner.id === 'facebook').length);
   await fill(search, 'no-such-setting-here');
-  expect(container.querySelector('.root-config__empty')?.textContent).toBe('No matching settings.');
+  expect(container.querySelector('.root-config__empty')?.textContent).toContain('No matching settings.');
+  expect(container.querySelector('.root-config__empty button')?.textContent).toBe('Reset filters');
 });
 
 it('renders configured operator text as plain text and preserves search placeholders', async () => {
@@ -126,4 +129,47 @@ it('renders configured operator text as plain text and preserves search placehol
   expect(container.querySelector('.root-config__content-head h2')?.textContent).toBe('Résultats : timezone');
   expect(container.querySelector('script')).toBeNull();
   expect([...container.querySelectorAll('button')].some(button => button.textContent === '<script>unsafe</script>')).toBe(true);
+});
+
+it('uses shared switches and selects, retaining the saved boolean after a failed write', async () => {
+  const boolean = safeConfigShape().find(item => item.key === 'auth.openRegistration')!;
+  const selection = safeConfigShape().find(item => item.kind === 'select' && (item.options?.length ?? 0) > 1)!;
+  const fetch = vi.fn().mockRejectedValue(new Error('offline')); vi.stubGlobal('fetch', fetch);
+  await act(async () => root.render(createElement(RootConfigForm, { definitions: [boolean, selection], initialValues: [{ key: boolean.key, value: false, isSet: true, source: 'database' }], availability: AVAILABILITY_CATALOG, initialSearch: ' ' })));
+  const switchButton = container.querySelector<HTMLButtonElement>('[role=switch]')!;
+  expect(switchButton).not.toBeNull(); await act(async () => switchButton.click());
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ key: boolean.key, value: true });
+  expect(switchButton.getAttribute('aria-checked')).toBe('false');
+  const search = container.querySelector<HTMLInputElement>('#root-config-search')!;
+  await fill(search, selection.key);
+  expect(container.querySelector('[role=combobox]')).not.toBeNull();
+  expect(container.querySelector('select')).toBeNull();
+});
+
+it('rejects an empty number with associated field feedback before any request', async () => {
+  const definition = safeConfigShape().find(item => item.key === 'root.activityPageSize')!;
+  const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+  await act(async () => root.render(createElement(RootConfigForm, { definitions: [definition], initialValues: values, availability: AVAILABILITY_CATALOG })));
+  const input = container.querySelector<HTMLInputElement>('input[type=number]')!;
+  await fill(input, '');
+  const save = [...container.querySelectorAll('button')].find(button => button.textContent === 'Save')!;
+  await act(async () => save.click());
+  expect(fetch).not.toHaveBeenCalled(); expect(input.getAttribute('aria-invalid')).toBe('true');
+  expect(document.getElementById(input.getAttribute('aria-describedby')!)?.textContent).toContain('enter a finite number');
+});
+
+it('names the secret in a shared confirmation and retains the dialog on failure', async () => {
+  const definition = safeConfigShape().find(item => item.key === 'meta.appSecret')!;
+  const fetch = vi.fn().mockRejectedValue(new Error('offline')); vi.stubGlobal('fetch', fetch);
+  await act(async () => root.render(createElement(RootConfigForm, { definitions: [definition], initialValues: [{ key: definition.key, value: '', isSet: true, source: 'database' }], availability: AVAILABILITY_CATALOG })));
+  const clear = [...container.querySelectorAll('button')].find(button => button.textContent === 'Clear saved secret')!;
+  await act(async () => clear.click()); expect(fetch).not.toHaveBeenCalled();
+  const dialog = document.querySelector('dialog')!;
+  expect(dialog.textContent).toContain(definition.label);
+  expect(dialog.textContent).toContain('Operations using it may stop');
+  expect(document.activeElement?.textContent).toBe('Cancel');
+  const confirm = [...dialog.querySelectorAll('button')].find(button => button.textContent === 'Clear saved secret')!;
+  await act(async () => confirm.click());
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ key: definition.key, value: '', clear: true });
+  expect(document.querySelector('dialog [role=alert]')?.textContent).toContain('Could not clear');
 });

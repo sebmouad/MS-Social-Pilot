@@ -1,3 +1,6 @@
+import { Badge } from '@/components/Badge';
+import { IconPlugConnected, IconCircleCheck } from '@tabler/icons-react';
+import { PageHeader } from '@/components/PageHeader';
 import { RootFrame } from '@/server/root/RootFrame';
 import { requireRootPage } from '@/server/config/access';
 import { platformStatuses } from '@/server/platforms/registry';
@@ -17,8 +20,7 @@ export default async function RootPlatformsPage() {
   await requireRootPage();
   const statuses = await platformStatuses();
   return <RootFrame active="/root/platforms">
-    <div className="root-directory__head"><div><p className="root-config__eyebrow">Root · Platform modules</p><h1>Platform modules</h1>
-      <p>Each social platform is a module. Switch a module on to offer it to workspaces; switch it off to hide it everywhere. Connected data stays stored either way.</p></div></div>
+    <PageHeader module="root" title="Platform modules" description={<>Each social platform is a module. Switch a module on to offer it to workspaces; switch it off to hide it everywhere. Connected data stays stored either way.</>} />
     <ul className="root-platforms">{statuses.map(({ module, enabled, ready }) => {
       const supported = (Object.keys(CAPABILITY_LABELS) as (keyof CapabilityDeclaration)[]).filter(key => module.capabilities[key] === 'supported');
       const state = !enabled ? { label: 'Off', tone: 'off' } : ready ? { label: 'On · customers can connect', tone: 'good' } : { label: 'On · setup incomplete', tone: 'warning' };
@@ -27,9 +29,9 @@ export default async function RootPlatformsPage() {
         <div className="root-platform__body">
           <h2>{module.name}</h2>
           <p>{module.description}</p>
-          <p className="root-platform__state" data-tone={state.tone}>{state.label}</p>
+          <Badge tone={state.tone === 'good' ? 'success' : state.tone === 'off' ? 'neutral' : 'warning'} icon={<IconPlugConnected size={14} />}>{state.label}</Badge>
           {enabled && !ready && <p className="root-platform__hint">Fill in the {module.name} app credentials in <a href={`/root/platforms/${module.id}`}>{module.name} settings</a> ({module.settingsGroup} groups) so customers can connect.</p>}
-          <ul className="root-platform__capabilities" aria-label={`${module.name} capabilities`}>{supported.map(key => <li key={key}>{CAPABILITY_LABELS[key]}</li>)}</ul>
+          <ul className="root-platform__capabilities" aria-label={`${module.name} capabilities`}>{supported.map(key => <li key={key}><Badge tone="brand" icon={<IconCircleCheck size={14} />}>{CAPABILITY_LABELS[key]}</Badge></li>)}</ul>
         </div>
         <div className="root-platform__actions">
           <PlatformSwitch settingKey={module.enabledKey} name={module.name} enabled={enabled} />

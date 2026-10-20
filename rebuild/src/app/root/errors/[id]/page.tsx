@@ -1,3 +1,5 @@
+import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { PageHeader } from '@/components/PageHeader';
 import { notFound } from 'next/navigation';
 import { requireRootPage } from '@/server/config/access';
 import { RootFrame } from '@/server/root/RootFrame';
@@ -18,7 +20,7 @@ export default async function RootErrorPage({ params }: { params: Promise<{ id: 
     return <RootFrame active="/root/errors"><section className="root-control__notice" role="alert"><h2>Error unavailable</h2><p>The error could not be loaded.</p><a href="/root/errors">Back to errors</a></section></RootFrame>;
   }
   return <RootFrame active="/root/errors"><div className="root-ops">
-    <header className="root-control__heading"><p className="root-config__eyebrow"><a href="/root/errors">Errors</a> · {item.source}</p><h1>{item.name}</h1><p>{item.message}</p></header>
+    <PageHeader module="root" breadcrumbs={<Breadcrumbs items={[{ label: 'Errors', href: '/root/errors' }, { label: item.source }]} />} title={item.name ?? item.source} description={<>{item.message}</>} />
     <section className="root-ops__panel"><dl>
       <dt>Occurrences</dt><dd>{item.count}</dd><dt>First seen</dt><dd>{new Date(item.firstSeenAt).toLocaleString()}</dd><dt>Last seen</dt><dd>{new Date(item.lastSeenAt).toLocaleString()}</dd>
       <dt>Release</dt><dd>{item.release}</dd>{item.location && <><dt>Location</dt><dd>{item.location}</dd></>}<dt>Status</dt><dd>{item.resolvedAt ? 'Resolved' : 'Open'}</dd>

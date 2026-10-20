@@ -1,4 +1,5 @@
 'use client';
+import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
@@ -32,6 +33,7 @@ function RecoveryControl({ mode, context, identity, available = true, knownRemot
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  useRootActionFeedback(error, notice, () => router.refresh());
   const [pending, setPending] = useState(false);
   const phrase = mode === 'record' ? outcome ? `ROOT RECORD PUBLICATION ${identity} ${outcome}` : '' : `ROOT ${mode === 'finish' ? 'FINISH' : 'ADOPT'} PUBLICATION ${identity}`;
   const label = mode === 'record' ? knownRemoteId ? 'Verify submitted publication' : 'Record external check' : mode === 'finish' ? 'Finish local record' : 'Adopt for recovery';

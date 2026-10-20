@@ -27,8 +27,10 @@ afterEach(async () => {
 
 async function openSignOut() {
   await act(async () => root.render(createElement(RootUserControls, { id: 'user-1', email: 'person@example.test', disabled: false, root: false, self: false })));
-  const opener = [...container.querySelectorAll('button')].find(button => button.textContent === 'Sign out')!;
+  const opener = container.querySelector<HTMLButtonElement>('[aria-haspopup=menu]')!;
   await act(async () => { opener.focus(); opener.click(); });
+  const item = [...container.querySelectorAll<HTMLButtonElement>('[role=menuitem]')].find(button => button.textContent === 'Sign out')!;
+  await act(async () => item.click());
   const dialog = document.querySelector('dialog')!;
   const input = dialog.querySelector('input')!;
   const phrase = rootUserConfirmation('sign-out', 'person@example.test');
@@ -83,8 +85,10 @@ describe('Root user account confirmation', () => {
 
   it('keeps a cancellable dialog before submission and blocks self controls', async () => {
     await act(async () => root.render(createElement(RootUserControls, { id: 'user-1', email: 'person@example.test', disabled: false, root: false, self: false })));
-    const opener = [...container.querySelectorAll('button')].find(button => button.textContent === 'Sign out')!;
+    const opener = container.querySelector<HTMLButtonElement>('[aria-haspopup=menu]')!;
     await act(async () => { opener.focus(); opener.click(); });
+    const item = [...container.querySelectorAll<HTMLButtonElement>('[role=menuitem]')].find(button => button.textContent === 'Sign out')!;
+    await act(async () => item.click());
     const dialog = document.querySelector('dialog')!;
     const cancel = dialog.querySelector<HTMLButtonElement>('[data-dialog-cancel]')!;
     await act(async () => cancel.click());

@@ -33,8 +33,18 @@ describe('Root users directory page', () => {
     expect(html).toContain('Active sessions');
     expect(html).toContain('Authenticator: Enabled');
     expect(html).toContain('Passkeys: 1');
-    expect(html).toContain('Installation owner');
+    expect(html).toContain('role="combobox"');
+    expect(html).toContain('aria-label="Account status"');
     expect(state.load).toHaveBeenCalledWith('root-user', { q: 'casey', status: 'active' });
+  });
+
+  it('shows the installation-owner marker only for an actual owner row', async () => {
+    const ordinary = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
+    expect(ordinary).not.toContain('root-user__owner');
+    state.load.mockResolvedValueOnce({ ...directory, users: [{ ...user, isInstanceOwner: true }] });
+    const owner = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
+    expect(owner).toContain('root-user__owner');
+    expect(owner).toContain('Installation owner');
   });
 
   it('distinguishes an empty installation from filters with no matches', async () => {
