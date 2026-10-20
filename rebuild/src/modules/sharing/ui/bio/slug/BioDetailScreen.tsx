@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: 'Links', referrer: 'no-referrer' };
 export default async function BioPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   let access: Awaited<ReturnType<typeof openPublicBio>>;
-  try { access = await openPublicBio(slug, clientIpFromHeaders(await headers())); }
+  try { access = await openPublicBio(slug, clientIpFromHeaders(await headers()), 'render'); }
   catch { return <main className={styles.page}><p role="alert" className={styles.note}>This page could not be loaded. Please try again shortly.</p></main>; }
   if (!access.ok && access.reason === 'rate_limited') return <main className={styles.page}><p role="alert" className={styles.note}>Too many visits just now. Please wait a few minutes and try again.</p></main>;
   if (!access.ok) notFound();

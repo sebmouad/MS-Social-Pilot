@@ -26,8 +26,11 @@ type Row = Omit<PublicLink, 'targetIds' | 'workspaceName' | 'tokenHash' | 'creat
 const notFound = { ok: false, reason: 'not_found' } as const;
 const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** `bucket` separates page opens from image requests: a page of images must not spend the page-open allowance. */
-export async function resolvePublicLink(token: string, address: string | null, bucket: 'view' | 'media' = 'view'): Promise<PublicAccess<PublicLink>> {
+/**
+ * `bucket` separates page opens from image requests: a page of images must not spend the page-open allowance.
+ * `render` is the rendered page behind the entry route, which already spent a `view` allowance on the same visit.
+ */
+export async function resolvePublicLink(token: string, address: string | null, bucket: 'view' | 'media' | 'render' = 'view'): Promise<PublicAccess<PublicLink>> {
   // A malformed token never reaches the limiter or the database: there is nothing to protect and nothing to learn.
   if (typeof token !== 'string' || !TOKEN_SHAPE.test(token)) return notFound;
   const limits = await sharingLimits();

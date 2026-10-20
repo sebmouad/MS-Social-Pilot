@@ -1,9 +1,13 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { Button } from '@/components/Button';
 import { validateFields } from '@/lib/ui/form-validation';
+import { AuthField, AuthNotice, AuthShell, authStyles } from '@/modules/home/auth/AuthShell';
+import { authCopy, type AuthLocale } from '@/modules/home/auth/copy';
 
-export default function EnrollSecondStepPage({ continuePath }: { continuePath: '/join' | '/home' }) {
+export default function EnrollSecondStepPage({ continuePath, locale = 'en' }: { continuePath: '/join' | '/home'; locale?: AuthLocale }) {
+  const t = authCopy(locale).enroll;
   const [secret, setSecret] = useState('');
   const [codes, setCodes] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -16,12 +20,12 @@ export default function EnrollSecondStepPage({ continuePath }: { continuePath: '
       const result = await response.json();
       if (!response.ok) throw new Error();
       setSecret(result.secret);
-    } catch { setError('Setup could not start. Sign in again and retry.'); }
+    } catch { setError(t.beginFailed); }
     finally { setBusy(false); }
   }
   async function confirm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError('');
-    const errors = validateFields(event.currentTarget, { code: { empty: 'Enter the six-digit code.', invalid: 'Enter all six digits from your authenticator.' } });
+    const errors = validateFields(event.currentTarget, { code: { empty: t.codeEmpty, invalid: t.codeInvalid } });
     setFieldError(errors.code ?? '');
     if (errors.code) return;
     setBusy(true);
@@ -32,11 +36,24 @@ export default function EnrollSecondStepPage({ continuePath }: { continuePath: '
       if (!response.ok) throw new Error();
       setCodes(result.recoveryCodes);
       setSecret('');
-    } catch { setError('The code was not accepted. Check your authenticator and try again.'); }
+    } catch { setError(t.rejected); }
     finally { setBusy(false); }
   }
-  return <main className="auth-screen"><div className="auth-card"><p className="eyebrow">Social Pilot</p><h1>Protect your account</h1>
-    {codes.length ? <><p>Save these recovery codes somewhere private. Each code works once. They will not be shown again.</p><ul>{codes.map(code => <li key={code}><code>{code}</code></li>)}</ul><a href={continuePath}>I have saved my codes — continue</a></> : secret ? <><p>Add this setup key to your authenticator app, then enter its six-digit code.</p><p className="setup-secret"><code>{secret}</code></p><form method="post" noValidate onSubmit={confirm}><label htmlFor="setup-code">Authenticator code</label><input id="setup-code" name="code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" required minLength={6} maxLength={6} spellCheck={false} aria-invalid={Boolean(fieldError)} aria-describedby={fieldError ? 'setup-code-error' : undefined} />{fieldError && <p id="setup-code-error" className="auth-field-error">{fieldError}</p>}<button type="submit" disabled={busy}>{busy ? 'Checking…' : 'Finish setup'}</button></form></> : <><p>Your account requires an authenticator before this preview can open.</p><button type="button" onClick={begin} disabled={busy}>{busy ? 'Starting…' : 'Set up authenticator'}</button></>}
-    {error && <p role="alert" className="muted">{error}</p>}
-  </div></main>;
+  if (codes.length) return <AuthShell title={t.savedTitle} lead={t.savedLead}>
+    <ul className={authStyles.codes} aria-label={t.savedTitle}>{codes.map(code => <li key={code}><code>{code}</code></li>)}</ul>
+    <a className="ui-button ui-button--primary" href={continuePath}>{t.continue}</a>
+  </AuthShell>;
+  return <AuthShell title={t.title} lead={secret ? t.secretLead : t.intro}>
+    {secret ? <>
+      <p className={authStyles.secret} aria-label={t.secretLabel}><code>{secret}</code></p>
+      <form className={authStyles.form} method="post" noValidate onSubmit={confirm}>
+        <AuthField id="setup-code" name="code" label={t.code} autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" required minLength={6} maxLength={6} spellCheck={false} error={fieldError} disabled={busy} />
+        {error && <AuthNotice>{error}</AuthNotice>}
+        <Button type="submit" variant="primary" busy={busy} className={authStyles.fill}>{busy ? t.busy : t.submit}</Button>
+      </form>
+    </> : <>
+      {error && <AuthNotice>{error}</AuthNotice>}
+      <Button variant="primary" busy={busy} onClick={begin} className={authStyles.fill}>{busy ? t.beginBusy : t.begin}</Button>
+    </>}
+  </AuthShell>;
 }

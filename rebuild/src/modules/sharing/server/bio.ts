@@ -96,10 +96,10 @@ export async function workspaceOffersBio(workspaceId: string, policy: { ttlMs: n
 }
 
 /** Public page: label-only links (addresses are reached through the counted redirect). */
-export async function openPublicBio(slug: string, address: string | null): Promise<BioAccess<PublicBio>> {
+export async function openPublicBio(slug: string, address: string | null, bucket: 'view' | 'render' = 'view'): Promise<BioAccess<PublicBio>> {
   const checked = SLUG_SCHEMA.safeParse(slug); if (!checked.success) return { ok: false, reason: 'not_found' };
   const limits = await sharingLimits();
-  const allowed = () => visitorAllowed('bio:view', address, checked.data, limits.viewRateLimit!, limits.viewRateWindowMs!, limits.anonymousVisitorFactor!, limits.rateStoreCapacity!);
+  const allowed = () => visitorAllowed(`bio:${bucket}`, address, checked.data, limits.viewRateLimit!, limits.viewRateWindowMs!, limits.anonymousVisitorFactor!, limits.rateStoreCapacity!);
   // A known address is counted before the lookup. An unknown one is counted per page only after the page exists, so guessed slugs create no windows.
   if (address && !allowed()) return { ok: false, reason: 'rate_limited' };
   const pages = await prisma.$queryRaw<Array<{ id: string; workspaceId: string; title: string; description: string | null; avatarUrl: string | null }>>`SELECT b.id, b."workspaceId", b.title, b.description, b."avatarUrl" FROM bio_pages b JOIN workspaces w ON w.id = b."workspaceId" WHERE b.slug = ${checked.data} AND b.enabled = true AND w."suspendedAt" IS NULL AND NOT EXISTS (SELECT 1 FROM workspace_data_purges p WHERE p."workspaceId" = w.id AND p.status <> 'completed') LIMIT 1`;

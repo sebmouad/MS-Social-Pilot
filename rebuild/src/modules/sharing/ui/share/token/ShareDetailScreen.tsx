@@ -16,7 +16,7 @@ const when = (date: Date | null, zone: string) => date ? new Intl.DateTimeFormat
 export default async function SharePage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { token } = await params;
   const tab = (await searchParams).tab;
-  const access = await resolvePublicLink(token, clientIpFromHeaders(await headers()));
+  const access = await resolvePublicLink(token, clientIpFromHeaders(await headers()), 'render');
   if (!access.ok && access.reason === 'rate_limited') return <main className={styles.page}><p role="alert" className={styles.notice}>Too many visits just now. Please wait a few minutes and try again.</p></main>;
   if (!access.ok) notFound();
   const link = access.value;
