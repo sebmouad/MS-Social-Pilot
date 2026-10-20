@@ -6,6 +6,8 @@ import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { addTeamConfirmation, removeTeamConfirmation, TEAM_ROLES, updateTeamConfirmation } from '@/modules/settings/team';
+import { fill } from '@/modules/settings/ui/shell-copy';
+import { teamCopy, teamRoleLabel } from './copy';
 import styles from './team.module.css';
 
 type Member = { id: string; userId: string; role: string; name: string; email: string; allPages: boolean; targetIds: string[] };
@@ -14,9 +16,9 @@ type Scope = { allPages: boolean; targetIds: string[] };
 type ReceiptAction = 'added' | 'updated' | 'removed';
 
 const managerRole = (role: string) => role === 'owner' || role === 'admin';
-const roleLabel = (role: string) => role.charAt(0).toUpperCase() + role.slice(1);
 
-export function TeamControls({ members, targets, actorId, actorRole, total = members.length, hasMore = false, defaultRole = 'contributor', defaultAllPages = false }: {
+export function TeamControls({ members, targets, actorId, actorRole, total = members.length, hasMore = false, defaultRole = 'contributor', defaultAllPages = false, locale = 'en' }: {
+  locale?: 'en' | 'fr';
   members: Member[];
   targets: Target[];
   actorId: string;
@@ -26,6 +28,8 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
   defaultRole?: string;
   defaultAllPages?: boolean;
 }) {
+  const t = teamCopy[locale];
+  const roleLabel = (role: string) => teamRoleLabel(locale, role);
   const router = useRouter();
   const validation = useFormValidation();
   const mounted = useRef(true);
@@ -87,22 +91,22 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
       const result: unknown = await response.json().catch(() => null);
       const payload = result && typeof result === 'object' ? result as Record<string, unknown> : {};
       if (!response.ok) {
-        const message = typeof payload.error === 'string' && payload.error.trim() ? payload.error : 'We could not confirm whether this change completed. Refresh the member directory before retrying.';
+        const message = typeof payload.error === 'string' && payload.error.trim() ? payload.error : t.unconfirmed;
         throw new Error(message);
       }
       const expectedId = typeof body.membershipId === 'string' ? body.membershipId : null;
       if (payload.ok !== true || typeof payload.id !== 'string' || payload.id.length === 0 || (expectedId !== null && payload.id !== expectedId) || payload[expected] !== true) {
-        throw new Error('We could not confirm whether this change completed. Refresh the member directory before retrying.');
+        throw new Error(t.unconfirmed);
       }
       if (!mounted.current) return;
-      setFeedback({ text: expected === 'added' ? 'Member added.' : expected === 'updated' ? 'Member access updated.' : 'Member removed from this workspace.', error: false });
+      setFeedback({ text: expected === 'added' ? t.added : expected === 'updated' ? t.updated : t.removed, error: false });
       setAddReview(false); setEditing(null); setRemoving(null); setConfirmation('');
       router.refresh();
     } catch (error) {
       if (!mounted.current || (error instanceof DOMException && error.name === 'AbortError')) return;
       const message = responseReceived
-        ? error instanceof Error ? error.message : 'The team change could not be completed. Try again.'
-        : 'We could not confirm whether this change completed. Refresh the member directory before retrying.';
+        ? error instanceof Error ? error.message : t.teamFailed
+        : t.unconfirmed;
       setFeedback({ text: message, error: true });
     } finally {
       if (pendingRequest.current?.controller === controller) pendingRequest.current = null;
@@ -113,20 +117,20 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
   function startAdd(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const errors: Record<string, string> = {};
-    if (!canonicalEmail) errors.email = 'Enter the email address for an existing account.';
-    else if (members.some(member => member.email.trim().toLowerCase() === canonicalEmail)) errors.email = 'This person already has access to the workspace.';
+    if (!canonicalEmail) errors.email = t.emailRequired;
+    else if (members.some(member => member.email.trim().toLowerCase() === canonicalEmail)) errors.email = t.alreadyMember;
     if (!validation.validate(event.currentTarget, errors)) return;
     setFeedback(null); resetConfirmation(); setAddReview(true);
   }
 
   function targetChoices(current: Scope, update: (next: Scope) => void, disabled: boolean) {
     return <fieldset className={styles.scope}>
-      <legend>Channel access</legend>
-      <label className={styles.scopeAll}><input type="checkbox" checked={current.allPages} disabled={disabled} onChange={event => update({ allPages: event.currentTarget.checked, targetIds: current.targetIds })} />All channels</label>
+      <legend>{t.channelAccess}</legend>
+      <label className={styles.scopeAll}><input type="checkbox" checked={current.allPages} disabled={disabled} onChange={event => update({ allPages: event.currentTarget.checked, targetIds: current.targetIds })} />{t.allChannels}</label>
       {targets.length ? <div className={styles.scopeList}>{targets.map(target => <label key={target.id}>
         <input type="checkbox" checked={!current.allPages && current.targetIds.includes(target.id)} disabled={disabled || current.allPages} onChange={event => update({ allPages: false, targetIds: event.currentTarget.checked ? [...current.targetIds, target.id] : current.targetIds.filter(id => id !== target.id) })} />
         <span>{target.name}<small>{target.type}</small></span>
-      </label>)}</div> : <p className={styles.scopeEmpty}>No active channels are available to assign.</p>}
+      </label>)}</div> : <p className={styles.scopeEmpty}>{t.noChannelsToAssign}</p>}
     </fieldset>;
   }
 
@@ -148,25 +152,25 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
 
   return <div className={styles.team}>
     {canManage && <form method="post" className={styles.addForm} noValidate onSubmit={startAdd}>
-      <div className={styles.addIntro}><div><h3>Add a member</h3><p>Give an existing MS Social Pilot account access to this workspace.</p></div><span className={styles.count}>{total} total</span></div>
+      <div className={styles.addIntro}><div><h3>{t.addTitle}</h3><p>{t.addHint}</p></div><span className={styles.count}>{fill(t.totalCount, { count: total })}</span></div>
       <div className={styles.addFields}>
-        <label className={styles.field} htmlFor="team-member-email">Email address
+        <label className={styles.field} htmlFor="team-member-email">{t.emailAddress}
           <input id="team-member-email" name="email" type="email" autoComplete="email" value={email} maxLength={320} disabled={busy} aria-invalid={validation.errors.email ? true : undefined} aria-describedby={validation.errors.email ? 'team-member-email-error' : 'team-member-email-help'} onChange={event => { setEmail(event.currentTarget.value); validation.clear('email'); }} />
-          {validation.errors.email ? <FieldError id="team-member-email-error">{validation.errors.email}</FieldError> : <span id="team-member-email-help" className={styles.hint}>The account must already exist.</span>}
+          {validation.errors.email ? <FieldError id="team-member-email-error">{validation.errors.email}</FieldError> : <span id="team-member-email-help" className={styles.hint}>{t.accountExists}</span>}
         </label>
-        {roleSelect(role, value => { setRole(value); setScope(prev => scopeForRole(value, prev)); setConfirmation(''); }, busy, 'Workspace role')}
+        {roleSelect(role, value => { setRole(value); setScope(prev => scopeForRole(value, prev)); setConfirmation(''); }, busy, t.workspaceRole)}
       </div>
-      {managerRole(role) ? <p className={styles.scopeNote}>Workspace managers always have access to every channel.</p> : targetChoices(scope, next => { setScope(next); setConfirmation(''); }, busy)}
-      <div className={styles.addActions}><Button variant="primary" type="submit" disabled={busy}>Review member access</Button></div>
+      {managerRole(role) ? <p className={styles.scopeNote}>{t.managersAll}</p> : targetChoices(scope, next => { setScope(next); setConfirmation(''); }, busy)}
+      <div className={styles.addActions}><Button variant="primary" type="submit" disabled={busy}>{t.reviewAccess}</Button></div>
     </form>}
 
     {feedback && !feedback.error && <p ref={feedbackRef} tabIndex={-1} className={styles.success} role="status">{feedback.text}</p>}
 
-    {hasMore && <p className={styles.directoryLimit}>Showing {members.length} of {total} members. Contact an administrator if you need to manage someone outside this list.</p>}
-    <div className={styles.tableWrap} role="region" aria-label="Workspace member directory" tabIndex={0}>
+    {hasMore && <p className={styles.directoryLimit}>{fill(t.showing, { shown: members.length, total })}</p>}
+    <div className={styles.tableWrap} role="region" aria-label={t.directory} tabIndex={0}>
       <table className={styles.table}>
-        <caption className={styles.visuallyHidden}>Workspace members, roles and channel access</caption>
-        <thead><tr><th scope="col">Person</th><th scope="col">Workspace role</th><th scope="col">Channel access</th><th scope="col"><span className={styles.visuallyHidden}>Member actions</span></th></tr></thead>
+        <caption className={styles.visuallyHidden}>{t.caption}</caption>
+        <thead><tr><th scope="col">{t.person}</th><th scope="col">{t.workspaceRole}</th><th scope="col">{t.channelAccess}</th><th scope="col"><span className={styles.visuallyHidden}>{t.memberActions}</span></th></tr></thead>
         <tbody>{members.map(member => {
           const blockedOwner = member.role === 'owner' && actorRole !== 'owner';
           const canEditMember = member.userId !== actorId && !blockedOwner;
@@ -174,43 +178,45 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
           const missingTargetCount = member.targetIds.filter(id => !targets.some(target => target.id === id)).length;
           const fullChannelAccess = managerRole(member.role) || member.allPages;
           return <tr key={member.id}>
-            <th scope="row"><span className={styles.person}>{member.name || member.email}{member.userId === actorId && <span className={styles.you}>You</span>}</span><span className={styles.email}>{member.email}</span></th>
+            <th scope="row"><span className={styles.person}>{member.name || member.email}{member.userId === actorId && <span className={styles.you}>{t.you}</span>}</span><span className={styles.email}>{member.email}</span></th>
             <td><span className={styles.role}>{roleLabel(member.role)}</span></td>
-            <td>{fullChannelAccess ? <span className={styles.channelSummary}><span>All channels</span></span> : memberTargets.length || missingTargetCount ? <span className={styles.channelSummary}>{memberTargets.map(target => <span key={target.id}>{target.name}</span>)}{Boolean(missingTargetCount) && <span>{missingTargetCount} unavailable channel{missingTargetCount === 1 ? '' : 's'}</span>}</span> : <span className={styles.none}>No channels selected</span>}</td>
-            <td><div className={styles.rowActions}>{!canManage ? <span className={styles.hint}>View only</span> : member.userId === actorId ? <span className={styles.hint}>Your account</span> : blockedOwner ? <span className={styles.hint}>Owner only</span> : canEditMember && <><Button size="sm" disabled={busy} onClick={() => beginEdit(member)}>Edit access</Button><Button size="sm" variant="quiet" disabled={busy} onClick={() => { setRemoving(member); setConfirmation(''); setFeedback(null); }}>Remove</Button></>}</div></td>
+            <td>{fullChannelAccess ? <span className={styles.channelSummary}><span>{t.allChannels}</span></span> : memberTargets.length || missingTargetCount ? <span className={styles.channelSummary}>{memberTargets.map(target => <span key={target.id}>{target.name}</span>)}{Boolean(missingTargetCount) && <span>{missingTargetCount === 1 ? t.unavailableOne : fill(t.unavailableMany, { count: missingTargetCount })}</span>}</span> : <span className={styles.none}>{t.noneSelected}</span>}</td>
+            <td><div className={styles.rowActions}>{!canManage ? <span className={styles.hint}>{t.viewOnly}</span> : member.userId === actorId ? <span className={styles.hint}>{t.yourAccount}</span> : blockedOwner ? <span className={styles.hint}>{t.ownerOnly}</span> : canEditMember && <><Button size="sm" disabled={busy} onClick={() => beginEdit(member)}>{t.editAccess}</Button><Button size="sm" variant="quiet" disabled={busy} onClick={() => { setRemoving(member); setConfirmation(''); setFeedback(null); }}>{t.remove}</Button></>}</div></td>
           </tr>;
         })}</tbody>
       </table>
     </div>
 
-    <Dialog open={addReview} title="Review new member" description="Confirm the workspace access before adding this account." onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>Back</Button><Button variant="primary" disabled={busy || confirmation !== addConfirmation} onClick={() => void submit('POST', { email: canonicalEmail, role, targetIds: effectiveScope(role, scope).targetIds, allPages: effectiveScope(role, scope).allPages, confirmation: addConfirmation }, 'added')}>{busy ? 'Adding…' : 'Add member'}</Button></>}>
-      <div className={styles.review}><p><span>Account</span><strong>{canonicalEmail}</strong></p><p><span>Role</span><strong>{roleLabel(role)}</strong></p><p><span>Channels</span><strong>{managerRole(role) ? 'All channels (included with this role)' : scope.allPages ? 'All channels' : targets.filter(target => scope.targetIds.includes(target.id)).map(target => target.name).join(', ') || 'No channels selected'}</strong></p></div>
-      <ConfirmationField expected={addConfirmation} value={confirmation} onChange={setConfirmation} busy={busy} />
+    <Dialog open={addReview} title={t.reviewNew} description={t.reviewNewDetail} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>{t.back}</Button><Button variant="primary" disabled={busy || confirmation !== addConfirmation} onClick={() => void submit('POST', { email: canonicalEmail, role, targetIds: effectiveScope(role, scope).targetIds, allPages: effectiveScope(role, scope).allPages, confirmation: addConfirmation }, 'added')}>{busy ? t.adding : t.addMember}</Button></>}>
+      <div className={styles.review}><p><span>{t.account}</span><strong>{canonicalEmail}</strong></p><p><span>{t.role}</span><strong>{roleLabel(role)}</strong></p><p><span>{t.channels}</span><strong>{managerRole(role) ? t.allIncluded : scope.allPages ? t.allChannels : targets.filter(target => scope.targetIds.includes(target.id)).map(target => target.name).join(', ') || t.noneSelected}</strong></p></div>
+      <ConfirmationField locale={locale} expected={addConfirmation} value={confirmation} onChange={setConfirmation} busy={busy} />
       {feedback?.error && <p ref={feedbackRef} tabIndex={-1} className={styles.error} role="alert">{feedback.text}</p>}
     </Dialog>
 
-    <Dialog open={Boolean(editing)} title="Edit member access" description={editing ? `Change workspace access for ${editing.name || editing.email}.` : undefined} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>Cancel</Button><Button variant="primary" disabled={busy || !editing || confirmation !== editConfirmation} onClick={() => editing && void submit('PATCH', { membershipId: editing.id, role: editRole, targetIds: effectiveScope(editRole, editScope).targetIds, allPages: effectiveScope(editRole, editScope).allPages, confirmation: editConfirmation }, 'updated')}>{busy ? 'Saving…' : 'Save access'}</Button></>}>
+    <Dialog open={Boolean(editing)} title={t.editTitle} description={editing ? fill(t.editDetail, { name: editing.name || editing.email }) : undefined} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>{t.cancel}</Button><Button variant="primary" disabled={busy || !editing || confirmation !== editConfirmation} onClick={() => editing && void submit('PATCH', { membershipId: editing.id, role: editRole, targetIds: effectiveScope(editRole, editScope).targetIds, allPages: effectiveScope(editRole, editScope).allPages, confirmation: editConfirmation }, 'updated')}>{busy ? t.saving : t.saveAccess}</Button></>}>
       {editing && <>
-        {roleSelect(editRole, value => { setEditRole(value); setEditScope(prev => scopeForRole(value, prev)); setConfirmation(''); }, busy || (editing.userId === actorId) || (editing.role === 'owner' && actorRole !== 'owner'), 'Workspace role')}
-        {managerRole(editRole) ? <p className={styles.scopeNote}>Workspace managers always have access to every channel.</p> : <>
+        {roleSelect(editRole, value => { setEditRole(value); setEditScope(prev => scopeForRole(value, prev)); setConfirmation(''); }, busy || (editing.userId === actorId) || (editing.role === 'owner' && actorRole !== 'owner'), t.workspaceRole)}
+        {managerRole(editRole) ? <p className={styles.scopeNote}>{t.managersAll}</p> : <>
           {targetChoices(editScope, next => { setEditScope(next); setConfirmation(''); }, busy)}
-          {showUnavailableGrantControls && retainedUnavailableCount > 0 && <div className={styles.unavailableGrant}><p>{retainedUnavailableCount} channel access grant{retainedUnavailableCount === 1 ? ' is' : 's are'} unavailable in the current channel list. Keep these grants or remove them explicitly.</p><Button size="sm" disabled={busy} onClick={() => { setEditScope(current => ({ ...current, targetIds: current.targetIds.filter(id => availableTargetIds.has(id)) })); setConfirmation(''); }}>Remove {retainedUnavailableCount} unavailable channel grant{retainedUnavailableCount === 1 ? '' : 's'}</Button></div>}
-          {removedUnavailableCount > 0 && <p className={styles.removalWarning} role="note">Saving will remove {removedUnavailableCount} unavailable channel grant{removedUnavailableCount === 1 ? '' : 's'} from this member's access.</p>}
+          {showUnavailableGrantControls && retainedUnavailableCount > 0 && <div className={styles.unavailableGrant}><p>{retainedUnavailableCount === 1 ? t.grantOne : fill(t.grantMany, { count: retainedUnavailableCount })}</p><Button size="sm" disabled={busy} onClick={() => { setEditScope(current => ({ ...current, targetIds: current.targetIds.filter(id => availableTargetIds.has(id)) })); setConfirmation(''); }}>{retainedUnavailableCount === 1 ? t.removeGrantOne : fill(t.removeGrantMany, { count: retainedUnavailableCount })}</Button></div>}
+          {removedUnavailableCount > 0 && <p className={styles.removalWarning} role="note">{removedUnavailableCount === 1 ? t.savingRemovesOne : fill(t.savingRemovesMany, { count: removedUnavailableCount })}</p>}
         </>}
-        <ConfirmationField expected={editConfirmation} value={confirmation} onChange={setConfirmation} busy={busy} action="UPDATE" />
+        <ConfirmationField locale={locale} expected={editConfirmation} value={confirmation} onChange={setConfirmation} busy={busy} action="UPDATE" />
         {feedback?.error && <p ref={feedbackRef} tabIndex={-1} className={styles.error} role="alert">{feedback.text}</p>}
       </>}
     </Dialog>
 
-    <Dialog open={Boolean(removing)} title="Remove workspace access" description={removing ? `Remove ${removing.name || removing.email} from this workspace?` : undefined} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>Keep member</Button><Button variant="danger" disabled={busy || !removing || confirmation !== removeConfirmation} onClick={() => removing && void submit('DELETE', { membershipId: removing.id, confirmation: removeConfirmation }, 'removed')}>{busy ? 'Removing…' : 'Remove from workspace'}</Button></>}>
-      {removing && <><p className={styles.removeCopy}>This revokes access to this workspace. Their account and access to other workspaces stay available.</p><ConfirmationField expected={removeConfirmation} value={confirmation} onChange={setConfirmation} busy={busy} action="REMOVE" /><p className={styles.hint}>This change takes effect as soon as it is confirmed.</p>{feedback?.error && <p ref={feedbackRef} tabIndex={-1} className={styles.error} role="alert">{feedback.text}</p>}</>}
+    <Dialog open={Boolean(removing)} title={t.removeTitle} description={removing ? fill(t.removeDetail, { name: removing.name || removing.email }) : undefined} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>{t.keepMember}</Button><Button variant="danger" disabled={busy || !removing || confirmation !== removeConfirmation} onClick={() => removing && void submit('DELETE', { membershipId: removing.id, confirmation: removeConfirmation }, 'removed')}>{busy ? t.removing : t.removeFromWorkspace}</Button></>}>
+      {removing && <><p className={styles.removeCopy}>{t.removeCopy}</p><ConfirmationField locale={locale} expected={removeConfirmation} value={confirmation} onChange={setConfirmation} busy={busy} action="REMOVE" /><p className={styles.hint}>{t.immediate}</p>{feedback?.error && <p ref={feedbackRef} tabIndex={-1} className={styles.error} role="alert">{feedback.text}</p>}</>}
     </Dialog>
   </div>;
 }
 
-function ConfirmationField({ expected, value, onChange, busy, action = 'ADD' }: { expected: string; value: string; onChange: (value: string) => void; busy: boolean; action?: 'ADD' | 'UPDATE' | 'REMOVE' }) {
+function ConfirmationField({ expected, value, onChange, busy, action = 'ADD', locale = 'en' }: { expected: string; value: string; onChange: (value: string) => void; busy: boolean; action?: 'ADD' | 'UPDATE' | 'REMOVE'; locale?: 'en' | 'fr' }) {
+  const t = teamCopy[locale];
+  const [before, after] = t.confirmType.split('{code}');
   return <label className={styles.confirmField}>
-    <span>Type <code>{expected}</code> to confirm</span>
-    <input value={value} autoComplete="off" disabled={busy} aria-label={`${action} confirmation`} onChange={event => onChange(event.currentTarget.value)} />
+    <span>{before}<code>{expected}</code>{after}</span>
+    <input value={value} autoComplete="off" disabled={busy} aria-label={fill(t.confirmAria, { action })} onChange={event => onChange(event.currentTarget.value)} />
   </label>;
 }

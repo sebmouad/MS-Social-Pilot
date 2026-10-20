@@ -8,6 +8,8 @@ import { ModalDialog } from '@/components/ModalDialog';
 import { RouteNotice } from '@/components/RouteNotice';
 import { SidebarDock } from '@/components/SidebarDock';
 import type { NotificationPage, NotificationPreferenceView, NotificationRow } from '@/modules/settings/notifications/server';
+import { fill } from '@/modules/settings/ui/shell-copy';
+import { notificationsCopy } from './copy';
 import styles from './notifications.module.css';
 
 type Notice = { message: string; error: boolean; key: number } | null;
@@ -15,22 +17,23 @@ type Action = { kind: 'read' | 'delete'; item: NotificationRow } | null;
 type EmailPrefs = NotificationPreferenceView['preferences'];
 
 const UPDATE_CONFIRMATION = 'UPDATE NOTIFICATION PREFERENCES';
-const eventName = (kind: NotificationRow['kind']) => kind === 'note_mention' ? 'Teammate note mention' : 'Content mix needs attention';
-const emailOutcome = (state: NotificationRow['emailState']) => {
-  switch (state) {
-    case 'sent': return 'Email sent';
-    case 'pending': return 'Email pending';
-    case 'sending': return 'Email sending';
-    case 'uncertain': return 'Email outcome needs review';
-    case 'failed': return 'Email could not be sent';
-    case 'cancelled': return 'Email canceled';
-    default: return 'Email status unavailable';
-  }
-};
 
 export function NotificationCenter({ initialPreferences, initialPage, locale = initialPreferences?.locale ?? 'en' }: { initialPreferences: NotificationPreferenceView | null; initialPage: NotificationPage | null; locale?: 'en' | 'fr' }) {
   const labels = notificationPreferenceLabels[locale];
-  const [confirmPreferences, preferencesDialog] = useConfirm({ title: locale === 'fr' ? 'Préférences de notification' : 'Notification preferences', cancel: locale === 'fr' ? 'Annuler' : 'Cancel', confirm: locale === 'fr' ? 'Enregistrer' : 'Save', danger: false });
+  const t = notificationsCopy[locale];
+  const eventName = (kind: NotificationRow['kind']) => kind === 'note_mention' ? t.eventMention : t.eventMix;
+  const emailOutcome = (state: NotificationRow['emailState']) => {
+    switch (state) {
+      case 'sent': return t.emailSent;
+      case 'pending': return t.emailPending;
+      case 'sending': return t.emailSending;
+      case 'uncertain': return t.emailUncertain;
+      case 'failed': return t.emailFailed;
+      case 'cancelled': return t.emailCancelled;
+      default: return t.emailUnknown;
+    }
+  };
+  const [confirmPreferences, preferencesDialog] = useConfirm({ title: t.prefsDialogTitle, cancel: t.cancel, confirm: t.save, danger: false });
   const [preferences, setPreferences] = useState(initialPreferences);
   const [rows, setRows] = useState(initialPage?.items ?? []);
   const [page, setPage] = useState(initialPage?.page ?? 1);
@@ -59,8 +62,8 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
       if (nextUnreadOnly) query.set('unreadOnly', 'true');
       const response = await fetch(`/api/notifications?${query}`, { cache: 'no-store' });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? 'Notifications could not be loaded.');
-      if (!Array.isArray(result.notifications?.items) || !Number.isInteger(result.notifications?.page) || typeof result.notifications?.hasMore !== 'boolean') throw new Error('Notifications could not be confirmed. Refresh and try again.');
+      if (!response.ok) throw new Error(result.error ?? t.loadFailed);
+      if (!Array.isArray(result.notifications?.items) || !Number.isInteger(result.notifications?.page) || typeof result.notifications?.hasMore !== 'boolean') throw new Error(t.loadUnconfirmed);
       setRows(result.notifications.items.map((row: NotificationRow) => ({ ...row, createdAt: new Date(row.createdAt), readAt: row.readAt ? new Date(row.readAt) : null })));
       setPage(result.notifications.page);
       setHasMore(result.notifications.hasMore);
@@ -71,9 +74,9 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
         setMuteDraft(result.preferences.mutes.map((mute: { targetId: string }) => mute.targetId));
       }
       setUnreadOnly(nextUnreadOnly);
-      announce('Notifications updated.');
+      announce(t.updated);
     } catch (error) {
-      announce(error instanceof Error ? error.message : 'Notifications could not be loaded. Please try again.', true);
+      announce(error instanceof Error ? error.message : t.loadRetry, true);
     } finally { setBusy(false); }
   }
 
@@ -84,15 +87,15 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
       const mutes = preferences.channels.filter(channel => muteDraft.includes(channel.id)).map(channel => ({ targetId: channel.id, event: 'queueEmpty' as const }));
       const response = await fetch('/api/notifications', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...prefsDraft, mutes, confirmation: UPDATE_CONFIRMATION }) });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? 'Notification preferences could not be saved.');
+      if (!response.ok) throw new Error(result.error ?? t.prefsSaveFailed);
       const saved = result.preferences ?? result;
-      if (typeof saved.preferences?.onNoteMention !== 'boolean' || typeof saved.preferences?.onQueueEmpty !== 'boolean' || !Array.isArray(saved.mutes)) throw new Error('The saved preferences could not be confirmed. Refresh to review their current state.');
+      if (typeof saved.preferences?.onNoteMention !== 'boolean' || typeof saved.preferences?.onQueueEmpty !== 'boolean' || !Array.isArray(saved.mutes)) throw new Error(t.prefsUnconfirmed);
       setPreferences(saved);
       setPrefsDraft(saved.preferences);
       setMuteDraft(saved.mutes.map((mute: { targetId: string }) => mute.targetId));
       setPrefsChanged(false); setReviewPrefs(false);
-      announce('Notification preferences saved.');
-    } catch (error) { announce(error instanceof Error ? error.message : 'Notification preferences could not be saved. Please try again.', true); }
+      announce(t.prefsSaved);
+    } catch (error) { announce(error instanceof Error ? error.message : t.prefsRetry, true); }
     finally { busyRef.current = false; setBusy(false); }
   }
 
@@ -105,12 +108,12 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
       const confirmation = `${kind === 'read' ? 'READ' : 'DELETE'} NOTIFICATION ${item.id}`;
       const response = await fetch(`/api/notifications?id=${encodeURIComponent(item.id)}`, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation }) });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? `This alert could not be ${kind === 'read' ? 'marked as read' : 'deleted'}.`);
-      if (result.id !== item.id || (kind === 'read' ? result.read !== true : result.deleted !== true)) throw new Error('The result could not be confirmed. Refresh notifications before trying again.');
+      if (!response.ok) throw new Error(result.error ?? (kind === 'read' ? t.readFailed : t.deleteFailed));
+      if (result.id !== item.id || (kind === 'read' ? result.read !== true : result.deleted !== true)) throw new Error(t.actionUnconfirmed);
       setRows(current => kind === 'delete' || (kind === 'read' && unreadOnly) ? current.filter(row => row.id !== item.id) : current.map(row => row.id === item.id ? { ...row, readAt: result.readAt ?? new Date().toISOString() } : row));
       setAction(null);
-      announce(kind === 'read' ? 'Alert marked as read.' : 'Alert deleted.');
-    } catch (error) { announce(error instanceof Error ? error.message : 'The alert could not be updated. Please try again.', true); }
+      announce(kind === 'read' ? t.markedRead : t.deleted);
+    } catch (error) { announce(error instanceof Error ? error.message : t.updateRetry, true); }
     finally { busyRef.current = false; setBusy(false); }
   }
 
@@ -119,51 +122,51 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
   return <>
     {preferencesDialog}
     <SidebarDock>
-      <aside className={styles.sidebar} aria-label="Notification controls">
-        <form className={styles.preferences} onSubmit={event => { event.preventDefault(); if (!ADDITIONAL_NOTIFICATION_PREFERENCES.some(key => prefsDraft[key] !== preferences?.preferences[key])) { setReviewPrefs(true); return; } void confirmPreferences(locale === 'fr' ? 'Enregistrer vos préférences personnelles ?' : 'Save your personal email preferences?').then(ok => { if (ok) void savePreferences(); }); }}>
-          <h2>Email alerts</h2>
-          <p>Choose the personal email updates you want.</p>
-          <label className={styles.check}><input type="checkbox" checked={prefsDraft.onNoteMention} onChange={event => { const checked = event.currentTarget.checked; setPrefsDraft(current => ({ ...current, onNoteMention: checked })); setPrefsChanged(true); }} disabled={!preferences || busy} /><span>When a teammate mentions you in a note</span></label>
-          <label className={styles.check}><input type="checkbox" checked={prefsDraft.onQueueEmpty} onChange={event => { const checked = event.currentTarget.checked; setPrefsDraft(current => ({ ...current, onQueueEmpty: checked })); setPrefsChanged(true); }} disabled={!preferences || busy} /><span>When a selected channel has nothing left in its queue</span></label>
+      <aside className={styles.sidebar} aria-label={t.controls}>
+        <form className={styles.preferences} onSubmit={event => { event.preventDefault(); if (!ADDITIONAL_NOTIFICATION_PREFERENCES.some(key => prefsDraft[key] !== preferences?.preferences[key])) { setReviewPrefs(true); return; } void confirmPreferences(t.savePrompt).then(ok => { if (ok) void savePreferences(); }); }}>
+          <h2>{t.emailAlerts}</h2>
+          <p>{t.emailAlertsHint}</p>
+          <label className={styles.check}><input type="checkbox" checked={prefsDraft.onNoteMention} onChange={event => { const checked = event.currentTarget.checked; setPrefsDraft(current => ({ ...current, onNoteMention: checked })); setPrefsChanged(true); }} disabled={!preferences || busy} /><span>{t.onMention}</span></label>
+          <label className={styles.check}><input type="checkbox" checked={prefsDraft.onQueueEmpty} onChange={event => { const checked = event.currentTarget.checked; setPrefsDraft(current => ({ ...current, onQueueEmpty: checked })); setPrefsChanged(true); }} disabled={!preferences || busy} /><span>{t.onQueueEmpty}</span></label>
           {preferences && preferences.channels.length > 0 && <fieldset className={styles.mutes}>
-            <legend>Mute empty-queue emails by channel</legend>
+            <legend>{t.muteLegend}</legend>
             {preferences.channels.map(channel => <label key={channel.id} className={styles.check}><input type="checkbox" checked={muteDraft.includes(channel.id)} onChange={event => { const checked = event.currentTarget.checked; setMuteDraft(current => checked ? [...current, channel.id] : current.filter(id => id !== channel.id)); setPrefsChanged(true); }} disabled={busy} /><span>{channel.name}</span></label>)}
-            <small>You can mute up to {preferences.maxMutes} channel{preferences.maxMutes === 1 ? '' : 's'}.</small>
+            <small>{preferences.maxMutes === 1 ? t.muteLimitOne : fill(t.muteLimitMany, { max: preferences.maxMutes })}</small>
           </fieldset>}
-          {preferences && preferences.channels.length === 0 && <p className={styles.hint}>No channels are currently available for channel-specific mutes.</p>}
+          {preferences && preferences.channels.length === 0 && <p className={styles.hint}>{t.noMuteChannels}</p>}
           <p>{labels.pending}</p>
           {ADDITIONAL_NOTIFICATION_PREFERENCES.map(key => <label key={key} className={styles.check}><input type="checkbox" checked={prefsDraft[key] ?? (key !== 'onNewInbox')} onChange={event => { const checked = event.currentTarget.checked; setPrefsDraft(current => ({ ...current, [key]: checked })); setPrefsChanged(true); }} disabled={!preferences || busy} /><span>{labels[key]}</span></label>)}
-          <Button type="submit" variant="primary" disabled={!preferences || !prefsChanged || busy || tooManyMutes}>Review changes</Button>
-          {tooManyMutes && <p className={styles.error}>Choose no more than {preferences?.maxMutes} channel mutes.</p>}
+          <Button type="submit" variant="primary" disabled={!preferences || !prefsChanged || busy || tooManyMutes}>{t.review}</Button>
+          {tooManyMutes && <p className={styles.error}>{fill(t.tooManyMutes, { max: preferences?.maxMutes ?? 0 })}</p>}
         </form>
         <div className={styles.sidebarSection}>
-          <h2>Inbox view</h2>
-          <label className={styles.check}><input type="checkbox" checked={unreadOnly} onChange={event => { const value = event.currentTarget.checked; void loadList(1, value); }} disabled={busy} /><span>Unread alerts only</span></label>
+          <h2>{t.inboxView}</h2>
+          <label className={styles.check}><input type="checkbox" checked={unreadOnly} onChange={event => { const value = event.currentTarget.checked; void loadList(1, value); }} disabled={busy} /><span>{t.unreadOnly}</span></label>
           <div className={styles.paging}>
-            <Button size="sm" disabled={busy || page <= 1} onClick={() => void loadList(page - 1)}>Previous</Button>
-            <span>Page {page}</span>
-            <Button size="sm" disabled={busy || !hasMore} onClick={() => void loadList(page + 1)}>Next</Button>
+            <Button size="sm" disabled={busy || page <= 1} onClick={() => void loadList(page - 1)}>{t.previous}</Button>
+            <span>{fill(t.page, { page })}</span>
+            <Button size="sm" disabled={busy || !hasMore} onClick={() => void loadList(page + 1)}>{t.next}</Button>
           </div>
-          <Button size="sm" onClick={() => void loadList(page)}>Refresh alerts</Button>
+          <Button size="sm" onClick={() => void loadList(page)}>{t.refresh}</Button>
         </div>
       </aside>
     </SidebarDock>
 
-    <section className={styles.inbox} aria-label="Your alerts">
-      <header className={styles.inboxHeading}><div><h2>Your alerts</h2><p>Alerts are private to your account in this workspace.</p></div><span>{rows.filter(row => !row.readAt).length} unread on this page</span></header>
-      {!preferences && <div className={styles.emptyState}><p>Your preferences could not be loaded.</p><Button onClick={() => void loadList(1)}>Retry</Button></div>}
-      {!listLoaded && rows.length === 0 && preferences && <div className={styles.emptyState}><p>Your alerts could not be loaded.</p><Button onClick={() => void loadList(1)}>Retry</Button></div>}
-      {listLoaded && rows.length === 0 && <div className={styles.emptyState}><h3>{page > 1 ? 'No alerts on this page' : unreadOnly ? 'No unread alerts' : 'No alerts yet'}</h3><p>{page > 1 ? 'Use the previous page control in the sidebar to review earlier alerts.' : unreadOnly ? 'Turn off the unread filter to review alerts you have already read.' : 'New mentions and content mix updates will appear here when they need your attention.'}</p></div>}
+    <section className={styles.inbox} aria-label={t.alerts}>
+      <header className={styles.inboxHeading}><div><h2>{t.alerts}</h2><p>{t.alertsHint}</p></div><span>{fill(t.unreadCount, { count: rows.filter(row => !row.readAt).length })}</span></header>
+      {!preferences && <div className={styles.emptyState}><p>{t.prefsMissing}</p><Button onClick={() => void loadList(1)}>{t.retry}</Button></div>}
+      {!listLoaded && rows.length === 0 && preferences && <div className={styles.emptyState}><p>{t.alertsMissing}</p><Button onClick={() => void loadList(1)}>{t.retry}</Button></div>}
+      {listLoaded && rows.length === 0 && <div className={styles.emptyState}><h3>{page > 1 ? t.emptyPageTitle : unreadOnly ? t.emptyUnreadTitle : t.emptyTitle}</h3><p>{page > 1 ? t.emptyPageBody : unreadOnly ? t.emptyUnreadBody : t.emptyBody}</p></div>}
       {rows.length > 0 && <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <caption className="sr-only">Your personal notifications</caption>
-          <thead><tr><th scope="col">Alert</th><th scope="col">When</th><th scope="col">Email outcome</th><th scope="col">Status</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+          <caption className="sr-only">{t.tableCaption}</caption>
+          <thead><tr><th scope="col">{t.alert}</th><th scope="col">{t.when}</th><th scope="col">{t.emailOutcome}</th><th scope="col">{t.status}</th><th scope="col"><span className="sr-only">{t.actions}</span></th></tr></thead>
           <tbody>{rows.map(item => <tr key={item.id} data-unread={!item.readAt || undefined}>
             <td><span className={styles.title}>{item.title}</span><span className={styles.body}>{item.body}</span></td>
-            <td><time dateTime={item.createdAt.toISOString()}>{new Date(item.createdAt).toLocaleString()}</time></td>
+            <td><time dateTime={item.createdAt.toISOString()}>{new Date(item.createdAt).toLocaleString(locale)}</time></td>
             <td>{emailOutcome(item.emailState)}</td>
-            <td>{item.available ? `${item.readAt ? 'Read' : 'Unread'} · ${eventName(item.kind)}` : 'Source no longer available'}</td>
-          <td><div className={styles.actions}>{!item.readAt && <Button size="sm" onClick={() => setAction({ kind: 'read', item })}>Mark read</Button>}<Button size="sm" variant="danger" onClick={() => setAction({ kind: 'delete', item })}>Delete</Button></div></td>
+            <td>{item.available ? `${item.readAt ? t.read : t.unread} · ${eventName(item.kind)}` : t.sourceGone}</td>
+          <td><div className={styles.actions}>{!item.readAt && <Button size="sm" onClick={() => setAction({ kind: 'read', item })}>{t.markRead}</Button>}<Button size="sm" variant="danger" onClick={() => setAction({ kind: 'delete', item })}>{t.delete}</Button></div></td>
           </tr>)}</tbody>
         </table>
       </div>}
@@ -171,19 +174,19 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
 
     {notice && !reviewPrefs && !action && <RouteNotice key={notice.key} focusKey={String(notice.key)} error={notice.error} className={styles.routeNotice}>{notice.message}</RouteNotice>}
     {reviewPrefs && <ModalDialog className={styles.modal} labelledBy="notification-prefs-title" onDismiss={() => setReviewPrefs(false)} busy={busy}>
-      <div className={styles.dialog}><header><h2 id="notification-prefs-title">Review notification preferences</h2><p>These choices change email updates for your account only.</p></header>
-        <ul><li>Note mention email: <strong>{prefsDraft.onNoteMention ? 'On' : 'Off'}</strong></li><li>Empty-queue email: <strong>{prefsDraft.onQueueEmpty ? 'On' : 'Off'}</strong></li><li>Channels muted for empty-queue email: <strong>{muteDraft.length}</strong></li></ul>
+      <div className={styles.dialog}><header><h2 id="notification-prefs-title">{t.reviewTitle}</h2><p>{t.reviewHint}</p></header>
+        <ul><li>{t.mentionEmail} <strong>{prefsDraft.onNoteMention ? t.on : t.off}</strong></li><li>{t.queueEmail} <strong>{prefsDraft.onQueueEmpty ? t.on : t.off}</strong></li><li>{t.mutedCount} <strong>{muteDraft.length}</strong></li></ul>
         {notice?.error && <RouteNotice key={notice.key} focusKey={String(notice.key)} error className={styles.dialogError}>{notice.message}</RouteNotice>}
-        <footer><Button data-dialog-cancel onClick={() => setReviewPrefs(false)} disabled={busy}>Keep editing</Button><Button variant="primary" onClick={() => void savePreferences()} disabled={busy}>{busy ? 'Saving…' : 'Save preferences'}</Button></footer>
+        <footer><Button data-dialog-cancel onClick={() => setReviewPrefs(false)} disabled={busy}>{t.keepEditing}</Button><Button variant="primary" onClick={() => void savePreferences()} disabled={busy}>{busy ? t.saving : t.savePreferences}</Button></footer>
       </div>
     </ModalDialog>}
     {action && <ModalDialog className={styles.modal} labelledBy="notification-action-title" describedBy="notification-action-description" onDismiss={() => setAction(null)} busy={busy}>
-      <div className={styles.dialog}><header><h2 id="notification-action-title">{action.kind === 'read' ? 'Mark this alert as read?' : 'Delete this alert?'}</h2><p id="notification-action-description">{action.item.title}</p></header>
-        {action.kind === 'delete' && <p>This removes the alert from your inbox. It does not change the post, note or channel.</p>}
-        {action.kind === 'read' && <p>The alert will stay in your inbox and can still be found in the full list.</p>}
-        <p className={styles.reviewCopy}>Review the alert above, then choose {action.kind === 'read' ? 'Mark read' : 'Delete alert'} to confirm this exact action.</p>
+      <div className={styles.dialog}><header><h2 id="notification-action-title">{action.kind === 'read' ? t.markReadTitle : t.deleteTitle}</h2><p id="notification-action-description">{action.item.title}</p></header>
+        {action.kind === 'delete' && <p>{t.deleteBody}</p>}
+        {action.kind === 'read' && <p>{t.readBody}</p>}
+        <p className={styles.reviewCopy}>{action.kind === 'read' ? t.reviewCopyRead : t.reviewCopyDelete}</p>
         {notice?.error && <RouteNotice key={notice.key} focusKey={String(notice.key)} error className={styles.dialogError}>{notice.message}</RouteNotice>}
-        <footer><Button data-dialog-cancel onClick={() => setAction(null)} disabled={busy}>Cancel</Button><Button variant={action.kind === 'delete' ? 'danger' : 'primary'} onClick={() => void confirmAction()} disabled={busy}>{busy ? 'Working…' : action.kind === 'read' ? 'Mark read' : 'Delete alert'}</Button></footer>
+        <footer><Button data-dialog-cancel onClick={() => setAction(null)} disabled={busy}>{t.cancel}</Button><Button variant={action.kind === 'delete' ? 'danger' : 'primary'} onClick={() => void confirmAction()} disabled={busy}>{busy ? t.working : action.kind === 'read' ? t.markRead : t.deleteAlert}</Button></footer>
       </div>
     </ModalDialog>}
   </>;

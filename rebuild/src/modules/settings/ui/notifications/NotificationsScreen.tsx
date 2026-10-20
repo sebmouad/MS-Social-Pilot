@@ -3,7 +3,9 @@ import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { listNotifications, readNotificationPreferences } from '@/modules/settings/notifications/server';
 import { SettingsPage, SettingsPanel } from '@/modules/settings/ui/_components';
+import { fill } from '@/modules/settings/ui/shell-copy';
 import { NotificationCenter } from './NotificationCenter';
+import { notificationsCopy } from './copy';
 
 export const metadata: Metadata = { title: 'Notifications' };
 
@@ -14,11 +16,14 @@ export default async function NotificationsPage() {
     readNotificationPreferences(actor).catch(() => null),
     listNotifications(actor, { page: 1 }).catch(() => null),
   ]);
+  // The saved personal locale drives this screen, matching NotificationCenter.
+  const locale = preferences?.locale ?? 'en';
+  const t = notificationsCopy[locale];
 
   return <PageFrame module="settings" scopedAccess>
-    <SettingsPage active="settings/notifications" title="Notifications" description={`Your personal alerts for ${viewer.membership.workspace.name}.`}>
-      <SettingsPanel title="Your notification preferences" detail="Email choices belong to your account. Channel mutes apply only to empty-queue email alerts.">
-        <NotificationCenter initialPreferences={preferences} initialPage={notifications} />
+    <SettingsPage active="settings/notifications" title={t.title} locale={locale} description={fill(t.description, { workspace: viewer.membership.workspace.name })}>
+      <SettingsPanel title={t.panel} detail={t.panelDetail}>
+        <NotificationCenter initialPreferences={preferences} initialPage={notifications} locale={locale} />
       </SettingsPanel>
     </SettingsPage>
   </PageFrame>;

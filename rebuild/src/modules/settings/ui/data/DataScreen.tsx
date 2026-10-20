@@ -2,22 +2,27 @@ import type { Metadata } from 'next';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { SettingsPage, SettingsPanel, styles } from '@/modules/settings/ui/_components';
+import { settingsLocale } from '@/modules/settings/ui/locale';
+import { fill } from '@/modules/settings/ui/shell-copy';
 import { DataControls } from './controls';
 import { WorkspaceExports } from './exports';
+import { dataCopy } from './copy';
 
 export const metadata: Metadata = { title: 'Data and privacy' };
 
 export default async function DataSettingsPage() {
   const viewer = await requireViewer({ feature: 'settings/data' });
+  const locale = await settingsLocale();
+  const t = dataCopy[locale];
   const manager = ['owner', 'admin'].includes(viewer.membership.role);
-  return <PageFrame module="settings"><SettingsPage active="settings/data" title="Data and privacy" description={`Export or remove the data stored for ${viewer.membership.workspace.name}.`}>
-    <SettingsPanel title="Export workspace data" detail="Prepare a ZIP in the background, then download it before it expires.">
-      <p className={styles['settings-note']}>The database snapshot includes workspace details, member names and emails, connected account metadata, channels, posts, inbox records, stored analytics, and older tables directly owned by this workspace. The manifest lists exported table counts and remaining coverage gaps. Provider credential fields and the instance-wide security audit log are excluded.</p>
-      {manager ? <WorkspaceExports key={viewer.workspaceId} workspaceId={viewer.workspaceId} /> : <p className={styles['settings-note']}>Only workspace owners and admins can manage exports.</p>}
+  return <PageFrame module="settings"><SettingsPage active="settings/data" title={t.title} locale={locale} description={fill(t.description, { workspace: viewer.membership.workspace.name })}>
+    <SettingsPanel title={t.exportPanel} detail={t.exportDetail}>
+      <p className={styles['settings-note']}>{t.exportNote}</p>
+      {manager ? <WorkspaceExports key={viewer.workspaceId} workspaceId={viewer.workspaceId} locale={locale} /> : <p className={styles['settings-note']}>{t.managersOnly}</p>}
     </SettingsPanel>
-    <SettingsPanel title="Delete workspace data" detail="Remove the workspace’s content and connected account records from this application.">
-      <p className={styles['settings-note']}>This removes workspace-owned database records, stored media, and export files while keeping workspace identity and member access. The ZIP includes directly workspace-owned older tables and stored media; its manifest identifies records outside that boundary. Content already published to social networks remains there, and provider authorization is not revoked.</p>
-      <DataControls workspaceName={viewer.membership.workspace.name} destructive />
+    <SettingsPanel title={t.deletePanel} detail={t.deleteDetail}>
+      <p className={styles['settings-note']}>{t.deleteNote}</p>
+      <DataControls workspaceName={viewer.membership.workspace.name} locale={locale} destructive />
     </SettingsPanel>
   </SettingsPage></PageFrame>;
 }

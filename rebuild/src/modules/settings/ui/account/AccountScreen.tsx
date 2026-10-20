@@ -7,6 +7,7 @@ import { requireViewer } from '@/server/context';
 import { SettingsPage, SettingsPanel, styles } from '@/modules/settings/ui/_components';
 import { AccountManager } from './manager';
 import { accountPasswordPolicy } from '@/server/account-settings';
+import { accountCopy } from './copy';
 
 export const metadata: Metadata = { title: 'Account' };
 
@@ -18,18 +19,19 @@ export default async function AccountPage() {
     if (!(error instanceof Error) || !error.message.includes('NEXT_REDIRECT')) throw error;
     return <PersonKeysAccountFallback locale={locale} />;
   }
+  const t = accountCopy[locale];
   const passwordPolicy = await accountPasswordPolicy();
   const values = [
-    { label: 'Workspace', value: viewer.membership.workspace.name },
-    { label: 'Your role', value: viewer.membership.role },
-    { label: 'Workspace time zone', value: viewer.membership.workspace.timezone },
-    { label: 'Workspace slug', value: viewer.membership.workspace.slug },
+    { label: t.workspace, value: viewer.membership.workspace.name },
+    { label: t.role, value: viewer.membership.role },
+    { label: t.timezone, value: viewer.membership.workspace.timezone },
+    { label: t.slug, value: viewer.membership.workspace.slug },
   ];
 
-  return <PageFrame module="settings" scopedAccess><SettingsPage active="settings/account" title="Account" description="Your profile and the workspace context used for this session.">
-    <AccountManager initialName={viewer.user.name} email={viewer.user.email} passwordPolicy={passwordPolicy} />
+  return <PageFrame module="settings" scopedAccess><SettingsPage active="settings/account" title={t.title} description={t.description} locale={locale}>
+    <AccountManager locale={locale} initialName={viewer.user.name} email={viewer.user.email} passwordPolicy={passwordPolicy} />
     <PersonKeysManager locale={locale} />
-    <SettingsPanel title="Workspace context">
+    <SettingsPanel title={t.contextTitle}>
       <dl className={styles['settings-account-grid']}>{values.map(item => <div className={styles['settings-account-item']} key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>
     </SettingsPanel>
   </SettingsPage></PageFrame>;

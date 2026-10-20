@@ -8,11 +8,11 @@ import { workspaceOperationsCopy } from '@/modules/settings/workspace-operations
 import { WORKSPACE_OPERATION_BOUNDS as B, workspaceOperationsConfirmation, type WorkspaceOperations } from '@/modules/settings/workspace-operations';
 import styles from './policy.module.css';
 
-const t = workspaceOperationsCopy.en;
 type Draft = Omit<WorkspaceOperations, 'utmSource' | 'utmMedium' | 'utmCampaignTemplate' | 'aiTone' | 'aiBrandVoice' | 'aiAvoidWords'> & Record<'utmSource' | 'utmMedium' | 'utmCampaignTemplate' | 'aiTone' | 'aiBrandVoice' | 'aiAvoidWords', string>;
 const toDraft = (value: WorkspaceOperations): Draft => ({ ...value, utmSource: value.utmSource ?? '', utmMedium: value.utmMedium ?? '', utmCampaignTemplate: value.utmCampaignTemplate ?? '', aiTone: value.aiTone ?? '', aiBrandVoice: value.aiBrandVoice ?? '', aiAvoidWords: value.aiAvoidWords ?? '' });
 
-export function WorkspaceOperationsForm({ workspaceId, initial }: { workspaceId: string; initial: WorkspaceOperations }) {
+export function WorkspaceOperationsForm({ workspaceId, initial, locale = 'en' }: { workspaceId: string; initial: WorkspaceOperations; locale?: 'en' | 'fr' }) {
+  const t = workspaceOperationsCopy[locale];
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [confirmation, setConfirmation] = useState(''); const [busy, setBusy] = useState(false); const [message, setMessage] = useState(''); const [error, setError] = useState(false);
   const inFlight = useRef(false);
