@@ -462,3 +462,19 @@ has not been run and the migration is unapplied/unrehearsed** (no database was s
 Still open: shared callers passing `formatId`; stored-video resolution; a neutral cancel/reschedule
 adapter operation and UI/HTTP/MCP entry; pinning the new migration in `scripts/cutover-rehearsal.sh` and its
 test after backup/scratch-restore; adding the table to export; cleaned live coverage.
+
+
+## Batch103: schedule-change evidence in Root (private, default off)
+
+`readFacebookNativeScheduleEvidence` (`formats/journal-recovery.ts`) reads the content-free rows of
+`rebuild_facebook_native_schedule_changes` (cancel/reschedule state, new schedule instant, final video id,
+Page id, revision; never the owner token) with the same Root cap and operation filter as the other native
+evidence, and `media-recovery-host.ts` merges it into the Facebook publication evidence table. A database
+without the Batch102 migration returns an empty list (checked with `to_regclass`) instead of failing the whole
+evidence read. Read-only: no action, no provider request. Tests: `facebook-native-schedule-evidence.test.ts`
+(mocked queries). Root keys: none. Migration: none.
+
+Still open: adding the table to the data-export bundle (the bundle lives in Settings, outside Facebook
+ownership; rows already cascade on workspace erasure); shared callers passing `formatId`; stored-video
+resolution; a neutral cancel/reschedule operation with UI/HTTP/MCP entry; pinning migration `20261030140000`
+and `20261030100000` in `scripts/cutover-rehearsal.sh`; PostgreSQL runs; cleaned live coverage.

@@ -1,6 +1,6 @@
 import type { PlatformPublicationRecovery } from '@/server/platforms/host';
 import { assertFacebookMediaResolution, assertFacebookMediaSettled, readFacebookMediaEvidence } from './media-journal';
-import { assertFacebookNativeResolution, assertFacebookNativeSettled, readFacebookNativeEvidence, readFacebookNativeProofEvidence } from './formats/journal-recovery';
+import { assertFacebookNativeResolution, assertFacebookNativeSettled, readFacebookNativeEvidence, readFacebookNativeProofEvidence, readFacebookNativeScheduleEvidence } from './formats/journal-recovery';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 
@@ -21,14 +21,14 @@ export const facebookPublicationRecovery: PlatformPublicationRecovery = {
       throw new OperationError('unavailable', 'Publication evidence is temporarily unavailable.');
     }
     const cap = Math.min(configured, resultCap ?? configured);
-    const [media, native, proofs] = await Promise.all([readFacebookMediaEvidence(operationId, cap), readFacebookNativeEvidence(operationId, cap), readFacebookNativeProofEvidence(operationId, cap)]);
-    const merged = [...media.items, ...native.items, ...proofs.items].sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')));
+    const [media, native, proofs, schedules] = await Promise.all([readFacebookMediaEvidence(operationId, cap), readFacebookNativeEvidence(operationId, cap), readFacebookNativeProofEvidence(operationId, cap), readFacebookNativeScheduleEvidence(operationId, cap)]);
+    const merged = [...media.items, ...native.items, ...proofs.items, ...schedules.items].sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')));
     const items = merged.slice(0, cap);
     const visibleIds = new Set(items.map(row => row.id));
-    const allColumns = [...media.columns, ...native.columns, ...proofs.columns];
+    const allColumns = [...media.columns, ...native.columns, ...proofs.columns, ...schedules.columns];
     const columns = allColumns.filter((column, index) => allColumns.findIndex(existing => existing.key === column.key) === index);
     return { title: 'Facebook publication evidence', description: 'Photo, feed and native delivery intents and receipts. Unresolved submissions are held for review and never resent automatically.',
-      columns, summaryColumnKeys: ['state', 'recordType', 'remoteId', 'updatedAt'], items, rowIdKey: 'id', truncated: media.truncated || native.truncated || proofs.truncated || merged.length > cap,
+      columns, summaryColumnKeys: ['state', 'recordType', 'remoteId', 'updatedAt'], items, rowIdKey: 'id', truncated: media.truncated || native.truncated || proofs.truncated || schedules.truncated || merged.length > cap,
       actions: [...(media.actions ?? []), ...(native.actions ?? [])].filter(action => visibleIds.has(action.rowId)) };
   },
   async executeRootAction(userId, input) {
