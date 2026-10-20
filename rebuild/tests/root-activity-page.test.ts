@@ -3,6 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 const state = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: async () => ({ id: 'root' }) }));
 vi.mock('../src/server/root/activity', () => ({ listRootActivity: state.list }));
+// Audit policy has its own reader; keep this page unit test independent of Prisma.
+vi.mock('../src/server/root/audit-config', () => ({
+  readAuditConfig: async () => ({ retentionDays: 30, exportMaxRows: 250, batchSize: 25 }),
+  saveAuditSettings: vi.fn(),
+}));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'root.activityPageSize' ? 50 : 200 }));
 vi.mock('../src/server/root/RootFrame', () => ({ RootFrame: 'main' }));
 vi.mock('../src/components/SidebarDock', () => ({ SidebarDock: 'aside' }));
@@ -17,6 +22,11 @@ describe('Root activity work surface', () => {
     expect(html).toMatch(/<aside>[\s\S]*name="q"[\s\S]*name="workspaceId"[\s\S]*name="from"[\s\S]*name="to"[\s\S]*Newer activity[\s\S]*Older activity[\s\S]*<\/aside>/);
     expect(html).toContain('2026-10-16 12:00:00 UTC');
     expect(html).toContain('Showing 1 recorded event.');
+    expect(html).toContain('Export CSV');
+    expect(html).toContain('up to 250 events');
+    expect(html).toMatch(/name="days"[^>]*value="30"/);
+    expect(html).toMatch(/name="exportRows"[^>]*value="250"/);
+    expect(html).toMatch(/name="batchSize"[^>]*value="25"/);
     expect(state.list).toHaveBeenCalledWith('root', { q: 'config', limit: 2 });
   });
   it('distinguishes no history, no matches and a page whose records changed', async () => {
