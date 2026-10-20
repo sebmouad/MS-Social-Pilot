@@ -1,19 +1,22 @@
 import { z } from 'zod';
-import { MEDIA_BOUNDS } from './config';
+import { MEDIA_BOUNDS, MEDIA_DEFAULTS } from './config';
 
 /** Library asset ids: rebuild image files use UUIDs; migrated/video rows use legacy cuid-style ids. */
-export const ASSET_ID_SCHEMA = z.string().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/);
+export const ASSET_ID_SCHEMA = z.string().min(1).max(MEDIA_BOUNDS.identifierMaxCharacters.max).regex(/^[A-Za-z0-9_-]+$/);
 const IMAGE_FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const isImageFileId = (id: string) => IMAGE_FILE_ID.test(id);
 
-export const LIBRARY_QUERY_SCHEMA = z.object({
+export const libraryQuerySchema = (maxSearch: number, maxPage: number) => z.object({
   kind: z.enum(['image', 'video']).optional(),
-  q: z.string().trim().max(MEDIA_BOUNDS.maxSearchCharacters.max).refine(v => !/[\u0000-\u001f\u007f]/.test(v)).optional(),
-  page: z.number().int().safe().min(1).max(1000).optional(),
+  q: z.string().trim().max(maxSearch).refine(v => !/[\u0000-\u001f\u007f]/.test(v)).optional(),
+  page: z.number().int().safe().min(1).max(maxPage).optional(),
   usage: z.enum(['used', 'unused']).optional(),
 }).strict();
-export const IMPORT_SCHEMA = z.object({ url: z.string().trim().min(1).max(2048), name: z.string().trim().max(180).optional(), confirmation: z.string() }).strict();
-export const DELETE_SCHEMA = z.object({ id: ASSET_ID_SCHEMA, allowInUse: z.boolean().optional(), confirmation: z.string() }).strict();
+export const LIBRARY_QUERY_SCHEMA = libraryQuerySchema(MEDIA_BOUNDS.maxSearchCharacters.max, MEDIA_BOUNDS.pageNumberMax.max);
+export const importSchema = (maxUrl: number, maxName: number) => z.object({ url: z.string().trim().min(1).max(maxUrl), name: z.string().trim().max(maxName).optional(), confirmation: z.string() }).strict();
+export const IMPORT_SCHEMA = importSchema(MEDIA_BOUNDS.importUrlMaxCharacters.max, MEDIA_BOUNDS.assetNameMaxCharacters.max);
+export const deleteSchema = (maxId: number) => z.object({ id: z.string().min(1).max(maxId).regex(/^[A-Za-z0-9_-]+$/), allowInUse: z.boolean().optional(), confirmation: z.string() }).strict();
+export const DELETE_SCHEMA = deleteSchema(MEDIA_BOUNDS.identifierMaxCharacters.max);
 
 export const importConfirmation = (url: string) => `IMPORT MEDIA ${url}`;
 export const deleteConfirmation = (id: string) => `DELETE MEDIA ${id}`;
@@ -46,10 +49,10 @@ export function sniffMedia(bytes: Uint8Array): Sniffed | null {
 }
 
 /** A readable file name from a URL path or a supplied name; never a path. */
-export function safeAssetName(preferred: string | undefined, url: string, fallback: string): string {
+export function safeAssetName(preferred: string | undefined, url: string, fallback: string, maxCharacters: number = MEDIA_DEFAULTS.assetNameMaxCharacters): string {
   let candidate = preferred ?? '';
   if (!candidate) { try { candidate = decodeURIComponent(new URL(url).pathname.split('/').filter(Boolean).pop() ?? ''); } catch { candidate = ''; } }
-  const cleaned = candidate.replace(/[\u0000-\u001f\u007f\\/]/g, '').replace(/^\.+/, '').trim().slice(0, 180);
+  const cleaned = candidate.replace(/[\u0000-\u001f\u007f\\/]/g, '').replace(/^\.+/, '').trim().slice(0, maxCharacters);
   return cleaned || fallback;
 }
 

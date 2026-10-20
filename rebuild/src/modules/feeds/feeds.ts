@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { FEEDS_BOUNDS } from './config';
+import { FEEDS_BOUNDS, FEEDS_DEFAULTS } from './config';
 
 /** Feed entry parsing and message rendering: pure, bounded, never throws on malformed documents. */
-export const FEED_ID_SCHEMA = z.string().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/);
+export const FEED_ID_SCHEMA = z.string().min(1).max(FEEDS_BOUNDS.identifierMaxCharacters.max).regex(/^[A-Za-z0-9_-]+$/);
 const clean = (max: number) => z.string().trim().max(max).refine(v => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(v), 'Control characters are not allowed.');
 export const FEED_KINDS = ['rss', 'wordpress'] as const;
 export type FeedKind = (typeof FEED_KINDS)[number];
@@ -11,17 +11,19 @@ export const FEED_HANDLING = ['review', 'schedule'] as const;
 export type FeedHandling = (typeof FEED_HANDLING)[number];
 export const DEFAULT_MESSAGE_TEMPLATE = '{title}\n\n{link}';
 
-export const FEED_INPUT_SCHEMA = z.object({
-  name: clean(240).refine(v => v.length > 0, 'Enter a name.'),
-  url: z.string().trim().min(1).max(2048),
+export const feedIdSchema = (maxCharacters: number) => z.string().min(1).max(maxCharacters).regex(/^[A-Za-z0-9_-]+$/);
+export const feedInputSchema = (limits: { maxName: number; maxUrl: number; maxMessage: number; maxHashtags: number; maxTargets: number; maxIdentifier: number; maxSpread: number }) => z.object({
+  name: clean(limits.maxName).refine(v => v.length > 0, 'Enter a name.'),
+  url: z.string().trim().min(1).max(limits.maxUrl),
   kind: z.enum(FEED_KINDS).default('rss'),
   enabled: z.boolean().default(true),
-  messageTemplate: clean(FEEDS_BOUNDS.messageMaxCharacters.max).refine(v => v.length > 0, 'Enter a message template.').default(DEFAULT_MESSAGE_TEMPLATE),
-  hashtags: clean(1000).default(''),
+  messageTemplate: clean(limits.maxMessage).refine(v => v.length > 0, 'Enter a message template.').default(DEFAULT_MESSAGE_TEMPLATE),
+  hashtags: clean(limits.maxHashtags).default(''),
   handling: z.enum(FEED_HANDLING).default('review'),
-  spreadMinutes: z.number().int().min(0).max(FEEDS_BOUNDS.maxSpreadMinutes.max).default(0),
-  targetIds: z.array(z.string().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/)).max(FEEDS_BOUNDS.maxTargets.max).default([]),
+  spreadMinutes: z.number().int().min(0).max(limits.maxSpread).default(0),
+  targetIds: z.array(feedIdSchema(limits.maxIdentifier)).max(limits.maxTargets).default([]),
 }).strict();
+export const FEED_INPUT_SCHEMA = feedInputSchema({ maxName: FEEDS_BOUNDS.nameMaxCharacters.max, maxUrl: FEEDS_BOUNDS.urlMaxCharacters.max, maxMessage: FEEDS_BOUNDS.messageMaxCharacters.max, maxHashtags: FEEDS_BOUNDS.hashtagsMaxCharacters.max, maxTargets: FEEDS_BOUNDS.maxTargets.max, maxIdentifier: FEEDS_BOUNDS.identifierMaxCharacters.max, maxSpread: FEEDS_BOUNDS.maxSpreadMinutes.max });
 export type FeedInput = z.infer<typeof FEED_INPUT_SCHEMA>;
 export const FEED_CREATE_SCHEMA = FEED_INPUT_SCHEMA.extend({ confirmation: z.string() }).strict();
 export const FEED_UPDATE_SCHEMA = FEED_INPUT_SCHEMA.extend({ id: FEED_ID_SCHEMA, confirmation: z.string() }).strict();
@@ -30,7 +32,12 @@ export const FEED_CHECK_MODES = ['preview', 'drafts', 'posts'] as const;
 export type FeedCheckMode = (typeof FEED_CHECK_MODES)[number];
 /** `createDrafts: true` is the older spelling of `mode: 'drafts'`. */
 export const FEED_CHECK_SCHEMA = z.object({ id: FEED_ID_SCHEMA, mode: z.enum(FEED_CHECK_MODES).optional(), createDrafts: z.boolean().optional(), confirmation: z.string().optional() }).strict();
-export const FEED_LIST_SCHEMA = z.object({ page: z.number().int().min(1).max(100000).optional() }).strict();
+export const feedCreateSchema = (limits: Parameters<typeof feedInputSchema>[0]) => feedInputSchema(limits).extend({ confirmation: z.string() }).strict();
+export const feedUpdateSchema = (limits: Parameters<typeof feedInputSchema>[0]) => feedInputSchema(limits).extend({ id: feedIdSchema(limits.maxIdentifier), confirmation: z.string() }).strict();
+export const feedDeleteSchema = (maxIdentifier: number) => z.object({ id: feedIdSchema(maxIdentifier), confirmation: z.string() }).strict();
+export const feedCheckSchema = (maxIdentifier: number) => z.object({ id: feedIdSchema(maxIdentifier), mode: z.enum(FEED_CHECK_MODES).optional(), createDrafts: z.boolean().optional(), confirmation: z.string().optional() }).strict();
+export const feedListSchema = (pageNumberMax: number) => z.object({ page: z.number().int().min(1).max(pageNumberMax).optional() }).strict();
+export const FEED_LIST_SCHEMA = feedListSchema(FEEDS_BOUNDS.pageNumberMax.max);
 
 export const createFeedConfirmation = (name: string) => `CREATE FEED ${name}`;
 export const updateFeedConfirmation = (id: string) => `UPDATE FEED ${id}`;
@@ -79,27 +86,29 @@ const dateOf = (value: string | null) => { if (!value) return null; const d = ne
 const safeLink = (value: string | null) => { if (!value) return null; try { const u = new URL(value); return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : null; } catch { return null; } };
 
 /** RSS 2.0 and Atom. Returns at most `maxItems` entries, newest-document-order first. */
-export function parseFeedDocument(xml: string, maxItems: number): FeedEntry[] {
+export type FeedParserLimits = { title: number; guid: number; description: number };
+const DEFAULT_PARSER_LIMITS: FeedParserLimits = { title: FEEDS_DEFAULTS.entryTitleMaxCharacters, guid: FEEDS_DEFAULTS.entryGuidMaxCharacters, description: FEEDS_DEFAULTS.entryDescriptionMaxCharacters };
+export function parseFeedDocument(xml: string, maxItems: number, limits: FeedParserLimits = DEFAULT_PARSER_LIMITS): FeedEntry[] {
   const entries: FeedEntry[] = [];
   for (const match of xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)) {
     if (entries.length >= maxItems) break;
     const block = match[0];
     const link = safeLink(tagText(block, 'link') ?? atomLink(block));
-    const title = cap(tagText(block, 'title'), 500);
-    const guid = cap(tagText(block, 'guid', 'id') ?? link ?? title, 500);
+    const title = cap(tagText(block, 'title'), limits.title);
+    const guid = cap(tagText(block, 'guid', 'id') ?? link ?? title, limits.guid);
     if (!guid) continue;
-    entries.push({ guid, title: title === null ? null : stripHtml(title) || null, link, description: cap(tagText(block, 'description', 'summary', 'content'), 20000), publishedAt: dateOf(tagText(block, 'pubDate', 'published', 'updated', 'date')) });
+    entries.push({ guid, title: title === null ? null : stripHtml(title) || null, link, description: cap(tagText(block, 'description', 'summary', 'content'), limits.description), publishedAt: dateOf(tagText(block, 'pubDate', 'published', 'updated', 'date')) });
   }
   return entries;
 }
 
 /** The site's WordPress REST posts endpoint. */
-export function wordpressApiUrl(site: string): string {
+export function wordpressApiUrl(site: string, pageSize: number = FEEDS_DEFAULTS.wordpressPageSize): string {
   const url = new URL(site);
   const base = url.pathname.replace(/\/wp-json.*$/, '').replace(/\/+$/, '');
-  return `${url.origin}${base}/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc`;
+  return `${url.origin}${base}/wp-json/wp/v2/posts?per_page=${pageSize}&orderby=date&order=desc`;
 }
-export function parseWordPressDocument(body: string, maxItems: number): FeedEntry[] {
+export function parseWordPressDocument(body: string, maxItems: number, limits: FeedParserLimits = DEFAULT_PARSER_LIMITS): FeedEntry[] {
   let posts: unknown;
   try { posts = JSON.parse(body); } catch { return []; }
   if (!Array.isArray(posts)) return [];
@@ -109,10 +118,10 @@ export function parseWordPressDocument(body: string, maxItems: number): FeedEntr
     if (!raw || typeof raw !== 'object') continue;
     const post = raw as { id?: unknown; link?: unknown; date_gmt?: unknown; guid?: { rendered?: unknown }; title?: { rendered?: unknown }; excerpt?: { rendered?: unknown } };
     const link = safeLink(typeof post.link === 'string' ? post.link : null);
-    const guid = cap(typeof post.guid?.rendered === 'string' ? post.guid.rendered : link ?? (typeof post.id === 'number' ? `wp:${post.id}` : null), 500);
+    const guid = cap(typeof post.guid?.rendered === 'string' ? post.guid.rendered : link ?? (typeof post.id === 'number' ? `wp:${post.id}` : null), limits.guid);
     if (!guid) continue;
-    const title = typeof post.title?.rendered === 'string' ? cap(stripHtml(post.title.rendered), 500) || null : null;
-    entries.push({ guid, title, link, description: typeof post.excerpt?.rendered === 'string' ? post.excerpt.rendered.slice(0, 20000) : null, publishedAt: typeof post.date_gmt === 'string' ? dateOf(`${post.date_gmt}Z`) : null });
+    const title = typeof post.title?.rendered === 'string' ? cap(stripHtml(post.title.rendered), limits.title) || null : null;
+    entries.push({ guid, title, link, description: typeof post.excerpt?.rendered === 'string' ? post.excerpt.rendered.slice(0, limits.description) : null, publishedAt: typeof post.date_gmt === 'string' ? dateOf(`${post.date_gmt}Z`) : null });
   }
   return entries;
 }
@@ -166,5 +175,5 @@ export function spreadGroups(targetIds: readonly string[], spreadMinutes: number
   return spreadMinutes > 0 ? targetIds.map(id => [id]) : [[...targetIds]];
 }
 
-/** Backoff multiplier after consecutive failures: 1, 2, 4 ... capped. */
-export const backoffMultiplier = (failures: number, ceiling: number) => Math.min(2 ** Math.min(Math.max(failures, 0), 30), ceiling);
+/** Backoff multiplier after consecutive failures: 1, 2, 4 ... capped without computing an exponent above the ceiling. */
+export const backoffMultiplier = (failures: number, ceiling: number) => Math.min(2 ** Math.min(Math.max(failures, 0), Math.ceil(Math.log2(Math.max(1, ceiling)))), ceiling);

@@ -1,3 +1,4 @@
+import { ROOT_AUDIT_CONTROLS_COPY, ROOT_AUDIT_DOWNLOAD } from '@/lib/config/root-audit-controls';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 const state = vi.hoisted(() => ({ list: vi.fn() }));
@@ -8,7 +9,7 @@ vi.mock('../src/server/root/audit-config', () => ({
   readAuditConfig: async () => ({ retentionDays: 30, exportMaxRows: 250, batchSize: 25 }),
   saveAuditSettings: vi.fn(),
 }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'root.activityPageSize' ? 50 : 200 }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'root.auditControlsCopy' ? ROOT_AUDIT_CONTROLS_COPY : key === 'root.auditDownloadPolicy' ? ROOT_AUDIT_DOWNLOAD : key === 'root.activityPageSize' ? 50 : 200 }));
 vi.mock('../src/server/root/RootFrame', () => ({ RootFrame: 'main' }));
 vi.mock('../src/components/SidebarDock', () => ({ SidebarDock: 'aside' }));
 import Page from '../src/app/root/activity/page';

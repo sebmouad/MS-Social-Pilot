@@ -5,20 +5,22 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { ModalDialog } from '@/components/ModalDialog';
 import type { PlatformPublicationAction, PlatformPublicationActionResult } from '@/server/platforms/host';
+import type { RootEvidencePolicy } from '@/lib/config/root-evidence-policy';
+import { evidenceCopyText, type RootEvidenceCopy } from '@/lib/config/root-evidence-copy';
 
-type Props = { providerId: string; action: PlatformPublicationAction; onReceipt?: (message: string) => void };
-const validReceipt = (value: unknown, action: PlatformPublicationAction): value is PlatformPublicationActionResult => {
+type Props = { providerId: string; action: PlatformPublicationAction; policy: RootEvidencePolicy; copy: RootEvidenceCopy; onReceipt?: (message: string) => void };
+const validReceipt = (value: unknown, action: PlatformPublicationAction, policy: RootEvidencePolicy): value is PlatformPublicationActionResult => {
   if (!value || typeof value !== 'object') return false;
   const result = value as Record<string, unknown>;
   return result.actionId === action.actionId && result.subjectId === action.subjectId &&
-    typeof result.operationId === 'string' && /^[A-Za-z0-9_-]{1,2048}$/.test(result.operationId) &&
+    typeof result.operationId === 'string' && result.operationId.length <= policy.identifierCharacters && /^[A-Za-z0-9_-]+$/.test(result.operationId) &&
     ['confirmed', 'attested', 'rejected', 'needs_review'].includes(String(result.state)) && typeof result.ok === 'boolean' &&
-    typeof result.message === 'string' && result.message.trim().length > 0 && result.message.length <= 500 &&
+    typeof result.message === 'string' && result.message.trim().length > 0 && result.message.length <= policy.messageCharacters &&
     !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(result.message) &&
     (result.state === 'confirmed' || result.state === 'attested' ? result.ok === true : result.ok === false);
 };
 
-export function RootPlatformPublicationAction({ providerId, action, onReceipt }: Props) {
+export function RootPlatformPublicationAction({ providerId, action, policy, copy, onReceipt }: Props) {
   const router = useRouter();
   const id = useId().replace(/:/g, '');
   const metadataVersion = JSON.stringify(action);
@@ -61,7 +63,7 @@ export function RootPlatformPublicationAction({ providerId, action, onReceipt }:
     if (busy) return;
     if (reviewRequired) {
       router.refresh();
-      announce('Evidence refreshed. Check the current module action details before continuing.');
+      announce(copy.refreshNotice);
     }
     setOpen(false); setError(null); setConfirmation(''); setAcknowledged(false);
   };
@@ -70,10 +72,10 @@ export function RootPlatformPublicationAction({ providerId, action, onReceipt }:
     const nextFieldErrors: Record<string, string> = {};
     for (const field of fields) {
       const value = fieldValues[field.key];
-      if (field.kind === 'text' && field.required && (typeof value !== 'string' || !value.trim())) nextFieldErrors[field.key] = `Enter a value for ${field.label}.`;
-      else if (field.kind === 'text' && typeof value === 'string' && value.length > (field.maxLength ?? 2048)) nextFieldErrors[field.key] = `Keep ${field.label} within ${field.maxLength ?? 2048} characters.`;
-      else if (field.kind === 'choice' && field.required && (typeof value !== 'string' || !field.options?.some(option => option.value === value))) nextFieldErrors[field.key] = `Choose an option for ${field.label}.`;
-      else if (field.kind === 'checkbox' && field.required && value !== true) nextFieldErrors[field.key] = 'Check this box to continue.';
+      if (field.kind === 'text' && field.required && (typeof value !== 'string' || !value.trim())) nextFieldErrors[field.key] = evidenceCopyText(copy.enterField, { label: field.label });
+      else if (field.kind === 'text' && typeof value === 'string' && value.length > Math.min(field.maxLength ?? policy.fieldValueCharacters, policy.fieldValueCharacters)) nextFieldErrors[field.key] = evidenceCopyText(copy.keepFieldWithin, { label: field.label, limit: Math.min(field.maxLength ?? policy.fieldValueCharacters, policy.fieldValueCharacters) });
+      else if (field.kind === 'choice' && field.required && (typeof value !== 'string' || !field.options?.some(option => option.value === value))) nextFieldErrors[field.key] = evidenceCopyText(copy.chooseField, { label: field.label });
+      else if (field.kind === 'checkbox' && field.required && value !== true) nextFieldErrors[field.key] = copy.checkToContinue;
     }
     setFieldErrors(nextFieldErrors);
     if (Object.keys(nextFieldErrors).length) { setError(null); return; }
@@ -86,27 +88,27 @@ export function RootPlatformPublicationAction({ providerId, action, onReceipt }:
       });
       let payload: unknown;
       try { payload = await response.json(); } catch { payload = null; }
-      if (!response.ok || !validReceipt(payload, action)) {
-        const result = validReceipt(payload, action) ? payload : null;
+      if (!response.ok || !validReceipt(payload, action, policy)) {
+        const result = validReceipt(payload, action, policy) ? payload : null;
         const validationError = !response.ok && response.status < 500 && payload && typeof payload === 'object' &&
           (payload as { code?: unknown }).code === 'invalid_request' && typeof (payload as { error?: unknown }).error === 'string';
         if (response.status >= 500 || !result && !validationError || result?.state === 'needs_review') setReviewRequired(true);
         const status = result?.state === 'needs_review' || response.status >= 500
-          ? 'The result could not be confirmed. Review the current platform evidence before taking further action.'
+          ? copy.errorResultUnconfirmed
           : result?.state === 'rejected' ? result.message
             : typeof (payload as { error?: unknown } | null)?.error === 'string' ? (payload as { error: string }).error
-              : 'The result could not be confirmed. Review the current platform evidence before taking further action.';
+              : copy.errorResultUnconfirmed;
         setError(status); return;
       }
       if (!['confirmed', 'attested'].includes(payload.state) || payload.ok !== true) { if (payload.state === 'needs_review') setReviewRequired(true); setError(payload.message); return; }
       setOpen(false); setConfirmation(''); setAcknowledged(false);
       announce(payload.state === 'attested'
-        ? `Human report recorded. The platform did not independently confirm it. ${payload.message}`
+        ? `${copy.humanReportPrefix}${payload.message}`
         : payload.message);
       router.refresh();
     } catch {
       setReviewRequired(true);
-      setError('The result could not be confirmed. Review the current platform evidence before taking further action.');
+      setError(copy.errorResultUnconfirmed);
     } finally { setBusy(false); }
   };
 
@@ -122,7 +124,7 @@ export function RootPlatformPublicationAction({ providerId, action, onReceipt }:
       <div className="ui-dialog__header"><h2 id={`root-platform-action-${id}`}>{action.label}</h2></div>
       <div className="ui-dialog__body">
         <p id={`root-platform-action-description-${id}`}>{action.description}</p>
-        {action.context?.length ? <dl className="root-publication-evidence__context" aria-label="Resolved action context">
+        {action.context?.length ? <dl className="root-publication-evidence__context" aria-label={copy.actionContext}>
           {action.context.map((item, index) => <div key={`${item.label}-${index}`}>
             <dt>{item.label}</dt><dd>{item.value}</dd>
           </div>)}
@@ -136,7 +138,7 @@ export function RootPlatformPublicationAction({ providerId, action, onReceipt }:
           return <div className="ui-field" key={field.key}>
             {field.kind === 'text' ? <>
               <label htmlFor={fieldId}>{field.label}</label>
-              <input id={fieldId} ref={node => { fieldRefs.current[field.key] = node; }} className="ui-input" type="text" value={typeof fieldValues[field.key] === 'string' ? fieldValues[field.key] as string : ''} maxLength={field.maxLength} required={field.required} {...common} onChange={event => setFieldValue(field.key, event.target.value)} />
+              <input id={fieldId} ref={node => { fieldRefs.current[field.key] = node; }} className="ui-input" type="text" value={typeof fieldValues[field.key] === 'string' ? fieldValues[field.key] as string : ''} maxLength={Math.min(field.maxLength ?? policy.fieldValueCharacters, policy.fieldValueCharacters)} required={field.required} {...common} onChange={event => setFieldValue(field.key, event.target.value)} />
             </> : field.kind === 'choice' ? <fieldset disabled={busy} aria-describedby={describedBy} aria-invalid={errorId ? true : undefined}>
               <legend>{field.label}</legend>
               {(field.options ?? []).map((option, index) => <label key={option.value} htmlFor={`${fieldId}-${index}`}>
@@ -149,15 +151,15 @@ export function RootPlatformPublicationAction({ providerId, action, onReceipt }:
             {fieldErrors[field.key] ? <p id={errorId} className="ui-field-error" role="alert">{fieldErrors[field.key]}</p> : null}
           </div>;
         })}
-        <label className="ui-field"><span>Type <strong>{action.confirmation}</strong> to confirm</span>
-          <input className="ui-input" value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" disabled={busy} aria-label="Exact confirmation" />
+        <label className="ui-field"><span>{evidenceCopyText(copy.typeToConfirm, { confirmation: action.confirmation })}</span>
+          <input className="ui-input" value={confirmation} maxLength={policy.confirmationCharacters} onChange={event => setConfirmation(event.target.value)} autoComplete="off" disabled={busy} aria-label={copy.exactConfirmation} />
         </label>
         <label className="ui-field"><span><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} disabled={busy} /> {action.acknowledgmentLabel}</span></label>
         {error ? <p ref={errorRef} className="ui-error" role="alert" tabIndex={-1}>{error}</p> : null}
       </div>
       <div className="ui-dialog__actions">
-        <Button type="button" data-dialog-cancel disabled={busy} onClick={dismiss}>{reviewRequired ? 'Close and review' : 'Cancel'}</Button>
-        <Button type="button" variant={action.intent === 'inspect' ? 'secondary' : 'danger'} disabled={busy || reviewRequired || confirmation !== action.confirmation || !acknowledged} onClick={() => void submit()}>{busy ? 'Working…' : action.label}</Button>
+        <Button type="button" data-dialog-cancel disabled={busy} onClick={dismiss}>{reviewRequired ? copy.closeAndReview : copy.cancel}</Button>
+        <Button type="button" variant={action.intent === 'inspect' ? 'secondary' : 'danger'} disabled={busy || reviewRequired || confirmation !== action.confirmation || !acknowledged} onClick={() => void submit()}>{busy ? copy.working : action.label}</Button>
       </div>
     </ModalDialog> : null}
   </>;

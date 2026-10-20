@@ -6,8 +6,8 @@ import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { hit } from '@/server/rate-limit';
 import { issueMcpKey } from '@/modules/settings/mcp-access/server';
-import { INTEGRATIONS_CONFIG } from '../config';
-import { cleanClientName, OAuthError, pkceMatches, redirectRegistered, registrationSchema, safeEqual, sha256Hex, CLIENT_ID, CODE_CHALLENGE } from './protocol';
+import { INTEGRATIONS_CONFIG, INTEGRATIONS_INPUT_HARD_MAX } from '../config';
+import { cleanClientName, OAuthError, pkceMatches, redirectRegistered, registrationSchemaForLimits, safeEqual, sha256Hex, CLIENT_ID, CODE_CHALLENGE } from './protocol';
 
 /**
  * OAuth for MCP clients. The access token is an ordinary scoped `mcp_api_keys` row made by the Settings issuance
@@ -23,11 +23,19 @@ export type OAuthResourceScope = { version: 1; mode: 'all' } | { version: 1; mod
 export type OAuthRuntime = {
   enabled: boolean; issuer: string | null; codeTtlSeconds: number; keyLifetimeDays: number; maxClients: number; clientIdleDays: number;
   registrationsPerHour: number; tokenAttemptsPerMinute: number; consentsPerHour: number;
+  clientNameInputMaxCharacters: number; clientNameMaxCharacters: number; redirectUriMaxCharacters: number; redirectUrisMaxItems: number; authorizationStateMaxCharacters: number;
+  scopeMaxCharacters: number; resourceIdMaxCharacters: number; resourceIdsMaxItems: number; issuedKeyNameMaxCharacters: number;
+  defaultClientName: string; issuedKeyNamePrefix: string;
 };
 const KEYS = {
   enabled: 'integrations.oauth.enabled', issuer: 'integrations.oauth.issuerUrl', codeTtlSeconds: 'integrations.oauth.codeTtlSeconds', keyLifetimeDays: 'integrations.oauth.keyLifetimeDays',
   maxClients: 'integrations.oauth.maxClients', clientIdleDays: 'integrations.oauth.clientIdleDays', registrationsPerHour: 'integrations.oauth.registrationsPerHour',
   tokenAttemptsPerMinute: 'integrations.oauth.tokenAttemptsPerMinute', consentsPerHour: 'integrations.oauth.consentsPerHour',
+  clientNameInputMaxCharacters: 'integrations.oauth.clientNameInputMaxCharacters', clientNameMaxCharacters: 'integrations.oauth.clientNameMaxCharacters', redirectUriMaxCharacters: 'integrations.oauth.redirectUriMaxCharacters',
+  redirectUrisMaxItems: 'integrations.oauth.redirectUrisMaxItems', authorizationStateMaxCharacters: 'integrations.oauth.authorizationStateMaxCharacters',
+  scopeMaxCharacters: 'integrations.oauth.scopeMaxCharacters', resourceIdMaxCharacters: 'integrations.oauth.resourceIdMaxCharacters',
+  resourceIdsMaxItems: 'integrations.oauth.resourceIdsMaxItems', issuedKeyNameMaxCharacters: 'integrations.oauth.issuedKeyNameMaxCharacters',
+  defaultClientName: 'integrations.oauth.defaultClientName', issuedKeyNamePrefix: 'integrations.oauth.issuedKeyNamePrefix',
 } as const;
 const unavailable = () => new OAuthError('temporarily_unavailable', 'OAuth connectors are not available right now.', 503);
 
@@ -66,10 +74,10 @@ export async function registerClient(input: unknown, ip: string | null) {
   const rt = await requireOAuth();
   const limit = hit(`oauth:register:${ip ?? 'all'}`, { limit: rt.registrationsPerHour, windowMs: 3_600_000 });
   if (!limit.allowed) throw new OAuthError('temporarily_unavailable', 'Too many registrations. Try again later.', 429);
-  const parsed = registrationSchema.safeParse(input);
+  const parsed = registrationSchemaForLimits(rt).safeParse(input);
   if (!parsed.success) throw new OAuthError('invalid_client_metadata', parsed.error.issues.map(issue => issue.message).join('; ') || 'Send JSON with redirect_uris.');
   const uris = [...new Set(parsed.data.redirect_uris)];
-  const name = cleanClientName(parsed.data.client_name);
+  const name = cleanClientName(parsed.data.client_name, rt.clientNameMaxCharacters, rt.defaultClientName);
   await prisma.$executeRaw`DELETE FROM mcp_oauth_clients WHERE COALESCE("lastUsedAt","createdAt") < NOW() - (${rt.clientIdleDays} * INTERVAL '1 day')`;
   const count = await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM mcp_oauth_clients`;
   if (Number(count[0]?.count ?? 0) >= rt.maxClients) throw new OAuthError('temporarily_unavailable', 'Client registration is full. Try again later.', 503);
@@ -93,7 +101,7 @@ const decisionSchema = z.object({
   writeFeatures: z.array(z.enum(featureIds)).max(featureIds.length),
   resourceScope: z.discriminatedUnion('mode', [
     z.object({ version: z.literal(1), mode: z.literal('all') }).strict(),
-    z.object({ version: z.literal(1), mode: z.literal('selected'), ids: z.array(z.string().min(1).max(100)).max(1000), adAccountIds: z.array(z.string().min(1).max(100)).max(1000) }).strict(),
+    z.object({ version: z.literal(1), mode: z.literal('selected'), ids: z.array(z.string().min(1).max(INTEGRATIONS_INPUT_HARD_MAX)).max(INTEGRATIONS_INPUT_HARD_MAX), adAccountIds: z.array(z.string().min(1).max(INTEGRATIONS_INPUT_HARD_MAX)).max(INTEGRATIONS_INPUT_HARD_MAX) }).strict(),
   ]),
 }).strict();
 export type ConsentDecision = z.input<typeof decisionSchema>;
@@ -111,6 +119,9 @@ export async function createAuthorizationCode(actor: Actor, raw: unknown): Promi
   const parsed = decisionSchema.safeParse(raw);
   if (!parsed.success || parsed.data.writeFeatures.some(feature => !parsed.data.readFeatures.includes(feature))) throw new OAuthError('invalid_request', 'Choose valid access.');
   const data = parsed.data;
+  if (data.redirectUri.length > rt.redirectUriMaxCharacters || data.resourceScope.mode === 'selected' && [data.resourceScope.ids, data.resourceScope.adAccountIds].some(ids => ids.length > rt.resourceIdsMaxItems || ids.some(id => id.length > rt.resourceIdMaxCharacters))) {
+    throw new OAuthError('invalid_request', 'The selected redirect or resources exceed the current connector limits.');
+  }
   const client = await findClient(data.clientId);
   if (!client || !redirectRegistered(client.redirectUris, data.redirectUri)) throw new OAuthError('invalid_request', 'Unknown client or redirect address.');
   const scope = data.resourceScope.mode === 'selected' ? { ...data.resourceScope, ids: [...new Set(data.resourceScope.ids)], adAccountIds: [...new Set(data.resourceScope.adAccountIds)] } : data.resourceScope;
@@ -158,7 +169,7 @@ export async function exchangeCode(input: { code: string; clientId: string; redi
   if (!client || !redirectRegistered(client.redirectUris, row.redirectUri)) throw grantFailed();
   const maxDays = await runtimeConfig('mcp.keys.maxLifetimeDays');
   const days = Math.min(rt.keyLifetimeDays, typeof maxDays === 'number' ? maxDays : 1);
-  const name = `OAuth: ${client.name}`.slice(0, 100);
+  const name = `${rt.issuedKeyNamePrefix}${client.name}`.slice(0, rt.issuedKeyNameMaxCharacters);
   let issued: Awaited<ReturnType<typeof issueMcpKey>>;
   try {
     issued = await issueMcpKey({ userId: row.userId, workspaceId: row.workspaceId }, { name, readFeatures: row.readFeatures, writeFeatures: row.writeFeatures, expiresInDays: days, resourceScope: row.resourceScope, confirmation: `CREATE MCP KEY ${name}` });

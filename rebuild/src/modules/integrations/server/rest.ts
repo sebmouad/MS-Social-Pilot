@@ -1,5 +1,6 @@
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
+import { runtimeConfig } from '@/server/config/store';
 import { clientIp } from '@/server/client-ip';
 import { hit, forgive } from '@/server/rate-limit';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
@@ -19,6 +20,7 @@ import { WEBHOOKS_FEATURE_ID } from '../manifest';
 export class RateLimited extends OperationError {
   constructor(readonly retryAfterSeconds: number) { super('unavailable', 'Too many requests. Try again shortly.'); this.name = 'RateLimited'; }
 }
+const within = (condition: boolean) => { if (!condition) throw new OperationError('invalid_request', 'One or more fields exceed the current integrations limits.'); };
 /** A key resolved to the person and workspace it acts as. `viewer.permissions` is the owner's CURRENT access narrowed to the key's grants. */
 export type ApiKeyContext = { keyId: string; viewer: McpViewer; actor: IntegrationsActor };
 
@@ -71,7 +73,7 @@ export async function restPages(ctx: ApiKeyContext) {
   const connection = await selectedResourceConnectionWhere(viewer.workspaceId, entitledPlatformIds(viewer.entitlements));
   const rows = await prisma.target.findMany({
     where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: connection }, ...(scope.all ? {} : { id: { in: [...scope.ids] } }) },
-    select: { id: true, name: true, type: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }], take: Math.max(1, viewer.maxResultItems ?? 100),
+    select: { id: true, name: true, type: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }], take: Math.max(1, viewer.maxResultItems ?? Number(await runtimeConfig('data.postPageMaxItems'))),
   });
   return { pages: rows.map(row => ({ id: row.id, name: row.name, type: row.type })) };
 }
@@ -98,8 +100,9 @@ export async function restSubscribe(ctx: ApiKeyContext, input: unknown, deps?: P
 /** A key may remove only the subscriptions it made itself. */
 export async function restUnsubscribe(ctx: ApiKeyContext, input: unknown) {
   requireWorkspaceWide(ctx);
-  const data = parse(REST_HOOK_ID_SCHEMA, input);
   const rt = await runtime(); requireEnabled(rt, 'webhooks');
+  const data = parse(REST_HOOK_ID_SCHEMA, input);
+  within(data.id.length <= rt.limits.webhookIdMaxCharacters);
   await authorize(ctx.actor, true);
   return protect(transact(ctx.actor, rt.limits, async tx => {
     await authorize(ctx.actor, true);
@@ -115,14 +118,13 @@ export const REST_WEBHOOK_FEATURE = WEBHOOKS_FEATURE_ID;
 /** The grant a key needs for /api/v1/posts: the same one the MCP post tools use, with its read/write split and channel ceiling. */
 export const REST_POSTS_FEATURE = 'publishing/posts';
 export const REST_POSTS_QUERY_KEYS = ['status', 'from', 'to', 'limit', 'channelId', 'pages', 'q'] as const;
-export const REST_POSTS_BODY_MAX_BYTES = 256 * 1024;
-
 /** Read a JSON body with a hard byte cap, checked before and after reading, so an oversized request is refused. */
-export async function readCappedJson(request: Request, maxBytes = REST_POSTS_BODY_MAX_BYTES): Promise<unknown> {
+export async function readCappedJson(request: Request, maxBytes?: number): Promise<unknown> {
+  const cap = maxBytes ?? (await runtime()).limits.restPostsBodyMaxBytes;
   const declared = Number(request.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > maxBytes) throw new OperationError('invalid_request', 'This request is too large.');
+  if (Number.isFinite(declared) && declared > cap) throw new OperationError('invalid_request', 'This request is too large.');
   const text = await request.text();
-  if (Buffer.byteLength(text) > maxBytes) throw new OperationError('invalid_request', 'This request is too large.');
+  if (Buffer.byteLength(text) > cap) throw new OperationError('invalid_request', 'This request is too large.');
   try { return JSON.parse(text) as unknown; } catch { throw new OperationError('invalid_request', 'Enter valid details.'); }
 }
 
@@ -145,7 +147,7 @@ export async function restListPosts(ctx: ApiKeyContext, query: Record<string, st
     input.channelId = channel;
   }
   const ids = pageIdsFor(viewer);
-  const posts = await listPostsWithFirstComment({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(ids === undefined ? {} : { allowedTargetIds: ids }) }, input, viewer.maxResultItems ?? 100);
+  const posts = await listPostsWithFirstComment({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(ids === undefined ? {} : { allowedTargetIds: ids }) }, input, viewer.maxResultItems ?? Number(await runtimeConfig('data.postPageMaxItems')));
   return { posts };
 }
 
@@ -156,6 +158,15 @@ export async function restListPosts(ctx: ApiKeyContext, query: Record<string, st
  */
 export async function restCreatePost(ctx: ApiKeyContext, input: unknown) {
   const data = parse(REST_POST_CREATE_SCHEMA, input, 'Check the post details: message, targetIds and an optional future scheduledAt.');
+  const limits = (await runtime()).limits;
+  within(data.message.length <= limits.restMessageMaxCharacters
+    && data.targetIds.length <= limits.restTargetIdsMaxItems
+    && data.targetIds.every(id => id.length <= limits.restTargetIdMaxCharacters)
+    && (data.firstComment === undefined || data.firstComment.length <= limits.restFirstCommentMaxCharacters)
+    && (data.firstCommentDelayMinutes === undefined || data.firstCommentDelayMinutes <= limits.restFirstCommentDelayMaxMinutes)
+    && (data.link === undefined || data.link.length <= limits.restLinkMaxCharacters)
+    && (data.media === undefined || data.media.length <= limits.restMediaMaxItems && data.media.every(item => item.url.length <= limits.restMediaUrlMaxCharacters && (item.altText === undefined || item.altText.length <= limits.restMediaAltTextMaxCharacters)))
+    && (data.destinationFormats === undefined || Object.keys(data.destinationFormats).length <= limits.restFormatEntriesMaxItems && Object.entries(data.destinationFormats).every(([key, value]) => key.length <= limits.restFormatKeyMaxCharacters && value.length <= limits.restFormatValueMaxCharacters)));
   const { viewer } = ctx;
   const result = await createPostForApi(publishingActor(viewer), {
     message: data.message, targetIds: data.targetIds, ...(data.firstComment === undefined ? {} : { firstComment: data.firstComment }),

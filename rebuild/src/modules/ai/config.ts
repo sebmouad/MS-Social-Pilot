@@ -4,11 +4,15 @@ import { entry } from '@/lib/config/entry';
 export const AI_DEFAULTS = {
   enabled: false, provider: 'anthropic', model: 'claude-sonnet-5-5', endpoint: 'https://api.anthropic.com/v1/messages',
   openaiModel: 'gpt-6-luna', openaiEndpoint: 'https://api.openai.com/v1/chat/completions', geminiModel: 'gemini-3.6-flash', geminiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models', requestTimeoutMs: 30000, maxOutputTokens: 600,
-  maxInputCharacters: 4000, hourlyRequestsPerWorkspace: 60, maxHashtags: 10, transactionTimeoutMs: 10000, transactionMaxWaitMs: 5000,
+  maxInputCharacters: 4000, hourlyRequestsPerWorkspace: 60, maxHashtags: 10, hashtagBodyMaxCharacters: 60, outputInputMultiplier: 2, languageMaxCharacters: 32,
+  summaryMaxCharacters: 1200, summarySubjectMaxCharacters: 200, sentimentLookbackDays: 15, transactionTimeoutMs: 10000, transactionMaxWaitMs: 5000,
 } as const;
 export const AI_BOUNDS = {
   requestTimeoutMs: { min: 2000, max: 120000 }, maxOutputTokens: { min: 50, max: 4000 }, maxInputCharacters: { min: 100, max: 20000 },
   hourlyRequestsPerWorkspace: { min: 1, max: 100000 }, maxHashtags: { min: 1, max: 30 }, transactionTimeoutMs: { min: 1000, max: 60000 }, transactionMaxWaitMs: { min: 100, max: 10000 },
+  summaryMaxCharacters: { min: 100, max: 10000 }, sentimentLookbackDays: { min: 1, max: 365 },
+  summarySubjectMaxCharacters: { min: 0, max: 2000 },
+  hashtagBodyMaxCharacters: { min: 1, max: 256 }, outputInputMultiplier: { min: 1, max: 10 }, languageMaxCharacters: { min: 2, max: 256 },
 } as const;
 /** Only providers with a shipped implementation may be selected. */
 export const AI_PROVIDER_CHOICES = [{ value: 'anthropic', label: 'Anthropic (Claude)' }, { value: 'openai', label: 'OpenAI' }, { value: 'gemini', label: 'Google Gemini' }] as const;
@@ -20,6 +24,7 @@ const G = 'Publishing · AI writing assist';
 export const AI_CONFIG = [
   entry({ key: 'ai.sentimentBatchSize', group: 'AI · Comment sentiment', label: 'Comment classification batch size', kind: 'number', description: 'Maximum stored comments examined per alert pass. Classification requires AI enabled, a key and workspace opt-in.', defaultValue: 20, schema: z.number().int().min(1).max(100), consumption: 'active' }),
   entry({ key: 'ai.sentimentDailyCap', group: 'AI · Comment sentiment', label: 'Daily comment classification cap per workspace', kind: 'number', description: 'UTC-day request ceiling, including failed attempts.', defaultValue: 200, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
+  entry({ key: 'ai.sentimentLookbackDays', group: 'AI · Comment sentiment', label: 'Comment classification lookback (days)', kind: 'number', description: 'Maximum comment age considered for automatic sentiment classification.', defaultValue: AI_DEFAULTS.sentimentLookbackDays, schema: int(AI_BOUNDS.sentimentLookbackDays), consumption: 'active' }),
   entry({ key: 'ai.enabled', group: G, label: 'Enable AI services', kind: 'boolean', description: 'AI requires this switch and a saved provider key. Writing suggestions require review; opted-in workspaces can classify stored inbound comments for spike alerts.', defaultValue: AI_DEFAULTS.enabled, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'ai.provider', group: G, label: 'AI provider', kind: 'select', description: 'Provider used for writing assist, report recaps and comment sentiment. Its key, model and endpoint below must be set.', defaultValue: AI_DEFAULTS.provider, schema: z.enum(AI_PROVIDERS), options: AI_PROVIDER_CHOICES, consumption: 'active' }),
   entry({ key: 'ai.apiKey', group: G, label: 'Anthropic API key', kind: 'secret', description: 'Encrypted at rest. The saved value is never returned by the configuration API.', defaultValue: '', schema: z.string().max(2048), consumption: 'active' }),
@@ -36,6 +41,11 @@ export const AI_CONFIG = [
   entry({ key: 'ai.maxInputCharacters', group: G, label: 'AI input limit', kind: 'number', description: 'Longest text a member may send for assist.', defaultValue: AI_DEFAULTS.maxInputCharacters, schema: int(AI_BOUNDS.maxInputCharacters), consumption: 'active' }),
   entry({ key: 'ai.hourlyRequestsPerWorkspace', group: G, label: 'AI requests per workspace per hour', kind: 'number', description: 'Requests counted from the audit trail over a rolling hour; further requests are refused.', defaultValue: AI_DEFAULTS.hourlyRequestsPerWorkspace, schema: int(AI_BOUNDS.hourlyRequestsPerWorkspace), consumption: 'active' }),
   entry({ key: 'ai.maxHashtags', group: G, label: 'Hashtag suggestions', kind: 'number', description: 'Most hashtags returned by one suggestion.', defaultValue: AI_DEFAULTS.maxHashtags, schema: int(AI_BOUNDS.maxHashtags), consumption: 'active' }),
+  entry({ key: 'ai.hashtagBodyMaxCharacters', group: G, label: 'Hashtag character limit', kind: 'number', description: 'Maximum characters allowed after the leading # in one suggested hashtag.', defaultValue: AI_DEFAULTS.hashtagBodyMaxCharacters, schema: int(AI_BOUNDS.hashtagBodyMaxCharacters), consumption: 'active' }),
+  entry({ key: 'ai.outputInputMultiplier', group: G, label: 'AI output to input ratio', kind: 'number', description: 'Maximum generated text characters relative to the configured input ceiling.', defaultValue: AI_DEFAULTS.outputInputMultiplier, schema: int(AI_BOUNDS.outputInputMultiplier), consumption: 'active' }),
+  entry({ key: 'ai.languageMaxCharacters', group: G, label: 'AI language text limit', kind: 'number', description: 'Maximum characters in the language name supplied for translation or recaps.', defaultValue: AI_DEFAULTS.languageMaxCharacters, schema: int(AI_BOUNDS.languageMaxCharacters), consumption: 'active' }),
+  entry({ key: 'ai.summaryMaxCharacters', group: G, label: 'AI recap length', kind: 'number', description: 'Maximum characters retained in a generated AI recap.', defaultValue: AI_DEFAULTS.summaryMaxCharacters, schema: int(AI_BOUNDS.summaryMaxCharacters), consumption: 'active' }),
+  entry({ key: 'ai.summarySubjectMaxCharacters', group: G, label: 'AI recap subject length', kind: 'number', description: 'Maximum characters accepted for an AI recap subject.', defaultValue: AI_DEFAULTS.summarySubjectMaxCharacters, schema: int(AI_BOUNDS.summarySubjectMaxCharacters), consumption: 'active' }),
   entry({ key: 'ai.transactionTimeoutMs', group: G, label: 'AI usage transaction timeout (ms)', kind: 'number', description: 'Maximum duration of the usage-claim write.', defaultValue: AI_DEFAULTS.transactionTimeoutMs, schema: int(AI_BOUNDS.transactionTimeoutMs), consumption: 'active' }),
   entry({ key: 'ai.transactionMaxWaitMs', group: G, label: 'AI usage transaction wait (ms)', kind: 'number', description: 'Maximum wait for the usage-claim slot.', defaultValue: AI_DEFAULTS.transactionMaxWaitMs, schema: int(AI_BOUNDS.transactionMaxWaitMs), consumption: 'active' }),
 ] as const;

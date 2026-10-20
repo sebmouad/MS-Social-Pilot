@@ -1,21 +1,23 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), noHook: false }));
+const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), noHook: false, policy: vi.fn(), copy: vi.fn() }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: state.access }));
-vi.mock('../src/server/root/platform-publication-evidence', () => ({ readRootPlatformPublicationEvidence: state.read }));
+vi.mock('../src/server/root/platform-publication-evidence', () => ({ readRootPlatformPublicationEvidence: state.read, loadRootEvidencePolicy: state.policy, loadRootEvidenceCopy: state.copy }));
 vi.mock('../src/server/platforms/publication-recovery', () => ({ installedPublicationRecovery: () => state.noHook ? undefined : { readEvidence: vi.fn() } }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('../src/components/SidebarDock', () => ({ SidebarDock: ({ children }: { children: import('react').ReactNode }) => children }));
 import { RootPlatformPublicationEvidence } from '../src/server/root/RootPlatformPublicationEvidence';
 import { OperationError } from '../src/lib/operation-error';
+import { ROOT_EVIDENCE_POLICY } from '../src/lib/config/root-evidence-policy';
+import { ROOT_EVIDENCE_COPY } from '../src/lib/config/root-evidence-copy';
 
-beforeEach(() => { vi.clearAllMocks(); state.noHook = false; state.access.mockResolvedValue({ id: 'root' }); state.read.mockResolvedValue({ providerId: 'platform', title: 'Module upload receipts', description: 'Known receipt identifiers.', columns: [{ key: 'operationId', label: 'Publication operation' }, { key: 'remoteId', label: 'Remote receipt' }], items: [{ operationId: 'op_1', remoteId: 'receipt_1' }], truncated: false }); });
+beforeEach(() => { vi.clearAllMocks(); state.noHook = false; state.policy.mockResolvedValue(ROOT_EVIDENCE_POLICY); state.copy.mockResolvedValue(ROOT_EVIDENCE_COPY); state.access.mockResolvedValue({ id: 'root' }); state.read.mockResolvedValue({ providerId: 'platform', title: 'Module upload receipts', description: 'Known receipt identifiers.', columns: [{ key: 'operationId', label: 'Publication operation' }, { key: 'remoteId', label: 'Remote receipt' }], items: [{ operationId: 'op_1', remoteId: 'receipt_1' }], truncated: false }); });
 
 describe('generic Root platform publication evidence panel', () => {
   it('uses module-owned labels and values in the shared table', async () => {
     const html = renderToStaticMarkup(await RootPlatformPublicationEvidence({ providerId: 'platform' }));
     expect(html).toContain('Module upload receipts'); expect(html).toContain('Publication operation'); expect(html).toContain('receipt_1');
-    expect(html).toContain('Any available action requires its own module-defined confirmation'); expect(state.read).toHaveBeenCalledWith('root', { providerId: 'platform' });
+    expect(html).toContain('Any available action requires its own module-defined confirmation'); expect(state.read).toHaveBeenCalledWith('root', { providerId: 'platform' }, ROOT_EVIDENCE_POLICY, ROOT_EVIDENCE_COPY);
     expect(html).toContain('name="operationId"'); expect(html).toContain('action="/root/platforms/platform"');
     expect(html).toContain('Apply filter'); expect(html).toContain('href="/root/platforms/platform"'); expect(html).toContain('Reset filter');
   });
@@ -44,11 +46,19 @@ describe('generic Root platform publication evidence panel', () => {
     expect(html).toContain('value="bad value"'); expect(html).toContain('aria-invalid="true"');
     expect(html).toContain('aria-describedby="root-platform-publication-evidence-error"');
     expect(html).toContain('Enter one operation ID'); expect(html).toContain('Reset filter');
-    expect(state.read).toHaveBeenCalledWith('root', { providerId: 'platform', operationId: 'bad value' });
+    expect(state.read).toHaveBeenCalledWith('root', { providerId: 'platform', operationId: 'bad value' }, ROOT_EVIDENCE_POLICY, ROOT_EVIDENCE_COPY);
+  });
+  it('keeps field errors associated when Root changes the validation copy', async () => {
+    state.copy.mockResolvedValue({ ...ROOT_EVIDENCE_COPY, invalidOperationId: 'Use a receipt identifier of at most {limit} characters.' });
+    state.read.mockRejectedValueOnce(new OperationError('invalid_request', 'Safe validation text.'));
+    const html = renderToStaticMarkup(await RootPlatformPublicationEvidence({ providerId: 'platform', operationId: 'bad value' }));
+    expect(html).toContain('Use a receipt identifier of at most 200 characters.');
+    expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain('aria-describedby="root-platform-publication-evidence-error"');
   });
   it('treats a cleared sidebar field as the unfiltered history', async () => {
     const html = renderToStaticMarkup(await RootPlatformPublicationEvidence({ providerId: 'platform', operationId: '' }));
-    expect(state.read).toHaveBeenCalledWith('root', { providerId: 'platform' });
+    expect(state.read).toHaveBeenCalledWith('root', { providerId: 'platform' }, ROOT_EVIDENCE_POLICY, ROOT_EVIDENCE_COPY);
     expect(html).not.toContain('Publication evidence unavailable');
   });
   it('omits the panel and sidebar filter if the installed module has no evidence hook', async () => {

@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
+import { OAUTH_INPUT_DEFAULTS } from '../config';
 
 /** Pure protocol rules for the MCP connector flow. No I/O here, so every rule is directly testable. */
 
@@ -10,8 +11,8 @@ const CTRL = /[\u0000-\u001f\u007f-\u009f‪-‮⁦-⁩]/g;
  * Redirect URIs are matched exactly later; this decides what may be registered at all. https anywhere, or http on loopback
  * (desktop clients). No fragments, no credentials, no wildcard or relative forms, no other schemes.
  */
-export function isAllowedRedirect(uri: string): boolean {
-  if (typeof uri !== 'string' || uri.length > 2000 || /[\s\u0000-\u001f]/.test(uri) || uri.includes('*') || uri.includes('#')) return false;
+export function isAllowedRedirect(uri: string, maxCharacters: number = OAUTH_INPUT_DEFAULTS.redirectUriMaxCharacters): boolean {
+  if (typeof uri !== 'string' || uri.length > maxCharacters || /[\s\u0000-\u001f]/.test(uri) || uri.includes('*') || uri.includes('#')) return false;
   let url: URL;
   try { url = new URL(uri); } catch { return false; }
   if (url.hash || url.username || url.password) return false;
@@ -19,22 +20,31 @@ export function isAllowedRedirect(uri: string): boolean {
   return url.protocol === 'http:' && LOOPBACK.includes(url.hostname);
 }
 
-export const registrationSchema = z.object({
-  client_name: z.string().max(200).optional(),
-  redirect_uris: z.array(z.string()).min(1).max(10),
-  token_endpoint_auth_method: z.literal('none').optional(),
-  grant_types: z.array(z.string()).optional(),
-  response_types: z.array(z.string()).optional(),
-}).passthrough().superRefine((value, ctx) => {
-  if (value.redirect_uris.some(uri => !isAllowedRedirect(uri))) ctx.addIssue({ code: 'custom', message: 'Redirect URIs must use https (or http on localhost) with no fragment.' });
-  if (value.grant_types && value.grant_types.some(grant => grant !== 'authorization_code')) ctx.addIssue({ code: 'custom', message: 'Only the authorization_code grant is supported.' });
-  if (value.response_types && value.response_types.some(type => type !== 'code')) ctx.addIssue({ code: 'custom', message: 'Only the code response type is supported.' });
+export type OAuthInputLimits = { clientNameInputMaxCharacters: number; clientNameMaxCharacters: number; redirectUriMaxCharacters: number; redirectUrisMaxItems: number; authorizationStateMaxCharacters: number; scopeMaxCharacters: number };
+export function registrationSchemaForLimits(limits: Pick<OAuthInputLimits, 'clientNameInputMaxCharacters' | 'redirectUriMaxCharacters' | 'redirectUrisMaxItems'>) {
+  return z.object({
+    client_name: z.string().max(limits.clientNameInputMaxCharacters).optional(),
+    redirect_uris: z.array(z.string().max(limits.redirectUriMaxCharacters)).min(1).max(limits.redirectUrisMaxItems),
+    token_endpoint_auth_method: z.literal('none').optional(),
+    grant_types: z.array(z.string()).optional(),
+    response_types: z.array(z.string()).optional(),
+  }).passthrough().superRefine((value, ctx) => {
+    if (value.redirect_uris.some(uri => !isAllowedRedirect(uri, limits.redirectUriMaxCharacters))) ctx.addIssue({ code: 'custom', message: 'Redirect URIs must use https (or http on localhost) with no fragment.' });
+    if (value.grant_types && value.grant_types.some(grant => grant !== 'authorization_code')) ctx.addIssue({ code: 'custom', message: 'Only the authorization_code grant is supported.' });
+    if (value.response_types && value.response_types.some(type => type !== 'code')) ctx.addIssue({ code: 'custom', message: 'Only the code response type is supported.' });
+  });
+}
+/** Compatibility schema preserves the original protocol-facing defaults. Service code uses the live-limits factory. */
+export const registrationSchema = registrationSchemaForLimits({
+  clientNameInputMaxCharacters: OAUTH_INPUT_DEFAULTS.clientNameInputMaxCharacters,
+  redirectUriMaxCharacters: OAUTH_INPUT_DEFAULTS.redirectUriMaxCharacters,
+  redirectUrisMaxItems: OAUTH_INPUT_DEFAULTS.redirectUrisMaxItems,
 });
 
 /** Display name shown on the consent screen: stripped of control and bidi characters so it cannot disguise itself. */
-export function cleanClientName(raw: string | undefined): string {
-  const name = (raw ?? '').replace(CTRL, '').replace(/\s+/g, ' ').trim().slice(0, 60);
-  return name || 'MCP client';
+export function cleanClientName(raw: string | undefined, maxCharacters: number, fallback: string): string {
+  const name = (raw ?? '').replace(CTRL, '').replace(/\s+/g, ' ').trim().slice(0, maxCharacters);
+  return name || fallback;
 }
 
 export const CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
@@ -85,12 +95,20 @@ export class OAuthError extends Error {
 }
 
 /** Authorization request parameters, parsed once for the screen and re-parsed for the decision. */
-export const authorizeParamsSchema = z.object({
-  client_id: z.string().regex(CLIENT_ID),
-  redirect_uri: z.string().min(1).max(2000),
-  response_type: z.literal('code'),
-  code_challenge: z.string().regex(CODE_CHALLENGE),
-  code_challenge_method: z.literal('S256'),
-  state: z.string().max(1000).optional(),
-  scope: z.string().max(200).optional(),
+export function authorizeParamsSchemaForLimits(limits: Pick<OAuthInputLimits, 'redirectUriMaxCharacters' | 'authorizationStateMaxCharacters' | 'scopeMaxCharacters'>) {
+  return z.object({
+    client_id: z.string().regex(CLIENT_ID),
+    redirect_uri: z.string().min(1).max(limits.redirectUriMaxCharacters),
+    response_type: z.literal('code'),
+    code_challenge: z.string().regex(CODE_CHALLENGE),
+    code_challenge_method: z.literal('S256'),
+    state: z.string().max(limits.authorizationStateMaxCharacters).optional(),
+    scope: z.string().max(limits.scopeMaxCharacters).optional(),
+  });
+}
+/** Compatibility parser retains the former 2000/1000/200 defaults. Integrators should use the Root-limits factory. */
+export const authorizeParamsSchema = authorizeParamsSchemaForLimits({
+  redirectUriMaxCharacters: OAUTH_INPUT_DEFAULTS.redirectUriMaxCharacters,
+  authorizationStateMaxCharacters: OAUTH_INPUT_DEFAULTS.authorizationStateMaxCharacters,
+  scopeMaxCharacters: OAUTH_INPUT_DEFAULTS.scopeMaxCharacters,
 });

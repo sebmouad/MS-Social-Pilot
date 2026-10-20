@@ -4,7 +4,9 @@ import { cron, entry } from '@/lib/config/entry';
 export const FEEDS_DEFAULTS = {
   pageSize: 25, maxPerWorkspace: 25, fetchTimeoutMs: 15000, fetchMaxBytes: 2097152, fetchMaxRedirects: 3, allowHttp: false, hostAllowlist: [] as string[],
   maxItemsPerCheck: 20, maxTargets: 50, messageMaxCharacters: 5000, nameMaxCharacters: 120, minCheckIntervalSeconds: 60,
-  transactionTimeoutMs: 20000, transactionMaxWaitMs: 5000, excerptCharacters: 280,
+  transactionTimeoutMs: 20000, transactionMaxWaitMs: 5000, excerptCharacters: 280, listScanMargin: 100, qualifyingOwnerScanLimit: 10,
+  urlMaxCharacters: 2048, identifierMaxCharacters: 80, pageNumberMax: 100000, hashtagsMaxCharacters: 1000,
+  entryTitleMaxCharacters: 500, entryGuidMaxCharacters: 500, entryDescriptionMaxCharacters: 20000, wordpressPageSize: 20,
   autoCheckEnabled: false, autoCheckIntervalSeconds: 3600, autoCheckMaxFeedsPerRun: 10, autoCheckMaxBackoffMultiplier: 8,
   autoCheckSchedule: '*/15 * * * *', autoCheckMaxItemsPerFeed: 10, autoCheckDisableAfterFailures: 10, maxSpreadMinutes: 1440, queueLookaheadDays: 60, fallbackDelayMinutes: 60, fallbackSpacingMinutes: 30,
 } as const;
@@ -16,6 +18,9 @@ export const FEEDS_BOUNDS = {
   autoCheckIntervalSeconds: { min: 300, max: 86400 }, autoCheckMaxFeedsPerRun: { min: 1, max: 200 }, autoCheckMaxBackoffMultiplier: { min: 1, max: 64 },
   autoCheckMaxItemsPerFeed: { min: 1, max: 50 }, autoCheckDisableAfterFailures: { min: 0, max: 100 }, maxSpreadMinutes: { min: 0, max: 10080 }, queueLookaheadDays: { min: 1, max: 365 },
   fallbackDelayMinutes: { min: 15, max: 1440 }, fallbackSpacingMinutes: { min: 5, max: 720 },
+  listScanMargin: { min: 0, max: 1000 }, qualifyingOwnerScanLimit: { min: 1, max: 100 },
+  urlMaxCharacters: { min: 256, max: 8192 }, identifierMaxCharacters: { min: 25, max: 256 }, pageNumberMax: { min: 1000, max: 10000000 }, hashtagsMaxCharacters: { min: 0, max: 10000 },
+  entryTitleMaxCharacters: { min: 40, max: 5000 }, entryGuidMaxCharacters: { min: 40, max: 5000 }, entryDescriptionMaxCharacters: { min: 1000, max: 100000 }, wordpressPageSize: { min: 1, max: 100 },
 } as const;
 const int = (range: { min: number; max: number }) => z.number().int().min(range.min).max(range.max);
 const G = 'Content feeds';
@@ -34,6 +39,16 @@ export const FEEDS_CONFIG = [
   entry({ key: 'feeds.nameMaxCharacters', group: G, label: 'Feed name limit', kind: 'number', description: 'Longest feed name.', defaultValue: FEEDS_DEFAULTS.nameMaxCharacters, schema: int(FEEDS_BOUNDS.nameMaxCharacters), consumption: 'active' }),
   entry({ key: 'feeds.minCheckIntervalSeconds', group: G, label: 'Minimum seconds between checks', kind: 'number', description: 'A feed cannot be checked again sooner than this.', defaultValue: FEEDS_DEFAULTS.minCheckIntervalSeconds, schema: int(FEEDS_BOUNDS.minCheckIntervalSeconds), consumption: 'active' }),
   entry({ key: 'feeds.excerptCharacters', group: G, label: 'Excerpt length', kind: 'number', description: 'Characters used for the {excerpt} placeholder.', defaultValue: FEEDS_DEFAULTS.excerptCharacters, schema: int(FEEDS_BOUNDS.excerptCharacters), consumption: 'active' }),
+  entry({ key: 'feeds.listScanMargin', group: G, label: 'Feed list scan margin', kind: 'number', description: 'Additional rows fetched when listing feeds, so workspace-scoped filtering still returns a useful page.', defaultValue: FEEDS_DEFAULTS.listScanMargin, schema: int(FEEDS_BOUNDS.listScanMargin), consumption: 'active' }),
+  entry({ key: 'feeds.qualifyingOwnerScanLimit', group: G, label: 'Automatic feed owner scan limit', kind: 'number', description: 'Workspace owners examined when finding an eligible owner for automatic feed work.', defaultValue: FEEDS_DEFAULTS.qualifyingOwnerScanLimit, schema: int(FEEDS_BOUNDS.qualifyingOwnerScanLimit), consumption: 'active' }),
+  entry({ key: 'feeds.urlMaxCharacters', group: G, label: 'Feed address length', kind: 'number', description: 'Maximum characters accepted in a saved feed address.', defaultValue: FEEDS_DEFAULTS.urlMaxCharacters, schema: int(FEEDS_BOUNDS.urlMaxCharacters), consumption: 'active' }),
+  entry({ key: 'feeds.identifierMaxCharacters', group: G, label: 'Feed and channel identifier length', kind: 'number', description: 'Maximum characters accepted for a feed or destination identifier.', defaultValue: FEEDS_DEFAULTS.identifierMaxCharacters, schema: int(FEEDS_BOUNDS.identifierMaxCharacters), consumption: 'active' }),
+  entry({ key: 'feeds.pageNumberMax', group: G, label: 'Feed page number ceiling', kind: 'number', description: 'Largest accepted page number for a feed list request.', defaultValue: FEEDS_DEFAULTS.pageNumberMax, schema: int(FEEDS_BOUNDS.pageNumberMax), consumption: 'active' }),
+  entry({ key: 'feeds.hashtagsMaxCharacters', group: G, label: 'Feed hashtag text length', kind: 'number', description: 'Maximum hashtag text saved with a feed.', defaultValue: FEEDS_DEFAULTS.hashtagsMaxCharacters, schema: int(FEEDS_BOUNDS.hashtagsMaxCharacters), consumption: 'active' }),
+  entry({ key: 'feeds.entryTitleMaxCharacters', group: G, label: 'Feed item title length', kind: 'number', description: 'Maximum title text retained from a feed item.', defaultValue: FEEDS_DEFAULTS.entryTitleMaxCharacters, schema: int(FEEDS_BOUNDS.entryTitleMaxCharacters), consumption: 'active' }),
+  entry({ key: 'feeds.entryGuidMaxCharacters', group: G, label: 'Feed item identifier length', kind: 'number', description: 'Maximum identifier text retained from a feed item.', defaultValue: FEEDS_DEFAULTS.entryGuidMaxCharacters, schema: int(FEEDS_BOUNDS.entryGuidMaxCharacters), consumption: 'active' }),
+  entry({ key: 'feeds.entryDescriptionMaxCharacters', group: G, label: 'Feed item description length', kind: 'number', description: 'Maximum description text retained from a feed item.', defaultValue: FEEDS_DEFAULTS.entryDescriptionMaxCharacters, schema: int(FEEDS_BOUNDS.entryDescriptionMaxCharacters), consumption: 'active' }),
+  entry({ key: 'feeds.wordpressPageSize', group: G, label: 'WordPress items requested per page', kind: 'number', description: 'Items requested from the WordPress REST API for one feed read.', defaultValue: FEEDS_DEFAULTS.wordpressPageSize, schema: int(FEEDS_BOUNDS.wordpressPageSize), consumption: 'active' }),
   entry({ key: 'feeds.transactionTimeoutMs', group: G, label: 'Feed transaction timeout (ms)', kind: 'number', description: 'Maximum duration of one feed write.', defaultValue: FEEDS_DEFAULTS.transactionTimeoutMs, schema: int(FEEDS_BOUNDS.transactionTimeoutMs), consumption: 'active' }),
   entry({ key: 'feeds.transactionMaxWaitMs', group: G, label: 'Feed transaction wait (ms)', kind: 'number', description: 'Maximum wait for a feed write slot.', defaultValue: FEEDS_DEFAULTS.transactionMaxWaitMs, schema: int(FEEDS_BOUNDS.transactionMaxWaitMs), consumption: 'active' }),
   entry({ key: 'feeds.autoCheck.enabled', group: G, label: 'Check feeds automatically', kind: 'boolean', description: 'When on, the background worker reads enabled feeds on their interval and turns new items into posts as each feed is set up: sent to approvals, or scheduled. Approval rules always apply; automation never publishes immediately.', defaultValue: FEEDS_DEFAULTS.autoCheckEnabled, schema: z.boolean(), consumption: 'active' }),

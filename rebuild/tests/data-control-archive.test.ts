@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  runtimeConfig: vi.fn(async (key: string) => key === 'data.maxArchiveBytes' ? 268435456 : '/media-root'),
+  runtimeConfig: vi.fn(async (key: string) => key === 'data.maxArchiveBytes' ? 268435456 : key === 'data.zipSafetyHeadroomBytes' ? 67108864 : '/media-root'),
   rows: vi.fn(async () => [{ storageKey: 'workspace-a/photo.bin' }]),
   data: vi.fn(async () => ({ format: 'ms-social-pilot-workspace-export', workspace: { id: 'workspace-a' }, security: { credentialsExcluded: true }, indirectTables: { external_posts: [], link_clicks: [] }, coverage: { directlyOwnedLegacyTables: ['media'], directlyOwnedLegacyRowCounts: { media: 2 }, directlyOwnedLegacyTablesComplete: true, complete: false, omitted: ['indirect data'] } })),
   files: vi.fn(async () => [{ path: 'media/photo.bin', content: Buffer.from([1, 2, 3]) }]),

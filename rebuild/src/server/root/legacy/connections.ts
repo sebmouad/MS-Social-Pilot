@@ -1,3 +1,5 @@
+import { runtimeConfig } from '@/server/config/store';
+import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { OperationError } from '@/lib/operation-error';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
@@ -7,10 +9,10 @@ import { assertRootActor, invalid, redact } from './authz';
 import { legacySetting, rootResultLimit } from './policy';
 
 const filterSchema = z.object({
-  q: z.string().trim().max(2000).optional(),
-  provider: z.string().trim().min(1).max(64).regex(/^[a-z0-9_-]+$/).optional(),
+  q: z.string().trim().optional(),
+  provider: z.string().trim().min(1).regex(/^[a-z0-9_-]+$/).refine(withinSynchronousLimit('root.providerIdMaxCharacters')).optional(),
   state: z.enum(['connected', 'expired', 'revoked']).optional(),
-  page: z.coerce.number().int().min(1).max(100000).optional(),
+  page: z.coerce.number().int().min(1).refine(value => value <= synchronousPolicy('root.pageMaxNumber')).optional(),
 }).strict();
 
 /**
@@ -39,13 +41,14 @@ export async function listRootConnections(actorId: string, input: unknown = {}, 
       select: { id: true, provider: true, name: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true, invalidReason: true, createdAt: true, workspace: { select: { id: true, name: true } }, targets: { select: { enabled: true } } },
     }),
   ]);
+  const reasonLimit = await runtimeConfig('root.connectionReasonMaxCharacters');
   const items = rows.map(row => {
     const status: ConnectionState = connectionState(row, now);
     return {
       id: row.id, provider: row.provider, platformName: platformModule(row.provider)?.name ?? row.provider, installed: Boolean(platformModule(row.provider)),
       name: row.name, workspace: row.workspace, state: status,
       tokenExpiresAt: row.tokenExpiresAt?.toISOString() ?? null, invalidatedAt: row.invalidatedAt?.toISOString() ?? null,
-      invalidReason: redact(row.invalidReason, 200),
+      invalidReason: redact(row.invalidReason, reasonLimit),
       scopeCount: row.scopes.split(/[,\s]+/).filter(Boolean).length,
       channels: { selected: row.targets.filter(target => target.enabled).length, discovered: row.targets.length },
       createdAt: row.createdAt.toISOString(),
@@ -56,7 +59,7 @@ export async function listRootConnections(actorId: string, input: unknown = {}, 
 
 export const rootDisconnectConfirmation = (socialAccountId: string) => `DISCONNECT CONNECTION ${socialAccountId}`;
 export const rootDisconnectDeleteConfirmation = (socialAccountId: string) => `DELETE CONNECTION DATA ${socialAccountId}`;
-const validId = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 200;
+const validId = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= synchronousPolicy('root.identifierMaxCharacters');
 
 /** What delete mode would remove, as local row counts. Read-only; nothing is changed and nothing is asked of the platform. */
 export async function previewRootConnectionDeletion(actorId: string, socialAccountId: string) {
@@ -77,7 +80,7 @@ export async function disconnectRootConnection(actorId: string, socialAccountId:
   if (!validId(socialAccountId)) throw new OperationError('invalid_request', 'Choose a connection.');
   if (mode !== 'retain' && mode !== 'delete') throw new OperationError('invalid_request', 'Choose retain or delete.');
   const expected = mode === 'delete' ? rootDisconnectDeleteConfirmation(socialAccountId) : rootDisconnectConfirmation(socialAccountId);
-  if (confirmation !== expected) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
+  if (typeof confirmation !== 'string' || confirmation.length > synchronousPolicy('root.confirmationMaxCharacters') || confirmation !== expected) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
   const owner = await prisma.socialAccount.findUnique({ where: { id: socialAccountId }, select: { workspaceId: true } });
   if (!owner) throw new OperationError('not_found', 'Connection not found.');
   const { disconnectSocialAccount } = await import('@/server/connection-mutations');

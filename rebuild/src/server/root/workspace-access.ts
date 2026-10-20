@@ -1,3 +1,4 @@
+import { rootUserIdSchema, rootUserConfirmationSchema } from '@/lib/root-user-controls';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -8,6 +9,7 @@ type WorkspaceAccessRow = { id: string; name: string; suspendedAt: Date | null }
 
 /** Private control-plane operation; never nest it inside the shared workspace write lock. */
 export async function setRootWorkspaceAccess(actorId: string, workspaceId: string, suspended: boolean, confirmation: string) {
+  if (!rootUserIdSchema.safeParse(workspaceId).success || !rootUserConfirmationSchema.safeParse(confirmation).success) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
   const [timeout, maxWait] = await Promise.all([runtimeConfig('data.workspaceOperationTimeoutMs'), runtimeConfig('data.workspaceOperationLockWaitMs')]);
   return prisma.$transaction(async tx => {
     const actor = await tx.user.findUnique({ where: { id: actorId }, select: { isInstanceOwner: true, disabledAt: true } });
@@ -37,6 +39,7 @@ export const rootWorkspaceDeletionConfirmation = (workspaceId: string) => `DELET
  * leaves the purge resumable and the workspace suspended, never half-visible to customers.
  */
 export async function deleteRootWorkspace(actorId: string, workspaceId: string, confirmation: string) {
+  if (!rootUserIdSchema.safeParse(workspaceId).success || !rootUserConfirmationSchema.safeParse(confirmation).success) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
   if (confirmation !== rootWorkspaceDeletionConfirmation(workspaceId)) throw new OperationError('invalid_request', 'Enter the exact confirmation shown.');
   const { purgeWorkspaceData } = await import('@/server/data-control');
   const counts = await purgeWorkspaceData({ userId: actorId, workspaceId }, async tx => {

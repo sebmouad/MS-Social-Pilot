@@ -16,7 +16,8 @@ describe('module declarations', () => {
     expect(new Set(keys).size).toBe(keys.length);
     for (const key of keys) { expect(key.startsWith('integrations.')).toBe(true); expect(CONFIG_BY_KEY.has(key as never)).toBe(true); }
     expect(settingsManifest.rootSettingsPrefixes).toContain('integrations.');
-    expect(INTEGRATIONS_CONFIG.every(item => item.consumption === 'active')).toBe(true);
+    expect(INTEGRATIONS_CONFIG.every(item => item.consumption === 'active' || item.consumption === 'configured')).toBe(true);
+    expect(INTEGRATIONS_CONFIG.filter(item => item.consumption === 'configured').map(item => item.key).sort()).toEqual(['integrations.oauth.authorizationStateMaxCharacters', 'integrations.oauth.scopeMaxCharacters']);
   });
   it('declares one Settings page and one worker job whose schedule key exists', () => {
     expect(INTEGRATIONS_PAGES.map(page => page.id)).toEqual(['settings/webhooks']);

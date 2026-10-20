@@ -1,3 +1,5 @@
+import { applyConnectionHealthCopy } from '@/lib/connection-health';
+import { applySynchronousPolicy } from '@/server/synchronous-policy';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, type ConfigKey, type ConfigValue } from '@/lib/config/registry';
@@ -121,6 +123,8 @@ export async function saveConfig(input: unknown, actorId: string) {
     });
     await audit(tx, actorId, definition.key, encrypted ? 'secret updated' : 'value updated');
   });
+  applySynchronousPolicy(definition.key, checked.data);
+  if (definition.key === 'connections.healthCopy') applyConnectionHealthCopy(checked.data);
   if (definition.key === 'app.publicOrigin' || definition.key === 'app.developmentOrigins') await (await import('@/server/request-origin')).refreshPublicOrigin();
 }
 

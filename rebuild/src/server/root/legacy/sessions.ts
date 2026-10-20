@@ -1,3 +1,4 @@
+import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
@@ -5,7 +6,7 @@ import { assertRootActor, invalid, lockRootActor } from './authz';
 import { writeRootAudit } from './audit';
 import { legacySetting, rootResultLimit, rootTransaction } from './policy';
 
-const filterSchema = z.object({ q: z.string().trim().max(2000).optional() }).strict();
+const filterSchema = z.object({ q: z.string().trim().optional() }).strict();
 
 export const sessionSignOutConfirmation = (sessionId: string) => `SIGN OUT SESSION ${sessionId}`;
 
@@ -34,11 +35,11 @@ export async function listRootSessions(actorId: string, input: unknown = {}, res
   return { items, truncated: rows.length > limit, limit, limits: { searchMaxCharacters: max } };
 }
 
-const signOutSchema = z.object({ confirmation: z.string() }).strict();
+const signOutSchema = z.object({ confirmation: z.string().refine(withinSynchronousLimit('root.confirmationMaxCharacters')) }).strict();
 
 /** End one browser session. Atomic with its audit; the account itself is unchanged. */
 export async function signOutRootSession(actorId: string, sessionId: string, input: unknown) {
-  if (!sessionId || sessionId.length > 200) throw invalid('Choose a session.');
+  if (!sessionId || sessionId.length > synchronousPolicy('root.identifierMaxCharacters')) throw invalid('Choose a session.');
   const parsed = signOutSchema.safeParse(input);
   if (!parsed.success || parsed.data.confirmation !== sessionSignOutConfirmation(sessionId)) throw invalid('Enter the exact sign-out confirmation.');
   return rootTransaction(async tx => {

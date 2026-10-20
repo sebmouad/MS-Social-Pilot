@@ -1,3 +1,4 @@
+import { ROOT_AUDIT_BOUNDS } from '@/lib/config/root-audit-controls';
 import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
 import { prisma } from '@/server/data';
@@ -5,9 +6,9 @@ import { OperationError } from '@/lib/operation-error';
 import { randomUUID } from 'node:crypto';
 
 export const ROOT_AUDIT_CONFIG = [
-  entry({ key: 'root.auditExportMaxRows', group: 'Root · audit', label: 'Audit export row limit', kind: 'number', description: 'Refuse exports exceeding this many matching events.', defaultValue: 10000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
-  entry({ key: 'root.auditRetentionDays', group: 'Root · audit', label: 'Audit retention days', kind: 'number', description: 'Zero keeps audit history forever. Applies to Root and workspace activity.', defaultValue: 0, schema: z.number().int().min(0).max(36500), consumption: 'active' }),
-  entry({ key: 'root.auditRetentionBatchSize', group: 'Root · audit', label: 'Audit retention batch size', kind: 'number', description: 'Maximum rows deleted per audit table in each purge run.', defaultValue: 1000, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
+  entry({ key: 'root.auditExportMaxRows', group: 'Root · audit', label: 'Audit export row limit', kind: 'number', description: 'Refuse exports exceeding this many matching events.', defaultValue: 10000, schema: z.number().int().min(1).max(ROOT_AUDIT_BOUNDS.exportRows.max), consumption: 'active' }),
+  entry({ key: 'root.auditRetentionDays', group: 'Root · audit', label: 'Audit retention days', kind: 'number', description: 'Zero keeps audit history forever. Applies to Root and workspace activity.', defaultValue: 0, schema: z.number().int().min(0).max(ROOT_AUDIT_BOUNDS.retentionDays.max), consumption: 'active' }),
+  entry({ key: 'root.auditRetentionBatchSize', group: 'Root · audit', label: 'Audit retention batch size', kind: 'number', description: 'Maximum rows deleted per audit table in each purge run.', defaultValue: 1000, schema: z.number().int().min(1).max(ROOT_AUDIT_BOUNDS.batchSize.max), consumption: 'active' }),
 ] as const;
 
 // Local bridge until the host aggregates ROOT_AUDIT_CONFIG. No unvalidated values.

@@ -6,6 +6,7 @@ const deps = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: deps.refresh }) }));
 vi.mock('../src/components/SidebarDock', () => ({ SidebarDock: ({ children }: { children: import('react').ReactNode }) => children }));
 import { RootDiagnosticsClient } from '../src/server/root/RootDiagnosticsClient';
+import { ROOT_DIAGNOSTICS_COPY } from '../src/lib/config/root-diagnostics-copy';
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
 const initial = { scope: 'platform:facebook', label: 'Facebook', timeZone: 'UTC', enabled: true, minimumIntervalSeconds: 30, incompleteRunStaleSeconds: 600, connectionLimit: 10, connections: [{ id: 'source', name: 'Example source', workspaceId: 'preview_workspace' }], history: [] };
@@ -13,7 +14,7 @@ const receipt = { id: 'diag_test', scope: initial.scope, connectionId: null, sta
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks(); container = document.createElement('div'); document.body.append(container); root = createRoot(container);
-  await act(async () => root.render(createElement(RootDiagnosticsClient, { initial })));
+  await act(async () => root.render(createElement(RootDiagnosticsClient, { initial, copy: ROOT_DIAGNOSTICS_COPY })));
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 const button = () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Run diagnostics')!;

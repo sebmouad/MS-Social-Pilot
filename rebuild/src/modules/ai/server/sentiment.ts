@@ -10,7 +10,7 @@ import { AI_CONFIG } from '../config';
 import { complete, settings, type AiDeps } from './ai';
 
 export const SENTIMENT_VERSION = 'comment-sentiment-v1';
-const DAY = 86400000;
+const DAY = 86400000; // Fixed milliseconds per UTC day.
 export function parseSentiment(raw: string): 'negative' | 'neutral' | 'positive' | null {
   const value = raw.trim();
   return value === 'negative' || value === 'neutral' || value === 'positive' ? value : null;
@@ -27,11 +27,12 @@ export async function classifyCommentSentiment(now = new Date(), deps: AiDeps = 
   const s = await sentimentSettings(deps);
   // Even an injected port must not bypass Root's credential gate.
   if (!s) return { available: false, classified: null };
-  const config = await runtimeConfigBatch(['ai.sentimentBatchSize', 'ai.sentimentDailyCap']);
+  const config = await runtimeConfigBatch(['ai.sentimentBatchSize', 'ai.sentimentDailyCap', 'ai.sentimentLookbackDays']);
   const batch = AI_CONFIG.find(e => e.key === 'ai.sentimentBatchSize')!.schema.parse(config['ai.sentimentBatchSize']) as number;
   const cap = AI_CONFIG.find(e => e.key === 'ai.sentimentDailyCap')!.schema.parse(config['ai.sentimentDailyCap']) as number;
+  const lookbackDays = AI_CONFIG.find(e => e.key === 'ai.sentimentLookbackDays')!.schema.parse(config['ai.sentimentLookbackDays']) as number;
   const start = new Date(now); start.setUTCHours(0, 0, 0, 0);
-  const since = new Date(now.getTime() - 15 * DAY);
+  const since = new Date(now.getTime() - lookbackDays * DAY);
   const candidates = await prisma.$queryRaw<Array<{ id: string; workspaceId: string; targetId: string; provider: string }>>`
     SELECT c.id, t."workspaceId", t.id AS "targetId", a.provider FROM post_comments c
     JOIN post_targets pt ON pt.id = c."postTargetId" JOIN posts p ON p.id = pt."postId"

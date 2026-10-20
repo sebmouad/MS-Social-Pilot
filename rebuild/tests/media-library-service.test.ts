@@ -59,6 +59,19 @@ describe('library listing', () => {
     expect(result.usage).toMatchObject({ usedBytes: 3000, quotaBytes: 5368709120 });
     expect(db.$queryRaw.mock.calls.every(c => (c[0] as TemplateStringsArray).join('?').includes('?') || true)).toBe(true);
   });
+  it('applies Root overrides to stored-image scan and usage excerpt bounds', async () => {
+    state.overrides = { 'media.imageListLimit': 321, 'media.holderExcerptCharacters': 42 };
+    const s = store();
+    await readLibrary(actor, {}, { store: s as never });
+    expect(s.listImages).toHaveBeenCalledWith('w1', 321);
+    const holders = db.$queryRaw.mock.calls.find(call => (call[0] as TemplateStringsArray).join('?').includes('FROM posts p'))!;
+    expect(holders.slice(1)).toContain(42);
+  });
+  it('accepts a raised library page ceiling from Root', async () => {
+    state.overrides['media.pageNumberMax'] = 2000;
+    const result = await readLibrary(actor, { page: 1001 }, { store: store() as never });
+    expect(result.page).toBe(1001);
+  });
   it('shows a channel-limited member usage as used or unused without naming posts', async () => {
     state.auth.mockResolvedValue({ role: 'editor', actor: { ...actor, allowedTargetIds: ['t1'] }, workspaceWide: false });
     state.posts = [{ id: 'p1', status: 'draft', scheduledAt: null, excerpt: 'Private', media: `"${'med_clip_0001'}"`, keys: ['med_clip_0001'] }];
@@ -108,6 +121,12 @@ describe('import from a web address', () => {
     expect(s.putImage).toHaveBeenCalledOnce();
     const audit = executed('activity_logs')[0]!;
     expect(audit.values.some(v => typeof v === 'string' && v.includes('"host":"example.com"') && !v.includes('/pic.jpg'))).toBe(true);
+  });
+  it('accepts raised import URL and asset name ceilings from Root', async () => {
+    state.overrides = { 'media.importUrlMaxCharacters': 4096, 'media.assetNameMaxCharacters': 300 };
+    const url = `https://example.com/${'x'.repeat(2100)}`; const name = 'n'.repeat(200); const s = store();
+    const result = await importFromUrl(actor, { url, name, confirmation: `IMPORT MEDIA ${url}` }, { net: net(JPEG), store: s as never });
+    expect(result.name).toBe(name);
   });
   it('stores a video as a library row with a managed storage key', async () => {
     const s = store();

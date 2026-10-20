@@ -1,3 +1,4 @@
+import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
@@ -8,7 +9,7 @@ import { roleChangeSchema, roleConfirmation, WORKSPACE_ROLES } from './shared';
 
 type PrivilegeRow = { membershipId: string; workspaceId: string; workspace: string; userId: string; name: string; email: string; role: string; allPages: boolean; pageCount: number; isRoot: boolean; disabled: boolean; suspended: boolean; lastSession: Date | null };
 
-const filterSchema = z.object({ q: z.string().trim().max(2000).optional(), role: z.enum(WORKSPACE_ROLES).optional(), workspaceId: z.string().min(1).max(200).optional(), page: z.coerce.number().int().min(1).max(100000).optional() }).strict();
+const filterSchema = z.object({ q: z.string().trim().optional(), role: z.enum(WORKSPACE_ROLES).optional(), workspaceId: z.string().min(1).refine(withinSynchronousLimit('root.identifierMaxCharacters')).optional(), page: z.coerce.number().int().min(1).refine(value => value <= synchronousPolicy('root.pageMaxNumber')).optional() }).strict();
 const like = (value: string) => `%${value.replace(/[\\%_]/g, match => `\\${match}`)}%`;
 
 async function query(filters: z.infer<typeof filterSchema>, limit: number, offset: number) {

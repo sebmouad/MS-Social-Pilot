@@ -69,6 +69,20 @@ const DRAFTS = { mode: 'drafts', confirmation: 'CREATE FEED DRAFTS feed_1' };
 const POSTS = { mode: 'posts', confirmation: 'CREATE FEED POSTS feed_1' };
 
 describe('feed management', () => {
+  it('uses configured list scan margin when reading feed rows', async () => {
+    state.overrides = { 'feeds.listScanMargin': 17 };
+    await readFeeds(actor);
+    expect(db.$queryRawUnsafe.mock.calls[0]?.[2]).toBe(42);
+  });
+  it('accepts configured feed page, URL, name and hashtag ceilings', async () => {
+    state.overrides = { 'feeds.pageNumberMax': 200000, 'feeds.nameMaxCharacters': 200, 'feeds.urlMaxCharacters': 4096, 'feeds.hashtagsMaxCharacters': 2000 };
+    await expect(readFeeds(actor, { page: 100001 })).resolves.toMatchObject({ page: 100001 });
+    const name = 'n'.repeat(150), url = `https://example.com/${'x'.repeat(2100)}`;
+    await createFeed(actor, { ...draft, name, url, hashtags: 'h'.repeat(1200), confirmation: `CREATE FEED ${name}` }, deps);
+    expect(executed('INSERT INTO feed_sources')[0]!.values).toContain(name);
+    expect(executed('INSERT INTO feed_sources')[0]!.values).toContain(url);
+    expect(executed('INSERT INTO feed_sources')[0]!.values).toContain('h'.repeat(1200));
+  });
   it('requires exact confirmations and strict input before any database access', async () => {
     await expect(createFeed(actor, { ...draft, confirmation: 'CREATE FEED other' }, deps)).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(updateFeed(actor, { ...draft, id: 'feed_1', extra: 1, confirmation: 'UPDATE FEED feed_1' }, deps)).rejects.toMatchObject({ code: 'invalid_request' });
@@ -194,6 +208,16 @@ describe('feed checks and draft creation', () => {
     const n = net('[]');
     await checkFeed(actor, { id: 'feed_1' }, { net: n, now: () => NOW });
     expect(n.fetcher.mock.calls[0]![0].url).toContain('/wp-json/wp/v2/posts');
+  });
+  it('uses configured WordPress page size and item title and identifier ceilings', async () => {
+    state.feedRows = [row({ kind: 'wordpress', url: 'https://example.com/blog' })];
+    state.overrides = { 'feeds.wordpressPageSize': 31, 'feeds.entryTitleMaxCharacters': 550, 'feeds.entryGuidMaxCharacters': 560 };
+    const body = JSON.stringify([{ link: 'https://example.com/post', guid: { rendered: 'g'.repeat(600) }, title: { rendered: 'T'.repeat(600) }, excerpt: { rendered: 'd'.repeat(21000) } }]);
+    const n = net(body);
+    const result = await checkFeed(actor, { id: 'feed_1' }, { net: n, now: () => NOW });
+    expect(n.fetcher.mock.calls[0]![0].url).toContain('per_page=31');
+    expect(result.entries[0]!.guid).toHaveLength(560);
+    expect(result.entries[0]!.title).toHaveLength(550);
   });
 });
 

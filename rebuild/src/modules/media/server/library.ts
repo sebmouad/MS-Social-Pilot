@@ -9,8 +9,8 @@ import { authorizeFeature, type ToolActor, type ToolAuthorization } from './acce
 import { fsMediaStore, type MediaStore } from './store';
 import { checkUrlShape, defaultFetchDeps, guardedFetch, NetGuardError, type FetchDeps, type FetchPolicy } from '@/modules/publishing/server/media/network/net-guard';
 import {
-  assetReferences, COMMITTED_STATUSES, DELETE_SCHEMA, deleteConfirmation, deleteInUseConfirmation, IMPORT_SCHEMA, importConfirmation, isImageFileId,
-  LIBRARY_QUERY_SCHEMA, likeContains, safeAssetName, sniffMedia, type AssetHolder, type LibraryAsset, type LibraryUsage,
+  assetReferences, COMMITTED_STATUSES, deleteConfirmation, deleteInUseConfirmation, importConfirmation, isImageFileId,
+  libraryQuerySchema, importSchema, deleteSchema, likeContains, safeAssetName, sniffMedia, type AssetHolder, type LibraryAsset, type LibraryUsage,
 } from '../library';
 import { MEDIA_BOUNDS } from '../config';
 
@@ -36,13 +36,13 @@ async function protect<T>(operation: Promise<T>): Promise<T> {
 
 export async function bounds() {
   try {
-    const keys = ['media.libraryPageSize', 'media.workspaceQuotaBytes', 'media.videoMaxBytes', 'media.allowedVideoMimeTypes', 'media.importMaxBytes', 'media.importTimeoutMs', 'media.importMaxRedirects', 'media.importAllowHttp', 'media.importHostAllowlist', 'media.holderScanLimit', 'media.holderListLimit', 'media.searchMaxCharacters', 'media.transactionTimeoutMs', 'media.transactionMaxWaitMs', 'data.workspaceOperationTimeoutMs'] as const;
-    const [pageSize, quota, videoMax, videoMimes, importMax, importTimeout, redirects, allowHttp, allowlist, scan, listLimit, search, timeout, maxWait, workspaceTimeout] = await Promise.all(keys.map(key => runtimeConfig(key)));
+    const keys = ['media.libraryPageSize', 'media.workspaceQuotaBytes', 'media.videoMaxBytes', 'media.allowedVideoMimeTypes', 'media.importMaxBytes', 'media.importTimeoutMs', 'media.importMaxRedirects', 'media.importAllowHttp', 'media.importHostAllowlist', 'media.holderScanLimit', 'media.holderListLimit', 'media.imageListLimit', 'media.holderExcerptCharacters', 'media.identifierMaxCharacters', 'media.pageNumberMax', 'media.importUrlMaxCharacters', 'media.assetNameMaxCharacters', 'media.searchMaxCharacters', 'media.transactionTimeoutMs', 'media.transactionMaxWaitMs', 'data.workspaceOperationTimeoutMs'] as const;
+    const [pageSize, quota, videoMax, videoMimes, importMax, importTimeout, redirects, allowHttp, allowlist, scan, listLimit, imageLimit, holderExcerpt, identifierMax, pageMax, urlMax, nameMax, search, timeout, maxWait, workspaceTimeout] = await Promise.all(keys.map(key => runtimeConfig(key)));
     const B = MEDIA_BOUNDS;
     if (!inRange(pageSize, B.pageSize) || !inRange(quota, B.workspaceQuotaBytes) || !inRange(videoMax, B.videoMaxBytes) || !inRange(importMax, B.importMaxBytes) || !inRange(importTimeout, B.importTimeoutMs) || !inRange(redirects, B.importMaxRedirects)
-      || !inRange(scan, B.holderScanLimit) || !inRange(listLimit, B.holderListLimit) || !inRange(search, B.maxSearchCharacters) || !inRange(timeout, B.transactionTimeoutMs) || !inRange(maxWait, B.transactionMaxWaitMs) || !inRange(workspaceTimeout, B.workspaceTimeoutMs)
+      || !inRange(scan, B.holderScanLimit) || !inRange(listLimit, B.holderListLimit) || !inRange(imageLimit, B.imageListLimit) || !inRange(holderExcerpt, B.holderExcerptCharacters) || !inRange(identifierMax, B.identifierMaxCharacters) || !inRange(pageMax, B.pageNumberMax) || !inRange(urlMax, B.importUrlMaxCharacters) || !inRange(nameMax, B.assetNameMaxCharacters) || !inRange(search, B.maxSearchCharacters) || !inRange(timeout, B.transactionTimeoutMs) || !inRange(maxWait, B.transactionMaxWaitMs) || !inRange(workspaceTimeout, B.workspaceTimeoutMs)
       || typeof allowHttp !== 'boolean' || !Array.isArray(allowlist) || !Array.isArray(videoMimes) || timeout + maxWait >= workspaceTimeout) throw unavailable();
-    return { pageSize, quota, videoMax, videoMimes: videoMimes as string[], importMax, importTimeout, redirects, allowHttp, allowlist: allowlist as string[], scan, listLimit, search, timeout, maxWait };
+    return { pageSize, quota, videoMax, videoMimes: videoMimes as string[], importMax, importTimeout, redirects, allowHttp, allowlist: allowlist as string[], scan, listLimit, imageLimit, holderExcerpt, identifierMax, pageMax, urlMax, nameMax, search, timeout, maxWait };
   } catch (error) { if (error instanceof OperationError) throw error; throw unavailable(); }
 }
 const policyOf = (l: Limits): FetchPolicy => ({ timeoutMs: l.importTimeout, maxBytes: l.importMax, maxRedirects: l.redirects, allowHttp: l.allowHttp, hostAllowlist: l.allowlist });
@@ -65,23 +65,23 @@ async function audit(tx: Tx, actor: ToolActor, action: string, detail: object) {
 
 type Source = { id: string; source: LibraryAsset['source']; url?: string | null; storageKey?: string | null };
 /** Which posts reference each asset. One scan per call, bounded by `scan`; `truncated` means more posts matched than were examined. */
-async function attribute(db: Pick<Tx, '$queryRaw'>, workspaceId: string, assets: readonly Source[], scan: number): Promise<{ byAsset: Map<string, AssetHolder[]>; truncated: boolean }> {
+async function attribute(db: Pick<Tx, '$queryRaw'>, workspaceId: string, assets: readonly Source[], scan: number, excerptCharacters: number): Promise<{ byAsset: Map<string, AssetHolder[]>; truncated: boolean }> {
   const byAsset = new Map<string, AssetHolder[]>();
   const refs = new Map(assets.map(a => [a.id, assetReferences(a)]));
   const all = [...new Set([...refs.values()].flat())];
   if (!all.length) return { byAsset, truncated: false };
   const patterns = all.map(likeContains);
-  const rows = await db.$queryRaw<PostRow[]>`SELECT p.id, p.status::text AS status, p."scheduledAt", left(p.message, 80) AS excerpt, p.media::text AS media, p."mediaKeys" AS keys FROM posts p WHERE p."workspaceId" = ${workspaceId} AND (p."mediaKeys" && ${all}::text[] OR p.media::text LIKE ANY(${patterns}::text[])) ORDER BY p."createdAt" DESC, p.id ASC LIMIT ${scan + 1}`;
+  const rows = await db.$queryRaw<PostRow[]>`SELECT p.id, p.status::text AS status, p."scheduledAt", left(p.message, ${excerptCharacters}) AS excerpt, p.media::text AS media, p."mediaKeys" AS keys FROM posts p WHERE p."workspaceId" = ${workspaceId} AND (p."mediaKeys" && ${all}::text[] OR p.media::text LIKE ANY(${patterns}::text[])) ORDER BY p."createdAt" DESC, p.id ASC LIMIT ${scan + 1}`;
   for (const [id, list] of refs) {
     byAsset.set(id, rows.slice(0, scan).filter(r => list.some(ref => (r.keys ?? []).includes(ref) || r.media.includes(ref))).map(r => ({ postId: r.id, status: r.status, scheduledAt: r.scheduledAt, excerpt: r.excerpt })));
   }
   return { byAsset, truncated: rows.length > scan };
 }
 
-async function usageOf(db: Pick<Tx, '$queryRaw'>, workspaceId: string, store: MediaStore, quota: number): Promise<LibraryUsage> {
+async function usageOf(db: Pick<Tx, '$queryRaw'>, workspaceId: string, store: MediaStore, quota: number, imageLimit: number): Promise<LibraryUsage> {
   const [totals, images] = await Promise.all([
     db.$queryRaw<Array<{ bytes: bigint | number; count: bigint | number }>>`SELECT COALESCE(SUM(size), 0)::bigint AS bytes, COUNT(*)::bigint AS count FROM media WHERE "workspaceId" = ${workspaceId}`,
-    store.listImages(workspaceId, 1000),
+    store.listImages(workspaceId, imageLimit),
   ]);
   const exact = images.totalFiles !== undefined && images.totalBytes !== undefined;
   const imageBytes = exact ? images.totalBytes! : images.items.reduce((sum, item) => sum + item.size, 0);
@@ -93,8 +93,8 @@ const nameFor = (id: string) => `Uploaded image ${id.slice(0, 8)}`;
 /** Videos and images for the workspace, usage/quota, and the posts that hold each asset. */
 export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: MediaDeps = {}) {
   const store = deps.store ?? fsMediaStore;
-  const query = parse(LIBRARY_QUERY_SCHEMA, input);
   const l = await bounds();
+  const query = parse(libraryQuerySchema(l.search, l.pageMax), input);
   if ((query.q?.length ?? 0) > l.search) throw bad('Shorten the search.');
   const auth = await authorizeFeature(actor, FEATURE, 'read');
   const page = query.page ?? 1; const q = query.q ?? ''; const kind = query.kind ?? '';
@@ -102,8 +102,8 @@ export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: M
   return protect((async () => {
     const [rows, images, usage] = await Promise.all([
       prisma.$queryRaw<Row[]>`SELECT id, filename, "mimeType", size, kind::text AS kind, url, "storageKey", width, height, "createdAt" FROM media WHERE "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL AND (${kind} = '' OR kind::text = ${kind}) AND (${q} = '' OR filename ILIKE ${likeContains(q)}) ORDER BY "createdAt" DESC, id ASC LIMIT ${window}`,
-      kind === 'video' ? Promise.resolve({ items: [], truncated: false }) : store.listImages(actor.workspaceId, 1000),
-      usageOf(prisma, actor.workspaceId, store, l.quota),
+      kind === 'video' ? Promise.resolve({ items: [], truncated: false }) : store.listImages(actor.workspaceId, l.imageLimit),
+      usageOf(prisma, actor.workspaceId, store, l.quota, l.imageLimit),
     ]);
     const known = new Set(rows.map(r => r.id.toLowerCase()));
     const candidates: Array<Source & { asset: Omit<LibraryAsset, 'inUse' | 'holderCount' | 'holders'> }> = [
@@ -111,7 +111,7 @@ export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: M
       ...images.items.filter(i => !known.has(i.id.toLowerCase()) && (q === '' || nameFor(i.id).toLowerCase().includes(q.toLowerCase()))).map(i => ({ id: i.id, source: 'stored-image' as const, asset: { id: i.id, kind: 'image' as const, mimeType: i.mimeType, name: nameFor(i.id), size: i.size, createdAt: i.createdAt, width: null, height: null, source: 'stored-image' as const } })),
     ].sort((a, b) => b.asset.createdAt.getTime() - a.asset.createdAt.getTime() || a.id.localeCompare(b.id));
     const scope = query.usage ? candidates : candidates.slice((page - 1) * l.pageSize, page * l.pageSize + 1);
-    const { byAsset, truncated } = await attribute(prisma, actor.workspaceId, scope, l.scan);
+    const { byAsset, truncated } = await attribute(prisma, actor.workspaceId, scope, l.scan, l.holderExcerpt);
     let items = scope.map(c => { const h = byAsset.get(c.id) ?? []; return { ...c.asset, inUse: h.length > 0, holderCount: h.length, holders: auth.workspaceWide ? h.slice(0, l.listLimit) : null } satisfies LibraryAsset; });
     if (query.usage) items = items.filter(i => query.usage === 'used' ? i.inUse : !i.inUse).slice((page - 1) * l.pageSize, page * l.pageSize + 1);
     return { items: items.slice(0, l.pageSize), page, pageSize: l.pageSize, hasMore: items.length > l.pageSize, usage, workspaceWide: auth.workspaceWide, usageMayBeIncomplete: truncated || usage.approximate, limits: { maxSearchCharacters: l.search } };
@@ -121,9 +121,10 @@ export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: M
 /** Import an image or video from a public web address. Re-checks quota, type and size under the workspace lock. */
 export async function importFromUrl(actor: ToolActor, input: unknown, deps: MediaDeps = {}) {
   const store = deps.store ?? fsMediaStore; const net = deps.net ?? defaultFetchDeps();
-  const data = parse(IMPORT_SCHEMA, input);
+  const l = await bounds();
+  const data = parse(importSchema(l.urlMax, l.nameMax), input);
   if (data.confirmation !== importConfirmation(data.url)) throw bad();
-  const l = await bounds(); await authorizeFeature(actor, FEATURE, 'write');
+  await authorizeFeature(actor, FEATURE, 'write');
   return protect((async () => {
     const policy = policyOf(l);
     checkUrlShape(data.url, policy);
@@ -133,10 +134,10 @@ export async function importFromUrl(actor: ToolActor, input: unknown, deps: Medi
     const declaredOk = fetched.contentType === '' || fetched.contentType === 'application/octet-stream' || fetched.contentType === 'binary/octet-stream' || (sniffed !== null && fetched.contentType.startsWith(`${sniffed.kind}/`));
     if (!sniffed || !declaredOk) throw bad('That address does not return a supported image or video.');
     if (sniffed.kind === 'video' && (!l.videoMimes.includes(sniffed.mimeType) || fetched.bytes.length > l.videoMax)) throw bad('That video is not an accepted type or is larger than the allowed size.');
-    const name = safeAssetName(data.name, data.url, sniffed.kind === 'video' ? 'video' : 'image');
+    const name = safeAssetName(data.name, data.url, sniffed.kind === 'video' ? 'video' : 'image', l.nameMax);
     return transact(actor.workspaceId, l, async tx => {
       await lockActor(tx, actor, true);
-      const usage = await usageOf(tx, actor.workspaceId, store, l.quota);
+      const usage = await usageOf(tx, actor.workspaceId, store, l.quota, l.imageLimit);
       if (usage.usedBytes + fetched.bytes.length > l.quota) throw new OperationError('conflict', 'This workspace has reached its media storage limit. Delete unused media and try again.');
       if (sniffed.kind === 'image') {
         const file = new File([new Uint8Array(fetched.bytes)], name, { type: sniffed.mimeType });
@@ -167,10 +168,10 @@ export async function importFromUrl(actor: ToolActor, input: unknown, deps: Medi
  */
 export async function deleteAsset(actor: ToolActor, input: unknown, deps: MediaDeps = {}) {
   const store = deps.store ?? fsMediaStore;
-  const data = parse(DELETE_SCHEMA, input);
+  const l = await bounds();
+  const data = parse(deleteSchema(l.identifierMax), input);
   const force = data.allowInUse === true;
   if (data.confirmation !== (force ? deleteInUseConfirmation(data.id) : deleteConfirmation(data.id))) throw bad();
-  const l = await bounds();
   const first = await authorizeFeature(actor, FEATURE, 'write');
   if (!first.workspaceWide) throw new OperationError('forbidden', 'Deleting media can affect posts on every channel. Ask a member with access to all channels.');
   return protect(transact(actor.workspaceId, l, async tx => {
@@ -181,7 +182,7 @@ export async function deleteAsset(actor: ToolActor, input: unknown, deps: MediaD
     const row = rows[0];
     if (!isFile && !row) throw new OperationError('not_found', 'This media is unavailable in the current workspace.');
     const target: Source = isFile ? { id: data.id, source: 'stored-image' } : { id: row!.id, source: 'library', url: row!.url, storageKey: row!.storageKey };
-    const { byAsset, truncated } = await attribute(tx, actor.workspaceId, [target], l.scan);
+    const { byAsset, truncated } = await attribute(tx, actor.workspaceId, [target], l.scan, l.holderExcerpt);
     const holders = byAsset.get(target.id) ?? [];
     if (holders.length || truncated) {
       if (!force) throw new OperationError('conflict', `This media is used by ${holders.length || 'many'} post${holders.length === 1 ? '' : 's'}. Remove it from those posts first, or confirm deleting it anyway.`);

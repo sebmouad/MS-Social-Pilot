@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
+import { INTEGRATIONS_INPUT_HARD_MAX } from './config';
 
 export type IntegrationsActor = { userId: string; workspaceId: string };
 
@@ -9,12 +10,13 @@ export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 /** Events this installation actually emits. Every one is derived from durable state by the worker (see server/events.ts). */
 export const EMITTED_EVENTS: readonly WebhookEvent[] = [...WEBHOOK_EVENTS];
 
-const id = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/);
+/** Parser safety ceiling. The live Root policy is checked by the owning service and stays below this bound. */
+const id = z.string().min(1).max(INTEGRATIONS_INPUT_HARD_MAX).regex(/^[A-Za-z0-9_-]+$/);
 const events = z.array(z.enum(WEBHOOK_EVENTS)).min(1).max(WEBHOOK_EVENTS.length);
 
 export const WEBHOOK_CREATE_SCHEMA = z.object({
-  name: z.string().trim().min(1).max(60),
-  url: z.string().trim().min(1).max(500),
+  name: z.string().trim().min(1).max(INTEGRATIONS_INPUT_HARD_MAX),
+  url: z.string().trim().min(1).max(INTEGRATIONS_INPUT_HARD_MAX),
   events,
   confirmation: z.string(),
 }).strict();
@@ -22,20 +24,20 @@ export const WEBHOOK_UPDATE_SCHEMA = z.object({
   id, enabled: z.boolean().optional(), events: events.optional(), confirmation: z.string(),
 }).strict().refine(v => v.enabled !== undefined || v.events !== undefined);
 export const ID_CONFIRM_SCHEMA = z.object({ id, confirmation: z.string() }).strict();
-export const DELIVERY_QUERY_SCHEMA = z.object({ id, page: z.number().int().min(1).max(10000).optional() }).strict();
+export const DELIVERY_QUERY_SCHEMA = z.object({ id, page: z.number().int().min(1).max(INTEGRATIONS_INPUT_HARD_MAX).optional() }).strict();
 /** REST-hook subscription made with an API key (the key's owner and ceilings still apply). */
 export const REST_HOOK_SCHEMA = z.object({
-  name: z.string().trim().min(1).max(60).optional(), url: z.string().trim().min(1).max(500), events,
+  name: z.string().trim().min(1).max(INTEGRATIONS_INPUT_HARD_MAX).optional(), url: z.string().trim().min(1).max(INTEGRATIONS_INPUT_HARD_MAX), events,
 }).strict();
 /** Body of POST /api/v1/posts. Strict and bounded; Publishing applies its own Root limits on top. */
 export const REST_POST_CREATE_SCHEMA = z.object({
-  message: z.string().max(10_000),
-  targetIds: z.array(z.string().min(1).max(200)).min(1).max(50),
-  firstComment: z.string().max(10_000).optional(),
-  firstCommentDelayMinutes: z.number().int().min(0).max(100_000).optional(),
-  link: z.string().max(2_000).optional(),
-  media: z.array(z.object({ kind: z.enum(['image', 'video']), url: z.string().min(1).max(2_000), altText: z.string().max(1_000).optional() }).strict()).max(20).optional(),
-  destinationFormats: z.record(z.string().min(1).max(200), z.string().min(1).max(100)).refine(v => Object.keys(v).length <= 50).optional(),
+  message: z.string().max(INTEGRATIONS_INPUT_HARD_MAX),
+  targetIds: z.array(z.string().min(1).max(INTEGRATIONS_INPUT_HARD_MAX)).min(1).max(INTEGRATIONS_INPUT_HARD_MAX),
+  firstComment: z.string().max(INTEGRATIONS_INPUT_HARD_MAX).optional(),
+  firstCommentDelayMinutes: z.number().int().min(0).max(INTEGRATIONS_INPUT_HARD_MAX).optional(),
+  link: z.string().max(INTEGRATIONS_INPUT_HARD_MAX).optional(),
+  media: z.array(z.object({ kind: z.enum(['image', 'video']), url: z.string().min(1).max(INTEGRATIONS_INPUT_HARD_MAX), altText: z.string().max(INTEGRATIONS_INPUT_HARD_MAX).optional() }).strict()).max(INTEGRATIONS_INPUT_HARD_MAX).optional(),
+  destinationFormats: z.record(z.string().min(1).max(INTEGRATIONS_INPUT_HARD_MAX), z.string().min(1).max(INTEGRATIONS_INPUT_HARD_MAX)).refine(v => Object.keys(v).length <= INTEGRATIONS_INPUT_HARD_MAX).optional(),
   scheduledAt: z.string().datetime({ offset: true }).optional(),
 }).strict();
 export const REST_HOOK_ID_SCHEMA = z.object({ id }).strict();

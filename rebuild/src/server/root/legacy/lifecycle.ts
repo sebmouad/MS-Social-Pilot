@@ -1,3 +1,4 @@
+import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
@@ -20,7 +21,7 @@ export async function setLifecycleUserAccess(actorId: string, userId: string, di
 }
 
 export async function setLifecycleWorkspaceAccess(actorId: string, workspaceId: string, suspended: boolean, confirmation: string) {
-  if (!workspaceId || workspaceId.length > 200 || !confirmation || confirmation.length > 400) throw invalid('Choose a workspace and enter the exact confirmation.');
+  if (!workspaceId || workspaceId.length > synchronousPolicy('root.identifierMaxCharacters') || !confirmation || confirmation.length > synchronousPolicy('root.confirmationMaxCharacters')) throw invalid('Choose a workspace and enter the exact confirmation.');
   return setRootWorkspaceAccess(actorId, workspaceId, suspended, confirmation);
 }
 

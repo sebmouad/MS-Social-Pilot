@@ -1,3 +1,4 @@
+import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { Prisma } from '../../../generated/client';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
@@ -9,14 +10,14 @@ import { writeRootAudit } from './legacy/audit';
 import { invitationStatusSql as statusSql, revokeInstallationInvitation } from '@/modules/settings/server/invitations';
 import { deleteUnverifiedRegistration, resendUnverifiedRegistration, unverifiedRegistrationWhere } from '@/modules/settings/server/registration';
 
-const identifier = z.string().min(1).max(255).regex(/^[^\u0000-\u001f\u007f]+$/);
+const identifier = z.string().min(1).regex(/^[^\u0000-\u001f\u007f]+$/).refine(withinSynchronousLimit('root.registrationIdentifierMaxCharacters'));
 const filters = z.object({
-  q: z.string().trim().max(2000).optional(), workspaceId: identifier.optional(),
+  q: z.string().trim().optional(), workspaceId: identifier.optional(),
   status: z.enum(['pending', 'expired', 'accepted']).optional(),
-  page: z.coerce.number().int().min(1).max(100000).default(1),
-  accountsPage: z.coerce.number().int().min(1).max(100000).default(1),
+  page: z.coerce.number().int().min(1).refine(value => value <= synchronousPolicy('root.pageMaxNumber')).default(1),
+  accountsPage: z.coerce.number().int().min(1).refine(value => value <= synchronousPolicy('root.pageMaxNumber')).default(1),
 }).strict();
-const confirmationSchema = z.object({ confirmation: z.string().max(400) }).strict();
+const confirmationSchema = z.object({ confirmation: z.string().refine(withinSynchronousLimit('root.confirmationMaxCharacters')) }).strict();
 export const registrationConfirmation = (action: 'resend' | 'delete', userId: string) => `${action === 'resend' ? 'RESEND VERIFICATION' : 'DELETE UNVERIFIED ACCOUNT'} ${userId}`;
 
 type Invitation = { id: string; workspaceId: string; workspaceName: string; email: string; role: string; createdAt: Date; expiresAt: Date; acceptedAt: Date | null; status: 'pending' | 'expired' | 'accepted' };

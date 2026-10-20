@@ -1,3 +1,4 @@
+import { refreshSynchronousPolicy } from './synchronous-policy';
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
 import { runtimeConfig } from '@/server/config/store';
 
@@ -17,6 +18,7 @@ const state = ((globalThis as { __mspPublicOrigin?: OriginState }).__mspPublicOr
 state.development ??= [];
 
 export async function refreshPublicOrigin(): Promise<void> {
+  await refreshSynchronousPolicy(runtimeConfig);
   try { state.value = String(await runtimeConfig('app.publicOrigin') ?? ''); }
   catch { /* keep the last known value */ }
   try { state.development = (await runtimeConfig('app.developmentOrigins') as string[]) ?? []; }

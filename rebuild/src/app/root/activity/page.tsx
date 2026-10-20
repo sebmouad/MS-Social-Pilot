@@ -1,3 +1,4 @@
+import { ROOT_AUDIT_BOUNDS, auditControlsText } from '@/lib/config/root-audit-controls';
 import { AuditExport, AuditRetention } from './AuditControls';
 import { revalidatePath } from 'next/cache';
 import { readAuditConfig, saveAuditSettings } from '@/server/root/audit-config';
@@ -15,17 +16,17 @@ export const metadata = { title: 'Activity · Root' };
 export default async function RootActivityPage({ searchParams }: { searchParams: Promise<RootActivitySearch> }) {
   const actor = await requireRootPage();
   const params = await searchParams;
-  const auditPolicy = await readAuditConfig();
+  const [auditPolicy, auditCopy, downloadPolicy] = await Promise.all([readAuditConfig(), runtimeConfig('root.auditControlsCopy'), runtimeConfig('root.auditDownloadPolicy')]);
   async function saveRetention(_previous: string, data: FormData) {
     'use server';
     const current = await requireRootPage();
     const raw = String(data.get('days') ?? '');
-    if (!/^\d+$/.test(raw) || Number(raw) > 36500) return 'Enter whole retention days from 0 to 36500.';
+    if (!/^\d+$/.test(raw) || Number(raw) > ROOT_AUDIT_BOUNDS.retentionDays.max) return auditControlsText(auditCopy.invalidDays, ROOT_AUDIT_BOUNDS.retentionDays);
     try {
       await saveAuditSettings(current.id, { 'root.auditRetentionDays': Number(raw), 'root.auditExportMaxRows': Number(data.get('exportRows')), 'root.auditRetentionBatchSize': Number(data.get('batchSize')) });
       revalidatePath('/root/activity');
-      return 'Retention saved.';
-    } catch { return 'Retention could not be saved. Please retry.'; }
+      return auditCopy.saved;
+    } catch { return auditCopy.saveFailure; }
   }
   let activities: Awaited<ReturnType<typeof listRootActivity>> | null = null;
   let policy: { pageSize: number; searchCharacters: number } | null = null;
@@ -38,8 +39,8 @@ export default async function RootActivityPage({ searchParams }: { searchParams:
   const filtered = Boolean(activities && Object.values(activities.filters).some(Boolean));
   return <RootFrame active="/root/activity">
     <header className="root-control__heading"><p className="root-config__eyebrow">Root · Control center</p><h1>Activity</h1><p>Recorded changes across this installation. Dates and times use UTC. Sensitive audit details are omitted.</p></header>
-    {activities && <AuditExport href={`/api/root/activity/export?${new URLSearchParams(Object.entries(activities.filters).filter(([, value]) => Boolean(value)))}`} limit={auditPolicy.exportMaxRows} />}
-    <AuditRetention days={auditPolicy.retentionDays} exportRows={auditPolicy.exportMaxRows} batchSize={auditPolicy.batchSize} save={saveRetention} />
+    {activities && <AuditExport href={`/api/root/activity/export?${new URLSearchParams(Object.entries(activities.filters).filter(([, value]) => Boolean(value)))}`} limit={auditPolicy.exportMaxRows} copy={auditCopy} downloadPolicy={downloadPolicy} />}
+    <AuditRetention days={auditPolicy.retentionDays} exportRows={auditPolicy.exportMaxRows} batchSize={auditPolicy.batchSize} save={saveRetention} copy={auditCopy} />
     <RootActivityFilters values={params} page={activities} policy={policy} />
     {activities === null ? <section className="root-control__notice" role="alert"><h2>{invalid ? 'Check activity filters' : 'Activity is unavailable'}</h2><p>{invalid ? 'A date, search or page link is invalid. Adjust the sidebar filters or reset to the latest activity.' : 'The audit store could not be read. Please retry, or check database availability.'}</p><a href="/root/activity">Reset to latest activity</a></section> : activities.items.length === 0 ? <section className="root-control__panel"><h2>{params.cursor ? 'No activity on this page' : filtered ? 'No activity matches these filters' : 'No activity recorded'}</h2><p>{params.cursor ? 'Recorded events may have changed. Open the latest matching activity from the sidebar.' : filtered ? 'Try another action, person, workspace or date range.' : 'Installation and workspace actions will appear here when recorded.'}</p></section> : <><p className="root-activity__summary">Showing {activities.items.length} {filtered ? 'matching ' : ''}recorded {activities.items.length === 1 ? 'event' : 'events'}.</p><ol className="root-activity">
       {activities.items.map(item => <li key={item.id}>

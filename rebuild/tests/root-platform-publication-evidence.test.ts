@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ active: vi.fn(), evidence: vi.fn(), execute: vi.fn(), limit: 100, configFailure: false }));
+const state = vi.hoisted(() => ({ active: vi.fn(), evidence: vi.fn(), execute: vi.fn(), limit: 100, configFailure: false, policy: vi.fn() }));
 vi.mock('../src/server/root/operations', () => ({ requireActiveRoot: state.active }));
 vi.mock('@/platforms', () => ({ PLATFORM_MODULES: [{ id: 'installed_but_disabled' }, { id: 'another' }] }));
 vi.mock('../src/server/platforms/publication-recovery', () => ({ installedPublicationRecovery: (provider: string) => provider === 'installed_but_disabled' ? { readEvidence: state.evidence, executeRootAction: state.execute } : undefined }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: async () => { if (state.configFailure) throw new Error('database unavailable'); return state.limit; } }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => { if (state.configFailure) throw new Error('database unavailable'); return key === 'root.platformEvidencePolicy' ? state.policy() : state.limit; } }));
 import { readRootPlatformPublicationEvidence, runRootPlatformPublicationAction } from '../src/server/root/platform-publication-evidence';
 import { OperationError } from '../src/lib/operation-error';
+import { ROOT_EVIDENCE_POLICY } from '../src/lib/config/root-evidence-policy';
 
 const panel = { title: 'Upload receipts', description: 'Known receipt identifiers.', columns: [{ key: 'operationId', label: 'Operation' }, { key: 'remoteId', label: 'Remote receipt' }], items: [{ operationId: 'op_1', remoteId: 'media_1' }], truncated: false };
-beforeEach(() => { vi.clearAllMocks(); state.limit = 100; state.configFailure = false; state.active.mockResolvedValue(undefined); state.evidence.mockResolvedValue(panel); state.execute.mockResolvedValue({ ok: true, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_1', state: 'confirmed', message: 'Action receipt recorded.' }); });
+beforeEach(() => { vi.clearAllMocks(); state.limit = 100; state.configFailure = false; state.policy.mockReturnValue(ROOT_EVIDENCE_POLICY); state.active.mockResolvedValue(undefined); state.evidence.mockResolvedValue(panel); state.execute.mockResolvedValue({ ok: true, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_1', state: 'confirmed', message: 'Action receipt recorded.' }); });
 
 describe('Root platform publication evidence service', () => {
   it('preserves validated compact columns without dropping the full receipt schema', async () => {
@@ -60,6 +61,14 @@ describe('Root platform publication evidence service', () => {
     state.limit = 100; state.configFailure = true;
     await expect(readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).rejects.toMatchObject({ code: 'unavailable' });
     expect(state.evidence).not.toHaveBeenCalled();
+  });
+  it('applies live lower metadata and action bounds and never exceeds the host cell integrity ceiling', async () => {
+    state.policy.mockReturnValue({ ...ROOT_EVIDENCE_POLICY, metadataTitleCharacters: 8 });
+    await expect(readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).rejects.toMatchObject({ code: 'upstream_failure' });
+    state.policy.mockReturnValue({ ...ROOT_EVIDENCE_POLICY, identifierCharacters: 2049 });
+    await expect(readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).rejects.toMatchObject({ code: 'unavailable' });
+    state.policy.mockReturnValue({ ...ROOT_EVIDENCE_POLICY, confirmationCharacters: 4 });
+    await expect(runRootPlatformPublicationAction('root', { providerId: 'installed_but_disabled', actionId: 'module_action', subjectId: 'row_1', confirmation: 'CONFIRM', acknowledged: true })).rejects.toMatchObject({ code: 'invalid_request' });
   });
   it.each([
     { providerId: 'not installed' }, { providerId: 'installed_but_disabled', operationId: 'contains space' },

@@ -3,7 +3,7 @@ import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { checkUrlShape, defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import {
-  createFeedConfirmation, deleteFeedConfirmation, draftFeedConfirmation, FEED_CHECK_SCHEMA, FEED_CREATE_SCHEMA, FEED_DELETE_SCHEMA, FEED_LIST_SCHEMA, FEED_UPDATE_SCHEMA,
+  createFeedConfirmation, deleteFeedConfirmation, draftFeedConfirmation, feedCheckSchema, feedCreateSchema, feedDeleteSchema, feedListSchema, feedUpdateSchema,
   postFeedConfirmation, updateFeedConfirmation, type FeedCheckMode, type FeedInput,
 } from '../feeds';
 import { authorizeFeedWrite, authorizeFeeds, type FeedActor } from './access';
@@ -21,12 +21,12 @@ async function validateSaved(deps: FeedDeps, actor: FeedActor, ids: string[], ma
 }
 
 export async function readFeeds(actor: FeedActor, input: unknown = {}) {
-  const query = parse(FEED_LIST_SCHEMA, input);
   const l = await bounds();
+  const query = parse(feedListSchema(l.pageNumberMax), input);
   const auth = await authorizeFeeds(actor, 'read');
   const page = query.page ?? 1;
   return protect((async () => {
-    const rows = await prisma.$queryRawUnsafe<FeedRow[]>(`SELECT ${FEED_COLUMNS} FROM feed_sources WHERE "workspaceId" = $1 ORDER BY name ASC, id ASC LIMIT $2`, actor.workspaceId, l.maxFeeds + 100);
+    const rows = await prisma.$queryRawUnsafe<FeedRow[]>(`SELECT ${FEED_COLUMNS} FROM feed_sources WHERE "workspaceId" = $1 ORDER BY name ASC, id ASC LIMIT $2`, actor.workspaceId, l.maxFeeds + l.listScanMargin);
     const visible = rows.map(toRecord).filter(feed => within(auth, feed.targetIds));
     const window = visible.slice((page - 1) * l.pageSize, page * l.pageSize + 1);
     return { feeds: window.slice(0, l.pageSize), page, pageSize: l.pageSize, hasMore: window.length > l.pageSize, limits: { maxNameCharacters: l.maxName, maxMessageCharacters: l.maxMessage, maxTargets: l.maxTargets, maxSpreadMinutes: l.maxSpread }, scopedView: auth.actor.allowedTargetIds !== undefined };
@@ -45,9 +45,9 @@ const normalizeOrBad = (input: FeedInput, l: FeedLimits, scoped: boolean) => {
 };
 
 export async function createFeed(actor: FeedActor, input: unknown, deps: FeedDeps = {}) {
-  const data = parse(FEED_CREATE_SCHEMA, input);
-  if (data.confirmation !== createFeedConfirmation(data.name)) throw bad();
   const l = await bounds();
+  const data = parse(feedCreateSchema({ maxName: l.maxName, maxUrl: l.maxUrl, maxMessage: l.maxMessage, maxHashtags: l.maxHashtags, maxTargets: l.maxTargets, maxIdentifier: l.maxIdentifier, maxSpread: l.maxSpread }), input);
+  if (data.confirmation !== createFeedConfirmation(data.name)) throw bad();
   const { confirmation: _c, ...rest } = data;
   const auth = await authorizeFeedWrite(actor);
   const feed = normalizeOrBad(rest, l, auth.actor.allowedTargetIds !== undefined);
@@ -69,9 +69,9 @@ export async function createFeed(actor: FeedActor, input: unknown, deps: FeedDep
 }
 
 export async function updateFeed(actor: FeedActor, input: unknown, deps: FeedDeps = {}) {
-  const data = parse(FEED_UPDATE_SCHEMA, input);
-  if (data.confirmation !== updateFeedConfirmation(data.id)) throw bad();
   const l = await bounds();
+  const data = parse(feedUpdateSchema({ maxName: l.maxName, maxUrl: l.maxUrl, maxMessage: l.maxMessage, maxHashtags: l.maxHashtags, maxTargets: l.maxTargets, maxIdentifier: l.maxIdentifier, maxSpread: l.maxSpread }), input);
+  if (data.confirmation !== updateFeedConfirmation(data.id)) throw bad();
   const { id, confirmation: _c, ...rest } = data;
   const auth = await authorizeFeedWrite(actor);
   const feed = normalizeOrBad(rest, l, auth.actor.allowedTargetIds !== undefined);
@@ -97,9 +97,10 @@ export async function updateFeed(actor: FeedActor, input: unknown, deps: FeedDep
 
 /** Deleting a feed removes its source and remembered items; posts already created from it stay in Publishing. */
 export async function deleteFeed(actor: FeedActor, input: unknown) {
-  const data = parse(FEED_DELETE_SCHEMA, input);
+  const l = await bounds();
+  const data = parse(feedDeleteSchema(l.maxIdentifier), input);
   if (data.confirmation !== deleteFeedConfirmation(data.id)) throw bad();
-  const l = await bounds(); await authorizeFeedWrite(actor);
+  await authorizeFeedWrite(actor);
   return protect(transact(actor.workspaceId, l, async tx => {
     const auth = await lockActor(tx, actor, true);
     const rows = await tx.$queryRaw<Array<{ id: string; name: string; targetIds: unknown }>>`SELECT id, name, "targetIds" FROM feed_sources WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
@@ -123,13 +124,14 @@ const modeOf = (data: { mode?: FeedCheckMode | undefined; createDrafts?: boolean
  * both need their exact confirmation. Nothing is published by this operation.
  */
 export async function checkFeed(actor: FeedActor, input: unknown, deps: FeedDeps = {}) {
-  const data = parse(FEED_CHECK_SCHEMA, input);
+  const l = await bounds();
+  const data = parse(feedCheckSchema(l.maxIdentifier), input);
   const mode = modeOf(data);
   if (data.mode !== undefined && data.createDrafts !== undefined && (data.createDrafts !== (data.mode === 'drafts'))) throw bad();
   if (mode === 'drafts' && data.confirmation !== draftFeedConfirmation(data.id)) throw bad();
   if (mode === 'posts' && data.confirmation !== postFeedConfirmation(data.id)) throw bad();
   if (mode === 'preview' && data.confirmation !== undefined) throw bad();
-  const l = await bounds(); const now = (deps.now ?? (() => new Date()))();
+  const now = (deps.now ?? (() => new Date()))();
   const ports = await defaultPorts(deps.net ?? defaultFetchDeps());
   if (deps.validateTargets) ports.validate = deps.validateTargets;
   if (deps.resolveFormats) ports.formats = deps.resolveFormats;

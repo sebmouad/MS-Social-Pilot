@@ -1,3 +1,4 @@
+import { synchronousPolicy } from '@/lib/config/synchronous-policy';
 import { requireRootPage } from '@/server/config/access';
 import { RootFrame } from '@/server/root/RootFrame';
 import { listRootPlanHistory, listRootPlans, listRootSubscribers } from '@/server/root/legacy/plans';
@@ -24,7 +25,7 @@ export default async function RootPlansPage() {
         {plansCut && <p className="root-ops__muted" role="status">Showing the first {planLimit} plans. Raise the plan catalog limit in Root settings to see more.</p>}
         {plans.map(plan => <div key={plan.id}>
           <p className="root-ops__muted">{plan.subscribers ?? 0} {plan.subscribers === 1 ? 'account' : 'accounts'}{plan.isDefault ? ' · default for new sign-ups' : ''}</p>
-          <PlanEditor plan={plan} groups={featureGroups} />
+          <PlanEditor plan={plan} groups={featureGroups} nameMaxCharacters={synchronousPolicy('root.planNameMaxCharacters')} />
         </div>)}
         <section className="root-ops__panel" aria-labelledby="subscribers"><h2 id="subscribers">Subscribers</h2>
           {subsCut && <p className="root-ops__muted" role="status">Showing the first {subLimit} accounts. Raise the subscriber limit in Root settings to assign plans to others.</p>}

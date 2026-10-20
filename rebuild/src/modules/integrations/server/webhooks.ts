@@ -9,6 +9,7 @@ import { emitRecentEvents } from './events';
 import { checkReceiver, defaultWebhookDeps, sendSigned, type WebhookDeps } from './webhook-transport';
 
 export { emitWebhook, emitRecentPostEvents, emitRecentEvents } from './events';
+const within = (condition: boolean) => { if (!condition) throw new OperationError('invalid_request', 'One or more fields exceed the current integrations limits.'); };
 
 export type WebhookView = { id: string; name: string; urlDisplay: string; events: WebhookEvent[]; enabled: boolean; source: 'dashboard' | 'api_key'; lastError: string | null; lastSentAt: Date | null; createdAt: Date; pending: number; failed: number };
 export type DeliveryView = { id: string; event: string; status: string; attempts: number; responseStatus: number | null; error: string | null; nextAttemptAt: Date; deliveredAt: Date | null; createdAt: Date };
@@ -33,8 +34,9 @@ export async function listWebhooks(actor: IntegrationsActor) {
 /** Shared by the dashboard, MCP and REST hooks. `apiKeyId` marks an endpoint an API key subscribed (stored in `apiTokenId`). */
 export async function createWebhook(actor: IntegrationsActor, input: unknown, options: { apiKeyId?: string | null; deps?: Pick<WebhookDeps, 'resolve'>; skipConfirmation?: boolean } = {}) {
   const data = parse(WEBHOOK_CREATE_SCHEMA.extend({ confirmation: WEBHOOK_CREATE_SCHEMA.shape.confirmation.optional() }), input, 'Enter a name, a public https address and at least one event.');
-  if (!options.skipConfirmation) exact(data.confirmation ?? '', confirmations.createWebhook(data.name));
   const rt = await runtime(); requireEnabled(rt, 'webhooks');
+  within(data.name.length <= rt.limits.webhookNameMaxCharacters && data.url.length <= rt.limits.webhookUrlMaxCharacters);
+  if (!options.skipConfirmation) exact(data.confirmation ?? '', confirmations.createWebhook(data.name));
   await authorize(actor, true);
   const deps = options.deps ?? defaultWebhookDeps();
   await checkReceiver(data.url, rt.hostAllowlist, deps.resolve);
@@ -51,8 +53,9 @@ export async function createWebhook(actor: IntegrationsActor, input: unknown, op
 }
 
 export async function updateWebhook(actor: IntegrationsActor, input: unknown) {
-  const data = parse(WEBHOOK_UPDATE_SCHEMA, input); exact(data.confirmation, confirmations.updateWebhook(data.id));
-  const rt = await runtime(); requireEnabled(rt, 'webhooks'); await authorize(actor, true);
+  const rt = await runtime(); requireEnabled(rt, 'webhooks');
+  const data = parse(WEBHOOK_UPDATE_SCHEMA, input); within(data.id.length <= rt.limits.webhookIdMaxCharacters); exact(data.confirmation, confirmations.updateWebhook(data.id));
+  await authorize(actor, true);
   return protect(transact(actor, rt.limits, async tx => {
     await authorize(actor, true);
     const rows = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM webhook_endpoints WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
@@ -65,8 +68,9 @@ export async function updateWebhook(actor: IntegrationsActor, input: unknown) {
 }
 
 export async function deleteWebhook(actor: IntegrationsActor, input: unknown) {
-  const data = parse(ID_CONFIRM_SCHEMA, input); exact(data.confirmation, confirmations.deleteWebhook(data.id));
-  const rt = await runtime(); await authorize(actor, true);
+  const rt = await runtime();
+  const data = parse(ID_CONFIRM_SCHEMA, input); within(data.id.length <= rt.limits.webhookIdMaxCharacters); exact(data.confirmation, confirmations.deleteWebhook(data.id));
+  await authorize(actor, true);
   return protect(transact(actor, rt.limits, async tx => {
     await authorize(actor, true);
     const removed = await tx.$queryRaw<Array<{ id: string }>>`DELETE FROM webhook_endpoints WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} RETURNING id`;
@@ -78,8 +82,9 @@ export async function deleteWebhook(actor: IntegrationsActor, input: unknown) {
 
 /** Old secret stops signing immediately; the new one is shown once (and can be revealed again by an owner/admin). */
 export async function rotateWebhookSecret(actor: IntegrationsActor, input: unknown) {
-  const data = parse(ID_CONFIRM_SCHEMA, input); exact(data.confirmation, confirmations.rotateWebhookSecret(data.id));
-  const rt = await runtime(); requireEnabled(rt, 'webhooks'); await authorize(actor, true);
+  const rt = await runtime(); requireEnabled(rt, 'webhooks');
+  const data = parse(ID_CONFIRM_SCHEMA, input); within(data.id.length <= rt.limits.webhookIdMaxCharacters); exact(data.confirmation, confirmations.rotateWebhookSecret(data.id));
+  await authorize(actor, true);
   const secret = newWebhookSecret();
   await protect(transact(actor, rt.limits, async tx => {
     await authorize(actor, true);
@@ -95,8 +100,9 @@ export async function rotateWebhookSecret(actor: IntegrationsActor, input: unkno
  * that commits before the value leaves this function. Only the session UI/API calls this; there is no MCP or REST equivalent.
  */
 export async function revealWebhookSecret(actor: IntegrationsActor, input: unknown, now = new Date()) {
-  const data = parse(ID_CONFIRM_SCHEMA, input); exact(data.confirmation, confirmations.revealWebhookSecret(data.id));
-  const rt = await runtime(); requireEnabled(rt, 'webhooks'); await authorize(actor, true);
+  const rt = await runtime(); requireEnabled(rt, 'webhooks');
+  const data = parse(ID_CONFIRM_SCHEMA, input); within(data.id.length <= rt.limits.webhookIdMaxCharacters); exact(data.confirmation, confirmations.revealWebhookSecret(data.id));
+  await authorize(actor, true);
   const limited = hit(`integrations:reveal:${actor.userId}`, { limit: rt.limits.webhookRevealsPerHour, windowMs: 3_600_000, now: now.getTime() });
   if (!limited.allowed) throw new OperationError('unavailable', 'Too many secrets shown recently. Try again later.');
   const envelope = await protect(transact(actor, rt.limits, async tx => {
@@ -111,9 +117,10 @@ export async function revealWebhookSecret(actor: IntegrationsActor, input: unkno
 }
 
 export async function listDeliveries(actor: IntegrationsActor, input: unknown) {
-  const q = parse(DELIVERY_QUERY_SCHEMA, input);
+  const rt = await runtime();
+  const q = parse(DELIVERY_QUERY_SCHEMA, input); within(q.id.length <= rt.limits.webhookIdMaxCharacters && (q.page === undefined || q.page <= rt.limits.webhookDeliveryPageMaxNumber));
   await authorize(actor, false);
-  const rt = await runtime(); const size = rt.limits.webhookDeliveriesPageSize; const page = q.page ?? 1;
+  const size = rt.limits.webhookDeliveriesPageSize; const page = q.page ?? 1;
   return protect((async () => {
     const endpoint = await prisma.$queryRaw<Array<{ id: string; name: string }>>`SELECT id, name FROM webhook_endpoints WHERE id = ${q.id} AND "workspaceId" = ${actor.workspaceId}`;
     if (!endpoint[0]) throw notFound('webhook');
@@ -123,7 +130,7 @@ export async function listDeliveries(actor: IntegrationsActor, input: unknown) {
 }
 
 type Attempted = { deliveryId: string; delivered: boolean; status: number | null; error: string | null };
-const reasonCap = (value: string | null) => value?.slice(0, 200) ?? null;
+const reasonCap = (value: string | null, maxCharacters: number) => value?.slice(0, maxCharacters) ?? null;
 
 async function loadSecret(db: Tx | typeof prisma, endpointId: string, workspaceId: string) {
   const rows = await db.$queryRaw<Array<{ url: string; secret: string; enabled: boolean }>>`SELECT url, secret, enabled FROM webhook_endpoints WHERE id = ${endpointId} AND "workspaceId" = ${workspaceId}`;
@@ -134,28 +141,29 @@ async function loadSecret(db: Tx | typeof prisma, endpointId: string, workspaceI
 const bodyOf = (id: string, payload: unknown) => JSON.stringify({ id, ...((payload && typeof payload === 'object' ? payload : {}) as object) });
 
 /** Record one attempt: only the claimant (status still pending) may settle it. `retryAfterSeconds` null means no further automatic attempts. */
-export async function settleAttempt(db: Tx | typeof prisma, row: { id: string; endpointId: string; workspaceId: string; attempts: number }, outcome: { ok: boolean; status: number | null; error: string | null }, now: Date, retryAfterSeconds: number | null) {
+export async function settleAttempt(db: Tx | typeof prisma, row: { id: string; endpointId: string; workspaceId: string; attempts: number }, outcome: { ok: boolean; status: number | null; error: string | null }, now: Date, retryAfterSeconds: number | null, errorMaxCharacters: number) {
   const attempts = row.attempts + 1; const status = outcome.ok ? 'delivered' : retryAfterSeconds === null ? 'failed' : 'pending';
   const next = new Date(now.getTime() + (retryAfterSeconds ?? 0) * 1000);
-  const updated = await db.$executeRaw`UPDATE webhook_deliveries SET attempts = ${attempts}, "responseStatus" = ${outcome.status}, error = ${reasonCap(outcome.error)}, status = ${status}, "deliveredAt" = ${outcome.ok ? now : null}, "nextAttemptAt" = ${next} WHERE id = ${row.id} AND "workspaceId" = ${row.workspaceId} AND status = 'pending'`;
+  const updated = await db.$executeRaw`UPDATE webhook_deliveries SET attempts = ${attempts}, "responseStatus" = ${outcome.status}, error = ${reasonCap(outcome.error, errorMaxCharacters)}, status = ${status}, "deliveredAt" = ${outcome.ok ? now : null}, "nextAttemptAt" = ${next} WHERE id = ${row.id} AND "workspaceId" = ${row.workspaceId} AND status = 'pending'`;
   if (Number(updated) > 0) {
     if (outcome.ok) await db.$executeRaw`UPDATE webhook_endpoints SET "lastSentAt" = ${now}, "lastError" = NULL WHERE id = ${row.endpointId}`;
-    else await db.$executeRaw`UPDATE webhook_endpoints SET "lastError" = ${reasonCap(outcome.error)} WHERE id = ${row.endpointId}`;
+    else await db.$executeRaw`UPDATE webhook_endpoints SET "lastError" = ${reasonCap(outcome.error, errorMaxCharacters)} WHERE id = ${row.endpointId}`;
   }
   return Number(updated) > 0;
 }
 
 /** A ping sent at once and not retried, so a wrong address shows now. */
 export async function testWebhook(actor: IntegrationsActor, input: unknown, deps: WebhookDeps = defaultWebhookDeps(), now = new Date()): Promise<Attempted> {
-  const data = parse(ID_CONFIRM_SCHEMA, input); exact(data.confirmation, confirmations.testWebhook(data.id));
-  const rt = await runtime(); requireEnabled(rt, 'webhooks'); await authorize(actor, true);
+  const rt = await runtime(); requireEnabled(rt, 'webhooks');
+  const data = parse(ID_CONFIRM_SCHEMA, input); within(data.id.length <= rt.limits.webhookIdMaxCharacters); exact(data.confirmation, confirmations.testWebhook(data.id));
+  await authorize(actor, true);
   return protect((async () => {
     const endpoint = await loadSecret(prisma, data.id, actor.workspaceId);
     const deliveryId = `whd_${randomUUID()}`;
     const payload = { event: 'ping', occurredAt: now.toISOString(), data: {} };
     await prisma.$executeRaw`INSERT INTO webhook_deliveries (id, "endpointId", "workspaceId", event, payload, status, attempts, "nextAttemptAt", "createdAt") VALUES (${deliveryId}, ${data.id}, ${actor.workspaceId}, 'ping', ${JSON.stringify(payload)}::jsonb, 'pending', 0, ${new Date(now.getTime() + rt.limits.webhookLeaseSeconds * 1000)}, ${now})`;
     const outcome = await sendSigned({ url: endpoint.url, secret: endpoint.secret, deliveryId, event: 'ping', body: bodyOf(deliveryId, payload), now, timeoutMs: rt.limits.webhookSendTimeoutMs, allowlist: rt.hostAllowlist, deps });
-    await settleAttempt(prisma, { id: deliveryId, endpointId: data.id, workspaceId: actor.workspaceId, attempts: 0 }, outcome, now, null);
+    await settleAttempt(prisma, { id: deliveryId, endpointId: data.id, workspaceId: actor.workspaceId, attempts: 0 }, outcome, now, null, rt.limits.webhookErrorMaxCharacters);
     await prisma.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, 'webhook.tested', ${JSON.stringify({ webhookId: data.id, delivered: outcome.ok })}::jsonb, NOW())`;
     return { deliveryId, delivered: outcome.ok, status: outcome.status, error: outcome.error };
   })());
@@ -163,8 +171,9 @@ export async function testWebhook(actor: IntegrationsActor, input: unknown, deps
 
 /** Send a past delivery again now. Same delivery id, so receivers can de-duplicate; only settled deliveries qualify, and the claim is atomic. */
 export async function redeliverWebhook(actor: IntegrationsActor, input: unknown, deps: WebhookDeps = defaultWebhookDeps(), now = new Date()): Promise<Attempted> {
-  const data = parse(ID_CONFIRM_SCHEMA, input); exact(data.confirmation, confirmations.redeliver(data.id));
-  const rt = await runtime(); requireEnabled(rt, 'webhooks'); await authorize(actor, true);
+  const rt = await runtime(); requireEnabled(rt, 'webhooks');
+  const data = parse(ID_CONFIRM_SCHEMA, input); within(data.id.length <= rt.limits.webhookIdMaxCharacters); exact(data.confirmation, confirmations.redeliver(data.id));
+  await authorize(actor, true);
   return protect((async () => {
     const claimed = await prisma.$queryRaw<Array<{ id: string; endpointId: string; workspaceId: string; event: string; payload: unknown; attempts: number }>>`UPDATE webhook_deliveries SET status = 'pending', "nextAttemptAt" = ${new Date(now.getTime() + rt.limits.webhookLeaseSeconds * 1000)} WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} AND status IN ('delivered', 'failed') RETURNING id, "endpointId", "workspaceId", event, payload, attempts`;
     const row = claimed[0];
@@ -172,9 +181,9 @@ export async function redeliverWebhook(actor: IntegrationsActor, input: unknown,
       const exists = await prisma.$queryRaw<Array<{ id: string }>>`SELECT id FROM webhook_deliveries WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId}`;
       throw exists[0] ? new OperationError('conflict', 'This delivery is already being sent.') : notFound('delivery');
     }
-    let endpoint; try { endpoint = await loadSecret(prisma, row.endpointId, actor.workspaceId); } catch (error) { await settleAttempt(prisma, row, { ok: false, status: null, error: 'Signing secret unavailable.' }, now, null); throw error; }
+    let endpoint; try { endpoint = await loadSecret(prisma, row.endpointId, actor.workspaceId); } catch (error) { await settleAttempt(prisma, row, { ok: false, status: null, error: 'Signing secret unavailable.' }, now, null, rt.limits.webhookErrorMaxCharacters); throw error; }
     const outcome = await sendSigned({ url: endpoint.url, secret: endpoint.secret, deliveryId: row.id, event: row.event, body: bodyOf(row.id, row.payload), now, timeoutMs: rt.limits.webhookSendTimeoutMs, allowlist: rt.hostAllowlist, deps });
-    await settleAttempt(prisma, row, outcome, now, null);
+    await settleAttempt(prisma, row, outcome, now, null, rt.limits.webhookErrorMaxCharacters);
     await prisma.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, 'webhook.redelivered', ${JSON.stringify({ deliveryId: row.id, webhookId: row.endpointId, delivered: outcome.ok })}::jsonb, NOW())`;
     return { deliveryId: row.id, delivered: outcome.ok, status: outcome.status, error: outcome.error };
   })());
@@ -207,10 +216,10 @@ export async function deliverDueWebhooks(deps: WebhookDeps = defaultWebhookDeps(
     const sentAt = clock();
     const outcome = endpoint ? await sendSigned({ url: endpoint.url, secret: endpoint.secret, deliveryId: row.id, event: row.event, body: bodyOf(row.id, row.payload), now: sentAt, timeoutMs: rt.limits.webhookSendTimeoutMs, allowlist: rt.hostAllowlist, deps }) : { ok: false, status: null, error: 'Signing secret unavailable.', retryable: false };
     const wait = !outcome.ok && outcome.retryable ? rt.retryDelaysSeconds[row.attempts] ?? null : null;
-    await settleAttempt(prisma, row, outcome, sentAt, wait);
+    await settleAttempt(prisma, row, outcome, sentAt, wait, rt.limits.webhookErrorMaxCharacters);
     if (outcome.ok) result.delivered += 1; else if (wait !== null) result.retrying += 1; else result.failed += 1;
   }
   const cutoff = new Date(now.getTime() - rt.limits.webhookRetentionDays * 86_400_000);
-  result.purged = Number(await prisma.$executeRaw`DELETE FROM webhook_deliveries WHERE id IN (SELECT id FROM webhook_deliveries WHERE status <> 'pending' AND "createdAt" < ${cutoff} ORDER BY "createdAt" ASC LIMIT 1000)`);
+  result.purged = Number(await prisma.$executeRaw`DELETE FROM webhook_deliveries WHERE id IN (SELECT id FROM webhook_deliveries WHERE status <> 'pending' AND "createdAt" < ${cutoff} ORDER BY "createdAt" ASC LIMIT ${rt.limits.webhookPurgeBatchSize})`);
   return result;
 }

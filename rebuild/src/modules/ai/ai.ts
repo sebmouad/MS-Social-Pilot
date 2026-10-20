@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AI_BOUNDS, AI_DEFAULTS } from './config';
 
 export const TONES = ['friendly', 'professional', 'playful', 'urgent', 'informative'] as const;
 export type Tone = (typeof TONES)[number];
@@ -7,12 +8,13 @@ export type AiKind = (typeof AI_KINDS)[number];
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const noControl = (v: string) => !CONTROL.test(v);
 
-export const AI_REQUEST_SCHEMA = z.object({
+export const aiRequestSchema = (maxInput: number, maxLanguage: number) => z.object({
   kind: z.enum(AI_KINDS),
-  text: z.string().trim().min(1).max(20000).refine(noControl, 'Control characters are not allowed.'),
+  text: z.string().trim().min(1).max(maxInput).refine(noControl, 'Control characters are not allowed.'),
   tone: z.enum(TONES).optional(),
-  language: z.string().trim().min(2).max(32).regex(/^[A-Za-z][A-Za-z -]*$/).optional(),
+  language: z.string().trim().min(2).max(maxLanguage).regex(/^[A-Za-z][A-Za-z -]*$/).optional(),
 }).strict().refine(v => v.kind !== 'translate' || v.language !== undefined, { message: 'Choose a language.' });
+export const AI_REQUEST_SCHEMA = aiRequestSchema(AI_BOUNDS.maxInputCharacters.max, AI_BOUNDS.languageMaxCharacters.max);
 export type AiRequest = z.infer<typeof AI_REQUEST_SCHEMA>;
 
 export type AiResult = { kind: AiKind; text: string; hashtags: string[] };
@@ -46,11 +48,12 @@ export function buildPrompt(request: AiRequest, maxHashtags: number, context: Ai
 }
 
 /** Recap input for report sections. `facts` is compact figure text; only it reaches the model. */
-export const SUMMARIZE_SCHEMA = z.object({
-  facts: z.string().trim().min(1).max(20000).refine(noControl, 'Control characters are not allowed.'),
-  subject: z.string().trim().max(200).refine(noControl, 'Control characters are not allowed.').optional(),
-  language: z.string().trim().min(2).max(32).regex(/^[A-Za-z][A-Za-z -]*$/).default('English'),
+export const summarizeSchema = (maxFacts: number, maxSubject: number, maxLanguage: number = AI_BOUNDS.languageMaxCharacters.max) => z.object({
+  facts: z.string().trim().min(1).max(maxFacts).refine(noControl, 'Control characters are not allowed.'),
+  subject: z.string().trim().max(maxSubject).refine(noControl, 'Control characters are not allowed.').optional(),
+  language: z.string().trim().min(2).max(maxLanguage).regex(/^[A-Za-z][A-Za-z -]*$/).default('English'),
 }).strict();
+export const SUMMARIZE_SCHEMA = summarizeSchema(AI_BOUNDS.maxInputCharacters.max, AI_BOUNDS.summarySubjectMaxCharacters.max);
 export type SummarizeRequest = z.input<typeof SUMMARIZE_SCHEMA>;
 export function buildSummaryPrompt(request: z.output<typeof SUMMARIZE_SCHEMA>): { system: string; prompt: string } {
   const system = [
@@ -62,9 +65,10 @@ export function buildSummaryPrompt(request: z.output<typeof SUMMARIZE_SCHEMA>): 
   return { system, prompt: `${subject}<material>\n${request.facts.replace(/<\/?material>/gi, '')}\n</material>` };
 }
 
-export function parseHashtags(text: string, max: number): string[] {
+export function parseHashtags(text: string, max: number, maxCharacters: number = AI_DEFAULTS.hashtagBodyMaxCharacters): string[] {
   const seen = new Set<string>(); const out: string[] = [];
-  for (const m of text.matchAll(/#[\p{L}\p{N}_]{1,60}/gu)) {
+  const hashtag = new RegExp(`#(?:[\\p{L}\\p{N}_]{1,${Math.max(1, maxCharacters)}})`, 'gu');
+  for (const m of text.matchAll(hashtag)) {
     const tag = m[0]; const key = tag.toLowerCase();
     if (!seen.has(key)) { seen.add(key); out.push(tag); }
     if (out.length >= max) break;

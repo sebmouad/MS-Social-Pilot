@@ -33,7 +33,7 @@ vi.mock('@/server/client-ip', () => ({ clientIp: () => '203.0.113.9' }));
 
 import { INTEGRATIONS_CONFIG } from '../src/modules/integrations/config';
 const DEFAULTS: Record<string, unknown> = Object.fromEntries(INTEGRATIONS_CONFIG.map(item => [item.key, item.defaultValue]));
-import { cleanClientName, isAllowedRedirect, pkceMatches, redirectRegistered, registrationSchema, s256, safeEqual, sameOrigin } from '../src/modules/integrations/oauth/protocol';
+import { authorizeParamsSchema, authorizeParamsSchemaForLimits, cleanClientName, isAllowedRedirect, pkceMatches, redirectRegistered, registrationSchema, registrationSchemaForLimits, s256, safeEqual, sameOrigin } from '../src/modules/integrations/oauth/protocol';
 import { createAuthorizationCode, exchangeCode, findClient, registerClient } from '../src/modules/integrations/oauth/server';
 import { POST as consentPost } from '../src/app/api/oauth/authorize/route';
 import { POST as tokenPost } from '../src/app/api/oauth/token/route';
@@ -134,9 +134,18 @@ describe('protocol rules', () => {
     expect(sameOrigin(h({ origin: ISSUER, 'sec-fetch-site': 'cross-site' }), `${ISSUER}/x`, ISSUER)).toBe(false);
   });
   it('strips control and bidirectional characters from client names', () => {
-    expect(cleanClientName('Cl‮aude\u0000\n  Pro')).toBe('Claude Pro');
-    expect(cleanClientName('   ')).toBe('MCP client');
-    expect(cleanClientName('x'.repeat(200))).toHaveLength(60);
+    expect(cleanClientName('Cl‮aude\u0000\n  Pro', 60, 'MCP client')).toBe('Claude Pro');
+    expect(cleanClientName('   ', 60, 'MCP client')).toBe('MCP client');
+    expect(cleanClientName('x'.repeat(200), 60, 'MCP client')).toHaveLength(60);
+  });
+  it('keeps compatibility parser defaults and exposes Root-limit schema factories', () => {
+    const registration = { client_name: 'x'.repeat(201), redirect_uris: [REDIRECT] };
+    expect(registrationSchema.safeParse(registration).success).toBe(false);
+    expect(registrationSchemaForLimits({ clientNameInputMaxCharacters: 300, redirectUriMaxCharacters: 3000, redirectUrisMaxItems: 12 }).safeParse(registration).success).toBe(true);
+    const params = { client_id: CLIENT, redirect_uri: REDIRECT, response_type: 'code', code_challenge: CHALLENGE, code_challenge_method: 'S256', state: 's'.repeat(1001), scope: 's'.repeat(201) };
+    expect(authorizeParamsSchema.safeParse(params).success).toBe(false);
+    expect(authorizeParamsSchemaForLimits({ redirectUriMaxCharacters: 3000, authorizationStateMaxCharacters: 1500, scopeMaxCharacters: 300 }).safeParse(params).success).toBe(true);
+    expect(isAllowedRedirect(`${REDIRECT}${'x'.repeat(2000)}`)).toBe(false);
   });
 });
 
@@ -178,6 +187,36 @@ describe('dynamic client registration', () => {
     expect(body).not.toHaveProperty('client_secret');
     expect(executed('INSERT INTO mcp_oauth_clients')).toHaveLength(1);
     expect(executed('root_activities').some(q => q.values.includes('oauth.client_registered'))).toBe(true);
+  });
+  it('accepts the historical 200-character name input and keeps the separate 60-character display cap', async () => {
+    enable();
+    const response = await post({ client_name: 'C'.repeat(100), redirect_uris: [REDIRECT] });
+    expect(response.status).toBe(201);
+    expect((await response.json()).client_name).toBe('C'.repeat(60));
+    expect(executed('INSERT INTO mcp_oauth_clients').at(-1)?.values[1]).toBe('C'.repeat(60));
+  });
+  it('uses Root copy for empty client names and the key-name prefix', async () => {
+    enable(); state.config['integrations.oauth.defaultClientName'] = 'Unnamed app';
+    const response = await post({ client_name: '   ', redirect_uris: [REDIRECT] });
+    expect(response.status).toBe(201);
+    expect((await response.json()).client_name).toBe('Unnamed app');
+  });
+  it('enforces current Root client name, redirect count and redirect size limits', async () => {
+    enable();
+    state.config['integrations.oauth.clientNameInputMaxCharacters'] = 3;
+    expect((await post({ client_name: 'Claude', redirect_uris: [REDIRECT] })).status).toBe(400);
+    state.config['integrations.oauth.clientNameInputMaxCharacters'] = 200;
+    state.config['integrations.oauth.clientNameMaxCharacters'] = 3;
+    expect((await post({ client_name: 'Claude', redirect_uris: [REDIRECT] })).status).toBe(201);
+    expect(executed('INSERT INTO mcp_oauth_clients').at(-1)?.values[1]).toBe('Cla');
+    state.config['integrations.oauth.clientNameMaxCharacters'] = 60;
+    state.executions.length = 0;
+    state.config['integrations.oauth.redirectUrisMaxItems'] = 1;
+    expect((await post({ redirect_uris: [REDIRECT, 'https://other.test/cb'] })).status).toBe(400);
+    state.config['integrations.oauth.redirectUrisMaxItems'] = 10;
+    state.config['integrations.oauth.redirectUriMaxCharacters'] = 10;
+    expect((await post({ redirect_uris: [REDIRECT] })).status).toBe(400);
+    expect(executed('INSERT INTO mcp_oauth_clients')).toHaveLength(0);
   });
   it('rejects unsafe redirect URIs, bad JSON and oversized bodies without storing anything', async () => {
     enable();
@@ -362,6 +401,12 @@ describe('token endpoint', () => {
     expect((await response.json()).error).toBe('invalid_grant');
     expect(state.issued).toHaveLength(0);
   });
+  it('uses the current Root issued-key name ceiling', async () => {
+    enable(); state.config['integrations.oauth.issuedKeyNameMaxCharacters'] = 5; state.config['integrations.oauth.issuedKeyNamePrefix'] = 'Agent: ';
+    const response = await tokenPost(tokenRequest(goodToken(addCode())));
+    expect(response.status).toBe(200);
+    expect((state.issued[0] as { input: { name: string } }).input.name).toBe('Agent');
+  });
   it('rate limits token requests per client and address', async () => {
     enable(); state.config['integrations.oauth.tokenAttemptsPerMinute'] = 2;
     const statuses = [];
@@ -377,6 +422,14 @@ describe('direct service guards', () => {
   it('createAuthorizationCode revalidates client and redirect even if called directly', async () => {
     enable();
     await expect(createAuthorizationCode({ userId: 'u', workspaceId: 'w' }, { clientId: CLIENT, redirectUri: 'https://evil.test/cb', codeChallenge: CHALLENGE, readFeatures: ['publishing/posts'], writeFeatures: [], resourceScope: { version: 1, mode: 'all' } })).rejects.toMatchObject({ code: 'invalid_request' });
+    state.config['integrations.oauth.resourceIdMaxCharacters'] = 1;
+    await expect(createAuthorizationCode({ userId: 'u', workspaceId: 'w' }, { clientId: CLIENT, redirectUri: REDIRECT, codeChallenge: CHALLENGE, readFeatures: ['publishing/posts'], writeFeatures: [], resourceScope: { version: 1, mode: 'selected', ids: ['t1'], adAccountIds: [] } })).rejects.toMatchObject({ code: 'invalid_request' });
+    state.config['integrations.oauth.resourceIdMaxCharacters'] = 100;
+    state.config['integrations.oauth.resourceIdsMaxItems'] = 1;
+    await expect(createAuthorizationCode({ userId: 'u', workspaceId: 'w' }, { clientId: CLIENT, redirectUri: REDIRECT, codeChallenge: CHALLENGE, readFeatures: ['publishing/posts'], writeFeatures: [], resourceScope: { version: 1, mode: 'selected', ids: ['t1', 't2'], adAccountIds: [] } })).rejects.toMatchObject({ code: 'invalid_request' });
+    state.config['integrations.oauth.resourceIdsMaxItems'] = 1000;
+    state.config['integrations.oauth.redirectUriMaxCharacters'] = 10;
+    await expect(createAuthorizationCode({ userId: 'u', workspaceId: 'w' }, { clientId: CLIENT, redirectUri: REDIRECT, codeChallenge: CHALLENGE, readFeatures: ['publishing/posts'], writeFeatures: [], resourceScope: { version: 1, mode: 'all' } })).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(createAuthorizationCode({ userId: 'u', workspaceId: 'w' }, { clientId: CLIENT, redirectUri: REDIRECT, codeChallenge: CHALLENGE, readFeatures: ['root/overview'], writeFeatures: [], resourceScope: { version: 1, mode: 'all' } })).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(findClient('not-a-client')).resolves.toBeNull();
     await expect(registerClient({ redirect_uris: ['http://evil.test'] }, null)).rejects.toMatchObject({ code: 'invalid_client_metadata' });

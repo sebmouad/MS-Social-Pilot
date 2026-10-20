@@ -12,6 +12,10 @@ const exactOrigin = (value: string) => {
 };
 
 export const MAIL_CONFIG = [
+  entry({ key: 'mail.recipientMaxCharacters', group: 'Shared · Transactional mail', label: 'Recipient address character limit', kind: 'number', description: 'Maximum recipient address characters accepted by shared transactional mail.', defaultValue: 320, schema: z.number().int().min(1).max(320), consumption: 'active' }),
+  entry({ key: 'mail.workspaceIdMaxCharacters', group: 'Shared · Transactional mail', label: 'Mail workspace identifier limit', kind: 'number', description: 'Maximum workspace identifier characters recorded with a mail delivery.', defaultValue: 128, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'mail.templateMaxCharacters', group: 'Shared · Transactional mail', label: 'Mail template identifier limit', kind: 'number', description: 'Maximum template identifier characters accepted by shared transactional mail.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'mail.providerIdMaxCharacters', group: 'Shared · Transactional mail', label: 'Mail provider receipt limit', kind: 'number', description: 'Maximum message identifier characters retained from a mail transport receipt.', defaultValue: 255, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'mail.enabled', group: 'Shared · Transactional mail', label: 'Transactional email enabled', kind: 'boolean', description: 'Allow account and workspace transactional messages through the configured SMTP service.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'mail.publicOrigin', group: 'Shared · Transactional mail', label: 'Public application origin', kind: 'text', description: 'Exact public HTTPS origin used in transactional email links. Localhost HTTP is allowed for development.', defaultValue: '', schema: z.string().max(300).refine(exactOrigin, 'Use an exact HTTPS origin or localhost HTTP origin.'), consumption: 'active' }),
   entry({ key: 'mail.smtpHost', group: 'Shared · Transactional mail', label: 'SMTP host', kind: 'text', description: 'SMTP hostname or IP address, without a URL or port.', defaultValue: '', schema: hostSchema, consumption: 'active' }),
@@ -29,6 +33,11 @@ export const MAIL_CONFIG = [
 ] as const;
 
 export const MAIL_TRANSPORT_SCHEMA = z.object({
+  recipientMaxCharacters: z.number().int().min(1).max(320),
+  workspaceIdMaxCharacters: z.number().int().min(1).max(1000),
+  templateMaxCharacters: z.number().int().min(1).max(1000),
+  providerIdMaxCharacters: z.number().int().min(1).max(1000),
+
   enabled: z.boolean(), publicOrigin: z.string(), smtpHost: hostSchema, smtpPort: z.number().int().min(1).max(65535),
   smtpSecure: z.boolean(), smtpRequireTls: z.boolean(), smtpUsername: z.string().max(320), smtpPassword: z.string().max(4096),
   fromAddress: z.string().max(320), fromName: z.string().trim().min(1).max(120), connectionTimeoutMs: z.number().int().min(1000).max(60000),

@@ -1,12 +1,13 @@
 import { OperationError } from '@/lib/operation-error';
 import type { McpToolGroup } from '@/server/mcp/kit';
 import { AI_KINDS, TONES } from './ai';
+import { AI_BOUNDS } from './config';
 import { aiStatus, runAssist, COMPOSER_FEATURE, type AiDeps } from './server/ai';
 import type { AiActor } from './server/access';
 
 export const aiToolDefinitions = [
   { name: 'get_ai_assist_status', description: 'Report whether AI writing assist is available to this member in the current workspace, with supported kinds, tones and input limit. Unavailable when it is not configured by the installation operator or is switched off for the workspace.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'ai_assist_write', description: 'Generate suggested post text (caption, improve, translate or hashtags). Returns text for review only: it saves, schedules and publishes nothing, so the member must use the text deliberately. Counted against the workspace hourly AI limit.', inputSchema: { type: 'object', required: ['kind', 'text'], properties: { kind: { enum: [...AI_KINDS] }, text: { type: 'string', minLength: 1, maxLength: 20000 }, tone: { enum: [...TONES] }, language: { type: 'string', maxLength: 32, description: 'Required for translate, for example French.' } }, additionalProperties: false } },
+  { name: 'ai_assist_write', description: 'Generate suggested post text (caption, improve, translate or hashtags). Returns text for review only: it saves, schedules and publishes nothing, so the member must use the text deliberately. Counted against the workspace hourly AI limit.', inputSchema: { type: 'object', required: ['kind', 'text'], properties: { kind: { enum: [...AI_KINDS] }, text: { type: 'string', minLength: 1, maxLength: AI_BOUNDS.maxInputCharacters.max }, tone: { enum: [...TONES] }, language: { type: 'string', maxLength: AI_BOUNDS.languageMaxCharacters.max, description: 'Required for translate, for example French.' } }, additionalProperties: false } },
 ] as const;
 export const aiTools = new Set<string>(aiToolDefinitions.map(tool => tool.name));
 export const aiWriteTools = new Set<string>(['ai_assist_write']);

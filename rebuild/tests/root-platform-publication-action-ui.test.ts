@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh }) }));
 import { RootPlatformPublicationAction } from '../src/server/root/RootPlatformPublicationAction';
+import { ROOT_EVIDENCE_POLICY } from '../src/lib/config/root-evidence-policy';
+import { ROOT_EVIDENCE_COPY } from '../src/lib/config/root-evidence-copy';
 
 const action = { rowId: 'row_1', actionId: 'module_action', subjectId: 'row_1', label: 'Resolve receipt', description: 'Review this stored receipt.', acknowledgmentLabel: 'I checked this receipt', confirmation: 'RESOLVE row_1' };
 const actionWithFields = { ...action, fields: [
@@ -42,7 +44,7 @@ afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlo
 describe('Root platform publication action dialog', () => {
   it('uses shared neutral buttons for module-declared inspections', async () => {
     await act(async () => root.render(createElement(RootPlatformPublicationAction, {
-      providerId: 'example', action: { ...action, intent: 'inspect' },
+      providerId: 'example', action: { ...action, intent: 'inspect' }, policy: ROOT_EVIDENCE_POLICY, copy: ROOT_EVIDENCE_COPY,
     })));
     const opener = container.querySelector('button')!;
     expect(opener.className).toContain('ui-button--secondary');
@@ -52,10 +54,18 @@ describe('Root platform publication action dialog', () => {
     expect(buttons.find(button => button.textContent?.includes(action.label))?.className).toContain('ui-button--secondary');
   });
 
+  it('uses the live Root policy to lower client field-value ceilings', async () => {
+    const policy = { ...ROOT_EVIDENCE_POLICY, fieldValueCharacters: 3, identifierCharacters: 5, messageCharacters: 4 };
+    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action: actionWithFields, policy, copy: ROOT_EVIDENCE_COPY })); });
+    await act(async () => container.querySelector('button')!.click());
+    const text = container.querySelector('input[type=text]') as HTMLInputElement;
+    expect(text.maxLength).toBe(3);
+  });
+
   it('opens with cancel focused, requires exact text and acknowledgement, and preserves fields after an uncertain receipt', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: false, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_1', state: 'needs_review', message: 'Review the current receipt.' }) });
     vi.stubGlobal('fetch', fetchMock);
-    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action })); });
+    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action, policy: ROOT_EVIDENCE_POLICY, copy: ROOT_EVIDENCE_COPY })); });
     const opener = container.querySelector('button')!;
     await act(async () => opener.click()); await flush();
     const cancel = container.querySelector('[data-dialog-cancel]') as HTMLButtonElement;
@@ -84,7 +94,7 @@ describe('Root platform publication action dialog', () => {
   it('shows resolved module context before confirmation and keeps it out of the action request', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: true, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_context', state: 'confirmed', message: 'Receipt recorded.' }) });
     vi.stubGlobal('fetch', fetchMock);
-    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action: actionWithContext })); });
+    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action: actionWithContext, policy: ROOT_EVIDENCE_POLICY, copy: ROOT_EVIDENCE_COPY })); });
     await act(async () => container.querySelector('button')!.click()); await flush();
     const context = container.querySelector('dl[aria-label="Resolved action context"]')!;
     expect(context.textContent).toContain('Example workspace');
@@ -104,7 +114,7 @@ describe('Root platform publication action dialog', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: false, status: 404, json: async () => { throw new Error('not JSON'); } });
     vi.stubGlobal('fetch', fetchMock);
-    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action })); });
+    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action, policy: ROOT_EVIDENCE_POLICY, copy: ROOT_EVIDENCE_COPY })); });
     const clickOpen = async () => { await act(async () => container.querySelector('button')!.click()); await flush(); };
     const fillAndSubmit = async () => {
       const confirmation = container.querySelector('.ui-input') as HTMLInputElement;
@@ -130,7 +140,7 @@ describe('Root platform publication action dialog', () => {
       .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ code: 'invalid_request', error: 'Check the exact confirmation and try again.' }) })
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ ok: true, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_3', state: 'confirmed', message: 'Receipt recorded.' }) });
     vi.stubGlobal('fetch', fetchMock);
-    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action })); });
+    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action, policy: ROOT_EVIDENCE_POLICY, copy: ROOT_EVIDENCE_COPY })); });
     const clickOpen = async () => { await act(async () => container.querySelector('button')!.click()); await flush(); };
     const fillAndSubmit = async () => {
       const confirmation = container.querySelector('.ui-input') as HTMLInputElement;
@@ -152,7 +162,7 @@ describe('Root platform publication action dialog', () => {
   it('renders module fields, focuses missing required input, and retains matching values after an uncertain result', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: false, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_4', state: 'needs_review', message: 'Review current evidence.' }) });
     vi.stubGlobal('fetch', fetchMock);
-    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action: actionWithFields })); });
+    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action: actionWithFields, policy: ROOT_EVIDENCE_POLICY, copy: ROOT_EVIDENCE_COPY })); });
     await act(async () => container.querySelector('button')!.click()); await flush();
     const confirmation = container.querySelector('input[aria-label="Exact confirmation"]') as HTMLInputElement;
     const riskAcknowledgment = [...container.querySelectorAll('input[type="checkbox"]')].find(input => !input.id.includes('verified')) as HTMLInputElement;
@@ -182,7 +192,7 @@ describe('Root platform publication action dialog', () => {
   it('forwards close-and-review feedback through the table callback', async () => {
     const onReceipt = vi.fn();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => { throw new Error('not JSON'); } }));
-    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action, onReceipt })); });
+    await act(async () => { root.render(createElement(RootPlatformPublicationAction, { providerId: 'installed_module', action, policy: ROOT_EVIDENCE_POLICY, copy: ROOT_EVIDENCE_COPY, onReceipt })); });
     await act(async () => container.querySelector('button')!.click()); await flush();
     await act(async () => setTextValue(container.querySelector('input[aria-label="Exact confirmation"]') as HTMLInputElement, action.confirmation));
     await act(async () => check(container.querySelector('input[type="checkbox"]') as HTMLInputElement));

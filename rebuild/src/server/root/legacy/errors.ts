@@ -1,3 +1,4 @@
+import { synchronousPolicy, withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { runtimeConfig } from '@/server/config/store';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
@@ -8,7 +9,7 @@ import { rootResultLimit, legacySetting, rootTransaction } from './policy';
 
 type ErrorRow = { id: string; source: string; name: string; message: string; stack?: string | null; location: string | null; release: string; count: number; firstSeenAt: Date; lastSeenAt: Date; resolvedAt: Date | null; total?: number };
 
-const filterSchema = z.object({ status: z.enum(['open', 'resolved', 'all']).optional(), source: z.enum(['server', 'worker', 'browser']).optional(), q: z.string().trim().max(2000).optional(), page: z.coerce.number().int().min(1).max(100000).optional() }).strict();
+const filterSchema = z.object({ status: z.enum(['open', 'resolved', 'all']).optional(), source: z.enum(['server', 'worker', 'browser']).optional(), q: z.string().trim().optional(), page: z.coerce.number().int().min(1).refine(value => value <= synchronousPolicy('root.pageMaxNumber')).optional() }).strict();
 const like = (value: string) => `%${value.replace(/[\\%_]/g, match => `\\${match}`)}%`;
 const unavailable = () => new OperationError('unavailable', 'The error log is not available in this database.');
 
@@ -47,7 +48,7 @@ export async function listRootErrors(actorId: string, input: unknown = {}, resul
 
 export async function getRootError(actorId: string, id: string) {
   await assertRootActor(prisma, actorId);
-  if (!id || id.length > 200) throw invalid('Choose an error.');
+  if (!id || id.length > synchronousPolicy('root.identifierMaxCharacters')) throw invalid('Choose an error.');
   try {
     const row = (await prisma.$queryRaw<ErrorRow[]>`SELECT id, source, name, message, stack, location, release, count, "firstSeenAt", "lastSeenAt", "resolvedAt" FROM error_events WHERE id = ${id}`)[0];
     if (!row) throw new OperationError('not_found', 'Error not found.');
@@ -60,7 +61,7 @@ export async function getRootError(actorId: string, id: string) {
 
 /** Mark an error group resolved or reopen it. Reversible bookkeeping, so no typed confirmation; audited atomically. A new occurrence reopens it by itself. */
 export async function setRootErrorResolved(actorId: string, id: string, resolved: boolean) {
-  if (!id || id.length > 200 || typeof resolved !== 'boolean') throw invalid('Choose an error.');
+  if (!id || id.length > synchronousPolicy('root.identifierMaxCharacters') || typeof resolved !== 'boolean') throw invalid('Choose an error.');
   try {
     return await rootTransaction(async tx => {
       await lockRootActor(tx, actorId);

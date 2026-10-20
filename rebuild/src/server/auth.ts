@@ -5,6 +5,7 @@
  * supply records read from the legacy database; these helpers never create,
  * update, migrate, or delete users or sessions.
  */
+import { synchronousPolicy } from './synchronous-policy';
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 export const LEGACY_SESSION_COOKIE = 'msp_session';
@@ -13,8 +14,6 @@ export const LEGACY_SESSION_COOKIE = 'msp_session';
 const LEGACY_SCRYPT_COST = 16_384;
 const LEGACY_SCRYPT_KEY_BYTES = 64;
 const LEGACY_SCRYPT_SALT_BYTES = 16;
-// Legacy validation accepts at most 200 Unicode characters.
-const MAX_PASSWORD_BYTES = 800;
 const LEGACY_SESSION_TOKEN_BYTES = 32;
 
 export interface LegacyUserAuthRecord {
@@ -35,7 +34,9 @@ export interface LegacySessionAuthRecord {
 
 /** Validate and verify the legacy `scrypt:<N>:<salt>:<hash>` format. */
 export function verifyLegacyPassword(password: string, encoded: string): boolean {
-  if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES) return false;
+  // A lower new-password policy must not invalidate already accepted legacy passwords.
+  const maxBytes = Math.max(synchronousPolicy('auth.passwordMaxBytes'), synchronousPolicy('auth.passwordVerificationMaxBytes'));
+  if (Buffer.byteLength(password, 'utf8') > maxBytes) return false;
   const parts = encoded.split(':');
   if (parts.length !== 4 || parts[0] !== 'scrypt' || parts[1] !== String(LEGACY_SCRYPT_COST)) return false;
 
@@ -53,7 +54,7 @@ export function verifyLegacyPassword(password: string, encoded: string): boolean
 
 /** Create a password hash using the format accepted by the legacy sign-in flow. */
 export function hashLegacyPassword(password: string): string {
-  if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES) throw new Error('Password is too long.');
+  if (Buffer.byteLength(password, 'utf8') > synchronousPolicy('auth.passwordMaxBytes')) throw new Error('Password is too long.');
   const salt = randomBytes(LEGACY_SCRYPT_SALT_BYTES);
   const digest = scryptSync(password, salt, LEGACY_SCRYPT_KEY_BYTES, { N: LEGACY_SCRYPT_COST });
   return `scrypt:${LEGACY_SCRYPT_COST}:${salt.toString('base64url')}:${digest.toString('base64url')}`;

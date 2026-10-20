@@ -1,3 +1,4 @@
+import { synchronousPolicy } from './synchronous-policy';
 import { randomBytes } from 'node:crypto';
 import type { Prisma } from '../../generated/client';
 import { runtimeConfig } from '@/server/config/store';
@@ -15,7 +16,7 @@ export async function accountPasswordPolicy(): Promise<AccountPasswordPolicy> {
 export function validateProfileName(value: unknown) {
   if (typeof value !== 'string') return null;
   const name = value.trim();
-  return name.length >= 1 && name.length <= 100 ? name : null;
+  return name.length >= 1 && name.length <= synchronousPolicy('settings.accountNameMaxLength') ? name : null;
 }
 
 export function validateNewPassword(value: unknown, policy: AccountPasswordPolicy) {

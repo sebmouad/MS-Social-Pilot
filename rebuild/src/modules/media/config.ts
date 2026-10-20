@@ -5,12 +5,16 @@ export const MEDIA_DEFAULTS = {
   pageSize: 48, workspaceQuotaBytes: 5368709120, videoMaxBytes: 536870912, importMaxBytes: 536870912,
   importTimeoutMs: 30000, importMaxRedirects: 3, importAllowHttp: false, importHostAllowlist: [] as string[],
   allowedVideoMimeTypes: ['video/mp4', 'video/quicktime', 'video/webm'], holderScanLimit: 500, holderListLimit: 10,
+  imageListLimit: 1000, holderExcerptCharacters: 80, identifierMaxCharacters: 80, pageNumberMax: 1000,
+  importUrlMaxCharacters: 2048, assetNameMaxCharacters: 180,
   maxSearchCharacters: 120, transactionTimeoutMs: 20000, transactionMaxWaitMs: 5000,
 } as const;
 export const MEDIA_BOUNDS = {
   pageSize: { min: 5, max: 200 }, workspaceQuotaBytes: { min: 1048576, max: 1099511627776 }, videoMaxBytes: { min: 1048576, max: 2147483647 },
   importMaxBytes: { min: 1048576, max: 2147483647 }, importTimeoutMs: { min: 1000, max: 300000 }, importMaxRedirects: { min: 0, max: 10 },
   holderScanLimit: { min: 10, max: 5000 }, holderListLimit: { min: 1, max: 50 }, maxSearchCharacters: { min: 10, max: 500 },
+  imageListLimit: { min: 100, max: 10000 }, holderExcerptCharacters: { min: 20, max: 500 },
+  identifierMaxCharacters: { min: 1, max: 256 }, pageNumberMax: { min: 100, max: 1000000 }, importUrlMaxCharacters: { min: 1, max: 8192 }, assetNameMaxCharacters: { min: 1, max: 1000 },
   transactionTimeoutMs: { min: 1000, max: 60000 }, transactionMaxWaitMs: { min: 100, max: 10000 }, workspaceTimeoutMs: { min: 5000, max: 3600000 },
 } as const;
 export const VIDEO_MIME_CHOICES = ['video/mp4', 'video/quicktime', 'video/webm'] as const;
@@ -29,6 +33,12 @@ export const MEDIA_CONFIG = [
   entry({ key: 'media.importHostAllowlist', group: G, label: 'Import host allowlist', kind: 'json', description: 'Domains imports may use (subdomains included). Empty allows any public host; private networks are always refused.', defaultValue: [...MEDIA_DEFAULTS.importHostAllowlist], schema: z.array(z.string().trim().min(1).max(253).regex(/^[A-Za-z0-9*.-]+$/)).max(100), consumption: 'active' }),
   entry({ key: 'media.holderScanLimit', group: G, label: 'Usage scan limit', kind: 'number', description: 'Maximum posts examined per request when attributing assets to the posts that use them.', defaultValue: MEDIA_DEFAULTS.holderScanLimit, schema: int(MEDIA_BOUNDS.holderScanLimit), consumption: 'active' }),
   entry({ key: 'media.holderListLimit', group: G, label: 'Posts listed per asset', kind: 'number', description: 'Posts named in an asset usage list.', defaultValue: MEDIA_DEFAULTS.holderListLimit, schema: int(MEDIA_BOUNDS.holderListLimit), consumption: 'active' }),
+  entry({ key: 'media.imageListLimit', group: G, label: 'Stored images scanned', kind: 'number', description: 'Maximum stored images read when combining image files with the media library.', defaultValue: MEDIA_DEFAULTS.imageListLimit, schema: int(MEDIA_BOUNDS.imageListLimit), consumption: 'active' }),
+  entry({ key: 'media.holderExcerptCharacters', group: G, label: 'Post usage excerpt length', kind: 'number', description: 'Characters of post text retained for each media usage reference.', defaultValue: MEDIA_DEFAULTS.holderExcerptCharacters, schema: int(MEDIA_BOUNDS.holderExcerptCharacters), consumption: 'active' }),
+  entry({ key: 'media.identifierMaxCharacters', group: G, label: 'Asset identifier length', kind: 'number', description: 'Maximum characters accepted for a library asset identifier.', defaultValue: MEDIA_DEFAULTS.identifierMaxCharacters, schema: int(MEDIA_BOUNDS.identifierMaxCharacters), consumption: 'active' }),
+  entry({ key: 'media.pageNumberMax', group: G, label: 'Library page number ceiling', kind: 'number', description: 'Largest accepted page number in a media library request.', defaultValue: MEDIA_DEFAULTS.pageNumberMax, schema: int(MEDIA_BOUNDS.pageNumberMax), consumption: 'active' }),
+  entry({ key: 'media.importUrlMaxCharacters', group: G, label: 'Import address length', kind: 'number', description: 'Maximum characters accepted for a media import address.', defaultValue: MEDIA_DEFAULTS.importUrlMaxCharacters, schema: int(MEDIA_BOUNDS.importUrlMaxCharacters), consumption: 'active' }),
+  entry({ key: 'media.assetNameMaxCharacters', group: G, label: 'Asset name length', kind: 'number', description: 'Maximum characters retained in an imported media name.', defaultValue: MEDIA_DEFAULTS.assetNameMaxCharacters, schema: int(MEDIA_BOUNDS.assetNameMaxCharacters), consumption: 'active' }),
   entry({ key: 'media.searchMaxCharacters', group: G, label: 'Library search limit', kind: 'number', description: 'Maximum characters in a library search.', defaultValue: MEDIA_DEFAULTS.maxSearchCharacters, schema: int(MEDIA_BOUNDS.maxSearchCharacters), consumption: 'active' }),
   entry({ key: 'media.transactionTimeoutMs', group: G, label: 'Library transaction timeout (ms)', kind: 'number', description: 'Maximum duration of one library write.', defaultValue: MEDIA_DEFAULTS.transactionTimeoutMs, schema: int(MEDIA_BOUNDS.transactionTimeoutMs), consumption: 'active' }),
   entry({ key: 'media.transactionMaxWaitMs', group: G, label: 'Library transaction wait (ms)', kind: 'number', description: 'Maximum wait for a library write slot.', defaultValue: MEDIA_DEFAULTS.transactionMaxWaitMs, schema: int(MEDIA_BOUNDS.transactionMaxWaitMs), consumption: 'active' }),

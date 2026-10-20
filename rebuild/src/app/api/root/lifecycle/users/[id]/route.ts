@@ -1,10 +1,11 @@
+import { withinSynchronousLimit } from '@/lib/config/synchronous-policy';
 import { z } from 'zod';
 import { setLifecycleUserAccess } from '@/server/root/legacy/lifecycle';
 import { readBody, rootRoute } from '@/server/root/legacy/http';
 import { deleteRootUser } from '@/server/root/user-controls';
 
 export const runtime = 'nodejs';
-const schema = z.object({ disabled: z.boolean(), confirmation: z.string().min(1).max(400) }).strict();
+const schema = z.object({ disabled: z.boolean(), confirmation: z.string().min(1).refine(withinSynchronousLimit('root.confirmationMaxCharacters')) }).strict();
 
 export const PATCH = rootRoute<{ params: Promise<{ id: string }> }>({ write: true }, async (request, actorId, { params }) => {
   const { id } = await params;
@@ -12,7 +13,7 @@ export const PATCH = rootRoute<{ params: Promise<{ id: string }> }>({ write: tru
   return setLifecycleUserAccess(actorId, id, input.disabled, input.confirmation);
 });
 
-const deleteSchema = z.object({ confirmation: z.string().min(1).max(400) }).strict();
+const deleteSchema = z.object({ confirmation: z.string().min(1).refine(withinSynchronousLimit('root.confirmationMaxCharacters')) }).strict();
 /** Permanent deletion of a disabled account; see deleteRootUser. */
 export const DELETE = rootRoute<{ params: Promise<{ id: string }> }>({ write: true }, async (request, actorId, { params }) => {
   const { id } = await params;
