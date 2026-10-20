@@ -640,6 +640,17 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
   const native = policy?.native;
   const nativeFormat = (id: unknown): FacebookNativeFormatId | null =>
     native && (id === 'video' || id === 'reel' || id === 'story_photo' || id === 'story_video') ? id : null;
+  /**
+   * A video/Reel is commented on and deleted through the same Graph edges as a feed post, so the format only gates what
+   * is refused: Stories have no such operation and an unknown id never falls back to feed. A native comment needs the
+   * private switch; deletion of a video/Reel stays possible with it off so existing content can still be removed.
+   */
+  const assertFormatSupportsOperation = (formatId: unknown, operation: 'first comment' | 'deletion'): void => {
+    if (formatId === undefined || formatId === FACEBOOK_FEED_FORMAT_ID) return;
+    if (formatId === 'story_photo' || formatId === 'story_video') throw new FacebookApiError(`This publishing format does not support ${operation}.`, 0);
+    if ((formatId === 'video' || formatId === 'reel') && (operation === 'deletion' || nativeFormat(formatId))) return;
+    throw new FacebookApiError('The selected publishing format is unavailable.', 0);
+  };
   const engine = createFacebookEngine(config, fetchImpl);
   const requiredPostReadScopes = policy?.postReadScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
   const requiredPostPublishScopes = policy?.postPublishScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
@@ -702,6 +713,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       return createFacebookPublisher(config, fetchImpl, policy?.mediaJournalFactory)(request);
     },
     async publishFirstComment(request) {
+      assertFormatSupportsOperation(request.formatId, 'first comment');
       if (!canUseCredential(request.credential, 'firstComment')) throw new FacebookApiError('Facebook Page first-comment permission is missing or unavailable.', 0);
       return createFacebookFirstCommentPublisher(config, fetchImpl)(request);
     },
@@ -717,6 +729,8 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       return createFacebookEngine(config, fetchImpl, request.signal).getStatus(request.credential.accessToken, request.remoteId, { targetId: request.target.id, contentKind: nativeId ? (nativeId === 'story_photo' ? 'image' : 'video') : request.contentKind, ...(nativeId ? { nativeFormat: nativeId } : {}) });
     },
     async deleteRemote(request) {
+      assertFormatSupportsOperation(request.formatId, 'deletion');
+      if (typeof request.remoteId !== 'string' || !/^[A-Za-z0-9_:-]{1,128}$/.test(request.remoteId)) throw new FacebookApiError('A Facebook post id is required for deletion.', 0);
       if (!canUseCredential(request.credential, 'remoteDelete')) throw new FacebookApiError('Facebook Page post deletion permission is missing or unavailable.', 0);
       await createFacebookEngine(config, fetchImpl, request.signal).deletePost(request.credential.accessToken, request.remoteId);
     },

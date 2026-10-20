@@ -172,3 +172,12 @@ widens the proof ledger accordingly and is not applied anywhere. The endpoint an
 fields are unverified against live Graph (mocked tests only). Stories declare no
 first comment or deletion. Reels now declare first comment and deletion through the
 format-blind shared paths; live behavior is unverified. See FACEBOOK_NATIVE_FORMATS.md.
+
+
+## Batch98 deletion and comment gating
+
+The adapter now refuses Story and unknown format ids for first comments and remote
+deletion before any request, validates the remote id shape, and confirms a deletion
+only on an explicit boolean `success: true`. Native video/Reel deletion remains
+allowed with the private switch off; a native comment needs it. Shared callers must
+still pass `formatId`; see FACEBOOK_NATIVE_FORMATS.md (Batch98). Mocked fetch only.
