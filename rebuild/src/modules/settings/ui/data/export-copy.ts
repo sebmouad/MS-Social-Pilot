@@ -1,0 +1,26 @@
+export const exportCopy = {
+  en: {
+    request: 'Request workspace ZIP', title: 'Prepare a workspace export',
+    description: 'The archive is prepared in the background. It includes the current database snapshot and stored workspace media; its manifest describes coverage and exclusions.',
+    confirmation: 'Type the exact confirmation below to request the archive.', cancel: 'Cancel', pending: 'Requesting…',
+    requested: 'Export requested. You can leave this screen while it is prepared.',
+    failure: 'The request could not be confirmed. Refresh export history before trying again.',
+    loadError: 'Export history could not be loaded. Refresh to try again.',
+    loading: 'Loading export history…', refresh: 'Refresh exports', history: 'Workspace export history',
+    empty: 'No workspace exports yet.', created: 'Requested', status: 'Status', expiry: 'Expires', download: 'Download ZIP',
+    preparing: 'Available when ready', unavailable: 'Unavailable', failed: 'Preparation failed. You can request another export.',
+    statuses: { requested: 'Requested', running: 'Preparing', ready: 'Ready', failed: 'Failed', expired: 'Expired' },
+  },
+  fr: {
+    request: 'Demander une archive ZIP', title: 'Préparer une archive de l’espace',
+    description: 'L’archive est préparée en arrière-plan. Elle inclut un instantané de la base et les médias stockés ; son manifeste décrit les données incluses et les exclusions.',
+    confirmation: 'Saisissez la confirmation exacte ci-dessous pour demander l’archive.', cancel: 'Annuler', pending: 'Demande en cours…',
+    requested: 'Archive demandée. Vous pouvez quitter cet écran pendant sa préparation.',
+    failure: 'La demande n’a pas pu être confirmée. Actualisez l’historique avant de réessayer.',
+    loadError: 'Impossible de charger l’historique. Actualisez pour réessayer.',
+    loading: 'Chargement de l’historique…', refresh: 'Actualiser les archives', history: 'Historique des archives de l’espace',
+    empty: 'Aucune archive pour le moment.', created: 'Demandée le', status: 'État', expiry: 'Expire le', download: 'Télécharger le ZIP',
+    preparing: 'Disponible après préparation', unavailable: 'Indisponible', failed: 'La préparation a échoué. Vous pouvez demander une autre archive.',
+    statuses: { requested: 'Demandée', running: 'En préparation', ready: 'Disponible', failed: 'Échec', expired: 'Expirée' },
+  },
+} as const;

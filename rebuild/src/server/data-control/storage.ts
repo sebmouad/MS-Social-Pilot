@@ -118,6 +118,12 @@ export async function canonicalMediaRoot(mediaRoot: string): Promise<string> {
 export async function removeWorkspaceStorage(mediaRoot: string, workspaceId: string): Promise<WorkspaceStorageCleanup> {
   validateWorkspaceId(workspaceId);
   const root = await canonicalMediaRoot(mediaRoot);
+  const { prisma } = await import('@/server/data');
+  const cleanupRoots = await prisma.$queryRaw<Array<{ mediaRoot: string }>>`SELECT DISTINCT "mediaRoot" FROM rebuild_export_file_cleanups WHERE "workspaceId" = ${workspaceId}`;
+  const oldRoots = new Set<string>();
+  for (const item of cleanupRoots) {
+    if (await assertDirectory(item.mediaRoot)) oldRoots.add(await canonicalMediaRoot(item.mediaRoot));
+  }
   const mediaTarget = path.join(root, workspaceId);
   const exportsRoot = path.join(root, 'exports');
 
@@ -126,6 +132,15 @@ export async function removeWorkspaceStorage(mediaRoot: string, workspaceId: str
   if (await assertDirectory(exportsRoot)) {
     const exportTarget = path.join(exportsRoot, workspaceId);
     if (await assertDirectory(exportTarget)) targets.push(exportTarget);
+  }
+
+  for (const oldRoot of oldRoots) {
+    if (oldRoot === root) continue;
+    const oldExports = path.join(oldRoot, 'exports');
+    if (await assertDirectory(oldExports)) {
+      const oldTarget = path.join(oldExports, workspaceId);
+      if (await assertDirectory(oldTarget)) targets.push(oldTarget);
+    }
   }
 
   // Validate every selected tree before deleting either one, so a discovered link leaves both intact.
@@ -142,5 +157,6 @@ export async function removeWorkspaceStorage(mediaRoot: string, workspaceId: str
       if (!isMissing(error)) throw error;
     }
   }
+  await prisma.$executeRaw`DELETE FROM rebuild_export_file_cleanups WHERE "workspaceId" = ${workspaceId}`;
   return totals;
 }

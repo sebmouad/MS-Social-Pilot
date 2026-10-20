@@ -1,9 +1,11 @@
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readWorkspaceStorage, removeWorkspaceStorage } from '../src/server/data-control/storage';
 
+const db = vi.hoisted(() => ({ query: vi.fn(async () => [] as Array<{ mediaRoot: string }>), execute: vi.fn(async () => 1) }));
+vi.mock('../src/server/data', () => ({ prisma: { $queryRaw: db.query, $executeRaw: db.execute } }));
 const tempDirs: string[] = [];
 
 async function tempDir() {
@@ -13,10 +15,22 @@ async function tempDir() {
 }
 
 afterEach(async () => {
+  db.query.mockResolvedValue([]);
   await Promise.all(tempDirs.splice(0).map(directory => rm(directory, { recursive: true, force: true })));
 });
 
 describe('removeWorkspaceStorage', () => {
+  it('erases archives from an earlier configured root using the durable deletion outbox', async () => {
+    const root = await tempDir();
+    const oldRoot = await tempDir();
+    await mkdir(path.join(oldRoot, 'exports', 'workspace-a'), { recursive: true });
+    await writeFile(path.join(oldRoot, 'exports', 'workspace-a', 'archive.zip'), 'zip');
+    db.query.mockResolvedValue([{ mediaRoot: oldRoot }]);
+    await expect(removeWorkspaceStorage(root, 'workspace-a')).resolves.toEqual({ files: 1, bytes: 3 });
+    await expect(readFile(path.join(oldRoot, 'exports', 'workspace-a', 'archive.zip'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(db.execute).toHaveBeenCalled();
+  });
+
   it('reads tenant media recursively and rejects symlinks', async () => {
     const root = await tempDir();
     const tenant = path.join(root, 'workspace-a');

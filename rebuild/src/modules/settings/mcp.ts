@@ -10,10 +10,12 @@ import { auditedReceipt, canManageData, pageIdsFor, requireConfirmation, type Mc
 import { teamToolDefinitions, teamTools, executeTeamTool, invitationAvailability } from './team-mcp';
 import { workspacePolicyToolDefinitions, workspacePolicyTools, executeWorkspacePolicyTool } from './workspace-policy-mcp';
 import { notificationToolDefinitions, executeNotificationTool } from './notifications/mcp';
+import { WORKSPACE_EXPORT_MCP } from './export-mcp';
 
 
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
 export const SETTINGS_MCP: readonly McpToolGroup[] = [
+  WORKSPACE_EXPORT_MCP,
   {
     id: 'settings-team',
     tools: teamToolDefinitions,

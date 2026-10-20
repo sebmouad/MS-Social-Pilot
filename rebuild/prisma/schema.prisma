@@ -147,6 +147,7 @@ model Workspace {
   instagramAccounts InstagramAccount[]
   mcpApiKeys     McpApiKey[]
   dataPurge      WorkspaceDataPurge?
+  exports RebuildWorkspaceExport[]
 
   inboxDeletions RebuildInboxDeletion[]
   postDeletions  RebuildPostDeletion[]
@@ -649,4 +650,35 @@ model SavedView {
   createdAt   DateTime @default(now())
   @@index([workspaceId, userId, screen])
   @@map("saved_views")
+}
+
+model RebuildWorkspaceExport {
+  id String @id
+  workspaceId String
+  requestedById String
+  apiKeyId String?
+  status String @default("requested")
+  mediaRoot String
+  leaseToken String?
+  leaseUntil DateTime?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  error String?
+  bytes Int?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt], map: "rebuild_workspace_exports_due")
+  @@index([workspaceId, createdAt], map: "rebuild_workspace_exports_workspace")
+  @@map("rebuild_workspace_exports")
+}
+
+// Deletion outbox: no FK so file cleanup survives erasure and a worker restart.
+model RebuildExportFileCleanup {
+  id String @id
+  workspaceId String
+  mediaRoot String
+  nextAttemptAt DateTime @default(now())
+
+  @@index([workspaceId], map: "rebuild_export_file_cleanups_workspace")
+  @@map("rebuild_export_file_cleanups")
 }

@@ -4,12 +4,13 @@ import { INTEGRATIONS_JOBS, INTEGRATIONS_PAGES, INTEGRATIONS_ROOT_PREFIX } from 
 export const settingsManifest = {
   id: 'settings',
   jobs: [
+    { name: 'workspaceExports', label: 'Workspace ZIP exports', configKey: 'data.exportSchedule' },
     { name: 'purges', label: 'Data deletion recovery', configKey: 'data.purgeRecoverySchedule' },
     { name: 'notifications', label: 'Notification delivery', configKey: 'notifications.deliverySchedule' },
     ...INTEGRATIONS_JOBS,
   ],
   rootSettingsPrefixes: ['settings.', 'connections.', 'mcp.keys.', 'notifications.', 'sharing.', 'bio.', INTEGRATIONS_ROOT_PREFIX],
-  rootSettingKeys: ['data.purgeRecoverySchedule', 'data.deleteTransactionTimeoutMs', 'data.maxArchiveBytes'],
+  rootSettingKeys: ['data.exportMaxJobs', 'data.exportExpiryHours', 'data.exportWorkerBatch', 'data.exportLeaseSeconds', 'data.exportSchedule', 'data.purgeRecoverySchedule', 'data.deleteTransactionTimeoutMs', 'data.maxArchiveBytes'],
   title: 'Settings',
   href: '/settings/connections',
   pages: [

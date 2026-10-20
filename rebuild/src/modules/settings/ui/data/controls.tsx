@@ -35,7 +35,7 @@ export function DataControls({ workspaceName, destructive = false }: { workspace
     finally { setBusy(false); }
   }
 
-  if (!destructive) return <div className={styles['data-controls']}><a className={styles['data-button']} href="/api/settings/data">Download workspace ZIP</a><span className={styles['settings-note']}>Includes the rebuild database snapshot and stored workspace media. The archive manifest describes database coverage.</span></div>;
+  if (!destructive) return null;
 
   return <div className={styles['data-controls']}>
     {!counts ? <button type="button" onClick={previewDeletion} disabled={busy || previewBusy}>{previewBusy ? 'Counting rows…' : 'Preview rows to delete'}</button> : <>

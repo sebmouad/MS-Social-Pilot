@@ -17,6 +17,11 @@ export const SETTINGS_CONFIG = [
 
 /** Every Root setting this product module declares. The registry merges installed modules; edit only here. */
 export const SETTINGS_MODULE_CONFIG = [
+  entry({ key: 'data.exportMaxJobs', group: 'Data controls', label: 'Retained export jobs per workspace', kind: 'number', description: 'Maximum retained jobs before requesting another export. Expired and failed rows are retired to make room.', defaultValue: 20, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'data.exportExpiryHours', group: 'Data controls', label: 'Export lifetime (hours)', kind: 'number', description: 'Lifetime from request, including build time; expired archives cannot be downloaded.', defaultValue: 168, schema: z.number().int().min(1).max(2160), consumption: 'active' }),
+  entry({ key: 'data.exportWorkerBatch', group: 'Data controls', label: 'Export worker batch', kind: 'number', description: 'Maximum builds and cleanup items examined per worker pass.', defaultValue: 2, schema: z.number().int().min(1).max(100), consumption: 'active' }),
+  entry({ key: 'data.exportLeaseSeconds', group: 'Data controls', label: 'Export claim lifetime (seconds)', kind: 'number', description: 'Claim recovery delay after a worker stops. A database row lock prevents simultaneous builds even after the lease expires.', defaultValue: 600, schema: z.number().int().min(30).max(3600), consumption: 'active' }),
+  entry({ key: 'data.exportSchedule', group: 'Data controls', label: 'Export worker schedule', kind: 'text', description: 'Five-field cron schedule for archive builds and expired file cleanup.', defaultValue: '* * * * *', schema: cron, consumption: 'active' }),
   ...SETTINGS_CONFIG,
   ...SETTINGS_INVITATION_CONFIG,
   ...SETTINGS_WORKSPACE_CONFIG,
