@@ -44,7 +44,7 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
       const identity = progress.after ?? '';
       if (seen.has(identity)) throw new Error('Repeated history cursor.');
       seen.add(identity);
-      const batch = await page(`${encodeURIComponent(pageId)}/${policy.edge}`, token, { fields: [...new Set(['id', 'created_time', ...policy.fields])].join(','), limit: String(config.pageSize), since: String(Date.parse(progress.since) / 1000), until: String(Date.parse(progress.until) / 1000), ...(progress.after ? { after: progress.after } : {}) });
+      const batch = await page(`${encodeURIComponent(pageId)}/${policy.edge}`, token, { fields: [...new Set(['id', 'created_time', ...policy.fields])].join(','), limit: String(config.pageSize), since: String(Math.floor(Date.parse(progress.since) / 1000)), until: String(Math.floor(Date.parse(progress.until) / 1000)), ...(progress.after ? { after: progress.after } : {}) });
       for (const raw of batch.rows) {
         const post = obj(raw); const createdTime = new Date(String(post.created_time));
         if (typeof post.id !== 'string' || !Number.isFinite(createdTime.getTime())) throw new Error('Invalid history post identity.');
