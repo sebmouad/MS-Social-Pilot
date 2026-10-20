@@ -243,3 +243,62 @@ publishing attachments); there is no UI/HTTP/MCP entry that sets `nativeSchedule
 Reel first comment and deletion, Stories, application of the switch to the composer
 format picker, native-schedule cancel/reschedule at the provider, and live proof
 remain open. Groups stay unsupported (API removed).
+
+
+## Batch97: Story formats, Reel follow-ups and Story proof (private, default off)
+
+Same private switch (`facebook.native.publishingEnabled`); mocked Graph transport
+only. Nothing here is verified against live Graph. All code is in `platforms/facebook/**`.
+
+- **Photo Story / Video Story** (`story_photo`, `story_video`) are declared by the
+  adapter only while the switch is on, and `formats/publish.ts` dispatches them
+  through the existing executor and the batch89 journal. A photo Story uploads the
+  photo unpublished (stored bytes via the signed multipart port, or Facebook fetches
+  a guarded remote HTTPS photo after the address-pinned probe) and then creates the
+  Story from its photo id; a video Story uses the resumable phases. The result is
+  `submitted` with the final Story post id (never the staged photo/video id).
+- A Story is its media alone: a caption, link or schedule is refused before any
+  claim or transport (definite rejection), as are the wrong media kind, several
+  files and out-of-policy size/aspect/length. The Root `storyPhoto.*`/`storyVideo.*`
+  limits already existed; the defaults are tall frames only (0.5-0.6 width/height).
+  Stories declare no first comment, remote delete or native schedule; their media
+  descriptors disable link, alt text and mixed media.
+- The publisher's `inspect`/`resolveRemote` dependencies now take the media kind so
+  photos are probed as images and videos as videos.
+- **Reel** now declares first comment and remote delete. The adapter's shared
+  comment/delete paths are format-blind (a Reel is a Video object, so the same
+  comments edge and DELETE are used); the shared requests carry no format id.
+  Comment dispatch still waits for confirmed publication, and delete keeps the
+  shared durable intent/receipt/uncertain handling. Whether Facebook accepts both
+  on a Reel is unverified until cleaned live coverage.
+- **Story status** reads the Page's Stories edge (`<page>/stories?fields=post_id,
+  status,creation_time`) and is positive only for exactly one entry whose `post_id`
+  is the final Story id and whose status is published. Not listed (the edge is a
+  bounded recent list and Stories expire), archived, malformed or ambiguous answers
+  are `unknown`, never absent or failed; Graph100/sub33 is unknown. The older
+  `readFacebookNativeStatus` scaffold still reports Stories as unsupported.
+- **Story proof recovery.** Migration `20261030100000_rebuild_facebook_native_story_proofs`
+  (additive, unapplied to any database) widens the proof ledger's format check and
+  replaces the accepted-proof guard: a Story keeps two journal identities (staged
+  media plus final Story), so accepted Story proof requires exactly those two, one of
+  them the final id, and the complete confirmed chain (`photo_upload`,`story_create`
+  or `upload_start`,`upload_transfer`,`story_finish`). Video and Reel keep the sole
+  identity rule. `facebookNativeStatusEligible` and `readFacebookNativeProof` mirror
+  it. As for Video/Reel, a Story submission projects as published only after Root
+  accepts a current proof; automatic reads alone do not.
+
+Root keys: `facebook.native.storyPhotoFormatLabel`, `facebook.native.storyVideoFormatLabel`
+(both in `platforms/facebook/module.ts`; the registry schema version must be bumped by
+the registry owner). The switch's label/description now mention Stories.
+
+Evidence: `tests/facebook-native-story.test.ts` (dispatch of both Stories, refusals,
+uncertain/no-resend, status mapper and adapter read, eligibility, Reel comment/delete,
+static migration checks) plus the updated host and read-proof tests. No PostgreSQL run
+of the new migration, no browser, no live Meta.
+
+Open: apply and rehearse the migration (backup/scratch restore, pin it in
+`scripts/cutover-rehearsal.sh`) and add PostgreSQL proof tests for Story acceptance;
+shared stored-video resolution (still images only) so stored Reel/Story video bytes
+reach the adapter; no UI/HTTP/MCP entry sets `nativeSchedule`; the shared comment and
+delete requests should carry the format id so Reel-specific handling is possible;
+cleaned live coverage for every native format.

@@ -10,7 +10,12 @@ import {
 /** Shared format identities declared by the Facebook module behind the private native switch. */
 export const FACEBOOK_NATIVE_VIDEO_FORMAT_ID = 'video';
 export const FACEBOOK_NATIVE_REEL_FORMAT_ID = 'reel';
-export const isFacebookNativePublishFormat = (id: unknown): id is 'video' | 'reel' => id === FACEBOOK_NATIVE_VIDEO_FORMAT_ID || id === FACEBOOK_NATIVE_REEL_FORMAT_ID;
+export const FACEBOOK_NATIVE_STORY_PHOTO_FORMAT_ID = 'story_photo';
+export const FACEBOOK_NATIVE_STORY_VIDEO_FORMAT_ID = 'story_video';
+export type FacebookNativePublishFormatId = 'video' | 'reel' | 'story_photo' | 'story_video';
+export const isFacebookNativePublishFormat = (id: unknown): id is FacebookNativePublishFormatId =>
+  id === FACEBOOK_NATIVE_VIDEO_FORMAT_ID || id === FACEBOOK_NATIVE_REEL_FORMAT_ID ||
+  id === FACEBOOK_NATIVE_STORY_PHOTO_FORMAT_ID || id === FACEBOOK_NATIVE_STORY_VIDEO_FORMAT_ID;
 
 /** Trusted metadata derived from the exact bytes; caller-supplied media facts are never used. */
 export interface FacebookNativeInspected { bytes: Uint8Array; mimeType: string; sizeBytes: number; width: number; height: number; durationSeconds?: number }
@@ -19,10 +24,10 @@ export interface FacebookNativePublishDeps {
   policy: FacebookNativePolicy;
   /** Signed Facebook transport for one Page credential; bounded by the request signal. */
   transport(accessToken: string, signal?: AbortSignal): Promise<FacebookNativeTransport>;
-  /** Probe bytes the host already holds (stored media). */
-  inspect(bytes: Uint8Array, signal?: AbortSignal): Promise<FacebookNativeInspected>;
-  /** Fetch and probe a public HTTPS video through the guarded resolver. */
-  resolveRemote(url: string, signal?: AbortSignal): Promise<FacebookNativeInspected>;
+  /** Probe bytes the host already holds (stored media). `kind` is the media kind the format needs. */
+  inspect(bytes: Uint8Array, signal: AbortSignal | undefined, kind: 'image' | 'video'): Promise<FacebookNativeInspected>;
+  /** Fetch and probe a public HTTPS file through the guarded resolver. */
+  resolveRemote(url: string, signal: AbortSignal | undefined, kind: 'image' | 'video'): Promise<FacebookNativeInspected>;
   execute?: typeof executeFacebookNativeWithJournal;
   now?: () => Date;
 }
@@ -46,34 +51,43 @@ export function createFacebookNativePublisher(deps: FacebookNativePublishDeps) {
     const publication = request.publication;
     if (!publication || !request.operationId) throw refused('This publication cannot be recorded. Try again from the post.');
     if (request.signal?.aborted) throw uncertain('Facebook operation was cancelled.');
+    const story = format === 'story_photo' || format === 'story_video';
+    const kind: 'image' | 'video' = format === 'story_photo' ? 'image' : 'video';
     const items = request.media ?? [];
-    if (items.length !== 1 || items[0]!.kind !== 'video') throw refused(format === 'reel' ? 'A Reel needs exactly one video.' : 'A video post needs exactly one video.');
+    if (items.length !== 1 || items[0]!.kind !== kind) {
+      throw refused(format === 'reel' ? 'A Reel needs exactly one video.' : format === 'video' ? 'A video post needs exactly one video.'
+        : format === 'story_photo' ? 'A photo Story needs exactly one photo.' : 'A video Story needs exactly one video.');
+    }
+    // A Story is only its media; refuse rather than silently drop customer text, a link or a schedule.
+    if (story && (request.text?.trim() || request.link || request.scheduledAt)) {
+      throw refused('A Story is published as the media alone, immediately. Remove the text, link or schedule, or choose another format.');
+    }
     const item = items[0]!;
+    const facts = (i: FacebookNativeInspected) => ({ sizeBytes: i.sizeBytes, width: i.width, height: i.height,
+      ...(i.durationSeconds !== undefined ? { durationSeconds: i.durationSeconds } : {}) });
     let media: FacebookNativeMedia;
     try {
       if (item.localFile) {
-        const inspected = await deps.inspect(item.localFile.bytes, request.signal);
-        media = { kind: 'video', bytes: inspected.bytes, fileName: item.localFile.fileName, mimeType: inspected.mimeType,
-          sizeBytes: inspected.sizeBytes, width: inspected.width, height: inspected.height,
-          ...(inspected.durationSeconds !== undefined ? { durationSeconds: inspected.durationSeconds } : {}) };
+        const inspected = await deps.inspect(item.localFile.bytes, request.signal, kind);
+        media = { kind, bytes: inspected.bytes, fileName: item.localFile.fileName, mimeType: inspected.mimeType, ...facts(inspected) };
       } else {
-        const inspected = await deps.resolveRemote(item.url, request.signal);
-        // A Reel is uploaded from the guarded snapshot; a video post lets Facebook fetch the URL and keeps only the probe facts.
-        media = { kind: 'video', ...(format === 'reel' ? { bytes: inspected.bytes, mimeType: inspected.mimeType } : { url: item.url }),
-          sizeBytes: inspected.sizeBytes, width: inspected.width, height: inspected.height,
-          ...(inspected.durationSeconds !== undefined ? { durationSeconds: inspected.durationSeconds } : {}) };
+        const inspected = await deps.resolveRemote(item.url, request.signal, kind);
+        // A Reel or video Story is uploaded from the guarded snapshot; a video post or photo Story lets Facebook fetch the URL and keeps only the probe facts.
+        const upload = format === 'reel' || format === 'story_video';
+        media = { kind, ...(upload ? { bytes: inspected.bytes, mimeType: inspected.mimeType } : { url: item.url }), ...facts(inspected) };
       }
     } catch {
-      throw refused('This video could not be checked. Choose a supported video file or a public HTTPS link.');
+      throw refused(kind === 'image' ? 'This photo could not be checked. Choose a supported image file or a public HTTPS link.'
+        : 'This video could not be checked. Choose a supported video file or a public HTTPS link.');
     }
     let plan;
     try {
-      plan = planFacebookNative({ targetId: request.target.id, targetKind: request.target.kind, format: format === 'reel' ? 'reel' : 'post',
+      plan = planFacebookNative({ targetId: request.target.id, targetKind: request.target.kind, format: story ? 'story' : format === 'reel' ? 'reel' : 'post',
         ...(request.text ? { text: request.text } : {}), link: request.link ?? null, media: [media],
         scheduledAt: request.scheduledAt ?? null, now: (deps.now ?? (() => new Date()))(), policy: deps.policy });
     } catch (error) {
       if (error instanceof FacebookNativeValidationError) throw refused(error.message);
-      throw refused('This video cannot be published in the selected format.');
+      throw refused('This media cannot be published in the selected format.');
     }
     let outcome;
     try {

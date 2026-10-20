@@ -50,20 +50,21 @@ export async function configuredFacebookNativePublishing(): Promise<FacebookNati
   try {
     const enabled = await configured<boolean>('facebook.native.publishingEnabled');
     if (enabled !== true) return null;
-    const [{ policy }, videoLabel, reelLabel] = await Promise.all([
+    const [{ policy }, videoLabel, reelLabel, storyPhotoLabel, storyVideoLabel] = await Promise.all([
       configuredFacebookNativeSettings(), configured<string>('facebook.native.videoFormatLabel'), configured<string>('facebook.native.reelFormatLabel'),
+      configured<string>('facebook.native.storyPhotoFormatLabel'), configured<string>('facebook.native.storyVideoFormatLabel'),
     ]);
     const inspected = (snapshot: Awaited<ReturnType<typeof inspectMediaSnapshot>> | Awaited<ReturnType<typeof resolveRemoteMediaSnapshot>>) => ({
       bytes: snapshot.bytes, mimeType: snapshot.mimeType, sizeBytes: snapshot.sizeBytes, width: snapshot.width, height: snapshot.height,
       ...(snapshot.durationSeconds !== undefined ? { durationSeconds: snapshot.durationSeconds } : {}),
     });
     return {
-      videoLabel, reelLabel,
+      videoLabel, reelLabel, storyPhotoLabel, storyVideoLabel,
       publish: createFacebookNativePublisher({
         policy,
         transport: async (accessToken, signal) => configuredFacebookNativeTransport(accessToken, { signal }),
-        inspect: async (bytes, signal) => inspected(await inspectMediaSnapshot(bytes, 'video', { signal })),
-        resolveRemote: async (url, signal) => inspected(await resolveRemoteMediaSnapshot(url, 'video', { signal })),
+        inspect: async (bytes, signal, kind) => inspected(await inspectMediaSnapshot(bytes, kind, { signal })),
+        resolveRemote: async (url, signal, kind) => inspected(await resolveRemoteMediaSnapshot(url, kind, { signal })),
       }),
     };
   } catch {

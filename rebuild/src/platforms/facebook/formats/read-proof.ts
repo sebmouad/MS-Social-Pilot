@@ -1,4 +1,4 @@
-import { mapFacebookVideoStatus } from './status';
+import { FACEBOOK_STORY_STATUS_FIELDS, mapFacebookStoryStatus, mapFacebookVideoStatus } from './status';
 import type { FacebookNativeReadTransport } from './types';
 
 export interface FacebookNativeReadProofBinding {
@@ -10,7 +10,7 @@ export interface FacebookNativeReadProofBinding {
   actorId: string;
   remoteTargetId: string;
   sourceFormatId: string;
-  format: 'video' | 'reel';
+  format: 'video' | 'reel' | 'story_photo' | 'story_video';
   payloadHash: string;
   remoteId: string;
   revision: number;
@@ -64,6 +64,21 @@ export async function readFacebookNativeProof(
   const binding = snapshot(bindingInput);
   const requestStartedAt = new Date();
   if (signal?.aborted) return proof(binding, 'unknown', 'aborted', requestStartedAt);
+
+  if (binding.format === 'story_photo' || binding.format === 'story_video') {
+    // A Story has no readable object of its own; the Page's Stories edge lists it by final post id.
+    let listed: unknown;
+    try {
+      listed = await transport.getGraph(`${binding.remoteTargetId}/stories`, [...FACEBOOK_STORY_STATUS_FIELDS], signal);
+    } catch {
+      return proof(binding, 'unknown', signal?.aborted ? 'aborted' : 'read_failed', new Date());
+    }
+    const storyObservedAt = new Date();
+    if (signal?.aborted) return proof(binding, 'unknown', 'aborted', storyObservedAt);
+    if (!record(listed)) return proof(binding, 'unknown', 'status_shape_invalid', storyObservedAt);
+    const story = mapFacebookStoryStatus(binding.remoteId, listed);
+    return proof(binding, story.status === 'published' ? 'published' : 'unknown', story.detail, storyObservedAt);
+  }
   if ((binding.format as string) !== 'video' && (binding.format as string) !== 'reel') return proof(binding, 'unknown', 'readback_unsupported', requestStartedAt);
 
   let raw: unknown;

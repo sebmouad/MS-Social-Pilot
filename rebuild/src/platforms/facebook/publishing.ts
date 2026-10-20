@@ -52,7 +52,7 @@ export interface FacebookEngine {
   discoverPages(accessToken: string): Promise<FacebookPage[]>;
   discoverAdAccounts(accessToken: string): Promise<FacebookAdAccount[]>;
   publish(input: FacebookPublishInput): Promise<FacebookPublished>;
-  getStatus(accessToken: string, remoteId: string, context: { targetId: string; contentKind?: 'text' | 'image' | 'video'; nativeFormat?: 'video' | 'reel' }): Promise<RemoteStatus>;
+  getStatus(accessToken: string, remoteId: string, context: { targetId: string; contentKind?: 'text' | 'image' | 'video'; nativeFormat?: 'video' | 'reel' | 'story_photo' | 'story_video' }): Promise<RemoteStatus>;
   deletePost(accessToken: string, remoteId: string): Promise<void>;
   getPhotoCleanupState(accessToken: string, remoteId: string): Promise<{ id: unknown; page_story_id?: unknown; can_delete: unknown }>;
   deletePhoto(accessToken: string, remoteId: string, onDispatch?: () => void, onConfirmed?: () => void): Promise<void>;
@@ -383,6 +383,18 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       if (typeof remoteId !== 'string' || !/^[A-Za-z0-9_:-]+$/.test(remoteId) ||
           typeof targetId !== 'string' || !/^[A-Za-z0-9_:-]+$/.test(targetId) ||
           !['text', 'image', 'video'].includes(contentKind)) return unknown();
+      if (context?.nativeFormat === 'story_photo' || context?.nativeFormat === 'story_video') {
+        // A Story is read from the Page's Stories edge by its final post id; not being listed is unknown, never absent.
+        const { FACEBOOK_STORY_STATUS_FIELDS, mapFacebookStoryStatus } = await import('./formats/status');
+        let listed: unknown;
+        try { listed = await request(`${encodeURIComponent(targetId)}/stories`, { token, params: { fields: FACEBOOK_STORY_STATUS_FIELDS.join(',') } }); }
+        catch (error) {
+          if (error instanceof FacebookApiError && error.code === 100 && error.subcode === 33) return unknown();
+          throw error;
+        }
+        return mapFacebookStoryStatus(remoteId, object(listed)).status === 'published'
+          ? { state: 'published', remoteId, targetId, publishedAt: null } : unknown();
+      }
       const video = contentKind === 'video';
       const fields = video
         ? 'id,from,status,published,created_time,scheduled_publish_time'
@@ -604,12 +616,19 @@ export interface FacebookNativePublishingPolicy {
   publish(request: PublishRequest): Promise<PublishResult>;
   videoLabel: string;
   reelLabel: string;
+  storyPhotoLabel: string;
+  storyVideoLabel: string;
 }
 const FACEBOOK_NATIVE_VIDEO_MEDIA: PublishingMediaSupport = { kinds: ['video'], maxImages: 0, maxVideos: 1, mixedKinds: false, linkWithMedia: true, imageAltText: false };
+/** A Story is its media alone: no caption link, alt text or mixed media. */
+const FACEBOOK_STORY_PHOTO_MEDIA: PublishingMediaSupport = { kinds: ['image'], maxImages: 1, maxVideos: 0, mixedKinds: false, linkWithMedia: false, imageAltText: false };
+const FACEBOOK_STORY_VIDEO_MEDIA: PublishingMediaSupport = { kinds: ['video'], maxImages: 0, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: false };
+type FacebookNativeFormatId = NonNullable<NonNullable<Parameters<FacebookEngine['getStatus']>[2]>['nativeFormat']>;
 
 export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { feedFormatLabel?: string; postReadScopes?: readonly string[]; postPublishScopes?: readonly string[]; postDeleteScopes?: readonly string[]; firstCommentScopes?: readonly string[]; mediaJournalFactory?: FacebookMediaJournalFactory; native?: FacebookNativePublishingPolicy }): PlatformAdapter {
   const native = policy?.native;
-  const nativeFormat = (id: unknown): 'video' | 'reel' | null => native && (id === 'video' || id === 'reel') ? id : null;
+  const nativeFormat = (id: unknown): FacebookNativeFormatId | null =>
+    native && (id === 'video' || id === 'reel' || id === 'story_photo' || id === 'story_video') ? id : null;
   const engine = createFacebookEngine(config, fetchImpl);
   const requiredPostReadScopes = policy?.postReadScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
   const requiredPostPublishScopes = policy?.postPublishScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
@@ -645,7 +664,10 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
     publishingFormats: [{ id: FACEBOOK_FEED_FORMAT_ID, label: policy?.feedFormatLabel ?? FACEBOOK_FEED_FORMAT_LABEL, media: FACEBOOK_PUBLISHING_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } },
       ...(native ? [
         { id: 'video', label: native.videoLabel, media: FACEBOOK_NATIVE_VIDEO_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: true } },
-        { id: 'reel', label: native.reelLabel, media: FACEBOOK_NATIVE_VIDEO_MEDIA, firstComment: false, remoteStatus: true, remoteDelete: false, scheduling: { application: true, native: false } },
+        { id: 'reel', label: native.reelLabel, media: FACEBOOK_NATIVE_VIDEO_MEDIA, firstComment: true, remoteStatus: true, remoteDelete: true, scheduling: { application: true, native: false } },
+        // Stories expose no comment or delete operation here; status comes from the Page's Stories edge.
+        { id: 'story_photo', label: native.storyPhotoLabel, media: FACEBOOK_STORY_PHOTO_MEDIA, firstComment: false, remoteStatus: true, remoteDelete: false, scheduling: { application: true, native: false } },
+        { id: 'story_video', label: native.storyVideoLabel, media: FACEBOOK_STORY_VIDEO_MEDIA, firstComment: false, remoteStatus: true, remoteDelete: false, scheduling: { application: true, native: false } },
       ] : [])],
     capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
     canUseCredential,
@@ -681,7 +703,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
         throw new FacebookApiError('The selected publishing format has no status reader.', 0);
       }
       if (!canUseCredential(request.credential, 'remoteStatus')) throw new FacebookApiError('Facebook Page status-read permission is missing or unavailable.', 0);
-      return createFacebookEngine(config, fetchImpl, request.signal).getStatus(request.credential.accessToken, request.remoteId, { targetId: request.target.id, contentKind: nativeId ? 'video' : request.contentKind, ...(nativeId ? { nativeFormat: nativeId } : {}) });
+      return createFacebookEngine(config, fetchImpl, request.signal).getStatus(request.credential.accessToken, request.remoteId, { targetId: request.target.id, contentKind: nativeId ? (nativeId === 'story_photo' ? 'image' : 'video') : request.contentKind, ...(nativeId ? { nativeFormat: nativeId } : {}) });
     },
     async deleteRemote(request) {
       if (!canUseCredential(request.credential, 'remoteDelete')) throw new FacebookApiError('Facebook Page post deletion permission is missing or unavailable.', 0);

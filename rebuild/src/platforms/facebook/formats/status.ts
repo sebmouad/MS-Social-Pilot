@@ -71,6 +71,25 @@ export function mapFacebookVideoStatus(format: FacebookNativeAttemptRecord['form
   return { status: 'unknown', detail: 'publication_receipt_missing' };
 }
 
+/** Fields requested from a Page's Stories edge. UNVERIFIED against live Graph; mocked tests only. */
+export const FACEBOOK_STORY_STATUS_FIELDS: readonly string[] = Object.freeze(['post_id', 'status', 'creation_time']);
+
+/**
+ * Map one answer from a Page's Stories edge to a neutral status for the exact final Story id.
+ * A Story that is not listed is `unknown`, never absent or failed: the edge is a bounded recent list
+ * and Stories expire, so non-membership proves nothing. Only an explicit published entry is positive.
+ */
+export function mapFacebookStoryStatus(remoteId: string, raw: Record<string, unknown>): Omit<FacebookStatusReadback, 'polls'> {
+  const data = raw.data;
+  if (!Array.isArray(data)) return { status: 'unknown', detail: 'status_shape_invalid' };
+  const matches = data.filter(entry => rec(entry) && (entry as Record<string, unknown>).post_id === remoteId) as Array<Record<string, unknown>>;
+  if (matches.length === 0) return { status: 'unknown', detail: 'story_not_listed' };
+  if (matches.length > 1) return { status: 'unknown', detail: 'story_ambiguous' };
+  const status = matches[0]!.status;
+  if (typeof status !== 'string') return { status: 'unknown', detail: 'status_missing' };
+  return status.toLowerCase() === 'published' ? { status: 'published', detail: null } : { status: 'unknown', detail: 'status_unrecognized' };
+}
+
 /** One read, bounded polling while processing. Reads are safe to repeat; nothing is written. */
 export async function readFacebookNativeStatus(record: Pick<FacebookNativeAttemptRecord, 'format' | 'remoteId' | 'knownIds'>, deps: StatusDeps): Promise<FacebookStatusReadback> {
   // Snapshot every value that may otherwise be mutated while transport is awaited.
