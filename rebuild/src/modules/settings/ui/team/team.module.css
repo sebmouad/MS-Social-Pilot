@@ -1,4 +1,4 @@
-.team { display: grid; grid-template-columns: minmax(0, 1fr); overflow-wrap: anywhere; gap: 22px; min-width: 0; }
+.team { contain: inline-size; display: grid; grid-template-columns: minmax(0, 1fr); overflow-wrap: anywhere; gap: 22px; min-width: 0; }
 .addForm { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 17px; padding: 19px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
 .addIntro { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .addIntro h3 { margin: 0; color: var(--ink); font-size: 15px; font-weight: 700; letter-spacing: -.15px; }
