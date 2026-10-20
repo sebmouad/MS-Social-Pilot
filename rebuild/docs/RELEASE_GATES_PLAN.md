@@ -447,3 +447,13 @@ each gate is actually run; never claim a gate from this plan alone.
   `social-pilot` and `social-pilot-worker` stayed active with unchanged start times
   (never restarted); the public site kept answering. The first drill found a production
   `next build` type failure (`src/app/root/config/page.tsx`), fixed in `c802becc`.
+
+## Production cutover — 2026-10-20 22:09 CEST
+
+- **Commit:** `5f1e52d7a39062c2b29df9974ec2b1f38546269b`, run by owner via `rebuild/scripts/prod-cutover.sh`.
+- **Fresh backup:** `/var/backups/socialpilot-cutover-20261020-220930` (dump sha256 `d80b51ae…cd9f7a`).
+- **Build:** OK. Legacy worker stopped first (single publisher). 34 migrations applied to live `social_pilot`.
+- **Health:** local `/sign-in` 200, API probe OK, public `/sign-in` 200 → `CUTOVER COMPLETE`.
+- **Services:** `social-pilot-rebuild` + `social-pilot-rebuild-worker` active/enabled; legacy `social-pilot` + worker inactive/disabled. Legacy release kept at `/srv/ms-social-pilot` for rollback.
+- **Post-check (orchestrator, public):** `/sign-in`, `/home`, `/api/auth/register` all 200.
+- **Open:** owner sign-in check; Root `storage.mediaRoot` + mail settings; live Facebook test gate (needs owner test Page); post-cutover rollback drill; pin 4 newer migrations in `cutover-rehearsal.sh`; drop scratch `social_pilot_rehearsal`; rewire `socialpilot-deploy` to the rebuild.
