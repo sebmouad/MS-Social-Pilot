@@ -1,3 +1,6 @@
+import { z } from 'zod';
+import { revokeTeamInvitationConfirmation } from '@/modules/settings/invitations';
+import { listRootRegistration, revokeRootRegistrationInvitation, controlRootRegistrationAccount, registrationConfirmation } from '../registration-admin';
 import { OperationError } from '@/lib/operation-error';
 import type { RootMcpActor } from '@/server/mcp/types';
 import { assignRootPlan, listRootPlanHistory, listRootPlans, listRootSubscribers, updateRootPlan } from './plans';
@@ -15,8 +18,18 @@ import { disconnectRootConnection, listRootConnections } from './connections';
 const none = { type: 'object', properties: {}, additionalProperties: false } as const;
 const privateNote = ' Installation owner only; workspace API keys cannot use this tool.';
 
-/** Definitions for the host to merge into the Root MCP list. Not wired here. */
+const registrationId = z.string().min(1).max(255).regex(/^[^\u0000-\u001f\u007f]+$/);
+const registrationWrite = z.object({ userId: registrationId, confirmation: z.string().max(400) }).strict();
+const registrationRevoke = z.object({ workspaceId: registrationId, invitationId: registrationId, confirmation: z.string().max(400) }).strict();
+const idProperty = { type: 'string', minLength: 1, maxLength: 255 } as const;
+const confirmationProperty = { type: 'string', maxLength: 400 } as const;
+
+/** Definitions merged automatically into the private installation MCP host. */
 export const rootLegacyToolDefinitions = [
+  { name: 'list_root_registration', description: 'Inspect read-only open-registration status, workspace invitations and eligible unverified self-registrations installation-wide. Invitation filters workspaceId and status do not filter accounts; q searches both. Independently paged and capped by Root and MCP limits; no total is inferred.' + privateNote, annotations: { readOnlyHint: true }, inputSchema: { type: 'object', properties: { q: { type: 'string', maxLength: 2000 }, workspaceId: idProperty, status: { type: 'string', enum: ['pending', 'expired', 'accepted'] }, page: { type: 'integer', minimum: 1, maximum: 100000 }, accountsPage: { type: 'integer', minimum: 1, maximum: 100000 } }, additionalProperties: false } },
+  { name: 'revoke_root_invitation', description: 'Revoke an unaccepted invitation in the exact workspace; its link stops working. Confirmation must exactly match REVOKE INVITATION <invitationId>.' + privateNote, annotations: { readOnlyHint: false, destructiveHint: true }, inputSchema: { type: 'object', required: ['workspaceId', 'invitationId', 'confirmation'], properties: { workspaceId: idProperty, invitationId: idProperty, confirmation: confirmationProperty }, additionalProperties: false } },
+  { name: 'resend_root_registration_verification', description: 'Replace the verification link and send mail for an eligible active self-registration. Requires open registration and working mail. Only delivery sent confirms submission; inspect mail/account state before retrying an uncertain outcome. Confirmation must exactly match RESEND VERIFICATION <userId>.' + privateNote, annotations: { readOnlyHint: false, destructiveHint: true }, inputSchema: { type: 'object', required: ['userId', 'confirmation'], properties: { userId: idProperty, confirmation: confirmationProperty }, additionalProperties: false } },
+  { name: 'delete_root_unverified_registration', description: 'Permanently delete an eligible unverified non-Root self-registration without memberships and its personal authentication data. Confirmation must exactly match DELETE UNVERIFIED ACCOUNT <userId>.' + privateNote, annotations: { readOnlyHint: false, destructiveHint: true }, inputSchema: { type: 'object', required: ['userId', 'confirmation'], properties: { userId: idProperty, confirmation: confirmationProperty }, additionalProperties: false } },
   { name: 'list_root_plans', description: 'Plan catalog with limits, features grouped by owning module, and subscriber counts.' + privateNote, inputSchema: none },
   { name: 'list_root_plan_history', description: 'Bounded plan edit and assignment audit history.' + privateNote, inputSchema: none },
   { name: 'list_root_subscribers', description: 'Bounded accounts that own a workspace, with their plan.' + privateNote, inputSchema: none },
@@ -65,6 +78,20 @@ export async function callRootLegacyTool(viewer: RootMcpActor, name: string, arg
   const id = viewer.userId;
   const cap = viewer.maxResultItems;
   switch (name) {
+    case 'list_root_registration': return listRootRegistration(id, args, cap);
+    case 'revoke_root_invitation': {
+      const parsed = registrationRevoke.safeParse(args);
+      if (!parsed.success || parsed.data.confirmation !== revokeTeamInvitationConfirmation(parsed.data.invitationId)) throw new OperationError('invalid_request', 'Enter the exact invitation confirmation shown.');
+      const { workspaceId, invitationId, confirmation } = parsed.data;
+      return revokeRootRegistrationInvitation(id, workspaceId, invitationId, { confirmation });
+    }
+    case 'resend_root_registration_verification':
+    case 'delete_root_unverified_registration': {
+      const action = name === 'resend_root_registration_verification' ? 'resend' : 'delete';
+      const parsed = registrationWrite.safeParse(args);
+      if (!parsed.success || parsed.data.confirmation !== registrationConfirmation(action, parsed.data.userId)) throw new OperationError('invalid_request', 'Enter the exact account confirmation shown.');
+      return controlRootRegistrationAccount(id, parsed.data.userId, action, { confirmation: parsed.data.confirmation });
+    }
     case 'list_root_plans': reject(args); return listRootPlans(id, cap);
     case 'list_root_plan_history': reject(args); return listRootPlanHistory(id, cap);
     case 'list_root_subscribers': reject(args); return listRootSubscribers(id, cap);

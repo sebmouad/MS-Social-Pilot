@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../src/server/root/registration-admin', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/server/root/registration-admin')>(),
+  ...h.registration,
+}));
 
 const h = vi.hoisted(() => ({
   actor: vi.fn(),
+  registration: { listRootRegistration: vi.fn(), revokeRootRegistrationInvitation: vi.fn(), controlRootRegistrationAccount: vi.fn() },
   plans: { listRootPlans: vi.fn(), listRootPlanHistory: vi.fn(), listRootSubscribers: vi.fn(), updateRootPlan: vi.fn(), assignRootPlan: vi.fn() },
   priv: { listRootPrivileges: vi.fn(), exportRootPrivileges: vi.fn(), changeRootMemberRole: vi.fn() },
   life: { loadRootLifecycle: vi.fn(), transferWorkspaceOwnership: vi.fn(), setLifecycleUserAccess: vi.fn(), setLifecycleWorkspaceAccess: vi.fn() },
@@ -126,8 +131,8 @@ describe('Root MCP definitions', () => {
     await expect(callRootLegacyTool(viewer, 'list_root_plans', [] as never)).rejects.toMatchObject({ code: 'invalid_request' });
   });
 
-  it('offers no tool that starts, restores or deletes backups, accounts or workspaces', () => {
-    expect(rootLegacyToolDefinitions.map(tool => tool.name).filter(name => /backup|restore|delete|purge/.test(name) && !name.startsWith('get_'))).toEqual(['delete_root_user', 'delete_root_workspace']); // deliberate, confirmed deletions of disabled accounts and suspended workspaces
+  it('offers only the explicitly confirmed account and workspace deletion tools', () => {
+    expect(rootLegacyToolDefinitions.map(tool => tool.name).filter(name => /backup|restore|delete|purge/.test(name) && !name.startsWith('get_'))).toEqual(['delete_root_unverified_registration', 'delete_root_user', 'delete_root_workspace']); // deliberate, confirmed deletions of disabled accounts and suspended workspaces
   });
 });
 
@@ -152,5 +157,51 @@ describe('MCP error action confirmation', () => {
     await callRootLegacyTool(viewer, 'set_root_error_resolved', { id: 'e1', resolved: true, confirmation: 'RESOLVE ROOT ERROR e1' });
     expect(h.errs.setRootErrorResolved).toHaveBeenCalledWith('root', 'e1', true);
     await expect(callRootLegacyTool(viewer, 'get_root_error', { id: 'e1', extra: true })).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+});
+
+describe('registration MCP service parity', () => {
+  const viewer = { userId: 'root', isInstanceOwner: true, maxResultItems: 7 } as never;
+  const writes = [
+    ['revoke_root_invitation', { workspaceId: 'w1', invitationId: 'i1', confirmation: 'REVOKE INVITATION i1' }],
+    ['resend_root_registration_verification', { userId: 'u1', confirmation: 'RESEND VERIFICATION u1' }],
+    ['delete_root_unverified_registration', { userId: 'u1', confirmation: 'DELETE UNVERIFIED ACCOUNT u1' }],
+  ] as const;
+
+  it('declares strict schemas and explicit read/write hints', () => {
+    expect(rootLegacyToolDefinitions.find(t => t.name === 'list_root_registration')).toMatchObject({ annotations: { readOnlyHint: true }, inputSchema: { additionalProperties: false } });
+    for (const [name] of writes) expect(rootLegacyToolDefinitions.find(t => t.name === name)).toMatchObject({ annotations: { readOnlyHint: false, destructiveHint: true }, inputSchema: { additionalProperties: false, required: expect.arrayContaining(['confirmation']) } });
+  });
+
+  it('dispatches scoped writes and bounded reads to the HTTP service', async () => {
+    const { GET } = await import('../src/app/api/root/registration/route');
+    const filters = { q: 'example', workspaceId: 'w1', status: 'pending', page: '2', accountsPage: '3' };
+    const receipt = { openRegistration: false, invitations: [], accounts: [], moreInvitations: false, moreAccounts: false };
+    h.registration.listRootRegistration.mockResolvedValue(receipt);
+    expect((await GET(get(`${url}?${new URLSearchParams(filters)}`), undefined)).status).toBe(200);
+    expect(h.registration.listRootRegistration).toHaveBeenLastCalledWith('root', filters);
+    expect(await callRootLegacyTool(viewer, 'list_root_registration', filters)).toBe(receipt);
+    expect(h.registration.listRootRegistration).toHaveBeenLastCalledWith('root', filters, 7);
+    for (const [name, args] of writes) await callRootLegacyTool(viewer, name, args);
+    expect(h.registration.revokeRootRegistrationInvitation).toHaveBeenCalledWith('root', 'w1', 'i1', { confirmation: 'REVOKE INVITATION i1' });
+    expect(h.registration.controlRootRegistrationAccount.mock.calls).toEqual([
+      ['root', 'u1', 'resend', { confirmation: 'RESEND VERIFICATION u1' }],
+      ['root', 'u1', 'delete', { confirmation: 'DELETE UNVERIFIED ACCOUNT u1' }],
+    ]);
+  });
+
+  it.each(writes)('rejects invalid confirmations and arguments for %s before dispatch', async (name, args) => {
+    const { confirmation, ...without } = args;
+    for (const input of [without, { ...args, confirmation: 'yes' }, { ...args, confirmation: confirmation.toLowerCase() }, { ...args, confirmation: `${confirmation} ` }, { ...args, confirmation: confirmation.replace(/ (i1|u1)$/, ' other') }, { ...args, force: true }]) await expect(callRootLegacyTool(viewer, name, input)).rejects.toMatchObject({ code: 'invalid_request' });
+    for (const field of Object.keys(without)) for (const value of [null, 1, '', 'x'.repeat(256), 'bad\nidentifier']) await expect(callRootLegacyTool(viewer, name, { ...args, [field]: value })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(h.registration.revokeRootRegistrationInvitation).not.toHaveBeenCalled();
+    expect(h.registration.controlRootRegistrationAccount).not.toHaveBeenCalled();
+  });
+
+  it('denies non-Root and workspace-key identities for all four tools before services', async () => {
+    for (const actor of [{ userId: 'member', isInstanceOwner: false }, { userId: 'root', isInstanceOwner: true, apiKeyId: 'key' }]) {
+      for (const [name, args] of [['list_root_registration', {}], ...writes] as const) await expect(callRootLegacyTool(actor, name, args)).rejects.toMatchObject({ code: 'forbidden' });
+    }
+    for (const fn of Object.values(h.registration)) expect(fn).not.toHaveBeenCalled();
   });
 });
