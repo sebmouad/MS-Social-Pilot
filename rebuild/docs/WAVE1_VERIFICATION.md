@@ -52,3 +52,14 @@ production build (dev server used); MCP calls with real keys; live Facebook.
   blocks that defect class statically.
 - Not covered: team invitation email acceptance in the browser, Root deletion
   buttons in the browser, themes other than the default, production build.
+- Team invitation end to end in the browser: with temporary loopback SMTP and
+  `settings.invitationsEnabled`, the owner invited a new address as Contributor;
+  the real email's `/join` link let the person create an account and join
+  (membership created, email verified, invitation accepted). Copy that wrongly said
+  invitees needed an existing account was corrected.
+- Root deletion buttons in the browser: the invitee (disabled) was deleted from
+  `/root/lifecycle`, then a suspended synthetic workspace; both were gone in the
+  database. Wide Root tables keep their documented local horizontal scroll, so the
+  Action column can sit past the scroll edge at narrow desktop widths.
+- Cleanup: Root grant reverted (one installation owner), invitation, email logs,
+  test audit rows and nine temporary `app_settings` rows removed; 111 tables.

@@ -168,7 +168,7 @@ export function InvitationControls({ invitations, actorRole, available }: {
   }
 
   return <section className={styles.invitations} aria-labelledby="team-invitations-heading">
-    <div className={styles.heading}><div><h2 id="team-invitations-heading">Invitations</h2><p>Invite someone with an existing account. The link expires at the time shown below.</p></div></div>
+    <div className={styles.heading}><div><h2 id="team-invitations-heading">Invitations</h2><p>Invite someone by email. They can join with an existing account or create one from the link. The link expires at the time shown below.</p></div></div>
 
     {canManage && !available && <p className={styles.unavailable} role="status">Invitations are unavailable right now. Existing invitations remain listed below.</p>}
     {canManage && available && <form method="post" noValidate className={styles.form} onSubmit={startInvite}>
@@ -181,7 +181,7 @@ export function InvitationControls({ invitations, actorRole, available }: {
             if (reissuing && next.trim().toLowerCase() !== reissuing.email.trim().toLowerCase()) setReissuing(null);
             setConfirmation('');
           }} />
-          {validation.errors.email ? <FieldError id="team-invitation-email-error">{validation.errors.email}</FieldError> : <span id="team-invitation-email-help" className={styles.hint}>The invited person must have an existing account.</span>}
+          {validation.errors.email ? <FieldError id="team-invitation-email-error">{validation.errors.email}</FieldError> : <span id="team-invitation-email-help" className={styles.hint}>They can use an existing account or create one when they accept.</span>}
         </label>
         <label className={styles.field}>Workspace role
           <select value={role} disabled={busy} onChange={event => { setRole(event.currentTarget.value as (typeof ROLES)[number]); setConfirmation(''); }}>
