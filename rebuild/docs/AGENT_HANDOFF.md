@@ -786,3 +786,20 @@ auth/onboarding (Session A);
 then wave 3 (auth/onboarding, feeds and integrations WIP, agency extras, owner
 export). The untracked feeds/integrations/webhooks/API-access WIP in the main
 checkout is still unintegrated; its media and AI parts are superseded by main.
+
+## Preview migrations 23–24 applied (2026-10-20, Session A)
+
+`20261026100000_rebuild_oauth_connectors` (SHA-256 `58514dc2…79d5`) and
+`20261027100000_rebuild_workspace_exports` (Codex-authored async export, SHA-256
+`1d154d62…acac`) were applied to the synthetic `_preview` database only, each in a
+single transaction, after a full `pg_dump -Fc` backup (SHA-256
+`026bfda559f07d97c6f3ae3ee24392316b63ab37dccbdcb9e68c02958abce2fb`, kept outside
+Git in the session scratchpad) whose scratch restore matched all 107 table row
+counts. Preview now has 111 tables. Both are pinned in
+`scripts/cutover-rehearsal.sh` and its test. The full schema-only rehearsal script
+was NOT rerun (needs a sanitized staging dump and host `psql`). Production untouched.
+
+Clean-main full suite at `6d25791b` with real PostgreSQL (set both
+`REBUILD_PREVIEW_DATABASE_URL` and `DATABASE_URL`): 3,724 tests, 0 skips, typecheck
+clean; 7 failures in the parallel run all pass with `--no-file-parallelism`
+(shared-database collisions, not product defects).
