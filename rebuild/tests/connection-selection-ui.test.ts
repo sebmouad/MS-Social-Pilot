@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConnectionManager } from '../src/modules/settings/ui/connections/manager';
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 vi.mock('../src/modules/settings/ui/settings.module.css', () => ({ default: {} }));
@@ -31,7 +33,7 @@ describe('connection selection recovery', () => {
     expect(checkbox.checked).toBe(true);
   });
 
-  it('omits restored choices from the write request', async () => {
+  it('does not write when all choices were restored', async () => {
     const fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ error: 'Example recovery response' }) });
     vi.stubGlobal('fetch', fetch);
     const checkbox = container.querySelector<HTMLInputElement>('input[type=checkbox]')!;
@@ -39,7 +41,8 @@ describe('connection selection recovery', () => {
     await act(async () => checkbox.click());
     const save = [...container.querySelectorAll('button')].find(button => button.textContent === 'Save selections')!;
     await act(async () => save.click());
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ items: [] });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(container.querySelector('dialog')).toBeNull();
     vi.unstubAllGlobals();
   });
 

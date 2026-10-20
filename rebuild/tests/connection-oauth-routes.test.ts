@@ -25,6 +25,20 @@ vi.mock('../src/platforms/facebook/runtime', () => ({
 }));
 vi.mock('../src/platforms/facebook/discovery', () => ({ persistFacebookDiscovery: mocks.persistFacebookDiscovery, recordFacebookConnectionFailure: mocks.recordFacebookConnectionFailure }));
 
+// The compatibility start route now enforces the same current-session/service authority as canonical REST/MCP.
+vi.mock('../src/modules/settings/server/account-session', () => ({ accountSessionActor: async (userId: string, workspaceId: string) => ({ userId, workspaceId, sessionTokenHash: 'synthetic-session' }) }));
+vi.mock('../src/server/data', () => ({
+  getSessionByTokenHash: async () => ({ userId: 'user-1', user: { id: 'user-1', disabledAt: null }, pending: null, expiresAt: new Date('2099-01-01') }),
+  prisma: { membership: { findUnique: async () => ({ role: 'owner' }) }, $transaction: async (run: (tx: unknown) => unknown) => run({}) },
+}));
+vi.mock('../src/server/account-settings', () => ({ auditAccountMutation: async () => {} }));
+vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: async () => ({ features: { 'settings/connections': { read: true, write: true } } }) }));
+vi.mock('../src/server/entitlements', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/server/entitlements')>(),
+  canUseFeature: () => true,
+  loadEntitlements: async () => ({ ...(await mocks.requireViewer()).entitlements, workspaceId: 'workspace-1' }),
+}));
+
 import { GET as callbackRoute } from '../src/app/api/connections/[platform]/callback/route';
 import { POST as startRoute } from '../src/app/api/connections/[platform]/start/route';
 
@@ -47,7 +61,7 @@ afterEach(() => {
 beforeEach(() => {
   process.env.ENCRYPTION_KEY = validKey;
   mocks.requireViewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' }, entitlements: { platformCapabilities: { facebook: true } } });
-  mocks.runtimeConfig.mockImplementation((key: string) => Promise.resolve(key === 'meta.pageInsightReadScopes' ? ['read_insights', 'pages_read_engagement'] : key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.adsManageScopes' ? ['ads_management'] : key === 'meta.postReadScopes' ? ['pages_read_engagement'] : key === 'meta.oauthStateMinutes' ? 10 : key === 'platforms.facebook.enabled' ? true : key === 'ads.managementEnabled' ? false : undefined));
+  mocks.runtimeConfig.mockImplementation((key: string) => Promise.resolve(key === 'app.publicOrigin' ? '' : key === 'meta.pageInsightReadScopes' ? ['read_insights', 'pages_read_engagement'] : key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.adsManageScopes' ? ['ads_management'] : key === 'meta.postReadScopes' ? ['pages_read_engagement'] : key === 'meta.oauthStateMinutes' ? 10 : key === 'platforms.facebook.enabled' ? true : key === 'ads.managementEnabled' ? false : undefined));
   mocks.configuredFacebookAdapter.mockResolvedValue({ id: 'facebook', capabilities: { connection: 'supported' }, getAuthorizationUrl: vi.fn() });
   mocks.engine.getAuthorizationUrl.mockImplementation((input: { state: string; scopes: string[] }) => `https://www.facebook.com/dialog/oauth?state=${input.state}&scope=${input.scopes.join(',')}`);
   mocks.configuredFacebookOAuth.mockResolvedValue({ appId: 'app-id', appSecret: 'app-secret', redirectUri: callbackUrl, scopes: ['pages_show_list'] });
@@ -63,14 +77,14 @@ beforeEach(() => {
 
 describe('Meta OAuth start route', () => {
   it('denies a platform no longer entitled before preparing provider authorization', async () => {
-    mocks.requireViewer.mockResolvedValueOnce({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' }, entitlements: { platformCapabilities: { facebook: false } } });
-    const response = await POST(new Request(startUrl, { method: 'POST', headers: { origin: 'https://social.example.test' } }));
-    expect(response.status).toBe(404);
+    mocks.requireViewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' }, entitlements: { platformCapabilities: { facebook: false } } });
+    const response = await POST(new Request(startUrl, { method: 'POST', headers: { origin: 'https://social.example.test' }, body: JSON.stringify({ confirmation: 'START CONNECTION facebook' }) }));
+    expect(response.status).toBe(409);
     expect(mocks.engine.getAuthorizationUrl).not.toHaveBeenCalled();
   });
 
   it('enforces same-origin and sets a short-lived HttpOnly callback state cookie', async () => {
-    const request = new Request(startUrl, { method: 'POST', headers: { origin: 'https://social.example.test' } });
+    const request = new Request(startUrl, { method: 'POST', headers: { origin: 'https://social.example.test' }, body: JSON.stringify({ confirmation: 'START CONNECTION facebook' }) });
     const response = await POST(request);
     const body = await response.json();
     const state = new URL(body.authorizationUrl).searchParams.get('state');
@@ -94,7 +108,7 @@ describe('Meta OAuth start route', () => {
 
 describe('Meta OAuth callback route', () => {
   it('rechecks platform entitlement on return before exchanging or persisting', async () => {
-    mocks.requireViewer.mockResolvedValueOnce({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' }, entitlements: { platformCapabilities: { facebook: false } } });
+    mocks.requireViewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' }, entitlements: { platformCapabilities: { facebook: false } } });
     const response = await GET(new NextRequest(callbackUrl + '?code=never-exchange'));
     expect(response.headers.get('location')).toContain('notice=connect_failed');
     expect(mocks.engine.exchangeCode).not.toHaveBeenCalled();

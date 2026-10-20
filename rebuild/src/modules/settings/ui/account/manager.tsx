@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { DataTable, Badge, ConfirmDialog, useToast } from '@/components';
+import { IconDevices } from '@tabler/icons-react';
 import { useConfirm } from '@/components/useConfirm';
 import type { AccountConfirmationCopy } from '../../account-confirmation-copy';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
@@ -10,8 +12,10 @@ import { accountCopy, fill } from './copy';
 type Session = { id: string; expiresAt: string; current: boolean };
 
 export function AccountManager({ initialName, email, passwordPolicy, canWrite, nameMaxLength, confirmationCopy, locale = 'en' }: { canWrite: boolean; nameMaxLength: number; confirmationCopy: AccountConfirmationCopy; initialName: string; email: string; passwordPolicy: { minLength: number; maxBytes: number }; locale?: 'en' | 'fr' }) {
+  const toast = useToast();
   const t = accountCopy[locale];
   const [confirm, confirmationDialog] = useConfirm(confirmationCopy);
+  const [pendingSession, setPendingSession] = useState<string | null>(null);
   const [name, setName] = useState(initialName);
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -53,8 +57,8 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
     try {
       const response = await fetch('/api/settings/account', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, confirmation: 'UPDATE ACCOUNT PROFILE' }) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error ?? t.profileFailed);
-      setName(result.name); setNotice(t.profileUpdated);
-    } catch { setNotice(t.profileFailed); }
+      setName(result.name); setNotice(t.profileUpdated); toast.notify({ title: t.profileUpdated });
+    } catch { setNotice(t.profileFailed); toast.failed(t.profileFailed, () => document.querySelector<HTMLInputElement>('[name="name"]')?.focus(), t.saveProfile); }
     finally { setBusy(false); }
   }
 
@@ -68,23 +72,24 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
     try {
       const response = await fetch('/api/settings/account', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ currentPassword, newPassword, confirmation: 'CHANGE ACCOUNT PASSWORD' }) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error ?? t.passwordFailed);
-      setCurrentPassword(''); setNewPassword(''); setSessions(current => current.filter(session => session.current)); setNextOffset(null); setNotice(t.passwordChanged);
-    } catch { setNotice(t.passwordFailed); }
+      setCurrentPassword(''); setNewPassword(''); setSessions(current => current.filter(session => session.current)); setNextOffset(null); setNotice(t.passwordChanged); toast.notify({ title: t.passwordChanged });
+    } catch { setNotice(t.passwordFailed); toast.failed(t.passwordFailed, () => document.querySelector<HTMLInputElement>('[name="currentPassword"]')?.focus(), t.changePassword); }
     finally { setBusy(false); }
   }
 
   async function revokeSession(id: string) {
-    if (!canWrite || !await confirm(confirmationCopy.session)) return;
+    if (!canWrite) return t.revokeFailed;
     setBusy(true); setNotice('');
     try {
       const response = await fetch('/api/settings/account/sessions', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, confirmation: `REVOKE ACCOUNT SESSION ${id}` }) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error ?? t.revokeFailed);
-      setSessions(current => current.filter(session => session.id !== id)); setNotice(t.sessionRevoked);
-    } catch { setNotice(t.revokeFailed); }
+      setSessions(current => current.filter(session => session.id !== id)); setNotice(t.sessionRevoked); toast.notify({ title: t.sessionRevoked });
+    } catch { setNotice(t.revokeFailed); toast.failed(t.revokeFailed, () => setPendingSession(id), t.signOut); return t.revokeFailed; }
     finally { setBusy(false); }
   }
 
   return <>{confirmationDialog}
+    {pendingSession && <ConfirmDialog open title={t.signOut} objectName={`${t.otherSession} · ${pendingSession}`} consequence={confirmationCopy.session} confirmLabel={t.signOut} cancelLabel={confirmationCopy.cancel} failureLabel={t.revokeFailed} onClose={() => setPendingSession(null)} onConfirm={async () => (await revokeSession(pendingSession)) ?? null} />}
     <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.profile}</h2><p>{t.profileDetail}</p></div></div>
       <form method="post" noValidate className={styles['mcp-key-form']} onSubmit={saveName}>
         <div className={styles['mcp-key-fields']}><label>{t.name}<input name="name" required maxLength={nameMaxLength} value={name} onChange={event => { setName(event.currentTarget.value); nameValidation.clear('name'); }} disabled={busy || !canWrite} {...nameValidation.fieldProps('name')} /><FieldError {...nameValidation.errorProps('name')} /></label><label>{t.email}<input name="email" value={email} readOnly aria-describedby="account-email-note" /></label></div>
@@ -99,10 +104,11 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
       </div><p className={styles['settings-note']}>{fill(t.passwordRule, { min: passwordPolicy.minLength, max: passwordPolicy.maxBytes })}</p><button type="submit" disabled={busy}>{t.changePassword}</button></form>
     </section>}
     <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.sessions}</h2><p>{t.sessionsDetail}</p></div></div>
-      <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th>{t.session}</th><th>{t.expires}</th><th /></tr></thead><tbody>
-        {sessions.map(session => <tr key={session.id}><td>{session.current ? t.currentSession : t.otherSession}</td><td>{new Date(session.expiresAt).toLocaleString(locale)}</td><td>{canWrite && !session.current && <button type="button" disabled={busy} onClick={() => revokeSession(session.id)}>{t.signOut}</button>}</td></tr>)}
-        {!sessions.length && <tr><td colSpan={3}>{t.noSessions}</td></tr>}
-      </tbody></table></div>
+      <DataTable caption={t.sessions} rows={sessions} rowKey={session => session.id} emptyMessage={t.noSessions} emptyIcon={<IconDevices />} columns={[
+        { key: 'session', label: t.session, render: session => <Badge tone={session.current ? 'module' : 'neutral'}>{session.current ? t.currentSession : t.otherSession}</Badge> },
+        { key: 'expires', label: t.expires, render: session => new Date(session.expiresAt).toLocaleString(locale) },
+        { key: 'actions', label: t.signOut, render: session => canWrite && !session.current && <button type="button" className="ui-button ui-button--quiet" disabled={busy} onClick={() => setPendingSession(session.id)}>{t.signOut}</button> },
+      ]} />
     </section>
     {nextOffset !== null && <button type="button" disabled={busy} onClick={() => void moreSessions()}>{confirmationCopy.more}</button>}
     {notice && <p role="status" className={styles['settings-note']}>{notice}</p>}

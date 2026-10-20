@@ -10,7 +10,9 @@ import { fill } from '@/modules/settings/ui/shell-copy';
 import { ConnectionManager } from './manager';
 import { connectablePlatforms, platformGrantHealth } from '@/server/platforms/registry';
 import { summarizeConnectionHealth, connectionHealthText, type ConnectionHealthCopyKey } from '@/lib/connection-health';
-import { ReconnectButton } from './reconnect';
+import { ConnectionRowMenu } from './row-menu';
+import { DataTable, EmptyState } from '@/components';
+import { IconPlugConnected } from '@tabler/icons-react';
 import { platformModule } from '@/platforms';
 import { connectionState } from '@/lib/connection-status';
 import { runtimeConfig } from '@/server/config/store';
@@ -50,28 +52,31 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     {notice('saved', 'status', t.saved)}
     {notice('failed', 'alert', t.failed)}
     {!accounts.length && !adRows.length ? <SettingsPanel title={t.noneTitle} detail={t.noneDetail}>
-      <p className={styles['settings-empty']}>{connectable.length && canManage ? t.noneConnect : t.noneAvailable}</p>
+      <EmptyState title={t.noneTitle} icon={<IconPlugConnected />} action={connectable.length && canManage ? <a href="#connection-actions">{t.manageSelections}</a> : <a href="/settings/account">{t.account}</a>}>{canManage && connectable.length ? t.noneConnect : t.noneAvailable}</EmptyState>
     </SettingsPanel> : <>
     <SettingsPanel title={t.socialPanel} detail={accounts.length === 1 ? t.socialDetailOne : fill(t.socialDetailMany, { count: accounts.length })}>
-      {accounts.length ? <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th scope="col">{t.account}</th><th scope="col">{t.platform}</th><th scope="col">{t.channels}</th><th scope="col">{t.status}</th>{canManage && <th scope="col">{t.actions}</th>}</tr></thead><tbody>
-        {accounts.map(account => { const health = healthById.get(account.id)!; return <tr key={account.id}>
-          <td><span className={styles['settings-table__primary']}>{account.name}</span><span className={styles['settings-table__secondary']}>{fill(t.added, { date: dayFormat.format(account.createdAt) })}</span></td>
-          <td>{providerName(account.provider)}</td>
-          <td>{account.targets.length ? <><span className={styles['settings-table__secondary']}>{fill(t.selectedOf, { enabled: account.targets.filter(target => target.enabled).length, total: account.targets.length })}</span><div className={styles['settings-inline-list']}>{account.targets.map(target => <div key={target.id} className={styles['settings-chip']} data-disabled={!target.enabled}><span className={styles['settings-chip__dot']} />{target.name || providerName(target.type)}{!target.enabled && t.notSelectedSuffix}</div>)}</div></> : <span className={styles['settings-table__secondary']}>{t.noChannels}</span>}</td>
-          <td><Status tone={health.token === 'valid' ? 'good' : 'warning'}>{text(`token.${health.token}`)}</Status>
-            <span className={styles['settings-table__secondary']}>{account.tokenExpiresAt ? text('token.expiresOn', { date: dateFormat.format(account.tokenExpiresAt) }) : text('token.noExpiry')}</span>
+      {[...new Set(accounts.map(account => account.provider))].map(provider => <section key={provider} aria-label={providerName(provider)}>
+        <h3>{providerName(provider)}</h3>
+        <DataTable caption={`${t.socialPanel} · ${providerName(provider)}`} rows={accounts.filter(account => account.provider === provider)} rowKey={account => account.id} emptyMessage={t.noSocial} columns={[
+          { key: 'account', label: t.account, render: account => <><span className={styles['connection-mark']} aria-hidden="true">{account.name.slice(0, 1)}</span><strong>{account.name}</strong><span className={styles['settings-table__secondary']}>{fill(t.added, { date: dayFormat.format(account.createdAt) })}</span></> },
+          { key: 'channels', label: t.channels, render: account => account.targets.length ? <><span>{fill(t.selectedOf, { enabled: account.targets.filter(target => target.enabled).length, total: account.targets.length })}</span><div className={styles['settings-inline-list']}>{account.targets.map(target => <div key={target.id} className={styles['settings-chip']} data-disabled={!target.enabled}>{target.name || target.type}{!target.enabled && t.notSelectedSuffix}</div>)}</div></> : t.noChannels },
+          { key: 'status', label: t.status, render: account => { const health = healthById.get(account.id)!; return <><Status tone={health.token === 'valid' ? 'good' : 'warning'}>{text(`token.${health.token}`)}</Status><span className={styles['settings-table__secondary']}>{account.tokenExpiresAt ? text('token.expiresOn', { date: dateFormat.format(account.tokenExpiresAt) }) : text('token.noExpiry')}</span>
             {health.grants.length > 0 && <ul className={styles['settings-health-list']} aria-label={text('permissions')}>{health.grants.map(group => <li key={group.id}>{group.label}: {text(group.state)}</li>)}</ul>}
             {health.missing.length > 0 && <span className={styles['settings-table__secondary']}>{text('missingSummary', { labels: health.missing.map(group => group.label).join(', ') })}</span>}
-            {health.grants.length > 0 && health.grants.every(group => group.state === 'unknown') && <span className={styles['settings-table__secondary']}>{text('unknownSummary')}</span>}</td>
-          {canManage && <td><div className={styles['settings-row-actions']}>{health.reconnectRecommended && <ReconnectButton platformId={account.provider} label={text('reconnect')} busyLabel={text('reconnecting')} failedLabel={text('reconnectFailed')} />}<a href={`/settings/connections?source=${encodeURIComponent(account.id)}&action=manage`}>{t.manage}</a><a className={styles['settings-row-actions__danger']} href={`/settings/connections?source=${encodeURIComponent(account.id)}&action=disconnect`}>{t.disconnect}</a></div></td>}
-        </tr>; })}
-      </tbody></table></div> : <div className={styles['settings-empty']}>{t.noSocial}</div>}
+            {health.grants.length > 0 && health.grants.every(group => group.state === 'unknown') && <span className={styles['settings-table__secondary']}>{text('unknownSummary')}</span>}</>; } },
+          ...(canManage ? [{ key: 'actions', label: t.actions, render: (account: (typeof accounts)[number]) => <ConnectionRowMenu id={account.id} name={account.name} platformId={account.provider} manageLabel={t.manageSelection} disconnectLabel={t.disconnect} actionsLabel={t.actions} reconnectLabel={text('reconnect')} busyLabel={text('reconnecting')} failedLabel={text('reconnectFailed')} /> }] : []),
+        ]} />
+      </section>)}
       {!canManage && <p className={styles['settings-note']}>{t.managersOnly}</p>}
     </SettingsPanel>
     <SettingsPanel title={t.adPanel} detail={adRows.length === 1 ? t.adDetailOne : fill(t.adDetailMany, { count: adRows.length })}>
-      {adRows.length ? <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th scope="col">{t.adAccount}</th><th scope="col">{t.linkedProfile}</th><th scope="col">{t.accountId}</th><th scope="col">{t.status}</th>{canManage && <th scope="col">{t.actions}</th>}</tr></thead><tbody>
-        {adRows.map(ad => <tr key={ad.id}><td><span className={styles['settings-table__primary']}>{ad.name}</span><span className={styles['settings-table__secondary']}>{ad.provider ? providerName(ad.provider) : t.platformMissing}</span></td><td>{ad.owner ?? t.noLinkedProfile}</td><td>{ad.actId}</td><td><Status tone={ad.enabled && ad.state === 'connected' ? 'good' : 'warning'}>{!ad.enabled ? t.notSelected : ad.state && ad.state !== 'connected' ? statusLabels[ad.state] : t.selected}</Status></td>{canManage && <td>{ad.socialAccountId && socialById.has(ad.socialAccountId) ? <a className={styles['settings-row-actions__link']} href={`/settings/connections?source=${encodeURIComponent(ad.socialAccountId)}&action=manage`}>{t.manageSelection}</a> : <span className={styles['settings-table__secondary']}>{t.reconnectFirst}</span>}</td>}</tr>)}
-      </tbody></table></div> : <div className={styles['settings-empty']}>{t.noAds}</div>}
+      <DataTable caption={t.adPanel} rows={adRows} rowKey={ad => ad.id} emptyMessage={t.noAds} emptyIcon={<IconPlugConnected />} columns={[
+        { key: 'account', label: t.adAccount, render: ad => <><strong>{ad.name}</strong><span className={styles['settings-table__secondary']}>{ad.provider ? providerName(ad.provider) : t.platformMissing}</span></> },
+        { key: 'profile', label: t.linkedProfile, render: ad => ad.owner ?? t.noLinkedProfile },
+        { key: 'id', label: t.accountId, render: ad => ad.actId },
+        { key: 'status', label: t.status, render: ad => <Status tone={ad.enabled && ad.state === 'connected' ? 'good' : 'warning'}>{!ad.enabled ? t.notSelected : ad.state && ad.state !== 'connected' ? statusLabels[ad.state] : t.selected}</Status> },
+        ...(canManage ? [{ key: 'actions', label: t.actions, render: (ad: (typeof adRows)[number]) => ad.socialAccountId && socialById.has(ad.socialAccountId) ? <a href={`/settings/connections?source=${encodeURIComponent(ad.socialAccountId)}&action=manage`}>{t.manageSelection}</a> : t.reconnectFirst }] : []),
+      ]} />
     </SettingsPanel>
     </>}
     <p className={styles['settings-note']}>{t.footnote}</p>

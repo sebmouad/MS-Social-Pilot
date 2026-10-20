@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { DataTable, Badge, Select, ConfirmDialog, useToast } from '@/components';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
@@ -28,6 +29,7 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
   defaultRole?: string;
   defaultAllPages?: boolean;
 }) {
+  const toast = useToast();
   const t = teamCopy[locale];
   const roleLabel = (role: string) => teamRoleLabel(locale, role);
   const router = useRouter();
@@ -61,7 +63,6 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
   const canonicalEmail = email.trim().toLowerCase();
   const addConfirmation = addTeamConfirmation(canonicalEmail);
   const editConfirmation = editing ? updateTeamConfirmation(editing.id) : '';
-  const removeConfirmation = removing ? removeTeamConfirmation(removing.id) : '';
   const effectiveScope = (selectedRole: string, selectedScope: Scope) => managerRole(selectedRole) || selectedScope.allPages ? { allPages: true, targetIds: [] } : selectedScope;
   const scopeForRole = (selectedRole: string, selectedScope: Scope) => managerRole(selectedRole) ? { allPages: true, targetIds: selectedScope.targetIds } : selectedScope;
 
@@ -79,7 +80,7 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
   }
 
   async function submit(method: 'POST' | 'PATCH' | 'DELETE', body: Record<string, unknown>, expected: ReceiptAction) {
-    if (pendingRequest.current) return;
+    if (pendingRequest.current) return t.unconfirmed;
     const controller = new AbortController();
     pendingRequest.current = { controller };
     setBusy(true);
@@ -99,15 +100,16 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
         throw new Error(t.unconfirmed);
       }
       if (!mounted.current) return;
-      setFeedback({ text: expected === 'added' ? t.added : expected === 'updated' ? t.updated : t.removed, error: false });
+      const text = expected === 'added' ? t.added : expected === 'updated' ? t.updated : t.removed;
+      setFeedback({ text, error: false }); toast.notify({ title: text });
       setAddReview(false); setEditing(null); setRemoving(null); setConfirmation('');
-      router.refresh();
+      router.refresh(); return null;
     } catch (error) {
       if (!mounted.current || (error instanceof DOMException && error.name === 'AbortError')) return;
       const message = responseReceived
         ? error instanceof Error ? error.message : t.teamFailed
         : t.unconfirmed;
-      setFeedback({ text: message, error: true });
+      setFeedback({ text: message, error: true }); toast.failed(message, () => router.refresh(), t.directory); return message;
     } finally {
       if (pendingRequest.current?.controller === controller) pendingRequest.current = null;
       if (mounted.current) setBusy(false);
@@ -137,9 +139,7 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
   function roleSelect(value: string, onChange: (value: string) => void, disabled: boolean, name: string) {
     const choices = TEAM_ROLES.filter(item => item !== 'owner' || actorRole === 'owner' || value === 'owner');
     return <label className={styles.field}>{name}
-      <select value={value} disabled={disabled} onChange={event => onChange(event.currentTarget.value)}>
-        {choices.map(item => <option key={item} value={item}>{roleLabel(item)}</option>)}
-      </select>
+<Select aria-label={name} name="role" value={value} disabled={disabled} onChange={onChange} options={choices.map(item => ({ value: item, label: roleLabel(item) }))} />
     </label>;
   }
 
@@ -167,25 +167,16 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
     {feedback && !feedback.error && <p ref={feedbackRef} tabIndex={-1} className={styles.success} role="status">{feedback.text}</p>}
 
     {hasMore && <p className={styles.directoryLimit}>{fill(t.showing, { shown: members.length, total })}</p>}
-    <div className={styles.tableWrap} role="region" aria-label={t.directory} tabIndex={0}>
-      <table className={styles.table}>
-        <caption className={styles.visuallyHidden}>{t.caption}</caption>
-        <thead><tr><th scope="col">{t.person}</th><th scope="col">{t.workspaceRole}</th><th scope="col">{t.channelAccess}</th><th scope="col"><span className={styles.visuallyHidden}>{t.memberActions}</span></th></tr></thead>
-        <tbody>{members.map(member => {
-          const blockedOwner = member.role === 'owner' && actorRole !== 'owner';
-          const canEditMember = member.userId !== actorId && !blockedOwner;
-          const memberTargets = targets.filter(target => member.targetIds.includes(target.id));
-          const missingTargetCount = member.targetIds.filter(id => !targets.some(target => target.id === id)).length;
-          const fullChannelAccess = managerRole(member.role) || member.allPages;
-          return <tr key={member.id}>
-            <th scope="row"><span className={styles.person}>{member.name || member.email}{member.userId === actorId && <span className={styles.you}>{t.you}</span>}</span><span className={styles.email}>{member.email}</span></th>
-            <td><span className={styles.role}>{roleLabel(member.role)}</span></td>
-            <td>{fullChannelAccess ? <span className={styles.channelSummary}><span>{t.allChannels}</span></span> : memberTargets.length || missingTargetCount ? <span className={styles.channelSummary}>{memberTargets.map(target => <span key={target.id}>{target.name}</span>)}{Boolean(missingTargetCount) && <span>{missingTargetCount === 1 ? t.unavailableOne : fill(t.unavailableMany, { count: missingTargetCount })}</span>}</span> : <span className={styles.none}>{t.noneSelected}</span>}</td>
-            <td><div className={styles.rowActions}>{!canManage ? <span className={styles.hint}>{t.viewOnly}</span> : member.userId === actorId ? <span className={styles.hint}>{t.yourAccount}</span> : blockedOwner ? <span className={styles.hint}>{t.ownerOnly}</span> : canEditMember && <><Button size="sm" disabled={busy} onClick={() => beginEdit(member)}>{t.editAccess}</Button><Button size="sm" variant="quiet" disabled={busy} onClick={() => { setRemoving(member); setConfirmation(''); setFeedback(null); }}>{t.remove}</Button></>}</div></td>
-          </tr>;
-        })}</tbody>
-      </table>
-    </div>
+    <DataTable caption={t.caption} rows={members} rowKey={member => member.id} emptyMessage={t.noneSelected} columns={[
+      { key: 'person', label: t.person, render: member => <><span className={styles.person}>{member.name || member.email}{member.userId === actorId && <span className={styles.you}>{t.you}</span>}</span><span className={styles.email}>{member.email}</span></> },
+      { key: 'role', label: t.workspaceRole, render: member => <Badge tone={managerRole(member.role) ? 'module' : 'neutral'}>{roleLabel(member.role)}</Badge> },
+      { key: 'scope', label: t.channelAccess, render: member => {
+        const memberTargets = targets.filter(target => member.targetIds.includes(target.id));
+        const missingTargetCount = member.targetIds.filter(id => !targets.some(target => target.id === id)).length;
+        return managerRole(member.role) || member.allPages ? <span>{t.allChannels}</span> : memberTargets.length || missingTargetCount ? <span className={styles.channelSummary}>{memberTargets.map(target => <span key={target.id}>{target.name}</span>)}{Boolean(missingTargetCount) && <span>{missingTargetCount === 1 ? t.unavailableOne : fill(t.unavailableMany, { count: missingTargetCount })}</span>}</span> : <span className={styles.none}>{t.noneSelected}</span>;
+      } },
+      { key: 'actions', label: t.memberActions, render: member => <div className={styles.rowActions}>{!canManage ? <span className={styles.hint}>{t.viewOnly}</span> : member.userId === actorId ? <span className={styles.hint}>{t.yourAccount}</span> : member.role === 'owner' && actorRole !== 'owner' ? <span className={styles.hint}>{t.ownerOnly}</span> : <><Button size="sm" disabled={busy} onClick={() => beginEdit(member)}>{t.editAccess}</Button><Button size="sm" variant="quiet" disabled={busy} onClick={() => { setRemoving(member); setConfirmation(''); setFeedback(null); }}>{t.remove}</Button></>}</div> },
+    ]} />
 
     <Dialog open={addReview} title={t.reviewNew} description={t.reviewNewDetail} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>{t.back}</Button><Button variant="primary" disabled={busy || confirmation !== addConfirmation} onClick={() => void submit('POST', { email: canonicalEmail, role, targetIds: effectiveScope(role, scope).targetIds, allPages: effectiveScope(role, scope).allPages, confirmation: addConfirmation }, 'added')}>{busy ? t.adding : t.addMember}</Button></>}>
       <div className={styles.review}><p><span>{t.account}</span><strong>{canonicalEmail}</strong></p><p><span>{t.role}</span><strong>{roleLabel(role)}</strong></p><p><span>{t.channels}</span><strong>{managerRole(role) ? t.allIncluded : scope.allPages ? t.allChannels : targets.filter(target => scope.targetIds.includes(target.id)).map(target => target.name).join(', ') || t.noneSelected}</strong></p></div>
@@ -206,9 +197,8 @@ export function TeamControls({ members, targets, actorId, actorRole, total = mem
       </>}
     </Dialog>
 
-    <Dialog open={Boolean(removing)} title={t.removeTitle} description={removing ? fill(t.removeDetail, { name: removing.name || removing.email }) : undefined} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>{t.keepMember}</Button><Button variant="danger" disabled={busy || !removing || confirmation !== removeConfirmation} onClick={() => removing && void submit('DELETE', { membershipId: removing.id, confirmation: removeConfirmation }, 'removed')}>{busy ? t.removing : t.removeFromWorkspace}</Button></>}>
-      {removing && <><p className={styles.removeCopy}>{t.removeCopy}</p><ConfirmationField locale={locale} expected={removeConfirmation} value={confirmation} onChange={setConfirmation} busy={busy} action="REMOVE" /><p className={styles.hint}>{t.immediate}</p>{feedback?.error && <p ref={feedbackRef} tabIndex={-1} className={styles.error} role="alert">{feedback.text}</p>}</>}
-    </Dialog>
+    {removing && <ConfirmDialog open title={t.removeTitle} objectName={removing.name || removing.email} consequence={t.removeCopy} confirmLabel={t.removeFromWorkspace} cancelLabel={t.keepMember} pendingLabel={t.removing} failureLabel={t.teamFailed} onClose={() => { if (!busy) { setRemoving(null); resetConfirmation(); } }} onConfirm={async () => { const result = await submit('DELETE', { membershipId: removing.id, confirmation: removeTeamConfirmation(removing.id) }, 'removed'); return result === undefined ? t.unconfirmed : result; }} />}
+
   </div>;
 }
 

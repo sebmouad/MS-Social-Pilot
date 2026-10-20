@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import { agencyExportCopy, type AgencyExportLocale } from '../export-copy';
 
 /** Remount on filter changes so an old request can never download a new filter's export. */
 export function AgencyExport({ query, locale }: { query: string; locale: AgencyExportLocale }) {
+  const toast = useToast();
   const t = agencyExportCopy[locale];
   const request = useRef<AbortController | null>(null);
   const feedbackRef = useRef<HTMLParagraphElement>(null);
@@ -31,8 +33,8 @@ export function AgencyExport({ query, locale }: { query: string; locale: AgencyE
         const anchor = document.createElement('a'); anchor.href = url; anchor.download = result.filename;
         document.body.append(anchor); anchor.click(); anchor.remove();
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 0); }
-      setFeedback('prepared');
-    } catch { if (!controller.signal.aborted) setFeedback('failed'); }
+      setFeedback('prepared'); toast.notify({ title: t.prepared });
+    } catch { if (!controller.signal.aborted) { setFeedback('failed'); toast.failed(t.failed, () => void download(format), format === 'csv' ? t.csv : t.json); } }
     finally { if (request.current === controller) { request.current = null; setBusy(false); } }
   }
   return <section aria-label={t.title}>

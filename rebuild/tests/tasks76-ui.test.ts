@@ -18,12 +18,12 @@ beforeEach(async()=>{
 });
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.unstubAllGlobals();});
 describe('Tasks customer confirmation and edit recovery',()=>{
-  it('requires a consequence checkbox, hides protocol commands and sends the exact selected-task confirmation',async()=>{
+  it('names the object and consequence, hides protocol commands and sends the exact selected-task confirmation',async()=>{
     vi.mocked(fetch).mockResolvedValue({ok:true,json:async()=>({ok:true})} as Response);
     await click(button('Delete'));const dialog=container.querySelector('dialog')!;
     expect(dialog.textContent).toContain('Review campaign');expect(dialog.textContent).not.toContain('DELETE TASK');
-    expect(button('Delete task',dialog).disabled).toBe(true);await click(button('Delete task',dialog));expect(fetch).not.toHaveBeenCalled();
-    await click(dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!);await click(button('Delete task',dialog));
+    expect(dialog.textContent).toContain('permanently removed'); expect(fetch).not.toHaveBeenCalled();
+    await click(button('Delete task',dialog));
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({action:'task.delete',id:'task-a',confirmation:'DELETE TASK task-a'});
     expect(container.querySelector('dialog')).toBeNull();expect(container.textContent).toContain('Task deleted.');
   });
@@ -67,4 +67,26 @@ describe('Task board shared confirmations', () => {
     await fill(dialog.querySelector<HTMLTextAreaElement>('textarea')!, 'Ready to review'); await click(button('Post comment', dialog));
     expect(sent()[0]).toEqual({ action: 'comment.add', taskId: 'task-a', body: 'Ready to review', confirmation: 'COMMENT ON TASK task-a' });
   });
+});
+
+it('saves only the edited title with optimistic version protection, keeping other task fields untouched', async () => {
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as Response);
+  const edit = container.querySelector<HTMLButtonElement>('button[aria-label="Edit Review campaign"]')!;
+  await click(edit);
+  const input = container.querySelector<HTMLInputElement>('.ui-inline-edit input')!;
+  await fill(input, 'Campaign ready');
+  await click(container.querySelector<HTMLButtonElement>('.ui-inline-edit button[aria-label="Save"]')!);
+  expect(sent()[0]).toEqual({ action: 'task.update', id: task.id, title: 'Campaign ready', expectedUpdatedAt: task.updatedAt, confirmation: 'UPDATE TASK task-a' });
+  expect(sent()[0]).not.toHaveProperty('notes'); expect(sent()[0]).not.toHaveProperty('postId');
+  expect(refresh).toHaveBeenCalledOnce();
+});
+
+it('keeps an inline title draft open after a service refusal', async () => {
+  vi.mocked(fetch).mockResolvedValue({ ok: false, json: async () => ({ error: 'This task changed. Refresh before saving.' }) } as Response);
+  await click(container.querySelector<HTMLButtonElement>('button[aria-label="Edit Review campaign"]')!);
+  const input = container.querySelector<HTMLInputElement>('.ui-inline-edit input')!;
+  await fill(input, 'A revised title');
+  await click(container.querySelector<HTMLButtonElement>('.ui-inline-edit button[aria-label="Save"]')!);
+  expect(input.value).toBe('A revised title'); expect(container.querySelector('.ui-inline-edit [role=alert]')).not.toBeNull();
+  expect(refresh).not.toHaveBeenCalled();
 });

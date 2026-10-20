@@ -34,3 +34,5 @@
 .actionError { color: var(--danger, #b3261e); font-size: .75rem; max-width: 16rem; }
 .sectionHead { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
 .section h3 { margin: .4rem 0 0; font-size: .9rem; }
+
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }

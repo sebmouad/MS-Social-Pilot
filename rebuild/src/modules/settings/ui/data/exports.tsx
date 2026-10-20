@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/Button';
-import { Dialog } from '@/components/Dialog';
+import { ConfirmDialog, useToast } from '@/components';
 import { DataTable } from '@/components/DataTable';
 import { exportCopy } from './export-copy';
 
@@ -16,12 +16,12 @@ function isJob(value: unknown): value is ExportJob {
     && Number.isFinite(Date.parse(job.createdAt)) && (job.expiresAt === null || (typeof job.expiresAt === 'string' && Number.isFinite(Date.parse(job.expiresAt))));
 }
 
-export function WorkspaceExports({ workspaceId, locale = 'en' }: { workspaceId: string; locale?: 'en' | 'fr' }) {
+export function WorkspaceExports({ workspaceId, workspaceName = workspaceId, locale = 'en' }: { workspaceId: string; workspaceName?: string; locale?: 'en' | 'fr' }) {
+  const toast = useToast();
   const copy = exportCopy[locale];
   const [jobs, setJobs] = useState<ExportJob[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState(false);
-  const [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<'requested' | 'failure' | null>(null);
   const busyRef = useRef(false);
@@ -42,15 +42,15 @@ export function WorkspaceExports({ workspaceId, locale = 'en' }: { workspaceId: 
     return () => { controller.abort(); clearInterval(timer); };
   }, [refresh, workspaceId]);
   async function requestExport() {
-    if (busyRef.current || confirmation !== expected) return;
+    if (busyRef.current) return copy.failure;
     busyRef.current = true; setBusy(true); setNotice(null);
     try {
-      const response = await fetch('/api/settings/data/exports', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation }) });
+      const response = await fetch('/api/settings/data/exports', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation: expected }) });
       const result: unknown = await response.json();
       if (!response.ok || !isJob((result as { job?: unknown })?.job)) throw new Error();
-      setNotice('requested'); setOpen(false); setConfirmation('');
+      setNotice('requested'); setOpen(false); toast.notify({ title: copy.requested });
       await refresh();
-    } catch { setNotice('failure'); }
+    } catch { setNotice('failure'); toast.failed(copy.failure, () => void refresh(), copy.refresh); return copy.failure; }
     finally { busyRef.current = false; setBusy(false); }
   }
   const date = (value: string) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
@@ -58,17 +58,13 @@ export function WorkspaceExports({ workspaceId, locale = 'en' }: { workspaceId: 
     <Button variant="primary" onClick={() => { setOpen(true); setNotice(null); }}>{copy.request}</Button>{' '}
     <Button onClick={() => { void refresh(); }}>{copy.refresh}</Button>
     {notice && !open && <p role={notice === 'failure' ? 'alert' : 'status'} tabIndex={-1} ref={node => node?.focus()}>{copy[notice]}</p>}
-    {loadError ? <p role="alert">{copy.loadError}</p> : jobs === null ? <p role="status">{copy.loading}</p> : <DataTable caption={copy.history} rows={jobs} rowKey={job => job.id} emptyMessage={copy.empty} columns={[
+    {loadError ? <p role="alert">{copy.loadError}</p> : jobs === null ? <p role="status">{copy.loading}</p> : <DataTable caption={copy.history} rows={jobs} rowKey={job => job.id} emptyMessage={copy.empty} emptyAction={<Button onClick={() => setOpen(true)}>{copy.request}</Button>} columns={[
       { key: 'created', label: copy.created, render: job => date(job.createdAt) },
       { key: 'status', label: copy.status, render: job => <>{copy.statuses[job.status]}{job.status === 'failed' && <p>{copy.failed}</p>}</> },
       { key: 'expiry', label: copy.expiry, render: job => job.expiresAt ? date(job.expiresAt) : copy.preparing },
       { key: 'download', label: copy.download, render: job => job.status === 'ready' && job.expiresAt && Date.parse(job.expiresAt) > Date.now() ? <a className="ui-button ui-button--secondary ui-button--sm" href={`/api/settings/data/exports/${encodeURIComponent(job.id)}`}>{copy.download}</a> : copy.unavailable },
     ]} />}
-    <Dialog open={open} title={copy.title} description={copy.description} busy={busy} onClose={() => { if (!busy) setOpen(false); }} actions={<><Button disabled={busy} onClick={() => setOpen(false)}>{copy.cancel}</Button><Button variant="primary" disabled={busy || confirmation !== expected} onClick={requestExport}>{busy ? copy.pending : copy.request}</Button></>}>
-      <p>{copy.confirmation}</p><p style={{ overflowWrap: 'anywhere' }}><code>{expected}</code></p>
-      <label htmlFor="workspace-export-confirmation">{copy.confirmation}</label>
-      <input id="workspace-export-confirmation" className="ui-input" autoComplete="off" value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={busy} />
-      {notice === 'failure' && <p role="alert" tabIndex={-1} ref={node => node?.focus()}>{copy.failure}</p>}
-    </Dialog>
+    {open && <ConfirmDialog open title={copy.title} objectName={workspaceName} consequence={copy.description} confirmLabel={copy.request} cancelLabel={copy.cancel} pendingLabel={copy.pending} failureLabel={copy.failure} danger={false} onClose={() => setOpen(false)} onConfirm={async () => (await requestExport()) ?? null} />}
+
   </div>;
 }

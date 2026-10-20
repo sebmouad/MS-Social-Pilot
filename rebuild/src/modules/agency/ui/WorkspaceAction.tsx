@@ -1,10 +1,12 @@
 'use client';
 import { useState } from 'react';
+import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import styles from './agency.module.css';
 
 /** Switches the signed-in session to one administered workspace, then opens the destination there. */
 export function WorkspaceAction({ workspaceId, workspaceName, href, label, variant = 'secondary' }: { workspaceId: string; workspaceName: string; href: string; label: string; variant?: 'primary' | 'secondary' | 'quiet' }) {
+  const toast = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   async function open() {
@@ -13,14 +15,16 @@ export function WorkspaceAction({ workspaceId, workspaceName, href, label, varia
     try {
       const response = await fetch('/api/workspaces/select', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workspaceId }) });
       if (!response.ok) throw new Error('select');
+      toast.notify({ title: `${label}: ${workspaceName}` });
       window.location.assign(href);
     } catch {
-      setError(`Could not switch to ${workspaceName}. Check your connection and try again.`);
+      const message = `Could not switch to ${workspaceName}. Check your connection and try again.`;
+      setError(message); toast.failed(message, () => void open(), label);
       setPending(false);
     }
   }
   return <span className={styles.action}>
-    <Button size="sm" variant={variant} disabled={pending} aria-label={`${label}: ${workspaceName}`} onClick={() => void open()}>{pending ? 'Opening…' : label}</Button>
+    <Button size="sm" variant={variant} busy={pending} disabled={pending} aria-label={`${label}: ${workspaceName}`} onClick={() => void open()}>{pending ? 'Opening…' : label}</Button>
     {error && <span role="alert" className={styles.actionError}>{error}</span>}
   </span>;
 }

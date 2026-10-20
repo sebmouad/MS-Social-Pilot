@@ -9,17 +9,20 @@ import { agencyOverview, agencySearchLimit } from '@/modules/agency/server/agenc
 import { AgencyFilters } from './AgencyFilters';
 import { AgencyHeading, AgencyShell } from './AgencyChrome';
 import { WorkspaceAction } from './WorkspaceAction';
+import { Badge, DataTable, EmptyState, MetricCard } from '@/components';
+import { BarChart } from '@/components/charts';
+import { IconAlertTriangle, IconCalendar, IconChecklist, IconPlugConnected, IconBuildingCommunity } from '@tabler/icons-react';
 import styles from './agency.module.css';
 
 const KEYS = ['q', 'sort', 'order', 'attention'];
 const WITHHELD = 'Not shown for workspaces where you lack access to this data';
 
 function Status({ item }: { item: AgencyWorkspace }) {
-  if (item.state === 'suspended') return <span className={styles.flag} data-tone="warn">Suspended</span>;
-  if (item.state === 'deleting') return <span className={styles.flag} data-tone="warn">Data deletion in progress</span>;
+  if (item.state === 'suspended') return <Badge tone="warning">Suspended</Badge>;
+  if (item.state === 'deleting') return <Badge tone="warning">Data deletion in progress</Badge>;
   const metrics = item.metrics;
   return <>
-    {item.needsAttention ? <span className={styles.flag} data-tone="warn">Needs attention</span> : <span className={styles.flag} data-tone="ok">Healthy</span>}
+    {item.needsAttention ? <Badge tone="warning">Needs attention</Badge> : <Badge tone="success">Healthy</Badge>}
     {metrics && (metrics.disconnected ?? 0) > 0 && <span className={styles.meta}>{metrics.disconnected} of {metrics.channels} channels cannot publish</span>}
     {metrics && (metrics.failed ?? 0) > 0 && <span className={styles.meta}>{metrics.failed} failed posts</span>}
     {metrics && (metrics.overdueTasks ?? 0) > 0 && <span className={styles.meta}>{metrics.overdueTasks} overdue tasks</span>}
@@ -38,8 +41,7 @@ function Actions({ item }: { item: AgencyWorkspace }) {
 }
 
 /** A cell for one count: a withheld value is a dash with an explanation, never a zero. */
-const Cell = ({ value }: { value: number | null | undefined }) =>
-  <td className={styles.num}>{value === undefined ? '–' : value === null ? <span title={WITHHELD}>–<span className="sr-only"> {WITHHELD}</span></span> : value}</td>;
+const Cell = ({ value }: { value: number | null | undefined }) => value == null ? <span title={WITHHELD}>–<span className="sr-only"> {WITHHELD}</span></span> : value;
 
 /** Tells the reader when a total leaves out workspaces whose data this person cannot read. */
 function Coverage({ totals, group }: { totals: AgencyTotals; group: AgencyGroup }) {
@@ -74,30 +76,27 @@ export default async function AgencyPage({ searchParams }: { searchParams: Promi
           : `You manage more than ${result.limit} workspaces; only the first ${result.limit} by name are shown. Search by name to find another workspace.`)
           + (filters.attention ? ` The needs-attention filter only looked at those ${result.limit}.` : '')}
       </RouteNotice>}
-      {totals.workspaces > 0 && <dl className={styles.tiles} aria-label={`Across ${scope}`}>
-        <div><dt>{result.filtered ? 'Matching workspaces' : 'Workspaces'}</dt><dd>{totals.workspaces}</dd></div>
-        <div data-tone={totals.needingAttention ? 'warn' : undefined}><dt>Need attention</dt><dd>{totals.needingAttention}</dd></div>
-        <div data-tone={totals.disconnected ? 'warn' : undefined}><dt>Channels that cannot publish</dt><dd>{count(totals.disconnected)} {totals.channels !== null && <span>of {totals.channels}</span>}<Coverage totals={totals} group="channels" /></dd></div>
-        <div data-tone={totals.failed ? 'warn' : undefined}><dt>Failed posts</dt><dd>{count(totals.failed)}<Coverage totals={totals} group="publishing" /></dd></div>
-        <div><dt>Scheduled posts</dt><dd>{count(totals.scheduled)}<Coverage totals={totals} group="publishing" /></dd></div>
-        <div data-tone={totals.overdueTasks ? 'warn' : undefined}><dt>Overdue tasks</dt><dd>{count(totals.overdueTasks)} {totals.openTasks !== null && <span>of {totals.openTasks} open</span>}<Coverage totals={totals} group="tasks" /></dd></div>
-      </dl>}
+      {totals.workspaces > 0 && <div className={styles.metrics} aria-label={`Across ${scope}`}>
+        <MetricCard module="agency" icon={<IconBuildingCommunity size={20} />} label={result.filtered ? 'Matching workspaces' : 'Workspaces'} value={totals.workspaces} />
+        <MetricCard module="agency" icon={<IconAlertTriangle size={20} />} label="Need attention" value={totals.needingAttention} />
+        <MetricCard module="agency" icon={<IconPlugConnected size={20} />} label="Channels that cannot publish" value={count(totals.disconnected)} unavailable={totals.disconnected === null ? WITHHELD : undefined} hint={<>{totals.channels !== null && `of ${totals.channels}`}<Coverage totals={totals} group="channels" /></>} />
+        <MetricCard module="agency" icon={<IconAlertTriangle size={20} />} label="Failed posts" value={count(totals.failed)} unavailable={totals.failed === null ? WITHHELD : undefined} hint={<Coverage totals={totals} group="publishing" />} />
+        <MetricCard module="agency" icon={<IconCalendar size={20} />} label="Scheduled posts" value={count(totals.scheduled)} unavailable={totals.scheduled === null ? WITHHELD : undefined} hint={<Coverage totals={totals} group="publishing" />} />
+        <MetricCard module="agency" icon={<IconChecklist size={20} />} label="Overdue tasks" value={count(totals.overdueTasks)} unavailable={totals.overdueTasks === null ? WITHHELD : undefined} hint={<>{totals.openTasks !== null && `of ${totals.openTasks} open`}<Coverage totals={totals} group="tasks" /></>} />
+      </div>}
+      {result.workspaces.some(item => item.metrics?.scheduled != null || item.metrics?.failed != null) && <BarChart label="Scheduled posts · Failed posts" locale={locale} categories={result.workspaces.map(item => item.name)} series={[
+        { id: 'scheduled', name: 'Scheduled posts', values: result.workspaces.map(item => item.metrics?.scheduled ?? null) },
+        { id: 'failed', name: 'Failed posts', values: result.workspaces.map(item => item.metrics?.failed ?? null) },
+      ]} orientation="horizontal" />}
       {result.workspaces.length === 0
-        ? <p className={styles.empty}>{totals.workspaces === 0 && !result.filtered ? 'You do not own or administer any workspace with Agency access yet.'
-          : totals.workspaces === 0 ? 'No workspaces match this search.' : 'No workspaces need attention.'} {(result.filtered || filters.attention) && <a href="/agency">Reset filters</a>}</p>
-        : <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <caption className="sr-only">Workspaces you manage</caption>
-            <thead><tr><th scope="col">Workspace</th><th scope="col">Status</th><th scope="col" className={styles.num}>Channels</th><th scope="col" className={styles.num}>Scheduled</th><th scope="col" className={styles.num}>Failed</th><th scope="col" className={styles.num}>Open tasks</th><th scope="col" className={styles.num}>Team</th><th scope="col" className={styles.num}>Clients</th><th scope="col">Actions</th></tr></thead>
-            <tbody>{result.workspaces.map(item => <tr key={item.id}>
-              <th scope="row"><span className={styles.name}>{item.name}</span><span className={styles.meta}>{item.role === 'owner' ? 'Owner' : 'Admin'}</span></th>
-              <td><Status item={item} /></td>
-              <Cell value={item.metrics?.channels} /><Cell value={item.metrics?.scheduled} /><Cell value={item.metrics?.failed} />
-              <Cell value={item.metrics?.openTasks} /><Cell value={item.metrics?.members} /><Cell value={item.metrics?.clients} />
-              <td><Actions item={item} /></td>
-            </tr>)}</tbody>
-          </table>
-        </div>}
+        ? <EmptyState title={totals.workspaces === 0 && !result.filtered ? 'You do not own or administer any workspace with Agency access yet.' : totals.workspaces === 0 ? 'No workspaces match this search.' : 'No workspaces need attention.'} icon={<IconBuildingCommunity />} action={<a href={result.filtered || filters.attention ? '/agency' : '/settings/workspace'}>{result.filtered || filters.attention ? 'Reset filters' : 'View workspace'}</a>} />
+        : <DataTable caption="Workspaces you manage" rows={result.workspaces} rowKey={item => item.id} columns={[
+          { key: 'name', label: 'Workspace', render: item => <><strong>{item.name}</strong><span className={styles.meta}>{item.role === 'owner' ? 'Owner' : 'Admin'}</span></> },
+          { key: 'status', label: 'Status', render: item => <Status item={item} /> },
+          ...([['channels', 'Channels'], ['scheduled', 'Scheduled'], ['failed', 'Failed'], ['openTasks', 'Open tasks'], ['members', 'Team'], ['clients', 'Clients']] as const).map(([key, label]) => ({ key, label, align: 'end' as const, render: (item: AgencyWorkspace) => <Cell value={item.metrics?.[key]} /> })),
+          { key: 'actions', label: 'Actions', render: item => <Actions item={item} /> },
+        ]} />}
+
     </AgencyShell>;
   } catch (error) {
     return <AgencyShell><AgencyHeading description="Compare the workspaces you manage." /><RouteNotice error focusKey="agency-load-error">{error instanceof OperationError ? error.message : 'Agency data could not be loaded. Refresh and try again.'}</RouteNotice></AgencyShell>;

@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import type { FeatureId } from '@/lib/product';
 import styles from './settings.module.css';
-import { shellCopy } from './shell-copy';
+import { PageHeader } from '@/components/PageHeader';
+import { Badge } from '@/components/Badge';
 
 export { styles };
 
@@ -12,10 +13,8 @@ export function SettingsPage({ active, title, description, children, locale = 'e
   description: string;
   children: ReactNode;
 }) {
-  return <div className={styles['settings-page']}>
-    <header className={styles['settings-heading']}>
-      <div><p className={styles['settings-eyebrow']}>{shellCopy[locale].eyebrow}</p><h1>{title}</h1><p>{description}</p></div>
-    </header>
+  return <div className={styles['settings-page']} data-module="settings">
+    <PageHeader module="settings" title={title} description={description} />
     {children}
   </div>;
 }
@@ -25,5 +24,5 @@ export function SettingsPanel({ title, detail, children }: { title: string; deta
 }
 
 export function Status({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'good' | 'warning' | 'neutral' }) {
-  return <span className={`${styles['settings-status']} ${styles[`settings-status--${tone}`]}`}><span aria-hidden="true" className={styles['settings-status__dot']} />{children}</span>;
+  return <Badge tone={tone === "good" ? "success" : tone}>{children}</Badge>;
 }

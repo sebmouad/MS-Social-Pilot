@@ -3,12 +3,13 @@ import { operationFailure } from '@/lib/operation-error';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
-import { disconnectSocialAccount, previewSocialAccountDeletion, setConnectionSelections } from '@/server/connection-mutations';
+import { disconnectSocialAccount, previewSocialAccountDeletion } from '@/server/connection-mutations';
+import { changeConnectionSelections } from '@/modules/settings/server/connection-selection';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
-const selectionSchema = z.object({ items: z.array(z.object({ kind: z.enum(['target', 'adAccount']), id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), enabled: z.boolean() })).max(250) });
+
 const disconnectSchema = z.object({ socialAccountId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), mode: z.enum(['retain', 'delete']).default('retain'), confirmation: z.string().max(20).optional() });
 const previewSchema = z.object({ socialAccountId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/) });
 
@@ -32,10 +33,10 @@ export async function PATCH(request: Request) {
   try { viewer = await requireViewer({ feature: 'settings/connections' }); }
   catch { return reply({ error: 'Not authorized.' }, 401); }
   try {
-    const input = selectionSchema.parse(await request.json());
+    const input: unknown = await request.json();
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
-    await withWorkspaceOperation(viewer.workspaceId, () => setConnectionSelections(actor, input.items));
-    return reply({ ok: true });
+    const result = await withWorkspaceOperation(viewer.workspaceId, () => changeConnectionSelections(actor, input));
+    return reply(result);
   } catch (error) {
     return connectionError(error, 'The selection could not be saved.');
   }
