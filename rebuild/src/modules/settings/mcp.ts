@@ -11,6 +11,7 @@ import { teamToolDefinitions, teamTools, executeTeamTool, invitationAvailability
 import { workspacePolicyToolDefinitions, workspacePolicyTools, executeWorkspacePolicyTool } from './workspace-policy-mcp';
 import { notificationToolDefinitions, executeNotificationTool } from './notifications/mcp';
 import { WORKSPACE_EXPORT_MCP } from './export-mcp';
+import { connectionDirectoryFeatures, connectionDirectoryToolDefinitions, connectionDirectoryTools, executeConnectionDirectoryTool } from './connections-mcp';
 
 
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
@@ -86,14 +87,16 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
     tools: [
     { name: 'list_pages', description: 'List enabled workspace destinations and their publishing availability.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
     { name: 'set_connection_selection', description: 'Enable or disable one workspace channel or advertising account. Confirmation must exactly identify the selection and action.', inputSchema: { type: 'object', required: ['kind', 'id', 'enabled', 'confirmation'], properties: { kind: { type: 'string', enum: ['target', 'adAccount'] }, id: { type: 'string' }, enabled: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    ...connectionDirectoryToolDefinitions,
     ],
     features: {
       list_pages: 'settings/connections',
       set_connection_selection: 'settings/connections',
+      ...connectionDirectoryFeatures,
     },
-    writeTools: ['set_connection_selection'],
-    scope: { resourceTools: ['list_pages'], workspaceTools: ['set_connection_selection'], resources: ['msp://targets'] },
-    managers: [{ tools: new Set(['set_connection_selection']), message: 'Only workspace owners and admins can change connections.', hideFromList: true, beforeArguments: true }],
+    writeTools: ['set_connection_selection', 'disconnect_connection'],
+    scope: { resourceTools: ['list_pages'], workspaceTools: ['set_connection_selection', ...connectionDirectoryTools], resources: ['msp://targets'] },
+    managers: [{ tools: new Set(['set_connection_selection', ...connectionDirectoryTools]), message: 'Only workspace owners and admins can change connections.', hideFromList: true, beforeArguments: true, inExecutor: true }],
     resources: [
       { uri: 'msp://targets', name: "Destinations", description: "Enabled workspace destinations.", mimeType: 'application/json', feature: 'settings/connections', readTool: 'list_pages' },
     ],
@@ -113,6 +116,9 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
           };
         });
       }
+      case 'list_connections': case 'preview_connection_disconnect': case 'disconnect_connection':
+        requireFeature(viewer.entitlements, 'settings/connections');
+        return executeConnectionDirectoryTool(viewer, name, args, cap);
       case 'set_connection_selection': {
         requireFeature(viewer.entitlements, 'settings/connections');
         const kind = args.kind === 'target' || args.kind === 'adAccount' ? args.kind : null;
