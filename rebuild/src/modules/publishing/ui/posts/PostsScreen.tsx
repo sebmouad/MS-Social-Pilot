@@ -13,6 +13,7 @@ import { RouteNotice } from '@/components/RouteNotice';
 import { PostStatus } from '../../../../../generated/client';
 import { canUseFeature } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
+import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import { OperationError, isOperationErrorCode } from '@/lib/operation-error';
 
 const NOTICE_TEXT: Record<string, string> = {
@@ -61,6 +62,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     <RouteNotice className={styles.errorNotice} error focusKey={`posts-read-error:${q ?? ''}:${status ?? ''}:${channel ?? ''}`}>{`${listingError ?? 'Posts could not be loaded.'} Reset the sidebar filters and try again.`}</RouteNotice>
   </>;
   const targetChoices = await publishingDestinationChoices(viewer);
+  const undoSendSeconds = await loadWorkspaceOperations(viewer.workspaceId).then(value => value.undoSendSeconds, () => 0);
   const rows = listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }> }));
   const noticeText = notice ? NOTICE_TEXT[notice] ?? (notice.startsWith('imported-') ? `${notice.slice('imported-'.length)} posts imported as drafts.` : undefined) : undefined;
   const canManageDrafts = ["owner", "admin", "editor"].includes(viewer.membership.role);
@@ -84,7 +86,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
       && !post.targets.some(target => target.status === 'processing' || target.status === 'scheduled_remote');
     return <details className={previewStyles.managePost}>
       <summary>Manage post</summary>
-      {canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} canOrganize={canUseFeature(viewer.entitlements, 'publishing/collaboration') && canAccessFeature(viewer.permissions, 'publishing/collaboration', 'read')} canDuplicate={canDuplicate} canQueue={canWritePosts && canUseFeature(viewer.entitlements, 'publishing/queue') && canAccessFeature(viewer.permissions, 'publishing/queue', 'write')} timeZone={viewer.membership.workspace.timezone} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>}
+      {canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} canOrganize={canUseFeature(viewer.entitlements, 'publishing/collaboration') && canAccessFeature(viewer.permissions, 'publishing/collaboration', 'read')} canDuplicate={canDuplicate} canQueue={canWritePosts && canUseFeature(viewer.entitlements, 'publishing/queue') && canAccessFeature(viewer.permissions, 'publishing/queue', 'write')} timeZone={viewer.membership.workspace.timezone} undoSendSeconds={undoSendSeconds} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>}
     </details>;
   };
   const previewFor = (post: (typeof rows)[number], variant: 'feed' | 'card') => <PostPreview

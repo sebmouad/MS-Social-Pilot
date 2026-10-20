@@ -5,6 +5,7 @@ import { usePreserveFormState } from '@/components/usePreserveFormState';
 import { AutoTextarea } from '@/components/AutoTextarea';
 
 import { retryableDestinationCount, bulkCopy } from "@/modules/publishing/bulk";
+import { PublishNowButton } from "./PublishNowButton";
 import { cancelScheduledPostAction, deletePostWithRecoveryAction, importPostsAction, publishPostAction, recordFirstCommentOutcomeAction, schedulePostAction, sendFirstCommentAction, submitForApprovalAction, syncPostAction, updatePostWithRecoveryAction, type ComposerValues, type FirstCommentActionState, type PostDeleteActionState, type PostEditActionState } from "./actions";
 import { startTransition, useActionState, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { flushSync } from 'react-dom';
@@ -112,7 +113,7 @@ export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
   </form>;
 }
 
-export function PostRowActions({ post, targets, canEdit, canPublish, imageRules, canDuplicate = false, canOrganize = false, canQueue = false, timeZone = 'UTC' }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules; canDuplicate?: boolean; canOrganize?: boolean; canQueue?: boolean; timeZone?: string }) {
+export function PostRowActions({ post, targets, canEdit, canPublish, imageRules, canDuplicate = false, canOrganize = false, canQueue = false, timeZone = 'UTC', undoSendSeconds = 0 }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules; canDuplicate?: boolean; canOrganize?: boolean; canQueue?: boolean; timeZone?: string; undoSendSeconds?: number }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [retryCopy, setRetryCopy] = useState<ReturnType<typeof bulkCopy>>(bulkCopy('en'));
   useEffect(() => { setRetryCopy(bulkCopy(document.documentElement.lang || navigator.language)); }, []);
@@ -134,10 +135,7 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules,
       <summary onClick={event => { if (rowPending) event.preventDefault(); }}>Edit post</summary>
       <PostEditForm post={post} targets={targets} selected={selected} imageRules={imageRules} disabled={rowPending} onPendingChange={setEditPending} />
     </details> : null}
-    {canPublish && isDraft && post.targets.length ? <form noValidate action={publishPostAction}>
-      <input type="hidden" name="postId" value={post.id} />
-      <button className="ui-button ui-button--primary ui-button--sm" type="submit" disabled={rowPending}>Publish now</button>
-    </form> : null}
+    {canPublish && isDraft && post.targets.length ? <PublishNowButton postId={post.id} undoSendSeconds={undoSendSeconds} disabled={rowPending} /> : null}
     {canPublish && retryableDestinationCount(post) > 0 ? <RetryFailedButton postId={post.id} count={retryableDestinationCount(post)} copy={retryCopy} disabled={rowPending} /> : null}
     {canEdit && isDraft && post.targets.length ? <>
       <form noValidate action={submitForApprovalAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={rowPending}>Submit for approval</button></form>

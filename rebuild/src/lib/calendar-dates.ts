@@ -54,9 +54,14 @@ export function weekdayOfKey(key: string): number {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
-/** The Sunday that starts the week containing `key`. */
-export function weekStartKey(key: string): string {
-  return addDaysToKey(key, -weekdayOfKey(key));
+/** Days between `key` and the start of its week; `weekStartsOn` is 0 = Sunday … 6 = Saturday. */
+export function weekOffsetOfKey(key: string, weekStartsOn = 0): number {
+  return (weekdayOfKey(key) - weekStartsOn + 7) % 7;
+}
+
+/** The first day of the week containing `key` (Sunday unless `weekStartsOn` says otherwise). */
+export function weekStartKey(key: string, weekStartsOn = 0): string {
+  return addDaysToKey(key, -weekOffsetOfKey(key, weekStartsOn));
 }
 
 function wallFields(instant: Date, timeZone: string) {
