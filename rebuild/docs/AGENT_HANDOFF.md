@@ -781,7 +781,16 @@ any database or pinned in cutover-rehearsal.sh: apply only after the documented
 backup/scratch-restore check. OAuth is off until Root sets
 `integrations.oauth.*` (enabled + issuer URL).
 
-Next: apply/pin the OAuth migration through the backup gate; browser runs of the wave 2 screens;
+Wave 2 browser evidence (2026-10-20, headless Playwright Chromium on the 3200 dev
+preview, synthetic owner created and fully removed afterwards): Goals, Reports,
+Media library, Feeds, Webhooks, Ads compare and the OAuth consent page at 1440px and
+390px in Grove and Nightfall, 28/28 with no failed requests, console errors or
+horizontal overflow. The run found a Reports hydration mismatch (Node and Chromium
+time-zone data disagree for Africa/Casablanca), fixed in 506ffaf9 by formatting on
+the server. Render checks only: UI write flows are covered by service and
+real-PostgreSQL tests, not by browser runs.
+
+Next: (OAuth migration applied and pinned by Session A, a9c2cb11);
 auth/onboarding (Session A);
 then wave 3 (auth/onboarding, feeds and integrations WIP, agency extras, owner
 export). The untracked feeds/integrations/webhooks/API-access WIP in the main
