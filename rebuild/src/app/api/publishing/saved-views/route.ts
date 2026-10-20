@@ -14,7 +14,12 @@ export async function GET(request: Request) {
   try {
     if ([...params.keys()].some(key => key !== 'screen') || params.getAll('screen').length !== 1) throw new OperationError('invalid_request', 'Choose a valid screen.');
     return reply(await listSavedViews({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { screen }));
-  } catch (error) { const failure = operationFailure(error, 'Saved views could not be loaded.'); return reply({ error: failure.error, code: failure.code }, failure.status); }
+  } catch (error) {
+    const failure = operationFailure(error, 'Saved views could not be loaded.');
+    // The sidebar list is a convenience: temporary storage trouble is reported in the body so the page load stays free of failed requests.
+    if (failure.code === 'unavailable') return reply({ views: [], unavailable: true, error: failure.error, code: failure.code });
+    return reply({ error: failure.error, code: failure.code }, failure.status);
+  }
 }
 
 export async function POST(request: Request) {

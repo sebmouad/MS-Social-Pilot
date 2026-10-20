@@ -19,8 +19,8 @@ export function SavedViews({ screen }: { screen: SavedViewScreen }) {
   useEffect(() => {
     let active = true;
     fetch(`/api/publishing/saved-views?screen=${screen}`, { cache: 'no-store' })
-      .then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<{ views: SavedViewRecord[] }>; })
-      .then(body => { if (active) setViews(body.views); })
+      .then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<{ views: SavedViewRecord[]; unavailable?: boolean }>; })
+      .then(body => { if (!active) return; setViews(body.views); if (body.unavailable) setMessage({ text: savedViewCopy(document.documentElement.lang).loadFailed, error: true }); })
       .catch(() => { if (active) { setViews([]); setMessage({ text: savedViewCopy(document.documentElement.lang).loadFailed, error: true }); } });
     return () => { active = false; };
   }, [screen]);
