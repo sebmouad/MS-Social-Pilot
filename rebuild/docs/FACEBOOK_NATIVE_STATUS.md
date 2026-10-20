@@ -158,3 +158,17 @@ published; a native video uses the video mapper. A scheduled provider answer is
 `scheduled` and does not confirm publication. If the switch is turned off while
 native posts are in flight, their status reads are refused (held) rather than
 guessed. Evidence is mocked fetch only; no live Graph read was made.
+
+
+## Batch97 Story status
+
+The adapter reads a Story through the Page's Stories edge and the canonical read
+proof does the same by final post id (`mapFacebookStoryStatus`). Positive only for
+one exact published entry; not listed, archived, malformed, ambiguous or Graph100/
+sub33 answers stay `unknown` and never prove absence. Story recovery eligibility
+requires the complete confirmed chain and exactly the staged media id plus the final
+Story id; the additive migration `20261030100000_rebuild_facebook_native_story_proofs`
+widens the proof ledger accordingly and is not applied anywhere. The endpoint and
+fields are unverified against live Graph (mocked tests only). Stories declare no
+first comment or deletion. Reels now declare first comment and deletion through the
+format-blind shared paths; live behavior is unverified. See FACEBOOK_NATIVE_FORMATS.md.

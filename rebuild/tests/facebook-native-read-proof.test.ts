@@ -38,11 +38,13 @@ describe('canonical Facebook native read proof', () => {
     expect(result).toMatchObject({ outcome: 'unknown', detail });
   });
 
-  it('does not read unsupported Story formats', async () => {
-    const getGraph = vi.fn(async () => response());
-    const unsupported = { ...binding(), format: 'story_video' } as unknown as FacebookNativeReadProofBinding;
-    expect(await readFacebookNativeProof(unsupported, transport(getGraph))).toMatchObject({ outcome: 'unknown', detail: 'readback_unsupported' });
-    expect(getGraph).not.toHaveBeenCalled();
+  it('reads a Story from the Page Stories edge by its final id and never infers absence', async () => {
+    const story = { ...binding(), format: 'story_video' as const, remoteId: 'story-1' };
+    const getGraph = vi.fn(async () => ({ data: [{ post_id: 'other', status: 'PUBLISHED' }, { post_id: 'story-1', status: 'PUBLISHED' }] }));
+    expect(await readFacebookNativeProof(story, transport(getGraph))).toMatchObject({ outcome: 'published', detail: null });
+    expect(getGraph).toHaveBeenCalledWith(`${story.remoteTargetId}/stories`, ['post_id', 'status', 'creation_time'], undefined);
+    expect(await readFacebookNativeProof(story, transport(async () => ({ data: [] })))).toMatchObject({ outcome: 'unknown', detail: 'story_not_listed' });
+    expect(await readFacebookNativeProof(story, transport(async () => ({ data: [{ post_id: 'story-1', status: 'ARCHIVED' }] })))).toMatchObject({ outcome: 'unknown', detail: 'status_unrecognized' });
   });
 
   it('keeps Reel publication phase and scheduled evidence distinct', async () => {

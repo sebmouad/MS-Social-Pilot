@@ -4,9 +4,9 @@
  * a real transport, a durable attempt store, authorization, UI/API/MCP and live proof.
  *
  * `wired:false` stays: it means "not enabled by default and not live-verified". Video
- * and Reel are privately dispatchable behind Root `facebook.native.publishingEnabled`
+ * Reel and both Stories are privately dispatchable behind Root `facebook.native.publishingEnabled`
  * (formats/publish.ts); the adapter's own format descriptors, not this list, declare
- * what customers see, and only while that switch is on. Stories remain undispatched.
+ * what customers see, and only while that switch is on. Stories have no comment or delete operation.
  */
 export interface FacebookNativeCapability {
   id: 'video' | 'reel' | 'story_photo' | 'story_video';
@@ -24,6 +24,6 @@ export interface FacebookNativeCapability {
 export const FACEBOOK_NATIVE_CAPABILITIES: readonly FacebookNativeCapability[] = Object.freeze([
   { id: 'video', label: 'Video post', targetKinds: ['page'], nativeSchedule: true, mediaKind: 'video', firstComment: true, remoteDelete: true, statusReadback: true, wired: false },
   { id: 'reel', label: 'Reel', targetKinds: ['page'], nativeSchedule: false, mediaKind: 'video', firstComment: true, remoteDelete: true, statusReadback: true, wired: false },
-  { id: 'story_photo', label: 'Photo Story', targetKinds: ['page'], nativeSchedule: false, mediaKind: 'image', firstComment: false, remoteDelete: false, statusReadback: false, wired: false },
+  { id: 'story_photo', label: 'Photo Story', targetKinds: ['page'], nativeSchedule: false, mediaKind: 'image', firstComment: false, remoteDelete: false, statusReadback: true, wired: false },
   { id: 'story_video', label: 'Video Story', targetKinds: ['page'], nativeSchedule: false, mediaKind: 'video', firstComment: false, remoteDelete: false, statusReadback: true, wired: false },
 ] as const);

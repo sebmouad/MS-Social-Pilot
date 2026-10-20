@@ -196,3 +196,16 @@ only, with no PostgreSQL run of the host-to-journal chain yet.
 Still required: an actual PostgreSQL test of host → shared claim → journal →
 submitted receipt; native first-comment and delete routing for Reels; process-loss
 and late-fact recovery; shared stored-video resolution; live Meta coverage.
+
+
+## Batch97 Story chains
+
+Story publishing reuses the batch89 journal unchanged: `story_photo` journals
+`photo_upload`,`story_create` and `story_video` journals `upload_start`,
+`upload_transfer`,`story_finish`, each with the staged media id and the final Story id.
+Migration `20261030100000_rebuild_facebook_native_story_proofs` (unapplied) lets the
+proof ledger accept those chains with the two-identity rule. Still required before
+relying on it: backup/scratch-restore and apply on the synthetic database, pin the
+migration in the cutover rehearsal, actual PostgreSQL acceptance/guard tests, and the
+cleanup question for a staged unpublished photo that a Story consumed (assumed not an
+orphan; unverified). See FACEBOOK_NATIVE_FORMATS.md.

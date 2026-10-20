@@ -17,6 +17,7 @@ const classifyFacebook = (error: unknown) => createFacebookAdapter(config).class
 const NOW = new Date('2026-10-20T12:00:00Z');
 const GOOD: FacebookNativeInspected = { bytes: new Uint8Array([1, 2, 3, 4]), mimeType: 'video/mp4', sizeBytes: 4, width: 1080, height: 1920, durationSeconds: 20 };
 const LANDSCAPE: FacebookNativeInspected = { ...GOOD, width: 1920, height: 1080 };
+const labels = { videoLabel: 'Video post', reelLabel: 'Reel', storyPhotoLabel: 'Photo Story', storyVideoLabel: 'Video Story' };
 const publication = { workspaceId: 'w1', postId: 'p1', postTargetId: 'pt1', targetId: 't1', actorId: 'u1' };
 
 function request(over: Partial<PublishRequest> = {}): PublishRequest {
@@ -81,7 +82,7 @@ describe('native video and Reel dispatch through the host', () => {
     const remote = request({ media: [{ kind: 'video', url: 'https://cdn.example.com/a.mp4' }] });
     const reel = harness({ inspected: GOOD });
     await reel.publish({ ...remote, formatId: 'reel' });
-    expect(reel.resolveRemote).toHaveBeenCalledWith('https://cdn.example.com/a.mp4', undefined);
+    expect(reel.resolveRemote).toHaveBeenCalledWith('https://cdn.example.com/a.mp4', undefined, 'video');
     expect(reel.transport.upload).toHaveBeenCalledOnce();
     const video = harness({ inspected: LANDSCAPE, transport: { postGraph: vi.fn(async () => ({ id: 'vid-2' })) } });
     expect((await video.publish(remote)).remoteId).toBe('vid-2');
@@ -159,13 +160,18 @@ describe('adapter declaration behind the private switch', () => {
     expect(adapter.publishingFormats?.some(f => f.scheduling.native)).toBe(false);
   });
 
-  it('declares Video (native schedule) and Reel only while the switch is on', async () => {
+  it('declares Video (native schedule), Reel and Stories only while the switch is on', async () => {
     const publish = vi.fn(async () => ({ remoteId: 'x', url: null, state: 'submitted' as const }));
-    const adapter = createFacebookAdapter(config, fetch, { ...scopes, native: { publish, videoLabel: 'Video post', reelLabel: 'Reel' } });
+    const adapter = createFacebookAdapter(config, fetch, { ...scopes, native: { publish, ...labels } });
     const formats = adapter.publishingFormats!;
-    expect(formats.map(f => f.id)).toEqual(['post', 'video', 'reel']);
+    expect(formats.map(f => f.id)).toEqual(['post', 'video', 'reel', 'story_photo', 'story_video']);
     expect(formats.find(f => f.id === 'video')?.scheduling).toEqual({ application: true, native: true });
-    expect(formats.find(f => f.id === 'reel')).toMatchObject({ scheduling: { application: true, native: false }, firstComment: false, remoteDelete: false, media: { kinds: ['video'], maxVideos: 1 } });
+    expect(formats.find(f => f.id === 'reel')).toMatchObject({ scheduling: { application: true, native: false }, firstComment: true, remoteDelete: true, media: { kinds: ['video'], maxVideos: 1 } });
+    // Stories are their media alone: no link, comment or remote delete, no provider-held schedule.
+    expect(formats.find(f => f.id === 'story_photo')).toMatchObject({ label: 'Photo Story', firstComment: false, remoteDelete: false, remoteStatus: true,
+      scheduling: { application: true, native: false }, media: { kinds: ['image'], maxImages: 1, maxVideos: 0, linkWithMedia: false } });
+    expect(formats.find(f => f.id === 'story_video')).toMatchObject({ label: 'Video Story', firstComment: false, remoteDelete: false,
+      media: { kinds: ['video'], maxVideos: 1, maxImages: 0, linkWithMedia: false } });
     const credential = { accessToken: 'tok', grantedScopes: ['pages_manage_posts'] } as PublishRequest['credential'];
     await adapter.publish!(request({ credential }));
     expect(publish).toHaveBeenCalledOnce();
@@ -175,7 +181,7 @@ describe('adapter declaration behind the private switch', () => {
     const off = createFacebookAdapter(config, fetch, scopes);
     await expect(off.publish!(request({ credential: { accessToken: 't', grantedScopes: ['pages_manage_posts'] } as never }))).rejects.toMatchObject({ status: 400, code: 100 });
     const publish = vi.fn();
-    const on = createFacebookAdapter(config, fetch, { ...scopes, native: { publish, videoLabel: 'v', reelLabel: 'r' } });
+    const on = createFacebookAdapter(config, fetch, { ...scopes, native: { publish, ...labels } });
     await expect(on.publish!(request({ credential: { accessToken: 't', grantedScopes: [] } as never }))).rejects.toBeInstanceOf(FacebookApiError);
     expect(publish).not.toHaveBeenCalled();
   });
@@ -184,12 +190,12 @@ describe('adapter declaration behind the private switch', () => {
     const calls: string[] = [];
     const reelBody = { id: 'v1', from: { id: 'page-1' }, published: true, status: { video_status: 'ready', publishing_phase: { status: 'processing' } } };
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => { calls.push(String(input)); return new Response(JSON.stringify(reelBody), { status: 200 }); }) as unknown as typeof fetch;
-    const adapter = createFacebookAdapter(config, fetchMock, { ...scopes, native: { publish: vi.fn(), videoLabel: 'v', reelLabel: 'r' } });
+    const adapter = createFacebookAdapter(config, fetchMock, { ...scopes, native: { publish: vi.fn(), ...labels } });
     const req = { credential: { accessToken: 'tok', grantedScopes: ['pages_read_engagement'] }, target: { id: 'page-1', name: '', kind: 'page' }, remoteId: 'v1', formatId: 'reel', contentKind: 'video' as const };
     // The Reel publishing phase is still processing, so the shared status stays unknown instead of published.
     expect(await adapter.getRemoteStatus!(req as never)).toMatchObject({ state: 'unknown' });
     const done = { ...reelBody, status: { video_status: 'ready', publishing_phase: { status: 'complete' } } };
-    const ok = createFacebookAdapter(config, vi.fn(async () => new Response(JSON.stringify(done), { status: 200 })) as unknown as typeof fetch, { ...scopes, native: { publish: vi.fn(), videoLabel: 'v', reelLabel: 'r' } });
+    const ok = createFacebookAdapter(config, vi.fn(async () => new Response(JSON.stringify(done), { status: 200 })) as unknown as typeof fetch, { ...scopes, native: { publish: vi.fn(), ...labels } });
     expect(await ok.getRemoteStatus!(req as never)).toMatchObject({ state: 'published', remoteId: 'v1', targetId: 'page-1' });
     expect(calls.length).toBe(1);
   });
