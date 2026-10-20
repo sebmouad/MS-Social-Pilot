@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Prisma } from '../generated/client';
-import { listPostPage, prisma } from '../src/server/data';
+const config = vi.hoisted(() => ({ read: vi.fn(async () => 100) }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: config.read }));
+import { getAdPerformance, getLatestPageAudience, getPageInsightRows, listPostPage, prisma } from '../src/server/data';
 
 describe('scoped post pagination', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -108,4 +110,34 @@ describe('scoped post pagination', () => {
     await listPostPage('workspace-1', 1, 50, ['page-1'], 'author-1', { status: 'pending_approval', order: 'created_asc' });
     expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: expect.objectContaining({ status: 'pending_approval' }), orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }));
   });
+});
+
+
+it('applies the current Root page ceiling before counting and selecting', async () => {
+  config.read.mockResolvedValueOnce(3);
+  vi.spyOn(prisma.post, 'count').mockResolvedValue(8);
+  const query = vi.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
+  const result = await listPostPage('bounded-workspace', 2, 50, [], 'author');
+  expect(query).toHaveBeenCalledWith(expect.objectContaining({ skip: 3, take: 3 }));
+  expect(result).toMatchObject({ page: 2, pages: 3, total: 8 });
+  expect(config.read).toHaveBeenCalledWith('data.postPageMaxItems');
+  vi.restoreAllMocks();
+});
+
+
+it('applies configured stored-insight defaults and audience candidate limits', async () => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-20T00:00:00Z'));
+  try {
+    const insights = vi.spyOn(prisma.pageInsight, 'findMany').mockResolvedValue([]);
+    config.read.mockResolvedValueOnce(12);
+    await getPageInsightRows('workspace');
+    expect(insights).toHaveBeenLastCalledWith(expect.objectContaining({ where: expect.objectContaining({ endTime: { gte: new Date('2026-10-08T00:00:00Z') } }) }));
+    config.read.mockResolvedValueOnce(7);
+    await getLatestPageAudience('workspace', ['channel']);
+    expect(insights).toHaveBeenLastCalledWith(expect.objectContaining({ take: 7, where: expect.objectContaining({ targetId: 'channel', target: { workspaceId: 'workspace', type: 'page' } }) }));
+    const ads = vi.spyOn(prisma.adInsight, 'findMany').mockResolvedValue([]);
+    config.read.mockResolvedValueOnce(9);
+    await getAdPerformance('workspace');
+    expect(ads).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ date: { gte: new Date('2026-10-11T00:00:00Z') } }) }));
+  } finally { vi.useRealTimers(); vi.restoreAllMocks(); }
 });

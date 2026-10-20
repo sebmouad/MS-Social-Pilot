@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   prisma: {} as Record<string, any>,
-  runtimeConfig: vi.fn(async (key: string): Promise<string | number | undefined> => key === 'storage.mediaRoot' ? '/tmp/media' : key === 'data.deleteTransactionTimeoutMs' ? 120000 : key === 'data.maxArchiveBytes' ? 268435456 : undefined),
+  runtimeConfig: vi.fn(async (key: string): Promise<string | number | undefined> => key === 'storage.mediaRoot' ? '/tmp/media' : key === 'data.deleteTransactionTimeoutMs' ? 120000 : key === 'logging.purgeErrorMaxCharacters' ? 1000 : key === 'data.maxArchiveBytes' ? 268435456 : undefined),
   canonicalMediaRoot: vi.fn(async (root: string) => root),
   removeWorkspaceStorage: vi.fn(async () => ({ files: 2, bytes: 17 })),
 }));
@@ -16,7 +16,7 @@ vi.mock('../src/server/data-control/storage', () => ({
 
 afterEach(() => {
   vi.clearAllMocks();
-  mocks.runtimeConfig.mockImplementation(async (key: string) => key === 'storage.mediaRoot' ? '/tmp/media' : key === 'data.deleteTransactionTimeoutMs' ? 120000 : key === 'data.maxArchiveBytes' ? 268435456 : undefined);
+  mocks.runtimeConfig.mockImplementation(async (key: string) => key === 'storage.mediaRoot' ? '/tmp/media' : key === 'data.deleteTransactionTimeoutMs' ? 120000 : key === 'logging.purgeErrorMaxCharacters' ? 1000 : key === 'data.maxArchiveBytes' ? 268435456 : undefined);
   mocks.canonicalMediaRoot.mockImplementation(async (root: string) => root);
   mocks.removeWorkspaceStorage.mockResolvedValue({ files: 2, bytes: 17 });
   for (const key of Object.keys(mocks.prisma)) delete mocks.prisma[key];
@@ -221,11 +221,14 @@ describe('workspace data controls', () => {
 
   it('resumes file cleanup after failure without deleting database rows twice', async () => {
     const { tx, job, transaction } = makePurgeClient();
+    const readConfig = mocks.runtimeConfig.getMockImplementation()!;
+    mocks.runtimeConfig.mockImplementation(async key => key === 'logging.purgeErrorMaxCharacters' ? 4 : readConfig(key));
     mocks.removeWorkspaceStorage.mockRejectedValueOnce(new Error('disk busy'));
     const { deleteWorkspaceData } = await import('../src/server/data-control');
     const actor = { userId: 'u1', workspaceId: 'w1' };
     await expect(deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'DELETE')).rejects.toThrow('disk busy');
     expect(job.status).toBe('db_deleted');
+    expect(job.error).toBe('disk');
     const deleteCallsAfterFailure = tx.$executeRawUnsafe.mock.calls.length;
 
     const result = await deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'DELETE');

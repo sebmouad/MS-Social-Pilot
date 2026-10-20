@@ -1,3 +1,4 @@
+import { runtimeConfigBatch } from '@/server/config/store';
 import { PlatformApiError } from '@/platforms/errors';
 
 export function isRetryableSyncError(error: unknown): boolean {
@@ -6,21 +7,25 @@ export function isRetryableSyncError(error: unknown): boolean {
 }
 
 export type RetryBackoff = { baseDelayMs: number; maxDelayMs: number };
-const DEFAULT_BACKOFF: RetryBackoff = { baseDelayMs: 1000, maxDelayMs: 60_000 };
 
 export async function withRetries<T>(
   operation: () => Promise<T>,
   retryLimit: number,
-  backoff: RetryBackoff = DEFAULT_BACKOFF,
+  backoff?: RetryBackoff,
   delay: (milliseconds: number) => Promise<void> = sleep,
   shouldRetry: (error: unknown) => boolean = isRetryableSyncError,
 ): Promise<T> {
   let attempt = 0;
+  let policy = backoff;
   for (;;) {
     try { return await operation(); }
     catch (error) {
       if (attempt >= retryLimit || !shouldRetry(error)) throw error;
-      const wait = Math.min(backoff.maxDelayMs, backoff.baseDelayMs * 2 ** attempt);
+      if (!policy) {
+        const values = await runtimeConfigBatch(['sync.retryBaseDelayMs', 'sync.retryMaxDelayMs']);
+        policy = { baseDelayMs: Number(values['sync.retryBaseDelayMs']), maxDelayMs: Number(values['sync.retryMaxDelayMs']) };
+      }
+      const wait = Math.min(policy.maxDelayMs, policy.baseDelayMs * 2 ** attempt);
       attempt += 1;
       await delay(wait);
     }

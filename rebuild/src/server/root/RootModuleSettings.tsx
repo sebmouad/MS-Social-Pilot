@@ -1,3 +1,4 @@
+import { ROOT_CONFIG_COPY, type RootConfigCopy } from '@/lib/config/root-config-copy';
 import { RootDiagnostics } from './RootDiagnostics';
 import { RootJobHealth } from '@/server/jobs/RootJobHealth';
 import { readConfig } from '@/server/config/store';
@@ -23,7 +24,7 @@ export async function RootModuleSettings({ kind, id, title, description, childre
     {await RootDiagnostics({ scope: `${kind}:${id}` })}
     {kind === 'product' ? await RootJobHealth({ moduleId: id }) : null}
     {values === null ? <section className="root-control__notice" role="alert"><h2>Module settings unavailable</h2><p>Settings could not be loaded. Reload this module to try again.</p></section> : <div className="root-config">
-      <RootConfigForm key={`${kind}:${id}`} definitions={definitions} initialValues={values.filter(value => keys.has(value.key))} groupPrefix={groupPrefix} availability={{
+      <RootConfigForm key={`${kind}:${id}`} definitions={definitions} initialValues={values.filter(value => keys.has(value.key))} groupPrefix={groupPrefix} copy={(values.find(value => value.key === 'root.configCopy')?.value ?? ROOT_CONFIG_COPY) as RootConfigCopy} availability={{
         modules: AVAILABILITY_CATALOG.modules.filter(module => kind === 'product' && module.id === id),
         features: AVAILABILITY_CATALOG.features.filter(feature => kind === 'product' && feature.module === id),
       }} />

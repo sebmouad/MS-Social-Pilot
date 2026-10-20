@@ -100,7 +100,8 @@ export async function getTargets(workspaceId: string, allowedTargetIds?: readonl
 
 /** Paginate posts after workspace and channel scope have been enforced in the query. */
 export async function listPostPage(workspaceId: string, page: number, pageSize: number, allowedTargetIds: readonly string[] | null, authorId: string | undefined, filters: { status?: PostStatus; channelId?: string; order?: 'scheduled_asc' | 'created_asc'; where?: Prisma.PostWhereInput } = {}) {
-  const size = Math.max(1, Math.min(Math.trunc(pageSize), 100));
+  const { runtimeConfig } = await import('@/server/config/store');
+  const size = Math.max(1, Math.min(Math.trunc(pageSize), await runtimeConfig('data.postPageMaxItems')));
   const requestedPage = Number.isSafeInteger(page) && page > 0 ? page : 1;
   const scopeWhere = publishingPostVisibilityWhere(workspaceId, allowedTargetIds, authorId);
   const where: Prisma.PostWhereInput = filters.where ? { AND: [scopeWhere, filters.where] } : {
@@ -188,9 +189,11 @@ export async function getAdAccounts(workspaceId: string, allowedProviders: reado
 const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
 /** Read captured daily Page metrics for destinations owned by this workspace. */
-export async function getPageInsightRows(workspaceId: string, days = 30) {
+export async function getPageInsightRows(workspaceId: string, days?: number) {
+  const { runtimeConfig } = await import('@/server/config/store');
+  const rangeDays = days ?? await runtimeConfig('data.insightDefaultDays');
   return prisma.pageInsight.findMany({
-    where: { target: { workspaceId, type: "page" }, period: "day", endTime: { gte: daysAgo(days) } },
+    where: { target: { workspaceId, type: "page" }, period: "day", endTime: { gte: daysAgo(rangeDays) } },
     orderBy: { endTime: "desc" },
     select: { id: true, metric: true, period: true, endTime: true, numeric: true, target: { select: { id: true, name: true } } },
   });
@@ -198,11 +201,13 @@ export async function getPageInsightRows(workspaceId: string, days = 30) {
 
 /** Latest stored follower stock for each selected Page, with the current name preferred. */
 export async function getLatestPageAudience(workspaceId: string, targetIds: string[]) {
+  const { runtimeConfig } = await import('@/server/config/store');
+  const candidateLimit = await runtimeConfig('data.audienceCandidateLimit');
   return Promise.all(targetIds.map(async targetId => {
     const rows = await prisma.pageInsight.findMany({
       where: { targetId, target: { workspaceId, type: 'page' }, metric: { in: ['page_follows', 'page_fans'] }, numeric: { not: null } },
       orderBy: { endTime: 'desc' },
-      take: 20,
+      take: candidateLimit,
       select: { metric: true, numeric: true, endTime: true, target: { select: { id: true, name: true } } },
     });
     const latest = rows[0];
@@ -211,8 +216,10 @@ export async function getLatestPageAudience(workspaceId: string, targetIds: stri
 }
 
 /** Read account-level delivery rows and campaign-level rows for a workspace. */
-export async function getAdPerformance(workspaceId: string, days = 30) {
-  const where = { adAccount: { workspaceId }, date: { gte: daysAgo(days) } };
+export async function getAdPerformance(workspaceId: string, days?: number) {
+  const { runtimeConfig } = await import('@/server/config/store');
+  const rangeDays = days ?? await runtimeConfig('data.insightDefaultDays');
+  const where = { adAccount: { workspaceId }, date: { gte: daysAgo(rangeDays) } };
   const [accountRows, campaignRows] = await Promise.all([
     prisma.adInsight.findMany({
       where: { ...where, level: "account" },

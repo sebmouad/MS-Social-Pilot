@@ -129,7 +129,8 @@ async function main() {
     catch (error) { log('worker tick failed', error); }
     await new Promise(resolve => setTimeout(resolve, worker.pollIntervalMs));
   }
-  while (worker.running.size > 0) await new Promise(resolve => setTimeout(resolve, 250));
+  const drainPollMs = await runtimeConfig('sync.workerDrainPollMs');
+  while (worker.running.size > 0) await new Promise(resolve => setTimeout(resolve, drainPollMs));
   await prisma.$disconnect();
 }
 

@@ -1,3 +1,4 @@
+import { CONFIG_BY_KEY } from '@/lib/config/registry';
 import { moduleManifests } from '@/modules';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
@@ -28,9 +29,11 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
   const startedMinute = new Map<JobName, number>();
   const running = new Set<JobName>();
   let lastHeartbeat = 0;
-  let pollIntervalMs = 5_000;
+  // Bootstrap fallback prevents a hot loop if the first configuration read fails.
+  // Successful ticks replace it with the current stored value.
+  let pollIntervalMs = Number(CONFIG_BY_KEY.get('sync.workerPollSeconds')!.defaultValue) * SECOND_MS;
 
-  async function launch(job: Job, now: Date, retryLimit: number, retryBackoff: RetryBackoff, leaseMs: number): Promise<void> {
+  async function launch(job: Job, now: Date, retryLimit: number, retryBackoff: RetryBackoff, leaseMs: number, renewalDivisor: number, errorLimit: number, summaryLimit: number): Promise<void> {
     if (running.has(job.name)) return;
     const minuteStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
     const minuteEnd = new Date(minuteStart.getTime() + 60_000);
@@ -55,7 +58,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
       void deps.renewLease(job.name, token, new Date(Date.now() + leaseMs)).then(renewed => {
         if (!renewed) deps.logger(`lease for ${job.name} is no longer owned by this worker`);
       }).catch(error => deps.logger(`lease renewal failed for ${job.name}`, error));
-    }, Math.floor(leaseMs / 3));
+    }, Math.max(1, Math.floor(leaseMs / renewalDivisor)));
     try {
       attempts = 1;
       summary = await deps.execute(job.name, new Date(), retryLimit, retryBackoff);
@@ -63,12 +66,12 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
       deps.logger(`[${job.name}] ${summary}`);
     } catch (error) {
       outcome = 'failed';
-      errorText = (error instanceof Error ? error.message : String(error)).slice(0, 2000);
+      errorText = (error instanceof Error ? error.message : String(error)).slice(0, errorLimit);
       deps.logger(`[${job.name}] failed: ${errorText}`);
     } finally {
       clearInterval(renew);
       const finishedAt = new Date();
-      await deps.writeRun({ id: randomUUID(), job: job.name, owner, startedAt, finishedAt, outcome, attempts, ...(summary ? { summary: summary.slice(0, 2000) } : {}), ...(errorText ? { error: errorText } : {}) }).catch(error => deps.logger(`run audit write failed for ${job.name}`, error));
+      await deps.writeRun({ id: randomUUID(), job: job.name, owner, startedAt, finishedAt, outcome, attempts, ...(summary ? { summary: summary.slice(0, summaryLimit) } : {}), ...(errorText ? { error: errorText.slice(0, errorLimit) } : {}) }).catch(error => deps.logger(`run audit write failed for ${job.name}`, error));
       await deps.releaseLease(job.name, token).catch(error => deps.logger(`lease release failed for ${job.name}`, error));
       running.delete(job.name);
     }
@@ -85,6 +88,9 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     const retryBaseDelayMs = await deps.readConfig('sync.retryBaseDelayMs') as number;
     const retryMaxDelayMs = await deps.readConfig('sync.retryMaxDelayMs') as number;
     const leaseMinutes = await deps.readConfig('sync.workerLeaseMinutes') as number;
+    const renewalDivisor = await deps.readConfig('sync.workerLeaseRenewalDivisor') as number;
+    const errorLimit = await deps.readConfig('logging.workerErrorMaxCharacters') as number;
+    const summaryLimit = await deps.readConfig('logging.workerSummaryMaxCharacters') as number;
     const heartbeatSeconds = await deps.readConfig('sync.workerHeartbeatSeconds') as number;
     const workerPollSeconds = await deps.readConfig('sync.workerPollSeconds') as number;
     pollIntervalMs = Math.max(1, Math.trunc(workerPollSeconds)) * SECOND_MS;
@@ -97,7 +103,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
         const expression = await deps.readConfig(job.configKey) as string;
         if (!cronMatches(expression, now)) continue;
         if (running.has(job.name)) continue;
-        void launch(job, now, Math.max(0, Math.trunc(retryLimit)), retryBackoff, leaseMs).catch(error => deps.logger(`could not start ${job.name}`, error));
+        void launch(job, now, Math.max(0, Math.trunc(retryLimit)), retryBackoff, leaseMs, renewalDivisor, errorLimit, summaryLimit).catch(error => deps.logger(`could not start ${job.name}`, error));
         // Lease acquisition is async; reserve a local slot before its result.
         available--;
       }

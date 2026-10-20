@@ -20,15 +20,15 @@ export const moduleHealthScopes: readonly Scope[] = [
 ];
 export type StoredHealthRun = { id: string; startedAt: Date; finishedAt: Date | null; outcome: string };
 /** Schedule-aware freshness, using worker timezone and existing stale grace.
- * A bounded one-day search cannot establish freshness for older sparse schedules. */
-export function jobHealth(run: StoredHealthRun | null, schedule: unknown, now: Date, graceSeconds: number) {
+ * A Root-bounded schedule search cannot establish freshness for older sparse schedules. */
+export function jobHealth(run: StoredHealthRun | null, schedule: unknown, now: Date, graceSeconds: number, lookbackMinutes: number) {
   let freshness: HealthStatus = 'unknown';
   if (run && typeof schedule === 'string' && run.startedAt <= now) {
     const end = Math.floor((now.getTime() - graceSeconds * 1000) / 60_000) * 60_000;
-    const start = Math.max(Math.floor(run.startedAt.getTime() / 60_000) * 60_000 + 60_000, end - 86400000);
+    const start = Math.max(Math.floor(run.startedAt.getTime() / 60_000) * 60_000 + 60_000, end - lookbackMinutes * 60_000);
     try {
       cronMatches(schedule, now);
-      freshness = run.startedAt.getTime() < end - 86400000 ? 'unknown' : 'pass';
+      freshness = run.startedAt.getTime() < end - lookbackMinutes * 60_000 ? 'unknown' : 'pass';
       for (let at = end; at >= start; at -= 60_000) if (cronMatches(schedule, new Date(at))) { freshness = 'fail'; break; }
     } catch { freshness = 'unknown'; }
   }
@@ -44,6 +44,7 @@ export async function loadRootModuleHealth(actorId: string, scopeId?: string) {
   const started = performance.now();
   const now = new Date();
   const grace = await runtimeConfig('root.workerStaleSeconds');
+  const lookbackMinutes = await runtimeConfig('root.jobHealthLookbackMinutes');
   const enabled = await runtimeConfig('jobs.enabled');
   const stored = new Map((await prisma.appSetting.findMany({ select: { key: true, value: true, encrypted: true } })).map(row => [row.key, row]));
   const modules = await Promise.all(moduleHealthScopes.filter(s => scopeId === undefined || s.id === scopeId).map(async scope => {
@@ -62,8 +63,8 @@ export async function loadRootModuleHealth(actorId: string, scopeId?: string) {
     const jobs = scope.health.jobHistory ? await Promise.all(scope.jobs.map(async job => {
       try {
         const run = await prisma.rebuildSyncRun.findFirst({ where: { job: job.name, owner: { startsWith: REBUILD_WORKER_PREFIX } }, orderBy: [{ startedAt: 'desc' }, { id: 'desc' }], select: { id: true, startedAt: true, finishedAt: true, outcome: true } });
-        return { name: job.name, ...jobHealth(run, enabled ? await runtimeConfig(job.configKey) : null, now, grace) };
-      } catch { return { name: job.name, ...jobHealth(null, null, now, grace) }; }
+        return { name: job.name, ...jobHealth(run, enabled ? await runtimeConfig(job.configKey) : null, now, grace, lookbackMinutes) };
+      } catch { return { name: job.name, ...jobHealth(null, null, now, grace, lookbackMinutes) }; }
     })) : [];
     const queues = await Promise.all(scope.health.pendingQueues.map(async name => {
       try {

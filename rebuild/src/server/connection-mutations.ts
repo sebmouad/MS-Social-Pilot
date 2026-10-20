@@ -77,7 +77,8 @@ async function requireSelectableSource(tx: import('../../generated/client').Pris
 export async function setConnectionSelections(actor: ConnectionMutationActor, items: ConnectionSelection[]) {
   const membership = await currentMembership(actor);
   if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
-  if (items.length > 250 || new Set(items.map(item => `${item.kind}:${item.id}`)).size !== items.length) throw new OperationError('invalid_request', 'Invalid selection list.');
+  const { runtimeConfig } = await import('@/server/config/store');
+  if (items.length > await runtimeConfig('data.connectionSelectionMaxItems') || new Set(items.map(item => `${item.kind}:${item.id}`)).size !== items.length) throw new OperationError('invalid_request', 'Invalid selection list.');
   const entitlements = items.some(item => item.enabled) ? await loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }) : null;
   if (items.some(item => item.enabled) && (!entitlements || !canUseFeature(entitlements, 'settings/connections'))) throw new OperationError('forbidden', 'Connection selection is unavailable in this workspace.');
   await prisma.$transaction(async tx => {

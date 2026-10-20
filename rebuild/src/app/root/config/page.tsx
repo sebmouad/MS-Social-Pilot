@@ -1,29 +1,34 @@
 import { requireRootPage } from '@/server/config/access';
-import { readConfig } from '@/server/config/store';
-import { safeConfigShape } from '@/lib/config/registry';
+import { readConfig, runtimeConfig } from '@/server/config/store';
+import { AVAILABILITY_CATALOG, CONFIG_BY_KEY, safeConfigShape } from '@/lib/config/registry';
+import { ROOT_CONFIG_COPY, type RootConfigCopy } from '@/lib/config/root-config-copy';
 import { RootFrame } from '@/server/root/RootFrame';
 import { RootConfigForm } from './root-config-form';
 
-export const metadata = { title: 'Shared configuration · Root' };
+export async function generateMetadata() {
+  await requireRootPage();
+  const copy = await runtimeConfig('root.configCopy').catch(() => ROOT_CONFIG_COPY);
+  return { title: copy.metadataTitle };
+}
 
 export default async function RootConfigPage({ searchParams }: { searchParams: Promise<{ search?: string | string[] }> }) {
-  // Root access is checked before rendering the shared shell. This route must
-  // not depend on workspace membership: an installation owner may have none.
   await requireRootPage();
-  const search = (await searchParams)?.search;
-  const initialSearch = typeof search === 'string' ? search.slice(0, 2000) : '';
-  const definitions = safeConfigShape().filter(setting => setting.owner.kind === 'shared');
+  // readConfig validates the same registry snapshot used by HTTP and MCP and masks secrets.
+  // Registry defaults keep the recovery screen available if the store cannot be read.
   let values: Awaited<ReturnType<typeof readConfig>> | null = null;
   try { values = await readConfig(); } catch { /* Render a recoverable store state. */ }
-  const keys = new Set(definitions.map(definition => definition.key));
+  const copy = (values?.find(value => value.key === 'root.configCopy')?.value ?? ROOT_CONFIG_COPY) as RootConfigCopy;
+  const searchLimit = Number(values?.find(value => value.key === 'root.configSearchMaxCharacters')?.value ?? CONFIG_BY_KEY.get('root.configSearchMaxCharacters')!.defaultValue);
+  const search = (await searchParams)?.search;
+  const initialSearch = typeof search === 'string' ? search.slice(0, searchLimit) : '';
   return <RootFrame active="/root/config">
     <div className="root-config">
       <header className="root-config__heading">
-        <p className="root-config__eyebrow">Root · Installation</p>
-        <h1>Shared configuration</h1>
-        <p className="root-config__intro">Installation-wide infrastructure controls. Product and platform settings live in their module sections in the sidebar. Every setting is validated and states whether runtime paths consume it.</p>
+        <p className="root-config__eyebrow">{copy.eyebrow}</p>
+        <h1>{copy.pageTitle}</h1>
+        <p className="root-config__intro">{copy.intro}</p>
       </header>
-      {values === null ? <p role="alert" className="root-config__empty">Shared settings could not be loaded. Reload to try again.</p> : <RootConfigForm key={`shared:${initialSearch}`} initialSearch={initialSearch} definitions={definitions} initialValues={values.filter(value => keys.has(value.key))} availability={{ modules: [], features: [] }} />}
+      {values === null ? <p role="alert" className="root-config__empty">{copy.unavailable}</p> : <RootConfigForm key={`all:${initialSearch}`} initialSearch={initialSearch} definitions={safeConfigShape()} initialValues={values} availability={AVAILABILITY_CATALOG} groupByOwner copy={copy} />}
     </div>
   </RootFrame>;
 }

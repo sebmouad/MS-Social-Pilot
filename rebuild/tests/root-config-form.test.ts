@@ -99,3 +99,31 @@ describe('Root configuration form writes', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/try again/i);
   });
 });
+
+
+it('makes every registered setting reachable through owner-aware search', async () => {
+  const all = safeConfigShape();
+  await act(async () => root.render(createElement(RootConfigForm, { definitions: all, initialValues: [], availability: AVAILABILITY_CATALOG, groupByOwner: true })));
+  const categories = container.querySelector('[aria-label="Configuration categories"]')!;
+  expect(categories.textContent).toContain('Shared controls');
+  expect(categories.textContent).toContain('Product · publishing');
+  expect(categories.textContent).toContain('Platform · facebook');
+  const search = container.querySelector<HTMLInputElement>('#root-config-search')!;
+  for (const definition of all) {
+    await fill(search, definition.key);
+    expect([...container.querySelectorAll('code')].some(code => code.textContent === definition.key)).toBe(true);
+  }
+  await fill(search, 'Platform · facebook');
+  expect(container.querySelectorAll('.root-config__card').length).toBe(all.filter(item => item.owner.kind === 'platform' && item.owner.id === 'facebook').length);
+  await fill(search, 'no-such-setting-here');
+  expect(container.querySelector('.root-config__empty')?.textContent).toBe('No matching settings.');
+});
+
+it('renders configured operator text as plain text and preserves search placeholders', async () => {
+  const { ROOT_CONFIG_COPY } = await import('../src/lib/config/root-config-copy');
+  await act(async () => root.render(createElement(RootConfigForm, { definitions, initialValues: values, availability: AVAILABILITY_CATALOG, initialSearch: 'timezone', copy: { ...ROOT_CONFIG_COPY, find: 'Trouver un réglage', searchResults: 'Résultats : {search}', save: '<script>unsafe</script>' } })));
+  expect(container.querySelector('label')?.textContent).toBe('Trouver un réglage');
+  expect(container.querySelector('.root-config__content-head h2')?.textContent).toBe('Résultats : timezone');
+  expect(container.querySelector('script')).toBeNull();
+  expect([...container.querySelectorAll('button')].some(button => button.textContent === '<script>unsafe</script>')).toBe(true);
+});

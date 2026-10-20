@@ -1,3 +1,4 @@
+import { runtimeConfig } from '@/server/config/store';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
@@ -11,10 +12,14 @@ const filterSchema = z.object({ status: z.enum(['open', 'resolved', 'all']).opti
 const like = (value: string) => `%${value.replace(/[\\%_]/g, match => `\\${match}`)}%`;
 const unavailable = () => new OperationError('unavailable', 'The error log is not available in this database.');
 
-async function shape(row: ErrorRow, withStack: boolean) {
-  const [message, stack] = await Promise.all([legacySetting('root.legacy.errorMessageMaxCharacters'), withStack ? legacySetting('root.legacy.errorStackMaxCharacters') : Promise.resolve(0)]);
+async function errorShapePolicy(withStack: boolean) {
+  const [message, stack, name, location, release] = await Promise.all([legacySetting('root.legacy.errorMessageMaxCharacters'), withStack ? legacySetting('root.legacy.errorStackMaxCharacters') : Promise.resolve(0), runtimeConfig('root.errorNameMaxCharacters'), runtimeConfig('root.errorLocationMaxCharacters'), runtimeConfig('root.errorReleaseMaxCharacters')]);
+  return { message, stack, name, location, release };
+}
+
+function shape(row: ErrorRow, withStack: boolean, { message, stack, name, location, release }: Awaited<ReturnType<typeof errorShapePolicy>>) {
   return {
-    id: row.id, source: row.source, name: redact(row.name, 200), message: redact(row.message, message), location: redact(row.location?.split(/[?#]/)[0], 300), release: row.release.replace(/[^\x20-\x7e]/g, "").slice(0, 64), count: row.count,
+    id: row.id, source: row.source, name: redact(row.name, name), message: redact(row.message, message), location: redact(row.location?.split(/[?#]/)[0], location), release: row.release.replace(/[^\x20-\x7e]/g, "").slice(0, release), count: row.count,
     firstSeenAt: row.firstSeenAt.toISOString(), lastSeenAt: row.lastSeenAt.toISOString(), resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
     ...(withStack ? { stack: redact(row.stack, stack) } : {}),
   };
@@ -32,7 +37,8 @@ export async function listRootErrors(actorId: string, input: unknown = {}, resul
   const sourceFilter = source ?? null;
   try {
     const rows = await prisma.$queryRaw<ErrorRow[]>`SELECT id, source, name, message, location, release, count, "firstSeenAt", "lastSeenAt", "resolvedAt", COUNT(*) OVER()::int AS total FROM error_events WHERE (${status} = 'all' OR (${status} = 'open' AND "resolvedAt" IS NULL) OR (${status} = 'resolved' AND "resolvedAt" IS NOT NULL)) AND (${sourceFilter}::text IS NULL OR source = ${sourceFilter}) AND (${pattern}::text IS NULL OR name ILIKE ${pattern} ESCAPE '\\' OR message ILIKE ${pattern} ESCAPE '\\' OR location ILIKE ${pattern} ESCAPE '\\') ORDER BY "lastSeenAt" DESC, id LIMIT ${size} OFFSET ${(page - 1) * size}`;
-    return { items: await Promise.all(rows.map(row => shape(row, false))), page, pageSize: size, total: rows[0]?.total ?? 0, limits: { searchMaxCharacters: max } };
+    const policy = await errorShapePolicy(false);
+    return { items: rows.map(row => shape(row, false, policy)), page, pageSize: size, total: rows[0]?.total ?? 0, limits: { searchMaxCharacters: max } };
   } catch (error) {
     if (isMissingRelation(error)) throw unavailable();
     throw error;
@@ -45,7 +51,7 @@ export async function getRootError(actorId: string, id: string) {
   try {
     const row = (await prisma.$queryRaw<ErrorRow[]>`SELECT id, source, name, message, stack, location, release, count, "firstSeenAt", "lastSeenAt", "resolvedAt" FROM error_events WHERE id = ${id}`)[0];
     if (!row) throw new OperationError('not_found', 'Error not found.');
-    return shape(row, true);
+    return shape(row, true, await errorShapePolicy(true));
   } catch (error) {
     if (isMissingRelation(error)) throw unavailable();
     throw error;

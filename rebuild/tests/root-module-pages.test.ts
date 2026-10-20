@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), form: vi.fn() }));
+const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), form: vi.fn(), config: vi.fn() }));
 vi.mock('../src/app/root/modules/ModuleHealth', () => ({ ModuleHealth: async () => createElement('section', null, 'Stored module health') }));
 vi.mock('../src/server/root/RootDiagnostics', () => ({ RootDiagnostics: async () => null }));
 vi.mock('../src/server/root/RootInboxDeletions', () => ({ RootInboxDeletions: async () => createElement('section', null, 'Inbox deletion recovery') }));
@@ -9,7 +9,7 @@ vi.mock('../src/server/root/RootPostDeletions', () => ({ RootPostDeletions: asyn
 vi.mock('../src/server/root/RootPublicationAttempts', () => ({ RootPublicationAttempts: async () => createElement('section', null, 'Publication attempt recovery') }));
 vi.mock('../src/server/jobs/RootJobHealth', () => ({ RootJobHealth: async () => null }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: state.access }));
-vi.mock('../src/server/config/store', () => ({ readConfig: state.read }));
+vi.mock('../src/server/config/store', () => ({ readConfig: state.read, runtimeConfig: state.config }));
 vi.mock('../src/server/root/RootFrame', () => ({ RootFrame: 'main' }));
 vi.mock('../src/app/root/config/root-config-form', () => ({ RootConfigForm: state.form }));
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('Not found'); } }));
@@ -17,7 +17,7 @@ import { RootModuleSettings } from '../src/server/root/RootModuleSettings';
 import ProductPage from '../src/app/root/modules/[id]/page';
 import PlatformPage from '../src/app/root/platforms/[id]/page';
 import ModulesPage from '../src/app/root/modules/page';
-import SharedPage from '../src/app/root/config/page';
+import SharedPage, { generateMetadata } from '../src/app/root/config/page';
 import { moduleManifests } from '../src/modules';
 
 beforeEach(() => {
@@ -30,6 +30,15 @@ beforeEach(() => {
   state.form.mockImplementation(() => createElement('section', null, 'Owned settings'));
 });
 describe('Root module screens', () => {
+  it('reads the configured metadata title only after Root authorization', async () => {
+    state.config.mockResolvedValueOnce({ metadataTitle: 'Private installation controls' });
+    await expect(generateMetadata()).resolves.toEqual({ title: 'Private installation controls' });
+    expect(state.config).toHaveBeenCalledWith('root.configCopy');
+    state.config.mockClear();
+    state.access.mockRejectedValueOnce(new Error('Root required'));
+    await expect(generateMetadata()).rejects.toThrow('Root required');
+    expect(state.config).not.toHaveBeenCalled();
+  });
   it('gives each module only its settings and feature inventory', async () => {
     renderToStaticMarkup(await RootModuleSettings({ kind: 'product', id: 'publishing', title: 'Publishing', description: 'Publishing controls' }));
     const props = state.form.mock.calls[0][0];
@@ -44,11 +53,12 @@ describe('Root module screens', () => {
     expect(keys).toContain('meta.appSecret'); expect(keys).toContain('inbox.messengerReplyWindowHours');
     expect(keys).not.toContain('publishing.maxMessageCharacters');
   });
-  it('excludes product and provider settings from shared configuration', async () => {
+  it('exposes the complete registered catalog grouped by owner', async () => {
     renderToStaticMarkup(await SharedPage({ searchParams: Promise.resolve({}) }));
     const props = state.form.mock.calls[0][0];
-    expect(props.definitions.every((setting: { owner: { kind: string } }) => setting.owner.kind === 'shared')).toBe(true);
-    expect(props.initialValues.map((setting: { key: string }) => setting.key)).toEqual(['auth.sessionDays']);
+    expect(new Set(props.definitions.map((setting: { owner: { kind: string } }) => setting.owner.kind))).toEqual(new Set(['shared', 'product', 'platform']));
+    expect(props.groupByOwner).toBe(true);
+    expect(props.initialValues).toHaveLength(4);
   });
   it('keeps navigation and safe recovery copy when the settings store fails', async () => {
     state.read.mockRejectedValueOnce(new Error('postgres://private-password@db'));
