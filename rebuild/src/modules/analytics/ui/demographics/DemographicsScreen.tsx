@@ -1,3 +1,5 @@
+import { BarChart } from '@/components/charts';
+import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { Button } from '@/components/Button';
 import { PageFrame } from '@/server/PageFrame';
@@ -54,9 +56,8 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
   </form>;
   const metrics = data ? [...data.groups.flatMap(group => group.metrics), ...data.other] : [];
   return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/demographics">{filters}</WorkflowNav>}><div className={styles.root}>
-    <header className={styles.heading}><p className={styles.eyebrow}>{t('Analytics', 'Statistiques')}</p><h1>{t('Audience history', 'Historique de l’audience')}</h1>
-      <p>{t('Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.', 'Catégories d’âge, de genre, de pays, de ville et de langue enregistrées telles que fournies. Chaque mesure reste distincte ; les nombres ne sont jamais additionnés entre dates ou sources.')}</p>
-      {data && <p>{data.period.start} — {data.period.end} UTC</p>}</header>
+    <PageHeader module="analytics" title={t('Audience history', 'Historique de l’audience')} description={<>{t('Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.', 'Catégories d’âge, de genre, de pays, de ville et de langue enregistrées telles que fournies. Chaque mesure reste distincte ; les nombres ne sont jamais additionnés entre dates ou sources.')}</>} />
+      {data && <p>{data.period.start} — {data.period.end} UTC</p>}
     {failed && <section id="demographics-error" role="alert" className={styles.panel}><h2>{t('History could not be loaded', 'Impossible de charger l’historique')}</h2><p>{t('Review your dates and channels, narrow the period, or retry. Your filters have been retained.', 'Vérifiez les dates et les canaux, réduisez la période ou réessayez. Vos filtres sont conservés.')}</p></section>}
     {data && <section className={styles.panel}><h2>{t('Audience size', 'Taille de l’audience')}</h2><p>{data.audience.covered ? number.format(data.audience.total) : unknown} · {data.audience.covered} / {data.audience.selected} {t('selected channels', 'canaux sélectionnés')}</p><p>{t('Latest valid figure per covered channel. This is not a count of unique people across networks.', 'Dernière valeur valide de chaque canal couvert. Ce total ne représente pas des personnes uniques entre réseaux.')}</p></section>}
     {data?.empty && <section className={styles.panel}><h2>{t('No stored breakdowns', 'Aucune répartition enregistrée')}</h2><p>{t('Not available for these channels and dates. Try another period or channel.', 'Non disponible pour ces canaux et ces dates. Essayez une autre période ou un autre canal.')}</p></section>}
@@ -65,6 +66,8 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
       {!metric.history.length && <p>{unknown}</p>}
       {metric.history.map(item => <details key={`${item.resourceId}:${item.asOf.toISOString()}`}><summary>{item.resourceLabel} · {t('As of', 'Au')} {when(item.asOf)}</summary>
         <p>{t('Fetched at', 'Collecté le')} {when(item.fetchedAt)}</p>
+        <BarChart locale={fr ? 'fr' : 'en'} label={`${metric.label} · ${item.resourceLabel} · ${when(item.asOf)}`} orientation="horizontal"
+          categories={item.rows.map(row => row.label)} series={[{ id: metric.key, name: metric.label, values: item.rows.map(row => row.value) }]} />
         <div className={styles.tableWrap}><table><caption>{metric.label} · {item.resourceLabel} · {when(item.asOf)}</caption><thead><tr><th scope="col">{t('Category', 'Catégorie')}</th><th scope="col">{t('Value', 'Valeur')}</th><th scope="col">{t('Share of snapshot', 'Part de la mesure')}</th></tr></thead><tbody>
           {item.rows.map(row => <tr key={row.label}><th scope="row">{row.label}</th><td>{row.value === null ? unknown : number.format(row.value)}</td><td>{row.share === null ? unknown : `${number.format(row.share)}%`}</td></tr>)}
         </tbody></table></div></details>)}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { ModalDialog } from '@/components/ModalDialog';
@@ -43,7 +44,14 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [operationBlocked, setOperationBlocked] = useState(false);
   const [loadError, setLoadError] = useState('');
-  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const toast = useToast();
+  const [outcome, storeOutcome] = useState<Outcome | null>(null);
+  const setOutcome = (value: Outcome | null) => {
+    storeOutcome(value);
+    if (!value) return;
+    if (value.tone === 'ok') toast.notify({ title: value.text, tone: 'success' });
+    else toast.failed(value.text, () => window.location.assign('/ads/objects#changes'), 'Review change history');
+  };
   const [pending, setPending] = useState<Pending | null>(null);
   const [pendingDialogOpen, setPendingDialogOpen] = useState(false);
   const [budgetKind, setBudgetKind] = useState<'daily' | 'lifetime'>('daily');

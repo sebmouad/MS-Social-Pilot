@@ -1,6 +1,9 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { MetricCard } from '@/components/MetricCard';
+import { IconPin } from '@tabler/icons-react';
+import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
@@ -14,9 +17,14 @@ export function PinManager({ pins: initial, pinnable, max }: { pins: PinView[]; 
   const [choice, setChoice] = useState('');
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState<PinView | null>(null);
+  const toast = useToast();
   const [notice, setNotice] = useState<{ error: boolean; text: string; key: number } | null>(null);
   const inFlight = useRef(false);
-  const say = (text: string, error = false) => setNotice(v => ({ error, text, key: (v?.key ?? 0) + 1 }));
+  const say = (text: string, error = false) => {
+    setNotice(v => ({ error, text, key: (v?.key ?? 0) + 1 }));
+    if (error) toast.failed(text, () => window.location.reload(), 'Refresh and check');
+    else toast.notify({ title: text, tone: 'success' });
+  };
   const pinnedKeys = new Set(pins.map(p => p.key));
   const options = pinnable.filter(p => !pinnedKeys.has(p.key));
 
@@ -48,7 +56,7 @@ export function PinManager({ pins: initial, pinnable, max }: { pins: PinView[]; 
           <div className={styles.actions}><Button type="submit" variant="primary" disabled={busy || !choice}>{busy ? 'Saving…' : 'Pin metric'}</Button></div></form>
           : <p className={styles.empty}>No more single-value metrics are available for your channels yet.</p>}</section>
     <section className={styles.panel} aria-labelledby="pin-list"><h2 id="pin-list">Your pinned metrics ({pins.length} of {max})</h2>
-      {pins.length ? <ul className={styles.list}>{pins.map((p, i) => <li key={p.key}><div><strong>{p.label}</strong>
+      {pins.length ? <ul className={styles.list}>{pins.map((p, i) => <li key={p.key}><div><MetricCard module="analytics" icon={<IconPin />} label={p.label} value={p.value} unavailable={p.state === 'unavailable' ? 'Not available for your current channels.' : undefined} />
         <small>{p.state === 'available' ? <>{p.value} · {p.basis} · {p.coverage} · as of {p.asOf}{p.change ? ` · ${p.change}` : ''}</> : 'Not available for your current channels, so its value is unknown. You can remove it.'}</small></div>
         <div className={styles.actions}><Button size="sm" disabled={busy || i === 0} aria-label={`Move ${p.label} up`} onClick={() => move(i, -1)}>Up</Button><Button size="sm" disabled={busy || i === pins.length - 1} aria-label={`Move ${p.label} down`} onClick={() => move(i, 1)}>Down</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => setRemoving(p)}>Unpin</Button></div></li>)}</ul>
         : <p className={styles.empty}>Nothing pinned yet. Pinned metrics are personal and only visible to you.</p>}</section>

@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -17,7 +18,7 @@ export default async function GoalsPage() {
   try { data = await readGoals({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); }
   catch (error) { failure = operationFailure(error, t('loadFailed')).error; }
   return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/goals" />}><div className={styles.root}>
-    <header className={styles.heading}><p className={styles.eyebrow}>{t('eyebrow')}</p><h1>{t('title')}</h1>{data && <p>{t('subtitle', { from: data.month.start, to: data.month.end, zone: data.month.timeZone })}</p>}</header>
+    <PageHeader module="analytics" title={t('title')} />{data && <p>{t('subtitle', { from: data.month.start, to: data.month.end, zone: data.month.timeZone })}</p>}
     {failure && <section className={styles.panel} role="alert"><h2>{t('loadFailedTitle')}</h2><p>{failure}</p><a href="/analytics/goals">{t('retry')}</a></section>}
     {data && !data.channels.length && <section className={styles.panel}><h2>{t('noChannelsTitle')}</h2><p>{t('noChannels')}</p><a href="/settings/connections">{t('manageConnections')}</a></section>}
     {data?.channels.map(channel => <section key={channel.channelId} className={styles.panel} aria-labelledby={`goal-${channel.channelId}`}>

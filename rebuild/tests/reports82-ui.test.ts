@@ -44,6 +44,18 @@ async function enter(input: HTMLInputElement | HTMLTextAreaElement, value: strin
 }
 
 describe('Reports workflow UI', () => {
+  it('opens a named template row menu and preserves the deletion acknowledgement', async () => {
+    await render(base({ templates: [template] }));
+    expect(container.querySelector('.ui-table--stack')).toBeTruthy();
+    await click(container.querySelector<HTMLElement>('button[aria-label="Actions for Weekly view"]')!);
+    const item = [...container.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(node => node.textContent?.includes('Delete'))!;
+    await click(item);
+    const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
+    expect(dialog.textContent).toContain('Weekly view');
+    expect(button('Delete template', dialog).disabled).toBe(true);
+    expect(dialog.querySelector('input[type="checkbox"]')).toBeTruthy();
+  });
+
   it('keeps stored unsupported sections on template edits and uses Root labels for new choices', async () => {
     await render(base({ templates: [template] }));
     await click(button('Edit'));

@@ -1,3 +1,9 @@
+import { headers } from 'next/headers';
+import { AccountCharts } from './AccountCharts';
+import { EmptyState } from '@/components/EmptyState';
+import { IconAd } from '@tabler/icons-react';
+import { Badge } from '@/components/Badge';
+import { PageHeader } from '@/components/PageHeader';
 import { entitledPlatformIds } from '@/server/entitlements';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -16,6 +22,7 @@ const money = (value: number | null, currency: string | null) => value === null 
 
 export default async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[] }> }) {
   const { workspaceId, permissions, entitlements } = await requireViewer({ feature: 'ads/overview', channelScoped: true });
+  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
   const policy = await loadAdsReportPolicy();
   const allowedTargetIds = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
   const allowedProviders = entitledPlatformIds(entitlements);
@@ -44,8 +51,8 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
   const exportPolicy = canExport ? await loadAdsOutputPolicy().catch(() => null) : null;
   const sidebar = <AdsReportSidebar accounts={dataset.accounts} filters={filters} action="/ads" kind="accounts" policy={policy} page={accountPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
   return <PageFrame module="ads" sidebar={dataset.accounts.length ? sidebar : undefined}><div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">Ads</p><h1>Ad accounts</h1><p>{dataset.accounts.length ? `Showing ${accountPage.from}–${accountPage.to} of ${accountPage.resultCount} accounts · Page ${accountPage.page} of ${accountPage.pageCount}. Stored delivery performance · ${dateRangeLabel(filters)}. Account currencies remain separate.` : 'Connect the advertising accounts you want to manage.'}</p></div></header>
-    {!dataset.accounts.length ? <section className="panel empty-state"><h2>No ad accounts connected</h2><p>Connect and select an advertising account to see delivery and manage campaigns here.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <>
+    <PageHeader module="ads" title={"Ad accounts"} description={<>{dataset.accounts.length ? `Showing ${accountPage.from}–${accountPage.to} of ${accountPage.resultCount} accounts · Page ${accountPage.page} of ${accountPage.pageCount}. Stored delivery performance · ${dateRangeLabel(filters)}. Account currencies remain separate.` : 'Connect the advertising accounts you want to manage.'}</>} />
+    {!dataset.accounts.length ? <EmptyState title="No ad accounts connected" icon={<IconAd />} action={<a className="text-link" href="/settings/connections">View connections</a>}>Connect and select an advertising account to see delivery and manage campaigns here.</EmptyState> : <>
     <section className="metric-grid" aria-label="Advertising account totals">
       <article className="metric-card"><dl><dt>Linked accounts</dt><dd>{scopedAccounts.length}</dd></dl></article>
       <article className="metric-card"><dl><dt>Enabled accounts</dt><dd>{enabled}</dd></dl></article>
@@ -56,8 +63,8 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
       {visibleAccounts.length ? <div className="ads-account-list">{visibleAccounts.map(account => {
         const row = accountMetrics.get(account.id);
         return <article className="ads-account-card" key={account.id}>
-          <div className="ads-account-card__heading"><div><span className="badge">{account.enabled ? 'Enabled' : 'Disabled'}</span><h3>{account.name}</h3><p className="small-note">{account.actId}{account.currency ? ` · ${account.currency}` : ''} · Platform status: {account.accountStatus ?? 'not provided'}</p></div><span className="ads-account-card__sync">{account.lastSyncedAt ? `Synced ${account.lastSyncedAt.toLocaleDateString()}` : 'No sync recorded'}</span></div>
-          {row ? <><div className="ads-metric-strip"><span><small>Spend</small><strong>{money(row.spend, row.currency)}</strong></span><span><small>Impressions</small><strong>{number.format(row.impressions)}</strong></span><span><small>Reach · latest day</small><strong>{number.format(row.reach)}</strong></span><span><small>Clicks</small><strong>{number.format(row.clicks)}</strong></span><span><small>CPC</small><strong>{money(row.cpc, row.currency)}</strong></span><span><small>CPM</small><strong>{money(row.cpm, row.currency)}</strong></span><span><small>CTR</small><strong>{row.ctr === null ? '—' : `${number.format(row.ctr)}%`}</strong></span><span><small>CPP · latest day</small><strong>{money(row.cpp, row.currency)}</strong></span><span><small>Frequency · latest day</small><strong>{row.frequency === null ? '—' : number.format(row.frequency)}</strong></span></div><details className="ads-stored-details ads-account-details"><summary>Action and daily results</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details></> : <p className="empty-note">No account-level delivery rows in this date range.</p>}
+          <div className="ads-account-card__heading"><div><Badge tone={account.enabled ? 'success' : 'neutral'}>{account.enabled ? 'Enabled' : 'Disabled'}</Badge><h3>{account.name}</h3><p className="small-note">{account.actId}{account.currency ? ` · ${account.currency}` : ''} · Platform status: {account.accountStatus ?? 'not provided'}</p></div><span className="ads-account-card__sync">{account.lastSyncedAt ? `Synced ${account.lastSyncedAt.toLocaleDateString()}` : 'No sync recorded'}</span></div>
+          {row ? <><AccountCharts row={row} locale={locale} /><div className="ads-metric-strip"><span><small>Spend</small><strong>{money(row.spend, row.currency)}</strong></span><span><small>Impressions</small><strong>{number.format(row.impressions)}</strong></span><span><small>Reach · latest day</small><strong>{number.format(row.reach)}</strong></span><span><small>Clicks</small><strong>{number.format(row.clicks)}</strong></span><span><small>CPC</small><strong>{money(row.cpc, row.currency)}</strong></span><span><small>CPM</small><strong>{money(row.cpm, row.currency)}</strong></span><span><small>CTR</small><strong>{row.ctr === null ? '—' : `${number.format(row.ctr)}%`}</strong></span><span><small>CPP · latest day</small><strong>{money(row.cpp, row.currency)}</strong></span><span><small>Frequency · latest day</small><strong>{row.frequency === null ? '—' : number.format(row.frequency)}</strong></span></div><details className="ads-stored-details ads-account-details"><summary>Action and daily results</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details></> : <p className="empty-note">No account-level delivery rows in this date range.</p>}
         </article>;
       })}</div> : <div className="empty-state"><h3>No ad accounts match these filters</h3><p>Choose another account in the sidebar.</p></div>}
     </section>

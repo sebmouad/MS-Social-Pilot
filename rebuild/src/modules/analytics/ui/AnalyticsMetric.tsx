@@ -1,3 +1,6 @@
+import { MetricCard } from '@/components/MetricCard';
+import { TimeSeriesChart, DonutChart, BarChart } from '@/components/charts';
+import { IconChartLine } from '@tabler/icons-react';
 import type { MetricView } from '@/modules/analytics/server/aggregate';
 import type { AnalyticsComparisonValue } from '@/modules/analytics/server/types';
 
@@ -31,21 +34,12 @@ export function AnalyticsMetricComparison({ metric, comparison }: { metric: Metr
 
 function SeriesPreview({ metric, chartPoints }: { metric: MetricView; chartPoints: number }) {
   const points = metric.points.slice(-chartPoints);
-  const values = points.map(point => point.value).filter(Number.isFinite);
+  if (metric.kind === 'breakdown' && metric.rows.length) return <DonutChart label={metric.label} slices={metric.rows.map(row => ({ name: row.label, value: row.value }))} />;
+  if (!points.length && metric.rows.length) return <BarChart label={metric.label} orientation="horizontal" categories={metric.rows.map(row => row.label)} series={[{ id: metric.key, name: metric.label, values: metric.rows.map(row => row.value) }]} />;
   if (!points.length) return <p className="analytics-series-note">No dated series is stored for this metric.</p>;
-  const maximum = Math.max(1, ...values.map(value => Math.abs(value)));
-  const zero = 48;
-  const width = 100 / points.length;
-  const bars = points.map((point, index) => {
-    const value = Number.isFinite(point.value) ? point.value : 0;
-    const height = value === 0 ? 1 : Math.max(1, Math.abs(value) / maximum * 42);
-    return { x: index * width + width * .14, y: value >= 0 ? zero - height : zero, width: Math.max(.45, width * .72), height };
-  });
   return <div className="analytics-series-preview">
-    <svg viewBox="0 0 100 96" role="img" aria-label={`${metric.label} chart preview showing the latest ${points.length} of ${metric.points.length} stored dates. The full date and value series is available from the Metric detail selector in the sidebar.`}>
-      <line x1="0" y1={zero} x2="100" y2={zero} className="analytics-series-preview__baseline" />
-      {bars.map((bar, index) => <rect key={`${points[index]!.date}:${index}`} x={bar.x} y={bar.y} width={bar.width} height={bar.height} rx=".7" className="analytics-series-preview__bar" />)}
-    </svg>
+    <TimeSeriesChart label={metric.label} format={metric.unit === 'percent' ? { style: 'percent' } : undefined} series={[{ id: metric.key, name: metric.label,
+      points: points.map(point => ({ t: point.date, v: Number.isFinite(point.value) ? (metric.unit === 'percent' ? point.value / 100 : point.value) : null })) }]} />
     <p>Latest {points.length} of {metric.points.length} stored dates shown. Open this metric in the sidebar's Metric detail selector for the full series and resource values.</p>
   </div>;
 }
@@ -55,13 +49,16 @@ export default function AnalyticsMetric({ metric, comparison, chartPoints }: { m
   const detailLabel = metric.resourceKind === 'ad-account' ? 'ad accounts' : 'channels';
 
   return <article className="analytics-metric">
-    <div className="analytics-metric__heading"><div><h3>{metric.label}</h3>
+    <MetricCard module="analytics" icon={<IconChartLine />} label={metric.label} value={value}
+      unavailable={metric.total === null ? 'No aggregate value' : undefined}
+      sparkline={metric.points.slice(-chartPoints).map(point => Number.isFinite(point.value) ? point.value : null)} />
+    <div className="analytics-metric__heading"><div>
       <p>{metric.sourceLabel} · {metric.coverage} of {metric.available} {detailLabel} covered</p>
       <p>{metric.aggregationLabel}</p>
       {metric.aggregationNote && <p className="analytics-aggregation-note">{metric.aggregationNote}</p>}
       {metric.latestAt && <p>Latest data {new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.latestAt)}</p>}
       {metric.updatedAt && <p>Last synced {new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.updatedAt)}</p>}
-    </div><strong>{value}</strong></div>
+    </div></div>
     <SeriesPreview metric={metric} chartPoints={chartPoints} />
     {metric.coverage < metric.available && <p className="analytics-coverage">Values are available for {metric.coverage} of {metric.available} selected {detailLabel}. Missing values are unknown, not zero.</p>}
     <AnalyticsMetricComparison metric={metric} comparison={comparison} />

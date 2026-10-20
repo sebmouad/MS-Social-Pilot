@@ -2,6 +2,7 @@
 import { useId, useState } from 'react';
 import { isAdsReportDay, type AdsFilterErrors } from '@/modules/ads/report-filters';
 import type { AdsReportPolicy } from '@/modules/ads/report-policy';
+import { FilterPanel, FilterChips } from '@/components/FilterPanel';
 import { Button } from '@/components/Button';
 
 export type AdsFilterValues = { period: string; since: string; until: string; account: string };
@@ -16,7 +17,13 @@ export function AdsFilterForm({ accounts, values, errors = {}, action, policy }:
   const unknownPeriod = !policy.presets.some(item => item.id === period) && !custom;
   const unknownAccount = values.account !== 'all' && !accounts.some(account => account.id === values.account);
   return <form noValidate action={action} method="get" className="ads-sidebar-filter">
-    <p className="ads-filter-heading">Filters</p>
+    <FilterPanel title="Filters" activeCount={Object.values(values).filter(Boolean).length} onReset={() => window.location.assign(action)} summary={<FilterChips filters={Object.entries(values).filter(([, value]) => value && value !== 'all').map(([key, value]) => ({ key, label: ({ period: 'Date range', since: 'From', until: 'To', account: 'Account' } as Record<string, string>)[key]!, value: key === 'account' ? accounts.find(account => account.id === value)?.name ?? value : key === 'period' ? policy.presets.find(preset => preset.id === value)?.label ?? value : value }))} onRemove={key => {
+      const params = new URLSearchParams(values);
+      params.delete(key);
+      if (key === 'since' || key === 'until' || key === 'period') { params.delete('since'); params.delete('until'); params.delete('period'); }
+      window.location.assign(`${action}?${params}`);
+    }} />}>
+
     <div className="ads-filter-field"><label className="ui-field"><span>Date range</span><select className="ui-input" name="period" value={period} onChange={event => setPeriod(event.target.value)} {...field('period')}>
       {unknownPeriod ? <option value={period}>Unavailable date range</option> : null}
       {policy.presets.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}<option value="custom">Custom dates</option>
@@ -31,5 +38,5 @@ export function AdsFilterForm({ accounts, values, errors = {}, action, policy }:
     </select></label>{error('account')}</div>
     <Button type="submit">Apply filters</Button>
     <a className="ads-filter-reset" href={action}>Reset filters</a>
-  </form>;
+  </FilterPanel></form>;
 }
