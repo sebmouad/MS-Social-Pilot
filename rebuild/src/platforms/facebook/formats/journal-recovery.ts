@@ -75,6 +75,28 @@ export async function assertFacebookNativeSettled(
       LIMIT 1`;
 
   if (rows.length) throw conflict();
+
+  // A provider-held schedule cancel/reschedule that may have reached Facebook
+  // (started or uncertain) also holds removal; the table exists only once its
+  // additive migration is applied, so absence means there is nothing to hold.
+  const present = await tx.$queryRaw<{ present: boolean }[]>`
+    SELECT to_regclass('rebuild_facebook_native_schedule_changes') IS NOT NULL AS present`;
+  if (present[0]?.present !== true) return;
+  const pending = targetIds === undefined
+    ? await tx.$queryRaw<Array<{ changeId: string }>>`
+      SELECT c."changeId"
+      FROM rebuild_facebook_native_schedule_changes c
+      WHERE c."workspaceId" = ${workspaceId} AND c.state IN ('started', 'uncertain')
+      LIMIT 1`
+    : await tx.$queryRaw<Array<{ changeId: string }>>`
+      SELECT c."changeId"
+      FROM rebuild_facebook_native_schedule_changes c
+      JOIN rebuild_facebook_native_journal j
+        ON j."workspaceId" = c."workspaceId" AND j."operationId" = c."publishOperationId"
+      WHERE c."workspaceId" = ${workspaceId} AND j."targetId" = ANY(${[...targetIds]}::text[])
+        AND c.state IN ('started', 'uncertain')
+      LIMIT 1`;
+  if (pending.length) throw conflict();
 }
 
 /** Preserve the shared publication outcome guard while rejecting contradictory native evidence. */

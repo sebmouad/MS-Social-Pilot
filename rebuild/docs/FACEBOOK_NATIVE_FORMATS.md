@@ -478,3 +478,21 @@ Still open: adding the table to the data-export bundle (the bundle lives in Sett
 ownership; rows already cascade on workspace erasure); shared callers passing `formatId`; stored-video
 resolution; a neutral cancel/reschedule operation with UI/HTTP/MCP entry; pinning migration `20261030140000`
 and `20261030100000` in `scripts/cutover-rehearsal.sh`; PostgreSQL runs; cleaned live coverage.
+
+
+## Batch104: removal guard covers schedule changes (private, default off)
+
+`assertFacebookNativeSettled` (the installed hook that holds local post deletion, disconnect-with-erasure
+and workspace purge) now also refuses while a `rebuild_facebook_native_schedule_changes` row is `started`
+or `uncertain` (a cancel/reschedule that may have reached Facebook), scoped by workspace and, when targets
+are given, by the parent journal's target. Previously a parent journal still `confirmed` passed even if its
+cancel was unresolved. The table probe uses `to_regclass`, so a database without migration
+`20261030140000` is unaffected. Tests: `facebook-native-journal-recovery.test.ts` (mocked queries; no
+PostgreSQL run). Root keys: none. Migration: none.
+
+Remaining locally implementable Facebook-owned work: none identified. Everything left is outside
+`platforms/facebook` (shared callers passing `formatId` in `deletion.ts`/`first-comment.ts`, stored-video
+resolution, `nativeSchedule` entry points, a neutral cancel/reschedule operation + UI/HTTP/MCP, adding the
+schedule table to the Settings export bundle, pinning migrations `20261030100000`/`20261030140000` in
+`scripts/cutover-rehearsal.sh`), needs a database (PostgreSQL runs of the Story-proof and schedule-journal
+tests, migration backup/restore), or needs live Meta verification (the nine-item list under Batch99).
