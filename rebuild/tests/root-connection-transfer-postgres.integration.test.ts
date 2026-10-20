@@ -8,7 +8,7 @@ const shared = vi.hoisted(() => ({ client: undefined as unknown as Record<string
 vi.mock('../src/server/data', () => ({ prisma: new Proxy({}, { get: (_t, key) => { const v = shared.client?.[key as string]; return typeof v === 'function' ? v.bind(shared.client) : v; } }) }));
 vi.mock('@/server/data', () => ({ prisma: new Proxy({}, { get: (_t, key) => { const v = shared.client?.[key as string]; return typeof v === 'function' ? v.bind(shared.client) : v; } }) }));
 
-import { disconnectRootConnection, rootDisconnectConfirmation } from '../src/server/root/legacy/connections';
+import { disconnectRootConnection, previewRootConnectionDeletion, rootDisconnectConfirmation, rootDisconnectDeleteConfirmation } from '../src/server/root/legacy/connections';
 import { installationTransferConfirmation, transferInstallationOwnership } from '../src/server/root/legacy/transfer';
 
 function isolated(value: string) {
@@ -52,6 +52,15 @@ describe.skipIf(!url)('Root connection and installation controls on real Postgre
     expect(sa.invalidatedAt).not.toBeNull();
     const t = (await db.$queryRaw<Array<{ enabled: boolean }>>`SELECT enabled FROM targets WHERE id = ${target}`)[0]!;
     expect(t.enabled).toBe(false);
+  });
+
+  it('deletes a connection and its channel records for Root only with the dedicated confirmation', async () => {
+    await expect(disconnectRootConnection(other, account, rootDisconnectDeleteConfirmation(account), 'delete')).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(disconnectRootConnection(root, account, rootDisconnectConfirmation(account), 'delete')).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(await previewRootConnectionDeletion(root, account)).toMatchObject({ workspaceId: ws, counts: { channels: 1, scheduledRemote: 0 } });
+    expect(await disconnectRootConnection(root, account, rootDisconnectDeleteConfirmation(account), 'delete')).toMatchObject({ mode: 'delete', providerRevoked: false, deleted: { channels: 1 } });
+    expect(await db.$queryRaw`SELECT 1 FROM social_accounts WHERE id = ${account}`).toHaveLength(0);
+    expect(await db.$queryRaw`SELECT 1 FROM targets WHERE id = ${target}`).toHaveLength(0);
   });
 
   it('transfers the installation to exactly one new owner and refuses a non-owner', async () => {

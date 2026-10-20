@@ -1,7 +1,6 @@
 'use client';
 // Renders only settings with live consumers: calendar week start, report business hours, UTM tagging,
-// composer spacing, best-time suggestions/queue preference, undo send, AI voice and the negative-comment alert.
-// Link shortening has no consumer yet and is sent back unchanged.
+// composer spacing, best-time suggestions/queue preference, undo send, link shortening, AI voice and the negative-comment alert.
 import { useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { workspaceOperationsCopy } from '@/modules/settings/workspace-operations-copy';
@@ -47,6 +46,8 @@ export function WorkspaceOperationsForm({ workspaceId, initial, locale = 'en' }:
     <fieldset className={styles.group} disabled={busy}><legend>{t.linksLegend}</legend>
       {text('utmSource', B.utmPart, t.utmSource)}{text('utmMedium', B.utmPart, t.utmMedium)}{text('utmCampaignTemplate', B.utmCampaign, t.utmCampaign)}
       <small className={styles.hint}>{t.utmHint}</small>
+      <label><input type="checkbox" checked={draft.shortenerEnabled} onChange={event => set('shortenerEnabled', event.target.checked)} /> {t.shortenLinks}</label>
+      <small className={styles.hint}>{t.shortenHint}</small>
     </fieldset>
     <fieldset className={styles.group} disabled={busy}><legend>{t.spacingOnlyLegend}</legend>
       {number('spamGapMinutes', B.spamGapMinutes, t.spamGap, t.spamGapHint)}
