@@ -2,13 +2,15 @@ import { SidebarDock } from '@/components/SidebarDock';
 import { PostPreview } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
 import { readPublishingPostPage } from "@/modules/publishing/server/read";
-import { addDaysToKey, workspaceDateKey } from "@/lib/calendar-dates";
+import { addDaysToKey, instantToWall, workspaceDateKey } from "@/lib/calendar-dates";
 import { PageHeading, PublishingPagination } from "@/modules/publishing/ui/publishing-ui";
 import { EmptyState } from "@/modules/publishing/ui/worklist";
 import workflow from "@/modules/publishing/ui/workflow.module.css";
 import { CancelScheduleButton } from "@/modules/publishing/ui/WorkflowSubmitButtons";
 import { canCancelQueuedPost } from "@/modules/publishing/ui/workflow-access";
 import { cancelScheduledPostAction } from "@/modules/publishing/ui/posts/actions";
+
+import { RescheduleQueuedPost } from "./RescheduleQueuedPost";
 
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const viewer = await requireViewer({ feature: "publishing/queue", channelScoped: true });
@@ -35,9 +37,12 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         <ul className={workflow.items} aria-label={dayHeading(key)}>{posts.map(post => {
           const due = post.scheduledAt !== null && post.scheduledAt <= now;
           const mayCancel = canCancelQueuedPost({ canWritePosts: viewer.permissions.features["publishing/posts"].write, role: viewer.membership.role, userId: viewer.user.id, authorId: post.authorId });
+          const mayMove = mayCancel && post.scheduledAt && post.targets.every(target => target.status === "pending" && !target.remotePostId);
+          const wall = post.scheduledAt ? instantToWall(post.scheduledAt, timeZone) : null;
           const actions = <div className={workflow.actions}>
             {mayCancel ? <><form noValidate action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><CancelScheduleButton /></form><p className={workflow.help}>Returns the post to drafts.</p></>
               : <p className={workflow.help}>{viewer.permissions.features["publishing/posts"].write ? "Only the author or a workspace manager can cancel this item." : "You can view this post but cannot change it."}</p>}
+            {mayMove && wall ? <RescheduleQueuedPost postId={post.id} date={wall.date} time={wall.time} timeZone={timeZone} text={post.message} /> : null}
             {due ? <p className={workflow.help} role="status">Due; publishes on the next run.</p> : null}
           </div>;
           return <li key={post.id} className={workflow.item}><PostPreview post={post} authorName={post.authorId === viewer.user.id ? viewer.user.name : "Workspace member"} timeZone={timeZone} actions={actions} /></li>;
