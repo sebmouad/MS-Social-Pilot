@@ -9,6 +9,7 @@ export const rootManifest = {
     { title: 'Shared controls', pages: [
       { title: 'Overview', href: '/root' },
       { title: 'Users', href: '/root/users' },
+      { title: 'Registration / Invitations', href: '/root/registration' },
       { title: 'Workspaces', href: '/root/workspaces' },
       { title: 'Plans', href: '/root/plans' },
       { title: 'Privileges', href: '/root/privileges' },

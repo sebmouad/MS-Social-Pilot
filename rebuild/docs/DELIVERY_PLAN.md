@@ -442,3 +442,15 @@ UI/HTTP/MCP and CSV are implemented with synthetic unit/render checks. Review
 `modules/analytics/demographics/README.md`; verify actual PostgreSQL and browser
 history/export across themes and widths before claiming runtime parity. No
 migration or new Root keys; no production/provider verification in this batch.
+
+## Root registration worktree — 2026-10-20
+
+Branch `codex/root-registration`: Root registration/invitation UI, HTTP and shared
+service are implemented with Settings-owned domain helpers, current authority,
+scoped exact confirmations, audits and en/fr shared controls. No new Root keys or
+migration; no registry or legacy MCP edits. MCP tool schemas/dispatch and evidence
+limits are in ROOT_REGISTRATION_ADMIN.md. Next: host registration of those tools,
+actual PostgreSQL/FK/concurrency and SMTP checks, then browser theme/viewport and
+MCP transport verification. Unit/render/DOM checks do not close those gates.
+This worktree is branch-commit only by explicit instruction: no push, deployment,
+servers, install or client generation. Full project goal remains active.

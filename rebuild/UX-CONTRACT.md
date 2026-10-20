@@ -510,3 +510,15 @@ and UTC as-of time; fetch time, original categories and within-snapshot shares
 appear inside. Missing values read Not available / Non disponible. English and
 French copy, failure filter retention and server rendering have synthetic tests;
 actual browser/theme/viewport and download interaction checks remain open.
+
+### Root registration administration (2026-10-20 branch)
+
+`/root/registration` uses shared DataTable/Button/useConfirm with English/French
+copy. Sidebar controls own search, invitation status/workspace filters and
+independent directory paging. Registration state is read-only, with a configuration
+search link; missing values say unavailable. Accepted invitations expose no revoke.
+Mutations require exact typed phrases, disable duplicate submission and keep
+input/error on failure; only a matching receipt closes the dialog. Unconfirmed
+mail delivery stays explicit. Shared useConfirm supports optional asynchronous
+exact confirmation while preserving simple callers. DOM/render checks pass; real
+browser theme/viewport verification remains open. See ROOT_REGISTRATION_ADMIN.md.

@@ -31,6 +31,13 @@ async function fill(input: HTMLInputElement, value: string) {
 }
 
 describe('Root configuration form writes', () => {
+  it('opens the linked registration key through initial configuration search', async () => {
+    const definitions = safeConfigShape().filter(setting => setting.owner.kind === 'shared');
+    await act(async () => root.render(createElement(RootConfigForm, { definitions, initialValues: [], availability: AVAILABILITY_CATALOG, initialSearch: 'auth.openRegistration' })));
+    expect(container.querySelector<HTMLInputElement>('#root-config-search')?.value).toBe('auth.openRegistration');
+    expect(container.querySelectorAll('.root-config__card')).toHaveLength(1);
+    expect(container.querySelector('.root-config__card')?.textContent).toContain('auth.openRegistration');
+  });
   it('uses the module category names without repeating the platform group prefix', async () => {
     const scoped = safeConfigShape().filter(setting => setting.key === 'meta.appId' || setting.key === 'platforms.facebook.enabled');
     await act(async () => root.render(createElement(RootConfigForm, { definitions: scoped, initialValues: [], availability: { modules: [], features: [] }, groupPrefix: 'Facebook' })));

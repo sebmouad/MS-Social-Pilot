@@ -1,5 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import type { Prisma } from '../../../../generated/client';
+import { Prisma } from '../../../../generated/client';
+import { lockRootActor } from '@/server/root/legacy/authz';
+import { writeRootAudit } from '@/server/root/legacy/audit';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -45,6 +47,9 @@ function assertRole(value: string): asserts value is TeamRole { if (!role(value)
 function invitationStatus(row: Pick<InviteRow, 'acceptedAt' | 'expiresAt'>, now = new Date()): InvitationStatus {
   if (row.acceptedAt) return 'accepted'; return row.expiresAt.getTime() <= now.getTime() ? 'expired' : 'pending';
 }
+/** Operator directory expression; alias `i`. State rules stay owned by Settings. */
+export const invitationStatusSql = Prisma.sql`CASE WHEN i."acceptedAt" IS NOT NULL THEN 'accepted' WHEN i."expiresAt" <= NOW() THEN 'expired' ELSE 'pending' END`;
+
 function requireConfirmation(actual: string, expected: string) { if (actual !== expected) throw invalid(); }
 
 async function invitationLimits() {
@@ -194,14 +199,35 @@ export async function revokeTeamInvitation(actor: TeamActor, input: unknown): Pr
   const bounds = await invitationLimits(); await authorize(actor, true);
   return protect(transaction(actor.workspaceId, bounds, async tx => {
     const current = await lockAndRecheckActor(tx, actor, true);
-    const rows = await tx.$queryRaw<InviteRow[]>`SELECT id, "workspaceId", email, role::text AS role, "tokenHash", "invitedById", "expiresAt", "acceptedAt", "acceptedByUserId", "createdAt" FROM invitations WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
-    const invite = rows[0]; if (!invite) throw new OperationError('not_found', 'This invitation is unavailable in the current workspace.');
-    if (invite.acceptedAt) throw new OperationError('conflict', 'An accepted invitation cannot be revoked.');
-    if (invite.role === 'owner' && current.role !== 'owner') throw forbidden();
-    await tx.$executeRaw`DELETE FROM invitations WHERE id = ${invite.id} AND "workspaceId" = ${actor.workspaceId} AND "acceptedAt" IS NULL`;
+    const invite = await revokeInvitationRecord(tx, actor.workspaceId, value.id, current.role === 'owner');
     await audit(tx, actor.workspaceId, actor.userId, 'team.invitation_revoked', { invitationId: invite.id, email: invite.email, role: invite.role });
     await lockAndRecheckActor(tx, actor, true);
     return { id: invite.id, revoked: true as const };
+  }));
+}
+
+/** Shared state transition; both workspace and installation authority use the same locked record. */
+async function revokeInvitationRecord(tx: Tx, workspaceId: string, id: string, mayRevokeOwner: boolean) {
+  const rows = await tx.$queryRaw<Array<Pick<InviteRow, 'id' | 'workspaceId' | 'email' | 'role' | 'acceptedAt'>>>`SELECT id, "workspaceId", email, role::text AS role, "acceptedAt" FROM invitations WHERE id = ${id} AND "workspaceId" = ${workspaceId} FOR UPDATE`;
+  const invite = rows[0];
+  if (!invite) throw new OperationError('not_found', 'This invitation is unavailable in the current workspace.');
+  if (invite.acceptedAt) throw new OperationError('conflict', 'An accepted invitation cannot be revoked.');
+  if (invite.role === 'owner' && !mayRevokeOwner) throw forbidden();
+  const removed = await tx.$executeRaw`DELETE FROM invitations WHERE id = ${invite.id} AND "workspaceId" = ${workspaceId} AND "acceptedAt" IS NULL`;
+  if (removed !== 1) throw conflict();
+  return invite;
+}
+
+/** Private installation authority, independent of workspace membership. Suspension/purge guards still apply. */
+export async function revokeInstallationInvitation(actorId: string, workspaceId: string, input: unknown) {
+  const value = parse(TEAM_INVITATION_REVOKE_SCHEMA, input);
+  requireConfirmation(value.confirmation, revokeTeamInvitationConfirmation(value.id));
+  const bounds = await invitationLimits();
+  return protect(transaction(workspaceId, bounds, async tx => {
+    await lockRootActor(tx, actorId);
+    const invite = await revokeInvitationRecord(tx, workspaceId, value.id, true);
+    await writeRootAudit(tx, actorId, 'root.invitation_revoked', { workspaceId, invitationId: invite.id });
+    return { id: invite.id, workspaceId, revoked: true as const };
   }));
 }
 
