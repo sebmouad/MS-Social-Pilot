@@ -1,3 +1,4 @@
+import type { PersonMcpIdentity } from '@/modules/settings/person-keys/types';
 import type { Entitlements } from '../entitlements';
 import type { ScopedPermissions } from '../permissions';
 
@@ -11,5 +12,5 @@ export type McpInstallationViewer = {
   scope: 'installation'; userId: string; isInstanceOwner: true;
   maxResultItems?: number; apiKeyId?: never;
 };
-export type McpIdentity = McpViewer | McpInstallationViewer;
+export type McpIdentity = McpViewer | McpInstallationViewer | PersonMcpIdentity;
 export type RootMcpActor = Pick<McpViewer, 'userId' | 'isInstanceOwner' | 'apiKeyId' | 'maxResultItems'>;

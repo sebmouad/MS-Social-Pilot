@@ -1,3 +1,4 @@
+import { authenticatePersonBearer } from '@/modules/settings/person-keys/service';
 import { authenticateBearerHeader } from '@/server/mcp/bearer';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -53,7 +54,13 @@ async function getViewer(scope: RequestScope): Promise<McpIdentity | null> {
 async function getRequestViewer(request: Request): Promise<McpIdentity | null> {
   const scope = requestScope(request);
   // A supplied bearer always determines authentication; never fall back to cookies.
-  if (request.headers.has('authorization')) return scope === 'installation' ? null : getBearerViewer(request);
+  if (request.headers.has('authorization')) {
+    if (scope === 'installation') return null;
+    const authorization = request.headers.get('authorization');
+    // Person credentials never flow through the workspace authenticator, even when invalid.
+    if (authorization?.startsWith('Bearer mcp_person_')) return scope === 'workspace' ? null : authenticatePersonBearer(authorization);
+    return getBearerViewer(request);
+  }
   return getViewer(scope);
 }
 
@@ -111,8 +118,8 @@ async function handlePost(request: Request) {
   try { viewer = await getRequestViewer(request); }
   catch (error) { const failure = operationFailure(error, 'MCP access could not be checked. Please try again.'); return json({ jsonrpc: '2.0', id: null, error: { code: failure.code === 'invalid_request' ? -32600 : -32603, message: failure.error } }, { status: failure.status }); }
   if (!viewer) return unauthenticated();
-  const requestsPerMinute = await runtimeConfig(viewer.apiKeyId ? 'mcp.keys.requestsPerMinute' : 'mcp.requestsPerMinute') as number;
-  const rateKey = viewer.apiKeyId ? `mcp:key:${viewer.apiKeyId}` : viewer.scope === 'installation' ? `mcp:installation:${viewer.userId}` : `mcp:${viewer.workspaceId}:${viewer.userId}`;
+  const requestsPerMinute = await runtimeConfig(viewer.scope === 'person' || viewer.apiKeyId ? 'mcp.keys.requestsPerMinute' : 'mcp.requestsPerMinute') as number;
+  const rateKey = viewer.scope === 'person' ? `mcp:person-key:${viewer.personKeyId}` : viewer.apiKeyId ? `mcp:key:${viewer.apiKeyId}` : viewer.scope === 'installation' ? `mcp:installation:${viewer.userId}` : `mcp:${viewer.workspaceId}:${viewer.userId}`;
   if (!hit(rateKey, { limit: requestsPerMinute, windowMs: 60_000 }).allowed) {
     return json({ jsonrpc: '2.0', id: null, error: { code: -32004, message: 'MCP request limit reached.' } }, { status: 429 });
   }

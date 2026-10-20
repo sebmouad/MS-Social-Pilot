@@ -1,3 +1,4 @@
+import { runtimeConfig } from '@/server/config/store';
 import { prisma } from '@/server/data';
 import { canUseFeature, canUseModule, loadEntitlements, resolveEntitlements } from '@/server/entitlements';
 import { OperationError } from '@/lib/operation-error';
@@ -117,4 +118,15 @@ export async function classifyWorkspaces(actor: AgencyActor, rows: readonly Admi
     for (const item of settled) if (item) out.push(item);
   }
   return out;
+}
+
+/** Issuance needs at least one currently usable overview workspace; the key stores none of these grants. */
+export async function assertAgencyOverviewCredentialAccess(actor: AgencyActor): Promise<void> {
+  await assertInstallationPolicy('agency/overview');
+  const limit = await runtimeConfig('agency.workspaceLimit');
+  const concurrency = await runtimeConfig('agency.accessConcurrency');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 2000 || !Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) throw new OperationError('unavailable', 'Agency access policy is unavailable.');
+  const rows = await administeredWorkspaces(actor, limit);
+  const items = await classifyWorkspaces(actor, rows.slice(0, limit), 'agency/overview', concurrency);
+  if (!items.some(item => item.state === 'available')) throw new OperationError('forbidden', 'A currently available Agency overview workspace is required.');
 }
