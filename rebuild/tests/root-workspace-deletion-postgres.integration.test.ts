@@ -7,7 +7,7 @@ import { PrismaClient } from '../generated/client';
 
 /** Root workspace deletion against the guarded `_preview` database; config is stubbed, SQL and erasure are real. */
 const url = process.env.REBUILD_PREVIEW_DATABASE_URL;
-const shared = vi.hoisted(() => ({ client: undefined as unknown as Record<string, unknown>, mediaRoot: '' }));
+const shared = vi.hoisted(() => ({ client: undefined as unknown as Record<string, unknown>, mediaRoot: '', feed: '' }));
 vi.mock('../src/server/data', () => ({ prisma: new Proxy({}, { get: (_t, key) => { const v = shared.client?.[key as string]; return typeof v === 'function' ? v.bind(shared.client) : v; } }) }));
 vi.mock('@/server/data', () => ({ prisma: new Proxy({}, { get: (_t, key) => { const v = shared.client?.[key as string]; return typeof v === 'function' ? v.bind(shared.client) : v; } }) }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => ({ 'data.deleteTransactionTimeoutMs': 60_000, 'data.workspaceOperationTimeoutMs': 30_000, 'data.workspaceOperationLockWaitMs': 10_000, 'storage.mediaRoot': shared.mediaRoot } as Record<string, unknown>)[key] }));
@@ -32,6 +32,13 @@ describe.skipIf(!url)('Root workspace deletion on real PostgreSQL', () => {
     await db.$executeRaw`UPDATE users SET "lastActiveWorkspaceId" = ${ws} WHERE id = ${owner}`;
     await db.$executeRaw`INSERT INTO saved_views (id, "workspaceId", "userId", name, screen, query) VALUES (${randomUUID()}, ${ws}, ${owner}, 'v', 'posts', '')`;
     await db.$executeRaw`INSERT INTO posts (id, "workspaceId", "authorId", message, status, "createdAt", "updatedAt") VALUES (${randomUUID()}, ${ws}, ${owner}, 'Synthetic', 'draft', NOW(), NOW())`;
+    // Wave 2 tables: a feed with an item (no workspaceId; reached through feed_sources) and a webhook with a delivery.
+    const feed = randomUUID(); const endpoint = randomUUID();
+    await db.$executeRaw`INSERT INTO feed_sources (id, "workspaceId", name, url, "targetIds", "autoApprove", "ingestFrom", "updatedAt") VALUES (${feed}, ${ws}, 'Synthetic feed', 'https://feeds.example.com/rss.xml', '[]'::jsonb, false, NOW(), NOW())`;
+    await db.$executeRaw`INSERT INTO feed_items (id, "feedSourceId", guid) VALUES (${randomUUID()}, ${feed}, 'synthetic-guid')`;
+    await db.$executeRaw`INSERT INTO webhook_endpoints (id, "workspaceId", name, url, secret) VALUES (${endpoint}, ${ws}, 'Synthetic hook', 'https://hooks.example.com/x', 'not-a-secret')`;
+    await db.$executeRaw`INSERT INTO webhook_deliveries (id, "endpointId", "workspaceId", event, payload) VALUES (${randomUUID()}, ${endpoint}, ${ws}, 'post.published', '{}'::jsonb)`;
+    shared.feed = feed;
   });
   afterAll(async () => {
     if (!db) return;
@@ -56,7 +63,8 @@ describe.skipIf(!url)('Root workspace deletion on real PostgreSQL', () => {
     const result = await deleteRootWorkspace(root, ws, rootWorkspaceDeletionConfirmation(ws));
     expect(result.deleted).toBe(true);
     expect(await db.$queryRaw<unknown[]>`SELECT id FROM workspaces WHERE id = ${ws}`).toHaveLength(0);
-    for (const table of ['posts', 'saved_views', 'memberships', 'workspace_data_purges']) {
+    expect(await db.$queryRaw<unknown[]>`SELECT id FROM feed_items WHERE "feedSourceId" = ${shared.feed}`).toHaveLength(0);
+    for (const table of ['posts', 'saved_views', 'memberships', 'workspace_data_purges', 'feed_sources', 'webhook_endpoints', 'webhook_deliveries']) {
       expect(await db.$queryRawUnsafe<unknown[]>(`SELECT 1 FROM ${table} WHERE "workspaceId" = $1`, ws)).toHaveLength(0);
     }
     const kept = await db.$queryRaw<Array<{ last: string | null }>>`SELECT "lastActiveWorkspaceId" AS last FROM users WHERE id = ${owner}`;
