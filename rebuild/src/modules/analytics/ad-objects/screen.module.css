@@ -1,0 +1,4 @@
+.raw { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 32rem; min-width: 12rem; }
+
+.filters { display: grid; gap: 1rem; min-width: 0; }
+.filters h2 { margin: 0; font-size: 1rem; }

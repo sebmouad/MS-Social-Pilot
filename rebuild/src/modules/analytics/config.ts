@@ -9,6 +9,9 @@ import { ANALYTICS_EXPLORER_CONFIG } from './explorer-config';
 
 /** Every Root setting this product module declares. The registry merges installed modules; edit only here. */
 export const ANALYTICS_MODULE_CONFIG = [
+  entry({ key: 'analytics.adObjects.pageSize', group: 'Analytics · Ad objects', label: 'Objects per page', kind: 'number', description: 'Stored ad-object summaries per Analytics page.', defaultValue: 25, schema: z.number().int().min(1).max(200), consumption: 'active' }),
+  entry({ key: 'analytics.adObjects.maxRows', group: 'Analytics · Ad objects', label: 'Ad-object row limit', kind: 'number', description: 'Complete stored dataset and export row ceiling. Oversized reads are refused.', defaultValue: 10000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
+  entry({ key: 'analytics.adObjects.maxBytes', group: 'Analytics · Ad objects', label: 'Ad-object output bytes', kind: 'number', description: 'Maximum serialized JSON/CSV result size; narrow filters when exceeded.', defaultValue: 2000000, schema: z.number().int().min(1024).max(20000000), consumption: 'active' }),
   entry({ key: 'analytics.postsPageSize', group: 'Analytics · Posts', label: 'Posts per page', kind: 'number', description: 'Published post rows per explorer page.', defaultValue: 25, schema: z.number().int().min(1).max(200), consumption: 'active' }),
   ...DEMOGRAPHICS_CONFIG,
   ...PINNED_METRIC_CONFIG,
