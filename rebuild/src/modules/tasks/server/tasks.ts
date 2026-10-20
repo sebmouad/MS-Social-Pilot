@@ -200,6 +200,16 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
   const parsed = TASK_ACTION_SCHEMA.safeParse(raw);
   if (!parsed.success) throw invalid('Choose a valid task action.');
   const value: TaskAction = parsed.data;
+  // Every interface carries the same intent token; the service validates it before side effects.
+  switch (value.action) {
+    case 'task.create': expect(value.confirmation, taskConfirmations.create(value.title)); break;
+    case 'task.createMany': expect(value.confirmation, taskConfirmations.createMany(value.titles.length)); break;
+    case 'task.update': expect(value.confirmation, taskConfirmations.update(value.id)); break;
+    case 'task.transition': expect(value.confirmation, taskConfirmations.transition(value.id, value.status)); break;
+    case 'comment.add': expect(value.confirmation, taskConfirmations.comment(value.taskId)); break;
+    case 'task.delete': expect(value.confirmation, taskConfirmations.delete(value.id)); break;
+    case 'comment.delete': expect(value.confirmation, taskConfirmations.deleteComment(value.id)); break;
+  }
   // The result returns every created id, so a batch larger than the key's result ceiling is refused whole, never truncated.
   const ceiling = options?.maxItems;
   if (value.action === 'task.createMany' && ceiling !== undefined && Number.isInteger(ceiling) && ceiling >= 1 && value.titles.length > ceiling) {
@@ -256,7 +266,6 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
     }
 
     if (value.action === 'comment.delete') {
-      expect(value.confirmation, taskConfirmations.deleteComment(value.id));
       const found = await tx.$queryRaw<Array<{ authorId: string | null; taskId: string }>>`SELECT "authorId", "taskId" FROM task_comments WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
       if (!found[0]) throw missing();
       if (found[0].authorId !== actor.userId && !TASK_COMMENT_MODERATOR_ROLES.includes(role)) throw new OperationError('forbidden', 'Only the comment author or a workspace manager can remove this comment.');
@@ -271,7 +280,6 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
     if (!current) throw missing();
 
     if (value.action === 'task.delete') {
-      expect(value.confirmation, taskConfirmations.delete(value.id));
       if (!canRemove(actor.userId, role, current)) throw new OperationError('forbidden', 'You can only delete tasks you created, unless you manage the workspace.');
       const comments = await tx.$executeRaw`DELETE FROM task_comments WHERE "taskId" = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
       const removed = await tx.$executeRaw`DELETE FROM tasks WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;

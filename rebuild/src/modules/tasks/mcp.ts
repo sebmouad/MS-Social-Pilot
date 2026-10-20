@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
-import { TASK_STATUSES, taskConfirmations, type TasksActor } from './tasks';
+import { TASK_STATUSES, type TasksActor } from './tasks';
 import { TASKS_TOOL_ACCESS, TASKS_FEATURE_ID } from './semantics';
 import { pageIdsFor, type McpToolGroup } from '@/server/mcp/kit';
 import { getTask, listTaskPostChoices, listTasks, performTaskAction } from './server/tasks';
@@ -26,10 +26,6 @@ export const tasksToolDefinitions = [
   { name: 'delete_task_comment', description: 'Delete your comment, or any comment as an owner/admin. Confirmation: DELETE TASK COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'confirmation'], properties: { id, confirmation: { type: 'string' } }, additionalProperties: false } },
 ];
 
-function confirmed(args: Record<string, unknown>, expected: string) {
-  if (args.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation must be exactly: ${expected}`);
-}
-
 /**
  * Run one Tasks tool. `actor.allowedTargetIds` is the key's channel ceiling and `ceiling` its result-size limit;
  * both reach the services, which intersect them with the member's current access on every call.
@@ -47,19 +43,15 @@ export async function executeTasksTool(actor: TasksActor, name: string, args: Re
     return getTask(actor, checked.data.id, { ...options, ...(checked.data.commentOffset === undefined ? {} : { commentOffset: checked.data.commentOffset }) });
   }
   if (name === 'list_task_post_choices') return listTaskPostChoices(actor, args, options);
-  const { confirmation: _confirmation, ...rest } = args;
-  void _confirmation;
   switch (name) {
-    case 'create_task': confirmed(args, taskConfirmations.create(String(args.title ?? ''))); return performTaskAction(actor, { ...rest, action: 'task.create' });
+    case 'create_task': return performTaskAction(actor, { ...args, action: 'task.create' });
     case 'create_task_checklist': {
-      const count = Array.isArray(args.titles) ? args.titles.length : 0;
-      confirmed(args, taskConfirmations.createMany(count));
-      return performTaskAction(actor, { ...rest, action: 'task.createMany' }, options);
+      return performTaskAction(actor, { ...args, action: 'task.createMany' }, options);
     }
-    case 'update_task': confirmed(args, taskConfirmations.update(String(args.id ?? ''))); return performTaskAction(actor, { ...rest, action: 'task.update' });
-    case 'move_task': confirmed(args, taskConfirmations.transition(String(args.id ?? ''), args.status as never)); return performTaskAction(actor, { ...rest, action: 'task.transition' });
+    case 'update_task': return performTaskAction(actor, { ...args, action: 'task.update' });
+    case 'move_task': return performTaskAction(actor, { ...args, action: 'task.transition' });
     case 'delete_task': return performTaskAction(actor, { ...args, action: 'task.delete' });
-    case 'add_task_comment': confirmed(args, taskConfirmations.comment(String(args.taskId ?? ''))); return performTaskAction(actor, { ...rest, action: 'comment.add' });
+    case 'add_task_comment': return performTaskAction(actor, { ...args, action: 'comment.add' });
     case 'delete_task_comment': return performTaskAction(actor, { ...args, action: 'comment.delete' });
     default: throw new OperationError('invalid_request', 'Unknown task action.');
   }

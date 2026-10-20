@@ -14,15 +14,16 @@ export const accountConfirmations = {
   profile: 'UPDATE ACCOUNT PROFILE', password: 'CHANGE ACCOUNT PASSWORD',
   session: (id: string) => `REVOKE ACCOUNT SESSION ${id}`,
 };
-async function authorize(actor: AccountActor, write = false) {
+export async function authorizeAccountSession(actor: AccountActor, write = false, feature = 'settings/account') {
   if (actor.apiKeyId || !actor.sessionTokenHash) throw new OperationError('forbidden', 'Use a signed-in browser session to manage your account.');
   const [session, permissions, entitlements] = await Promise.all([
     getSessionByTokenHash(actor.sessionTokenHash), loadPermissions(actor.userId, actor.workspaceId),
     loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }),
   ]);
   if (!isUsableLegacySession(session, actor.userId)) throw new OperationError('unauthorized', 'Sign in to continue.');
-  if (!permissions || !entitlements || entitlements.workspaceId !== actor.workspaceId || !canUseFeature(entitlements, 'settings/account') || !canAccessFeature(permissions, 'settings/account', write ? 'write' : 'read')) throw new OperationError('forbidden', 'Account settings are unavailable.');
+  if (!permissions || !entitlements || entitlements.workspaceId !== actor.workspaceId || !canUseFeature(entitlements, feature) || !canAccessFeature(permissions, feature, write ? 'write' : 'read')) throw new OperationError('forbidden', 'Account settings are unavailable.');
 }
+const authorize = authorizeAccountSession;
 export async function readAccount(actor: AccountActor) {
   await authorize(actor);
   const user = await prisma.user.findUnique({ where: { id: actor.userId }, select: { name: true, email: true } });

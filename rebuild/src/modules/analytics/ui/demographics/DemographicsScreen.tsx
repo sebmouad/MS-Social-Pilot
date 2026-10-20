@@ -13,7 +13,7 @@ const values = (v: Search[string]) => v === undefined ? [] : Array.isArray(v) ? 
 
 export default async function DemographicsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const viewer = await requireViewer({ feature: 'analytics/demographics', channelScoped: true });
-  const fr = /\bfr\b/i.test((await headers()).get('accept-language') ?? '');
+  const fr = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '');
   const t = (en: string, french: string) => fr ? french : en;
   const number = new Intl.NumberFormat(fr ? 'fr' : 'en', { maximumFractionDigits: 1 });
   const unknown = t('Not available', 'Non disponible');

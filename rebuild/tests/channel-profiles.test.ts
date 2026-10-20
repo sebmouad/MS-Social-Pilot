@@ -11,7 +11,7 @@ vi.mock('@/server/permissions', () => ({ canAccessFeature: m.access }));
 vi.mock('@/server/platforms/resource-visibility', () => ({ selectedResourceConnectionWhere: m.selected }));
 vi.mock('@/server/platforms/resource-lock', () => ({ lockSelectedResources: m.lock }));
 import { changeChannelProfiles, readChannelProfiles } from '@/modules/settings/channel-profiles/service';
-import { deleteGroupConfirmation } from '@/modules/settings/channel-profiles/contracts';
+import { saveGroupConfirmation, setLabelsConfirmation, deleteGroupConfirmation } from '@/modules/settings/channel-profiles/contracts';
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const policy = { maxGroups: 3, maxChannels: 3, maxLabelsPerChannel: 2, maxNameCharacters: 12 };
 const sql = (call: unknown[]) => (call[0] as TemplateStringsArray).join('?');
@@ -53,35 +53,35 @@ describe('channel profile authority and persistence', () => {
     if (reason === 'suspended') m.db.$queryRaw.mockResolvedValue([{ suspendedAt: new Date() }]);
     if (reason === 'purging') m.db.workspaceDataPurge.findUnique.mockResolvedValue({ status: 'running' });
     if (reason === 'feature') m.use.mockReturnValue(false);
-    await expect(changeChannelProfiles(actor, { action: 'setLabels', channelId: 'a', labels: [] })).rejects.toBeDefined();
+    await expect(changeChannelProfiles(actor, { action: 'setLabels', channelId: 'a', confirmation: setLabelsConfirmation('a'), labels: [] })).rejects.toBeDefined();
     expect(m.db.$executeRaw).not.toHaveBeenCalled();
   });
   it('refuses editor writes and rechecks role after locking', async () => {
     m.db.membership.findUnique.mockResolvedValueOnce({ role: 'owner' }).mockResolvedValueOnce({ role: 'editor' });
-    await expect(changeChannelProfiles(actor, { action: 'setLabels', channelId: 'a', labels: [] })).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(changeChannelProfiles(actor, { action: 'setLabels', channelId: 'a', confirmation: setLabelsConfirmation('a'), labels: [] })).rejects.toMatchObject({ code: 'forbidden' });
     expect(m.db.$executeRaw).not.toHaveBeenCalled();
   });
   it('rejects unavailable channels and configured label/name bounds', async () => {
     for (const input of [
-      { action: 'setLabels', channelId: 'other', labels: [] },
-      { action: 'setLabels', channelId: 'a', labels: ['x', 'y', 'z'] },
-      { action: 'saveGroup', name: 'Name too long here', channelIds: ['a'] },
+      { action: 'setLabels', channelId: 'other', confirmation: setLabelsConfirmation('other'), labels: [] },
+      { action: 'setLabels', channelId: 'a', confirmation: setLabelsConfirmation('a'), labels: ['x', 'y', 'z'] },
+      { action: 'saveGroup', name: 'Name too long here', confirmation: saveGroupConfirmation({ name: 'Name too long here' }), channelIds: ['a'] },
     ]) await expect(changeChannelProfiles(actor, input)).rejects.toBeDefined();
     expect(m.db.$executeRaw).not.toHaveBeenCalled();
   });
   it('replaces labels including an explicit empty list and atomically audits', async () => {
-    await expect(changeChannelProfiles(actor, { action: 'setLabels', channelId: 'a', labels: [] })).resolves.toMatchObject({ ok: true, id: 'a' });
+    await expect(changeChannelProfiles(actor, { action: 'setLabels', channelId: 'a', confirmation: setLabelsConfirmation('a'), labels: [] })).resolves.toMatchObject({ ok: true, id: 'a' });
     expect(m.lock).toHaveBeenCalledWith(m.db, 'w1', [{ kind: 'target', id: 'a' }]);
     expect(sql(m.db.$executeRaw.mock.calls[0]!)).toContain('ON CONFLICT');
     expect(m.db.$executeRaw.mock.calls[0]).toContainEqual([]);
     expect(sql(m.db.$executeRaw.mock.calls[1]!)).toContain('INSERT INTO activity_logs');
   });
   it('creates and replaces named groups without duplicates', async () => {
-    await changeChannelProfiles(actor, { action: 'saveGroup', name: 'Brand', channelIds: ['a', 'a'] });
+    await changeChannelProfiles(actor, { action: 'saveGroup', name: 'Brand', confirmation: saveGroupConfirmation({ name: 'Brand' }), channelIds: ['a', 'a'] });
     expect(m.db.$executeRaw.mock.calls.filter(call => sql(call).includes('INSERT INTO page_group_targets'))).toHaveLength(1);
     expect(sql(m.db.$executeRaw.mock.calls[0]!)).toContain('INSERT INTO page_groups');
     m.db.$executeRaw.mockClear();
-    await changeChannelProfiles(actor, { action: 'saveGroup', id: 'g1', name: 'New', channelIds: ['a'] });
+    await changeChannelProfiles(actor, { action: 'saveGroup', id: 'g1', name: 'New', confirmation: saveGroupConfirmation({ id: 'g1', name: 'New' }), channelIds: ['a'] });
     expect(sql(m.db.$executeRaw.mock.calls[0]!)).toContain('UPDATE page_groups');
   });
   it('will not replace/delete a group containing channels outside current scope', async () => {
@@ -92,7 +92,7 @@ describe('channel profile authority and persistence', () => {
       if (query.includes('FROM page_group_targets')) return [{ targetId: 'hidden' }];
       return [];
     });
-    for (const input of [{ action: 'saveGroup', id: 'g1', name: 'New', channelIds: ['a'] }, { action: 'deleteGroup', id: 'g1', confirmation: deleteGroupConfirmation('g1') }]) await expect(changeChannelProfiles(actor, input)).rejects.toMatchObject({ code: 'conflict' });
+    for (const input of [{ action: 'saveGroup', id: 'g1', name: 'New', confirmation: saveGroupConfirmation({ id: 'g1', name: 'New' }), channelIds: ['a'] }, { action: 'deleteGroup', id: 'g1', confirmation: deleteGroupConfirmation('g1') }]) await expect(changeChannelProfiles(actor, input)).rejects.toMatchObject({ code: 'conflict' });
     expect(m.db.$executeRaw).not.toHaveBeenCalled();
   });
   it('requires exact delete confirmation and deletes only its own group', async () => {
@@ -108,11 +108,11 @@ describe('channel profile authority and persistence', () => {
     m.config.mockResolvedValueOnce({ ...policy, maxGroups: 0 });
     await expect(readChannelProfiles(actor)).rejects.toMatchObject({ code: 'unavailable' });
     m.db.$executeRaw.mockRejectedValueOnce(new Error('private database details'));
-    await expect(changeChannelProfiles(actor, { action: 'setLabels', channelId: 'a', labels: [] })).rejects.toMatchObject({ code: 'unavailable' });
+    await expect(changeChannelProfiles(actor, { action: 'setLabels', channelId: 'a', confirmation: setLabelsConfirmation('a'), labels: [] })).rejects.toMatchObject({ code: 'unavailable' });
   });
   it('maps a duplicate group name to a safe conflict', async () => {
     m.db.$executeRaw.mockRejectedValueOnce({ code: 'P2002' });
-    await expect(changeChannelProfiles(actor, { action: 'saveGroup', name: 'Brand', channelIds: ['a'] })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(changeChannelProfiles(actor, { action: 'saveGroup', name: 'Brand', confirmation: saveGroupConfirmation({ name: 'Brand' }), channelIds: ['a'] })).rejects.toMatchObject({ code: 'conflict' });
   });
   it('preserves scheduling rules rather than cascading them on group deletion', async () => {
     const original = m.db.$queryRaw.getMockImplementation()!;
@@ -121,4 +121,23 @@ describe('channel profile authority and persistence', () => {
     expect(m.db.$executeRaw).not.toHaveBeenCalled();
   });
 
+});
+
+describe('channel profile exact write confirmations', () => {
+  it.each([
+    { action: 'saveGroup', name: 'Brand', channelIds: ['a'] },
+    { action: 'saveGroup', id: 'g1', name: 'New', channelIds: ['a'] },
+    { action: 'setLabels', channelId: 'a', labels: [] },
+  ])('rejects missing or wrong confirmations before persistence %j', async input => {
+    for (const confirmation of [undefined, 'wrong', 'SAVE CHANNEL GROUP other', 'SET CHANNEL PROFILE LABELS other']) {
+      await expect(changeChannelProfiles(actor, { ...input, ...(confirmation === undefined ? {} : { confirmation }) })).rejects.toMatchObject({ code: 'invalid_request' });
+    }
+    expect(m.db.$executeRaw).not.toHaveBeenCalled(); expect(m.db.$transaction).not.toHaveBeenCalled();
+  });
+  it('binds create confirmation to trimmed name and edit confirmation to stable id', async () => {
+    expect(saveGroupConfirmation({ name: ' Brand ' })).toBe('SAVE CHANNEL GROUP Brand');
+    expect(saveGroupConfirmation({ id: 'g1', name: 'Changed' })).toBe('SAVE CHANNEL GROUP g1');
+    await expect(changeChannelProfiles(actor, { action: 'saveGroup', name: ' Brand ', channelIds: ['a'], confirmation: 'SAVE CHANNEL GROUP Brand' })).resolves.toMatchObject({ ok: true });
+    expect(m.db.$executeRaw.mock.calls[0]).toContain('Brand');
+  });
 });

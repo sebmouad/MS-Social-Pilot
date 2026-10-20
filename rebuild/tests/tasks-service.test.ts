@@ -81,7 +81,7 @@ beforeEach(() => {
 });
 
 const listed = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `t${i}`, title: `T${i}`, notes: null, status: 'todo', assigneeId: null, assigneeName: null, dueOn: '2020-01-01', postId: null, createdById: actor.userId, createdByName: 'Me', commentCount: 0, createdAt: new Date(), updatedAt: new Date() }));
-const create = (extra: Record<string, unknown> = {}) => ({ action: 'task.create', title: 'x', ...extra });
+const create = (extra: Record<string, unknown> = {}) => ({ action: 'task.create', title: 'x', confirmation: taskConfirmations.create(String(extra.title ?? 'x')), ...extra });
 
 describe('task reads', () => {
   it('denies clients, non-members and malformed ids', async () => {
@@ -194,8 +194,8 @@ describe('task writes', () => {
     await expect(performTaskAction(actor, create())).resolves.toMatchObject({ ok: true });
   });
   it('stamps task changes with the statement clock so an optimistic token never moves backwards', async () => {
-    await performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'doing' });
-    await performTaskAction(actor, { action: 'task.update', id: 't1', title: 'New' });
+    await performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'doing', confirmation: 'MOVE TASK t1 TO doing' });
+    await performTaskAction(actor, { action: 'task.update', id: 't1', confirmation: 'UPDATE TASK t1', title: 'New' });
     const updates = writes.filter(write => write.sql.includes('UPDATE tasks'));
     expect(updates).toHaveLength(2);
     for (const update of updates) expect(update.sql).toContain('clock_timestamp()');
@@ -223,16 +223,16 @@ describe('task writes', () => {
     auditCount = 0; await expect(performTaskAction(actor, create())).rejects.toMatchObject({ code: 'unavailable' });
   });
   it('creates a checklist in one insert with bounded size, computed due dates and a single audit', async () => {
-    const result = await performTaskAction(actor, { action: 'task.createMany', titles: [' A ', 'B', 'C'], assigneeId: 'user-b', startOn: '2026-12-30', gapDays: 2 });
+    const result = await performTaskAction(actor, { action: 'task.createMany', confirmation: 'CREATE 3 TASKS', titles: [' A ', 'B', 'C'], assigneeId: 'user-b', startOn: '2026-12-30', gapDays: 2 });
     expect(result).toMatchObject({ ok: true, action: 'task.createMany' }); expect((result as { ids: string[] }).ids).toHaveLength(3);
     expect(writes).toHaveLength(1); expect(writes[0]!.sql).toContain('unnest'); expect(audits).toHaveLength(1);
     expect(writes[0]!.values).toContainEqual(['2026-12-30', '2027-01-01', '2027-01-03']);
     expect(writes[0]!.values).toContainEqual(['A', 'B', 'C']);
-    await performTaskAction(actor, { action: 'task.createMany', titles: ['A', 'B', 'C'] });
+    await performTaskAction(actor, { action: 'task.createMany', confirmation: 'CREATE 3 TASKS', titles: ['A', 'B', 'C'] });
     expect(writes[1]!.values).toContainEqual(['', '', '']);
   });
   it('refuses oversize, invalid or overflowing checklists without writing', async () => {
-    const run = (value: Record<string, unknown>) => performTaskAction(actor, { action: 'task.createMany', titles: ['A'], ...value });
+    const run = (value: Record<string, unknown>) => performTaskAction(actor, { action: 'task.createMany', confirmation: taskConfirmations.createMany(Array.isArray(value.titles) ? value.titles.length : 1), titles: ['A'], ...value });
     await expect(run({ titles: ['A', 'B', 'C', 'D'] })).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(run({ titles: ['A', '  '] })).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(run({ titles: ['x'.repeat(21)] })).rejects.toMatchObject({ code: 'invalid_request' });
@@ -245,27 +245,27 @@ describe('task writes', () => {
   it('allows a move between any two different statuses and detects concurrent change', async () => {
     expect(TASK_TRANSITIONS.done).toEqual(['todo', 'doing']);
     taskRow = { ...taskRow!, status: 'done' };
-    await expect(performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'doing' })).resolves.toMatchObject({ ok: true });
-    await expect(performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'done' })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'doing', confirmation: 'MOVE TASK t1 TO doing' })).resolves.toMatchObject({ ok: true });
+    await expect(performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'done', confirmation: 'MOVE TASK t1 TO done' })).rejects.toMatchObject({ code: 'conflict' });
     taskRow = { ...taskRow!, status: 'todo' };
     mocks.prisma.$executeRaw.mockResolvedValueOnce(0);
-    await expect(performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'done' })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'done', confirmation: 'MOVE TASK t1 TO done' })).rejects.toMatchObject({ code: 'conflict' });
   });
   it('limits contributors to tasks they created or are assigned', async () => {
     role = 'contributor';
-    await expect(performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'doing' })).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'doing', confirmation: 'MOVE TASK t1 TO doing' })).rejects.toMatchObject({ code: 'forbidden' });
     taskRow = { ...taskRow!, assigneeId: actor.userId };
-    await expect(performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'doing' })).resolves.toMatchObject({ ok: true });
+    await expect(performTaskAction(actor, { action: 'task.transition', id: 't1', status: 'doing', confirmation: 'MOVE TASK t1 TO doing' })).resolves.toMatchObject({ ok: true });
     await expect(performTaskAction(actor, { action: 'task.delete', id: 't1', confirmation: taskConfirmations.delete('t1') })).rejects.toMatchObject({ code: 'forbidden' });
   });
   it('returns not_found for another workspace task, refuses empty updates and stale edits', async () => {
-    taskRow = null; await expect(performTaskAction(actor, { action: 'task.update', id: 'foreign', title: 'x' })).rejects.toMatchObject({ code: 'not_found' });
+    taskRow = null; await expect(performTaskAction(actor, { action: 'task.update', id: 'foreign', confirmation: 'UPDATE TASK foreign', title: 'x' })).rejects.toMatchObject({ code: 'not_found' });
     taskRow = { id: 't1', title: 'Old', notes: null, status: 'todo', assigneeId: null, dueOn: null, postId: null, createdById: 'someone', updatedAt };
-    await expect(performTaskAction(actor, { action: 'task.update', id: 't1', title: 'Old' })).rejects.toMatchObject({ code: 'invalid_request' });
-    await expect(performTaskAction(actor, { action: 'task.update', id: 't1', title: 'New', expectedUpdatedAt: '2026-10-18T09:00:00.000Z' })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(performTaskAction(actor, { action: 'task.update', id: 't1', confirmation: 'UPDATE TASK t1', title: 'Old' })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(performTaskAction(actor, { action: 'task.update', id: 't1', confirmation: 'UPDATE TASK t1', title: 'New', expectedUpdatedAt: '2026-10-18T09:00:00.000Z' })).rejects.toMatchObject({ code: 'conflict' });
     expect(writes).toHaveLength(0);
-    await expect(performTaskAction(actor, { action: 'task.update', id: 't1', title: 'New', expectedUpdatedAt: updatedAt.toISOString() })).resolves.toMatchObject({ ok: true });
-    await expect(performTaskAction(actor, { action: 'task.update', id: 't1', title: 'Newer' })).resolves.toMatchObject({ ok: true });
+    await expect(performTaskAction(actor, { action: 'task.update', id: 't1', confirmation: 'UPDATE TASK t1', title: 'New', expectedUpdatedAt: updatedAt.toISOString() })).resolves.toMatchObject({ ok: true });
+    await expect(performTaskAction(actor, { action: 'task.update', id: 't1', confirmation: 'UPDATE TASK t1', title: 'Newer' })).resolves.toMatchObject({ ok: true });
   });
   it('requires the exact confirmation to delete and removes comments with the task', async () => {
     await expect(performTaskAction(actor, { action: 'task.delete', id: 't1', confirmation: 'delete' })).rejects.toMatchObject({ code: 'invalid_request' });
@@ -274,9 +274,9 @@ describe('task writes', () => {
     expect(writes[0]!.sql).toContain('DELETE FROM task_comments'); expect(writes[1]!.sql).toContain('DELETE FROM tasks'); expect(audits).toHaveLength(1);
   });
   it('keeps comment text out of the audit trail and protects other authors', async () => {
-    await performTaskAction(actor, { action: 'comment.add', taskId: 't1', body: 'secret words' });
+    await performTaskAction(actor, { action: 'comment.add', taskId: 't1', confirmation: 'COMMENT ON TASK t1', body: 'secret words' });
     expect(audits[0]).not.toContain('secret words');
-    await expect(performTaskAction(actor, { action: 'comment.add', taskId: 't1', body: 'x'.repeat(31) })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(performTaskAction(actor, { action: 'comment.add', taskId: 't1', confirmation: 'COMMENT ON TASK t1', body: 'x'.repeat(31) })).rejects.toMatchObject({ code: 'invalid_request' });
     commentRow = { authorId: 'other', taskId: 't1' };
     await expect(performTaskAction(actor, { action: 'comment.delete', id: 'c1', confirmation: taskConfirmations.deleteComment('c1') })).rejects.toMatchObject({ code: 'forbidden' });
     role = 'admin'; await expect(performTaskAction(actor, { action: 'comment.delete', id: 'c1', confirmation: taskConfirmations.deleteComment('c1') })).resolves.toMatchObject({ ok: true });
@@ -284,7 +284,7 @@ describe('task writes', () => {
   it('rechecks the Tasks switch inside the write lock so a concurrent member disable wins over the preflight', async () => {
     freshWrite = false;
     await expect(performTaskAction(actor, create())).rejects.toMatchObject({ code: 'forbidden' });
-    await expect(performTaskAction(actor, { action: 'comment.add', taskId: 't1', body: 'late' })).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(performTaskAction(actor, { action: 'comment.add', taskId: 't1', confirmation: 'COMMENT ON TASK t1', body: 'late' })).rejects.toMatchObject({ code: 'forbidden' });
     expect(writes).toHaveLength(0); expect(audits).toHaveLength(0);
     expect(mocks.resolve).toHaveBeenCalledWith(expect.objectContaining({ role: 'editor' }));
   });
@@ -364,5 +364,26 @@ describe('task MCP', () => {
     featureOn = false;
     await expect(executeTasksTool(actor, 'list_tasks', {})).rejects.toMatchObject({ code: 'forbidden' });
     await expect(executeTasksTool(actor, 'move_task', { id: 't1', status: 'doing', confirmation: taskConfirmations.transition('t1', 'doing') })).rejects.toMatchObject({ code: 'forbidden' });
+  });
+});
+
+describe('shared task confirmation boundary', () => {
+  const actions = [
+    { action: 'task.create', title: 'Plan', confirmation: 'CREATE TASK Plan' },
+    { action: 'task.createMany', titles: ['A', 'B'], confirmation: 'CREATE 2 TASKS' },
+    { action: 'task.update', id: 't1', title: 'New', confirmation: 'UPDATE TASK t1' },
+    { action: 'task.transition', id: 't1', status: 'doing', confirmation: 'MOVE TASK t1 TO doing' },
+    { action: 'comment.add', taskId: 't1', body: 'Hello', confirmation: 'COMMENT ON TASK t1' },
+    { action: 'task.delete', id: 't1', confirmation: 'DELETE TASK t1' },
+    { action: 'comment.delete', id: 'c1', confirmation: 'DELETE TASK COMMENT c1' },
+  ];
+  it.each(actions)('requires confirmation in the shared schema: $action', async value => {
+    const { confirmation: _confirmation, ...missing } = value;
+    await expect(performTaskAction(actor, missing)).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(writes).toHaveLength(0); expect(audits).toHaveLength(0); expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+  });
+  it.each(actions)('refuses mismatched confirmation before writes: $action', async value => {
+    await expect(performTaskAction(actor, { ...value, confirmation: 'yes' })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(writes).toHaveLength(0); expect(audits).toHaveLength(0); expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
   });
 });

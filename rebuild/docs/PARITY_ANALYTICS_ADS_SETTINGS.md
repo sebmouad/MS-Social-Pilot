@@ -85,17 +85,18 @@ explicitly listed below rather than treated as equal capabilities.
 | Customer action / UI | REST | MCP tool | Shared core / status |
 | --- | --- | --- | --- |
 | View discovered/selected connections and health | **GET `/api/settings/connections?offset=…`** | `list_connections` | **`settings/server/connection-directory.ts`** with fresh manager/tenant/feature checks + shared `listConnections`/health; Added REST/shared paginated read |
-| Connect/reconnect provider / complete consent | POST `/api/connections/[platform]/start`, GET callback | **Missing** | Provider-owned `connectionFlow.start` consumes browser request/viewer; **Gap**, outside host/provider ownership; do not manufacture OAuth state |
+| Connect/reconnect provider: start authorization | POST `/api/oauth/connections/[platform]/start` | `start_connection` | `settings/server/connection-start.ts`; same exact `START CONNECTION <platform>`, current session/manager/platform checks, audit and provider-owned state cookies. Returns authorization URL only; Added. Old route delegation remains an integration gap below |
+| Complete provider consent | Provider authorization URL then existing callback | Open `start_connection` receipt in the same signed-in browser | External provider consent requires human navigation; no app secret or replacement consent tool. Callback/state validation remains provider-owned |
 | Enable/disable channel or ad account | PATCH `/api/connections` | `set_connection_selection` | `server/connection-mutations.ts:setConnectionSelections`; Present, confirmation difference below |
 | Save multiple selection changes atomically | PATCH `/api/connections` | **`set_connection_selections`** | Same core, module wrapper checks Root batch bound and exact `SET CONNECTION SELECTIONS <count>`; Added MCP |
 | Preview disconnect-related record counts | POST `/api/connections` | `preview_connection_disconnect` | `previewSocialAccountDeletion`; Present |
 | Disconnect retaining related records | DELETE `/api/connections` (`mode=retain`) | `disconnect_connection` (`mode=retain`) | `disconnectSocialAccount`; exact tool `DISCONNECT <id> RETAIN`; local credential removal only; Present |
 | Disconnect deleting related records | DELETE same (`mode=delete`) | `disconnect_connection` (`mode=delete`) | Same service; UI `DELETE`, MCP exact scoped phrase; Present |
 | Read channel groups/profile labels | GET `/settings/profiles/operations`; **GET `/api/settings/profiles`** | `list_channel_profiles` | `settings/channel-profiles/service.ts`; Added REST alias (existing module HTTP handler already serves UI route) |
-| Create channel group | POST same (`action=saveGroup`) | `save_channel_group` | Same profile service; Present; existing confirmation gap |
-| Edit channel group | POST same (`action=saveGroup,id`) | `save_channel_group` | Same service; Present; existing confirmation gap |
+| Create channel group | POST same (`action=saveGroup`) | `save_channel_group` | Same profile service; exact confirmation enforced in service; Present |
+| Edit channel group | POST same (`action=saveGroup,id`) | `save_channel_group` | Same service; exact confirmation enforced in service; Present |
 | Delete channel group | POST same (`action=deleteGroup`) | `delete_channel_group` | Same service; exact `DELETE CHANNEL GROUP <id>`; Present |
-| Set/clear channel profile labels | POST same (`action=setLabels`) | `set_channel_profile_labels` | Same service; Present; existing confirmation gap |
+| Set/clear channel profile labels | POST same (`action=setLabels`) | `set_channel_profile_labels` | Same service; exact confirmation enforced in service; Present |
 | Read watermark settings | GET `/settings/watermark/operations`; **GET `/api/settings/watermark`** | `get_workspace_watermark` | `settings/watermark/service.ts`; Added REST alias |
 | Save watermark/logo | POST same | `save_workspace_watermark` | Same watermark service/confirmation; Present |
 | Remove watermark | POST same | `remove_workspace_watermark` | Same watermark service/confirmation; Present |
@@ -116,7 +117,7 @@ explicitly listed below rather than treated as equal capabilities.
 | Change password and revoke other sessions | POST `/api/settings/account` | **`change_account_password`** | Same service; `CHANGE ACCOUNT PASSWORD`, verifies current password, compare-and-set hash, content-free audit; Added MCP/refactored REST |
 | List/page own active sessions | GET `/api/settings/account/sessions?offset=…` | **`list_account_sessions`** | Same service; current session identified, hashes removed, Root/key ceiling; Added MCP/refactored REST |
 | Revoke another active session | DELETE `/api/settings/account/sessions` | **`revoke_account_session`** | Same service; `REVOKE ACCOUNT SESSION <id>`, cannot revoke current/foreign session; Added MCP/refactored REST |
-| Read/change appearance | Browser theme context/cookie only | **Missing** | **Gap:** shared `components/ThemeProvider.tsx`, `app/layout.tsx`, `lib/themes.ts` require coordinated changes outside ownership |
+| Read/change appearance | GET/PATCH `/api/settings/appearance` | `get_appearance` / `update_appearance` | `settings/server/appearance.ts`; theme stored in existing `users.theme`, display mode cookie-only (no mode column). Same session authority, `UPDATE APPEARANCE`, transactional audit and cookies; Added. Settings picker uses this REST service |
 | Preview workspace erasure | POST `/api/settings/data` | `preview_workspace_data_deletion` | `server/data-control`; Present |
 | Export synchronous ZIP with media | GET `/api/settings/data` | **`export_workspace_archive`** | Same `server/data-control/archive.ts:exportWorkspaceArchive`; Added MCP |
 | Export redacted direct-record JSON snapshot | **GET `/api/settings/data/snapshot`** | `export_workspace_data` | Same `exportWorkspaceData`; Added REST. This is explicitly a partial snapshot, not the ZIP archive |
@@ -140,12 +141,12 @@ explicitly listed below rather than treated as equal capabilities.
 ## Settings: sharing, bio and webhooks (source owned by other modules)
 
 These screens are installed in Settings navigation, but their services/tools are
-owned by `modules/sharing` and `modules/integrations`. No edits were made there.
+owned by `modules/sharing` and `modules/integrations`. Round 2 adds a thin Settings-owned session guard for secret-bearing responses; all webhook rules, confirmation, rate limits and audit remain in the original Integrations service. No Integrations product logic is duplicated.
 
 | Customer action / UI | REST | MCP tool | Shared core / status |
 | --- | --- | --- | --- |
 | List/page client share links | GET `/api/sharing/links` | `list_share_links` | `modules/sharing/server`; Present |
-| Discover shareable channel choices | **Missing standalone REST read** (UI server loader) | `list_shareable_channels` | `listShareableChannels`; **Gap outside ownership** |
+| Discover shareable channel choices | GET `/api/sharing/channels` | `list_shareable_channels` | Same `listShareableChannels` as UI picker, current sharing authority/scope and Root bound; Added REST |
 | Create review/calendar/portal link | POST `/api/sharing/links` | `create_share_link` | Same sharing core; exact confirmation; Present |
 | Edit title/description | PATCH `/api/sharing/links/[id]` | `update_share_link` | Version-checked shared update; existing confirmation gap for copy-only edits |
 | Edit link access/resources/expiry | PATCH same | `update_share_link` | Same shared core; exact confirmation; replaces secret on access changes; Present |
@@ -162,8 +163,8 @@ owned by `modules/sharing` and `modules/integrations`. No edits were made there.
 | Create webhook | POST `/api/webhooks` | `create_webhook` | Same core; `CREATE WEBHOOK <name>`; Present |
 | Enable/disable endpoint or edit events | PATCH `/api/webhooks/[id]` | `update_webhook` | Same core; `UPDATE WEBHOOK <id>`; Present |
 | Delete webhook and delivery history | DELETE same | `delete_webhook` | Same core; `DELETE WEBHOOK <id>`; Present |
-| Reveal signing secret | POST `/api/webhooks/[id]/secret/reveal` | **Missing by current module policy** | **Gap:** integrations policy explicitly withholds secret revelation from MCP; requires owning-module decision/implementation |
-| Rotate signing secret | POST `/api/webhooks/[id]/secret` | `rotate_webhook_secret` | Same rotation core; MCP withholds new secret; exact confirmation; Present with secret-output gap |
+| Reveal signing secret in one response | POST `/api/webhooks/[id]/secret/reveal` | `reveal_webhook_secret` | Same `settings/server/webhook-secrets.ts` → Integrations reveal service: current session, manager/tenant/write checks, exact `REVEAL WEBHOOK SECRET <id>`, rate limit and committed content-free audit. Added session-only MCP; lists never return secrets |
+| Rotate signing secret and return new secret once | POST `/api/webhooks/[id]/secret` | `rotate_webhook_secret_once` (session); existing `rotate_webhook_secret` remains secret-free | Same Settings session guard → Integrations rotation service; `ROTATE WEBHOOK SECRET <id>`; Added session-only result parity without widening bearer-key secret authority |
 | Send test ping | POST `/api/webhooks/[id]/test` | `test_webhook` | Same core; exact `TEST WEBHOOK <id>`; Present |
 | List/page delivery history | GET `/api/webhooks/[id]/deliveries` | `list_webhook_deliveries` | Same core; Present |
 | Redeliver settled delivery | POST `/api/webhooks/[id]/deliveries/[deliveryId]` | `redeliver_webhook_delivery` | Same core; exact `REDELIVER WEBHOOK DELIVERY <id>`; Present |
@@ -190,8 +191,8 @@ owned by `modules/sharing` and `modules/integrations`. No edits were made there.
 | --- | --- | --- | --- |
 | Overview search/sort/order/attention filter | GET `/api/agency` | `get_agency_overview` through person credential dispatcher | `agency/server/agency.ts:agencyOverview`; Present; workspace keys excluded |
 | Export filtered overview CSV/JSON | GET `/api/agency?format=csv\|json` | `get_agency_overview` (`format`) | `agency/server/export.ts`; Present |
-| Client/member/invitation directory search | GET `/api/agency?view=clients` | `list_agency_clients` **definition only** | `listAgencyClients`; **Gap:** current person dispatcher intentionally exposes overview only, not Clients; no workspace-key fallback |
-| Enter a workspace / open its module or team | POST `/api/workspaces/select`, then navigate | **Missing** | **Gap:** route changes browser workspace cookie and has inline membership validation; requires shared person/session selection service and host context handling |
+| Client/member/invitation directory search | GET `/api/agency?view=clients` | `list_agency_clients` (session) | Same `listAgencyClients` per-workspace authority/entitlement/team filtering. Added session MCP registration; existing overview-only person keys remain overview-only |
+| Enter a workspace / open its module or team | POST `/api/workspaces/select`, then navigate | `select_workspace` (session) | Shared `agency/server/workspace-selection.ts`: current session/member locks, suspended/purge guard, audit, browser cookie. Subsequent requests use selection; no credential scope changes. MCP requires `SELECT WORKSPACE <id>`; REST retains existing explicit-selection payload |
 | Manage a client's team/invitation after switching | Settings team/invitation routes above | Team/invitation tools in that workspace | Same workspace services; Agency does not bypass per-workspace grants |
 
 ## Confirmation and authority ledger
@@ -203,18 +204,17 @@ This batch does **not** certify the existing implementations as uniformly confir
   tenant/role/audit but has no confirmation input for selections. The new batch
   wrapper cannot secure the older route. Fix requires the connection service and
   `/api/connections/route.ts` owners, then the Connections manager's payload/dialog.
-- Tasks create/update/move/comment-add confirmations currently live in the MCP
-  adapter; it strips the text before `performTaskAction`. The REST/UI path uses
-  the same action service without those confirmations. Delete confirmations are
-  already in the service. A follow-up in the Tasks-owned files must move all
-  write confirmations into the action schema/service and update UI/MCP plus
-  existing service/route/DOM/integration fixtures together. No missing endpoint
-  was found for Tasks; this existing behavioral gap remains open.
-- Channel-group save and channel-label replacement have no confirmation in the
-  existing profile service/MCP schema. Delete is exact-confirmed. These are
-  existing in-lane behavioral gaps, not missing route registrations.
+- Tasks now require and validate confirmation for every write inside
+  `TASK_ACTION_SCHEMA` / `performTaskAction`. MCP preserves the value; REST and
+  UI send the same create/checklist/update/move/comment/delete confirmations.
+  Unit, HTTP, MCP and DOM fixtures were updated together. Database concurrency
+  fixtures were updated but the six integration cases remain opt-in/skipped.
+- Channel-group creation/editing and channel-label replacement now require exact
+  `SAVE CHANNEL GROUP <name-or-id>` / `SET CHANNEL PROFILE LABELS <channelId>`
+  inside the shared service. UI uses the shared confirmation dialog with Root
+  English/French copy; MCP and REST submit the same tokens. Delete is unchanged.
 - Sharing copy-only edits are version checked but do not require confirmation;
-  access changes do. Sharing is outside this lane's owned paths.
+  access changes do. Sharing UI is excluded from this lane; requiring confirmation for those existing saves needs that UI owner to send it.
 - New account profile/password/session-revocation services check exact confirmation
   and current feature write access, session identity, expiry/pending/disabled state;
   passwords use the existing password policy and audit helpers. Session-only MCP
@@ -225,33 +225,34 @@ This batch does **not** certify the existing implementations as uniformly confir
 ## Integration work outside owned paths
 
 1. `src/lib/config/registry.ts`: integrator increments `CONFIG_SCHEMA_VERSION` once
-   for the batch's six new Root keys (below). This lane deliberately did not edit it.
-2. Connections: extract a neutral, session-bound OAuth-start service from the route/
-   platform flow contract (`src/server/platforms/host.ts`, platform adapters,
-   `src/app/api/connections/[platform]/start/route.ts`). It must return usable
-   consent navigation without granting provider access before consent; then add
-   the corresponding Settings-owned tool. The new Settings directory route covers discovery without changing the old route.
-   Centralize selection confirmations and replace the underlying hardcoded 250
-   item ceiling with the owning Root policy; do not just add a second bypass route.
-3. Appearance: coordinate `src/components/ThemeProvider.tsx`, `src/app/layout.tsx`
-   and `src/lib/themes.ts` with a Settings-owned appearance service/REST/MCP.
-   Decide how an MCP session's cookie preference reaches the requesting browser;
-   an unrelated workspace/person key must not silently change another browser.
-   The current provider directly writes a fixed-lifetime cookie, so adding a
-   pretend server preference here would not implement the visible behavior.
-4. Webhooks: owner of `src/modules/integrations/**` must reconcile secret-reveal
-   policy with requested full capability parity, using the same reauthentication/
-   confirmation and secret service as the UI. Add a REST read for `listShareableChannels` in `src/app/api/sharing/**` using
-   the same sharing service as the picker and MCP tool. Existing webhook bearer keys must
-   not gain new secret authority accidentally. Do not duplicate webhook logic in
-   Settings solely to bypass that module's declared policy.
-5. Agency: `list_agency_clients` exists in the module but is not transport-reachable.
-   Current person credentials explicitly store `readFeature=agency/overview`.
-   Clients needs separately granted authority, with person credential schema/host
-   policy/migration changes, rather than widening all existing overview keys.
-   Workspace switching needs a shared person/session service extracted from
-   `/api/workspaces/select`, plus appropriate MCP host context support
-   (`src/server/mcp/**`), not a workspace-scoped key escape.
+   for any unregistered Root keys in the round-specific lists below. This lane deliberately did not edit it.
+2. OAuth compatibility entry: `src/app/api/connections/[platform]/start/route.ts`
+   is outside this lane. Replace its inline implementation with a thin call to
+   `connectionStartHttp(request, (await params).platform)` from
+   `modules/settings/server/connection-start-http.ts`. All owned UI callers now
+   use `/api/oauth/connections/[platform]/start`, the same service as session MCP.
+   The old route still lacks the new confirmation/audit boundary until delegated.
+   Selection confirmations still need the connection service and old
+   `/api/connections/route.ts` owners, including removal of the fixed 250 ceiling.
+3. Global appearance: `src/app/layout.tsx` still initializes from cookies/Root
+   defaults only. Integrator should load the authenticated user's existing
+   `users.theme` when there is no valid theme cookie, through the Settings service.
+   Settings reads/writes and browser reload already consume the account preference.
+   `components/ThemeProvider.tsx` and its shared shell controls still write a fixed
+   cookie lifetime directly; route those changes through the same appearance
+   REST service (mode stays cookie-only). Do not infer whole-app preference
+   unification from the newly shared Settings picker.
+4. Webhook aliases deliberately preserve existing bearer policy. The new
+   `reveal_webhook_secret` and `rotate_webhook_secret_once` accept browser sessions
+   only and use the same core as REST. There is no duplication of secret storage,
+   generation, scope, rate limits, confirmations or audits. Integrations-owned
+   explanatory comments saying no MCP reveal exists should be updated by that
+   module's owner. Repeated explicit reveal remains possible, confirmed/rate-limited
+   each time; “once” describes a response, not destruction of the signing key.
+5. Agency session tools are registered through the Settings-installed catalog.
+   Person credentials still store `readFeature=agency/overview` and intentionally
+   cannot read Clients or switch browser workspaces. Adding those to person keys
+   would require an explicit new grant/schema/host policy, not a silent upgrade.
 6. Account helper ownership: `src/server/account-settings.ts` still owns product
    password/name/audit helpers. Move the product parts into Settings in a coordinated
    batch; this lane imports the existing shared policy/audit instead of editing it.
@@ -291,7 +292,7 @@ external dependency symlink. New Root keys need the integrator's schema-version
 bump before release. Browser themes/viewports/keyboard, actual PostgreSQL,
 provider operations and real MCP transport remain unverified.
 
-Final local verification: **247 tests passed in 17 targeted files**, no skips or
+Round 1 verification (historical): **247 tests passed in 17 targeted files**, no skips or
 failures, using `npx vitest run --no-cache` from `rebuild/`. The cache-enabled
 first run passed its assertions but failed writing the external dependency cache;
 the successful final run disabled caching. `npx tsc --noEmit -p .` completed with
@@ -376,3 +377,142 @@ Complete batch inventory (paths relative to `rebuild/`; dependency symlinks excl
 - `tests/parity-connection-selection.test.ts`
 - `tests/parity-rest-surfaces.test.ts`
 - `tests/settings-form-validation.test.ts`
+
+
+## Round 2 requested action coverage and remaining integration
+
+Every action requested for this round now has a REST and authenticated MCP
+entry point calling the same module service: OAuth startup, appearance read/save,
+webhook reveal/rotate, Agency Clients, workspace selection and sharing channels.
+Tasks and channel-profile write confirmations were also moved into their shared
+services. English-first `Accept-Language` with French fallbacks now keeps the
+Analytics Audience history heading in English; French-first remains French.
+
+This is action/source coverage, **not a 100% end-to-end architecture or release
+claim**. No requested application action intrinsically lacks a REST/MCP equivalent.
+External provider consent still requires opening the returned authorization URL
+in the same browser session that received its state cookies; consent is owned by
+the external provider and cannot be replaced by an application tool. Browser-only
+navigation, copying a receipt and applying a theme to the current document remain
+client behavior; the underlying data/actions are exposed.
+
+The old OAuth startup route, global theme shell writers/initialization and
+connection-selection confirmation boundary still require the exact external
+edits listed above. Existing sharing copy-only edits remain version checked but
+unconfirmed; enforcing confirmations requires coordinated changes with the
+excluded sharing UI. Existing overview-only person credentials and webhook
+bearer credentials deliberately gain no new secret, Clients or browser-write
+powers. These are credential boundaries, not missing session capabilities.
+
+New Root keys for round 2 (registry version deliberately unchanged):
+
+- `settings.appearanceCookieMaxAgeSeconds`: Settings REST/MCP theme/mode cookie lifetime.
+- `settings.appearanceCopy`: complete English/French appearance labels and feedback.
+- `settings.channelProfilesConfirmationCopy`: English/French profile-save confirmation dialogs.
+- `agency.workspaceIdMaxLength`: workspace selection input bound.
+
+Appearance uses existing `theme.default` / `theme.defaultMode` defaults and the
+existing `users.theme` database column via parameterized SQL (the compatibility
+Prisma model omits this column). No mode column exists, so mode is cookie-only.
+No migration, client generation, shared registry edit, server, deployment, push
+or production change was made. Changes remain uncommitted: linked Git metadata
+is outside the sandbox writable roots.
+
+
+Round 2 final verification from `rebuild/`:
+
+- `npx tsc --noEmit -p .`: **0 errors**.
+- Targeted `npx vitest run --no-cache`: **551 passed, 6 skipped**, across
+  **28 files (27 passed, one database integration file skipped)**. The skipped
+  `tasks78-concurrency.integration.test.ts` cases require a configured test database.
+- `git diff --check`: passed. No full-suite or browser/live-provider run.
+
+The targeted files were:
+
+- `tests/parity-appearance-round2.test.ts`
+- `tests/parity-appearance-ui-round2.test.ts`
+- `tests/parity-session-surfaces-round2.test.ts`
+- `tests/parity-oauth-round2-service.test.ts`
+- `tests/parity-oauth-round2-transports.test.ts`
+- `tests/parity-agency-round2.test.ts`
+- `tests/workspace-selection-route.test.ts`
+- `tests/agency-service.test.ts`
+- `tests/agency-route.test.ts`
+- `tests/agency-mcp.test.ts`
+- `tests/agency-host-integration.test.ts`
+- `tests/analytics-demographics-surfaces.test.ts`
+- `tests/parity-account-service.test.ts`
+- `tests/parity-account-mcp.test.ts`
+- `tests/parity-rest-surfaces.test.ts`
+- `tests/settings-copy-parity.test.ts`
+- `tests/integrations-access.test.ts`
+- `tests/integrations-services.test.ts`
+- `tests/mcp-security.test.ts`
+- `tests/raw-sql-void-guard.test.ts`
+- `tests/channel-profiles.test.ts`
+- `tests/channel-profiles-surfaces.test.ts`
+- `tests/tasks-host-integration.test.ts`
+- `tests/tasks-module.test.ts`
+- `tests/tasks-route.test.ts`
+- `tests/tasks-service.test.ts`
+- `tests/tasks76-ui.test.ts`
+- `tests/tasks78-concurrency.integration.test.ts`
+
+Round 2 changed-file inventory (relative to `rebuild/`; pre-existing dependency symlinks excluded):
+
+- `docs/PARITY_ANALYTICS_ADS_SETTINGS.md`
+- `src/app/api/oauth/connections/[platform]/start/route.ts`
+- `src/app/api/settings/appearance/route.ts`
+- `src/app/api/sharing/channels/route.ts`
+- `src/app/api/webhooks/[id]/secret/reveal/route.ts`
+- `src/app/api/webhooks/[id]/secret/route.ts`
+- `src/app/api/workspaces/select/route.ts`
+- `src/modules/agency/config.ts`
+- `src/modules/agency/mcp.ts`
+- `src/modules/agency/server/workspace-selection.ts`
+- `src/modules/analytics/ui/demographics/DemographicsScreen.tsx`
+- `src/modules/settings/channel-profiles/config.ts`
+- `src/modules/settings/channel-profiles/contracts.ts`
+- `src/modules/settings/channel-profiles/copy.ts`
+- `src/modules/settings/channel-profiles/mcp.ts`
+- `src/modules/settings/channel-profiles/service.ts`
+- `src/modules/settings/config.ts`
+- `src/modules/settings/connection-start-mcp.ts`
+- `src/modules/settings/mcp.ts`
+- `src/modules/settings/server/account.ts`
+- `src/modules/settings/server/appearance-http.ts`
+- `src/modules/settings/server/appearance.ts`
+- `src/modules/settings/server/connection-start-http.ts`
+- `src/modules/settings/server/connection-start.ts`
+- `src/modules/settings/server/webhook-secrets-http.ts`
+- `src/modules/settings/server/webhook-secrets.ts`
+- `src/modules/settings/session-parity-mcp.ts`
+- `src/modules/settings/ui/appearance/AppearanceScreen.tsx`
+- `src/modules/settings/ui/appearance/copy.ts`
+- `src/modules/settings/ui/appearance/picker.tsx`
+- `src/modules/settings/ui/connections/manager.tsx`
+- `src/modules/settings/ui/connections/reconnect.tsx`
+- `src/modules/settings/ui/profiles/ProfilesManager.tsx`
+- `src/modules/settings/ui/profiles/ProfilesScreen.tsx`
+- `src/modules/tasks/mcp.ts`
+- `src/modules/tasks/server/tasks.ts`
+- `src/modules/tasks/tasks.ts`
+- `src/modules/tasks/ui/TaskBoard.tsx`
+- `tests/agency-service.test.ts`
+- `tests/analytics-demographics-surfaces.test.ts`
+- `tests/channel-profiles-surfaces.test.ts`
+- `tests/channel-profiles.test.ts`
+- `tests/integrations-access.test.ts`
+- `tests/parity-agency-round2.test.ts`
+- `tests/parity-appearance-round2.test.ts`
+- `tests/parity-appearance-ui-round2.test.ts`
+- `tests/parity-oauth-round2-service.test.ts`
+- `tests/parity-oauth-round2-transports.test.ts`
+- `tests/parity-session-surfaces-round2.test.ts`
+- `tests/tasks-host-integration.test.ts`
+- `tests/tasks-module.test.ts`
+- `tests/tasks-route.test.ts`
+- `tests/tasks-service.test.ts`
+- `tests/tasks76-ui.test.ts`
+- `tests/tasks78-concurrency.integration.test.ts`
+- `tests/workspace-selection-route.test.ts`

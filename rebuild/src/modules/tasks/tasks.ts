@@ -40,14 +40,14 @@ const dueOn = calendarDay;
 const text = z.string().max(20000);
 
 export const TASK_ACTION_SCHEMA = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('task.create'), title: text, notes: text.nullish(), assigneeId: identifier.nullish(), dueOn: dueOn.nullish(), postId: identifier.nullish() }).strict(),
+  z.object({ action: z.literal('task.create'), confirmation: z.string(), title: text, notes: text.nullish(), assigneeId: identifier.nullish(), dueOn: dueOn.nullish(), postId: identifier.nullish() }).strict(),
   /** `expectedUpdatedAt` (the value the editor loaded) turns a lost update into a conflict instead of an overwrite. */
-  z.object({ action: z.literal('task.update'), id: identifier, title: text.optional(), notes: text.nullish(), assigneeId: identifier.nullish(), dueOn: dueOn.nullish(), postId: identifier.nullish(), expectedUpdatedAt: z.string().datetime().optional() }).strict(),
-  z.object({ action: z.literal('task.transition'), id: identifier, status: z.enum(TASK_STATUSES) }).strict(),
+  z.object({ action: z.literal('task.update'), confirmation: z.string(), id: identifier, title: text.optional(), notes: text.nullish(), assigneeId: identifier.nullish(), dueOn: dueOn.nullish(), postId: identifier.nullish(), expectedUpdatedAt: z.string().datetime().optional() }).strict(),
+  z.object({ action: z.literal('task.transition'), confirmation: z.string(), id: identifier, status: z.enum(TASK_STATUSES) }).strict(),
   z.object({ action: z.literal('task.delete'), id: identifier, confirmation: z.string().max(400) }).strict(),
   /** A checklist: every line becomes a task in one atomic write; due dates start at `startOn` and advance `gapDays` per line. */
-  z.object({ action: z.literal('task.createMany'), titles: z.array(text).min(1).max(1000), assigneeId: identifier.nullish(), startOn: calendarDay.nullish(), gapDays: z.number().int().min(0).max(3650).default(1) }).strict(),
-  z.object({ action: z.literal('comment.add'), taskId: identifier, body: text }).strict(),
+  z.object({ action: z.literal('task.createMany'), confirmation: z.string(), titles: z.array(text).min(1).max(1000), assigneeId: identifier.nullish(), startOn: calendarDay.nullish(), gapDays: z.number().int().min(0).max(3650).default(1) }).strict(),
+  z.object({ action: z.literal('comment.add'), confirmation: z.string(), taskId: identifier, body: text }).strict(),
   z.object({ action: z.literal('comment.delete'), id: identifier, confirmation: z.string().max(400) }).strict(),
 ]);
 export type TaskAction = z.infer<typeof TASK_ACTION_SCHEMA>;
@@ -71,7 +71,7 @@ export const TASK_POST_CHOICE_SCHEMA = z.object({
 export const taskConfirmations = {
   delete: (id: string) => `DELETE TASK ${id}`,
   deleteComment: (id: string) => `DELETE TASK COMMENT ${id}`,
-  /** MCP-only write confirmations; app screens use direct controls with the same server checks. */
+  /** Shared write confirmations; customer controls send these without exposing protocol commands. */
   create: (title: string) => `CREATE TASK ${title.trim()}`,
   createMany: (count: number) => `CREATE ${count} TASKS`,
   update: (id: string) => `UPDATE TASK ${id}`,

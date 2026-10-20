@@ -10,7 +10,7 @@ export function ReconnectButton({ platformId, label, busyLabel, failedLabel }: {
   async function reconnect() {
     setBusy(true); setFailed(false);
     try {
-      const response = await fetch(`/api/connections/${encodeURIComponent(platformId)}/start`, { method: 'POST' });
+      const response = await fetch(`/api/oauth/connections/${encodeURIComponent(platformId)}/start`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation: `START CONNECTION ${platformId}` }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || typeof result.authorizationUrl !== 'string') throw new Error('start');
       const authorizationUrl = new URL(result.authorizationUrl);

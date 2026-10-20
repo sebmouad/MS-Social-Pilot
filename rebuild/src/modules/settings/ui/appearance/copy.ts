@@ -1,14 +1,21 @@
+import { z } from 'zod';
 export const appearanceCopy = {
   en: {
     title: 'Appearance', description: 'Choose the colors that make your workspace feel right.',
-    panel: 'Workspace theme', panelDetail: 'Your choice is saved in this browser and will be ready the next time you visit.',
-    note: 'Theme colors are designed to keep text, controls, and focus indicators easy to see.',
-    group: 'Choose a workspace theme', current: 'Current',
+    panel: 'Your theme', panelDetail: 'Your theme is saved to your account. Display mode is saved in this browser.',
+    note: 'Theme colors keep text, controls, and focus indicators easy to see.',
+    group: 'Choose a theme', current: 'Current', mode: 'Display mode', save: 'Save appearance', saving: 'Saving…', saved: 'Appearance saved.', failed: 'Appearance could not be saved. Try again.',
+    vivid: 'Vivid', vividDescription: 'Deep indigo navigation with colorful modules.', meta: 'Meta blue', metaDescription: 'Light navigation with a blue accent.', warm: 'Warm', warmDescription: 'Cream and coral, rounded and friendly.', clean: 'Clean', cleanDescription: 'Crisp gray with color in icons and charts.',
+    light: 'Light', dark: 'Dark', system: 'Match device',
   },
   fr: {
     title: 'Apparence', description: 'Choisissez les couleurs qui conviennent à votre espace.',
-    panel: 'Thème de l’espace', panelDetail: 'Votre choix est enregistré dans ce navigateur et sera prêt à votre prochaine visite.',
-    note: 'Les couleurs des thèmes sont conçues pour que le texte, les commandes et les indicateurs de focus restent faciles à voir.',
-    group: 'Choisir un thème d’espace', current: 'Actuel',
+    panel: 'Votre thème', panelDetail: 'Votre thème est enregistré dans votre compte. Le mode d’affichage est enregistré dans ce navigateur.',
+    note: 'Les couleurs gardent le texte, les commandes et les indicateurs de focus faciles à voir.',
+    group: 'Choisir un thème', current: 'Actuel', mode: 'Mode d’affichage', save: 'Enregistrer l’apparence', saving: 'Enregistrement…', saved: 'Apparence enregistrée.', failed: 'Impossible d’enregistrer l’apparence. Réessayez.',
+    vivid: 'Vif', vividDescription: 'Navigation indigo et modules colorés.', meta: 'Bleu Meta', metaDescription: 'Navigation claire avec un accent bleu.', warm: 'Chaleureux', warmDescription: 'Crème et corail aux formes arrondies.', clean: 'Épuré', cleanDescription: 'Gris net et couleurs dans les icônes et graphiques.',
+    light: 'Clair', dark: 'Sombre', system: 'Selon l’appareil',
   },
-} as const;
+};
+export const appearanceCopySchema = z.object({ en: z.object(Object.fromEntries(Object.keys(appearanceCopy.en).map(key => [key, z.string().trim().min(1)]))).strict(), fr: z.object(Object.fromEntries(Object.keys(appearanceCopy.fr).map(key => [key, z.string().trim().min(1)]))).strict() }).strict();
+export type AppearanceCopy = typeof appearanceCopy.en;

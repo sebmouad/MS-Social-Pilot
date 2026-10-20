@@ -17,10 +17,12 @@ import { GET, POST } from '@/modules/settings/channel-profiles/http';
 import { GroupShortcut } from '@/modules/settings/ui/profiles/GroupShortcut';
 import { ProfilesManager } from '@/modules/settings/ui/profiles/ProfilesManager';
 import { publishingPostReadQuery } from '@/modules/publishing/server/read-query';
-import { profileCopy } from '@/modules/settings/channel-profiles/copy';
+import { profileCopy, profileConfirmationCopy } from '@/modules/settings/channel-profiles/copy';
 const directory = { channels: [{ id: 'a', name: 'Alpha', labels: ['North'] }, { id: 'b', name: 'Beta', labels: [] }], groups: [{ id: 'g', name: 'Brand', channelIds: ['a', 'hidden'] }] };
 beforeEach(() => {
   vi.clearAllMocks();
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
   service.requireViewer.mockResolvedValue({ user: { id: 'u1' }, workspaceId: 'w1' });
   service.readChannelProfiles.mockResolvedValue(directory); service.changeChannelProfiles.mockResolvedValue({ ok: true, id: 'g' });
   service.authorize.mockResolvedValue({ actor: { userId: 'u1', workspaceId: 'w1' }, entitlements: {} });
@@ -32,16 +34,16 @@ describe('shared channel profile entry points', () => {
     const viewer = { userId: 'u1', workspaceId: 'w1', permissions: { pageScope: { all: false, ids: ['a'] } } } as never;
     await CHANNEL_PROFILES_MCP.execute(viewer, 'list_channel_profiles', {}, 100);
     expect(service.readChannelProfiles).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1', allowedChannelIds: ['a'] }, 'settings/connections');
-    await CHANNEL_PROFILES_MCP.execute(viewer, 'set_channel_profile_labels', { channelId: 'a', labels: [] }, 100);
-    expect(service.changeChannelProfiles).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1', allowedChannelIds: ['a'] }, { action: 'setLabels', channelId: 'a', labels: [] });
+    await CHANNEL_PROFILES_MCP.execute(viewer, 'set_channel_profile_labels', { channelId: 'a', labels: [], confirmation: 'SET CHANNEL PROFILE LABELS a' }, 100);
+    expect(service.changeChannelProfiles).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1', allowedChannelIds: ['a'] }, { action: 'setLabels', channelId: 'a', labels: [], confirmation: 'SET CHANNEL PROFILE LABELS a' });
     await expect(CHANNEL_PROFILES_MCP.execute(viewer, 'save_channel_group', { action: 'deleteGroup' }, 100)).rejects.toMatchObject({ code: 'invalid_request' });
   });
   it('rejects cross-origin HTTP writes and forwards an authenticated request', async () => {
     const bad = await POST(new Request('https://example.test/settings/profiles/operations', { method: 'POST', headers: { origin: 'https://evil.test' }, body: '{}' }));
     expect(bad.status).toBe(403); expect(service.changeChannelProfiles).not.toHaveBeenCalled();
-    const response = await POST(new Request('https://example.test/settings/profiles/operations', { method: 'POST', headers: { origin: 'https://example.test' }, body: JSON.stringify({ action: 'setLabels', channelId: 'a', labels: [] }) }));
+    const response = await POST(new Request('https://example.test/settings/profiles/operations', { method: 'POST', headers: { origin: 'https://example.test' }, body: JSON.stringify({ action: 'setLabels', channelId: 'a', labels: [], confirmation: 'SET CHANNEL PROFILE LABELS a' }) }));
     expect(await response.json()).toMatchObject({ ok: true });
-    expect(service.changeChannelProfiles).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1' }, { action: 'setLabels', channelId: 'a', labels: [] });
+    expect(service.changeChannelProfiles).toHaveBeenCalledWith({ userId: 'u1', workspaceId: 'w1' }, { action: 'setLabels', channelId: 'a', labels: [], confirmation: 'SET CHANNEL PROFILE LABELS a' });
     expect((await GET(new Request('https://example.test/settings/profiles/operations?workspaceId=other'))).status).toBe(400);
   });
   it('uses selected group ids under existing post visibility and never widens a stale group', async () => {
@@ -86,13 +88,33 @@ describe('shared channel profile entry points', () => {
     await act(async () => root.render(React.createElement(ProfilesManager, { initial: directory, locale: 'en', canManage: true })));
     const input = host.querySelector<HTMLInputElement>('input[name="labels"]')!; input.value = 'Updated';
     await act(async () => { input.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    await act(async () => { const button = [...document.querySelectorAll('button')].find(button => button.textContent === profileConfirmationCopy.en.confirm)!; button.click(); });
     expect(host.querySelector('[role="alert"]')?.textContent).toContain(profileCopy.en.failure);
     expect(input.value).toBe('Updated');
     await act(async () => { input.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    await act(async () => { const button = [...document.querySelectorAll('button')].find(button => button.textContent === profileConfirmationCopy.en.confirm)!; button.click(); });
     expect(host.querySelector('[role="status"]')?.textContent).toContain(profileCopy.en.success);
     expect(host.querySelector<HTMLInputElement>('input[name="labels"]')!.value).toBe('Updated');
-    expect(JSON.parse(fetcher.mock.calls[1]![1].body)).toMatchObject({ action: 'setLabels', channelId: 'a', labels: ['Updated'] });
+    expect(JSON.parse(fetcher.mock.calls[1]![1].body)).toMatchObject({ action: 'setLabels', channelId: 'a', labels: ['Updated'], confirmation: 'SET CHANNEL PROFILE LABELS a' });
     await act(async () => root.unmount());
   });
 
+});
+
+
+it('requires confirmation on every MCP write declaration', () => {
+  for (const name of CHANNEL_PROFILES_MCP.writeTools!) expect(CHANNEL_PROFILES_MCP.tools.find(tool => tool.name === name)?.inputSchema.required).toContain('confirmation');
+});
+
+it('uses Root-provided French confirmation copy and cancels label changes without a request', async () => {
+  const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+  const copy = { title: 'Vérifier le profil', saveGroup: 'Valider {name} ({count})', setLabels: 'Valider les libellés de {name}', cancel: 'Conserver', confirm: 'Valider' };
+  const host = document.createElement('div'); document.body.appendChild(host); const root = createRoot(host);
+  await act(async () => root.render(React.createElement(ProfilesManager, { initial: directory, locale: 'fr', canManage: true, confirmationCopy: copy })));
+  const input = host.querySelector<HTMLInputElement>('input[name="labels"]')!; input.value = 'Updated';
+  await act(async () => input.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(fetcher).not.toHaveBeenCalled(); expect(host.textContent).toContain(copy.title); expect(host.textContent).toContain('Valider les libellés de Alpha');
+  await act(async () => { [...document.querySelectorAll('button')].find(button => button.textContent === copy.cancel)!.click(); });
+  expect(fetcher).not.toHaveBeenCalled(); expect(input.value).toBe('Updated'); expect(host.querySelector('dialog')).toBeNull();
+  await act(async () => root.unmount());
 });

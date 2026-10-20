@@ -1,3 +1,4 @@
+import { OperationError } from '@/lib/operation-error';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const guard = vi.hoisted(() => ({ purging: vi.fn(), operation: vi.fn() }));
@@ -155,9 +156,10 @@ describe('Tasks MCP host wiring', () => {
 
   it('serializes writes through the purge guard and workspace lock and requires the exact confirmation', async () => {
     const viewer = viewerFor();
+    tasksService.performTaskAction.mockRejectedValueOnce(new OperationError('invalid_request', 'Type the exact confirmation text to continue.'));
     const refused = await body(await rpc(viewer, 'tools/call', { name: 'create_task', arguments: { title: 'Plan', confirmation: 'yes' } }));
     expect(refused.result.isError).toBe(true);
-    expect(tasksService.performTaskAction).not.toHaveBeenCalled();
+    expect(tasksService.performTaskAction).toHaveBeenCalledWith(expect.anything(), { action: 'task.create', title: 'Plan', confirmation: 'yes' });
     const accepted = await body(await rpc(viewer, 'tools/call', { name: 'create_task', arguments: { title: 'Plan', confirmation: 'CREATE TASK Plan' } }));
     expect(accepted.result.isError).toBeUndefined();
     expect(guard.purging).toHaveBeenCalledWith('workspace-a');
@@ -165,7 +167,7 @@ describe('Tasks MCP host wiring', () => {
     expect(guard.operation).not.toHaveBeenCalled();
     expect(tasksService.performTaskAction).toHaveBeenCalledWith(
       { userId: 'user-a', workspaceId: 'workspace-a', allowedTargetIds: undefined, permissionCeiling: viewer.permissions },
-      expect.objectContaining({ action: 'task.create', title: 'Plan' }),
+      expect.objectContaining({ action: 'task.create', title: 'Plan', confirmation: 'CREATE TASK Plan' }),
     );
   });
 

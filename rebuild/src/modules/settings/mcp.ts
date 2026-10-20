@@ -1,6 +1,9 @@
 import { changeConnectionSelections } from './server/connection-selection';
 import { exportWorkspaceArchive } from '@/server/data-control/archive';
 import { ACCOUNT_MCP } from './account-mcp';
+import { SESSION_PARITY_MCP } from './session-parity-mcp';
+import { CONNECTION_START_MCP } from './connection-start-mcp';
+import { AGENCY_SESSION_MCP } from '@/modules/agency/mcp';
 import { CHANNEL_PROFILES_MCP } from './channel-profiles/mcp';
 import { WATERMARK_MCP } from './watermark/mcp';
 import { OperationError } from '@/lib/operation-error';
@@ -21,6 +24,9 @@ import { connectionDirectoryFeatures, connectionDirectoryToolDefinitions, connec
 
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
 export const SETTINGS_MCP: readonly McpToolGroup[] = [
+  SESSION_PARITY_MCP,
+  CONNECTION_START_MCP,
+  AGENCY_SESSION_MCP,
   ACCOUNT_MCP,
   WORKSPACE_EXPORT_MCP,
   CHANNEL_PROFILES_MCP,

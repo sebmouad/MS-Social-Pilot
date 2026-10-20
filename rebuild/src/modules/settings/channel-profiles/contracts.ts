@@ -7,10 +7,12 @@ export type ProfileDirectory = { channels: ChannelProfile[]; groups: ChannelGrou
 const id = z.string().trim().min(1).max(200).refine(value => !/[\u0000-\u001f\u007f]/.test(value));
 const name = z.string().trim().min(1).max(200).refine(value => !/[\u0000-\u001f\u007f]/.test(value));
 export const profileAction = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('saveGroup'), id: id.optional(), name, channelIds: z.array(id).min(1).max(10000) }).strict(),
+  z.object({ action: z.literal('saveGroup'), id: id.optional(), name, confirmation: z.string(), channelIds: z.array(id).min(1).max(10000) }).strict(),
   z.object({ action: z.literal('deleteGroup'), id, confirmation: z.string().max(300) }).strict(),
-  z.object({ action: z.literal('setLabels'), channelId: id, labels: z.array(name.refine(value => !value.includes(','))).max(100) }).strict(),
+  z.object({ action: z.literal('setLabels'), channelId: id, confirmation: z.string(), labels: z.array(name.refine(value => !value.includes(','))).max(100) }).strict(),
 ]);
+export const saveGroupConfirmation = (value: { id?: string; name: string }) => `SAVE CHANNEL GROUP ${value.id ?? value.name.trim()}`;
+export const setLabelsConfirmation = (channelId: string) => `SET CHANNEL PROFILE LABELS ${channelId}`;
 export const deleteGroupConfirmation = (id: string) => `DELETE CHANNEL GROUP ${id}`;
 export function scopedGroups(groups: ChannelGroup[], channelIds: readonly string[]): ChannelGroup[] {
   const allowed = new Set(channelIds);

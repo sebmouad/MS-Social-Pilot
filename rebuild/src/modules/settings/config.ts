@@ -9,8 +9,11 @@ import { ACCOUNT_RECOVERY_CONFIG } from './account-recovery-config';
 import { REGISTRATION_CONFIG } from './registration-config';
 import { NOTIFICATIONS_CONFIG } from './notifications/config';
 import { entry, cron } from '@/lib/config/entry';
+import { appearanceCopy, appearanceCopySchema } from './ui/appearance/copy';
 
 export const SETTINGS_CONFIG = [
+  entry({ key: 'settings.appearanceCookieMaxAgeSeconds', group: 'Settings · Appearance', label: 'Appearance cookie lifetime (seconds)', kind: 'number', description: 'Lifetime of theme and display-mode cookies saved by Settings REST and session MCP.', defaultValue: 31536000, schema: z.number().int().min(1).max(315360000), consumption: 'active' }),
+  entry({ key: 'settings.appearanceCopy', group: 'Settings · Appearance', label: 'Appearance copy', kind: 'json', description: 'English and French theme labels, display modes, feedback and Settings appearance copy.', defaultValue: appearanceCopy, schema: appearanceCopySchema, consumption: 'active' }),
   entry({ key: 'settings.connectionDirectoryPageSize', group: 'Connections', label: 'Connection directory page size', kind: 'number', description: 'Maximum discovered connection sources returned per REST/MCP page.', defaultValue: 25, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'settings.connectionSelectionBatchSize', group: 'Connections', label: 'Selection batch size', kind: 'number', description: 'Maximum confirmed channel/ad-account selection changes in one operation. The current underlying storage service supports at most 250.', defaultValue: 250, schema: z.number().int().min(1).max(250), consumption: 'active' }),
   entry({ key: 'settings.accountConfirmationCopy', group: 'Settings · Account', label: 'Account confirmation copy', kind: 'json', description: 'English and French confirmation dialog labels and consequences.', defaultValue: accountConfirmationCopy, schema: accountConfirmationCopySchema, consumption: 'active' }),

@@ -30,6 +30,12 @@ it('renders French copy and retains invalid filters after read failure without e
   expect(html).toContain('Historique de l’audience'); expect(html).toContain('Impossible de charger');
   expect(html).toContain('value="bad-date"'); expect(html).toContain('value="gone"'); expect(html).not.toContain('private database');
 });
+it.each(['en-US,en;q=0.9,fr;q=0.8', 'en,fr-FR;q=0.5'])('keeps the English heading when French is a fallback: %s', async language => {
+  state.language = language;
+  const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
+  expect(html).toContain('<h1>Audience history</h1>');
+  expect(html).not.toContain('Historique de l’audience');
+});
 it('returns private HTTP JSON and CSV through the same service', async () => {
   const json = await GET(new Request('http://example.test/api/analytics/demographics?channel=a&channel=b&filter=1'));
   expect(json.status).toBe(200);

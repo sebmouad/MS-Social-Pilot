@@ -33,6 +33,38 @@ describe('Tasks customer confirmation and edit recovery',()=>{
     await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'Revised campaign');input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));});
     await click(button('Save task',dialog));
     expect(container.querySelector('dialog[open]')).not.toBeNull();expect(input.value).toBe('Revised campaign');expect(dialog.querySelector('[role="alert"]')?.textContent).toContain('changed while');
-    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toMatchObject({action:'task.update',id:'task-a',title:'Revised campaign',expectedUpdatedAt:task.updatedAt});expect(refresh).not.toHaveBeenCalled();
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toMatchObject({action:'task.update',confirmation:'UPDATE TASK task-a',id:'task-a',title:'Revised campaign',expectedUpdatedAt:task.updatedAt});expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+const fill = async (input: HTMLInputElement | HTMLTextAreaElement, value: string) => act(async () => {
+  const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true }));
+});
+const sent = () => vi.mocked(fetch).mock.calls.filter(call => call[1]?.method === 'POST').map(call => JSON.parse(String(call[1]?.body)));
+describe('Task board shared confirmations', () => {
+  it('confirms task creation from the existing save control', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as Response);
+    await click(button('New task')); const dialog = container.querySelector('dialog')!;
+    await fill(dialog.querySelector<HTMLInputElement>('input[required]')!, 'New campaign'); await click(button('Save task', dialog));
+    expect(sent()[0]).toMatchObject({ action: 'task.create', title: 'New campaign', confirmation: 'CREATE TASK New campaign' });
+  });
+  it('confirms the chosen status through its direct action', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as Response);
+    await click(button('Start'));
+    expect(sent()[0]).toEqual({ action: 'task.transition', id: 'task-a', status: 'doing', confirmation: 'MOVE TASK task-a TO doing' });
+  });
+  it('confirms the reviewed checklist count', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as Response);
+    await click(button('Add checklist')); const dialog = container.querySelector('dialog')!;
+    await fill(dialog.querySelector<HTMLTextAreaElement>('textarea')!, 'Draft\nReview'); await click(button('Create tasks', dialog));
+    expect(sent()[0]).toMatchObject({ action: 'task.createMany', titles: ['Draft', 'Review'], confirmation: 'CREATE 2 TASKS' });
+  });
+  it('confirms a comment for the currently viewed task', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ ok: true, comments: [], canComment: true }) } as Response);
+    await click(button('Details (1)')); const dialog = container.querySelector('dialog')!;
+    await fill(dialog.querySelector<HTMLTextAreaElement>('textarea')!, 'Ready to review'); await click(button('Post comment', dialog));
+    expect(sent()[0]).toEqual({ action: 'comment.add', taskId: 'task-a', body: 'Ready to review', confirmation: 'COMMENT ON TASK task-a' });
   });
 });

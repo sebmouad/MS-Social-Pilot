@@ -9,7 +9,7 @@ import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
-import { deleteGroupConfirmation, profileAction, scopedGroups, type ProfileActor, type ProfileFeature, type ProfileDirectory } from './contracts';
+import { saveGroupConfirmation, setLabelsConfirmation, deleteGroupConfirmation, profileAction, scopedGroups, type ProfileActor, type ProfileFeature, type ProfileDirectory } from './contracts';
 import { profilePolicySchema } from './config';
 
 const denied = () => new OperationError('forbidden', 'Channel profiles are unavailable for this account.');
@@ -55,6 +55,8 @@ export async function changeChannelProfiles(actor: ProfileActor, input: unknown)
     await authorize(actor, 'settings/connections', true); const limits = await policy();
     if (value.action === 'saveGroup' && (value.name.length > limits.maxNameCharacters || value.channelIds.length > limits.maxChannels)) throw invalid();
     if (value.action === 'setLabels' && (value.labels.length > limits.maxLabelsPerChannel || value.labels.some(label => label.length > limits.maxNameCharacters))) throw invalid();
+    if (value.action === 'saveGroup' && value.confirmation !== saveGroupConfirmation(value)) throw invalid();
+    if (value.action === 'setLabels' && value.confirmation !== setLabelsConfirmation(value.channelId)) throw invalid();
     if (value.action === 'deleteGroup' && value.confirmation !== deleteGroupConfirmation(value.id)) throw invalid();
     const [timeout, maxWait] = await Promise.all([runtimeConfig('settings.teamOperationTimeoutMs'), runtimeConfig('settings.teamOperationMaxWaitMs')]);
     return prisma.$transaction(async tx => {
