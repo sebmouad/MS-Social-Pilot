@@ -1,3 +1,6 @@
+import { SESSION_ONLY_MCP_FEATURES } from '../../mcp-access/session-policy';
+import { listMcpKeys } from '../../mcp-access/server';
+import { accountConfirmationCopySchema } from '../../account-confirmation-copy';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { prisma } from '@/server/data';
@@ -14,16 +17,19 @@ import { fill } from '@/modules/settings/ui/shell-copy';
 import { mcpCopy } from './copy';
 
 export const metadata = { title: 'MCP API keys' };
-type KeyRow = { id: string; name: string; tokenPrefix: string; readFeatures: string[]; writeFeatures: string[]; resourceScope: {mode:string;ids?:string[];adAccountIds?:string[]}|null; expiresAt: Date; revokedAt: Date | null; createdAt: Date; lastUsedAt: Date | null };
 
-export default async function McpKeysPage() {
+
+export default async function McpKeysPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
   const viewer = await requireViewer({ feature: 'settings/mcp' });
   const locale = await settingsLocale();
   const t = mcpCopy[locale];
   const isManager = viewer.membership.role === 'owner' || viewer.membership.role === 'admin';
   if (!isManager) return <PageFrame module="settings"><SettingsPage active="settings/mcp" title={t.title} description={t.description} locale={locale}><SettingsPanel title={t.restricted}><p className={styles['settings-note']}>{t.managersOnly}</p></SettingsPanel></SettingsPage></PageFrame>;
-  const [keys, maxLifetimeDays] = await Promise.all([
-    prisma.$queryRaw<KeyRow[]>`SELECT id, name, "tokenPrefix", "readFeatures", "writeFeatures", "resourceScope", "expiresAt", "revokedAt", "createdAt", "lastUsedAt" FROM mcp_api_keys WHERE "workspaceId" = ${viewer.workspaceId} ORDER BY "createdAt" DESC`,
+  const params = await searchParams;
+  const keyOffset = params.keyOffset === undefined ? 0 : Number(params.keyOffset);
+  const copy = accountConfirmationCopySchema.parse(await runtimeConfig('settings.accountConfirmationCopy'))[locale];
+  const [keyPage, maxLifetimeDays] = await Promise.all([
+    listMcpKeys({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { offset: keyOffset }),
     runtimeConfig('mcp.keys.maxLifetimeDays') as Promise<number>,
   ]);
   const [maxResources,defaultLifetimeDays] = await Promise.all([runtimeConfig('mcp.keys.maxResourceIds') as Promise<number>,runtimeConfig('mcp.keys.defaultLifetimeDays') as Promise<number>]);
@@ -34,9 +40,13 @@ export default async function McpKeysPage() {
   ]);
   const resourcesTruncated=channels.length+adAccounts.length>maxResources;
   const resources=resourcesTruncated?[]:[...channels.map(c=>({...c,kind:'channel' as const})),...adAccounts.map(a=>({...a,kind:'adAccount' as const}))];
-  const features = PAGES.filter(feature => workspaceMcpFeatureIds().includes(feature.id) && canUseFeature(viewer.entitlements, feature.id)).map(feature => ({ ...feature, name: feature.title, moduleLabel:MODULES.find(module=>module.id===feature.module)?.title??feature.module, canRead: canAccessFeature(viewer.permissions, feature.id, 'read'), canWrite: canAccessFeature(viewer.permissions, feature.id, 'write') })).filter(feature => feature.canRead || feature.canWrite);
+  const features = PAGES.filter(feature => !SESSION_ONLY_MCP_FEATURES.has(feature.id) && workspaceMcpFeatureIds().includes(feature.id) && canUseFeature(viewer.entitlements, feature.id)).map(feature => ({ ...feature, name: feature.title, moduleLabel:MODULES.find(module=>module.id===feature.module)?.title??feature.module, canRead: canAccessFeature(viewer.permissions, feature.id, 'read'), canWrite: canAccessFeature(viewer.permissions, feature.id, 'write') })).filter(feature => feature.canRead || feature.canWrite);
   return <PageFrame module="settings"><SettingsPage active="settings/mcp" title={t.title} locale={locale} description={fill(t.issueDescription, { workspace: viewer.membership.workspace.name })}>
-    <SettingsPanel title={t.createPanel} detail={t.createDetail}><McpKeyManager locale={locale} features={features} initialKeys={keys.map(key => ({ ...key, expiresAt: key.expiresAt.toISOString(), revokedAt: key.revokedAt?.toISOString() ?? null, createdAt: key.createdAt.toISOString(), lastUsedAt: key.lastUsedAt?.toISOString() ?? null }))} maxLifetimeDays={maxLifetimeDays} defaultLifetimeDays={defaultLifetimeDays} resources={resources} resourcesTruncated={resourcesTruncated} /></SettingsPanel>
+    <SettingsPanel title={t.createPanel} detail={t.createDetail}><McpKeyManager locale={locale} features={features} initialKeys={keyPage.keys.map(key => ({ ...key, expiresAt: key.expiresAt.toISOString(), revokedAt: key.revokedAt?.toISOString() ?? null, createdAt: key.createdAt.toISOString(), lastUsedAt: key.lastUsedAt?.toISOString() ?? null }))} maxLifetimeDays={maxLifetimeDays} defaultLifetimeDays={defaultLifetimeDays} resources={resources} resourcesTruncated={resourcesTruncated} /></SettingsPanel>
+    {(keyOffset > 0 || keyPage.nextOffset !== null) && <nav aria-label={t.title}>
+      {keyOffset > 0 && <a href="/settings/mcp">{copy.previous}</a>}
+      {keyPage.nextOffset !== null && <a href={`/settings/mcp?keyOffset=${keyPage.nextOffset}`}>{copy.more}</a>}
+    </nav>}
     <p className={styles['settings-note']}>{t.footnote}</p>
   </SettingsPage></PageFrame>;
 }

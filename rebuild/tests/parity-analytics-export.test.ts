@@ -1,0 +1,40 @@
+import { beforeEach, expect, it, vi } from 'vitest';
+const m = vi.hoisted(() => ({ read: vi.fn(), csv: vi.fn(), config: vi.fn() }));
+vi.mock('@/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: m.read }));
+vi.mock('@/modules/analytics/server/reports', () => ({ analyticsSnapshotCsv: m.csv }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: m.config }));
+vi.mock('@/modules/analytics/ad-objects/mcp', () => ({ adObjectsMcp: {} }));
+vi.mock('@/modules/analytics/explorer-posts/mcp', () => ({ postsMcp: {} }));
+vi.mock('@/modules/analytics/reports/mcp', () => ({ analyticsReportToolDefinitions: [], analyticsReportAvailableToolDefinitions: vi.fn(), executeAnalyticsReportTool: vi.fn() }));
+vi.mock('@/modules/analytics/demographics/mcp', () => ({ analyticsDemographicsToolDefinitions: [], executeAnalyticsDemographicsTool: vi.fn() }));
+vi.mock('@/modules/analytics/pins/mcp', () => ({ analyticsPinToolDefinitions: [], executeAnalyticsPinTool: vi.fn() }));
+vi.mock('@/modules/analytics/goals/mcp', () => ({ analyticsGoalToolDefinitions: [], executeAnalyticsGoalTool: vi.fn() }));
+vi.mock('@/modules/analytics/comparison/mcp', () => ({ analyticsComparisonToolDefinitions: [], executeAnalyticsComparisonTool: vi.fn() }));
+vi.mock('@/modules/analytics/explorer-mcp', () => ({ analyticsExplorerToolDefinitions: [], executeAnalyticsExplorerTool: vi.fn() }));
+vi.mock('@/modules/settings/mcp-access/tool-policy', () => ({ isResourceRestricted: () => true }));
+vi.mock('@/modules/analytics/server/report-workflows', () => ({ ensureReportWorkflows: vi.fn() }));
+vi.mock('@/server/mcp/kit', () => ({ pageIdsFor: () => ['channel-a'], analyticsActorFor: vi.fn(), requiredString: vi.fn() }));
+import type { McpViewer } from '@/server/mcp/types';
+import { ANALYTICS_MCP } from '@/modules/analytics/mcp';
+const group = ANALYTICS_MCP.find(g => g.id === 'analytics-report-export')!;
+const viewer = { userId: 'user', workspaceId: 'workspace', allowedAdAccountIds: ['account-a'], adAccountTargetScope: { all: false, ids: ['channel-b'] } } as unknown as McpViewer;
+beforeEach(() => { vi.clearAllMocks(); m.config.mockResolvedValue(100); m.read.mockResolvedValue({ period: { start: '2026-10-01', end: '2026-10-02' } }); m.csv.mockReturnValue({ csv: 'sample\r\n', rowCount: 1, truncated: true }); });
+it('uses the same Analytics Reports snapshot/CSV core with independent resource ceilings', async () => {
+  const args = { targetIds: ['channel-a'], adAccountIds: ['account-a'], start: '2026-10-01', end: '2026-10-02', compare: 'previous' };
+  const result = await group.execute(viewer, 'export_analytics_report', args, 2);
+  expect(group.features.export_analytics_report).toBe('analytics/reports');
+  expect(m.read).toHaveBeenCalledWith(viewer, { filter: '1', channel: ['channel-a'], adFilter: '1', adAccount: ['account-a'], start: '2026-10-01', end: '2026-10-02', compare: 'previous' }, { allowedChannelIds: ['channel-a'], feature: 'analytics/reports' });
+  expect(m.csv).toHaveBeenCalledWith(expect.anything(), 2);
+  expect(result).toMatchObject({ fileName: 'report-2026-10-01-2026-10-02.csv', byteLength: 8, truncated: true });
+});
+it('also respects a lower Root export ceiling', async () => {
+  m.config.mockResolvedValue(1);
+  await group.execute(viewer, 'export_analytics_report', {}, 5);
+  expect(m.csv).toHaveBeenCalledWith(expect.anything(), 1);
+});
+it('does not widen a service refusal or overlong credential selection', async () => {
+  m.read.mockRejectedValue(Object.assign(new Error('Denied'), { code: 'forbidden' }));
+  await expect(group.execute(viewer, 'export_analytics_report', {}, 5)).rejects.toMatchObject({ code: 'forbidden' });
+  await expect(group.execute({ ...viewer, maxResultItems: 1 }, 'export_analytics_report', { targetIds: ['a', 'b'] }, 1)).rejects.toMatchObject({ code: 'invalid_request' });
+  expect(m.csv).not.toHaveBeenCalled();
+});

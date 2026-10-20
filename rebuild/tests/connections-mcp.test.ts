@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const service = vi.hoisted(() => ({ list: vi.fn(), preview: vi.fn(), disconnect: vi.fn(), operation: vi.fn(), purge: vi.fn(), health: vi.fn() }));
-vi.mock('../src/server/data', async importOriginal => ({ ...(await importOriginal<object>()), listConnections: service.list }));
+vi.mock('../src/server/data', async importOriginal => ({ ...(await importOriginal<object>()), listConnections: service.list, prisma: { user: { findUnique: async () => ({ disabledAt: null }) }, membership: { findUnique: async () => ({ role: 'owner' }) } } }));
 vi.mock('../src/server/connection-mutations', async importOriginal => ({ ...(await importOriginal<object>()), previewSocialAccountDeletion: service.preview, disconnectSocialAccount: service.disconnect }));
 vi.mock('../src/server/platforms/registry', async importOriginal => ({ ...(await importOriginal<object>()), platformGrantHealth: service.health }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: service.purge, withWorkspaceOperation: service.operation }));
 vi.mock('../src/server/mcp/kit', async importOriginal => ({ ...(await importOriginal<object>()), auditedReceipt: async (_viewer: unknown, _tool: string, _detail: unknown, result: unknown) => result }));
+vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: async () => resolvePermissions({ role: 'owner', allPages: true, pageAccess: [], clientAccess: [], workspaceDisabledModules: [], memberDisabledModules: [] }) }));
+vi.mock('../src/server/entitlements', async original => { const real = await original<typeof import('../src/server/entitlements')>(); return { ...real, loadEntitlements: async () => real.resolveEntitlements({ workspace: { id: 'workspace', disabledModules: [] }, membership: { userId: 'actor', disabledModules: [] } }) }; });
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'settings.connectionDirectoryPageSize' ? 25 : key === 'mcp.maxResultItems' ? 100 : false }));
 import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
 import { resolvePermissions } from '../src/server/permissions';
 import { resolveEntitlements } from '../src/server/entitlements';

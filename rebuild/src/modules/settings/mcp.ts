@@ -1,3 +1,6 @@
+import { changeConnectionSelections } from './server/connection-selection';
+import { exportWorkspaceArchive } from '@/server/data-control/archive';
+import { ACCOUNT_MCP } from './account-mcp';
 import { CHANNEL_PROFILES_MCP } from './channel-profiles/mcp';
 import { WATERMARK_MCP } from './watermark/mcp';
 import { OperationError } from '@/lib/operation-error';
@@ -18,6 +21,7 @@ import { connectionDirectoryFeatures, connectionDirectoryToolDefinitions, connec
 
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
 export const SETTINGS_MCP: readonly McpToolGroup[] = [
+  ACCOUNT_MCP,
   WORKSPACE_EXPORT_MCP,
   CHANNEL_PROFILES_MCP,
   WATERMARK_MCP,
@@ -90,17 +94,19 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
     id: 'settings-connections',
     tools: [
     { name: 'list_pages', description: 'List enabled workspace destinations and their publishing availability.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+    { name: 'set_connection_selections', description: 'Atomically change multiple channel/ad-account selections, just like the Connections modal. Confirmation: SET CONNECTION SELECTIONS <number of items>. Current workspace manager authority is rechecked by the shared service.', inputSchema: { type: 'object', required: ['items', 'confirmation'], properties: { items: { type: 'array', minItems: 1, items: { type: 'object', required: ['kind', 'id', 'enabled'], properties: { kind: { type: 'string', enum: ['target', 'adAccount'] }, id: { type: 'string' }, enabled: { type: 'boolean' } }, additionalProperties: false } }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'set_connection_selection', description: 'Enable or disable one workspace channel or advertising account. Confirmation must exactly identify the selection and action.', inputSchema: { type: 'object', required: ['kind', 'id', 'enabled', 'confirmation'], properties: { kind: { type: 'string', enum: ['target', 'adAccount'] }, id: { type: 'string' }, enabled: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     ...connectionDirectoryToolDefinitions,
     ],
     features: {
       list_pages: 'settings/connections',
+      set_connection_selections: 'settings/connections',
       set_connection_selection: 'settings/connections',
       ...connectionDirectoryFeatures,
     },
-    writeTools: ['set_connection_selection', 'disconnect_connection'],
-    scope: { resourceTools: ['list_pages'], workspaceTools: ['set_connection_selection', ...connectionDirectoryTools], resources: ['msp://targets'] },
-    managers: [{ tools: new Set(['set_connection_selection', ...connectionDirectoryTools]), message: 'Only workspace owners and admins can change connections.', hideFromList: true, beforeArguments: true, inExecutor: true }],
+    writeTools: ['set_connection_selection', 'set_connection_selections', 'disconnect_connection'],
+    scope: { resourceTools: ['list_pages'], workspaceTools: ['set_connection_selection', 'set_connection_selections', ...connectionDirectoryTools], resources: ['msp://targets'] },
+    managers: [{ tools: new Set(['set_connection_selection', 'set_connection_selections', ...connectionDirectoryTools]), message: 'Only workspace owners and admins can change connections.', hideFromList: true, beforeArguments: true, inExecutor: true }],
     resources: [
       { uri: 'msp://targets', name: "Destinations", description: "Enabled workspace destinations.", mimeType: 'application/json', feature: 'settings/connections', readTool: 'list_pages' },
     ],
@@ -123,6 +129,8 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
       case 'list_connections': case 'preview_connection_disconnect': case 'disconnect_connection':
         requireFeature(viewer.entitlements, 'settings/connections');
         return executeConnectionDirectoryTool(viewer, name, args, cap);
+      case 'set_connection_selections':
+        return changeConnectionSelections({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args);
       case 'set_connection_selection': {
         requireFeature(viewer.entitlements, 'settings/connections');
         const kind = args.kind === 'target' || args.kind === 'adAccount' ? args.kind : null;
@@ -142,18 +150,20 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
     id: 'settings-data',
     tools: [
     { name: 'preview_workspace_data_deletion', description: 'Count workspace records that a data deletion would remove. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+    { name: 'export_workspace_archive', description: 'Download the same bounded workspace ZIP archive as Settings Data. Includes the archive service coverage and media; current workspace owner/admin access is rechecked. Returned as base64.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
     { name: 'export_workspace_data', description: 'Export the current workspace JSON snapshot, including directly workspace-owned legacy tables with credential fields redacted. Indirect records and media bytes are not included. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
     { name: 'delete_workspace_data', description: 'Delete workspace records and stored files while retaining workspace identity and members. A failed file cleanup can be retried. Confirmation must exactly match DELETE WORKSPACE DATA <workspaceId>. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', required: ['confirmation'], properties: { confirmation: { type: 'string' } }, additionalProperties: false } },
     ],
     features: {
       preview_workspace_data_deletion: 'settings/data',
+      export_workspace_archive: 'settings/data',
       export_workspace_data: 'settings/data',
       delete_workspace_data: 'settings/data',
     },
     writeTools: ['delete_workspace_data'],
     selfLockedWrites: ['delete_workspace_data'],
-    scope: { workspaceTools: ['preview_workspace_data_deletion', 'export_workspace_data', 'delete_workspace_data'] },
-    managers: [{ tools: new Set(['preview_workspace_data_deletion', 'export_workspace_data', 'delete_workspace_data']), message: 'Only workspace owners and admins can manage workspace data.', hideFromList: true, inExecutor: true }],
+    scope: { workspaceTools: ['preview_workspace_data_deletion', 'export_workspace_data', 'export_workspace_archive', 'delete_workspace_data'] },
+    managers: [{ tools: new Set(['preview_workspace_data_deletion', 'export_workspace_data', 'export_workspace_archive', 'delete_workspace_data']), message: 'Only workspace owners and admins can manage workspace data.', hideFromList: true, inExecutor: true }],
     purgeCheckExempt: ['delete_workspace_data'],
     resources: [
       { uri: 'msp://data/deletion-preview', name: "Data deletion preview", description: "Current workspace record counts before deletion.", mimeType: 'application/json', feature: 'settings/data', readTool: 'preview_workspace_data_deletion', managerOnly: true, guardedRead: true },
@@ -162,6 +172,10 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
       switch (name) {
       case 'preview_workspace_data_deletion':
         return previewWorkspaceDataDeletion({ userId: viewer.userId, workspaceId: viewer.workspaceId });
+      case 'export_workspace_archive': {
+        const content = await exportWorkspaceArchive({ userId: viewer.userId, workspaceId: viewer.workspaceId });
+        return { mimeType: 'application/zip', byteLength: content.length, contentBase64: content.toString('base64') };
+      }
       case 'export_workspace_data':
         return exportWorkspaceData({ userId: viewer.userId, workspaceId: viewer.workspaceId });
       case 'delete_workspace_data': {

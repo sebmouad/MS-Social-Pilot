@@ -1,3 +1,5 @@
+import { runtimeConfig } from '@/server/config/store';
+import { analyticsSnapshotCsv } from './server/reports';
 import { adObjectsMcp } from './ad-objects/mcp';
 import { postsMcp } from './explorer-posts/mcp';
 import { OperationError } from '@/lib/operation-error';
@@ -13,7 +15,7 @@ import { analyticsGoalToolDefinitions, executeAnalyticsGoalTool } from './goals/
 import { analyticsComparisonToolDefinitions, executeAnalyticsComparisonTool } from './comparison/mcp';
 import { analyticsExplorerToolDefinitions, executeAnalyticsExplorerTool } from './explorer-mcp';
 
-async function readMcpAnalyticsSnapshot(viewer: McpViewer, args: Record<string, unknown>, metricKey?: string) {
+async function readMcpAnalyticsSnapshot(viewer: McpViewer, args: Record<string, unknown>, metricKey?: string, feature?: 'analytics/overview' | 'analytics/reports') {
   const cap = viewer.maxResultItems ?? 100;
   const selectedIds = (value: unknown, label: string): unknown => {
     if (value === undefined) return undefined;
@@ -27,7 +29,7 @@ async function readMcpAnalyticsSnapshot(viewer: McpViewer, args: Record<string, 
   if (targetIds !== undefined) { input.filter = '1'; input.channel = targetIds; }
   if (adAccountIds !== undefined) { input.adFilter = '1'; input.adAccount = adAccountIds; }
   if (metricKey !== undefined) input.metric = metricKey;
-  return readAnalyticsSnapshot(viewer, input, { allowedChannelIds: pageIdsFor(viewer) });
+  return readAnalyticsSnapshot(viewer, input, { allowedChannelIds: pageIdsFor(viewer), ...(feature ? { feature } : {}) });
 }
 function analyticsPageArgs(args: Record<string, unknown>, cap: number, fallback: number) {
   const integer = (key: string, minimum: number, maximum?: number) => {
@@ -44,6 +46,17 @@ function analyticsPageArgs(args: Record<string, unknown>, cap: number, fallback:
 
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
 export const ANALYTICS_MCP: readonly McpToolGroup[] = [
+  {
+    id: 'analytics-report-export',
+    tools: [{ name: 'export_analytics_report', description: 'Export the same scoped overview CSV as Analytics Reports, including metric details and comparison. Root and credential row ceilings apply; truncation is explicit.', inputSchema: { type: 'object', properties: { start: { type: 'string' }, end: { type: 'string' }, compare: { type: 'string', enum: ['none', 'previous', 'year'] }, targetIds: { type: 'array', items: { type: 'string' } }, adAccountIds: { type: 'array', items: { type: 'string' } }, search: { type: 'string' } }, additionalProperties: false } }],
+    features: { export_analytics_report: 'analytics/reports' },
+    scope: { resourceTools: ['export_analytics_report'] },
+    execute: async (viewer, _name, args, cap) => {
+      const snapshot = await readMcpAnalyticsSnapshot(viewer, args, undefined, 'analytics/reports');
+      const result = analyticsSnapshotCsv(snapshot, Math.min(await runtimeConfig('analytics.reportExportRows'), cap));
+      return { ...result, fileName: `report-${snapshot.period.start}-${snapshot.period.end}.csv`, byteLength: Buffer.byteLength(result.csv, 'utf8') };
+    },
+  },
   postsMcp,
   adObjectsMcp,
   {

@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const service = vi.hoisted(() => ({ listAdsCreatives: vi.fn(), listAdsOperations: vi.fn(), performAdsManagement: vi.fn(), previewAdsManagement: vi.fn(), resolveAdsOperation: vi.fn() }));
+const service = vi.hoisted(() => ({ describeAdsManagement: vi.fn(), readAdsCreativeImage: vi.fn(), listAdsCreatives: vi.fn(), listAdsOperations: vi.fn(), performAdsManagement: vi.fn(), previewAdsManagement: vi.fn(), resolveAdsOperation: vi.fn() }));
 vi.mock('@/modules/ads/management/server', () => service);
 import { adsManagementToolDefinitions, executeAdsManagementTool } from '@/modules/ads/management/mcp';
 const actor = { userId: 'user', workspaceId: 'workspace', allowedTargetIds: ['allowed'] };
@@ -23,4 +23,14 @@ it('applies the same ceiling to creative browsing', async () => {
   service.listAdsCreatives.mockResolvedValue({ items: [{ id: 'creative' }], next: null });
   await expect(executeAdsManagementTool(actor, 'list_ads_creatives', { adAccountId: 'account' }, 1)).resolves.toMatchObject({ items: [{ id: 'creative' }] });
   expect(service.listAdsCreatives).toHaveBeenCalledWith(actor, { adAccountId: 'account', limit: 1 });
+});
+
+it('exposes the same management capabilities and image preview as HTTP without dropping key ceilings', async () => {
+  service.describeAdsManagement.mockResolvedValue({ canManage: false, operations: [] });
+  await expect(executeAdsManagementTool(actor, 'get_ads_management_options', { adAccountId: 'account' }, 5)).resolves.toMatchObject({ operations: [] });
+  expect(service.describeAdsManagement).toHaveBeenCalledWith(actor, 'account');
+  service.readAdsCreativeImage.mockResolvedValue({ bytes: Buffer.from('image'), mimeType: 'image/png' });
+  await expect(executeAdsManagementTool(actor, 'get_ads_creative_image', { adAccountId: 'account', mediaId: 'image.png' }, 5)).resolves.toEqual({ mimeType: 'image/png', byteLength: 5, base64: 'aW1hZ2U=' });
+  expect(service.readAdsCreativeImage).toHaveBeenCalledWith(actor, { adAccountId: 'account', mediaId: 'image.png' });
+  await expect(executeAdsManagementTool(actor, 'get_ads_creative_image', { adAccountId: 'account' }, 5)).rejects.toMatchObject({ code: 'invalid_request' });
 });

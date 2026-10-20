@@ -1,3 +1,4 @@
+import { accountConfirmationCopy, accountConfirmationCopySchema } from './account-confirmation-copy';
 import { PERSON_KEYS_CONFIG } from './person-keys/config';
 import { CHANNEL_PROFILES_CONFIG } from './channel-profiles/config';
 import { WATERMARK_CONFIG } from './watermark/config';
@@ -10,6 +11,11 @@ import { NOTIFICATIONS_CONFIG } from './notifications/config';
 import { entry, cron } from '@/lib/config/entry';
 
 export const SETTINGS_CONFIG = [
+  entry({ key: 'settings.connectionDirectoryPageSize', group: 'Connections', label: 'Connection directory page size', kind: 'number', description: 'Maximum discovered connection sources returned per REST/MCP page.', defaultValue: 25, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'settings.connectionSelectionBatchSize', group: 'Connections', label: 'Selection batch size', kind: 'number', description: 'Maximum confirmed channel/ad-account selection changes in one operation. The current underlying storage service supports at most 250.', defaultValue: 250, schema: z.number().int().min(1).max(250), consumption: 'active' }),
+  entry({ key: 'settings.accountConfirmationCopy', group: 'Settings · Account', label: 'Account confirmation copy', kind: 'json', description: 'English and French confirmation dialog labels and consequences.', defaultValue: accountConfirmationCopy, schema: accountConfirmationCopySchema, consumption: 'active' }),
+  entry({ key: 'settings.accountNameMaxLength', group: 'Settings · Account', label: 'Profile name length', kind: 'number', description: 'Maximum characters in a customer profile name across UI, HTTP and MCP.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'settings.accountSessionPageSize', group: 'Settings · Account', label: 'Session page size', kind: 'number', description: 'Maximum active account sessions returned per page.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'settings.teamDefaultRole', group: 'Settings · Team', label: 'New member default role', kind: 'select', description: 'Initial non-manager role in the Add member form. Every submitted role still requires explicit confirmation and current authority.', defaultValue: 'contributor', schema: z.enum(['editor', 'contributor', 'viewer', 'client']), consumption: 'active', options: [{ value: 'editor', label: 'Editor' }, { value: 'contributor', label: 'Contributor' }, { value: 'viewer', label: 'Viewer' }, { value: 'client', label: 'Client' }] }),
   entry({ key: 'settings.teamDefaultAllChannels', group: 'Settings · Team', label: 'New members initially select all channels', kind: 'boolean', description: 'Initial channel choice in the Add member form. False starts with no grants selected. Manager roles always include every channel.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'settings.teamMaxMembers', group: 'Settings · Team', label: 'Maximum team members', kind: 'number', description: 'Maximum memberships in one workspace, including disabled accounts. Larger directories are refused without returning a partial list. This installation ceiling does not replace subscription seat policy.', defaultValue: 500, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
@@ -20,6 +26,7 @@ export const SETTINGS_CONFIG = [
 
 /** Every Root setting this product module declares. The registry merges installed modules; edit only here. */
 export const SETTINGS_MODULE_CONFIG = [
+  entry({ key: 'mcp.keys.historyPageSize', group: 'MCP · API keys', label: 'Key history page size', kind: 'number', description: 'Maximum workspace key metadata rows returned per page.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'data.exportMaxJobs', group: 'Data controls', label: 'Retained export jobs per workspace', kind: 'number', description: 'Maximum retained jobs before requesting another export. Expired and failed rows are retired to make room.', defaultValue: 20, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'data.exportExpiryHours', group: 'Data controls', label: 'Export lifetime (hours)', kind: 'number', description: 'Lifetime from request, including build time; expired archives cannot be downloaded.', defaultValue: 168, schema: z.number().int().min(1).max(2160), consumption: 'active' }),
   entry({ key: 'data.exportWorkerBatch', group: 'Data controls', label: 'Export worker batch', kind: 'number', description: 'Maximum builds and cleanup items examined per worker pass.', defaultValue: 2, schema: z.number().int().min(1).max(100), consumption: 'active' }),

@@ -5,7 +5,7 @@ import { loadPermissions } from '@/server/permissions/loader';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import { OperationError } from '@/lib/operation-error';
 
-export type AdsReadActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[]; /** Explicit ad-account ceiling: [] means none, undefined means no account-level restriction. */ allowedAdAccountIds?: readonly string[] };
+export type AdsReadActor = { allowedPlatformIds?: readonly string[]; userId: string; workspaceId: string; allowedTargetIds?: readonly string[]; /** Explicit ad-account ceiling: [] means none, undefined means no account-level restriction. */ allowedAdAccountIds?: readonly string[] };
 
 /** Recheck all customer report permissions and intersect caller-provided scope with current grants. */
 export async function authorizeAdsRead(actor: AdsReadActor, feature: 'ads/campaigns' | 'ads/compare' | 'ads/objects' = 'ads/campaigns') {
@@ -34,6 +34,6 @@ export async function authorizeAdsRead(actor: AdsReadActor, feature: 'ads/campai
     entitlements,
     allowedTargetIds,
     allowedAdAccountIds: actor.allowedAdAccountIds,
-    allowedProviders: entitledPlatformIds(entitlements),
+    allowedProviders: entitledPlatformIds(entitlements).filter(id => actor.allowedPlatformIds === undefined || actor.allowedPlatformIds.includes(id)),
   };
 }

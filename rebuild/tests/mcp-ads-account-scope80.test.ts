@@ -158,3 +158,10 @@ describe('Ads management service applies the ceiling (real service, provider nev
     expect(mocks.platformAds).not.toHaveBeenCalled();
   });
 });
+
+it('intersects the credential platform ceiling with fresh service entitlements', async () => {
+ const denied=await authorizeAdsRead({...base,allowedPlatformIds:[]});
+ expect(denied.allowedProviders).toEqual([]);
+ const allowed=await authorizeAdsRead({...base,allowedPlatformIds:['facebook']});
+ expect(allowed.allowedProviders).toEqual(['facebook']);
+});

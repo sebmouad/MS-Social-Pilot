@@ -1,22 +1,18 @@
+import { readAdsCreationOptions } from './server/creation-options';
+import { listAdsAccounts, readAdsPerformance } from './server/performance';
 import { OperationError } from '@/lib/operation-error';
-import { prisma } from '@/server/data';
 import { entitledPlatformIds } from '@/server/entitlements';
-import { platformAds } from '@/server/platforms/registry';
 import { ensureAdsManagement } from '@/modules/ads/server/management';
 import { withAdsErrorBoundary } from '@/modules/ads/server/errors';
-import { canManageWorkspaceAds, createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '@/modules/ads/server/actions';
-import { getAdsAccountWhere, getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/modules/ads/server/queries';
-import { summarizeInsights } from '@/modules/ads/server/summary';
+import { createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '@/modules/ads/server/actions';
 import type { AdMutationRequest } from '@/platforms/types';
 import { adsActorFor, adsTargetIdsFor, adAccountIdsFor, auditedReceipt, auditConfirmedAdsWrite, confirmedAdsReceipt, requiredString, type McpToolGroup } from '@/server/mcp/kit';
-import { loadAdsReportPolicy } from './server/report-policy';
 import { readAdsDailyRows } from './server/report-read';
 import { exportAdsReport } from './server/export';
 import { adsAnalysisToolDefinitions, executeAdsAnalysisTool } from './analysis/mcp';
 import { adsManagementToolDefinitions, executeAdsManagementTool } from './management/mcp';
 import { adsDirectoryToolDefinitions, executeAdsDirectoryTool } from './directory/mcp';
 import { adsReportToolDefinitions, ADS_MCP_MAX_PAGE_ITEMS } from './mcp-metadata';
-import { parseAdsPerformanceFilters } from './performance-filters';
 
 const ADS_MANAGER_TOOLS: ReadonlySet<string> = new Set(['list_ad_accounts', 'get_ad_creation_options', 'create_ad_campaign', 'create_ad_set', 'update_ad']);
 /** Provider failures on campaign tools map to safe Ads errors. */
@@ -57,19 +53,7 @@ export const ADS_MCP: readonly McpToolGroup[] = [
     ],
     execute: async (viewer, name, args, cap) => {
       switch (name) {
-      case 'list_ad_accounts': {
-        if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new OperationError('forbidden', 'Only workspace owners and admins can list advertising accounts.');
-        const offset = args.offset === undefined ? 0 : Number(args.offset);
-        const limit = args.limit === undefined ? cap : Number(args.limit);
-        if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
-        const pageLimit = Math.min(limit, cap);
-        const where = await getAdsAccountWhere(viewer.workspaceId, adsTargetIdsFor(viewer), entitledPlatformIds(viewer.entitlements), adAccountIdsFor(viewer));
-        const [accounts, accountCount] = await Promise.all([
-          prisma.adAccount.findMany({ where, orderBy: { name: 'asc' }, skip: offset, take: pageLimit, select: { id: true, actId: true, name: true, enabled: true, currency: true } }),
-          prisma.adAccount.count({ where }),
-        ]);
-        return { accounts, accountCount, nextOffset: offset + accounts.length < accountCount ? offset + accounts.length : null };
-      }
+      case 'list_ad_accounts': return listAdsAccounts({ ...adsActorFor(viewer), allowedPlatformIds: entitledPlatformIds(viewer.entitlements) }, args, cap);
       case 'get_ads_report_rows': {
         if (args.limit !== undefined && (!Number.isSafeInteger(args.limit) || (args.limit as number) < 1 || (args.limit as number) > ADS_MCP_MAX_PAGE_ITEMS)) {
           throw new OperationError('invalid_request', `limit must be an integer from 1 to ${ADS_MCP_MAX_PAGE_ITEMS}.`);
@@ -78,33 +62,7 @@ export const ADS_MCP: readonly McpToolGroup[] = [
       }
       case 'export_ads_report':
         return exportAdsReport(adsActorFor(viewer), args, { maxItems: cap });
-      case 'get_ads_performance': {
-        const allowedTargetIds = adsTargetIdsFor(viewer);
-        const policy = await loadAdsReportPolicy();
-        const accounts = await getAdsAccounts(viewer.workspaceId, allowedTargetIds, entitledPlatformIds(viewer.entitlements), adAccountIdsFor(viewer));
-        const filters = parseAdsPerformanceFilters(args, accounts.map(account => account.id), new Date(), policy);
-        const accountId = filters.accountId;
-        const range = { from: filters.since, to: filters.until, endExclusive: true };
-        const level = args.level;
-        if (level !== undefined && (typeof level !== 'string' || !['campaign', 'adset', 'ad'].includes(level))) throw new OperationError('invalid_request', 'level must be campaign, adset, or ad.');
-        const offset = args.offset === undefined ? 0 : args.offset;
-        const accountOffset = args.accountOffset === undefined ? 0 : args.accountOffset;
-        if (typeof offset !== 'number' || !Number.isSafeInteger(offset) || offset < 0 || (args.limit !== undefined && (typeof args.limit !== 'number' || !Number.isSafeInteger(args.limit) || args.limit < 1 || args.limit > 200))) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
-        if (typeof accountOffset !== 'number' || !Number.isSafeInteger(accountOffset) || accountOffset < 0) throw new OperationError('invalid_request', 'accountOffset must be a non-negative integer.');
-        const levels: AdsInsightLevel[] = level === undefined ? ['campaign', 'adset', 'ad'] : [level as AdsInsightLevel];
-        const { insights, pageSize } = await getAdsDataset(viewer.workspaceId, filters, allowedTargetIds, entitledPlatformIds(viewer.entitlements), { levels, ...(viewer.allowedAdAccountIds === undefined ? {} : { allowedAdAccountIds: adAccountIdsFor(viewer) }) });
-        const rows = summarizeInsights(insights, level as string | undefined).filter(row => ['campaign', 'adset', 'ad'].includes(row.level));
-        const limit = args.limit === undefined ? pageSize : args.limit as number;
-        const pageLimit = Math.min(limit, cap);
-        const performance = rows.slice(offset, offset + pageLimit).map(row => ({
-          id: row.id, name: row.name, level: row.level, accountId: row.accountId, accountName: row.accountName, currency: row.currency,
-          spend: row.spend, impressions: row.impressions, clicks: row.clicks, reach: row.reach, reachDate: row.reachDate,
-          cpc: row.cpc, cpm: row.cpm, cpp: row.cpp, ctr: row.ctr, frequency: row.frequency, actions: row.actions, dailyRowCount: row.rows,
-        }));
-        const visibleAccounts = accounts.filter(account => !accountId || account.id === accountId);
-        const accountPage = visibleAccounts.slice(accountOffset, accountOffset + cap).map(({ id, name, currency }) => ({ id, name, currency }));
-        return { range, reportOptions: policy, accounts: accountPage, accountCount: visibleAccounts.length, nextAccountOffset: accountOffset + accountPage.length < visibleAccounts.length ? accountOffset + accountPage.length : null, level: level ?? null, resultCount: rows.length, performance, nextOffset: offset + performance.length < rows.length ? offset + performance.length : null };
-      }
+      case 'get_ads_performance': return readAdsPerformance({ ...adsActorFor(viewer), allowedPlatformIds: entitledPlatformIds(viewer.entitlements) }, args, cap);
       case 'get_live_ad_status': {
         const adAccountId = requiredString(args, 'adAccountId');
         const objectId = requiredString(args, 'objectId');
@@ -112,27 +70,7 @@ export const ADS_MCP: readonly McpToolGroup[] = [
         if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(objectId) || !['campaign', 'adset', 'ad'].includes(objectType)) throw new OperationError('invalid_request', 'Invalid ad object request.');
         return readWorkspaceAdObject(adsActorFor(viewer), { adAccountId, objectId, objectType }, adsTargetIdsFor(viewer));
       }
-      case 'get_ad_creation_options': {
-        const adAccountId = requiredString(args, 'adAccountId');
-        if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId)) throw new OperationError('invalid_request', 'Invalid ad account ID.');
-        const where = await getAdsAccountWhere(viewer.workspaceId, adsTargetIdsFor(viewer), entitledPlatformIds(viewer.entitlements), adAccountIdsFor(viewer));
-        const account = await prisma.adAccount.findFirst({
-          where: { AND: [where, { id: adAccountId }] },
-          select: { id: true, currency: true, socialAccount: { select: { provider: true } } },
-        });
-        const provider = account?.socialAccount?.provider;
-        const host = provider ? await platformAds(provider) : null;
-        const manageable = account && await canManageWorkspaceAds(adsActorFor(viewer), adAccountId);
-        if (!account || !provider || !host || !manageable) throw new OperationError('unavailable', 'The selected advertising account is unavailable.');
-        const creationUi = host.creationUi ? await host.creationUi() : host.ui;
-        return {
-          adAccountId: account.id,
-          provider,
-          currency: account.currency,
-          campaign: creationUi.campaign ? { options: creationUi.campaign.options, defaultOption: creationUi.campaign.defaultOption, confirmationTemplate: creationUi.campaign.confirmationTemplate, nameMaxLength: creationUi.campaign.nameMaxLength } : null,
-          adSet: adsTargetIdsFor(viewer) === undefined && creationUi.adSet ? { options: creationUi.adSet.options, defaultOption: creationUi.adSet.defaultOption, confirmationTemplate: creationUi.adSet.confirmationTemplate, nameMaxLength: creationUi.adSet.nameMaxLength, countryCodeFormat: 'Two uppercase letters, for example MA', dailyBudgetFormat: 'Positive integer in minor currency units' } : null,
-        };
-      }
+      case 'get_ad_creation_options': return readAdsCreationOptions({ ...adsActorFor(viewer), allowedPlatformIds: entitledPlatformIds(viewer.entitlements) }, args);
       case 'create_ad_campaign': {
         const adAccountId = requiredString(args, 'adAccountId');
         const nameValue = requiredString(args, 'name');
@@ -203,6 +141,8 @@ export const ADS_MCP: readonly McpToolGroup[] = [
     id: 'ads-management',
     tools: adsManagementToolDefinitions,
     features: {
+      get_ads_management_options: 'ads/campaigns',
+      get_ads_creative_image: 'ads/campaigns',
       preview_ads_change: 'ads/campaigns',
       apply_ads_change: 'ads/campaigns',
       list_ads_changes: 'ads/campaigns',
@@ -211,7 +151,7 @@ export const ADS_MCP: readonly McpToolGroup[] = [
       list_ads_creative_sources: 'ads/campaigns',
     },
     writeTools: ['apply_ads_change', 'resolve_ads_change'],
-    scope: { resourceTools: ['preview_ads_change', 'apply_ads_change', 'list_ads_changes', 'resolve_ads_change', 'list_ads_creatives', 'list_ads_creative_sources'] },
+    scope: { resourceTools: ['get_ads_management_options', 'get_ads_creative_image', 'preview_ads_change', 'apply_ads_change', 'list_ads_changes', 'resolve_ads_change', 'list_ads_creatives', 'list_ads_creative_sources'] },
     errorBoundary: adsErrorBoundary,
     execute: (viewer, name, args, cap) => executeAdsManagementTool(adsActorFor(viewer), name, args, cap),
   },
