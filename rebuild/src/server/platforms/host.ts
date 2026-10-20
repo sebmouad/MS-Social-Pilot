@@ -164,6 +164,8 @@ export interface PlatformHost {
   adapter(): Promise<PlatformAdapter>;
   jobs?: Partial<Record<PlatformJobName, (now: Date, retryLimit: number, retryBackoff: RetryBackoff) => Promise<JobSummary>>>;
   connection: {
+    /** Server-only renewal; null means this credential cannot be renewed. No persistence or UI data. */
+    renewToken?(input: { accessToken: string; refreshToken: string | null; signal: AbortSignal }): Promise<{ accessToken: string; expiresAt: Date | null; refreshToken?: string | null } | null>;
     /** True when Root has filled in what a customer needs to connect. */
     isReady(): Promise<boolean>;
     start(request: Request, viewer: ConnectionViewer): Promise<NextResponse>;

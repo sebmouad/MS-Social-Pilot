@@ -5,7 +5,7 @@ vi.mock('../src/server/root/registration-admin', async importOriginal => ({
 }));
 
 const h = vi.hoisted(() => ({
-  actor: vi.fn(),
+  actor: vi.fn(), refreshConnection: vi.fn(),
   registration: { listRootRegistration: vi.fn(), revokeRootRegistrationInvitation: vi.fn(), controlRootRegistrationAccount: vi.fn() },
   plans: { listRootPlans: vi.fn(), listRootPlanHistory: vi.fn(), listRootSubscribers: vi.fn(), updateRootPlan: vi.fn(), assignRootPlan: vi.fn() },
   priv: { listRootPrivileges: vi.fn(), exportRootPrivileges: vi.fn(), changeRootMemberRole: vi.fn() },
@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   errs: { listRootErrors: vi.fn(), getRootError: vi.fn(), setRootErrorResolved: vi.fn() },
   back: { readRootBackupStatus: vi.fn(), readRootDiagnosticsSummary: vi.fn() },
 }));
+vi.mock('../src/server/root/legacy/connection-refresh', () => ({ refreshRootConnection: h.refreshConnection }));
 vi.mock('../src/server/config/access', () => ({ currentRootActor: h.actor }));
 vi.mock('../src/server/root/legacy/plans', () => h.plans);
 vi.mock('../src/server/root/legacy/privileges', () => h.priv);
@@ -103,6 +104,7 @@ describe('private Root HTTP boundary', () => {
 describe('Root MCP definitions', () => {
   it('uses unique names that do not collide with existing Root tools, and every resource targets a defined tool', () => {
     const names = rootLegacyToolDefinitions.map(tool => tool.name);
+    expect(names).toContain('refresh_root_connection');
     expect(new Set(names).size).toBe(names.length);
     const merged = rootToolDefinitions.map(tool => tool.name);
     expect(new Set(merged).size).toBe(merged.length);
@@ -203,5 +205,36 @@ describe('registration MCP service parity', () => {
       for (const [name, args] of [['list_root_registration', {}], ...writes] as const) await expect(callRootLegacyTool(actor, name, args)).rejects.toMatchObject({ code: 'forbidden' });
     }
     for (const fn of Object.values(h.registration)) expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('connection refresh HTTP/MCP parity', () => {
+  it('shares the exact scoped service and safe outcome receipt', async () => {
+    const { POST } = await import('../src/app/api/root/connections/[id]/refresh/route');
+    const receipt = { socialAccountId: 'c1', workspaceId: 'w1', outcome: 'not_renewable', tokenExpiresAt: null };
+    h.refreshConnection.mockResolvedValue(receipt);
+    const args = { socialAccountId: 'c1', confirmation: 'REFRESH CONNECTION c1' };
+    expect(await (await POST(post({ confirmation: args.confirmation }), ctx('c1'))).json()).toEqual({ ok: true, ...receipt });
+    expect(h.refreshConnection).toHaveBeenLastCalledWith('root', args);
+    expect(await callRootLegacyTool({ userId: 'root', isInstanceOwner: true }, 'refresh_root_connection', args)).toEqual(receipt);
+    expect(h.refreshConnection).toHaveBeenLastCalledWith('root', args);
+    expect(rootLegacyToolDefinitions.find(t => t.name === 'refresh_root_connection')).toMatchObject({ annotations: { readOnlyHint: false }, inputSchema: { additionalProperties: false, required: ['socialAccountId', 'confirmation'] } });
+  });
+  it('enforces HTTP authentication, origin and strict bodies before the service', async () => {
+    const { POST } = await import('../src/app/api/root/connections/[id]/refresh/route');
+    expect((await POST(post({}, 'https://evil.test'), ctx('c1'))).status).toBe(403);
+    h.actor.mockResolvedValueOnce(null);
+    expect((await POST(post({}), ctx('c1'))).status).toBe(401);
+    h.actor.mockResolvedValueOnce({ id: 'member', isInstanceOwner: false });
+    expect((await POST(post({}), ctx('c1'))).status).toBe(404);
+    expect((await POST(post({ confirmation: 'REFRESH CONNECTION c1', force: true }), ctx('c1'))).status).toBe(400);
+    expect(h.refreshConnection).not.toHaveBeenCalled();
+  });
+  it('rejects workspace-key and non-Root MCP identities before service dispatch', async () => {
+    for (const actor of [{ userId: 'member', isInstanceOwner: false }, { userId: 'root', isInstanceOwner: true, apiKeyId: 'key' }]) {
+      await expect(callRootLegacyTool(actor, 'refresh_root_connection', {})).rejects.toMatchObject({ code: 'forbidden' });
+    }
+    expect(h.refreshConnection).not.toHaveBeenCalled();
   });
 });

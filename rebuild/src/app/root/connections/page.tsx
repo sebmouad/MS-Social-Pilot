@@ -1,3 +1,4 @@
+import { RefreshConnection } from './RefreshConnection';
 import { ConfirmAction } from '../plans/ConfirmAction';
 import { headers } from 'next/headers';
 import { requireRootPage } from '@/server/config/access';
@@ -47,7 +48,7 @@ export default async function RootConnectionsPage({ searchParams }: { searchPara
             <td>{fill(t.selectedOf, { selected: item.channels.selected, discovered: item.channels.discovered })}</td>
             <td>{fill(t.permissionCount, { count: item.scopeCount })}</td>
             <td>{item.tokenExpiresAt ? <time dateTime={item.tokenExpiresAt}>{new Date(item.tokenExpiresAt).toLocaleString(locale)}</time> : t.never}</td>
-            <td>{item.state === 'revoked' ? '—' : <ConfirmAction id={`disconnect-${item.id}`} label={t.disconnect} title={fill(t.disconnectTitle, { name: item.name })} description={t.disconnectBody} phrase={`DISCONNECT CONNECTION ${item.id}`} endpoint={`/api/root/connections/${encodeURIComponent(item.id)}`} method="POST" body={{}} variant="danger" successText={t.disconnectDone} />}</td>
+            <td><RefreshConnection id={item.id} name={item.name} locale={locale} />{' '}{item.state === 'revoked' ? '—' : <ConfirmAction id={`disconnect-${item.id}`} label={t.disconnect} title={fill(t.disconnectTitle, { name: item.name })} description={t.disconnectBody} phrase={`DISCONNECT CONNECTION ${item.id}`} endpoint={`/api/root/connections/${encodeURIComponent(item.id)}`} method="POST" body={{}} variant="danger" successText={t.disconnectDone} />}</td>
           </tr>)}</tbody>
         </table></div>
         <p className="root-directory__pager">{fill(t.page, { page: data.page, pages: Math.max(1, Math.ceil(data.total / data.pageSize)) })}

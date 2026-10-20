@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../src/server/root/legacy/connection-refresh', () => ({ refreshRootConnection: state.refreshConnection }));
 vi.mock('../src/server/root/registration-admin', async importOriginal => ({
   ...await importOriginal<typeof import('../src/server/root/registration-admin')>(),
   ...state.registration,
 }));
-const state = vi.hoisted(() => ({ registration: { listRootRegistration: vi.fn(), revokeRootRegistrationInvitation: vi.fn(), controlRootRegistrationAccount: vi.fn() }, actor: vi.fn(), read: vi.fn(), save: vi.fn(), workspaces: vi.fn(), activity: vi.fn(), access: vi.fn(), lock: vi.fn(), post: vi.fn(), execute: vi.fn(), diagnostics: vi.fn(), diagnosticRun: vi.fn(), operations: vi.fn(), deletions: vi.fn(), confirmDeletion: vi.fn(), publishingRead: vi.fn() }));
+const state = vi.hoisted(() => ({ refreshConnection: vi.fn(), registration: { listRootRegistration: vi.fn(), revokeRootRegistrationInvitation: vi.fn(), controlRootRegistrationAccount: vi.fn() }, actor: vi.fn(), read: vi.fn(), save: vi.fn(), workspaces: vi.fn(), activity: vi.fn(), access: vi.fn(), lock: vi.fn(), post: vi.fn(), execute: vi.fn(), diagnostics: vi.fn(), diagnosticRun: vi.fn(), operations: vi.fn(), deletions: vi.fn(), confirmDeletion: vi.fn(), publishingRead: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.actor }, post: { findMany: state.post }, $executeRaw: state.execute } }));
 vi.mock('../src/server/config/store', () => ({ readConfig: state.read, saveConfig: state.save, runtimeConfig: async () => 100 }));
 vi.mock('../src/server/root/inbox-deletions', () => ({ listRootInboxDeletions: state.deletions, confirmRootInboxDeletion: state.confirmDeletion }));
@@ -35,7 +36,7 @@ describe('installation-only MCP context', () => {
     const initialized = await (await invoke('initialize')).json();
     expect(initialized.result.instructions).toContain('Private installation access');
     const names = (await (await invoke('tools/list')).json()).result.tools.map((tool: { name: string }) => tool.name);
-    expect(names.sort()).toEqual(['list_root_registration', 'revoke_root_invitation', 'resend_root_registration_verification', 'delete_root_unverified_registration', 'assign_root_plan', 'change_root_member_role', 'export_root_privileges', 'get_root_backup_status', 'get_root_diagnostics_summary', 'get_root_error', 'get_root_lifecycle', 'list_root_connections', 'list_root_errors', 'delete_root_workspace', 'delete_root_user', 'export_root_activity', 'disconnect_root_connection', 'transfer_root_installation', 'list_root_sessions', 'sign_out_root_session', 'list_root_plan_history', 'list_root_plans', 'list_root_privileges', 'list_root_subscribers', 'set_root_error_resolved', 'transfer_root_workspace_ownership', 'update_root_plan', 'adopt_root_legacy_publication', 'confirm_root_inbox_deletion', 'finish_root_publication_projection', 'get_root_config', 'get_root_diagnostics', 'get_root_operations', 'get_root_platform_publication_evidence', 'list_root_activity', 'list_root_inbox_deletions', 'list_root_post_deletions', 'list_root_publication_attempts', 'list_root_users', 'list_root_workspaces', 'manage_root_user', 'record_root_post_deletion_outcome', 'record_root_publication_outcome', 'run_root_diagnostics', 'run_root_platform_publication_action', 'set_root_config', 'set_root_workspace_access'].sort());
+    expect(names.sort()).toEqual(['list_root_registration', 'revoke_root_invitation', 'resend_root_registration_verification', 'delete_root_unverified_registration', 'assign_root_plan', 'change_root_member_role', 'export_root_privileges', 'get_root_backup_status', 'get_root_diagnostics_summary', 'get_root_error', 'get_root_lifecycle', 'list_root_connections', 'list_root_errors', 'delete_root_workspace', 'delete_root_user', 'export_root_activity', 'disconnect_root_connection', 'refresh_root_connection', 'transfer_root_installation', 'list_root_sessions', 'sign_out_root_session', 'list_root_plan_history', 'list_root_plans', 'list_root_privileges', 'list_root_subscribers', 'set_root_error_resolved', 'transfer_root_workspace_ownership', 'update_root_plan', 'adopt_root_legacy_publication', 'confirm_root_inbox_deletion', 'finish_root_publication_projection', 'get_root_config', 'get_root_diagnostics', 'get_root_operations', 'get_root_platform_publication_evidence', 'list_root_activity', 'list_root_inbox_deletions', 'list_root_post_deletions', 'list_root_publication_attempts', 'list_root_users', 'list_root_workspaces', 'manage_root_user', 'record_root_post_deletion_outcome', 'record_root_publication_outcome', 'run_root_diagnostics', 'run_root_platform_publication_action', 'set_root_config', 'set_root_workspace_access'].sort());
     const resources = (await (await invoke('resources/list')).json()).result.resources.map((resource: { uri: string }) => resource.uri);
     expect(resources.sort()).toEqual(['msp://root/backups', 'msp://root/connections', 'msp://root/sessions', 'msp://root/errors', 'msp://root/lifecycle', 'msp://root/plans', 'msp://root/privileges', 'msp://root/activity', 'msp://root/config', 'msp://root/diagnostics', 'msp://root/inbox-deletions', 'msp://root/operations', 'msp://root/platform-publication-evidence', 'msp://root/post-deletions', 'msp://root/publication-attempts', 'msp://root/users', 'msp://root/workspaces'].sort());
   });
@@ -68,7 +69,7 @@ describe('installation-only MCP context', () => {
   });
   it.each([null, { isInstanceOwner: false, disabledAt: null }, { isInstanceOwner: true, disabledAt: new Date() }])('rechecks current owner authority before Root data or mutations', async actor => {
     state.actor.mockResolvedValue(actor);
-    for (const name of ['list_root_registration', 'revoke_root_invitation', 'resend_root_registration_verification', 'delete_root_unverified_registration', 'list_root_inbox_deletions', 'confirm_root_inbox_deletion', 'get_root_diagnostics', 'run_root_diagnostics', 'get_root_operations', 'get_root_config', 'set_root_config', 'list_root_workspaces', 'list_root_activity', 'set_root_workspace_access', 'list_root_users', 'manage_root_user']) expect((await (await call(name)).json()).result.structuredContent.code).toBe('forbidden');
+    for (const name of ['refresh_root_connection', 'list_root_registration', 'revoke_root_invitation', 'resend_root_registration_verification', 'delete_root_unverified_registration', 'list_root_inbox_deletions', 'confirm_root_inbox_deletion', 'get_root_diagnostics', 'run_root_diagnostics', 'get_root_operations', 'get_root_config', 'set_root_config', 'list_root_workspaces', 'list_root_activity', 'set_root_workspace_access', 'list_root_users', 'manage_root_user']) expect((await (await call(name)).json()).result.structuredContent.code).toBe('forbidden');
     expect(state.read).not.toHaveBeenCalled(); expect(state.save).not.toHaveBeenCalled(); expect(state.activity).not.toHaveBeenCalled(); expect(state.workspaces).not.toHaveBeenCalled(); expect(state.access).not.toHaveBeenCalled();
   });
   it('routes private diagnostics and worker reads to shared services with caps and exact run arguments', async () => {
@@ -80,7 +81,7 @@ describe('installation-only MCP context', () => {
     await invoke('resources/read', { uri: 'msp://root/diagnostics' }); expect(state.diagnostics).toHaveBeenCalledWith('root', 'shared', 10);
   });
   it('refuses owner-created workspace keys for every new diagnostic capability before services', async () => {
-    for (const name of ['list_root_registration', 'revoke_root_invitation', 'resend_root_registration_verification', 'delete_root_unverified_registration', 'get_root_operations', 'get_root_diagnostics', 'run_root_diagnostics', 'list_root_inbox_deletions', 'confirm_root_inbox_deletion']) await expect(runRootTool({ userId: 'root', isInstanceOwner: true, apiKeyId: 'workspace-key' }, name, {})).rejects.toMatchObject({ code: 'forbidden' });
+    for (const name of ['refresh_root_connection', 'list_root_registration', 'revoke_root_invitation', 'resend_root_registration_verification', 'delete_root_unverified_registration', 'get_root_operations', 'get_root_diagnostics', 'run_root_diagnostics', 'list_root_inbox_deletions', 'confirm_root_inbox_deletion']) await expect(runRootTool({ userId: 'root', isInstanceOwner: true, apiKeyId: 'workspace-key' }, name, {})).rejects.toMatchObject({ code: 'forbidden' });
     expect(state.actor).not.toHaveBeenCalled(); expect(state.operations).not.toHaveBeenCalled(); expect(state.diagnostics).not.toHaveBeenCalled(); expect(state.diagnosticRun).not.toHaveBeenCalled();
   });
   it('shares bounded private deletion history and exact operator attestation through tools/resources', async () => {
@@ -141,4 +142,20 @@ describe('registration installation MCP transport', () => {
     const failure = (await (await call('list_root_registration')).json()).result;
     expect(failure.structuredContent.code).toBe('upstream_failure'); expect(JSON.stringify(failure)).not.toContain('private-password');
   });
+});
+
+
+it('returns private connection renewal receipts through installation MCP without workspace locks or secondary audits', async () => {
+  const args = { socialAccountId: 'c1', confirmation: 'REFRESH CONNECTION c1' };
+  for (const outcome of ['renewed', 'not_renewable', 'failed']) {
+    const receipt = { socialAccountId: 'c1', workspaceId: 'w1', outcome, tokenExpiresAt: null };
+    state.refreshConnection.mockResolvedValueOnce(receipt);
+    expect((await (await call('refresh_root_connection', args)).json()).result.structuredContent).toEqual(receipt);
+    expect(state.refreshConnection).toHaveBeenLastCalledWith('root', args);
+  }
+  state.refreshConnection.mockRejectedValueOnce(new Error('private-token-in-provider-url'));
+  const failed = (await (await call('refresh_root_connection', args)).json()).result;
+  expect(failed.structuredContent.code).toBe('upstream_failure');
+  expect(JSON.stringify(failed)).not.toContain('private-token');
+  expect(state.lock).not.toHaveBeenCalled(); expect(state.execute).not.toHaveBeenCalled();
 });
