@@ -47,4 +47,25 @@ describe('theme text contrast', () => {
       }
     }
   });
+  it('keeps status chips, links, focus rings and field borders readable in every theme', () => {
+    const pairs: Array<[string, string, number]> = [
+      ['accent', 'accent-soft', 4.5], ['accent', 'surface', 4.5], ['accent', 'surface-muted', 4.5],
+      ['warning', 'warning-soft', 4.5], ['warning', 'surface', 4.5],
+      ['danger', 'danger-soft', 4.5], ['danger', 'surface', 4.5],
+      ['ink-soft', 'accent-soft', 4.5], ['ink-faint', 'accent-soft', 4.5], ['ink', 'selection', 4.5],
+      ['focus', 'surface', 3], ['focus', 'canvas', 3], ['focus', 'surface-raised', 3], ['line-strong', 'surface', 1.4],
+    ];
+    const failures: string[] = [];
+    for (const theme of THEMES) {
+      const override = css.match(new RegExp(`:root\\[data-theme="${theme.id}"\\]\\s*\\{([^}]+)\\}`))?.[1] ?? '';
+      const value = (name: string) => token(override, name) ?? token(base, name);
+      for (const [ink, surface, minimum] of pairs) {
+        const foreground = value(ink), background = value(surface);
+        if (!foreground || !background) { failures.push(`${theme.name}: ${ink}/${surface} missing`); continue; }
+        const ratio = contrast(foreground, background);
+        if (ratio < minimum) failures.push(`${theme.name}: ${ink} on ${surface} ${ratio.toFixed(2)} < ${minimum}`);
+      }
+    }
+    expect(failures).toEqual([]);
+  });
 });

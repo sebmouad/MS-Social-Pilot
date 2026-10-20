@@ -48,7 +48,7 @@ Do not use pill-shaped control groups that wrap unpredictably, nested settings m
 
 ## Colors
 
-Grove uses the exact frontmatter palette. Accent identifies the active module and primary safe actions; danger is reserved for destructive actions; warning flags recoverable risk. Borders and tonal surfaces establish hierarchy before shadows do. Charts must label metrics and units in text and must not rely on color alone. Muted text uses `#5f6c62` in Grove, `#596e78` in Coast, and `#7e6558` in Clay so small helper text meets WCAG AA on their canvas, panels, and muted surfaces. Nightfall preserves the same semantic hierarchy with lighter text and accent on dark surfaces. Forced-colors mode should retain system contrast.
+Grove uses the exact frontmatter palette. Accent identifies the active module and primary safe actions; danger is reserved for destructive actions; warning flags recoverable risk. Borders and tonal surfaces establish hierarchy before shadows do. Charts must label metrics and units in text and must not rely on color alone. Muted text uses `#5f6c62` in Grove, `#596e78` in Coast, and `#765e51` in Clay so small helper text meets WCAG AA on their canvas, panels, and muted surfaces. Nightfall preserves the same semantic hierarchy with lighter text and accent on dark surfaces. Forced-colors mode should retain system contrast.
 
 The module rail has its own semantic palette: Grove `#172e24`, Coast `#162e3b`, Clay `#392a23`, Nightfall `#0b141a`. Use `--rail-ink`, `--rail-active-bg` and `--rail-active-ink` for its controls, and `--on-accent` for primary action text. Contrast regressions cover normal/selected rail labels and primary action normal/hover text in all four themes.
 
