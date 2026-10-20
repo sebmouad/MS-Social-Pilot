@@ -19,7 +19,7 @@ import { INBOX_MCP } from '../src/modules/inbox/mcp';
 import { executeBulkTool } from '../src/modules/publishing/bulk-mcp';
 import { OperationError } from '../src/lib/operation-error';
 const actor = { userId: 'user', workspaceId: 'workspace' };
-const viewer = { ...actor, scope: 'workspace', role: 'owner', workspace: { id: 'workspace', name: 'Synthetic workspace', timezone: 'Europe/Paris' }, entitlements: {} as McpViewer['entitlements'], permissions: { pageScope: { all: false, ids: ['channel'] } } } as McpViewer;
+const viewer = { ...actor, scope: 'workspace', role: 'owner', workspace: { id: 'workspace', name: 'Synthetic workspace', timezone: 'Europe/Paris' }, entitlements: {} as unknown as McpViewer['entitlements'], permissions: { pageScope: { all: false, ids: ['channel'] } } } as unknown as McpViewer;
 const request = (path: string, body: unknown) => new Request(`https://app.example/api/${path}`, { method: 'POST', headers: { origin: 'https://app.example', 'content-type': 'application/json' }, body: JSON.stringify(body) });
 beforeEach(() => {
   vi.resetAllMocks(); h.viewer.mockResolvedValue({ user: { id: 'user' }, workspaceId: 'workspace' });
