@@ -6,12 +6,12 @@ import { runtimeConfig } from '@/server/config/store';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { publicMailOrigin, sendTransactionalMail } from '@/server/mail';
 import { PAGES } from '@/lib/product';
-import { loadNotificationPolicy, notificationRecipientEligible, recipientAllowsNotification, type NotificationEvent } from './server';
+import { loadNotificationPolicy, notificationRecipientEligible, recipientAllowsNotification, txLocale, localizedNotificationCopy, type NotificationEvent } from './server';
 import type { NotificationEnqueueInput } from './contracts';
 
 type Tx = Prisma.TransactionClient;
 export type NotificationDeliveryStats = { examined: number; sent: number; cancelled: number; failed: number; uncertain: number; skipped: number; purged: number };
-type Candidate = { id: string; workspaceId: string; userId: string; eventId: string; kind: NotificationEvent; postId: string | null; noteId: string | null; targetId: string | null; labelId: string | null; attempt: number };
+type Candidate = { id: string; workspaceId: string; userId: string; eventId: string; kind: NotificationEvent; postId: string | null; noteId: string | null; targetId: string | null; labelId: string | null; accountId?: string | null; attempt: number };
 type Claim = { candidate: Candidate; token: string; title: string; body: string };
 
 const emptyStats = (): NotificationDeliveryStats => ({ examined: 0, sent: 0, cancelled: 0, failed: 0, uncertain: 0, skipped: 0, purged: 0 });
@@ -34,7 +34,7 @@ async function runtimeBounds() {
 function enqueueInput(row: Candidate): NotificationEnqueueInput {
   return {
     eventId: row.eventId, workspaceId: row.workspaceId, userId: row.userId, kind: row.kind,
-    ...(row.postId ? { postId: row.postId } : {}), ...(row.noteId ? { noteId: row.noteId } : {}),
+    ...(row.accountId ? { accountId: row.accountId } : {}), ...(row.postId ? { postId: row.postId } : {}), ...(row.noteId ? { noteId: row.noteId } : {}),
     ...(row.targetId ? { targetId: row.targetId } : {}), ...(row.labelId ? { labelId: row.labelId } : {}),
   };
 }
@@ -51,7 +51,7 @@ async function uncertainExpired(now: Date, workspaceId: string | undefined) {
 }
 
 async function claim(tx: Tx, id: string, now: Date, policy: Awaited<ReturnType<typeof runtimeBounds>>): Promise<{ claim: Claim | null; outcome: 'skipped' | null }> {
-  const rows = await tx.$queryRaw<Candidate[]>`SELECT n.id, n."workspaceId", n."userId", n."eventId", n.kind, n."postId", n."noteId", n."targetId", n."labelId", n.attempt
+  const rows = await tx.$queryRaw<Candidate[]>`SELECT n.id, n."workspaceId", n."userId", n."eventId", n.kind, n."postId", n."noteId", n."targetId", n."labelId", n."accountId", n.attempt
     FROM rebuild_notifications n WHERE n.id = ${id} AND n."emailState" = 'pending' AND n."nextAt" <= ${now} FOR UPDATE OF n`;
   const row = rows[0];
   if (!row) return { claim: null, outcome: 'skipped' };
@@ -60,7 +60,7 @@ async function claim(tx: Tx, id: string, now: Date, policy: Awaited<ReturnType<t
   const changed = await tx.$executeRaw`UPDATE rebuild_notifications SET "emailState" = 'sending', attempt = attempt + 1, "lastAttemptAt" = ${now}, "updatedAt" = NOW(), "claimToken" = ${token}, "claimUntil" = ${claimUntil}, "nextAt" = NULL, "safeReason" = NULL WHERE id = ${id} AND "emailState" = 'pending' AND "nextAt" <= ${now}`;
   if (changed !== 1) return { claim: null, outcome: 'skipped' };
   await auditDelivery(tx, { ...row, attempt: row.attempt + 1 }, 'sending');
-  const copy = policy.eventCopy[row.kind];
+  const copy = localizedNotificationCopy(policy.eventCopy[row.kind], await txLocale(tx, row.userId));
   return { claim: { candidate: { ...row, attempt: row.attempt + 1 }, token, title: copy.title, body: copy.body }, outcome: null };
 }
 
@@ -71,11 +71,21 @@ async function lockEventResources(tx: Tx, row: Candidate) {
     if (!note.length) return false;
     const context = await tx.$queryRaw<Array<{ targetId: string }>>`SELECT pt."targetId" FROM posts p JOIN post_targets pt ON pt."postId" = p.id WHERE p.id = ${row.postId!} AND p."workspaceId" = ${row.workspaceId} ORDER BY pt."targetId" FOR SHARE OF p, pt`;
     ids = context.map(item => item.targetId);
-  } else {
+  } else if (row.kind === 'mix_dry') {
     const rules = await tx.$queryRaw<Array<{ id: string }>>`SELECT r.id FROM content_mix_rules r JOIN labels l ON l.id = r."labelId" AND l."workspaceId" = r."workspaceId" LEFT JOIN page_group_targets pgt ON pgt."groupId" = r."groupId" AND pgt."targetId" = ${row.targetId!} WHERE r."workspaceId" = ${row.workspaceId} AND (r."targetId" = ${row.targetId!} OR (r."targetId" IS NULL AND r."groupId" IS NOT NULL AND pgt."groupId" IS NOT NULL)) AND (${row.labelId ?? null}::text IS NULL OR r."labelId" = ${row.labelId ?? null}) AND r."dryNotifiedAt" IS NOT NULL FOR SHARE OF r, l`;
     if (!rules.length) return false;
     ids = [row.targetId!];
   }
+  if (row.accountId) {
+    const account = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM social_accounts WHERE id = ${row.accountId} AND "workspaceId" = ${row.workspaceId} FOR SHARE`;
+    if (!account.length) return false;
+  }
+  if (row.postId && row.kind !== 'note_mention') {
+    const posts = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM posts WHERE id = ${row.postId} AND "workspaceId" = ${row.workspaceId} FOR SHARE`;
+    if (!posts.length) return false;
+    const targets = await tx.$queryRaw<Array<{ targetId: string }>>`SELECT "targetId" FROM post_targets WHERE "postId" = ${row.postId} ORDER BY "targetId" FOR SHARE`;
+    ids = targets.map(item => item.targetId);
+  } else if (row.targetId && row.kind !== 'mix_dry') ids = [row.targetId];
   if (ids.length) {
     const targets = await tx.$queryRaw<Array<{ id: string; socialAccountId: string | null }>>`SELECT t.id, t."socialAccountId" FROM targets t WHERE t."workspaceId" = ${row.workspaceId} AND t.id = ANY(${ids}::text[]) ORDER BY t.id FOR SHARE OF t`;
     if (targets.length !== new Set(ids).size) return false;
@@ -123,10 +133,11 @@ async function deliverUnderGuards(claimed: Claim, now: Date, policy: Awaited<Ret
     const centerPath = PAGES.find(page => page.id === 'settings/notifications')?.href;
     if (!centerPath) throw unavailable();
     const centerUrl = new URL(centerPath, origin).toString();
+    const centerLabel = await txLocale(tx, candidate.userId) === 'fr' ? 'Ouvrir votre centre de notifications' : 'Open your notification center';
     ioStarted.value = true;
     let mail: Awaited<ReturnType<typeof sendTransactionalMail>>;
     try {
-      mail = await sendTransactionalMail({ to: user.email, subject: claimed.title, text: `${claimed.body}\n\nOpen your notification center: ${centerUrl}`, template: `notification_${candidate.kind}`, workspaceId: candidate.workspaceId });
+      mail = await sendTransactionalMail({ to: user.email, subject: claimed.title, text: `${claimed.body}\n\n${centerLabel}: ${centerUrl}`, template: `notification_${candidate.kind}`, workspaceId: candidate.workspaceId });
     } catch { mail = { status: 'uncertain' }; }
     const result = mail.status === 'sent' ? 'sent' : mail.status === 'failed' ? 'failed' : mail.status === 'uncertain' ? 'uncertain' : 'retry';
     const state = result === 'retry' && candidate.attempt >= policy.maxAttempts ? 'failed' : result === 'retry' ? 'pending' : result;

@@ -1,3 +1,5 @@
+import { authorizeInbox } from '@/modules/inbox/server/access';
+import { hasPlatformCapability } from '@/server/entitlements';
 import { ADDITIONAL_NOTIFICATION_PREFERENCES } from './catalog';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
@@ -164,15 +166,17 @@ export async function listNotifications(actor: NotificationActor, input: { page?
   const limit = await bounds();
   const page = query.page ?? 1;
   const copy = await notificationEventCopy();
-  const rows = await protect(prisma.$queryRaw<NotificationDbRow[]>`SELECT id, kind, "createdAt", "updatedAt", "readAt", "emailSentAt", "emailState", "postId", "noteId", "targetId", "labelId", "eventId", "userId", "workspaceId" FROM rebuild_notifications WHERE "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} AND (${query.unreadOnly ?? false} = false OR "readAt" IS NULL) ORDER BY "createdAt" DESC, id DESC LIMIT ${limit.pageSize + 1} OFFSET ${(page - 1) * limit.pageSize}`);
+  const rows = await protect(prisma.$queryRaw<NotificationDbRow[]>`SELECT id, kind, "createdAt", "updatedAt", "readAt", "emailSentAt", "emailState", "postId", "noteId", "targetId", "labelId", "accountId", "eventId", "userId", "workspaceId" FROM rebuild_notifications WHERE "workspaceId" = ${actor.workspaceId} AND "userId" = ${actor.userId} AND (${query.unreadOnly ?? false} = false OR "readAt" IS NULL) ORDER BY "createdAt" DESC, id DESC LIMIT ${limit.pageSize + 1} OFFSET ${(page - 1) * limit.pageSize}`);
   const items: NotificationRow[] = [];
   for (const row of rows.slice(0, limit.pageSize)) {
     const context: NotificationEnqueueInput = {
       eventId: row.eventId, workspaceId: row.workspaceId, userId: row.userId, kind: row.kind,
-      ...(row.postId ? { postId: row.postId } : {}), ...(row.noteId ? { noteId: row.noteId } : {}),
+      ...(row.accountId ? { accountId: row.accountId } : {}), ...(row.postId ? { postId: row.postId } : {}), ...(row.noteId ? { noteId: row.noteId } : {}),
       ...(row.targetId ? { targetId: row.targetId } : {}), ...(row.labelId ? { labelId: row.labelId } : {}),
     };
     const available = await notificationRecipientEligible(prisma as unknown as Tx, context);
+    const locale = await txLocale(prisma as unknown as Tx, actor.userId);
+    const eventText = localizedNotificationCopy(copy[row.kind], locale);
     // Project only the public inbox fields. Stable source event IDs encode
     // business identifiers (for example note_<noteId>) and must never escape.
     const publicRow = {
@@ -180,7 +184,7 @@ export async function listNotifications(actor: NotificationActor, input: { page?
       readAt: row.readAt, emailSentAt: row.emailSentAt, emailState: row.emailState,
     };
     items.push(available
-      ? { ...publicRow, ...copy[row.kind], available: true, postId: row.postId, noteId: row.noteId, targetId: row.targetId, labelId: row.labelId }
+      ? { ...publicRow, ...eventText, available: true, postId: row.postId, noteId: row.noteId, targetId: row.targetId, labelId: row.labelId }
       : { ...publicRow, ...copy.unavailable, available: false, postId: null, noteId: null, targetId: null, labelId: null });
   }
   return { items, page, pageSize: limit.pageSize, hasMore: rows.length > limit.pageSize };
@@ -225,7 +229,7 @@ export async function enqueueNotification(tx: Tx, input: NotificationEnqueueInpu
   // in-app item is still created; email starts cancelled when the member opted out.
   const emailAllowed = await recipientAllowsNotification(tx, value);
   const id = `nt_${randomUUID()}`;
-  const inserted = await tx.$executeRaw`INSERT INTO rebuild_notifications (id, "eventId", "workspaceId", "userId", kind, "postId", "noteId", "targetId", "labelId", "createdAt", "emailState", attempt, "nextAt") VALUES (${id}, ${value.eventId}, ${value.workspaceId}, ${value.userId}, ${value.kind}, ${value.postId ?? null}, ${value.noteId ?? null}, ${value.targetId ?? null}, ${value.labelId ?? null}, NOW(), ${emailAllowed ? 'pending' : 'cancelled'}, 0, ${emailAllowed ? new Date() : null}) ON CONFLICT ("workspaceId", "eventId", "userId") DO NOTHING`;
+  const inserted = await tx.$executeRaw`INSERT INTO rebuild_notifications (id, "eventId", "workspaceId", "userId", kind, "postId", "noteId", "targetId", "labelId", "accountId", "createdAt", "emailState", attempt, "nextAt") VALUES (${id}, ${value.eventId}, ${value.workspaceId}, ${value.userId}, ${value.kind}, ${value.postId ?? null}, ${value.noteId ?? null}, ${value.targetId ?? null}, ${value.labelId ?? null}, ${value.accountId ?? null}, NOW(), ${emailAllowed ? 'pending' : 'cancelled'}, 0, ${emailAllowed ? new Date() : null}) ON CONFLICT ("workspaceId", "eventId", "userId") DO NOTHING`;
   return { id: inserted === 1 ? id : '', inserted: inserted === 1 };
 }
 
@@ -237,6 +241,27 @@ export async function notificationRecipientEligible(tx: Tx, input: NotificationE
   catch (error) {
     if (error instanceof OperationError && (error.code === 'unauthorized' || error.code === 'forbidden' || error.code === 'not_found')) return false;
     throw error;
+  }
+  if (['connection_expired', 'token_expiring'].includes(value.kind)) {
+    const authority = await authorize(recipient, false);
+    if (!['owner', 'admin'].includes(authority.role) || !canUseFeature(authority.entitlements, 'settings/connections') || !canAccessFeature(authority.permissions, 'settings/connections', 'read')) return false;
+    const accounts = await tx.$queryRaw<Array<{ provider: string }>>`SELECT provider FROM social_accounts WHERE id = ${value.accountId!} AND "workspaceId" = ${value.workspaceId}`;
+    return accounts.length === 1 && hasPlatformCapability(authority.entitlements, accounts[0]!.provider);
+  }
+  if (['inbox_digest', 'moderation_alert', 'negative_spike'].includes(value.kind)) {
+    try { return (await authorizeInbox(recipient)).channelIds.includes(value.targetId!); }
+    catch (error) { if (error instanceof OperationError && ['unauthorized', 'forbidden', 'not_found'].includes(error.code)) return false; throw error; }
+  }
+  if (['publish_failure', 'approval_request', 'approval_decision', 'draft_updated', 'queue_empty'].includes(value.kind)) {
+    let access;
+    try { access = await authorizePublishing(recipient, value.kind === 'queue_empty' ? 'publishing/queue' : value.kind === 'approval_request' ? 'publishing/approvals' : 'publishing/posts', 'read'); }
+    catch (error) { if (error instanceof OperationError && ['unauthorized', 'forbidden', 'not_found'].includes(error.code)) return false; throw error; }
+    const ids = await selectedPublishingTargetIds(value.workspaceId, access.entitlements, access.actor.allowedTargetIds);
+    if (value.targetId && !ids.includes(value.targetId)) return false;
+    if (value.kind === 'queue_empty') return ['owner', 'admin'].includes(access.role);
+    if (value.kind === 'approval_request' && !['owner', 'admin', 'editor'].includes(access.role)) return false;
+    const ownAuthor = access.actor.allowedTargetIds !== undefined || access.role === 'contributor' || ['approval_decision', 'draft_updated'].includes(value.kind) ? value.userId : undefined;
+    return Boolean(await tx.post.findFirst({ where: { id: value.postId!, ...publishingPostVisibilityWhere(value.workspaceId, ids, ownAuthor) }, select: { id: true } }));
   }
   if (value.kind === 'note_mention') {
     let recipientAuth;
@@ -268,11 +293,25 @@ export async function notificationRecipientEligible(tx: Tx, input: NotificationE
 /** Internal, validated preference read for event producers. */
 export async function recipientAllowsNotification(tx: Tx, input: Pick<NotificationEnqueueInput, 'workspaceId' | 'userId' | 'kind' | 'targetId'>) {
   const limit = await bounds();
-  const rows = await tx.$queryRaw<Array<{ enabled: boolean | null; muted: boolean }>>`SELECT CASE WHEN ${input.kind} = 'note_mention' THEN ns."onNoteMention" ELSE ns."onQueueEmpty" END AS enabled,
-    EXISTS (SELECT 1 FROM notification_mutes m JOIN targets t ON t.id = m."targetId" WHERE m."userId" = ${input.userId} AND m."targetId" = ${input.targetId ?? ''} AND m.event = 'queueEmpty' AND t."workspaceId" = ${input.workspaceId}) AS muted FROM (SELECT 1) seed LEFT JOIN notification_settings ns ON ns."userId" = ${input.userId} AND ns."workspaceId" = ${input.workspaceId}`;
+  const rows = await tx.$queryRaw<Array<{ preferences: Record<string, boolean> | null; muted: boolean }>>`SELECT to_jsonb(ns) AS preferences,
+    EXISTS (SELECT 1 FROM notification_mutes m JOIN targets t ON t.id = m."targetId" WHERE m."userId" = ${input.userId} AND m."targetId" = ${input.targetId ?? ''} AND m.event = ${input.kind === 'publish_failure' ? 'publishFailure' : input.kind === 'inbox_digest' ? 'newInbox' : ['queue_empty', 'mix_dry'].includes(input.kind) ? 'queueEmpty' : ''} AND t."workspaceId" = ${input.workspaceId}) AS muted FROM (SELECT 1) seed LEFT JOIN notification_settings ns ON ns."userId" = ${input.userId} AND ns."workspaceId" = ${input.workspaceId}`;
   const row = rows[0];
-  return !row?.muted && (typeof row?.enabled === 'boolean' ? row.enabled : (input.kind === 'note_mention' ? limit.preferenceDefaults.onNoteMention : limit.preferenceDefaults.onQueueEmpty));
+  const key = notificationPreferenceKey(input.kind);
+  const enabled = row?.preferences?.[key];
+  const fallback = input.kind === 'note_mention' ? limit.preferenceDefaults.onNoteMention : ['mix_dry', 'queue_empty'].includes(input.kind) ? limit.preferenceDefaults.onQueueEmpty : input.kind !== 'inbox_digest';
+  return !row?.muted && (typeof enabled === 'boolean' ? enabled : fallback);
 }
 
 /** Atomic mention-port helper: recipients are independently checked and deduplicated by stable event ID. */
 export const notificationPreferenceDefaults = NOTIFICATIONS_DEFAULTS;
+
+export function notificationPreferenceKey(kind: import('./contracts').NotificationEvent): string {
+  return ({ note_mention: 'onNoteMention', mix_dry: 'onQueueEmpty', queue_empty: 'onQueueEmpty', publish_failure: 'onPublishFailure', connection_expired: 'onPublishFailure', token_expiring: 'onTokenExpiry', approval_request: 'onApprovalRequest', approval_decision: 'onApprovalDecision', draft_updated: 'onDraftUpdated', inbox_digest: 'onNewInbox', moderation_alert: 'onModerationAlert', negative_spike: 'onModerationAlert' })[kind];
+}
+export async function txLocale(tx: Tx, userId: string) {
+  const rows = await tx.$queryRaw<Array<{ locale: string }>>`SELECT locale::text AS locale FROM users WHERE id = ${userId}`;
+  return rows[0]?.locale === 'fr' ? 'fr' : 'en';
+}
+export function localizedNotificationCopy(copy: { title: string; body: string; frTitle?: string; frBody?: string }, locale: string) {
+  return { title: locale === 'fr' ? copy.frTitle ?? copy.title : copy.title, body: locale === 'fr' ? copy.frBody ?? copy.body : copy.body };
+}

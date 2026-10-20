@@ -1,3 +1,4 @@
+vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: vi.fn().mockResolvedValue(undefined) }));
 // Operation-lock/authority behavior is exercised by publishing-guard and PostgreSQL suites.
 vi.mock('@/modules/publishing/server/guard', () => ({
   withPublishingTransaction: (_signal: AbortSignal, work: (tx: unknown) => Promise<unknown>) => db.$transaction(work),
@@ -35,6 +36,7 @@ vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({
 
 import { cancelScheduledPost, createPost, publishPost, reschedulePost, restorePostVersion, reviewPost, schedulePost, submitPostForApproval, updatePost } from '@/modules/publishing/server/lifecycle';
 
+import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 const actor = { userId: 'u1', workspaceId: 'w1' };
 
 beforeEach(() => {
@@ -285,3 +287,28 @@ describe('publishing lifecycle transitions', () => {
     expect(db.post.update).not.toHaveBeenCalled();
   });
 });
+
+ describe('durable publishing alerts', () => {
+  it('enqueues an approval request in the submitting transaction', async () => {
+    await submitPostForApproval(actor, 'p1');
+    expect(emitWorkspaceAlert).toHaveBeenCalledWith(db, expect.objectContaining({ workspaceId: 'w1', postId: 'p1', kind: 'approval_request' }));
+  });
+  it('enqueues a decision only after the guarded review mutation succeeds', async () => {
+    db.post.findFirst.mockResolvedValue({ id: 'p1', status: 'pending_approval', scheduledAt: null });
+    await reviewPost(actor, 'p1', 'approve');
+    expect(emitWorkspaceAlert).toHaveBeenCalledWith(db, expect.objectContaining({ kind: 'approval_decision', postId: 'p1' }));
+    vi.mocked(emitWorkspaceAlert).mockClear();
+    db.post.updateMany.mockResolvedValue({ count: 0 });
+    await expect(reviewPost(actor, 'p1', 'reject')).rejects.toThrow();
+    expect(emitWorkspaceAlert).not.toHaveBeenCalled();
+  });
+  it('does not alert authors about their own draft edits', async () => {
+    await updatePost(actor, { postId: 'p1', message: 'Updated', firstComment: '', targetIds: ['target-1'] });
+    expect(emitWorkspaceAlert).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ kind: 'draft_updated' }));
+  });
+  it('emits author-scoped draft update after another person edits', async () => {
+    db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'other', status: 'draft', targets: [] });
+    await updatePost(actor, { postId: 'p1', message: 'Updated', firstComment: '', targetIds: ['target-1'] });
+    expect(emitWorkspaceAlert).toHaveBeenCalledWith(db, expect.objectContaining({ kind: 'draft_updated', postId: 'p1' }));
+  });
+ });

@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
 import { OperationError } from '@/lib/operation-error';
 import { z } from 'zod';
@@ -99,6 +101,7 @@ export async function queuePost(actor: PublishingActor, postId: string) {
       if (timezoneUpdated !== 1) throw new OperationError('conflict', 'This post changed while it was being queued. Refresh and try again.');
       if (holdForApproval) {
         const approvalUpdated = await tx.$executeRaw`UPDATE posts SET "approvalStatus" = 'pending', "submittedById" = ${context.actor.userId}, "submittedAt" = NOW(), "reviewedById" = NULL, "reviewedAt" = NULL, "reviewNote" = NULL WHERE id = ${postId} AND "workspaceId" = ${actor.workspaceId}`;
+        if (approvalUpdated === 1) await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: randomUUID(), kind: 'approval_request', postId });
         if (approvalUpdated !== 1) throw new OperationError('conflict', 'This post changed while it was being queued. Refresh and try again.');
       }
       await recordPostVersion(tx, postId, context.actor.userId, retention);

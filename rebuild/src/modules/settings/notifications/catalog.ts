@@ -13,7 +13,7 @@ export const notificationPreferenceLabels = {
     onNewInbox: 'Hourly inbox digest (opt in)',
     onDraftUpdated: 'Changes to your unpublished posts',
     onModerationAlert: 'Moderation alerts and negative comment spikes',
-    pending: 'Delivery for these alert types is not available yet.',
+    pending: 'Email delivery follows your personal preferences.',
   },
   fr: {
     onPublishFailure: 'Échecs de publication et connexions interrompues',
@@ -23,6 +23,6 @@ export const notificationPreferenceLabels = {
     onNewInbox: 'Résumé horaire de la boîte de réception (sur inscription)',
     onDraftUpdated: 'Modifications de vos publications non publiées',
     onModerationAlert: 'Alertes de modération et hausse des commentaires négatifs',
-    pending: 'La diffusion de ces types d’alertes n’est pas encore disponible.',
+    pending: 'La diffusion par e-mail suit vos préférences personnelles.',
   },
 } as const;

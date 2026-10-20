@@ -1,3 +1,4 @@
+import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
 import type { PublishResult, RemoteStatus } from '@/platforms/types';
@@ -94,6 +95,7 @@ export async function recordPublicationOutcomeInTransaction(tx: Prisma.Transacti
     await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='attested_absent', reason='external_human_attestation', "attestedAt"=CURRENT_TIMESTAMP, "attestedBy"=${actorId}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id} AND "workspaceId"=${input.workspaceId}`;
     await tx.postTarget.updateMany({ where: { id: row.postTargetId, postId: row.postId, targetId: row.targetId, post: { workspaceId: input.workspaceId }, status: 'processing', remotePostId: null }, data: { status: 'failed' } });
     await aggregatePublicationPostInTransaction(tx, input.workspaceId, row.postId);
+    await emitWorkspaceAlert(tx, { workspaceId: input.workspaceId, eventId: `publication_${row.id}`, kind: 'publish_failure', postId: row.postId, targetId: row.targetId });
   }
   await audit(tx, actorId, input.workspaceId, 'publishing.publication_outcome_recorded', { operationId: row.id, postId: row.postId, targetId: row.targetId, outcome: input.outcome, verification: 'external_human_attestation' });
   return { ok: true as const, operationId: row.id, state: confirmed ? 'receipt_recorded' as const : 'attested_absent' as const };
@@ -252,6 +254,7 @@ async function dispatchAndRecord(actor: PublishingActor, signal: AbortSignal, op
       const changed = await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state=${rejected ? 'rejected' : 'uncertain'}, reason=${rejected ? 'provider_rejected' : 'outcome_unknown'}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${operation.id} AND "workspaceId"=${actor.workspaceId} AND state='started'`;
       if (changed !== 1) throw new OperationError('conflict', 'The publication outcome changed.');
       if (rejected) await tx.postTarget.updateMany({ where: { id: operation.postTargetId, postId: operation.postId, post: { workspaceId: actor.workspaceId }, status: 'processing', remotePostId: null }, data: { status: 'failed' } });
+      if (rejected) await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: `publication_${operation.id}`, kind: 'publish_failure', postId: operation.postId, targetId: operation.targetId });
       await audit(tx, actor.userId, actor.workspaceId, rejected ? 'publishing.publication_rejected' : 'publishing.publication_uncertain', { operationId: operation.id, postId: operation.postId });
     }); return rejected ? 'failed' : 'needs_review'; } catch { return 'needs_review'; }
   }

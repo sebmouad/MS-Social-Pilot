@@ -52,14 +52,14 @@ the UI states that limitation.
 
 | Legacy producer (`src/lib/email/notify.ts`) | Personal switch | Durable rebuild production/delivery |
 | --- | --- | --- |
-| Publication failure; connection expired | onPublishFailure | Open |
-| Token approaching expiry | onTokenExpiry | Open |
-| Approval request | onApprovalRequest | Open |
-| Approval decision (author only) | onApprovalDecision | Open |
-| Hourly inbox digest | onNewInbox (default off) | Open |
-| Empty queue transition | onQueueEmpty | Open |
-| Draft updated (author only) | onDraftUpdated | Open |
-| Moderation match; negative comment spike | onModerationAlert | Open |
+| Publication failure; connection expired | onPublishFailure | Implemented; runtime verification open |
+| Token approaching expiry | onTokenExpiry | Implemented; runtime verification open |
+| Approval request | onApprovalRequest | Implemented; runtime verification open |
+| Approval decision (author only) | onApprovalDecision | Implemented; runtime verification open |
+| Hourly inbox digest | onNewInbox (default off) | Implemented; runtime verification open |
+| Empty queue transition | onQueueEmpty | Implemented; runtime verification open |
+| Draft updated (author only) | onDraftUpdated | Implemented; runtime verification open |
+| Moderation match; negative comment spike | onModerationAlert | Implemented; runtime verification open |
 | Internal note mention | onNoteMention | Existing durable intent/email |
 | Content mix dry | onQueueEmpty | Existing durable intent/email |
 
@@ -68,27 +68,37 @@ failure aggregate, disconnected/expiring accounts, disk, backups and provider
 usage) are a distinct private operator workflow. They must not be exposed as
 ordinary member notifications or leak installation diagnostics into a workspace.
 
-### Integration blocker outside this branch's file ownership
+## Alert delivery integration (2026-10-20)
 
-`prisma/migrations/20261018150000_rebuild_notifications/migration.sql` defines
-both a kind allowlist CHECK (only `note_mention`, `mix_dry`) and a context-shape
-CHECK restricted to those kinds. New event types cannot be inserted by changing
-TypeScript alone. Do not overload existing kinds or bypass these constraints.
-An additive migration must expand both constraints, define durable context
-references for connection/inbox incidents, and preserve current tenant/resource
-checks. No migration was written or applied in this branch.
+The preceding preference-only snapshot is superseded for source implementation.
+Publishing now emits transaction-bound failure, approval request/decision,
+author-only draft-change and empty-queue intents. The Inbox worker emits
+moderation-match alerts, opt-in hourly personal digests (bounded, skip-locked
+cursor claims) and negative spikes from existing classified sentiment. The
+notification worker scans a bounded rotating account slice for revoked/expired
+and approaching-expiry credentials. Connection alerts are admin/owner-only.
+All use Settings' durable intent service, recipient/event idempotency and existing
+email retry/uncertain-hold delivery, with current feature/resource authorization
+at enqueue, listing and delivery. Preferences control email; in-app alerts remain.
+Channel mutes apply to failure, inbox and queue events. New events have English
+and French copy; existing saved Root copy documents obtain additive defaults.
 
-The subsequent integration batch must connect transaction-bound producers in
-Publishing, Inbox and connection lifecycle services; extend enqueue validation,
-resource locks, recipient eligibility and localized event/mail copy; resolve
-recipients with current role/feature/resource access; apply the corresponding
-personal switch and channel mute; and keep the existing idempotency, retry and
-uncertain-hold delivery semantics. Approval/draft decisions must remain author
-only; connection repair alerts admin/owner only; inbox digests need bounded
-transactional cursor claims. All of these producers are outside the explicitly
-owned paths. Full remaining-alert parity is therefore **incomplete**.
+Migration `20261028100000_rebuild_alert_delivery` expands kind/context CHECKs
+and adds a cascading connection reference. It is additive and **not applied**.
+No credential content, provider error text or comment/post content is copied to
+alerts. Private Root installation incidents remain separate. Legacy member
+alert inventory has no Ads/report alert type; their own workflows are unchanged.
 
-No Root keys added. New tests cover independent switches, strict input validation
-and English/French label coverage. Targeted notification tests, SQL guard and
-TypeScript are local evidence only; no server, database, browser, SMTP or provider
-verification was run for these preference changes.
+Root keys (Settings-owned): `notifications.connectionWarningDays` and
+`notifications.connectionScanBatch`. The internal rotating scan cursor is stored
+as `notifications.connectionScanCursor`; it is operational state, not a Root key.
+
+Open: no rebuild sentiment classifier exists, so unclassified comments cannot
+produce negative spikes. Database migration/concurrency, SMTP, browser and live
+provider verification remain outstanding. Local mocked producer/service tests,
+SQL guard and TypeScript checks do not establish those runtime outcomes.
+
+Branch verification: 148 tests / 17 targeted files passed, including the raw SQL
+void guard; `npx tsc --noEmit -p .` passed. An additional module-manifest suite
+has a pre-existing unrelated Analytics route expectation failure: it omits
+`/analytics/posts`. No build, server, database migration or live probe was run.

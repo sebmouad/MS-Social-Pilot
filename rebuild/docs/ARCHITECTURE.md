@@ -1476,3 +1476,11 @@ once something marks it invalidated. Open: a Root setting for the warning window
 (constant for now), a scheduled health check with a stored check time, re-requesting
 declined permissions on Reconnect, MCP exposure, locale plumbing, browser check.
 Evidence: unit tests and full suite (3,352/376) on a scratch synthetic database copy.
+
+## Alert delivery branch — 2026-10-20
+
+Settings durable notifications now receive Publishing lifecycle, connection expiry
+and Inbox moderation/digest/spike producers; see [NOTIFICATIONS.md](NOTIFICATIONS.md).
+The additive root Prisma migration is unapplied. Negative spikes depend on existing
+classified sentiment; rebuild classification and live delivery/concurrency proof
+remain open. Local branch-only commit requested; no push, servers or cutover.

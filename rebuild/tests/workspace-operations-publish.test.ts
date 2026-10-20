@@ -1,3 +1,4 @@
+vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: vi.fn().mockResolvedValue(undefined) }));
 // Operation-lock/authority behavior is exercised by publishing-guard and PostgreSQL suites.
 vi.mock('@/modules/publishing/server/guard', () => ({
   withPublishingTransaction: (_signal: AbortSignal, work: (tx: unknown) => Promise<unknown>) => db.$transaction(work),

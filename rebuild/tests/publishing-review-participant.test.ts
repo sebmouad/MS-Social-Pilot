@@ -1,3 +1,4 @@
+vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: vi.fn().mockResolvedValue(undefined) }));
 // Contract tests for the neutral review-participant protocol. The transaction is a
 // snapshot/rollback fake: it proves lifecycle wiring (ordering, shared tx, error
 // propagation), not PostgreSQL rollback itself, which is Prisma's guarantee.

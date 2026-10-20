@@ -1,3 +1,4 @@
+vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: vi.fn().mockResolvedValue(undefined) }));
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/server/data', () => ({ prisma: {} }));

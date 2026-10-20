@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '../../../../generated/client';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
+import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
@@ -172,7 +173,11 @@ export async function runInboxModerationRules(actor: InboxReadActor, channelId: 
       if (rule.action === 'reply' && !text) { result.skipped++; continue; }
       // Claimed before acting: another run finds the row and leaves the comment alone.
       const claimId = randomUUID();
-      const claimed = await prisma.$executeRaw`INSERT INTO moderation_actions (id, "workspaceId", "ruleId", "ruleName", "targetId", "remoteCommentId", "authorId", "authorName", message, action, "createdAt") VALUES (${claimId}, ${actor.workspaceId}, ${rule.id}, ${rule.name}, ${comment.targetId}, ${comment.remoteId}, ${comment.fromId}, ${comment.fromName}, ${(comment.message ?? '').slice(0, 500)}, ${rule.action}, ${now}) ON CONFLICT ("ruleId", "remoteCommentId") DO NOTHING`;
+      const claimed = await prisma.$transaction(async tx => {
+        const changed = await tx.$executeRaw`INSERT INTO moderation_actions (id, "workspaceId", "ruleId", "ruleName", "targetId", "remoteCommentId", "authorId", "authorName", message, action, "createdAt") VALUES (${claimId}, ${actor.workspaceId}, ${rule.id}, ${rule.name}, ${comment.targetId}, ${comment.remoteId}, ${comment.fromId}, ${comment.fromName}, ${(comment.message ?? '').slice(0, 500)}, ${rule.action}, ${now}) ON CONFLICT ("ruleId", "remoteCommentId") DO NOTHING`;
+        if (changed && rule.action === 'alert') await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: `moderation_${claimId}`, kind: 'moderation_alert', targetId: comment.targetId });
+        return changed;
+      });
       if (!claimed) break;
       try {
         if (rule.action === 'hide') await withWorkspaceOperation(actor.workspaceId, () => moderateInboxComment(actor, { id: comment.id, hidden: true }));

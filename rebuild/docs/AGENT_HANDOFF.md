@@ -812,3 +812,11 @@ Clean-main full suite at `6d25791b` with real PostgreSQL (set both
 `REBUILD_PREVIEW_DATABASE_URL` and `DATABASE_URL`): 3,724 tests, 0 skips, typecheck
 clean; 7 failures in the parallel run all pass with `--no-file-parallelism`
 (shared-database collisions, not product defects).
+
+## Alert delivery branch — 2026-10-20
+
+Settings durable notifications now receive Publishing lifecycle, connection expiry
+and Inbox moderation/digest/spike producers; see [NOTIFICATIONS.md](NOTIFICATIONS.md).
+The additive root Prisma migration is unapplied. Negative spikes depend on existing
+classified sentiment; rebuild classification and live delivery/concurrency proof
+remain open. Local branch-only commit requested; no push, servers or cutover.

@@ -1,3 +1,5 @@
+import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
+import { enqueueEmptyQueueNotifications } from './notification-events';
 import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
 import { validateSelectedPublishingFormat } from '@/modules/publishing/formats';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -93,6 +95,7 @@ async function workspaceRequiresApproval(workspaceId: string) {
 }
 async function setApprovalPending(tx: Prisma.TransactionClient, actor: PublishingActor, postId: string) {
   await tx.$executeRaw`UPDATE posts SET "approvalStatus" = 'pending', "submittedById" = ${actor.userId}, "submittedAt" = NOW(), "reviewedById" = NULL, "reviewedAt" = NULL, "reviewNote" = NULL WHERE id = ${postId} AND "workspaceId" = ${actor.workspaceId}`;
+  await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: randomUUID(), kind: 'approval_request', postId });
 }
 
 export function validText(value: string, maxText: number) {
@@ -243,6 +246,7 @@ export async function reviewPost(actor: PublishingActor, postId: string, decisio
       if (changed.count !== 1) throw new OperationError('conflict', 'This post is no longer awaiting approval.');
       await tx.$executeRaw`UPDATE posts SET "approvalStatus" = ${decision === 'approve' ? 'approved' : 'rejected'}::"ApprovalStatus", "reviewedById" = ${actor.userId}, "reviewedAt" = NOW(), "reviewNote" = ${reviewNote || null} WHERE id = ${post.id} AND "workspaceId" = ${actor.workspaceId}`;
       await participant?.after?.(tx, context);
+      await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: randomUUID(), kind: 'approval_decision', postId: post.id });
       signal.throwIfAborted();
       await audit(tx, actor, decision === 'approve' ? 'publishing.post_approved' : 'publishing.post_rejected', { postId: post.id, ...(reviewNote ? { note: reviewNote } : {}) });
     });
@@ -392,6 +396,7 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
       // retain their publishing bypass while contributors need fresh review.
       const reset = await tx.$executeRaw`UPDATE posts SET "approvalStatus" = 'pending', "reviewedById" = NULL, "reviewedAt" = NULL, "reviewNote" = NULL WHERE id = ${existing.id} AND "workspaceId" = ${actor.workspaceId} AND "approvalStatus" = 'approved'`;
       await recordPostVersion(tx, existing.id, actor.userId, retention);
+      if (existing.authorId !== actor.userId) await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: randomUUID(), kind: 'draft_updated', postId: existing.id });
       await audit(tx, actor, 'publishing.post_updated', { postId: existing.id, targetCount: targets.length });
       return { status: existing.status, approvalReset: reset === 1 };
     });
@@ -463,7 +468,7 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       const adapter = provider ? await platformFor(provider, 'publishing') : null;
       const credential = adapter ? readPublishingCredential(item.target, adapter, 'publishing') : null;
       const eligible = Boolean(credential && provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && (!post.firstComment?.trim() || adapter.publishFirstComment) && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
-      if (!eligible) { failed++; await markTarget(actor, item.id, 'failed', signal); continue; }
+      if (!eligible) { failed++; await markTarget(actor, post.id, item.id, 'failed', signal); continue; }
       linkSettings ??= await loadWorkspaceOperations(actor.workspaceId);
       const preparedLinks = linkSettings;
       const outcome = await publishDestinationInOperation({ actor, signal }, {
@@ -488,6 +493,7 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
     const status = pending ? (published ? 'partially_failed' : 'publishing') : failed ? (published ? 'partially_failed' : 'failed') : 'published';
     await publishingTransaction(signal, async tx => {
       await tx.post.update({ where: { id: post.id }, data: { status, publishedAt: published && !pending && !failed ? new Date() : undefined, updatedAt: new Date() } });
+      if (post.status === 'scheduled') await enqueueEmptyQueueNotifications(tx, actor.workspaceId, post.id, post.targets.map(item => item.target.id));
       await audit(tx, actor, 'publishing.publish_finished', { postId: post.id, published, failed, needsReconciliation: pending, firstCommentsNeedingReview, firstCommentsNotSent });
     });
     return { published, failed, needsReconciliation: pending, firstCommentsNeedingReview, firstCommentsNotSent, skipped: false };
@@ -563,9 +569,10 @@ export function parsePublishingCsv(source: string): string[][] {
   return rows;
 }
 
-async function markTarget(actor: PublishingActor, id: string, status: 'failed', signal: AbortSignal) {
+async function markTarget(actor: PublishingActor, postId: string, id: string, status: 'failed', signal: AbortSignal) {
   await publishingTransaction(signal, async tx => {
     await tx.postTarget.updateMany({ where: { id, post: { workspaceId: actor.workspaceId }, status: { in: ['pending', 'failed', 'processing'] }, remotePostId: null }, data: { status } });
+    await emitWorkspaceAlert(tx, { workspaceId: actor.workspaceId, eventId: randomUUID(), kind: 'publish_failure', postId });
     await audit(tx, actor, 'publishing.target_failed', { postTargetId: id });
   });
 }

@@ -1,3 +1,5 @@
+vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: vi.fn().mockResolvedValue(undefined) }));
+import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
@@ -98,6 +100,7 @@ describe('queuePost', () => {
     h.role = 'contributor'; h.policy = [{ timezone: 'America/Casablanca', requiresApproval: true }];
     const result = await queuePost(actor, 'p1');
     expect(result.status).toBe('pending_approval');
+    expect(emitWorkspaceAlert).toHaveBeenCalledWith(db, expect.objectContaining({ kind: 'approval_request', workspaceId: actor.workspaceId, postId: expect.any(String) }));
     expect(db.post.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'pending_approval', scheduledAt: h.at }) }));
     expect(h.writes.some(w => w.sql.includes('"approvalStatus" = \'pending\'') && w.sql.includes('"reviewedById" = NULL'))).toBe(true);
     expect(h.audit).toHaveBeenCalledWith(db, actor, 'publishing.post_queued', expect.objectContaining({ status: 'pending_approval' }));

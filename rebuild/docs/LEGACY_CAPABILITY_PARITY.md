@@ -243,3 +243,10 @@ comment implementation gap for the current supported format; native formats,
 full live-provider delivery and broader publication/deletion release gates remain
 open. Persistent receipt-storage failures remain held without a guaranteed
 late-fact append; do not describe the entire Publishing/Facebook engine as done.
+
+Notification delivery update, 2026-10-20: remaining legacy workspace event
+producers now enqueue durable Settings intents with personal email switches and
+current authority. See NOTIFICATIONS.md for exact event coverage and limits.
+Migration remains unapplied, negative spikes require stored classified sentiment,
+and runtime/provider/SMTP/concurrency evidence remains open. This does not close
+the broader Notifications/integrations parity row.

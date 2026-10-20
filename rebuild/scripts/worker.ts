@@ -45,6 +45,8 @@ const dependencies: WorkerDependencies = {
     }
     if (job === 'notifications') {
       const { deliverNotifications } = await import('../src/modules/settings/notifications/delivery');
+      const { scanConnectionAlerts } = await import('../src/modules/settings/notifications/connection-alerts');
+      await scanConnectionAlerts(now);
       const result = await deliverNotifications(now);
       return `examined=${result.examined} sent=${result.sent} cancelled=${result.cancelled} failed=${result.failed} uncertain=${result.uncertain} skipped=${result.skipped} purged=${result.purged}`;
     }
@@ -74,6 +76,8 @@ const dependencies: WorkerDependencies = {
     const result = await runEnabledPlatformJob('inbox', now, retryLimit, retryBackoff);
     const { runAutomaticInboxModeration } = await import('../src/modules/inbox/server/moderation');
     const moderation = await runAutomaticInboxModeration(new Date()).catch(() => null);
+    const { runInboxAlertProducers } = await import('../src/modules/inbox/server/notification-events');
+    await runInboxAlertProducers(now);
     const rules = moderation ? `rules=${moderation.workspaces}/${moderation.acted} rulesFailed=${moderation.failed}` : 'rules=unavailable';
     return `examined=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed} ${rules}`;
   },

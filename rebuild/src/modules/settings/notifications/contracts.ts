@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export type NotificationActor = { userId: string; workspaceId: string };
-export const NOTIFICATION_EVENTS = ['note_mention', 'mix_dry'] as const;
+export const NOTIFICATION_EVENTS = ['note_mention', 'mix_dry', 'publish_failure', 'connection_expired', 'token_expiring', 'approval_request', 'approval_decision', 'inbox_digest', 'queue_empty', 'draft_updated', 'moderation_alert', 'negative_spike'] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
 export type NotificationMute = { targetId: string; event: 'queueEmpty' };
 
@@ -28,9 +28,12 @@ export const notificationEnqueueSchema = z.object({
   workspaceId: identifier,
   userId: identifier,
   kind: z.enum(NOTIFICATION_EVENTS),
-  postId: identifier.optional(), noteId: identifier.optional(), targetId: identifier.optional(), labelId: identifier.optional(),
+  accountId: identifier.optional(), postId: identifier.optional(), noteId: identifier.optional(), targetId: identifier.optional(), labelId: identifier.optional(),
 }).strict().superRefine((value, ctx) => {
   if (value.kind === 'note_mention' && (!value.postId || !value.noteId)) ctx.addIssue({ code: 'custom', message: 'A note mention requires a post and note.' });
+  if (['publish_failure', 'approval_request', 'approval_decision', 'draft_updated'].includes(value.kind) && !value.postId) ctx.addIssue({ code: 'custom', message: 'This event requires a post.' });
+  if (['connection_expired', 'token_expiring'].includes(value.kind) && !value.accountId) ctx.addIssue({ code: 'custom', message: 'This event requires a connection.' });
+  if (['inbox_digest', 'queue_empty', 'moderation_alert', 'negative_spike'].includes(value.kind) && !value.targetId) ctx.addIssue({ code: 'custom', message: 'This event requires a channel.' });
   if (value.kind === 'mix_dry' && !value.targetId) ctx.addIssue({ code: 'custom', message: 'A dry content mix requires a selected target.' });
 });
 export type NotificationEnqueueInput = z.infer<typeof notificationEnqueueSchema>;
@@ -52,6 +55,6 @@ export type NotificationPreferenceView = {
 export type NotificationRow = {
   id: string; kind: NotificationEvent; createdAt: Date; updatedAt: Date; readAt: Date | null; emailSentAt: Date | null;
   emailState: 'pending' | 'sending' | 'sent' | 'failed' | 'uncertain' | 'cancelled';
-  title: string; body: string; available: boolean; postId: string | null; noteId: string | null; targetId: string | null; labelId: string | null;
+  accountId?: string | null; title: string; body: string; available: boolean; postId: string | null; noteId: string | null; targetId: string | null; labelId: string | null;
 };
 export type NotificationPage = { items: NotificationRow[]; page: number; pageSize: number; hasMore: boolean };

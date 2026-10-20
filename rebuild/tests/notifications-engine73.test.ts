@@ -41,7 +41,7 @@ beforeEach(() => {
   db.$transaction.mockImplementation(async (run: (tx: typeof db) => Promise<unknown>) => run(db));
   db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const query = { sql: strings.join('?'), values }; state.queries.push(query);
-    if (query.sql.includes('SELECT CASE WHEN')) return [{ enabled: state.preferenceEnabled, muted: state.muted }];
+    if (query.sql.includes('SELECT to_jsonb(ns)')) return [{ preferences: { onNoteMention: state.preferenceEnabled, onQueueEmpty: state.preferenceEnabled }, muted: state.muted }];
     if (query.sql.includes('SELECT "onNoteMention"')) return [{ onNoteMention: state.preferenceEnabled, onQueueEmpty: state.preferenceEnabled }];
     if (query.sql.includes('SELECT n.id FROM post_notes')) return state.noteValid ? [{ id: 'note-a' }] : [];
     if (query.sql.includes('SELECT n.id, n."workspaceId", n."userId"')) return [{ id: 'row-a', workspaceId: actor.workspaceId, userId: actor.userId, eventId: 'note_note-a', kind: 'note_mention', postId: 'post-a', noteId: 'note-a', targetId: null, labelId: null, attempt: 0 }];
@@ -171,5 +171,38 @@ describe('notification email delivery state machine', () => {
     state.failFinish = false;
     await expect(deliverNotifications(new Date(now.getTime() + 121000), actor.workspaceId)).resolves.toMatchObject({ uncertain: 1, examined: 0 });
     expect(state.sends).toBe(1);
+  });
+});
+
+describe('additional durable alert contracts', () => {
+  it.each([
+    ['publish_failure', 'onPublishFailure'], ['connection_expired', 'onPublishFailure'],
+    ['token_expiring', 'onTokenExpiry'], ['approval_request', 'onApprovalRequest'],
+    ['approval_decision', 'onApprovalDecision'], ['inbox_digest', 'onNewInbox'],
+    ['queue_empty', 'onQueueEmpty'], ['draft_updated', 'onDraftUpdated'],
+    ['moderation_alert', 'onModerationAlert'], ['negative_spike', 'onModerationAlert'],
+  ] as const)('honors %s email opt-out independently', async (kind, preference) => {
+    const { recipientAllowsNotification } = await import('../src/modules/settings/notifications/server');
+    db.$queryRaw.mockResolvedValue([{ preferences: { [preference]: false }, muted: false }]);
+    await expect(recipientAllowsNotification(db as never, { ...actor, kind, targetId: 'target-a' })).resolves.toBe(false);
+    db.$queryRaw.mockResolvedValue([{ preferences: { [preference]: true }, muted: false }]);
+    await expect(recipientAllowsNotification(db as never, { ...actor, kind, targetId: 'target-a' })).resolves.toBe(true);
+  });
+  it('requires durable context and supplies French copy for every new event', async () => {
+    const { notificationEnqueueSchema } = await import('../src/modules/settings/notifications/contracts');
+    const { localizedNotificationCopy } = await import('../src/modules/settings/notifications/server');
+    const { NOTIFICATIONS_DEFAULTS } = await import('../src/modules/settings/notifications/config');
+    for (const kind of ['publish_failure', 'connection_expired', 'token_expiring', 'approval_request', 'approval_decision', 'inbox_digest', 'queue_empty', 'draft_updated', 'moderation_alert', 'negative_spike'] as const) {
+      expect(notificationEnqueueSchema.safeParse({ ...actor, eventId: 'event', kind }).success).toBe(false);
+      expect(notificationEnqueueSchema.safeParse({ ...actor, eventId: 'event', kind, postId: 'post', targetId: 'target', accountId: 'account' }).success).toBe(true);
+      expect(localizedNotificationCopy(NOTIFICATIONS_DEFAULTS.eventCopy[kind], 'fr').title).toBe(NOTIFICATIONS_DEFAULTS.eventCopy[kind].frTitle);
+    }
+  });
+  it('keeps decisions and draft changes author-only in current visibility queries', async () => {
+    const { notificationRecipientEligible } = await import('../src/modules/settings/notifications/server');
+    for (const kind of ['approval_decision', 'draft_updated'] as const) {
+      await notificationRecipientEligible(db as never, { ...actor, eventId: 'event', kind, postId: 'post-a' });
+      expect(db.post.findFirst).toHaveBeenLastCalledWith(expect.objectContaining({ where: expect.objectContaining({ ownAuthor: actor.userId, workspaceId: actor.workspaceId }) }));
+    }
   });
 });

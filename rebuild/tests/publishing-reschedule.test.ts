@@ -1,3 +1,4 @@
+vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'publishing.collab.versionRetention' ? 50 : 15000 }));
 // Operation-lock/authority behavior is exercised by publishing-guard and PostgreSQL suites.
 vi.mock('@/modules/publishing/server/guard', () => ({

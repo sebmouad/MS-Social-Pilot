@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   prisma: { postComment: { findFirst: vi.fn() }, $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() },
-  config: vi.fn(), authorize: vi.fn(), workspace: vi.fn(), permissions: vi.fn(), capabilities: vi.fn(), moderate: vi.fn(), reply: vi.fn(),
+  notify: vi.fn(), config: vi.fn(), authorize: vi.fn(), workspace: vi.fn(), permissions: vi.fn(), capabilities: vi.fn(), moderate: vi.fn(), reply: vi.fn(),
 }));
+vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: mocks.notify }));
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
 vi.mock('../src/modules/inbox/server/access', () => ({ authorizeInbox: mocks.authorize }));
@@ -151,4 +152,14 @@ describe('moderation MCP tools', () => {
     await expect(executeInboxModerationTool(actor, 'delete_inbox_moderation_rule', { id: 'r1', confirmation: 'wrong' })).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(executeInboxModerationTool(actor, 'delete_inbox_moderation_rule', { id: 'r1', confirmation: moderationConfirmation.remove('r1') })).resolves.toMatchObject({ ok: true, action: 'rule.delete' });
   });
+});
+
+it('enqueues moderation alerts once in the claim transaction', async () => {
+  rules = [{ ...rule, id: 'r-alert', action: 'alert' }];
+  comments = [{ id: 'c', remoteId: 'remote', targetId: 'channel-a', message: 'https://example.com', provider: 'test', channelIdentity: 'own' }];
+  await runInboxModerationRules(actor, null);
+  expect(mocks.notify).toHaveBeenCalledWith(mocks.prisma, expect.objectContaining({ kind: 'moderation_alert', targetId: 'channel-a' }));
+  mocks.notify.mockClear(); claimed = 0;
+  await runInboxModerationRules(actor, null);
+  expect(mocks.notify).not.toHaveBeenCalled();
 });

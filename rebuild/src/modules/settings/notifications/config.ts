@@ -18,6 +18,16 @@ export const NOTIFICATIONS_DEFAULTS = {
   retentionDays: 365,
   preferenceDefaults: { onNoteMention: true, onQueueEmpty: true },
   eventCopy: {
+    publish_failure: { title: 'Publication failed', body: 'A publication needs your attention.', frTitle: 'Échec de publication', frBody: 'Une publication nécessite votre attention.' },
+    connection_expired: { title: 'Reconnect a connection', body: 'A workspace connection needs to be reconnected.', frTitle: 'Reconnecter une connexion', frBody: 'Une connexion de cet espace doit être rétablie.' },
+    token_expiring: { title: 'Connection approaching expiry', body: 'Renew a workspace connection before it expires.', frTitle: 'Connexion bientôt expirée', frBody: 'Renouvelez une connexion avant son expiration.' },
+    approval_request: { title: 'Post awaiting approval', body: 'A post is ready for review.', frTitle: 'Publication à valider', frBody: 'Une publication est prête à être examinée.' },
+    approval_decision: { title: 'A decision on your post', body: 'Review the approval decision on your post.', frTitle: 'Décision sur votre publication', frBody: 'Consultez la décision de validation de votre publication.' },
+    inbox_digest: { title: 'New inbox activity', body: 'Review new activity in your inbox.', frTitle: 'Activité dans la boîte de réception', frBody: 'Consultez les nouvelles activités dans votre boîte de réception.' },
+    queue_empty: { title: 'Your queue is empty', body: 'Add content to keep this channel active.', frTitle: 'Votre file est vide', frBody: 'Ajoutez du contenu pour garder ce canal actif.' },
+    draft_updated: { title: 'Your draft changed', body: 'A teammate updated your unpublished post.', frTitle: 'Votre brouillon a changé', frBody: 'Un collègue a modifié votre publication non publiée.' },
+    moderation_alert: { title: 'Moderation needs attention', body: 'Review a moderation match in your inbox.', frTitle: 'Modération à examiner', frBody: 'Consultez une correspondance de modération dans votre boîte de réception.' },
+    negative_spike: { title: 'Negative comment activity', body: 'Review increased negative activity in your inbox.', frTitle: 'Hausse des commentaires négatifs', frBody: 'Consultez la hausse des activités négatives dans votre boîte de réception.' },
     note_mention: { title: 'You were mentioned in a post note', body: 'A teammate mentioned you in an internal post note.' },
     mix_dry: { title: 'A content mix needs attention', body: 'A selected channel has no eligible posts for its content mix.' },
     unavailable: { title: 'Related item unavailable', body: 'This alert is still in your inbox, but its related item is no longer available.' },
@@ -25,6 +35,16 @@ export const NOTIFICATIONS_DEFAULTS = {
 } as const;
 
 const eventCopySchema = z.object({
+  publish_failure: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.publish_failure),
+  connection_expired: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.connection_expired),
+  token_expiring: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.token_expiring),
+  approval_request: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.approval_request),
+  approval_decision: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.approval_decision),
+  inbox_digest: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.inbox_digest),
+  queue_empty: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.queue_empty),
+  draft_updated: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.draft_updated),
+  moderation_alert: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.moderation_alert),
+  negative_spike: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.negative_spike),
   note_mention: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500) }).strict(),
   mix_dry: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500) }).strict(),
   unavailable: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500) }).strict(),
@@ -33,6 +53,8 @@ const preferenceDefaultsSchema = z.object({ onNoteMention: z.boolean(), onQueueE
 const number = (min: number, max: number) => z.number().int().min(min).max(max);
 
 export const NOTIFICATIONS_CONFIG = [
+  entry({ key: 'notifications.connectionWarningDays', group: 'Settings · Notifications', label: 'Connection expiry warning (days)', kind: 'number', description: 'Warn connection administrators before recorded credential expiry.', defaultValue: 7, schema: number(1, 90), consumption: 'active' }),
+  entry({ key: 'notifications.connectionScanBatch', group: 'Settings · Notifications', label: 'Connection alert scan batch', kind: 'number', description: 'Maximum accounts inspected per rotating durable scan.', defaultValue: 100, schema: number(1, 1000), consumption: 'active' }),
   entry({ key: 'notifications.pageSize', group: 'Settings · Notifications', label: 'Notification page size', kind: 'number', description: 'Maximum in-app notifications returned on one page.', defaultValue: NOTIFICATIONS_DEFAULTS.pageSize, schema: number(5, 100), consumption: 'active' }),
   entry({ key: 'notifications.deliveryBatchSize', group: 'Settings · Notifications', label: 'Notification delivery batch size', kind: 'number', description: 'Maximum due notification emails claimed in one worker run.', defaultValue: NOTIFICATIONS_DEFAULTS.deliveryBatchSize, schema: number(1, 500), consumption: 'active' }),
   entry({ key: 'notifications.maxAttempts', group: 'Settings · Notifications', label: 'Notification email attempts', kind: 'number', description: 'Maximum bounded retry count for errors confirmed before SMTP delivery starts.', defaultValue: NOTIFICATIONS_DEFAULTS.maxAttempts, schema: number(1, 10), consumption: 'active' }),
