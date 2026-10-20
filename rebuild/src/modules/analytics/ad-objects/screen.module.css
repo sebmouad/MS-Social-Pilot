@@ -2,3 +2,7 @@
 
 .filters { display: grid; gap: 1rem; min-width: 0; }
 .filters h2 { margin: 0; font-size: 1rem; }
+
+/* Keep intrinsic table widths inside DataTable's named, focusable scroller. */
+.content { grid-template-columns: minmax(0, 1fr); min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.content :global(.ui-table-shell), .content :global(.ui-table-wrap) { min-width: 0; max-width: 100%; }

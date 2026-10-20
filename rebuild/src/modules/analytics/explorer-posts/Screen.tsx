@@ -5,6 +5,7 @@ import { Button } from '@/components/Button';
 import { DataTable } from '@/components/DataTable';
 import { readPosts } from './service';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
+import local from './screen.module.css';
 
 export default async function PostsScreen({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const viewer = await requireViewer({ feature: 'analytics/posts', channelScoped: true });
@@ -33,7 +34,7 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
     <a href={`/api/analytics/posts?${query({ format: 'csv' })}`}>{t('Export selection (CSV)', 'Exporter la sélection (CSV)')}</a>
     <nav aria-label={t('Pages', 'Pages')} className={styles.actions}>{d.input.page > 1 && <a href={`?${query({ page: String(d.input.page - 1) })}`}>{t('Previous', 'Précédent')}</a>}<span>{t('Page', 'Page')} {d.input.page}</span>{d.nextPage && <a href={`?${query({ page: String(d.nextPage) })}`}>{t('Next', 'Suivant')}</a>}</nav>
   </form>;
-  return <PageFrame module="analytics" scopedAccess sidebar={sidebar}><div className={styles.root}><header className={styles.heading}><h1>{t('Post explorer', 'Explorateur de publications')}</h1><p>{t('Published posts with stored measures. Measures are snapshots, not period totals. Missing data is not available.', 'Publications et mesures enregistrées. Les mesures sont des instantanés, pas des totaux de période. Les données manquantes sont indisponibles.')}</p></header>
+  return <PageFrame module="analytics" scopedAccess sidebar={sidebar}><div className={`${styles.root} ${local.content}`}><header className={styles.heading}><h1>{t('Post explorer', 'Explorateur de publications')}</h1><p>{t('Published posts with stored measures. Measures are snapshots, not period totals. Missing data is not available.', 'Publications et mesures enregistrées. Les mesures sont des instantanés, pas des totaux de période. Les données manquantes sont indisponibles.')}</p></header>
     <DataTable caption={t('Published posts', 'Publications publiées')} rows={d.items} rowKey={p => `${p.channelId}:${p.postId}`} emptyMessage={t('No published posts for this selection and period.', 'Aucune publication pour cette sélection et cette période.')} columns={[
       { key: 'post', label: t('Post', 'Publication'), render: p => p.url ? <a href={p.url} rel="noreferrer" target="_blank">{p.text || unavailable}</a> : p.text || unavailable },
       { key: 'channel', label: t('Channel', 'Canal'), render: p => p.channelName },
