@@ -189,3 +189,11 @@ deletion before any request, validates the remote id shape, and confirms a delet
 only on an explicit boolean `success: true`. Native video/Reel deletion remains
 allowed with the private switch off; a native comment needs it. Shared callers must
 still pass `formatId`; see FACEBOOK_NATIVE_FORMATS.md (Batch98). Mocked fetch only.
+
+
+## Batch100 Story readback
+
+The shared native status helper reads Stories through the Page's Stories edge (one read, exact final
+id, no polling), so reconciliation of Story attempts is no longer `readback_unsupported`. Results other
+than an exact published entry are `unknown`; a read never confirms or mutates an attempt. Mocked fetch
+only. See FACEBOOK_NATIVE_FORMATS.md (Batch100).

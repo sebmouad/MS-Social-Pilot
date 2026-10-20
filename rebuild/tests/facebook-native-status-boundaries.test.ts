@@ -61,10 +61,10 @@ describe('native status boundary safety', () => {
     expect(transport.deleteGraph).not.toHaveBeenCalled();
   });
 
-  it.each(['story_photo', 'story_video'] as const)('keeps %s status unsupported', async (format) => {
+  it.each(['story_photo', 'story_video'] as const)('does not read %s as a Video object and needs a Page identity', async (format) => {
     const transport = emptyTransport();
     expect(mapFacebookVideoStatus(format, published)).toMatchObject({ status: 'unknown', detail: 'readback_unsupported' });
-    expect(await readFacebookNativeStatus(row({ format, remoteId: 'FINAL' }), { transport })).toMatchObject({ status: 'unknown', detail: 'readback_unsupported', polls: 0 });
+    expect(await readFacebookNativeStatus(row({ format, remoteId: 'FINAL' }), { transport })).toMatchObject({ status: 'unknown', detail: 'no_target_id', polls: 0 });
     expect(transport.getGraph).not.toHaveBeenCalled();
   });
 

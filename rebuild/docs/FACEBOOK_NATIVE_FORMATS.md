@@ -389,3 +389,27 @@ on a sandbox Page, inspect the result and clean up:
 7. Media limits (size, duration, aspect) in `native-config.ts` and the allowed upload origins.
 8. Rate-limit/throttle headers and codes interpreted by `interpretFacebookThrottle`.
 9. Comment and delete response shapes (`success: true`, comment `id`) per format.
+
+
+## Batch100: Story readback in the shared status helper (private, default off)
+
+Mocked transport only. `readFacebookNativeStatus` (used by `reconcileFacebookNativeAttempt` and the
+child-operation helpers) no longer reports Stories as `readback_unsupported`. For `story_photo` and
+`story_video` it makes exactly one read of `<page>/stories` (the attempt record's `targetId`) and maps
+it with `mapFacebookStoryStatus` by the exact final Story id. A Story is live on creation, so there is
+no polling. Not listed, ambiguous, archived, malformed, Graph100/sub33, failed and cancelled reads are
+`unknown` (never absent or failed); a missing/unsafe Page or final id reads nothing
+(`no_target_id`/`no_remote_id`). A read alone still never confirms or changes an attempt: reconciliation
+of an uncertain Story attempt keeps it uncertain and sends nothing. `mapFacebookVideoStatus` still
+refuses Story formats. Tests: `facebook-native-story-readback.test.ts` (plus updated boundary tests).
+
+Root keys: none. Migration: none.
+
+Open (unchanged): shared callers must pass `formatId` (`modules/publishing/server/deletion.ts`,
+`first-comment.ts`); stored-video resolution; `nativeSchedule` entry points; the cancel/reschedule
+helpers have no durable store (the journal is bound to one publication operation and a started parent,
+so the `<op>:cancel` / `<op>:reschedule:<unix>` child rows need their own tenant-bound table and a neutral
+adapter operation before any customer surface exists); applying and rehearsing migration
+`20261030100000` and running PostgreSQL Story proof tests (none run yet; the existing PostgreSQL files
+skip without the guarded preview database); cleaned live coverage for every native format.
+Live-verification item 4 now also covers the Stories edge read used for reconciliation.

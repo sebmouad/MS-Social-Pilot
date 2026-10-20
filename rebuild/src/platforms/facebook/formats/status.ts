@@ -91,7 +91,7 @@ export function mapFacebookStoryStatus(remoteId: string, raw: Record<string, unk
 }
 
 /** One read, bounded polling while processing. Reads are safe to repeat; nothing is written. */
-export async function readFacebookNativeStatus(record: Pick<FacebookNativeAttemptRecord, 'format' | 'remoteId' | 'knownIds'>, deps: StatusDeps): Promise<FacebookStatusReadback> {
+export async function readFacebookNativeStatus(record: Pick<FacebookNativeAttemptRecord, 'format' | 'remoteId' | 'knownIds' | 'targetId'>, deps: StatusDeps): Promise<FacebookStatusReadback> {
   // Snapshot every value that may otherwise be mutated while transport is awaited.
   const format = record.format;
   const remoteId = record.remoteId;
@@ -99,7 +99,20 @@ export async function readFacebookNativeStatus(record: Pick<FacebookNativeAttemp
   const signal = deps.signal;
   const transport = deps.transport;
   if (aborted(signal)) return { status: 'unknown', detail: 'aborted', polls: 0 };
-  if (format === 'story_photo' || format === 'story_video') return { status: 'unknown', detail: 'readback_unsupported', polls: 0 };
+  if (format === 'story_photo' || format === 'story_video') {
+    // A Story has no readable object of its own: one read of the Page's Stories edge by the exact final id.
+    // A Story is live on creation, so there is nothing to poll; not listed stays unknown (never absent).
+    const pageId = validFinalId(record.targetId) ? record.targetId : null;
+    if (!id) return { status: 'unknown', detail: 'no_remote_id', polls: 0 };
+    if (!pageId) return { status: 'unknown', detail: 'no_target_id', polls: 0 };
+    try {
+      const listed = await transport.getGraph(`${pageId}/stories`, [...FACEBOOK_STORY_STATUS_FIELDS], signal);
+      if (aborted(signal)) return { status: 'unknown', detail: 'aborted', polls: 1 };
+      return { ...(rec(listed) ? mapFacebookStoryStatus(id, listed) : { status: 'unknown' as const, detail: 'status_shape_invalid' }), polls: 1 };
+    } catch {
+      return { status: 'unknown', detail: aborted(signal) ? 'aborted' : 'read_failed', polls: 1 };
+    }
+  }
   if (format !== 'video' && format !== 'reel') return { status: 'unknown', detail: 'readback_unsupported', polls: 0 };
   if (!id) return { status: 'unknown', detail: 'no_remote_id', polls: 0 };
   const policy = deps.policy ?? facebookNativePolicyFrom();
@@ -162,7 +175,7 @@ export async function reconcileFacebookNativeAttempt(operationId: string, deps: 
   const stateSnapshot = record.state;
   const remoteIdSnapshot = record.remoteId;
   const knownIdsSnapshot = [...record.knownIds];
-  const readback = await readFacebookNativeStatus({ format: record.format, remoteId: remoteIdSnapshot, knownIds: knownIdsSnapshot }, { ...deps, transport, signal });
+  const readback = await readFacebookNativeStatus({ format: record.format, remoteId: remoteIdSnapshot, knownIds: knownIdsSnapshot, ...(record.targetId ? { targetId: record.targetId } : {}) }, { ...deps, transport, signal });
   if (aborted(signal)) return { state: stateSnapshot, readback, cancelled: true };
   // A readback is evidence only. This scaffold has no authorized,
   // identity-bound proof writer; a read alone cannot confirm durable delivery.
