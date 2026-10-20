@@ -338,3 +338,54 @@ Facebook sees `undefined` and treats the call as feed, which is the previous beh
 Shared stored-video resolution, `nativeSchedule` entry points, applying and rehearsing
 migration `20261030100000`, PostgreSQL Story proof tests and cleaned live coverage for
 every native format also remain open.
+
+
+## Batch99: provider-held schedule cancel/reschedule and live-verification ledger (private, default off)
+
+Mocked transport only; `platforms/facebook/formats/schedule.ts`, exported from the formats
+index and not registered in the neutral catalog or any shared service.
+
+- `cancelFacebookNativeSchedule(publishOperationId, deps)` and
+  `rescheduleFacebookNativeSchedule(publishOperationId, newInstant, deps)` act only on a
+  native **Video** whose parent attempt is `published`/`confirmed` with a valid final id.
+  Reels, Stories, unpublished attempts and unsafe ids are refused before any request.
+- Each reads first (one status read, no polling) and writes only when Facebook itself reports
+  the object as scheduled; live, processing or unknown answers return `not_scheduled` with no write.
+- Cancel is a DELETE of the held object, reschedule a POST of `published=false` plus
+  `scheduled_publish_time`. A change is confirmed only by boolean `success: true`. The
+  new instant must lie inside the Root `scheduleMinSeconds`/`scheduleMaxSeconds` window.
+- Idempotency: child rows `<op>:cancel` and `<op>:reschedule:<unix>`; a repeat returns
+  `already_attempted`, an unclear answer is settled by one readback and stays `uncertain`
+  (never a second write). A definite Facebook refusal is `rejected`. If the attempt row cannot
+  be written, nothing is sent. A confirmed cancel moves the parent to `deleted` by CAS.
+- Status reconciliation now treats `:cancel` and `:reschedule:<unix>` rows as child operations
+  (like `:comment`/`:delete`) and never reads them as publications. `guarded`/`record`
+  moved to `formats/attempt-io.ts` with no behavior change.
+
+Root keys: none. Migration: none. No customer surface calls these helpers yet.
+
+Still open (host): the neutral adapter contract has no cancel/reschedule operation, so no
+UI/HTTP/MCP entry exists; `modules/publishing/server/deletion.ts` and `first-comment.ts` still
+need to pass `formatId`; shared stored-video resolution; migration `20261030100000` PostgreSQL
+Story proof tests.
+
+### Needs live Meta verification (nothing below is proven)
+
+All Graph paths, fields and body shapes in the native engine come from SDK/spec declarations
+and mocked tests. Before any native format is advertised, verify with identifiable test content
+on a sandbox Page, inspect the result and clean up:
+
+1. App review and granted scopes for Video, Reel and Story publishing, first comment, deletion.
+2. Video: unpublished upload then publish, resumable `upload_phase` flow, `file_url` mode, and
+   `scheduled_publish_time` limits (Root min/max defaults are unverified).
+3. Reel: start/transfer/finish, `publishing_phase` values and `complete` meaning, schedule
+   support (declared `native:false`), first comment and DELETE on a Reel.
+4. Photo Story (`photo_stories` with unpublished photo id) and Video Story (`video_stories`
+   phases); the `<page>/stories` edge fields and visibility window used for status; Story expiry.
+5. Status fields: `status.video_status`, `published`, `scheduled_publish_time`; processing
+   durations; Graph100/sub33 meaning; error codes classified as definite rejection.
+6. Cancel (DELETE of a scheduled video) and reschedule (POST new time) success bodies, and
+   whether a held video accepts a changed time.
+7. Media limits (size, duration, aspect) in `native-config.ts` and the allowed upload origins.
+8. Rate-limit/throttle headers and codes interpreted by `interpretFacebookThrottle`.
+9. Comment and delete response shapes (`success: true`, comment `id`) per format.

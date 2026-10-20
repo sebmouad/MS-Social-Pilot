@@ -174,6 +174,14 @@ first comment or deletion. Reels now declare first comment and deletion through 
 format-blind shared paths; live behavior is unverified. See FACEBOOK_NATIVE_FORMATS.md.
 
 
+## Batch99 schedule child operations
+
+`:cancel` and `:reschedule:<unix>` attempt rows (see FACEBOOK_NATIVE_FORMATS.md, Batch99)
+are child operations: reconciliation returns their stored state and never reads Graph for them.
+Cancel/reschedule write only after a read shows Facebook reports the video as scheduled. Mocked
+fetch only; the full list of items needing live Meta verification is in FACEBOOK_NATIVE_FORMATS.md.
+
+
 ## Batch98 deletion and comment gating
 
 The adapter now refuses Story and unknown format ids for first comments and remote
