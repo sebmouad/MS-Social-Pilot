@@ -187,7 +187,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   if (!canResolve) return <p className={styles.readOnly}>You can read this conversation but not change it.</p>;
   return <div className={styles.toolbar}>
     <div className={styles.toolbarButtons}>
-      {!reply && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? 'Reopened.' : 'Marked as resolved.')}>{resolved ? 'Reopen' : 'Mark resolved'}</Button>}
+      {!reply && <Button size="sm" variant="secondary" data-inbox-resolve disabled={busy !== null} onClick={() => void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? 'Reopened.' : 'Marked as resolved.')}>{resolved ? 'Reopen' : 'Mark resolved'}</Button>}
       {kind === 'comment' && canHide && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('hide', { action: 'moderate', id, hidden: !hidden }, hidden ? `${reply ? 'Reply' : 'Comment'} is visible again.` : `${reply ? 'Reply' : 'Comment'} hidden.`)}>{hidden ? `Unhide ${noun}` : `Hide ${noun}`}</Button>}
       {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => void openDeleteDialog()}>Delete {noun}</Button>}
     </div>
@@ -243,7 +243,7 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
   return <form method="post" noValidate className={styles.reply} onSubmit={event => void submit(event)}>
     <p id={ruleId} className={allowed ? styles.ruleOpen : styles.ruleClosed}><span aria-hidden="true">{allowed ? '●' : '■'}</span> <strong>{headline}</strong>{detail ? <span className={styles.ruleDetail}> {detail}</span> : null}</p>
     <label htmlFor={fieldId} className="ui-visually-hidden">{copy.reply}</label>
-    <AutoTextarea id={fieldId} name="reply" rows={3} maxLength={maxLength} value={text} disabled={!allowed || busy} aria-describedby={[ruleId, countId, validation.fieldProps('reply')['aria-describedby']].filter(Boolean).join(' ')} aria-invalid={Boolean(error) || Boolean(validation.errors.reply) || undefined}
+    <AutoTextarea id={fieldId} name="reply" data-inbox-reply rows={3} maxLength={maxLength} value={text} disabled={!allowed || busy} aria-describedby={[ruleId, countId, validation.fieldProps('reply')['aria-describedby']].filter(Boolean).join(' ')} aria-invalid={Boolean(error) || Boolean(validation.errors.reply) || undefined}
       placeholder={allowed ? (kind === 'message' ? copy.privatePlaceholder : copy.publicPlaceholder) : copy.unavailable} onChange={event => { updateText(event.target.value); setSent(''); }} />
     <FieldError {...validation.errorProps('reply')} />
     <div className={styles.replyFoot}>

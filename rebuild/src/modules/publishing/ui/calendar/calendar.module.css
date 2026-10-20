@@ -81,4 +81,16 @@
   .agenda { display: grid; }
   .moveOptions, .pickForm fieldset { grid-template-columns: minmax(0, 1fr); }
 }
+/* Redesign: chips take their first channel's colour; today is marked on the day cell and week column. */
+.post:not([data-status="failed"]):not([data-status="partially_failed"]):not([data-status="rejected"]) { border-left-color: var(--chip, var(--mod, var(--accent))); background: color-mix(in srgb, var(--chip, var(--mod, var(--accent))) 9%, var(--surface)); }
+.post { box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent); transition: box-shadow var(--ease), transform var(--ease); }
+.post:hover { box-shadow: 0 3px 10px color-mix(in srgb, var(--ink) 14%, transparent); }
+.post[data-status="published"] { opacity: .88; }
+.day[data-today] { background: var(--mod-soft, var(--accent-soft)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
+.day[data-today] .dayHead time { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 50%; background: var(--mod, var(--accent)); color: var(--on-accent, #fff); }
+.weekHead[data-today] { background: var(--mod-soft, var(--accent-soft)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
+.todayTag { background: var(--mod, var(--accent)); }
+.day:hover .add { color: var(--mod-ink, var(--accent)); }
+.empty { border-color: var(--mod, var(--line-strong)); background: var(--mod-soft, transparent); }
+@media (prefers-reduced-motion: reduce) { .post { transition: none; } }
 @media (forced-colors: active) { .post, .day, .slot { border-color: CanvasText; } }

@@ -1,9 +1,11 @@
 import type { PostSummary } from "@/server/data";
+import type { ReactNode } from "react";
 import styles from "./publishing.module.css";
+import { ModuleHeader } from "./kit/kit";
 import { postContentSummary } from '@/modules/publishing/content-summary';
 
-export function PageHeading({ title, description, eyebrow = "Publishing", summary }: { title: string; description: string; eyebrow?: string; summary?: string }) {
-  return <header className={styles.heading}><div><p className={styles.eyebrow}>{eyebrow}</p><h1>{title}</h1><p>{description}</p></div>{summary ? <span className={styles.summary}>{summary}</span> : null}</header>;
+export function PageHeading({ title, description, eyebrow = "Publishing", summary, href, actions }: { title: string; description: string; eyebrow?: string; summary?: string; href?: string; actions?: ReactNode }) {
+  return <ModuleHeader module="publishing" href={href} eyebrow={eyebrow} title={title} description={description} summary={summary} actions={actions} />;
 }
 
 export function PublishingPagination({ path, page, pages }: { path: string; page: number; pages: number }) {

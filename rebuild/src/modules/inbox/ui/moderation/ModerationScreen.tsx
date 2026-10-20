@@ -4,6 +4,7 @@ import { canAccessFeature } from '@/server/permissions';
 import { ModerationRules } from '@/modules/inbox/components/ModerationRules';
 import { moderationText } from '@/modules/inbox/moderation';
 import styles from '@/modules/inbox/ui/inbox.module.css';
+import { InboxHeader } from '@/modules/inbox/ui/InboxChrome';
 
 
 export default async function InboxModerationPage() {
@@ -17,7 +18,7 @@ export default async function InboxModerationPage() {
     </div>
   </aside>;
   return <PageFrame module="inbox" scopedAccess sidebar={sidebar}><div className={styles.page}>
-    <header className={styles.head}><div><p className="eyebrow">Inbox</p><h1>{moderationText('en', 'title')}</h1><p>{moderationText('en', 'pageIntro')}</p></div></header>
+    <InboxHeader href="/inbox" eyebrow="Inbox" title={moderationText('en', 'title')} description={moderationText('en', 'pageIntro')} actions={<a className="ui-button ui-button--secondary" href="/inbox">Conversations</a>} />
     <ModerationRules canWrite={canWrite} />
   </div></PageFrame>;
 }

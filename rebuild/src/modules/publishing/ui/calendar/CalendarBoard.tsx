@@ -43,7 +43,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     onDrop: (event: DragEvent) => dropOn(event, date, time),
   };
 
-  const postCard = (post: BoardPost) => <div key={post.id} className={styles.post} data-status={post.status} data-movable={post.movable || undefined}
+  const postCard = (post: BoardPost) => <div key={post.id} className={styles.post} data-status={post.status} data-movable={post.movable || undefined} style={post.channels[0] ? { ["--chip" as string]: post.channels[0].mark.color } : undefined}
     draggable={post.movable} onDragStart={event => { dragged.current = post; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", post.id); }} onDragEnd={() => { dragged.current = null; setOver(null); }}>
     <div className={styles.postMeta}><time dateTime={post.whenIso}>{timeOf(post)}</time><StatusChip status={post.status} compact /></div>
     <p className={styles.postText} title={post.text}>{post.text || "No text included"}</p>
