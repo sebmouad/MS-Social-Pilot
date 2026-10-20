@@ -3,6 +3,7 @@ import { AGENCY_CONFIG } from './agency/config';
 import { AI_CONFIG } from './ai/config';
 import { ANALYTICS_MODULE_CONFIG } from './analytics/config';
 import { FEEDS_CONFIG } from './feeds/config';
+import { HOME_CONFIG } from './home/config';
 import { INBOX_MODULE_CONFIG } from './inbox/config';
 import { INTEGRATIONS_CONFIG } from './integrations/config';
 import { MEDIA_CONFIG } from './media/config';
@@ -16,6 +17,7 @@ import { TASKS_CONFIG } from './tasks/config';
  * changes settings in its own config.ts; this list changes only when a module is installed.
  */
 export const INSTALLED_MODULE_CONFIG = [
+  ...HOME_CONFIG,
   ...ADS_MODULE_CONFIG,
   ...ANALYTICS_MODULE_CONFIG,
   ...SETTINGS_MODULE_CONFIG,
