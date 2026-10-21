@@ -110,6 +110,12 @@ export async function selectOriginsByPostIds(workspaceId: string, postIds: reado
     FROM wordpress_recipe_plans p JOIN wordpress_recipe_sources s ON s.id = p."sourceId" AND s."workspaceId" = p."workspaceId"
     WHERE p."workspaceId" = ${workspaceId} AND p."postId" = ANY(${[...postIds]}::text[]) ORDER BY p."postId", p."slotAt" DESC`;
 }
+/** Ids of the workspace's posts that recipe automation created. */
+export async function selectPostIdsWithOrigin(workspaceId: string): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ postId: string }>>`SELECT DISTINCT p."postId" AS "postId" FROM wordpress_recipe_plans p JOIN wordpress_recipe_sources s ON s.id = p."sourceId" AND s."workspaceId" = p."workspaceId"
+    WHERE p."workspaceId" = ${workspaceId} AND p."postId" IS NOT NULL`;
+  return rows.map(row => row.postId);
+}
 /** Whether the workspace has a recipe source at all. */
 export async function hasRecipeSource(workspaceId: string): Promise<boolean> {
   const rows = await prisma.$queryRaw<Array<{ one: number }>>`SELECT 1 AS one FROM wordpress_recipe_sources WHERE "workspaceId" = ${workspaceId} LIMIT 1`;
