@@ -57,7 +57,7 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
         for (const metric of new Set(policy.metrics)) {
           try {
             const data = await page(`${encodeURIComponent(post.id)}/insights`, token, { metric, period: 'lifetime', limit: String(config.pageSize) });
-            if (data.after) throw new Error('Unexpected metric continuation.');
+            // Insights always return time-window paging links (previous/next) even for one lifetime value; they are not a continuation of this metric.
             for (const rawMetric of data.rows) { const item = obj(rawMetric); if (item.name !== metric) continue; const values = Array.isArray(item.values) ? item.values : []; const value = obj(values.at(-1)).value ?? obj(item.total_value).value; if (value !== undefined) insights[aliases[metric] ?? metric] = number(value) ?? value; }
           } catch { signal?.throwIfAborted(); failures.push(metric); postFailures.push(metric); }
         }
