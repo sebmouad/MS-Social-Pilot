@@ -10,10 +10,13 @@ export type InboxListItem = {
   /** Stored classification of a comment; null (unknown) for messages, reviews and unclassified comments. Never defaulted to neutral. */
   sentiment: InboxSentiment | null;
 };
-export type InboxFilters = { channelId: string | null; kind: 'all' | 'message' | 'comment' | 'review'; state: 'open' | 'resolved' | 'all'; hidden: 'visible' | 'all'; q: string };
+/** One-click narrowing of the activity list. Several may be combined; each must hold. Items a filter cannot judge (for example unclassified comments for negative) are left out, never guessed. */
+export const INBOX_QUICK_FILTERS = ['unread', 'unanswered', 'negative', 'mentions'] as const;
+export type InboxQuickFilter = typeof INBOX_QUICK_FILTERS[number];
+export type InboxFilters ={ channelId: string | null; kind: 'all' | 'message' | 'comment' | 'review'; state: 'open' | 'resolved' | 'all'; hidden: 'visible' | 'all'; q: string };
 export type InboxPageCursors = { olderCursor: string | null; newerCursor: string | null };
-export type InboxLimits = { listPageSize: number; threadPageSize: number; searchMaxCharacters: number; cursorMaxCharacters: number };
-export type InboxListPage = InboxPageCursors & { items: InboxListItem[]; total: number; limit: number; cursor: string | null; filters: InboxFilters; channels: { id: string; name: string }[]; lastSynced: Date | null; timeZone: string; limits: InboxLimits };
+export type InboxLimits = { listPageSize: number; threadPageSize: number; searchMaxCharacters: number; cursorMaxCharacters: number; /** Items one bulk action may include; screens use it to explain the limit before a request is made. */ bulkMaxItems?: number };
+export type InboxListPage = InboxPageCursors & { /** Present only when quick filters are applied. */ quick?: InboxQuickFilter[]; items: InboxListItem[]; total: number; limit: number; cursor: string | null; filters: InboxFilters; channels: { id: string; name: string }[]; lastSynced: Date | null; timeZone: string; limits: InboxLimits };
 /** Comment threads nest: parentId is the entry a reply answers (the opening comment when its parent is not on this page); depth is 0 for the opening comment. */
 export type ThreadEntry = { id: string; author: string; text: string; time: Date; fromChannel: boolean; sentBy: string | null; parentId: string | null; depth: number; hidden: boolean };
 export type OpenThread = {

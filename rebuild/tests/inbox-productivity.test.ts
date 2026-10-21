@@ -16,7 +16,7 @@ const actor = { userId: 'member-a', workspaceId: 'workspace-a' };
 const caps = {
   'inbox.noteMaxCharacters': 2000, 'inbox.noteHistoryLimit': 100, 'inbox.savedReplyPageLimit': 100,
   'inbox.savedReplyNameMaxCharacters': 100, 'inbox.savedReplyBodyMaxCharacters': 2000,
-  'inbox.productivityAssigneeLimit': 500, 'inbox.workflowTransactionTimeoutMs': 5000,
+  'inbox.productivityAssigneeLimit': 500, 'inbox.savedReplyMaxCount': 200, 'inbox.workflowTransactionTimeoutMs': 5000,
   'inbox.workflowTransactionMaxWaitMs': 500,
 };
 const sqlText = (query: unknown) => typeof query === 'string' ? query : (query as { sql?: string })?.sql ?? (query as string[])?.join('') ?? '';
@@ -83,6 +83,29 @@ describe('Inbox productivity service', () => {
     expect(sqlText(query)).toContain('saved_replies');
     expect(sqlText(query)).toContain('"workspaceId"');
     expect((query as { values?: unknown[] }).values).toContain('%a\\%\\_\\\\b%');
+  });
+
+  it('reports how many saved replies the workspace uses of the Root limit, and the name and text limits', async () => {
+    replyRows = [{ count: BigInt(7) }];
+    const result = await listSavedReplies(actor, {});
+    expect(result).toMatchObject({ total: 7, maxCount: 200, limits: { nameMaxCharacters: 100, bodyMaxCharacters: 2000 } });
+    const counting = mocks.prisma.$queryRaw.mock.calls.map(call => sqlText(call[0])).find(sql => sql.includes('COUNT(*)'));
+    expect(counting).toContain('"workspaceId"');
+  });
+
+  it('refuses a new saved reply at the Root count limit, counting under a per-workspace lock', async () => {
+    replyRows = [{ count: BigInt(200) }];
+    await expect(performInboxProductivityAction(actor, { action: 'reply.create', name: 'Hours', body: 'Open 9 to 5', confirmation: 'CREATE SAVED REPLY Hours' })).rejects.toMatchObject({ code: 'conflict', message: expect.stringContaining('200') });
+    const statements = mocks.prisma.$executeRaw.mock.calls.map(call => sqlText(call[0]));
+    expect(statements.some(sql => sql.includes('pg_advisory_xact_lock'))).toBe(true);
+    expect(statements.some(sql => sql.includes('INSERT INTO saved_replies'))).toBe(false);
+    expect(statements.some(sql => sql.includes('inbox.'))).toBe(false);
+  });
+
+  it('still lets a full library be edited and trimmed', async () => {
+    replyRows = [{ id: 'reply-a', count: BigInt(200) }];
+    await expect(performInboxProductivityAction(actor, { action: 'reply.update', id: 'reply-a', name: 'Updated', body: 'Welcome', confirmation: 'UPDATE SAVED REPLY reply-a' })).resolves.toMatchObject({ ok: true });
+    await expect(performInboxProductivityAction(actor, { action: 'reply.delete', id: 'reply-a', confirmation: 'DELETE SAVED REPLY reply-a' })).resolves.toMatchObject({ ok: true });
   });
 
   it('validates active assignees and reports no mutation when the item disappears during assignment', async () => {

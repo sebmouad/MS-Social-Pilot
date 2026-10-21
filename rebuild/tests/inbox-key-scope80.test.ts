@@ -23,7 +23,7 @@ vi.mock('../src/modules/inbox/server/deletion', () => ({ deleteInboxCommentDurab
 vi.mock('../src/modules/inbox/server/comment-guard', () => ({ lockInboxChannel: vi.fn(), assertInboxDeletionsSettled: vi.fn() }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
 vi.mock('../src/server/config/store', () => ({
-  runtimeConfig: async (key: string) => ({ 'inbox.noteMaxCharacters': 1000, 'inbox.noteHistoryLimit': 50, 'inbox.savedReplyPageLimit': 50, 'inbox.savedReplyNameMaxCharacters': 100, 'inbox.savedReplyBodyMaxCharacters': 2000, 'inbox.productivityAssigneeLimit': 100, 'inbox.workflowTransactionTimeoutMs': 5000, 'inbox.workflowTransactionMaxWaitMs': 2000 })[key],
+  runtimeConfig: async (key: string) => ({ 'inbox.noteMaxCharacters': 1000, 'inbox.noteHistoryLimit': 50, 'inbox.savedReplyPageLimit': 50, 'inbox.savedReplyNameMaxCharacters': 100, 'inbox.savedReplyBodyMaxCharacters': 2000, 'inbox.productivityAssigneeLimit': 100, 'inbox.savedReplyMaxCount': 200, 'inbox.workflowTransactionTimeoutMs': 5000, 'inbox.workflowTransactionMaxWaitMs': 2000 })[key],
 }));
 
 import { moderateInboxComment, replyToInbox } from '@/modules/inbox/server/actions';

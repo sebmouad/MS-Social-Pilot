@@ -23,15 +23,15 @@ async function item(actor: InboxReadActor, channels: string[], value: z.infer<ty
 }
 async function limits() {
   const values = await Promise.all([
-    runtimeConfig('inbox.noteMaxCharacters'), runtimeConfig('inbox.noteHistoryLimit'), runtimeConfig('inbox.savedReplyPageLimit'), runtimeConfig('inbox.savedReplyNameMaxCharacters'), runtimeConfig('inbox.savedReplyBodyMaxCharacters'), runtimeConfig('inbox.productivityAssigneeLimit'),
+    runtimeConfig('inbox.noteMaxCharacters'), runtimeConfig('inbox.noteHistoryLimit'), runtimeConfig('inbox.savedReplyPageLimit'), runtimeConfig('inbox.savedReplyNameMaxCharacters'), runtimeConfig('inbox.savedReplyBodyMaxCharacters'), runtimeConfig('inbox.productivityAssigneeLimit'), runtimeConfig('inbox.savedReplyMaxCount'),
   ]);
   const checked = z.tuple([
     z.number().int().min(1).max(10000), z.number().int().min(1).max(1000), z.number().int().min(1).max(1000),
-    z.number().int().min(1).max(500), z.number().int().min(1).max(10000), z.number().int().min(1).max(5000),
+    z.number().int().min(1).max(500), z.number().int().min(1).max(10000), z.number().int().min(1).max(5000), z.number().int().min(1).max(5000),
   ]).safeParse(values);
   if (!checked.success) throw new OperationError('unavailable', 'Inbox productivity controls are currently unavailable.');
-  const [noteMaxCharacters, noteHistoryLimit, savedReplyPageLimit, savedReplyNameMaxCharacters, savedReplyBodyMaxCharacters, productivityAssigneeLimit] = checked.data;
-  return { noteMaxCharacters, noteHistoryLimit, savedReplyPageLimit, savedReplyNameMaxCharacters, savedReplyBodyMaxCharacters, productivityAssigneeLimit };
+  const [noteMaxCharacters, noteHistoryLimit, savedReplyPageLimit, savedReplyNameMaxCharacters, savedReplyBodyMaxCharacters, productivityAssigneeLimit, savedReplyMaxCount] = checked.data;
+  return { noteMaxCharacters, noteHistoryLimit, savedReplyPageLimit, savedReplyNameMaxCharacters, savedReplyBodyMaxCharacters, productivityAssigneeLimit, savedReplyMaxCount };
 }
 async function timeout() {
   const values = await Promise.all([runtimeConfig('inbox.workflowTransactionTimeoutMs'), runtimeConfig('inbox.workflowTransactionMaxWaitMs')]);
@@ -84,12 +84,16 @@ export async function listSavedReplies(actor: InboxReadActor, input: unknown = {
   if (!parsed.success) throw invalid();
   requireAllChannels(actor);
   await authorizeInbox(actor, {}, 'read');
-  const { savedReplyPageLimit } = await limits();
+  const { savedReplyPageLimit, savedReplyMaxCount, savedReplyNameMaxCharacters, savedReplyBodyMaxCharacters } = await limits();
   const limit = Math.min(parsed.data.limit ?? savedReplyPageLimit, savedReplyPageLimit);
   const q = `%${parsed.data.q.replace(/[\\%_]/g, c => `\\${c}`)}%`;
-  const rows = await prisma.$queryRaw<Array<{ id: string; name: string; body: string; createdAt: Date; updatedAt: Date }>>(Prisma.sql`SELECT id, name, body, "createdAt", "updatedAt" FROM saved_replies WHERE "workspaceId" = ${actor.workspaceId} AND (${parsed.data.q} = '' OR name ILIKE ${q} ESCAPE '\\' OR body ILIKE ${q} ESCAPE '\\') ORDER BY name, id OFFSET ${parsed.data.offset} LIMIT ${limit + 1}`);
+  const [rows, counted] = await Promise.all([
+    prisma.$queryRaw<Array<{ id: string; name: string; body: string; createdAt: Date; updatedAt: Date }>>(Prisma.sql`SELECT id, name, body, "createdAt", "updatedAt" FROM saved_replies WHERE "workspaceId" = ${actor.workspaceId} AND (${parsed.data.q} = '' OR name ILIKE ${q} ESCAPE '\\' OR body ILIKE ${q} ESCAPE '\\') ORDER BY name, id OFFSET ${parsed.data.offset} LIMIT ${limit + 1}`),
+    prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`SELECT COUNT(*) AS count FROM saved_replies WHERE "workspaceId" = ${actor.workspaceId}`),
+  ]);
   const hasMore = rows.length > limit;
-  return { ok: true as const, replies: rows.slice(0, limit), offset: parsed.data.offset, limit, nextOffset: hasMore ? parsed.data.offset + limit : null };
+  // total counts every saved reply of the workspace (not only this search) so screens can show usage against maxCount.
+  return { ok: true as const, replies: rows.slice(0, limit), offset: parsed.data.offset, limit, nextOffset: hasMore ? parsed.data.offset + limit : null, total: Number(counted[0]?.count ?? 0), maxCount: savedReplyMaxCount, limits: { nameMaxCharacters: savedReplyNameMaxCharacters, bodyMaxCharacters: savedReplyBodyMaxCharacters } };
 }
 
 export async function performInboxProductivityAction(actor: InboxReadActor, input: unknown) {
@@ -164,6 +168,10 @@ export async function performInboxProductivityAction(actor: InboxReadActor, inpu
       await lockActiveActor(tx, actor);
       let id: string;
       if (value.action === 'reply.create') {
+        // Serialize creators per workspace so concurrent requests cannot both pass the count check.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`saved_replies:${actor.workspaceId}`}))`;
+        const existing = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM saved_replies WHERE "workspaceId" = ${actor.workspaceId}`;
+        if (Number(existing[0]?.count ?? 0) >= cap.savedReplyMaxCount) throw new OperationError('conflict', `You can keep up to ${cap.savedReplyMaxCount} saved replies. Delete one to add another.`);
         id = randomUUID();
         const inserted = await tx.$executeRaw`INSERT INTO saved_replies (id, "workspaceId", name, body, "createdAt", "updatedAt") VALUES (${id}, ${actor.workspaceId}, ${value.name}, ${value.body}, NOW(), NOW())`;
         if (!inserted) throw new OperationError('unavailable', 'The saved reply could not be created.');

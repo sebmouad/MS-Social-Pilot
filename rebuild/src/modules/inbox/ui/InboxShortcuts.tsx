@@ -1,16 +1,23 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { IconKeyboard } from '@tabler/icons-react';
+import { Button, Dialog, ShortcutHint } from '@/components';
+import { round3Copy } from './round3-copy';
+import type { InboxLocale } from './copy';
+import styles from './inbox-round3.module.css';
 
 const TYPING = /^(input|textarea|select)$/i;
 
 /**
- * Helpdesk keys without a mouse: j/k move between conversations, r jumps to the reply
- * box, e resolves or reopens. Ignored while typing, with modifier keys, or when a dialog
- * is open. Every key only focuses or clicks a control that already exists on the page,
- * so permissions and confirmations stay in the shared actions.
+ * Helpdesk keys without a mouse: j/k move between conversations, x selects the focused one, r jumps to the
+ * reply box, e resolves or reopens, / searches and ? lists them all. Ignored while typing, with modifier keys, or
+ * when a dialog is open. Every key only focuses or clicks a control that already exists on the page, so
+ * permissions and confirmations stay in the shared actions. The same keys are listed in the guide this button opens.
  */
-export function InboxShortcuts() {
+export function InboxShortcuts({ locale = 'en' }: { locale?: InboxLocale }) {
+  const copy = round3Copy[locale].shortcuts;
+  const [guide, setGuide] = useState(false);
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -26,6 +33,21 @@ export function InboxShortcuts() {
         event.preventDefault();
         items[next]?.focus();
         items[next]?.scrollIntoView({ block: 'nearest' });
+      } else if (key === 'x') {
+        // The checkbox that sits beside the focused (or open) conversation row.
+        const row = document.activeElement instanceof HTMLElement ? document.activeElement.closest('li') : null;
+        const box = (row ?? document.querySelector('[data-inbox-item][aria-current="true"]')?.closest('li'))?.querySelector<HTMLInputElement>('input[data-inbox-select]');
+        if (!box) return;
+        event.preventDefault();
+        box.click();
+      } else if (key === '/') {
+        const search = document.querySelector<HTMLInputElement>('input[name="q"]');
+        if (!search) return;
+        event.preventDefault();
+        search.focus();
+      } else if (key === '?') {
+        event.preventDefault();
+        setGuide(true);
       } else if (key === 'r') {
         const reply = document.querySelector<HTMLTextAreaElement>('textarea[data-inbox-reply]:not(:disabled)');
         if (!reply) return;
@@ -41,5 +63,19 @@ export function InboxShortcuts() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
-  return null;
+  const rows: Array<[string, Array<[string, string]>]> = [
+    [copy.groups.move, [['j', copy.keys.next], ['k', copy.keys.previous], ['/', copy.keys.search]]],
+    [copy.groups.act, [['r', copy.keys.reply], ['e', copy.keys.resolve], ['?', copy.keys.help]]],
+    [copy.groups.select, [['x', copy.keys.select], ['escape', copy.keys.clear]]],
+  ];
+  return <>
+    <Button variant="quiet" leading={<IconKeyboard size={18} stroke={1.75} />} trailing={<ShortcutHint chord="?" />} onClick={() => setGuide(true)}>{copy.open}</Button>
+    <Dialog open={guide} title={copy.title} description={copy.description} closeLabel={copy.close} onClose={() => setGuide(false)}>
+      <div className={styles.keys}>
+        {rows.map(([group, entries]) => <section key={group}><h3>{group}</h3><dl>
+          {entries.map(([chord, label]) => <div key={chord}><dt>{label}</dt><dd><ShortcutHint chord={chord} /></dd></div>)}
+        </dl></section>)}
+      </div>
+    </Dialog>
+  </>;
 }

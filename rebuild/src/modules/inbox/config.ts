@@ -3,12 +3,14 @@ import { entry, cron } from '@/lib/config/entry';
 import { INBOX_PRODUCTIVITY_CONFIG } from './productivity-config';
 import { INBOX_MODERATION_CONFIG } from './moderation-config';
 import { INBOX_SYNC_CONFIG } from './sync-config';
+import { INBOX_DETAILS_CONFIG } from './details-config';
 
 /** Every Root setting this product module declares. The registry merges installed modules; edit only here. */
 export const INBOX_MODULE_CONFIG = [
   ...INBOX_PRODUCTIVITY_CONFIG,
   ...INBOX_MODERATION_CONFIG,
   ...INBOX_SYNC_CONFIG,
+  ...INBOX_DETAILS_CONFIG,
   entry({ key: 'inbox.listPageSize', group: 'Inbox · Browsing', label: 'Inbox list page limit', kind: 'number', description: 'Default and maximum merged conversations/comments per UI, HTTP or MCP page. MCP result limits can reduce it.', defaultValue: 25, schema: z.number().int().min(1).max(200), consumption: 'active' }),
   entry({ key: 'inbox.threadPageSize', group: 'Inbox · Browsing', label: 'Inbox history page limit', kind: 'number', description: 'Default and maximum stored messages or comment replies per thread history page. The original comment remains visible separately.', defaultValue: 50, schema: z.number().int().min(1).max(200), consumption: 'active' }),
   entry({ key: 'inbox.searchMaxCharacters', group: 'Inbox · Browsing', label: 'Inbox search character limit', kind: 'number', description: 'Maximum literal message/person search length in Inbox UI, HTTP and MCP.', defaultValue: 200, schema: z.number().int().min(1).max(2000), consumption: 'active' }),
