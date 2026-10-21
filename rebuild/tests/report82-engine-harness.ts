@@ -1,3 +1,4 @@
+import { PUBLICATION_REPORT_DEFAULTS } from '@/modules/analytics/reports/config';
 import { workspaceCopyDefaults } from '@/modules/analytics/workspace-copy';
 import { goalsCopyDefaults } from '@/modules/analytics/goals/copy';
 import { responseTimeCopyDefaults } from '@/modules/analytics/reports/generation/response-copy';
@@ -7,6 +8,7 @@ import { vi } from 'vitest';
 
 export type Call = { sql: string; values: unknown[] };
 export const defaults = () => ({
+  publicationRows: [] as unknown[], failedPublicationRows: [] as unknown[], publicationDays: [] as unknown[],
   role: 'editor', member: true, disabled: false, suspended: false, purge: null as string | null,
   entitled: true, canAccess: true, scope: null as string[] | null, providers: ['p1'], usable: true,
   lockMember: true, lockRole: null as string | null, lockSuspended: false, freshScope: null as string[] | null, freshDeny: [] as string[],
@@ -27,6 +29,7 @@ const nextDue = () => {
   return state.due[dueIndex++];
 };
 const CONFIG: Record<string, unknown> = {
+  'analytics.reports.publicationDetails': PUBLICATION_REPORT_DEFAULTS,
   'analytics.reports.pageSize': 2, 'analytics.reports.maxTemplates': 3, 'analytics.reports.templateNameMaxCharacters': 20, 'analytics.reports.maxSchedules': 3,
   'analytics.reports.maxRecipients': 3, 'analytics.reports.dueBatchSize': 10, 'analytics.reports.transactionTimeoutMs': 5000, 'analytics.reports.transactionMaxWaitMs': 2000,
   'analytics.reports.sendTime': '08:00', 'analytics.reports.maxOutputRows': 100, 'analytics.reports.maxOutputBytes': 20000, 'analytics.reports.runLeaseSeconds': 600,
@@ -38,6 +41,9 @@ export const configValue = (key: string) => (key === 'analytics.workspaceCopy' ?
 export const db = {
   $queryRaw: vi.fn(async (s: TemplateStringsArray, ...v: unknown[]) => {
     const sql = text(s); state.queries.push({ sql, values: v });
+    if (sql.includes('FROM post_targets pt JOIN posts p') && sql.includes('GROUP BY day')) return state.publicationDays;
+    if (sql.includes('FROM post_targets pt JOIN posts p') && sql.includes("pt.status = 'published'")) return state.publicationRows;
+    if (sql.includes('FROM post_targets pt JOIN posts p') && sql.includes("pt.status = 'failed'")) return state.failedPublicationRows;
     if (sql.includes('to_regclass')) return [{ present: state.tablePresent }];
     if (sql.includes('FROM memberships m JOIN users u') && sql.includes('FOR SHARE OF m, u, w')) {
       const role = state.lockRole ?? state.role;

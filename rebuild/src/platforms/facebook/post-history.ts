@@ -8,6 +8,38 @@ const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' 
 const number = (v: unknown): number | null => (typeof v === 'number' || typeof v === 'string' && v.trim()) && Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : null;
 const aliases: Record<string, string> = { post_impressions: 'impressions', post_impressions_unique: 'reach', post_engaged_users: 'engagement', post_clicks: 'clicks', post_video_views: 'video_views', post_video_view_time: 'video_watch_time' };
 
+function hasVideo(post: Record<string, unknown>): boolean {
+  const attachments = (value: unknown): boolean => {
+    const data = obj(value).data;
+    return Array.isArray(data) && data.some(raw => {
+      const item = obj(raw);
+      return item.media_type === 'video' || item.type === 'video_inline' || item.type === 'video_autoplay' || attachments(item.subattachments);
+    });
+  };
+  return post.status_type === 'added_video' || attachments(post.attachments);
+}
+
+/** Keep observations separate: edge visibility and insights can disagree at the same fetch. */
+function resolveReactions(insights: Record<string, unknown>, post: Record<string, unknown>, edges: Record<string, number>, complete: boolean, observedAt: Date) {
+  const categories = Object.entries(obj(insights.post_reactions_by_type_total));
+  const validInsights = categories.length > 0 && categories.every(([, value]) => number(value) !== null);
+  const insightTotal = validInsights ? categories.reduce((sum, [, value]) => sum + number(value)!, 0) : null;
+  const summaryTotal = number(obj(obj(post.reactions).summary).total_count);
+  const edgeTotal = complete ? Object.values(edges).reduce((sum, value) => sum + value, 0) : null;
+  const source = insightTotal !== null ? 'insights' : summaryTotal !== null ? 'summary' : edgeTotal !== null ? 'edges' : 'unknown';
+  const total = insightTotal ?? summaryTotal ?? edgeTotal;
+  if (total !== null) insights.reactions = total;
+  // Never mix individual reaction types from different observations into a total.
+  const selected = validInsights ? categories : source === 'edges' ? Object.entries(edges) : [];
+  for (const [type, value] of selected) insights[`reactions_${type.toLowerCase()}`] = number(value);
+  const totals = [insightTotal, summaryTotal, edgeTotal].filter(value => value !== null);
+  insights.reactionProvenance = {
+    source, metric: validInsights ? 'post_reactions_by_type_total' : null,
+    insightTotal, summaryTotal, edgeTotal, edgeTypes: edges, edgesComplete: complete,
+    conflict: new Set(totals).size > 1, observedAt: observedAt.toISOString(),
+  };
+}
+
 /** Cursor-only continuation: never persist or follow a provider URL containing credentials. */
 export function createFacebookPostHistory(config: FacebookConfig, policyInput: z.input<typeof facebookHistoryPolicySchema>, fetcher: typeof fetch = fetch, signal?: AbortSignal) {
   const policy = facebookHistoryPolicySchema.parse(policyInput);
@@ -57,13 +89,16 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
         const postFailures: string[] = [];
         for (const [key, value] of [['shares', obj(post.shares).count], ['comments', obj(obj(post.comments).summary).total_count]] as const) { const n = number(value); if (n !== null) insights[key] = n; }
         for (const metric of new Set(policy.metrics)) {
+          // Eligibility is based on provider metadata, never a speculative call on every photo/text post.
+          if (metric.startsWith('post_video_') && !hasVideo(post)) continue;
           try {
             const data = await page(`${encodeURIComponent(post.id)}/insights`, token, { metric, period: 'lifetime', limit: String(config.pageSize) }, { timeWindow: true });
             // Insights always return time-window paging links (previous/next) even for one lifetime value; they are not a continuation of this metric.
             for (const rawMetric of data.rows) { const item = obj(rawMetric); if (item.name !== metric) continue; const values = Array.isArray(item.values) ? item.values : []; const value = obj(values.at(-1)).value ?? obj(item.total_value).value; if (value !== undefined) insights[aliases[metric] ?? metric] = number(value) ?? value; }
           } catch { signal?.throwIfAborted(); failures.push(metric); postFailures.push(metric); }
         }
-        let reactionTotal = 0; let reactionsComplete = policy.reactionTypes.length > 0;
+        const edgeReactions: Record<string, number> = {};
+        let reactionsComplete = policy.reactionTypes.length > 0;
         for (const type of new Set(policy.reactionTypes)) {
           try {
             let after: string | null = null; let total = 0; let complete = false; const cursors = new Set<string>();
@@ -73,10 +108,10 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
               total += data.rows.length; after = data.after; if (!after) { complete = true; break; }
             }
             if (!complete) throw new Error('Reaction budget exceeded.');
-            insights[`reactions_${type.toLowerCase()}`] = total; reactionTotal += total;
+            edgeReactions[type.toLowerCase()] = total;
           } catch { signal?.throwIfAborted(); reactionsComplete = false; failures.push(`reactions_${type}`); postFailures.push(`reactions_${type}`); }
         }
-        if (reactionsComplete) insights.reactions = reactionTotal;
+        resolveReactions(insights, post, edgeReactions, reactionsComplete, now);
         insights.collectionFailures = [...new Set(postFailures)];
         const text = (key: string) => typeof post[key] === 'string' ? post[key] as string : null;
         posts.push({ remoteId: post.id, message: text('message'), permalink: text('permalink_url'), statusType: text('status_type'), pictureUrl: text('full_picture'), createdTime, insights });

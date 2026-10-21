@@ -13,7 +13,7 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
   validateFacebookConfig(config);
   const periods = facebookInsightPeriodsSchema.parse(policy.periods);
   const content = facebookContentInsightsSchema.parse(policy.content);
-  async function rows(path: string, token: string, params: Record<string, string>): Promise<unknown[]> {
+  async function rows(path: string, token: string, params: Record<string, string>, lifetimeSnapshot = false): Promise<unknown[]> {
     const first = graphObjectUrl(config, path);
     for (const [key, value] of Object.entries(params)) first.searchParams.set(key, value);
     first.searchParams.set('limit', String(config.pageSize));
@@ -41,6 +41,9 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
       // Provider messages can contain request URLs/tokens. Keep failures content-free.
       if (!response.ok || payload.error || !Array.isArray(payload.data)) throw new Error('Analytics request was rejected or returned an invalid collection.');
       values.push(...payload.data);
+      // Lifetime insight links describe other time windows, not more objects in this snapshot.
+      // Discovery and Ads still require complete cursor pagination.
+      if (lifetimeSnapshot) return values;
       const link = object(payload.paging).next;
       next = typeof link === 'string' && link ? new URL(link) : null;
     }
@@ -95,7 +98,7 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
         for (const metric of new Set(metrics)) for (const period of new Set(requestedPeriods)) {
           signal?.throwIfAborted();
           try {
-            const data = await rows(`${encodeURIComponent(id)}/${edge}`, token, { ...range, metric, period });
+            const data = await rows(`${encodeURIComponent(id)}/${edge}`, token, { ...range, metric, period }, period === 'lifetime');
             for (const raw of data) {
               const item = object(raw);
               // A provider cannot inject another metric into this request's identity.
@@ -108,9 +111,11 @@ export function createFacebookDataCollector(config: FacebookConfig, policy: Poli
               const normalized = [...points, ...(Object.hasOwn(total, 'value') && until ? [{ value: total.value, end_time: until.toISOString() }] : [])];
               for (const rawPoint of normalized) {
                 const point = object(rawPoint);
-                const endTime = typeof point.end_time === 'string' ? new Date(point.end_time) : null;
+                // Lifetime values often omit end_time. The explicit requested end is a
+                // snapshot anchor, not evidence of when each view/reaction occurred.
+                const endTime = typeof point.end_time === 'string' ? new Date(point.end_time) : responsePeriod === 'lifetime' ? until : null;
                 if (!endTime || !Number.isFinite(endTime.getTime()) || !Object.hasOwn(point, 'value')) continue;
-                result.push({ metric: `${prefix}${metric}`, period: points.includes(rawPoint) ? responsePeriod : `total_over_range:${since?.toISOString() ?? "unspecified"}`, endTime, value: point.value, numeric: numeric(point.value) });
+                result.push({ metric: `${prefix}${metric}`, period: points.includes(rawPoint) || responsePeriod === 'lifetime' ? responsePeriod : `total_over_range:${since?.toISOString() ?? "unspecified"}`, endTime, value: point.value, numeric: numeric(point.value) });
               }
               // Retain total_value breakdowns independently from its numeric value.
               if (until && Array.isArray(total.breakdowns)) {

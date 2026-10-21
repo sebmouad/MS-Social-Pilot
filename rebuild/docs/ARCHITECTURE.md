@@ -1,6 +1,6 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-21 against local HEAD `46c6bdae`; reviewed `git log 1240a9ce..HEAD`.
+Updated 2026-10-21 against local HEAD `6d3347fb` (round 6); reviewed `git log 46c6bdae..HEAD` and the round 6 file list.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains the binding target,
 unchanged. This document describes implementation and gaps; deployment, source,
 automated tests, browser checks and live-provider evidence are separate claims.
@@ -20,12 +20,13 @@ not fresh probes by this documentation worker. That log records 34 applied
 migrations, backup, health checks, ownership repair, owner sign-in confirmation,
 legacy configuration import and later AI/browser checks. Cutover happened; full
 contract completion is still unproven. The deployed release is recorded by the
-integrator as `46c6bdae`; this review did not observe it, and application of the
+integrator as `6d3347fb`; this review did not observe it, and application of the
 newest migrations must still be checked before claiming source live. The log also
 records the 2026-10-21 post-cutover rollback drill (**PASS**: backup restored to a
 scratch database, legacy and the installed rebuild started on spare ports; live
-services unchanged) and the first full recipe day (40/40 publications with 40/40
-first comments). The drill proves a restorable backup and startable rollback
+services unchanged) and the first full recipe day (07:00, 11:00, 15:00 and 17:00
+Europe/Paris: 40/40 publications with 40/40 first comments; the article link was
+then removed from the comments at the owner's request). The drill proves a restorable backup and startable rollback
 artifacts, not a proxy cutback or media restoration.
 See [CUTOVER.md](CUTOVER.md) for current status and historical migration procedures.
 
@@ -59,7 +60,8 @@ moves. Registration of a module does not prove its workflows or health.
 ## Configuration and public origin
 
 `src/lib/config/registry.ts` aggregates module/platform declarations and
-`src/lib/config/shared-config.ts`. Local HEAD has schema version **114**. Runtime
+`src/lib/config/shared-config.ts`. Local HEAD has schema version **115** (round 6 adds `meta.adsCopy`, the Facebook
+Ads action copy, owned by `src/platforms/facebook/ads-ui-config.ts`). Runtime
 consumers use `runtimeConfig`; Root validates and transactionally audits saves,
 encrypts secrets and groups controls under Shared, Product and Platform owners.
 Database access and encryption trust material remain bootstrap dependencies.
@@ -286,6 +288,49 @@ join, verify-email/recovery text and calendar contrast at source (unit tests, no
 rerun). Remaining: raw server text on several module forms, boundary above the
 shell, keyboard/system-mode in Firefox/WebKit, all four themes there, real Safari,
 screen readers, long content, client-render throws and confirmed provider writes.
+
+Round 5 (Chromium only, local production build of `46c6bdae`, synthetic database
+that gained Feeds recipe rows): full matrix 992/992 cells over 62 routes including
+the Ads pages and `/publishing/feeds` (**162 findings**, none from Ads or Feeds), a
+72-cell fixes check (no broken-image icon on Posts, Queue, Approvals, Calendar; 10
+findings) and an unknown-route check (64/64, HTTP 404, 0 findings). Remaining causes:
+seeded media with no stored file (80), tokenless `/join` preview requests and 429s
+(addressed at source in round 6, below), the warm-light calendar "View post" button at
+4.35:1 (published-card opacity `.88` in `calendar.module.css`; seven of eight
+theme/mode combinations pass) and the saved-view save after the session cookie is
+removed, which still said "check its name" (8/8 desktop cells). Not proven: Firefox,
+WebKit, keyboard/system/dynamic/empty/failure parts, Ads create/edit flows driven in
+a browser, recipe card visual inspection. `not-found.tsx` remains absent from
+`src/app/`.
+
+Round 6 (`6d3347fb`; source and unit evidence, **no browser rerun**):
+
+- Ads: Facebook-owned `ads-copy.ts` holds the EN/FR action labels, name-validation
+  text and confirmation templates; Root key `meta.adsCopy` lets the operator edit
+  them with placeholders validated (every token exactly once). Ads module
+  `copy.ts` gains matching customer strings. Paused `ad.create` status is unchanged:
+  the ledger CHECK migration and the live `ads_management` grant are still missing.
+- Join: `/api/auth/invitations/preview` answers `{ invitation: null }` (HTTP 200)
+  for a missing or unknown token, and `join-form.tsx` shows the "link needed"
+  state from that body instead of a 404. The form still makes one request, so a 429
+  from the per-token rate limit is not ruled out. Tests `invitation-http`, `join-form`.
+- Queue: `cancelScheduledPostAction` no longer routes failures through the shared
+  runner's redirect; it throws so `CancelScheduleForm` keeps filters, reschedule
+  input and its localized inline notice (`post-cancel-action.test.ts`).
+- Recipe recovery (`wordpress-planner`, `-recovery`, `-store`): uncertain-slot
+  reconciliation resolves the post by the **ledger's stored post id**, not by
+  channel and scheduled time, so a manual post at the same slot is never adopted
+  and a cancelled post (time cleared) is still found; unknown identity keeps the
+  slot uncertain; settlement is conditional on the expected post id. A refused
+  pause-cancel is rotated behind untouched work by a timestamp-only write
+  (`deferCancellation`; `plannedUpcoming` orders by least recent attempt), so a
+  refused first batch no longer starves later posts and `remaining` is no longer
+  forced false.
+- New tests: `feeds-recipe-recovery-verification`, `publishing-scheduling-
+  verification` (mixed application/platform holds, stale due-worker claim, first-
+  comment failure after confirmed publication, remote reschedule timeout, contributor
+  approval), `facebook-ads-copy`, `browser-matrix-round5`. All use fakes or mocked
+  ports; no PostgreSQL, live Facebook or production run.
 
 Historical 328/328 synthetic checks and the production Chrome sweep remain dated
 evidence. No browser round covers every later merge, and no declaration guard

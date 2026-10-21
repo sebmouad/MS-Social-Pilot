@@ -1,5 +1,17 @@
 import { z } from 'zod';
 const en = {
+  "Publication log": "Publication log",
+  "Daily publications (UTC)": "Daily publications (UTC)",
+  "Currently failed destinations": "Currently failed destinations",
+  "Publication details are from stored destination state. Daily totals use UTC publication dates; days without publications are omitted.": "Publication details are from stored destination state. Daily totals use UTC publication dates; days without publications are omitted.",
+  "Failures are destinations currently marked failed and last updated in this period, not a history of every failed attempt. Review the post before retrying.": "Failures are destinations currently marked failed and last updated in this period, not a history of every failed attempt. Review the post before retrying.",
+  "The publication log reached its row limit; daily totals still cover the full period.": "The publication log reached its row limit; daily totals still cover the full period.",
+  "The failed destination list reached its row limit.": "The failed destination list reached its row limit.",
+  "No stored publications in this period.": "No stored publications in this period.",
+  "No currently failed destinations updated in this period.": "No currently failed destinations updated in this period.",
+  "Content excerpts may be shortened. Other destinations and provider error details are not included.": "Content excerpts may be shortened. Other destinations and provider error details are not included.",
+  "Attempts": "Attempts",
+
   "Member slowest first response (calendar time)": "Member slowest first response (calendar time)",
   "Member slowest first response (business hours)": "Member slowest first response (business hours)",
   "Member answered waits resolved": "Member answered waits resolved",
@@ -161,6 +173,18 @@ const en = {
   "Channel": "Channel"
 };
 const fr: typeof en = {
+  "Publication log": "Journal des publications",
+  "Daily publications (UTC)": "Publications quotidiennes (UTC)",
+  "Currently failed destinations": "Destinations actuellement en échec",
+  "Publication details are from stored destination state. Daily totals use UTC publication dates; days without publications are omitted.": "Les détails proviennent de l’état enregistré des destinations. Les totaux quotidiens utilisent les dates UTC de publication ; les jours sans publication sont omis.",
+  "Failures are destinations currently marked failed and last updated in this period, not a history of every failed attempt. Review the post before retrying.": "Les échecs sont les destinations actuellement en échec et modifiées pendant cette période, pas un historique de chaque tentative échouée. Vérifiez la publication avant de réessayer.",
+  "The publication log reached its row limit; daily totals still cover the full period.": "Le journal des publications a atteint sa limite de lignes ; les totaux quotidiens couvrent toujours toute la période.",
+  "The failed destination list reached its row limit.": "La liste des destinations en échec a atteint sa limite de lignes.",
+  "No stored publications in this period.": "Aucune publication enregistrée pendant cette période.",
+  "No currently failed destinations updated in this period.": "Aucune destination actuellement en échec modifiée pendant cette période.",
+  "Content excerpts may be shortened. Other destinations and provider error details are not included.": "Les extraits peuvent être raccourcis. Les autres destinations et les détails des erreurs de la plateforme ne sont pas inclus.",
+  "Attempts": "Tentatives",
+
   "Member slowest first response (calendar time)": "Première réponse la plus lente par membre (temps calendaire)",
   "Member slowest first response (business hours)": "Première réponse la plus lente par membre (heures ouvrées)",
   "Member answered waits resolved": "Attentes avec réponse résolues par membre",

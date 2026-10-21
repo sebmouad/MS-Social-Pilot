@@ -1,3 +1,4 @@
+import { defaultFacebookAdsText, type FacebookAdsText } from '../ads-copy';
 import type { AdsNeutralOperation, AdsOpsContext } from '@/modules/ads/management/types';
 import { runtimeConfig } from '@/server/config/store';
 import { FacebookAdsOpsError, type FacebookAdsTransport } from './transport';
@@ -5,11 +6,11 @@ import { FacebookAdsOpsError, type FacebookAdsTransport } from './transport';
 /** Standalone creatives have no PAUSED status. They stay unattached: this never creates or updates an ad.
  * Protocol mapping follows Meta's Marketing API collection (see ADS_PARITY.md).
  */
-export async function executeFacebookCreative(transport: FacebookAdsTransport, context: AdsOpsContext, operation: Extract<AdsNeutralOperation, { type: 'creative.create' }>) {
+export async function executeFacebookCreative(transport: FacebookAdsTransport, context: AdsOpsContext, operation: Extract<AdsNeutralOperation, { type: 'creative.create' }>, text: FacebookAdsText = defaultFacebookAdsText) {
   const source = context.creative;
-  if (!source || source.identityKind !== 'page' || !/^[0-9]+$/.test(source.identityId) || !context.recordReceipt) throw new FacebookAdsOpsError('Choose an available Page identity and stored image.', { status: 0, beforeWrite: true });
+  if (!source || source.identityKind !== 'page' || !/^[0-9]+$/.test(source.identityId) || !context.recordReceipt) throw new FacebookAdsOpsError(text('creativeSourceInvalid'), { status: 0, beforeWrite: true }, 'creativeSourceInvalid');
   const [maxBytes, mimeTypes] = await Promise.all([runtimeConfig('meta.maxImageUploadBytes'), runtimeConfig('meta.allowedImageMimeTypes')]);
-  if (!Number.isSafeInteger(maxBytes) || source.image.bytes.length < 1 || source.image.bytes.length > (maxBytes as number) || !Array.isArray(mimeTypes) || !(mimeTypes as readonly string[]).includes(source.image.mimeType)) throw new FacebookAdsOpsError('Choose a supported stored image within the upload limit.', { status: 0, beforeWrite: true });
+  if (!Number.isSafeInteger(maxBytes) || source.image.bytes.length < 1 || source.image.bytes.length > (maxBytes as number) || !Array.isArray(mimeTypes) || !(mimeTypes as readonly string[]).includes(source.image.mimeType)) throw new FacebookAdsOpsError(text('imageUnsupported'), { status: 0, beforeWrite: true }, 'imageUnsupported');
   const token = context.credential.accessToken;
   const path = encodeURIComponent(context.accountId);
   const uploaded = await transport.post(`${path}/adimages`, token, { bytes: source.image.bytes.toString('base64') }, context.signal);
@@ -27,6 +28,6 @@ export async function executeFacebookCreative(transport: FacebookAdsTransport, c
     await context.recordReceipt({ imageHash: image.hash, creativeId: result.id, mediaId: operation.mediaId });
     return { remoteId: result.id };
   } catch {
-    throw new FacebookAdsOpsError('Creative creation is unconfirmed; an uploaded image may remain. Review the stored receipt before any further request.', { status: 0 });
+    throw new FacebookAdsOpsError(text('creativeUnconfirmed'), { status: 0 }, 'creativeUnconfirmed');
   }
 }

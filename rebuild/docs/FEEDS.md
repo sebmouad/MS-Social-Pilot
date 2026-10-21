@@ -1,7 +1,8 @@
 # Content feeds (legacy parity wave 3)
 
 Status: **source/mock evidence plus recorded production recipe planning**.
-Updated 2026-10-21 against local HEAD `6fb0e57f`. The rebuild is in production;
+Updated 2026-10-21 against local HEAD `6d3347fb` (deployed per the integrator;
+schema 115; round 6 recovery changes below). The rebuild is in production;
 [RELEASE_GATES_PLAN.md](RELEASE_GATES_PLAN.md#production-log--2026-10-21) records
 the recipe run below. Original RSS/Atom mocked tests do not establish live checks
 of every feed kind. No fresh database, browser or provider calls in this doc pass.
@@ -144,5 +145,16 @@ Ledger states: `planned` (post id stored), `claimed` (unfinished; older than `cl
 - **Pool health** in `get_recipe_source`, `GET /api/feeds/wordpress` and the UI ("Recipe supply"): per channel, eligible recipes (not planned or recently posted there, and not planned elsewhere when channels must differ) and `daysLeft = floor(eligible / (posts per day x channels sharing the pool))`; `null` when the cooldown is 0 (recipes may repeat). Flagged low under `feeds.wordpress.poolWarnDays`. `complete: false` means the scan limit was reached and the counts are lower bounds. The estimate does not count recipes that return after the cooldown. It needs a full library scan, so the result is cached per source for `poolCacheSeconds` (per process) and is `null` when the library cannot be read.
 - **Worker log.** The `feedsPoll` line now ends with `recipes: sources=.. planned=.. failed=.. uncertain=.. unfilled=..` plus `reason=` and `stops=` (budget, no_pages, error, ...) or `recipes=off`.
 - New Root keys: `feeds.wordpress.poolWarnDays`, `poolCacheSeconds`, `pauseCancelEnabled`, `pauseCancelBatchSize`. Evidence: unit and service tests with fakes (`feeds-wordpress-planner`, `-recovery-service`, `-db-image`, `feeds-mcp`); no PostgreSQL, browser, MariaDB, Facebook or production run.
-- Still open: with every first `pauseCancelBatchSize` posts permanently refused, later ones are not reached; the default Publishing lookup for reconciliation reads Publishing's post table from the feeds module (a Publishing-owned lookup would be cleaner).
+- Superseded by round 6 (below): reconciliation by channel and time, and the starvation of later posts behind a refused first batch.
+
+### Production record (owner-recorded, 2026-10-21)
+
+The first full recipe day ran at all four configured Europe/Paris slots (07:00, 11:00, 15:00, 17:00): **40/40 posts published with 40/40 first comments, no errors**; 70 plans remain pending on the rolling horizon. The first comments originally carried the article link (preview); the owner had it removed, and commit `2e23223a` records the audited update of 80 scheduled comments and keeps a link only when the template contains `{link}`. This is production evidence for that day and the planned/publish path only. Retry, pause-cancel and supply-exhaustion paths have not been exercised in production.
+
+### Round 6 recovery changes (`6d3347fb`, source and unit evidence)
+
+- **Identity, not time.** `postForSlot` now reads the ledger row for (workspace, channel, slot) and returns the post only when it stores exactly one `postId` that still exists in the workspace; otherwise it throws ("identity unconfirmed"). `retryRecipeSlots` therefore no longer adopts a manual post at the same channel and time, finds a recipe post even after cancellation cleared its scheduled time, and leaves the slot `uncertain` (counted `unconfirmed`) when identity is unknown or unreadable. Old interrupted claims without a stored id stay uncertain until reconciled by hand; they are never resent blindly. A claim inside its lease is never looked up or released. `settleIf` now also requires the expected post id, so a concurrent settlement is not overwritten. This replaces the earlier "any post for that channel and time" residual risk.
+- **Refused cancellations rotate.** `deferCancellation` (optional on the `RecipeStore` port) bumps only `updatedAt` of a refused `planned` row, guarded by state and post id; `plannedUpcoming` orders by least recent attempt, then slot time. A fully refused batch reports `notCancelled` and `remaining: true`, and the next request reaches untouched posts. State, receipt and reason of the refused row are unchanged.
+- Tests: `tests/feeds-recipe-recovery-verification.test.ts` (fake ports/store). No PostgreSQL, MariaDB, Facebook or production exercise; the raw `UPDATE`/ordering SQL has only text-level checks.
+- Still open: a post that the ledger never recorded (crash between create and save of the id) needs manual reconciliation; a post permanently refused by cancel keeps being retried every request, behind other work; the default Publishing lookup reads the post table from the feeds module (a Publishing-owned lookup would be cleaner). No new Root keys in round 6 for Feeds.
 

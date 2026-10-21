@@ -3,12 +3,20 @@ import { entry } from '@/lib/config/entry';
 
 export const RESPONSE_ANALYSIS_LIMITS = { messages: { default: 20000, min: 100, max: 100000 }, events: { default: 20000, min: 100, max: 100000 }, members: { default: 25, min: 1, max: 500 } } as const;
 
+export const PUBLICATION_REPORT_POLICY_SCHEMA = z.object({
+  publishedRows: z.number().int().min(1).max(10000),
+  failedRows: z.number().int().min(1).max(10000),
+  excerptCharacters: z.number().int().min(20).max(2000),
+}).strict();
+export const PUBLICATION_REPORT_DEFAULTS = { publishedRows: 100, failedRows: 100, excerptCharacters: 240 };
+
 const G = 'Analytics · Report workflows';
 const num = (key: string, label: string, description: string, defaultValue: number, min: number, max: number) =>
   entry({ key, group: G, label, kind: 'number', description, defaultValue, schema: z.number().int().min(min).max(max), consumption: 'active' });
 
 /** Root-managed bounds for report templates and schedule definitions. */
 export const REPORT_WORKFLOW_CONFIG = [
+  entry({ key: 'analytics.reports.publicationDetails', group: G, label: 'Publication report details', kind: 'json', description: 'Maximum published and currently failed destination rows and content excerpt length in the Published posts report section. Daily UTC totals are counted independently; clipped logs are disclosed.', defaultValue: PUBLICATION_REPORT_DEFAULTS, schema: PUBLICATION_REPORT_POLICY_SCHEMA, consumption: 'active' }),
   num('analytics.reports.responseEventLimit', 'Response analysis workflow events', 'Maximum stored resolution and reopening events examined per channel report. Truncation suppresses resolution durations and is disclosed.', RESPONSE_ANALYSIS_LIMITS.events.default, RESPONSE_ANALYSIS_LIMITS.events.min, RESPONSE_ANALYSIS_LIMITS.events.max),
   num('analytics.reports.responseMessageLimit', 'Response analysis records per source', 'Maximum stored messages and comments examined separately, including pre-period context. Incomplete boundary threads are excluded; truncation and stored-only coverage are disclosed.', RESPONSE_ANALYSIS_LIMITS.messages.default, RESPONSE_ANALYSIS_LIMITS.messages.min, RESPONSE_ANALYSIS_LIMITS.messages.max),
   num('analytics.reports.responseMemberLimit', 'Response analysis member rows', 'Maximum replying members listed in each combined, comment and conversation summary of one channel report; including their slowest replies and saved-resolution outcomes; omitted members are disclosed separately.', RESPONSE_ANALYSIS_LIMITS.members.default, RESPONSE_ANALYSIS_LIMITS.members.min, RESPONSE_ANALYSIS_LIMITS.members.max),

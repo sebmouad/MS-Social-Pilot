@@ -12,6 +12,31 @@ const response = (value: unknown, status = 200) => new Response(JSON.stringify(v
 const point = (name: string, value: unknown) => ({ name, period: 'day', values: [{ end_time: until.toISOString(), value }] });
 const collector = (fetcher: typeof fetch, periods: Array<'day' | 'lifetime'> = ['day']) => createFacebookDataCollector(config, { periods, content: [] }, fetcher);
 describe('Facebook data coverage collection', () => {
+  it('collects lifetime video insights without following time-window links or discarding undated snapshots', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/videos')) return response({ data: [{ id: 'video-1' }] });
+      expect(url.searchParams.get('period')).toBe('lifetime');
+      return response({ data: [{ name: url.searchParams.get('metric'), period: 'lifetime', values: [{ value: 12 }] }], paging: { next: 'https://graph.facebook.test/v26.0/video-1/video_insights?since=1&until=2' } });
+    });
+    const result = await createFacebookDataCollector({ ...config, graphVersion: 'v26.0', pageInsightMetrics: [] }, { periods: ['day'], content: [{ edge: 'videos', insightEdge: 'video_insights', metrics: ['total_video_views'], periods: ['lifetime'] }] }, fetcher).getPageInsightObservations('token', 'page', since, until);
+    expect(result).toEqual([{ metric: 'content:videos:video-1:total_video_views', period: 'lifetime', endTime: until, value: 12, numeric: 12 }]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it('keeps lifetime totals as snapshots rather than range totals', async () => {
+    const fetcher = vi.fn(async () => response({ data: [{ name: 'page_follows', total_value: { value: 100 } }] }));
+    const result = await createFacebookDataCollector({ ...config, pageInsightMetrics: ['page_follows'] }, { periods: ['lifetime'], content: [] }, fetcher).getPageInsightObservations('token', 'page', since, until);
+    expect(result[0]).toMatchObject({ metric: 'page_follows', period: 'lifetime', endTime: until, numeric: 100 });
+  });
+  it('retains supported follows and views independently when another configured Page metric is rejected', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const metric = new URL(String(input)).searchParams.get('metric');
+      return metric === 'invalid_metric' ? response({ error: { code: 100 } }, 400) : response({ data: [point(String(metric), 3)] });
+    });
+    const result = await createFacebookDataCollector({ ...config, graphVersion: 'v26.0', pageInsightMetrics: ['page_follows', 'invalid_metric', 'page_media_view', 'page_total_media_view_unique'] }, { periods: ['day'], content: [] }, fetcher).getPageInsightObservations('token', 'page', since, until);
+    expect(result.map(row => row.metric)).toEqual(['page_follows', 'page_media_view', 'page_total_media_view_unique']);
+    expect(result.failedMetrics?.map(row => row.metric)).toEqual(['invalid_metric::day']);
+  });
   it('validates all new Root defaults', () => {
     for (const setting of FACEBOOK_DATA_CONFIG) expect(setting.schema.safeParse(setting.defaultValue).success).toBe(true);
   });

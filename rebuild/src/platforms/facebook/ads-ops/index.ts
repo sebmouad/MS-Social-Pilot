@@ -3,8 +3,9 @@ import { createHash } from 'node:crypto';
 import { executeFacebookCreative } from './creative';
 import { FACEBOOK_ADS_CREATION_UI_SCHEMA } from '../ads-ui-config';
 import type { AdsUiSchema } from '@/platforms/ads-ui';
-import { OperationError } from '@/lib/operation-error';
+import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
 import type { FacebookConfig } from '@/platforms/facebook/config';
+import { configOrDefault } from '@/server/config/config-or-default';
 import { runtimeConfig, runtimeSecret } from '@/server/config/store';
 import type { AdsCreativeSummary, AdsNeutralOperation, AdsOpsContext, AdsOpsHost, AdsOpsLimits, AdsOperationSupport } from '@/modules/ads/management/types';
 import { FACEBOOK_ADSET_CREATE_DEFAULTS, FACEBOOK_ADSET_OPTIMIZATION_GOALS, FACEBOOK_CAMPAIGN_OBJECTIVES, FACEBOOK_CREATE_STATUS, facebookCountryOptions, isFacebookCountryCode } from './creation';
@@ -31,47 +32,55 @@ export const FACEBOOK_ADS_OPERATIONS: readonly AdsOperationSupport[] = [
 ];
 
 
+/** Stable provider-owned validation identity; wording never determines behavior. */
+export class FacebookAdsValidationError extends OperationError {
+  constructor(code: OperationErrorCode, readonly issueCode: keyof import('../ads-copy').FacebookAdsCopy, text: FacebookAdsText, values?: Record<string, string | number>) {
+    super(code, text(issueCode, values));
+    this.name = 'FacebookAdsValidationError';
+  }
+}
+
 type CreateOperation = Extract<AdsNeutralOperation, { type: 'campaign.create' | 'adset.create' }>;
 const validName = (name: string, max: number) => name.trim().length > 0 && name.trim().length <= max && !/[\u0000-\u001f\u007f]/.test(name);
 
 function validateCreation(operation: CreateOperation, nameMax: number, limits?: AdsOpsLimits, text: FacebookAdsText = defaultFacebookAdsText) {
-  if (typeof operation.name !== 'string' || !validName(operation.name, nameMax)) throw new OperationError('invalid_request', text('nameInvalid', { max: nameMax }));
+  if (typeof operation.name !== 'string' || !validName(operation.name, nameMax)) throw new FacebookAdsValidationError('invalid_request', 'nameInvalid', text, { max: nameMax });
   if (operation.type === 'campaign.create') {
-    if (operation.objectType !== 'campaign' || !FACEBOOK_CAMPAIGN_OBJECTIVES.some(item => item.value === operation.objective)) throw new OperationError('invalid_request', 'Choose a supported campaign objective.');
+    if (operation.objectType !== 'campaign' || !FACEBOOK_CAMPAIGN_OBJECTIVES.some(item => item.value === operation.objective)) throw new FacebookAdsValidationError('invalid_request', 'objectiveInvalid', text);
     return;
   }
-  if (operation.objectType !== 'adset') throw new OperationError('invalid_request', 'Invalid ad object.');
-  if (typeof operation.parentId !== 'string' || !SAFE_ID.test(operation.parentId)) throw new OperationError('invalid_request', 'Choose a valid parent campaign.');
-  if (!Number.isSafeInteger(operation.dailyBudgetMinor) || operation.dailyBudgetMinor < 1) throw new OperationError('invalid_request', 'Daily budgets must be positive whole minor currency units.');
-  if (limits && operation.dailyBudgetMinor > limits.maxBudgetMinor) throw new OperationError('invalid_request', 'This budget is above the limit allowed for a single change.');
-  if (!isFacebookCountryCode(operation.countryCode)) throw new OperationError('invalid_request', 'Choose a valid country.');
-  if (!FACEBOOK_ADSET_OPTIMIZATION_GOALS.some(item => item.value === operation.optimizationGoal)) throw new OperationError('invalid_request', 'Choose a valid optimization goal.');
+  if (operation.objectType !== 'adset') throw new FacebookAdsValidationError('invalid_request', 'objectInvalid', text);
+  if (typeof operation.parentId !== 'string' || !SAFE_ID.test(operation.parentId)) throw new FacebookAdsValidationError('invalid_request', 'parentCampaignInvalid', text);
+  if (!Number.isSafeInteger(operation.dailyBudgetMinor) || operation.dailyBudgetMinor < 1) throw new FacebookAdsValidationError('invalid_request', 'dailyBudgetInvalid', text);
+  if (limits && operation.dailyBudgetMinor > limits.maxBudgetMinor) throw new FacebookAdsValidationError('invalid_request', 'budgetLimitExceeded', text);
+  if (!isFacebookCountryCode(operation.countryCode)) throw new FacebookAdsValidationError('invalid_request', 'countryInvalid', text);
+  if (!FACEBOOK_ADSET_OPTIMIZATION_GOALS.some(item => item.value === operation.optimizationGoal)) throw new FacebookAdsValidationError('invalid_request', 'optimizationInvalid', text);
 }
 
 export function validateFacebookAdsOperation(operation: AdsNeutralOperation, limits?: AdsOpsLimits, text: FacebookAdsText = defaultFacebookAdsText): void {
   const nameMax = Math.min(NAME_MAX, limits?.nameMaxCharacters ?? NAME_MAX);
   const support = FACEBOOK_ADS_OPERATIONS.find(item => item.id === operation.type);
-  if (!support || !support.objectTypes.includes(operation.objectType)) throw new OperationError('unavailable', 'This change is not available.');
+  if (!support || !support.objectTypes.includes(operation.objectType)) throw new FacebookAdsValidationError('unavailable', 'changeUnavailable', text);
   if (operation.type === 'campaign.create' || operation.type === 'adset.create') return validateCreation(operation, nameMax, limits, text);
   if (operation.type === 'ad.create') {
-    if (operation.objectType !== 'ad' || typeof operation.name !== 'string' || !validName(operation.name, nameMax)) throw new OperationError('invalid_request', text('nameInvalid', { max: nameMax }));
-    if (typeof operation.parentId !== 'string' || !SAFE_ID.test(operation.parentId)) throw new OperationError('invalid_request', 'Choose a valid parent ad set.');
-    if (typeof operation.creativeId !== 'string' || !SAFE_ID.test(operation.creativeId)) throw new OperationError('invalid_request', 'Choose a valid creative.');
+    if (operation.objectType !== 'ad' || typeof operation.name !== 'string' || !validName(operation.name, nameMax)) throw new FacebookAdsValidationError('invalid_request', 'nameInvalid', text, { max: nameMax });
+    if (typeof operation.parentId !== 'string' || !SAFE_ID.test(operation.parentId)) throw new FacebookAdsValidationError('invalid_request', 'parentAdSetInvalid', text);
+    if (typeof operation.creativeId !== 'string' || !SAFE_ID.test(operation.creativeId)) throw new FacebookAdsValidationError('invalid_request', 'creativeInvalid', text);
     return;
   }
   if (operation.type === 'creative.create') {
-    if (!validName(operation.name, nameMax) || !SAFE_ID.test(operation.targetId) || !/^[A-Za-z0-9_.-]{1,150}$/.test(operation.mediaId) || !['image', 'link'].includes(operation.format) || operation.message.length > 5000 || operation.title.length > 200) throw new OperationError('invalid_request', 'Enter valid creative details.');
+    if (!validName(operation.name, nameMax) || !SAFE_ID.test(operation.targetId) || !/^[A-Za-z0-9_.-]{1,150}$/.test(operation.mediaId) || !['image', 'link'].includes(operation.format) || operation.message.length > 5000 || operation.title.length > 200) throw new FacebookAdsValidationError('invalid_request', 'creativeDetailsInvalid', text);
     if (operation.format === 'link') {
-      let url: URL; try { url = new URL(operation.linkUrl ?? ''); } catch { throw new OperationError('invalid_request', 'Enter an HTTPS destination.'); }
-      if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 2048) throw new OperationError('invalid_request', 'Enter an HTTPS destination without credentials.');
-    } else if (operation.linkUrl !== undefined || operation.title) throw new OperationError('invalid_request', 'Image creatives use message text only.');
+      let url: URL; try { url = new URL(operation.linkUrl ?? ''); } catch { throw new FacebookAdsValidationError('invalid_request', 'destinationInvalid', text); }
+      if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 2048) throw new FacebookAdsValidationError('invalid_request', 'destinationCredentialsInvalid', text);
+    } else if (operation.linkUrl !== undefined || operation.title) throw new FacebookAdsValidationError('invalid_request', 'imageTextOnly', text);
     return;
   }
-  if (!SAFE_ID.test(operation.objectId)) throw new OperationError('invalid_request', 'Invalid ad object.');
-  if (operation.type === 'rename' && (!operation.name || operation.name.length > nameMax || /[\u0000-\u001f\u007f]/.test(operation.name))) throw new OperationError('invalid_request', text('nameInvalid', { max: nameMax }));
-  if (operation.type === 'budget.set' && limits && operation.budget.minor > limits.maxBudgetMinor) throw new OperationError('invalid_request', 'This budget is above the limit allowed for a single change.');
-  if (operation.type === 'budget.set' && (!Number.isSafeInteger(operation.budget.minor) || operation.budget.minor < 1)) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units.');
-  if (operation.type === 'creative.assign' && !SAFE_ID.test(operation.creativeId)) throw new OperationError('invalid_request', 'Choose a valid creative.');
+  if (!SAFE_ID.test(operation.objectId)) throw new FacebookAdsValidationError('invalid_request', 'objectInvalid', text);
+  if (operation.type === 'rename' && (!operation.name || operation.name.length > nameMax || /[\u0000-\u001f\u007f]/.test(operation.name))) throw new FacebookAdsValidationError('invalid_request', 'nameInvalid', text, { max: nameMax });
+  if (operation.type === 'budget.set' && limits && operation.budget.minor > limits.maxBudgetMinor) throw new FacebookAdsValidationError('invalid_request', 'budgetLimitExceeded', text);
+  if (operation.type === 'budget.set' && (!Number.isSafeInteger(operation.budget.minor) || operation.budget.minor < 1)) throw new FacebookAdsValidationError('invalid_request', 'budgetInvalid', text);
+  if (operation.type === 'creative.assign' && !SAFE_ID.test(operation.creativeId)) throw new FacebookAdsValidationError('invalid_request', 'creativeInvalid', text);
 }
 
 export function facebookAdsConfirmation(operation: AdsNeutralOperation, context: { adAccountId: string; currency: string | null }, text: FacebookAdsText = defaultFacebookAdsText): string {
@@ -101,13 +110,13 @@ function belongs(payload: Record<string, unknown>, accountId: string) {
   return Boolean(remote) && remote === bareAccount(accountId);
 }
 
-async function verifyOwned(transport: FacebookAdsTransport, token: string, accountId: string, objectId: string, what: string, signal?: AbortSignal) {
+async function verifyOwned(transport: FacebookAdsTransport, token: string, accountId: string, objectId: string, signal?: AbortSignal, text: FacebookAdsText = defaultFacebookAdsText) {
   const payload = await transport.get(encodeURIComponent(objectId), token, { fields: 'id,account_id' }, signal);
-  if (payload.id !== objectId || !belongs(payload, accountId)) throw new FacebookAdsOpsError(`This ${what} does not belong to the selected ad account.`, { status: 0, beforeWrite: true });
+  if (payload.id !== objectId || !belongs(payload, accountId)) throw new FacebookAdsOpsError(text('ownershipMismatch'), { status: 0, beforeWrite: true }, 'ownershipMismatch');
 }
 
 /** Status is a provider-owned constant: creation never reads a status from the payload. */
-async function executeCreation(transport: FacebookAdsTransport, token: string, context: AdsOpsContext, operation: CreateOperation) {
+async function executeCreation(transport: FacebookAdsTransport, token: string, context: AdsOpsContext, operation: CreateOperation, text: FacebookAdsText) {
   const name = operation.name.trim();
   let body: Record<string, string>;
   if (operation.type === 'campaign.create') {
@@ -116,7 +125,7 @@ async function executeCreation(transport: FacebookAdsTransport, token: string, c
     // A campaign has an objective; an ad set or ad does not, so this also rejects wrong-level ids.
     const parent = await transport.get(encodeURIComponent(operation.parentId), token, { fields: 'id,account_id,objective' }, context.signal);
     if (parent.id !== operation.parentId || !belongs(parent, context.accountId) || typeof parent.objective !== 'string') {
-      throw new FacebookAdsOpsError('This campaign does not belong to the selected ad account.', { status: 0, beforeWrite: true });
+      throw new FacebookAdsOpsError(text('ownershipCampaignMismatch'), { status: 0, beforeWrite: true }, 'ownershipCampaignMismatch');
     }
     body = {
       campaign_id: operation.parentId, name, daily_budget: String(operation.dailyBudgetMinor),
@@ -128,30 +137,30 @@ async function executeCreation(transport: FacebookAdsTransport, token: string, c
   const edge = operation.type === 'campaign.create' ? 'campaigns' : 'adsets';
   const result = await transport.post(`${encodeURIComponent(context.accountId)}/${edge}`, token, body, context.signal);
   // The write was sent: a missing or malformed id leaves the outcome unknown, never "rejected".
-  if (typeof result.id !== 'string' || !SAFE_ID.test(result.id)) throw new FacebookAdsOpsError('Facebook did not confirm the new object.', { status: 200 });
+  if (typeof result.id !== 'string' || !SAFE_ID.test(result.id)) throw new FacebookAdsOpsError(text('creationUnconfirmed'), { status: 200 }, 'creationUnconfirmed');
   await context.recordReceipt?.({ remoteId: result.id });
   return { remoteId: result.id };
 }
 
 /** An ad starts paused under a verified ad set with a verified existing creative; status is never taken from the caller. */
-async function executeAdCreation(transport: FacebookAdsTransport, token: string, context: AdsOpsContext, operation: Extract<AdsNeutralOperation, { type: 'ad.create' }>) {
+async function executeAdCreation(transport: FacebookAdsTransport, token: string, context: AdsOpsContext, operation: Extract<AdsNeutralOperation, { type: 'ad.create' }>, text: FacebookAdsText) {
   // A campaign or ad has no sibling shape of an ad set: an ad set carries a campaign_id and no adset_id.
   const parent = await transport.get(encodeURIComponent(operation.parentId), token, { fields: 'id,account_id,campaign_id,adset_id' }, context.signal);
   if (parent.id !== operation.parentId || !belongs(parent, context.accountId) || typeof parent.campaign_id !== 'string' || parent.adset_id !== undefined) {
-    throw new FacebookAdsOpsError('This ad set does not belong to the selected ad account.', { status: 0, beforeWrite: true });
+    throw new FacebookAdsOpsError(text('ownershipAdSetMismatch'), { status: 0, beforeWrite: true }, 'ownershipAdSetMismatch');
   }
-  await verifyOwned(transport, token, context.accountId, operation.creativeId, 'creative', context.signal);
+  await verifyOwned(transport, token, context.accountId, operation.creativeId, context.signal, text);
   const result = await transport.post(`${encodeURIComponent(context.accountId)}/ads`, token, {
     name: operation.name.trim(), adset_id: operation.parentId, creative: JSON.stringify({ creative_id: operation.creativeId }), status: FACEBOOK_CREATE_STATUS,
   }, context.signal);
-  if (typeof result.id !== 'string' || !SAFE_ID.test(result.id)) throw new FacebookAdsOpsError('Facebook did not confirm the new object.', { status: 200 });
+  if (typeof result.id !== 'string' || !SAFE_ID.test(result.id)) throw new FacebookAdsOpsError(text('creationUnconfirmed'), { status: 200 }, 'creationUnconfirmed');
   await context.recordReceipt?.({ remoteId: result.id });
   return { remoteId: result.id };
 }
 
 async function configuredCreationUi(): Promise<AdsUiSchema> {
   const checked = FACEBOOK_ADS_CREATION_UI_SCHEMA.safeParse(await runtimeConfig('meta.adsCreationUi'));
-  if (!checked.success) throw new FacebookAdsOpsError('Creation policy is unavailable.', { status: 0, beforeWrite: true });
+  if (!checked.success) throw new FacebookAdsOpsError(defaultFacebookAdsText('creationPolicyUnavailable'), { status: 0, beforeWrite: true }, 'creationPolicyUnavailable');
   return checked.data;
 }
 
@@ -161,7 +170,7 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
     const ui = await loadCreationUi();
     const form = operation.type === 'campaign.create' ? ui.campaign : ui.adSet;
     const choice = operation.type === 'campaign.create' ? operation.objective : operation.optimizationGoal;
-    if (!form || !form.options.some(option => option.value === choice) || operation.name.length > form.nameMaxLength) throw new FacebookAdsOpsError('Choose a current creation option and valid name.', { status: 0, beforeWrite: true });
+    if (!form || !form.options.some(option => option.value === choice) || operation.name.length > form.nameMaxLength) throw new FacebookAdsOpsError(text('creationOptionInvalid'), { status: 0, beforeWrite: true }, 'creationOptionInvalid');
   };
   return {
     provider: 'facebook',
@@ -173,7 +182,7 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
       try { await checkCurrent(operation); }
       catch (error) {
         if (!(error instanceof FacebookAdsOpsError) || !error.detail.beforeWrite) throw error;
-        throw new OperationError(error.message === 'Creation policy is unavailable.' ? 'unavailable' : 'invalid_request', error.message);
+        throw new FacebookAdsValidationError(error.issueCode === 'creationPolicyUnavailable' ? 'unavailable' : 'invalid_request', error.issueCode, text);
       }
     },
     confirmation: (operation, context) => facebookAdsConfirmation(operation, context, text),
@@ -183,11 +192,11 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
       await checkCurrent(operation);
       const transport = await loadTransport();
       const token = context.credential.accessToken;
-      if (!SAFE_ID.test(context.accountId)) throw new FacebookAdsOpsError('Invalid ad account.', { status: 0, beforeWrite: true });
-      if (operation.type === 'creative.create') return executeFacebookCreative(transport, context, operation);
-      if (operation.type === 'ad.create') return executeAdCreation(transport, token, context, operation);
-      if (operation.type === 'campaign.create' || operation.type === 'adset.create') return executeCreation(transport, token, context, operation);
-      await verifyOwned(transport, token, context.accountId, operation.objectId, 'object', context.signal);
+      if (!SAFE_ID.test(context.accountId)) throw new FacebookAdsOpsError(text('accountInvalid'), { status: 0, beforeWrite: true }, 'accountInvalid');
+      if (operation.type === 'creative.create') return executeFacebookCreative(transport, context, operation, text);
+      if (operation.type === 'ad.create') return executeAdCreation(transport, token, context, operation, text);
+      if (operation.type === 'campaign.create' || operation.type === 'adset.create') return executeCreation(transport, token, context, operation, text);
+      await verifyOwned(transport, token, context.accountId, operation.objectId, context.signal, text);
       const path = encodeURIComponent(operation.objectId);
       let body: Record<string, string>;
       switch (operation.type) {
@@ -196,14 +205,14 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
         case 'rename': body = { name: operation.name }; break;
         case 'delete': body = { status: 'DELETED' }; break;
         case 'creative.assign': {
-          await verifyOwned(transport, token, context.accountId, operation.creativeId, 'creative', context.signal);
+          await verifyOwned(transport, token, context.accountId, operation.creativeId, context.signal, text);
           body = { creative: JSON.stringify({ creative_id: operation.creativeId }) };
           break;
         }
       }
       const result = await transport.post(path, token, body, context.signal);
       // Graph answers { success: true } for updates; anything else is not a confirmed write.
-      if (result.success !== true) throw new FacebookAdsOpsError('Facebook did not confirm the change.', { status: 200 });
+      if (result.success !== true) throw new FacebookAdsOpsError(text('changeUnconfirmed'), { status: 200 }, 'changeUnconfirmed');
       return { remoteId: operation.objectId };
     },
     async listCreatives(context: AdsOpsContext, page: { limit: number; after?: string }) {
@@ -228,13 +237,13 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
   };
 }
 
-async function configuredTransport(fetchImpl?: FacebookAdsFetch) {
+async function configuredTransport(fetchImpl?: FacebookAdsFetch, text: FacebookAdsText = defaultFacebookAdsText) {
   const [graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes, appSecretProofEnabled, appSecret] = await Promise.all([
     runtimeConfig('meta.graphBaseUrl'), runtimeConfig('meta.oauthBaseUrl'), runtimeConfig('meta.graphVersion'), runtimeConfig('meta.requestTimeoutMs'),
     runtimeConfig('meta.maxPages'), runtimeConfig('meta.pageSize'), runtimeConfig('meta.pageInsightMetrics'), runtimeConfig('meta.adInsightFields'),
     runtimeConfig('meta.maxImageUploadBytes'), runtimeConfig('meta.allowedImageMimeTypes'), runtimeConfig('meta.appSecretProofEnabled'), runtimeSecret('meta.appSecret'),
   ]);
-  return createFacebookAdsTransport({ graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes, appSecretProofEnabled, ...(appSecret ? { appSecret } : {}) } as FacebookConfig, fetchImpl);
+  return createFacebookAdsTransport({ graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes, appSecretProofEnabled, ...(appSecret ? { appSecret } : {}) } as FacebookConfig, fetchImpl, text);
 }
 
 /** Runtime host for explicit installation by the host assembly (see docs/ADS_PARITY.md). */
@@ -242,5 +251,6 @@ export const facebookAdsOps: AdsOpsHost = createFacebookAdsOps(() => configuredT
 
 /** Resolve once per shared service request, then use the same copy for preview and exact consent checks. */
 export async function configuredFacebookAdsOps(locale: 'en' | 'fr' = 'en'): Promise<AdsOpsHost> {
-  return createFacebookAdsOps(() => configuredTransport(), configuredCreationUi, facebookAdsText(FACEBOOK_ADS_COPY_SCHEMA.parse(await runtimeConfig('meta.adsCopy')), locale));
+  const text = facebookAdsText(await configOrDefault('meta.adsCopy', FACEBOOK_ADS_COPY_SCHEMA), locale);
+  return createFacebookAdsOps(() => configuredTransport(undefined, text), configuredCreationUi, text);
 }

@@ -1,5 +1,5 @@
 import { defaultFacebookAdsText, type FacebookAdsText } from './ads-copy';
-import { facebookAdsConfirmation } from './ads-ops';
+import { facebookAdsConfirmation, FacebookAdsValidationError } from './ads-ops';
 import { FACEBOOK_ADS_UI_DEFAULTS, FACEBOOK_ADS_CREATION_UI_SCHEMA } from './ads-ui-config';
 import { facebookStoredAdsParent } from './ads-parent';
 import type { FacebookCampaignObjective } from './protocol';
@@ -16,14 +16,14 @@ export const FACEBOOK_AD_OBJECTIVES = new Set<FacebookCampaignObjective>([
 export const FACEBOOK_ADS_MANAGEMENT_SCOPE = 'ads_management';
 
 export function validateFacebookCampaign(name: string, objective: string, text: FacebookAdsText = defaultFacebookAdsText): asserts objective is FacebookCampaignObjective {
-  if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) throw new OperationError('invalid_request', text('nameInvalid', { max: 100 }));
-  if (!FACEBOOK_AD_OBJECTIVES.has(objective as FacebookCampaignObjective)) throw new OperationError('invalid_request', 'Choose a supported campaign objective.');
+  if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) throw new FacebookAdsValidationError('invalid_request', 'nameInvalid', text, { max: 100 });
+  if (!FACEBOOK_AD_OBJECTIVES.has(objective as FacebookCampaignObjective)) throw new FacebookAdsValidationError('invalid_request', 'objectiveInvalid', text);
 }
 export function validateFacebookAdSet(input: { name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }, text: FacebookAdsText = defaultFacebookAdsText) {
-  if (!input.name || input.name.length > 100 || /[\u0000-\u001f\u007f]/.test(input.name)) throw new OperationError('invalid_request', text('nameInvalid', { max: 100 }));
-  if (!Number.isSafeInteger(input.dailyBudgetMinor) || input.dailyBudgetMinor < 1) throw new OperationError('invalid_request', 'Daily budgets must be positive whole minor currency units.');
-  if (!/^[A-Z]{2}$/.test(input.countryCode)) throw new OperationError('invalid_request', 'Country code must be a two-letter uppercase code.');
-  if (!['LINK_CLICKS', 'IMPRESSIONS'].includes(input.optimizationGoal)) throw new OperationError('invalid_request', 'Choose a valid country code and optimization goal.');
+  if (!input.name || input.name.length > 100 || /[\u0000-\u001f\u007f]/.test(input.name)) throw new FacebookAdsValidationError('invalid_request', 'nameInvalid', text, { max: 100 });
+  if (!Number.isSafeInteger(input.dailyBudgetMinor) || input.dailyBudgetMinor < 1) throw new FacebookAdsValidationError('invalid_request', 'dailyBudgetInvalid', text);
+  if (!/^[A-Z]{2}$/.test(input.countryCode)) throw new FacebookAdsValidationError('invalid_request', 'countryCodeInvalid', text);
+  if (!['LINK_CLICKS', 'IMPRESSIONS'].includes(input.optimizationGoal)) throw new FacebookAdsValidationError('invalid_request', 'countryOptimizationInvalid', text);
 }
 
 export function facebookCampaignConfirmation(accountId: string, name: string, objective: string) {

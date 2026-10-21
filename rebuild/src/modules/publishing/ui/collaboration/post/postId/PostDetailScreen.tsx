@@ -9,6 +9,7 @@ import { loadComposerCopy } from '../../../../server/composer-copy';
 import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
 import { SidebarDock } from '@/components/SidebarDock';
 import { parsePostCollaborationSearch } from '@/modules/publishing/collaboration/search';
+import { notFound } from 'next/navigation';
 import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
 import { requireViewer } from '@/server/context';
@@ -59,6 +60,7 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
         recycle={recycle ? { enabled: recycle.enabled, everyDays: recycle.everyDays, limit: recycle.limit, count: recycle.count, nextAt: recycle.nextAt?.toISOString() ?? null, variants: recycle.variants, isRepeat: recycle.isRepeat, maxIntervalDays: recycle.limits.maxIntervalDays, maxRepeats: recycle.limits.maxRepeats, defaultIntervalDays: recycle.limits.defaultIntervalDays, maxVariants: recycle.limits.maxVariants } : null} />
     </>;
   } catch (error) {
+    if (error instanceof OperationError && error.code === 'not_found') notFound();
     return <><PageHeading title={copy.postTitle} description={copy.postHelp} /><RouteNotice error focusKey="collab-post-error">{error instanceof OperationError ? error.message : copy.postFailure}</RouteNotice></>;
   }
 }

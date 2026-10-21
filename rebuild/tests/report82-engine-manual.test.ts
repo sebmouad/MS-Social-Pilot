@@ -405,3 +405,27 @@ describe('current release bounds and lease clock', () => {
     } finally {vi.useRealTimers();}
   });
 });
+
+
+describe('published report details through the confirmed MCP workflow', () => {
+  it('prepares the same three publication views, persists their artifact and audits once', async () => {
+    state.publicationRows = [{ postId: 'post-visible', text: 'Published example', at: new Date('2026-10-02T12:00Z'), attempts: 1 }];
+    state.failedPublicationRows = [{ postId: 'post-failed', text: 'Review this example', at: new Date('2026-10-03T12:00Z'), attempts: 2 }];
+    state.publicationDays = [{ day: '2026-10-02', published: BigInt(1) }];
+    const output = await executeAnalyticsReportTool(actor, 'generate_report', channelInput());
+    if (!('csv' in output)) throw new Error('Expected prepared report');
+    expect(output.csv).toContain('publication_log');
+    expect(output.csv).toContain('publication_day');
+    expect(output.csv).toContain('publication_failure');
+    expect(output.html).toContain('Review this example');
+    expect(JSON.stringify(finishedWrites())).toContain('post-visible');
+    expect(execs('activity_logs').filter(call => call.values.includes('analytics.report_run_started'))).toHaveLength(1);
+    expect(mailPort.send).not.toHaveBeenCalled();
+  });
+  it('refuses missing exact consent or changed channel scope before reading excerpts', async () => {
+    await expect(executeAnalyticsReportTool(actor, 'generate_report', channelInput({ confirmation: '' }))).rejects.toMatchObject({ code: 'invalid_request' });
+    state.scope = ['elsewhere'];
+    await expect(executeAnalyticsReportTool(actor, 'generate_report', channelInput())).rejects.toBeDefined();
+    expect(state.queries.filter(call => call.sql.includes('FROM post_targets pt JOIN posts p'))).toHaveLength(0);
+  });
+});

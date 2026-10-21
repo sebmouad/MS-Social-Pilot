@@ -36,7 +36,7 @@ export function SavedViews({ screen }: { screen: SavedViewScreen }) {
     try {
       const response = await fetch('/api/publishing/saved-views', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ screen, name: name.trim(), query: current }) });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) { setMessage({ text: body.code === 'conflict' ? copy.limit : copy.saveFailed, error: true }); return; }
+      if (!response.ok) { setMessage({ text: response.status === 401 || body.code === 'unauthorized' ? copy.sessionEnded : body.code === 'conflict' ? copy.limit : copy.saveFailed, error: true }); return; }
       setViews(list => [...(list ?? []), body.view].sort((a, b) => a.name.localeCompare(b.name)));
       setName(''); setMessage({ text: copy.saved, error: false });
     } catch { setMessage({ text: copy.saveFailed, error: true }); }

@@ -1,9 +1,8 @@
 # Shared agent handoff
 
-Updated 2026-10-21 against local HEAD `46c6bdae`, reviewing
-`git log 1240a9ce..HEAD`, the changed-file list of `46c6bdae`, dated release and
-browser records and selected current source. This supersedes the previous `1240a9ce`
-continuation. The binding contract is unchanged; the full goal remains active. No
+Updated 2026-10-21 against local HEAD `6d3347fb` (round 6), reviewing
+`git log 46c6bdae..HEAD`, the round 6 diff, dated release and browser records and
+selected current source. This supersedes the previous `46c6bdae` continuation. The binding contract is unchanged; the full goal remains active. No
 fresh database, browser, provider or production observation was made by this
 documentation worker; production facts below are owner/integrator records.
 
@@ -17,7 +16,8 @@ release work; source and historical receipts do not identify current deployment.
 
 ## Production record
 
-Deployed release (integrator statement): `46c6bdae`. Owner cutover: 2026-10-20 22:09 CEST, release `5f1e52d7`, via
+Deployed release (integrator statement): `6d3347fb`, configuration schema **115**
+(not independently observed; confirm the applied migrations). Owner cutover: 2026-10-20 22:09 CEST, release `5f1e52d7`, via
 `rebuild/scripts/prod-cutover.sh`, origin https://social.newsgeet.com. Rebuild
 web/worker recorded active/enabled; legacy inactive/disabled, retained for rollback
 at `/srv/ms-social-pilot`. Releases use `rebuild/scripts/prod-deploy.sh`; legacy
@@ -59,7 +59,7 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
   Sharing; last three include service/public error localization. `configOrDefault`
   validates runtime or registry default; `configValueOrDefault` checks outer shape
   only. Residual literals/prompts/dynamic labels and stale OAuth metadata remain
-  in CONFIG_LITERAL_AUDIT. Schema version is now **114**, not 104–113.
+  in CONFIG_LITERAL_AUDIT. Schema version is now **115**, not 104–114.
 - Appearance (`2b42470b`): global shell and Settings save through confirmed
   appearance service; theme in users, mode under exact account key, transaction
   audit, Root-lifetime cookie cache and validated-session fallback in layout.
@@ -129,7 +129,29 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
   queue cancel, Root activity, two-step wording, tokenless join, verify-email/
   password-recovery text and calendar badge contrast fixes
   (`tests/browser-findings-fixes.test.ts`, `tests/ui-copy-coverage.test.ts`).
-  These have unit/render evidence without a browser rerun.
+  These have unit/render evidence; round 5 reran Chromium on `46c6bdae` (below).
+- Round 6 (`6d3347fb`; source and unit tests with fakes, no browser, PostgreSQL,
+  provider or production run):
+  - Ads copy: Facebook-owned `ads-copy.ts` (EN/FR labels, name validation, confirmation
+    templates) behind new Root key `meta.adsCopy` (placeholders validated); Ads
+    `copy.ts` customer strings. `ad.create` is still blocked by the missing ledger
+    CHECK migration and `ads_management` grant.
+  - Join: preview answers `{ invitation: null }` (200) for a missing/unknown token and
+    `join-form.tsx` shows "link needed" from it (no 404; a 429 from the per-token limit
+    is still possible).
+  - Queue: `cancelScheduledPostAction` throws on failure instead of redirecting, so
+    `CancelScheduleForm` keeps filters, reschedule input and its inline notice.
+  - Recipe recovery: uncertain slots reconcile by the ledger's stored post id (never
+    by channel+time; a manual post is not adopted, a cancelled post is still found,
+    unknown identity stays uncertain, settlement guarded by expected post id). A
+    refused pause-cancel is rotated behind untouched work (`deferCancellation`,
+    least-recent-attempt order), so the earlier starvation gap is closed at unit level;
+    `remaining` is no longer forced false.
+  - New tests: `feeds-recipe-recovery-verification`, `publishing-scheduling-
+    verification` (mixed native/app holds, stale due-worker claim, comment failure
+    after confirmed publish, reschedule timeout, contributor approval),
+    `facebook-ads-copy`, `browser-matrix-round5`. They are not live scheduling or
+    recipe recovery evidence.
 
 ## Browser evidence, not an all-green gate
 
@@ -152,14 +174,24 @@ preview PostgreSQL database; none of it is production or provider evidence.
   recovery verified in Firefox only; Firefox/WebKit dynamic, session, empty,
   not-found and failure parts reproduce the module findings.
 
-Unresolved (per the report and the `46c6bdae` file list; not rerun): `not-found.tsx`
-is missing, so unknown routes show Next's default page; unknown bio/share/
-collaboration/Root ids answer HTTP 200 (soft 404); raw server text on Tasks, Labels,
-Templates, Analytics goals and Inbox moderation; saved-view 401 wording; the error
-boundary sits above the shell; WebKit hydration; `/join` preview 404/429 console
-errors on repeated loads; share-media 404s from seed data. `46c6bdae` fixes queue
-cancel, Root activity, two-step wording, tokenless join, verify-email/recovery text
-and calendar contrast at source only. Not covered: keyboard/system-mode runs in
+- Round 5 (Chromium only, local build of `46c6bdae`, synthetic database with Feeds
+  recipe rows): full matrix 992/992 cells over 62 routes incl. Ads and Feeds, **162
+  findings** (none from Ads or Feeds); fixes check 72/72 cells (0 broken images, 10
+  findings); unknown route 64/64 with HTTP 404 and 0 findings. Causes: 80 seeded-media
+  404s (data), tokenless `/join` 404s/429s (addressed at source by round 6), warm-light
+  calendar "View post" at 4.35:1 (published-card opacity `.88`), and saved-view save
+  without a session still saying "check its name" (8/8 desktop cells; Publishing
+  `SavedViews.tsx`/`saved_saveFailed` unchanged). Firefox/WebKit and the dynamic/
+  empty/system/keyboard/failure parts were not rerun.
+
+Unresolved (not rerun after round 6): `not-found.tsx` is still missing from
+`src/app/` (round 5 saw HTTP 404 and no check findings, not a themed bilingual page);
+unknown bio/share/collaboration/Root ids answered HTTP 200 in round 4; raw server
+text on Tasks, Labels, Templates, Analytics goals and Inbox moderation; saved-view
+session wording; calendar warm-light contrast; error boundary above the shell;
+WebKit hydration; share-media 404s from seed data. Round 6 changes to `/join` and
+the queue cancel failure have unit evidence only. `46c6bdae` fixed Root activity,
+two-step wording, verify-email/recovery text at source only. Not covered: keyboard/system-mode runs in
 Firefox/WebKit, all four themes there, real Safari/iOS, screen readers, long content,
 client-render throws and every later merge. Read the report for exact routes/checks
 rather than summing cells into a completion percentage. Historical production Chrome
@@ -187,9 +219,10 @@ and WAVE1 checks retain their dates.
 5. App owner adds `src/app/not-found.tsx` (`'use client'`, `ErrorState kind="not-found"`
    with `useErrorLocale`), real 404 statuses for unknown detail ids (fix the
    `loading.tsx` streaming order) and a boundary inside the shell. Module owners
-   remove raw server text, fix hydration formatting and the `/join` preview. Rerun
-   the matrix in all three engines, including keyboard walks, all four themes and
-   the round-5 fixes.
+   remove raw server text, fix hydration formatting, saved-view session wording
+   (`SavedViews.tsx`) and warm-light calendar published-card contrast. Rerun the
+   matrix in all three engines, including keyboard walks, all four themes, the
+   round 6 `/join` and queue-cancel changes and the Ads/Feeds forms.
 6. Integration owner tests mixed scheduling and recipe retry/pause/recovery,
    metrics/history, live REST/MCP scope, provider outcomes/cleanup and index plans/
    volume. Preserve unresolved photo-canary ledger/Page lock; failed Graph lookup

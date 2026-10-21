@@ -5,6 +5,64 @@ const config: FacebookConfig = { graphBaseUrl: 'https://graph.example.test', oau
 const now = new Date('2026-10-20T00:00:00Z');
 const policy = { lookbackDays: 365, pageBudget: 1, edge: 'published_posts' as const, fields: ['message'], metrics: ['post_clicks'], reactionTypes: ['LIKE'] };
 const response = (data: unknown) => new Response(JSON.stringify(data));
+describe('v26 insight authority', () => {
+ const metrics = ['post_media_view', 'post_total_media_view_unique', 'post_reactions_by_type_total', 'post_clicks', 'post_clicks_by_type'];
+ function fixture(value: unknown, summary = 0) {
+  return vi.fn(async (input: RequestInfo | URL) => {
+   const url = new URL(String(input));
+   if (url.pathname.endsWith('/published_posts')) return response({ data: [{ id: 'p', created_time: '2026-10-01', reactions: { summary: { total_count: summary } } }] });
+   if (url.pathname.endsWith('/reactions')) return response({ data: [] });
+   const metric = url.searchParams.get('metric');
+   return response({ data: [{ name: metric, total_value: { value: metric === 'post_reactions_by_type_total' ? value : metric === 'post_clicks_by_type' ? { 'link clicks': 2 } : 3 } }], paging: { next: 'unused-window' } });
+  });
+ }
+ it('prefers insights over conflicting summary and edge counts without adding sources', async () => {
+  const result = await createFacebookPostHistory({ ...config, graphVersion: 'v26.0' }, { ...policy, metrics }, fixture({ like: 1, love: 0 })).collect('token', 'page', now);
+  expect(result.posts[0].insights).toMatchObject({ post_media_view: 3, post_total_media_view_unique: 3, clicks: 3, post_clicks_by_type: { 'link clicks': 2 }, reactions: 1, reactions_like: 1,
+   reactionProvenance: { source: 'insights', metric: 'post_reactions_by_type_total', insightTotal: 1, summaryTotal: 0, edgeTotal: 0, conflict: true, observedAt: now.toISOString() } });
+ });
+ it('preserves an authoritative insight zero against a positive summary', async () => {
+  const result = await createFacebookPostHistory(config, { ...policy, metrics }, fixture({ like: 0 }, 4)).collect('token', 'page', now);
+  expect(result.posts[0].insights).toMatchObject({ reactions: 0, reactionProvenance: { source: 'insights', conflict: true } });
+ });
+ it('retains authoritative reaction types even when a reaction edge fails', async () => {
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+   const url = new URL(String(input));
+   if (url.pathname.endsWith('/published_posts')) return response({ data: [{ id: 'p', created_time: '2026-10-01' }] });
+   if (url.pathname.endsWith('/reactions')) return response({ error: { code: 100 } });
+   return response({ data: [{ name: 'post_reactions_by_type_total', values: [{ value: { like: '1', care: 2 } }] }] });
+  });
+  const result = await createFacebookPostHistory(config, { ...policy, metrics: ['post_reactions_by_type_total'] }, fetcher).collect('token', 'page', now);
+  expect(result.posts[0].insights).toMatchObject({ reactions: 3, reactions_like: 1, reactions_care: 2, collectionFailures: ['reactions_LIKE'], reactionProvenance: { source: 'insights', edgeTotal: null, edgesComplete: false } });
+ });
+ it('records an unknown total when every reaction source is missing', async () => {
+  const fetcher = vi.fn(async () => response({ data: [{ id: 'p', created_time: '2026-10-01' }] }));
+  const result = await createFacebookPostHistory(config, { ...policy, metrics: [], reactionTypes: [] }, fetcher).collect('token', 'page', now);
+  expect(result.posts[0].insights.reactions).toBeUndefined();
+  expect(result.posts[0].insights.reactionProvenance).toMatchObject({ source: 'unknown', insightTotal: null, summaryTotal: null, edgeTotal: null, conflict: false });
+ });
+ it.each([{}, { like: null }, { like: -1 }, { like: true }])('does not fabricate an insight total from invalid categories %j', async value => {
+  const result = await createFacebookPostHistory(config, { ...policy, metrics, reactionTypes: [] }, fixture(value, 4)).collect('token', 'page', now);
+  expect(result.posts[0].insights).toMatchObject({ reactions: 4, reactionProvenance: { source: 'summary', insightTotal: null, edgeTotal: null } });
+ });
+ it('requests configured video metrics only for positively identified video posts', async () => {
+  const requested: string[] = [];
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+   const url = new URL(String(input));
+   if (url.pathname.endsWith('/published_posts')) return response({ data: [
+    { id: 'photo', created_time: '2026-10-01', status_type: 'added_photos' },
+    { id: 'video', created_time: '2026-10-01', status_type: 'added_video' },
+    { id: 'attached', created_time: '2026-10-01', attachments: { data: [{ media_type: 'video' }] } },
+    { id: 'unknown', created_time: '2026-10-01' },
+   ] });
+   requested.push(url.pathname);
+   return response({ data: [{ name: 'post_video_views', values: [{ value: 8 }] }] });
+  });
+  const result = await createFacebookPostHistory(config, { ...policy, metrics: ['post_video_views'], reactionTypes: [] }, fetcher).collect('token', 'page', now);
+  expect(requested).toHaveLength(2);
+  expect(result.posts.map(post => post.insights.video_views)).toEqual([undefined, 8, 8, undefined]);
+ });
+});
 describe('Page history', () => {
  it('validates Root defaults', () => { for (const setting of [...FACEBOOK_HISTORY_CONFIG, ...FACEBOOK_DATA_DETAIL_CONFIG]) expect(setting.schema.safeParse(setting.defaultValue).success).toBe(true); });
  it('resumes a stable interval and normalizes paginated reaction counts and insights', async () => {

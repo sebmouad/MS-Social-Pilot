@@ -118,6 +118,64 @@ repeat the number already shown in the card.
 
 Both sides use one symmetric axis; values are always shown as positive numbers.
 
+## Facebook collection and reaction provenance (2026-10-21)
+
+Source changes in `src/platforms/facebook/post-history.ts` select a valid,
+nonempty `post_reactions_by_type_total` breakdown before a reaction summary,
+then a fully read set of configured reaction-type edges. Counts from competing
+sources are never added. An insight zero is authoritative; an empty or invalid
+breakdown is unknown. `reactions` and `reactions_<type>` use one selected source.
+The raw insight breakdown remains stored. `reactionProvenance` retains the
+selected source, metric identity, insight/summary/edge totals, edge-type counts,
+configured-edge completeness, disagreement flag and collection observation time.
+Partial edge counts remain in provenance, without becoming a complete total.
+This prevents the recorded summary 0 / insights 1 mismatch from replacing 1 with
+0. It does not explain Meta's discrepancy; provider lag remains unproven.
+
+History reads every configured metric independently and retains scalar and
+structured values. Fixture coverage exercises `post_media_view`,
+`post_total_media_view_unique`, `post_reactions_by_type_total`, `post_clicks`
+(normalized to `clicks`) and `post_clicks_by_type`, including `total_value`
+responses. Configured `post_video_*` metrics are requested only for posts
+positively identified by `status_type=added_video` or video attachment metadata,
+including nested attachments. Unknown media type is not assumed to be video.
+
+The content insights loader now treats lifetime paging links as time-window
+links, and retains lifetime points without `end_time` when an explicit requested
+end is available. That end is a snapshot anchor, not an occurrence timestamp.
+Lifetime totals remain lifetime snapshots; non-lifetime totals retain their
+explicit range identity. Content discovery and Ads still enforce full bounded
+pagination. Page follows/views remain independently configured requests: one
+rejected metric does not erase successful observations.
+
+Evidence: fixture tests only (`tests/facebook-post-history.test.ts` and
+`tests/facebook-data-coverage.test.ts`). No fresh Graph eligibility, complete
+history, browser, transport parity or production evidence is established here.
+Neither new Root keys nor a schema-version change are included.
+
+Required integration outside this lane:
+
+- In `src/platforms/facebook/config.ts`, add `post_clicks` to the
+  `meta.postHistoryPolicy` default metrics. Review persisted Root overrides too;
+  changing a default does not update an existing policy.
+- Configure version/grant-verified video metrics in that policy and retain
+  `status_type` in its fields; add `attachments{media_type,type,subattachments}`
+  if attachment-based video detection is needed. Alternatively configure the
+  existing `meta.contentInsightCollections` video/video-insights path. The
+  fixture metric names demonstrate transport behavior, not v26 eligibility.
+- Review `meta.pageInsightMetrics` in `src/platforms/facebook/module.ts` and
+  persisted Root settings for the desired eligible follows/views measures,
+  including `page_total_media_view_unique`, and compatible
+  `meta.pageInsightPeriods`. No speculative metric list is injected by loaders.
+- Extend the existing `meta.metricLabels` bilingual catalog for the selected
+  metrics. Full customer presentation of nested post click categories and
+  provenance, and correct duration units for video watch-time charts, remain
+  separate work; the neutral analytics unit contract currently lacks duration.
+- Recollect historical snapshots to replace previously stored edge-derived
+  canonical totals. This change does not rewrite existing records. An integrator
+  owns configuration versioning and updates to architecture/handoff documents
+  outside this worker's ownership.
+
 ## Tests
 
 `tests/charts-options.test.ts` (props → option mapping per chart, formatting),

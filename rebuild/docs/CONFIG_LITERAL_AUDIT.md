@@ -1,11 +1,106 @@
-# Shared infrastructure and Root literal audit — round 2
+# Configuration literal audit — current coverage and historical rounds
 
-Status updated 2026-10-21 against local HEAD `6fb0e57f`: **partial literal
-coverage; no rebuild or release completion claim**. Round-two key tables, test
-counts, owned-file lists and publication prose below are historical lane records,
-now integrated in Git. Their earlier “working tree only” and “merge this file”
-instructions are not current publication status. This documentation pass adds no
-Root keys and does not change `CONFIG_SCHEMA_VERSION` (current source: 106).
+Status updated 2026-10-21 against local HEAD `6d3347fb` plus this provider-error
+working-tree batch: **partial literal coverage; no rebuild or release completion
+claim**. Current source registry version is **115**; this lane does not edit it.
+Earlier key tables, counts and publication prose below are historical lane
+records. Current source consumers and the explicit residuals take precedence.
+
+## Facebook provider-error mapping follow-up — 2026-10-21
+
+Owned changes: `src/platforms/facebook/ads-copy.ts`, `ads.ts`,
+`ads-ops/{index,transport,creative}.ts`, `tests/facebook-ads-copy.test.ts`, and
+this audit. No new Root keys. The existing `meta.adsCopy` declaration in
+`ads-ui-config.ts` imports the expanded strict catalog/schema without an edit to
+that excluded file. There are 33 added EN/FR catalog fields:
+
+`objectiveInvalid`, `objectInvalid`, `parentCampaignInvalid`, `dailyBudgetInvalid`,
+`budgetLimitExceeded`, `countryCodeInvalid`, `countryOptimizationInvalid`,
+`countryInvalid`, `optimizationInvalid`, `changeUnavailable`, `parentAdSetInvalid`,
+`creativeInvalid`, `creativeDetailsInvalid`, `destinationInvalid`,
+`destinationCredentialsInvalid`, `imageTextOnly`, `budgetInvalid`,
+`creationPolicyUnavailable`, `creationOptionInvalid`, `accountInvalid`,
+`ownershipAdSetMismatch`, `ownershipCampaignMismatch`, `ownershipMismatch`,
+`creationUnconfirmed`, `changeUnconfirmed`, `creativeSourceInvalid`,
+`imageUnsupported`, `creativeUnconfirmed`, `connectionUnavailable`,
+`responseUnreadable`, `providerFailure`, `cancelledBeforeDispatch`,
+`signingUnavailable`.
+
+Ads validation now carries a stable `issueCode` alongside the neutral
+`OperationError.code`; transport/creative failures also carry `issueCode`.
+Creation-policy classification uses that identity instead of comparing English
+wording. Request-resolved text feeds validation, provider transport and creative
+outcomes. Graph messages and fetch exception strings are discarded by this Ads
+transport; numeric status/code/transient evidence stays on its internal detail
+object for classification. No raw provider text is added to customer output or
+persisted by this change. Unconfirmed writes and partial creative uploads remain
+uncertain. Configured catalog reads use schema-validated `configOrDefault`;
+missing, invalid or older incomplete stored catalogs fall back to the complete
+registry default. That fallback replaces the whole catalog, so older partial
+customizations need reconciliation when Root next saves the expanded catalog.
+
+**Wiring limitation, found by source search:** `configuredFacebookAdsOps(locale)`
+has no production caller at this HEAD. `facebook/host.ts` installs static
+`facebookAdsOps`; the shared Ads service consumes that host. The configurable
+factory is tested, but this is not evidence that installed customer requests
+apply Root edits or French locale to every provider validation. Integrator must
+add a neutral locale-aware operations resolver to the host/service contract and
+install the configured factory in `facebook/host.ts`; shared code must not import
+Facebook or branch on provider. The synchronous pure validators keep catalog
+bootstrap defaults unless supplied request-resolved text. Do not mark full copy
+consumption complete from the existing active setting metadata.
+
+Residual provider mappings (not protocol exceptions):
+
+- `formats/plan.ts` and `formats/types.ts` already have native issue codes, but
+  their English validation/default exception messages still need a bilingual
+  Root catalog and request-locale plumbing from the publishing service.
+- `formats/{execute,publish,status,schedule}.ts` retain safe English failure and
+  uncertainty messages; `formats/{journal-recovery,status-recovery}.ts` retain
+  recovery validation and operator copy. Separate customer copy from Root-only
+  diagnostics before extraction; preserve uncertainty/reconciliation behavior.
+- `publishing.ts:graphError` retains raw Graph messages in `FacebookApiError`,
+  and network/token paths retain fetch exception messages. `adset.ts` also
+  retains provider text. Their caller-specific diagnostic/customer boundaries
+  need stable-code mapping and safe EN/FR copy; this Ads transport change does
+  not sanitize those other engines.
+- `ads.ts` remaining availability, reconnect and configured-UI failures still
+  use English literals; its legacy campaign/ad-set pure validation now uses
+  the catalog and stable issues. Their locale/configuration wiring is also
+  subject to the host limitation above.
+- Existing Ads name/content/title/URL parser bounds (100/5000/200/2048), choices
+  and other operational literals remain an extraction gap; this batch changes
+  error mapping only and does not reclassify them as protocol invariants.
+
+Verification from `rebuild/`: `npx tsc --noEmit -p .` reports zero errors;
+`npx vitest run --no-cache tests/facebook-ads-copy.test.ts tests/facebook-ads-ops.test.ts tests/facebook-ads-creative.test.ts tests/facebook-ads-ad-create.test.ts tests/facebook-ads-provider.test.ts tests/facebook-ads-creation-config75.test.ts`
+passes **79 tests / 6 files**; `git diff --check` is clean. These are targeted
+mocked/unit checks, with no whole-suite, browser, provider, database or production
+evidence. No server, deployment,
+push, schema bump or production action is part of this lane. Architecture/status
+and continuation documents are outside ownership; integrator should copy these
+limited findings into ARCHITECTURE.md, DELIVERY_PLAN.md and AGENT_HANDOFF.md.
+
+## Current module catalog inventory (source presence, not exhaustive consumption)
+
+The previous round-two snapshot omitted later catalogs. Current owning config
+files declare `feeds.copy`, `feeds.recipeCopy`, `media.copy`,
+`sharing.ownerCopy`, `sharing.publicCopy`, `sharing.copy.answerNotice`,
+`publishing.{noticeCopy,templateCopy,labelCopy,uiCopy}`,
+`inbox.customerCopy`, `ads.{customerCopy,analysisCopy,creativeCopy}`,
+`home.{authCopy,uiCopy}`, `tasks.customerCopy`,
+`agency.{exportCopy,customerCopy}`, and
+`analytics.{responseTimeCopy,reportDocumentCopy,errorCopy,recordsCopy,overviewCopy,workspaceCopy,goalsCopy,downloadCopy}`.
+The document language setting is `analytics.reportDocumentLocale`.
+`home.authCopy` still declares configured/pending route integration.
+Feeds/Media/Sharing have subsequent localized service/public-error paths
+(`server/messages.ts` and owning catalogs); the old claim below that all their
+safe failure catalogs were unextracted is superseded. This inventory does not
+prove every runtime branch, dynamic label, AI prompt, Root screen or transport
+fallback uses a catalog. Existing browser raw-server-text findings remain
+separate evidence and require a fresh consumer/browser review.
+
+## Historical round-two extraction
 
 The original extraction declared 96 keys. The two OAuth consent limits now have
 route/screen readers, but their owning metadata still says `configured` and

@@ -787,6 +787,10 @@ export const publishingActionCopy = {
     "en": "You have reached the saved view limit for this screen. Remove one first.",
     "fr": "Vous avez atteint la limite de vues enregistrées pour cet écran. Supprimez-en une d’abord."
   },
+  "saved_sessionEnded": {
+    "en": "Your session has ended. Sign in again, then save the view.",
+    "fr": "Votre session est terminée. Reconnectez-vous, puis enregistrez la vue."
+  },
   "saved_invalid": {
     "en": "These filters cannot be saved. Reset the filters and try again.",
     "fr": "Ces filtres ne peuvent pas être enregistrés. Réinitialisez les filtres et réessayez."
@@ -990,5 +994,5 @@ export function actionBulkCopy(t: PublishingActionText) {
   return { select: (label: string) => t('bulk_select', { label }), selectAll: t('bulk_selectAll'), actions, titles, descriptions, date: t('bulk_date'), time: t('bulk_time'), cancel: t('bulk_cancel'), confirm: t('bulk_confirm'), working: t('bulk_working'), clear: t('bulk_clear'), unconfirmed: t('bulk_unconfirmed'), retryOne: t('bulk_retryOne'), whenRequired: t('bulk_whenRequired'), tryAgain: t('bulk_tryAgain'), selected: (count: number) => t(count === 0 ? 'bulk_selectedZero' : count === 1 ? 'bulk_selectedOne' : 'bulk_selectedMany', { count }), summary: (result: { done: number; needsReview: number; skipped: number; failed: number }) => t('bulk_summary', result), retryOneHelp: (count: number) => t(count === 0 ? 'bulk_retryOneHelpZero' : count === 1 ? 'bulk_retryOneHelpOne' : 'bulk_retryOneHelpMany', { count }) };
 }
 export function actionSavedViewCopy(t: PublishingActionText) {
-  return { heading: t('saved_heading'), empty: t('saved_empty'), nameLabel: t('saved_nameLabel'), save: t('saved_save'), saving: t('saved_saving'), saved: t('saved_saved'), remove: t('saved_remove'), removed: t('saved_removed'), loadFailed: t('saved_loadFailed'), saveFailed: t('saved_saveFailed'), removeFailed: t('saved_removeFailed'), nameRequired: t('saved_nameRequired'), limit: t('saved_limit'), invalid: t('saved_invalid'), removeLabel: (name: string) => t('saved_removeLabel', { name }) };
+  return { heading: t('saved_heading'), empty: t('saved_empty'), nameLabel: t('saved_nameLabel'), save: t('saved_save'), saving: t('saved_saving'), saved: t('saved_saved'), remove: t('saved_remove'), removed: t('saved_removed'), loadFailed: t('saved_loadFailed'), saveFailed: t('saved_saveFailed'), sessionEnded: t('saved_sessionEnded'), removeFailed: t('saved_removeFailed'), nameRequired: t('saved_nameRequired'), limit: t('saved_limit'), invalid: t('saved_invalid'), removeLabel: (name: string) => t('saved_removeLabel', { name }) };
 }
