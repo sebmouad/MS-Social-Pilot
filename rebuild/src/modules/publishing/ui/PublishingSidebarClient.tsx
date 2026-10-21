@@ -8,7 +8,7 @@ import { CalendarFilters } from "./calendar/CalendarFilters";
 import { SavedViews } from "./SavedViews";
 
 /** Chooses the sidebar controls for the current publishing page. */
-export function PublishingSidebarClient({ groups, locale, channels, today, searchMaxCharacters, exportMaxPosts, exportMaxBytes }: { groups?: ChannelGroup[]; locale?: 'en' | 'fr'; channels: Array<{ id: string; name: string }>; today: string; searchMaxCharacters: number; exportMaxPosts: number; exportMaxBytes: number }) {
+export function PublishingSidebarClient({ groups, locale, channels, today, searchMaxCharacters, exportMaxPosts, exportMaxBytes, origins }: { groups?: ChannelGroup[]; locale?: 'en' | 'fr'; channels: Array<{ id: string; name: string }>; today: string; searchMaxCharacters: number; exportMaxPosts: number; exportMaxBytes: number; origins?: Array<{ kind: string; label: string }> }) {
   const copy = usePublishingCopy(locale);
   const pathname = usePathname();
   return pathname.startsWith("/publishing/collaboration")
@@ -19,5 +19,5 @@ export function PublishingSidebarClient({ groups, locale, channels, today, searc
     ? <div aria-label={copy.templateTools}><p className="shell-subnav__label">{copy.templatesTitle}</p><p className="help">{copy.templateHelp}</p></div>
     : pathname === "/publishing/calendar"
     ? <><CalendarFilters channels={channels} today={today} /><SavedViews screen="calendar" /></>
-    : <><PostFilters groups={groups} locale={locale} channels={channels} currentMonth={today.slice(0, 7)} searchMaxCharacters={searchMaxCharacters} exportMaxPosts={exportMaxPosts} exportMaxBytes={exportMaxBytes} />{pathname === "/publishing/posts" ? <SavedViews screen="posts" /> : null}</>;
+    : <><PostFilters groups={groups} locale={locale} channels={channels} currentMonth={today.slice(0, 7)} searchMaxCharacters={searchMaxCharacters} exportMaxPosts={exportMaxPosts} exportMaxBytes={exportMaxBytes} origins={origins} />{pathname === "/publishing/posts" ? <SavedViews screen="posts" /> : null}</>;
 }

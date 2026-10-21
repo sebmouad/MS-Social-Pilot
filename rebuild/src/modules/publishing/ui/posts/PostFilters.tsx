@@ -7,6 +7,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { PublishingChannelOptions } from '@/modules/publishing/ui/PublishingChannelOptions';
 import styles from '@/modules/publishing/ui/publishing.module.css';
 import { PostExport } from './PostExport';
+import { originCopy } from '../origins/copy';
 
 const statuses = [
   'draft', 'pending_approval', 'rejected',
@@ -19,7 +20,7 @@ export function parsePostView(value: string | null | undefined): PostView {
   return value === 'feed' || value === 'cards' ? value : 'table';
 }
 
-export function PostFilters({ groups = [], locale = 'en', channels, currentMonth, searchMaxCharacters, exportMaxPosts, exportMaxBytes }: { groups?: ChannelGroup[]; locale?: 'en' | 'fr'; channels: Array<{ id: string; name: string }>; currentMonth: string; searchMaxCharacters?: number; exportMaxPosts?: number; exportMaxBytes?: number }) {
+export function PostFilters({ groups = [], locale = 'en', channels, currentMonth, searchMaxCharacters, exportMaxPosts, exportMaxBytes, origins = [] }: { groups?: ChannelGroup[]; locale?: 'en' | 'fr'; channels: Array<{ id: string; name: string }>; currentMonth: string; searchMaxCharacters?: number; exportMaxPosts?: number; exportMaxBytes?: number; origins?: Array<{ kind: string; label: string }> }) {
   const copy = usePublishingCopy(locale);
   const pathname = usePathname();
   const params = useSearchParams();
@@ -49,6 +50,13 @@ export function PostFilters({ groups = [], locale = 'en', channels, currentMonth
       <PublishingChannelOptions channels={channels} selected={params.get("channel")} groupIds={groups.map(group => group.id)} />
       {groups.length > 0 && <optgroup label={profileCopy[locale].groups}>{groups.filter(group => group.channelIds.some(id => channels.some(channel => channel.id === id))).map(group => <option key={group.id} value={`channel-group:${group.id}`}>{group.name}</option>)}</optgroup>}
     </select>
+    {origins.length ? <>
+      <label htmlFor="post-origin-filter">{originCopy[locale].filterLabel}</label>
+      <select id="post-origin-filter" name="origin" defaultValue={params.get('origin') ?? ''}>
+        <option value="">{originCopy[locale].anyOrigin}</option>
+        {origins.map(option => <option value={option.kind} key={option.kind}>{option.label}</option>)}
+      </select>
+    </> : null}
     <label htmlFor="post-search-filter">{copy.searchPosts}</label>
     <input id="post-search-filter" type="search" name="q" maxLength={searchMaxCharacters} defaultValue={params.get('q') ?? ''} placeholder={copy.searchPlaceholder} aria-describedby="post-search-help" />
     <p id="post-search-help" className={styles.help}>{copy.searchHelp}</p>

@@ -13,6 +13,7 @@ import { channelBadgeInfo } from "@/lib/channel-badge";
 import { formatPostPreviewTime } from "@/components/PostPreview";
 import { moveCandidates } from "@/lib/reschedule";
 import { CalendarBoard } from "./CalendarBoard";
+import { loadPostOrigins } from "../origins/load";
 import { runtimeConfig } from '@/server/config/store';
 import type { BoardDay, BoardPost } from "./types";
 import styles from "./calendar.module.css";
@@ -59,6 +60,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const to = new Date(utcNoon(keys[keys.length - 1]!).getTime() + 2 * DAY);
   const { posts, channels, channelUnavailable } = await readPublishingCalendar({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { from, to, channelId, status });
 
+  const origins = await loadPostOrigins(viewer.workspaceId, posts.map(post => post.id), locale);
   const canEditCalendar = canAccessFeature(viewer.permissions, "publishing/calendar", "write");
   const canCreate = canAccessFeature(viewer.permissions, "publishing/posts", "write");
   const byDay = new Map<string, BoardPost[]>();
@@ -73,6 +75,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     byDay.set(key, [...(byDay.get(key) ?? []), {
       id: post.id, text: postContentSummary(post.message, post.media, post.link, copy).slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable,
       authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember,
+      origin: origins.get(post.id),
       clockLabel: formatPostPreviewTime(when, timeZone),
       wallTime,
       moveOptions: movable ? moveCandidates(when.toISOString(), timeZone, now.getTime(), movePolicy) : undefined,
