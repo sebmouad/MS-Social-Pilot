@@ -70,3 +70,57 @@ HTTP routes are same-origin for writes and call the same services. MCP group `co
 - `drafts` mode has no stored per-feed setting (no migration); it is a manual action.
 - `qualifyingOwner` and the screen are not covered by their own unit tests beyond the injected seams.
 - Automatic reading is off until Root enables `feeds.autoCheck.enabled`; the worker must run (`npm run worker`).
+
+## WordPress recipe planner (2026-10-21)
+
+Status: SOURCE and MOCKED TESTS (mocked `mysql2` pool, in-memory ledger, fake Publishing and image ports; real `sharp` conversion). No real MariaDB, PostgreSQL, browser, live Facebook or production run. **Nothing is enabled**: the Root master switch `feeds.wordpress.enabled` defaults off and a new source starts paused. The integrator configures and dry-runs first.
+
+Purpose: keep every selected Page continuously scheduled with recipes from the owner's WordPress site. Each configured time on each Page gets a **different** recipe: Facebook image and caption in the post, the canonical recipe in the first comment. Read-only access to WordPress; the application never writes to it.
+
+| File | Role |
+| --- | --- |
+| `wordpress/config.ts` | 48 `feeds.wordpress.*` Root keys (spread into `FEEDS_CONFIG`; one secret, the others `active`) |
+| `wordpress/recipe.ts` | pure: per-source config merge over Root defaults, recipe parsing, first-comment rendering and truncation, permalink and image addresses, slot instants (DST), recipe allocation, confirmations |
+| `wordpress/db.ts` | read-only MariaDB access (lazy `mysql2/promise`, injectable pool): candidate query, attachment-path query |
+| `wordpress/image.ts` | guarded fetch, media inspection, WebP to JPEG (`sharp`), stored through `uploadWorkspaceImage` |
+| `server/wordpress-settings.ts` | one validated Root snapshot for the feature |
+| `server/wordpress-store.ts` | `RecipeStore` port and Prisma implementation (sources, ledger claims) |
+| `server/wordpress-planner.ts` | `planSource` (fill the horizon) and `runRecipePlanning` (worker entry) |
+| `server/wordpress.ts` | customer service: read, save, pause/resume, preview, run now |
+| `copy-recipes.ts`, `ui/RecipeSource.tsx` | en+fr copy and the screen section on `/publishing/feeds` |
+
+Migration `20261031140000_rebuild_wordpress_sources` (additive, SHA-256 `cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642`, pinned in `scripts/cutover-rehearsal.sh` and its test, **not applied to any database**): `wordpress_recipe_sources` (one per workspace; name, site, enabled, all-or-selected channels, JSON config overrides, last run) and `wordpress_recipe_plans` (the ledger). Both carry `workspaceId` FKs with cascade and the purge write gate, so catalog-driven export and erasure cover them.
+
+### Data mapping (verified production facts)
+
+- Recipes: `wp_posts` rows with `post_type = 'post'`, `post_status = 'publish'`; table prefix, type, status and every meta key below are Root defaults that each source may override.
+- Caption: meta `_msrwa_facebook_caption`. Image: meta `_msrwa_facebook_generated` is an attachment ID; the attachment's `_wp_attached_file` gives the path, public address `{siteUrl}{uploadsPath}/{path}`. Recipe: meta `_msrwa_recipe` (JSON). Already shared: meta `fb_shared_at` (skipped when "skip shared" is on). A recipe needs all three of caption, image file and a recipe with at least one ingredient or step, otherwise it is not a candidate.
+- Link: `feeds.wordpress.permalinkTemplate` (`{siteUrl}/{slug}/`), e.g. ID 60938 becomes `https://recettes.newsgeet.com/potee-auvergnate-a-lancienne-fondante-et-doree/`.
+- Ingredients and steps may be strings or objects (`name/text/item`, `quantity/qty/amount`, `unit`, `note`, nested groups with `items`); group titles become heading lines.
+- First comment: template with `{title} {description} {ingredients} {steps} {servings} {prep} {cook} {total} {link}` (French default). Ingredients get bullets, steps are numbered. Over the limit (the smaller of `feeds.wordpress.firstCommentMaxCharacters` and `publishing.maxMessageCharacters`) steps are cut first, then ingredients, with a mark, and the link is always kept.
+- Image: downloaded with the address-pinned public fetch (feeds redirect/allow-http/host-allowlist settings apply, so the WordPress host must pass `feeds.hostAllowlist` when that list is not empty), checked by `inspectMediaSnapshot`, converted to JPEG (quality from Root, lowered stepwise until under `publishing.maxImageUploadBytes`), and stored as a workspace image referenced as `media:<id>`.
+
+### Planning
+
+1. The `feedsPoll` job (schedule `feeds.autoCheck.schedule`, no new job name, `scripts/worker.ts` unchanged) now also runs `runRecipePlanning` after RSS reading. It acts only when `feeds.wordpress.enabled` is on and a source is enabled; RSS reading's own switch is independent. The result is attached as `recipes` on the job summary (the worker's one-line log does not print it).
+2. Per source it acts as the oldest active workspace owner who qualifies (`qualifyingOwner`, the workspace-owner worker policy). Channels are the source's list or, with "all channels", every enabled publishable channel whose type is in `feeds.wordpress.targetTypes`; each is validated through Publishing's `validateTargets` and dropped when Publishing would refuse it.
+3. Slots: configured local times in the source time zone for `horizonDays` ahead, DST-correct (a time inside the spring gap moves to the first minute that exists; an ambiguous autumn time uses its first occurrence), starting `minLeadMinutes` from now.
+4. Allocation: slots in time order, pages in name order; each slot takes the first recipe that no other page received in the horizon (when distinct), that this page has not had within `cooldownDays`, and that this slot has not already failed with. Recipes are scanned newest first (or oldest) in keyset batches, up to `candidateMaxScan` rows.
+5. Each slot is claimed in the ledger first (unique on source, page, time), then image prepared, then Publishing `createPost` with one target, the scheduled time, the caption, the stored image, the rendered first comment and the first-comment delay. Publishing's own authorization, approval, scheduling mode (application default), first-comment continuation and status reconciliation apply unchanged.
+6. Per-run budget `feeds.wordpress.runBudget` bounds posts created across all sources (default 80, the first fill of 10 pages x 2 days x 4 slots).
+
+Ledger states: `planned` (post id stored), `claimed` (unfinished; older than `claimLeaseSeconds` it becomes `uncertain`), `uncertain` (a result that could not be confirmed: never retried automatically, the slot stays consumed, the recipe stays blocked), `failed` (definitive refusal: image or content problem). A failed slot is retried with another recipe (the failed ones are kept in `skipped` and stay blocked for that page) until `maxSlotAttempts`. An authority error (forbidden/unauthorized/unavailable) stops the source's run without blaming the recipe.
+
+### API and MCP
+
+`GET/PUT /api/feeds/wordpress`, `POST /api/feeds/wordpress/preview`, `/run`, `/state`; same-origin writes. MCP tools in the `content-feeds` group: `get_recipe_source`, `save_recipe_source` (`SAVE RECIPE SOURCE <name>`), `preview_recipe_source`, `run_recipe_planner` (`RUN RECIPE PLANNER`), `set_recipe_source_state` (`PAUSE RECIPE SOURCE` / `RESUME RECIPE SOURCE`). All are channel-scoped: a channel-limited member or key sees and changes only a source whose channels are explicitly listed and all inside the grant; a workspace-wide source is refused to them. Manual run-now acts as the signed-in member and requires the Root switch and an active source. The database address is never returned; the read model only says whether planning is available.
+
+### Limitations and open work
+
+- Not run against MariaDB, PostgreSQL, a browser or Facebook. The raw SQL, the migration, the real `sharp`/media-storage path and the first dry run on production are unverified. `mysql2` is pinned in `rebuild/package.json` (3.24.5) but no lockfile or install was updated here.
+- Chronological order uses `ID` (newest first by `ID`), not `post_date_gmt`.
+- The pool of eligible recipes is finite (about 2,900 with caption and image). At 40 posts a day with a 365-day cooldown it is exhausted in about 70 days; the planner then reports unfilled slots instead of repeating.
+- A crash between creating the post and saving its ID leaves an `uncertain` row (slot consumed, no duplicate); the post itself is found in Publishing.
+- Planned posts are not removed when a source is paused or a channel is deselected (they are ordinary scheduled posts). Failed slots are not shown with a manual retry action.
+- The preview shows the original WordPress image address in an `<img>`; a strict `img-src` policy must allow the site, or a proxy would be needed.
+- Shortening marks, minutes suffix and the French default template are Root settings; the customer-facing error text of the service is English like the rest of the feeds service.

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { FEEDS_CONFIG, FEEDS_DEFAULTS } from '../src/modules/feeds/config';
 import { FEEDS_FEATURE_ID, FEEDS_JOBS, FEEDS_PAGES, FEEDS_ROOT_KEYS } from '../src/modules/feeds/manifest';
-import { FEEDS_MCP, feedToolDefinitions, feedTools, feedWriteTools } from '../src/modules/feeds/mcp';
+import { FEEDS_MCP, feedToolDefinitions, feedTools, feedWriteTools, recipeToolDefinitions, recipeTools } from '../src/modules/feeds/mcp';
 import { feedsCopy, feedsLocale, feedsText } from '../src/modules/feeds/copy';
+import { recipeCopy, recipeText } from '../src/modules/feeds/copy-recipes';
 import { publishingManifest } from '../src/modules/publishing/manifest';
 import { moduleManifests } from '../src/modules';
 import { INSTALLED_MODULE_CONFIG } from '../src/modules/installed-config';
@@ -52,18 +53,19 @@ describe('content feeds MCP surface', () => {
   const group = FEEDS_MCP[0]!;
   it('is installed, feature bound and declares closed schemas', () => {
     expect(installedMcpGroups()).toContain(group);
-    expect(feedTools.size).toBe(5);
-    for (const tool of feedToolDefinitions) {
+    expect(feedToolDefinitions).toHaveLength(5);
+    expect(feedTools.size).toBe(feedToolDefinitions.length + recipeToolDefinitions.length);
+    for (const tool of [...feedToolDefinitions, ...recipeToolDefinitions]) {
       expect(group.features[tool.name]).toBe(FEEDS_FEATURE_ID);
       expect((tool.inputSchema as { additionalProperties: boolean }).additionalProperties).toBe(false);
-      if (feedWriteTools.has(tool.name) && tool.name !== 'check_content_feed') expect(Object.keys((tool.inputSchema as { properties: object }).properties)).toContain('confirmation');
+      if (feedWriteTools.has(tool.name) && !['check_content_feed', 'preview_recipe_source'].includes(tool.name)) expect(Object.keys((tool.inputSchema as { properties: object }).properties)).toContain('confirmation');
     }
     expect([...group.writeTools!].sort()).toEqual([...feedWriteTools].sort());
   });
 
   it('classifies tools and the resource as channel-scoped (the service enforces the ceiling)', () => {
     const restricted = { permissions: { pageScope: { all: false, ids: ['t1'] } }, apiKeyId: 'k1', resourceRestricted: true } as never;
-    for (const tool of feedToolDefinitions) {
+    for (const tool of [...feedToolDefinitions, ...recipeToolDefinitions]) {
       expect(classifyTool(tool.name)).toBe('resource');
       expect(toolAllowedForScope(restricted, tool.name)).toBe(true);
     }
@@ -79,6 +81,30 @@ describe('content feeds MCP surface', () => {
   });
 });
 
+describe('recipe source MCP parity', () => {
+  const group = FEEDS_MCP[0]!;
+  it('exposes get, save, preview, run and pause/resume with exact confirmations on the writes', () => {
+    expect(recipeToolDefinitions.map(t => t.name)).toEqual(['get_recipe_source', 'save_recipe_source', 'preview_recipe_source', 'run_recipe_planner', 'set_recipe_source_state']);
+    const tool = (name: string) => recipeToolDefinitions.find(t => t.name === name)!;
+    expect(tool('save_recipe_source').description).toContain('SAVE RECIPE SOURCE <name>');
+    expect(tool('run_recipe_planner').description).toContain('RUN RECIPE PLANNER');
+    expect(tool('set_recipe_source_state').description).toContain('PAUSE RECIPE SOURCE');
+    expect(tool('set_recipe_source_state').description).toContain('RESUME RECIPE SOURCE');
+    for (const name of ['save_recipe_source', 'run_recipe_planner', 'set_recipe_source_state']) expect((tool(name).inputSchema as unknown as { required: string[] }).required).toContain('confirmation');
+    expect((tool('preview_recipe_source').inputSchema as unknown as { required?: string[] }).required).toBeUndefined();
+    expect(group.tools.map(t => t.name)).toEqual(expect.arrayContaining([...recipeTools]));
+    for (const name of recipeTools) expect(group.features[name]).toBe(FEEDS_FEATURE_ID);
+    expect(group.selfLockedWrites).toEqual(expect.arrayContaining(['save_recipe_source', 'run_recipe_planner', 'set_recipe_source_state']));
+  });
+
+  it('keeps every recipe-source Root key under the feeds.wordpress prefix, with the database address as the only secret', () => {
+    const keys = FEEDS_CONFIG.filter(e => e.key.startsWith('feeds.wordpress.'));
+    expect(keys.length).toBeGreaterThan(40);
+    expect(keys.filter(e => e.kind === 'secret').map(e => e.key)).toEqual(['feeds.wordpress.databaseUrl']);
+    expect(keys.find(e => e.key === 'feeds.wordpress.enabled')!.defaultValue).toBe(false);
+  });
+});
+
 describe('content feeds copy', () => {
   it('has the same keys in English and French and picks the language from accept-language', () => {
     expect(Object.keys(feedsCopy.fr).sort()).toEqual(Object.keys(feedsCopy.en).sort());
@@ -87,5 +113,11 @@ describe('content feeds copy', () => {
     expect(feedsLocale(null)).toBe('en');
     expect(feedsText('fr', 'postsCreated', { count: 2, held: 1 })).toBe('2 publication(s) créée(s) (1 en attente de validation).');
     expect(feedsText('en', 'templateHint')).toContain('{title}');
+  });
+
+  it('has the same recipe-source keys in English and French', () => {
+    expect(Object.keys(recipeCopy.fr).sort()).toEqual(Object.keys(recipeCopy.en).sort());
+    expect(recipeText('fr', 'runNotice', { planned: 3, failed: 1, unfilled: 0 })).toBe('3 publications programmées, 1 en échec, 0 horaires encore vides.');
+    expect(recipeText('en', 'templateHint')).toContain('{ingredients}');
   });
 });
