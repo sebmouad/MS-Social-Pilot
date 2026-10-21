@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ read: vi.fn(), authorize: vi.fn() }));
+vi.mock('@/modules/analytics/server/error-copy', async () => {
+  const { errorCopyDefaults } = await import('@/modules/analytics/error-copy');
+  const { OperationError } = await import('@/lib/operation-error');
+  return { analyticsError: async (code: import('@/lib/operation-error').OperationErrorCode, key: keyof typeof errorCopyDefaults) => new OperationError(code, errorCopyDefaults[key].en), analyticsLanguage: async () => 'en', localizeAnalyticsError: async (error: unknown) => error };
+});
 vi.mock('@/server/data', () => ({ prisma: {} }));
 vi.mock('@/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: mocks.read }));
 vi.mock('@/modules/analytics/server/access', () => ({ authorize: mocks.authorize }));

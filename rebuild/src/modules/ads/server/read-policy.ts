@@ -1,8 +1,11 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
 import { ADS_READ_MAX_ROWS_SCHEMA, ADS_READ_PAGE_SIZE_SCHEMA, type AdsReadPolicy } from '../read-policy';
 
 export async function loadAdsReadPolicy(readConfig: typeof runtimeConfig = runtimeConfig): Promise<AdsReadPolicy> {
+  return withAdsCopySnapshot(async () => {
   try {
     const [pageSize, maxRows] = await Promise.all([
       readConfig('ads.reportPageSize'),
@@ -13,6 +16,8 @@ export async function loadAdsReadPolicy(readConfig: typeof runtimeConfig = runti
       maxRows: ADS_READ_MAX_ROWS_SCHEMA.parse(maxRows),
     };
   } catch {
-    throw new OperationError('unavailable', 'Reports are temporarily unavailable. Try again later.');
+    throw new OperationError('unavailable', await adsServiceText('service024'));
   }
+
+  });
 }

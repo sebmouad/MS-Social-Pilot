@@ -1,6 +1,10 @@
+import { bilingualCatalog } from './catalog';
+import { z } from 'zod';
+import { copySchema } from '@/lib/config/copy-schema';
 import type { AuthLocale } from './auth/copy';
 
 const en = {
+  homeUnavailable: 'Home is unavailable in this workspace.', supportedAction: 'Choose a supported Home action.',
   eyebrow: 'Workspace overview', lead: 'How your channels are doing, and what comes next.', metrics: 'Workspace figures',
   channels: 'Connected channels', adAccounts: 'Linked ad accounts', published: 'Published posts', scheduled: 'Scheduled posts',
   firstStep: 'First step', startTitle: 'Choose the channels you want to manage',
@@ -31,7 +35,8 @@ const en = {
   adsEmptyTitle: 'No ad spend yet', adsEmptyBody: 'Spend shows here once your ad accounts have stored results.', adsEmptyAction: 'Open ads',
 };
 
-export const homeCopy = (locale: AuthLocale): typeof en => locale === 'fr' ? {
+const fr: typeof en = {
+  homeUnavailable: 'L’accueil est indisponible dans cet espace.', supportedAction: 'Choisissez une action d’accueil prise en charge.',
   eyebrow: 'Vue d’ensemble de l’espace', lead: 'Comment vont vos canaux, et ce qui arrive ensuite.', metrics: 'Chiffres de l’espace',
   channels: 'Canaux connectés', adAccounts: 'Comptes publicitaires liés', published: 'Publications publiées', scheduled: 'Publications planifiées',
   firstStep: 'Première étape', startTitle: 'Choisissez les canaux à gérer',
@@ -60,9 +65,19 @@ export const homeCopy = (locale: AuthLocale): typeof en => locale === 'fr' ? {
   inbox: 'Boîte de réception', inboxOpen: 'conversations en attente', inboxZero: 'Tout est à jour.', inboxAction: 'Ouvrir la boîte de réception',
   adSpend: 'Dépenses publicitaires', adSpendNote: '{n} derniers jours, par devise', adSpendTrend: 'Dépenses publicitaires par jour, {n} derniers jours',
   adsEmptyTitle: 'Pas encore de dépenses', adsEmptyBody: 'Les dépenses apparaissent dès que vos comptes publicitaires ont des résultats enregistrés.', adsEmptyAction: 'Ouvrir les publicités',
-} : en;
+};
 
 /** Replace `{name}` placeholders in a copy string. */
 export function fill(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) => key in values ? String(values[key]) : match);
 }
+
+export const homeCopyDefaults = { en, fr };
+export type HomeCopy = typeof en;
+/** Browser-safe defaults; server screens supply the current Root catalog. */
+export const homeCopy = (locale: AuthLocale, catalog: typeof homeCopyDefaults = homeCopyDefaults): HomeCopy => catalog[locale];
+
+const homeCatalog = bilingualCatalog(homeCopyDefaults);
+export const homeCopyCatalogDefaults = homeCatalog.catalog;
+export const homeCopySchema = homeCatalog.schema;
+export const homeLocaleCopy = homeCatalog.view;

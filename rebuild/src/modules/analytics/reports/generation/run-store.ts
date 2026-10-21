@@ -1,3 +1,4 @@
+import { errorCopyDefaults, type AnalyticsErrorCopy } from '../../error-copy';
 import { createHash, randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { audit, type Tx } from '../server/access';
@@ -13,19 +14,24 @@ export const OPEN_STATUSES = ['claimed', 'generating', 'delivering'] as const;
 export class ClaimLost extends Error { constructor() { super('The report run is no longer owned by this worker.'); this.name = 'ClaimLost'; } }
 
 export const FAILURE_TEXT: Record<string, string> = {
-  channel_unavailable: 'The channel is disabled, disconnected or no longer available.', access_unavailable: 'The report owner no longer has access to this report.',
-  workspace_unavailable: 'The workspace is suspended or being erased.', no_report_owner: 'The person who set up this schedule is no longer available.',
-  schedule_removed: 'The schedule was removed before delivery.', no_supported_sections: 'This report lists only sections that are not available yet. Edit its template.',
-  generation_failed: 'The report could not be prepared.', delivery_failed: 'No recipient received the report.',
-  delivery_uncertain: 'Delivery to at least one recipient could not be confirmed. Check with the recipients before sending again.',
-  lease_expired: 'The run was interrupted before it finished.', lease_expired_during_delivery: 'The run was interrupted during delivery. Delivery was not retried; check with the recipients.',
-  result_too_large: 'The report has more rows than this access allows.',
-  stored_output_too_large: 'The report is too large to keep for download. Choose fewer sections or a shorter period.',
-  delivery_not_started: 'Email delivery stopped before the next recipient could be contacted. Review this run before preparing another report.',
-  workspace_time_zone_unavailable: 'The workspace time zone is unavailable. Review workspace settings.',
-  result_not_recorded: 'The result could not be recorded. Delivery was not retried; check with the recipients.',
+  channel_unavailable: errorCopyDefaults["The channel is disabled, disconnected or no longer available."].en, access_unavailable: errorCopyDefaults["The report owner no longer has access to this report."].en,
+  workspace_unavailable: errorCopyDefaults["The workspace is suspended or being erased."].en, no_report_owner: errorCopyDefaults["The person who set up this schedule is no longer available."].en,
+  schedule_removed: errorCopyDefaults["The schedule was removed before delivery."].en, no_supported_sections: errorCopyDefaults["This report lists only sections that are not available yet. Edit its template."].en,
+  generation_failed: errorCopyDefaults["The report could not be prepared."].en, delivery_failed: errorCopyDefaults["No recipient received the report."].en,
+  delivery_uncertain: errorCopyDefaults["Delivery to at least one recipient could not be confirmed. Check with the recipients before sending again."].en,
+  lease_expired: errorCopyDefaults["The run was interrupted before it finished."].en, lease_expired_during_delivery: errorCopyDefaults["The run was interrupted during delivery. Delivery was not retried; check with the recipients."].en,
+  result_too_large: errorCopyDefaults["The report has more rows than this access allows."].en,
+  stored_output_too_large: errorCopyDefaults["The report is too large to keep for download. Choose fewer sections or a shorter period."].en,
+  delivery_not_started: errorCopyDefaults["Email delivery stopped before the next recipient could be contacted. Review this run before preparing another report."].en,
+  workspace_time_zone_unavailable: errorCopyDefaults["The workspace time zone is unavailable. Review workspace settings."].en,
+  result_not_recorded: errorCopyDefaults["The result could not be recorded. Delivery was not retried; check with the recipients."].en,
 };
-export const reportFailureText = (reason: string | null) => reason ? FAILURE_TEXT[reason] ?? 'The run did not finish.' : null;
+export const reportFailureText = (reason: string | null, copy: AnalyticsErrorCopy = errorCopyDefaults, locale: 'en' | 'fr' = 'en') => {
+  if (!reason) return null;
+  const source = FAILURE_TEXT[reason] ?? errorCopyDefaults['The run did not finish.'].en;
+  const key = (Object.keys(errorCopyDefaults) as Array<keyof AnalyticsErrorCopy>).find(key => errorCopyDefaults[key].en === source)!;
+  return copy[key][locale];
+};
 export const safeReason = (reason: string) => (reason in FAILURE_TEXT ? reason : 'generation_failed');
 export const mask = (address: string) => { const [local = '', domain = ''] = address.split('@'); return `${[...local][0] ?? ''}***@${domain}`; };
 

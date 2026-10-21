@@ -1,3 +1,6 @@
+import { documentText, reportDocumentCopyDefaults, type ReportDocumentCopy } from './copy';
+import { responseTimeCopyDefaults, type ResponseTimeCopy } from './response-copy';
+import { loadReportDocumentCopy } from './copy-server';
 import type { MetricView } from '@/modules/analytics/server/aggregate';
 import { readAnalyticsSnapshot } from '../../server/read';
 import { REPORT_SECTION_IDS, REPORT_SUPPORTED_SECTIONS, type ReportActor, type ReportGenerationPort, type ReportGenerationRequest, type ReportGenerationResult, type ReportOutput, type ReportSectionId } from '../contracts';
@@ -7,7 +10,7 @@ import { platformAnalytics } from '@/server/platforms/registry';
 import type { DestinationMeasures, PostPerformance } from '@/server/platforms/host';
 import { channelGoalProgress } from '../../goals/server/goals';
 import type { GoalMonth, GoalProgress } from '../../goals/contracts';
-import { describeBusinessHours, formatDuration, readResponseTime, type ResponseTimeSummary } from './response-time';
+import { describeBusinessHours as responseHours, formatDuration as responseDuration, readResponseTime, type ResponseTimeSummary } from './response-time';
 
 /** One channel's per-destination summary: neutral counts plus the platform module's stored measures (null = not stored). */
 export type DestinationSummary = {
@@ -23,8 +26,8 @@ export type ReportBounds = { maxRows: number; maxBytes: number };
 
 /** The AI recap of one run: `ready` carries generated text; `unavailable` means it could not be produced this run (rate limit or provider failure). */
 export type RecapState = { state: 'ready'; text: string } | { state: 'unavailable' };
-export const RECAP_LABEL = 'AI-generated summary of the figures in this report. It may contain mistakes; check it against the figures.';
-export const RECAP_UNAVAILABLE = 'The AI recap is unavailable for this run. The figures below are unaffected.';
+export const RECAP_LABEL = reportDocumentCopyDefaults.en["AI-generated summary of the figures in this report. It may contain mistakes; check it against the figures."];
+export const RECAP_UNAVAILABLE = reportDocumentCopyDefaults.en["The AI recap is unavailable for this run. The figures below are unaffected."];
 /** Recap writer. Receives only compact report figures; the default is the AI module's authorized `summarize`. */
 export type RecapWriter = (actor: { userId: string; workspaceId: string; permissionCeiling?: ReportActor['permissionCeiling'] }, request: { facts: string; subject: string; language: string }) => Promise<{ text: string }>;
 const defaultRecap: RecapWriter = async (actor, request) => (await import('@/modules/ai/server/ai')).summarize(actor, request, { feature: 'analytics/reports' });
@@ -64,7 +67,15 @@ type Snapshot = Awaited<ReturnType<typeof readAnalyticsSnapshot>>;
  * as-of times; a metric without data is "Not available", never zero. Every rendering is bounded in rows and UTF-8 bytes, and
  * anything cut is marked; when even the fixed parts exceed the bound a minimal notice is returned instead of an overflowing page.
  */
-export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null; recap?: RecapState | null }, bounds: ReportBounds): ReportOutput {
+export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null; recap?: RecapState | null }, bounds: ReportBounds, copy: ReportDocumentCopy = reportDocumentCopyDefaults.en, locale: 'en' | 'fr' = 'en', responseCopy: ResponseTimeCopy = responseTimeCopyDefaults): ReportOutput {
+  const t = documentText(copy);
+  const formatDuration = (ms: number | null) => responseDuration(ms, responseCopy, locale);
+  const describeBusinessHours = (hours: Parameters<typeof responseHours>[0]) => responseHours(hours, responseCopy, locale);
+  const RECAP_LABEL = t("AI-generated summary of the figures in this report. It may contain mistakes; check it against the figures.");
+  const RECAP_UNAVAILABLE = t("The AI recap is unavailable for this run. The figures below are unaffected.");
+  const coverageText = (m: Pick<MetricView, 'coverage' | 'available'>) => t("{v0} of {v1} channels", { v0: m.coverage, v1: m.available });
+  const valueText = (m: MetricView) => m.total === null ? t("Not available") : (m.displayTotal ?? String(m.total));
+  const asOf = (date: Date | null | undefined) => date ? date.toISOString().slice(0, 10) : t("unknown");
   const wanted = new Set(input.sections);
   // The recap is included only when the run produced it or recorded that it could not; otherwise (AI off or not permitted) it is not included.
   const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s) && (s !== 'aiRecap' || Boolean(input.recap)));
@@ -75,53 +86,53 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const audience = included.includes('audience') ? snapshot.audience : null;
   const response = included.includes('responseTime') ? input.responseTime ?? null : null;
   const responseBasis = response ? (response.businessHours
-    ? `Business hours (${describeBusinessHours(response.businessHours)}): median first response ${formatDuration(response.businessMedianMs)}, counting only time inside business hours. Calendar time: median first response ${formatDuration(response.medianMs)}.`
-    : `Calendar time: median first response ${formatDuration(response.medianMs)}. Business hours are not set for this workspace, so no business-hours figure is shown.`) : '';
-  const responseLine = response ? `${responseBasis} ${response.answered} answered, ${response.unanswered} waiting at period end. From stored Inbox messages${response.partial ? '; only the earliest messages were read' : ''}.` : '';
-  const memberLine = (m: { name: string; answered: number; medianMs: number | null }) => `${clamp(m.name, 80)}: ${m.answered} answered, median first response ${formatDuration(m.medianMs)}`;
-  const memberLines = response?.members ? [...response.members.map(memberLine), ...(response.membersOmitted ? [`${response.membersOmitted} more not listed`] : [])] : [];
-  const resolveLine = response?.resolve ? `Resolve time: median ${formatDuration(response.resolve.medianMs)} from the first visitor message to resolved; ${response.resolve.resolved} resolved, ${response.resolve.unresolved} not resolved (not counted as zero).` : '';
+    ? t("Business hours ({v0}): median first response {v1}, counting only time inside business hours. Calendar time: median first response {v2}.", { v0: describeBusinessHours(response.businessHours), v1: formatDuration(response.businessMedianMs), v2: formatDuration(response.medianMs) })
+    : t("Calendar time: median first response {v0}. Business hours are not set for this workspace, so no business-hours figure is shown.", { v0: formatDuration(response.medianMs) })) : '';
+  const responseLine = response ? t("{v0} {v1} answered, {v2} waiting at period end. From stored Inbox messages{v3}.", { v0: responseBasis, v1: response.answered, v2: response.unanswered, v3: response.partial ? t("; only the earliest messages were read") : '' }) : '';
+  const memberLine = (m: { name: string; answered: number; medianMs: number | null }) => t("{v0}: {v1} answered, median first response {v2}", { v0: clamp(m.name, 80), v1: m.answered, v2: formatDuration(m.medianMs) });
+  const memberLines = response?.members ? [...response.members.map(memberLine), ...(response.membersOmitted ? [t("{v0} more not listed", { v0: response.membersOmitted })] : [])] : [];
+  const resolveLine = response?.resolve ? t("Resolve time: median {v0} from the first visitor message to resolved; {v1} resolved, {v2} not resolved (not counted as zero).", { v0: formatDuration(response.resolve.medianMs), v1: response.resolve.resolved, v2: response.resolve.unresolved }) : '';
   const recap = included.includes('aiRecap') ? input.recap ?? null : null;
   const recapText = recap ? (recap.state === 'ready' ? recap.text : RECAP_UNAVAILABLE) : '';
   const topPosts = included.includes('topPosts') ? input.topPosts ?? [] : null;
   const destination = included.includes('destinations') ? input.destination ?? null : null;
-  const destinationNote = destination ? `Stored values summed over ${destination.posts} published post${destination.posts === 1 ? '' : 's'}; a measure no post has stored is Not available, not zero.` : '';
-  const linkClicksText = destination ? (destination.linkClicks === null ? 'Not available' : String(destination.linkClicks)) : '';
-  const measureText = (m: DestinationMeasures['measures'][number]) => m.value === null ? 'Not available' : `${m.value}${m.measuredPosts < (destination?.posts ?? 0) ? ` (stored for ${m.measuredPosts} of ${destination?.posts} posts)` : ''}`;
-  const postTitle = (p: PostPerformance) => clamp(p.text || '(no text)', 120);
+  const destinationNote = destination ? t("Stored values summed over {v0} published post{v1}; a measure no post has stored is Not available, not zero.", { v0: destination.posts, v1: destination.posts === 1 ? '' : 's' }) : '';
+  const linkClicksText = destination ? (destination.linkClicks === null ? t("Not available") : String(destination.linkClicks)) : '';
+  const measureText = (m: DestinationMeasures['measures'][number]) => m.value === null ? t("Not available") : `${m.value}${m.measuredPosts < (destination?.posts ?? 0) ? t(" (stored for {v0} of {v1} posts)", { v0: m.measuredPosts, v1: destination?.posts ?? 0 }) : ''}`;
+  const postTitle = (p: PostPerformance) => clamp(p.text || t("(no text)"), 120);
   const goals = included.includes('goals') ? input.goals ?? { month: { month: '', start: '', end: '', timeZone: '' }, goals: [] } : null;
-  const goalText = (g: GoalProgress) => `${g.label}: ${g.actual === null ? 'No data' : g.actual} of ${g.target} (${g.percent}%, ${g.paceLabel})`;
+  const goalText = (g: GoalProgress) => t("{v0}: {v1} of {v2} ({v3}%, {v4})", { v0: g.label, v1: g.actual === null ? t("No data") : g.actual, v2: g.target, v3: g.percent, v4: g.paceLabel });
   const audienceAsOf = audience ? audience.entries.map(e => e.asOf).filter((d): d is Date => d instanceof Date).sort((a, b) => b.getTime() - a.getTime())[0] : undefined;
 
   // CSV: long form, one row per summary/point/resource, cut at the row and byte limits.
   const header = ['record_type', 'metric_key', 'metric', 'source', 'resource', 'date', 'value', 'unit', 'coverage', 'aggregation'];
   const rows: unknown[][] = [];
-  if (recap) rows.push(['ai_recap', 'ai_recap', 'AI recap (AI-generated)', 'AI-generated', '', '', recap.state === 'ready' ? recap.text : '', '', '', recap.state === 'ready' ? RECAP_LABEL : RECAP_UNAVAILABLE]);
-  if (audience) for (const e of audience.entries) rows.push(['audience', e.metric, e.metricLabel, e.sourceLabel, e.name, e.asOf, e.value, 'people', `${audience.covered} of ${audience.selected} channels`, 'Latest value per channel; not unique people']);
+  if (recap) rows.push(['ai_recap', 'ai_recap', t("AI recap (AI-generated)"), t("AI-generated"), '', '', recap.state === 'ready' ? recap.text : '', '', '', recap.state === 'ready' ? RECAP_LABEL : RECAP_UNAVAILABLE]);
+  if (audience) for (const e of audience.entries) rows.push(['audience', e.metric, e.metricLabel, e.sourceLabel, e.name, e.asOf, e.value, 'people', t("{v0} of {v1} channels", { v0: audience.covered, v1: audience.selected }), t("Latest value per channel; not unique people")]);
   if (response) {
-    rows.push(['response_time', 'median_first_response_minutes', 'Median first response (calendar time)', 'Inbox', '', '', response.medianMs === null ? '' : Math.round(response.medianMs / 60_000), 'minutes', response.partial ? 'partial' : '', 'Median wait until the channel replied; calendar time']);
-    rows.push(['response_time', 'median_first_response_business_minutes', 'Median first response (business hours)', 'Inbox', '', '', response.businessHours && response.businessMedianMs !== null ? Math.round(response.businessMedianMs / 60_000) : '', 'minutes', response.businessHours ? (response.partial ? 'partial' : '') : 'not set', response.businessHours ? `Median wait counting only business hours: ${describeBusinessHours(response.businessHours)}` : 'Business hours are not set for this workspace; no figure']);
-    rows.push(['response_time', 'answered_waits', 'Answered waits', 'Inbox', '', '', response.answered, 'waits', '', 'Count in period']);
-    rows.push(['response_time', 'unanswered_waits', 'Waiting at period end', 'Inbox', '', '', response.unanswered, 'waits', '', 'Count at period end']);
-    for (const m of response.members ?? []) rows.push(['response_time', 'member_first_response_minutes', 'Median first response by member', 'Inbox', clamp(m.name, 80), '', m.medianMs === null ? '' : Math.round(m.medianMs / 60_000), 'minutes', `${m.answered} answered`, m.memberId === null ? 'Replies sent outside the app; calendar time' : 'Replies sent through this app; calendar time']);
+    rows.push(['response_time', 'median_first_response_minutes', t("Median first response (calendar time)"), t("Inbox"), '', '', response.medianMs === null ? '' : Math.round(response.medianMs / 60_000), 'minutes', response.partial ? 'partial' : '', t("Median wait until the channel replied; calendar time")]);
+    rows.push(['response_time', 'median_first_response_business_minutes', t("Median first response (business hours)"), t("Inbox"), '', '', response.businessHours && response.businessMedianMs !== null ? Math.round(response.businessMedianMs / 60_000) : '', 'minutes', response.businessHours ? (response.partial ? 'partial' : '') : t("not set"), response.businessHours ? t("Median wait counting only business hours: {v0}", { v0: describeBusinessHours(response.businessHours) }) : t("Business hours are not set for this workspace; no figure")]);
+    rows.push(['response_time', 'answered_waits', t("Answered waits"), t("Inbox"), '', '', response.answered, 'waits', '', t("Count in period")]);
+    rows.push(['response_time', 'unanswered_waits', t("Waiting at period end"), t("Inbox"), '', '', response.unanswered, 'waits', '', t("Count at period end")]);
+    for (const m of response.members ?? []) rows.push(['response_time', 'member_first_response_minutes', t("Median first response by member"), t("Inbox"), clamp(m.name, 80), '', m.medianMs === null ? '' : Math.round(m.medianMs / 60_000), 'minutes', t("{v0} answered", { v0: m.answered }), m.memberId === null ? t("Replies sent outside the app; calendar time") : t("Replies sent through this app; calendar time")]);
     if (response.resolve) {
-      rows.push(['response_time', 'median_resolve_minutes', 'Median resolve time', 'Inbox', '', '', response.resolve.medianMs === null ? '' : Math.round(response.resolve.medianMs / 60_000), 'minutes', `${response.resolve.resolved} resolved`, 'First visitor message in the period to resolved; calendar time; unresolved conversations excluded, not zero']);
-      rows.push(['response_time', 'unresolved_conversations', 'Not resolved', 'Inbox', '', '', response.resolve.unresolved, 'conversations', '', 'Conversations with a visitor message in the period and no valid resolved time']);
+      rows.push(['response_time', 'median_resolve_minutes', t("Median resolve time"), t("Inbox"), '', '', response.resolve.medianMs === null ? '' : Math.round(response.resolve.medianMs / 60_000), 'minutes', t("{v0} resolved", { v0: response.resolve.resolved }), t("First visitor message in the period to resolved; calendar time; unresolved conversations excluded, not zero")]);
+      rows.push(['response_time', 'unresolved_conversations', t("Not resolved"), t("Inbox"), '', '', response.resolve.unresolved, 'conversations', '', t("Conversations with a visitor message in the period and no valid resolved time")]);
     }
   }
-  if (goals) for (const g of goals.goals) rows.push(['goal', g.metric, g.label, 'Goals', '', goals.month.start, g.actual ?? '', 'target ' + g.target, `${g.percent}%`, `${g.paceLabel}; month ${goals.month.start} to ${goals.month.end} (${goals.month.timeZone})`]);
+  if (goals) for (const g of goals.goals) rows.push(['goal', g.metric, g.label, t("Goals"), '', goals.month.start, g.actual ?? '', 'target ' + g.target, `${g.percent}%`, t("{v0}; month {v1} to {v2} ({v3})", { v0: g.paceLabel, v1: goals.month.start, v2: goals.month.end, v3: goals.month.timeZone })]);
   if (included.includes('destinations')) {
     if (destination) {
-      rows.push(['destination', 'posts_published', 'Posts published', 'Published posts', destination.name, '', destination.posts, 'posts', '', `Channel type ${destination.type}; count in period`]);
-      for (const m of destination.measures) rows.push(['destination_measure', m.key, m.label, 'Stored post insights', destination.name, '', m.value ?? '', 'count', `${m.measuredPosts} of ${destination.posts} posts`, 'Sum of stored per-post values; missing is not zero']);
-      rows.push(['destination_measure', 'link_clicks_lifetime', 'Link clicks (lifetime)', 'Short links', destination.name, '', destination.linkClicks ?? '', 'clicks', '', `Lifetime clicks, not clicks in the period; destination-attributed links plus unambiguous legacy links only (${destination.sharedPosts} shared posts)`]);
-    } else rows.push(['destination', 'unavailable', 'Destination summary', '', '', '', '', '', '', 'Not available']);
+      rows.push(['destination', 'posts_published', t("Posts published"), t("Published posts"), destination.name, '', destination.posts, 'posts', '', t("Channel type {v0}; count in period", { v0: destination.type })]);
+      for (const m of destination.measures) rows.push(['destination_measure', m.key, m.label, t("Stored post insights"), destination.name, '', m.value ?? '', 'count', t("{v0} of {v1} posts", { v0: m.measuredPosts, v1: destination.posts }), t("Sum of stored per-post values; missing is not zero")]);
+      rows.push(['destination_measure', 'link_clicks_lifetime', t("Link clicks (lifetime)"), t("Short links"), destination.name, '', destination.linkClicks ?? '', 'clicks', '', t("Lifetime clicks, not clicks in the period; destination-attributed links plus unambiguous legacy links only ({v0} shared posts)", { v0: destination.sharedPosts })]);
+    } else rows.push(['destination', 'unavailable', t("Destination summary"), '', '', '', '', '', '', t("Not available")]);
   }
   if (topPosts) topPosts.forEach((p, i) => {
-    rows.push(['top_post', `rank_${i + 1}`, postTitle(p), p.rankLabel, p.url ?? '', p.publishedAt, p.rankValue ?? '', p.rankLabel.toLowerCase(), '', 'Stored per-post measures; missing is not zero']);
-    for (const m of p.measures) rows.push(['top_post_measure', m.key, m.label, p.rankLabel, postTitle(p), p.publishedAt, m.value ?? '', '', '', `Rank ${i + 1}`]);
+    rows.push(['top_post', `rank_${i + 1}`, postTitle(p), p.rankLabel, p.url ?? '', p.publishedAt, p.rankValue ?? '', p.rankLabel.toLowerCase(), '', t("Stored per-post measures; missing is not zero")]);
+    for (const m of p.measures) rows.push(['top_post_measure', m.key, m.label, p.rankLabel, postTitle(p), p.publishedAt, m.value ?? '', '', '', t("Rank {v0}", { v0: i + 1 })]);
   });
-  if (included.includes('published')) for (const [k, v] of Object.entries(snapshot.publishing)) rows.push(['publishing', k, k, '', '', '', v, 'posts', '', 'Count in period']);
+  if (included.includes('published')) for (const [k, v] of Object.entries(snapshot.publishing)) rows.push(['publishing', k, k, '', '', '', v, 'posts', '', t("Count in period")]);
   for (const m of metrics) {
     const agg = [m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. ');
     rows.push(['summary', m.key, m.label, m.sourceLabel, '', m.latestAt, m.total === null ? '' : (m.displayTotal ?? m.total), m.unit, coverageText(m), agg]);
@@ -146,39 +157,39 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   if (bytes(json) > bounds.maxBytes) { json = '{"truncated":true}\n'; jsonTruncated = true; if (bytes(json) > bounds.maxBytes) json = ''; }
 
   // Printable HTML and plain text show the summary tier only (one row per metric).
-  const title = `Analytics report: ${channelName}, ${period.start} to ${period.end}`;
-  const audienceHtml = audience ? `<h2>Audience</h2><p>${esc(audience.covered)} of ${esc(audience.selected)} selected channels have audience data${audienceAsOf ? `, as of ${asOf(audienceAsOf)}` : ''}. This sum is not unique people across networks.</p><p><strong>${audience.covered ? esc(audience.total) : 'Not available'}</strong></p>` : '';
+  const title = t("Analytics report: {v0}, {v1} to {v2}", { v0: channelName, v1: period.start, v2: period.end });
+  const audienceHtml = audience ? `<h2>${esc(t("Audience"))}</h2><p>${esc(t("{v0} of {v1} selected channels have audience data{v2}. This sum is not unique people across networks.", { v0: audience.covered, v1: audience.selected, v2: audienceAsOf ? t(", as of {v0}", { v0: asOf(audienceAsOf) }) : '' }))}</p><p><strong>${audience.covered ? esc(audience.total) : esc(t("Not available"))}</strong></p>` : '';
   const htmlOf = (count: number, marked: boolean) => {
     const shown = metrics.slice(0, count);
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:14px/1.5 system-ui,sans-serif;margin:2rem;color:#111}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #bbb;padding:.35rem .5rem;text-align:left}small{color:#555}@media print{body{margin:0}}</style></head><body>`
-      + `<h1>${esc(title)}</h1><p><small>Generated ${esc(input.generatedAt.toISOString())}. Values come from stored analytics; "Not available" means no data, not zero.</small></p>`
-      + (recap ? `<h2>AI recap</h2><p><strong>AI-generated.</strong> <small>${esc(RECAP_LABEL)}</small></p><p>${esc(recapText)}</p>` : '')
-      + (included.includes('published') ? `<h2>Published posts</h2><p>Published ${esc(snapshot.publishing.published)}, scheduled ${esc(snapshot.publishing.scheduled)}, failed ${esc(snapshot.publishing.failed)}.</p>` : '')
-      + (response ? `<h2>Response time</h2><p>${esc(responseLine)}</p>${memberLines.length ? `<ul>${memberLines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}${resolveLine ? `<p>${esc(resolveLine)}</p>` : ''}` : '')
-      + (goals ? `<h2>Goals</h2>${goals.goals.length ? `<p><small>Month ${esc(goals.month.start)} to ${esc(goals.month.end)} (${esc(goals.month.timeZone)}), up to generation for the current month.</small></p><table><thead><tr><th>Goal</th><th>Target</th><th>This month</th><th>Progress</th><th>Pace</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? 'No data' : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : '<p>No goals are set for this channel.</p>'}` : '')
-      + (included.includes('destinations') ? `<h2>Destinations</h2>${destination ? `<p><small>${esc(destinationNote)}</small></p><table><thead><tr><th>Destination</th><th>Type</th><th>Posts</th>${destination.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}<th>Link clicks (lifetime)</th></tr></thead><tbody><tr><td>${esc(destination.name)}</td><td>${esc(destination.type)}</td><td>${esc(destination.posts)}</td>${destination.measures.map(m => `<td>${esc(measureText(m))}</td>`).join('')}<td>${esc(linkClicksText)}</td></tr></tbody></table><p><small>Link clicks are lifetime totals for links attributed to this channel. Legacy links without a destination count only when the post has a single published destination.</small></p>` : '<p>Destination summary not available.</p>'}` : '')
-      + (topPosts ? `<h2>Top posts</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>Post</th><th>Published</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.url ? `<a href="${esc(p.url)}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}</td><td>${asOf(p.publishedAt)}</td><td>${p.rankValue === null ? 'Not available' : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? 'Not available' : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<p>No published posts with stored measures in this period.</p>'}` : '')
+    return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:14px/1.5 system-ui,sans-serif;margin:2rem;color:#111}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #bbb;padding:.35rem .5rem;text-align:left}small{color:#555}@media print{body{margin:0}}</style></head><body>`
+      + `<h1>${esc(title)}</h1><p><small>${esc(t('Generated {v0}. Values come from stored analytics; "Not available" means no data, not zero.', { v0: input.generatedAt.toISOString() }))}</small></p>`
+      + (recap ? `<h2>${esc(t("AI recap"))}</h2><p><strong>${esc(t("AI-generated."))}</strong> <small>${esc(RECAP_LABEL)}</small></p><p>${esc(recapText)}</p>` : '')
+      + (included.includes('published') ? `<h2>${esc(t("Published posts"))}</h2><p>${esc(t("Published {v0}, scheduled {v1}, failed {v2}.", { v0: snapshot.publishing.published, v1: snapshot.publishing.scheduled, v2: snapshot.publishing.failed }))}</p>` : '')
+      + (response ? `<h2>${esc(t("Response time"))}</h2><p>${esc(responseLine)}</p>${memberLines.length ? `<ul>${memberLines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}${resolveLine ? `<p>${esc(resolveLine)}</p>` : ''}` : '')
+      + (goals ? `<h2>${esc(t("Goals"))}</h2>${goals.goals.length ? `<p><small>${esc(t("Month {v0} to {v1} ({v2}), up to generation for the current month.", { v0: goals.month.start, v1: goals.month.end, v2: goals.month.timeZone }))}</small></p><table><thead><tr><th>${esc(t("Goal"))}</th><th>${esc(t("Target"))}</th><th>${esc(t("This month"))}</th><th>${esc(t("Progress"))}</th><th>${esc(t("Pace"))}</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? esc(t("No data")) : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : `<p>${esc(t("No goals are set for this channel."))}</p>`}` : '')
+      + (included.includes('destinations') ? `<h2>${esc(t("Destinations"))}</h2>${destination ? `<p><small>${esc(destinationNote)}</small></p><table><thead><tr><th>${esc(t("Destination"))}</th><th>${esc(t("Type"))}</th><th>${esc(t("Posts"))}</th>${destination.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}<th>${esc(t("Link clicks (lifetime)"))}</th></tr></thead><tbody><tr><td>${esc(destination.name)}</td><td>${esc(destination.type)}</td><td>${esc(destination.posts)}</td>${destination.measures.map(m => `<td>${esc(measureText(m))}</td>`).join('')}<td>${esc(linkClicksText)}</td></tr></tbody></table><p><small>${esc(t("Link clicks are lifetime totals for links attributed to this channel. Legacy links without a destination count only when the post has a single published destination."))}</small></p>` : `<p>${esc(t("Destination summary not available."))}</p>`}` : '')
+      + (topPosts ? `<h2>${esc(t("Top posts"))}</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>${esc(t("Post"))}</th><th>${esc(t("Published"))}</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.url ? `<a href="${esc(p.url)}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}</td><td>${esc(asOf(p.publishedAt))}</td><td>${p.rankValue === null ? esc(t("Not available")) : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? esc(t("Not available")) : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : `<p>${esc(t("No published posts with stored measures in this period."))}</p>`}` : '')
       + audienceHtml
-      + (metrics.length ? `<h2>Metrics</h2><table><thead><tr><th>Metric</th><th>Source</th><th>Value</th><th>Basis</th><th>Coverage</th><th>As of</th></tr></thead><tbody>${shown.map(m => `<tr><td>${esc(m.label)}</td><td>${esc(m.sourceLabel)}</td><td>${esc(valueText(m))}</td><td>${esc([m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. '))}</td><td>${esc(coverageText(m))}</td><td>${asOf(m.latestAt)}</td></tr>`).join('')}</tbody></table>` : '')
-      + (marked ? `<p><strong>This report was shortened to fit its size limit.</strong></p>` : '')
-      + (notIncluded.length ? `<p><small>Not included: ${esc(notIncluded.join(', '))} (not available in this report yet).</small></p>` : '') + '</body></html>';
+      + (metrics.length ? `<h2>${esc(t("Metrics"))}</h2><table><thead><tr><th>${esc(t("Metric"))}</th><th>${esc(t("Source"))}</th><th>${esc(t("Value"))}</th><th>${esc(t("Basis"))}</th><th>${esc(t("Coverage"))}</th><th>${esc(t("As of"))}</th></tr></thead><tbody>${shown.map(m => `<tr><td>${esc(m.label)}</td><td>${esc(m.sourceLabel)}</td><td>${esc(valueText(m))}</td><td>${esc([m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. '))}</td><td>${esc(coverageText(m))}</td><td>${esc(asOf(m.latestAt))}</td></tr>`).join('')}</tbody></table>` : '')
+      + (marked ? `<p><strong>${esc(t("This report was shortened to fit its size limit."))}</strong></p>` : '')
+      + (notIncluded.length ? `<p><small>${esc(t("Not included: {v0} (not available in this report yet).", { v0: notIncluded.join(', ') }))}</small></p>` : '') + '</body></html>';
   };
   const metricCap = Math.min(metrics.length, bounds.maxRows);
   const htmlCount = fit(metricCap, bounds.maxBytes, c => htmlOf(c, true));
   let htmlTruncated = htmlCount < metrics.length;
   let html = htmlOf(htmlCount, htmlTruncated);
   if (bytes(html) > bounds.maxBytes) { // the fixed parts alone do not fit
-    html = cutBytes(`<!doctype html><html lang="en"><body><p>${esc(clamp(title, 80))}</p><p><strong>This report was shortened to fit its size limit.</strong></p></body></html>`, bounds.maxBytes);
+    html = cutBytes(`<!doctype html><html lang="${locale}"><body><p>${esc(clamp(title, 80))}</p><p><strong>${esc(t("This report was shortened to fit its size limit."))}</strong></p></body></html>`, bounds.maxBytes);
     htmlTruncated = true;
   }
-  const baseLines = [title, '', ...(recap ? [`AI recap (AI-generated; ${RECAP_LABEL})`, recapText, ''] : []), ...(included.includes('published') ? [`Published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`] : []),
-    ...(response ? [`Response time: ${responseLine}`, ...memberLines.map(l => `  ${l}`), ...(resolveLine ? [resolveLine] : [])] : []),
-    ...(goals ? [`Goals (month ${goals.month.start} to ${goals.month.end}):`, ...(goals.goals.length ? goals.goals.map(goalText) : ['No goals are set for this channel.'])] : []),
-    ...(included.includes('destinations') ? ['Destinations:', ...(destination ? [`${clamp(destination.name, 200)} (${destination.type}): ${destination.posts} posts; ${destination.measures.map(m => `${m.label} ${measureText(m)}`).join('; ')}; link clicks (lifetime) ${linkClicksText}`] : ['Destination summary not available.'])] : []),
-    ...(topPosts ? ['Top posts:', ...(topPosts.length ? topPosts.map((p, i) => `${i + 1}. ${postTitle(p)} (${asOf(p.publishedAt)}): ${p.rankLabel} ${p.rankValue ?? 'Not available'}`) : ['No published posts with stored measures in this period.'])] : []),
-    ...(audience ? [`Audience: ${audience.covered ? audience.total : 'Not available'} (${audience.covered} of ${audience.selected} channels${audienceAsOf ? `; as of ${asOf(audienceAsOf)}` : ''}; not unique people)`] : [])];
-  const metricLines = metrics.map(m => `${clamp(m.label, 200)} (${clamp(m.sourceLabel, 200)}): ${valueText(m)}; ${coverageText(m)}; as of ${asOf(m.latestAt)}`);
-  const tail = (cut: boolean) => [...(cut ? ['Shortened to fit the size limit.'] : []), ...(notIncluded.length ? [`Not included: ${notIncluded.join(', ')}`] : [])];
+  const baseLines = [title, '', ...(recap ? [t("AI recap (AI-generated; {v0})", { v0: RECAP_LABEL }), recapText, ''] : []), ...(included.includes('published') ? [t("Published {v0}, scheduled {v1}, failed {v2}.", { v0: snapshot.publishing.published, v1: snapshot.publishing.scheduled, v2: snapshot.publishing.failed })] : []),
+    ...(response ? [t("Response time: {v0}", { v0: responseLine }), ...memberLines.map(l => `  ${l}`), ...(resolveLine ? [resolveLine] : [])] : []),
+    ...(goals ? [t("Goals (month {v0} to {v1}):", { v0: goals.month.start, v1: goals.month.end }), ...(goals.goals.length ? goals.goals.map(goalText) : [t("No goals are set for this channel.")])] : []),
+    ...(included.includes('destinations') ? [t("Destinations:"), ...(destination ? [t("{v0} ({v1}): {v2} posts; {v3}; link clicks (lifetime) {v4}", { v0: clamp(destination.name, 200), v1: destination.type, v2: destination.posts, v3: destination.measures.map(m => `${m.label} ${measureText(m)}`).join('; '), v4: linkClicksText })] : [t("Destination summary not available.")])] : []),
+    ...(topPosts ? [t("Top posts:"), ...(topPosts.length ? topPosts.map((p, i) => `${i + 1}. ${postTitle(p)} (${asOf(p.publishedAt)}): ${p.rankLabel} ${p.rankValue ?? t("Not available")}`) : [t("No published posts with stored measures in this period.")])] : []),
+    ...(audience ? [t("Audience: {v0} ({v1} of {v2} channels{v3}; not unique people)", { v0: audience.covered ? audience.total : t("Not available"), v1: audience.covered, v2: audience.selected, v3: audienceAsOf ? t("; as of {v0}", { v0: asOf(audienceAsOf) }) : '' })] : [])];
+  const metricLines = metrics.map(m => t("{v0} ({v1}): {v2}; {v3}; as of {v4}", { v0: clamp(m.label, 200), v1: clamp(m.sourceLabel, 200), v2: valueText(m), v3: coverageText(m), v4: asOf(m.latestAt) }));
+  const tail = (cut: boolean) => [...(cut ? [t("Shortened to fit the size limit.")] : []), ...(notIncluded.length ? [t("Not included: {v0}", { v0: notIncluded.join(', ') })] : [])];
   const textOf = (count: number, cut: boolean) => [...baseLines, ...metricLines.slice(0, count), ...tail(cut)].join('\n');
   const textCount = fit(metricCap, bounds.maxBytes, c => textOf(c, true));
   let textTruncated = textCount < metricLines.length;
@@ -199,7 +210,7 @@ export function recapFacts(snapshot: Snapshot, input: { sections: ReportSectionI
   const lines: string[] = [];
   if (wanted.has('published')) lines.push(`Posts: published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`);
   if (wanted.has('audience') && snapshot.audience) lines.push(`Audience: ${snapshot.audience.covered ? snapshot.audience.total : 'Not available'} (${snapshot.audience.covered} of ${snapshot.audience.selected} channels; not unique people).`);
-  if (wanted.has('responseTime') && input.responseTime) lines.push(`Median first response ${input.responseTime.businessHours ? `${formatDuration(input.responseTime.businessMedianMs)} in business hours, ${formatDuration(input.responseTime.medianMs)} in calendar time` : `${formatDuration(input.responseTime.medianMs)} in calendar time (no business hours set)`}; ${input.responseTime.answered} answered, ${input.responseTime.unanswered} waiting.`);
+  if (wanted.has('responseTime') && input.responseTime) lines.push(`Median first response ${input.responseTime.businessHours ? `${responseDuration(input.responseTime.businessMedianMs)} in business hours, ${responseDuration(input.responseTime.medianMs)} in calendar time` : `${responseDuration(input.responseTime.medianMs)} in calendar time (no business hours set)`}; ${input.responseTime.answered} answered, ${input.responseTime.unanswered} waiting.`);
   if (wanted.has('goals') && input.goals?.goals.length) for (const g of input.goals.goals.slice(0, 20)) lines.push(`Goal ${factText(g.label)}: ${g.actual === null ? 'No data' : g.actual} of ${g.target} (${g.percent}%, ${factText(g.paceLabel)}).`);
   const d = wanted.has('destinations') ? input.destination : null;
   if (d) lines.push(`Destination: ${d.posts} posts published; ${d.measures.map(m => `${factText(m.label)} ${m.value ?? 'Not available'}`).join('; ')}.`);
@@ -227,6 +238,7 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
         const auth = await authorizeReport(actor, 'read');
         if (auth.scope !== null && !auth.scope.includes(request.channelId)) return { ok: false, reason: 'channel_unavailable' };
         if (!(await usableChannelIds(prisma, actor.workspaceId, auth.providers, [request.channelId])).length) return { ok: false, reason: 'channel_unavailable' };
+        const documentCopy = await loadReportDocumentCopy();
         const readActor = { userId: actor.userId, workspaceId: actor.workspaceId, allowedAdAccountIds: actor.allowedAdAccountIds, adAccountTargetScope: actor.adAccountTargetScope };
         const snapshot = await readAnalyticsSnapshot(readActor, { start: request.period.start, end: request.period.end, compare: 'none', filter: '1', channel: request.channelId, adFilter: '1' }, { feature: 'analytics/reports', allowedChannelIds: [request.channelId] });
         if (snapshot.selected.channelIds.length !== 1 || snapshot.selected.channelIds[0] !== request.channelId) return { ok: false, reason: 'channel_unavailable' };
@@ -234,12 +246,12 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
         const base = await deps.bounds();
         const ceiling = resultCeiling(actor);
         const bounds = { maxRows: ceiling === undefined ? base.maxRows : Math.min(base.maxRows, ceiling), maxBytes: base.maxBytes };
-        const responseTime = request.sections.includes('responseTime') ? await readResponseTime(actor.workspaceId, request.channelId, request.period) : null;
+        const responseTime = request.sections.includes('responseTime') ? await readResponseTime(actor.workspaceId, request.channelId, request.period, documentCopy.locale) : null;
         const topPosts = request.sections.includes('topPosts') ? await readTopPosts(actor.workspaceId, request.channelId, request.period) : null;
         const destination = request.sections.includes('destinations') ? await readDestination(actor.workspaceId, request.channelId, request.period) : null;
-        const goals = request.sections.includes('goals') ? await channelGoalProgress(actor.workspaceId, request.channelId, request.period.end, deps.now?.() ?? new Date()) : null;
-        const recap = request.sections.includes('aiRecap') ? await makeRecap(deps.recap ?? defaultRecap, actor, channel?.name ?? 'Channel', snapshot, { sections: request.sections, responseTime, topPosts, destination, goals }) : null;
-        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? 'Channel', sections: request.sections, responseTime, topPosts, destination, goals, recap, generatedAt: deps.now?.() ?? new Date() }, bounds) };
+        const goals = request.sections.includes('goals') ? await channelGoalProgress(actor.workspaceId, request.channelId, request.period.end, deps.now?.() ?? new Date(), documentCopy.locale) : null;
+        const recap = request.sections.includes('aiRecap') ? await makeRecap(deps.recap ?? defaultRecap, actor, channel?.name ?? documentText(documentCopy.copy)('Channel'), snapshot, { sections: request.sections, responseTime, topPosts, destination, goals }, documentCopy.locale) : null;
+        return { ok: true, output: renderReport(snapshot, { channelName: channel?.name ?? documentText(documentCopy.copy)('Channel'), sections: request.sections, responseTime, topPosts, destination, goals, recap, generatedAt: deps.now?.() ?? new Date() }, bounds, documentCopy.copy, documentCopy.locale, documentCopy.responseCopy) };
       } catch (error) {
         const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
         return { ok: false, reason: code === 'unauthorized' || code === 'forbidden' ? 'access_unavailable' : 'generation_failed' };
@@ -253,11 +265,11 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
  * shared workspace limit). AI off or no AI access: null, so the section is listed as not included. Rate limit, provider failure or
  * an unusable answer: the report still succeeds and the section says the recap is unavailable. Nothing is invented.
  */
-async function makeRecap(write: RecapWriter, actor: ReportActor, channelName: string, snapshot: Snapshot, parts: Parameters<typeof recapFacts>[1]): Promise<RecapState | null> {
+async function makeRecap(write: RecapWriter, actor: ReportActor, channelName: string, snapshot: Snapshot, parts: Parameters<typeof recapFacts>[1], locale: 'en' | 'fr'): Promise<RecapState | null> {
   const facts = recapFacts(snapshot, parts);
   if (!facts) return { state: 'unavailable' };
   try {
-    const out = await write({ userId: actor.userId, workspaceId: actor.workspaceId, permissionCeiling: actor.permissionCeiling }, { facts, subject: `${factText(channelName).slice(0, 100)}, ${snapshot.period.start} to ${snapshot.period.end}`, language: 'English' });
+    const out = await write({ userId: actor.userId, workspaceId: actor.workspaceId, permissionCeiling: actor.permissionCeiling }, { facts, subject: `${factText(channelName).slice(0, 100)}, ${snapshot.period.start} to ${snapshot.period.end}`, language: locale === 'fr' ? 'French' : 'English' });
     const text = typeof out?.text === 'string' ? out.text.trim() : '';
     return text ? { state: 'ready', text } : { state: 'unavailable' };
   } catch (error) {

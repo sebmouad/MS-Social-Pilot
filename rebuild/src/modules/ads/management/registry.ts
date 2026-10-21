@@ -1,3 +1,4 @@
+import { defaultAdsText } from '@/modules/ads/copy';
 import type { AdsOpsHost } from './types';
 
 /**
@@ -6,7 +7,7 @@ import type { AdsOpsHost } from './types';
  */
 const hosts = new Map<string, AdsOpsHost>();
 export function registerAdsOpsHost(host: AdsOpsHost) {
-  if (hosts.has(host.provider)) throw new Error(`Ads operations already registered for ${host.provider}.`);
+  if (hosts.has(host.provider)) throw new Error(defaultAdsText('validation006', { value0: host.provider }));
   hosts.set(host.provider, host);
 }
 export function adsOpsHostFor(provider: string): AdsOpsHost | null { return hosts.get(provider) ?? null; }

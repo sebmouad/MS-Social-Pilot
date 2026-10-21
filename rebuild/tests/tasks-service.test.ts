@@ -1,3 +1,4 @@
+import { customerCopy } from '@/modules/tasks/ui/copy';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -37,7 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks(); purgeStatus = null; role = 'editor'; suspended = null; taskRow = { id: 't1', title: 'Old', notes: null, status: 'todo', assigneeId: null, dueOn: null, postId: null, createdById: 'someone', updatedAt };
   taskRows = []; commentRows = []; assignable = true; postFound = true; commentRow = null; auditCount = 1; scope = { all: true, ids: [] }; moduleOn = true; featureOn = true; access = { read: true, write: true };
   audits.length = 0; writes.length = 0;
-  mocks.config.mockImplementation(async (key: string) => caps[key]);
+  mocks.config.mockImplementation(async (key: string) => key === 'tasks.customerCopy' ? customerCopy : caps[key]);
   mocks.purging.mockResolvedValue(undefined);
   mocks.permissions.mockImplementation(async () => ({ pageScope: scope.all ? { all: true } : { all: false, ids: scope.ids } }));
   mocks.entitlements.mockImplementation(async () => ({ workspaceId: 'workspace-a' }));

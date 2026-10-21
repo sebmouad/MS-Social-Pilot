@@ -1,3 +1,5 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
 import {
@@ -6,6 +8,7 @@ import {
 } from '../output-policy';
 
 export async function loadAdsOutputPolicy(readConfig: typeof runtimeConfig = runtimeConfig): Promise<AdsOutputPolicy> {
+  return withAdsCopySnapshot(async () => {
   try {
     const [detailMaxBytes, exportMaxBytes, exportFileName] = await Promise.all([
       readConfig('ads.detailMaxBytes'), readConfig('ads.exportMaxBytes'), readConfig('ads.exportFileName'),
@@ -16,6 +19,8 @@ export async function loadAdsOutputPolicy(readConfig: typeof runtimeConfig = run
       exportFileName: ADS_EXPORT_FILE_NAME_SCHEMA.parse(exportFileName),
     };
   } catch {
-    throw new OperationError('unavailable', 'Ads reports are temporarily unavailable. Try again later.');
+    throw new OperationError('unavailable', await adsServiceText('service018'));
   }
+
+  });
 }

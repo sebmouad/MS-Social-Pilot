@@ -1,3 +1,5 @@
+import { errorCopyDefaults } from '@/modules/analytics/error-copy';
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -12,9 +14,9 @@ import type { Tx } from '../../server/access';
 export type { Tx };
 const FEATURE = 'analytics/reports';
 
-export const bad = (message = 'Choose valid details and confirm the exact action.') => new OperationError('invalid_request', message);
-export const missing = () => new OperationError('not_found', 'This item is unavailable in the current workspace.');
-export const unavailable = () => new OperationError('unavailable', 'Analytics workflows are temporarily unavailable. Try again later.');
+export const bad = (message = errorCopyDefaults["Choose valid details and confirm the exact action."].en) => new OperationError('invalid_request', message);
+export const missing = () => new OperationError('not_found', errorCopyDefaults["This item is unavailable in the current workspace."].en);
+export const unavailable = () => new OperationError('unavailable', errorCopyDefaults["Analytics workflows are temporarily unavailable. Try again later."].en);
 /** Roles that may change shared report definitions; others read only. */
 export const REPORT_WRITE_ROLES = ['owner', 'admin', 'editor'] as const;
 export const isWriter = (role: string) => (REPORT_WRITE_ROLES as readonly string[]).includes(role);
@@ -49,7 +51,7 @@ export function effectiveScope(grants: ScopedPermissions['pageScope'], ceiling: 
 }
 export function resultCeiling(actor: Pick<ReportActor, 'maxResultItems'>): number | undefined {
   if (actor.maxResultItems === undefined) return undefined;
-  if (!Number.isInteger(actor.maxResultItems) || actor.maxResultItems < 1) throw new OperationError('forbidden', 'This access key cannot list report results.');
+  if (!Number.isInteger(actor.maxResultItems) || actor.maxResultItems < 1) throw new OperationError('forbidden', errorCopyDefaults["This access key cannot list report results."].en);
   return actor.maxResultItems;
 }
 /** Bounded page: the smaller of Root's size and the key ceiling. */
@@ -61,7 +63,7 @@ export const pageOf = (configured: number, ceiling: number | undefined) => (ceil
 export const workspaceWide = (actor: Pick<ReportActor, 'allowedChannelIds' | 'apiKeyId' | 'resourceRestricted'>) =>
   actor.resourceRestricted === undefined ? !(actor.apiKeyId !== undefined && actor.allowedChannelIds !== undefined) : actor.resourceRestricted !== true;
 export function requireWorkspaceWide(actor: ReportActor) {
-  if (!workspaceWide(actor)) throw new OperationError('forbidden', 'Report templates are workspace-wide and unavailable to access keys limited to selected channels.');
+  if (!workspaceWide(actor)) throw new OperationError('forbidden', errorCopyDefaults["Report templates are workspace-wide and unavailable to access keys limited to selected channels."].en);
 }
 
 /**
@@ -70,21 +72,21 @@ export function requireWorkspaceWide(actor: ReportActor) {
  * Hiding a control is never the check.
  */
 export async function authorizeReport(actor: ReportActor, access: 'read' | 'write', options: { manager?: boolean } = {}): Promise<ReportAuthority> {
-  if (!actor?.userId || !actor.workspaceId) throw new OperationError('unauthorized', 'Sign in with an active workspace account.');
+  if (!actor?.userId || !actor.workspaceId) throw await analyticsError('unauthorized', "Sign in with an active workspace account.");
   const maxItems = resultCeiling(actor);
   const rows = await prisma.$queryRaw<Array<{ role: string; suspendedAt: Date | null }>>`SELECT m.role::text AS role, w."suspendedAt" FROM memberships m JOIN users u ON u.id = m."userId" JOIN workspaces w ON w.id = m."workspaceId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} AND u."disabledAt" IS NULL`;
   const row = rows[0];
-  if (!row) throw new OperationError('unauthorized', 'Sign in with an active account to use Analytics.');
-  if (row.suspendedAt && access === 'write') throw new OperationError('forbidden', 'This workspace is suspended.');
+  if (!row) throw await analyticsError('unauthorized', "Sign in with an active account to use Analytics.");
+  if (row.suspendedAt && access === 'write') throw await analyticsError('forbidden', "This workspace is suspended.");
   const [entitlements, permissions] = await Promise.all([
     loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }),
     loadPermissions(actor.userId, actor.workspaceId),
   ]);
   if (!entitlements || entitlements.workspaceId !== actor.workspaceId || !permissions || !canUseFeature(entitlements, FEATURE) || !allowed(permissions, actor.permissionCeiling, access)) {
-    throw new OperationError('forbidden', 'This Analytics feature is unavailable in this workspace.');
+    throw await analyticsError('forbidden', "This Analytics feature is unavailable in this workspace.");
   }
   const canManage = isWriter(row.role) && allowed(permissions, actor.permissionCeiling, 'write');
-  if (options.manager && !canManage) throw new OperationError('forbidden', 'Reports are managed by owners, admins and editors.');
+  if (options.manager && !canManage) throw await analyticsError('forbidden', "Reports are managed by owners, admins and editors.");
   if (access === 'write') await assertWorkspaceNotPurging(actor.workspaceId);
   const providers = (await selectedResourceConnectionWhere(actor.workspaceId, entitledPlatformIds(entitlements))).provider.in;
   return { role: row.role, scope: effectiveScope(permissions.pageScope, actor.allowedChannelIds), providers, canManage, maxItems };
@@ -98,12 +100,12 @@ type LockRow = { role: string; suspendedAt: Date | null; allPages: boolean | nul
 export async function lockActor(tx: Tx, actor: ReportActor): Promise<{ role: string; scope: readonly string[] | null }> {
   const rows = await tx.$queryRaw<LockRow[]>`SELECT m.role::text AS role, w."suspendedAt", m."allPages" AS "allPages", COALESCE(m."disabledModules", ARRAY[]::TEXT[]) AS "memberDisabled", COALESCE(w."disabledModules", ARRAY[]::TEXT[]) AS "workspaceDisabled", COALESCE(w."clientAccess", ARRAY[]::TEXT[]) AS "clientAccess", COALESCE((SELECT ARRAY_AGG(DISTINCT x."targetId") FROM member_page_access x JOIN targets tg ON tg.id = x."targetId" AND tg."workspaceId" = w.id WHERE x."membershipId" = m.id), ARRAY[]::TEXT[]) AS "pageIds" FROM memberships m JOIN users u ON u.id = m."userId" JOIN workspaces w ON w.id = m."workspaceId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} AND u."disabledAt" IS NULL FOR SHARE OF m, u, w`;
   const row = rows[0];
-  if (!row || !isWriter(row.role)) throw new OperationError('unauthorized', 'Your active workspace access changed. Sign in again to continue.');
-  if (row.suspendedAt) throw new OperationError('forbidden', 'This workspace is suspended.');
+  if (!row || !isWriter(row.role)) throw await analyticsError('unauthorized', "Your active workspace access changed. Sign in again to continue.");
+  if (row.suspendedAt) throw await analyticsError('forbidden', "This workspace is suspended.");
   const purge = await tx.$queryRaw<Array<{ status: string }>>`SELECT status::text FROM workspace_data_purges WHERE "workspaceId" = ${actor.workspaceId}`;
-  if (purge[0] && purge[0].status !== 'completed') throw new OperationError('conflict', 'Workspace data deletion is in progress.');
+  if (purge[0] && purge[0].status !== 'completed') throw await analyticsError('conflict', "Workspace data deletion is in progress.");
   const fresh = resolvePermissions({ role: row.role, allPages: row.allPages === true, workspaceDisabledModules: row.workspaceDisabled ?? [], memberDisabledModules: row.memberDisabled ?? [], clientAccess: row.clientAccess ?? [], pageAccess: (row.pageIds ?? []).map(targetId => ({ targetId })) });
-  if (!allowed(fresh, actor.permissionCeiling, 'write')) throw new OperationError('forbidden', 'This Analytics feature is unavailable in this workspace.');
+  if (!allowed(fresh, actor.permissionCeiling, 'write')) throw await analyticsError('forbidden', "This Analytics feature is unavailable in this workspace.");
   return { role: row.role, scope: effectiveScope(fresh.pageScope, actor.allowedChannelIds) };
 }
 
@@ -128,5 +130,5 @@ export async function usableChannelIds(db: Pick<Tx, '$queryRaw'>, workspaceId: s
 export async function audit(tx: Tx, actor: Pick<ReportActor, 'userId' | 'workspaceId' | 'apiKeyId'> | { userId: string | null; workspaceId: string; apiKeyId?: string }, action: string, detail: Record<string, unknown>) {
   const recorded = actor.apiKeyId ? { ...detail, apiKeyId: actor.apiKeyId, authSource: 'api_key' } : detail;
   const count = await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, ${action}, ${JSON.stringify(recorded)}::jsonb, NOW())`;
-  if (count !== 1) throw new OperationError('unavailable', 'The change could not be recorded, so it was not saved.');
+  if (count !== 1) throw await analyticsError('unavailable', "The change could not be recorded, so it was not saved.");
 }

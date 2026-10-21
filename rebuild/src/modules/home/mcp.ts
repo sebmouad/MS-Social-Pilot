@@ -1,3 +1,4 @@
+import { homeErrorCopy } from './server/copy';
 import { OperationError } from '@/lib/operation-error';
 import type { McpToolGroup } from '@/server/mcp/kit';
 import { readHomeOverview } from './server/overview';
@@ -14,7 +15,7 @@ export const HOME_MCP: readonly McpToolGroup[] = [
     features: { get_home_overview: 'home/overview' },
     scope: { workspaceTools: ['get_home_overview'] },
     execute: async (viewer, name) => {
-      if (name !== 'get_home_overview') throw new OperationError('invalid_request', 'Choose a supported Home action.');
+      if (name !== 'get_home_overview') throw new OperationError('invalid_request', (await homeErrorCopy()).supportedAction);
       return readHomeOverview({ userId: viewer.userId, workspaceId: viewer.workspaceId });
     },
   },

@@ -1,3 +1,7 @@
+import { defaultAnalyticsError } from '@/modules/analytics/error-copy';
+import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
+import { errorCopyDefaults } from '@/modules/analytics/error-copy';
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
@@ -101,6 +105,7 @@ async function boundary(row: Pick<DueRow, 'workspaceId' | 'targetId' | 'createdB
  * Prepared manual artifacts past their retention are cleared first (history stays), even while delivery is unavailable.
  */
 export async function runDueReportSchedules(deps: DueRunDeps = {}): Promise<DueRunSummary> {
+  try {
   const summary: DueRunSummary = { disabled: false, examined: 0, completed: 0, partial: 0, failed: 0, uncertain: 0, skipped: 0, interrupted: 0, maintenanceFailures: 0, cleared: 0 };
   const registered = registeredReportPorts();
   const generation = deps.generation ?? registered?.generation;
@@ -220,11 +225,14 @@ export async function runDueReportSchedules(deps: DueRunDeps = {}): Promise<DueR
     }
   }
   return summary;
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }
 
 /** Run history within the person's channel scope and current connections. Recipient masks are shown only to people who manage schedules. */
 export async function listReportRuns(actor: ReportActor, input: unknown = {}) {
-  const parsed = listSchema.safeParse(input ?? {}); if (!parsed.success) throw bad('Choose a valid result page.');
+  try {
+  const parsed = listSchema.safeParse(input ?? {}); if (!parsed.success) throw bad( errorCopyDefaults["Choose a valid result page."].en);
   const auth = await authorizeReport(actor, 'read');
   const limits = await reportLimits();
   const size = pageOf(limits.historyPageSize, auth.maxItems);
@@ -241,6 +249,8 @@ export async function listReportRuns(actor: ReportActor, input: unknown = {}) {
     };
   });
   return { ok: true as const, runs, page: parsed.data.page, hasMore: rows.length > size };
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }
 
 /** Explicit inclusive UTC dates under the shared Analytics date policy (Root's default and maximum range), never in the future. */
@@ -252,15 +262,15 @@ async function directPeriod(start: string, end: string, now: Date): Promise<Repo
   } catch { throw unavailable(); }
   try {
     const range = analyticsDateRange({ start, end }, { defaultDays: Math.min(days[0], days[1]), maxDays: days[1], now });
-    if (range.end > now.toISOString().slice(0, 10)) throw bad('Choose a through date that is not in the future.');
+    if (range.end > now.toISOString().slice(0, 10)) throw bad( errorCopyDefaults["Choose a through date that is not in the future."].en);
     return { start: range.start, end: range.end };
   } catch (error) {
     if (error instanceof OperationError) throw error;
     if (error instanceof AnalyticsComparisonError) {
-      if (error.code === 'invalid_policy') throw new OperationError('unavailable', 'Report dates could not be checked. Try again shortly.');
-      if (error.code === 'range_too_large') throw bad(`Choose a range of at most ${days[1]} days.`);
-      if (error.code === 'invalid_range') throw bad('The From date must be on or before the Through date.');
-      throw bad('Choose valid From and Through dates.');
+      if (error.code === 'invalid_policy') throw await analyticsError('unavailable', "Report dates could not be checked. Try again shortly.");
+      if (error.code === 'range_too_large') throw bad(defaultAnalyticsError('Choose a range of at most {0} days.', days[1]));
+      if (error.code === 'invalid_range') throw bad( errorCopyDefaults["The From date must be on or before the Through date."].en);
+      throw bad( errorCopyDefaults["Choose valid From and Through dates."].en);
     }
     throw error;
   }
@@ -305,6 +315,7 @@ type Existing = { id: string; status: string; requestHash: string | null; target
  * failed run or an expired artifact is reported explicitly and never regenerated.
  */
 export async function runReportNow(actor: ReportActor, input: unknown, at?: Date) {
+  try {
   const now = at ?? new Date();
   const parsed = reportRunSchema.safeParse(input); if (!parsed.success) throw bad();
   const value = parsed.data;
@@ -325,42 +336,42 @@ export async function runReportNow(actor: ReportActor, input: unknown, at?: Date
       if (fresh.scope !== null && !fresh.scope.includes(channelId)) throw missing();
       if (templateId) {
         const template = (await tx.$queryRaw<Array<{ id: string; sections: unknown }>>`SELECT id, sections FROM report_templates WHERE id = ${templateId} AND "workspaceId" = ${actor.workspaceId}`)[0];
-        if (!template) throw bad('Choose a report template from this workspace.');
+        if (!template) throw bad( errorCopyDefaults["Choose a report template from this workspace."].en);
         sections = cleanSections(template.sections);
       } else sections = DEFAULT_SECTIONS;
       hash = requestHash({ kind: 'channel', channelId, templateId, start: runPeriod.start, end: runPeriod.end });
     } else {
       const row = (await tx.$queryRaw<Array<{ targetId: string; frequency: string; templateId: string | null; timezone: string; weekStartsOn: number; sections: unknown }>>`SELECT s."targetId", s.frequency, s."templateId", w.timezone, w."weekStartsOn", tp.sections FROM report_schedules s JOIN workspaces w ON w.id = s."workspaceId" LEFT JOIN report_templates tp ON tp.id = s."templateId" AND tp."workspaceId" = s."workspaceId" WHERE s.id = ${value.scheduleId} AND s."workspaceId" = ${actor.workspaceId}`)[0];
       if (!row || (fresh.scope !== null && !fresh.scope.includes(row.targetId))) throw missing();
-      if (!validTimeZone(row.timezone)) throw new OperationError('unavailable', 'The workspace time zone is unavailable. Review workspace settings.');
+      if (!validTimeZone(row.timezone)) throw await analyticsError('unavailable', "The workspace time zone is unavailable. Review workspace settings.");
       const frequency = (REPORT_FREQUENCIES as readonly string[]).includes(row.frequency) ? row.frequency as ReportFrequency : 'weekly';
       channelId = row.targetId; templateId = row.templateId; runPeriod = reportPeriod(frequency, now, row.timezone, row.weekStartsOn);
       sections = row.sections === null || row.sections === undefined ? DEFAULT_SECTIONS : cleanSections(row.sections);
       hash = requestHash({ kind: 'schedule', scheduleId: value.scheduleId, channelId, templateId });
     }
-    if (!(await usableChannelIds(tx, actor.workspaceId, auth.providers, [channelId], true)).length) throw bad(direct ? 'This channel is not available. Choose another channel.' : 'This channel is not available. Choose another schedule.');
+    if (!(await usableChannelIds(tx, actor.workspaceId, auth.providers, [channelId], true)).length) throw bad(direct ? errorCopyDefaults["This channel is not available. Choose another channel."].en : errorCopyDefaults["This channel is not available. Choose another schedule."].en);
 
     const existing = (await tx.$queryRaw<Existing[]>`SELECT id, status, "requestHash", "targetId", output, "outputExpiresAt" FROM report_runs WHERE "idempotencyKey" = ${key} AND "workspaceId" = ${actor.workspaceId} FOR SHARE`)[0];
     if (existing) {
-      if (existing.requestHash !== hash || existing.targetId !== channelId) throw new OperationError('conflict', 'This request id was already used for a different report. Start a new request.');
-      if (existing.status === 'claimed' || existing.status === 'generating') throw new OperationError('conflict', 'This report is still being prepared and will not be started again. Wait a moment, then check the run history.');
-      if (existing.status !== 'completed') throw new OperationError('conflict', 'This request already ended without a report. Start a new request.');
+      if (existing.requestHash !== hash || existing.targetId !== channelId) throw await analyticsError('conflict', "This request id was already used for a different report. Start a new request.");
+      if (existing.status === 'claimed' || existing.status === 'generating') throw await analyticsError('conflict', "This report is still being prepared and will not be started again. Wait a moment, then check the run history.");
+      if (existing.status !== 'completed') throw await analyticsError('conflict', "This request already ended without a report. Start a new request.");
       const stored = existing.outputExpiresAt && existing.outputExpiresAt.getTime() > now.getTime() ? readStored(existing.output) : null;
-      if (!stored) throw new OperationError('unavailable', 'This prepared report is no longer available and will not be regenerated. Start a new request.');
-      if (!Number.isSafeInteger(stored.rowCount) || stored.rowCount < 0 || stored.rowCount > Math.min(limits.maxRows, auth.maxItems ?? limits.maxRows) || Buffer.byteLength(stored.csv, 'utf8') > limits.maxBytes || Buffer.byteLength(stored.html, 'utf8') > limits.maxBytes || (stored.json !== undefined && Buffer.byteLength(stored.json, 'utf8') > limits.maxBytes) || Buffer.byteLength(JSON.stringify(stored), 'utf8') > limits.maxStoredBytes) throw new OperationError('unavailable', 'This prepared report exceeds your current report limits. Start a new request.');
+      if (!stored) throw await analyticsError('unavailable', "This prepared report is no longer available and will not be regenerated. Start a new request.");
+      if (!Number.isSafeInteger(stored.rowCount) || stored.rowCount < 0 || stored.rowCount > Math.min(limits.maxRows, auth.maxItems ?? limits.maxRows) || Buffer.byteLength(stored.csv, 'utf8') > limits.maxBytes || Buffer.byteLength(stored.html, 'utf8') > limits.maxBytes || (stored.json !== undefined && Buffer.byteLength(stored.json, 'utf8') > limits.maxBytes) || Buffer.byteLength(JSON.stringify(stored), 'utf8') > limits.maxStoredBytes) throw await analyticsError('unavailable', "This prepared report exceeds your current report limits. Start a new request.");
       return { kind: 'replay', runId: existing.id, channelId, stored };
     }
 
     const runId = randomUUID(); const token = newToken();
     const inserted = await tx.$queryRaw<Array<{ id: string }>>`INSERT INTO report_runs (id, "workspaceId", "scheduleId", "targetId", kind, "idempotencyKey", "requestHash", "claimToken", "periodStart", "periodEnd", status, "leaseUntil", "startedAt", deliveries, "requestedById", "createdAt") VALUES (${runId}, ${actor.workspaceId}, ${direct ? null : value.scheduleId}, ${channelId}, 'manual', ${key}, ${hash}, ${token}, ${runPeriod.start}, ${runPeriod.end}, 'generating', ${new Date(now.getTime() + limits.leaseSeconds * 1000)}, ${now}, '[]'::jsonb, ${actor.userId}, ${now}) ON CONFLICT ("idempotencyKey") DO NOTHING RETURNING id`;
-    if (!inserted.length) throw new OperationError('conflict', 'This report request was already handled. Check the run history.');
+    if (!inserted.length) throw await analyticsError('conflict', "This report request was already handled. Check the run history.");
     await audit(tx, actor, 'analytics.report_run_started', { runId, scheduleId: direct ? null : value.scheduleId, channelId, templateId, start: runPeriod.start, end: runPeriod.end, kind: 'manual' });
     return { kind: 'new', runId, token, channelId, scheduleId: direct ? null : value.scheduleId, templateId, period: runPeriod, sections };
   });
 
   if (prepared.kind === 'replay') {
     // A stored result is shown again only if the person, feature, key, scope and connection still qualify now.
-    if (await releaseBlocker(actor, prepared.channelId)) throw new OperationError('forbidden', 'You no longer have access to this report.');
+    if (await releaseBlocker(actor, prepared.channelId)) throw await analyticsError('forbidden', "You no longer have access to this report.");
     await prisma.$transaction(tx => audit(tx, actor, 'analytics.report_run_replayed', { runId: prepared.runId, channelId: prepared.channelId }));
     return released(prepared.runId, prepared.stored, true);
   }
@@ -370,7 +381,7 @@ export async function runReportNow(actor: ReportActor, input: unknown, at?: Date
   const detail = { runId: prepared.runId, scheduleId: prepared.scheduleId, channelId: prepared.channelId };
   const fail = async (reason: string): Promise<never> => {
     await finishRun(ref, { status: 'failed', reason }, clock, limits.finishRetries, { audit: { actor, action: 'analytics.report_run_finished', detail: { ...detail, status: 'failed', reason } } });
-    throw new OperationError('unavailable', reportFailureText(reason) ?? 'The report could not be prepared.');
+    throw new OperationError('unavailable', reportFailureText(reason) ?? errorCopyDefaults['The report could not be prepared.'].en);
   };
   let output: ReportOutput | null = null; let reason: string | null = null;
   try { const made = await ports.generation.generate({ actor, channelId: prepared.channelId, sections: prepared.sections, period: prepared.period }); if (made.ok) output = made.output; else reason = safeReason(made.reason); }
@@ -386,6 +397,8 @@ export async function runReportNow(actor: ReportActor, input: unknown, at?: Date
   // The artifact is stored in the same fenced completion + audit transaction, before anything is released over HTTP/MCP.
   const completedAt = clock();
   const recorded = await finishRun(ref, { status: 'completed', rowCount: output.rowCount, truncated: output.truncated, output: stored, outputExpiresAt: new Date(completedAt.getTime() + limits.retentionHours * 3600 * 1000) }, clock, limits.finishRetries, { audit: { actor, action: 'analytics.report_run_finished', detail: { ...detail, status: 'completed', rows: output.rowCount, truncated: output.truncated, kind: 'manual' } } });
-  if (!recorded) throw new OperationError('unavailable', 'The report could not be recorded, so it was not released. Try again with a new request.');
+  if (!recorded) throw await analyticsError('unavailable', "The report could not be recorded, so it was not released. Try again with a new request.");
   return released(prepared.runId, stored, false);
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }

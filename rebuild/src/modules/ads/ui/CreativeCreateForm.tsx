@@ -1,3 +1,4 @@
+import { useAdsMessage } from '@/modules/ads/ui/AdsCopyProvider';
 'use client';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Button } from '@/components/Button';
@@ -6,14 +7,16 @@ import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { useConfirm } from '@/components/useConfirm';
 import type { AdsNeutralOperation } from '../management/types';
 import { clearCreation, loadCreation, saveCreation, type CreationOwnerScope } from './creationRequestStore';
-import { creativeCopy } from './creative-copy';
+import { useAdsCatalogs } from './AdsCopyProvider';
 
 type Creative = Extract<AdsNeutralOperation, { type: 'creative.create' }>;
 type Review = { operation: Creative; confirmation: string; requestId: string };
 type Sources = { targets: { id: string; name: string }[]; images: { id: string; mimeType: string }[]; nextTargetOffset: number | null; nextImageAfter: string | null; nameMaxCharacters: number };
 
 export function CreativeCreateForm({ adAccountId, accountName, ownerScope, locale = 'en' }: { adAccountId: string; accountName: string; ownerScope: CreationOwnerScope; locale?: 'en' | 'fr' }) {
-  const t = creativeCopy[locale];
+  const localize = useAdsMessage();
+  const { catalogs } = useAdsCatalogs();
+  const t = catalogs.creative[locale];
   const { userId, workspaceId } = ownerScope;
   const owner = useMemo(() => ({ userId, workspaceId }), [userId, workspaceId]);
   const [sources, setSources] = useState<Sources | null>(null);
@@ -110,8 +113,8 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
   return <section className="ads-campaign-create ads-creative-create" aria-label={`${t.title} · ${accountName}`}>
     <h3>{t.title} · {accountName}</h3><p className="small-note">{t.description}</p>
     {loading ? <p role="status">{t.loading}</p> : null}
-    {error ? <p role="alert" className="ui-error">{error} <Button onClick={() => setReload(value => value + 1)} disabled={busy || loading}>{t.refresh}</Button></p> : null}
-    {notice ? <p role="status">{notice}</p> : null}
+    {error ? <p role="alert" className="ui-error">{localize(error)} <Button onClick={() => setReload(value => value + 1)} disabled={busy || loading}>{t.refresh}</Button></p> : null}
+    {notice ? <p role="status">{localize(notice)}</p> : null}
     {held ? <div role="alert"><p>{t.held}</p><p><strong>{held.operation.name}</strong> · {held.operation.mediaId}</p><Button disabled={busy} onClick={() => void send(held)}>{busy ? t.pending : t.check}</Button> <a href="/ads/objects#changes">{t.history}</a></div> : null}
     {sources ? <form noValidate onSubmit={submit} aria-label={t.title}>
       <div className="ads-campaign-create__fields">

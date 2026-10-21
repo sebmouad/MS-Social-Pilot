@@ -1,4 +1,4 @@
-import { OperationError } from '@/lib/operation-error';
+import { copyError, withCustomerCopy } from './server/copy';
 import { AGENCY_SORTS, type AgencyActor } from './agency';
 import { exportAgencyOverview } from './server/export';
 import { agencyOverview, listAgencyClients } from './server/agency';
@@ -26,16 +26,16 @@ export function agencyActorFor(identity: unknown): AgencyActor {
   const value = identity && typeof identity === 'object' ? identity as Record<string, unknown> : {};
   const forbiddenKeys = ['apiKeyId', 'personKeyId', 'readFeature', 'workspaceId', 'workspace', 'permissions', 'isInstanceOwner'];
   if (value.scope !== 'person' || typeof value.userId !== 'string' || !value.userId || forbiddenKeys.some(key => key in value)) {
-    throw new OperationError('forbidden', 'Agency tools are available only to a signed-in person, not to a workspace key.');
+    throw copyError('forbidden', 'Agency tools are available only to a signed-in person, not to a workspace key.');
   }
   return { userId: value.userId };
 }
 
-export async function executeAgencyTool(identity: unknown, name: string, args: Record<string, unknown>) {
+async function executeAgencyToolImpl(identity: unknown, name: string, args: Record<string, unknown>) {
   const actor = agencyActorFor(identity);
   if (name === 'get_agency_overview') return 'format' in args ? exportAgencyOverview(actor, args) : agencyOverview(actor, args);
   if (name === 'list_agency_clients') return listAgencyClients(actor, args);
-  throw new OperationError('invalid_request', 'Unknown agency tool.');
+  throw copyError('invalid_request', 'Unknown agency tool.');
 }
 
 /** Browser session catalog. Person overview credentials and workspace keys never enter this group. */
@@ -49,17 +49,20 @@ export const AGENCY_SESSION_MCP: McpToolGroup = {
   writeTools: ['select_workspace'], selfLockedWrites: ['select_workspace'], purgeCheckExempt: ['select_workspace'],
   scope: { workspaceTools: ['list_agency_clients', 'select_workspace'] },
   available: async viewer => () => !viewer.apiKeyId,
-  beforeCall: viewer => { if (viewer.apiKeyId) throw new OperationError('forbidden', 'Use a signed-in browser session.'); },
-  execute: async (viewer, name, args) => {
-    if (viewer.apiKeyId) throw new OperationError('forbidden', 'Use a signed-in browser session.');
+  // The shared MCP host's synchronous beforeCall contract cannot await a Root catalog.
+  beforeCall: viewer => { if (viewer.apiKeyId) throw copyError('forbidden', 'Use a signed-in browser session.'); },
+  execute: async (viewer, name, args) => withCustomerCopy(async () => {
+    if (viewer.apiKeyId) throw copyError('forbidden', 'Use a signed-in browser session.');
     const actor = await accountSessionActor(viewer.userId, viewer.workspaceId);
     await assertAgencySession(actor);
     if (name === 'list_agency_clients') return listAgencyClients({ userId: actor.userId }, args);
     if (name === 'select_workspace') {
       // The service enforces a supplied confirmation; tools also require its presence.
-      if (typeof args.confirmation !== 'string') throw new OperationError('invalid_request', 'Confirm the workspace selection.');
+      if (typeof args.confirmation !== 'string') throw copyError('invalid_request', 'Confirm the workspace selection.');
       return selectWorkspace(actor, args);
     }
-    throw new OperationError('invalid_request', 'Unknown agency session tool.');
-  },
+    throw copyError('invalid_request', 'Unknown agency session tool.');
+  }),
 };
+
+export const executeAgencyTool = (...args: Parameters<typeof executeAgencyToolImpl>) => withCustomerCopy(() => executeAgencyToolImpl(...args));

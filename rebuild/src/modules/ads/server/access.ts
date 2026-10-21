@@ -1,3 +1,5 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import { prisma } from '@/server/data';
 import { canUseFeature, entitledPlatformIds, loadEntitlements } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
@@ -9,8 +11,9 @@ export type AdsReadActor = { allowedPlatformIds?: readonly string[]; userId: str
 
 /** Recheck all customer report permissions and intersect caller-provided scope with current grants. */
 export async function authorizeAdsRead(actor: AdsReadActor, feature: 'ads/campaigns' | 'ads/compare' | 'ads/objects' = 'ads/campaigns') {
+  return withAdsCopySnapshot(async () => {
   const user = await prisma.user.findUnique({ where: { id: actor.userId }, select: { disabledAt: true } });
-  if (!user || user.disabledAt) throw new OperationError('unauthorized', 'Sign in with an active account to view Ads reports.');
+  if (!user || user.disabledAt) throw new OperationError('unauthorized', await adsServiceText('service001'));
 
   const [membership, entitlements, permissions] = await Promise.all([
     prisma.membership.findFirst({ where: { userId: actor.userId, workspaceId: actor.workspaceId }, select: { role: true } }),
@@ -19,7 +22,7 @@ export async function authorizeAdsRead(actor: AdsReadActor, feature: 'ads/campai
   ]);
   if (!membership || !entitlements || entitlements.workspaceId !== actor.workspaceId || !permissions ||
     !canUseFeature(entitlements, feature) || !canAccessFeature(permissions, feature, 'read')) {
-    throw new OperationError('forbidden', 'Ads report access is unavailable in this workspace.');
+    throw new OperationError('forbidden', await adsServiceText('service002'));
   }
   await assertWorkspaceNotPurging(actor.workspaceId);
 
@@ -36,4 +39,6 @@ export async function authorizeAdsRead(actor: AdsReadActor, feature: 'ads/campai
     allowedAdAccountIds: actor.allowedAdAccountIds,
     allowedProviders: entitledPlatformIds(entitlements).filter(id => actor.allowedPlatformIds === undefined || actor.allowedPlatformIds.includes(id)),
   };
+
+  });
 }

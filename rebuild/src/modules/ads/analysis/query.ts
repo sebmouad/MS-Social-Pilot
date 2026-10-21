@@ -1,3 +1,4 @@
+import { defaultAdsText } from '@/modules/ads/copy';
 import { requestOrigin } from '@/server/request-origin';
 import { OperationError } from '@/lib/operation-error';
 
@@ -7,7 +8,7 @@ export function searchRecord(url: string, integerKeys: readonly string[] = []): 
   const out: Record<string, unknown> = {};
   for (const key of new Set(params.keys())) {
     const all = params.getAll(key);
-    if (all.length !== 1) throw new OperationError('invalid_request', 'Choose one value for each filter.');
+    if (all.length !== 1) throw new OperationError('invalid_request', defaultAdsText('validation044'));
     const value = all[0]!;
     out[key] = integerKeys.includes(key) ? (/^\d{1,15}$/.test(value) ? Number(value) : value) : value;
   }
@@ -26,18 +27,18 @@ export function pageSearchRecord(
   allowedKeys: readonly string[],
   maxCharacters: number,
 ): Record<string, string | undefined> {
-  if (Object.keys(params).some(key => !allowedKeys.includes(key))) throw new OperationError('invalid_request', 'Remove unknown Ads filters and try again.');
+  if (Object.keys(params).some(key => !allowedKeys.includes(key))) throw new OperationError('invalid_request', defaultAdsText('validation045'));
   const out: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined) continue;
     if (Array.isArray(value)) {
-      if (value.length !== 1) throw new OperationError('invalid_request', 'Choose one value for each Ads filter.');
+      if (value.length !== 1) throw new OperationError('invalid_request', defaultAdsText('validation046'));
       out[key] = value[0];
     } else out[key] = value;
-    if (out[key]!.length > maxCharacters) throw new OperationError('invalid_request', `Keep each Ads filter to ${maxCharacters} characters or fewer.`);
+    if (out[key]!.length > maxCharacters) throw new OperationError('invalid_request', defaultAdsText('validation047', { value0: maxCharacters }));
   }
   if (out.offset !== undefined && (!/^\d{1,9}$/.test(out.offset) || !Number.isSafeInteger(Number(out.offset)))) {
-    throw new OperationError('invalid_request', 'Choose a valid page number or reset the filters.');
+    throw new OperationError('invalid_request', defaultAdsText('validation048'));
   }
   return out;
 }

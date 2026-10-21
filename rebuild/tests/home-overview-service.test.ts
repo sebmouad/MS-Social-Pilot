@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  entitlements: vi.fn(), permissions: vi.fn(), canUse: vi.fn(), canAccess: vi.fn(), batch: vi.fn(), workspace: vi.fn(), queryRaw: vi.fn(),
+  entitlements: vi.fn(), permissions: vi.fn(), canUse: vi.fn(), canAccess: vi.fn(), batch: vi.fn(), config: vi.fn(), workspace: vi.fn(), queryRaw: vi.fn(),
   snapshot: vi.fn(), inbox: vi.fn(), ads: vi.fn(), posts: vi.fn(), host: vi.fn(),
 }));
 vi.mock('@/server/data', () => ({ prisma: { workspace: { findUnique: mocks.workspace }, $queryRaw: mocks.queryRaw } }));
-vi.mock('@/server/config/store', () => ({ runtimeConfigBatch: mocks.batch }));
+vi.mock('@/server/config/store', () => ({ runtimeConfigBatch: mocks.batch, runtimeConfig: mocks.config }));
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.canUse }));
 vi.mock('@/server/permissions', () => ({ canAccessFeature: mocks.canAccess }));
 vi.mock('@/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
@@ -31,7 +31,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.entitlements.mockResolvedValue({}); mocks.permissions.mockResolvedValue({ pageScope: { all: true } });
   mocks.canUse.mockReturnValue(true); mocks.canAccess.mockReturnValue(true);
-  mocks.batch.mockResolvedValue(config); mocks.workspace.mockResolvedValue({ timezone: 'UTC' });
+  mocks.batch.mockResolvedValue(config); mocks.config.mockImplementation(async (key: string) => config[key]); mocks.workspace.mockResolvedValue({ timezone: 'UTC' });
   mocks.queryRaw.mockResolvedValue([{ id: 'c1', provider: 'p' }, { id: 'c2', provider: 'p' }]);
   mocks.snapshot.mockResolvedValue(snapshot());
   mocks.inbox.mockResolvedValue({ total: 4 });

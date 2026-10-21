@@ -1,3 +1,6 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { defaultAdsText } from '@/modules/ads/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import { OperationError } from '@/lib/operation-error';
 import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/modules/ads/server/queries';
 import { readWorkspaceAdObject } from '@/modules/ads/server/actions';
@@ -20,32 +23,33 @@ type Row = { adAccountId: string; objectId: string; objectName: string | null; d
 const flow = (row: Row) => ({ date: adsIsoDay(row.date), spend: row.spend, impressions: row.impressions, clicks: row.clicks });
 const text = (value: unknown, key: string, max: number) => {
   if (value === undefined) return undefined;
-  if (typeof value !== 'string' || value.length > max) throw new OperationError('invalid_request', `Choose a valid ${key}.`);
+  if (typeof value !== 'string' || value.length > max) throw new OperationError('invalid_request', defaultAdsText('validation049', { value0: key }));
   return value;
 };
 const int = (value: unknown, min: number, max: number, fallback: number, name: string) => {
   if (value === undefined) return fallback;
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new OperationError('invalid_request', `Choose a ${name} from ${min} to ${max}.`);
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new OperationError('invalid_request', defaultAdsText('validation004', { value0: name, value1: min, value2: max }));
   return value;
 };
 
 /** Browse stored campaign / ad set / ad objects with period figures, last delivery and freshness. */
 export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {}, now = new Date()) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', 'Choose valid Ads directory filters.');
+  return withAdsCopySnapshot(async () => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', await adsServiceText('service089'));
   const values = input as Record<string, unknown>;
-  if (Object.keys(values).some(key => !INPUT_KEYS.has(key))) throw new OperationError('invalid_request', 'Choose valid Ads directory filters.');
+  if (Object.keys(values).some(key => !INPUT_KEYS.has(key))) throw new OperationError('invalid_request', await adsServiceText('service089'));
   const access = await authorizeAdsRead(actor, 'ads/objects');
   const [reportPolicy, analysisPolicy, readPolicy] = await Promise.all([loadAdsReportPolicy(), loadAdsAnalysisPolicy(), loadAdsReadPolicy()]);
   const max = reportPolicy.maxFilterCharacters;
   const level = (text(values.level, 'level', max) ?? 'campaign') as DirectoryLevel;
-  if (!LEVELS.includes(level)) throw new OperationError('invalid_request', 'Choose campaigns, ad sets or ads.');
+  if (!LEVELS.includes(level)) throw new OperationError('invalid_request', await adsServiceText('service078'));
   const parentId = text(values.parentId, 'parent object', max);
-  if (parentId !== undefined && !SAFE_ID.test(parentId)) throw new OperationError('invalid_request', 'Choose a valid parent object.');
+  if (parentId !== undefined && !SAFE_ID.test(parentId)) throw new OperationError('invalid_request', await adsServiceText('service090'));
   const q = text(values.q, 'search', max)?.trim().toLowerCase();
   const sort = (text(values.sort, 'sort', max) ?? 'spend') as AdsObjectSortKey;
-  if (!OBJECT_SORT_KEYS.includes(sort)) throw new OperationError('invalid_request', 'Choose a valid sort column.');
+  if (!OBJECT_SORT_KEYS.includes(sort)) throw new OperationError('invalid_request', await adsServiceText('service079'));
   const direction = text(values.direction, 'direction', max) ?? (sort === 'name' ? 'asc' : 'desc');
-  if (direction !== 'asc' && direction !== 'desc') throw new OperationError('invalid_request', 'Choose ascending or descending order.');
+  if (direction !== 'asc' && direction !== 'desc') throw new OperationError('invalid_request', await adsServiceText('service080'));
   const limit = int(values.limit, 1, readPolicy.maxRows, readPolicy.pageSize, 'page size');
   const offset = int(values.offset, 0, Number.MAX_SAFE_INTEGER, 0, 'offset');
 
@@ -98,17 +102,20 @@ export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {},
     total, offset, limit, nextOffset: offset + page.length < total ? offset + page.length : null, items: page,
     parentLinks: level === 'campaign' ? 'none' as const : items.some(item => item.parentId) ? 'stored' as const : 'unavailable' as const,
     freshness: assessFreshness(rows.map(row => row.fetchedAt), now, analysisPolicy.staleAfterHours),
-    note: 'Figures come from stored daily reports. Levels overlap, so campaign, ad set and ad figures must not be added together.',
+    note: await adsServiceText('service091'),
   };
+
+  });
 }
 
 /** One object: stored period figures, daily series, best-effort live status and the changes the actor can make. */
 export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, now = new Date()) {
+  return withAdsCopySnapshot(async () => {
   const values = (input && typeof input === 'object' && !Array.isArray(input) ? input : {}) as Record<string, unknown>;
   const allowed = new Set(['accountId', 'level', 'objectId', 'period', 'start', 'end']);
-  if (Object.keys(values).some(key => !allowed.has(key))) throw new OperationError('invalid_request', 'Choose a valid ad object.');
+  if (Object.keys(values).some(key => !allowed.has(key))) throw new OperationError('invalid_request', await adsServiceText('service092'));
   const { accountId, level, objectId } = values as Record<string, string | undefined>;
-  if (!accountId || !level || !LEVELS.includes(level as DirectoryLevel) || !objectId || !SAFE_ID.test(objectId)) throw new OperationError('invalid_request', 'Choose an account, a level and an object.');
+  if (!accountId || !level || !LEVELS.includes(level as DirectoryLevel) || !objectId || !SAFE_ID.test(objectId)) throw new OperationError('invalid_request', await adsServiceText('service093'));
   const access = await authorizeAdsRead(actor, 'ads/objects');
   const reportPolicy = await loadAdsReportPolicy();
   const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders, access.allowedAdAccountIds);
@@ -116,7 +123,7 @@ export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, n
   const filters = parseAdsPerformanceFilters({ ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), accountId }, accounts.map(account => account.id), now, reportPolicy);
   const dataset = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, { levels: [level as AdsInsightLevel], objectId, allowedAdAccountIds: access.allowedAdAccountIds });
   const rows = dataset.insights as unknown as Row[];
-  if (!rows.length) throw new OperationError('not_found', 'No stored report rows were found for this object in the selected range.');
+  if (!rows.length) throw new OperationError('not_found', await adsServiceText('service094'));
   const totals = totalsFromRows(rows.map(flow));
   let live: { available: true; configuredStatus: string | null; effectiveStatus: string | null } | { available: false } = { available: false };
   try {
@@ -136,4 +143,6 @@ export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, n
       ? { available: true as const, canManage: management.canManage, operations: management.operations.filter(op => op.objectTypes.includes(level as DirectoryLevel)) }
       : { available: false as const, canManage: false as const, operations: [] },
   };
+
+  });
 }

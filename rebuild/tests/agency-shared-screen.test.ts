@@ -1,7 +1,10 @@
+import { customerCopy } from '@/modules/agency/ui/copy';
+import { agencyExportCatalog } from '@/modules/agency/export-copy';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { AgencyOverview } from '@/modules/agency/agency';
 const m = vi.hoisted(() => ({ overview: vi.fn(), language: 'en' }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'agency.exportCopy' ? agencyExportCatalog : customerCopy }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': m.language }) }));
 vi.mock('@/server/context', () => ({ requireViewer: async () => ({ user: { id: 'person' } }) }));
 vi.mock('@/modules/agency/server/agency', () => ({ agencySearchLimit: async () => 40, agencyOverview: m.overview }));

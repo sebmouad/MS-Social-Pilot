@@ -3,9 +3,17 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 const state = vi.hoisted(() => ({ read: vi.fn(), config: vi.fn(), viewer: vi.fn(), headers: vi.fn() }));
+vi.mock('@/modules/analytics/server/overview-copy', async () => {
+  const { overviewCopyDefaults } = await import('@/modules/analytics/overview-copy');
+  return { loadOverviewCopy: async (locale: 'en' | 'fr') => overviewCopyDefaults[locale] };
+});
+vi.mock('@/modules/analytics/server/copy', async () => {
+  const c = await import('@/modules/analytics/copy');
+  return { analyticsCopy: async () => ({ reports: c.reportCopyDefaults, goals: c.goalsCopyDefaults, downloads: c.downloadCopyDefaults, demographics: c.demographicsCopyDefaults, workspace: c.workspaceCopyDefaults, records: c.recordsCopyDefaults, errors: c.errorCopyDefaults }) };
+});
 vi.mock('next/headers', () => ({ headers: state.headers }));
 vi.mock('../src/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: state.read }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
+vi.mock('../src/server/config/store', async () => { const { errorCopyDefaults } = await import('@/modules/analytics/error-copy'); const { workspaceCopyDefaults } = await import('@/modules/analytics/workspace-copy'); return { runtimeConfig: (key: string) => key === 'analytics.workspaceCopy' ? Promise.resolve(workspaceCopyDefaults) : key === 'analytics.errorCopy' ? Promise.resolve(errorCopyDefaults) : state.config(key) }; });
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children }: { sidebar: import('react').ReactNode; children: import('react').ReactNode }) => createElement('main', null, createElement('aside', null, sidebar), children) }));
 vi.mock('../src/server/entitlements', () => ({ canUseFeature: (_entitlements: unknown, feature: string) => feature === 'analytics/reports' }));

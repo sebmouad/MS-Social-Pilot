@@ -1,8 +1,10 @@
+import { overviewCopyCatalogDefaults } from '@/modules/analytics/overview-copy';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ viewer: vi.fn(), read: vi.fn() }));
+const state = vi.hoisted(() => ({ viewer: vi.fn(), read: vi.fn(), config: vi.fn() }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: state.config }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/modules/analytics/server/read', () => ({ readAnalytics: state.read }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children, scopedAccess }: { sidebar: import('react').ReactNode; children: import('react').ReactNode; scopedAccess?: boolean }) => createElement('main', { 'data-scoped-access': scopedAccess }, createElement('aside', null, sidebar), children) }));
@@ -50,6 +52,7 @@ const base = (): AnalyticsReadResult => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  state.config.mockResolvedValue(overviewCopyCatalogDefaults);
   state.viewer.mockResolvedValue({
     user: { id: 'reader' }, workspaceId: 'workspace',
     permissions: { pageScope: { all: false, ids: ['channel-a'] } },
@@ -65,6 +68,17 @@ const links = (html: string) => [...html.matchAll(/href="([^"]+)"/g)]
   .map(match => new URL(match[1].replaceAll('&amp;', '&'), 'http://preview.test'));
 
 describe('Analytics explorer page', () => {
+  it('renders edited Root overview copy in both page and sidebar', async () => {
+    state.config.mockResolvedValue({ ...overviewCopyCatalogDefaults, Performance: { ...overviewCopyCatalogDefaults.Performance, en: 'Workspace results' }, 'Report filters': { ...overviewCopyCatalogDefaults['Report filters'], en: 'Choose your report' }, 'No aggregate value': { ...overviewCopyCatalogDefaults['No aggregate value'], en: 'No combined figure' } });
+    const result = base();
+    result.metrics.items = [{ ...valueMetric, total: null, displayTotal: undefined }];
+    state.read.mockResolvedValueOnce(result);
+    const html = await render();
+    expect(html).toContain('Workspace results');
+    expect(html).toContain('Choose your report');
+    expect(html).toContain('No combined figure');
+    expect(state.config).toHaveBeenCalledWith('analytics.overviewCopy');
+  });
   it('uses the scoped reader and still shows selected ad metrics with no channels selected', async () => {
     const html = await render({ compare: 'previous', filter: '1', channel: [], adFilter: '1', adAccount: 'account-a' });
 

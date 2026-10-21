@@ -1,3 +1,5 @@
+import { loadOverviewCopy } from '../server/overview-copy';
+import { overviewCopyDefaults, overviewText, type OverviewCopy } from '../overview-copy';
 import { AnalyticsFilters, MetricPicker } from './AnalyticsFilters';
 import { EmptyState } from '@/components/EmptyState';
 import { IconAlertTriangle, IconCalendarEvent, IconChartBar, IconPlugConnected, IconSend } from '@tabler/icons-react';
@@ -49,25 +51,27 @@ function removeQuery(query: string, key: string) {
   return params.toString();
 }
 
-function formatDay(value: string, options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }) {
-  return new Intl.DateTimeFormat('en', { ...options, timeZone: 'UTC' }).format(new Date(`${value}T12:00:00.000Z`));
+function formatDay(value: string, locale: string = 'en', options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }) {
+  return new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' }).format(new Date(`${value}T12:00:00.000Z`));
 }
 
-function formatValue(value: number, unit: string) {
-  const amount = new Intl.NumberFormat('en', { maximumFractionDigits: unit === 'currency' ? 2 : 1 }).format(value);
+function formatValue(value: number, unit: string, locale: string = 'en') {
+  const amount = new Intl.NumberFormat(locale, { maximumFractionDigits: unit === 'currency' ? 2 : 1 }).format(value);
   return unit === 'percent' ? `${amount}%` : unit === 'multiple' ? `${amount}×` : amount;
 }
 
-function Pagination({ query, parameter, page, pages, label }: { query: string; parameter: string; page: number; pages: number; label: string }) {
+function Pagination({ query, parameter, page, pages, label, copy }: { copy: OverviewCopy; query: string; parameter: string; page: number; pages: number; label: string }) {
+  const t = overviewText(copy);
   if (pages < 2) return null;
-  return <nav className="analytics-pager" aria-label={`${label} pages`}>
-    <span>Page {page} of {pages}</span>
-    {page > 1 && <a href={`/analytics?${updateQuery(query, parameter, page - 1)}`}>Previous {label.toLowerCase()}</a>}
-    {page < pages && <a href={`/analytics?${updateQuery(query, parameter, page + 1)}`}>Next {label.toLowerCase()}</a>}
+  return <nav className="analytics-pager" aria-label={t("{label} pages", { label })}>
+    <span>{t("Page {page} of {pages}", { page, pages })}</span>
+    {page > 1 && <a href={`/analytics?${updateQuery(query, parameter, page - 1)}`}>{t("Previous {label}", { label: label.toLowerCase() })}</a>}
+    {page < pages && <a href={`/analytics?${updateQuery(query, parameter, page + 1)}`}>{t("Next {label}", { label: label.toLowerCase() })}</a>}
   </nav>;
 }
 
-function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHref, profiles, locale }: { profiles?: ProfileDirectory; locale: 'en' | 'fr'; data: AnalyticsReadResult; query: string; exportHref?: string; connectionsHref?: string; explorerHref?: string }) {
+function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHref, profiles, locale, copy }: { copy: OverviewCopy; profiles?: ProfileDirectory; locale: 'en' | 'fr'; data: AnalyticsReadResult; query: string; exportHref?: string; connectionsHref?: string; explorerHref?: string }) {
+  const t = overviewText(copy);
   const params = new URLSearchParams(query);
   const selectedChannels = new Set(data.selected.channelIds);
   const selectedAccounts = new Set(data.selected.adAccountIds);
@@ -77,113 +81,116 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHr
 
   return <div className="analytics-sidebar">
     <form noValidate action="/analytics" method="get" className="analytics-sidebar-filter">
-      <AnalyticsFilters title="Report filters" query={query} path="/analytics" locale={locale}>
+      <AnalyticsFilters copy={copy} title={t("Report filters")} query={query} path="/analytics" locale={locale}>
       <fieldset className="analytics-filter-section">
-        <legend className="shell-subnav__label">Stored calendar dates (UTC)</legend>
-        <label className="analytics-date-filter">From<input type="date" name="start" defaultValue={data.period.start} /></label>
-        <label className="analytics-date-filter">To<input type="date" name="end" defaultValue={data.period.end} /></label>
+        <legend className="shell-subnav__label">{t("Stored calendar dates (UTC)")}</legend>
+        <label className="analytics-date-filter">{t("From")}<input type="date" name="start" defaultValue={data.period.start} /></label>
+        <label className="analytics-date-filter">{t("To")}<input type="date" name="end" defaultValue={data.period.end} /></label>
       </fieldset>
-      <label className="analytics-select-filter">Compare with
+      <label className="analytics-select-filter">{t("Compare with")}
         <select name="compare" defaultValue={comparison}>
-          <option value="none">No comparison</option>
-          <option value="previous">Previous equal-length period</option>
-          <option value="year">Same calendar dates last year</option>
+          <option value="none">{t("No comparison")}</option>
+          <option value="previous">{t("Previous equal-length period")}</option>
+          <option value="year">{t("Same calendar dates last year")}</option>
         </select>
       </label>
-      <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">Channels</legend>
+      <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">{t("Channels")}</legend>
         {freshPage('filter')}
         {profiles && <GroupShortcut groups={profiles.groups} allowedIds={data.options.channels.map(channel => channel.id)} locale={locale} />}
         {data.options.channels.length ? data.options.channels.map(channel => <label key={channel.id}>
           <input type="checkbox" name="channel" value={channel.id} defaultChecked={selectedChannels.has(channel.id)} />
           <span>{profiles?.channels.find(profile => profile.id === channel.id) ? profileChannelName(profiles.channels.find(profile => profile.id === channel.id)!) : channel.name}</span>
-        </label>) : <p className="small-note">No channels available.</p>}
+        </label>) : <p className="small-note">{t("No channels available.")}</p>}
       </fieldset>
-      <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">Ad accounts</legend>
+      <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">{t("Ad accounts")}</legend>
         {freshPage('adFilter')}
         {data.options.adAccounts.length ? data.options.adAccounts.map(account => <label key={account.id}>
           <input type="checkbox" name="adAccount" value={account.id} defaultChecked={selectedAccounts.has(account.id)} />
           <span>{account.name}{account.currency ? ` · ${account.currency}` : ''}</span>
-        </label>) : <p className="small-note">No ad accounts available.</p>}
+        </label>) : <p className="small-note">{t("No ad accounts available.")}</p>}
       </fieldset>
-      <label className="analytics-select-filter">Search metrics
-        <input type="search" name="search" maxLength={data.searchMaxLength} defaultValue={params.get('search') ?? ''} placeholder="Name or source" />
+      <label className="analytics-select-filter">{t("Search metrics")}
+        <input type="search" name="search" maxLength={data.searchMaxLength} defaultValue={params.get('search') ?? ''} placeholder={t("Name or source")} />
       </label>
-      <MetricPicker label="Metric detail" options={data.options.metrics} initial={selectedMetric} />
+      <MetricPicker copy={copy} locale={locale} label={t("Metric detail")} options={data.options.metrics} initial={selectedMetric} />
       {freshPage('page')}{freshPage('pointPage')}{freshPage('rowPage')}
-      <Button type="submit" variant="primary">Apply filters</Button>
-      <a className="analytics-filter-reset" href="/analytics">Reset filters</a>
+      <Button type="submit" variant="primary">{t("Apply filters")}</Button>
+      <a className="analytics-filter-reset" href="/analytics">{t("Reset filters")}</a>
     </AnalyticsFilters></form>
 
     <div className="analytics-sidebar-pages">
-      <p className="shell-subnav__label">Browse results</p>
-      {!data.detail && <Pagination query={data.query} parameter="page" page={data.metrics.page} pages={data.metrics.pages} label="Metrics" />}
+      <p className="shell-subnav__label">{t("Browse results")}</p>
+      {!data.detail && <Pagination copy={copy} query={data.query} parameter="page" page={data.metrics.page} pages={data.metrics.pages} label={t("Metrics")} />}
       {data.detail && <>
-        <Pagination query={data.query} parameter="pointPage" page={data.detail.points.page} pages={data.detail.points.pages} label="Series" />
-        <Pagination query={data.query} parameter="rowPage" page={data.detail.rows.page} pages={data.detail.rows.pages} label="Resources" />
-        <a className="analytics-sidebar-export" href={`/analytics?${removeQuery(data.query, 'metric')}`}>Back to all metric cards</a>
+        <Pagination copy={copy} query={data.query} parameter="pointPage" page={data.detail.points.page} pages={data.detail.points.pages} label={t("Series")} />
+        <Pagination copy={copy} query={data.query} parameter="rowPage" page={data.detail.rows.page} pages={data.detail.rows.pages} label={t("Resources")} />
+        <a className="analytics-sidebar-export" href={`/analytics?${removeQuery(data.query, 'metric')}`}>{t("Back to all metric cards")}</a>
       </>}
-      {exportHref && <><a className="analytics-sidebar-export" href={exportHref}>Export CSV</a><p className="analytics-export-note">Exports include up to {data.exportRowLimit} data rows. Larger downloads are marked as truncated.</p></>}
-      {explorerHref && <a className="analytics-sidebar-export" href={explorerHref}>Explore metric sources and types</a>}
-      {connectionsHref && <a className="analytics-sidebar-export" href={connectionsHref}>View connections</a>}
-      {!data.metrics.total && <p className="small-note">No metrics match these filters.</p>}
+      {exportHref && <><a className="analytics-sidebar-export" href={exportHref}>{t("Export CSV")}</a><p className="analytics-export-note">{t("Exports include up to {limit} data rows. Larger downloads are marked as truncated.", { limit: data.exportRowLimit })}</p></>}
+      {explorerHref && <a className="analytics-sidebar-export" href={explorerHref}>{t("Explore metric sources and types")}</a>}
+      {connectionsHref && <a className="analytics-sidebar-export" href={connectionsHref}>{t("View connections")}</a>}
+      {!data.metrics.total && <p className="small-note">{t("No metrics match these filters.")}</p>}
     </div>
   </div>;
 }
 
-function AnalyticsRecoverySidebar({ retryHref }: { retryHref: string }) {
+function AnalyticsRecoverySidebar({ retryHref, copy }: { retryHref: string; copy: OverviewCopy }) {
+  const t = overviewText(copy);
   return <div className="analytics-sidebar-pages">
-    <p className="shell-subnav__label">Recovery</p>
-    <a href={retryHref}>Try again with these filters</a>
-    <a href="/analytics">Reset filters</a>
+    <p className="shell-subnav__label">{t("Recovery")}</p>
+    <a href={retryHref}>{t("Try again with these filters")}</a>
+    <a href="/analytics">{t("Reset filters")}</a>
   </div>;
 }
 
-function MetricTable({ data }: { data: AnalyticsReadResult }) {
+function MetricTable({ data, copy, locale }: { data: AnalyticsReadResult; copy: OverviewCopy; locale: string }) {
+  const t = overviewText(copy);
   const detail = data.detail!;
   const metric = detail.metric;
   const rowStart = detail.rows.total ? (detail.rows.page - 1) * detail.rows.pageSize + 1 : 0;
   const rowEnd = Math.min(detail.rows.page * detail.rows.pageSize, detail.rows.total);
   const pointStart = detail.points.total ? (detail.points.page - 1) * detail.points.pageSize + 1 : 0;
   const pointEnd = Math.min(detail.points.page * detail.points.pageSize, detail.points.total);
-  const timeLabel = metric.resourceKind === 'ad-account' ? 'ad accounts' : 'channels';
+  const timeLabel = metric.resourceKind === 'ad-account' ? t("ad accounts") : t("channels");
 
   return <section className="panel analytics-detail" aria-labelledby="analytics-detail-title">
-    <header className="analytics-panel-title"><div><p className="eyebrow">Metric detail</p><h2 id="analytics-detail-title">{metric.label}</h2><p className="small-note">{metric.sourceLabel} · {metric.aggregationLabel}</p>{metric.aggregationNote && <p className="analytics-aggregation-note">{metric.aggregationNote}</p>}</div>
-      <strong className="analytics-detail-total">{metric.displayTotal ?? (metric.total === null ? '—' : formatValue(metric.total, metric.unit))}</strong>
+    <header className="analytics-panel-title"><div><p className="eyebrow">{t("Metric detail")}</p><h2 id="analytics-detail-title">{metric.label}</h2><p className="small-note">{metric.sourceLabel} · {metric.aggregationLabel}</p>{metric.aggregationNote && <p className="analytics-aggregation-note">{metric.aggregationNote}</p>}</div>
+      <strong className="analytics-detail-total">{metric.displayTotal ?? (metric.total === null ? '—' : formatValue(metric.total, metric.unit, locale))}</strong>
     </header>
-    <p className="analytics-detail-coverage">Coverage: {metric.coverage} of {metric.available} selected {timeLabel}. A missing value is unknown, not zero.</p>
-    <AnalyticsMetricComparison metric={metric} comparison={data.comparisons[metric.key]} />
+    <p className="analytics-detail-coverage">{t("Coverage: {covered} of {available} selected {resources}. A missing value is unknown, not zero.", { covered: metric.coverage, available: metric.available, resources: timeLabel })}</p>
+    <AnalyticsMetricComparison locale={locale as 'en' | 'fr'} copy={copy} metric={metric} comparison={data.comparisons[metric.key]} />
     <div className="analytics-table-wrap">
       <table className="analytics-table">
-        <caption>Full date and value series · {detail.points.total} stored values · showing {pointStart}–{pointEnd}</caption>
-        <thead><tr><th scope="col">Stored calendar date (UTC)</th><th scope="col">Value</th></tr></thead>
-        <tbody>{detail.points.items.map(point => <tr key={point.date}><th scope="row" title="Stored calendar date (UTC)">{formatDay(point.date)}</th><td>{formatValue(point.value, metric.unit)}</td></tr>)}</tbody>
+        <caption>{t("Full date and value series · {total} stored values · showing {start}–{end}", { total: detail.points.total, start: pointStart, end: pointEnd })}</caption>
+        <thead><tr><th scope="col">{t("Stored calendar date (UTC)")}</th><th scope="col">{t("Value")}</th></tr></thead>
+        <tbody>{detail.points.items.map(point => <tr key={point.date}><th scope="row" title={t("Stored calendar date (UTC)")}>{formatDay(point.date, locale)}</th><td>{formatValue(point.value, metric.unit, locale)}</td></tr>)}</tbody>
       </table>
-      {!detail.points.total && <p className="empty-note">No dated values are stored for this metric.</p>}
+      {!detail.points.total && <p className="empty-note">{t("No dated values are stored for this metric.")}</p>}
     </div>
     <div className="analytics-table-wrap">
       <table className="analytics-table">
-        <caption>Resource detail · {detail.rows.total} stored rows · showing {rowStart}–{rowEnd}</caption>
-        <thead><tr><th scope="col">{metric.kind === 'breakdown' ? 'Category' : metric.resourceKind === 'ad-account' ? 'Ad account' : 'Channel'}</th><th scope="col">Value</th><th scope="col">Data date</th></tr></thead>
-        <tbody>{detail.rows.items.map(row => <tr key={`${row.label}:${row.asOf?.toISOString() ?? 'unknown'}`}><th scope="row">{row.label}</th><td>{formatValue(row.value, metric.unit)}</td><td>{row.asOf ? formatDay(row.asOf.toISOString().slice(0, 10)) : 'Date unavailable'}</td></tr>)}</tbody>
+        <caption>{t("Resource detail · {total} stored rows · showing {start}–{end}", { total: detail.rows.total, start: rowStart, end: rowEnd })}</caption>
+        <thead><tr><th scope="col">{metric.kind === 'breakdown' ? t("Category") : metric.resourceKind === 'ad-account' ? t("Ad account") : t("Channel")}</th><th scope="col">{t("Value")}</th><th scope="col">{t("Data date")}</th></tr></thead>
+        <tbody>{detail.rows.items.map(row => <tr key={`${row.label}:${row.asOf?.toISOString() ?? 'unknown'}`}><th scope="row">{row.label}</th><td>{formatValue(row.value, metric.unit, locale)}</td><td>{row.asOf ? formatDay(row.asOf.toISOString().slice(0, 10), locale) : t("Date unavailable")}</td></tr>)}</tbody>
       </table>
-      {!detail.rows.total && <p className="empty-note">No resource-level values are stored for this metric.</p>}
+      {!detail.rows.total && <p className="empty-note">{t("No resource-level values are stored for this metric.")}</p>}
     </div>
   </section>;
 }
 
-function audienceSection(data: AnalyticsReadResult) {
+function audienceSection(data: AnalyticsReadResult, copy: OverviewCopy, locale: string) {
+  const t = overviewText(copy);
   if (!data.selected.channelIds.length) return null;
   return <section className="panel analytics-audience">
-    <div className="analytics-panel-title"><div><h2>Selected channel audience</h2><p className="small-note">Latest stored audience count for each selected channel with a valid measure.</p></div><span className="badge">{data.audience.covered} of {data.audience.selected} channels</span></div>
+    <div className="analytics-panel-title"><div><h2>{t("Selected channel audience")}</h2><p className="small-note">{t("Latest stored audience count for each selected channel with a valid measure.")}</p></div><span className="badge">{t("{covered} of {selected} channels", { covered: data.audience.covered, selected: data.audience.selected })}</span></div>
     {data.audience.entries.length ? <>
-      <div className="analytics-audience__total"><strong>{new Intl.NumberFormat('en').format(data.audience.total)}</strong><span>total audience across channels with data</span></div>
+      <div className="analytics-audience__total"><strong>{new Intl.NumberFormat(locale).format(data.audience.total)}</strong><span>{t("total audience across channels with data")}</span></div>
       <div className="report-list">{data.audience.entries.map(entry => <div className="report-row" key={entry.id}>
         <span>{entry.name}<small> {entry.metricLabel}</small></span>
-        <strong>{new Intl.NumberFormat('en').format(entry.value)} · data {formatDay(entry.asOf.toISOString().slice(0, 10))} · synced {formatDay(entry.fetchedAt.toISOString().slice(0, 10))}</strong>
+        <strong>{t("{value} · data {date} · synced {synced}", { value: new Intl.NumberFormat(locale).format(entry.value), date: formatDay(entry.asOf.toISOString().slice(0, 10), locale), synced: formatDay(entry.fetchedAt.toISOString().slice(0, 10), locale) })}</strong>
       </div>)}</div>
-    </> : <p className="empty-note">No audience counts are stored for the selected channels. Missing audience data is unknown, not zero.</p>}
-    <p className="small-note">Counts are added across channels. People represented in more than one audience may be counted more than once.</p>
+    </> : <p className="empty-note">{t("No audience counts are stored for the selected channels. Missing audience data is unknown, not zero.")}</p>}
+    <p className="small-note">{t("Counts are added across channels. People represented in more than one audience may be counted more than once.")}</p>
   </section>;
 }
 
@@ -191,6 +198,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const viewer = await requireViewer({ feature: 'analytics/overview', channelScoped: true });
   const params = await searchParams;
   const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
+  const copy = await loadOverviewCopy(locale);
+  const t = overviewText(copy);
   const profiles = await readChannelProfiles({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, 'analytics/overview').catch(() => undefined);
   let data: AnalyticsReadResult | null = null;
   let failure: ReturnType<typeof operationFailure> | null = null;
@@ -200,7 +209,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       feature: 'analytics/overview',
     });
   } catch (error) {
-    failure = operationFailure(error, 'Analytics could not be loaded. Try again or reset the filters.');
+    failure = operationFailure(error, t("Analytics could not be loaded. Try again or reset the filters."));
   }
 
   const canExport = data !== null && (data.selected.channelIds.length > 0 || data.selected.adAccountIds.length > 0)
@@ -216,37 +225,37 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const retryQuery = rawQuery(params);
   const retryHref = `/analytics${retryQuery ? `?${retryQuery}` : ''}`;
 
-  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length && !data.options.adAccounts.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar retryHref={retryHref} /> : undefined}>
+  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar copy={copy} profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length && !data.options.adAccounts.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar copy={copy} retryHref={retryHref} /> : undefined}>
     <div className="page-stack">
-      <PageHeader module="analytics" title={"Performance"} />
-        {data && <><p title="These are inclusive stored calendar-date boundaries in UTC.">Stored calendar dates (UTC): {formatDay(data.period.start)} to {formatDay(data.period.end)}.</p>
-          {data.period.comparison && <p>Compared with {data.period.comparison.mode === 'year' ? 'the same calendar dates last year' : 'the previous equal-length period'}: {formatDay(data.period.comparison.start)} to {formatDay(data.period.comparison.end)}.</p>}
+      <PageHeader module="analytics" title={t("Performance")} />
+        {data && <><p title={t("These are inclusive stored calendar-date boundaries in UTC.")}>{t("Stored calendar dates (UTC): {start} to {end}.", { start: formatDay(data.period.start, locale), end: formatDay(data.period.end, locale) })}</p>
+          {data.period.comparison && <p>{t("Compared with {period}: {start} to {end}.", { period: data.period.comparison.mode === "year" ? t("the same calendar dates last year") : t("the previous equal-length period"), start: formatDay(data.period.comparison.start, locale), end: formatDay(data.period.comparison.end, locale) })}</p>}
         </>}
 
-      {failure && <section className="panel analytics-state"><EmptyState tone="error" title="Analytics could not be loaded" action={<a href={retryHref}>Try again with these filters</a>}>{failure.error} Use the sidebar to retry with these filters or reset them.</EmptyState></section>}
+      {failure && <section className="panel analytics-state"><EmptyState tone="error" title={t("Analytics could not be loaded")} action={<a href={retryHref}>{t("Try again with these filters")}</a>}>{failure.error} {t("Use the sidebar to retry with these filters or reset them.")}</EmptyState></section>}
       {data && <>
         {!data.options.channels.length && !data.options.adAccounts.length
-          ? <section className="panel analytics-state"><EmptyState icon={<IconPlugConnected />} title="No selected resources are available" action={connectionsHref ? <a href={connectionsHref}>View connections</a> : undefined}>Connect or enable a channel or ad account to see its stored metrics.</EmptyState></section>
+          ? <section className="panel analytics-state"><EmptyState icon={<IconPlugConnected />} title={t("No selected resources are available")} action={connectionsHref ? <a href={connectionsHref}>{t("View connections")}</a> : undefined}>{t("Connect or enable a channel or ad account to see its stored metrics.")}</EmptyState></section>
           : (data.options.channels.length > 0 || data.options.adAccounts.length > 0) && !data.selected.channelIds.length && !data.selected.adAccountIds.length
-            ? <section className="panel analytics-state"><EmptyState icon={<IconChartBar />} title="No resources selected">Choose channels or ad accounts in the sidebar to see their stored metrics.</EmptyState></section>
+            ? <section className="panel analytics-state"><EmptyState icon={<IconChartBar />} title={t("No resources selected")}>{t("Choose channels or ad accounts in the sidebar to see their stored metrics.")}</EmptyState></section>
             : null}
-        {audienceSection(data)}
+        {audienceSection(data, copy, locale)}
         {data.selected.channelIds.length > 0 && <OverviewInsights locale={locale} workspaceId={viewer.workspaceId} window={data.period.range}
           channels={data.options.channels.filter(channel => data!.selected.channelIds.includes(channel.id))} />}
         {data.selected.channelIds.length > 0 && <section className="panel analytics-publishing">
-          <div className="analytics-panel-title"><div><h2>Publishing records</h2><p className="small-note">Matched to selected channels and dates. Published posts use publish date, scheduled posts use scheduled date, and failed posts use creation date.</p></div></div>
+          <div className="analytics-panel-title"><div><h2>{t("Publishing records")}</h2><p className="small-note">{t("Matched to selected channels and dates. Published posts use publish date, scheduled posts use scheduled date, and failed posts use creation date.")}</p></div></div>
           <div className="metric-grid">
-            <MetricCard module="analytics" icon={<IconSend />} label="Published" value={data.publishing.published} />
-            <MetricCard module="analytics" icon={<IconCalendarEvent />} label="Scheduled" value={data.publishing.scheduled} />
-            <MetricCard module="analytics" icon={<IconAlertTriangle />} label="Failed or partial" value={data.publishing.failed} />
+            <MetricCard module="analytics" icon={<IconSend />} label={t("Published")} value={data.publishing.published} />
+            <MetricCard module="analytics" icon={<IconCalendarEvent />} label={t("Scheduled")} value={data.publishing.scheduled} />
+            <MetricCard module="analytics" icon={<IconAlertTriangle />} label={t("Failed or partial")} value={data.publishing.failed} />
           </div>
         </section>}
-        {data.selected.adAccountIds.length > 0 && <p className="small-note analytics-ad-coverage">{data.selected.adAccountIds.length} ad accounts selected. Coverage is shown for each metric.</p>}
-        {data.detail ? <MetricTable data={data} /> : data.metrics.items.length ? <section className="panel">
-          <div className="analytics-panel-title"><div><h2>Available metrics</h2><p className="small-note">Stored measurements for the selected resources and range. Use the sidebar to open a metric's full series and resource detail.</p></div><span className="badge">{data.metrics.total} metrics</span></div>
-          <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric key={`${metric.sourceLabel}:${metric.key}`} locale={locale} metric={metric} comparison={data.comparisons[metric.key]} previousPoints={data.previousPoints[metric.key]} chartPoints={data.chartPoints} />)}</div>
+        {data.selected.adAccountIds.length > 0 && <p className="small-note analytics-ad-coverage">{t("{count} ad accounts selected. Coverage is shown for each metric.", { count: data.selected.adAccountIds.length })}</p>}
+        {data.detail ? <MetricTable copy={copy} locale={locale} data={data} /> : data.metrics.items.length ? <section className="panel">
+          <div className="analytics-panel-title"><div><h2>{t("Available metrics")}</h2><p className="small-note">{t("Stored measurements for the selected resources and range. Use the sidebar to open a metric's full series and resource detail.")}</p></div><span className="badge">{t("{count} metrics", { count: data.metrics.total })}</span></div>
+          <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric copy={copy} key={`${metric.sourceLabel}:${metric.key}`} locale={locale} metric={metric} comparison={data.comparisons[metric.key]} previousPoints={data.previousPoints[metric.key]} chartPoints={data.chartPoints} />)}</div>
         </section> : data.selected.channelIds.length || data.selected.adAccountIds.length
-          ? <EmptyState title="No metrics match these filters" icon={<IconChartBar />} action={<a href="/analytics">Reset filters</a>}>Change the date range, metric search, or resource selection in the sidebar.</EmptyState>
+          ? <EmptyState title={t("No metrics match these filters")} icon={<IconChartBar />} action={<a href="/analytics">{t("Reset filters")}</a>}>{t("Change the date range, metric search, or resource selection in the sidebar.")}</EmptyState>
           : null}
       </>}
     </div>

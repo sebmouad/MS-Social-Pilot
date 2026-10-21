@@ -1,3 +1,4 @@
+import { customerCopy } from '@/modules/agency/ui/copy';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ prisma: { $queryRaw: vi.fn(), appSetting: { findMany: vi.fn() } }, config: vi.fn(), invitations: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), purge: vi.fn() }));
@@ -46,7 +47,7 @@ const metricCalls = (token: string) => mocks.prisma.$queryRaw.mock.calls.filter(
 
 beforeEach(() => {
   vi.clearAllMocks(); administered = []; metrics = []; denied = new Set(); withheld = {}; limited = new Set(); policy = []; switches = {}; caps = { ...defaults };
-  mocks.config.mockImplementation(async (key: string) => caps[key]);
+  mocks.config.mockImplementation(async (key: string) => key === 'agency.customerCopy' ? customerCopy : caps[key]);
   mocks.invitations.mockResolvedValue({ available: true, invitations: [] });
   mocks.purge.mockResolvedValue(undefined);
   mocks.prisma.appSetting.findMany.mockImplementation(async (args: { where: { key: { in: string[] } } }) => policy.filter(item => args.where.key.in.includes(item.key)));
@@ -368,7 +369,7 @@ describe('agency configuration and manifest', () => {
   it('exports valid unique configuration for every operational bound the services read', () => {
     const keys = AGENCY_CONFIG.map(entry => entry.key);
     expect(new Set(keys).size).toBe(keys.length);
-    expect([...keys].sort()).toEqual(Object.keys(defaults).sort());
+    expect([...keys].sort()).toEqual([...Object.keys(defaults), 'agency.customerCopy', 'agency.exportCopy'].sort());
     for (const entry of AGENCY_CONFIG) { expect(entry.schema.safeParse(entry.defaultValue).success).toBe(true); expect(entry.consumption).toBe('active'); }
     expect(agencyManifest.pages.map(page => page.id)).toEqual(['agency/overview', 'agency/clients']);
     expect(agencyManifest.rootSettingsPrefixes).toEqual(['agency.']);

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
+import { describe, expect, it, vi } from 'vitest';
 import { ADS_REPORT_POLICY_SCHEMA } from '../src/modules/ads/config';
 import { ADS_REPORT_DEFAULT_POLICY } from '../src/modules/ads/report-policy';
 import { parseAdsFilters } from '../src/modules/ads/report-filters';

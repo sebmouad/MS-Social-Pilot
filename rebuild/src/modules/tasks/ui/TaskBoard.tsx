@@ -1,5 +1,5 @@
 'use client';
-import { uiCopy, type UiLocale } from './copy';
+import { uiCopy, type CustomerCopy, type UiLocale } from './copy';
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -16,10 +16,10 @@ import styles from './tasks.module.css';
 type Person = { id: string; name: string };
 type Mode = { kind: 'form'; task: TaskView | null } | { kind: 'delete'; task: TaskView } | { kind: 'detail'; task: TaskView } | { kind: 'checklist' } | null;
 
-export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary, view, filtered, locale = 'en' }: { tasks: TaskView[]; assignees: Person[]; canCreate: boolean; limits: TaskLimits; today: string; summary: TaskSummary; view: 'table' | 'board'; filtered: boolean; locale?: UiLocale }) {
-  const t = uiCopy(locale);
+export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary, view, filtered, locale = 'en', copy }: { tasks: TaskView[]; assignees: Person[]; canCreate: boolean; limits: TaskLimits; today: string; summary: TaskSummary; view: 'table' | 'board'; filtered: boolean; copy?: CustomerCopy; locale?: UiLocale }) {
+  const t = uiCopy(locale, copy);
   const UNKNOWN = t("The result is unknown. Refresh the list and check the task before trying again.");
-  const message = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : t("The change could not be confirmed. Refresh the list and check the task before trying again.");
+  const message = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? t((body as { error: string }).error) : t("The change could not be confirmed. Refresh the list and check the task before trying again.");
   const day = (value: string) => { const parsed = new Date(`${value}T00:00:00Z`); return Number.isFinite(parsed.getTime()) ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(parsed) : value; };
   const verb = (status: TaskStatus) => status === 'todo' ? t("Reopen") : status === 'doing' ? t("Start") : t("Mark done");
 
@@ -229,7 +229,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
       actions={<><Button onClick={close} disabled={busy}>{t("Cancel")}</Button><Button variant="primary" type="submit" form="task-checklist" disabled={busy}>{busy ? t("Creating...") : t("Create tasks")}</Button></>}>
       <form noValidate id="task-checklist" className={styles.form} onSubmit={saveChecklist}>
         {formError && <RouteNotice error focusKey={`task-checklist-${formError}`}>{formError}</RouteNotice>}
-        <label>{t("Tasks, one per line (up to")} {limits.workflowRowLimit})<AutoTextarea value={checklist.lines} rows={6} onChange={event => setChecklist({ ...checklist, lines: event.target.value })} placeholder={locale === 'fr' ? 'Rédiger la publication\nObtenir une approbation\nPlanifier' : 'Draft the post\nGet approval\nSchedule it'} /></label>
+        <label>{t("Tasks, one per line (up to")} {limits.workflowRowLimit})<AutoTextarea value={checklist.lines} rows={6} onChange={event => setChecklist({ ...checklist, lines: event.target.value })} placeholder={t('Draft the post\nGet approval\nSchedule it')} /></label>
         <label>{t("Assigned to")}<Select aria-label={t("Assigned to")} value={checklist.assigneeId} disabled={busy} onChange={assigneeId => setChecklist({ ...checklist, assigneeId })} options={[{ value: "", label: t("Unassigned") }, ...assignees.map(person => ({ value: person.id, label: person.name }))]} /></label>
         <label>{t("First due date (optional)")}<input type="date" value={checklist.startOn} onChange={event => setChecklist({ ...checklist, startOn: event.target.value })} /></label>
         <label>{t("Days between due dates")}<input type="number" inputMode="numeric" min={0} max={limits.workflowGapMaxDays} value={checklist.gapDays} disabled={!checklist.startOn} onChange={event => setChecklist({ ...checklist, gapDays: event.target.value })} /></label>

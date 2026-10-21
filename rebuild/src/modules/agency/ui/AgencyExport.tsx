@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
-import { agencyExportCopy, type AgencyExportLocale } from '../export-copy';
+import { agencyExportCopy, type AgencyExportCatalog, type AgencyExportLocale } from '../export-copy';
 
 /** Remount on filter changes so an old request can never download a new filter's export. */
-export function AgencyExport({ query, locale }: { query: string; locale: AgencyExportLocale }) {
+export function AgencyExport({ query, locale, catalog = agencyExportCopy }: { query: string; locale: AgencyExportLocale; catalog?: AgencyExportCatalog }) {
   const toast = useToast();
-  const t = agencyExportCopy[locale];
+  const t = catalog[locale];
   const request = useRef<AbortController | null>(null);
   const feedbackRef = useRef<HTMLParagraphElement>(null);
   const [busy, setBusy] = useState(false);

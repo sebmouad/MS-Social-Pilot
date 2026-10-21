@@ -1,12 +1,14 @@
+import { customerCopy } from './ui/copy';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OperationError } from '@/lib/operation-error';
 const mocks = vi.hoisted(() => ({ overview: vi.fn(), viewer: vi.fn() }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'agency.exportCopy' ? agencyExportCatalog : customerCopy }));
 vi.mock('./server/agency', () => ({ agencyOverview: mocks.overview, listAgencyClients: vi.fn() }));
 vi.mock('@/server/context', () => ({ requireViewer: mocks.viewer }));
 import { exportAgencyOverview } from './server/export';
 import { executeAgencyTool } from './mcp';
 import { GET } from '@/app/api/agency/route';
-import { agencyExportCopy, agencyExportLocale } from './export-copy';
+import { agencyExportCatalog, agencyExportCopy, agencyExportLocale } from './export-copy';
 
 const now = new Date('2026-10-20T08:00:00Z');
 const actor = { userId: 'agency-owner' };

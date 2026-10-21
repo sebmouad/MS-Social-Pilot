@@ -1,3 +1,4 @@
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { REPORT_UI_POLICY_SCHEMA, DEFAULT_REPORT_UI_POLICY } from '@/modules/analytics/report-ui-config';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
@@ -24,5 +25,5 @@ export async function loadReportUiPolicy(actor?: Pick<ReportActor, 'userId' | 'w
       return {...policy,enabledSections:policy.enabledSections.filter(id=>id!=='aiRecap'),defaultSections:policy.defaultSections.filter(id=>id!=='aiRecap'),sectionOptions:policy.sectionOptions.filter(item=>item.id!=='aiRecap')};
     }
   } catch { /* configuration details stay private */ }
-  throw new OperationError('unavailable','Report choices could not be loaded. Try again shortly.');
+  throw await analyticsError('unavailable', "Report choices could not be loaded. Try again shortly.");
 }

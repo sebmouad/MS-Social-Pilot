@@ -1,5 +1,5 @@
 "use client";
-import { uiCopy, type UiLocale } from './copy';
+import { uiCopy, type CustomerCopy, type UiLocale } from './copy';
 import { SidebarDock } from '@/components/SidebarDock';
 import { useState } from 'react';
 import { Button, Select, FilterPanel, FilterChips, TextInput } from '@/components';
@@ -15,8 +15,8 @@ export const AGENCY_SORT_LABELS: Record<(typeof AGENCY_SORTS)[number], string> =
  * Overview filters live in the shell sidebar (or phone drawer) and submit as plain GET navigation. `searchLimit`
  * is the Root-managed search length the service enforces. Name search runs on the server before the workspace cap.
  */
-export function AgencyFilters({ values, searchLimit, locale = 'en' }: { values: { q: string; sort: string; order: string; attention: boolean }; searchLimit: number; locale?: UiLocale }) {
-  const t = uiCopy(locale);
+export function AgencyFilters({ values, searchLimit, locale = 'en', copy }: { values: { q: string; sort: string; order: string; attention: boolean }; searchLimit: number; copy?: CustomerCopy; locale?: UiLocale }) {
+  const t = uiCopy(locale, copy);
   const [draft, setDraft] = useState(values);
   const filters = [...(values.q ? [{ key: 'q', label: t("Search"), value: values.q }] : []), ...(values.attention ? [{ key: 'attention', label: t("Status"), value: t("Needs attention") }] : [])];
   const remove = (key: string) => { const query = new URLSearchParams(window.location.search); query.delete(key); window.location.assign(`/agency${query.size ? `?${query}` : ''}`); };
@@ -33,8 +33,8 @@ export function AgencyFilters({ values, searchLimit, locale = 'en' }: { values: 
   </FilterPanel></SidebarDock></>;
 }
 
-export function ClientFilters({ q, searchLimit, locale = 'en' }: { q: string; searchLimit: number; locale?: UiLocale }) {
-  const t = uiCopy(locale);
+export function ClientFilters({ q, searchLimit, locale = 'en', copy }: { q: string; searchLimit: number; copy?: CustomerCopy; locale?: UiLocale }) {
+  const t = uiCopy(locale, copy);
   const [search, setSearch] = useState(q);
   const filters = q ? [{ key: 'q', label: t("Search"), value: q }] : [];
   return <><FilterChips removeLabel={t('Remove filter')} label={t('Active filters')} filters={filters} onRemove={() => window.location.assign('/agency/clients')} /><SidebarDock><FilterPanel resetLabel={t('Reset filters')} title={t("Client filters")} activeCount={filters.length} onReset={() => window.location.assign('/agency/clients')}>

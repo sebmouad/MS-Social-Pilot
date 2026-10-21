@@ -1,3 +1,4 @@
+import { workspaceCopyDefaults, workspaceText, type WorkspaceCopy } from '../workspace-copy';
 import { aggregateValues, type AnalyticsAudienceEntry, type AnalyticsKind, type AnalyticsMetricInput } from './catalog';
 
 export type MetricView = {
@@ -24,7 +25,8 @@ export type MetricView = {
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 const formatDay = (value: string) => new Date(`${value}T12:00:00.000Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
-function metricView(input: AnalyticsMetricInput): MetricView {
+function metricView(input: AnalyticsMetricInput, copy: WorkspaceCopy, locale: 'en' | 'fr'): MetricView {
+  const t = workspaceText(copy, locale);
   const byDay = new Map<string, number>();
   const byChannel = new Map<string, { label: string; values: Array<{ date: Date; value: number }> }>();
   for (const observation of input.observations) {
@@ -58,9 +60,9 @@ function metricView(input: AnalyticsMetricInput): MetricView {
     label: input.label,
     sourceLabel: input.sourceLabel,
     resourceKind: input.resourceKind ?? 'channel',
-    aggregationLabel: input.aggregationLabel ?? (input.kind === 'breakdown' ? 'Latest category values'
-      : input.kind === 'stock' || input.rollup === 'latest-per-channel' ? 'Latest value per resource'
-        : input.kind === 'ratio' ? 'Calculated for the selected period' : 'Total over the selected period'),
+    aggregationLabel: input.aggregationLabel ?? (input.kind === 'breakdown' ? t("Latest category values")
+      : input.kind === 'stock' || input.rollup === 'latest-per-channel' ? t("Latest value per resource")
+        : input.kind === 'ratio' ? t("Calculated for the selected period") : t("Total over the selected period")),
     aggregationNote: input.aggregationNote,
     unit: input.unit,
     kind: input.kind,
@@ -80,7 +82,7 @@ function metricView(input: AnalyticsMetricInput): MetricView {
 }
 
 /** Generic aggregation over normalized inputs. It has no provider/schema knowledge. */
-export function buildAnalytics(metrics: AnalyticsMetricInput[], audienceEntries: AnalyticsAudienceEntry[], audienceSelected: number) {
+export function buildAnalytics(metrics: AnalyticsMetricInput[], audienceEntries: AnalyticsAudienceEntry[], audienceSelected: number, copy: WorkspaceCopy = workspaceCopyDefaults, locale: 'en' | 'fr' = 'en') {
   const audience = {
     entries: audienceEntries,
     total: audienceEntries.reduce((sum, row) => sum + row.value, 0),
@@ -89,6 +91,6 @@ export function buildAnalytics(metrics: AnalyticsMetricInput[], audienceEntries:
   };
   return {
     audience,
-    metrics: metrics.map(metricView).sort((a, b) => a.sourceLabel === b.sourceLabel ? a.label.localeCompare(b.label) : a.sourceLabel.localeCompare(b.sourceLabel)),
+    metrics: metrics.map(metric => metricView(metric, copy, locale)).sort((a, b) => a.sourceLabel === b.sourceLabel ? a.label.localeCompare(b.label) : a.sourceLabel.localeCompare(b.sourceLabel)),
   };
 }

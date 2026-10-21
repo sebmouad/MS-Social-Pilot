@@ -1,3 +1,11 @@
+import { cache } from 'react';
+import { runtimeConfig } from '@/server/config/store';
+import { goalsText, type GoalsCatalog } from '../copy';
+import { analyticsLanguage } from '../../server/error-copy';
+const goalCopy = cache(() => runtimeConfig('analytics.goalsCopy'));
+import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
+import { errorCopyDefaults } from '@/modules/analytics/error-copy';
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -53,16 +61,18 @@ async function actualsFor(workspaceId: string, channel: Channel, from: Date, to:
 }
 
 /** Goals of one channel for a workspace-local month: a past month is judged whole, the current one up to `now`. */
-async function progressFor(workspaceId: string, channel: Channel, stored: StoredGoal[], window: { start: Date; end: Date }, now: Date): Promise<GoalProgress[]> {
+async function progressFor(workspaceId: string, channel: Channel, stored: StoredGoal[], window: { start: Date; end: Date }, now: Date, locale?: 'en' | 'fr'): Promise<GoalProgress[]> {
   const rows = GOAL_METRICS.flatMap(metric => stored.filter(g => g.targetId === channel.id && g.metric === metric).slice(0, 1).map(g => ({ metric, target: g.target })));
   if (!rows.length) return [];
   const until = now < window.end ? now : window.end;
   const share = elapsed(window.start, window.end, until);
   const actuals = await actualsFor(workspaceId, channel, window.start, until);
+  const copy = await goalCopy();
+  const language = locale ?? await analyticsLanguage();
   return rows.map(({ metric, target }) => {
     const actual = actuals[metric];
     const pace = goalPace(target, actual, share);
-    return { metric, label: GOAL_LABELS[metric], target, actual, percent: goalPercent(target, actual), pace, paceLabel: PACE_LABELS[pace] };
+    return { metric, label: goalsText(language, `metric.${metric}`, {}, copy), target, actual, percent: goalPercent(target, actual), pace, paceLabel: goalsText(language, `pace.${pace}`, {}, copy) };
   });
 }
 
@@ -73,11 +83,12 @@ function monthView(window: { month: string; start: Date; end: Date }, timeZone: 
 
 /** Goals with month-to-date progress for every channel the actor may see (or one channel). */
 export async function readGoals(actor: Actor, input: unknown = {}, now = new Date()): Promise<{ ok: true; month: GoalMonth; channels: ChannelGoals[]; canManage: boolean }> {
+  try {
   const parsed = readGoalsSchema.safeParse(input ?? {}); if (!parsed.success) throw bad();
   const auth = await authorize(actor, FEATURE, 'read');
   const ids = await channelsFor(actor, auth.scope, parsed.data.channelId);
-  if (parsed.data.channelId && !ids.length) throw new OperationError('not_found', 'This channel is unavailable in the current workspace.');
-  if (actor.maxResultItems !== undefined && ids.length > actor.maxResultItems) throw new OperationError('invalid_request', 'The goals result exceeds the current MCP limit. Choose one channel.');
+  if (parsed.data.channelId && !ids.length) throw await analyticsError('not_found', "This channel is unavailable in the current workspace.");
+  if (actor.maxResultItems !== undefined && ids.length > actor.maxResultItems) throw await analyticsError('invalid_request', "The goals result exceeds the current MCP limit. Choose one channel.");
   const timeZone = await workspaceTimeZone(actor.workspaceId);
   const window = monthWindow(monthIn(now, timeZone), timeZone);
   const [channels, stored] = await Promise.all([
@@ -91,26 +102,29 @@ export async function readGoals(actor: Actor, input: unknown = {}, now = new Dat
   let canManage = false;
   try { await authorize(actor, FEATURE, 'write'); canManage = (WRITERS as readonly string[]).includes(auth.role); } catch { canManage = false; }
   return { ok: true, month: monthView(window, timeZone), channels: result, canManage };
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }
 
 /** Set or clear (null) monthly goals for one channel. Omitted metrics are left unchanged. */
 export async function setGoals(actor: Actor, input: unknown) {
+  try {
   const parsed = setGoalsSchema.safeParse(input); if (!parsed.success) throw bad();
   const value = parsed.data;
   if (value.confirmation !== goalsConfirmation(value.channelId)) throw bad();
   const changes = Object.entries(value.goals) as Array<[GoalMetric, number | null]>;
-  if (!changes.length) throw bad('Choose at least one goal to change.');
+  if (!changes.length) throw bad( errorCopyDefaults["Choose at least one goal to change."].en);
   const auth = await authorize(actor, FEATURE, 'write');
-  if (!(WRITERS as readonly string[]).includes(auth.role)) throw new OperationError('forbidden', 'Goals are managed by owners, admins and editors.');
-  if (!(await channelsFor(actor, auth.scope, value.channelId)).length) throw new OperationError('not_found', 'This channel is unavailable in the current workspace.');
+  if (!(WRITERS as readonly string[]).includes(auth.role)) throw await analyticsError('forbidden', "Goals are managed by owners, admins and editors.");
+  if (!(await channelsFor(actor, auth.scope, value.channelId)).length) throw await analyticsError('not_found', "This channel is unavailable in the current workspace.");
   const [channel] = await channelRows(actor.workspaceId, [value.channelId]);
-  if (!channel) throw new OperationError('not_found', 'This channel is unavailable in the current workspace.');
+  if (!channel) throw await analyticsError('not_found', "This channel is unavailable in the current workspace.");
   const trackable = await trackableFor(channel);
-  if (changes.some(([metric, target]) => target !== null && !trackable.includes(metric))) throw bad('This goal cannot be tracked for this channel.');
+  if (changes.some(([metric, target]) => target !== null && !trackable.includes(metric))) throw bad( errorCopyDefaults["This goal cannot be tracked for this channel."].en);
   return withWorkspaceOperation(actor.workspaceId, () => prisma.$transaction(async tx => {
     await lockActor(tx, actor, WRITERS);
     const owned = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM targets WHERE id = ${value.channelId} AND "workspaceId" = ${actor.workspaceId} FOR SHARE`;
-    if (!owned.length) throw new OperationError('not_found', 'This channel is unavailable in the current workspace.');
+    if (!owned.length) throw await analyticsError('not_found', "This channel is unavailable in the current workspace.");
     for (const [metric, target] of changes) {
       if (target === null) await tx.$executeRaw`DELETE FROM page_goals WHERE "targetId" = ${value.channelId} AND "workspaceId" = ${actor.workspaceId} AND metric = ${metric}`;
       else await tx.$executeRaw`INSERT INTO page_goals (id, "workspaceId", "targetId", metric, target, "createdAt", "updatedAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${value.channelId}, ${metric}, ${target}, NOW(), NOW()) ON CONFLICT ("targetId", metric) DO UPDATE SET target = EXCLUDED.target, "updatedAt" = NOW() WHERE page_goals."workspaceId" = ${actor.workspaceId}`;
@@ -118,17 +132,22 @@ export async function setGoals(actor: Actor, input: unknown) {
     await audit(tx, actor, 'analytics.goals_changed', { channelId: value.channelId, metrics: changes.map(([metric, target]) => ({ metric, cleared: target === null })) });
     return { ok: true as const, channelId: value.channelId, changed: changes.length };
   }));
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }
 
 /**
  * Goals for one already-authorized channel in the workspace-local month holding the report period's last day.
  * A past month is judged whole; the current one up to `now`. Used by Reports.
  */
-export async function channelGoalProgress(workspaceId: string, channelId: string, periodEnd: string, now = new Date()): Promise<{ month: GoalMonth; goals: GoalProgress[] }> {
+export async function channelGoalProgress(workspaceId: string, channelId: string, periodEnd: string, now = new Date(), locale?: 'en' | 'fr'): Promise<{ month: GoalMonth; goals: GoalProgress[] }> {
+  try {
   const timeZone = await workspaceTimeZone(workspaceId);
   const window = monthWindow(/^\d{4}-\d{2}-\d{2}$/.test(periodEnd) ? periodEnd.slice(0, 7) : monthIn(now, timeZone), timeZone);
   const [channel] = await channelRows(workspaceId, [channelId]);
   if (!channel) return { month: monthView(window, timeZone), goals: [] };
   const stored = await prisma.$queryRaw<StoredGoal[]>`SELECT "targetId", metric, target FROM page_goals WHERE "workspaceId" = ${workspaceId} AND "targetId" = ${channelId}`;
-  return { month: monthView(window, timeZone), goals: await progressFor(workspaceId, channel, stored, window, now) };
+  return { month: monthView(window, timeZone), goals: await progressFor(workspaceId, channel, stored, window, now, locale) };
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }

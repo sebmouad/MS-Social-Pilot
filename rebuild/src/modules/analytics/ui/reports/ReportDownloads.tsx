@@ -4,17 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 import { IconDownload, IconFileTypePdf } from '@tabler/icons-react';
 import { Button, useToast } from '@/components';
 import styles from './workflows.module.css';
+import { downloadCopyDefaults, type DownloadCatalog } from './download-copy';
 
 type PreparedDownloads = { filename: string; csv: string; html: string; json: string | null };
-const copy = {
-  en: { csv: 'Download CSV', json: 'Download JSON', html: 'Download printable page', pdf: 'Print / save PDF', printHelp: 'Choose Save as PDF in your browser’s print dialog.', prepared: 'Download prepared. Check your downloads.', printing: 'Print preview opened. Choose Save as PDF to keep a copy.', failed: 'The download could not be opened. Try again.', printFailed: 'Print preview could not be opened. Download the printable page and print it from your browser.', frame: 'Printable report', close: 'Close print preview' },
-  fr: { csv: 'Télécharger le CSV', json: 'Télécharger le JSON', html: 'Télécharger la page imprimable', pdf: 'Imprimer / enregistrer en PDF', printHelp: 'Choisissez Enregistrer au format PDF dans la fenêtre d’impression du navigateur.', prepared: 'Téléchargement préparé. Consultez vos téléchargements.', printing: 'Aperçu avant impression ouvert. Choisissez Enregistrer au format PDF pour conserver une copie.', failed: 'Impossible d’ouvrir le téléchargement. Réessayez.', printFailed: 'Impossible d’ouvrir l’aperçu. Téléchargez la page imprimable, puis imprimez-la depuis votre navigateur.', frame: 'Rapport imprimable', close: 'Fermer l’aperçu d’impression' },
-} as const;
+
 
 /** CSV/JSON are service-produced artifacts; PDF uses the browser's print dialog, never a renamed HTML file. */
-export function ReportDownloads({ prepared, locale = 'en' }: { prepared: PreparedDownloads; locale?: 'en' | 'fr' }) {
+export function ReportDownloads({ prepared, locale = 'en', copy = downloadCopyDefaults }: { prepared: PreparedDownloads; locale?: 'en' | 'fr'; copy?: DownloadCatalog }) {
   const toast = useToast();
-  const c = copy[locale];
+  const c = Object.fromEntries(Object.entries(copy).map(([key, value]) => [key, value[locale]])) as Record<keyof DownloadCatalog, string>;
   const [printing, setPrinting] = useState(false);
   const wrapper = useRef<HTMLDivElement>(null);
   const printLaunched = useRef(false);

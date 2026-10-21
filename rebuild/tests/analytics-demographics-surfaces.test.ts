@@ -2,6 +2,10 @@ import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ read: vi.fn(), viewer: vi.fn(), language: 'en' }));
+vi.mock('@/modules/analytics/server/copy', async () => {
+  const c = await import('@/modules/analytics/copy');
+  return { analyticsCopy: async () => ({ reports: c.reportCopyDefaults, goals: c.goalsCopyDefaults, downloads: c.downloadCopyDefaults, demographics: c.demographicsCopyDefaults, workspace: c.workspaceCopyDefaults, records: c.recordsCopyDefaults, errors: c.errorCopyDefaults }) };
+});
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': state.language }) }));
 vi.mock('@/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('@/modules/analytics/demographics/server/demographics', () => ({ readDemographics: state.read }));

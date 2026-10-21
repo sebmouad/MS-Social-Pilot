@@ -1,3 +1,6 @@
+import { loadAdsCopy } from '@/modules/ads/server/copy';
+import { customerText } from '@/modules/ads/copy';
+import { AdsCopyProvider } from '@/modules/ads/ui/AdsCopyProvider';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { IconAd, IconSpeakerphone } from '@tabler/icons-react';
@@ -29,23 +32,25 @@ const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 const date = (value: Date) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(value);
 
-export default async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[] }> }) {
+async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[] }> }) {
   const viewer = await requireViewer({ feature: 'ads/campaigns', channelScoped: true });
   const { workspaceId } = viewer;
   const locale = adsLocale((await headers()).get('accept-language'));
+  const catalogs = await loadAdsCopy();
+  const t = (key: Parameters<typeof customerText>[2], values?: Record<string, string | number>) => customerText(catalogs.customer, locale, key, values);
   const policy = await loadAdsReportPolicy();
   const allowedProviders = entitledPlatformIds(viewer.entitlements);
   const allowedTargetIds = viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids;
   const [params, accounts] = await Promise.all([searchParams, getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders)]);
   let filters;
   try { filters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); }
-  catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView accounts={accounts} input={params} error={error} action="/ads/campaigns" title="Campaign, ad set, and ad results" policy={policy} />; }
+  catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView catalogs={catalogs} locale={locale} accounts={accounts} input={params} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
   let requestedPage: number;
   try { requestedPage = parseAdsResultPage(params.page); }
-  catch (error) { return <AdsReportFailureView accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title="Campaign, ad set, and ad results" policy={policy} />; }
+  catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
   let dataset;
   try { dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders, { levels: ['campaign', 'adset', 'ad'] }); }
-  catch (error) { return <AdsReportFailureView accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title="Campaign, ad set, and ad results" policy={policy} />; }
+  catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
   const summaries = summarizeInsights(dataset.insights).filter(row => ['campaign', 'adset', 'ad'].includes(row.level))
     .sort((left, right) => left.accountName.localeCompare(right.accountName) || left.level.localeCompare(right.level) || left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
   const objectPage = pageAdsRows(summaries, requestedPage, dataset.pageSize);
@@ -67,18 +72,18 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   })));
   const canExport = canUseFeature(viewer.entitlements, 'ads/campaigns') && canAccessFeature(viewer.permissions, 'ads/campaigns', 'read');
   const exportPolicy = canExport ? await loadAdsOutputPolicy().catch(() => null) : null;
-  const sidebar = <AdsReportSidebar accounts={accounts} filters={filters} action="/ads/campaigns" kind="objects" policy={policy} page={objectPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
+  const sidebar = <AdsReportSidebar catalogs={catalogs} locale={locale} accounts={accounts} filters={filters} action="/ads/campaigns" kind="objects" policy={policy} page={objectPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
   return <PageFrame module="ads" sidebar={accounts.length ? sidebar : undefined}><div className="page-stack">
-    <PageHeader module="ads" title={"Campaign, ad set, and ad results"} description={<>{accounts.length ? `Showing ${objectPage.from}–${objectPage.to} of ${objectPage.resultCount} objects · Page ${objectPage.page} of ${objectPage.pageCount}. Stored daily insight records · ${dateRangeLabel(filters)}. Select an account and date range in the sidebar.` : 'Connect an advertising account to review and manage its campaigns.'}</>} />
-    {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title="No ad accounts connected" action={<a className="text-link" href="/settings/connections">View connections</a>}>Connect and select an advertising account to see campaign results and available actions here.</EmptyState></section> : <>
+    <PageHeader module="ads" title={t('text041')} description={<>{accounts.length ? t('text260', { value0: objectPage.from, value1: objectPage.to, value2: objectPage.resultCount, value3: objectPage.page, value4: objectPage.pageCount, value5: dateRangeLabel(filters) }) : t('text042')}</>} />
+    {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title={t('text003')} action={<a className="text-link" href="/settings/connections">{t('text004')}</a>}>{t('text043')}</EmptyState></section> : <>
     {objectPage.resultCount ? [...byAccount].map(([accountId, rows]) => {
       const account = accounts.find(item => item.id === accountId);
       const levels = [
-        { value: 'campaign', label: 'Campaigns' }, { value: 'adset', label: 'Ad sets' }, { value: 'ad', label: 'Ads' },
+        { value: 'campaign', label: t('text057') }, { value: 'adset', label: t('text058') }, { value: 'ad', label: t('text059') },
       ];
       return <section className="panel ads-results-panel" key={accountId}>
-        <div className="analytics-panel-title"><div><h2>{rows[0]?.accountName ?? account?.name ?? 'Ad account'}</h2><p className="small-note">{account?.actId}{account?.currency ? ` · ${account.currency}` : ''}</p></div><span className="badge">{rows.length} objects</span></div>
-        <CampaignCharts accountName={rows[0]?.accountName ?? account?.name ?? 'Ad account'} rows={rows} locale={locale} />
+        <div className="analytics-panel-title"><div><h2>{rows[0]?.accountName ?? account?.name ?? t('text044')}</h2><p className="small-note">{account?.actId}{account?.currency ? ` · ${account.currency}` : ''}</p></div><span className="badge">{rows.length} {t('text045')}</span></div>
+        <CampaignCharts accountName={rows[0]?.accountName ?? account?.name ?? t('text044')} rows={rows} locale={locale} />
         {levels.map(level => {
           const levelRows = rows.filter(row => row.level === level.value);
           if (!levelRows.length) return null;
@@ -89,19 +94,25 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
               rows={levelRows.map(row => ({ key: row.key, id: row.id, name: row.name, level: row.level as 'campaign' | 'adset' | 'ad', currency: row.currency, spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, days: row.rows,
                 spendSeries: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => entry.spend) }))}
               actions={Object.fromEntries(levelRows.map(row => [row.key, slot(row)]))}
-              details={Object.fromEntries(levelRows.map(row => [row.key, <details className="ads-stored-details" key={row.key}><summary>{row.rows} daily row{row.rows === 1 ? '' : 's'}</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details>]))} />
+              details={Object.fromEntries(levelRows.map(row => [row.key, <details className="ads-stored-details" key={row.key}><summary>{t('dailyRowCount', { count: row.rows, suffix: row.rows === 1 ? '' : 's' })}</summary><div className="ads-detail-content"><h4>{t('text029')}</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>{t('text030')}</p>}<h4>{t('text031')}</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details>]))} />
           </div>;
         })}
-        {viewer.permissions.pageScope.all && actionAvailability.get(accountId) && adsUi.get(accountId)?.adSet && rows.some(row => row.level === 'campaign') ? <div className="ads-result-level"><h3>Create ad sets</h3><p className="small-note">Choose a campaign already verified in this account’s stored performance history.</p>
+        {viewer.permissions.pageScope.all && actionAvailability.get(accountId) && adsUi.get(accountId)?.adSet && rows.some(row => row.level === 'campaign') ? <div className="ads-result-level"><h3>{t('text047')}</h3><p className="small-note">{t('text048')}</p>
           {adsUi.get(accountId)?.adSet ? rows.filter(row => row.level === 'campaign').map(row => <AdSetCreateForm key={row.id} adAccountId={accountId} campaignId={row.id} campaignName={row.name} currency={row.currency} config={adsUi.get(accountId)!.adSet!} ownerScope={{ userId: viewer.user.id, workspaceId }} />) : null}
         </div> : null}
       </section>;
-    }) : <section className="panel"><EmptyState icon={<IconSpeakerphone />} title="No campaign, ad set, or ad insights stored" action={<a className="text-link" href="/ads">Return to ad accounts →</a>}>When insight rows are captured for the selected ad accounts and dates, each level will appear here with its saved metrics.</EmptyState></section>}
-    {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>Create a campaign</h2><p className="small-note">Each campaign is created paused under one enabled ad account.</p>
+    }) : <section className="panel"><EmptyState icon={<IconSpeakerphone />} title={t('text049')} action={<a className="text-link" href="/ads">{t('text050')}</a>}>{t('text051')}</EmptyState></section>}
+    {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>{t('text052')}</h2><p className="small-note">{t('text053')}</p>
       {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={{ userId: viewer.user.id, workspaceId }} />)}
     </section> : null}
     {accounts.filter(account => (!filters.accountId || account.id === filters.accountId) && creativeAvailability.get(account.id)).map(account => <section className="panel" key={`creative:${account.id}`}><CreativeCreateForm adAccountId={account.id} accountName={account.name} ownerScope={{ userId: viewer.user.id, workspaceId }} locale={locale} /></section>)}
-    <p className="ads-read-only-note">Review delivery and adjust eligible campaigns, ad sets, and ads. Changes require confirmation before they are sent.</p>
+    <p className="ads-read-only-note">{t('text054')}</p>
     </>}
   </div></PageFrame>;
+}
+
+export default async function AdsCopyScreen(props: Parameters<typeof CampaignsPage>[0]) {
+  const catalogs = await loadAdsCopy();
+  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
+  return <AdsCopyProvider catalogs={catalogs} locale={locale}>{await CampaignsPage(props)}</AdsCopyProvider>;
 }

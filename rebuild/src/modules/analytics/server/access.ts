@@ -1,3 +1,5 @@
+import { errorCopyDefaults } from '@/modules/analytics/error-copy';
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
@@ -13,22 +15,22 @@ export type AnalyticsFeature = 'analytics/overview' | 'analytics/reports' | 'ana
 export type Actor = { userId: string; workspaceId: string; allowedChannelIds?: readonly string[]; maxResultItems?: number } & AnalyticsAdCeiling;
 export type Authorization = { role: string; scope: string[] | null };
 
-export const bad = (message = 'Choose valid details and confirm the exact action.') => new OperationError('invalid_request', message);
-export const missing = () => new OperationError('not_found', 'This item is unavailable in the current workspace.');
-export const unavailable = () => new OperationError('unavailable', 'Analytics workflows are temporarily unavailable. Try again later.');
+export const bad = (message = errorCopyDefaults["Choose valid details and confirm the exact action."].en) => new OperationError('invalid_request', message);
+export const missing = () => new OperationError('not_found', errorCopyDefaults["This item is unavailable in the current workspace."].en);
+export const unavailable = () => new OperationError('unavailable', errorCopyDefaults["Analytics workflows are temporarily unavailable. Try again later."].en);
 
 /** Active account, membership, plan entitlement, role permission, channel scope; writes also require a workspace that is not being purged. */
 export async function authorize(actor: Actor, feature: AnalyticsFeature, access: 'read' | 'write'): Promise<Authorization> {
-  if (!actor?.userId || !actor.workspaceId) throw new OperationError('unauthorized', 'Sign in with an active workspace account.');
+  if (!actor?.userId || !actor.workspaceId) throw await analyticsError('unauthorized', "Sign in with an active workspace account.");
   const [user, membership, entitlements, permissions] = await Promise.all([
     prisma.user.findUnique({ where: { id: actor.userId }, select: { disabledAt: true } }),
     prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } }),
     loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }),
     loadPermissions(actor.userId, actor.workspaceId),
   ]);
-  if (!user || user.disabledAt || !membership) throw new OperationError('unauthorized', 'Sign in with an active account to use Analytics.');
+  if (!user || user.disabledAt || !membership) throw await analyticsError('unauthorized', "Sign in with an active account to use Analytics.");
   if (!entitlements || entitlements.workspaceId !== actor.workspaceId || !permissions || !canUseFeature(entitlements, feature) || !canAccessFeature(permissions, feature, access)) {
-    throw new OperationError('forbidden', 'This Analytics feature is unavailable in this workspace.');
+    throw await analyticsError('forbidden', "This Analytics feature is unavailable in this workspace.");
   }
   if (access === 'write') await assertWorkspaceNotPurging(actor.workspaceId);
   const current = permissions.pageScope.all ? null : [...permissions.pageScope.ids];
@@ -40,7 +42,7 @@ export async function authorize(actor: Actor, feature: AnalyticsFeature, access:
 export async function lockActor(tx: Tx, actor: Actor, roles: readonly string[]) {
   const rows = await tx.$queryRaw<Array<{ role: string; disabledAt: Date | null }>>`SELECT m.role::text AS role, u."disabledAt" FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} FOR SHARE OF m, u`;
   const row = rows[0];
-  if (!row || row.disabledAt || !roles.includes(row.role)) throw new OperationError('unauthorized', 'Your active workspace access changed. Sign in again to continue.');
+  if (!row || row.disabledAt || !roles.includes(row.role)) throw await analyticsError('unauthorized', "Your active workspace access changed. Sign in again to continue.");
 }
 
 /** Audit records hold identifiers and counts only, never recipient addresses. */

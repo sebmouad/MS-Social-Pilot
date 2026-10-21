@@ -1,3 +1,4 @@
+vi.mock('@/modules/analytics/reports/generation/copy-server', async () => ({ loadReportDocumentCopy: async () => ({ copy: (await import('@/modules/analytics/reports/generation/copy')).reportDocumentCopyDefaults.en, locale: 'en' }) }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/server/data', async () => ({ prisma: (await import('./report82-engine-harness')).db }));

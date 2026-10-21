@@ -1,3 +1,6 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { defaultAdsText } from '@/modules/ads/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import { OperationError } from '@/lib/operation-error';
 import { adsIsoDay } from '../report-filters';
 import { parseAdsPerformanceFilters } from '../performance-filters';
@@ -14,15 +17,15 @@ const DAY = 86_400_000;
 const INPUT_KEYS = new Set(['period', 'start', 'end', 'accountId', 'level', 'objectId']);
 
 function recordInput(input: unknown): Record<string, unknown> {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', 'Choose valid Ads report filters.');
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', defaultAdsText('validation002'));
   const value = input as Record<string, unknown>;
-  if (Object.keys(value).some(key => !INPUT_KEYS.has(key))) throw new OperationError('invalid_request', 'Choose valid Ads report filters.');
+  if (Object.keys(value).some(key => !INPUT_KEYS.has(key))) throw new OperationError('invalid_request', defaultAdsText('validation002'));
   return value;
 }
 
 function text(value: unknown, name: string, maximum: number): string | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== 'string' || value.length > maximum) throw new OperationError('invalid_request', `Choose valid Ads report filters. ${name} must be text with at most ${maximum} characters.`);
+  if (typeof value !== 'string' || value.length > maximum) throw new OperationError('invalid_request', defaultAdsText('validation003', { value0: name, value1: maximum }));
   return value;
 }
 
@@ -30,19 +33,20 @@ function compare(a: string, b: string) { return a < b ? -1 : a > b ? 1 : 0; }
 
 /** Produce a complete CSV report or refuse it; this service never exports a page or partial row set. */
 export async function exportAdsReport(actor: AdsReadActor, input: unknown = {}, constraints: AdsExportConstraints = {}) {
+  return withAdsCopySnapshot(async () => {
   const access = await authorizeAdsRead(actor);
   const values = recordInput(input);
   const [reportPolicy, outputPolicy] = await Promise.all([loadAdsReportPolicy(), loadAdsOutputPolicy()]);
   const level = text(values.level, 'level', reportPolicy.maxFilterCharacters);
-  if (level !== undefined && !LEVELS.includes(level as AdsInsightLevel)) throw new OperationError('invalid_request', 'Choose one valid Ads report level.');
+  if (level !== undefined && !LEVELS.includes(level as AdsInsightLevel)) throw new OperationError('invalid_request', await adsServiceText('service013'));
   const objectId = text(values.objectId, 'objectId', reportPolicy.maxFilterCharacters);
-  if (objectId !== undefined && (!objectId || /[\u0000-\u001f\u007f]/.test(objectId))) throw new OperationError('invalid_request', 'Choose a valid Ads object id.');
+  if (objectId !== undefined && (!objectId || /[\u0000-\u001f\u007f]/.test(objectId))) throw new OperationError('invalid_request', await adsServiceText('service014'));
   if (objectId !== undefined && (typeof values.accountId !== 'string' || typeof level !== 'string')) {
-    throw new OperationError('invalid_request', 'An Ads object id requires one explicit account and report level.');
+    throw new OperationError('invalid_request', await adsServiceText('service015'));
   }
   if (!constraints || typeof constraints !== 'object' || Array.isArray(constraints) || Object.keys(constraints).some(key => key !== 'maxItems') ||
     (constraints.maxItems !== undefined && (!Number.isSafeInteger(constraints.maxItems) || constraints.maxItems < 1))) {
-    throw new OperationError('invalid_request', 'Choose a valid Ads export row limit.');
+    throw new OperationError('invalid_request', await adsServiceText('service016'));
   }
   const period = text(values.period, 'period', reportPolicy.maxFilterCharacters);
   const start = text(values.start, 'start', reportPolicy.maxFilterCharacters);
@@ -50,14 +54,14 @@ export async function exportAdsReport(actor: AdsReadActor, input: unknown = {}, 
   const accountId = text(values.accountId, 'accountId', reportPolicy.maxFilterCharacters);
   const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders, access.allowedAdAccountIds);
   const filters = parseAdsPerformanceFilters({ ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), ...(accountId === undefined ? {} : { accountId }) }, accounts.map(account => account.id), new Date(), reportPolicy);
-  if (objectId !== undefined && !filters.accountId) throw new OperationError('invalid_request', 'An Ads object id requires one explicit account and report level.');
+  if (objectId !== undefined && !filters.accountId) throw new OperationError('invalid_request', await adsServiceText('service015'));
 
   const levels = level === undefined ? undefined : [level as AdsInsightLevel];
   const dataset = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, {
     allowedAdAccountIds: access.allowedAdAccountIds, ...(levels === undefined ? {} : { levels }), ...(objectId === undefined ? {} : { objectId }),
   });
   const maxItems = constraints.maxItems ?? dataset.maxRows;
-  if (dataset.insights.length > maxItems) throw new OperationError('invalid_request', 'This Ads export contains too many rows. Choose fewer accounts or a shorter date range. No partial file was created.');
+  if (dataset.insights.length > maxItems) throw new OperationError('invalid_request', await adsServiceText('service017'));
   const rows = dataset.insights.map(normalizeAdsDailyRow).sort((a, b) =>
     compare(b.date, a.date) || compare(a.accountId, b.accountId) || compare(a.level, b.level) || compare(a.objectId, b.objectId) || compare(a.id, b.id));
   const csv = buildAdsReportCsv(rows, outputPolicy.exportMaxBytes);
@@ -74,4 +78,6 @@ export async function exportAdsReport(actor: AdsReadActor, input: unknown = {}, 
     generatedAt: new Date().toISOString(),
     sensitiveFieldsRedacted: rows.reduce((count, row) => count + row.redactedPaths.length, 0),
   };
+
+  });
 }

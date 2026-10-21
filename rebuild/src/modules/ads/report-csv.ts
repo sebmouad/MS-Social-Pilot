@@ -1,3 +1,4 @@
+import { defaultAdsText } from '@/modules/ads/copy';
 import { OperationError } from '@/lib/operation-error';
 import type { AdsDailyRow } from './report-data';
 
@@ -6,7 +7,7 @@ export const ADS_REPORT_CSV_COLUMNS = [
   'impressions', 'clicks', 'reach', 'cpc', 'cpm', 'cpp', 'ctr', 'frequency', 'actions_json', 'fields_json', 'redacted_paths_json',
 ] as const;
 
-const EXPORT_LIMIT_MESSAGE = 'Advertising report exceeds the configured export size limit.';
+const EXPORT_LIMIT_MESSAGE = defaultAdsText('validation058');
 const encoder = new TextEncoder();
 
 export function quote(value: string): string {
@@ -23,14 +24,14 @@ function jsonCell(value: unknown): string {
     if (serialized === undefined) throw new Error();
     return serialized;
   } catch {
-    throw new OperationError('unavailable', 'Advertising report data is temporarily unavailable.');
+    throw new OperationError('unavailable', defaultAdsText('validation059'));
   }
 }
 
 function scalarCell(value: string | number | null): string {
   if (value === null) return '';
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new OperationError('unavailable', 'Advertising report data is temporarily unavailable.');
+    if (!Number.isFinite(value)) throw new OperationError('unavailable', defaultAdsText('validation059'));
     return String(value);
   }
   return quote(safeText(value));
@@ -49,7 +50,7 @@ function rowCsv(row: AdsDailyRow): string {
 
 /** Build one complete UTF-8 CSV v1 payload, refusing the whole export above its byte ceiling. */
 export function buildAdsReportCsv(rows: readonly AdsDailyRow[], maxBytes: number): { csv: string; rowCount: number; byteLength: number } {
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new OperationError('invalid_request', 'Choose a valid advertising report export size limit.');
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new OperationError('invalid_request', defaultAdsText('validation060'));
   let byteLength = 0;
   let csv = '';
   const append = (record: string) => {

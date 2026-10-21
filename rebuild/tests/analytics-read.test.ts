@@ -10,7 +10,7 @@ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: state.entitleme
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: state.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permission }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: state.purge }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
+vi.mock('../src/server/config/store', async () => { const { errorCopyDefaults } = await import('@/modules/analytics/error-copy'); const { workspaceCopyDefaults } = await import('@/modules/analytics/workspace-copy'); return { runtimeConfig: (key: string) => key === 'analytics.workspaceCopy' ? Promise.resolve(workspaceCopyDefaults) : key === 'analytics.errorCopy' ? Promise.resolve(errorCopyDefaults) : state.config(key) }; });
 vi.mock('@/modules/analytics/server/data', () => ({ loadAnalytics: state.load }));
 
 import { readAnalytics, readAnalyticsSnapshot } from '../src/modules/analytics/server/read';

@@ -1,5 +1,6 @@
+import { loadCustomerCopy } from '../../server/copy';
 import { headers } from 'next/headers';
-import { uiCopy, uiLocale } from '../copy';
+import { uiCopy, type CustomerCopy, uiLocale } from '../copy';
 import { requireViewer } from '@/server/context';
 import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
@@ -14,18 +15,19 @@ import styles from '@/modules/agency/ui/agency.module.css';
 export default async function AgencyClientsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const viewer = await requireViewer({ channelScoped: true });
   const locale = uiLocale((await headers()).get('accept-language'));
-  const t = uiCopy(locale);
+  const copy = await loadCustomerCopy();
+  const t = uiCopy(locale, copy);
   const params = await searchParams;
   if (Object.entries(params).some(([key, value]) => key !== 'q' || typeof value !== 'string')) {
-    return <AgencyShell><AgencyHeading locale={locale} description={t("Review your filters.")} /><RouteNotice error focusKey="agency-filter-error">{t("Choose valid filters and try again.")}</RouteNotice><a href="/agency/clients">{t("Reset filters")}</a></AgencyShell>;
+    return <AgencyShell><AgencyHeading locale={locale} copy={copy} description={t("Review your filters.")} /><RouteNotice error focusKey="agency-filter-error">{t("Choose valid filters and try again.")}</RouteNotice><a href="/agency/clients">{t("Reset filters")}</a></AgencyShell>;
   }
   const q = String(params.q ?? '');
   try {
     const searchLimit = await agencySearchLimit();
     const result = await listAgencyClients({ userId: viewer.user.id }, q ? { q } : {});
     return <AgencyShell>
-      <AgencyHeading locale={locale} description={t("Client accounts and pending client invitations in workspaces you own or administer.")} />
-      <ClientFilters key={q} locale={locale} q={q} searchLimit={searchLimit} />
+      <AgencyHeading locale={locale} copy={copy} description={t("Client accounts and pending client invitations in workspaces you own or administer.")} />
+      <ClientFilters key={q} locale={locale} copy={copy} q={q} searchLimit={searchLimit} />
       {result.truncated && <RouteNotice focusKey="agency-truncated">
         {result.filtered ? t("More than {0} workspaces match this search; only the first {1} by name are shown. Search for more of the name to narrow them.", result.limit, result.limit)
           : t("You manage more than {0} workspaces; only the first {1} by name are shown. Search by workspace name to find another.", result.limit, result.limit)}
@@ -36,7 +38,7 @@ export default async function AgencyClientsPage({ searchParams }: { searchParams
         : result.workspaces.map(item => <section key={item.workspaceId} className={styles.section} aria-labelledby={`client-${item.workspaceId}`}>
           <div className={styles.sectionHead}>
             <h2 id={`client-${item.workspaceId}`}>{item.workspaceName}</h2>
-            {item.state === 'available' && <WorkspaceAction locale={locale} workspaceId={item.workspaceId} workspaceName={item.workspaceName} href="/settings/team" label={t("Manage team")} />}
+            {item.state === 'available' && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.workspaceId} workspaceName={item.workspaceName} href="/settings/team" label={t("Manage team")} />}
           </div>
           {item.state !== 'available'
             ? <p className={styles.help}>{item.state === 'suspended' ? t("This workspace is suspended, so its clients are not shown.") : t("Data deletion is in progress for this workspace.")}</p>
@@ -53,6 +55,6 @@ export default async function AgencyClientsPage({ searchParams }: { searchParams
         </section>)}
     </AgencyShell>;
   } catch (error) {
-    return <AgencyShell><AgencyHeading locale={locale} description={t("Client accounts across your workspaces.")} /><RouteNotice error focusKey="agency-load-error">{error instanceof OperationError ? error.message : t("Client accounts could not be loaded. Refresh and try again.")}</RouteNotice></AgencyShell>;
+    return <AgencyShell><AgencyHeading locale={locale} copy={copy} description={t("Client accounts across your workspaces.")} /><RouteNotice error focusKey="agency-load-error">{error instanceof OperationError ? t(error.message) : t("Client accounts could not be loaded. Refresh and try again.")}</RouteNotice></AgencyShell>;
   }
 }

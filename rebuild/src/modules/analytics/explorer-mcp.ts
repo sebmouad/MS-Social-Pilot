@@ -1,3 +1,4 @@
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { readAnalyticsExplorer } from './server/explorer';
@@ -27,6 +28,6 @@ const inputSchema = z.object({
 
 export async function executeAnalyticsExplorerTool(actor: AnalyticsReadActor, args: unknown, constraints: AnalyticsReadConstraints = {}, maxItems?: number) {
   const parsed = inputSchema.safeParse(args ?? {});
-  if (!parsed.success) throw new OperationError('invalid_request', 'Choose valid Analytics Explorer filters.');
+  if (!parsed.success) throw await analyticsError('invalid_request', "Choose valid Analytics Explorer filters.");
   return readAnalyticsExplorer(actor, parsed.data, constraints, maxItems);
 }

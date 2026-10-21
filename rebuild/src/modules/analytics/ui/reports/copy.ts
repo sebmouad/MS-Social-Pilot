@@ -1,6 +1,8 @@
 /** Module-owned customer copy. Root catalog registration is coordinated by the host owner. */
 export type UiLocale = 'en' | 'fr';
 const french: Record<string, string> = {
+  "{0} existing schedule": "{0} planification existante",
+  "{0} existing schedules": "{0} planifications existantes",
   "not confirmed": "non confirmé",
   "sent": "envoyé",
   "not sent": "non envoyé",
@@ -211,4 +213,6 @@ const french: Record<string, string> = {
   "Close": "Fermer"
 };
 export const uiLocale = (language: string | null): UiLocale => language?.trim().toLowerCase().startsWith('fr') ? 'fr' : 'en';
-export const uiCopy = (locale: UiLocale) => (text: string, ...values: Array<string | number>): string => (locale === 'fr' ? french[text] ?? text : text).replace(/\{(\d+)\}/g, (match, index: string) => String(values[Number(index)] ?? match));
+export const reportCopyDefaults = Object.fromEntries(Object.entries(french).map(([en, fr]) => [en, { en, fr }]));
+export type ReportCopy = typeof reportCopyDefaults;
+export const uiCopy = (locale: UiLocale, catalog: ReportCopy = reportCopyDefaults) => (text: string, ...values: Array<string | number>): string => (catalog[text]?.[locale] ?? text).replace(/\{(\d+)\}/g, (match, index: string) => String(values[Number(index)] ?? match));

@@ -1,7 +1,9 @@
+import { homeCopyCatalogDefaults } from '@/modules/home/copy';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ viewer: vi.fn(), selectedTargets: vi.fn(), permitted: vi.fn(), overview: vi.fn(), locale: vi.fn() }));
+const state = vi.hoisted(() => ({ viewer: vi.fn(), selectedTargets: vi.fn(), permitted: vi.fn(), overview: vi.fn(), locale: vi.fn(), config: vi.fn() }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: state.config }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children }: { children: unknown }) => children }));
 vi.mock('../src/server/entitlements', () => ({ canUseFeature: () => true, entitledPlatformIds: (value: { platformCapabilities: Record<string, boolean> }) => Object.keys(value.platformCapabilities).filter(id => value.platformCapabilities[id]) }));
@@ -32,6 +34,7 @@ const full = () => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  state.config.mockResolvedValue(homeCopyCatalogDefaults);
   state.viewer.mockResolvedValue({ user: { id: 'owner' }, workspaceId, membership: { workspace: { name: 'Example workspace' } }, entitlements: { platformCapabilities: { facebook: true } }, permissions: { pageScope: { all: true, ids: [] } } });
   state.selectedTargets.mockResolvedValue([{ id: 'channel-0' }]);
   state.permitted.mockReturnValue(true);
@@ -40,6 +43,14 @@ beforeEach(() => {
 });
 
 describe('Home overview screen', () => {
+  it('renders current Root copy without changing the selected data or links', async () => {
+    state.config.mockResolvedValue({ ...homeCopyCatalogDefaults, greeting: { ...homeCopyCatalogDefaults.greeting, en: 'Hello team' }, upcoming: { ...homeCopyCatalogDefaults.upcoming, en: 'Your next posts' } });
+    const html = renderToStaticMarkup(await HomePage());
+    expect(html).toContain('Hello team, Example workspace');
+    expect(html).toContain('Your next posts');
+    expect(html).toContain('Launch day');
+    expect(state.config).toHaveBeenCalledTimes(1);
+  });
   it('reads the overview as the current member and renders every card with its module link', async () => {
     const html = renderToStaticMarkup(await HomePage());
     expect(state.overview).toHaveBeenCalledWith({ userId: 'owner', workspaceId });

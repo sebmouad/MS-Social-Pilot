@@ -1,3 +1,8 @@
+import { localizeAdsMessage } from '../copy';
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { defaultAdsText } from '@/modules/ads/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
+import { loadAdsCopy } from '../server/copy';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
 import { getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '@/modules/ads/server/queries';
@@ -18,15 +23,18 @@ const INPUT_KEYS = new Set(['period', 'start', 'end', 'accountId', 'compare', 'l
 const OBJECT_LEVELS = ['campaign', 'adset', 'ad'] as const;
 
 export async function loadAdsAnalysisPolicy(readConfig: typeof runtimeConfig = runtimeConfig): Promise<AdsAnalysisPolicy> {
+  return withAdsCopySnapshot(async () => {
   try { return ADS_ANALYSIS_POLICY_SCHEMA.parse(await readConfig('ads.analysisPolicy')); }
-  catch { throw new OperationError('unavailable', 'Ads comparison is temporarily unavailable. Try again later.'); }
+  catch { throw new OperationError('unavailable', await adsServiceText('service075')); }
+
+  });
 }
 
 type Row = { adAccountId: string; level: string; objectId: string; objectName: string | null; date: Date; fetchedAt: Date | null; spend: number; impressions: number; clicks: number; reach?: number; actions?: unknown; adAccount: { id: string; name: string; currency: string | null } };
 const flow = (row: Row) => ({ date: adsIsoDay(row.date), spend: row.spend, impressions: row.impressions, clicks: row.clicks });
 const text = (value: unknown, key: string, max: number) => {
   if (value === undefined) return undefined;
-  if (typeof value !== 'string' || value.length > max) throw new OperationError('invalid_request', `Choose a valid ${key}.`);
+  if (typeof value !== 'string' || value.length > max) throw new OperationError('invalid_request', defaultAdsText('validation049', { value0: key }));
   return value;
 };
 
@@ -37,24 +45,28 @@ export type AdsComparisonResult = Awaited<ReturnType<typeof readAdsComparison>>;
  * Different currencies are never summed together: each currency forms its own group.
  */
 export async function readAdsComparison(actor: AdsReadActor, input: unknown = {}, now = new Date()) {
+  return withAdsCopySnapshot(async () => {
   return buildAdsComparison(actor, input, now, false);
+
+  });
 }
 
 async function buildAdsComparison(actor: AdsReadActor, input: unknown, now: Date, complete: boolean) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', 'Choose valid Ads comparison filters.');
+  const catalogs = await loadAdsCopy();
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', await adsServiceText('service076'));
   const values = input as Record<string, unknown>;
-  if (Object.keys(values).some(key => !INPUT_KEYS.has(key))) throw new OperationError('invalid_request', 'Choose valid Ads comparison filters.');
+  if (Object.keys(values).some(key => !INPUT_KEYS.has(key))) throw new OperationError('invalid_request', await adsServiceText('service076'));
   const access = await authorizeAdsRead(actor, 'ads/compare');
   const [reportPolicy, policy] = await Promise.all([loadAdsReportPolicy(), loadAdsAnalysisPolicy()]);
   const max = reportPolicy.maxFilterCharacters;
   const compare = text(values.compare, 'comparison', max) ?? 'previous';
-  if (compare !== 'previous' && compare !== 'accounts') throw new OperationError('invalid_request', 'Choose to compare with the previous period or across accounts.');
+  if (compare !== 'previous' && compare !== 'accounts') throw new OperationError('invalid_request', await adsServiceText('service077'));
   const level = (text(values.level, 'level', max) ?? 'campaign') as (typeof OBJECT_LEVELS)[number];
-  if (!OBJECT_LEVELS.includes(level)) throw new OperationError('invalid_request', 'Choose campaigns, ad sets or ads.');
+  if (!OBJECT_LEVELS.includes(level)) throw new OperationError('invalid_request', await adsServiceText('service078'));
   const sort = (text(values.sort, 'sort', max) ?? 'spend') as AdsObjectSortKey;
-  if (!OBJECT_SORT_KEYS.includes(sort)) throw new OperationError('invalid_request', 'Choose a valid sort column.');
+  if (!OBJECT_SORT_KEYS.includes(sort)) throw new OperationError('invalid_request', await adsServiceText('service079'));
   const direction = text(values.direction, 'sort direction', max) ?? (sort === 'name' ? 'asc' : 'desc');
-  if (direction !== 'asc' && direction !== 'desc') throw new OperationError('invalid_request', 'Choose ascending or descending order.');
+  if (direction !== 'asc' && direction !== 'desc') throw new OperationError('invalid_request', await adsServiceText('service080'));
 
   const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders, access.allowedAdAccountIds);
   const { period, start, end, accountId } = values as Record<string, string | undefined>;
@@ -62,7 +74,7 @@ async function buildAdsComparison(actor: AdsReadActor, input: unknown, now: Date
     ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), ...(accountId === undefined ? {} : { accountId }),
   }, accounts.map(account => account.id), now, reportPolicy);
   const selectedAccounts = accounts.filter(account => !filters.accountId || account.id === filters.accountId);
-  if (compare === 'accounts' && selectedAccounts.length > policy.maxCompareAccounts) throw new OperationError('invalid_request', `Compare at most ${policy.maxCompareAccounts} accounts. Choose a single account or fewer accounts.`);
+  if (compare === 'accounts' && selectedAccounts.length > policy.maxCompareAccounts) throw new OperationError('invalid_request', defaultAdsText('validation050', { value0: policy.maxCompareAccounts }));
 
   const levels: AdsInsightLevel[] = ['account', level];
   const currentSet = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, { levels, allowedAdAccountIds: access.allowedAdAccountIds });
@@ -144,7 +156,7 @@ async function buildAdsComparison(actor: AdsReadActor, input: unknown, now: Date
       hasData: accountRows.length > 0 || objectRows.length > 0,
       accountTotalsAvailable: accountRows.length > 0,
       totals, previous, kpis: totals ? buildKpis(totals, previous) : [],
-      findings: findings.map(finding => ({ ...finding, message: findingMessage(finding) })),
+      findings: findings.map(finding => ({ ...finding, message: localizeAdsMessage(catalogs, 'en', findingMessage(finding)) })),
       objects: sortObjects(objects, sort, direction).slice(0, complete ? undefined : policy.maxObjects), objectCount: objects.length,
       trend: [...trendByDay.values()].sort((a, b) => a.date.localeCompare(b.date)).map(day => ({ ...day, spend: Math.round(day.spend * 100) / 100 })),
       freshness: assessFreshness((accountRows.length ? accountRows : objectRows).map(row => row.fetchedAt), now, policy.staleAfterHours),
@@ -161,21 +173,24 @@ async function buildAdsComparison(actor: AdsReadActor, input: unknown, now: Date
     range: { from: adsIsoDay(filters.since), to: adsIsoDay(filters.until), endExclusive: true as const },
     previousRange: compare === 'previous' ? (() => { const w = previousWindow(filters.since, filters.until); return { from: adsIsoDay(w.since), to: adsIsoDay(w.until), endExclusive: true as const }; })() : null,
     accountId: filters.accountId, groups: result,
-    notes: ['Totals are recomputed from stored daily flows; ratios are not averaged.', 'Amounts in different currencies are never combined.', 'Reach is not additive and is not totalled; object rows show the highest single day.'],
+    notes: [await adsServiceText('service081'), await adsServiceText('service082'), await adsServiceText('service083')],
     generatedAt: now.toISOString(),
   };
 }
 
 /** Complete stored objects or findings; dataset row and UTF-8 export byte limits both apply. */
 export async function exportAdsComparison(actor: AdsReadActor, input: unknown = {}, now = new Date(), options: { kind?: unknown; locale?: unknown; resultLimit?: number } = {}) {
+  return withAdsCopySnapshot(async () => {
   const kind = options.kind ?? 'objects';
   const locale = options.locale ?? 'en';
-  if (kind !== 'objects' && kind !== 'findings') throw new OperationError('invalid_request', 'Choose objects or findings.');
-  if (locale !== 'en' && locale !== 'fr') throw new OperationError('invalid_request', 'Choose en or fr.');
+  if (kind !== 'objects' && kind !== 'findings') throw new OperationError('invalid_request', await adsServiceText('service084'));
+  if (locale !== 'en' && locale !== 'fr') throw new OperationError('invalid_request', await adsServiceText('service085'));
   const [outputPolicy, result] = await Promise.all([loadAdsOutputPolicy(), buildAdsComparison(actor, input, now, true)]);
-  if (result.groups.some(group => group.objectCount !== group.objects.length)) throw new OperationError('invalid_request', 'Too many objects to export completely. Choose fewer accounts or a shorter date range.');
+  if (result.groups.some(group => group.objectCount !== group.objects.length)) throw new OperationError('invalid_request', await adsServiceText('service086'));
   if (kind === 'objects') assertAdsResultCeiling(result, options.resultLimit);
-  const built = buildAdsComparisonCsv(result, outputPolicy.exportMaxBytes, kind, locale);
+  const built = buildAdsComparisonCsv(result, outputPolicy.exportMaxBytes, kind, locale, (await loadAdsCopy()).analysis);
   const base = outputPolicy.exportFileName.replace(/\.csv$/i, '');
   return { format: 'ms-social-pilot-ads-comparison-csv' as const, version: 1 as const, fileName: `${base}-comparison${kind === 'findings' ? '-findings' : ''}-${result.range.from}_${result.range.to}.csv`, ...built };
+
+  });
 }

@@ -1,3 +1,5 @@
+import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
@@ -32,13 +34,14 @@ function toMetric(metric: MetricView, cap: number): DemographicMetric {
     oldestAsOf: times.length ? new Date(Math.min(...times)) : null, newestAsOf: times.length ? new Date(Math.max(...times)) : null }, key: metric.key, label: metric.label, sourceLabel: metric.sourceLabel, unit: metric.unit, coverage: metric.coverage, available: metric.available, latestAt: metric.latestAt, aggregationLabel: metric.aggregationLabel, ...(metric.aggregationNote ? { aggregationNote: metric.aggregationNote } : {}), rows, hiddenRows };
 }
 export async function readDemographics(actor: Actor, input: unknown = {}) {
+  try {
   await authorize(actor, 'analytics/demographics', 'read');
   const [rawDimensions, rawCap] = await Promise.all([runtimeConfig('analytics.demographics.dimensions'), runtimeConfig('analytics.demographics.maxRowsPerMetric')]);
   const dimensions = demographicDimensionsSchema.safeParse(rawDimensions);
   const cap = z.number().int().min(1).max(500).safeParse(rawCap);
-  if (!dimensions.success || !cap.success) throw new OperationError('unavailable', 'Audience breakdowns are temporarily unavailable.');
+  if (!dimensions.success || !cap.success) throw await analyticsError('unavailable', "Audience breakdowns are temporarily unavailable.");
   const parsed = z.object({ format: z.enum(['json', 'csv']).optional() }).passthrough().safeParse(input ?? {});
-  if (!parsed.success) throw new OperationError('invalid_request', 'Choose a valid demographics format.');
+  if (!parsed.success) throw await analyticsError('invalid_request', "Choose a valid demographics format.");
   const { format, ...filters } = parsed.data;
   const snapshot = await readAnalyticsSnapshot(actor, filters, { feature: 'analytics/demographics', allowedChannelIds: actor.allowedChannelIds });
   const breakdowns = snapshot.allMetrics.filter(metric => metric.kind === 'breakdown' && metric.resourceKind === 'channel');
@@ -63,14 +66,16 @@ export async function readDemographics(actor: Actor, input: unknown = {}) {
   const metrics = [...groups.flatMap(group => group.metrics), ...result.other];
   const historyItems = metrics.reduce((sum, metric) => sum + metric.history.reduce((count, item) => count + 1 + item.rows.length, 0), 0);
   const historyLimit = Number(snapshot.exportRowLimit);
-  if (historyItems > 0 && (!Number.isSafeInteger(historyLimit) || historyLimit < 1)) throw new OperationError('unavailable', 'Audience history settings are unavailable.');
-  if (historyItems > historyLimit) throw new OperationError('invalid_request', 'Audience history exceeds the report row limit. Narrow the channels or date range.');
+  if (historyItems > 0 && (!Number.isSafeInteger(historyLimit) || historyLimit < 1)) throw await analyticsError('unavailable', "Audience history settings are unavailable.");
+  if (historyItems > historyLimit) throw await analyticsError('invalid_request', "Audience history exceeds the report row limit. Narrow the channels or date range.");
   const itemCount = historyItems + result.audience.entries.length + result.groups.length + result.other.length + result.options.channels.length + result.options.adAccounts.length + result.options.metrics.length + result.groups.reduce((total, group) => total + group.metrics.length + (group.combined?.rows.length ?? 0) + group.metrics.reduce((rows, metric) => rows + metric.rows.length, 0), 0) + result.other.reduce((total, metric) => total + metric.rows.length, 0);
   const hiddenRows = [...result.groups.flatMap(group => group.metrics.map(metric => metric.history.length ? 0 : metric.hiddenRows)), ...result.groups.map(group => group.combined?.hiddenRows ?? 0), ...result.other.map(metric => metric.history.length ? 0 : metric.hiddenRows)].reduce((sum, count) => sum + count, 0);
   if (actor.maxResultItems !== undefined && (!Number.isSafeInteger(actor.maxResultItems) || actor.maxResultItems < 1 || itemCount > actor.maxResultItems || hiddenRows > 0)) {
-    throw new OperationError('invalid_request', 'This audience breakdown is larger than the current MCP result limit. Narrow the selected channels or date range.');
+    throw await analyticsError('invalid_request', "This audience breakdown is larger than the current MCP result limit. Narrow the selected channels or date range.");
   }
   return { ...result, csv: format === 'csv' ? demographicsCsv(metrics) : null };
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }
 
 /** Quote every cell and neutralize spreadsheet formulas, including category names. */

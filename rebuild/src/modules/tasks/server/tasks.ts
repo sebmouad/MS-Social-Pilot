@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Prisma } from '../../../../generated/client';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
-import { OperationError } from '@/lib/operation-error';
+import { copyError, copyText, withCustomerCopy } from './copy';
 import {
   TASK_ACTION_SCHEMA, TASK_FILTER_SCHEMA, TASK_POST_CHOICE_SCHEMA, TASK_TRANSITIONS, addCalendarDays, taskConfirmations,
   type TaskAction, type TaskCommentView, type TaskLimits, type TaskPostChoice, type TaskStatus, type TaskSummary, type TaskView, type TasksActor, type TasksReadOptions,
@@ -13,9 +13,9 @@ import { canAccessFeature, resolvePermissions } from '@/server/permissions';
 import { authorizeTasks, type TasksAccess } from './access';
 import { postVisibility, visiblePosts } from './posts';
 
-const invalid = (message = 'Choose a valid task request.') => new OperationError('invalid_request', message);
-const missing = () => new OperationError('not_found', 'This task is unavailable in the current workspace.');
-const unavailable = () => new OperationError('unavailable', 'Tasks are currently unavailable.');
+const invalid = (message = 'Choose a valid task request.') => copyError('invalid_request', message);
+const missing = () => copyError('not_found', 'This task is unavailable in the current workspace.');
+const unavailable = () => copyError('unavailable', 'Tasks are currently unavailable.');
 const identifier = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
 
 const LIMIT_KEYS = ['tasks.titleMaxCharacters', 'tasks.notesMaxCharacters', 'tasks.commentMaxCharacters', 'tasks.pageLimit', 'tasks.commentHistoryLimit', 'tasks.assigneeLimit', 'tasks.postChoiceLimit', 'tasks.workflowRowLimit', 'tasks.workflowGapMaxDays'] as const;
@@ -85,12 +85,12 @@ async function assigneesFor(actor: TasksActor, bounds: Bounds, options?: TasksRe
   return { assignees: rows.slice(0, take), assigneesHasMore: rows.length > take };
 }
 
-export async function listTaskAssignees(actor: TasksActor, options?: TasksReadOptions) {
+async function listTaskAssigneesImpl(actor: TasksActor, options?: TasksReadOptions) {
   await authorizeTasks(actor, 'read');
   return (await assigneesFor(actor, await limits(), options)).assignees;
 }
 
-export async function listTasks(actor: TasksActor, rawFilters: unknown = {}, options?: TasksReadOptions) {
+async function listTasksImpl(actor: TasksActor, rawFilters: unknown = {}, options?: TasksReadOptions) {
   const parsed = TASK_FILTER_SCHEMA.safeParse(rawFilters);
   if (!parsed.success) throw invalid('Choose valid task filters.');
   const filters = parsed.data;
@@ -124,7 +124,7 @@ export async function listTasks(actor: TasksActor, rawFilters: unknown = {}, opt
 }
 
 /** One task and one page of its comments. `commentOffset` continues a long thread; the page size is Root's, capped by the MCP result ceiling. */
-export async function getTask(actor: TasksActor, id: unknown, options?: TasksReadOptions & { commentOffset?: number }) {
+async function getTaskImpl(actor: TasksActor, id: unknown, options?: TasksReadOptions & { commentOffset?: number }) {
   const parsed = identifier.safeParse(id);
   if (!parsed.success) throw missing();
   const offset = options?.commentOffset ?? 0;
@@ -145,7 +145,7 @@ export async function getTask(actor: TasksActor, id: unknown, options?: TasksRea
 }
 
 /** Posts the actor may link to a task: Publishing's visibility, searchable by text, one bounded page at a time. */
-export async function listTaskPostChoices(actor: TasksActor, rawQuery: unknown = {}, options?: TasksReadOptions) {
+async function listTaskPostChoicesImpl(actor: TasksActor, rawQuery: unknown = {}, options?: TasksReadOptions) {
   const parsed = TASK_POST_CHOICE_SCHEMA.safeParse(rawQuery);
   if (!parsed.success) throw invalid('Choose a valid post search.');
   const access = await authorizeTasks(actor, 'read');
@@ -162,20 +162,20 @@ export async function listTaskPostChoices(actor: TasksActor, rawQuery: unknown =
 
 async function audit(tx: Prisma.TransactionClient, actor: TasksActor, action: string, detail: object) {
   const count = await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, ${action}, ${JSON.stringify(detail)}::jsonb, NOW())`;
-  if (count !== 1) throw new OperationError('unavailable', 'The task change could not be recorded, so it was not saved.');
+  if (count !== 1) throw copyError('unavailable', 'The task change could not be recorded, so it was not saved.');
 }
 
 /** Re-read the actor's membership and workspace state inside the write transaction so a role change, disable or suspension wins over the earlier check. */
 async function lockActor(tx: Prisma.TransactionClient, actor: TasksActor): Promise<string> {
   const rows = await tx.$queryRaw<Array<{ role: string; suspendedAt: Date | null; allPages?: boolean | null; memberDisabled?: string[] | null; workspaceDisabled?: string[] | null; clientAccess?: string[] | null }>>`SELECT m.role::text AS role, w."suspendedAt", m."allPages" AS "allPages", COALESCE(m."disabledModules", ARRAY[]::TEXT[]) AS "memberDisabled", COALESCE(w."disabledModules", ARRAY[]::TEXT[]) AS "workspaceDisabled", COALESCE(w."clientAccess", ARRAY[]::TEXT[]) AS "clientAccess" FROM memberships m JOIN users u ON u.id = m."userId" JOIN workspaces w ON w.id = m."workspaceId" WHERE m."workspaceId" = ${actor.workspaceId} AND m."userId" = ${actor.userId} AND u."disabledAt" IS NULL FOR SHARE OF m, u, w`;
-  if (!rows[0] || !TASK_WRITE_ROLES.includes(rows[0].role)) throw new OperationError('forbidden', 'Tasks are unavailable for your role in this workspace.');
-  if (rows[0].suspendedAt) throw new OperationError('forbidden', 'This workspace is suspended.');
+  if (!rows[0] || !TASK_WRITE_ROLES.includes(rows[0].role)) throw copyError('forbidden', 'Tasks are unavailable for your role in this workspace.');
+  if (rows[0].suspendedAt) throw copyError('forbidden', 'This workspace is suspended.');
   // Read in a new statement after acquiring the lock: a snapshot taken before waiting could miss a purge that just committed.
   const purge = await tx.$queryRaw<Array<{ status: string }>>`SELECT status::text FROM workspace_data_purges WHERE "workspaceId" = ${actor.workspaceId}`;
-  if (purge[0] && purge[0].status !== 'completed') throw new OperationError('conflict', 'Workspace data deletion is in progress.');
+  if (purge[0] && purge[0].status !== 'completed') throw copyError('conflict', 'Workspace data deletion is in progress.');
   // A Root module switch or role change committed after the preflight must win over it.
   const fresh = resolvePermissions({ role: rows[0].role, allPages: rows[0].allPages === true, workspaceDisabledModules: rows[0].workspaceDisabled ?? [], memberDisabledModules: rows[0].memberDisabled ?? [], clientAccess: rows[0].clientAccess ?? [], pageAccess: [] });
-  if (!canAccessFeature(fresh, TASKS_FEATURE_ID, 'write')) throw new OperationError('forbidden', 'Tasks are unavailable for your role in this workspace.');
+  if (!canAccessFeature(fresh, TASKS_FEATURE_ID, 'write')) throw copyError('forbidden', 'Tasks are unavailable for your role in this workspace.');
   return rows[0].role;
 }
 async function assertAssignable(tx: Prisma.TransactionClient, actor: TasksActor, userId: string) {
@@ -188,15 +188,15 @@ async function assertLinkable(tx: Prisma.TransactionClient, visibility: Prisma.P
 }
 function text(value: string | null | undefined, max: number, label: string, required: boolean): string | null {
   const trimmed = (value ?? '').trim();
-  if (!trimmed) { if (required) throw invalid(`Enter a ${label}.`); return null; }
-  if (trimmed.length > max) throw invalid(`The ${label} is longer than ${max} characters.`);
+  if (!trimmed) { if (required) throw invalid(copyText("Enter a {0}.", copyText(label))); return null; }
+  if (trimmed.length > max) throw invalid(copyText("The {0} is longer than {1} characters.", copyText(label), max));
   return trimmed;
 }
 function expect(actual: string, wanted: string) { if (actual !== wanted) throw invalid('Type the exact confirmation text to continue.'); }
 
 type Row = { id: string; title: string; notes: string | null; status: string; assigneeId: string | null; dueOn: string | null; postId: string | null; createdById: string | null; updatedAt: Date };
 
-export async function performTaskAction(actor: TasksActor, raw: unknown, options?: TasksReadOptions) {
+async function performTaskActionImpl(actor: TasksActor, raw: unknown, options?: TasksReadOptions) {
   const parsed = TASK_ACTION_SCHEMA.safeParse(raw);
   if (!parsed.success) throw invalid('Choose a valid task action.');
   const value: TaskAction = parsed.data;
@@ -213,7 +213,7 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
   // The result returns every created id, so a batch larger than the key's result ceiling is refused whole, never truncated.
   const ceiling = options?.maxItems;
   if (value.action === 'task.createMany' && ceiling !== undefined && Number.isInteger(ceiling) && ceiling >= 1 && value.titles.length > ceiling) {
-    throw invalid(`This key returns at most ${ceiling} results per call, so a checklist can create at most ${ceiling} tasks at once. Nothing was created.`);
+    throw invalid(copyText("This key returns at most {0} results per call, so a checklist can create at most {1} tasks at once. Nothing was created.", ceiling, ceiling));
   }
   const access = await authorizeTasks(actor, 'write');
   const bounds = await limits();
@@ -237,8 +237,8 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
     }
 
     if (value.action === 'task.createMany') {
-      if (value.titles.length > bounds.workflowRowLimit) throw invalid(`A checklist can create at most ${bounds.workflowRowLimit} tasks at once.`);
-      if (value.gapDays > bounds.workflowGapMaxDays) throw invalid(`Due dates can be at most ${bounds.workflowGapMaxDays} days apart.`);
+      if (value.titles.length > bounds.workflowRowLimit) throw invalid(copyText("A checklist can create at most {0} tasks at once.", bounds.workflowRowLimit));
+      if (value.gapDays > bounds.workflowGapMaxDays) throw invalid(copyText("Due dates can be at most {0} days apart.", bounds.workflowGapMaxDays));
       const titles = value.titles.map(title => text(title, bounds.titleMaxCharacters, 'task title', true)!);
       const dues = titles.map((_, index) => {
         if (!value.startOn) return '';
@@ -268,7 +268,7 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
     if (value.action === 'comment.delete') {
       const found = await tx.$queryRaw<Array<{ authorId: string | null; taskId: string }>>`SELECT "authorId", "taskId" FROM task_comments WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
       if (!found[0]) throw missing();
-      if (found[0].authorId !== actor.userId && !TASK_COMMENT_MODERATOR_ROLES.includes(role)) throw new OperationError('forbidden', 'Only the comment author or a workspace manager can remove this comment.');
+      if (found[0].authorId !== actor.userId && !TASK_COMMENT_MODERATOR_ROLES.includes(role)) throw copyError('forbidden', 'Only the comment author or a workspace manager can remove this comment.');
       const removed = await tx.$executeRaw`DELETE FROM task_comments WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
       if (removed !== 1) throw missing();
       await audit(tx, actor, 'tasks.comment_deleted', { taskId: found[0].taskId, commentId: value.id });
@@ -280,7 +280,7 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
     if (!current) throw missing();
 
     if (value.action === 'task.delete') {
-      if (!canRemove(actor.userId, role, current)) throw new OperationError('forbidden', 'You can only delete tasks you created, unless you manage the workspace.');
+      if (!canRemove(actor.userId, role, current)) throw copyError('forbidden', 'You can only delete tasks you created, unless you manage the workspace.');
       const comments = await tx.$executeRaw`DELETE FROM task_comments WHERE "taskId" = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
       const removed = await tx.$executeRaw`DELETE FROM tasks WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
       if (removed !== 1) throw missing();
@@ -288,20 +288,20 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
       return { ok: true as const, action: value.action, id: value.id };
     }
 
-    if (!canChange(actor.userId, role, current)) throw new OperationError('forbidden', 'You can only change tasks you created or that are assigned to you.');
+    if (!canChange(actor.userId, role, current)) throw copyError('forbidden', 'You can only change tasks you created or that are assigned to you.');
 
     if (value.action === 'task.transition') {
       const from = current.status as TaskStatus;
-      if (!TASK_TRANSITIONS[from]?.includes(value.status)) throw new OperationError('conflict', 'This task is already in that status. Refresh and check its current status.');
+      if (!TASK_TRANSITIONS[from]?.includes(value.status)) throw copyError('conflict', 'This task is already in that status. Refresh and check its current status.');
       const changed = await tx.$executeRaw`UPDATE tasks SET status = ${value.status}, "updatedAt" = clock_timestamp() WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} AND status = ${from}`;
-      if (changed !== 1) throw new OperationError('conflict', 'This task changed while you were working. Refresh and try again.');
+      if (changed !== 1) throw copyError('conflict', 'This task changed while you were working. Refresh and try again.');
       await audit(tx, actor, 'tasks.status_changed', { taskId: value.id, from, to: value.status });
       return { ok: true as const, action: value.action, id: value.id };
     }
 
     // task.update: omitted keys stay, null clears.
     if (value.expectedUpdatedAt && new Date(value.expectedUpdatedAt).getTime() !== new Date(current.updatedAt).getTime()) {
-      throw new OperationError('conflict', 'This task changed while you were editing it. Refresh to see the latest version, then repeat your change.');
+      throw copyError('conflict', 'This task changed while you were editing it. Refresh to see the latest version, then repeat your change.');
     }
     const next = {
       title: value.title !== undefined ? text(value.title, bounds.titleMaxCharacters, 'task title', true)! : current.title,
@@ -320,3 +320,9 @@ export async function performTaskAction(actor: TasksActor, raw: unknown, options
     return { ok: true as const, action: value.action, id: value.id };
   }, config);
 }
+
+export const listTaskAssignees = (...args: Parameters<typeof listTaskAssigneesImpl>) => withCustomerCopy(() => listTaskAssigneesImpl(...args));
+export const listTasks = (...args: Parameters<typeof listTasksImpl>) => withCustomerCopy(() => listTasksImpl(...args));
+export const getTask = (...args: Parameters<typeof getTaskImpl>) => withCustomerCopy(() => getTaskImpl(...args));
+export const listTaskPostChoices = (...args: Parameters<typeof listTaskPostChoicesImpl>) => withCustomerCopy(() => listTaskPostChoicesImpl(...args));
+export const performTaskAction = (...args: Parameters<typeof performTaskActionImpl>) => withCustomerCopy(() => performTaskActionImpl(...args));

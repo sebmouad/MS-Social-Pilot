@@ -1,3 +1,4 @@
+vi.mock('@/modules/analytics/reports/generation/copy-server', async () => ({ loadReportDocumentCopy: async () => ({ copy: (await import('@/modules/analytics/reports/generation/copy')).reportDocumentCopyDefaults.en, locale: 'en' }) }));
 import { describe, expect, it, vi } from 'vitest';
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: db }));

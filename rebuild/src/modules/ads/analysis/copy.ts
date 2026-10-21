@@ -80,6 +80,7 @@ export const adsCopy = {
   },
 } as const;
 
+export type AdsAnalysisCopy = { [L in 'en' | 'fr']: { [K in keyof typeof adsCopy.en]: string } };
 export type AdsLocale = keyof typeof adsCopy;
 export type AdsCopyKey = keyof typeof adsCopy.en;
 
@@ -88,10 +89,10 @@ export function adsLocale(acceptLanguage: string | null | undefined): AdsLocale 
   return /^\s*fr\b/i.test(acceptLanguage ?? '') ? 'fr' : 'en';
 }
 
-export function adsText(locale: AdsLocale, key: AdsCopyKey, values: Record<string, string | number> = {}): string {
-  return (adsCopy[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+export function adsText(locale: AdsLocale, key: AdsCopyKey, values: Record<string, string | number> = {}, copy: AdsAnalysisCopy = adsCopy): string {
+  return (copy[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
 }
 
-export const adsFindingText = (locale: AdsLocale, key: AdsFindingKey, params: Record<string, string | number>) =>
-  adsText(locale, `finding.${key}` as AdsCopyKey, params);
-export const adsKpiLabel = (locale: AdsLocale, key: AdsKpiKey) => adsText(locale, `kpi.${key}` as AdsCopyKey);
+export const adsFindingText = (locale: AdsLocale, key: AdsFindingKey, params: Record<string, string | number>, copy: AdsAnalysisCopy = adsCopy) =>
+  adsText(locale, `finding.${key}` as AdsCopyKey, params, copy);
+export const adsKpiLabel = (locale: AdsLocale, key: AdsKpiKey, copy: AdsAnalysisCopy = adsCopy) => adsText(locale, `kpi.${key}` as AdsCopyKey, {}, copy);

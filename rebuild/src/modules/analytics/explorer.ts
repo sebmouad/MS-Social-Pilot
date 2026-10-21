@@ -1,3 +1,4 @@
+import { errorCopyDefaults } from '@/modules/analytics/error-copy';
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 
@@ -27,13 +28,13 @@ export type AnalyticsExplorerResult = {
 
 export function parseAnalyticsExplorerInput(raw: unknown, searchMaxCharacters: number): AnalyticsExplorerInput & { page?: number; pointPage?: number; rowPage?: number } {
   const parsed = analyticsExplorerFilterSchema.safeParse(raw ?? {});
-  if (!parsed.success) throw new OperationError('invalid_request', 'Choose valid Analytics Explorer filters, or reset the filters and try again.');
+  if (!parsed.success) throw new OperationError('invalid_request', errorCopyDefaults["Choose valid Analytics Explorer filters, or reset the filters and try again."].en);
   const input = parsed.data;
   const channels = input.channel === undefined ? [] : Array.isArray(input.channel) ? input.channel : [input.channel];
   const accounts = input.adAccount === undefined ? [] : Array.isArray(input.adAccount) ? input.adAccount : [input.adAccount];
-  if (new Set(channels).size !== channels.length || new Set(accounts).size !== accounts.length || (channels.length > 0 && input.filter !== '1') || (accounts.length > 0 && input.adFilter !== '1')) throw new OperationError('invalid_request', 'Choose valid Analytics Explorer filters, or reset the filters and try again.');
+  if (new Set(channels).size !== channels.length || new Set(accounts).size !== accounts.length || (channels.length > 0 && input.filter !== '1') || (accounts.length > 0 && input.adFilter !== '1')) throw new OperationError('invalid_request', errorCopyDefaults["Choose valid Analytics Explorer filters, or reset the filters and try again."].en);
   const search = input.search?.trim() ?? '';
-  if (search.length > searchMaxCharacters) throw new OperationError('invalid_request', 'Shorten the metric search and try again.');
-  const parsePage = (value: unknown) => { if (value === undefined) return undefined; const result = page.safeParse(value); if (!result.success) throw new OperationError('invalid_request', 'Choose a valid result page.'); return result.data; };
+  if (search.length > searchMaxCharacters) throw new OperationError('invalid_request', errorCopyDefaults["Shorten the metric search and try again."].en);
+  const parsePage = (value: unknown) => { if (value === undefined) return undefined; const result = page.safeParse(value); if (!result.success) throw new OperationError('invalid_request', errorCopyDefaults["Choose a valid result page."].en); return result.data; };
   return { ...input, search, page: parsePage(input.page), pointPage: parsePage(input.pointPage), rowPage: parsePage(input.rowPage) };
 }
