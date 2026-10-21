@@ -168,3 +168,87 @@ The first full recipe day ran at all four configured Europe/Paris slots (07:00, 
 - Tests: `tests/feeds-recipe-recovery-verification.test.ts` (fake ports/store). No PostgreSQL, MariaDB, Facebook or production exercise; the raw `UPDATE`/ordering SQL has only text-level checks.
 - Still open: a post that the ledger never recorded (crash between create and save of the id) needs manual reconciliation; a post permanently refused by cancel keeps being retried every request, behind other work; the default Publishing lookup reads the post table from the feeds module (a Publishing-owned lookup would be cleaner). No new Root keys in round 6 for Feeds.
 
+
+### Recipe supply lane (2026-10-21, working tree)
+
+Supply estimates, preview and planning now share `supplyLedgerView`. Retained
+history is read beyond the old cooldown window; turning the source cooldown to
+zero no longer silently permits repeats or labels the supply unlimited. With
+`distinctAcrossPages`, every channel consumes the same historical recipe pool,
+matching the estimate's posts-per-day × channels denominator. Otherwise history
+and reuse order apply per channel.
+
+New Root keys, declared in `wordpress/config.ts` and aggregated by `config.ts`:
+
+- `feeds.wordpress.reuseEnabled`: boolean, **false** by default. Off permanently
+  excludes recipes with retained planned/claimed/uncertain history in the relevant
+  pool. Definitively failed claims do not consume supply, but their skipped
+  recipes remain excluded.
+- `feeds.wordpress.reuseCooldownDays`: integer 0–3650, default **365**. When reuse
+  is enabled, the effective cooldown is the longer of this minimum and the
+  source's `cooldownDays` (whose Root default remains `repostCooldownDays`).
+  Only a `planned` ledger row with a matching destination currently recorded as
+  published and a known destination `publishedAt` can qualify. Cooldown uses
+  that actual publication time; old scheduled times alone are insufficient.
+
+Fresh recipes precede reusable recipes. Reusable recipes sort by their latest
+confirmed publication, oldest first. Any recent, future or uncertain use keeps a
+recipe blocked, even alongside an older confirmed publication. Existing image,
+Publishing authorization/approval and per-slot claim/settlement paths still apply.
+This records confirmed application publication state; it does not make a fresh
+provider read. Unknown or missing destination proof remains blocked. On a capped
+library scan, fresh recipes may be allocated but reuse is held: unseen fresh or
+older posted recipes may exist beyond the scan ceiling.
+
+The existing `feeds.wordpress.poolWarnDays` remains the configurable low-supply
+threshold (default 14 days; strict less-than comparison). Estimates are finite,
+exclude recipes that might become reusable later, and use the same eligibility
+policy as planning. Incomplete scans return lower bounds and `low: false` means
+**unconfirmed**, not adequate supply; the card says supply is unavailable and
+shows the lower bound. A complete scan below the threshold shows the shared
+English/French actionable warning from Root `feeds.recipeCopy`. The catalog also
+explains whether reuse is enabled and the effective cooldown. Cache identity
+includes source policy, runtime settings and authorized actor scope so Root
+threshold/reuse changes do not keep a previous policy's answer until TTL expiry;
+source invalidation clears all scope/policy variants.
+
+`GET /api/feeds/wordpress` and MCP `get_recipe_source` already shared
+`readRecipeSource`; both now return `reuse: { enabled, cooldownDays }` alongside
+`pool` (also carrying the reuse policy). No separate transport business rules or
+new endpoint were added. The Feeds screen uses the shared `RecipeSupplyWarning`.
+`ui/RecipeSupplyCard.tsx` is an authorized server component prepared for Home;
+it uses the same service and Root copy and hides itself when the source is
+invisible or access is refused.
+
+**Integration needed outside this lane:** `src/modules/home/ui/HomeScreen.tsx`
+must import `RecipeSupplyCard` from `@/modules/feeds/ui/RecipeSupplyCard` and mount
+`<RecipeSupplyCard actor={{ userId: viewer.user.id, workspaceId: viewer.workspaceId }} locale={locale} />`
+in its existing card layout, preferably in the publishing card. Home does not
+mount it yet; the Home warning requirement remains incomplete until that edit.
+The service derives current member scope; do not replace it with a direct SQL
+query in Home. Update ARCHITECTURE.md, GOAL.md, DELIVERY_PLAN.md and AGENT_HANDOFF.md
+with this batch and remaining Home work. Integrator owns CONFIG_SCHEMA_VERSION;
+this lane did not edit it. No schema migration is required for these joins.
+
+Evidence: targeted Vitest tests cover reuse off, actual-publication cooldown
+boundaries, latest-use blocking, fresh/oldest ordering, shared-pool consumption,
+capped scans, finite estimates, Root cache changes, bilingual warnings and the
+Home component, plus REST/MCP forwarding to the same service. These are fake-port,
+mocked transport and static-render checks. No server, full suite, browser,
+PostgreSQL/MariaDB, provider, deployment or production test was run. Retained
+history query volume/performance and concurrent cross-slot recipe allocation
+still need database/runtime evidence; existing unique slot claims do not prove
+cross-slot recipe exclusivity between concurrent planning runs.
+
+Verification for this lane: **142/142 tests passed in 12 targeted files**, using
+`npx vitest run` with `--no-cache` (the linked dependency directory's Vitest cache
+is outside writable roots). Files: `feeds-recipe-supply`,
+`feeds-recipe-supply-ui`, `feeds-recipe-supply-transports`,
+`feeds-wordpress-planner`, `feeds-wordpress-service`,
+`feeds-wordpress-recovery-service`, `feeds-mcp`, `recipe-origin-visibility`,
+`feeds-recipe-recovery-verification`, `feeds-wordpress-recipe`,
+`feeds-wordpress-db-image`, `feeds-wordpress-job` (all `tests/*.test.ts`).
+Vite CJS deprecation and existing missing Tailwind content warnings were emitted;
+there were no test failures. TypeScript uses `--incremental false` to avoid
+writing an unowned build-info artifact. This working tree is left uncommitted
+for the integrator; no push/deploy was authorized in this lane.

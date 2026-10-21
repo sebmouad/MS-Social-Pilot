@@ -6,6 +6,8 @@ import { MetricCard } from '@/components/MetricCard';
 import type { AdsSummary } from '@/modules/ads/server/summary';
 
 const day = (date: Date) => date.toISOString().slice(0, 10);
+/** Both charts share one height so the two panels line up in a row. */
+const CHART_HEIGHT = 260;
 
 /**
  * Account-level view of the campaign rows on the page: KPI cards, spend per campaign over time and the
@@ -40,16 +42,16 @@ export function CampaignCharts({ accountName, rows, locale }: { accountName: str
         unavailable={ctr === null ? t('text150') : undefined} />
     </div>
     <div className="ads-campaign-charts__grid">
-      <div>
+      <div className="ads-campaign-charts__panel">
         <h3>{t('text151')}</h3>
-        <TimeSeriesChart locale={locale} label={t('text152', { value0: accountName })}
+        <TimeSeriesChart locale={locale} height={CHART_HEIGHT} label={t('text152', { value0: accountName })}
           format={currency ? { style: 'currency', currency } : undefined}
           series={campaigns.filter(row => row.dailyMetrics.length).map(row => ({ id: row.id, name: row.name,
             points: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => ({ t: day(entry.date), v: entry.spend })) }))} />
       </div>
-      <div>
+      <div className="ads-campaign-charts__panel">
         <h3>{t('text153')}</h3>
-        <FunnelChart locale={locale} label={t('text154', { value0: accountName })} stages={[
+        <FunnelChart locale={locale} height={CHART_HEIGHT} label={t('text154', { value0: accountName })} stages={[
           { name: t('text020'), value: impressions }, { name: t('text022'), value: clicks }, { name: t('text145'), value: null },
         ]} />
         <p className="small-note">{t('text155')}</p>

@@ -1,5 +1,10 @@
 import { z } from 'zod';
 const en = {
+  "Publications by weekday (UTC)": "Publications by weekday (UTC)",
+  "Publications by hour (UTC)": "Publications by hour (UTC)",
+  "Publications by recorded attempts": "Publications by recorded attempts",
+  "Publication timing uses UTC, with Monday as weekday 1 and Sunday as 7. Counts describe saved publications, not recommended publishing times. Attempts are current stored counters; the final bucket includes that many attempts or more. Zero attempts means no recorded attempt, not proof of delivery without an attempt.": "Publication timing uses UTC, with Monday as weekday 1 and Sunday as 7. Counts describe saved publications, not recommended publishing times. Attempts are current stored counters; the final bucket includes that many attempts or more. Zero attempts means no recorded attempt, not proof of delivery without an attempt.",
+
   "Short-link details": "Short-link details",
   "Link lifetime clicks": "Link lifetime clicks",
   "Recorded link clicks in period": "Recorded link clicks in period",
@@ -192,6 +197,11 @@ const en = {
   "Channel": "Channel"
 };
 const fr: typeof en = {
+  "Publications by weekday (UTC)": "Publications par jour de la semaine (UTC)",
+  "Publications by hour (UTC)": "Publications par heure (UTC)",
+  "Publications by recorded attempts": "Publications par nombre de tentatives enregistrées",
+  "Publication timing uses UTC, with Monday as weekday 1 and Sunday as 7. Counts describe saved publications, not recommended publishing times. Attempts are current stored counters; the final bucket includes that many attempts or more. Zero attempts means no recorded attempt, not proof of delivery without an attempt.": "Les horaires utilisent UTC, avec lundi comme jour 1 et dimanche comme jour 7. Les nombres décrivent les publications enregistrées, pas des horaires recommandés. Les tentatives sont les compteurs actuels enregistrés ; la dernière tranche inclut ce nombre de tentatives ou plus. Zéro tentative signifie aucune tentative enregistrée, pas une diffusion sans tentative prouvée.",
+
   "Short-link details": "Détail des liens courts",
   "Link lifetime clicks": "Clics du lien depuis sa création",
   "Recorded link clicks in period": "Clics du lien enregistrés dans la période",

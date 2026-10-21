@@ -36,7 +36,7 @@ export function RecipeStatusCard({ status, locale, copy }: { status: RecipeStatu
       <div className={styles.statusItem}>
         <dt>{t('recipeStatusPool')}</dt>
         <dd>{status.pool
-          ? <><Badge tone={status.pool.low ? 'warning' : 'success'}>{status.pool.low ? t('recipeStatusPoolLow') : t('recipeStatusPoolOk')}</Badge>
+          ? <><Badge tone={!status.pool.complete || status.pool.low ? 'warning' : 'success'}>{!status.pool.complete ? t('recipeStatusPoolUnknown') : status.pool.low ? t('recipeStatusPoolLow') : t('recipeStatusPoolOk')}</Badge>
             <span className={styles.statusMeta}>{fewest !== null ? t('recipeStatusPoolDays', { days: fewest }) : t('recipeStatusPoolCount', { count: eligible })}{status.pool.complete ? '' : ' +'}</span></>
           : <span className={styles.statusMeta}>{t('recipeStatusPoolUnknown')}</span>}</dd>
       </div>

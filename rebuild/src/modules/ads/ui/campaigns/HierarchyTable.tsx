@@ -57,7 +57,7 @@ export function HierarchyTable({ caption, rows, locale, actions, details, object
     columns={[
       { key: 'name', label: t('text066'), hideCardLabel: true, render: row => <span className="ads-hierarchy__name">
         <span className="ui-mod-chip" data-module="ads" aria-hidden="true">{LEVEL_ICON[row.level]}</span>
-        <span>{row.path ? <small className="ads-object-id">{row.path}</small> : null}<strong>{row.name}</strong><small className="ads-object-id">{levelWord[row.level]} {t('text166')}{row.id}</small></span>
+        <span>{row.path ? <small className="ads-object-id" title={row.path}>{row.path}</small> : null}<strong>{row.name}</strong><small className="ads-object-id" title={row.id}>{levelWord[row.level]} {t('text166')}{row.id}</small></span>
       </span> },
       { key: 'delivery', label: t('text167'), render: row => row.spend > 0 || row.impressions > 0
         ? <Badge tone="success">{t('text168')} {t('text166')}{row.days} {row.days === 1 ? t('text169') : t('text170')}</Badge>

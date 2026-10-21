@@ -1,8 +1,9 @@
-.ads-object-manager__panel { display: grid; gap: var(--space-2, 0.5rem); margin-top: var(--space-2, 0.5rem); padding: var(--space-3, 0.75rem); border: 1px solid var(--border, currentColor); border-radius: var(--radius-md, 8px); }
-.ads-object-manager__row { display: flex; flex-wrap: wrap; gap: var(--space-2, 0.5rem); align-items: center; }
-.ads-change-history { display: grid; gap: var(--space-3, 0.75rem); padding: 0; list-style: none; }
-.ads-compare-grid { display: grid; gap: var(--space-3, 0.75rem); grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); margin: 0; }
-.ads-compare-grid div { padding: var(--space-3, 0.75rem); border: 1px solid var(--border, currentColor); border-radius: var(--radius-md, 8px); }
-.ads-compare-grid dt { font-size: 0.8125rem; }
-.ads-compare-grid dd { margin: 0; font-size: 1.25rem; font-weight: 600; }
-.ads-extra-filters { display: grid; gap: var(--space-2, 0.5rem); margin-top: var(--space-3, 0.75rem); }
+.ads-object-manager__panel { display: grid; gap: var(--space-2); margin-top: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-muted); }
+.ads-object-manager__row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.ads-change-history { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.ads-change-history > li { min-width: 0; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); overflow-wrap: anywhere; }
+.ads-compare-grid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); margin: 0; }
+.ads-compare-grid div { min-width: 0; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.ads-compare-grid dt { color: var(--ink-soft); font-size: 0.8125rem; }
+.ads-compare-grid dd { margin: 0; font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ads-extra-filters { display: grid; gap: var(--space-2); margin-top: var(--space-3); }

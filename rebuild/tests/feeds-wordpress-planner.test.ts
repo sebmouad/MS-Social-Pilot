@@ -26,6 +26,7 @@ const settings = (over: Partial<WordpressSettings> = {}): WordpressSettings => (
   minLeadMinutes: 5, targetTypes: ['page'], runBudget: 500, maxSourcesPerRun: 50, claimLeaseSeconds: 300, maxSlotAttempts: 3, previewCount: 5, ledgerPageSize: 50, commentMax: 8000, minutesSuffix: ' min', truncationMark: '…',
   image: { fetch: { timeoutMs: 1000, maxBytes: 1_000_000, maxRedirects: 2, allowHttp: false, hostAllowlist: [] }, maxPixels: 10_000_000, quality: 88, minQuality: 60, qualityStep: 8, maxOutputBytes: 1_000_000 },
   altMax: 100, sourceNameMax: 120, textMax: 10000, titleMax: 300, maxTargets: 50, identifierMax: 80, pageNumberMax: 100000, transaction: { timeoutMs: 20000, maxWaitMs: 5000 },
+  reuse: { enabled: false, cooldownDays: 365 },
   poolWarnDays: 14, poolCacheSeconds: 0, pauseCancel: { enabled: true, batchSize: 100 }, ...over,
 });
 
@@ -285,14 +286,14 @@ describe('failures', () => {
 
 describe('reposting rules', () => {
   it('blocks a recipe on a page within the cooldown but lets other pages use it, and ignores recipes only used before it', async () => {
-    const h = harness({ pages: 2, settings: {} });
-    const old = (page: string, wp: string, daysAgo: number): LedgerRow => ({ id: `old-${page}-${wp}`, sourceId: 's1', targetId: page, wpPostId: wp, slotAt: new Date(NOW.getTime() - daysAgo * 86_400_000), state: 'planned', postId: 'p', title: '', permalink: null, reason: null, skipped: [], claimedAt: NOW });
+    const h = harness({ pages: 2, settings: { reuse: { enabled: true, cooldownDays: 365 } } });
+    const old = (page: string, wp: string, daysAgo: number): LedgerRow => ({ id: `old-${page}-${wp}`, sourceId: 's1', targetId: page, wpPostId: wp, slotAt: new Date(NOW.getTime() - daysAgo * 86_400_000), publishedAt: new Date(NOW.getTime() - daysAgo * 86_400_000), state: 'planned', postId: 'p', title: '', permalink: null, reason: null, skipped: [], claimedAt: NOW });
     h.rows.push(old('page1', '5000', 10), old('page1', '4999', 400), old('page2', '5000', 400));
     await planSource(h.ctx(), source({ config: { distinctAcrossPages: false, horizonDays: 1 } }), auth);
     const byPage = (page: string) => h.rows.filter(r => r.targetId === page && r.state === 'planned' && r.id.startsWith('plan')).map(r => r.wpPostId);
     expect(byPage('page1')).not.toContain('5000');
-    expect(byPage('page1')[0]).toBe('4999');
-    expect(byPage('page2')[0]).toBe('5000');
+    expect(byPage('page1')[0]).toBe('4998'); // fresh recipes precede eligible reuse
+    expect(byPage('page2')[0]).toBe('4999');
   });
 
   it('does not repeat recipes already planned in the horizon on other pages when distinct', async () => {
@@ -465,11 +466,11 @@ describe('recipe pool health', () => {
     expect((await computePoolHealth({ settings: { ...h.cfg, poolWarnDays: 5 }, ports: h.ports, db: h.wp.db, source: source(), now: NOW })).low).toBe(true);
   });
 
-  it('has no exhaustion date when recipes may repeat immediately and marks a capped scan as a lower bound', async () => {
+  it('keeps a finite lower-bound estimate for a capped scan without claiming confirmed low supply', async () => {
     const h = harness({ pages: 1, rows: 40, settings: { candidateMaxScan: 10, candidateBatchSize: 10 } });
     const unlimited = source({ config: { cooldownDays: 0 } });
     const health = await computePoolHealth({ settings: h.cfg, ports: h.ports, db: h.wp.db, source: unlimited, now: NOW });
-    expect(health.pages[0]).toMatchObject({ daysLeft: null, low: false });
+    expect(health.pages[0]).toMatchObject({ daysLeft: 2, low: false });
     expect(health.complete).toBe(false);
   });
 });
@@ -482,5 +483,51 @@ describe('the worker log line', () => {
   });
   it('says when the planner did not run', () => {
     expect(formatFeedPollSummary({ ...base, reason: 'disabled' })).toBe('disabled examined=2 claimed=2 posts=1 held=0 skipped=0 failed=0 recipes=off');
+  });
+});
+
+
+describe('default-off reuse in the planner', () => {
+  it('does not forget recipes outside the old source cooldown window, even when it is zero', async () => {
+    const h = harness({ pages: 1, rows: 1 });
+    h.rows.push({ id: 'old', sourceId: 's1', targetId: 'page1', wpPostId: '5000', slotAt: new Date('2020-01-01Z'), publishedAt: new Date('2020-01-01Z'), state: 'planned', postId: 'old-post', title: '', permalink: null, reason: null, skipped: [], claimedAt: NOW });
+    const out = await planSource(h.ctx(), source({ config: { cooldownDays: 0 } }), auth);
+    expect(out.planned).toBe(0);
+    expect(out.unfilled).toBe(8);
+    const health = await computePoolHealth({ settings: h.cfg, ports: h.ports, db: h.wp.db, source: source({ config: { cooldownDays: 0 } }), now: NOW });
+    expect(health.pages[0]).toMatchObject({ eligible: 0, daysLeft: 0, low: true });
+  });
+  it('uses the oldest confirmed publication after fresh recipes and respects the Root minimum', async () => {
+    const h = harness({ pages: 1, rows: 3, settings: { reuse: { enabled: true, cooldownDays: 30 } } });
+    for (const [id, days] of [['5000', 40], ['4999', 100], ['4998', 29]] as const) {
+      const at = new Date(NOW.getTime() - days * 86400000);
+      h.rows.push({ id, sourceId: 's1', targetId: 'page1', wpPostId: id, slotAt: at, publishedAt: at, state: 'planned', postId: id, title: '', permalink: null, reason: null, skipped: [], claimedAt: NOW });
+    }
+    const out = await planSource(h.ctx(), source({ config: { cooldownDays: 0 } }), auth);
+    expect(out).toMatchObject({ planned: 2, unfilled: 6 });
+    expect(h.rows.filter(r => r.id.startsWith('plan')).map(r => r.wpPostId)).toEqual(['4999', '5000']);
+  });
+});
+
+
+describe('shared supply accounting', () => {
+  it('consumes historical recipes across channels when different recipes are required', async () => {
+    const h = harness({ pages: 2, rows: 1 });
+    h.rows.push({ id: 'old', sourceId: 's1', targetId: 'page1', wpPostId: '5000', slotAt: new Date('2020-01-01Z'), publishedAt: new Date('2020-01-01Z'), state: 'planned', postId: 'old-post', title: '', permalink: null, reason: null, skipped: [], claimedAt: NOW });
+    const health = await computePoolHealth({ settings: h.cfg, ports: h.ports, db: h.wp.db, source: source(), now: NOW });
+    expect(health.pages.map(p => p.eligible)).toEqual([0, 0]);
+    expect((await planSource(h.ctx(), source(), auth)).planned).toBe(0);
+  });
+});
+
+
+describe('bounded reuse scanning', () => {
+  it('does not reuse scanned recipes when an unscanned fresh recipe may still exist', async () => {
+    const h = harness({ pages: 1, rows: 3, settings: { reuse: { enabled: true, cooldownDays: 30 }, candidateMaxScan: 2, candidateBatchSize: 2 } });
+    for (const id of ['5000', '4999']) {
+      const at = new Date(NOW.getTime() - 100 * 86400000);
+      h.rows.push({ id, sourceId: 's1', targetId: 'page1', wpPostId: id, slotAt: at, publishedAt: at, state: 'planned', postId: id, title: '', permalink: null, reason: null, skipped: [], claimedAt: NOW });
+    }
+    expect((await planSource(h.ctx(), source({ config: { cooldownDays: 0 } }), auth)).planned).toBe(0);
   });
 });

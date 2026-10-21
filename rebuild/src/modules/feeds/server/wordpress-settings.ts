@@ -11,7 +11,7 @@ const KEYS = [
   'horizonDays', 'minLeadMinutes', 'distinctAcrossPages', 'repostCooldownDays', 'targetTypes', 'runBudget', 'maxSourcesPerRun', 'claimLeaseSeconds', 'maxSlotAttempts', 'previewCount', 'ledgerPageSize',
   'firstCommentTemplate', 'firstCommentMaxCharacters', 'firstCommentDelayMinutes', 'minutesSuffix', 'truncationMark', 'jpegQuality', 'jpegMinQuality', 'jpegQualityStep',
   'imageMaxBytes', 'imageMaxPixels', 'imageFetchTimeoutMs', 'sourceNameMaxCharacters', 'textMaxCharacters', 'titleMaxCharacters',
-  'poolWarnDays', 'poolCacheSeconds', 'pauseCancelEnabled', 'pauseCancelBatchSize',
+  'reuseEnabled', 'reuseCooldownDays', 'poolWarnDays', 'poolCacheSeconds', 'pauseCancelEnabled', 'pauseCancelBatchSize',
 ].map(name => `${P}${name}`);
 const SHARED = ['feeds.fetchMaxRedirects', 'feeds.allowHttp', 'feeds.hostAllowlist', 'feeds.maxTargets', 'feeds.identifierMaxCharacters', 'feeds.pageNumberMax', 'feeds.transactionTimeoutMs', 'feeds.transactionMaxWaitMs',
   'data.workspaceOperationTimeoutMs', 'publishing.maxMessageCharacters', 'publishing.maxImageAltCharacters', 'publishing.maxImageUploadBytes'];
@@ -21,6 +21,7 @@ export type WordpressSettings = {
   db: { connectTimeoutMs: number; queryTimeoutMs: number; poolSize: number }; candidateBatchSize: number; candidateMaxScan: number;
   defaults: PlanConfig; minLeadMinutes: number; targetTypes: string[]; runBudget: number; maxSourcesPerRun: number; claimLeaseSeconds: number; maxSlotAttempts: number; previewCount: number; ledgerPageSize: number;
   commentMax: number; minutesSuffix: string; truncationMark: string; image: ImageSettings; altMax: number;
+  reuse: { enabled: boolean; cooldownDays: number };
   poolWarnDays: number; poolCacheSeconds: number; pauseCancel: { enabled: boolean; batchSize: number };
   sourceNameMax: number; textMax: number; titleMax: number; maxTargets: number; identifierMax: number; pageNumberMax: number; transaction: { timeoutMs: number; maxWaitMs: number };
 };
@@ -53,6 +54,7 @@ export async function loadWordpressSettings(): Promise<WordpressSettings> {
       fetch: { timeoutMs: n(w('imageFetchTimeoutMs')), maxBytes: n(w('imageMaxBytes')), maxRedirects: n(s('feeds.fetchMaxRedirects')), allowHttp: s('feeds.allowHttp') === true, hostAllowlist: s('feeds.hostAllowlist') as string[] },
       maxPixels: n(w('imageMaxPixels')), quality: n(w('jpegQuality')), minQuality: n(w('jpegMinQuality')), qualityStep: n(w('jpegQualityStep')), maxOutputBytes: uploadMax,
     },
+    reuse: { enabled: w('reuseEnabled') === true, cooldownDays: n(w('reuseCooldownDays')) },
     poolWarnDays: n(w('poolWarnDays')), poolCacheSeconds: n(w('poolCacheSeconds')), pauseCancel: { enabled: w('pauseCancelEnabled') === true, batchSize: n(w('pauseCancelBatchSize')) },
     altMax: n(s('publishing.maxImageAltCharacters')), sourceNameMax: n(w('sourceNameMaxCharacters')), textMax: n(w('textMaxCharacters')), titleMax: n(w('titleMaxCharacters')),
     maxTargets: n(s('feeds.maxTargets')), identifierMax: n(s('feeds.identifierMaxCharacters')), pageNumberMax: n(s('feeds.pageNumberMax')), transaction: { timeoutMs: transactionTimeout, maxWaitMs: transactionWait },

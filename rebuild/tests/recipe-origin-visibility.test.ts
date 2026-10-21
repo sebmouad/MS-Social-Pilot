@@ -105,7 +105,7 @@ describe('recipe status', () => {
   const base: RecipeStatus = {
     state: 'active', lastRunAt: '2026-10-21T08:00:00.000Z', timeZone: 'UTC',
     upcoming: [{ slotAt: '2026-10-21T18:00:00.000Z', targetName: 'Page One', title: 'Soup' }], publishedToday: 2, failed: 1, uncertain: 1,
-    pool: { low: true, complete: false, pages: [{ targetId: 't1', targetName: 'Page One', eligible: 12, daysLeft: 4, low: true }] },
+    pool: { low: true, complete: true, pages: [{ targetId: 't1', targetName: 'Page One', eligible: 12, daysLeft: 4, low: true }] },
   };
 
   it('renders slots, today, problems and supply in English and French', () => {
@@ -115,7 +115,7 @@ describe('recipe status', () => {
     expect(en).toContain('Published today');
     expect(en).toContain('1 failed, 1 to check');
     expect(en).toContain('Running low');
-    expect(en).toContain('4 days left +');
+    expect(en).toContain('4 days left');
     const fr = renderToStaticMarkup(h(RecipeStatusCard, { status: base, locale: 'fr' }));
     expect(fr).toContain('Automatisation des recettes');
     expect(fr).toContain('1 en échec, 1 à contrôler');

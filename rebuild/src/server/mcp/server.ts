@@ -164,7 +164,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     const listed = await availability(viewer, 'listFilter');
     const available = await availability(viewer, 'available');
     const visible = ({ resource }: { resource: McpResourceDeclaration }) => (!resource.requiresAvailableTool || (listed(resource.readTool) && available(resource.readTool)))
-      && resourceAllowedForScope(viewer, resource.uri) && (!resource.managerOnly || canManageData(viewer))
+      && resourceAllowedForScope(viewer, resource.uri) && toolAllowedForScope(viewer, resource.readTool) && (!resource.managerOnly || canManageData(viewer))
       && (resource.feature === null || (canUseFeature(viewer.entitlements, resource.feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, resource.feature, 'read'))));
     return reply({ resources: [
       ...(resourceAllowedForScope(viewer, 'msp://workspace') ? [{ uri: 'msp://workspace', name: 'Workspace', description: 'Current workspace details.', mimeType: 'application/json' }] : []),
@@ -187,7 +187,9 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     }
     if (viewer.scope === 'installation') return error(-32602, 'Workspace access is required for this resource.');
     const declared = host().resources.find(({ resource }) => resource.uri === uri)?.resource;
-    if (declared?.guardedRead && ((declared.managerOnly && !canManageData(viewer)) || (declared.feature !== null && (!canUseFeature(viewer.entitlements, declared.feature) || !viewer.permissions || !canAccessFeature(viewer.permissions, declared.feature, 'read'))))) return error(-32602, 'Resource unavailable.');
+    // A direct URI read must satisfy the same declaration checks as resources/list,
+    // even when the backing tool requires a different feature.
+    if (declared && (!toolAllowedForScope(viewer, declared.readTool) || (declared.managerOnly && !canManageData(viewer)) || (declared.feature !== null && (!canUseFeature(viewer.entitlements, declared.feature) || !viewer.permissions || !canAccessFeature(viewer.permissions, declared.feature, 'read'))))) return error(-32602, 'Resource unavailable.');
     try {
       let contents: unknown;
       if (uri === 'msp://workspace') contents = viewer.workspace;

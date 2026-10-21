@@ -1,6 +1,7 @@
-.route-tabs { display: flex; gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
-.route-tabs a { padding: 8px 12px; border-radius: 7px; color: var(--ink-soft); font-size: 13px; font-weight: 650; }
+.route-tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.route-tabs a { display: inline-flex; align-items: center; flex: 0 0 auto; min-height: var(--control-height); padding: 8px 12px; border-radius: 7px; color: var(--ink-soft); font-size: 13px; font-weight: 650; }
 .route-tabs a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.route-tabs a { white-space: nowrap; }
 .analytics-panel-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .analytics-panel-title h2 { margin-bottom: 4px; }
 .account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
@@ -11,7 +12,7 @@
 .account-card h3 { margin: 16px 0 5px; font-size: 16px; }
 .account-card p { margin: 0; overflow-wrap: anywhere; }
 .account-card__details { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
-.account-card__details dt { color: var(--ink-faint); font-size: 11px; }
+.account-card__details dt { color: var(--ink-faint); font-size: 12px; }
 .account-card__details dd { margin: 5px 0 0; font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
 .empty-state { text-align: center; padding: 42px 24px; }
 .empty-state h2, .empty-state h3 { margin: 10px 0 8px; }
@@ -27,7 +28,7 @@
 .ads-report-export { display: grid; gap: 8px; margin-top: 14px; }
 .ads-report-export section { display: grid; gap: 8px; }
 .ads-filter-field { display: grid; gap: 8px; }
-.ads-filter-heading { margin: 0 0 2px; color: var(--ink-faint); font-size: 10px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.ads-filter-heading { margin: 0 0 2px; color: var(--ink-faint); font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .ads-sidebar-filter .ui-button { margin-top: 8px; }
 .ads-filter-reset { display: inline-flex; min-height: 40px; align-items: center; justify-self: center; color: var(--ink-soft); font-size: 12px; }
 .ads-account-list { display: grid; gap: 12px; margin-top: 18px; }
@@ -35,10 +36,10 @@
 .ads-account-card__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .ads-account-card__heading h3 { margin: 8px 0 3px; font-size: 15px; }
 .ads-account-card__heading p { margin: 0; }
-.ads-account-card__sync { color: var(--ink-faint); font-size: 11px; white-space: nowrap; }
+.ads-account-card__sync { color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
 .ads-metric-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
 .ads-metric-strip span { display: grid; gap: 4px; }
-.ads-metric-strip small { color: var(--ink-faint); font-size: 10px; }
+.ads-metric-strip small { color: var(--ink-faint); font-size: 12px; }
 .ads-metric-strip strong { color: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
 .ads-account-details { margin-top: 12px; }
 .ads-level-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--line); }
@@ -54,32 +55,34 @@
 .ads-performance-table td { vertical-align: middle; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ads-performance-table td:first-child { min-width: 190px; max-width: 290px; white-space: normal; overflow-wrap: anywhere; }
 .ads-performance-table td:first-child strong { display: block; }
-.ads-performance-table td small { display: block; margin-top: 4px; color: var(--ink-faint); font-size: 10px; }
+.ads-performance-table td small { display: block; margin-top: 4px; color: var(--ink-faint); font-size: 12px; }
+.ads-performance-table th:first-child, .ads-performance-table td:first-child { position: sticky; inset-inline-start: 0; z-index: 1; background: var(--surface); }
+.ads-performance-table tbody tr:hover td:first-child { background: var(--surface-hover); }
 .ads-object-id { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap !important; }
 .ads-object-actions { display: grid; gap: 7px; margin-top: 9px; }
 .ads-object-actions .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .ads-object-actions__status, .ads-object-actions__budget { display: flex; flex-wrap: wrap; gap: 5px; }
-.ads-object-actions button, .ads-object-actions select, .ads-object-actions input { min-height: 30px; padding: 4px 7px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--ink); font-size: 10px; }
+.ads-object-actions button, .ads-object-actions select, .ads-object-actions input { min-height: var(--control-height-sm); padding: 4px 8px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--ink); font-size: 12px; }
 .ads-object-actions button { color: var(--accent); font-weight: 700; cursor: pointer; }
 .ads-object-actions button:disabled { opacity: .55; cursor: wait; }
 .ads-object-actions input { width: 96px; }
 .ads-object-actions__budget select { max-width: 82px; }
 .ads-object-actions p { margin: 0; white-space: normal; }
 .ads-stored-details { min-width: 52px; }
-.ads-stored-details summary { color: var(--accent); font-size: 11px; font-weight: 700; cursor: pointer; }
+.ads-stored-details summary { color: var(--accent); font-size: 12px; font-weight: 700; cursor: pointer; }
 .ads-detail-content { position: relative; z-index: 1; width: min(420px, 70vw); max-height: 360px; margin-top: 8px; padding: 13px; overflow: auto; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: var(--shadow-panel); white-space: normal; }
-.ads-detail-content h4 { margin: 8px 0; font-size: 11px; }
+.ads-detail-content h4 { margin: 8px 0; font-size: 12px; }
 .ads-detail-content h4:first-child { margin-top: 0; }
-.ads-detail-content p { margin: 0 0 8px; color: var(--ink-faint); font-size: 11px; }
-.ads-detail-content ul { display: grid; gap: 5px; margin: 0 0 12px; padding: 0; list-style: none; font-size: 11px; }
+.ads-detail-content p { margin: 0 0 8px; color: var(--ink-faint); font-size: 12px; }
+.ads-detail-content ul { display: grid; gap: 5px; margin: 0 0 12px; padding: 0; list-style: none; font-size: 12px; }
 .ads-detail-content li { display: flex; justify-content: space-between; gap: 12px; }
-.ads-field-group h5 { margin: 10px 0 5px; color: var(--ink); font-size: 11px; }
+.ads-field-group h5 { margin: 10px 0 5px; color: var(--ink); font-size: 12px; }
 .ads-field-group dl { display: grid; gap: 0; margin: 0 0 8px; }
-.ads-field-group dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--line-subtle); font-size: 11px; }
+.ads-field-group dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--line-subtle); font-size: 12px; }
 .ads-field-group dt { min-width: 0; overflow-wrap: anywhere; color: var(--ink-soft); }
 .ads-field-group dd { margin: 0; flex: 0 0 auto; max-width: 55%; overflow-wrap: anywhere; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
 .ads-day-details { padding: 8px 0; border-top: 1px solid var(--line-subtle); }
-.ads-day-details summary { color: var(--ink-soft); font-size: 10px; font-weight: 650; cursor: pointer; }
+.ads-day-details summary { color: var(--ink-soft); font-size: 12px; font-weight: 650; cursor: pointer; }
 .ads-day-details p { margin: 7px 0; line-height: 1.5; }
 @media (max-width: 620px) { .ads-account-card__heading { flex-direction: column; } .ads-account-card__sync { white-space: normal; } }
 @media (max-width: 620px) { .account-grid { grid-template-columns: 1fr; } .analytics-panel-title { align-items: flex-start; flex-direction: column; } }
@@ -90,26 +93,26 @@
   .ads-performance-card__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   .ads-performance-card__heading > div { min-width: 0; }
   .ads-performance-card__heading strong { display: block; overflow-wrap: anywhere; }
-  .ads-performance-card__heading > span { flex: 0 0 auto; color: var(--ink-faint); font-size: 10px; }
-  .ads-performance-card__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 14px; margin: 14px 0; padding-top: 12px; border-top: 1px solid var(--line); }
+  .ads-performance-card__heading > span { flex: 0 0 auto; color: var(--ink-faint); font-size: 12px; }
+  .ads-performance-card__metrics {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 14px; margin: 14px 0; padding-top: 12px; border-top: 1px solid var(--line); }
   .ads-performance-card__metrics > div { min-width: 0; }
-  .ads-performance-card__metrics dt { color: var(--ink-faint); font-size: 10px; }
+  .ads-performance-card__metrics dt { color: var(--ink-faint); font-size: 12px; }
   .ads-performance-card__metrics dd { margin: 3px 0 0; color: var(--ink); font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-  .ads-performance-card__metrics dd small { display: block; margin-top: 3px; color: var(--ink-faint); font-size: 9px; font-weight: 400; }
+  .ads-performance-card__metrics dd small { display: block; margin-top: 3px; color: var(--ink-faint); font-size: 12px; font-weight: 400; }
   .ads-performance-card .ads-object-actions { margin: 12px 0; }
   .ads-performance-card .ads-object-actions__status, .ads-performance-card .ads-object-actions__budget { gap: 6px; }
-  .ads-performance-card .ads-object-actions button, .ads-performance-card .ads-object-actions select { min-height: 34px; font-size: 11px; }
-  .ads-performance-card .ads-object-actions input { min-height: 34px; }
+  .ads-performance-card .ads-object-actions button, .ads-performance-card .ads-object-actions select { min-height: var(--control-height-touch); font-size: 12px; }
+  .ads-performance-card .ads-object-actions input { min-height: var(--control-height-touch); }
   .ads-performance-card .ads-stored-details { padding-top: 10px; border-top: 1px solid var(--line); }
-  .ads-performance-card .ads-stored-details summary { min-height: 24px; display: flex; align-items: center; }
+  .ads-performance-card .ads-stored-details summary { min-height: var(--control-height-touch); display: flex; align-items: center; }
   .ads-performance-card .ads-detail-content { width: 100%; max-height: 420px; box-sizing: border-box; }
 }
 .ads-campaign-create { margin: 1rem 0; padding: 1rem; border: 1px solid var(--line); border-radius: .75rem; background: var(--surface-muted); }
 .ads-campaign-create h3 { margin: 0 0 .35rem; }
 .ads-campaign-create__fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; margin-top: .75rem; }
-.ads-campaign-create__fields label { display: grid; gap: .3rem; min-width: 12rem; }
-.ads-campaign-create__fields input, .ads-campaign-create__fields select { min-height: 2.5rem; padding: .4rem .55rem; }
-.ads-campaign-create__fields button { min-height: 2.5rem; }
+.ads-campaign-create__fields label { display: grid; gap: .3rem; min-width: min(100%, 12rem); }
+.ads-campaign-create__fields input, .ads-campaign-create__fields select { min-height: var(--control-height); padding: .4rem .55rem; }
+.ads-campaign-create__fields button { min-height: var(--control-height); }
 
 .ads-creative-image { display: block; object-fit: contain; max-width: 100%; margin-block: var(--space-3); }
 
@@ -121,7 +124,24 @@
 /* Campaign hierarchy table and account charts. */
 .ads-hierarchy__name { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .ads-hierarchy__name > span:last-child { display: grid; min-width: 0; overflow-wrap: anywhere; }
-.ads-hierarchy__spend { display: inline-grid; justify-items: end; gap: 2px; min-width: 96px; }
+.ads-hierarchy__name > span:last-child > small:first-child:not(:last-child) { color: var(--ink-soft); }
+.ads-hierarchy__name > span:last-child strong { font-weight: 650; }
+.ads-hierarchy__spend { display: inline-grid; justify-items: end; gap: 2px; min-width: 96px; font-variant-numeric: tabular-nums; }
 .ads-campaign-charts { display: grid; gap: 16px; margin-bottom: 16px; }
 .ads-campaign-charts__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
-.ads-campaign-charts__grid h3 { margin: 0 0 8px; }
+.ads-campaign-charts__panel { min-width: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.ads-campaign-charts__panel h3 { margin: 0 0 8px; font-size: 14px; }
+.ads-campaign-charts__panel .small-note { margin: 8px 0 0; }
+
+/* Keyboard focus: every route-local control gets the shared ring. */
+.route-tabs a:focus-visible, .ads-filter-reset:focus-visible, .ads-stored-details summary:focus-visible, .ads-day-details summary:focus-visible,
+.ads-object-actions button:focus-visible, .ads-object-actions select:focus-visible, .ads-object-actions input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.route-tabs a:hover:not([aria-current="page"]) { background: var(--surface-hover); color: var(--ink); }
+.ads-object-actions button:hover:not(:disabled) { background: var(--accent-soft); }
+.ads-stored-details summary, .ads-day-details summary { display: inline-flex; align-items: center; min-height: var(--control-height-sm); }
+.ads-account-card { box-shadow: var(--shadow-raised); }
+.ads-detail-content { scrollbar-gutter: stable; }
+/* Touch devices get full-size row actions without changing desktop density. */
+@media (pointer: coarse) { .ads-object-actions button, .ads-object-actions select, .ads-object-actions input { min-height: var(--control-height-touch); } }
+@media (max-width: 480px) { .ads-account-card, .ads-performance-card, .ads-campaign-charts__panel { padding: 12px; } .ads-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .empty-state { padding: 28px 16px; } }
+@media (forced-colors: active) { .route-tabs a[aria-current="page"] { outline: 2px solid Highlight; } .ads-performance-card, .ads-account-card { border-color: CanvasText; } }

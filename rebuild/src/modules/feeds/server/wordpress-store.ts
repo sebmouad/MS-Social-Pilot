@@ -9,6 +9,7 @@ export type SourceRow = {
 };
 export type LedgerRow = {
   id: string; sourceId: string; targetId: string; wpPostId: string; slotAt: Date; state: PlanState; postId: string | null; title: string; permalink: string | null;
+  publishedAt?: Date | null;
   reason: string | null; skipped: string[]; claimedAt: Date; targetName?: string;
 };
 export type ClaimInput = { workspaceId: string; sourceId: string; targetId: string; wpPostId: string; slotAt: Date; title: string; permalink: string | null; skipped: string[] };
@@ -68,7 +69,13 @@ export const prismaRecipeStore: RecipeStore = {
     return prisma.$queryRaw<Array<{ id: string; name: string }>>`SELECT id, name FROM targets WHERE "workspaceId" = ${source.workspaceId} AND enabled = true AND "canPublish" = true AND type::text = ANY(${[...types]}::text[]) AND (${ids === null} OR id = ANY(${ids ?? []}::text[])) ORDER BY name ASC, id ASC LIMIT ${limit}`;
   },
   async ledgerSince(sourceId, from) {
-    const rows = await prisma.$queryRawUnsafe<RawLedger[]>(`SELECT ${LEDGER_COLUMNS} FROM wordpress_recipe_plans WHERE "sourceId" = $1 AND "slotAt" >= $2`, sourceId, from);
+    const rows = await prisma.$queryRawUnsafe<RawLedger[]>(`SELECT l.*,
+      CASE WHEN pt.status::text = 'published' THEN pt."publishedAt" ELSE NULL END AS "publishedAt"
+      FROM wordpress_recipe_plans l
+      JOIN wordpress_recipe_sources s ON s.id = l."sourceId" AND s."workspaceId" = l."workspaceId"
+      LEFT JOIN posts p ON p.id = l."postId" AND p."workspaceId" = l."workspaceId"
+      LEFT JOIN post_targets pt ON pt."postId" = p.id AND pt."targetId" = l."targetId"
+      WHERE l."sourceId" = $1 AND l."slotAt" >= $2`, sourceId, from);
     return rows.map(toLedger);
   },
   async expireStale(sourceId, before) {

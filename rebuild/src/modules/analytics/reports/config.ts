@@ -10,11 +10,15 @@ export const LINK_REPORT_POLICY_SCHEMA = z.object({
 export const LINK_REPORT_DEFAULTS = { links: 100, days: 366 };
 
 export const PUBLICATION_REPORT_POLICY_SCHEMA = z.object({
+  weekdayBreakdown: z.boolean().default(true),
+  hourlyBreakdown: z.boolean().default(true),
+  attemptBreakdown: z.boolean().default(true),
+  attemptBucketCeiling: z.number().int().min(1).max(100).default(10),
   publishedRows: z.number().int().min(1).max(10000),
   failedRows: z.number().int().min(1).max(10000),
   excerptCharacters: z.number().int().min(20).max(2000),
 }).strict();
-export const PUBLICATION_REPORT_DEFAULTS = { publishedRows: 100, failedRows: 100, excerptCharacters: 240 };
+export const PUBLICATION_REPORT_DEFAULTS = { weekdayBreakdown: true, hourlyBreakdown: true, attemptBreakdown: true, attemptBucketCeiling: 10, publishedRows: 100, failedRows: 100, excerptCharacters: 240 };
 
 export const TOP_POST_CONTENT_POLICY_SCHEMA = z.object({
   imagePreviews: z.boolean(),
@@ -35,7 +39,7 @@ const num = (key: string, label: string, description: string, defaultValue: numb
 export const REPORT_WORKFLOW_CONFIG = [
   entry({ key: 'analytics.reports.linkDetails', group: G, label: 'Link report details', kind: 'json', description: 'Independent per-link inventory and UTC click-day row bounds in the Destinations report section. Recorded period clicks may be incomplete after retention; daily counts are independent of inventory clipping.', defaultValue: LINK_REPORT_DEFAULTS, schema: LINK_REPORT_POLICY_SCHEMA, consumption: 'active' }),
   entry({ key: 'analytics.reports.topPostContent', group: G, label: 'Top post content', kind: 'json', description: 'Ranked post count, destination text, attachment count, URL and article preview bounds, image preview switch and authenticated media path template. Report content is saved local state, not a remote snapshot.', defaultValue: TOP_POST_CONTENT_DEFAULTS, schema: TOP_POST_CONTENT_POLICY_SCHEMA, consumption: 'active' }),
-  entry({ key: 'analytics.reports.publicationDetails', group: G, label: 'Publication report details', kind: 'json', description: 'Maximum published and currently failed destination rows and content excerpt length in the Published posts report section. Daily UTC totals are counted independently; clipped logs are disclosed.', defaultValue: PUBLICATION_REPORT_DEFAULTS, schema: PUBLICATION_REPORT_POLICY_SCHEMA, consumption: 'active' }),
+  entry({ key: 'analytics.reports.publicationDetails', group: G, label: 'Publication report details', kind: 'json', description: 'Maximum published and currently failed destination rows and content excerpt length in the Published posts report section. Daily UTC totals and optional weekday, hourly and recorded-attempt distributions are counted independently; clipped logs are disclosed. The attempt ceiling groups all counters at or above the configured value.', defaultValue: PUBLICATION_REPORT_DEFAULTS, schema: PUBLICATION_REPORT_POLICY_SCHEMA, consumption: 'active' }),
   num('analytics.reports.responseEventLimit', 'Response analysis workflow events', 'Maximum stored resolution and reopening events examined per channel report. Truncation suppresses resolution durations and is disclosed.', RESPONSE_ANALYSIS_LIMITS.events.default, RESPONSE_ANALYSIS_LIMITS.events.min, RESPONSE_ANALYSIS_LIMITS.events.max),
   num('analytics.reports.responseMessageLimit', 'Response analysis records per source', 'Maximum stored messages and comments examined separately, including pre-period context. Incomplete boundary threads are excluded; truncation and stored-only coverage are disclosed.', RESPONSE_ANALYSIS_LIMITS.messages.default, RESPONSE_ANALYSIS_LIMITS.messages.min, RESPONSE_ANALYSIS_LIMITS.messages.max),
   num('analytics.reports.responseMemberLimit', 'Response analysis member rows', 'Maximum replying members listed in each combined, comment and conversation summary of one channel report; including their slowest replies and saved-resolution outcomes; omitted members are disclosed separately.', RESPONSE_ANALYSIS_LIMITS.members.default, RESPONSE_ANALYSIS_LIMITS.members.min, RESPONSE_ANALYSIS_LIMITS.members.max),

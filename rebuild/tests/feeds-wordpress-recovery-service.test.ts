@@ -180,3 +180,21 @@ describe('recipe pool health', () => {
     expect(view.pool!.pages.map(p => p.targetId)).toEqual(['p1']);
   });
 });
+
+
+describe('Root supply policy in the shared read service', () => {
+  it('returns default-off reuse and applies Root policy changes without retaining a stale cached warning', async () => {
+    state.overrides['feeds.wordpress.poolCacheSeconds'] = 900;
+    const { ports } = fakePorts(Array.from({ length: 10 }, (_, i) => wpRow(5000 - i)));
+    const first = await readRecipeSource(actor, {}, ports);
+    expect(first.reuse).toEqual({ enabled: false, cooldownDays: 365 });
+    expect(first.pool?.low).toBe(true);
+    state.overrides['feeds.wordpress.poolWarnDays'] = 1;
+    state.overrides['feeds.wordpress.reuseEnabled'] = true;
+    state.overrides['feeds.wordpress.reuseCooldownDays'] = 500;
+    const next = await readRecipeSource(actor, {}, ports);
+    expect(next.pool).toMatchObject({ low: false, warnDays: 1, reuse: { enabled: true, cooldownDays: 500 } });
+    expect(next.reuse).toEqual({ enabled: true, cooldownDays: 500 });
+    expect(JSON.stringify(next)).not.toMatch(/mysql:|secret/);
+  });
+});

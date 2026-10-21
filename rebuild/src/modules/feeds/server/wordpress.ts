@@ -9,7 +9,7 @@ import { pauseAndCancelRecipeSourceConfirmation, pauseRecipeSourceConfirmation, 
 import { authorizeFeedWrite, authorizeFeeds, type FeedActor, type FeedAuthorization } from './access';
 import { audit, bad, lockActor, protect, type Tx } from './core';
 import { feedsError } from './messages';
-import { commentFor, configOf, defaultPlannerPorts, openDatabase, planSource, recipeSummaryRecord, scanCandidates, type PlannerPorts } from './wordpress-planner';
+import { commentFor, configOf, defaultPlannerPorts, openDatabase, planSource, recipeSummaryRecord, scanCandidates, supplyLedgerView, type PlannerPorts } from './wordpress-planner';
 import { loadWordpressSettings, patchLimits, type WordpressSettings } from './wordpress-settings';
 import { cachedPoolHealth, computePoolHealth, forgetPoolHealth, type PoolHealth } from './wordpress-pool';
 import { cancelPlannedPosts, retryRecipeSlots } from './wordpress-recovery';
@@ -20,7 +20,6 @@ import { countPlans, selectPlans, selectSource, type LedgerRow, type SourceRow }
  * functions; authorization, channel scope, exact confirmations and audit live here.
  */
 const ID = /^[A-Za-z0-9_-]{1,256}$/;
-const MS_DAY = 86_400_000;
 export type RecipeDeps = Partial<PlannerPorts>;
 
 const readSchema = (pageMax: number) => z.object({ page: z.number().int().min(1).max(pageMax).optional() }).strict();
@@ -69,7 +68,7 @@ async function selectablePages(workspaceId: string, s: WordpressSettings, auth: 
 async function readPool(s: WordpressSettings, source: SourceRow, ports: PlannerPorts, auth: FeedAuthorization): Promise<PoolHealth | null> {
   try {
     const now = ports.now();
-    const health = await cachedPoolHealth(source.id, s.poolCacheSeconds, now, async () => {
+    const health = await cachedPoolHealth(`${source.id}|${JSON.stringify([source.workspaceId, source.config, source.targetIds, source.allTargets, s, auth.actor])}`, s.poolCacheSeconds, now, async () => {
       const db = await openDatabase(ports, s);
       if (!db) throw new Error('library_unavailable');
       try { return await computePoolHealth({ settings: s, ports, db, source, now }); } finally { await db.close(); }
@@ -103,7 +102,7 @@ export async function readRecipeSource(actor: FeedActor, input: unknown = {}, de
     return {
       source: source ? viewOf(s, source) : null, defaults: { ...s.defaults, siteUrl: s.siteUrl } as PlanConfig & { siteUrl: string }, pages,
       plans: { items: shown.slice(0, s.ledgerPageSize).map(planView), page, pageSize: s.ledgerPageSize, hasMore: plans.length > s.ledgerPageSize }, counts,
-      pool, available: s.enabled && configured, scopedView: scoped(auth),
+      pool, reuse: { enabled: s.reuse.enabled, cooldownDays: Math.max(s.reuse.cooldownDays, source ? configOf(s, source).cooldownDays : s.defaults.cooldownDays) }, available: s.enabled && configured, scopedView: scoped(auth),
       limits: { maxNameCharacters: s.sourceNameMax, maxTemplateCharacters: s.textMax, maxTargets: s.maxTargets, horizonDays: WORDPRESS_BOUNDS.horizonDays, cooldownDays: WORDPRESS_BOUNDS.repostCooldownDays, ageDays: WORDPRESS_BOUNDS.maxAgeDays, delayMinutes: WORDPRESS_BOUNDS.firstCommentDelayMinutes, commentMaxCharacters: s.commentMax, pauseCancel: s.pauseCancel.enabled },
     };
   })());
@@ -236,11 +235,14 @@ export async function previewRecipeSource(actor: FeedActor, input: unknown = {},
   try {
     const config = configOf(s, source);
     const now = ports.now();
-    const ledger = await ports.store.ledgerSince(source.id, new Date(now.getTime() - config.cooldownDays * MS_DAY));
-    const used = new Set(ledger.flatMap(row => row.state === 'failed' ? row.skipped : [row.wpPostId]));
-    const fresh = <C extends { wpPostId: string }>(found: C[]): C[] => found.filter(c => !used.has(c.wpPostId));
-    const scan = await scanCandidates(db, s, source, config, now, found => fresh(found).length >= s.previewCount);
-    const items: PreviewItem[] = fresh(scan.candidates).slice(0, s.previewCount).map(c => ({
+    const view = await supplyLedgerView(s, ports, source, now);
+    const used = new Set([...view.blocked.values()].flatMap(ids => [...ids]));
+    const dates = new Map<string, number>();
+    for (const page of view.reused.values()) for (const [id, at] of page) dates.set(id, Math.max(dates.get(id) ?? -Infinity, at));
+    const fresh = <C extends { wpPostId: string }>(found: C[], allowReuse = true): C[] => found.filter(c => !used.has(c.wpPostId) && !view.taken.has(c.wpPostId) && (allowReuse || !dates.has(c.wpPostId)))
+      .sort((a, b) => (dates.get(a.wpPostId) ?? -Infinity) - (dates.get(b.wpPostId) ?? -Infinity));
+    const scan = await scanCandidates(db, s, source, config, now, found => !s.reuse.enabled && fresh(found).length >= s.previewCount);
+    const items: PreviewItem[] = fresh(scan.candidates, scan.exhausted).slice(0, s.previewCount).map(c => ({
       wpPostId: c.wpPostId, title: c.title, permalink: c.permalink, imageUrl: c.imageUrl, caption: c.caption, firstComment: commentFor(s, config, c), publishedAt: c.publishedAt?.toISOString() ?? null,
     }));
     return { items, scanned: scan.scanned, exhausted: scan.exhausted };

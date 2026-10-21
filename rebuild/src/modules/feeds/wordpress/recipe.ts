@@ -206,16 +206,20 @@ export type Allocation<C> = { targetId: string; slotAt: Date; candidate: C };
  * that no other page received in the horizon (when distinct), and that the slot has not already failed with.
  */
 export function allocateRecipes<C extends { wpPostId: string }>(input: {
-  needs: readonly SlotNeed[]; candidates: readonly C[]; blocked: ReadonlyMap<string, ReadonlySet<string>>; taken: ReadonlySet<string>; distinct: boolean;
+  needs: readonly SlotNeed[]; candidates: readonly C[]; blocked: ReadonlyMap<string, ReadonlySet<string>>; taken: ReadonlySet<string>; distinct: boolean; allowReuse?: boolean; reused?: ReadonlyMap<string, ReadonlyMap<string, number>>;
 }): { assignments: Array<Allocation<C>>; unfilled: number } {
   const used = new Set(input.taken);
   const perPage = new Map<string, Set<string>>();
+  const ranked = new Map<string, readonly C[]>();
   const assignments: Array<Allocation<C>> = [];
   let unfilled = 0;
   for (const need of input.needs) {
     const page = perPage.get(need.targetId) ?? new Set(input.blocked.get(need.targetId) ?? []);
     perPage.set(need.targetId, page);
-    const pick = input.candidates.find(c => !page.has(c.wpPostId) && !(input.distinct && used.has(c.wpPostId)) && !need.avoid?.has(c.wpPostId));
+    const dates = input.reused?.get(need.targetId);
+    const candidates = ranked.get(need.targetId) ?? (dates?.size ? [...input.candidates].sort((a, b) => (dates.get(a.wpPostId) ?? -Infinity) - (dates.get(b.wpPostId) ?? -Infinity)) : input.candidates);
+    ranked.set(need.targetId, candidates);
+    const pick = candidates.find(c => !(input.allowReuse === false && dates?.has(c.wpPostId)) && !page.has(c.wpPostId) && !(input.distinct && used.has(c.wpPostId)) && !need.avoid?.has(c.wpPostId));
     if (!pick) { unfilled += 1; continue; }
     page.add(pick.wpPostId); used.add(pick.wpPostId);
     assignments.push({ targetId: need.targetId, slotAt: need.slotAt, candidate: pick });

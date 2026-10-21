@@ -7,6 +7,7 @@ import { RouteNotice } from '@/components/RouteNotice';
 import { recipeCopy, recipeText, type RecipeCopyCatalog, type RecipeCopyKey, type RecipeLocale } from '../copy-recipes';
 import { configPatch } from '../wordpress/recipe';
 import styles from './feeds.module.css';
+import { RecipeSupplyWarning } from './RecipeSupplyWarning';
 
 type Mapping = { captionMetaKey: string; imageMetaKey: string; recipeMetaKey: string; skipMetaKey: string; attachedFileMetaKey: string; postType: string; postStatus: string };
 export type RecipeConfig = {
@@ -21,6 +22,7 @@ export type RecipePlan = { id: string; targetId: string; targetName: string; wpP
 export type RecipeView = {
   source: RecipeSourceData | null; defaults: RecipeConfig & { siteUrl: string }; pages: Array<{ id: string; name: string }>; plans: { items: RecipePlan[]; page: number; hasMore: boolean };
   counts: Record<string, number>; available: boolean; limits: { maxNameCharacters: number; maxTemplateCharacters: number; pauseCancel?: boolean };
+  reuse?: { enabled: boolean; cooldownDays: number };
   pool?: RecipePool | null;
 };
 export type RecipePool = { asOf: string; complete: boolean; warnDays: number; low: boolean; pages: Array<{ targetId: string; targetName: string; eligible: number; daysLeft: number | null; low: boolean }> };
@@ -132,7 +134,8 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     {source && view.pool !== undefined && <div aria-live="polite">
       <h3 className={styles.sectionTitle}>{t('poolHeading')}</h3>
       {view.pool ? <>
-        {view.pool.low && <RouteNotice error focusKey="recipe-pool-low">{t('poolLow', { count: view.pool.pages.filter(p => p.low).length, days: view.pool.warnDays })}</RouteNotice>}
+        <RecipeSupplyWarning pool={view.pool} locale={locale} copy={copy} />
+        {view.reuse && <p className={styles.help}>{t(view.reuse.enabled ? 'poolReuseEnabled' : 'poolReuseDisabled', { days: view.reuse.cooldownDays })}</p>}
         <p className={styles.help}>{t('poolIntro')} {!view.pool.complete && t('poolPartial')} {t('poolAsOf', { when: when(view.pool.asOf, zone) })}</p>
         <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('poolHeading')}</caption>
           <thead><tr><th scope="col">{t('colChannel')}</th><th scope="col">{t('colEligible')}</th><th scope="col">{t('colDays')}</th></tr></thead>

@@ -98,9 +98,10 @@ export const commentFor = (settings: WordpressSettings, config: PlanConfig, c: P
 
 /* ----- ledger views ----- */
 
-export type LedgerView = { blocked: Map<string, Set<string>>; taken: Set<string>; byKey: Map<string, LedgerRow> };
+export type LedgerView = { reused: Map<string, Map<string, number>>; blocked: Map<string, Set<string>>; taken: Set<string>; byKey: Map<string, LedgerRow> };
 export const slotKey = (targetId: string, slotAt: Date) => `${targetId}|${slotAt.getTime()}`;
-export function ledgerView(rows: readonly LedgerRow[], now: Date): LedgerView {
+export function ledgerView(rows: readonly LedgerRow[], now: Date, reuse?: { enabled: boolean; cooldownDays: number }): LedgerView {
+  const reused = new Map<string, Map<string, number>>();
   const blocked = new Map<string, Set<string>>(); const taken = new Set<string>(); const byKey = new Map<string, LedgerRow>();
   const add = (page: string, id: string) => { const set = blocked.get(page) ?? new Set<string>(); set.add(id); blocked.set(page, set); };
   for (const row of rows) {
@@ -108,10 +109,33 @@ export function ledgerView(rows: readonly LedgerRow[], now: Date): LedgerView {
     // Recipes that failed for a slot stay away from its page even after the slot is planned with another recipe.
     for (const id of row.skipped) add(row.targetId, id);
     if (row.state === 'failed') continue;
-    add(row.targetId, row.wpPostId);
+    const published = row.publishedAt?.getTime();
+    const reusable = reuse?.enabled && row.state === 'planned' && row.postId && published !== undefined && Number.isFinite(published)
+      && published <= now.getTime() - reuse.cooldownDays * MS_DAY && row.slotAt.getTime() < now.getTime();
+    if (reusable) {
+      const dates = reused.get(row.targetId) ?? new Map<string, number>();
+      dates.set(row.wpPostId, Math.max(dates.get(row.wpPostId) ?? -Infinity, published)); reused.set(row.targetId, dates);
+    } else add(row.targetId, row.wpPostId);
     if (row.slotAt.getTime() >= now.getTime()) taken.add(row.wpPostId);
   }
-  return { blocked, taken, byKey };
+  return { blocked, taken, byKey, reused };
+}
+
+/** Read all retained recipe history: an old scheduled/unknown outcome is never silently made reusable. */
+export async function supplyLedgerView(settings: WordpressSettings, ports: PlannerPorts, source: SourceRow, now: Date): Promise<LedgerView> {
+  const config = configOf(settings, source);
+  const rows = await ports.store.ledgerSince(source.id, new Date(0));
+  const policy = { enabled: settings.reuse.enabled, cooldownDays: Math.max(settings.reuse.cooldownDays, config.cooldownDays) };
+  const view = ledgerView(rows, now, policy);
+  if (config.distinctAcrossPages) {
+    // Every channel consumes the same supply; historical use must have the same scope as the days-left estimate.
+    const shared = ledgerView(rows.map(row => ({ ...row, targetId: source.id })), now, policy);
+    const blocked = shared.blocked.get(source.id) ?? new Set<string>();
+    const reused = shared.reused.get(source.id) ?? new Map<string, number>();
+    const pages = await ports.store.pages(source, settings.targetTypes, settings.maxTargets);
+    for (const page of pages) { view.blocked.set(page.id, blocked); view.reused.set(page.id, reused); }
+  }
+  return view;
 }
 
 /* ----- one source ----- */
@@ -149,8 +173,7 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
 
   const slots = slotInstants({ now, slots: config.slots, timezone: config.timezone, horizonDays: config.horizonDays, leadMinutes: settings.minLeadMinutes });
   out.slots = slots.length;
-  const windowStart = new Date(now.getTime() - config.cooldownDays * MS_DAY);
-  const view = ledgerView(await ports.store.ledgerSince(source.id, windowStart.getTime() < now.getTime() ? windowStart : now), now);
+  const view = await supplyLedgerView(settings, ports, source, now);
 
   const needs: SlotNeed[] = []; const reviving = new Map<string, LedgerRow>();
   for (const slotAt of slots) for (const page of pages) {
@@ -164,9 +187,9 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
   const todo = needs.slice(0, Math.max(0, ctx.budget.left));
   if (!todo.length) return { ...out, reason: needs.length ? 'budget' : 'complete' };
 
-  const scan = await scanCandidates(ctx.db, settings, source, config, now, found => allocateRecipes({ needs: todo, candidates: found, blocked: view.blocked, taken: view.taken, distinct: config.distinctAcrossPages }).unfilled === 0);
+  const scan = await scanCandidates(ctx.db, settings, source, config, now, found => !settings.reuse.enabled && allocateRecipes({ needs: todo, candidates: found, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages }).unfilled === 0);
   out.scanned = scan.scanned;
-  const { assignments, unfilled } = allocateRecipes({ needs: todo, candidates: scan.candidates, blocked: view.blocked, taken: view.taken, distinct: config.distinctAcrossPages });
+  const { assignments, unfilled } = allocateRecipes({ needs: todo, candidates: scan.candidates, allowReuse: scan.exhausted, blocked: view.blocked, taken: view.taken, reused: view.reused, distinct: config.distinctAcrossPages });
   out.unfilled = unfilled + (needs.length - todo.length);
 
   for (const { targetId, slotAt, candidate: c } of assignments) {
