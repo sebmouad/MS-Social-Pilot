@@ -474,6 +474,7 @@ excepted.
 | --- | --- |
 | GET /api/auth/register | Public registration availability for account bootstrap; not authenticated customer workspace data. |
 | GET /api/connections/[platform]/callback | Provider consent callback validates browser OAuth state; autonomous tools initiate consent through mapped start_connection. |
+| GET /api/facebook/callback | Legacy Meta-registered alias of the provider consent callback; same browser OAuth state validation. |
 | GET /api/mcp | MCP HTTP transport negotiation/unsupported-stream response, not a product capability. |
 | GET /api/v1/me | Credential introspection returns authenticated key grants/ceilings; protocol-specific identity metadata, not workspace product data. |
 | POST /api/auth/invitations/accept | Interactive invitation redemption binds the current browser identity; workspace MCP credentials cannot bootstrap membership. |

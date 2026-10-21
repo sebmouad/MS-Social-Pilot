@@ -2,6 +2,11 @@ import { createHmac } from 'node:crypto';
 
 /** Graph API wire protocol paths and field names are isolated here. */
 export const FACEBOOK_CONNECTION_CALLBACK_PATH = '/api/connections/facebook/callback';
+/** Callback path registered in existing Meta apps by the legacy release; accepted as an alias. */
+export const FACEBOOK_LEGACY_CALLBACK_PATH = '/api/facebook/callback';
+export const FACEBOOK_CALLBACK_PATHS: readonly string[] = [FACEBOOK_CONNECTION_CALLBACK_PATH, FACEBOOK_LEGACY_CALLBACK_PATH];
+/** State cookie scope covering every accepted callback path. */
+export const FACEBOOK_OAUTH_COOKIE_PATH = '/api';
 export const FACEBOOK_PROTOCOL = Object.freeze({
   pageFeedEdge: 'feed',
   accessTokenField: 'access_token',

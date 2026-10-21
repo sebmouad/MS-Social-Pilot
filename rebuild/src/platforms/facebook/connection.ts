@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { FACEBOOK_CONNECTION_CALLBACK_PATH } from '@/platforms/facebook/protocol';
+import { FACEBOOK_CALLBACK_PATHS, FACEBOOK_OAUTH_COOKIE_PATH } from '@/platforms/facebook/protocol';
 import { FacebookApiError } from '@/platforms/facebook/publishing';
 import { createFacebookOAuthState, FACEBOOK_OAUTH_STATE_COOKIE, openFacebookOAuthState } from '@/platforms/facebook/oauth-state';
 import { persistFacebookDiscovery, recordFacebookConnectionFailure } from './discovery';
@@ -26,8 +26,7 @@ export async function startFacebookConnection(request: Request, viewer: Connecti
       runtimeConfig('ads.managementEnabled') as Promise<boolean>,
       runtimeConfig('meta.oauthStateMinutes') as Promise<number>,
     ]);
-    const expectedRedirect = new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, requestOrigin(request)).toString();
-    if (new URL(oauth.redirectUri).toString() !== expectedRedirect) {
+    if (!acceptedRedirect(oauth.redirectUri, request)) {
       await recordFacebookConnectionFailure({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, 'configuration', 'internal_error');
       return NextResponse.json({ error: 'Connection unavailable. Try again or contact support.' }, { status: 503 });
     }
@@ -42,7 +41,7 @@ export async function startFacebookConnection(request: Request, viewer: Connecti
     const response = NextResponse.json({ authorizationUrl }, { headers: { 'cache-control': 'no-store' } });
     response.cookies.set(FACEBOOK_OAUTH_STATE_COOKIE, pending.cookieValue, {
       httpOnly: true, secure: new URL(requestOrigin(request)).protocol === 'https:', sameSite: 'lax',
-      path: FACEBOOK_CONNECTION_CALLBACK_PATH, maxAge: stateTtlSeconds,
+      path: FACEBOOK_OAUTH_COOKIE_PATH, maxAge: stateTtlSeconds,
     });
     return response;
   } catch {
@@ -65,8 +64,7 @@ export async function finishFacebookConnection(request: NextRequest, viewer: Con
   try {
     return await withWorkspaceOperation(viewer.workspaceId, async () => {
       const [oauth, engine] = await Promise.all([configuredFacebookOAuth(), configuredFacebookEngine()]);
-      const expectedRedirect = new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, requestOrigin(request)).toString();
-      if (new URL(oauth.redirectUri).toString() !== expectedRedirect) return finish(request, 'connect_failed');
+      if (!acceptedRedirect(oauth.redirectUri, request, new URL(request.url).pathname)) return finish(request, 'connect_failed');
 
       stage = 'exchange';
       const shortLived = await engine.exchangeCode({ appId: oauth.appId, appSecret: oauth.appSecret, redirectUri: oauth.redirectUri, code });
@@ -97,7 +95,17 @@ function finish(request: NextRequest, notice: string, openSelection = false) {
   const response = NextResponse.redirect(location, { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
   response.cookies.set(FACEBOOK_OAUTH_STATE_COOKIE, '', {
     httpOnly: true, secure: new URL(requestOrigin(request)).protocol === 'https:', sameSite: 'lax',
-    path: FACEBOOK_CONNECTION_CALLBACK_PATH, maxAge: 0,
+    path: FACEBOOK_OAUTH_COOKIE_PATH, maxAge: 0,
   });
   return response;
+}
+
+/** The Root redirect URI must be on the public origin and one of the module's callback paths
+ * (and, on callback, the path actually requested). */
+function acceptedRedirect(configured: string, request: Request, callbackPath?: string): boolean {
+  try {
+    const url = new URL(configured);
+    if (url.origin !== new URL(requestOrigin(request)).origin || url.search || url.hash) return false;
+    return FACEBOOK_CALLBACK_PATHS.includes(url.pathname) && (callbackPath === undefined || callbackPath === url.pathname);
+  } catch { return false; }
 }
