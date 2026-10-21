@@ -39,30 +39,83 @@ and challenges. Account hooks project safe credential metadata explicitly.
 Secrets, installation operational records and erasure recovery state are not
 promised as exported customer content. Existing export completeness remains false.
 
+## Follow-up implementation (2026-10-21)
+
+`deleteRootUser` and `deleteUnverifiedRegistration` now call
+`deleteAccountSupplementaryData(tx, userId)` after authorization/eligibility locks
+and immediately before deleting the user, in the same transaction. Failure aborts
+the deletion. Exact-key appearance cleanup and legacy OAuth-code deletion remain
+account-scoped; workspace data is retained.
+
+`src/modules/settings/server/account-export.ts` provides `exportAccountData`.
+The shared service requires current session, membership, Settings account read
+permission and entitlement. It rechecks/locks the active session and account in
+its transaction, explicitly projects profile metadata, calls the supplementary
+export hook and atomically audits the read without personal values. It reuses
+`data.maxArchiveBytes` and the shared workspace-operation timeout/wait settings.
+No new Root keys or schema-version changes are introduced. The JSON receipt has
+UTF-8 byte size and explicit **partial** coverage; it includes profile, stored
+appearance and safe credential/grant metadata, excluding workspace content,
+media, passwords, secrets, authentication history, notification preferences and
+audit history. It does not claim full personal-data portability.
+
+`accountHttp(request, 'export')` prepares a private/no-store JSON attachment for
+GET with no query parameters. `server/account-export-mcp.ts` declares the
+session-only `ACCOUNT_EXPORT_MCP` group/tool `export_account_data`, calling that
+same service. These are tested adapters; public registration and UI are pending.
+No write confirmation is required for this authorized read.
+
+Migration `20261031150000_rebuild_supplementary_purge_gates` adds INSERT/UPDATE
+gates for `OAuthCode` and `rebuild_channel_profiles`, leaving DELETE available
+for erasure. The legacy-code gate follows the shared workspace-lock/status policy
+and also refuses missing workspace parents because no FK exists. The profile
+gate resolves target ownership, locks the workspace first and rechecks/locks the
+target before checking purge state. Existing historical orphans are not deleted
+and no unaudited foreign keys are added. Migration is **unapplied** in this lane.
+Reviewed SHA-256:
+`f3f22b82d60a3bbbbacd5b152b3ceb577a3d39d126fd0ecdc09151e106f09768`.
+
 ## Integration required outside owned paths
 
-`account.ts` contains persistence hooks, not public services. An authorized
-account export service must call `exportAccountSupplementaryData(tx, userId)` in
-its transaction. No account-export service/transport was found in the rebuild;
-workspace export is not a substitute.
+The lane's ownership rule forbids the following files. Integration owner must:
 
-In `src/server/root/user-controls.ts` (`deleteRootUser`), call
-`deleteAccountSupplementaryData(tx, userId)` after account lock/authorization and
-immediately before `DELETE FROM users`, in the same transaction. Do the same in
-`src/modules/settings/server/registration.ts` (`deleteUnverifiedRegistration`),
-and in any future self-service deletion. Without these calls the mode key and
-legacy OAuth codes remain orphaned. These files are outside this lane's ownership.
+- Add `src/app/api/settings/account/export/route.ts`, exporting GET that calls
+  `accountHttp(request, 'export')` from the Settings server adapter.
+- Import `ACCOUNT_EXPORT_MCP` from `./server/account-export-mcp` in
+  `src/modules/settings/mcp.ts` and spread/register that group in `SETTINGS_MCP`.
+  Keep session-only policy; workspace/person/OAuth keys cannot export account data.
+- Add an Account screen download control using the same GET attachment endpoint;
+  provide Root-editable English/French labels and accurate partial-coverage copy
+  through Settings' `config.ts`/copy catalog. Include loading/error/retry/access
+  states and browser checks. Map export error codes to this bilingual catalog as
+  well: the new server adapters currently follow the existing account services’
+  English safe-error pattern. No UI implementation or browser outcome is claimed.
+- Broaden the description/label of `data.maxArchiveBytes` in Settings `config.ts`
+  to cover both account JSON and workspace archives, since both consume it.
+- Pin the new migration in `rebuild/scripts/cutover-rehearsal.sh`: append its name
+  to `approved_migrations`, add `verify_migration` with the exact checksum above,
+  and apply it via `psql "$source_url" -q -v ON_ERROR_STOP=1 -f
+  "$migration_dir/20261031150000_rebuild_supplementary_purge_gates/migration.sql"`
+  after the existing WordPress migration. Extend the rehearsal's catalog checks
+  to require both enabled triggers and their expected functions, plus a test of
+  those script pins. This script is outside owned paths and was not modified.
+- Update ARCHITECTURE.md, DELIVERY_PLAN.md and AGENT_HANDOFF.md with these source
+  changes and remaining integration/database/browser proof. Do not describe the
+  export adapters as publicly exposed until their host registration is merged.
 
-`OAuthCode` has no workspace purge trigger or user/workspace FK. Add a separately
-reviewed migration installing the shared purge write gate (and tenant/user FKs
-only after checking old orphan records); this lane does not alter migrations.
-`rebuild_channel_profiles` likewise has no database purge-write trigger: its
-indirect ownership needs a target-aware gate if database-level protection is
-required. Existing service guards must remain in place.
+## Follow-up verification
 
-The integration owner should update ARCHITECTURE.md, DELIVERY_PLAN.md and
-AGENT_HANDOFF.md with this coverage and the remaining account-hook wiring; those
-documents are outside this lane's owned paths.
+`npx tsc --noEmit -p .`: passed, zero errors. Targeted Vitest: 74 passed,
+7 PostgreSQL tests skipped across 12 selected files (no
+`REBUILD_PREVIEW_DATABASE_URL`). The run used `--no-cache` because the pre-existing
+`node_modules` symlink points outside this worktree's writable sandbox. Coverage:
+account export service/HTTP/MCP adapters, supplementary hooks, actual registration
+admin integration, account service authorization, Root controls, migration
+checksum/shape and migration-table inventory. Optional recent-table PostgreSQL
+checks now include legacy OAuth/profile INSERT/UPDATE refusal for requested and
+db_deleted states, completed-state writes and foreign-workspace preservation.
+No migration, database-trigger runtime, concurrent PostgreSQL, server, browser,
+provider or production outcome is established by this run.
 
 ## Evidence
 
