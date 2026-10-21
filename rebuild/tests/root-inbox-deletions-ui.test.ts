@@ -62,3 +62,10 @@ describe('Root Inbox deletion recovery controls', () => {
     expect(deps.refresh).not.toHaveBeenCalled();
   });
 });
+
+
+it('uses the service-supplied confirmation ceiling in the dialog', async () => {
+  await act(async () => root.render(createElement(RootInboxDeletionControls, { row, limits: { identifierMaxCharacters: 80, confirmationMaxCharacters: 77 } })));
+  await act(async () => container.querySelector<HTMLButtonElement>('button')!.click());
+  expect(container.querySelector<HTMLInputElement>('input[name=confirmation]')!.maxLength).toBe(77);
+});

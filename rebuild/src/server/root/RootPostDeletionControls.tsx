@@ -1,4 +1,5 @@
 'use client';
+import { ROOT_RECOVERY_LIMITS, type RootRecoveryLimits } from '@/lib/config/root-recovery-policy';
 import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -13,7 +14,7 @@ type DeletionRow = {
 };
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export function RootPostDeletionControls({ row }: { row: DeletionRow }) {
+export function RootPostDeletionControls({ row, limits = ROOT_RECOVERY_LIMITS }: { row: DeletionRow; limits?: RootRecoveryLimits }) {
   const router = useRouter();
   const validation = useFormValidation();
   const inFlight = useRef(false);
@@ -102,7 +103,7 @@ export function RootPostDeletionControls({ row }: { row: DeletionRow }) {
           </fieldset>
           <FieldError {...validation.errorProps('outcome')} />
           <label className="ui-field" htmlFor={confirmationField.id}><span>Type <strong>{phrase || 'choose a verified result'}</strong> to confirm</span>
-            <input {...confirmationField} className="ui-input" name="confirmation" value={confirmation} maxLength={300} autoComplete="off" disabled={busy || !outcome} onChange={event => { setConfirmation(event.target.value); validation.clear('confirmation'); }} />
+            <input {...confirmationField} className="ui-input" name="confirmation" value={confirmation} maxLength={limits.confirmationMaxCharacters} autoComplete="off" disabled={busy || !outcome} onChange={event => { setConfirmation(event.target.value); validation.clear('confirmation'); }} />
           </label>
           <FieldError {...validation.errorProps('confirmation')} />
           <label className="ui-field"><span><input type="checkbox" name="verifiedOnPlatform" checked={verified} required disabled={busy} onChange={event => { setVerified(event.target.checked); validation.clear('verifiedOnPlatform'); }} /> I checked the actual platform for this exact post.</span></label>

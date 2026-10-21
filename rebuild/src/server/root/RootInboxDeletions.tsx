@@ -28,7 +28,7 @@ export async function RootInboxDeletions() {
     { key: 'state', label: 'State', render: (row: typeof history.items[number]) => stateLabel(row.state) },
     { key: 'started', label: 'Started', render: (row: typeof history.items[number]) => formatRootTimestamp(row.createdAt, history.timeZone) },
     { key: 'updated', label: 'Updated', render: (row: typeof history.items[number]) => formatRootTimestamp(row.updatedAt, history.timeZone) },
-    { key: 'action', label: 'Recovery', render: (row: typeof history.items[number]) => <RootInboxDeletionControls row={row} /> },
+    { key: 'action', label: 'Recovery', render: (row: typeof history.items[number]) => <RootInboxDeletionControls limits={history.limits} row={row} /> },
   ];
   return <section className="root-jobs" aria-labelledby="root-inbox-recovery-title">
     <p className="root-jobs__eyebrow">Inbox operations</p><h2 id="root-inbox-recovery-title">Comment deletion recovery</h2>

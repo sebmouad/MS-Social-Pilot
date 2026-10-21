@@ -11,7 +11,7 @@ import { selectedResourceConnectionWhere } from '@/server/platforms/resource-vis
 import { PAGES } from '@/lib/product';
 import { SettingsPanel, styles } from '@/modules/settings/ui/_components';
 import { oauthCopyFor, oauthLocale, oauthText } from '../copy';
-import { authorizeParamsSchema, redirectRegistered } from '../protocol';
+import { authorizeParamsSchemaForLimits, redirectRegistered } from '../protocol';
 import { findClient, oauthRuntime } from '../server';
 import { ConsentForm } from './ConsentForm';
 
@@ -36,7 +36,7 @@ export async function AuthorizeScreen({ searchParams }: { searchParams: Record<s
   const rt = await oauthRuntime().catch(() => null);
   if (!rt?.enabled || !rt.issuer) return bare(t('title', { client: 'MCP' }), t('unavailable'));
 
-  const params = authorizeParamsSchema.safeParse({
+  const params = authorizeParamsSchemaForLimits(rt).safeParse({
     client_id: first(searchParams.client_id), redirect_uri: first(searchParams.redirect_uri), response_type: first(searchParams.response_type),
     code_challenge: first(searchParams.code_challenge), code_challenge_method: first(searchParams.code_challenge_method),
     state: first(searchParams.state) || undefined, scope: first(searchParams.scope) || undefined,
@@ -55,14 +55,14 @@ export async function AuthorizeScreen({ searchParams }: { searchParams: Record<s
   const allowed = new Set(workspaceMcpFeatureIds());
   const features = PAGES.filter(page => allowed.has(page.id) && canUseFeature(viewer.entitlements, page.id) && canAccessFeature(viewer.permissions, page.id, 'read'))
     .map(page => ({ id: page.id, name: page.title, canWrite: canAccessFeature(viewer.permissions, page.id, 'write') }));
-  const limit = Number(await runtimeConfig('mcp.keys.maxResourceIds')) || 1000;
+  const limit = Math.min(rt.resourceIdsMaxItems, await runtimeConfig('mcp.keys.maxResourceIds'));
   const connection = await selectedResourceConnectionWhere(viewer.workspaceId, entitledPlatformIds(viewer.entitlements));
   const channelScope = viewer.permissions.pageScope;
   const [channels, adAccounts] = await Promise.all([
     prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: connection }, ...(channelScope.all ? {} : { id: { in: [...channelScope.ids] } }) }, select: { id: true, name: true }, orderBy: { name: 'asc' }, take: limit + 1 }),
     channelScope.all ? prisma.adAccount.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: connection } }, select: { id: true, name: true }, orderBy: { name: 'asc' }, take: limit + 1 }) : Promise.resolve([]),
   ]);
-  const truncated = channels.length + adAccounts.length > limit;
+  const truncated = channels.length > limit || adAccounts.length > limit;
   const asksWrite = (params.data.scope ?? '').split(/\s+/).includes('write');
   const host = new URL(params.data.redirect_uri).host;
 

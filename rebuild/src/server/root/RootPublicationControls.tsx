@@ -1,4 +1,5 @@
 'use client';
+import { ROOT_RECOVERY_LIMITS, type RootRecoveryLimits } from '@/lib/config/root-recovery-policy';
 import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
@@ -11,15 +12,15 @@ type Row = Context & { operationId: string; state: string; remotePostId: string 
 type Mode = 'record' | 'finish' | 'adopt';
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
-export function RootPublicationControls({ row }: { row: Row }) {
+export function RootPublicationControls({ row, limits = ROOT_RECOVERY_LIMITS }: { row: Row; limits?: RootRecoveryLimits }) {
   const submitted = row.state === 'submitted' && Boolean(row.remotePostId);
   const mode = row.state === 'receipt_recorded' ? 'finish' : ['started', 'uncertain'].includes(row.state) || submitted ? 'record' : null;
-  return <RecoveryControl mode={mode ?? 'record'} context={row} identity={row.operationId} available={mode !== null} knownRemoteId={submitted ? row.remotePostId : null} />;
+  return <RecoveryControl limits={limits} mode={mode ?? 'record'} context={row} identity={row.operationId} available={mode !== null} knownRemoteId={submitted ? row.remotePostId : null} />;
 }
-export function RootLegacyPublicationControl({ row }: { row: Context & { postTargetId: string } }) {
-  return <RecoveryControl mode="adopt" context={row} identity={row.postTargetId} />;
+export function RootLegacyPublicationControl({ row, limits = ROOT_RECOVERY_LIMITS }: { row: Context & { postTargetId: string }; limits?: RootRecoveryLimits }) {
+  return <RecoveryControl limits={limits} mode="adopt" context={row} identity={row.postTargetId} />;
 }
-function RecoveryControl({ mode, context, identity, available = true, knownRemoteId = null }: { mode: Mode; context: Context; identity: string; available?: boolean; knownRemoteId?: string | null }) {
+function RecoveryControl({ limits, mode, context, identity, available = true, knownRemoteId = null }: { limits: RootRecoveryLimits; mode: Mode; context: Context; identity: string; available?: boolean; knownRemoteId?: string | null }) {
   const router = useRouter();
   const validation = useFormValidation();
   const inFlight = useRef(false);
@@ -89,7 +90,7 @@ function RecoveryControl({ mode, context, identity, available = true, knownRemot
               <label className="ui-field" htmlFor={remoteUrlField.id}><span>Public post link, if available</span><input {...remoteUrlField} className="ui-input" name="remoteUrl" type="url" value={remoteUrl} disabled={pending} onChange={event => { setRemoteUrl(event.target.value); validation.clear('remoteUrl'); }} /></label><FieldError {...validation.errorProps('remoteUrl')} />
             </>}
           </>}
-          <label className="ui-field" htmlFor={confirmationField.id}><span>Type <strong>{phrase || 'choose a verified result'}</strong> to confirm</span><input {...confirmationField} className="ui-input" name="confirmation" value={confirmation} autoComplete="off" disabled={pending || !phrase} onChange={event => { setConfirmation(event.target.value); validation.clear('confirmation'); }} /></label><FieldError {...validation.errorProps('confirmation')} />
+          <label className="ui-field" htmlFor={confirmationField.id}><span>Type <strong>{phrase || 'choose a verified result'}</strong> to confirm</span><input {...confirmationField} className="ui-input" name="confirmation" maxLength={limits.confirmationMaxCharacters} value={confirmation} autoComplete="off" disabled={pending || !phrase} onChange={event => { setConfirmation(event.target.value); validation.clear('confirmation'); }} /></label><FieldError {...validation.errorProps('confirmation')} />
           {mode !== 'finish' && <><label className="ui-field"><span><input type="checkbox" name="verifiedExternally" checked={verified} required disabled={pending} onChange={event => { setVerified(event.target.checked); validation.clear('verifiedExternally'); }} /> I checked this exact destination. This is not automated verification.</span></label><FieldError {...validation.errorProps('verifiedExternally')} /></>}
           {error && <><p ref={errorRef} tabIndex={-1} role="alert" className="ui-error">{error}</p><Button type="button" size="sm" disabled={pending} onClick={() => { setOpen(false); router.refresh(); }}>Refresh attempt status</Button></>}
         </div>

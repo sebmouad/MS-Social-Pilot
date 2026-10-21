@@ -11,7 +11,7 @@ const state = vi.hoisted(() => ({
 }));
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), target: { findMany: vi.fn() }, adAccount: { findMany: vi.fn() } }));
 vi.mock('@/server/data', () => ({ prisma: db, getSessionByTokenHash: vi.fn() }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (key in state.config ? state.config[key] : key === 'mcp.keys.maxLifetimeDays' ? 365 : DEFAULTS[key]) }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (key in state.config ? state.config[key] : key === 'mcp.keys.maxLifetimeDays' ? 365 : key === 'http.oauthAuthorizeMaxBodyBytes' ? 65536 : DEFAULTS[key]) }));
 vi.mock('@/modules/settings/mcp-access/server', () => ({
   issueMcpKey: vi.fn(async (actor: unknown, input: { name: string }) => {
     if (state.issueFails) throw new OperationError('forbidden', 'API key management is unavailable with your current access.');
@@ -239,6 +239,44 @@ describe('dynamic client registration', () => {
 });
 
 describe('consent decision (POST /api/oauth/authorize)', () => {
+  it.each([
+    ['integrations.oauth.authorizationStateMaxCharacters', 'state', 3],
+    ['integrations.oauth.scopeMaxCharacters', 'scope', 3],
+    ['integrations.oauth.redirectUriMaxCharacters', 'redirect_uri', 10],
+  ])('uses live %s before any redirect or consent write', async (key, field, max) => {
+    enable(); state.config[key] = max;
+    const fields = base().filter(([name]) => name !== field);
+    const response = await consentPost(form([...fields, [field, field === 'redirect_uri' ? REDIRECT : 'long'], ['decision', 'deny']]));
+    expect(response.status).toBe(400);
+    expect(response.headers.get('location')).toBeNull();
+    expect(executed('INSERT INTO mcp_oauth_codes')).toHaveLength(0);
+    expect(executed('oauth.consent_denied')).toHaveLength(0);
+  });
+  it('accepts state above the former parser default when Root raises its limit', async () => {
+    enable(); state.config['integrations.oauth.authorizationStateMaxCharacters'] = 1500;
+    const response = await consentPost(form([...base().filter(([name]) => name !== 'state'), ['state', 's'.repeat(1200)], ['decision', 'deny']]));
+    expect(response.status).toBe(303);
+    expect(new URL(response.headers.get('location')!).searchParams.get('state')).toBe('s'.repeat(1200));
+  });
+  it.each([
+    ['integrations.oauth.resourceIdsMaxItems', 1, ['t1', 't2']],
+    ['integrations.oauth.resourceIdMaxCharacters', 1, ['t1']],
+    ['integrations.oauth.resourceIdsMaxItems', 1, ['t1', 't1']],
+  ])('rejects oversized resource input before lookup without truncating/deduplicating it', async (key, max, ids) => {
+    enable(); state.config[key as string] = max;
+    const response = await consentPost(form([...base(), ['decision', 'allow'], ['read', 'publishing/posts'], ['mode', 'selected'], ...(ids as string[]).map(id => ['target', id] as [string, string])]));
+    expect(response.status).toBe(400);
+    expect(db.target.findMany).not.toHaveBeenCalled();
+    expect(executed('INSERT INTO mcp_oauth_codes')).toHaveLength(0);
+  });
+  it('bounds actual bytes without relying on Content-Length', async () => {
+    enable(); state.config['http.oauthAuthorizeMaxBodyBytes'] = 1024;
+    const response = await consentPost(form([...base(), ['state', 'é'.repeat(1024)], ['decision', 'deny']]));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error_description: 'The request is too large.' });
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+  });
+
   const location = (response: Response) => new URL(response.headers.get('location')!);
   it('refuses cross-origin and Origin-less posts before touching anything (CSRF)', async () => {
     enable();

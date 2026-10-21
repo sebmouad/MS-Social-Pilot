@@ -1,3 +1,4 @@
+import { rootRecoveryFields } from '@/lib/config/root-recovery-policy';
 import { z } from 'zod';
 import type { Prisma } from '../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
@@ -15,13 +16,19 @@ type DeletionRow = {
   workspaceName: string | null; targetName: string | null;
 };
 
-const inputSchema = z.object({
-  operationId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/),
+const inputSchema = (fields: ReturnType<typeof rootRecoveryFields>) => z.object({
+  ...fields,
   outcome: z.enum(['deleted', 'not_deleted']),
   verifiedOnPlatform: z.literal(true),
-  confirmation: z.string().max(300),
 }).strict();
 const forbidden = () => new OperationError('forbidden', 'Installation-owner access is required.');
+
+async function recoveryLimits() {
+  const [identifierMaxCharacters, confirmationMaxCharacters] = await Promise.all([
+    runtimeConfig('root.identifierMaxCharacters'), runtimeConfig('root.confirmationMaxCharacters'),
+  ]);
+  return { identifierMaxCharacters, confirmationMaxCharacters };
+}
 
 /** Bounded private Root view. No post text, credentials, or provider errors are selected. */
 export async function listRootPostDeletions(userId: string, cap?: number) {
@@ -39,7 +46,7 @@ export async function listRootPostDeletions(userId: string, cap?: number) {
     LEFT JOIN targets t ON t.id = d."targetId" AND t."workspaceId" = d."workspaceId"
     ORDER BY d."updatedAt" DESC, d.id DESC LIMIT ${Math.min(limit, cap ?? limit)}
   `;
-  return { timeZone, items: rows.map(row => ({
+  return { timeZone, limits: await recoveryLimits(), items: rows.map(row => ({
     operationId: row.id, workspaceId: row.workspaceId, workspaceName: row.workspaceName ?? row.workspaceId,
     targetId: row.targetId, targetName: row.targetName, provider: row.provider,
     remotePostId: row.remoteId, localPostIds: row.localPostIds, localPostTargetIds: row.localPostTargetIds,
@@ -51,7 +58,7 @@ export async function listRootPostDeletions(userId: string, cap?: number) {
 /** Record a Root human attestation. This never calls a provider or performs local cleanup. */
 export async function recordRootPostDeletionOutcome(userId: string, input: unknown) {
   await requireActiveRoot(userId);
-  const parsed = inputSchema.safeParse(input);
+  const parsed = inputSchema(rootRecoveryFields(await recoveryLimits())).safeParse(input);
   const expected = parsed.success
     ? `ROOT RECORD POST DELETION ${parsed.data.operationId} ${parsed.data.outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}`
     : '';
