@@ -117,6 +117,12 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
       t("{v0}: median first response {v1} calendar time, {v2} within business hours; slowest {v3} calendar time, {v4} within business hours.", { v0: label, v1: formatDuration(r.medianMs ?? null), v2: formatDuration(r.businessMedianMs ?? null), v3: formatDuration(r.slowestMs ?? null), v4: formatDuration(r.businessSlowestMs ?? null) }),
       t("{v0}: median resolution {v1} calendar time, {v2} within business hours; {v3} resolved, {v4} unresolved.", { v0: label, v1: formatDuration(r.resolve?.medianMs ?? null), v2: formatDuration(r.resolve?.businessMedianMs ?? null), v3: r.resolve?.resolved ?? 0, v4: r.resolve?.unresolved ?? 0 }),
     );
+    if (r.history) responseDetails.push(
+      t("{v0}: {v1} recorded resolution cycles; median {v2} calendar time, {v3} within business hours.", { v0: label, v1: r.history.measuredCycles, v2: formatDuration(r.history.medianMs), v3: formatDuration(r.history.businessMedianMs) }),
+      t("{v0}: {v1} resolution events, {v2} reopening events. Events may concern waits absent from stored visitor history.", { v0: label, v1: r.history.resolved, v2: r.history.reopened }),
+    );
+    for (const member of r.members ?? []) responseDetails.push(t("{v0} — {v1}: {v2} first replies; median {v3} calendar time, {v4} within business hours.", { v0: label, v1: member.name, v2: member.answered, v3: formatDuration(member.medianMs), v4: formatDuration(member.businessMedianMs ?? null) }));
+    if (r.membersOmitted) responseDetails.push(t("{v0}: {v1} more responding members not listed.", { v0: label, v1: r.membersOmitted }));
   }
   const recap = included.includes('aiRecap') ? input.recap ?? null : null;
   const recapText = recap ? (recap.state === 'ready' ? recap.text : RECAP_UNAVAILABLE) : '';
@@ -175,6 +181,21 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
       add('median_resolve_business_minutes', t("Median resolve time (business hours)"), minutes(r.resolve?.businessMedianMs), 'minutes', response.businessHours ? describeBusinessHours(response.businessHours) : t("not set"));
       add('resolved_waits', t("Resolved"), r.resolve?.resolved, 'waits', t("Count at period end"));
       add('unresolved_waits', t("Not resolved"), r.resolve?.unresolved, 'waits', t("Count at period end"));
+      if (r.history) {
+        const note = t("Only recorded resolution cycles with a visitor start in the period; reopening alone creates no duration.");
+        add('historical_resolution_cycles', t("Historical resolution cycles"), r.history.measuredCycles, 'cycles', note);
+        add('historical_resolve_minutes', t("Historical resolution cycles"), minutes(r.history.medianMs), 'minutes', note);
+        add('historical_resolve_business_minutes', t("Median resolve time (business hours)"), minutes(r.history.businessMedianMs), 'minutes', response.businessHours ? note : t("not set"));
+        add('resolution_events', t("Resolution events"), r.history.resolved, 'events', t("Recorded actions in period; visitor history may be unavailable. Counts are not resolution cycles."));
+        add('reopening_events', t("Reopening events"), r.history.reopened, 'events', t("Recorded actions in period; visitor history may be unavailable. Counts are not resolution cycles."));
+      }
+      for (const member of r.members ?? []) {
+        const addMember = (key: string, metric: string, value: number | null | undefined, unit: string, note: string) => rows.push(['response_time', `${prefix}_member_${key}`, metric, label, member.name, '', value ?? '', unit, coverage, note]);
+        addMember('answered_waits', t("Answered waits"), member.answered, 'waits', t("Count in period"));
+        addMember('first_response_minutes', t("Median first response by member"), minutes(member.medianMs), 'minutes', t("Median wait until the channel replied; calendar time"));
+        addMember('first_response_business_minutes', t("Median first response by member (business hours)"), minutes(member.businessMedianMs), 'minutes', response.businessHours ? describeBusinessHours(response.businessHours) : t("not set"));
+      }
+      if (r.membersOmitted !== undefined) add('members_omitted', t("Responding members not listed"), r.membersOmitted, 'members', t("Configured member row limit applies independently to each source."));
     }
     for (const m of response.members ?? []) if (m.businessMedianMs !== undefined) rows.push(['response_time', 'member_first_response_business_minutes', t("Median first response by member (business hours)"), t("Inbox"), clamp(m.name, 80), '', m.businessMedianMs === null ? '' : m.businessMedianMs / 60_000, 'minutes', response.businessHours ? (response.partial ? 'partial' : 'stored_only') : t("not set"), t("First replies attributed to the responding member; configured workspace business hours only.")]);
     rows.push(['response_time', 'answered_waits', t("Answered waits"), t("Inbox"), '', '', response.answered, 'waits', response.partial ? 'partial' : '', t("Count in period")]);

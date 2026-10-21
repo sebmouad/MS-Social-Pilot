@@ -1,5 +1,12 @@
 import { z } from 'zod';
 const en = {
+  "{v0}: {v1} recorded resolution cycles; median {v2} calendar time, {v3} within business hours.": "{v0}: {v1} recorded resolution cycles; median {v2} calendar time, {v3} within business hours.",
+  "{v0}: {v1} resolution events, {v2} reopening events. Events may concern waits absent from stored visitor history.": "{v0}: {v1} resolution events, {v2} reopening events. Events may concern waits absent from stored visitor history.",
+  "{v0} — {v1}: {v2} first replies; median {v3} calendar time, {v4} within business hours.": "{v0} — {v1}: {v2} first replies; median {v3} calendar time, {v4} within business hours.",
+  "{v0}: {v1} more responding members not listed.": "{v0}: {v1} more responding members not listed.",
+  "Recorded actions in period; visitor history may be unavailable. Counts are not resolution cycles.": "Recorded actions in period; visitor history may be unavailable. Counts are not resolution cycles.",
+  "Responding members not listed": "Responding members not listed",
+  "Configured member row limit applies independently to each source.": "Configured member row limit applies independently to each source.",
   "Resolved": "Resolved",
   "Comments": "Comments",
   "Conversations": "Conversations",
@@ -146,6 +153,13 @@ const en = {
   "Channel": "Channel"
 };
 const fr: typeof en = {
+  "{v0}: {v1} recorded resolution cycles; median {v2} calendar time, {v3} within business hours.": "{v0} : {v1} cycles de résolution enregistrés ; médiane {v2} en temps calendaire, {v3} en heures ouvrées.",
+  "{v0}: {v1} resolution events, {v2} reopening events. Events may concern waits absent from stored visitor history.": "{v0} : {v1} événements de résolution, {v2} de réouverture. Ces événements peuvent concerner des attentes absentes de l’historique enregistré des visiteurs.",
+  "{v0} — {v1}: {v2} first replies; median {v3} calendar time, {v4} within business hours.": "{v0} — {v1} : {v2} premières réponses ; médiane {v3} en temps calendaire, {v4} en heures ouvrées.",
+  "{v0}: {v1} more responding members not listed.": "{v0} : {v1} autres membres ayant répondu non affichés.",
+  "Recorded actions in period; visitor history may be unavailable. Counts are not resolution cycles.": "Actions enregistrées sur la période ; l’historique des visiteurs peut être indisponible. Ces nombres ne sont pas des cycles de résolution.",
+  "Responding members not listed": "Membres ayant répondu non affichés",
+  "Configured member row limit applies independently to each source.": "La limite configurée de membres s’applique séparément à chaque source.",
   "Resolved": "Résolues",
   "Comments": "Commentaires",
   "Conversations": "Conversations",

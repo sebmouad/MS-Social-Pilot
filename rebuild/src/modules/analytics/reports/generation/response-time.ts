@@ -1,4 +1,4 @@
-import { historicalResolutionCycles, periodResponseMessages, type ResolutionEvent } from '../server/response-history';
+import { historicalResolutionCycles, periodResponseMessages, type HistoricalCycle, type ResolutionEvent } from '../server/response-history';
 import { configValueOrDefault } from '@/server/config/config-or-default';
 import { cache } from 'react';
 import { runtimeConfig } from '@/server/config/store';
@@ -19,7 +19,7 @@ import { businessHoursOrNull, businessMs, calendarMs, type BusinessHoursSetting 
  */
 export type ResponseTimeSummary = {
   coverage?: { storedOnly: true; messagesRead: number; commentsRead: number; eventsRead: number; messagesTruncated: boolean; commentsTruncated: boolean; eventsTruncated: boolean; incompleteGroupsExcluded: number; snapshotFallbackItems: number; periodStart: string; periodEndExclusive: string };
-  history?: { resolved: number; reopened: number; measuredCycles: number; medianMs: number | null; businessMedianMs: number | null };
+  history?: ResponseHistorySummary;
   answered: number; unanswered: number; medianMs: number | null;
   slowestMs?: number | null; businessSlowestMs?: number | null;
   comments?: SourceResponseSummary;
@@ -37,8 +37,12 @@ export type ResponseTimeSummary = {
   /** First visitor message in the period to the conversation's resolvedAt. Unresolved conversations are counted, never zero. */
   resolve?: ResolveSummary;
 };
+export type ResponseHistorySummary = { resolved: number; reopened: number; measuredCycles: number; medianMs: number | null; businessMedianMs: number | null };
 /** Separate source statistics; optional measures keep retained/older summaries readable. */
 export type SourceResponseSummary = {
+  history?: ResponseHistorySummary;
+  members?: MemberResponse[];
+  membersOmitted?: number;
   answered: number; unanswered: number; total?: number; answeredPercent?: number | null;
   medianMs?: number | null; businessMedianMs?: number | null;
   slowestMs?: number | null; businessSlowestMs?: number | null; resolve?: ResolveSummary;
@@ -130,10 +134,11 @@ export function summarizeResponseTimes(messages: ResponseMessage[], partial = fa
 }
 
 /** Uses the same wait arithmetic as the combined report; never averages source medians. */
-export function summarizeResponseSource(messages: ResponseMessage[], partial = false, business: { hours: BusinessHoursSetting; timeZone: string } | null = null): SourceResponseSummary {
-  const result = summarizeResponseTimes(messages, partial, business);
+export function summarizeResponseSource(messages: ResponseMessage[], partial = false, business: { hours: BusinessHoursSetting; timeZone: string } | null = null, attribution: { names: ReadonlyMap<string, string>; copy: ResponseTimeCopy; locale: 'en' | 'fr'; limit: number } = { names: new Map(), copy: responseTimeCopyDefaults, locale: 'en', limit: MEMBER_ROWS_CAP }): SourceResponseSummary {
+  const result = summarizeResponseTimes(messages, partial, business, attribution.names, attribution.copy, attribution.locale, attribution.limit);
   const total = result.answered + result.unanswered;
   return {
+    members: result.members, membersOmitted: result.membersOmitted,
     total, answered: result.answered, unanswered: result.unanswered,
     answeredPercent: total ? result.answered / total * 100 : null,
     medianMs: result.medianMs, businessMedianMs: result.businessMedianMs,
@@ -227,19 +232,27 @@ export async function readResponseTime(workspaceId: string, channelId: string, p
     sentById: r.sentById, resolvedAt: resolvedAt('message', r.conversationId, r.conversation?.resolvedAt),
   })), from, to);
   const commentMessages = periodResponseMessages(commentResponseMessages(completeComments.map(row => ({ ...row, resolvedAt: resolvedAt('comment', row.id, row.resolvedAt) })), target.providerId, to), from, to);
-  const cycles = eventsTruncated ? [] : historicalResolutionCycles([
-    ...completeRows.map(row => ({ itemId: row.conversationId, kind: 'message' as const, createdTime: row.createdTime, fromChannel: row.sentById !== null || row.fromId === target.providerId })),
-    ...completeComments.filter(row => !row.parentRemoteId).map(row => ({ itemId: row.id, kind: 'comment' as const, createdTime: row.createdTime, fromChannel: row.sentById !== null || row.fromId === target.providerId })),
-  ], history, from, to);
+  const cycleMessages = completeRows.map(row => ({ itemId: row.conversationId, kind: 'message' as const, createdTime: row.createdTime, fromChannel: row.sentById !== null || row.fromId === target.providerId }));
+  const cycleComments = completeComments.filter(row => !row.parentRemoteId).map(row => ({ itemId: row.id, kind: 'comment' as const, createdTime: row.createdTime, fromChannel: row.sentById !== null || row.fromId === target.providerId }));
+  const conversationCycles = eventsTruncated ? [] : historicalResolutionCycles(cycleMessages, history.filter(event => event.kind === 'message'), from, to);
+  const commentCycles = eventsTruncated ? [] : historicalResolutionCycles(cycleComments, history.filter(event => event.kind === 'comment'), from, to);
+  // Combine the actual cycles, never source medians. Event counts also include
+  // stored actions on items whose visitor history is unavailable.
+  const historySummary = (cycles: HistoricalCycle[], events: ResolutionEvent[]): ResponseHistorySummary => ({
+    resolved: events.filter(event => event.createdAt >= from && event.resolved).length,
+    reopened: events.filter(event => event.createdAt >= from && !event.resolved).length,
+    measuredCycles: cycles.length, medianMs: median(cycles.map(cycle => calendarMs(cycle.startedAt, cycle.resolvedAt))),
+    businessMedianMs: business ? median(cycles.map(cycle => businessMs(cycle.startedAt, cycle.resolvedAt, business.hours, business.timeZone))) : null,
+  });
   const combined = [...messages.map(m => ({ ...m, conversationId: `conversation:${m.conversationId}` })), ...commentMessages];
   // Names only, and only for current members of this workspace; anyone else shows as a former member.
   const memberIds = [...new Set(combined.map(m => m.sentById).filter((id): id is string => Boolean(id)))];
   const users = memberIds.length ? await prisma.user.findMany({ where: { id: { in: memberIds }, memberships: { some: { workspaceId } } }, select: { id: true, name: true } }) : [];
   const names = new Map(users.map(u => [u.id, u.name])); const copy = await responseCopy();
   const summary = summarizeResponseTimes(combined, partial, business, names, copy, locale, memberLimit);
-  const counts = (items: ResponseMessage[]) => summarizeResponseSource(items, partial, business);
-  return { ...summary, comments: counts(commentMessages), conversations: counts(messages),
-    history: { resolved: history.filter(event => event.createdAt >= from && event.resolved).length, reopened: history.filter(event => event.createdAt >= from && !event.resolved).length, measuredCycles: cycles.length, medianMs: median(cycles.map(cycle => calendarMs(cycle.startedAt, cycle.resolvedAt))), businessMedianMs: business ? median(cycles.map(cycle => businessMs(cycle.startedAt, cycle.resolvedAt, business.hours, business.timeZone))) : null },
+  const counts = (items: ResponseMessage[], kind: ResolutionEvent['kind'], cycles: HistoricalCycle[]) => ({ ...summarizeResponseSource(items, partial, business, { names, copy, locale, limit: memberLimit }), history: historySummary(cycles, history.filter(event => event.kind === kind)) });
+  return { ...summary, comments: counts(commentMessages, 'comment', commentCycles), conversations: counts(messages, 'message', conversationCycles),
+    history: historySummary([...conversationCycles, ...commentCycles], history),
     coverage: { storedOnly: true, messagesRead: Math.min(rows.length, messageLimit), commentsRead: Math.min(commentRows.length, messageLimit), eventsRead: history.length, messagesTruncated: rows.length > messageLimit, commentsTruncated: commentRows.length > messageLimit, eventsTruncated, incompleteGroupsExcluded: Number(splitConversation) + Number(splitPost), snapshotFallbackItems, periodStart: from.toISOString(), periodEndExclusive: to.toISOString() },
   };
 }
