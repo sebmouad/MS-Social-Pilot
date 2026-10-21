@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en" data-theme="vivid" data-mode="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Social Pilot v2 prototype</title>
+<!-- Static design prototype for docs/design-v2. Synthetic content only. Not product code. -->
+<style>
+:root{--canvas:#f6f5fd;--surface:#fff;--surface-muted:#efeefb;--surface-hover:#ebe9fb;--ink:#1b1838;--ink-soft:#4d4870;--ink-faint:#5a5680;--line:#e3e1f4;--line-subtle:#efeefb;--control-border:#7a75a6;--accent:#534AB7;--accent-hover:#3C3489;--accent-soft:#EEEDFE;--on-accent:#fff;--success:#0b6b3a;--success-soft:#e1f3e8;--warning:#854F0B;--warning-soft:#FAEEDA;--danger:#A32D2D;--danger-soft:#FCEBEB;--focus:#378ADD;--rail-bg:#26215C;--rail-ink:#CECBF6;--rail-active-bg:#3C3489;--rail-active-ink:#fff;--on-mod:#fff;
+--area-home:#534AB7;--area-plan:#D85A30;--area-inbox:#1D9E75;--area-results:#7F77DD;--area-tasks:#378ADD;--area-agency:#D4537E;
+--chart-1:#7F77DD;--chart-2:#1D9E75;--shadow-card:0 1px 2px rgb(20 24 40/5%),0 10px 28px -14px rgb(20 24 40/16%);--shadow-pop:0 10px 30px rgb(0 0 0/14%);
+--radius-sm:8px;--radius-md:12px;--radius-lg:16px;--sidebar-w:248px;--topbar-h:56px;--control-h:40px}
+:root[data-mode=dark]{--canvas:#15132b;--surface:#1e1b3a;--surface-muted:#26224a;--surface-hover:#2f2a5c;--ink:#ECEBFB;--ink-soft:#c4c0ea;--ink-faint:#AFA9EC;--line:#35315e;--line-subtle:#2a2650;--control-border:#6e68a6;--accent:#AFA9EC;--accent-hover:#CECBF6;--accent-soft:#3C3489;--on-accent:#26215C;--success:#76dca1;--success-soft:#14301f;--warning:#FAC775;--warning-soft:#4a3410;--danger:#F09595;--danger-soft:#4a1d1d;--rail-bg:#0e0c22;--on-mod:#15132b;--area-home:#AFA9EC;--area-plan:#F0997B;--area-inbox:#5DCAA5;--area-results:#9F97F0;--area-tasks:#85B7EB;--area-agency:#ED93B1}
+*{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}a{color:inherit;text-decoration:none}:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.frame{display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr);min-height:100vh}
+.sb{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:6px;padding:16px 12px;background:var(--rail-bg);color:var(--rail-ink);overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 12px;color:#fff;font-weight:750;font-size:16px}.brand i{width:28px;height:28px;border-radius:8px;background:var(--rail-active-bg);display:grid;place-items:center;font-style:normal}
+.ws{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;border:1px solid rgb(255 255 255/14%);font-size:13px;margin-bottom:6px}
+.create{display:flex;justify-content:center;align-items:center;gap:8px;height:40px;border:0;border-radius:var(--radius-sm);background:#fff;color:#26215C;font-weight:700;cursor:pointer;margin-bottom:10px}
+.nav a{display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;border-radius:8px;font-size:13px;font-weight:600}.nav a:hover{background:rgb(255 255 255/8%)}.nav a[aria-current=page]{background:var(--rail-active-bg);color:#fff}
+.chip{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--on-mod);font-size:13px}
+.badge{margin-left:auto;min-width:20px;padding:0 6px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-size:11px;font-weight:700;text-align:center}
+.sec{margin:14px 8px 4px;font-size:11px;font-weight:700;letter-spacing:.06em;opacity:.8}
+.ch{display:flex;align-items:center;gap:10px;height:36px;padding:0 8px;border-radius:8px;font-size:13px;cursor:pointer;border:0;background:none;color:inherit;width:100%;text-align:left}.ch:hover{background:rgb(255 255 255/8%)}.ch[aria-pressed=true]{background:var(--rail-active-bg);color:#fff}
+.av{position:relative;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;background:#fff;color:#26215C;flex:0 0 auto}.av b{position:absolute;right:-2px;bottom:-2px;width:9px;height:9px;border-radius:50%;border:2px solid var(--rail-bg)}
+.foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px 8px;border-top:1px solid rgb(255 255 255/12%);font-size:13px}
+.main{min-width:0}.top{position:sticky;top:0;z-index:5;height:var(--topbar-h);display:flex;align-items:center;justify-content:space-between;padding:0 32px;background:var(--surface);border-bottom:1px solid var(--line-subtle)}
+.top .scope{display:none}.icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer}
+.content{max-width:1280px;margin:0 auto;padding:24px 32px 64px}
+.ph{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}.ph h1{margin:0;font-size:28px;line-height:36px;letter-spacing:-.02em}.count{margin-left:10px;padding:2px 8px;border-radius:999px;background:var(--surface-muted);color:var(--ink-soft);font-size:12px;font-weight:600;vertical-align:middle}
+.btn{display:inline-flex;align-items:center;gap:8px;height:var(--control-h);padding:0 14px;border-radius:var(--radius-sm);border:1px solid var(--control-border);background:var(--surface);font-weight:650;font-size:13px;cursor:pointer}.btn.p{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.btn.p:hover{background:var(--accent-hover)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:4px 0 14px;overflow-x:auto}.tabs a{padding:10px 12px;font-weight:600;color:var(--ink-soft);border-bottom:2px solid transparent;white-space:nowrap}.tabs a[aria-current=page]{color:var(--ink);border-color:var(--accent)}
+.fr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}.fchip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 6px 0 10px;border:1px solid var(--control-border);border-radius:999px;font-size:12px;background:var(--surface)}.fchip button{border:0;background:none;cursor:pointer;width:22px;height:22px;border-radius:50%}
+.search{margin-left:auto;height:40px;width:240px;padding:0 12px;border:1px solid var(--control-border);border-radius:8px;background:var(--surface)}
+.seg{display:inline-flex;padding:3px;border:1px solid var(--control-border);border-radius:10px;background:var(--surface-muted)}.seg button{height:32px;padding:0 10px;border:0;border-radius:7px;background:none;font-weight:600;font-size:12px;cursor:pointer;color:var(--ink-soft)}.seg button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0/12%)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--shadow-card)}
+table{width:100%;border-collapse:collapse}th{height:40px;padding:0 14px;text-align:left;font-size:12px;font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--line);background:var(--surface-muted)}td{height:48px;padding:6px 14px;border-bottom:1px solid var(--line-subtle);font-size:13px}tr:hover td{background:var(--surface-hover)}
+.thumb{width:36px;height:36px;border-radius:6px;background:linear-gradient(135deg,#e8e4ff,#ffe6da);flex:0 0 auto}.cell{display:flex;align-items:center;gap:10px}
+.st{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:650}.ok{background:var(--success-soft);color:var(--success)}.warn{background:var(--warning-soft);color:var(--warning)}.bad{background:var(--danger-soft);color:var(--danger)}.neu{background:var(--surface-muted);color:var(--ink-soft)}
+.avs{display:flex}.avs span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;background:var(--accent-soft);color:var(--accent);border:2px solid var(--surface);margin-left:-6px}.avs span:first-child{margin:0}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:16px}.kpi{padding:16px 18px}.kpi .l{display:flex;justify-content:space-between;color:var(--ink-soft);font-weight:600;font-size:13px}.kpi .v{font-size:32px;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:4px}.d{font-size:12px;font-weight:600}.d.up{color:var(--success)}.d.dn{color:var(--danger)}
+.info{position:relative;display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--control-border);background:none;font-size:11px;font-weight:700;color:var(--ink-soft);cursor:pointer}.info.w{border-color:var(--warning);color:var(--warning)}
+.pop{position:absolute;z-index:20;top:26px;right:0;width:300px;padding:12px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-pop);font-size:12px;font-weight:400;text-align:left;color:var(--ink);display:none}.info[aria-expanded=true]+.pop,.info[aria-expanded=true] .pop{display:block}.pop b{display:block;margin-bottom:4px;font-size:13px}.pop p{margin:4px 0;color:var(--ink-soft)}
+.grid2{display:grid;grid-template-columns:2fr 1fr;gap:16px}.pad{padding:16px 18px}.ct{display:flex;justify-content:space-between;align-items:center;margin:0 0 10px;font-size:16px;font-weight:650}
+svg.chart{width:100%;height:220px}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-subtle)}.row:last-child{border:0}.muted{color:var(--ink-soft);font-size:12px}
+.composer{position:fixed;inset:0;z-index:30;background:var(--canvas);display:none;flex-direction:column}.composer.open{display:flex}.composer.open~.legend{display:none}
+.ctop{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--line)}
+.cbody{flex:1;overflow:auto;display:grid;grid-template-columns:minmax(0,720px) 420px;gap:24px;justify-content:center;padding:24px}
+.field{margin-bottom:18px}.field label{display:block;font-weight:650;margin-bottom:6px}.chans{display:flex;gap:8px;flex-wrap:wrap}.cchip{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 12px 0 6px;border-radius:999px;border:1px solid var(--control-border);background:var(--surface);cursor:pointer;font-weight:600}.cchip[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}.cchip .av{background:var(--accent-soft);color:var(--accent)}
+textarea{width:100%;min-height:150px;padding:12px;border:1px solid var(--control-border);border-radius:var(--radius-sm);background:var(--surface);resize:none}
+.drop{display:flex;gap:8px;align-items:center;padding:16px;border:1px dashed var(--control-border);border-radius:var(--radius-md);background:var(--surface)}
+details{border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface);padding:0 14px;margin-bottom:12px}summary{height:44px;display:flex;align-items:center;font-weight:650;cursor:pointer}
+.prev{position:sticky;top:0;padding:16px}.post{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--surface)}.img{height:180px;border-radius:8px;background:linear-gradient(135deg,#e8e4ff,#ffe6da);margin-top:10px}
+.abar{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -8px 24px -18px rgb(0 0 0/30%)}
+.split{display:inline-flex}.split .btn:first-child{border-radius:8px 0 0 8px}.split .btn:last-child{border-radius:0 8px 8px 0;border-left:1px solid rgb(255 255 255/30%);padding:0 10px}
+.inbox{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;height:560px}.list{overflow:auto}.msg{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line-subtle);cursor:pointer}.msg[aria-current=true]{background:var(--accent-soft)}.thread{display:flex;flex-direction:column}.bubbles{flex:1;padding:16px;overflow:auto}.bub{max-width:70%;padding:10px 12px;border-radius:12px;background:var(--surface-muted);margin:6px 0}.bub.me{margin-left:auto;background:var(--accent-soft)}.reply{border-top:1px solid var(--line);padding:12px;display:flex;gap:8px;align-items:flex-end}.reply textarea{min-height:44px}
+.bottom{display:none}
+.view{display:none}.view.on{display:block}
+.legend{position:fixed;left:264px;bottom:16px;z-index:40;display:flex;gap:6px;padding:6px;border-radius:12px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-pop);font-size:12px}
+@media (max-width:760px){.legend{display:none}.top .scope{display:inline-flex}.tbl thead{display:none}.tbl tr{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:8px;padding:10px 12px;border-bottom:1px solid var(--line-subtle)}.tbl td{height:auto;border:0;padding:0}.tbl td:first-child{grid-column:1;grid-row:1}.tbl td:nth-child(2){grid-column:1;grid-row:2;padding-left:46px}.tbl td:last-child{grid-column:2;grid-row:1/3}.tbl td:nth-child(4){grid-column:1;grid-row:3;padding-left:46px;font-size:12px;color:var(--ink-soft)}.frame{display:block}.sb{display:none}.top{padding:0 16px}.scope{display:inline-flex}.content{padding:16px 16px 96px}.kpis{grid-template-columns:1fr 1fr}.grid2,.inbox{grid-template-columns:1fr}.search{width:100%;margin:0}.hide-p{display:none}.ph h1{font-size:24px}
+ .bottom{display:flex;position:fixed;z-index:10;left:0;right:0;bottom:0;height:64px;justify-content:space-around;align-items:center;background:var(--surface);border-top:1px solid var(--line)}.bottom a{display:grid;justify-items:center;font-size:11px;font-weight:600;color:var(--ink-soft)}.bottom a[aria-current=page]{color:var(--accent)}.fab{width:52px;height:52px;margin-top:-22px;border-radius:50%;border:0;background:var(--accent);color:var(--on-accent);font-size:26px;box-shadow:var(--shadow-pop)}
+ .tbl td:nth-child(3){display:none}.cbody{grid-template-columns:1fr;padding:16px}.prev{display:none}.legend{bottom:76px}}
+</style>
+</head>
+<body>
+<div class="frame">
+  <nav class="sb" aria-label="Main">
+    <div class="brand"><i>✦</i>Social Pilot</div>
+    <div class="ws">Preview QA Workspace <span aria-hidden="true">▾</span></div>
+    <button class="create" data-open-composer>＋ Create</button>
+    <div class="nav">
+      <a href="#home" data-view="home"><span class="chip" style="background:var(--area-home)">⌂</span>Home</a>
+      <a href="#plan" data-view="plan"><span class="chip" style="background:var(--area-plan)">▦</span>Plan<span class="badge" title="Waiting for approval">1</span></a>
+      <a href="#inbox" data-view="inbox"><span class="chip" style="background:var(--area-inbox)">✉</span>Inbox<span class="badge">3</span></a>
+      <a href="#results" data-view="results"><span class="chip" style="background:var(--area-results)">▲</span>Results</a>
+    </div>
+    <div class="sec">CHANNELS</div>
+    <button class="ch" aria-pressed="true" data-scope="All channels"><span class="av">∗</span>All channels</button>
+    <button class="ch" aria-pressed="false" data-scope="North Market"><span class="av">NM<b style="background:#2fbf71"></b></span>North Market</button>
+    <button class="ch" aria-pressed="false" data-scope="Studio"><span class="av">ST<b style="background:#2fbf71"></b></span>Studio</button>
+    <button class="ch" aria-pressed="false" data-scope="Weekend Deals"><span class="av">WD<b style="background:#f0b429"></b></span>Weekend Deals</button>
+    <a class="ch" href="#settings" style="opacity:.85">⚙ Manage channels</a>
+    <div class="foot"><span class="av">PQ</span>Preview QA<span style="margin-left:auto">⚙</span></div>
+  </nav>
+
+  <div class="main">
+    <header class="top">
+      <button class="btn scope" aria-haspopup="dialog"><span id="scopeLabel">All channels</span> ▾</button>
+      <span class="muted hide-p" id="crumb"></span>
+      <div style="display:flex;gap:8px"><button class="icon-btn" aria-label="Notifications">🔔</button><button class="icon-btn" aria-label="Switch light or dark" id="mode">◐</button></div>
+    </header>
+
+    <main class="content" id="main-content">
+      <!-- HOME -->
+      <section class="view" id="v-home">
+        <div class="ph"><h1>Good morning, Preview</h1><button class="btn">Last 28 days ▾</button></div>
+        <div class="card pad" style="margin-bottom:16px;border-left:4px solid var(--warning)">
+          <div class="ct">Needs attention</div>
+          <div class="row"><span class="st bad">1 failed</span>Preview: delivery failed and needs review<a class="btn" style="margin-left:auto" href="#plan">Review</a></div>
+          <div class="row"><span class="st warn">1 waiting</span>A post is waiting for your approval<a class="btn" style="margin-left:auto" href="#plan">Open approvals</a></div>
+          <div class="row"><span class="st warn">Reconnect</span>Weekend Deals needs to be reconnected<a class="btn" style="margin-left:auto" href="#settings">Reconnect</a></div>
+        </div>
+        <div class="kpis" data-kpis></div>
+        <div class="grid2">
+          <div class="card pad"><div class="ct">Coming up <a class="muted" href="#plan">Open calendar →</a></div>
+            <div class="row"><span class="thumb"></span><div>Preview: scheduled product launch<div class="muted">Thu Oct 23 · 09:00 · North Market</div></div><span class="st neu" style="margin-left:auto">Scheduled</span></div>
+            <div class="row"><span class="thumb"></span><div>Weekend recipe: lemon tart<div class="muted">Sat Oct 25 · 11:00 · Studio</div></div><span class="st neu" style="margin-left:auto">Queued</span></div>
+          </div>
+          <div class="card pad"><div class="ct">Inbox <a class="muted" href="#inbox">Open →</a></div><div style="font-size:32px;font-weight:750">3</div><div class="muted">conversations waiting for a reply</div></div>
+        </div>
+      </section>
+
+      <!-- PLAN -->
+      <section class="view" id="v-plan">
+        <div class="ph"><h1>Posts<span class="count">5</span></h1><div style="display:flex;gap:8px"><button class="btn hide-p">Import CSV</button><button class="btn p" data-open-composer>＋ Create post</button></div></div>
+        <nav class="tabs" aria-label="Plan"><a href="#plan" aria-current="page">Posts</a><a href="#plan">Calendar</a><a href="#plan">Queue</a><a href="#plan">Approvals <span class="count">1</span></a><a href="#plan">Library</a></nav>
+        <div class="fr"><button class="btn">Filter <span class="count">1</span></button><span class="fchip">Status: All except published <button aria-label="Remove filter Status">×</button></span><input class="search" placeholder="Search posts" aria-label="Search posts"><div class="seg hide-p" role="group" aria-label="View"><button aria-pressed="true">Table</button><button aria-pressed="false">Feed</button><button aria-pressed="false">Cards</button></div></div>
+        <div class="card" style="overflow:hidden"><table class="tbl"><thead><tr><th>Post</th><th>Status</th><th>Channels</th><th>When</th><th><span style="position:absolute;left:-9999px">Actions</span></th></tr></thead><tbody>
+          <tr><td><div class="cell"><span class="thumb"></span>Preview: delivery failed and needs review</div></td><td><span class="st bad">⚠ Failed</span></td><td><div class="avs"><span>NM</span></div></td><td>—</td><td><button class="icon-btn" aria-label="Actions for this post">⋯</button></td></tr>
+          <tr><td><div class="cell"><span class="thumb"></span>Preview: draft waiting for review</div></td><td><span class="st neu">Draft</span></td><td><div class="avs"><span>NM</span></div></td><td>—</td><td><button class="icon-btn" aria-label="Actions">⋯</button></td></tr>
+          <tr><td><div class="cell"><span class="thumb"></span>Preview: seasonal offer awaiting approval</div></td><td><span class="st warn">Waiting for approval</span></td><td><div class="avs"><span>ST</span></div></td><td>—</td><td><button class="icon-btn" aria-label="Actions">⋯</button></td></tr>
+          <tr><td><div class="cell"><span class="thumb"></span>Preview: published campaign recap</div></td><td><span class="st ok">✓ Published 2/2</span></td><td><div class="avs"><span>NM</span><span>ST</span></div></td><td>Oct 19, 01:00</td><td><button class="icon-btn" aria-label="Actions">⋯</button></td></tr>
+          <tr><td><div class="cell"><span class="thumb"></span>Preview: scheduled product launch</div></td><td><span class="st neu">Scheduled</span></td><td><div class="avs"><span>NM</span></div></td><td>Oct 23, 09:00</td><td><button class="icon-btn" aria-label="Actions">⋯</button></td></tr>
+        </tbody></table>
+        <div class="fr" style="justify-content:space-between;padding:10px 14px;margin:0"><span class="muted">1–5 of 5</span><span><button class="btn" disabled>Previous</button> <button class="btn" disabled>Next</button></span></div></div>
+      </section>
+
+      <!-- INBOX -->
+      <section class="view" id="v-inbox">
+        <div class="ph"><h1>Inbox<span class="count">3 waiting</span></h1><button class="btn">Sync now <span class="info" aria-label="About sync">i</span></button></div>
+        <div class="fr"><button class="btn">Filter</button><span class="fchip">Unread</span><span class="fchip">Needs reply</span><span class="fchip">Negative</span><input class="search" placeholder="Search people or messages" aria-label="Search inbox"></div>
+        <div class="inbox">
+          <div class="card list">
+            <div class="msg" aria-current="true"><span class="av" style="background:var(--accent-soft);color:var(--accent)">AP</span><div><b>Alex Preview</b> <span class="muted">· 11:03</span><div class="muted">Thanks. The latest campaign proof is ready…</div></div></div>
+            <div class="msg"><span class="av" style="background:var(--accent-soft);color:var(--accent)">JP</span><div><b>Jordan Preview</b> <span class="muted">· 10:53</span><div class="muted">Could you share details about the weekend offer?</div></div></div>
+            <div class="msg"><span class="av" style="background:var(--accent-soft);color:var(--accent)">JP</span><div><b>Jordan Preview</b> <span class="muted">· comment · 10:48</span><div class="muted">Is the offer available in store too?</div></div></div>
+          </div>
+          <div class="card thread"><div class="pad" style="border-bottom:1px solid var(--line);display:flex;justify-content:space-between"><b>Alex Preview · North Market</b><button class="btn">Resolve</button></div>
+            <div class="bubbles"><div class="bub">Hi! Is the campaign proof ready?</div><div class="bub me">Almost, sending it this morning.</div><div class="bub">Thanks. The latest campaign proof is ready for our review.</div></div>
+            <div class="reply"><textarea aria-label="Reply" placeholder="Write a reply…"></textarea><button class="btn">Saved replies ▾</button><button class="btn p">Reply</button></div></div>
+        </div>
+      </section>
+
+      <!-- RESULTS -->
+      <section class="view" id="v-results">
+        <div class="ph"><h1>Results</h1><button class="btn hide-p">Download report</button></div>
+        <nav class="tabs" aria-label="Results"><a href="#results" aria-current="page">Overview</a><a href="#results">Explore</a><a href="#results">Audience</a><a href="#results">Posts</a><a href="#results">Compare</a><a href="#results">Ads</a><a href="#results">Reports</a></nav>
+        <div class="fr"><button class="btn">Last 28 days ▾</button><span class="fchip">Compared with previous period</span><button class="btn">Filter</button></div>
+        <div class="kpis" data-kpis></div>
+        <div class="grid2">
+          <div class="card pad"><div class="ct">Views over time <div class="seg"><button aria-pressed="true">Views</button><button aria-pressed="false">Engagements</button><button aria-pressed="false">Clicks</button></div></div>
+            <svg class="chart" viewBox="0 0 600 220" role="img" aria-label="Views over the last 28 days, rising from 120 to 410 per day; previous period dashed">
+              <g stroke="var(--line)" stroke-width="1"><line x1="30" y1="190" x2="590" y2="190"/><line x1="30" y1="130" x2="590" y2="130"/><line x1="30" y1="70" x2="590" y2="70"/></g>
+              <polyline fill="none" stroke="var(--chart-1)" stroke-width="2.5" points="30,170 80,160 130,165 180,140 230,150 280,120 330,110 380,118 430,90 480,80 530,70 590,50"/>
+              <polyline fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".6" points="30,175 80,172 130,168 180,160 230,165 280,150 330,148 380,140 430,138 480,130 530,128 590,120"/>
+              <g fill="var(--ink-soft)" font-size="11"><text x="30" y="210">Sep 24</text><text x="290" y="210">Oct 8</text><text x="545" y="210">Oct 21</text></g></svg>
+            <button class="btn" style="height:32px">Show data</button></div>
+          <div class="card pad"><div class="ct">Top posts</div>
+            <div class="row"><span class="thumb"></span><div>Published campaign recap<div class="muted">1,240 views · 86 engagements</div></div></div>
+            <div class="row"><span class="thumb"></span><div>Lemon tart recipe<div class="muted">980 views · 64 engagements</div></div></div>
+            <div class="row"><span class="thumb"></span><div>Weekend offer<div class="muted">610 views · 21 engagements</div></div></div></div>
+        </div>
+      </section>
+
+      <section class="view" id="v-settings"><div class="ph"><h1>Settings</h1></div><div class="card pad"><div class="ct">Channels</div>
+        <div class="row"><span class="av" style="background:var(--accent-soft);color:var(--accent)">f</span><div><b>Preview Social Suite</b><div class="muted">3 of 4 Pages in use</div></div><span class="st ok" style="margin-left:auto">Connected</span><button class="btn">Manage Pages</button></div>
+        <div class="row"><span class="av" style="background:var(--accent-soft);color:var(--accent)">f</span><div><b>Weekend Deals</b><div class="muted">1 Page · permission expired</div></div><span class="st warn" style="margin-left:auto">Reconnect needed</span><button class="btn p">Reconnect</button></div></div></section>
+    </main>
+  </div>
+</div>
+
+<nav class="bottom" aria-label="Quick navigation"><a href="#home" data-view="home">⌂<span>Home</span></a><a href="#plan" data-view="plan">▦<span>Plan</span></a><button class="fab" aria-label="Create post" data-open-composer>＋</button><a href="#inbox" data-view="inbox">✉<span>Inbox</span></a><a href="#results" data-view="results">▲<span>Results</span></a></nav>
+
+<div class="composer" role="dialog" aria-modal="true" aria-label="New post" id="composer">
+  <div class="ctop"><b>New post</b><span class="muted">Draft saved 11:05</span><button class="icon-btn" aria-label="Close" data-close>✕</button></div>
+  <div class="cbody">
+    <div>
+      <div class="field"><label>Channels</label><div class="chans"><button class="cchip" aria-pressed="true"><span class="av">NM</span>North Market</button><button class="cchip" aria-pressed="true"><span class="av">ST</span>Studio</button><button class="cchip" aria-pressed="false" disabled title="Reconnect Weekend Deals to post here" style="opacity:.5"><span class="av">WD</span>Weekend Deals</button></div><a class="muted" href="#">Customize per channel</a></div>
+      <div class="field"><label for="txt">Text</label><textarea id="txt" placeholder="What do you want to share?">Our lemon tart is back this weekend 🍋</textarea><div class="muted" style="display:flex;justify-content:space-between"><span>✨ Improve · Shorter · Translate</span><span>38 / 63,206</span></div></div>
+      <div class="field"><label>Media</label><div class="drop"><button class="btn">Upload</button><button class="btn">From library</button><button class="btn">Add link</button><span class="muted">or drop images here</span></div></div>
+      <details><summary>＋ Add first comment</summary><textarea placeholder="Add a link or follow-up…" style="min-height:80px;margin-bottom:12px"></textarea></details>
+      <details><summary>Advanced</summary><p class="muted">Format per channel · Who sends it (Social Pilot or Facebook) · Labels · Custom fields</p></details>
+    </div>
+    <aside class="card prev"><div class="ct">Preview <div class="seg"><button aria-pressed="true">North Market</button><button aria-pressed="false">Studio</button></div></div><div class="post"><b>North Market</b><div class="muted">Sat Oct 25 · 11:00</div><p>Our lemon tart is back this weekend 🍋</p><div class="img"></div></div></aside>
+  </div>
+  <div class="abar"><span class="muted">Ready to schedule</span><div style="display:flex;gap:8px"><button class="btn">Save draft</button><span class="split"><button class="btn p">Schedule for Sat 11:00</button><button class="btn p" aria-label="More publish options">▾</button></span></div></div>
+</div>
+
+<div class="legend" aria-label="Prototype controls"><b style="padding:6px">Prototype</b><button class="btn" id="mode2" style="height:30px">Light/Dark</button></div>
+
+<script>
+const kpis=[["Audience","2,020","▲ 4%","up","Latest follower count for each channel, added together.","Coverage: 2 of 4 channels have data. People who follow several channels may be counted more than once.",true],["Views","12,480","▲ 18%","up","Times your posts were seen.","Period: Sep 24 – Oct 21 (UTC). Synced Oct 21, 11:03.",false],["Engagements","864","▼ 3%","dn","Reactions, comments and shares on your posts.","Missing days are not counted as zero.",false],["Link clicks","178","▲ 9%","up","Clicks on links in your posts.","From Facebook · synced Oct 21, 11:03.",false]];
+document.querySelectorAll('[data-kpis]').forEach(box=>box.innerHTML=kpis.map(([l,v,d,c,what,more,warn])=>`<div class="card kpi"><div class="l">${l}<span style="position:relative"><button class="info${warn?' w':''}" aria-expanded="false" aria-label="About ${l}">${warn?'!':'i'}</button><span class="pop" role="dialog"><b>${l}</b><p>${what}</p><p>${more}</p><p><a href="#" style="color:var(--accent)">Learn more</a></p></span></span></div><div class="v">${v}</div><div class="d ${c}">${d} <span class="muted">vs previous 28 days</span></div></div>`).join(''));
+document.addEventListener('click',e=>{const b=e.target.closest('.info');document.querySelectorAll('.info[aria-expanded=true]').forEach(x=>{if(x!==b)x.setAttribute('aria-expanded','false')});if(b)b.setAttribute('aria-expanded',b.getAttribute('aria-expanded')==='true'?'false':'true');
+ const s=e.target.closest('[data-scope]');if(s){document.querySelectorAll('[data-scope]').forEach(x=>x.setAttribute('aria-pressed',x===s));document.getElementById('scopeLabel').textContent=s.dataset.scope}
+ if(e.target.closest('[data-open-composer]'))document.getElementById('composer').classList.add('open');if(e.target.closest('[data-close]'))document.getElementById('composer').classList.remove('open');
+ const seg=e.target.closest('.seg button');if(seg)seg.parentElement.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===seg));
+ const cc=e.target.closest('.cchip:not([disabled])');if(cc)cc.setAttribute('aria-pressed',cc.getAttribute('aria-pressed')!=='true')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.getElementById('composer').classList.remove('open');document.querySelectorAll('.info').forEach(x=>x.setAttribute('aria-expanded','false'))}});
+const toggle=()=>{const r=document.documentElement;r.dataset.mode=r.dataset.mode==='dark'?'light':'dark'};document.getElementById('mode').onclick=toggle;document.getElementById('mode2').onclick=toggle;
+const names={home:'Home',plan:'Plan › Posts',inbox:'Inbox',results:'Results › Overview',settings:'Settings › Channels'};
+function route(){const v=(location.hash||'#plan').slice(1);document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));document.querySelectorAll('[data-view]').forEach(a=>a.toggleAttribute('aria-current',a.dataset.view===v)||a.getAttribute('aria-current')&&a.setAttribute('aria-current','page'));document.querySelectorAll('[data-view][aria-current]').forEach(a=>a.setAttribute('aria-current','page'));document.getElementById('crumb').textContent=names[v]||''}
+addEventListener('hashchange',route);route();
+</script>
+</body>
+</html>

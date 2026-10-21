@@ -34,6 +34,13 @@ components:
 
 # MS Social Pilot Design System
 
+> **Design v2 (2026-10-21, owner direction: "simple and efficient for a human user").**
+> [docs/design-v2/](docs/design-v2/README.md) has the full target. It covers one channel-first
+> sidebar, Plan/Inbox/Results areas with tabs, a full-screen composer and ⓘ caveats.
+> It also includes the build plan and the handoff prompt. It is not built yet. Once its PR
+> merges, batch B0 rewrites the layout sections below and records the decisions in the
+> contract. Until then this document describes the current (v1) UI.
+
 ## Overview
 
 ### Creative North Star
