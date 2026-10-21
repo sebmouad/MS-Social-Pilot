@@ -1,5 +1,6 @@
 vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 
 const state = vi.hoisted(() => ({
   prisma: {
@@ -23,7 +24,7 @@ vi.mock('../src/server/platforms/resource-lock', () => ({ lockSelectedResources:
 
 import { clearAdsOpsHosts, registerAdsOpsHost } from '../src/modules/ads/management/registry';
 import { ADS_MANAGEMENT_DEFAULT_POLICY } from '../src/modules/ads/management/config';
-import { describeAdsManagement, parseNeutralOperation, performAdsManagement, previewAdsManagement } from '../src/modules/ads/management/server';
+import { describeAdsManagement, parseNeutralOperation, performAdsManagement, previewAdsManagement, resolveAdsOperation, resolutionConfirmation, pendingRecoveryConfirmation } from '../src/modules/ads/management/server';
 import { executeAdsManagementTool } from '../src/modules/ads/management/mcp';
 import { defaultAdsCatalogs, localizeAdsMessage } from '../src/modules/ads/copy';
 import type { AdsNeutralOperation, AdsOpsHost } from '../src/modules/ads/management/types';
@@ -152,5 +153,62 @@ describe('missing advertising-changes grant', () => {
     expect(localizeAdsMessage(defaultAdsCatalogs, 'en', english)).toBe(english);
     expect(localizeAdsMessage(defaultAdsCatalogs, 'fr', english)).toBe(defaultAdsCatalogs.customer.grantMissing.fr);
     expect(defaultAdsCatalogs.customer.grantMissing.fr).toMatch(/Reconnectez/);
+  });
+});
+
+
+describe('ad.create request replay and recovery', () => {
+  const input = { adAccountId: 'acc1', operation: adOp, confirmation: CONFIRM, requestId: 'request-0001' };
+  const requestHash = createHash('sha256').update(JSON.stringify({ adAccountId: 'acc1', operation: adOp })).digest('hex');
+  const duplicate = () => state.prisma.$executeRaw.mockRejectedValueOnce(new Error('23505 duplicate key'));
+  const recorded = (status: string, hash = requestHash) => state.prisma.$queryRaw.mockResolvedValue([{
+    id: 'op1', requestHash: hash, status, remoteId: status === 'succeeded' ? 'ad-existing' : null, operationType: 'ad.create', objectType: 'ad',
+  }]);
+
+  it('replays the recorded created identity without dispatching again', async () => {
+    duplicate(); recorded('succeeded');
+    await expect(performAdsManagement(actor, input)).resolves.toMatchObject({ outcome: 'succeeded', replay: true, created: { objectType: 'ad', remoteId: 'ad-existing' } });
+    expect(execute).not.toHaveBeenCalled();
+    expect(state.prisma.$queryRaw.mock.calls[0]).toEqual(expect.arrayContaining(['w1', 'u1', 'request-0001']));
+  });
+
+  it('refuses reuse of a request id for a different payload', async () => {
+    duplicate(); recorded('succeeded', 'different-payload');
+    await expect(performAdsManagement(actor, input)).rejects.toMatchObject({ code: 'conflict' });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it.each(['pending', 'uncertain', 'resolved_applied', 'resolved_not_applied'])('never resends a %s request or invents a created identity', async status => {
+    duplicate(); recorded(status);
+    if (status === 'pending') await expect(performAdsManagement(actor, input)).rejects.toMatchObject({ code: 'conflict' });
+    else {
+      const result = await performAdsManagement(actor, input);
+      expect(result).not.toHaveProperty('created');
+      expect(result.outcome).toBe(status === 'resolved_applied' ? 'succeeded' : status === 'resolved_not_applied' ? 'rejected' : 'uncertain');
+    }
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('holds an ambiguous provider timeout and a missing receipt', async () => {
+    execute.mockRejectedValueOnce(new Error('timeout'));
+    await expect(performAdsManagement(actor, input)).resolves.toMatchObject({ outcome: 'uncertain' });
+    expect(state.prisma.$executeRaw.mock.calls.some(call => call.includes('unknown_outcome'))).toBe(true);
+    execute.mockResolvedValueOnce({});
+    const result = await performAdsManagement(actor, { ...input, requestId: 'request-0002' });
+    expect(result.outcome).toBe('uncertain');
+    expect(result).not.toHaveProperty('created');
+    expect(state.prisma.$executeRaw.mock.calls.some(call => String(call[0]).includes('missing_remote_id'))).toBe(true);
+  });
+
+  it.each(['pending', 'uncertain'] as const)('reconciles a %s creation by exact attestation without a provider call', async status => {
+    state.prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => /FOR UPDATE/.test(strings.join('?')) ? [{ status }] : [{
+      id: 'op1', adAccountId: 'acc1', actorId: 'u1', operationType: 'ad.create', objectType: 'ad', objectId: '@create-ad:s1', params: adOp, status,
+      remoteId: null, createdAt: new Date(), completedAt: null,
+    }]);
+    const confirmation = (status === 'pending' ? pendingRecoveryConfirmation : resolutionConfirmation)('op1', 'applied');
+    await expect(resolveAdsOperation(actor, { operationId: 'op1', resolution: 'applied', confirmation: 'yes' })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(resolveAdsOperation(actor, { operationId: 'op1', resolution: 'applied', confirmation })).resolves.toMatchObject({ status: 'resolved_applied', recoveredPending: status === 'pending' });
+    expect(execute).not.toHaveBeenCalled();
+    expect(state.prisma.$executeRaw.mock.calls.some(call => call.includes('resolved_applied') && call.includes('w1'))).toBe(true);
   });
 });

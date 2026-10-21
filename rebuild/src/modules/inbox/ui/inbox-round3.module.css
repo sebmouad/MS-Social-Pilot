@@ -76,3 +76,18 @@
 .keys dl > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
 .keys dd { margin: 0; flex: 0 0 auto; }
 .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* UX polish: selected rows, wrapped quick filters, focus rings and a stacking bulk bar on phones. */
+.row:has(.selectBox:checked) { background: var(--accent-soft); }
+.selectBox:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.quickToggle { border-radius: var(--radius-sm); white-space: normal; line-height: 1.2; padding-block: 6px; }
+.bulk { position: sticky; top: 0; z-index: 1; }
+.bulk[data-active] { border-bottom-color: var(--accent); }
+.bulkNote { overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .bulk { position: static; }
+  .bulkActions { width: 100%; }
+  .bulkActions > button { flex: 1 1 auto; min-height: 44px; }
+  .selectAll { min-height: 44px; }
+}
+@media (forced-colors: active) { .row:has(.selectBox:checked) { outline: 2px solid Highlight; outline-offset: -2px; } }

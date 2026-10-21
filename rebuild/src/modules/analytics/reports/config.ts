@@ -10,12 +10,24 @@ export const PUBLICATION_REPORT_POLICY_SCHEMA = z.object({
 }).strict();
 export const PUBLICATION_REPORT_DEFAULTS = { publishedRows: 100, failedRows: 100, excerptCharacters: 240 };
 
+export const TOP_POST_CONTENT_POLICY_SCHEMA = z.object({
+  imagePreviews: z.boolean(),
+  mediaUrlTemplate: z.string().min(1).max(2000).refine(value => /^\/(?!\/)[a-zA-Z0-9/_-]*\{id\}$/.test(value), 'Use an absolute application path ending in {id}.'),
+  posts: z.number().int().min(1).max(100),
+  textCharacters: z.number().int().min(120).max(20000),
+  mediaPerPost: z.number().int().min(1).max(50),
+  urlCharacters: z.number().int().min(100).max(8000),
+  previewCharacters: z.number().int().min(20).max(2000),
+}).strict();
+export const TOP_POST_CONTENT_DEFAULTS = { imagePreviews: true, mediaUrlTemplate: '/api/media/{id}', posts: 10, textCharacters: 4000, mediaPerPost: 10, urlCharacters: 2000, previewCharacters: 240 };
+
 const G = 'Analytics · Report workflows';
 const num = (key: string, label: string, description: string, defaultValue: number, min: number, max: number) =>
   entry({ key, group: G, label, kind: 'number', description, defaultValue, schema: z.number().int().min(min).max(max), consumption: 'active' });
 
 /** Root-managed bounds for report templates and schedule definitions. */
 export const REPORT_WORKFLOW_CONFIG = [
+  entry({ key: 'analytics.reports.topPostContent', group: G, label: 'Top post content', kind: 'json', description: 'Ranked post count, destination text, attachment count, URL and article preview bounds, image preview switch and authenticated media path template. Report content is saved local state, not a remote snapshot.', defaultValue: TOP_POST_CONTENT_DEFAULTS, schema: TOP_POST_CONTENT_POLICY_SCHEMA, consumption: 'active' }),
   entry({ key: 'analytics.reports.publicationDetails', group: G, label: 'Publication report details', kind: 'json', description: 'Maximum published and currently failed destination rows and content excerpt length in the Published posts report section. Daily UTC totals are counted independently; clipped logs are disclosed.', defaultValue: PUBLICATION_REPORT_DEFAULTS, schema: PUBLICATION_REPORT_POLICY_SCHEMA, consumption: 'active' }),
   num('analytics.reports.responseEventLimit', 'Response analysis workflow events', 'Maximum stored resolution and reopening events examined per channel report. Truncation suppresses resolution durations and is disclosed.', RESPONSE_ANALYSIS_LIMITS.events.default, RESPONSE_ANALYSIS_LIMITS.events.min, RESPONSE_ANALYSIS_LIMITS.events.max),
   num('analytics.reports.responseMessageLimit', 'Response analysis records per source', 'Maximum stored messages and comments examined separately, including pre-period context. Incomplete boundary threads are excluded; truncation and stored-only coverage are disclosed.', RESPONSE_ANALYSIS_LIMITS.messages.default, RESPONSE_ANALYSIS_LIMITS.messages.min, RESPONSE_ANALYSIS_LIMITS.messages.max),

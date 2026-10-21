@@ -115,3 +115,28 @@
 .pick { color: var(--ink-soft); }
 @media (max-width: 900px) { .reply { margin: 0; position: static; box-shadow: none; } }
 @media (forced-colors: active) { .item[aria-current="true"], .entry[data-from="channel"] { border-color: Highlight; } }
+
+/* UX polish: keyboard focus, sticky list header, phone spacing and touch targets. Theme tokens only. */
+.listHead { position: sticky; top: 0; z-index: 1; }
+.filters a:focus-visible, .pagination a:focus-visible, .back:focus-visible, .alert a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+.pagination span[aria-disabled="true"] { background: var(--surface-muted); cursor: not-allowed; }
+.item { transition: background-color .12s ease; }
+.item[data-attention] .preview { color: var(--ink); }
+.entry[data-reply] { background: var(--surface); }
+.alert { border-inline-start-width: 4px; }
+@media (prefers-reduced-motion: reduce) { .item { transition: none; } }
+@media (max-width: 900px) {
+  .threadPane { padding: 14px; gap: 14px; }
+  .back { position: sticky; top: 0; z-index: 1; margin: -4px 0 0; background: var(--surface); }
+  .entry, .entry[data-from="channel"] { max-width: 100%; justify-self: stretch; }
+  .replies { padding-inline-start: 10px; }
+  .item { padding: 14px; }
+  .listHead { position: static; }
+}
+@media (max-width: 900px), (pointer: coarse) {
+  .pagination a, .pagination span, .filters a { min-height: 44px; }
+}
+@media (forced-colors: active) {
+  .unreadDot { background: Highlight; forced-color-adjust: none; }
+  .item:focus-visible { outline-color: Highlight; }
+}

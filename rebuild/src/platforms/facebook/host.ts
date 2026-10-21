@@ -1,3 +1,4 @@
+import { configuredFacebookAdsOps } from './ads-ops';
 import { renewFacebookConnectionToken } from './token-renewal';
 import { facebookDiagnostics } from './diagnostics';
 import type { PlatformHost } from '@/server/platforms/host';
@@ -21,7 +22,7 @@ async function syncFacebookPosts(now?: Date, retryLimit?: number, retryBackoff?:
 export const facebookHost = {
   adapter: configuredFacebookAdapter,
   diagnostics: facebookDiagnostics,
-  ads: { ...facebookAdsHost, operations: facebookAdsOps },
+  ads: { ...facebookAdsHost, operations: facebookAdsOps, configuredOperations: configuredFacebookAdsOps },
   analytics: facebookAnalyticsHost,
   inbox: { replyPolicy: facebookReplyPolicy, canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, moderate: moderateFacebookComment, prepareDeleteComment: prepareDeleteFacebookComment, readCommentPresence: readFacebookCommentPresence, reviews: { sync: syncFacebookReviews } },
   connection: {

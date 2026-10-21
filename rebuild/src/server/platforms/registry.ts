@@ -5,6 +5,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { PLATFORM_HOSTS, type PlatformHost } from './index';
 import type { PlatformJobName, JobSummary } from '@/server/jobs/types';
 import type { RetryBackoff } from '@/server/jobs/retry';
+import { platformAdsLocale } from './host';
 
 /**
  * Product code reaches platforms only through here: by provider ID and
@@ -38,11 +39,13 @@ export async function platformInbox(provider: string): Promise<PlatformHost['inb
 }
 
 /** Enabled Ads implementation for a module that declares the Ads capability. */
-export async function platformAds(provider: string): Promise<NonNullable<PlatformHost['ads']> | null> {
+export async function platformAds(provider: string, locale: 'en' | 'fr' = platformAdsLocale()): Promise<NonNullable<PlatformHost['ads']> | null> {
   const module = platformModule(provider);
   const ads = hostFor(provider)?.ads;
   if (!module || module.capabilities.ads !== 'supported' || !ads || !await isPlatformEnabled(provider)) return null;
-  return ads;
+  // Return a request-local host: concurrent locales and later Root saves cannot mutate
+  // the installed singleton. Keep the resolved engine for validation, consent and I/O.
+  return ads.configuredOperations ? { ...ads, operations: await ads.configuredOperations(locale) } : ads;
 }
 
 /** Enabled module-owned storage loader and analytics normalizer. */

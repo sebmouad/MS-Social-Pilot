@@ -1,3 +1,6 @@
+import { readTopPostContent, reportUrl, type ReportTopPost } from '../server/top-post-content';
+import { runtimeConfig } from '@/server/config/store';
+import { TOP_POST_CONTENT_POLICY_SCHEMA } from '../config';
 import { readPublicationReport, type PublicationReport } from '../server/publication-report';
 import { publicationDetails } from './publication-details';
 import { documentText, reportDocumentCopyDefaults, type ReportDocumentCopy } from './copy';
@@ -69,7 +72,7 @@ type Snapshot = Awaited<ReturnType<typeof readAnalyticsSnapshot>>;
  * as-of times; a metric without data is "Not available", never zero. Every rendering is bounded in rows and UTF-8 bytes, and
  * anything cut is marked; when even the fixed parts exceed the bound a minimal notice is returned instead of an overflowing page.
  */
-export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; publications?: PublicationReport | null; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null; recap?: RecapState | null }, bounds: ReportBounds, copy: ReportDocumentCopy = reportDocumentCopyDefaults.en, locale: 'en' | 'fr' = 'en', responseCopy: ResponseTimeCopy = responseTimeCopyDefaults): ReportOutput {
+export function renderReport(snapshot: Snapshot, input: { channelName: string; sections: ReportSectionId[]; generatedAt: Date; publications?: PublicationReport | null; responseTime?: ResponseTimeSummary | null; topPosts?: ReportTopPost[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null; recap?: RecapState | null }, bounds: ReportBounds, copy: ReportDocumentCopy = reportDocumentCopyDefaults.en, locale: 'en' | 'fr' = 'en', responseCopy: ResponseTimeCopy = responseTimeCopyDefaults): ReportOutput {
   const t = documentText(copy);
   const formatDuration = (ms: number | null) => responseDuration(ms, responseCopy, locale);
   const describeBusinessHours = (hours: Parameters<typeof responseHours>[0]) => responseHours(hours, responseCopy, locale);
@@ -79,7 +82,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const valueText = (m: MetricView) => m.total === null ? t("Not available") : (m.displayTotal ?? String(m.total));
   const asOf = (date: Date | null | undefined) => date ? date.toISOString().slice(0, 10) : t("unknown");
   const publication = input.sections.includes('published') && input.publications ? publicationDetails(input.publications, copy) : null;
-  const sourceTruncated = publication?.truncated ?? false;
+  const sourceTruncated = (publication?.truncated ?? false) || Boolean(input.sections.includes('topPosts') && input.topPosts?.some(p => p.content?.shortened));
   const wanted = new Set(input.sections);
   // The recap is included only when the run produced it or recorded that it could not; otherwise (AI off or not permitted) it is not included.
   const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s) && (s !== 'aiRecap' || Boolean(input.recap)));
@@ -142,6 +145,9 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const linkClicksText = destination ? (destination.linkClicks === null ? t("Not available") : String(destination.linkClicks)) : '';
   const measureText = (m: DestinationMeasures['measures'][number]) => m.value === null ? t("Not available") : `${m.value}${m.measuredPosts < (destination?.posts ?? 0) ? t(" (stored for {v0} of {v1} posts)", { v0: m.measuredPosts, v1: destination?.posts ?? 0 }) : ''}`;
   const postTitle = (p: PostPerformance) => clamp(p.text || t("(no text)"), 120);
+  const contentNote = t('Content is saved local content, not a snapshot from the connected platform. Media opens separately; access may expire.') + ' ' + t('Locally stored media requires access to this workspace.');
+  const contentLines = (p: ReportTopPost) => p.content ? [contentNote, p.content.text, ...p.content.media.map(m => `${t(m.kind === 'image' ? 'Image' : 'Video')}: ${m.url}`), ...(p.content.link ? [`${t('Article link')}: ${p.content.link}`, p.content.articleTitle, p.content.articleDescription] : []), ...(p.content.shortened ? [t('Post content was shortened to the configured limits.')] : [])].filter(Boolean) : [];
+  const contentHtml = (p: ReportTopPost) => p.content ? `<details><summary>${esc(t('Post content'))}</summary><p>${esc(contentNote)}</p><p style="white-space:pre-wrap">${esc(p.content.text)}</p>${p.content.media.map(m => `<p><a rel="noreferrer noopener" href="${esc(reportUrl(m.url) ?? '')}">${esc(t(m.kind === 'image' ? 'Image' : 'Video'))}${p.content!.previewImages && m.kind === 'image' ? `<img loading="lazy" referrerpolicy="no-referrer" style="display:block;max-width:100%;height:auto" src="${esc(reportUrl(m.url) ?? '')}" alt="${esc(t('Image'))}">` : ''}</a></p>`).join('')}${p.content.link ? `<p><a rel="noreferrer noopener" href="${esc(reportUrl(p.content.link) ?? '')}">${esc(p.content.articleTitle || t('Article link'))}</a></p><p>${esc(p.content.articleDescription)}</p>` : ''}${p.content.shortened ? `<p>${esc(t('Post content was shortened to the configured limits.'))}</p>` : ''}</details>` : '';
   const goals = included.includes('goals') ? input.goals ?? { month: { month: '', start: '', end: '', timeZone: '' }, goals: [] } : null;
   const goalText = (g: GoalProgress) => t("{v0}: {v1} of {v2} ({v3}%, {v4})", { v0: g.label, v1: g.actual === null ? t("No data") : g.actual, v2: g.target, v3: g.percent, v4: g.paceLabel });
   const audienceAsOf = audience ? audience.entries.map(e => e.asOf).filter((d): d is Date => d instanceof Date).sort((a, b) => b.getTime() - a.getTime())[0] : undefined;
@@ -235,6 +241,12 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     } else rows.push(['destination', 'unavailable', t("Destination summary"), '', '', '', '', '', '', t("Not available")]);
   }
   if (topPosts) topPosts.forEach((p, i) => {
+    if (p.content) {
+      rows.push(['top_post_content', 'destination_text', t('Post content'), '', p.postId, p.publishedAt, p.content.text, '', '', contentNote]);
+      for (const media of p.content.media) rows.push(['top_post_media', media.kind, t(media.kind === 'image' ? 'Image' : 'Video'), '', p.postId, p.publishedAt, media.url, '', '', contentNote]);
+      if (p.content.link) rows.push(['top_post_link', 'article_link', p.content.articleTitle || t('Article link'), '', p.postId, p.publishedAt, p.content.link, '', '', p.content.articleDescription]);
+      if (p.content.shortened) rows.push(['top_post_coverage', 'content_shortened', t('Post content was shortened to the configured limits.'), '', p.postId, '', '', '', '', '']);
+    }
     rows.push(['top_post', `rank_${i + 1}`, postTitle(p), p.rankLabel, p.url ?? '', p.publishedAt, p.rankValue ?? '', p.rankLabel.toLowerCase(), '', t("Stored per-post measures; missing is not zero")]);
     for (const m of p.measures) rows.push(['top_post_measure', m.key, m.label, p.rankLabel, postTitle(p), p.publishedAt, m.value ?? '', '', '', t("Rank {v0}", { v0: i + 1 })]);
   });
@@ -278,7 +290,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
       + (response ? `<h2>${esc(t("Response time"))}</h2><p>${esc(responseLine)}</p>${responseDetails.map(line => `<p>${esc(line)}</p>`).join('')}${memberLines.length ? `<ul>${memberLines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}${resolveLine ? `<p>${esc(resolveLine)}</p>` : ''}` : '')
       + (goals ? `<h2>${esc(t("Goals"))}</h2>${goals.goals.length ? `<p><small>${esc(t("Month {v0} to {v1} ({v2}), up to generation for the current month.", { v0: goals.month.start, v1: goals.month.end, v2: goals.month.timeZone }))}</small></p><table><thead><tr><th>${esc(t("Goal"))}</th><th>${esc(t("Target"))}</th><th>${esc(t("This month"))}</th><th>${esc(t("Progress"))}</th><th>${esc(t("Pace"))}</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? esc(t("No data")) : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : `<p>${esc(t("No goals are set for this channel."))}</p>`}` : '')
       + (included.includes('destinations') ? `<h2>${esc(t("Destinations"))}</h2>${destination ? `<p><small>${esc(destinationNote)}</small></p><table><thead><tr><th>${esc(t("Destination"))}</th><th>${esc(t("Type"))}</th><th>${esc(t("Posts"))}</th>${destination.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}<th>${esc(t("Link clicks (lifetime)"))}</th></tr></thead><tbody><tr><td>${esc(destination.name)}</td><td>${esc(destination.type)}</td><td>${esc(destination.posts)}</td>${destination.measures.map(m => `<td>${esc(measureText(m))}</td>`).join('')}<td>${esc(linkClicksText)}</td></tr></tbody></table><p><small>${esc(t("Link clicks are lifetime totals for links attributed to this channel. Legacy links without a destination count only when the post has a single published destination."))}</small></p>` : `<p>${esc(t("Destination summary not available."))}</p>`}` : '')
-      + (topPosts ? `<h2>${esc(t("Top posts"))}</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>${esc(t("Post"))}</th><th>${esc(t("Published"))}</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.url ? `<a href="${esc(p.url)}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}</td><td>${esc(asOf(p.publishedAt))}</td><td>${p.rankValue === null ? esc(t("Not available")) : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? esc(t("Not available")) : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : `<p>${esc(t("No published posts with stored measures in this period."))}</p>`}` : '')
+      + (topPosts ? `<h2>${esc(t("Top posts"))}</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>${esc(t("Post"))}</th><th>${esc(t("Published"))}</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${reportUrl(p.url) ? `<a rel="noreferrer noopener" href="${esc(reportUrl(p.url))}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}${contentHtml(p)}</td><td>${esc(asOf(p.publishedAt))}</td><td>${p.rankValue === null ? esc(t("Not available")) : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? esc(t("Not available")) : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : `<p>${esc(t("No published posts with stored measures in this period."))}</p>`}` : '')
       + publicationHtml
       + audienceHtml
       + (metrics.length ? `<h2>${esc(t("Metrics"))}</h2><table><thead><tr><th>${esc(t("Metric"))}</th><th>${esc(t("Source"))}</th><th>${esc(t("Value"))}</th><th>${esc(t("Basis"))}</th><th>${esc(t("Coverage"))}</th><th>${esc(t("As of"))}</th></tr></thead><tbody>${shown.map(m => `<tr><td>${esc(m.label)}</td><td>${esc(m.sourceLabel)}</td><td>${esc(valueText(m))}</td><td>${esc([m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. '))}</td><td>${esc(coverageText(m))}</td><td>${esc(asOf(m.latestAt))}</td></tr>`).join('')}</tbody></table>` : '')
@@ -287,7 +299,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   };
   const metricCap = Math.min(metrics.length, Math.max(0, bounds.maxRows - publicationRows.length));
   const htmlCount = fit(metricCap, bounds.maxBytes, c => htmlOf(c, true));
-  let htmlTruncated = publicationCut || htmlCount < metrics.length;
+  let htmlTruncated = sourceTruncated || publicationCut || htmlCount < metrics.length;
   let html = htmlOf(htmlCount, htmlTruncated);
   if (bytes(html) > bounds.maxBytes) { // the fixed parts alone do not fit
     html = cutBytes(`<!doctype html><html lang="${locale}"><body><p>${esc(clamp(title, 80))}</p><p><strong>${esc(t("This report was shortened to fit its size limit."))}</strong></p></body></html>`, bounds.maxBytes);
@@ -297,13 +309,13 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     ...(response ? [t("Response time: {v0}", { v0: responseLine }), ...responseDetails, ...memberLines.map(l => `  ${l}`), ...(resolveLine ? [resolveLine] : [])] : []),
     ...(goals ? [t("Goals (month {v0} to {v1}):", { v0: goals.month.start, v1: goals.month.end }), ...(goals.goals.length ? goals.goals.map(goalText) : [t("No goals are set for this channel.")])] : []),
     ...(included.includes('destinations') ? [t("Destinations:"), ...(destination ? [t("{v0} ({v1}): {v2} posts; {v3}; link clicks (lifetime) {v4}", { v0: clamp(destination.name, 200), v1: destination.type, v2: destination.posts, v3: destination.measures.map(m => `${m.label} ${measureText(m)}`).join('; '), v4: linkClicksText })] : [t("Destination summary not available.")])] : []),
-    ...(topPosts ? [t("Top posts:"), ...(topPosts.length ? topPosts.map((p, i) => `${i + 1}. ${postTitle(p)} (${asOf(p.publishedAt)}): ${p.rankLabel} ${p.rankValue ?? t("Not available")}`) : [t("No published posts with stored measures in this period.")])] : []),
+    ...(topPosts ? [t("Top posts:"), ...(topPosts.length ? topPosts.flatMap((p, i) => [`${i + 1}. ${postTitle(p)} (${asOf(p.publishedAt)}): ${p.rankLabel} ${p.rankValue ?? t("Not available")}`, ...contentLines(p)]) : [t("No published posts with stored measures in this period.")])] : []),
     ...(audience ? [t("Audience: {v0} ({v1} of {v2} channels{v3}; not unique people)", { v0: audience.covered ? audience.total : t("Not available"), v1: audience.covered, v2: audience.selected, v3: audienceAsOf ? t("; as of {v0}", { v0: asOf(audienceAsOf) }) : '' })] : [])];
   const metricLines = metrics.map(m => t("{v0} ({v1}): {v2}; {v3}; as of {v4}", { v0: clamp(m.label, 200), v1: clamp(m.sourceLabel, 200), v2: valueText(m), v3: coverageText(m), v4: asOf(m.latestAt) }));
   const tail = (cut: boolean) => [...(cut ? [t("Shortened to fit the size limit.")] : []), ...(notIncluded.length ? [t("Not included: {v0}", { v0: notIncluded.join(', ') })] : [])];
   const textOf = (count: number, cut: boolean) => [...baseLines, ...metricLines.slice(0, count), ...tail(cut)].join('\n');
   const textCount = fit(metricCap, bounds.maxBytes, c => textOf(c, true));
-  let textTruncated = publicationCut || textCount < metricLines.length;
+  let textTruncated = sourceTruncated || publicationCut || textCount < metricLines.length;
   let text = textOf(textCount, textTruncated);
   if (bytes(text) > bounds.maxBytes) { text = cutBytes(text, bounds.maxBytes); textTruncated = true; }
   return { channelName, period, generatedAt: input.generatedAt.toISOString(), sections: included, notIncluded, csv, html, text, json, rowCount: csvRows, bytes: bytes(csv), htmlBytes: bytes(html), textBytes: bytes(text), jsonBytes: bytes(json), truncated: csvTruncated || htmlTruncated || textTruncated || jsonTruncated || csv !== csvRaw };
@@ -316,7 +328,7 @@ const factText = (text: unknown) => String(text ?? '').replace(/[\u0000-\u0008\u
  * authorized to read. No post text, URLs, message text or recipients are included; missing data is stated as such, never zero.
  * Returns '' when no other section supplies a figure.
  */
-export function recapFacts(snapshot: Snapshot, input: { sections: ReportSectionId[]; responseTime?: ResponseTimeSummary | null; topPosts?: PostPerformance[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null }): string {
+export function recapFacts(snapshot: Snapshot, input: { sections: ReportSectionId[]; responseTime?: ResponseTimeSummary | null; topPosts?: ReportTopPost[] | null; destination?: DestinationSummary | null; goals?: { month: GoalMonth; goals: GoalProgress[] } | null }): string {
   const wanted = new Set(input.sections);
   const lines: string[] = [];
   if (wanted.has('published')) lines.push(`Posts: published ${snapshot.publishing.published}, scheduled ${snapshot.publishing.scheduled}, failed ${snapshot.publishing.failed}.`);
@@ -359,7 +371,7 @@ export function createReportGenerator(deps: { bounds: () => Promise<ReportBounds
         const bounds = { maxRows: ceiling === undefined ? base.maxRows : Math.min(base.maxRows, ceiling), maxBytes: base.maxBytes };
         const responseTime = request.sections.includes('responseTime') ? await readResponseTime(actor.workspaceId, request.channelId, request.period, documentCopy.locale) : null;
         const publications = request.sections.includes('published') ? await readPublicationReport(actor.workspaceId, request.channelId, request.period) : null;
-        const topPosts = request.sections.includes('topPosts') ? await readTopPosts(actor.workspaceId, request.channelId, request.period) : null;
+        const topPosts = request.sections.includes('topPosts') ? await readTopPosts(actor.workspaceId, request.channelId, request.period, bounds.maxRows) : null;
         const destination = request.sections.includes('destinations') ? await readDestination(actor.workspaceId, request.channelId, request.period) : null;
         const goals = request.sections.includes('goals') ? await channelGoalProgress(actor.workspaceId, request.channelId, request.period.end, deps.now?.() ?? new Date(), documentCopy.locale) : null;
         const recap = request.sections.includes('aiRecap') ? await makeRecap(deps.recap ?? defaultRecap, actor, channel?.name ?? documentText(documentCopy.copy)('Channel'), snapshot, { sections: request.sections, responseTime, topPosts, destination, goals }, documentCopy.locale) : null;
@@ -390,16 +402,17 @@ async function makeRecap(write: RecapWriter, actor: ReportActor, channelName: st
   }
 }
 
-/** Ten best posts by the channel's own module ranking; a module without the hook yields an empty, honest section. */
-export const TOP_POSTS_LIMIT = 10;
-async function readTopPosts(workspaceId: string, channelId: string, period: { start: string; end: string }): Promise<PostPerformance[]> {
+/** Root-bounded best posts by the channel's own module ranking; a module without the hook yields an empty, honest section. */
+async function readTopPosts(workspaceId: string, channelId: string, period: { start: string; end: string }, maxRows: number): Promise<ReportTopPost[]> {
   const rows = await prisma.$queryRaw<Array<{ provider: string }>>`SELECT a.provider FROM targets t JOIN social_accounts a ON a.id = t."socialAccountId" AND a."workspaceId" = t."workspaceId" WHERE t.id = ${channelId} AND t."workspaceId" = ${workspaceId} LIMIT 1`;
   const provider = rows[0]?.provider;
   const analytics = provider ? await platformAnalytics(provider) : null;
   if (!analytics?.postPerformance) return [];
   const from = new Date(`${period.start}T00:00:00.000Z`);
   const to = new Date(new Date(`${period.end}T00:00:00.000Z`).getTime() + 86_400_000);
-  return analytics.postPerformance({ workspaceId, targetId: channelId, from, to, limit: TOP_POSTS_LIMIT });
+  const policy = TOP_POST_CONTENT_POLICY_SCHEMA.parse(await runtimeConfig('analytics.reports.topPostContent'));
+  const ranked = await analytics.postPerformance({ workspaceId, targetId: channelId, from, to, limit: Math.min(policy.posts, maxRows) });
+  return readTopPostContent(workspaceId, channelId, period, ranked);
 }
 
 /** Per-destination summary for one channel: neutral counts from stored publications and short links, platform measures through the module hook (stored data only). */

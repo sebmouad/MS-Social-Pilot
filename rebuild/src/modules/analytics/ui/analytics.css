@@ -82,3 +82,36 @@
 .analytics-posts__value { display: inline-grid; justify-items: end; gap: 4px; min-width: 72px; }
 .analytics-posts__bar { display: block; width: 100%; height: 4px; border-radius: 2px; background: var(--mod-soft, var(--line)); overflow: hidden; }
 .analytics-posts__bar > span { display: block; height: 100%; background: var(--mod, var(--chart-1)); border-radius: 2px; }
+
+/* UX polish: focus, tables, long channel lists, charts and phone layout. Theme tokens only. */
+.analytics-sidebar a:focus-visible, .analytics-pager a:focus-visible, .analytics-panel-title a:focus-visible, .analytics-state a:focus-visible, .analytics-posts__text a:focus-visible, .analytics-table-wrap:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+.analytics-sidebar-filter input:focus-visible, .analytics-sidebar-filter select:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+.analytics-channel-group { max-height: 15rem; overflow-y: auto; }
+.analytics-channel-group label { padding-inline: 2px; border-radius: var(--radius-sm); }
+.analytics-channel-group label:hover { background: var(--surface-hover); }
+.analytics-pager a { display: inline-flex; align-items: center; min-height: 36px; }
+.analytics-table-wrap { border: 1px solid var(--line); border-radius: var(--radius-md); }
+.analytics-table caption { padding: 10px 12px; font-weight: 600; }
+.analytics-table thead th { color: var(--ink-soft); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.analytics-table tbody tr:hover { background: var(--surface-hover); }
+.analytics-table tbody tr:last-child > * { border-bottom: 0; }
+.analytics-table th:not(:first-child), .analytics-table td:not(:first-child) { text-align: end; }
+.analytics-table-wrap .empty-note { margin: 0; padding: 14px 12px; border-top: 1px solid var(--line); }
+.analytics-metric { display: grid; align-content: start; gap: 10px; }
+.analytics-metric__heading p { overflow-wrap: anywhere; }
+.analytics-chart { min-width: 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.analytics-chart > * { max-width: 100%; }
+.analytics-series-preview { margin-top: 0; }
+.analytics-series-preview__bar { fill: var(--chart-1, var(--accent)); }
+.report-row { align-items: baseline; flex-wrap: wrap; }
+.report-row > strong { min-width: 0; margin-inline-start: auto; text-align: end; font-weight: 600; }
+@media (pointer: coarse) { .analytics-sidebar-filter input[type="checkbox"] { width: 24px; height: 24px; } .analytics-channel-group label { min-height: 44px; } }
+@media (max-width: 620px) {
+  .analytics-audience__total { flex-wrap: wrap; gap: 4px 12px; }
+  .report-row { flex-direction: column; gap: 4px; }
+  .report-row > strong { margin-inline-start: 0; text-align: start; }
+  .analytics-metric { padding: 12px; }
+  .analytics-table th, .analytics-table td { padding: 10px 8px; }
+  .analytics-pager a { min-height: 44px; }
+}
+@media (forced-colors: active) { .analytics-posts__bar > span { background: CanvasText; forced-color-adjust: none; } }

@@ -56,10 +56,12 @@ describe('v26 insight authority', () => {
     { id: 'unknown', created_time: '2026-10-01' },
    ] });
    requested.push(url.pathname);
-   return response({ data: [{ name: 'post_video_views', values: [{ value: 8 }] }] });
+   return response({ data: [{ name: url.searchParams.get('metric'), values: [{ value: 8 }] }] });
   });
-  const result = await createFacebookPostHistory(config, { ...policy, metrics: ['post_video_views'], reactionTypes: [] }, fetcher).collect('token', 'page', now);
-  expect(requested).toHaveLength(2);
+  const result = await createFacebookPostHistory(config, { ...policy, metrics: FACEBOOK_HISTORY_CONFIG[0].defaultValue.metrics.filter(metric => metric.startsWith('post_video_')), reactionTypes: [] }, fetcher).collect('token', 'page', now);
+  expect(requested).toHaveLength(4);
+  expect(requested.every(path => /\/(video|attached)\/insights$/.test(path))).toBe(true);
+  expect(result.posts.map(post => post.insights.video_watch_time)).toEqual([undefined, 8, 8, undefined]);
   expect(result.posts.map(post => post.insights.video_views)).toEqual([undefined, 8, 8, undefined]);
  });
 });
@@ -96,7 +98,7 @@ describe('Page history', () => {
 describe('round 3 history evidence', () => {
  it('uses replacement defaults and permits Root overrides', () => {
   const defaults = FACEBOOK_HISTORY_CONFIG[0].defaultValue;
-  expect(defaults.metrics).toEqual(['post_media_view', 'post_total_media_view_unique', 'post_clicks_by_type', 'post_reactions_by_type_total']);
+  expect(defaults.metrics).toEqual(['post_media_view', 'post_total_media_view_unique', 'post_clicks', 'post_clicks_by_type', 'post_reactions_by_type_total', 'post_video_views', 'post_video_view_time']);
   expect(FACEBOOK_HISTORY_CONFIG[0].schema.safeParse({ ...defaults, metrics: ['custom_metric'] }).success).toBe(true);
  });
  it('uses unix seconds and retains metric successes around a refusal', async () => {

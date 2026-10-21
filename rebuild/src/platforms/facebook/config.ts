@@ -63,10 +63,49 @@ export const facebookHistoryPolicySchema = z.object({
   metrics: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(100),
   reactionTypes: z.array(z.string().regex(/^[A-Z_]+$/)).max(30),
 });
-export const FACEBOOK_HISTORY_CONFIG = [entry({ key: 'meta.postHistoryPolicy', group: 'Facebook · Analytics collection', label: 'Page post history policy', kind: 'json', description: 'Resumable Page history window, per-run feed page budget, fields, lifetime metrics and reaction types. Metric eligibility depends on Graph version and grants.', defaultValue: { lookbackDays: 365, pageBudget: 2, edge: 'published_posts', fields: ['id', 'message', 'created_time', 'permalink_url', 'status_type', 'full_picture', 'shares', 'comments.limit(0).summary(true)'], metrics: ['post_media_view', 'post_total_media_view_unique', 'post_clicks_by_type', 'post_reactions_by_type_total'], reactionTypes: ['LIKE', 'LOVE', 'WOW', 'HAHA', 'SAD', 'ANGRY', 'CARE'] }, schema: facebookHistoryPolicySchema, consumption: 'active' })] as const;
+export const FACEBOOK_HISTORY_CONFIG = [entry({ key: 'meta.postHistoryPolicy', group: 'Facebook · Analytics collection', label: 'Page post history policy', kind: 'json', description: 'Resumable Page history window, per-run feed page budget, fields, lifetime metrics and reaction types. Video metrics are requested only for positively identified video posts. Metric eligibility depends on Graph version and grants; explicitly saved metric lists replace the defaults.', defaultValue: { lookbackDays: 365, pageBudget: 2, edge: 'published_posts', fields: ['id', 'message', 'created_time', 'permalink_url', 'status_type', 'full_picture', 'shares', 'comments.limit(0).summary(true)'], metrics: ['post_media_view', 'post_total_media_view_unique', 'post_clicks', 'post_clicks_by_type', 'post_reactions_by_type_total', 'post_video_views', 'post_video_view_time'], reactionTypes: ['LIKE', 'LOVE', 'WOW', 'HAHA', 'SAD', 'ANGRY', 'CARE'] }, schema: facebookHistoryPolicySchema, consumption: 'active' })] as const;
 
 export const facebookAdHierarchySchema = z.object({ levels: z.array(z.enum(['campaign', 'adset', 'ad'])).max(3), actionBreakdowns: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(10) });
+/** Normalized post keys and raw Page keys; saved labels override these defaults. */
+export const FACEBOOK_METRIC_LABEL_DEFAULTS = {
+  impressions: { en: 'Impressions', fr: 'Impressions' },
+  reach: { en: 'People reached', fr: 'Personnes touchées' },
+  clicks: { en: 'Clicks', fr: 'Clics' },
+  comments: { en: 'Comments', fr: 'Commentaires' },
+  shares: { en: 'Shares', fr: 'Partages' },
+  reactions: { en: 'Reactions', fr: 'Réactions' },
+  engagement: { en: 'Engagement', fr: 'Interactions' },
+  post_media_view: { en: 'Media views', fr: 'Vues des médias' },
+  post_total_media_view_unique: { en: 'People who viewed media', fr: 'Personnes ayant vu les médias' },
+  post_clicks_by_type: { en: 'Clicks by type', fr: 'Clics par type' },
+  post_reactions_by_type_total: { en: 'Reactions by type', fr: 'Réactions par type' },
+  video_views: { en: 'Video views', fr: 'Vues de vidéo' },
+  video_watch_time: { en: 'Video watch time (milliseconds)', fr: 'Durée de visionnage (millisecondes)' },
+  page_follows: { en: 'Followers', fr: 'Abonnés' },
+  page_daily_follows: { en: 'Daily follows', fr: 'Abonnements quotidiens' },
+  page_daily_follows_unique: { en: 'New followers', fr: 'Nouveaux abonnés' },
+  page_daily_unfollows_unique: { en: 'Lost followers', fr: 'Abonnés perdus' },
+  page_media_view: { en: 'Media views', fr: 'Vues des médias' },
+  page_total_media_view_unique: { en: 'People who viewed media', fr: 'Personnes ayant vu les médias' },
+  page_post_engagements: { en: 'Post engagements', fr: 'Interactions avec les publications' },
+  page_views_total: { en: 'Page views', fr: 'Vues de la Page' },
+  page_video_views: { en: 'Video views', fr: 'Vues de vidéo' },
+  reactions_like: { en: 'Likes', fr: 'Mentions J’aime' },
+  reactions_love: { en: 'Love reactions', fr: 'Réactions J’adore' },
+  reactions_wow: { en: 'Wow reactions', fr: 'Réactions Wouah' },
+  reactions_haha: { en: 'Haha reactions', fr: 'Réactions Haha' },
+  reactions_sad: { en: 'Sad reactions', fr: 'Réactions Triste' },
+  reactions_angry: { en: 'Angry reactions', fr: 'Réactions Grrr' },
+  reactions_care: { en: 'Care reactions', fr: 'Réactions Solidaire' },
+} satisfies Record<string, { en: string; fr: string }>;
+
+// Runtime single/batch reads and Root reads/saves all parse the owning schema.
+// Merge catalogs here so older stored catalogs gain newly shipped labels without
+// overwriting custom labels or forcing removed metrics back into collection lists.
+export const facebookMetricLabelsSchema = z.record(z.string(), z.object({ en: z.string().min(1), fr: z.string().min(1) }))
+  .transform(overrides => ({ ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...overrides }));
+
 export const FACEBOOK_DATA_DETAIL_CONFIG = [
  entry({ key: 'meta.adHierarchyPolicy', group: 'Facebook · Analytics collection', label: 'Ads hierarchy and action dimensions', kind: 'json', description: 'Additional daily campaign, ad set and ad reports. Action dimensions apply to these reports.', defaultValue: { levels: ['campaign', 'adset', 'ad'], actionBreakdowns: ['action_type'] }, schema: facebookAdHierarchySchema, consumption: 'active' }),
- entry({ key: 'meta.metricLabels', group: 'Facebook · Analytics collection', label: 'Bilingual metric labels', kind: 'json', description: 'English and French labels keyed by normalized metric name.', defaultValue: { engagement: { en: 'Engagement', fr: 'Interactions' }, video_views: { en: 'Video views', fr: 'Vues de vidéo' }, video_watch_time: { en: 'Video watch time (milliseconds)', fr: 'Durée de visionnage (millisecondes)' }, reactions_like: { en: 'Likes', fr: 'Mentions J’aime' }, reactions_love: { en: 'Love reactions', fr: 'Réactions J’adore' }, reactions_wow: { en: 'Wow reactions', fr: 'Réactions Wouah' }, reactions_haha: { en: 'Haha reactions', fr: 'Réactions Haha' }, reactions_sad: { en: 'Sad reactions', fr: 'Réactions Triste' }, reactions_angry: { en: 'Angry reactions', fr: 'Réactions Grrr' }, reactions_care: { en: 'Care reactions', fr: 'Réactions Solidaire' } }, schema: z.record(z.string(), z.object({ en: z.string().min(1), fr: z.string().min(1) })), consumption: 'active' }),
+ entry({ key: 'meta.metricLabels', group: 'Facebook · Analytics collection', label: 'Bilingual metric labels', kind: 'json', description: 'English and French labels keyed by normalized metric name. Saved entries override defaults; newly shipped labels are inherited automatically.', defaultValue: FACEBOOK_METRIC_LABEL_DEFAULTS, schema: facebookMetricLabelsSchema, consumption: 'active' }),
 ] as const;

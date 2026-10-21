@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { NextRequest, NextResponse } from 'next/server';
 import type { PlatformAdapter, AdMutationRequest, AdObjectReadRequest, PlatformCredential } from '@/platforms/types';
 import type { PlatformJobName, JobSummary } from '@/server/jobs/types';
@@ -110,6 +111,8 @@ export interface PlatformAnalyticsHost {
 export interface PlatformAdsHost {
   /** Optional complete object-management engine owned by this platform. */
   operations?: AdsOpsHost;
+  /** Resolve Root-managed customer copy for this request; failures must never fall back to a static engine. */
+  configuredOperations?(locale: 'en' | 'fr'): Promise<AdsOpsHost>;
   /** Pure interpretation of provider-owned stored fields; no credentials or network requests. */
   parentObjectId?(input: { level: 'campaign' | 'adset' | 'ad'; fields: unknown }): string | null;
   /** Safe, serializable UI configuration; never contains credentials or server functions. */
@@ -175,3 +178,16 @@ export interface PlatformHost {
   };
 }
 
+
+
+export type PlatformAdsLocale = 'en' | 'fr';
+const locales = new AsyncLocalStorage<PlatformAdsLocale>();
+
+/** Transport-independent locale scope shared by nested Ads service calls. */
+export function withPlatformAdsLocale<T>(locale: PlatformAdsLocale, operation: () => Promise<T>): Promise<T> {
+  return locales.run(locale, operation);
+}
+
+export function platformAdsLocale(): PlatformAdsLocale {
+  return locales.getStore() ?? 'en';
+}

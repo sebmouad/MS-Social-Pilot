@@ -76,9 +76,9 @@ export default function AnalyticsMetric({ metric, comparison, chartPoints, previ
       <p>{metric.aggregationLabel}</p>
       {metric.aggregationNote && <p className="analytics-aggregation-note">{metric.aggregationNote}</p>}
       {metric.latestAt && <p>{t("Latest data {date}", { date: new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.latestAt) })}</p>}
-      {metric.updatedAt && <p>{t("Last synced {date}", { date: new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.updatedAt) })}</p>}
+      {metric.updatedAt && <p>{t("Last synced {date}", { date: new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.updatedAt) })}</p>}
     </div></div>
-    <SeriesPreview copy={copy} metric={metric} chartPoints={chartPoints} previousPoints={previousPoints} locale={locale} />
+    <div className="analytics-chart"><SeriesPreview copy={copy} metric={metric} chartPoints={chartPoints} previousPoints={previousPoints} locale={locale} /></div>
     {metric.coverage < metric.available && <p className="analytics-coverage">{t("Values are available for {covered} of {available} selected {resources}. Missing values are unknown, not zero.", { covered: metric.coverage, available: metric.available, resources: detailLabel })}</p>}
     <AnalyticsMetricComparison locale={locale} copy={copy} metric={metric} comparison={comparison} />
   </article>;

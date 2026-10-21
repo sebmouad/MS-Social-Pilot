@@ -1,5 +1,13 @@
 import { z } from 'zod';
 const en = {
+  "Locally stored media requires access to this workspace.": "Locally stored media requires access to this workspace.",
+  "Post content": "Post content",
+  "Image": "Image",
+  "Video": "Video",
+  "Article link": "Article link",
+  "Content is saved local content, not a snapshot from the connected platform. Media opens separately; access may expire.": "Content is saved local content, not a snapshot from the connected platform. Media opens separately; access may expire.",
+  "Post content was shortened to the configured limits.": "Post content was shortened to the configured limits.",
+
   "Publication log": "Publication log",
   "Daily publications (UTC)": "Daily publications (UTC)",
   "Currently failed destinations": "Currently failed destinations",
@@ -173,6 +181,14 @@ const en = {
   "Channel": "Channel"
 };
 const fr: typeof en = {
+  "Locally stored media requires access to this workspace.": "Les médias enregistrés localement nécessitent un accès à cet espace de travail.",
+  "Post content": "Contenu de la publication",
+  "Image": "Image",
+  "Video": "Vidéo",
+  "Article link": "Lien de l’article",
+  "Content is saved local content, not a snapshot from the connected platform. Media opens separately; access may expire.": "Ce contenu est enregistré dans l’application, pas une copie de la plateforme connectée. Les médias s’ouvrent séparément ; leur accès peut expirer.",
+  "Post content was shortened to the configured limits.": "Le contenu a été raccourci selon les limites configurées.",
+
   "Publication log": "Journal des publications",
   "Daily publications (UTC)": "Publications quotidiennes (UTC)",
   "Currently failed destinations": "Destinations actuellement en échec",

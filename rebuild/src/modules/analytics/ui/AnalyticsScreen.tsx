@@ -159,7 +159,7 @@ function MetricTable({ data, copy, locale }: { data: AnalyticsReadResult; copy: 
     </header>
     <p className="analytics-detail-coverage">{t("Coverage: {covered} of {available} selected {resources}. A missing value is unknown, not zero.", { covered: metric.coverage, available: metric.available, resources: timeLabel })}</p>
     <AnalyticsMetricComparison locale={locale as 'en' | 'fr'} copy={copy} metric={metric} comparison={data.comparisons[metric.key]} />
-    <div className="analytics-table-wrap">
+    <div className="analytics-table-wrap" role="region" tabIndex={0} aria-label={t("Full date and value series · {total} stored values · showing {start}–{end}", { total: detail.points.total, start: pointStart, end: pointEnd })}>
       <table className="analytics-table">
         <caption>{t("Full date and value series · {total} stored values · showing {start}–{end}", { total: detail.points.total, start: pointStart, end: pointEnd })}</caption>
         <thead><tr><th scope="col">{t("Stored calendar date (UTC)")}</th><th scope="col">{t("Value")}</th></tr></thead>
@@ -167,7 +167,7 @@ function MetricTable({ data, copy, locale }: { data: AnalyticsReadResult; copy: 
       </table>
       {!detail.points.total && <p className="empty-note">{t("No dated values are stored for this metric.")}</p>}
     </div>
-    <div className="analytics-table-wrap">
+    <div className="analytics-table-wrap" role="region" tabIndex={0} aria-label={t("Resource detail · {total} stored rows · showing {start}–{end}", { total: detail.rows.total, start: rowStart, end: rowEnd })}>
       <table className="analytics-table">
         <caption>{t("Resource detail · {total} stored rows · showing {start}–{end}", { total: detail.rows.total, start: rowStart, end: rowEnd })}</caption>
         <thead><tr><th scope="col">{metric.kind === 'breakdown' ? t("Category") : metric.resourceKind === 'ad-account' ? t("Ad account") : t("Channel")}</th><th scope="col">{t("Value")}</th><th scope="col">{t("Data date")}</th></tr></thead>

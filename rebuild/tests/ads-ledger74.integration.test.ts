@@ -62,8 +62,8 @@ describe.skipIf(!databaseUrl)('Ads ledger constraints on isolated PostgreSQL', (
     const rows = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM ads_management_operations WHERE "workspaceId"=${id}`;
     expect(rows[0]?.count).toBe(BigInt(2));
   }));
-  it.each(['campaign', 'adset'] as const)('holds an ambiguous %s creation until explicit resolution', async kind => fixture(async (tx, id) => {
-    const object = kind === 'campaign' ? '@create-campaign' : '@create-adset:parent-one';
+  it.each(['campaign', 'adset', 'ad'] as const)('holds an ambiguous %s creation until explicit resolution', async kind => fixture(async (tx, id) => {
+    const object = kind === 'campaign' ? '@create-campaign' : kind === 'adset' ? '@create-adset:parent-one' : '@create-ad:parent-one';
     const operation = `${kind}.create`;
     const create = (suffix: string, request: string) => tx.$executeRaw`INSERT INTO ads_management_operations (id,"workspaceId","adAccountId","actorId","requestId","requestHash","operationType","objectType","objectId",params,status) VALUES (${`${id}_${suffix}`},${id},${id},${id},${request},${'b'.repeat(64)},${operation},${kind},${object},'{}'::jsonb,'pending')`;
     await create('first', 'creation-request-first');

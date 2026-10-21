@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { cache } from 'react';
 import { runtimeConfig } from '@/server/config/store';
 import { catalogLanguages, defaultAdsCatalogs, type AdsCatalogs } from '../copy';
+import { platformAdsLocale } from '@/server/platforms/host';
 
 const snapshots = new AsyncLocalStorage<{ copy?: Promise<AdsCatalogs> }>();
 const readAdsCopy = cache(async (): Promise<AdsCatalogs> => {
@@ -28,7 +29,7 @@ export function withAdsCopySnapshot<T>(operation: () => Promise<T>): Promise<T> 
 }
 
 /** Service/API/MCP failures use the same Root catalog as the customer screens. */
-export async function adsServiceText(key: import('../copy').AdsCustomerKey, values: Record<string, string | number> = {}, locale: 'en' | 'fr' = 'en') {
+export async function adsServiceText(key: import('../copy').AdsCustomerKey, values: Record<string, string | number> = {}, locale: 'en' | 'fr' = platformAdsLocale()) {
   const { customer } = await loadAdsCopy();
   return customer[key][locale].replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
 }
