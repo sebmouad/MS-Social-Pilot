@@ -1,9 +1,7 @@
 import { getBestTimeSuggestions } from './server/best-time';
 import { OperationError } from '@/lib/operation-error';
-import { requireFeature } from '@/server/entitlements';
 import { runtimeConfig } from '@/server/config/store';
-import { createLocalDraft, deleteLocalDraft, updateLocalDraft } from '@/server/post-mutations';
-import { cancelScheduledPost, createPost, deletePost, importPostsCsv, publishPost, reschedulePostToInstant, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '@/modules/publishing/server/lifecycle';
+import { cancelScheduledPost, importPostsCsv, publishPost, reschedulePostToInstant, reviewPost, schedulePost, submitPostForApproval, syncPostStatus } from '@/modules/publishing/server/lifecycle';
 import { parseScheduleMode } from './remote-scheduling';
 import { parseDestinationScheduleModes } from './server/schedule-modes';
 import { queuePostRequest } from '@/modules/publishing/server/queue';
@@ -17,7 +15,7 @@ import { adoptLegacyPublication, finishPublicationProjection, getPublicationStat
 import { duplicatePost } from './server/duplicate';
 import { listPostsWithFirstComment } from './server/api';
 import { exportPublishingPosts } from './server/export';
-import { parsePublishingMedia } from './media-support';
+import { createPublishingPost, updatePublishingPost, deletePublishingPost } from './server/api-writes';
 import { templateToolDefinitions, executeTemplateTool } from './template-mcp';
 import { labelToolDefinitions, executeLabelTool } from './labels-mcp';
 import { savedViewToolDefinitions, executeSavedViewTool } from './saved-views-mcp';
@@ -38,24 +36,6 @@ function isoInstant(value: unknown, key: string): Date {
   const date = new Date(String(value));
   if (typeof value !== 'string' || !Number.isFinite(date.getTime()) || !/^\d{4}-\d\d-\d\dT/.test(value)) throw new OperationError('invalid_request', `${key} must be an ISO date-time.`);
   return date;
-}
-
-function postMessageArgument(args: Record<string, unknown>) {
-  if (typeof args.message !== 'string') throw new OperationError('invalid_request', 'message must be a string; use an empty string for a post without a caption.');
-  return args.message;
-}
-function postMediaArguments(args: Record<string, unknown>) {
-  if (Object.prototype.hasOwnProperty.call(args, 'media')) {
-    if (args.imageUrl !== undefined || args.videoUrl !== undefined) throw new OperationError('invalid_request', 'Use the ordered media list or individual media URL fields, not both.');
-    return parsePublishingMedia(args.media);
-  }
-  for (const key of ['imageUrl', 'videoUrl']) {
-    if (args[key] !== undefined && typeof args[key] !== 'string') throw new OperationError('invalid_request', 'Media URLs must be strings.');
-  }
-  return parsePublishingMedia([
-    ...(typeof args.imageUrl === 'string' && args.imageUrl.trim() ? [{ kind: 'image', url: args.imageUrl.trim() }] : []),
-    ...(typeof args.videoUrl === 'string' && args.videoUrl.trim() ? [{ kind: 'video', url: args.videoUrl.trim() }] : []),
-  ]);
 }
 
 /** MCP tool groups this module installs. The host merges installed groups; edit only here. */
@@ -224,9 +204,9 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
     tools: [
     { name: 'list_posts', description: 'List workspace posts, newest first. Filter by status, scheduled date and literal case-insensitive post text or first-comment search.', inputSchema: { type: 'object', properties: { status: { type: 'string', description: 'Comma-separated post statuses.' }, from: { type: 'string', description: 'ISO date or date-time lower bound for scheduledAt.' }, to: { type: 'string', description: 'ISO date or date-time upper bound for scheduledAt.' }, limit: { type: 'integer', minimum: 1 }, channelId: { type: 'string' }, q: { type: 'string', description: 'Literal search in post text and first comment.' } }, additionalProperties: false } },
     { name: 'export_posts', description: 'Prepare a UTF-8 CSV of all matching authorized posts with content, first comments, media, timestamps and destination delivery outcomes. Filter by one status, channel and literal text/first-comment search. Root export limits and the MCP result ceiling apply; oversized results are refused, never silently truncated. CSV cells are protected against spreadsheet formula execution. This is a read and sends no provider request.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, channelId: { type: 'string' }, q: { type: 'string' } }, additionalProperties: false } },
-    { name: 'create_draft', description: 'Create an unpublished local draft. Confirmation is required: confirmation must be exactly CREATE DRAFT.', inputSchema: { type: 'object', required: ['message', 'confirmation'], properties: { message: { type: 'string', minLength: 1, maxLength: 10000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
-    { name: 'update_draft', description: 'Edit an unconnected local draft. Confirmation must be exactly UPDATE DRAFT followed by its ID.', inputSchema: { type: 'object', required: ['postId', 'message', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string', minLength: 1, maxLength: 10000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
-    { name: 'delete_draft', description: 'Permanently delete an unconnected local draft. Confirmation must be exactly DELETE DRAFT followed by its ID.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'create_draft', description: 'Create an unpublished local draft. Uses the same service as create_post with no destinations. Confirmation must be exactly CREATE POST.', inputSchema: { type: 'object', required: ['message', 'confirmation'], properties: { message: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'update_draft', description: 'Alias for update_post: replace unpublished content and its complete destination list through the same service. Confirmation must be exactly UPDATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'message', 'targetIds', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string' }, firstComment: { type: 'string' }, firstCommentDelayMinutes: { type: 'integer', minimum: 0 }, link: { type: 'string' }, media: postMediaInputSchema, destinationFormats: { type: 'object', additionalProperties: { type: 'string' } }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'delete_draft', description: 'Alias for local post deletion through the shared deletion service. Returns its durable receipt. Confirmation must be exactly DELETE POST <postId> LOCAL.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'publish_post', description: 'Publish a workspace post now to its configured destinations. This contacts social platforms. Confirmation must exactly match PUBLISH POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'send_first_comment', description: 'Send the saved first comment once to a confirmed remote post. Recorded rejections require retry_first_comment instead. This contacts the platform. If the result is uncertain, inspect list_posts and do not repeat until the outcome has been manually checked. Confirmation must exactly match SEND FIRST COMMENT <postTargetId>.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'retry_first_comment', description: 'Deliberately retry one saved first comment only after a recorded definite rejection. Uncertain, legacy unknown, in-flight and sent comments are refused. Sends immediately, overriding the saved delay. Confirmation must exactly match RETRY FIRST COMMENT <postTargetId>.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -297,31 +277,6 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
           maxItems: viewer.maxResultItems ?? await runtimeConfig('mcp.maxResultItems'),
         });
       }
-      case 'create_draft': {
-        requireFeature(viewer.entitlements, 'publishing/posts');
-        requireConfirmation(args, 'CREATE DRAFT');
-        const message = typeof args.message === 'string' ? args.message.trim() : '';
-        if (!message || message.length > 10000) throw new OperationError('invalid_request', 'message must contain 1 to 10000 characters.');
-        const result = await createLocalDraft(viewer, message);
-        return auditedReceipt(viewer, name, { postId: result.id }, { id: result.id, status: 'draft' });
-      }
-      case 'update_draft': {
-        requireFeature(viewer.entitlements, 'publishing/posts');
-        const postId = String(args.postId ?? '');
-        requireConfirmation(args, `UPDATE DRAFT ${postId}`);
-        const message = typeof args.message === 'string' ? args.message.trim() : '';
-        if (!postId || !message || message.length > 10000) throw new OperationError('invalid_request', 'postId and a message of 1 to 10000 characters are required.');
-        await updateLocalDraft(viewer, postId, message);
-        return auditedReceipt(viewer, name, { postId }, { id: postId, status: 'draft', updated: true });
-      }
-      case 'delete_draft': {
-        requireFeature(viewer.entitlements, 'publishing/posts');
-        const postId = String(args.postId ?? '');
-        requireConfirmation(args, `DELETE DRAFT ${postId}`);
-        if (!postId) throw new OperationError('invalid_request', 'postId is required.');
-        await deleteLocalDraft(viewer, postId);
-        return auditedReceipt(viewer, name, { postId }, { id: postId, deleted: true });
-      }
       case 'publish_post': {
         const postId = typeof args.postId === 'string' ? args.postId : '';
         if (!postId) throw new OperationError('invalid_request', 'postId is required.');
@@ -365,12 +320,12 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
         const result = await syncPostStatus(publishingActor(viewer), postId);
         return auditedReceipt(viewer, name, { postId, ...result }, { postId, ...result });
       }
+      case 'delete_draft':
       case 'delete_post': {
-        const postId = typeof args.postId === 'string' ? args.postId : '';
-        if (!postId || typeof args.deleteRemote !== 'boolean') throw new OperationError('invalid_request', 'postId and deleteRemote are required.');
-        requireConfirmation(args, `DELETE POST ${postId} ${args.deleteRemote ? 'REMOTE' : 'LOCAL'}`);
-        const result = await deletePost(publishingActor(viewer), postId, args.deleteRemote);
-        return auditedReceipt(viewer, name, { postId, remoteDeletionRequested: args.deleteRemote, state: result.state }, result);
+        const postId = requiredString(args, 'postId');
+        const input = name === 'delete_draft' ? { ...args, deleteRemote: false } : args;
+        const result = await deletePublishingPost(publishingActor(viewer), postId, input);
+        return auditedReceipt(viewer, name, { postId, remoteDeletionRequested: input.deleteRemote, state: result.state }, result);
       }
       case 'get_post_deletion_status': {
         const postId = requiredString(args, 'postId');
@@ -430,23 +385,17 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
         const result = await duplicatePost(publishingActor(viewer), args);
         return auditedReceipt(viewer, name, { sourcePostId: result.sourcePostId, postId: result.postId, replayed: result.replayed }, result);
       }
+      case 'create_draft':
       case 'create_post': {
-        requireConfirmation(args, 'CREATE POST');
-        if (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string')) throw new OperationError('invalid_request', 'targetIds must be an array of destination IDs.');
-        const media = postMediaArguments(args);
-        const scheduledAt = args.scheduledAt === undefined ? undefined : isoInstant(args.scheduledAt, 'scheduledAt');
-        const scheduleMode = parseScheduleMode(args.scheduleMode);
-        const destinationScheduleModes = parseDestinationScheduleModes(args.destinationScheduleModes);
-        const result = await createPost(publishingActor(viewer), { message: postMessageArgument(args), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', ...(args.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: args.firstCommentDelayMinutes }), destinationFormats: args.destinationFormats, targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media, ...(scheduledAt ? { scheduledAt } : {}), ...(scheduleMode ? { scheduleMode } : {}), ...(destinationScheduleModes ? { destinationScheduleModes } : {}) });
-        return auditedReceipt(viewer, name, { postId: result.id, targetCount: args.targetIds.length, ...(scheduledAt ? { scheduledAt: scheduledAt.toISOString(), scheduleMode: result.scheduleMode } : {}) }, { id: result.id, status: scheduledAt ? 'scheduled' : 'draft', ...(scheduledAt ? { scheduleMode: result.scheduleMode, destinationScheduleModes: result.destinationScheduleModes, remoteHold: result.remoteHold } : {}) });
+        const input = name === 'create_draft' ? { ...args, targetIds: [] } : args;
+        const result = await createPublishingPost(publishingActor(viewer), input);
+        return auditedReceipt(viewer, name, { postId: result.id }, result);
       }
+      case 'update_draft':
       case 'update_post': {
         const postId = requiredString(args, 'postId');
-        requireConfirmation(args, `UPDATE POST ${postId}`);
-        if (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string')) throw new OperationError('invalid_request', 'targetIds must be an array of destination IDs.');
-        const media = postMediaArguments(args);
-        await updatePost(publishingActor(viewer), { postId, message: postMessageArgument(args), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', ...(args.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: args.firstCommentDelayMinutes }), destinationFormats: args.destinationFormats, targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media });
-        return auditedReceipt(viewer, name, { postId, targetCount: args.targetIds.length }, { postId, updated: true });
+        const result = await updatePublishingPost(publishingActor(viewer), postId, args);
+        return auditedReceipt(viewer, name, { postId }, result);
       }
       case 'submit_post_for_approval': {
         const postId = requiredString(args, 'postId');
