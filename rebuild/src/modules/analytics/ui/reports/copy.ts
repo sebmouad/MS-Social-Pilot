@@ -1,7 +1,7 @@
 /** Module-owned customer copy. Root catalog registration is coordinated by the host owner. */
 export type UiLocale = 'en' | 'fr';
 const french: Record<string, string> = {
-  "Response-time reports include stored comment replies, slowest first response and resolution within business hours. Missing history is excluded; unset business hours show no figure.": "Les rapports de réponse incluent les réponses aux commentaires enregistrés, la réponse initiale la plus lente et la résolution en heures ouvrées. Les historiques absents sont exclus ; sans horaires définis, aucun résultat en heures ouvrées n’est affiché.",
+  "Response reports preserve the original start of visitor waits, show recorded resolution and reopening cycles, and disclose saved-history coverage. Complete platform history is not guaranteed.": "Les rapports de réponse conservent le début initial des attentes, présentent les cycles de résolution et de réouverture enregistrés et précisent la couverture de l’historique sauvegardé. L’historique complet de la plateforme n’est pas garanti.",
   "{0} existing schedule": "{0} planification existante",
   "{0} existing schedules": "{0} planifications existantes",
   "not confirmed": "non confirmé",
@@ -216,4 +216,4 @@ const french: Record<string, string> = {
 export const uiLocale = (language: string | null): UiLocale => language?.trim().toLowerCase().startsWith('fr') ? 'fr' : 'en';
 export const reportCopyDefaults = Object.fromEntries(Object.entries(french).map(([en, fr]) => [en, { en, fr }]));
 export type ReportCopy = typeof reportCopyDefaults;
-export const uiCopy = (locale: UiLocale, catalog: ReportCopy = reportCopyDefaults) => (text: string, ...values: Array<string | number>): string => (catalog[text]?.[locale] ?? text).replace(/\{(\d+)\}/g, (match, index: string) => String(values[Number(index)] ?? match));
+export const uiCopy = (locale: UiLocale, catalog: ReportCopy = reportCopyDefaults) => (text: string, ...values: Array<string | number>): string => (catalog[text]?.[locale] ?? reportCopyDefaults[text]?.[locale] ?? text).replace(/\{(\d+)\}/g, (match, index: string) => String(values[Number(index)] ?? match));
