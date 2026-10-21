@@ -1,3 +1,4 @@
+import { readInboxMetadata } from './metadata';
 import { inboxServiceText } from './service-copy';
 import { z } from 'zod';
 import { Prisma } from '../../../../generated/client';
@@ -118,7 +119,7 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
     inboxLastSynced(actor.workspaceId, channelIds),
   ]);
   const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
-  const items = await hydrateItems(actor.workspaceId, keys);
+  const items = await hydrateItems(actor.workspaceId, keys, channelIds);
   return { ...base, ...cursors, items, total, lastSynced };
 }
 
@@ -142,7 +143,7 @@ export function storedSentiment(value: string | null): InboxSentiment | null {
   return value === 'positive' || value === 'neutral' || value === 'negative' ? value : null;
 }
 
-async function hydrateItems(workspaceId: string, keys: Key[]): Promise<InboxListItem[]> {
+async function hydrateItems(workspaceId: string, keys: Key[], channelIds: string[]): Promise<InboxListItem[]> {
   const conversationIds = keys.filter(key => key.kind === 'message').map(key => key.id);
   const commentIds = keys.filter(key => key.kind === 'comment').map(key => key.id);
   const reviewIds = keys.filter(key => key.kind === 'review').map(key => key.id);
@@ -150,6 +151,10 @@ async function hydrateItems(workspaceId: string, keys: Key[]): Promise<InboxList
     conversationIds.length ? prisma.conversation.findMany({ where: { id: { in: conversationIds }, target: { workspaceId } }, select: { id: true, snippet: true, unreadCount: true, updatedTime: true, resolvedAt: true, target: { select: targetSelect }, messages: { orderBy: [{ createdTime: 'desc' }, { id: 'desc' }], take: 1, select: { fromName: true, fromId: true, sentById: true, message: true } } } }) : [],
     commentIds.length ? prisma.postComment.findMany({ where: { id: { in: commentIds }, postTarget: { target: { workspaceId }, post: { workspaceId } } }, select: { id: true, message: true, fromName: true, createdTime: true, resolvedAt: true, isHidden: true, sentiment: true, postTarget: { select: { target: { select: targetSelect }, post: { select: { message: true } } } } } }) : [],
     reviewIds.length ? readReviews(workspaceId, reviewIds) : [],
+  ]);
+  const [conversationMetadata, commentMetadata] = await Promise.all([
+    readInboxMetadata(prisma, { workspaceId, channelIds }, 'conversation', conversationIds),
+    readInboxMetadata(prisma, { workspaceId, channelIds }, 'comment', commentIds),
   ]);
   const answered = commentIds.length ? await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
     SELECT pc.id FROM post_comments pc JOIN post_targets pt ON pt.id = pc."postTargetId" JOIN targets t ON t.id = pt."targetId" JOIN posts p ON p.id = pt."postId"
@@ -159,10 +164,10 @@ async function hydrateItems(workspaceId: string, keys: Key[]): Promise<InboxList
   const mapped = new Map<string, InboxListItem>();
   for (const item of conversations) {
     const newest = item.messages[0];
-    mapped.set(`message:${item.id}`, { key: `message:${item.id}`, kind: 'message', id: item.id, author: newest?.sentById ? item.target.name : newest?.fromName || 'Conversation', preview: newest?.message || item.snippet || 'No message text available.', time: item.updatedTime, target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: item.unreadCount, needsReply: conversationNeedsReply(newest, item.target.providerId, Boolean(item.resolvedAt)), resolved: Boolean(item.resolvedAt), hidden: false, context: null, rating: null, recommendation: null, sentiment: null });
+    mapped.set(`message:${item.id}`, { key: `message:${item.id}`, kind: 'message', id: item.id, metadata: conversationMetadata.get(item.id), author: newest?.sentById ? item.target.name : newest?.fromName || 'Conversation', preview: newest?.message || item.snippet || 'No message text available.', time: item.updatedTime, target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: item.unreadCount, needsReply: conversationNeedsReply(newest, item.target.providerId, Boolean(item.resolvedAt)), resolved: Boolean(item.resolvedAt), hidden: false, context: null, rating: null, recommendation: null, sentiment: null });
   }
   for (const item of reviews) mapped.set(`review:${item.id}`, { key: `review:${item.id}`, kind: 'review', id: item.id, author: item.reviewerName || 'Visitor', preview: item.reviewText ?? '', time: item.createdTime, rating: item.rating, recommendation: recommendationOf(item.recommendationType), target: { id: item.target.id, name: item.target.name, provider: item.target.socialAccount?.provider ?? null }, unread: 0, needsReply: false, resolved: Boolean(item.resolvedAt), hidden: false, context: null, sentiment: null });
-  for (const item of comments) mapped.set(`comment:${item.id}`, { key: `comment:${item.id}`, kind: 'comment', id: item.id, author: item.fromName || 'Visitor', preview: item.message, time: item.createdTime, target: { id: item.postTarget.target.id, name: item.postTarget.target.name, provider: item.postTarget.target.socialAccount?.provider ?? null }, unread: 0, needsReply: !item.resolvedAt && !item.isHidden && !answeredIds.has(item.id), resolved: Boolean(item.resolvedAt), hidden: item.isHidden, context: item.postTarget.post.message, rating: null, recommendation: null, sentiment: storedSentiment(item.sentiment) });
+  for (const item of comments) mapped.set(`comment:${item.id}`, { key: `comment:${item.id}`, kind: 'comment', id: item.id, metadata: commentMetadata.get(item.id), author: item.fromName || 'Visitor', preview: item.message, time: item.createdTime, target: { id: item.postTarget.target.id, name: item.postTarget.target.name, provider: item.postTarget.target.socialAccount?.provider ?? null }, unread: 0, needsReply: !item.resolvedAt && !item.isHidden && !answeredIds.has(item.id), resolved: Boolean(item.resolvedAt), hidden: item.isHidden, context: item.postTarget.post.message, rating: null, recommendation: null, sentiment: storedSentiment(item.sentiment) });
   return keys.flatMap(key => { const item = mapped.get(`${key.kind}:${key.id}`); return item ? [item] : []; });
 }
 
@@ -212,7 +217,7 @@ export async function readInboxThread(actor: InboxReadActor, input: unknown, con
   const cursor = readInboxCursor(encoded, fingerprint, limits.cursorMaxCharacters, cursorError);
   if (cursor && cursor.kind !== kind) throw await invalid();
   if (!access.channelIds.length) throw new OperationError('not_found', await inboxServiceText('service23'));
-  const conversation = kind === 'message' ? await prisma.conversation.findFirst({ where: { id, targetId: { in: access.channelIds }, target: { workspaceId: actor.workspaceId } }, select: { id: true, resolvedAt: true, target: { select: targetSelect } } }) : null;
+  const conversation = kind === 'message' ? await prisma.conversation.findFirst({ where: { id, targetId: { in: access.channelIds }, target: { workspaceId: actor.workspaceId } }, select: { id: true, remoteId: true, resolvedAt: true, target: { select: targetSelect } } }) : null;
   const comment = kind === 'comment' ? await prisma.postComment.findFirst({ where: { id, parentRemoteId: null, postTarget: { targetId: { in: access.channelIds }, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, postTargetId: true, message: true, fromName: true, fromId: true, sentById: true, createdTime: true, resolvedAt: true, isHidden: true, postTarget: { select: { target: { select: targetSelect }, post: { select: { message: true } } } } } }) : null;
   if (!conversation && !comment) throw new OperationError('not_found', await inboxServiceText('service23'));
   const target = conversation?.target ?? comment!.postTarget.target;
@@ -231,19 +236,24 @@ export async function readInboxThread(actor: InboxReadActor, input: unknown, con
   ]);
   const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
   const ids = keys.map(item => item.id);
-  const select = { id: true, message: true, fromName: true, fromId: true, sentById: true, createdTime: true } as const;
+  const select = { id: true, remoteId: true, message: true, fromName: true, fromId: true, sentById: true, createdTime: true } as const;
   type Stored = { id: string; message: string | null; fromName: string | null; fromId: string | null; sentById: string | null; createdTime: Date; remoteId?: string; parentRemoteId?: string | null; isHidden?: boolean };
   // Replies at any stored depth belong to the opening comment: the recursive source above is scoped to its post target.
   const entries: Stored[] = !ids.length ? [] : conversation ? await prisma.conversationMessage.findMany({ where: { id: { in: ids }, conversationId: id }, select }) : await prisma.postComment.findMany({ where: { id: { in: ids }, postTargetId: comment!.postTargetId, remoteId: { not: comment!.remoteId } }, select: { ...select, remoteId: true, parentRemoteId: true, isHidden: true } });
+  const metadataScope = { workspaceId: actor.workspaceId, channelIds: access.channelIds };
+  const [threadMetadata, entryMetadata] = await Promise.all([
+    readInboxMetadata(prisma, metadataScope, conversation ? 'conversation' : 'comment', [id]),
+    readInboxMetadata(prisma, metadataScope, conversation ? 'message' : 'comment', entries.map(item => item.id)),
+  ]);
   const names = await memberNames(actor.workspaceId, [...new Set([...entries, ...(comment ? [comment] : [])].flatMap(entry => entry.sentById ? [entry.sentById] : []))]);
   const entry = (item: Stored, parentId: string | null = null, depth = 0): ThreadEntry => {
     const fromChannel = item.sentById !== null || item.fromId !== null && item.fromId === target.providerId;
-    return { id: item.id, author: fromChannel ? target.name : item.fromName || 'Visitor', text: item.message || '', time: item.createdTime, fromChannel, sentBy: item.sentById ? names.get(item.sentById) ?? 'A teammate' : null, parentId, depth, hidden: item.isHidden === true };
+    return { id: item.id, remoteId: item.remoteId, authorId: item.fromId, parentRemoteId: item.parentRemoteId ?? null, metadata: item.id === comment?.id ? threadMetadata.get(item.id) : entryMetadata.get(item.id), author: fromChannel ? target.name : item.fromName || 'Visitor', text: item.message || '', time: item.createdTime, fromChannel, sentBy: item.sentById ? names.get(item.sentById) ?? 'A teammate' : null, parentId, depth, hidden: item.isHidden === true };
   };
   const byId = new Map(entries.map(item => [item.id, item]));
   const pageOrder = [...keys].reverse().flatMap(key => { const item = byId.get(key.id); return item ? [item] : []; });
   const chronological = comment ? nestReplies(pageOrder, comment, entry) : pageOrder.map(item => entry(item));
-  return { thread: { kind, id, rating: null, recommendation: null, target: { id: target.id, name: target.name, providerId: target.providerId, provider: target.socialAccount?.provider ?? null }, resolved: Boolean(conversation?.resolvedAt ?? comment?.resolvedAt), hidden: comment?.isHidden ?? false, postText: comment?.postTarget.post.message ?? null, entries: [...(comment ? [entry(comment)] : []), ...chronological], lastInbound }, history: { ...cursors, total: Number(counts[0]?.count ?? 0), shown: chronological.length, limit: take, cursor: encoded ?? null } };
+  return { thread: { kind, id, remoteId: conversation?.remoteId ?? comment?.remoteId, metadata: threadMetadata.get(id), rating: null, recommendation: null, target: { id: target.id, name: target.name, providerId: target.providerId, provider: target.socialAccount?.provider ?? null }, resolved: Boolean(conversation?.resolvedAt ?? comment?.resolvedAt), hidden: comment?.isHidden ?? false, postText: comment?.postTarget.post.message ?? null, entries: [...(comment ? [entry(comment)] : []), ...chronological], lastInbound }, history: { ...cursors, total: Number(counts[0]?.count ?? 0), shown: chronological.length, limit: take, cursor: encoded ?? null } };
 }
 
 /** Refresh timestamps only: replies and local workflow actions do not claim provider synchronization. */

@@ -1,3 +1,4 @@
+import { storeInboxMetadata } from '@/modules/inbox/server/metadata';
 import { randomBytes } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { configuredFacebookEngine } from '@/platforms/facebook/runtime';
@@ -111,23 +112,26 @@ export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
               select: { id: true },
             });
             batchConversationCount++;
+            if ('metadata' in conversation) await storeInboxMetadata(tx, { workspaceId: actor.workspaceId, targetId: batch.targetId }, 'conversation', stored.id, (conversation as { metadata?: unknown }).metadata);
             for (const message of conversation.messages) {
-              await tx.conversationMessage.upsert({
+              const storedMessage = await tx.conversationMessage.upsert({
                 where: { conversationId_remoteId: { conversationId: stored.id, remoteId: message.id } },
                 create: { id: `msg_${randomBytes(12).toString('hex')}`, conversationId: stored.id, remoteId: message.id, fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
                 update: { fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
               });
+              if ('metadata' in message) await storeInboxMetadata(tx, { workspaceId: actor.workspaceId, targetId: batch.targetId }, 'message', storedMessage.id, (message as { metadata?: unknown }).metadata);
               batchMessageCount++;
             }
           }
           for (const postComments of batch.comments) {
             for (const comment of orderInboxCommentBatch(postComments.items)) {
               if (await inboxCommentSuppressed(tx, actor.workspaceId, batch.targetId, comment.id, comment.parentId)) continue;
-              await tx.postComment.upsert({
+              const storedComment = await tx.postComment.upsert({
                 where: { postTargetId_remoteId: { postTargetId: postComments.postTargetId, remoteId: comment.id } },
                 create: { id: `comment_${randomBytes(12).toString('hex')}`, postTargetId: postComments.postTargetId, remoteId: comment.id, parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, createdTime: comment.createdAt, fetchedAt: new Date() },
                 update: { parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, fetchedAt: new Date() },
               });
+              if ('metadata' in comment) await storeInboxMetadata(tx, { workspaceId: actor.workspaceId, targetId: batch.targetId }, 'comment', storedComment.id, (comment as { metadata?: unknown }).metadata);
               batchCommentCount++;
             }
           }

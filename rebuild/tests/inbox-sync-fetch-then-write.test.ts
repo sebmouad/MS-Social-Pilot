@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   depth: 0, events: [] as string[], providerDepths: [] as number[],
   targets: vi.fn(), freshTarget: vi.fn(), postTargets: vi.fn(), inboxList: vi.fn(), postComments: vi.fn(), suppressed: vi.fn(), lock: vi.fn(),
-  conversationUpsert: vi.fn(), commentUpsert: vi.fn(),
+  conversationUpsert: vi.fn(), messageUpsert: vi.fn(), commentUpsert: vi.fn(), metadataWrite: vi.fn(),
 }));
 
 const binding = { providerId: 'pa', accessToken: null, socialAccount: { workspaceId: 'w', accessToken: 'token', scopes: 'pages_messaging', tokenExpiresAt: null, invalidatedAt: null } };
@@ -15,7 +15,7 @@ async function inside<T>(name: string, run: () => Promise<T>): Promise<T> {
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_w: string, operation: () => Promise<unknown>) => inside('workspace', operation) }));
 vi.mock('../src/server/jobs/access', () => ({ assertWorkspaceJobAccess: vi.fn() }));
 vi.mock('../src/server/platforms/resource-lock', () => ({ withSelectedResourceOperation: (_w: string, _r: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => inside('lock', () => run({
-  conversation: { upsert: state.conversationUpsert }, conversationMessage: { upsert: vi.fn().mockResolvedValue({}) }, postComment: { upsert: state.commentUpsert },
+  conversation: { upsert: state.conversationUpsert }, conversationMessage: { upsert: state.messageUpsert }, postComment: { upsert: state.commentUpsert }, $executeRaw: state.metadataWrite,
 }, new AbortController().signal)) }));
 vi.mock('../src/modules/inbox/server/comment-guard', () => ({
   lockInboxChannel: state.lock, inboxCommentSuppressed: state.suppressed, orderInboxCommentBatch: (items: unknown[]) => items,
@@ -53,10 +53,34 @@ beforeEach(() => {
   state.postComments.mockResolvedValue([comment]);
   state.suppressed.mockResolvedValue(false);
   state.conversationUpsert.mockResolvedValue({ id: 'stored' });
-  state.commentUpsert.mockResolvedValue({});
+  state.messageUpsert.mockResolvedValue({ id: 'stored-message' });
+  state.commentUpsert.mockResolvedValue({ id: 'stored-comment' });
 });
 
 describe('Inbox sync fetch-then-write', () => {
+  it('preserves supplied provider metadata, parent ids and original Page response timestamps', async () => {
+    const respondedAt = new Date('2026-10-20T12:00:00Z');
+    state.inboxList.mockResolvedValue([{ id: 'conv1', snippet: 'Response', unreadCount: 0, messageCount: 1, updatedAt: respondedAt,
+      metadata: { participants: [{ id: 'visitor', name: 'Sam', pictureUrl: 'https://example.test/avatar' }], folder: 'inbox', labels: [] },
+      messages: [{ id: 'message1', fromId: 'pa', fromName: 'Page', text: null, createdAt: respondedAt, metadata: { attachments: [{ type: 'image', url: 'https://example.test/image' }] } }],
+    }]);
+    state.postComments.mockResolvedValue([{ ...comment, parentId: 'root-remote', fromId: 'pa', createdAt: respondedAt,
+      metadata: { reactions: [{ type: 'LIKE', count: 2 }], permalink: 'https://example.test/comment', threadId: 'root-remote' },
+    }]);
+
+    await syncInbox();
+
+    expect(state.providerDepths).toEqual([0, 0]);
+    expect(state.metadataWrite).toHaveBeenCalledTimes(3);
+    const payloads = state.metadataWrite.mock.calls.map(call => JSON.parse(call[1] as string));
+    expect(payloads).toEqual([
+      expect.objectContaining({ participants: [expect.objectContaining({ id: 'visitor', pictureUrl: 'https://example.test/avatar' })], folder: 'inbox', labels: [] }),
+      { attachments: [{ type: 'image', url: 'https://example.test/image' }] },
+      { reactions: [{ type: 'LIKE', count: 2 }], permalink: 'https://example.test/comment', threadId: 'root-remote' },
+    ]);
+    expect(state.messageUpsert.mock.calls[0]![0].update).toMatchObject({ fromId: 'pa', createdTime: respondedAt });
+    expect(state.commentUpsert.mock.calls[0]![0].create).toMatchObject({ parentRemoteId: 'root-remote', fromId: 'pa', createdTime: respondedAt });
+  });
   it('makes every provider call outside the workspace transaction and resource lock', async () => {
     const result = await syncInbox();
 
