@@ -4,9 +4,19 @@ import { z } from 'zod';
 import { currentRootActor } from '@/server/config/access';
 import { runtimeConfig } from '@/server/config/store';
 import { createRootWorkspace } from '@/server/root/workspace-controls';
+import { listRootWorkspaces } from '@/server/root/directory';
+import { rootRoute, searchParamsObject } from '@/server/root/legacy/http';
+import { OperationError } from '@/lib/operation-error';
 
 export const runtime = 'nodejs';
 const schema = z.object({ name: z.string().trim().min(1), ownerEmail: z.string().trim().email(), confirmation: z.string().min(1), timezone: z.string().optional() }).strict();
+
+/** Private directory read through the same service and Root page size as MCP/UI. */
+export const GET = rootRoute({}, async request => {
+  const query = searchParamsObject(request, ['q', 'page']);
+  if (query.page !== undefined && (!Number.isSafeInteger(Number(query.page)) || Number(query.page) < 1)) throw new OperationError('invalid_request', 'Choose a valid workspace query and page.');
+  return listRootWorkspaces(query, Number(await runtimeConfig('root.directoryPageSize')));
+});
 
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
