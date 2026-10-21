@@ -430,6 +430,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
         } }, operation);
       } catch (error) {
         // Record the provider result under the same selected-resource lock before recovery can proceed.
+        console.warn('[ads-change] provider failure', { operationId: id, operation: operation.type, name: error instanceof Error ? error.name : 'unknown', message: error instanceof Error ? error.message.replace(/https?:\/\/\S+/g, '[url]').replace(/(token|secret)=\S+/gi, '$1=[redacted]').slice(0, 300) : undefined, code: (error as { code?: unknown })?.code, subcode: (error as { subcode?: unknown })?.subcode, status: (error as { status?: unknown })?.status });
         let kind: 'rejected' | 'uncertain';
         try { kind = current!.ops.classifyFailure(error) === 'rejected' ? 'rejected' : 'uncertain'; } catch { kind = 'uncertain'; }
         const status: AdsOperationStatus = kind === 'rejected' ? 'rejected' : 'uncertain';
