@@ -124,7 +124,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
         {switching && <p className="shell-workspace-status" role="status">Switching workspace…</p>}
         {workspaceError && <p className="ui-error" role="alert">{workspaceError}</p>}
       </div>
-      {primaryAction && <a className="shell-create ui-button ui-button--primary" href={primaryAction.href}><IconPlus size={17} stroke={2} aria-hidden="true"/>{primaryAction.label}</a>}
+      {primaryAction && <a className="shell-create ui-button ui-button--primary" href={primaryAction.href}><IconPlus size={17} stroke={2} aria-hidden="true"/><span>{primaryAction.label}</span></a>}
       <div className="shell-context-content" onSubmitCapture={() => setFilterOpen(false)} onClickCapture={event => { if ((event.target as Element).closest('a[href]')) setFilterOpen(false); }}>
         {!installationMode && <nav className="shell-subnav" aria-label={`${active?.title} pages`}><p className="shell-subnav__label">{active?.title}</p>{modulePages.map(page => <a key={page.id} href={page.href} data-module={activeModule} className={`shell-subnav__link${pathname === page.href ? ' is-active' : ''}`} aria-current={pathname === page.href ? 'page' : undefined}><span className="shell-subnav__glyph"><PageGlyph href={page.href}/></span>{page.title}</a>)}</nav>}
         {visibleSidebar && <div className="shell-sidebar-filter">{sidebar}</div>}

@@ -15,7 +15,7 @@
 .ui-button--primary { box-shadow: 0 1px 2px rgb(0 0 0 / 14%); }
 .ui-button--secondary:hover:not(:disabled) { border-color: var(--ink-faint); }
 .ui-button--danger:active:not(:disabled) { filter: brightness(.85); }
-.ui-button:not(:has(> span:not(.ui-button__icon):not(:empty))) { padding-inline: 0; aspect-ratio: 1; }
+.ui-button[aria-label]:not(:has(> span:not(.ui-button__icon):not(:empty))) { padding-inline: 0; aspect-ratio: 1; }
 .ui-icon-button { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); cursor: pointer; transition: background var(--ease), color var(--ease); }
 .ui-icon-button:hover:not(:disabled) { background: var(--surface-muted); color: var(--ink); }
 .ui-icon-button:active:not(:disabled) { background: var(--line); }
