@@ -111,7 +111,7 @@ const PLACEHOLDER = /\{(title|description|ingredients|steps|servings|prep|cook|t
 
 /**
  * Fill the template. Ingredients get bullets and steps numbers. A text over the limit loses steps first, then
- * ingredients (marked), and always keeps the link; values are inserted literally in one pass.
+ * ingredients (marked), and keeps the link when the template uses {link}; values are inserted literally in one pass.
  */
 export function renderComment(template: string, recipe: Recipe, link: string, options: CommentOptions): string {
   const bullets = (items: Line[], count: number, cut: boolean) => {
@@ -139,9 +139,11 @@ export function renderComment(template: string, recipe: Recipe, link: string, op
   for (let ingredients = recipe.ingredients.length - 1; ingredients >= 0; ingredients -= 1) { const text = build(ingredients, 0); if (fits(text)) return text; }
   const minimal = build(0, 0);
   if (fits(minimal)) return minimal;
-  const tail = `${options.mark}\n${link}`;
+  // Last resort: keep the link only when the template asks for it.
+  const usesLink = /\{link\}/.test(template);
+  const tail = usesLink ? `${options.mark}\n${link}` : options.mark;
   const keep = options.max - tail.length;
-  return keep > 0 ? `${minimal.slice(0, keep).trimEnd()}${tail}` : link.slice(0, options.max);
+  return keep > 0 ? `${minimal.slice(0, keep).trimEnd()}${tail}` : (usesLink ? link : minimal).slice(0, options.max);
 }
 
 /* ----- addresses ----- */
