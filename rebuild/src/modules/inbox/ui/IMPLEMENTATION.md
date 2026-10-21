@@ -79,3 +79,20 @@ capability presentation, French copy, retained drafts and duplicate submission;
 services and checks current-authority refusal. These use synthetic data/mocked
 persistence and provider boundaries. PostgreSQL, live-provider, browser and MCP
 transport verification remain open; no servers were run for this branch batch.
+
+
+## Round 3: details panel, quick filters, bulk moderation, saved replies, shortcuts — 2026-10-21
+
+**Details panel.** `server/details.ts` (`readInboxContactDetails`, MCP `get_inbox_contact_details`) reads stored data only: the person (platform id on this channel), first seen, messages/comments written, related posts (posts they commented on), workflow state and a sentiment trend of their classified comments (`details.ts` `sentimentTrend`; fewer than two classified comments is `unknown`, unclassified comments stay visible as gaps, never neutral). Without a platform id only the open item is described and the panel says so. Reviews carry no identity. "Labels" are the workflow labels the team sees (open/resolved, hidden, unread, assignee): the data model has no user-defined Inbox labels. `ui/ContactDetails.tsx` is a collapsible side panel (right column from 1280px, above the history below that).
+
+**Quick filters.** `quick` (`unread`, `unanswered`, `negative`, `mentions`) on `readInboxList` / `list_inbox` / URL `quick=a,b`; all chosen must hold. A filter a kind cannot answer matches nothing there (comments have no unread count; messages and reviews have no stored sentiment). Unanswered mirrors the needs-reply rule; mentions look for the Root marker (`inbox.mentionPrefix`) plus the channel name. Toggles live in the sidebar filter panel; each active one is a removable chip in the content header.
+
+**Bulk moderation.** `server/bulk.ts` (`bulkInboxAction`, MCP `bulk_inbox_action`, UI server action `ui/bulk-action.ts`) runs resolve/reopen/hide/unhide/delete through the existing per-item services, sequentially, with one result per item and the Root cap `inbox.bulkMaxItems`. One exact confirmation covers the request (`BULK <ACTION> <n> INBOX ITEMS`); deletion also sends each comment's own `DELETE COMMENT <id>`. Resolve/reopen run at once with an Undo toast; hide/unhide/delete reach the platform and ask first in a ConfirmDialog (hide gets Undo afterwards, delete never does). Failed items stay selected. An unfinished deletion counts as not done.
+
+**Saved replies.** Service, REST (`/api/inbox/productivity`) and MCP tools already existed. Added: Root count limit `inbox.savedReplyMaxCount` enforced in the create transaction under a per-workspace advisory lock; the list response now returns `total`, `maxCount` and name/body limits; `ui/SavedRepliesManager.tsx` is a drawer (usage, search, create, edit, confirmed delete, empty/read-only/full states).
+
+**Shortcuts.** `InboxShortcuts` adds `x` (select focused row), `/` (search) and `?` (guide dialog with `ShortcutHint` keycaps); Escape clears a selection. Every key has a visible control.
+
+**Root keys:** `inbox.savedReplyMaxCount`, `inbox.relatedPostsLimit`, `inbox.sentimentTrendLimit`, `inbox.mentionPrefix`, `inbox.bulkMaxItems`. No migration.
+
+Evidence: `tests/inbox-round3.test.ts` (quick-filter SQL, bulk service, trend, details), `tests/inbox-round3-ui.test.ts` (jsdom: bulk bar, saved replies drawer, shortcuts, details, screen), and the saved-reply limit cases in `tests/inbox-productivity.test.ts`. Mocked persistence only: no PostgreSQL, browser, live-provider or MCP-transport run. Open: REST routes for bulk and contact details (see lane report), phone-width and four-theme visual check of the new controls.

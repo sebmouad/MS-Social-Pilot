@@ -21,9 +21,17 @@ import { InboxTag } from './InboxTags';
 import { InboxHeader, PersonAvatar, ShortcutHint } from './InboxChrome';
 import { InboxFilterPanel } from './InboxFilterPanel';
 import { InboxShortcuts } from './InboxShortcuts';
+import { BulkBar } from './BulkBar';
+import { ContactDetails } from './ContactDetails';
+import { InboxSelectionProvider, SelectBox, type SelectableItem } from './InboxSelection';
+import { SavedRepliesManager } from './SavedRepliesManager';
+import { readInboxContactDetails } from '@/modules/inbox/server/details';
+import type { InboxContactDetails } from '@/modules/inbox/details';
 import { inboxCopy } from './copy';
+import { round3Copy } from './round3-copy';
 import { inboxLocale } from './locale';
 import styles from './inbox.module.css';
+import r3 from './inbox-round3.module.css';
 
 const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'all', state: 'open', hidden: 'visible', q: '' };
 const singleValue = (value: string | string[] | undefined) => typeof value === 'string' ? value : undefined;
@@ -42,6 +50,7 @@ function locationFrom(page: InboxListPage | null, params: InboxSearchParams): In
     ...(filters.state !== 'open' ? { status: filters.state } : {}),
     ...(filters.hidden !== 'visible' ? { hidden: filters.hidden } : {}),
     ...(filters.q ? { q: filters.q } : {}),
+    ...(page?.quick?.length ? { quick: page.quick.join(',') } : {}),
     ...(page ? { limit: String(page.limit) } : typeof params.limit === 'string' ? { limit: params.limit } : {}),
   };
 }
@@ -51,7 +60,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const locale = await inboxLocale();
   const copy = inboxCopy[locale];
-  const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
+  const extra = round3Copy[locale];
+  const actor ={ userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const constraints = viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids };
 
   const listOutcome = await (async () => {
@@ -98,8 +108,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       thread.target.provider ? inboxCapabilities(thread.target.provider) : Promise.resolve({ reply: false, hide: false, remove: false, reviews: false, replyToReviews: false }),
       thread.kind === 'review' ? Promise.resolve({ allowed: false, headline: '', detail: undefined }) : inboxReplyPolicy(thread.target.provider, { kind: thread.kind, channelRemoteId: thread.target.providerId, lastInbound: thread.lastInbound, timeZone }),
     ]);
+    // Stored facts only; if they cannot be read the panel says so and the conversation itself stays usable.
+    const details: InboxContactDetails | null = await readInboxContactDetails(actor, { key: `${thread.kind}:${thread.id}` }, constraints).catch(() => null);
     const badge = channelBadgeInfo(thread.target.provider);
-    const first = thread.entries.find(entry => !entry.fromChannel);
+    const first =thread.entries.find(entry => !entry.fromChannel);
     const history = threadPage!.history;
     const childrenOf = new Map<string, ThreadEntry[]>();
     for (const entry of thread.entries) if (entry.parentId) childrenOf.set(entry.parentId, [...(childrenOf.get(entry.parentId) ?? []), entry]);
@@ -132,7 +144,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           {thread.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}
         </div>
       </header>
-      {thread.postText ? <p className={styles.postContext}><strong>{copy.onYourPost}</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}</p> : null}
+      <div className={r3.threadGrid}><div className={r3.threadMain}>
+      {thread.postText ?<p className={styles.postContext}><strong>{copy.onYourPost}</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}</p> : null}
       <p className={styles.contextNote}>{thread.kind === 'review' ? reviewText(locale, 'note') : copy.syncedNote}</p>
       <div className={styles.historyHead}>
         <h3>{thread.kind === 'comment' ? copy.commentHistory : thread.kind === 'review' ? reviewText(locale, 'reviewHistory') : copy.conversationHistory}</h3>
@@ -146,16 +159,41 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       {thread.kind === 'review'
         ? (canWrite && capabilities.replyToReviews ? <ReplyBox key={thread.id} id={thread.id} kind="review" allowed headline="" /> : <p>{reviewText(locale, 'replyUnavailable')}</p>)
         : <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} locale={locale} />}
+      </div>
+      <ContactDetails details={details} locale={locale} timeZone={timeZone} />
+      </div>
     </section>;
   }
 
   const visibleChannels = listPage?.channels ?? [];
-  const filtered = Boolean(filters.channelId || filters.kind !== 'all' || filters.state !== 'open' || filters.hidden !== 'visible' || filters.q);
+  const quickApplied = listPage?.quick ?? [];
+  const filtered = Boolean(filters.channelId || filters.kind !== 'all' || filters.state !== 'open' || filters.hidden !== 'visible' || filters.q || quickApplied.length);
+
+  // What this person may do to each item on the page, decided once per channel and provider. The services re-check on every action.
+  const abilities = new Map<string, { write: boolean; resolve: boolean; hide: boolean; remove: boolean }>();
+  if (listPage) {
+    const targets = [...new Map(listPage.items.map(item => [item.target.id, item.target.provider])).entries()];
+    const providers = [...new Set(targets.flatMap(([, provider]) => provider ? [provider] : []))];
+    const providerCaps = new Map(await Promise.all(providers.map(async provider => [provider, await inboxCapabilities(provider)] as const)));
+    await Promise.all(targets.map(async ([targetId, provider]) => {
+      const [write, resolve] = await Promise.all([canManageInbox(actor, targetId), canManageInboxWorkflow(actor, targetId)]);
+      const caps = provider ? providerCaps.get(provider) : undefined;
+      abilities.set(targetId, { write, resolve, hide: write && Boolean(caps?.hide), remove: write && Boolean(caps?.remove) });
+    }));
+  }
+  const selectables = new Map<string, SelectableItem>();
+  for (const item of listPage?.items ?? []) {
+    const ability = abilities.get(item.target.id);
+    if (!ability) continue;
+    const can = { resolve: ability.resolve, hide: item.kind === 'comment' && ability.hide, remove: item.kind === 'comment' && ability.remove };
+    if (can.resolve || can.hide || can.remove) selectables.set(item.key, { key: item.key, kind: item.kind, id: item.id, label: item.author, platformName: channelBadgeInfo(item.target.provider).platformName, resolved: item.resolved, hidden: item.hidden, can });
+  }
+  const canWriteReplies = [...abilities.values()].some(ability => ability.write);
   const syncTarget = channel === 'all' ? undefined : channel;
 
   const sidebar = <aside className={styles.filters} aria-label={copy.filtersLabel}>
     <InboxFilterPanel action={inboxHref()} filters={filters} channels={visibleChannels} locale={locale} thread={requestedThread} limit={listPage?.limit} maxLimit={listPage?.limits.listPageSize}
-      searchMaxCharacters={listPage?.limits.searchMaxCharacters} resetHref="/inbox" disabledLimit={!listPage} />
+      searchMaxCharacters={listPage?.limits.searchMaxCharacters} resetHref="/inbox" disabledLimit={!listPage} quick={listPage?.quick ?? []} />
     <div className={styles.navigationGroup}>
       <p className={styles.filterHeading}>{copy.automation}</p>
       <a href="/inbox/moderation">{copy.moderationRules}</a>
@@ -187,6 +225,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     ...(filters.state !== 'open' ? [{ key: 'status', label: copy.status, value: filters.state === 'resolved' ? copy.resolved : copy.all, removeHref: without('status', 'cursor') }] : []),
     ...(filters.hidden !== 'visible' ? [{ key: 'hidden', label: copy.hiddenComments, value: copy.showThem, removeHref: without('hidden', 'cursor') }] : []),
     ...(filters.q ? [{ key: 'q', label: copy.searchChip, value: filters.q, removeHref: without('q', 'cursor') }] : []),
+    // One removable chip per quick filter; removing one keeps the others.
+    ...quickApplied.map(filter => ({ key: `quick-${filter}`, label: extra.quick.chip, value: extra.quick[filter], removeHref: inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => key !== 'quick' && key !== 'cursor')), ...(quickApplied.length > 1 ? { quick: quickApplied.filter(item => item !== filter).join(',') } : {}), ...(requestedThread ? { thread: requestedThread } : {}) }) })),
   ];
 
   const listError = listOutcome.error;
@@ -195,7 +235,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   return <PageFrame module="inbox" scopedAccess sidebar={sidebar}><div className={styles.page}>
     <InboxHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} actions={visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true) : null} timeZone={timeZone} locale={locale} /> : undefined} />
-    <InboxShortcuts />
+    <div className={r3.tools}>
+      {visibleChannels.length > 0 ? <SavedRepliesManager locale={locale} canWrite={canWriteReplies} /> : null}
+      <InboxShortcuts locale={locale} />
+    </div>
     {listPage && listPage.items.length > 0 ? <ShortcutHint locale={locale} /> : null}
     <UrlFilterChips chips={chips} resetHref={resetHref} labels={{ active: copy.activeFilters, remove: copy.removeFilter, reset: copy.resetFilters }} />
     {listError ? <div role="alert" className={styles.alert}><p>{listError.error}</p><a href={resetHref}>{copy.resetAndReturn}</a></div> : null}
@@ -203,10 +246,13 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     {noChannels ? <section className="panel"><EmptyState icon={<IconPlugConnected size={26} />} title={copy.noChannelsTitle} action={<a className="ui-button ui-button--primary" href="/settings/connections">{copy.goConnections}</a>}>{copy.noChannelsBody}</EmptyState></section> : listPage ? <div className={styles.split} data-open={thread ? 'true' : 'false'}>
       <section className={styles.listPane} aria-label={copy.conversationsAndComments}>
         <div className={styles.listHead}><h2>{filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open}</h2><span>{copy.items(listPage.items.length, listPage.total)}</span></div>
-        {listPage.items.length ? <ul className={styles.list}>{listPage.items.map(item => {
+        {listPage.items.length ? <InboxSelectionProvider pageItems={[...selectables.values()]}>
+        {selectables.size ? <BulkBar locale={locale} maxItems={listPage.limits.bulkMaxItems ?? listPage.limit} /> : null}
+        <ul className={styles.list}>{listPage.items.map(item => {
           const badge = channelBadgeInfo(item.target.provider);
           const selected = thread !== null && thread.kind === item.kind && thread.id === item.id;
-          return <li key={item.key}><a className={styles.item} href={inboxHref({ ...baseLocation, ...(listPage.cursor ? { cursor: listPage.cursor } : {}), thread: item.key })} aria-current={selected ? 'true' : undefined} data-attention={item.needsReply || item.unread > 0 || undefined} data-inbox-item>
+          const selectable = selectables.get(item.key);
+          return <li key={item.key} className={selectables.size ? r3.row : undefined}>{selectables.size ? <span className={r3.rowSelect}>{selectable ? <SelectBox item={selectable} label={extra.bulk.selectItem(item.author)} /> : null}</span> : null}<a className={styles.item} href={inboxHref({ ...baseLocation, ...(listPage.cursor ? { cursor: listPage.cursor } : {}), thread: item.key })} aria-current={selected ? 'true' : undefined} data-attention={item.needsReply || item.unread > 0 || undefined} data-inbox-item>
             <PersonAvatar name={item.author} size={38} />
             <div className={styles.itemBody}>
             <div className={styles.itemTop}><span className={styles.author}>{item.unread > 0 || item.needsReply ? <span className={styles.unreadDot} role="img" aria-label={copy.unread} /> : null}{item.author}</span><time dateTime={item.time.toISOString()}>{formatInboxTime(item.time, timeZone)}</time></div>
@@ -223,10 +269,12 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             </div>
             </div>
           </a></li>;
-        })}</ul> : listPage.total > 0 && listPage.cursor
+        })}</ul></InboxSelectionProvider> : listPage.total > 0 && listPage.cursor
           ? <EmptyState icon={<IconInboxOff size={26} />} title={copy.emptyPageTitle} action={<a className="ui-button ui-button--secondary" href={inboxHref({ ...listPagingLocation, cursor: undefined })}>{copy.showLatest}</a>}>{copy.emptyPageBody}</EmptyState>
           : filtered
-            ? <EmptyState icon={<IconInboxOff size={26} />} title={copy.noMatchTitle} action={<a className="ui-button ui-button--secondary" href="/inbox">{copy.resetFilters}</a>}>{copy.noMatchBody}</EmptyState>
+            ? quickApplied.length
+              ? <EmptyState icon={<IconInboxOff size={26} />} title={extra.quick.noMatchTitle} action={<a className="ui-button ui-button--secondary" href={resetHref}>{copy.resetFilters}</a>}>{extra.quick.noMatchBody}</EmptyState>
+              : <EmptyState icon={<IconInboxOff size={26} />} title={copy.noMatchTitle} action={<a className="ui-button ui-button--secondary" href="/inbox">{copy.resetFilters}</a>}>{copy.noMatchBody}</EmptyState>
             : lastSynced
               ? <EmptyState icon={<IconInbox size={26} />} title={copy.noOpenTitle} action={<a className="ui-button ui-button--secondary" href="/inbox?status=resolved">{copy.showResolved}</a>}>{copy.noOpenBody}</EmptyState>
               : <EmptyState icon={<IconInbox size={26} />} title={copy.emptyTitle}>{copy.emptyBody}</EmptyState>}

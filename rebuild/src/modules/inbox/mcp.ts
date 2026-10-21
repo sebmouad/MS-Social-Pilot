@@ -3,6 +3,8 @@ import { moderateInboxComment, replyToInbox, setInboxResolved, syncInbox } from 
 import { auditedReceipt, inboxActor, pageIdsFor, requireConfirmation, requiredString, type McpToolGroup } from '@/server/mcp/kit';
 import { deleteInboxCommentDurably, finishInboxDeletion, getInboxDeletion } from './server/deletion';
 import { readInboxList, readInboxThread } from './server/read';
+import { readInboxContactDetails } from './server/details';
+import { bulkInboxAction } from './server/bulk';
 import { inboxProductivityToolDefinitions, executeInboxProductivityTool } from './productivity-mcp';
 import { inboxModerationToolDefinitions, executeInboxModerationTool } from './moderation-mcp';
 
@@ -11,7 +13,7 @@ export const INBOX_MCP: readonly McpToolGroup[] = [
   {
     id: 'inbox-conversations',
     tools: [
-    { name: 'list_inbox', description: 'Read the same merged, scoped Inbox activity as the app. Top-level comments and conversations have shared literal text/person search, channel/status/hidden filters and Older/Newer cursors. Root page and MCP result limits apply. Cursors reset when selection or filters change; activity can move when new messages arrive.', inputSchema: { type: 'object', properties: { channelId: { type: 'string' }, kind: { type: 'string', enum: ['all', 'comment', 'message', 'review'] }, state: { type: 'string', enum: ['open', 'resolved', 'all'] }, hidden: { type: 'string', enum: ['visible', 'all'] }, q: { type: 'string' }, cursor: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
+    { name: 'list_inbox', description: 'Read the same merged, scoped Inbox activity as the app. Top-level comments and conversations have shared literal text/person search, channel/status/hidden filters and Older/Newer cursors. Root page and MCP result limits apply. Cursors reset when selection or filters change; activity can move when new messages arrive.', inputSchema: { type: 'object', properties: { channelId: { type: 'string' }, kind: { type: 'string', enum: ['all', 'comment', 'message', 'review'] }, state: { type: 'string', enum: ['open', 'resolved', 'all'] }, hidden: { type: 'string', enum: ['visible', 'all'] }, q: { type: 'string' }, quick: { type: 'array', maxItems: 4, uniqueItems: true, items: { type: 'string', enum: ['unread', 'unanswered', 'negative', 'mentions'] }, description: 'Quick filters; all given must hold. negative uses stored comment classification only; unread applies to conversations.' }, cursor: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
     { name: 'get_inbox_thread', description: 'Read one authorized stored Inbox thread by message:<id>, comment:<id> or review:<id>. Defaults to newest stored messages/replies displayed chronologically; follow history Older/Newer cursors. Original comment remains visible on every reply page. History does not imply all provider history was fetched.', inputSchema: { type: 'object', required: ['key'], properties: { key: { type: 'string' }, cursor: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
     { name: 'reply_to_inbox', description: 'Send a reply to a synced conversation or comment through its connected platform. This contacts the remote platform. Reviews can be answered only where the channel module supports it. Confirmation must exactly match REPLY <message|comment|review> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'text', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment', 'review'] }, id: { type: 'string' }, text: { type: 'string', minLength: 1, maxLength: 2000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'sync_inbox', description: 'Fetch new conversations, comments and reviews from the connected platforms into the Inbox, exactly like the app\'s Sync button. Optionally limit to one authorized channel. This contacts the remote platform and only reads. Confirmation must exactly match SYNC INBOX or SYNC INBOX <channelId>.', inputSchema: { type: 'object', required: ['confirmation'], properties: { channelId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -19,6 +21,8 @@ export const INBOX_MCP: readonly McpToolGroup[] = [
     { name: 'delete_inbox_comment', description: 'Request permanent remote and local comment deletion once. Confirmation: DELETE COMMENT <id>. Read the returned state: only completed with remoteConfirmed and localConfirmed means deleted. Uncertain operations must be verified; repeating this tool never retries the remote call.', inputSchema: { type: 'object', required: ['id', 'confirmation'], properties: { id: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'finish_inbox_deletion', description: 'Complete only local cleanup after stored remote confirmation. Never contacts the platform. Confirmation: FINISH DELETION <operationId>.', inputSchema: { type: 'object', required: ['operationId', 'confirmation'], properties: { operationId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'set_inbox_resolved', description: 'Resolve or reopen a synced conversation, comment or review. Confirmation must exactly match RESOLVE <message|comment|review> <id> or REOPEN <message|comment|review> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'resolved', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment', 'review'] }, id: { type: 'string' }, resolved: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'get_inbox_contact_details', description: 'Read what is stored about the person behind one authorized Inbox item (message:<id>, comment:<id> or review:<id>): channel, first seen, messages written, related posts, workflow state and the sentiment trend of their classified comments. Reads stored data only; unclassified comments are unknown, not neutral.', inputSchema: { type: 'object', required: ['key'], properties: { key: { type: 'string' } }, additionalProperties: false } },
+    { name: 'bulk_inbox_action', description: 'Resolve, reopen, hide, show again or delete several Inbox items at once through the same per-item services as the single-item tools (hide, unhide and delete: comments only). Each item reports its own outcome; one failure never undoes another. Hide, unhide and delete contact the remote platform; deletion cannot be undone. The Root bulk limit applies. Confirmation must exactly match BULK <RESOLVE|REOPEN|HIDE|UNHIDE|DELETE> <number of distinct items> INBOX ITEMS.', inputSchema: { type: 'object', required: ['action', 'items', 'confirmation'], properties: { action: { type: 'string', enum: ['resolve', 'reopen', 'hide', 'unhide', 'delete'] }, items: { type: 'array', minItems: 1, items: { type: 'object', required: ['kind', 'id'], properties: { kind: { type: 'string', enum: ['message', 'comment', 'review'] }, id: { type: 'string' } }, additionalProperties: false } }, confirmation: { type: 'string' } }, additionalProperties: false } },
     { name: 'moderate_inbox_comment', description: 'Hide or unhide a synced comment through its connected platform. This contacts the remote platform. Confirmation must exactly match HIDE COMMENT <id> or UNHIDE COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'hidden', 'confirmation'], properties: { id: { type: 'string' }, hidden: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
     ],
     features: {
@@ -31,10 +35,13 @@ export const INBOX_MCP: readonly McpToolGroup[] = [
       finish_inbox_deletion: 'inbox/conversations',
       set_inbox_resolved: 'inbox/conversations',
       moderate_inbox_comment: 'inbox/conversations',
+      get_inbox_contact_details: 'inbox/conversations',
+      bulk_inbox_action: 'inbox/conversations',
     },
-    writeTools: ['sync_inbox', 'reply_to_inbox', 'delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved', 'moderate_inbox_comment'],
-    selfLockedWrites: ['delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved'],
-    scope: { resourceTools: ['list_inbox', 'get_inbox_thread', 'sync_inbox', 'reply_to_inbox', 'get_inbox_deletion', 'delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved', 'moderate_inbox_comment'], resources: ['msp://inbox'] },
+    writeTools: ['sync_inbox', 'reply_to_inbox', 'delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved', 'moderate_inbox_comment', 'bulk_inbox_action'],
+    // The bulk service takes the workspace operation lock per item, so the host must not wrap the whole request in one transaction.
+    selfLockedWrites: ['delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved', 'bulk_inbox_action'],
+    scope: { resourceTools: ['list_inbox', 'get_inbox_thread', 'get_inbox_contact_details', 'sync_inbox', 'reply_to_inbox', 'get_inbox_deletion', 'delete_inbox_comment', 'finish_inbox_deletion', 'set_inbox_resolved', 'moderate_inbox_comment', 'bulk_inbox_action'], resources: ['msp://inbox'] },
     resources: [
       { uri: 'msp://inbox', name: "Inbox", description: "Recent synced inbox activity.", mimeType: 'application/json', feature: 'inbox/conversations', readTool: 'list_inbox' },
     ],
@@ -45,6 +52,11 @@ export const INBOX_MCP: readonly McpToolGroup[] = [
         return { ...result, channelCount: channels.length };
       }
       case 'get_inbox_thread': return readInboxThread({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer), maxItems: cap });
+      case 'get_inbox_contact_details': return readInboxContactDetails({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer) });
+      case 'bulk_inbox_action': {
+        const result = await bulkInboxAction(inboxActor(viewer), args, { allowedChannelIds: pageIdsFor(viewer) });
+        return auditedReceipt(viewer, name, { action: result.action, requested: result.requested, succeeded: result.succeeded, failed: result.failed }, { ...result });
+      }
       case 'sync_inbox': {
         if (Object.keys(args).some(key => !['channelId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Choose an optional channel and confirm the sync.');
         const channelId = args.channelId === undefined ? undefined : requiredString(args, 'channelId');

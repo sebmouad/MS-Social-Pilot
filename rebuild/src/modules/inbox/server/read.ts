@@ -6,6 +6,7 @@ import { conversationNeedsReply } from '@/modules/inbox/server/threads';
 import { OperationError } from '@/lib/operation-error';
 import { authorizeInbox as readAccess } from './access';
 import { encodeInboxCursor, inboxFilterFingerprint, readInboxCursor, type InboxCursor } from './cursor';
+import { INBOX_QUICK_FILTERS, type InboxQuickFilter } from './types';
 import type { InboxReadActor, InboxReadConstraints, InboxLimits, InboxListItem, InboxSentiment, InboxListPage, InboxPageCursors, InboxThreadPage, ThreadEntry } from './types';
 
 const targetSelect = { id: true, name: true, providerId: true, socialAccount: { select: { provider: true } } } as const;
@@ -14,10 +15,10 @@ const invalid = () => new OperationError('invalid_request', 'Choose valid Inbox 
 type Key = { id: string; kind: 'message' | 'comment' | 'review'; time: Date };
 
 async function readLimits(): Promise<InboxLimits> {
-  const [listPageSize, threadPageSize, searchMaxCharacters, cursorMaxCharacters] = await Promise.all([
-    runtimeConfig('inbox.listPageSize'), runtimeConfig('inbox.threadPageSize'), runtimeConfig('inbox.searchMaxCharacters'), runtimeConfig('inbox.cursorMaxCharacters'),
+  const [listPageSize, threadPageSize, searchMaxCharacters, cursorMaxCharacters, bulkMaxItems] = await Promise.all([
+    runtimeConfig('inbox.listPageSize'), runtimeConfig('inbox.threadPageSize'), runtimeConfig('inbox.searchMaxCharacters'), runtimeConfig('inbox.cursorMaxCharacters'), runtimeConfig('inbox.bulkMaxItems'),
   ]);
-  return { listPageSize, threadPageSize, searchMaxCharacters, cursorMaxCharacters };
+  return { listPageSize, threadPageSize, searchMaxCharacters, cursorMaxCharacters, bulkMaxItems };
 }
 /** One tuple protocol for merged activity and individual history. C collation matches the encoded ordering. */
 function seek(cursor: InboxCursor | null) {
@@ -34,36 +35,67 @@ function pageKeys(rows: Key[], take: number, cursor: InboxCursor | null, fingerp
 }
 const literalSearch = (value: string) => `%${value.replace(/[\\%_]/g, character => `\\${character}`)}%`;
 
+type QuickBranch = 'message' | 'comment' | 'review';
+/**
+ * SQL for the quick filters, per branch of the merged activity (aliases c / pc+t / r as in readInboxList).
+ * A filter that cannot be judged for a kind (no unread count on comments, no stored sentiment on messages or
+ * reviews) matches nothing there: unknown is not a match. "Unanswered" mirrors the needs-reply rule shown on items.
+ */
+export function quickConditions(quick: readonly InboxQuickFilter[], mentionPrefix: string, branch: QuickBranch): Prisma.Sql {
+  const parts = quick.map(filter => {
+    if (branch === 'review') return Prisma.sql`AND false`;
+    if (branch === 'message') {
+      switch (filter) {
+        case 'unread': return Prisma.sql`AND c."unreadCount" > 0`;
+        case 'unanswered': return Prisma.sql`AND c."resolvedAt" IS NULL AND COALESCE((SELECT (m."sentById" IS NULL AND (m."fromId" IS NULL OR m."fromId" <> t."providerId")) FROM conversation_messages m WHERE m."conversationId" = c.id ORDER BY m."createdTime" DESC, m.id DESC LIMIT 1), false)`;
+        case 'negative': return Prisma.sql`AND false`;
+        case 'mentions': return Prisma.sql`AND EXISTS (SELECT 1 FROM conversation_messages m WHERE m."conversationId" = c.id AND strpos(lower(COALESCE(m.message, '')), lower(${mentionPrefix}::text || t.name)) > 0)`;
+      }
+    }
+    switch (filter) {
+      case 'unread': return Prisma.sql`AND false`;
+      case 'unanswered': return Prisma.sql`AND pc."resolvedAt" IS NULL AND pc."isHidden" = false AND NOT EXISTS (SELECT 1 FROM post_comments reply WHERE reply."postTargetId" = pc."postTargetId" AND reply."parentRemoteId" = pc."remoteId" AND (reply."sentById" IS NOT NULL OR reply."fromId" = t."providerId"))`;
+      case 'negative': return Prisma.sql`AND pc.sentiment = 'negative'`;
+      case 'mentions': return Prisma.sql`AND strpos(lower(pc.message), lower(${mentionPrefix}::text || t.name)) > 0`;
+    }
+  });
+  return parts.length ? Prisma.join(parts, ' ') : Prisma.empty;
+}
+
 /** Every stored top-level item is reachable; all filters apply before count and cursor selection. */
 export async function readInboxList(actor: InboxReadActor, input: unknown = {}, constraints: InboxReadConstraints = {}): Promise<InboxListPage> {
   const access = await readAccess(actor, constraints);
   const limits = await readLimits();
-  const parsed = z.object({ channelId: idSchema.optional(), kind: z.enum(['all', 'message', 'comment', 'review']).default('all'), state: z.enum(['open', 'resolved', 'all']).default('open'), hidden: z.enum(['visible', 'all']).default('visible'), q: z.string().trim().max(limits.searchMaxCharacters).default(''), cursor: z.string().max(limits.cursorMaxCharacters).optional(), limit: z.number().int().positive().safe().optional() }).strict().safeParse(input);
+  const parsed = z.object({ channelId: idSchema.optional(), kind: z.enum(['all', 'message', 'comment', 'review']).default('all'), state: z.enum(['open', 'resolved', 'all']).default('open'), hidden: z.enum(['visible', 'all']).default('visible'), q: z.string().trim().max(limits.searchMaxCharacters).default(''), cursor: z.string().max(limits.cursorMaxCharacters).optional(), limit: z.number().int().positive().safe().optional(), quick: z.array(z.enum(INBOX_QUICK_FILTERS)).max(INBOX_QUICK_FILTERS.length).default([]) }).strict().safeParse(input);
   if (!parsed.success) throw invalid();
   const { channelId, kind, state, hidden, q, limit: requestedLimit } = parsed.data;
+  const quick = INBOX_QUICK_FILTERS.filter(filter => parsed.data.quick.includes(filter));
+  const mentionPrefix = quick.includes('mentions') ? await runtimeConfig('inbox.mentionPrefix') : '';
+  if (quick.includes('mentions') && (typeof mentionPrefix !== 'string' || !mentionPrefix)) throw new OperationError('unavailable', 'The Mentions filter is currently unavailable.');
   if (channelId && !access.channelIds.includes(channelId)) throw new OperationError('forbidden', 'Selected channel is unavailable. Choose another channel or reset the filters.');
   const channelIds = channelId ? [channelId] : access.channelIds;
   const take = Math.min(requestedLimit ?? limits.listPageSize, limits.listPageSize, constraints.maxItems ?? limits.listPageSize);
-  const fingerprint = inboxFilterFingerprint({ workspaceId: actor.workspaceId, channelIds: [...channelIds].sort(), kind, state, hidden, q });
+  const fingerprint = inboxFilterFingerprint({ workspaceId: actor.workspaceId, channelIds: [...channelIds].sort(), kind, state, hidden, q, ...(quick.length ? { quick } : {}) });
   const cursor = readInboxCursor(parsed.data.cursor, fingerprint, limits.cursorMaxCharacters);
   const filters = { channelId: channelId ?? null, kind, state, hidden, q };
-  const base = { filters, channels: access.channels, timeZone: access.timeZone, limits, limit: take, cursor: parsed.data.cursor ?? null };
+  const base = { ...(quick.length ? { quick } : {}), filters, channels: access.channels, timeZone: access.timeZone, limits, limit: take, cursor: parsed.data.cursor ?? null };
   if (!channelIds.length) return { ...base, items: [], total: 0, olderCursor: null, newerCursor: null, lastSynced: null };
   const status = (alias: 'c' | 'pc' | 'r') => state === 'all' ? Prisma.empty : state === 'open' ? Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NULL` : Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NOT NULL`;
   const pattern = literalSearch(q);
+  const narrow = (branch: QuickBranch) => quickConditions(quick, mentionPrefix, branch);
   const activity = Prisma.sql`
     SELECT c.id, 'message'::text AS kind, c."updatedTime" AS time FROM conversations c JOIN targets t ON t.id = c."targetId"
-    WHERE ${kind === 'all' || kind === 'message'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('c')}
+    WHERE ${kind === 'all' || kind === 'message'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('c')} ${narrow('message')}
       ${q ? Prisma.sql`AND (c.snippet ILIKE ${pattern} ESCAPE ${'\\'} OR EXISTS (SELECT 1 FROM conversation_messages m WHERE m."conversationId" = c.id AND (m.message ILIKE ${pattern} ESCAPE ${'\\'} OR m."fromName" ILIKE ${pattern} ESCAPE ${'\\'})))` : Prisma.empty}
     UNION ALL
     SELECT pc.id, 'comment'::text AS kind, pc."createdTime" AS time FROM post_comments pc
       JOIN post_targets pt ON pt.id = pc."postTargetId" JOIN targets t ON t.id = pt."targetId" JOIN posts p ON p.id = pt."postId"
-    WHERE ${kind === 'all' || kind === 'comment'} AND pc."parentRemoteId" IS NULL AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('pc')}
+    WHERE ${kind === 'all' || kind === 'comment'} AND pc."parentRemoteId" IS NULL AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('pc')} ${narrow('comment')}
       ${hidden === 'visible' ? Prisma.sql`AND pc."isHidden" = false` : Prisma.empty}
       ${q ? Prisma.sql`AND (pc.message ILIKE ${pattern} ESCAPE ${'\\'} OR pc."fromName" ILIKE ${pattern} ESCAPE ${'\\'})` : Prisma.empty}
     UNION ALL
     SELECT r.id, 'review'::text AS kind, r."createdTime" AS time FROM page_reviews r JOIN targets t ON t.id = r."targetId"
-    WHERE ${kind === 'all' || kind === 'review'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('r')}
+    WHERE ${kind === 'all' || kind === 'review'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('r')} ${narrow('review')}
       ${q ? Prisma.sql`AND (r."reviewText" ILIKE ${pattern} ESCAPE ${'\\'} OR r."reviewerName" ILIKE ${pattern} ESCAPE ${'\\'})` : Prisma.empty}`;
   const order = cursor?.direction === 'newer' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
   const [rows, counts, lastSynced] = await Promise.all([
