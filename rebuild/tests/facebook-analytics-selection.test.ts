@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
-  targets: vi.fn(), adAccounts: vi.fn(), pageInsights: vi.fn(), adInsights: vi.fn(),
+  settings: vi.fn(), targets: vi.fn(), adAccounts: vi.fn(), pageInsights: vi.fn(), adInsights: vi.fn(),
 }));
 vi.mock('../src/server/data', () => ({ prisma: {
-  target: { findMany: db.targets }, adAccount: { findMany: db.adAccounts },
+  appSetting: { findMany: db.settings }, target: { findMany: db.targets }, adAccount: { findMany: db.adAccounts },
   pageInsight: { findMany: db.pageInsights }, adInsight: { findMany: db.adInsights },
 } }));
+
+vi.mock('@/modules/analytics/server/error-copy', () => ({ analyticsLanguage: async () => 'fr' }));
 
 import { facebookAnalyticsHost } from '../src/platforms/facebook/analytics';
 
@@ -16,6 +18,7 @@ const account = { id: 'ad-a', name: 'Ad account A', currency: 'USD' };
 describe('Facebook analytics selection reads', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    db.settings.mockResolvedValue([]);
     db.targets.mockResolvedValue([page('page-a', 'source-a'), page('page-b', 'source-b')]);
     db.adAccounts.mockResolvedValue([account]);
     db.pageInsights.mockResolvedValue([]);
@@ -35,4 +38,15 @@ describe('Facebook analytics selection reads', () => {
     await facebookAnalyticsHost.load({ workspaceId: 'w', range: { from: new Date('2026-10-01'), to: new Date('2026-10-31') }, selectedTargetIds: [], allowedTargetIds: ['page-a'], selectedAdAccountIds: ['ad-a'] });
     expect(db.adAccounts.mock.calls[0]![0].where.socialAccountId).toEqual({ in: ['source-a'] });
   });
+});
+
+it('loads saved Root Page labels for the request language through the host', async () => {
+  db.targets.mockResolvedValue([page('page-a', 'source-a')]);
+  db.adAccounts.mockResolvedValue([]);
+  const at = new Date('2026-10-15');
+  db.pageInsights.mockResolvedValue([{ metric: 'page_follows', period: 'day', numeric: 12, value: 12, endTime: at, fetchedAt: at, target: { id: 'page-a', name: 'Example' } }]);
+  db.settings.mockResolvedValue([{ key: 'meta.metricLabels', encrypted: false, value: { page_follows: { en: 'My followers', fr: 'Mes abonnés' } } }]);
+  const result = await facebookAnalyticsHost.load({ workspaceId: 'w', range: { from: new Date('2026-10-01'), to: new Date('2026-10-31') }, selectedTargetIds: ['page-a'], selectedAdAccountIds: [] });
+  expect(result.metrics[0]).toMatchObject({ label: 'Mes abonnés · Dernière valeur par canal', sourceLabel: 'Performances de la Page' });
+  expect(result.audienceEntries[0]?.metricLabel).toBe('Mes abonnés');
 });

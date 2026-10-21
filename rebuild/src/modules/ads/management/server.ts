@@ -523,18 +523,21 @@ export async function resolveAdsOperation(actor: AdsManageActor, input: { operat
     FROM ads_management_operations WHERE id = ${input.operationId} AND "workspaceId" = ${actor.workspaceId}`;
   const row = rows[0];
   if (!row) throw new OperationError('not_found', await adsServiceText('service065'));
-  const targetIds = allowedTargets(actor, access.permissions.pageScope);
-  if (row.operationType === 'creative.create' && targetIds !== null && !targetIds.includes((row.params as { targetId: string })?.targetId)) throw new OperationError('not_found', await adsServiceText('service065'));
+  // Recovery must use the same account/channel ceilings as management and history.
+  // Retained accounts need no active connection or provider grant: this only records an attestation.
+  const assertVisible = async (currentAccess: typeof access, accounts = prisma.adAccount) => {
+    const targetIds = allowedTargets(actor, currentAccess.permissions.pageScope);
+    if (row.operationType === 'creative.create' && targetIds !== null && !targetIds.includes((row.params as { targetId: string })?.targetId)) throw new OperationError('not_found', await adsServiceText('service065'));
+    const visible = await accounts.findFirst({
+      where: { id: row.adAccountId, ...accountIdCeiling(actor), workspaceId: actor.workspaceId, socialAccount: { is: { workspaceId: actor.workspaceId, ...accountTargetScope(actor, currentAccess.permissions.pageScope) } } },
+      select: { id: true },
+    });
+    if (!visible) throw new OperationError('not_found', await adsServiceText('service065'));
+  };
+  await assertVisible(access);
   if (row.status !== 'pending' && row.status !== 'uncertain') throw new OperationError('conflict', await adsServiceText('service066'));
   const expected = row.status === 'pending' ? pendingRecoveryConfirmation(input.operationId, input.resolution) : resolutionConfirmation(input.operationId, input.resolution);
   if (input.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${expected}`);
-  // Current workspace, module, role and key ceilings apply; retained disabled accounts remain visible for history recovery.
-  const pageScope = access.permissions.pageScope;
-  const visible = await prisma.adAccount.findFirst({
-    where: { id: row.adAccountId, ...accountIdCeiling(actor), workspaceId: actor.workspaceId, socialAccount: { is: { workspaceId: actor.workspaceId, ...accountTargetScope(actor, pageScope) } } },
-    select: { id: true },
-  });
-  if (!visible) throw new OperationError('not_found', await adsServiceText('service065'));
   const next = input.resolution === 'applied' ? 'resolved_applied' : 'resolved_not_applied';
   let settled: boolean;
   try {
@@ -542,6 +545,9 @@ export async function resolveAdsOperation(actor: AdsManageActor, input: { operat
       signal.throwIfAborted();
       const [current] = await tx.$queryRaw<Array<{ status: string }>>`SELECT status FROM ads_management_operations WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
       if (!current || current.status !== row.status) return false;
+      // Authority can change after preflight; check again while holding the account/ledger locks.
+      await assertVisible(await authorizeManager(actor, 'write'), tx.adAccount);
+      signal.throwIfAborted();
       const changed = Number(await tx.$executeRaw`UPDATE ads_management_operations SET status = ${next}, "resolvedBy" = ${actor.userId}, "resolvedAt" = NOW(), "resolutionNote" = ${input.note ?? null}, "updatedAt" = NOW()
         WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} AND status = ${row.status}`);
       if (changed !== 1) return false;

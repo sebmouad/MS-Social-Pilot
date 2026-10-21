@@ -1,6 +1,6 @@
 # UI, REST and MCP parity inventory
 
-Updated 2026-10-21 against local HEAD `46c6bdae` (merges since `1240a9ce`). This is a **source-level**
+Updated 2026-10-21 against local HEAD `960831df` (rounds 6–8 reviewed for MCP-relevant changes; the tool inventory below was last counted at `46c6bdae`; merges since `1240a9ce`). This is a **source-level**
 inventory using module MCP declarations, HTTP routes, shared services and the
 lane matrices. It is not a fresh tools/list dump, real MCP-client run, database,
 browser or provider verification. Full parity remains **partial**. The automated declaration guard and exact
@@ -19,7 +19,7 @@ selected-resource, person-key and installation authority remain distinct.
 | Publishing | Drafts, create/edit/import, lists/search/export, publish/retry/sync, schedule/reschedule/cancel/queue, approvals, deletion/recovery, first-comment send/retry/record, templates/labels/fields/notes/versions, saved views, mix/recycle/best times/media | Broad source coverage. Per-destination schedule modes flow through session REST, key REST v1 and MCP. Draft aliases and REST v1 create now use confirmed `api-writes` lifecycle boundaries (`acb56bd7`); real scheduling/provider and remaining write-boundary evidence stay partial |
 | Inbox | List/thread/sync/reply/resolve, nested replies/reviews, moderation/deletion/recovery, productivity, assignment/notes/saved replies and contact details | Broad source coverage; GET `/api/inbox/threads/[key]/details` calls `readInboxContactDetails` (added in `8852d367`). `bulkInboxAction` now has UI, `POST /api/inbox/bulk` and `bulk_inbox_action` (`f5c21c96`); mocked route tests only |
 | Analytics | Overview/details/explorer/previous points, comparisons, posts/ad objects, demographics/history CSV, pins/goals, report exports/templates/schedules/runs/generation | Present at source; session HTTP and MCP share cores, key REST v1 delegates declared tools to host. Completeness of collected metrics and real transport/provider results remain unproven |
-| Ads | Accounts/performance/directory/rows/exports/compare/status, creation choices, creative sources/image/create/assignment, change preview/apply/history/recovery | Present at source with session routes and key REST v1 through owning MCP groups. `ad.create` (paused) uses the same `previewAdsManagement`/`performAdsManagement` path from `AdCreateForm`, session REST and `preview_ads_change`/`apply_ads_change`; a missing `ads_management` grant yields a reconnect notice and localized error. The ledger CHECK migration for `ad.create` is absent at HEAD (fails closed). Live manager/grant/spend/creative outcomes remain partial |
+| Ads | Accounts/performance/directory/rows/exports/compare/status, creation choices, creative sources/image/create/assignment, change preview/apply/history/recovery | Present at source with session routes and key REST v1 through owning MCP groups. `ad.create` (paused) uses the same `previewAdsManagement`/`performAdsManagement` path from `AdCreateForm`, session REST and `preview_ads_change`/`apply_ads_change`; a missing `ads_management` grant yields a reconnect notice and localized error. The ledger CHECK migration for `ad.create` (`20261031180000_rebuild_ads_ad_creation`) exists since `960831df` and is recorded applied in production by the owner/integrator; the Ads MCP tools do not yet pass the customer locale to the runtime Ads copy scope (English default). Live manager/grant/spend/creative outcomes remain partial |
 | Settings connections | Directory/health, OAuth start, single/batch selection, disconnect preview/retain/delete | OAuth start UI/REST/session MCP share service; compatibility route also delegates. Single/batch MCP and REST selections call changeConnectionSelections; MCP and REST disconnect call changeConnectionDisconnect. Browser sends named retain/delete consent after final review. Targeted mocked transport and DOM tests cover caller parity; live client/provider and actual browser evidence remain separate |
 | Settings account/security/keys | Profile/password/session reads and changes; authenticator begin/enable/disable, passkey removal; workspace/person key list/issue/revoke | Session-only tools now exist; old claim that account/key issuance has no MCP is superseded. Bearer credentials cannot manage credentials/security. General authentication/passkey ceremony remains interactive |
 | Settings appearance | `appearanceSession`, GET/PATCH `/api/settings/appearance`, `get_appearance`, `update_appearance` | Shell ThemeProvider/mode toggle and Settings now share confirmed persistence (`2b42470b`); theme and mode are account-stored, cookies use Root lifetime, layout falls back to validated-session preferences. Cross-device/live persistence proof remains separate |
@@ -56,7 +56,13 @@ Mocked route/host tests are not a live key/client verification of every tool.
 - Root service-boundary gaps from the 2026-10-21 exception closure are closed at
   source (`46c6bdae`; see the update below); verify in PostgreSQL and with a real
   installation-session MCP client.
-- Ads `ad.create` needs a ledger operation-kind migration before it can write.
+- Ads `ad.create`: the ledger operation-kind migration exists (round 8) and is
+  recorded applied in production; still open are the live `ads_management` grant,
+  passing the customer locale from Ads REST/MCP entry points into the shared
+  service scope, and a channel-scope check in recovery. No MCP client run.
+- Round 7–8 reports (Published posts, Top post content) run through the existing
+  confirmed report-generation tools/routes; no new tool names or MCP surface.
+  Mocked evidence only.
 - Partial account export is registered in HTTP/MCP and exposed in the bilingual
   Account UI with explicit coverage/exclusions. Mapping and targeted automated
   checks cover those surfaces; real browser/MCP/database verification remains open.

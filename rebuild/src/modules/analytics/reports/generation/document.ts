@@ -1,3 +1,5 @@
+import { readLinkReport, type LinkReport } from '../server/link-report';
+import { linkDetails } from './link-details';
 import { readTopPostContent, reportUrl, type ReportTopPost } from '../server/top-post-content';
 import { runtimeConfig } from '@/server/config/store';
 import { TOP_POST_CONTENT_POLICY_SCHEMA } from '../config';
@@ -20,6 +22,7 @@ import { describeBusinessHours as responseHours, formatDuration as responseDurat
 /** One channel's per-destination summary: neutral counts plus the platform module's stored measures (null = not stored). */
 export type DestinationSummary = {
   name: string; type: string; posts: number;
+  links?: LinkReport;
   /** Lifetime clicks on short links of posts that went only to this channel in the period; null when unknown. */
   linkClicks: number | null;
   /** Posts that also reached other destinations, whose shared short-link clicks cannot be split honestly. */
@@ -82,7 +85,8 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const valueText = (m: MetricView) => m.total === null ? t("Not available") : (m.displayTotal ?? String(m.total));
   const asOf = (date: Date | null | undefined) => date ? date.toISOString().slice(0, 10) : t("unknown");
   const publication = input.sections.includes('published') && input.publications ? publicationDetails(input.publications, copy) : null;
-  const sourceTruncated = (publication?.truncated ?? false) || Boolean(input.sections.includes('topPosts') && input.topPosts?.some(p => p.content?.shortened));
+  const links = input.sections.includes('destinations') && input.destination?.links ? linkDetails(input.destination.links, copy) : null;
+  const sourceTruncated = (links?.truncated ?? false) || (publication?.truncated ?? false) || Boolean(input.sections.includes('topPosts') && input.topPosts?.some(p => p.content?.shortened));
   const wanted = new Set(input.sections);
   // The recap is included only when the run produced it or recorded that it could not; otherwise (AI off or not permitted) it is not included.
   const included = REPORT_SECTION_IDS.filter(s => wanted.has(s) && (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(s) && (s !== 'aiRecap' || Boolean(input.recap)));
@@ -154,7 +158,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
 
   // CSV: long form, one row per summary/point/resource, cut at the row and byte limits.
   const header = ['record_type', 'metric_key', 'metric', 'source', 'resource', 'date', 'value', 'unit', 'coverage', 'aggregation'];
-  const rows: unknown[][] = [...(publication?.rows ?? [])];
+  const rows: unknown[][] = [...(publication?.rows ?? []), ...(links?.rows ?? [])];
   if (recap) rows.push(['ai_recap', 'ai_recap', t("AI recap (AI-generated)"), t("AI-generated"), '', '', recap.state === 'ready' ? recap.text : '', '', '', recap.state === 'ready' ? RECAP_LABEL : RECAP_UNAVAILABLE]);
   if (audience) for (const e of audience.entries) rows.push(['audience', e.metric, e.metricLabel, e.sourceLabel, e.name, e.asOf, e.value, 'people', t("{v0} of {v1} channels", { v0: audience.covered, v1: audience.selected }), t("Latest value per channel; not unique people")]);
   if (response) {
@@ -277,8 +281,11 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   // Printable HTML and plain text show the summary tier only (one row per metric).
   const title = t("Analytics report: {v0}, {v1} to {v2}", { v0: channelName, v1: period.start, v2: period.end });
   const audienceHtml = audience ? `<h2>${esc(t("Audience"))}</h2><p>${esc(t("{v0} of {v1} selected channels have audience data{v2}. This sum is not unique people across networks.", { v0: audience.covered, v1: audience.selected, v2: audienceAsOf ? t(", as of {v0}", { v0: asOf(audienceAsOf) }) : '' }))}</p><p><strong>${audience.covered ? esc(audience.total) : esc(t("Not available"))}</strong></p>` : '';
-  const publicationRows = (publication?.rows ?? []).slice(0, bounds.maxRows);
-  const publicationCut = sourceTruncated || publicationRows.length < (publication?.rows.length ?? 0);
+  const linkRows = (links?.rows ?? []).slice(0, bounds.maxRows);
+  const linkLines = linkRows.map(row => `${row[2]}: ${row[3]} · ${row[4]} · ${row[5]} · ${row[6]} ${row[7]}`);
+  const linksHtml = links ? `<h2>${esc(t('Short-link details'))}</h2>${links.notes.map(note => `<p>${esc(note)}</p>`).join('')}<ul>${linkLines.map(line => `<li>${esc(line)}</li>`).join('')}</ul>` : '';
+  const publicationRows = (publication?.rows ?? []).slice(0, Math.max(0, bounds.maxRows - linkRows.length));
+  const publicationCut = sourceTruncated || linkRows.length < (links?.rows.length ?? 0) || publicationRows.length < (publication?.rows.length ?? 0);
   const publicationLines = publicationRows.map(row => `${row[3] || row[2]}: ${row[5] instanceof Date ? row[5].toISOString() : row[5]} · ${row[4]} · ${row[2]} · ${row[6]} ${row[7]}`);
   const publicationHtml = publication ? `<h2>${esc(t('Publication log'))} / ${esc(t('Daily publications (UTC)'))} / ${esc(t('Currently failed destinations'))}</h2>${publication.notes.map(note => `<p>${esc(note)}</p>`).join('')}<ul>${publicationLines.map(line => `<li>${esc(line)}</li>`).join('')}</ul>` : '';
   const htmlOf = (count: number, marked: boolean) => {
@@ -291,13 +298,14 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
       + (goals ? `<h2>${esc(t("Goals"))}</h2>${goals.goals.length ? `<p><small>${esc(t("Month {v0} to {v1} ({v2}), up to generation for the current month.", { v0: goals.month.start, v1: goals.month.end, v2: goals.month.timeZone }))}</small></p><table><thead><tr><th>${esc(t("Goal"))}</th><th>${esc(t("Target"))}</th><th>${esc(t("This month"))}</th><th>${esc(t("Progress"))}</th><th>${esc(t("Pace"))}</th></tr></thead><tbody>${goals.goals.map(g => `<tr><td>${esc(g.label)}</td><td>${esc(g.target)}</td><td>${g.actual === null ? esc(t("No data")) : esc(g.actual)}</td><td>${esc(g.percent)}%</td><td>${esc(g.paceLabel)}</td></tr>`).join('')}</tbody></table>` : `<p>${esc(t("No goals are set for this channel."))}</p>`}` : '')
       + (included.includes('destinations') ? `<h2>${esc(t("Destinations"))}</h2>${destination ? `<p><small>${esc(destinationNote)}</small></p><table><thead><tr><th>${esc(t("Destination"))}</th><th>${esc(t("Type"))}</th><th>${esc(t("Posts"))}</th>${destination.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}<th>${esc(t("Link clicks (lifetime)"))}</th></tr></thead><tbody><tr><td>${esc(destination.name)}</td><td>${esc(destination.type)}</td><td>${esc(destination.posts)}</td>${destination.measures.map(m => `<td>${esc(measureText(m))}</td>`).join('')}<td>${esc(linkClicksText)}</td></tr></tbody></table><p><small>${esc(t("Link clicks are lifetime totals for links attributed to this channel. Legacy links without a destination count only when the post has a single published destination."))}</small></p>` : `<p>${esc(t("Destination summary not available."))}</p>`}` : '')
       + (topPosts ? `<h2>${esc(t("Top posts"))}</h2>${topPosts.length ? `<table><thead><tr><th>#</th><th>${esc(t("Post"))}</th><th>${esc(t("Published"))}</th><th>${esc(topPosts[0]!.rankLabel)}</th>${topPosts[0]!.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}</tr></thead><tbody>${topPosts.map((p, i) => `<tr><td>${i + 1}</td><td>${reportUrl(p.url) ? `<a rel="noreferrer noopener" href="${esc(reportUrl(p.url))}">${esc(postTitle(p))}</a>` : esc(postTitle(p))}${contentHtml(p)}</td><td>${esc(asOf(p.publishedAt))}</td><td>${p.rankValue === null ? esc(t("Not available")) : esc(p.rankValue)}</td>${p.measures.map(m => `<td>${m.value === null ? esc(t("Not available")) : esc(m.value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : `<p>${esc(t("No published posts with stored measures in this period."))}</p>`}` : '')
+      + linksHtml
       + publicationHtml
       + audienceHtml
       + (metrics.length ? `<h2>${esc(t("Metrics"))}</h2><table><thead><tr><th>${esc(t("Metric"))}</th><th>${esc(t("Source"))}</th><th>${esc(t("Value"))}</th><th>${esc(t("Basis"))}</th><th>${esc(t("Coverage"))}</th><th>${esc(t("As of"))}</th></tr></thead><tbody>${shown.map(m => `<tr><td>${esc(m.label)}</td><td>${esc(m.sourceLabel)}</td><td>${esc(valueText(m))}</td><td>${esc([m.aggregationLabel, m.aggregationNote].filter(Boolean).join('. '))}</td><td>${esc(coverageText(m))}</td><td>${esc(asOf(m.latestAt))}</td></tr>`).join('')}</tbody></table>` : '')
       + (marked ? `<p><strong>${esc(t("This report was shortened to fit its size limit."))}</strong></p>` : '')
       + (notIncluded.length ? `<p><small>${esc(t("Not included: {v0} (not available in this report yet).", { v0: notIncluded.join(', ') }))}</small></p>` : '') + '</body></html>';
   };
-  const metricCap = Math.min(metrics.length, Math.max(0, bounds.maxRows - publicationRows.length));
+  const metricCap = Math.min(metrics.length, Math.max(0, bounds.maxRows - publicationRows.length - linkRows.length));
   const htmlCount = fit(metricCap, bounds.maxBytes, c => htmlOf(c, true));
   let htmlTruncated = sourceTruncated || publicationCut || htmlCount < metrics.length;
   let html = htmlOf(htmlCount, htmlTruncated);
@@ -305,7 +313,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     html = cutBytes(`<!doctype html><html lang="${locale}"><body><p>${esc(clamp(title, 80))}</p><p><strong>${esc(t("This report was shortened to fit its size limit."))}</strong></p></body></html>`, bounds.maxBytes);
     htmlTruncated = true;
   }
-  const baseLines = [title, ...(publication ? [...publication.notes, ...publicationLines] : []), '', ...(recap ? [t("AI recap (AI-generated; {v0})", { v0: RECAP_LABEL }), recapText, ''] : []), ...(included.includes('published') ? [t("Published {v0}, scheduled {v1}, failed {v2}.", { v0: snapshot.publishing.published, v1: snapshot.publishing.scheduled, v2: snapshot.publishing.failed })] : []),
+  const baseLines = [title, ...(links ? [t('Short-link details'), ...links.notes, ...linkLines] : []), ...(publication ? [...publication.notes, ...publicationLines] : []), '', ...(recap ? [t("AI recap (AI-generated; {v0})", { v0: RECAP_LABEL }), recapText, ''] : []), ...(included.includes('published') ? [t("Published {v0}, scheduled {v1}, failed {v2}.", { v0: snapshot.publishing.published, v1: snapshot.publishing.scheduled, v2: snapshot.publishing.failed })] : []),
     ...(response ? [t("Response time: {v0}", { v0: responseLine }), ...responseDetails, ...memberLines.map(l => `  ${l}`), ...(resolveLine ? [resolveLine] : [])] : []),
     ...(goals ? [t("Goals (month {v0} to {v1}):", { v0: goals.month.start, v1: goals.month.end }), ...(goals.goals.length ? goals.goals.map(goalText) : [t("No goals are set for this channel.")])] : []),
     ...(included.includes('destinations') ? [t("Destinations:"), ...(destination ? [t("{v0} ({v1}): {v2} posts; {v3}; link clicks (lifetime) {v4}", { v0: clamp(destination.name, 200), v1: destination.type, v2: destination.posts, v3: destination.measures.map(m => `${m.label} ${measureText(m)}`).join('; '), v4: linkClicksText })] : [t("Destination summary not available.")])] : []),
@@ -431,5 +439,5 @@ async function readDestination(workspaceId: string, channelId: string, period: {
   const count = counts[0];
   const analytics = await platformAnalytics(target.provider);
   const measured = analytics?.destinationMeasures ? await analytics.destinationMeasures({ workspaceId, targetId: channelId, from, to }) : { measures: [] };
-  return { name: clamp(target.name, 200), type: target.type, posts: Number(count?.posts ?? 0), sharedPosts: Number(count?.shared ?? 0), linkClicks: count?.clicks == null ? null : Number(count.clicks), measures: measured.measures };
+  return { name: clamp(target.name, 200), type: target.type, posts: Number(count?.posts ?? 0), sharedPosts: Number(count?.shared ?? 0), linkClicks: count?.clicks == null ? null : Number(count.clicks), links: await readLinkReport(workspaceId, channelId, period), measures: measured.measures };
 }

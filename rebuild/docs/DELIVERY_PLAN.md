@@ -1,6 +1,6 @@
 # Shared delivery plan
 
-Updated 2026-10-21 against local HEAD `46c6bdae`; reviewed merges since `1240a9ce`.
+Updated 2026-10-21 against local HEAD `960831df`; reviewed merges since `46c6bdae` (rounds 6–8).
 Goal remains active: [GOAL.md](GOAL.md). Binding target:
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md), unchanged. Current source
 and evidence: [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -9,12 +9,32 @@ and evidence: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Owner-recorded cutover occurred 2026-10-20; rebuild serves social.newsgeet.com,
 legacy web/worker are recorded disabled, releases use `rebuild/scripts/prod-deploy.sh`
-and legacy deployment is guarded. The deployed release is recorded as `46c6bdae`
-(integrator statement; this lane made no production calls and did not re-observe
+and legacy deployment is guarded. The deployed release is recorded as `960831df`,
+schema 117, with migration `20261031180000_rebuild_ads_ad_creation` applied
+(integrator/owner statement; this lane made no production calls and did not re-observe
 it). Preserve one publisher and rollback assets. RELEASE_GATES_PLAN's dated results
 are evidence, not proof every gate passed.
 
-Merged progress since the prior snapshot (`1240a9ce`):
+Merged progress in rounds 6–8 (`6d3347fb`, `5e7749c3`, `960831df`; source and
+unit/mocked evidence unless stated):
+
+- **Ads:** the `ad.create` ledger CHECK migration is authored (recorded applied in
+  production by the owner/integrator). Ads copy is Root-managed and resolved per
+  request through `configuredOperations(locale)`, but UI/REST/MCP callers do not
+  pass the customer locale yet; the cutover-rehearsal script and tests lack the new
+  migration; a recovery scope gap is noted in the Ads README. No live
+  `ads_management` grant or live write.
+- **Browser findings (source):** themed bilingual `not-found.tsx`, saved-view
+  session wording, published-card contrast, `notFound()` on unknown collaboration
+  post ids, Inbox/Analytics focus/table polish. Not rerun in a browser.
+- **Facebook:** richer post-metric collection (clicks, video metrics for video
+  posts, reaction provenance), shipped metric label defaults merged under saved
+  labels, ad error codes and EN/FR copy. Reports: Published posts and Top post
+  content (Root keys `analytics.reports.publicationDetails`, `...topPostContent`).
+- **Recipe recovery and scheduling (round 6):** ledger-id reconciliation and
+  pause-cancel rotation at unit level only.
+
+Merged progress in the earlier snapshot (`1240a9ce` to `46c6bdae`):
 
 - **Rollback drill (production host, owner-recorded):** `prod-rollback-drill.sh`
   restored a 2026-10-21 backup into a scratch database and started legacy and the
@@ -33,7 +53,7 @@ Merged progress since the prior snapshot (`1240a9ce`):
   theme application held; hydration and module findings remain (see below).
 - **Error pages:** `error.tsx` and new `global-error.tsx` use the shared themed,
   bilingual `ErrorState` with retry that re-requests the server and a way home.
-  A themed `not-found.tsx` is **still absent** from `src/app/`.
+  A themed `not-found.tsx` was absent then and was added in round 8 (`960831df`).
 - **Browser-finding fixes (source, unit):** queue cancel failure, Root activity
   controls, two-step failure wording, tokenless join preview, verify-email/
   password-recovery raw text and calendar today-badge contrast
@@ -59,10 +79,10 @@ Merged progress since the prior snapshot (`1240a9ce`):
 | Order | Work | Required evidence / owner |
 | --- | --- | --- |
 | 1 | Reconcile deployed release, migrations and recovery | Release owner confirms deployed SHA, target migration/ownership (recent purge-gate, read-index, inbox-metadata and trigram migrations), media backup coverage and a proxy-level cutback. Extend the rollback drill to the exact release; do not replay cutover |
-| 2 | Ads management activation | Database owner authors and applies a root migration extending the ledger operation-kind CHECK to `ad.create`. Release owner obtains the live `ads_management` grant on a test account; exercise paused creation, status/budget/creative changes and cleanup with exact confirmations. Integration owner runs real scoped MCP/key checks |
+| 2 | Ads management activation | Migration `20261031180000_rebuild_ads_ad_creation` is recorded applied; add it to the cutover rehearsal script/tests, pass the customer locale from UI/REST/MCP, and enforce channel scope in recovery. Release owner obtains the live `ads_management` grant on a test account; exercise paused creation, status/budget/creative changes and cleanup with exact confirmations. Integration owner runs real scoped MCP/key checks |
 | 3 | Close remaining service/transport differences | Agency owner (workspace switching confirmation) and Sharing owner (copy-only saves) reconcile with the service contract; run a cross-module auth/scope/confirmation matrix and real MCP client checks |
 | 4 | Prove data controls | Release owner pins supplementary purge gates in rehearsal; prove recent-table export/erasure, account deletion, partial-export content and trigger concurrency on isolated PostgreSQL. Keep coverage explicitly partial |
-| 5 | Fix and rerun browser findings | App owner adds `not-found.tsx` (themed, EN/FR) and real 404 statuses for unknown share/bio/Root/collaboration ids; a boundary inside the shell. Module owners remove raw server text (Tasks, Labels, Templates, Analytics goals, Inbox moderation, Root errors), fix saved-view 401 wording, WebKit hydration (`root-time.ts`, Sharing `LinksManager`) and `/join` preview 404/429. Rerun Chromium, Firefox and WebKit including keyboard walks in the new engines, all four themes, and the round-5 fixes |
+| 5 | Fix and rerun browser findings | App owner: real 404 statuses for unknown share/bio/Root ids (themed `not-found.tsx` exists since round 8; collaboration posts call `notFound()`); a boundary inside the shell. Module owners remove raw server text (Tasks, Labels, Templates, Analytics goals, Inbox moderation, Root errors), fix WebKit hydration (`root-time.ts`, Sharing `LinksManager`). Rerun Chromium, Firefox and WebKit including keyboard walks in the new engines, all four themes, and the round 6–8 fixes (saved-view wording, calendar contrast, `/join`, themed 404, Inbox/Analytics polish) |
 | 6 | Verify scheduling and recipe recovery | Publishing/Feeds/Facebook owners exercise mixed native/app holds, approval, cancel/reschedule, first comments, retry of uncertain claims, pause-cancel refused batches and supply exhaustion. Preserve ledger/locks and clean up identifiable test effects |
 | 7 | Verify reliability and performance at runtime | Worker owner measures stop/drain versus systemd timeout, database contention and stale binding/purge races. Database owner checks query plans and representative volume/timing for the new indexes |
 | 8 | Complete legacy/provider/configuration scope | Per-module work in LEGACY_CAPABILITY_PARITY; full Facebook collection/metadata, remaining connectors/format eligibility, live mail/security, complete Root/copy controls, report history/scale and actual REST/MCP/provider outcomes with cleanup |
@@ -89,7 +109,7 @@ fixes. Historical matrices remain dated.
 
 ## Delivery discipline
 
-Current schema version is 114; this documentation lane adds no Root keys and does
+Current schema version is 117; this documentation lane adds no Root keys and does
 not edit the registry version. Historical lane instructions to bump old versions are
 not current integration work. Recheck current source instead of replaying reports.
 Product logic belongs to modules, Facebook rules to its platform, shared hosts

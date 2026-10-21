@@ -55,15 +55,41 @@ export const FACEBOOK_DATA_CONFIG = [
   entry({ key: 'meta.contentInsightCollections', group: 'Facebook · Analytics collection', label: 'Content insight collections', kind: 'json', description: 'Version-verified posts, videos, Reels and Stories metrics and periods. Empty until verified against the configured Graph version. Uses existing insight read grants; does not grant permissions.', defaultValue: [], schema: facebookContentInsightsSchema, consumption: 'active' }),
 ] as const;
 
+/**
+ * Legacy arrays cannot distinguish an old default snapshot from deliberate removal.
+ * Migrate them as additions, never infer exclusions from absence. Operators record
+ * removals in excludedMetrics (including future names); exclusions always win.
+ * Read-time normalization is pure. Persist the normalized policy with saveRootConfig
+ * so the existing confirmed, transactional config.changed audit accompanies it.
+ * Never write settings from a worker/read or silently manufacture an audit actor.
+ */
+// Defaults can grow beyond a previously saved list length; do not truncate choices
+// or create normalized values that cannot be parsed again on the next read/save.
+const metricListSchema = z.array(z.string().regex(/^[a-z][a-z0-9_]*$/));
+export function mergeFacebookMetrics(defaults: readonly string[], metrics: readonly string[], excludedMetrics: readonly string[]) {
+  const excluded = new Set(excludedMetrics);
+  return [...new Set([...metrics, ...defaults])].filter(metric => !excluded.has(metric));
+}
+
+// Integrator: module.ts must use this schema/default for meta.pageInsightMetrics;
+// every runtime consumer must project .metrics into FacebookConfig.pageInsightMetrics.
+export const FACEBOOK_PAGE_METRIC_DEFAULTS = ['page_follows', 'page_daily_follows', 'page_daily_follows_unique', 'page_daily_unfollows_unique', 'page_media_view', 'page_total_media_view_unique', 'page_post_engagements', 'page_views_total', 'page_video_views'];
+export const facebookPageMetricPolicySchema = z.union([
+  metricListSchema.transform(metrics => ({ metrics, excludedMetrics: [] as string[] })),
+  z.object({ metrics: metricListSchema, excludedMetrics: metricListSchema }).strict(),
+]).transform(policy => ({ metrics: mergeFacebookMetrics(FACEBOOK_PAGE_METRIC_DEFAULTS, policy.metrics, policy.excludedMetrics), excludedMetrics: [...new Set(policy.excludedMetrics)] }));
+export const FACEBOOK_POST_METRIC_DEFAULTS = ['post_media_view', 'post_total_media_view_unique', 'post_clicks', 'post_clicks_by_type', 'post_reactions_by_type_total', 'post_video_views', 'post_video_view_time'];
+
 export const facebookHistoryPolicySchema = z.object({
   lookbackDays: z.number().int().min(1).max(36500),
   pageBudget: z.number().int().min(1).max(100),
   edge: z.enum(['published_posts', 'feed']),
   fields: z.array(z.string().min(1)).min(1).max(100),
-  metrics: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(100),
+  metrics: metricListSchema,
+  excludedMetrics: metricListSchema.optional(),
   reactionTypes: z.array(z.string().regex(/^[A-Z_]+$/)).max(30),
-});
-export const FACEBOOK_HISTORY_CONFIG = [entry({ key: 'meta.postHistoryPolicy', group: 'Facebook · Analytics collection', label: 'Page post history policy', kind: 'json', description: 'Resumable Page history window, per-run feed page budget, fields, lifetime metrics and reaction types. Video metrics are requested only for positively identified video posts. Metric eligibility depends on Graph version and grants; explicitly saved metric lists replace the defaults.', defaultValue: { lookbackDays: 365, pageBudget: 2, edge: 'published_posts', fields: ['id', 'message', 'created_time', 'permalink_url', 'status_type', 'full_picture', 'shares', 'comments.limit(0).summary(true)'], metrics: ['post_media_view', 'post_total_media_view_unique', 'post_clicks', 'post_clicks_by_type', 'post_reactions_by_type_total', 'post_video_views', 'post_video_view_time'], reactionTypes: ['LIKE', 'LOVE', 'WOW', 'HAHA', 'SAD', 'ANGRY', 'CARE'] }, schema: facebookHistoryPolicySchema, consumption: 'active' })] as const;
+}).transform(policy => ({ ...policy, metrics: mergeFacebookMetrics(FACEBOOK_POST_METRIC_DEFAULTS, policy.metrics, policy.excludedMetrics ?? []), excludedMetrics: [...new Set(policy.excludedMetrics ?? [])] }));
+export const FACEBOOK_HISTORY_CONFIG = [entry({ key: 'meta.postHistoryPolicy', group: 'Facebook · Analytics collection', label: 'Page post history policy', kind: 'json', description: 'Resumable Page history window, per-run feed page budget, fields, lifetime metrics and reaction types. Video metrics are requested only for positively identified video posts. Metric eligibility depends on Graph version and grants; saved metrics are additions to shipped defaults. Record deliberate removals in excludedMetrics; exclusions win and remain saved. Legacy missing metrics are not treated as exclusions. Save through Root to audit the normalized policy.', defaultValue: { lookbackDays: 365, pageBudget: 2, edge: 'published_posts', fields: ['id', 'message', 'created_time', 'permalink_url', 'status_type', 'full_picture', 'shares', 'comments.limit(0).summary(true)'], metrics: FACEBOOK_POST_METRIC_DEFAULTS, excludedMetrics: [], reactionTypes: ['LIKE', 'LOVE', 'WOW', 'HAHA', 'SAD', 'ANGRY', 'CARE'] }, schema: facebookHistoryPolicySchema, consumption: 'active' })] as const;
 
 export const facebookAdHierarchySchema = z.object({ levels: z.array(z.enum(['campaign', 'adset', 'ad'])).max(3), actionBreakdowns: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(10) });
 /** Normalized post keys and raw Page keys; saved labels override these defaults. */
@@ -81,6 +107,9 @@ export const FACEBOOK_METRIC_LABEL_DEFAULTS = {
   post_reactions_by_type_total: { en: 'Reactions by type', fr: 'Réactions par type' },
   video_views: { en: 'Video views', fr: 'Vues de vidéo' },
   video_watch_time: { en: 'Video watch time (milliseconds)', fr: 'Durée de visionnage (millisecondes)' },
+  page_fans: { en: 'Page likes', fr: 'Mentions J’aime de la Page' },
+  page_impressions: { en: 'Impressions', fr: 'Impressions' },
+  page_impressions_unique: { en: 'Unique impressions', fr: 'Impressions uniques' },
   page_follows: { en: 'Followers', fr: 'Abonnés' },
   page_daily_follows: { en: 'Daily follows', fr: 'Abonnements quotidiens' },
   page_daily_follows_unique: { en: 'New followers', fr: 'Nouveaux abonnés' },
@@ -101,11 +130,19 @@ export const FACEBOOK_METRIC_LABEL_DEFAULTS = {
 
 // Runtime single/batch reads and Root reads/saves all parse the owning schema.
 // Merge catalogs here so older stored catalogs gain newly shipped labels without
-// overwriting custom labels or forcing removed metrics back into collection lists.
+// overwriting custom labels. Collection exclusions are a separate policy.
 export const facebookMetricLabelsSchema = z.record(z.string(), z.object({ en: z.string().min(1), fr: z.string().min(1) }))
   .transform(overrides => ({ ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...overrides }));
 
+export const FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS = {
+  en: { source: 'Page performance', latest: 'Latest per channel', categories: 'Categories', overlap: 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.' },
+  fr: { source: 'Performances de la Page', latest: 'Dernière valeur par canal', categories: 'Catégories', overlap: 'Les personnes comptées peuvent figurer dans plusieurs ressources. Les sommes ne représentent pas des personnes distinctes ni la portée totale de la période.' },
+};
+const pageAnalyticsCopyLanguageSchema = z.object({ source: z.string().min(1), latest: z.string().min(1), categories: z.string().min(1), overlap: z.string().min(1) });
+export const facebookPageAnalyticsCopySchema = z.object({ en: pageAnalyticsCopyLanguageSchema, fr: pageAnalyticsCopyLanguageSchema });
+
 export const FACEBOOK_DATA_DETAIL_CONFIG = [
+ entry({ key: 'meta.pageAnalyticsCopy', group: 'Facebook · Analytics collection', label: 'Bilingual Page analytics copy', kind: 'json', description: 'English and French Page provenance, aggregation and category labels.', defaultValue: FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS, schema: facebookPageAnalyticsCopySchema, consumption: 'active' }),
  entry({ key: 'meta.adHierarchyPolicy', group: 'Facebook · Analytics collection', label: 'Ads hierarchy and action dimensions', kind: 'json', description: 'Additional daily campaign, ad set and ad reports. Action dimensions apply to these reports.', defaultValue: { levels: ['campaign', 'adset', 'ad'], actionBreakdowns: ['action_type'] }, schema: facebookAdHierarchySchema, consumption: 'active' }),
  entry({ key: 'meta.metricLabels', group: 'Facebook · Analytics collection', label: 'Bilingual metric labels', kind: 'json', description: 'English and French labels keyed by normalized metric name. Saved entries override defaults; newly shipped labels are inherited automatically.', defaultValue: FACEBOOK_METRIC_LABEL_DEFAULTS, schema: facebookMetricLabelsSchema, consumption: 'active' }),
 ] as const;

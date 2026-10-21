@@ -40,3 +40,20 @@ it('clears a secret only with the exact clear action', async () => {
   await saveRootConfig({ key: 'meta.appSecret', clear: true, confirmation: 'CLEAR ROOT SECRET meta.appSecret' }, 'root');
   expect(h.clear).toHaveBeenCalledWith({ where: { key: 'meta.appSecret' } }); expect(h.audit).toHaveBeenCalledOnce();
 });
+
+it('persists the migrated Facebook history policy and exclusions with its Root audit', async () => {
+  const { FACEBOOK_HISTORY_CONFIG } = await import('@/platforms/facebook/config');
+  const definition = FACEBOOK_HISTORY_CONFIG[0];
+  const input = { ...definition.defaultValue, metrics: ['custom_metric'], excludedMetrics: ['post_video_views', 'future_metric'] };
+  await saveRootConfig({ key: definition.key, value: input, confirmation: `SET ROOT CONFIG ${definition.key}` }, 'root');
+  const saved = h.upsert.mock.calls[0][0];
+  expect(saved.create.value.metrics).toContain('custom_metric');
+  expect(saved.create.value.metrics).toContain('post_clicks');
+  expect(saved.create.value.metrics).not.toContain('post_video_views');
+  expect(saved.create.value.excludedMetrics).toEqual(['post_video_views', 'future_metric']);
+  expect(saved.update.value).toEqual(saved.create.value);
+  expect(h.audit).toHaveBeenCalledOnce();
+  expect(h.audit.mock.calls[0][0].join('')).toContain('config.changed');
+  expect(h.audit.mock.calls[0]).toContainEqual(expect.stringContaining('"key":"meta.postHistoryPolicy"'));
+  expect(input.metrics).toEqual(['custom_metric']);
+});

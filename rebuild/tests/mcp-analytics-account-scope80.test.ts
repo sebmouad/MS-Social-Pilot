@@ -14,7 +14,7 @@ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: state.entitleme
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: state.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permission }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: state.purge }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config, runtimeConfigBatch: async (keys: string[]) => Object.fromEntries(await Promise.all(keys.map(async key => [key, await state.config(key)]))) }));
 vi.mock('../src/server/platforms/registry', async () => {
   const { facebookAnalyticsHost } = await import('../src/platforms/facebook/analytics');
   return { analyticsPlatformIds: async () => ['facebook'], platformAnalytics: async () => facebookAnalyticsHost };

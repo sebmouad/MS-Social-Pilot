@@ -3,6 +3,12 @@ import { entry } from '@/lib/config/entry';
 
 export const RESPONSE_ANALYSIS_LIMITS = { messages: { default: 20000, min: 100, max: 100000 }, events: { default: 20000, min: 100, max: 100000 }, members: { default: 25, min: 1, max: 500 } } as const;
 
+export const LINK_REPORT_POLICY_SCHEMA = z.object({
+  links: z.number().int().min(1).max(10000),
+  days: z.number().int().min(1).max(3660),
+}).strict();
+export const LINK_REPORT_DEFAULTS = { links: 100, days: 366 };
+
 export const PUBLICATION_REPORT_POLICY_SCHEMA = z.object({
   publishedRows: z.number().int().min(1).max(10000),
   failedRows: z.number().int().min(1).max(10000),
@@ -27,6 +33,7 @@ const num = (key: string, label: string, description: string, defaultValue: numb
 
 /** Root-managed bounds for report templates and schedule definitions. */
 export const REPORT_WORKFLOW_CONFIG = [
+  entry({ key: 'analytics.reports.linkDetails', group: G, label: 'Link report details', kind: 'json', description: 'Independent per-link inventory and UTC click-day row bounds in the Destinations report section. Recorded period clicks may be incomplete after retention; daily counts are independent of inventory clipping.', defaultValue: LINK_REPORT_DEFAULTS, schema: LINK_REPORT_POLICY_SCHEMA, consumption: 'active' }),
   entry({ key: 'analytics.reports.topPostContent', group: G, label: 'Top post content', kind: 'json', description: 'Ranked post count, destination text, attachment count, URL and article preview bounds, image preview switch and authenticated media path template. Report content is saved local state, not a remote snapshot.', defaultValue: TOP_POST_CONTENT_DEFAULTS, schema: TOP_POST_CONTENT_POLICY_SCHEMA, consumption: 'active' }),
   entry({ key: 'analytics.reports.publicationDetails', group: G, label: 'Publication report details', kind: 'json', description: 'Maximum published and currently failed destination rows and content excerpt length in the Published posts report section. Daily UTC totals are counted independently; clipped logs are disclosed.', defaultValue: PUBLICATION_REPORT_DEFAULTS, schema: PUBLICATION_REPORT_POLICY_SCHEMA, consumption: 'active' }),
   num('analytics.reports.responseEventLimit', 'Response analysis workflow events', 'Maximum stored resolution and reopening events examined per channel report. Truncation suppresses resolution durations and is disclosed.', RESPONSE_ANALYSIS_LIMITS.events.default, RESPONSE_ANALYSIS_LIMITS.events.min, RESPONSE_ANALYSIS_LIMITS.events.max),

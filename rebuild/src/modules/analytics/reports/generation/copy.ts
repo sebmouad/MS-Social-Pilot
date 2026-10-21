@@ -1,5 +1,16 @@
 import { z } from 'zod';
 const en = {
+  "Short-link details": "Short-link details",
+  "Link lifetime clicks": "Link lifetime clicks",
+  "Recorded link clicks in period": "Recorded link clicks in period",
+  "Daily recorded link clicks (UTC)": "Daily recorded link clicks (UTC)",
+  "Links belong to posts published to this channel in the report period. Only channel-attributed links and legacy links with one published destination are included.": "Links belong to posts published to this channel in the report period. Only channel-attributed links and legacy links with one published destination are included.",
+  "Lifetime clicks are running totals, not period clicks. Period and daily counts use retained click records; older records may have been deleted. Zero means no retained records, not proof of no clicks.": "Lifetime clicks are running totals, not period clicks. Period and daily counts use retained click records; older records may have been deleted. Zero means no retained records, not proof of no clicks.",
+  "Daily counts cover all eligible links independently of the link list limit. Days without retained clicks are omitted.": "Daily counts cover all eligible links independently of the link list limit. Days without retained clicks are omitted.",
+  "The link inventory reached its row limit.": "The link inventory reached its row limit.",
+  "The daily click list reached its row limit.": "The daily click list reached its row limit.",
+  "No eligible stored short links for these publications.": "No eligible stored short links for these publications.",
+
   "Locally stored media requires access to this workspace.": "Locally stored media requires access to this workspace.",
   "Post content": "Post content",
   "Image": "Image",
@@ -181,6 +192,17 @@ const en = {
   "Channel": "Channel"
 };
 const fr: typeof en = {
+  "Short-link details": "Détail des liens courts",
+  "Link lifetime clicks": "Clics du lien depuis sa création",
+  "Recorded link clicks in period": "Clics du lien enregistrés dans la période",
+  "Daily recorded link clicks (UTC)": "Clics quotidiens enregistrés (UTC)",
+  "Links belong to posts published to this channel in the report period. Only channel-attributed links and legacy links with one published destination are included.": "Les liens concernent les publications diffusées sur ce canal pendant la période du rapport. Seuls les liens attribués au canal et les anciens liens ayant une seule destination publiée sont inclus.",
+  "Lifetime clicks are running totals, not period clicks. Period and daily counts use retained click records; older records may have been deleted. Zero means no retained records, not proof of no clicks.": "Les clics cumulés sont des totaux depuis la création, pas des clics de la période. Les comptes de la période et par jour utilisent les clics conservés ; les anciens enregistrements peuvent avoir été supprimés. Zéro signifie aucun enregistrement conservé, sans prouver une absence de clics.",
+  "Daily counts cover all eligible links independently of the link list limit. Days without retained clicks are omitted.": "Les comptes quotidiens couvrent tous les liens admissibles indépendamment de la limite de la liste. Les jours sans clic conservé sont omis.",
+  "The link inventory reached its row limit.": "La liste des liens a atteint sa limite de lignes.",
+  "The daily click list reached its row limit.": "La liste des clics quotidiens a atteint sa limite de lignes.",
+  "No eligible stored short links for these publications.": "Aucun lien court conservé admissible pour ces publications.",
+
   "Locally stored media requires access to this workspace.": "Les médias enregistrés localement nécessitent un accès à cet espace de travail.",
   "Post content": "Contenu de la publication",
   "Image": "Image",

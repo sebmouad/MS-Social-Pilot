@@ -1,3 +1,6 @@
+import { analyticsLanguage } from '@/modules/analytics/server/error-copy';
+import { runtimeConfigBatch } from '@/server/config/store';
+import { FACEBOOK_METRIC_LABEL_DEFAULTS, FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS } from './config';
 import { facebookInsightCategories } from './data-normalization';
 import { prisma } from '@/server/data';
 import { readFacebookPostPerformance } from './post-performance';
@@ -8,19 +11,13 @@ import { safeNumber } from '@/modules/analytics/server/catalog';
 
 /** Provider vocabulary and interpretation for stored Facebook Page and Meta Ads metrics. */
 const metricNames: Record<string, string> = {
-  page_follows: 'Followers', page_fans: 'Page likes',
-  page_daily_follows: 'Daily follows', page_daily_follows_unique: 'New followers',
-  page_daily_unfollows_unique: 'Lost followers', page_total_media_view_unique: 'People reached',
-  page_impressions_unique: 'Unique impressions', page_impressions: 'Impressions',
-  page_media_view: 'Media views', page_post_engagements: 'Post engagements',
-  page_views_total: 'Page views', page_video_views: 'Video views',
   spend: 'Spend', impressions: 'Impressions', clicks: 'Clicks', reach: 'Reach',
   cpc: 'Cost per click', cpm: 'Cost per 1,000 impressions', cpp: 'Cost per person reached',
   ctr: 'Click-through rate', frequency: 'Frequency',
 };
 
 export function facebookMetricLabel(key: string): string | undefined {
-  return metricNames[key];
+  return metricNames[key] ?? (FACEBOOK_METRIC_LABEL_DEFAULTS as Record<string, { en: string; fr: string }>)[key]?.en;
 }
 
 function facebookLabel(key: string): string {
@@ -47,7 +44,13 @@ const object = (value: unknown): Record<string, unknown> => value && typeof valu
 const dayKey = (date: Date) => date.toISOString().slice(0, 10);
 const overlappingPeopleNote = 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.';
 
-function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: PageRow[], audienceAsOf?: Date): { metrics: AnalyticsMetricInput[]; audience: AnalyticsAudienceEntry[] } {
+type PagePresentation = { locale?: 'en' | 'fr'; metricLabels?: Record<string, { en: string; fr: string }>; pageCopy?: typeof FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS };
+
+function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: PageRow[], audienceAsOf?: Date, presentation: PagePresentation = {}): { metrics: AnalyticsMetricInput[]; audience: AnalyticsAudienceEntry[] } {
+  const locale = presentation.locale ?? 'en';
+  const copy = (presentation.pageCopy ?? FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS)[locale];
+  const labels = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...presentation.metricLabels } as Record<string, { en: string; fr: string }>;
+  const label = (key: string) => labels[key]?.[locale] ?? facebookLabel(key);
   const groups = new Map<string, PageRow[]>();
   for (const row of rows) { const key = `${row.metric}::${row.period ?? 'day'}`; const group = groups.get(key) ?? []; group.push(row); groups.set(key, group); }
   const metrics: AnalyticsMetricInput[] = [];
@@ -56,8 +59,8 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
     const numeric = group.flatMap(row => { const value = row.numeric ?? safeNumber(row.value); return value === null ? [] : [{ date: row.endTime, channelId: row.target.id, channelLabel: row.target.name, value }]; });
     const coveredResourceIds = [...new Set(numeric.map(row => row.channelId))].sort();
     const updatedAt = new Date(Math.max(...group.map(row => row.fetchedAt.getTime())));
-    const baseLabel = `${facebookLabel(first.metric)}${period !== 'day' ? ` · ${period}` : ''}`;
-    if (numeric.length) metrics.push({ key, label: kind === 'stock' ? `${baseLabel} · Latest per channel` : baseLabel, sourceLabel: 'Page performance', kind, unit: 'count', observations: numeric, ...(/unique|reach/.test(first.metric) ? { aggregationNote: overlappingPeopleNote } : {}), coveredResourceIds, ...(kind === 'stock' || period !== 'day' ? { rollup: 'latest-per-channel' as const } : {}), available: selected.length, updatedAt });
+    const baseLabel = `${label(first.metric)}${period !== 'day' ? ` · ${period}` : ''}`;
+    if (numeric.length) metrics.push({ key, label: kind === 'stock' ? `${baseLabel} · ${copy.latest}` : baseLabel, sourceLabel: copy.source, kind, unit: 'count', observations: numeric, ...(/unique|reach/.test(first.metric) ? { aggregationNote: copy.overlap } : {}), coveredResourceIds, ...(kind === 'stock' || period !== 'day' ? { rollup: 'latest-per-channel' as const } : {}), available: selected.length, updatedAt });
     // Keep each stored resource/time snapshot. Re-fetches at the same time
     // select the newest fetch; categories absent from a snapshot stay absent.
     const historyRows = new Map<string, PageRow>();
@@ -76,11 +79,11 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
     const values = new Map<string, number>();
     for (const row of newest.values()) for (const { label, value } of facebookInsightCategories(row.value)) { if (value !== null) values.set(label, (values.get(label) ?? 0) + value); }
     const latest = [...newest.values()];
-    if (breakdownHistory.length) metrics.push({ ...(first.metric.startsWith('content:') ? { totalOverride: null } : {}), breakdownHistory, key: numeric.length ? `${key}::breakdown` : key, label: `${baseLabel} · Categories`, sourceLabel: 'Page performance', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...newest.keys()].sort(), available: selected.length, covered: newest.size, latestAt: latest.length ? new Date(Math.max(...latest.map(row => row.endTime.getTime()))) : null, updatedAt: latest.length ? new Date(Math.max(...latest.map(row => row.fetchedAt.getTime()))) : null });
+    if (breakdownHistory.length) metrics.push({ ...(first.metric.startsWith('content:') ? { totalOverride: null } : {}), breakdownHistory, key: numeric.length ? `${key}::breakdown` : key, label: `${baseLabel} · ${copy.categories}`, sourceLabel: copy.source, kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...newest.keys()].sort(), available: selected.length, covered: newest.size, latestAt: latest.length ? new Date(Math.max(...latest.map(row => row.endTime.getTime()))) : null, updatedAt: latest.length ? new Date(Math.max(...latest.map(row => row.fetchedAt.getTime()))) : null });
   }
   const newest = new Map<string, PageRow>();
   for (const row of audienceRows) { if (audienceAsOf && row.endTime > audienceAsOf) continue; const old = newest.get(row.target.id); if (!old || row.endTime > old.endTime || (row.endTime.getTime() === old.endTime.getTime() && row.metric === 'page_follows' && old.metric !== 'page_follows') || (row.endTime.getTime() === old.endTime.getTime() && row.metric === old.metric && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }
-  const audience = [...newest.values()].flatMap(row => row.numeric === null ? [] : [{ id: row.target.id, name: row.target.name, metric: row.metric, metricLabel: row.metric === 'page_fans' ? 'Page likes' : 'Followers', sourceLabel: 'Page performance', value: row.numeric, asOf: row.endTime, fetchedAt: row.fetchedAt }]);
+  const audience = [...newest.values()].flatMap(row => row.numeric === null ? [] : [{ id: row.target.id, name: row.target.name, metric: row.metric, metricLabel: label(row.metric), sourceLabel: copy.source, value: row.numeric, asOf: row.endTime, fetchedAt: row.fetchedAt }]);
   return { metrics, audience };
 }
 
@@ -289,8 +292,8 @@ function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[]): 
 }
 
 /** Pure mapper kept at the Facebook boundary so stored-row semantics can be tested without storage. */
-export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienceRows: PageRow[]; adRows: AdRow[]; selectedTargets: FacebookTarget[]; selectedAdAccounts: SelectedAdAccount[]; audienceAsOf?: Date }) {
-  const page = pageInputs(input.pageRows, input.selectedTargets, input.audienceRows, input.audienceAsOf);
+export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienceRows: PageRow[]; adRows: AdRow[]; selectedTargets: FacebookTarget[]; selectedAdAccounts: SelectedAdAccount[]; audienceAsOf?: Date } & PagePresentation) {
+  const page = pageInputs(input.pageRows, input.selectedTargets, input.audienceRows, input.audienceAsOf, input);
   return { metrics: [...page.metrics, ...adInputs(input.adRows, input.selectedAdAccounts)], audienceEntries: page.audience, audienceSelected: input.selectedTargets.length };
 }
 
@@ -326,7 +329,8 @@ export const facebookAnalyticsHost = {
       selectedAdAccountIds.length ? prisma.adInsight.findMany({ where: { adAccount: { workspaceId: request.workspaceId, id: { in: selectedAdAccountIds }, ...(adTargetCeiling === undefined ? {} : { socialAccountId: { in: socialAccountIds } }), enabled: true, socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, level: 'account', date: { gte: request.range.from, lte: request.range.to } }, orderBy: [{ date: 'asc' }], select: { date: true, spend: true, impressions: true, clicks: true, reach: true, cpc: true, cpm: true, cpp: true, ctr: true, frequency: true, actions: true, fields: true, fetchedAt: true, adAccount: { select: { id: true, name: true, currency: true } } } }) : Promise.resolve([]),
     ]);
     const selectedAdAccounts = adAccounts.filter(account => selectedAdAccountIds.includes(account.id));
-    const normalized = normalizeFacebookAnalytics({ pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
+    const [presentation, locale] = await Promise.all([runtimeConfigBatch(['meta.metricLabels', 'meta.pageAnalyticsCopy']), analyticsLanguage()]);
+    const normalized = normalizeFacebookAnalytics({ locale, metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
     return { targets: visible.map(({ socialAccountId: _socialAccountId, ...target }) => target), selectedTargets: selectedTargets.map(({ socialAccountId: _socialAccountId, ...target }) => target), adAccounts, selectedAdAccountIds, ...normalized };
   },
 };

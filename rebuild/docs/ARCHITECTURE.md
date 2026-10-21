@@ -1,6 +1,6 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-21 against local HEAD `6d3347fb` (round 6); reviewed `git log 46c6bdae..HEAD` and the round 6 file list.
+Updated 2026-10-21 against local HEAD `960831df` (round 8); reviewed `git log 6d3347fb..HEAD` and the round 7–8 diffs.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains the binding target,
 unchanged. This document describes implementation and gaps; deployment, source,
 automated tests, browser checks and live-provider evidence are separate claims.
@@ -20,8 +20,10 @@ not fresh probes by this documentation worker. That log records 34 applied
 migrations, backup, health checks, ownership repair, owner sign-in confirmation,
 legacy configuration import and later AI/browser checks. Cutover happened; full
 contract completion is still unproven. The deployed release is recorded by the
-integrator as `6d3347fb`; this review did not observe it, and application of the
-newest migrations must still be checked before claiming source live. The log also
+integrator as `960831df` (schema 117), with migration
+`20261031180000_rebuild_ads_ad_creation` stated as applied in production; this
+review did not observe either and no receipt is in the repository, so confirm the
+applied migrations before claiming source live. The log also
 records the 2026-10-21 post-cutover rollback drill (**PASS**: backup restored to a
 scratch database, legacy and the installed rebuild started on spare ports; live
 services unchanged) and the first full recipe day (07:00, 11:00, 15:00 and 17:00
@@ -60,8 +62,11 @@ moves. Registration of a module does not prove its workflows or health.
 ## Configuration and public origin
 
 `src/lib/config/registry.ts` aggregates module/platform declarations and
-`src/lib/config/shared-config.ts`. Local HEAD has schema version **115** (round 6 adds `meta.adsCopy`, the Facebook
-Ads action copy, owned by `src/platforms/facebook/ads-ui-config.ts`). Runtime
+`src/lib/config/shared-config.ts`. Local HEAD has schema version **117** (round 6 added `meta.adsCopy`, the Facebook
+Ads action copy, owned by `src/platforms/facebook/ads-ui-config.ts`; round 7 added
+`analytics.reports.publicationDetails` (116); round 8 added
+`analytics.reports.topPostContent` (117); `meta.metricLabels` and
+`meta.postHistoryPolicy` changed defaults only). Runtime
 consumers use `runtimeConfig`; Root validates and transactionally audits saves,
 encrypts secrets and groups controls under Shared, Product and Platform owners.
 Database access and encryption trust material remain bootstrap dependencies.
@@ -128,7 +133,7 @@ not every cross-device persistence/security scenario.
 | Publishing | Drafts/composer, CSV, previews, list/calendar/queue, approvals, templates/labels/fields/notes/versions, bulk actions, first comments, recovery, best times, mix/recycle and short links | Shared UI/REST/MCP coverage documented in PARITY_PUBLISHING_INBOX; native/live and new scheduling runtime checks remain partial |
 | Inbox | Scoped threads/nested replies/reviews, sync, moderation/deletion recovery, assignment/notes/replies, quick filters, contact details, bulk actions and shortcuts | Contact-details REST and bulk UI/REST/MCP (`f5c21c96`) exist; provider history/metadata and live moderation remain partial |
 | Analytics | Catalog/series, previous-period points, comparison, posts, audience history, ad objects, pins, goals, reports/exports and charts | Stored-data surfaces share services; complete readable-provider collection, labels and provider history remain partial; response-report rounds 1–3 add comments, historical cycles, source/member breakdowns with disclosed stored-history limits |
-| Ads | Account/performance/directory/compare/export, hierarchy charts, creation options, durable confirmed management: campaign, ad set, paused ad and stored-image creative creation, status/budget/rename/assign/delete, missing-grant reconnect notice | Session REST/MCP plus key REST v1; management is off by default and awaits a live `ads_management` grant. `ad.create` needs a ledger CHECK migration that is absent at HEAD (writes fail closed). Mocked/fixture evidence only; see ADS_PARITY.md |
+| Ads | Account/performance/directory/compare/export, hierarchy charts, creation options, durable confirmed management: campaign, ad set, paused ad and stored-image creative creation, status/budget/rename/assign/delete, missing-grant reconnect notice | Session REST/MCP plus key REST v1; management is off by default and awaits a live `ads_management` grant. The `ad.create` ledger CHECK migration exists (`20261031180000_rebuild_ads_ad_creation`, recorded applied in production by the owner/integrator); Ads copy resolves per request through the platform host, but entry points do not yet pass the customer locale. Mocked/fixture evidence only; see ADS_PARITY.md |
 | Settings | Connections/selection, profiles/watermark, team/invitations, account/security/sessions, appearance, notifications, exports/erasure and keys | Broad service parity; selection and disconnect callers (UI, REST, MCP) share the confirmed services; partial account export is exposed (session route, MCP tool, bilingual download). Live mail/security/data coverage remain gaps; shell appearance shares persistence |
 | Media / Feeds / AI | Media images/videos/import/quota; RSS/Atom/WordPress feeds; recipe planner; AI writing/recap/sentiment | Shared UI/REST/MCP slices; real storage/source/automation and current browser/live evidence vary by feature |
 | Tasks / Agency / Sharing / Integrations | Task workflows, Agency overview/clients/export/switching, review/bio links, webhooks, scoped REST/OAuth connectors | Shared services exist; credential-specific capabilities and remaining confirmation differences must remain explicit |
@@ -281,9 +286,8 @@ preview database (so Feeds renders), verified a page-level throw boundary (16 ce
 per engine, 0 findings; retry recovery in Firefox only) and ran the dynamic,
 empty, not-found and failure parts in Firefox and WebKit, reproducing the module
 findings. `error.tsx` (retry re-requests the server) and `global-error.tsx` (layout
-failure; bilingual bootstrap catalog) are committed; **`not-found.tsx` is not**, so
-unknown routes still show Next's default page, and unknown detail ids still answer
-HTTP 200. `46c6bdae` fixes queue cancel, Root activity, two-step wording, tokenless
+failure; bilingual bootstrap catalog) were committed then; `not-found.tsx` was not
+(added in round 8, below), and unknown detail ids still answered HTTP 200. `46c6bdae` fixes queue cancel, Root activity, two-step wording, tokenless
 join, verify-email/recovery text and calendar contrast at source (unit tests, no
 rerun). Remaining: raw server text on several module forms, boundary above the
 shell, keyboard/system-mode in Firefox/WebKit, all four themes there, real Safari,
@@ -308,8 +312,8 @@ Round 6 (`6d3347fb`; source and unit evidence, **no browser rerun**):
 - Ads: Facebook-owned `ads-copy.ts` holds the EN/FR action labels, name-validation
   text and confirmation templates; Root key `meta.adsCopy` lets the operator edit
   them with placeholders validated (every token exactly once). Ads module
-  `copy.ts` gains matching customer strings. Paused `ad.create` status is unchanged:
-  the ledger CHECK migration and the live `ads_management` grant are still missing.
+  `copy.ts` gains matching customer strings. At round 6 `ad.create` still lacked its
+  ledger CHECK migration (added in round 8, below) and the live `ads_management` grant.
 - Join: `/api/auth/invitations/preview` answers `{ invitation: null }` (HTTP 200)
   for a missing or unknown token, and `join-form.tsx` shows the "link needed"
   state from that body instead of a 404. The form still makes one request, so a 429
@@ -331,6 +335,54 @@ Round 6 (`6d3347fb`; source and unit evidence, **no browser rerun**):
   comment failure after confirmed publication, remote reschedule timeout, contributor
   approval), `facebook-ads-copy`, `browser-matrix-round5`. All use fakes or mocked
   ports; no PostgreSQL, live Facebook or production run.
+
+Round 7 (`5e7749c3`; source and unit evidence with fakes, **no browser rerun**;
+schema 116):
+
+- Publishing: the saved-view save without a session says the session ended
+  (`saved_sessionEnded`); calendar published posts use a dashed edge and quieter fill
+  rather than opacity (the warm-light "View post" contrast finding); the collaboration
+  post screen calls `notFound()` for an unknown post.
+- Facebook (`src/platforms/facebook/`): `FacebookAdsValidationError` gives validation
+  failures a stable `issueCode`; `ads-copy.ts` holds the EN/FR validation, ownership,
+  unconfirmed-creation and transport messages used by `ads-ops`. Post-history
+  collection adds `post_clicks` and video metrics (only for positively identified
+  video posts), keeps insight, summary and per-type reaction observations separate
+  with `reactionProvenance` and a conflict flag, and treats lifetime insight links as
+  snapshots rather than more pages (`data-collection.ts`, `post-history.ts`).
+- Reports: Published posts content log, daily UTC counts and currently failed
+  destinations through the shared confirmed generator (Root
+  `analytics.reports.publicationDetails`).
+
+Round 8 (`960831df`; source and unit evidence, **no browser, PostgreSQL or live
+provider run**; schema 117):
+
+- Themed 404: `src/app/not-found.tsx` (`ErrorState kind="not-found"`, bilingual, link
+  home) is committed; `not-found-page` is a jsdom render test. HTTP statuses for
+  unknown share/bio/Root ids and a boundary inside the shell remain open.
+- Ads: migration `20261031180000_rebuild_ads_ad_creation` allows `ad.create` in the
+  operation ledger; the owner/integrator record it as applied in production
+  (unobserved here). Ads copy is Root-managed per request:
+  `PlatformAdsHost.configuredOperations(locale)` is resolved by `platformAds(provider,
+  locale)` into a request-local host, with `withPlatformAdsLocale` and
+  `withAdsErrorBoundary(operation, locale)` carrying the locale (neutral
+  `server/platforms/host.ts` and `registry.ts`; no provider branch). The Ads UI,
+  session REST and MCP entry points do not yet pass the customer locale, so Ads
+  messages are English there; the cutover rehearsal script and tests do not yet list
+  the migration; recovery does not recheck the unrestricted-channel rule (see
+  `src/modules/ads/server/README.md`).
+- Facebook configuration: shipped Page/post/reaction metric labels merge under saved
+  `meta.metricLabels`; default `meta.postHistoryPolicy` metrics gain clicks and video
+  metrics. Explicitly saved lists still replace defaults.
+- Analytics and Inbox: Top posts report content (saved destination text, media
+  references, optional image previews, article preview; Root
+  `analytics.reports.topPostContent`; `reports/TOP_POST_CONTENT.md`); focus rings,
+  labelled focusable table regions, scrollable long channel lists, locale-correct
+  "Last synced" and phone layout (`inbox-analytics-ux-polish`).
+- Tests (mocked or source-level): `not-found-page`, `ads-ad-create-migration`,
+  `ads-ad-create`, `ads-runtime-host`, `facebook-metric-config`,
+  `report-top-post-content*`, `inbox-analytics-ux-polish`. The applied-migration claim
+  is an owner record, not test evidence.
 
 Historical 328/328 synthetic checks and the production Chrome sweep remain dated
 evidence. No browser round covers every later merge, and no declaration guard
