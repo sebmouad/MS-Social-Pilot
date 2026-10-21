@@ -10,6 +10,7 @@ import {
   type CheckedEntry, type FeedCheckMode, type FeedEntry,
 } from '../feeds';
 import { authorizeFeedWrite, type FeedActor } from './access';
+import { feedsError, feedsMessage } from './messages';
 import { audit, idsOf, lockActor, missing, policyOf, protect, transact, type FeedLimits, type FeedRow, type Tx } from './core';
 
 /**
@@ -102,8 +103,8 @@ export async function ingestFeed(actor: FeedActor, feed: FeedRow, workspaceId: s
     const safe = (reason && SAFE_ERRORS[reason]) || 'The feed could not be read.';
     const turnedOff = await recordPoll(workspaceId, feed, { kind: 'error', message: safe }, options).catch(() => false);
     if (turnedOff) await audit(prisma as unknown as Tx, workspaceId, null, 'feeds.disabled_after_failures', { feedId: feed.id }).catch(() => undefined);
-    if (error instanceof OperationError) throw new OperationError(error.code, safe);
-    throw new OperationError('upstream_failure', safe);
+    if (error instanceof OperationError) throw await feedsError(error.code, safe);
+    throw await feedsError('upstream_failure', safe);
   }
 
   const guids = entries.map(e => e.guid);
@@ -131,7 +132,7 @@ export async function ingestFeed(actor: FeedActor, feed: FeedRow, workspaceId: s
   if (!items.length) { await recordPoll(workspaceId, feed, settle(), options); return base; }
   if (options.mode === 'posts' && !targetIds.length) {
     await recordPoll(workspaceId, feed, { kind: 'error', message: 'No channels are chosen for this feed.' }, options).catch(() => undefined);
-    throw new OperationError('conflict', 'Choose at least one channel for this feed before it creates posts.');
+    throw await feedsError('conflict', 'Choose at least one channel for this feed before it creates posts.');
   }
 
   try {
@@ -139,7 +140,9 @@ export async function ingestFeed(actor: FeedActor, feed: FeedRow, workspaceId: s
     await recordPoll(workspaceId, feed, settle(), options);
     return { ...base, ...created };
   } catch (error) {
-    const turnedOff = await recordPoll(workspaceId, feed, { kind: 'error', message: error instanceof OperationError && error.code === 'conflict' && /turned off|changed while/.test(error.message) ? error.message : CREATE_FAILED }, options).catch(() => false);
+    const staleFeed = error instanceof OperationError && error.code === 'conflict'
+      && [await feedsMessage('This feed was turned off. Turn it on to create posts.'), await feedsMessage('This feed changed while it was being read.')].includes(error.message);
+    const turnedOff = await recordPoll(workspaceId, feed, { kind: 'error', message: staleFeed ? (error as Error).message : CREATE_FAILED }, options).catch(() => false);
     if (turnedOff) await audit(prisma as unknown as Tx, workspaceId, null, 'feeds.disabled_after_failures', { feedId: feed.id }).catch(() => undefined);
     throw error;
   }
@@ -163,17 +166,17 @@ async function createPosts(actor: FeedActor, feed: FeedRow, workspaceId: string,
     await lockActor(tx, actor, true);
     const locked = await tx.$queryRaw<Array<{ enabled: boolean; targetIds: unknown; autoApprove: boolean; spreadMinutes: number }>>`SELECT enabled, "targetIds", "autoApprove", "spreadMinutes" FROM feed_sources WHERE id = ${feed.id} AND "workspaceId" = ${workspaceId} FOR UPDATE`;
     const current = locked[0];
-    if (!current) throw missing();
-    if (!current.enabled) throw new OperationError('conflict', 'This feed was turned off. Turn it on to create posts.');
+    if (!current) throw await missing();
+    if (!current.enabled) throw await feedsError('conflict', 'This feed was turned off. Turn it on to create posts.');
     // The channels and handling were validated for the settings that were read; stop if they changed since.
-    if (JSON.stringify(idsOf(current.targetIds)) !== JSON.stringify(targetIds)) throw new OperationError('conflict', 'This feed changed while it was being read.');
+    if (JSON.stringify(idsOf(current.targetIds)) !== JSON.stringify(targetIds)) throw await feedsError('conflict', 'This feed changed while it was being read.');
     const autoApprove = current.autoApprove;
     const spreadMinutes = Math.min(Number(current.spreadMinutes) || 0, l.maxSpread);
 
     let timezone = 'UTC'; let requiresApproval = false;
     if (scheduled) {
       const policy = await tx.$queryRaw<Array<{ timezone: string; requiresApproval: boolean }>>`SELECT timezone, "requiresApproval" FROM workspaces WHERE id = ${workspaceId} FOR SHARE`;
-      if (!policy[0] || !isValidTimeZone(policy[0].timezone) || typeof policy[0].requiresApproval !== 'boolean') throw new OperationError('unavailable', 'Workspace scheduling settings are unavailable.');
+      if (!policy[0] || !isValidTimeZone(policy[0].timezone) || typeof policy[0].requiresApproval !== 'boolean') throw await feedsError('unavailable', 'Workspace scheduling settings are unavailable.');
       timezone = policy[0].timezone; requiresApproval = policy[0].requiresApproval;
     }
     // Automation never bypasses a review rule: unreviewed article text is held when the feed asks for review

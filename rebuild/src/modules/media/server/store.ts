@@ -4,7 +4,7 @@ import path from 'node:path';
 import { runtimeConfig } from '@/server/config/store';
 import { canonicalMediaRoot, validateWorkspaceId } from '@/server/data-control/storage';
 import { deleteUnusedWorkspaceImage, listWorkspaceImages, uploadWorkspaceImage, type WorkspaceImageListing } from '@/modules/publishing/server/media/storage';
-import { OperationError } from '@/lib/operation-error';
+import { mediaError } from './messages';
 
 /** Storage port: the service never touches the filesystem directly, so tests inject a fake. */
 export interface MediaStore {
@@ -25,8 +25,8 @@ const MANAGED_KEY = (workspaceId: string) => new RegExp(`^${workspaceId.replace(
 
 async function root(): Promise<string> {
   const configured = await runtimeConfig('storage.mediaRoot') as string;
-  if (!configured) throw new OperationError('unavailable', 'Media storage is not available. Try again later.');
-  try { return await canonicalMediaRoot(configured); } catch { throw new OperationError('unavailable', 'Media storage is not available. Try again later.'); }
+  if (!configured) throw await mediaError('unavailable', 'Media storage is not available. Try again later.');
+  try { return await canonicalMediaRoot(configured); } catch { throw await mediaError('unavailable', 'Media storage is not available. Try again later.'); }
 }
 async function realDir(dir: string, create: boolean) {
   if (create) { try { await mkdir(dir); } catch (error) { if (!(typeof error === 'object' && error && 'code' in error && error.code === 'EEXIST')) throw error; } }

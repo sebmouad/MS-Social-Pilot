@@ -1,4 +1,4 @@
-import { OperationError } from '@/lib/operation-error';
+import { feedsError } from './server/messages';
 import { auditedReceipt, pageIdsFor, type McpToolGroup } from '@/server/mcp/kit';
 import { checkFeed, createFeed, deleteFeed, readFeeds, updateFeed, type FeedDeps } from './server/feeds';
 import type { FeedActor } from './server/access';
@@ -55,7 +55,7 @@ export async function executeFeedTool(actor: FeedActor, name: string, args: unkn
   if (name === 'update_content_feed') return updateFeed(actor, args, deps);
   if (name === 'delete_content_feed') return deleteFeed(actor, args);
   if (name === 'check_content_feed') return checkFeed(actor, args, deps);
-  throw new OperationError('invalid_request', 'Choose a supported feed action.');
+  throw await feedsError('invalid_request', 'Choose a supported feed action.');
 }
 
 /**

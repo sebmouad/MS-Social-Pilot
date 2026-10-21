@@ -10,7 +10,10 @@ import { openPublicBio } from '@/modules/sharing/server/bio';
 import { loadPublicCopy, sharingCopy } from '@/modules/sharing/server/limits';
 import styles from './bio.module.css';
 
-export const metadata: Metadata = { title: 'Links', referrer: 'no-referrer' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await loadPublicCopy(await authLocale());
+  return { title: t.bio.title, referrer: 'no-referrer' };
+}
 
 export default async function BioPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

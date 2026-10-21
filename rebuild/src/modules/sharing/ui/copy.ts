@@ -8,6 +8,7 @@ const en = {
   share: {
     kinds: { portal: 'Client portal', review: 'Review', calendar: 'Calendar' } as Record<string, string>,
     statuses: { awaiting_review: 'Waiting for your decision', planned: 'Planned', published: 'Published' } as Record<string, string>,
+    pageTitle: 'Shared with you',
     sections: 'Sections', tabReview: 'To review', tabCalendar: 'Calendar',
     emptyReviewTitle: 'Nothing to review', emptyReview: 'Nothing is waiting for review right now.',
     emptyCalendarTitle: 'Nothing planned', emptyCalendar: 'Nothing is planned in this period.',
@@ -32,6 +33,7 @@ const fr: Catalog = {
   share: {
     kinds: { portal: 'Portail client', review: 'Relecture', calendar: 'Calendrier' },
     statuses: { awaiting_review: 'En attente de votre décision', planned: 'Planifiée', published: 'Publiée' },
+    pageTitle: 'Partagé avec vous',
     sections: 'Sections', tabReview: 'À relire', tabCalendar: 'Calendrier',
     emptyReviewTitle: 'Rien à relire', emptyReview: 'Rien n’attend de relecture pour le moment.',
     emptyCalendarTitle: 'Rien de planifié', emptyCalendar: 'Rien n’est planifié sur cette période.',
@@ -50,10 +52,13 @@ const fr: Catalog = {
 
 export const publicCopyDefaults = { en, fr };
 
+/** Keys added after catalogs were first saved in Root: a saved catalog without them stays valid and the shipped text fills in. */
+const ADDED_LATER = new Set(['pageTitle']);
+
 /** Exact catalog shape for both languages: unknown or missing keys are rejected, blank text too. */
 const shape = (value: unknown): z.ZodTypeAny => typeof value === 'string'
   ? z.string().trim().min(1).max(4000)
-  : z.object(Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, shape(item)]))).strict();
+  : z.object(Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, ADDED_LATER.has(key) ? shape(item).optional() : shape(item)]))).strict();
 export const publicCopySchema = z.object({ en: shape(en), fr: shape(fr) }).strict();
 
 const fill = (template: string, count: number) => template.replace('{0}', String(count));
@@ -64,5 +69,6 @@ export type PublicCopy = Omit<Catalog, 'share'> & { share: Omit<Catalog['share']
 export const publicCopy = (locale: AuthLocale, catalog: typeof publicCopyDefaults = publicCopyDefaults): PublicCopy => {
   const text = locale === 'fr' ? catalog.fr : catalog.en;
   const { moreFilesOne, moreFilesMany, truncated, ...share } = text.share;
+  share.pageTitle ??= (locale === 'fr' ? publicCopyDefaults.fr : publicCopyDefaults.en).share.pageTitle;
   return { ...text, share: { ...share, moreFiles: count => count === 1 ? moreFilesOne : fill(moreFilesMany, count), truncated: count => fill(truncated, count) } };
 };

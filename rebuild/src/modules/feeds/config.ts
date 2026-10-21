@@ -4,6 +4,7 @@ import { copySchema } from '@/lib/config/copy-schema';
 import { WORDPRESS_CONFIG } from './wordpress/config';
 import { feedsCopy } from './copy';
 import { recipeCopy } from './copy-recipes';
+import { feedsMessages, feedsMessagesSchema } from './messages';
 
 export const FEEDS_DEFAULTS = {
   pageSize: 25, maxPerWorkspace: 25, fetchTimeoutMs: 15000, fetchMaxBytes: 2097152, fetchMaxRedirects: 3, allowHttp: false, hostAllowlist: [] as string[],
@@ -68,5 +69,6 @@ export const FEEDS_CONFIG = [
   entry({ key: 'feeds.fallbackSpacingMinutes', group: G, label: 'Spacing between fallback times (minutes)', kind: 'number', description: 'Minimum gap kept between feed posts placed without a queue time.', defaultValue: FEEDS_DEFAULTS.fallbackSpacingMinutes, schema: int(FEEDS_BOUNDS.fallbackSpacingMinutes), consumption: 'active' }),
   entry({ key: 'feeds.copy', group: G, label: 'Content feeds copy', kind: 'json', description: 'English and French content feeds labels, confirmations and feedback.', defaultValue: feedsCopy, schema: z.object({ en: copySchema(feedsCopy.en), fr: copySchema(feedsCopy.fr) }).strict(), consumption: 'active' }),
   entry({ key: 'feeds.recipeCopy', group: G, label: 'Recipe source copy', kind: 'json', description: 'English and French WordPress recipe source labels, confirmations and feedback.', defaultValue: recipeCopy, schema: z.object({ en: copySchema(recipeCopy.en), fr: copySchema(recipeCopy.fr) }).strict(), consumption: 'active' }),
+  entry({ key: 'feeds.messages', group: G, label: 'Content feeds failure messages', kind: 'json', description: 'English and French text of the content feeds\' failure replies in the app, REST API and MCP. The request\'s language picks the version; without one, English is used.', defaultValue: feedsMessages, schema: feedsMessagesSchema, consumption: 'active' }),
   ...WORDPRESS_CONFIG,
 ] as const;

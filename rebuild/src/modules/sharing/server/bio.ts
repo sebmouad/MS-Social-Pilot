@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { OperationError } from '@/lib/operation-error';
+import { sharingError } from './messages';
 import { prisma } from '@/server/data';
 import { visitorAllowed } from './rate';
 import { BIO_DELETE_SCHEMA, BIO_SAVE_SCHEMA, SLUG_SCHEMA, deleteBioConfirmation, safeUrl, saveBioConfirmation, type SharingActor, type SharingReadOptions } from '../contracts';
@@ -21,24 +21,25 @@ export async function readBioPage(actor: SharingActor, options: SharingReadOptio
 }
 
 export async function saveBioPage(actor: SharingActor, input: unknown) {
-  const parsed = BIO_SAVE_SCHEMA.safeParse(input); if (!parsed.success) throw bad();
-  const data = parsed.data; exact(data.confirmation, saveBioConfirmation(data.slug));
+  const parsed = BIO_SAVE_SCHEMA.safeParse(input); if (!parsed.success) throw await bad();
+  const data = parsed.data; await exact(data.confirmation, saveBioConfirmation(data.slug));
   await authorizeSharing(actor, 'bio', 'write'); const limits = await sharingLimits();
-  if (data.title.length > limits.bio_titleMaxCharacters! || (data.description?.length ?? 0) > limits.bio_descriptionMaxCharacters! || data.links.length > limits.bio_maxLinks!) throw bad();
+  if (data.title.length > limits.bio_titleMaxCharacters! || (data.description?.length ?? 0) > limits.bio_descriptionMaxCharacters! || data.links.length > limits.bio_maxLinks!) throw await bad();
   const avatar = data.avatarUrl ? safeUrl(data.avatarUrl, limits.bio_urlMaxCharacters!, true) : null;
-  if (data.avatarUrl && !avatar) throw bad('Use a secure (https) picture address.');
-  const links = data.links.map(link => {
+  if (data.avatarUrl && !avatar) throw await bad('Use a secure (https) picture address.');
+  const links: Array<{ label: string; url: string }> = [];
+  for (const link of data.links) {
     const url = safeUrl(link.url, limits.bio_urlMaxCharacters!);
-    if (!url || link.label.length > limits.bio_linkLabelMaxCharacters!) throw bad('Each link needs a short label and a valid web address.');
-    return { label: link.label, url };
-  });
+    if (!url || link.label.length > limits.bio_linkLabelMaxCharacters!) throw await bad('Each link needs a short label and a valid web address.');
+    links.push({ label: link.label, url });
+  }
   return protect(transact(actor.workspaceId, limits, async tx => {
     await lockActor(tx, actor, 'bio');
     const taken = await tx.$queryRaw<Array<{ workspaceId: string }>>`SELECT "workspaceId" FROM bio_pages WHERE slug = ${data.slug} AND "workspaceId" <> ${actor.workspaceId} LIMIT 1`;
-    if (taken[0]) throw new OperationError('conflict', 'That address is taken. Choose another.');
+    if (taken[0]) throw await sharingError('conflict', 'That address is taken. Choose another.');
     const pageId = `bio_${randomUUID()}`;
     const rows = await tx.$queryRaw<Array<{ id: string }>>`INSERT INTO bio_pages (id, "workspaceId", slug, title, description, "avatarUrl", enabled, "createdAt", "updatedAt") VALUES (${pageId}, ${actor.workspaceId}, ${data.slug}, ${data.title}, ${data.description ?? null}, ${avatar}, ${data.enabled}, NOW(), NOW()) ON CONFLICT ("workspaceId") DO UPDATE SET slug = EXCLUDED.slug, title = EXCLUDED.title, description = EXCLUDED.description, "avatarUrl" = EXCLUDED."avatarUrl", enabled = EXCLUDED.enabled, "updatedAt" = NOW() RETURNING id`;
-    const id = rows[0]?.id; if (!id) throw new OperationError('unavailable', 'The bio page could not be saved.');
+    const id = rows[0]?.id; if (!id) throw await sharingError('unavailable', 'The bio page could not be saved.');
     // A link keeps its id (so printed redirect addresses survive an edit) and click total when its label and address are unchanged.
     // Duplicate label+address pairs are matched one-to-one in order.
     const before = await tx.$queryRaw<Array<{ id?: string; label: string; url: string; clicks: number }>>`SELECT id, label, url, clicks FROM bio_links WHERE "pageId" = ${id} ORDER BY position ASC, id ASC FOR UPDATE`;
@@ -55,13 +56,13 @@ export async function saveBioPage(actor: SharingActor, input: unknown) {
 }
 
 export async function deleteBioPage(actor: SharingActor, input: unknown) {
-  const parsed = BIO_DELETE_SCHEMA.safeParse(input); if (!parsed.success) throw bad();
+  const parsed = BIO_DELETE_SCHEMA.safeParse(input); if (!parsed.success) throw await bad();
   await authorizeSharing(actor, 'bio', 'write'); const limits = await sharingLimits();
   return protect(transact(actor.workspaceId, limits, async tx => {
     await lockActor(tx, actor, 'bio');
     const rows = await tx.$queryRaw<Array<{ id: string; slug: string }>>`SELECT id, slug FROM bio_pages WHERE "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
-    const page = rows[0]; if (!page) throw new OperationError('not_found', 'This workspace has no bio page.');
-    exact(parsed.data.confirmation, deleteBioConfirmation(page.slug));
+    const page = rows[0]; if (!page) throw await sharingError('not_found', 'This workspace has no bio page.');
+    await exact(parsed.data.confirmation, deleteBioConfirmation(page.slug));
     await tx.$executeRaw`DELETE FROM bio_links WHERE "pageId" = ${page.id}`;
     await tx.$executeRaw`DELETE FROM bio_pages WHERE id = ${page.id} AND "workspaceId" = ${actor.workspaceId}`;
     await audit(tx, actor, 'sharing.bio_deleted', { pageId: page.id, slug: page.slug });

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
+import { feedsError } from './messages';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
@@ -18,18 +19,18 @@ export type FeedRow = {
 };
 export const FEED_COLUMNS = `id, name, url, kind, enabled, "messageTemplate", hashtags, "targetIds", "autoApprove", "spreadMinutes", "pollErrorCount", "lastPolledAt", "lastError", "lastEtag", "lastModified", "ingestFrom", "createdAt", "updatedAt"`;
 
-export const bad = (text = 'Choose valid feed details and confirm the exact action.') => new OperationError('invalid_request', text);
-export const unavailable = () => new OperationError('unavailable', 'Content feeds are temporarily unavailable. Refresh and try again.');
-export const missing = () => new OperationError('not_found', 'This feed is unavailable in the current workspace.');
-export const parse = <S extends import('zod').ZodTypeAny>(schema: S, input: unknown): import('zod').output<S> => { const r = schema.safeParse(input); if (!r.success) throw bad(); return r.data; };
+export const bad = (text = 'Choose valid feed details and confirm the exact action.') => feedsError('invalid_request', text);
+export const unavailable = () => feedsError('unavailable', 'Content feeds are temporarily unavailable. Refresh and try again.');
+export const missing = () => feedsError('not_found', 'This feed is unavailable in the current workspace.');
+export const parse = async <S extends import('zod').ZodTypeAny>(schema: S, input: unknown): Promise<import('zod').output<S>> => { const r = schema.safeParse(input); if (!r.success) throw await bad(); return r.data; };
 const inRange = (v: unknown, r: { min: number; max: number }): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= r.min && v <= r.max;
 const isUnique = (error: unknown) => Boolean(error && typeof error === 'object' && 'code' in error && ((error as { code?: unknown }).code === 'P2002' || (error as { code?: unknown }).code === '23505'));
 
 export async function protect<T>(operation: Promise<T>): Promise<T> {
   try { return await operation; } catch (error) {
     if (error instanceof OperationError) throw error;
-    if (isUnique(error)) throw new OperationError('conflict', 'A feed with this address already exists in the current workspace.');
-    throw new OperationError('upstream_failure', 'The feed operation could not be confirmed. Refresh the list before trying again.');
+    if (isUnique(error)) throw await feedsError('conflict', 'A feed with this address already exists in the current workspace.');
+    throw await feedsError('upstream_failure', 'The feed operation could not be confirmed. Refresh the list before trying again.');
   }
 }
 
@@ -44,9 +45,9 @@ export async function bounds() {
       || !inRange(maxUrl, B.urlMaxCharacters) || !inRange(maxIdentifier, B.identifierMaxCharacters) || !inRange(pageNumberMax, B.pageNumberMax) || !inRange(maxHashtags, B.hashtagsMaxCharacters) || !inRange(entryTitle, B.entryTitleMaxCharacters) || !inRange(entryGuid, B.entryGuidMaxCharacters) || !inRange(entryDescription, B.entryDescriptionMaxCharacters) || !inRange(wordpressPageSize, B.wordpressPageSize)
       || !inRange(timeout, B.transactionTimeoutMs) || !inRange(maxWait, B.transactionMaxWaitMs) || !inRange(workspaceTimeout, B.workspaceTimeoutMs) || !inRange(maxSpread, B.maxSpreadMinutes) || !inRange(lookaheadDays, B.queueLookaheadDays)
       || !inRange(fallbackDelay, B.fallbackDelayMinutes) || !inRange(fallbackSpacing, B.fallbackSpacingMinutes) || !inRange(itemsPerRun, B.autoCheckMaxItemsPerFeed)
-      || typeof allowHttp !== 'boolean' || !Array.isArray(allowlist) || timeout + maxWait >= workspaceTimeout) throw unavailable();
+      || typeof allowHttp !== 'boolean' || !Array.isArray(allowlist) || timeout + maxWait >= workspaceTimeout) throw await unavailable();
     return { pageSize, maxFeeds, fetchTimeout, fetchMax, redirects, allowHttp, allowlist: allowlist as string[], maxItems, maxTargets, maxMessage, maxName, minInterval, excerpt, listScanMargin, qualifyingOwnerScanLimit, maxUrl, maxIdentifier, pageNumberMax, maxHashtags, entryTitle, entryGuid, entryDescription, wordpressPageSize, timeout, maxWait, maxSpread, lookaheadDays, fallbackDelay, fallbackSpacing, itemsPerRun };
-  } catch (error) { if (error instanceof OperationError) throw error; throw unavailable(); }
+  } catch (error) { if (error instanceof OperationError) throw error; throw await unavailable(); }
 }
 export const policyOf = (l: FeedLimits): FetchPolicy => ({ timeoutMs: l.fetchTimeout, maxBytes: l.fetchMax, maxRedirects: l.redirects, allowHttp: l.allowHttp, hostAllowlist: l.allowlist });
 
@@ -60,15 +61,15 @@ export async function transact<T>(workspaceId: string, l: FeedLimits, fn: (tx: T
 /** Re-check the member row (locked) and the feature grant inside the transaction. */
 export async function lockActor(tx: Tx, actor: FeedActor, write: boolean): Promise<FeedAuthorization> {
   const rows = await tx.$queryRaw<Array<{ role: string; disabledAt: Date | null }>>`SELECT m.role::text AS role, u."disabledAt" FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} FOR UPDATE OF m, u`;
-  if (!rows[0] || rows[0].disabledAt) throw new OperationError('unauthorized', 'Your active workspace access changed. Sign in again to continue.');
+  if (!rows[0] || rows[0].disabledAt) throw await feedsError('unauthorized', 'Your active workspace access changed. Sign in again to continue.');
   const auth = await authorizeFeeds(actor, write ? 'write' : 'read');
-  if (write && !AUTHOR_ROLES.has(auth.role)) throw new OperationError('forbidden', 'You do not have permission to manage feeds.');
+  if (write && !AUTHOR_ROLES.has(auth.role)) throw await feedsError('forbidden', 'You do not have permission to manage feeds.');
   return auth;
 }
 /** `actor` null records a system action (the automatic worker) instead of claiming a person clicked a button. */
 export async function audit(tx: Tx, workspaceId: string, actor: FeedActor | null, action: string, detail: object) {
   const count = await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${workspaceId}, ${actor?.userId ?? null}, ${action}, ${JSON.stringify(detail)}::jsonb, NOW())`;
-  if (count !== 1) throw unavailable();
+  if (count !== 1) throw await unavailable();
 }
 
 export const idsOf = (value: unknown): string[] => Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];

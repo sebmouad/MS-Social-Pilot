@@ -10,7 +10,9 @@ import type { FeatureId } from '@/lib/product';
 import { SettingsPage, SettingsPanel, styles } from '@/modules/settings/ui/_components';
 import { BioManager } from './BioManager';
 
-export const metadata: Metadata = { title: 'Bio page' };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: ownerText(await loadOwnerCopy(await settingsLocale()))('Bio page') };
+}
 
 export default async function BioSettingsPage() {
   const viewer = await requireViewer({ feature: BIO_FEATURE_ID });

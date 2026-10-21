@@ -8,6 +8,7 @@ import { WORDPRESS_BOUNDS } from '../wordpress/config';
 import { pauseRecipeSourceConfirmation, planConfigPatchSchema, resumeRecipeSourceConfirmation, runRecipePlannerConfirmation, saveRecipeSourceConfirmation, type PlanConfig } from '../wordpress/recipe';
 import { authorizeFeedWrite, authorizeFeeds, type FeedActor, type FeedAuthorization } from './access';
 import { audit, bad, lockActor, protect, type Tx } from './core';
+import { feedsError } from './messages';
 import { commentFor, configOf, defaultPlannerPorts, openDatabase, planSource, recipeSummaryRecord, scanCandidates, type PlannerPorts } from './wordpress-planner';
 import { loadWordpressSettings, patchLimits, type WordpressSettings } from './wordpress-settings';
 import { countPlans, selectPlans, selectSource, type LedgerRow, type SourceRow } from './wordpress-store';
@@ -29,12 +30,12 @@ const saveSchema = (s: WordpressSettings) => z.object({
 const stateSchema = z.object({ enabled: z.boolean(), confirmation: z.string() }).strict();
 const confirmSchema = z.object({ confirmation: z.string() }).strict();
 
-const parse = <S extends z.ZodTypeAny>(schema: S, input: unknown): z.output<S> => { const r = schema.safeParse(input ?? {}); if (!r.success) throw bad(); return r.data; };
+const parse = async <S extends z.ZodTypeAny>(schema: S, input: unknown): Promise<z.output<S>> => { const r = schema.safeParse(input ?? {}); if (!r.success) throw await bad(); return r.data; };
 const scoped = (auth: FeedAuthorization) => auth.actor.allowedTargetIds !== undefined;
 /** A channel-limited member sees and manages only a source whose channels are all inside their access. */
 const visible = (auth: FeedAuthorization, source: SourceRow) => !scoped(auth) || (!source.allTargets && source.targetIds.length > 0 && source.targetIds.every(id => auth.actor.allowedTargetIds!.includes(id)));
-const unavailable = () => new OperationError('unavailable', 'Recipe planning is temporarily unavailable. Refresh and try again.');
-const notFound = () => new OperationError('not_found', 'No recipe source is set up in this workspace.');
+const unavailable = () => feedsError('unavailable', 'Recipe planning is temporarily unavailable. Refresh and try again.');
+const notFound = () => feedsError('not_found', 'No recipe source is set up in this workspace.');
 
 async function transact<T>(workspaceId: string, s: WordpressSettings, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return withWorkspaceOperation(workspaceId, () => prisma.$transaction(async tx => {
@@ -64,7 +65,7 @@ async function selectablePages(workspaceId: string, s: WordpressSettings, auth: 
 
 export async function readRecipeSource(actor: FeedActor, input: unknown = {}, deps: RecipeDeps = {}) {
   const s = await loadWordpressSettings();
-  const query = parse(readSchema(s.pageNumberMax), input);
+  const query = await parse(readSchema(s.pageNumberMax), input);
   const auth = await authorizeFeeds(actor, 'read');
   return protect((async () => {
     const row = await selectSource(actor.workspaceId);
@@ -92,22 +93,22 @@ export async function readRecipeSource(actor: FeedActor, input: unknown = {}, de
 
 export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: RecipeDeps = {}) {
   const s = await loadWordpressSettings();
-  const data = parse(saveSchema(s), input);
-  if (data.confirmation !== saveRecipeSourceConfirmation(data.name)) throw bad();
+  const data = await parse(saveSchema(s), input);
+  if (data.confirmation !== saveRecipeSourceConfirmation(data.name)) throw await bad();
   const auth = await authorizeFeedWrite(actor);
-  if (scoped(auth) && (data.allTargets || !data.targetIds.length)) throw bad('Choose at least one channel for this recipe source.');
-  if (!data.allTargets && (!data.targetIds.length || new Set(data.targetIds).size !== data.targetIds.length)) throw bad('Choose at least one channel, or use all channels.');
+  if (scoped(auth) && (data.allTargets || !data.targetIds.length)) throw await bad('Choose at least one channel for this recipe source.');
+  if (!data.allTargets && (!data.targetIds.length || new Set(data.targetIds).size !== data.targetIds.length)) throw await bad('Choose at least one channel, or use all channels.');
   const siteUrl = (data.siteUrl || s.siteUrl);
   let normalized: string;
   try {
     const url = checkUrlShape(siteUrl, { allowHttp: s.image.fetch.allowHttp, hostAllowlist: s.image.fetch.hostAllowlist });
     if (url.protocol !== 'https:' || url.search || url.hash) throw new Error('shape');
     normalized = `${url.origin}${url.pathname}`.replace(/\/+$/, '');
-  } catch (error) { throw error instanceof OperationError ? error : bad('Enter the recipe site address, starting with https://'); }
+  } catch (error) { throw error instanceof OperationError ? error : await bad('Enter the recipe site address, starting with https://'); }
   const ports = { ...defaultPlannerPorts(), ...deps };
   const known = new Set((await selectablePages(actor.workspaceId, s, auth)).map(p => p.id));
   if (!data.allTargets) {
-    if (data.targetIds.some(id => !known.has(id))) throw new OperationError('unavailable', 'One or more channels are unavailable. Refresh and choose again.');
+    if (data.targetIds.some(id => !known.has(id))) throw await feedsError('unavailable', 'One or more channels are unavailable. Refresh and choose again.');
     for (const id of data.targetIds) await ports.validateTarget(auth.actor, id);
   }
   const targetIds = data.allTargets ? [] : data.targetIds;
@@ -126,7 +127,7 @@ export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: R
     await audit(tx, actor.workspaceId, actor, existing ? 'feeds.recipe_source_updated' : 'feeds.recipe_source_created', { sourceId: id, host: new URL(normalized).hostname, allTargets: data.allTargets, targetCount: targetIds.length, enabled });
     await lockActor(tx, actor, true);
     const saved = await tx.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT id FROM wordpress_recipe_sources WHERE id = $1 AND "workspaceId" = $2`, id, actor.workspaceId);
-    if (!saved[0]) throw unavailable();
+    if (!saved[0]) throw await unavailable();
     return { id, created: !existing };
   })).then(async result => ({ ...result, source: viewOf(s, (await selectSource(actor.workspaceId))!) }));
 }
@@ -134,15 +135,15 @@ export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: R
 /** Pause or resume automatic planning for the workspace source. Pausing never removes posts already scheduled. */
 export async function setRecipeSourceState(actor: FeedActor, input: unknown) {
   const s = await loadWordpressSettings();
-  const data = parse(stateSchema, input);
-  if (data.confirmation !== (data.enabled ? resumeRecipeSourceConfirmation : pauseRecipeSourceConfirmation)) throw bad();
+  const data = await parse(stateSchema, input);
+  if (data.confirmation !== (data.enabled ? resumeRecipeSourceConfirmation : pauseRecipeSourceConfirmation)) throw await bad();
   const auth = await authorizeFeedWrite(actor);
   return protect(transact(actor.workspaceId, s, async tx => {
     await lockActor(tx, actor, true);
     const rows = await tx.$queryRaw<Array<{ id: string; allTargets: boolean; targetIds: unknown }>>`SELECT id, "allTargets", "targetIds" FROM wordpress_recipe_sources WHERE "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const row = rows[0];
     const ids = Array.isArray(row?.targetIds) ? (row!.targetIds as unknown[]).filter((v): v is string => typeof v === 'string') : [];
-    if (!row || (scoped(auth) && (row.allTargets || !ids.every(id => auth.actor.allowedTargetIds!.includes(id))))) throw notFound();
+    if (!row || (scoped(auth) && (row.allTargets || !ids.every(id => auth.actor.allowedTargetIds!.includes(id))))) throw await notFound();
     await tx.$executeRaw`UPDATE wordpress_recipe_sources SET enabled = ${data.enabled}, "lastError" = NULL, "updatedAt" = NOW() WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId}`;
     await audit(tx, actor.workspaceId, actor, data.enabled ? 'feeds.recipe_source_resumed' : 'feeds.recipe_source_paused', { sourceId: row.id });
     await lockActor(tx, actor, true);
@@ -155,7 +156,7 @@ export async function setRecipeSourceState(actor: FeedActor, input: unknown) {
 async function authorizedSource(actor: FeedActor) {
   const auth = await authorizeFeedWrite(actor);
   const source = await protect(selectSource(actor.workspaceId));
-  if (!source || !visible(auth, source)) throw notFound();
+  if (!source || !visible(auth, source)) throw await notFound();
   return { auth, source };
 }
 
@@ -163,11 +164,11 @@ export type PreviewItem = { wpPostId: string; title: string; permalink: string; 
 /** The next recipes exactly as they will post: image, caption and first comment. Nothing is created. */
 export async function previewRecipeSource(actor: FeedActor, input: unknown = {}, deps: RecipeDeps = {}) {
   const s = await loadWordpressSettings();
-  parse(z.object({}).strict(), input);
+  await parse(z.object({}).strict(), input);
   const { source } = await authorizedSource(actor);
   const ports = { ...defaultPlannerPorts(), ...deps };
   const db = await openDatabase(ports, s);
-  if (!db) throw new OperationError('unavailable', 'The recipe library could not be reached. Try again later.');
+  if (!db) throw await feedsError('unavailable', 'The recipe library could not be reached. Try again later.');
   try {
     const config = configOf(s, source);
     const now = ports.now();
@@ -181,21 +182,21 @@ export async function previewRecipeSource(actor: FeedActor, input: unknown = {},
     return { items, scanned: scan.scanned, exhausted: scan.exhausted };
   } catch (error) {
     if (error instanceof OperationError) throw error;
-    throw new OperationError('upstream_failure', 'The recipe library could not be read. Try again later.');
+    throw await feedsError('upstream_failure', 'The recipe library could not be read. Try again later.');
   } finally { await db.close(); }
 }
 
 /** Plan now, as the signed-in member: creates scheduled posts for unfilled slots, bounded by the run budget. */
 export async function runRecipePlannerNow(actor: FeedActor, input: unknown, deps: RecipeDeps = {}) {
   const s = await loadWordpressSettings();
-  const data = parse(confirmSchema, input);
-  if (data.confirmation !== runRecipePlannerConfirmation) throw bad();
+  const data = await parse(confirmSchema, input);
+  if (data.confirmation !== runRecipePlannerConfirmation) throw await bad();
   const { auth, source } = await authorizedSource(actor);
-  if (!s.enabled) throw new OperationError('unavailable', 'Recipe planning is not available right now.');
-  if (!source.enabled) throw new OperationError('conflict', 'This recipe source is paused. Resume it to plan posts.');
+  if (!s.enabled) throw await feedsError('unavailable', 'Recipe planning is not available right now.');
+  if (!source.enabled) throw await feedsError('conflict', 'This recipe source is paused. Resume it to plan posts.');
   const ports = { ...defaultPlannerPorts(), ...deps };
   const db = await openDatabase(ports, s);
-  if (!db) throw new OperationError('unavailable', 'The recipe library could not be reached. Try again later.');
+  if (!db) throw await feedsError('unavailable', 'The recipe library could not be reached. Try again later.');
   const now = ports.now();
   try {
     const outcome = await planSource({ settings: s, ports, db, budget: { left: s.runBudget }, now }, source, auth);
@@ -204,6 +205,6 @@ export async function runRecipePlannerNow(actor: FeedActor, input: unknown, deps
     return outcome;
   } catch (error) {
     if (error instanceof OperationError) throw error;
-    throw new OperationError('upstream_failure', 'Planning could not be completed. Check the planned posts before trying again.');
+    throw await feedsError('upstream_failure', 'Planning could not be completed. Check the planned posts before trying again.');
   } finally { await db.close(); }
 }

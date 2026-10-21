@@ -7,6 +7,7 @@ import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { MediaValidationError } from '@/modules/publishing/server/media/errors';
 import { authorizeFeature, type ToolActor, type ToolAuthorization } from './access';
 import { fsMediaStore, type MediaStore } from './store';
+import { mediaError } from './messages';
 import { checkUrlShape, defaultFetchDeps, guardedFetch, NetGuardError, type FetchDeps, type FetchPolicy } from '@/modules/publishing/server/media/network/net-guard';
 import {
   assetReferences, COMMITTED_STATUSES, deleteConfirmation, deleteInUseConfirmation, importConfirmation, isImageFileId,
@@ -21,16 +22,16 @@ type Limits = Awaited<ReturnType<typeof bounds>>;
 type Row = { id: string; filename: string; mimeType: string; size: number; kind: string; url: string; storageKey: string | null; width: number | null; height: number | null; createdAt: Date };
 type PostRow = { id: string; status: string; scheduledAt: Date | null; excerpt: string; media: string; keys: string[] | null };
 
-const bad = (text = 'Choose valid media details and confirm the exact action.') => new OperationError('invalid_request', text);
-const unavailable = () => new OperationError('unavailable', 'The media library is temporarily unavailable. Refresh and try again.');
-const parse = <S extends import('zod').ZodTypeAny>(schema: S, input: unknown): import('zod').output<S> => { const r = schema.safeParse(input); if (!r.success) throw bad(); return r.data; };
+const bad = (text = 'Choose valid media details and confirm the exact action.') => mediaError('invalid_request', text);
+const unavailable = () => mediaError('unavailable', 'The media library is temporarily unavailable. Refresh and try again.');
+const parse = async <S extends import('zod').ZodTypeAny>(schema: S, input: unknown): Promise<import('zod').output<S>> => { const r = schema.safeParse(input); if (!r.success) throw await bad(); return r.data; };
 const inRange = (v: unknown, r: { min: number; max: number }): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= r.min && v <= r.max;
 
 async function protect<T>(operation: Promise<T>): Promise<T> {
   try { return await operation; } catch (error) {
     if (error instanceof OperationError) throw error;
-    if (error instanceof MediaValidationError) throw bad('This file is not an accepted image, or it is larger than the allowed size.');
-    throw new OperationError('upstream_failure', 'The media operation could not be confirmed. Refresh the library before trying again.');
+    if (error instanceof MediaValidationError) throw await bad('This file is not an accepted image, or it is larger than the allowed size.');
+    throw await mediaError('upstream_failure', 'The media operation could not be confirmed. Refresh the library before trying again.');
   }
 }
 
@@ -41,9 +42,9 @@ export async function bounds() {
     const B = MEDIA_BOUNDS;
     if (!inRange(pageSize, B.pageSize) || !inRange(quota, B.workspaceQuotaBytes) || !inRange(videoMax, B.videoMaxBytes) || !inRange(importMax, B.importMaxBytes) || !inRange(importTimeout, B.importTimeoutMs) || !inRange(redirects, B.importMaxRedirects)
       || !inRange(scan, B.holderScanLimit) || !inRange(listLimit, B.holderListLimit) || !inRange(imageLimit, B.imageListLimit) || !inRange(holderExcerpt, B.holderExcerptCharacters) || !inRange(identifierMax, B.identifierMaxCharacters) || !inRange(pageMax, B.pageNumberMax) || !inRange(urlMax, B.importUrlMaxCharacters) || !inRange(nameMax, B.assetNameMaxCharacters) || !inRange(search, B.maxSearchCharacters) || !inRange(timeout, B.transactionTimeoutMs) || !inRange(maxWait, B.transactionMaxWaitMs) || !inRange(workspaceTimeout, B.workspaceTimeoutMs)
-      || typeof allowHttp !== 'boolean' || !Array.isArray(allowlist) || !Array.isArray(videoMimes) || timeout + maxWait >= workspaceTimeout) throw unavailable();
+      || typeof allowHttp !== 'boolean' || !Array.isArray(allowlist) || !Array.isArray(videoMimes) || timeout + maxWait >= workspaceTimeout) throw await unavailable();
     return { pageSize, quota, videoMax, videoMimes: videoMimes as string[], importMax, importTimeout, redirects, allowHttp, allowlist: allowlist as string[], scan, listLimit, imageLimit, holderExcerpt, identifierMax, pageMax, urlMax, nameMax, search, timeout, maxWait };
-  } catch (error) { if (error instanceof OperationError) throw error; throw unavailable(); }
+  } catch (error) { if (error instanceof OperationError) throw error; throw await unavailable(); }
 }
 const policyOf = (l: Limits): FetchPolicy => ({ timeoutMs: l.importTimeout, maxBytes: l.importMax, maxRedirects: l.redirects, allowHttp: l.allowHttp, hostAllowlist: l.allowlist });
 
@@ -55,12 +56,12 @@ async function transact<T>(workspaceId: string, l: Limits, fn: (tx: Tx) => Promi
 }
 async function lockActor(tx: Tx, actor: ToolActor, write: boolean): Promise<ToolAuthorization> {
   const rows = await tx.$queryRaw<Array<{ role: string; disabledAt: Date | null }>>`SELECT m.role::text AS role, u."disabledAt" FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} FOR UPDATE OF m, u`;
-  if (!rows[0] || rows[0].disabledAt) throw new OperationError('unauthorized', 'Your active workspace access changed. Sign in again to continue.');
+  if (!rows[0] || rows[0].disabledAt) throw await mediaError('unauthorized', 'Your active workspace access changed. Sign in again to continue.');
   return authorizeFeature(actor, FEATURE, write ? 'write' : 'read');
 }
 async function audit(tx: Tx, actor: ToolActor, action: string, detail: object) {
   const count = await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, ${action}, ${JSON.stringify(detail)}::jsonb, NOW())`;
-  if (count !== 1) throw unavailable();
+  if (count !== 1) throw await unavailable();
 }
 
 type Source = { id: string; source: LibraryAsset['source']; url?: string | null; storageKey?: string | null };
@@ -94,8 +95,8 @@ const nameFor = (id: string) => `Uploaded image ${id.slice(0, 8)}`;
 export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: MediaDeps = {}) {
   const store = deps.store ?? fsMediaStore;
   const l = await bounds();
-  const query = parse(libraryQuerySchema(l.search, l.pageMax), input);
-  if ((query.q?.length ?? 0) > l.search) throw bad('Shorten the search.');
+  const query = await parse(libraryQuerySchema(l.search, l.pageMax), input);
+  if ((query.q?.length ?? 0) > l.search) throw await bad('Shorten the search.');
   const auth = await authorizeFeature(actor, FEATURE, 'read');
   const page = query.page ?? 1; const q = query.q ?? ''; const kind = query.kind ?? '';
   const window = page * l.pageSize + 1;
@@ -122,23 +123,23 @@ export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: M
 export async function importFromUrl(actor: ToolActor, input: unknown, deps: MediaDeps = {}) {
   const store = deps.store ?? fsMediaStore; const net = deps.net ?? defaultFetchDeps();
   const l = await bounds();
-  const data = parse(importSchema(l.urlMax, l.nameMax), input);
-  if (data.confirmation !== importConfirmation(data.url)) throw bad();
+  const data = await parse(importSchema(l.urlMax, l.nameMax), input);
+  if (data.confirmation !== importConfirmation(data.url)) throw await bad();
   await authorizeFeature(actor, FEATURE, 'write');
   return protect((async () => {
     const policy = policyOf(l);
     checkUrlShape(data.url, policy);
     const fetched = await guardedFetch(data.url, policy, net);
-    if (fetched.notModified) throw bad('That address did not return a file.');
+    if (fetched.notModified) throw await bad('That address did not return a file.');
     const sniffed = sniffMedia(fetched.bytes);
     const declaredOk = fetched.contentType === '' || fetched.contentType === 'application/octet-stream' || fetched.contentType === 'binary/octet-stream' || (sniffed !== null && fetched.contentType.startsWith(`${sniffed.kind}/`));
-    if (!sniffed || !declaredOk) throw bad('That address does not return a supported image or video.');
-    if (sniffed.kind === 'video' && (!l.videoMimes.includes(sniffed.mimeType) || fetched.bytes.length > l.videoMax)) throw bad('That video is not an accepted type or is larger than the allowed size.');
+    if (!sniffed || !declaredOk) throw await bad('That address does not return a supported image or video.');
+    if (sniffed.kind === 'video' && (!l.videoMimes.includes(sniffed.mimeType) || fetched.bytes.length > l.videoMax)) throw await bad('That video is not an accepted type or is larger than the allowed size.');
     const name = safeAssetName(data.name, data.url, sniffed.kind === 'video' ? 'video' : 'image', l.nameMax);
     return transact(actor.workspaceId, l, async tx => {
       await lockActor(tx, actor, true);
       const usage = await usageOf(tx, actor.workspaceId, store, l.quota, l.imageLimit);
-      if (usage.usedBytes + fetched.bytes.length > l.quota) throw new OperationError('conflict', 'This workspace has reached its media storage limit. Delete unused media and try again.');
+      if (usage.usedBytes + fetched.bytes.length > l.quota) throw await mediaError('conflict', 'This workspace has reached its media storage limit. Delete unused media and try again.');
       if (sniffed.kind === 'image') {
         const file = new File([new Uint8Array(fetched.bytes)], name, { type: sniffed.mimeType });
         const stored = await store.putImage({ userId: actor.userId, workspaceId: actor.workspaceId }, file);
@@ -152,7 +153,7 @@ export async function importFromUrl(actor: ToolActor, input: unknown, deps: Medi
       const { storageKey } = await store.putVideo(actor.workspaceId, fileId, fetched.bytes);
       try {
         const inserted = await tx.$executeRaw`INSERT INTO media (id, "workspaceId", filename, "mimeType", size, kind, "storageProvider", "storageKey", url, "createdAt") VALUES (${rowId}, ${actor.workspaceId}, ${name}, ${sniffed.mimeType}, ${fetched.bytes.length}, 'video'::"MediaKind", 'local'::"StorageProvider", ${storageKey}, ${`media:${rowId}`}, NOW())`;
-        if (inserted !== 1) throw unavailable();
+        if (inserted !== 1) throw await unavailable();
         await audit(tx, actor, 'media.imported', { assetId: rowId, kind: 'video', size: fetched.bytes.length, host: new URL(fetched.finalUrl).hostname });
         await lockActor(tx, actor, true);
       } catch (error) { await store.removeStored(actor.workspaceId, storageKey).catch(() => undefined); throw error; }
@@ -169,34 +170,37 @@ export async function importFromUrl(actor: ToolActor, input: unknown, deps: Medi
 export async function deleteAsset(actor: ToolActor, input: unknown, deps: MediaDeps = {}) {
   const store = deps.store ?? fsMediaStore;
   const l = await bounds();
-  const data = parse(deleteSchema(l.identifierMax), input);
+  const data = await parse(deleteSchema(l.identifierMax), input);
   const force = data.allowInUse === true;
-  if (data.confirmation !== (force ? deleteInUseConfirmation(data.id) : deleteConfirmation(data.id))) throw bad();
+  if (data.confirmation !== (force ? deleteInUseConfirmation(data.id) : deleteConfirmation(data.id))) throw await bad();
   const first = await authorizeFeature(actor, FEATURE, 'write');
-  if (!first.workspaceWide) throw new OperationError('forbidden', 'Deleting media can affect posts on every channel. Ask a member with access to all channels.');
+  if (!first.workspaceWide) throw await mediaError('forbidden', 'Deleting media can affect posts on every channel. Ask a member with access to all channels.');
   return protect(transact(actor.workspaceId, l, async tx => {
     const auth = await lockActor(tx, actor, true);
-    if (!auth.workspaceWide) throw new OperationError('forbidden', 'Deleting media can affect posts on every channel. Ask a member with access to all channels.');
+    if (!auth.workspaceWide) throw await mediaError('forbidden', 'Deleting media can affect posts on every channel. Ask a member with access to all channels.');
     const isFile = isImageFileId(data.id);
     const rows = isFile ? [] : await tx.$queryRaw<Row[]>`SELECT id, filename, "mimeType", size, kind::text AS kind, url, "storageKey", width, height, "createdAt" FROM media WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const row = rows[0];
-    if (!isFile && !row) throw new OperationError('not_found', 'This media is unavailable in the current workspace.');
+    if (!isFile && !row) throw await mediaError('not_found', 'This media is unavailable in the current workspace.');
     const target: Source = isFile ? { id: data.id, source: 'stored-image' } : { id: row!.id, source: 'library', url: row!.url, storageKey: row!.storageKey };
     const { byAsset, truncated } = await attribute(tx, actor.workspaceId, [target], l.scan, l.holderExcerpt);
     const holders = byAsset.get(target.id) ?? [];
     if (holders.length || truncated) {
-      if (!force) throw new OperationError('conflict', `This media is used by ${holders.length || 'many'} post${holders.length === 1 ? '' : 's'}. Remove it from those posts first, or confirm deleting it anyway.`);
-      if (truncated || holders.some(h => COMMITTED_STATUSES.has(h.status))) throw new OperationError('conflict', 'This media is used by posts that are scheduled, publishing or awaiting approval. Change those posts first.');
+      if (!force) throw await (holders.length === 1
+        ? mediaError('conflict', 'This media is used by 1 post. Remove it from that post first, or confirm deleting it anyway.')
+        : holders.length ? mediaError('conflict', 'This media is used by {0} posts. Remove it from those posts first, or confirm deleting it anyway.', holders.length)
+          : mediaError('conflict', 'This media is used by many posts. Remove it from those posts first, or confirm deleting it anyway.'));
+      if (truncated || holders.some(h => COMMITTED_STATUSES.has(h.status))) throw await mediaError('conflict', 'This media is used by posts that are scheduled, publishing or awaiting approval. Change those posts first.');
     }
     if (isFile) {
       await audit(tx, actor, 'media.deleted', { assetId: data.id, kind: 'image', affectedPosts: holders.map(h => h.postId), forced: force });
       const removal = await store.removeImage(actor.workspaceId, data.id, force);
-      if (removal === 'missing') throw new OperationError('not_found', 'This media is unavailable in the current workspace.');
-      if (removal === 'in_use') throw new OperationError('conflict', 'This media is now in use. Refresh and review before deleting.');
+      if (removal === 'missing') throw await mediaError('not_found', 'This media is unavailable in the current workspace.');
+      if (removal === 'in_use') throw await mediaError('conflict', 'This media is now in use. Refresh and review before deleting.');
       return { id: data.id, deleted: true as const, fileRemoved: 'removed' as const, affectedPosts: holders.length };
     }
     const deleted = await tx.$executeRaw`DELETE FROM media WHERE id = ${row!.id} AND "workspaceId" = ${actor.workspaceId}`;
-    if (deleted !== 1) throw new OperationError('not_found', 'This media is unavailable in the current workspace.');
+    if (deleted !== 1) throw await mediaError('not_found', 'This media is unavailable in the current workspace.');
     await audit(tx, actor, 'media.deleted', { assetId: row!.id, kind: row!.kind, affectedPosts: holders.map(h => h.postId), forced: force });
     await lockActor(tx, actor, true);
     let fileRemoved: 'removed' | 'kept' | 'unconfirmed' = 'kept';

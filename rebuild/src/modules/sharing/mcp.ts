@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OperationError } from '@/lib/operation-error';
+import { sharingError } from './server/messages';
 import { deleteBioPage, readBioPage, saveBioPage } from './server/bio';
 import { createShareLink, deleteShareLink, listShareFeedback, listShareLinks, listShareableChannels, revokeShareLink, rotateShareLink, updateShareLink } from './server/links';
 import { SHARE_KINDS, type SharingActor } from './contracts';
@@ -37,18 +37,18 @@ const empty = z.object({}).strict();
 export async function executeSharingTool(actor: SharingActor, name: string, args: unknown, ceiling: number = SHARING_DEFAULT_RESULT_CEILING) {
   const options = { maxItems: ceiling };
   switch (name) {
-    case 'list_share_links': { const p = listSchema.safeParse(args ?? {}); if (!p.success) throw new OperationError('invalid_request', 'Choose a valid result page.'); return listShareLinks(actor, p.data, options); }
-    case 'list_shareable_channels': { if (!empty.safeParse(args ?? {}).success) throw new OperationError('invalid_request', 'This action takes no arguments.'); return { channels: await listShareableChannels(actor, options) }; }
+    case 'list_share_links': { const p = listSchema.safeParse(args ?? {}); if (!p.success) throw await sharingError('invalid_request', 'Choose a valid result page.'); return listShareLinks(actor, p.data, options); }
+    case 'list_shareable_channels': { if (!empty.safeParse(args ?? {}).success) throw await sharingError('invalid_request', 'This action takes no arguments.'); return { channels: await listShareableChannels(actor, options) }; }
     case 'list_share_feedback': return listShareFeedback(actor, args, options);
     case 'create_share_link': return createShareLink(actor, args);
     case 'update_share_link': return updateShareLink(actor, args);
     case 'revoke_share_link': return revokeShareLink(actor, args);
     case 'rotate_share_link': return rotateShareLink(actor, args);
     case 'delete_share_link': return deleteShareLink(actor, args);
-    case 'get_bio_page': { if (!empty.safeParse(args ?? {}).success) throw new OperationError('invalid_request', 'This action takes no arguments.'); return readBioPage(actor, options); }
+    case 'get_bio_page': { if (!empty.safeParse(args ?? {}).success) throw await sharingError('invalid_request', 'This action takes no arguments.'); return readBioPage(actor, options); }
     case 'save_bio_page': return saveBioPage(actor, args);
     case 'delete_bio_page': return deleteBioPage(actor, args);
-    default: throw new OperationError('invalid_request', 'Choose a supported sharing action.');
+    default: throw await sharingError('invalid_request', 'Choose a supported sharing action.');
   }
 }
 
