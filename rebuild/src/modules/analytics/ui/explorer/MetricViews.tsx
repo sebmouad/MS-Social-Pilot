@@ -6,7 +6,7 @@ import { IconChartLine, IconTable } from '@tabler/icons-react';
 import { previousSeries } from '../series';
 
 export function MetricViews({ label, points, unit, locale = 'en', previousPoints }: {
-  label: string; points: Array<{ date: string; value: number }>; unit: string; locale?: 'en' | 'fr'; previousPoints?: Array<{ date: string; value: number }>;
+  label: string; points: Array<{ date: string; value: number }>; unit: string; locale?: 'en' | 'fr'; previousPoints?: Array<{ date: string; value: number | null }>;
 }) {
   const fr = locale === 'fr';
   const comparison = previousSeries(points, previousPoints, unit);

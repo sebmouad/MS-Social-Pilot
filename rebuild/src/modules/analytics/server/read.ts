@@ -9,6 +9,7 @@ import { loadPermissions } from '@/server/permissions/loader';
 import { buildAnalytics, type MetricView } from '@/modules/analytics/server/aggregate';
 import { loadAnalytics, type AnalyticsAdScope } from '@/modules/analytics/server/data';
 import { AnalyticsComparisonError, analyticsDateRange, compareAnalytics } from './comparison';
+import { buildPreviousPoints } from './previous-points';
 import type { AnalyticsReadActor, AnalyticsReadConstraints, AnalyticsReadResult, AnalyticsSnapshot } from './types';
 
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
@@ -201,6 +202,8 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
     if (value) comparisons[metric.key] = value;
   }
 
+  const previousPoints = buildPreviousPoints(allMetrics, comparisonMetrics, metricIdentity, comparisons, period, period.comparison);
+
   const publishingRows = selectedChannelIds.length ? await prisma.post.groupBy({
     by: ['status'],
     where: {
@@ -222,6 +225,7 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
     audience: view.audience,
     publishing: { published: count('published'), scheduled: count('scheduled'), failed: count('failed') + count('partially_failed') },
     comparisons,
+    previousPoints,
     query: '',
     chartPoints: limits.chartPoints,
     searchMaxLength: limits.searchMaxLength,
