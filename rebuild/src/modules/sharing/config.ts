@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
+import { ownerCopy, ownerCopySchema } from './ui/owner-copy';
+import { publicCopyDefaults, publicCopySchema } from './ui/copy';
 
 const n = (min: number, max: number) => z.number().int().min(min).max(max);
 const G = 'Sharing · Client links';
@@ -55,7 +57,13 @@ export const SHARING_COPY_CONFIG = [
   text('bio.copy.footer', B, 'Bio page footer', 'Small text shown at the bottom of every public bio page. Leave empty to show none.', '', 200),
 ] as const;
 
-export const SHARING_CONFIG = [...SHARING_LIMIT_CONFIG, ...SHARING_COPY_CONFIG] as const;
+/** Root-managed interface text, English and French: the signed-in screens and the signed-out visitor pages. */
+export const SHARING_UI_COPY_CONFIG = [
+  entry({ key: 'sharing.ownerCopy', group: G, label: 'Sharing screen copy', kind: 'json', description: 'English and French labels, confirmations and feedback of the client links and bio page settings screens.', defaultValue: ownerCopy, schema: ownerCopySchema, consumption: 'active' }),
+  entry({ key: 'sharing.publicCopy', group: G, label: 'Public share and bio page copy', kind: 'json', description: 'English and French text of the signed-out share, review and bio pages. The visitor\'s browser language picks the version.', defaultValue: publicCopyDefaults, schema: publicCopySchema, consumption: 'active' }),
+] as const;
+
+export const SHARING_CONFIG = [...SHARING_LIMIT_CONFIG, ...SHARING_COPY_CONFIG, ...SHARING_UI_COPY_CONFIG] as const;
 
 export type SharingLimits = Record<string, number>;
 export type SharingCopy = { intro: string; answerNotice: string; bioFooter: string };

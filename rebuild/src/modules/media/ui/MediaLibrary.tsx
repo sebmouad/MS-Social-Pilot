@@ -6,7 +6,7 @@ import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
 import { SidebarDock } from '@/components/SidebarDock';
-import { mediaText, type MediaCopyKey, type MediaLocale } from '../copy';
+import { mediaText, type MediaCopyCatalog, type MediaCopyKey, type MediaLocale } from '../copy';
 import styles from './media.module.css';
 
 const PATH = '/publishing/media';
@@ -15,12 +15,12 @@ export type Asset = { id: string; kind: 'image' | 'video'; mimeType: string; nam
 type Usage = { usedBytes: number; quotaBytes: number; assetCount: number; approximate: boolean };
 const size = (n: number) => n >= 1073741824 ? `${(n / 1073741824).toFixed(1)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
-export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, workspaceWide, usageMayBeIncomplete, maxSearch, locale = 'en' }: {
+export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, workspaceWide, usageMayBeIncomplete, maxSearch, locale = 'en', copy }: {
   items: Asset[]; usage: Usage; page: number; hasMore: boolean; filters: { kind: string; usage: string; q: string };
-  canWrite: boolean; workspaceWide: boolean; usageMayBeIncomplete: boolean; maxSearch: number; locale?: MediaLocale;
+  canWrite: boolean; workspaceWide: boolean; usageMayBeIncomplete: boolean; maxSearch: number; locale?: MediaLocale; copy?: MediaCopyCatalog;
 }) {
   const router = useRouter();
-  const t = (key: MediaCopyKey, values?: Record<string, string | number>) => mediaText(locale, key, values);
+  const t = (key: MediaCopyKey, values?: Record<string, string | number>) => mediaText(locale, key, values, copy);
   const day = (v: string) => Number.isFinite(Date.parse(v)) ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(v)) : t('unknownDate');
   const errorText = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : t('unconfirmed');
   const [assets, setAssets] = useState(items);

@@ -64,6 +64,10 @@ export const recipeCopy = {
 
 export type RecipeCopyKey = keyof typeof recipeCopy.en;
 export type RecipeLocale = keyof typeof recipeCopy;
-export function recipeText(locale: RecipeLocale, key: RecipeCopyKey, values: Record<string, string | number> = {}): string {
-  return (recipeCopy[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+/** Root-edited catalog shape: same keys in both languages. */
+export type RecipeCopyCatalog = Record<RecipeLocale, Record<RecipeCopyKey, string>>;
+
+/** `catalog` is the Root-managed `feeds.recipeCopy` value; the shipped defaults apply when it is not supplied. */
+export function recipeText(locale: RecipeLocale, key: RecipeCopyKey, values: Record<string, string | number> = {}, catalog: RecipeCopyCatalog = recipeCopy): string {
+  return (catalog[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
 }

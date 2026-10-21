@@ -8,8 +8,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { authLocale } from '@/modules/home/auth/locale';
 import { clientIpFromHeaders } from '@/server/client-ip';
 import { loadPublicView, publicMode, resolvePublicLink } from '@/modules/sharing/server/public';
-import { sharingCopy } from '@/modules/sharing/server/limits';
-import { publicCopy } from '@/modules/sharing/ui/copy';
+import { loadPublicCopy, sharingCopy } from '@/modules/sharing/server/limits';
 import { ReviewActions } from './ReviewActions';
 import styles from './share.module.css';
 
@@ -22,7 +21,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
   const { token } = await params;
   const tab = (await searchParams).tab;
   const locale = await authLocale();
-  const t = publicCopy(locale);
+  const t = await loadPublicCopy(locale);
   const when = (date: Date | null, zone: string) => date ? new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone: zone }).format(date) : t.share.noDate;
   const access = await resolvePublicLink(token, clientIpFromHeaders(await headers()), 'render');
   if (!access.ok && access.reason === 'rate_limited') return <main className={styles.page}><div className={styles.body}><EmptyState tone="error" title={t.rateLimited} /></div></main>;

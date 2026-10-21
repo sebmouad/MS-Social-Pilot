@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
 import { requireViewer } from '@/server/context';
+import { runtimeConfig } from '@/server/config/store';
 import { prisma } from '@/server/data';
 import { canAccessFeature } from '@/server/permissions';
 import { PageHeading } from '@/modules/publishing/ui/publishing-ui';
@@ -16,7 +17,8 @@ import styles from './feeds.module.css';
 
 export default async function FeedsScreen({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const locale = feedsLocale((await headers()).get('accept-language'));
-  const t = (key: FeedsCopyKey, values: Record<string, string | number> = {}) => feedsText(locale, key, values);
+  const [copy, recipeCopy] = await Promise.all([runtimeConfig('feeds.copy'), runtimeConfig('feeds.recipeCopy')]);
+  const t = (key: FeedsCopyKey, values: Record<string, string | number> = {}) => feedsText(locale, key, values, copy);
   const viewer = await requireViewer({ feature: FEEDS_FEATURE_ID, channelScoped: true });
   const params = await searchParams;
   const heading = <PageHeading title={t('title')} description={t('description')} />;
@@ -34,8 +36,8 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
     return <>
       <PageHeading title={t('title')} description={t('description')} summary={t('pageSize', { count: result.pageSize })} />
       <FeedManager initialFeeds={result.feeds.map(f => ({ ...f, lastPolledAt: f.lastPolledAt?.toISOString() ?? null, createdAt: f.createdAt.toISOString(), updatedAt: f.updatedAt.toISOString() }))}
-        channels={channels.map(c => ({ id: c.id, name: c.name }))} page={result.page} hasMore={result.hasMore} canWrite={canWrite} limits={result.limits} locale={locale} automaticMinutes={automatic.intervalMinutes} />
-      {recipes && (recipes.source || canWrite) && <RecipeSource initial={recipes as unknown as RecipeView} locale={locale} canWrite={canWrite} />}
+        channels={channels.map(c => ({ id: c.id, name: c.name }))} page={result.page} hasMore={result.hasMore} canWrite={canWrite} limits={result.limits} locale={locale} automaticMinutes={automatic.intervalMinutes} copy={copy} />
+      {recipes && (recipes.source || canWrite) && <RecipeSource initial={recipes as unknown as RecipeView} locale={locale} canWrite={canWrite} copy={recipeCopy} />}
       <p className={styles.privacy}>{t('footnote')}</p>
     </>;
   } catch (error) {

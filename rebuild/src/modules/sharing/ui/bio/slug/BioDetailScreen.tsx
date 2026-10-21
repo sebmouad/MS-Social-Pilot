@@ -7,15 +7,14 @@ import { EmptyState } from '@/components/EmptyState';
 import { authLocale } from '@/modules/home/auth/locale';
 import { clientIpFromHeaders } from '@/server/client-ip';
 import { openPublicBio } from '@/modules/sharing/server/bio';
-import { sharingCopy } from '@/modules/sharing/server/limits';
-import { publicCopy } from '@/modules/sharing/ui/copy';
+import { loadPublicCopy, sharingCopy } from '@/modules/sharing/server/limits';
 import styles from './bio.module.css';
 
 export const metadata: Metadata = { title: 'Links', referrer: 'no-referrer' };
 
 export default async function BioPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const t = publicCopy(await authLocale());
+  const t = await loadPublicCopy(await authLocale());
   let access: Awaited<ReturnType<typeof openPublicBio>>;
   try { access = await openPublicBio(slug, clientIpFromHeaders(await headers()), 'render'); }
   catch { return <main className={styles.page}><EmptyState tone="error" title={t.loadFailed} /></main>; }

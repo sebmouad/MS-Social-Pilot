@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
 import { requireViewer } from '@/server/context';
+import { runtimeConfig } from '@/server/config/store';
 import { canAccessFeature } from '@/server/permissions';
 import { PageHeading } from '@/modules/publishing/ui/publishing-ui';
 import { readLibrary } from '../server/library';
@@ -14,7 +15,8 @@ const ALLOWED = ['kind', 'q', 'page', 'usage'];
 
 export default async function MediaScreen({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const LOCALE = mediaLocale((await headers()).get('accept-language'));
-  const t = (key: Parameters<typeof mediaText>[1]) => mediaText(LOCALE, key);
+  const copy = await runtimeConfig('media.copy');
+  const t = (key: Parameters<typeof mediaText>[1]) => mediaText(LOCALE, key, {}, copy);
   const viewer = await requireViewer({ feature: MEDIA_FEATURE_ID, channelScoped: true });
   const params = await searchParams;
   const heading = <PageHeading title={t('title')} description={t('description')} />;
@@ -30,7 +32,7 @@ export default async function MediaScreen({ searchParams }: { searchParams: Prom
       {heading}
       <MediaLibrary items={result.items.map(i => ({ ...i, createdAt: i.createdAt.toISOString(), holders: i.holders?.map(h => ({ ...h, scheduledAt: h.scheduledAt?.toISOString() ?? null })) ?? null }))}
         usage={result.usage} page={result.page} hasMore={result.hasMore} filters={{ kind: (kind as string | undefined) ?? '', usage: (usage as string | undefined) ?? '', q: typeof q === 'string' ? q : '' }}
-        canWrite={canWrite} workspaceWide={result.workspaceWide} usageMayBeIncomplete={result.usageMayBeIncomplete} maxSearch={result.limits.maxSearchCharacters} locale={LOCALE} />
+        canWrite={canWrite} workspaceWide={result.workspaceWide} usageMayBeIncomplete={result.usageMayBeIncomplete} maxSearch={result.limits.maxSearchCharacters} locale={LOCALE} copy={copy} />
       <p className={styles.help}>{t('privacy')}</p>
     </>;
   } catch (error) {

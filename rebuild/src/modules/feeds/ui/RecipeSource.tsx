@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
-import { recipeCopy, recipeText, type RecipeCopyKey, type RecipeLocale } from '../copy-recipes';
+import { recipeCopy, recipeText, type RecipeCopyCatalog, type RecipeCopyKey, type RecipeLocale } from '../copy-recipes';
 import { configPatch } from '../wordpress/recipe';
 import styles from './feeds.module.css';
 
@@ -32,8 +32,8 @@ const initialDraft = (view: RecipeView): Draft => view.source
   ? { name: view.source.name, siteUrl: view.source.siteUrl, allTargets: view.source.allTargets, targetIds: view.source.targetIds, config: structuredClone(view.source.config) }
   : { name: '', siteUrl: view.defaults.siteUrl, allTargets: true, targetIds: [], config: defaultConfig(view.defaults) };
 
-export function RecipeSource({ initial, locale, canWrite }: { initial: RecipeView; locale: RecipeLocale; canWrite: boolean }) {
-  const t = (key: RecipeCopyKey, values: Record<string, string | number> = {}) => recipeText(locale, key, values);
+export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: { initial: RecipeView; locale: RecipeLocale; canWrite: boolean; copy?: RecipeCopyCatalog }) {
+  const t = (key: RecipeCopyKey, values: Record<string, string | number> = {}) => recipeText(locale, key, values, copy);
   const [view, setView] = useState(initial);
   const [draft, setDraft] = useState(() => initialDraft(initial));
   const [review, setReview] = useState<Review | null>(null);
@@ -46,7 +46,7 @@ export function RecipeSource({ initial, locale, canWrite }: { initial: RecipeVie
   const say = (text: string, error = false) => setNotice(v => ({ error, text, key: (v?.key ?? 0) + 1 }));
   const errorText = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : t('unknownError');
   const phrase = review === 'save' ? `SAVE RECIPE SOURCE ${draft.name.trim()}` : review === 'pause' ? 'PAUSE RECIPE SOURCE' : review === 'resume' ? 'RESUME RECIPE SOURCE' : 'RUN RECIPE PLANNER';
-  const confirmParts = recipeCopy[locale].typeToConfirm.split('{phrase}');
+  const confirmParts = copy[locale].typeToConfirm.split('{phrase}');
   const when = (value: string | null, zone: string) => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: zone }).format(new Date(value)) : '';
   const zone = source?.config.timezone ?? draft.config.timezone;
   const setConfig = (patch: Partial<RecipeConfig>) => setDraft(d => ({ ...d, config: { ...d.config, ...patch } }));
@@ -92,7 +92,7 @@ export function RecipeSource({ initial, locale, canWrite }: { initial: RecipeVie
   const goPage = (page: number) => run(async () => { const body = await call(`/api/feeds/wordpress?page=${page}`, 'GET'); if (body && 'plans' in body) setView(v => ({ ...v, plans: body.plans, counts: body.counts })); });
   const toggle = (id: string) => setDraft(d => ({ ...d, targetIds: d.targetIds.includes(id) ? d.targetIds.filter(x => x !== id) : [...d.targetIds, id] }));
   const stateText = (p: RecipePlan) => t(p.state === 'planned' ? 'statePlanned' : p.state === 'claimed' ? 'stateClaimed' : p.state === 'uncertain' ? 'stateUncertain' : 'stateFailed');
-  const reasonText = (reason: string | null) => { const key = reason ? `reason${reason.charAt(0).toUpperCase()}${reason.slice(1)}` : ''; return key in recipeCopy[locale] ? t(key as RecipeCopyKey) : ''; };
+  const reasonText = (reason: string | null) => { const key = reason ? `reason${reason.charAt(0).toUpperCase()}${reason.slice(1)}` : ''; return key in copy[locale] ? t(key as RecipeCopyKey) : ''; };
   const reviewTitle = review ? t(review === 'save' ? 'saveTitle' : review === 'pause' ? 'pauseTitle' : review === 'resume' ? 'resumeTitle' : 'runTitle') : '';
   const reviewText = review ? t(review === 'save' ? 'saveDescription' : review === 'pause' ? 'pauseDescription' : review === 'resume' ? 'resumeDescription' : 'runDescription') : '';
   const reviewAction = review ? t(review === 'save' ? 'confirmSave' : review === 'pause' ? 'confirmPause' : review === 'resume' ? 'confirmResume' : 'confirmRun') : '';

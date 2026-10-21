@@ -1,0 +1,222 @@
+import { z } from 'zod';
+
+/**
+ * Root-editable text of the signed-in sharing screens (client links and bio page), English and French.
+ * Source phrases are the catalog identities; `{0}`, `{1}` mark values supplied at the call site.
+ * The signed-out visitor pages have their own catalog in `./copy`.
+ */
+const row = (en: string, fr: string) => ({ en, fr });
+
+export const ownerCopy = {
+  // Screens
+  'Client sharing': row('Client sharing', 'Partage client'),
+  'Give clients limited access to {0} without an account.': row('Give clients limited access to {0} without an account.', 'Donnez à vos clients un accès limité à {0}, sans compte.'),
+  'Share links': row('Share links', 'Liens de partage'),
+  'Review, calendar and portal links open without signing in, show only the channels you choose, and expire.': row('Review, calendar and portal links open without signing in, show only the channels you choose, and expire.', 'Les liens de relecture, de calendrier et de portail s’ouvrent sans connexion, n’affichent que les canaux choisis et expirent.'),
+  'Share links are unavailable right now.': row('Share links are unavailable right now.', 'Les liens de partage sont indisponibles pour le moment.'),
+  'Try again': row('Try again', 'Réessayer'),
+  'Bio page': row('Bio page', 'Page de liens'),
+  'One public page with your links for {0}. Clicks are counted without storing visitor details.': row('One public page with your links for {0}. Clicks are counted without storing visitor details.', 'Une page publique avec vos liens pour {0}. Les clics sont comptés sans conserver de données sur les visiteurs.'),
+  'Public page': row('Public page', 'Page publique'),
+  'Visitors need no account. Only the address, title, picture and link labels are shown; link addresses open through a counted redirect.': row('Visitors need no account. Only the address, title, picture and link labels are shown; link addresses open through a counted redirect.', 'Les visiteurs n’ont pas besoin de compte. Seuls l’adresse, le titre, l’image et les libellés des liens sont affichés ; les liens s’ouvrent par une redirection comptabilisée.'),
+  'The bio page is unavailable right now.': row('The bio page is unavailable right now.', 'La page de liens est indisponible pour le moment.'),
+
+  // Link kinds, statuses and answers
+  'Review': row('Review', 'Relecture'),
+  'Calendar': row('Calendar', 'Calendrier'),
+  'Client portal': row('Client portal', 'Portail client'),
+  'Approved': row('Approved', 'Approuvée'),
+  'Requested changes': row('Requested changes', 'Modifications demandées'),
+  'Commented': row('Commented', 'Commentaire'),
+  'Still waiting for review': row('Still waiting for review', 'Toujours en attente de relecture'),
+  'Scheduled': row('Scheduled', 'Programmée'),
+  'Draft': row('Draft', 'Brouillon'),
+  'Rejected': row('Rejected', 'Refusée'),
+  'Published': row('Published', 'Publiée'),
+  'Failed': row('Failed', 'Échec'),
+  'Partly failed': row('Partly failed', 'Échec partiel'),
+  'Active': row('Active', 'Actif'),
+  'Expired': row('Expired', 'Expiré'),
+  'Revoked': row('Revoked', 'Révoqué'),
+  'No expiry set': row('No expiry set', 'Aucune expiration'),
+
+  // Plurals
+  '{0} channel': row('{0} channel', '{0} canal'),
+  '{0} channels': row('{0} channels', '{0} canaux'),
+  '{0} answer': row('{0} answer', '{0} réponse'),
+  '{0} answers': row('{0} answers', '{0} réponses'),
+  '{0} link': row('{0} link', '{0} lien'),
+  '{0} links': row('{0} links', '{0} liens'),
+  '{0} counted click': row('{0} counted click', '{0} clic comptabilisé'),
+  '{0} counted clicks': row('{0} counted clicks', '{0} clics comptabilisés'),
+
+  // Consequences of revoke, rotate and delete
+  'The current address stops working immediately. You get a new one to send.': row('The current address stops working immediately. You get a new one to send.', 'L’adresse actuelle cesse de fonctionner immédiatement. Vous en recevez une nouvelle à envoyer.'),
+  'The address stops opening immediately and cannot be switched back on. Feedback already given is kept.': row('The address stops opening immediately and cannot be switched back on. Feedback already given is kept.', 'L’adresse cesse de s’ouvrir immédiatement et ne peut pas être réactivée. Les retours déjà donnés sont conservés.'),
+  'Deletes the link and any feedback recorded through it. Posts are not changed.': row('Deletes the link and any feedback recorded through it. Posts are not changed.', 'Supprime le lien et tous les retours enregistrés par son intermédiaire. Les publications ne sont pas modifiées.'),
+  'Deletes the link and {0} recorded through it. Posts are not changed.': row('Deletes the link and {0} recorded through it. Posts are not changed.', 'Supprime le lien et {0} enregistré(es) par son intermédiaire. Les publications ne sont pas modifiées.'),
+
+  // Link table
+  'Link': row('Link', 'Lien'),
+  'Status': row('Status', 'Statut'),
+  'Expires': row('Expires', 'Expiration'),
+  'Feedback': row('Feedback', 'Retours'),
+  'Manage': row('Manage', 'Gérer'),
+  ' · client can decide': row(' · client can decide', ' · le client peut décider'),
+  'all channels (older link)': row('all channels (older link)', 'tous les canaux (ancien lien)'),
+  'None yet': row('None yet', 'Aucun pour l’instant'),
+  'View {0} on {1}': row('View {0} on {1}', 'Voir {0} sur {1}'),
+  'Edit': row('Edit', 'Modifier'),
+  'Rotate': row('Rotate', 'Renouveler'),
+  'Revoke': row('Revoke', 'Révoquer'),
+  'Delete': row('Delete', 'Supprimer'),
+  'Edit {0}': row('Edit {0}', 'Modifier {0}'),
+  'Rotate {0}': row('Rotate {0}', 'Renouveler {0}'),
+  'Revoke {0}': row('Revoke {0}', 'Révoquer {0}'),
+  'Delete {0}': row('Delete {0}', 'Supprimer {0}'),
+  'New share link': row('New share link', 'Nouveau lien de partage'),
+  'No share links yet. Create one to invite a client to review posts or see the calendar.': row('No share links yet. Create one to invite a client to review posts or see the calendar.', 'Aucun lien de partage pour l’instant. Créez-en un pour inviter un client à relire des publications ou à consulter le calendrier.'),
+  'Previous page': row('Previous page', 'Page précédente'),
+  'Next page': row('Next page', 'Page suivante'),
+  'Page {0}': row('Page {0}', 'Page {0}'),
+
+  // Create and edit dialog
+  'Edit “{0}”': row('Edit “{0}”', 'Modifier « {0} »'),
+  'Anyone with the address can open it without signing in. It shows only the channels you choose and expires.': row('Anyone with the address can open it without signing in. It shows only the channels you choose and expires.', 'Toute personne disposant de l’adresse peut l’ouvrir sans se connecter. Il n’affiche que les canaux choisis et expire.'),
+  'This link is revoked and stays revoked. You can rename it; create a new link to share again.': row('This link is revoked and stays revoked. You can rename it; create a new link to share again.', 'Ce lien est révoqué et le reste. Vous pouvez le renommer ; créez un nouveau lien pour partager à nouveau.'),
+  'This link has expired. Set a new lifetime below to switch it back on.': row('This link has expired. Set a new lifetime below to switch it back on.', 'Ce lien a expiré. Indiquez une nouvelle durée ci-dessous pour le réactiver.'),
+  'Rename it freely. Changing what it shows or who can answer replaces its address.': row('Rename it freely. Changing what it shows or who can answer replaces its address.', 'Vous pouvez le renommer librement. Modifier ce qu’il affiche ou qui peut répondre remplace son adresse.'),
+  'Cancel': row('Cancel', 'Annuler'),
+  'Working…': row('Working…', 'En cours…'),
+  'Create link': row('Create link', 'Créer le lien'),
+  'Save and replace address': row('Save and replace address', 'Enregistrer et remplacer l’adresse'),
+  'Save changes': row('Save changes', 'Enregistrer les modifications'),
+  'Type': row('Type', 'Type'),
+  'Review: posts waiting for feedback': row('Review: posts waiting for feedback', 'Relecture : publications en attente de retour'),
+  'Calendar: what is planned and published': row('Calendar: what is planned and published', 'Calendrier : ce qui est planifié et publié'),
+  'Portal: review and calendar together': row('Portal: review and calendar together', 'Portail : relecture et calendrier réunis'),
+  'Title': row('Title', 'Titre'),
+  'Lifetime in days': row('Lifetime in days', 'Durée en jours'),
+  'Renew for (days)': row('Renew for (days)', 'Renouveler pour (jours)'),
+  '{0} (default)': row('{0} (default)', '{0} (par défaut)'),
+  'Keep current': row('Keep current', 'Conserver l’actuelle'),
+  'Up to {0} days.': row('Up to {0} days.', '{0} jours au maximum.'),
+  'Counts from today, up to {0} days.': row('Counts from today, up to {0} days.', 'Compté à partir d’aujourd’hui, {0} jours au maximum.'),
+  'Now expires {0}.': row('Now expires {0}.', 'Expire actuellement le {0}.'),
+  'Message for the client (optional)': row('Message for the client (optional)', 'Message pour le client (facultatif)'),
+  'Days back shown': row('Days back shown', 'Jours passés affichés'),
+  'Days ahead shown': row('Days ahead shown', 'Jours à venir affichés'),
+  'Channels shown': row('Channels shown', 'Canaux affichés'),
+  'Select all': row('Select all', 'Tout sélectionner'),
+  'Clear': row('Clear', 'Effacer'),
+  '{0} of {1} selected': row('{0} of {1} selected', '{0} sur {1} sélectionné(s)'),
+  'No channels are available to share. Select channels in Settings first.': row('No channels are available to share. Select channels in Settings first.', 'Aucun canal n’est disponible au partage. Sélectionnez d’abord des canaux dans les Réglages.'),
+  'This older link shows every channel. Choose channels to limit it, or leave all unchecked to keep it as it is.': row('This older link shows every channel. Choose channels to limit it, or leave all unchecked to keep it as it is.', 'Cet ancien lien affiche tous les canaux. Choisissez des canaux pour le limiter, ou laissez tout décoché pour le conserver tel quel.'),
+  'Tick every channel this link may show. Nothing ticked means nothing is shared.': row('Tick every channel this link may show. Nothing ticked means nothing is shared.', 'Cochez chaque canal que ce lien peut afficher. Rien de coché signifie que rien n’est partagé.'),
+  '{0} on this link is no longer available and will be dropped if you change the ticked channels.': row('{0} on this link is no longer available and will be dropped if you change the ticked channels.', '{0} de ce lien n’est plus disponible et sera retiré si vous modifiez les canaux cochés.'),
+  '{0} on this link are no longer available and will be dropped if you change the ticked channels.': row('{0} on this link are no longer available and will be dropped if you change the ticked channels.', '{0} de ce lien ne sont plus disponibles et seront retirés si vous modifiez les canaux cochés.'),
+  'Let visitors leave comments': row('Let visitors leave comments', 'Autoriser les visiteurs à laisser des commentaires'),
+  'Their approval or change request settles the post in your review queue': row('Their approval or change request settles the post in your review queue', 'Leur approbation ou leur demande de modification tranche la publication dans votre file de relecture'),
+  'Their approval or change request settles the post in your review queue (needs approval permission)': row('Their approval or change request settles the post in your review queue (needs approval permission)', 'Leur approbation ou leur demande de modification tranche la publication dans votre file de relecture (nécessite l’autorisation d’approuver)'),
+  'These changes replace the link’s address. The old address and any page already open with it stop working immediately; you will get a new address to send.': row('These changes replace the link’s address. The old address and any page already open with it stop working immediately; you will get a new address to send.', 'Ces modifications remplacent l’adresse du lien. L’ancienne adresse et toute page déjà ouverte avec elle cessent de fonctionner immédiatement ; vous recevrez une nouvelle adresse à envoyer.'),
+  'I understand that anyone who has the address can open this link without signing in until it expires or I revoke it.': row('I understand that anyone who has the address can open this link without signing in until it expires or I revoke it.', 'Je comprends que toute personne disposant de l’adresse peut ouvrir ce lien sans se connecter jusqu’à son expiration ou jusqu’à ce que je le révoque.'),
+  'I understand the old address will stop working and I must send the new one.': row('I understand the old address will stop working and I must send the new one.', 'Je comprends que l’ancienne adresse cessera de fonctionner et que je dois envoyer la nouvelle.'),
+  'Your entries are kept above until you reload.': row('Your entries are kept above until you reload.', 'Vos saisies sont conservées ci-dessus jusqu’au rechargement.'),
+  'Reload latest and discard my changes': row('Reload latest and discard my changes', 'Recharger la dernière version et abandonner mes modifications'),
+
+  // Revoke, rotate and delete dialog
+  'Rotate “{0}”': row('Rotate “{0}”', 'Renouveler « {0} »'),
+  'Revoke “{0}”': row('Revoke “{0}”', 'Révoquer « {0} »'),
+  'Delete “{0}”': row('Delete “{0}”', 'Supprimer « {0} »'),
+  'Confirm rotate': row('Confirm rotate', 'Confirmer le renouvellement'),
+  'Confirm revoke': row('Confirm revoke', 'Confirmer la révocation'),
+  'Confirm delete': row('Confirm delete', 'Confirmer la suppression'),
+  'I understand the current address stops working immediately.': row('I understand the current address stops working immediately.', 'Je comprends que l’adresse actuelle cesse de fonctionner immédiatement.'),
+  'I understand the address stops opening immediately and this cannot be undone.': row('I understand the address stops opening immediately and this cannot be undone.', 'Je comprends que l’adresse cesse de s’ouvrir immédiatement et que cette action est irréversible.'),
+  'I understand this permanently deletes the link.': row('I understand this permanently deletes the link.', 'Je comprends que cela supprime définitivement le lien.'),
+  'I understand this permanently deletes the link and {0}.': row('I understand this permanently deletes the link and {0}.', 'Je comprends que cela supprime définitivement le lien et {0}.'),
+
+  // Address reveal
+  'Copy the new address now': row('Copy the new address now', 'Copiez la nouvelle adresse maintenant'),
+  'Copy the address now': row('Copy the address now', 'Copiez l’adresse maintenant'),
+  'For security this address is shown only once. Anyone who has it can open the link until it expires or you revoke it.': row('For security this address is shown only once. Anyone who has it can open the link until it expires or you revoke it.', 'Par sécurité, cette adresse n’est affichée qu’une seule fois. Toute personne qui la possède peut ouvrir le lien jusqu’à son expiration ou jusqu’à sa révocation.'),
+  'For security this address is shown only once. Anyone who has it can open the link until it expires or you revoke it. The previous address no longer works.': row('For security this address is shown only once. Anyone who has it can open the link until it expires or you revoke it. The previous address no longer works.', 'Par sécurité, cette adresse n’est affichée qu’une seule fois. Toute personne qui la possède peut ouvrir le lien jusqu’à son expiration ou jusqu’à sa révocation. L’adresse précédente ne fonctionne plus.'),
+  'Copy address': row('Copy address', 'Copier l’adresse'),
+  'I have copied it': row('I have copied it', 'Je l’ai copiée'),
+  'Address copied.': row('Address copied.', 'Adresse copiée.'),
+  'Copy failed. Select the address and copy it manually.': row('Copy failed. Select the address and copy it manually.', 'La copie a échoué. Sélectionnez l’adresse et copiez-la manuellement.'),
+
+  // Feedback dialog
+  'Answers on “{0}”': row('Answers on “{0}”', 'Réponses sur « {0} »'),
+  'What clients answered, and where each post stands now. Approval changes appear only when the post status says so.': row('What clients answered, and where each post stands now. Approval changes appear only when the post status says so.', 'Ce que les clients ont répondu et l’état actuel de chaque publication. Les changements d’approbation n’apparaissent que si le statut de la publication l’indique.'),
+  'Close': row('Close', 'Fermer'),
+  'Loading answers…': row('Loading answers…', 'Chargement des réponses…'),
+  'Answers could not be loaded.': row('Answers could not be loaded.', 'Les réponses n’ont pas pu être chargées.'),
+  'No answers yet.': row('No answers yet.', 'Aucune réponse pour l’instant.'),
+  'Post: “{0}”': row('Post: “{0}”', 'Publication : « {0} »'),
+  'Post details are not shown: the post may have been deleted, or your role or plan cannot read Publishing.': row('Post details are not shown: the post may have been deleted, or your role or plan cannot read Publishing.', 'Les détails de la publication ne sont pas affichés : elle a peut-être été supprimée, ou votre rôle ou votre offre ne permet pas de lire Publication.'),
+  ' · Now: {0}': row(' · Now: {0}', ' · Actuellement : {0}'),
+  'Show more': row('Show more', 'Afficher plus'),
+
+  // Link feedback and failures
+  'The change could not be confirmed. Refresh before trying again.': row('The change could not be confirmed. Refresh before trying again.', 'La modification n’a pas pu être confirmée. Actualisez avant de réessayer.'),
+  'The change could not be confirmed.': row('The change could not be confirmed.', 'La modification n’a pas pu être confirmée.'),
+  'The link was created but its address could not be shown. Revoke it and create another.': row('The link was created but its address could not be shown. Revoke it and create another.', 'Le lien a été créé, mais son adresse n’a pas pu être affichée. Révoquez-le et créez-en un autre.'),
+  'Link created. The list could not be refreshed: reload the page to see it.': row('Link created. The list could not be refreshed: reload the page to see it.', 'Lien créé. La liste n’a pas pu être actualisée : rechargez la page pour le voir.'),
+  'The link was saved but its new address could not be shown. Rotate it to get a new one.': row('The link was saved but its new address could not be shown. Rotate it to get a new one.', 'Le lien a été enregistré, mais sa nouvelle adresse n’a pas pu être affichée. Renouvelez-le pour en obtenir une nouvelle.'),
+  'Link saved. The previous address no longer works.': row('Link saved. The previous address no longer works.', 'Lien enregistré. L’adresse précédente ne fonctionne plus.'),
+  'Link saved. The address is unchanged.': row('Link saved. The address is unchanged.', 'Lien enregistré. L’adresse est inchangée.'),
+  ' The list could not be refreshed: reload the page.': row(' The list could not be refreshed: reload the page.', ' La liste n’a pas pu être actualisée : rechargez la page.'),
+  'This link no longer exists.': row('This link no longer exists.', 'Ce lien n’existe plus.'),
+  'The link was rotated but its new address could not be shown. Rotate it again.': row('The link was rotated but its new address could not be shown. Rotate it again.', 'Le lien a été renouvelé, mais sa nouvelle adresse n’a pas pu être affichée. Renouvelez-le à nouveau.'),
+  'Link and its feedback deleted.': row('Link and its feedback deleted.', 'Lien et retours associés supprimés.'),
+  'Link revoked. It no longer opens.': row('Link revoked. It no longer opens.', 'Lien révoqué. Il ne s’ouvre plus.'),
+  'Link rotated. The previous address no longer works.': row('Link rotated. The previous address no longer works.', 'Lien renouvelé. L’adresse précédente ne fonctionne plus.'),
+
+  // Bio page form
+  'The bio page could not be confirmed. Refresh before trying again.': row('The bio page could not be confirmed. Refresh before trying again.', 'La page de liens n’a pas pu être confirmée. Actualisez avant de réessayer.'),
+  'The deletion could not be confirmed. Refresh before trying again.': row('The deletion could not be confirmed. Refresh before trying again.', 'La suppression n’a pas pu être confirmée. Actualisez avant de réessayer.'),
+  'Saved. Public address: {0}': row('Saved. Public address: {0}', 'Enregistré. Adresse publique : {0}'),
+  'Saved. The page is switched off, so visitors cannot open it.': row('Saved. The page is switched off, so visitors cannot open it.', 'Enregistré. La page est désactivée : les visiteurs ne peuvent pas l’ouvrir.'),
+  'Bio page deleted. Its address no longer opens.': row('Bio page deleted. Its address no longer opens.', 'Page de liens supprimée. Son adresse ne s’ouvre plus.'),
+  'No bio page yet. Fill in the details below and save to publish one.': row('No bio page yet. Fill in the details below and save to publish one.', 'Aucune page de liens pour l’instant. Renseignez les informations ci-dessous et enregistrez pour en publier une.'),
+  'Your key shows only part of this page’s links. Saving from here would remove the rest, so editing is paused.': row('Your key shows only part of this page’s links. Saving from here would remove the rest, so editing is paused.', 'Votre clé n’affiche qu’une partie des liens de cette page. Enregistrer d’ici supprimerait le reste ; la modification est donc suspendue.'),
+  'Address': row('Address', 'Adresse'),
+  'your-name': row('your-name', 'votre-nom'),
+  'letters, digits and single dashes.': row('letters, digits and single dashes.', 'lettres, chiffres et tirets simples.'),
+  'Description': row('Description', 'Description'),
+  'Picture address (https)': row('Picture address (https)', 'Adresse de l’image (https)'),
+  'Page is public': row('Page is public', 'La page est publique'),
+  'Links ({0} of {1})': row('Links ({0} of {1})', 'Liens ({0} sur {1})'),
+  'No links yet. Add the first one.': row('No links yet. Add the first one.', 'Aucun lien pour l’instant. Ajoutez le premier.'),
+  'Label': row('Label', 'Libellé'),
+  'Up': row('Up', 'Monter'),
+  'Down': row('Down', 'Descendre'),
+  'Remove': row('Remove', 'Retirer'),
+  'Move link {0} up': row('Move link {0} up', 'Monter le lien {0}'),
+  'Move link {0} down': row('Move link {0} down', 'Descendre le lien {0}'),
+  'Remove link {0}': row('Remove link {0}', 'Retirer le lien {0}'),
+  'Add link': row('Add link', 'Ajouter un lien'),
+  'Counts stay with a link while its label and address are unchanged. Editing either starts a new count.': row('Counts stay with a link while its label and address are unchanged. Editing either starts a new count.', 'Les compteurs restent attachés à un lien tant que son libellé et son adresse ne changent pas. Modifier l’un des deux relance le compte à zéro.'),
+  'Once saved, anyone with the address /bio/{0} can open this page and see its title, description, picture and links.': row('Once saved, anyone with the address /bio/{0} can open this page and see its title, description, picture and links.', 'Une fois enregistrée, toute personne disposant de l’adresse /bio/{0} peut ouvrir cette page et voir son titre, sa description, son image et ses liens.'),
+  'The page is switched off: visitors will not be able to open it, but your details and links are kept.': row('The page is switched off: visitors will not be able to open it, but your details and links are kept.', 'La page est désactivée : les visiteurs ne pourront pas l’ouvrir, mais vos informations et vos liens sont conservés.'),
+  ' Your current address /bio/{0} stops working.': row(' Your current address /bio/{0} stops working.', ' Votre adresse actuelle /bio/{0} cesse de fonctionner.'),
+  'I understand that saving replaces the current bio page and its {0}.': row('I understand that saving replaces the current bio page and its {0}.', 'Je comprends qu’enregistrer remplace la page de liens actuelle et ses {0}.'),
+  'I understand that saving replaces the current bio page and its {0} and makes the page public.': row('I understand that saving replaces the current bio page and its {0} and makes the page public.', 'Je comprends qu’enregistrer remplace la page de liens actuelle et ses {0}, et rend la page publique.'),
+  'Save bio page': row('Save bio page', 'Enregistrer la page de liens'),
+  'Delete page': row('Delete page', 'Supprimer la page'),
+  'Delete the bio page': row('Delete the bio page', 'Supprimer la page de liens'),
+  'Deletes the public page and its click totals. The address stops working immediately.': row('Deletes the public page and its click totals. The address stops working immediately.', 'Supprime la page publique et ses totaux de clics. L’adresse cesse de fonctionner immédiatement.'),
+  'This permanently deletes the bio page, its {0} and {1}. It cannot be undone and /bio/{2} stops working immediately.': row('This permanently deletes the bio page, its {0} and {1}. It cannot be undone and /bio/{2} stops working immediately.', 'Cela supprime définitivement la page de liens, ses {0} et {1}. Cette action est irréversible et /bio/{2} cesse de fonctionner immédiatement.'),
+} as const;
+
+export type OwnerCopy = { [K in keyof typeof ownerCopy]: { en: string; fr: string } };
+export const ownerCopySchema = z.object(Object.fromEntries(Object.keys(ownerCopy).map(key => [key, z.object({ en: z.string().trim().min(1).max(4000), fr: z.string().trim().min(1).max(4000) }).strict()])) as { [K in keyof OwnerCopy]: z.ZodObject<{ en: z.ZodString; fr: z.ZodString }> }).strict();
+
+/** Plain phrase → text for one language: the only part of the catalog sent to the browser. */
+export const resolveOwnerCopy = (locale: 'en' | 'fr', catalog: OwnerCopy = ownerCopy): Record<string, string> =>
+  Object.fromEntries(Object.entries(catalog).map(([phrase, text]) => [phrase, text[locale]]));
+
+/** `t('Phrase {0}', value)`: unknown phrases fall back to themselves so a missing row never blanks the screen. */
+export const ownerText = (dictionary: Record<string, string>) => (phrase: string, ...values: Array<string | number>): string =>
+  (dictionary[phrase] ?? phrase).replace(/\{(\d+)\}/g, (token, index: string) => values[Number(index)] === undefined ? token : String(values[Number(index)]));
