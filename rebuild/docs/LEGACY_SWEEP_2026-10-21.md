@@ -194,7 +194,7 @@ Rebuild evidence paths under `rebuild/src/`.
 | `key-dates*`, `seasons`, `holidays`, `trends` | none | missing |
 | `ics`, `calendar-feeds`, `calendar-days` | `lib/calendar-dates.ts` only | missing (feeds); calendar days done |
 | `spam-guard` | none | missing |
-| `ai`, `ai-providers`, `ai-models`, `ai-prices`, `ai-agents` | `modules/ai/**` (providers/models/limits); agents none; prices/budget none | partial |
+| `ai`, `ai-providers`, `ai-models`, `ai-prices`, `ai-agents` | `modules/ai/**` (providers/models/limits); prices/monthly budget now in `modules/ai/server/usage.ts` (source); agents none | partial |
 | `ai-image`, `ai-video`, `ai-voice`, `voice-names`, `text-backgrounds`, `alt-text`, `translation`, `translated-posts` | `modules/ai` translate kind only | missing / partial |
 | `chat` | none | missing |
 | `system-alerts`, `error-tracking`, `uptime`, `health`, `housekeeping`, `background-refresh` | worker jobs + `server/root/*`; no alert/error/uptime writer | partial (gap 3) |
@@ -241,7 +241,7 @@ Legacy `app_settings` keys (`src/lib/settings/definitions.ts`) vs rebuild regist
 | `networks.*`, `tiktok.*`, `youtube.*`, `linkedin.*`, `threads.*`, `x.*`, `pinterest.*` | none | missing (connectors absent) |
 | `ai.provider/apiKey/model/openaiKey/geminiKey` | `ai.provider`, `ai.apiKey`, `ai.model`, `ai.openaiApiKey`, `ai.geminiApiKey` (+ models/endpoints) | done (imported) |
 | `ai.rateLimitPerHour` | `ai.hourlyRequestsPerWorkspace` | done |
-| `ai.monthlyBudgetUsd`, `ai.priceOverrides` | none | missing |
+| `ai.monthlyBudgetUsd`, `ai.priceOverrides` | `ai.monthlyBudgetUsd`, `ai.priceOverrides`, `ai.fallbackInputPricePerMillionUsd`, `ai.fallbackOutputPricePerMillionUsd`, `ai.charactersPerToken` | done in source (mocked tests; estimated tokens, not provider-reported; no live run) |
 | `alerts.email/telegramBotToken/telegramChatId/publishFailures/diskPercent` | `notifications.*` (in-app/email) | partial: no Telegram, disk alerts |
 | `email.provider/smtp*/apiKey/from` | `mail.*` | partial: HTTP API provider (`email.apiKey`) not carried |
 | `links.shortenerDomain` | `publishing.shortLinkBaseUrl` | done |

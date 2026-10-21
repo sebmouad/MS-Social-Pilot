@@ -193,7 +193,7 @@ describe('workspace preferences and defaults', () => {
   });
   it('only writes the usage claim: suggestions are never persisted or published', async () => {
     await runAssist(actor, { kind: 'caption', text: 'secret launch' }, { port: port('Draft text') });
-    expect(state.exec).toHaveLength(1); expect(state.exec[0]!.sql).toContain('activity_logs');
+    expect(state.exec).toHaveLength(2); expect(state.exec.every(e => e.sql.includes('activity_logs'))).toBe(true);
     expect(JSON.stringify(state.exec)).not.toMatch(/secret launch|Draft text/);
   });
 });

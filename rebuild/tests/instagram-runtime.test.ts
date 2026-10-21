@@ -16,9 +16,10 @@ describe('Instagram runtime integration boundary', () => {
     expect(await configuredInstagramCollector()).toHaveProperty('post');
     expect(await configuredInstagramDiscovery()).toBeTypeOf('function');
   });
-  it('registers settings but keeps the incomplete host out of the installed customer catalog', () => {
+  it('installs the host catalog while keeping activation off by default', () => {
     expect(PLATFORM_CONFIG.some(setting => setting.key === 'instagram.policy')).toBe(true);
-    expect(PLATFORM_MODULES.some(module => String(module.id) === instagramModule.id)).toBe(false);
+    expect(PLATFORM_MODULES.some(module => String(module.id) === instagramModule.id)).toBe(true);
+    expect(PLATFORM_CONFIG.find(setting => setting.key === 'platforms.instagram.enabled')?.defaultValue).toBe(false);
   });
   it('fails closed for invalid Root policy', async () => {
     settings.runtimeConfig.mockResolvedValue({ ...INSTAGRAM_POLICY_DEFAULTS, pollAttempts: 0 });

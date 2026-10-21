@@ -8,6 +8,7 @@ import {
   type AiContext, type AiPort, type AiResult, type AiStatus, type SummarizeRequest, type SummaryResult,
 } from '../ai';
 import { authorizeAi, type AiActor } from './access';
+import { METERING_KEYS, meteringFrom, monthlyUsage, recordUsage, type Metering } from './usage';
 import { anthropicPort } from './anthropic';
 import { openaiPort } from './openai';
 import { geminiPort } from './gemini';
@@ -28,11 +29,11 @@ const PROVIDER_KEYS: Record<AiProviderId, { secret: string; model: string; endpo
   gemini: { secret: 'ai.geminiApiKey', model: 'ai.geminiModel', endpoint: 'ai.geminiEndpoint', port: geminiPort },
 };
 
-type Settings = { port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; hashtagBodyMax: number; outputInputMultiplier: number; languageMax: number; txTimeout: number; txWait: number };
+type Settings = { port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; hashtagBodyMax: number; outputInputMultiplier: number; languageMax: number; txTimeout: number; txWait: number; metering: Metering };
 /** Resolve everything assist needs; null when anything is unconfigured, so customer surfaces stay hidden. */
 export async function settings(deps: AiDeps): Promise<Settings | null> {
   try {
-    const c = await runtimeConfigBatch(['ai.enabled', 'ai.provider', 'ai.model', 'ai.endpoint', 'ai.openaiModel', 'ai.openaiEndpoint', 'ai.geminiModel', 'ai.geminiEndpoint', 'ai.requestTimeoutMs', 'ai.maxOutputTokens', 'ai.maxInputCharacters', 'ai.hourlyRequestsPerWorkspace', 'ai.maxHashtags', 'ai.hashtagBodyMaxCharacters', 'ai.outputInputMultiplier', 'ai.languageMaxCharacters', 'ai.transactionTimeoutMs', 'ai.transactionMaxWaitMs']);
+    const c = await runtimeConfigBatch(['ai.enabled', 'ai.provider', 'ai.model', 'ai.endpoint', 'ai.openaiModel', 'ai.openaiEndpoint', 'ai.geminiModel', 'ai.geminiEndpoint', 'ai.requestTimeoutMs', 'ai.maxOutputTokens', 'ai.maxInputCharacters', 'ai.hourlyRequestsPerWorkspace', 'ai.maxHashtags', 'ai.hashtagBodyMaxCharacters', 'ai.outputInputMultiplier', 'ai.languageMaxCharacters', 'ai.transactionTimeoutMs', 'ai.transactionMaxWaitMs', ...METERING_KEYS]);
     const B = AI_BOUNDS;
     const provider = c['ai.provider'] as AiProviderId;
     const keys = PROVIDER_KEYS[provider];
@@ -44,13 +45,15 @@ export async function settings(deps: AiDeps): Promise<Settings | null> {
       || !inRange(timeoutMs, B.requestTimeoutMs) || !inRange(maxTokens, B.maxOutputTokens) || !inRange(maxInput, B.maxInputCharacters)
       || !inRange(hourly, B.hourlyRequestsPerWorkspace) || !inRange(maxHashtags, B.maxHashtags) || !inRange(txTimeout, B.transactionTimeoutMs) || !inRange(txWait, B.transactionMaxWaitMs)) return null;
     if (!inRange(hashtagBodyMax, B.hashtagBodyMaxCharacters) || !inRange(outputInputMultiplier, B.outputInputMultiplier) || !inRange(languageMax, B.languageMaxCharacters)) return null;
+    const metering = meteringFrom(c, model);
+    if (!metering) return null;
     let port = deps.port;
     if (!port) {
       const apiKey = await runtimeSecret(keys.secret);
       if (!apiKey) return null;
       port = keys.port({ apiKey, endpoint });
     }
-    return { port, model, timeoutMs, maxTokens, maxInput, hourly, maxHashtags, hashtagBodyMax, outputInputMultiplier, languageMax, txTimeout, txWait };
+    return { port, model, timeoutMs, maxTokens, maxInput, hourly, maxHashtags, hashtagBodyMax, outputInputMultiplier, languageMax, txTimeout, txWait, metering };
   } catch { return null; }
 }
 
@@ -68,7 +71,9 @@ export async function aiStatus(actor: AiActor, deps: AiDeps = {}): Promise<AiSta
   const none: AiStatus = { available: false, kinds: [], tones: [], maxInputCharacters: null };
   try { await authorizeAi(actor, COMPOSER_FEATURE, 'write'); } catch { return none; }
   const [s, workspace] = await Promise.all([settings(deps), workspaceContext(actor.workspaceId)]);
-  return s && workspace?.enabled ? { available: true, kinds: AI_KINDS, tones: TONES, maxInputCharacters: s.maxInput } : none;
+  if (!s || !workspace?.enabled) return none;
+  let usage; try { usage = await monthlyUsage(actor.workspaceId, s.metering.budgetUsd, (deps.now ?? (() => new Date()))()); } catch { usage = undefined; }
+  return { available: true, kinds: AI_KINDS, tones: TONES, maxInputCharacters: s.maxInput, ...(usage ? { usage } : {}) };
 }
 
 /** Whether a report recap can be offered to this actor now: write access to Reports, AI configured and on for the workspace. No provider call, nothing claimed. */
@@ -89,6 +94,7 @@ async function claim(actor: AiActor, s: Settings, kind: string, inputLength: num
     const rows = await tx.$queryRaw<Array<{ role: string; disabledAt: Date | null; suspendedAt: Date | null }>>`SELECT m.role::text AS role, u."disabledAt", w."suspendedAt" FROM memberships m JOIN users u ON u.id = m."userId" JOIN workspaces w ON w.id = m."workspaceId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} FOR SHARE OF w FOR UPDATE OF m, u`;
     if (!rows[0] || rows[0].disabledAt) throw new OperationError('unauthorized', 'Your active workspace access changed. Sign in again to continue.');
     if (rows[0].suspendedAt) throw new OperationError('forbidden', 'This workspace is suspended.');
+    if (s.metering.budgetUsd > 0 && (await monthlyUsage(actor.workspaceId, s.metering.budgetUsd, now, tx)).remainingUsd === 0) throw new OperationError('conflict', 'This workspace has used its monthly AI budget. It resets at the start of next month.');
     const since = new Date(now.getTime() - 3600_000);
     const used = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM activity_logs WHERE "workspaceId" = ${actor.workspaceId} AND action = 'ai.requested' AND "createdAt" > ${since}`;
     if (Number(used[0]?.count ?? 0) >= s.hourly) throw new OperationError('conflict', 'This workspace has reached its hourly AI assist limit. Try again later.');
@@ -122,6 +128,7 @@ export async function runAssist(actor: AiActor, input: unknown, deps: AiDeps = {
 
   const { system, prompt } = buildPrompt(request, s.maxHashtags, workspace);
   const raw = await complete(s, system, prompt);
+  await recordUsage(s.metering, actor, request.kind, system.length + prompt.length, raw.length, (deps.now ?? (() => new Date()))());
   if (request.kind === 'hashtags') {
     const hashtags = parseHashtags(raw, s.maxHashtags, s.hashtagBodyMax);
     if (!hashtags.length) throw new OperationError('upstream_failure', 'AI assist returned no usable hashtags. Try again.');
@@ -157,7 +164,9 @@ export async function summarize(actor: AiActor, input: SummarizeRequest, options
   const recapMax = await runtimeConfigBatch(['ai.summaryMaxCharacters']);
   const limit = recapMax['ai.summaryMaxCharacters'];
   if (!inRange(limit, AI_BOUNDS.summaryMaxCharacters)) throw unavailable();
-  const text = cleanOutput(await complete(s, system, prompt), limit);
+  const rawRecap = await complete(s, system, prompt);
+  await recordUsage(s.metering, actor, 'summarize', system.length + prompt.length, rawRecap.length, (options.now ?? (() => new Date()))());
+  const text = cleanOutput(rawRecap, limit);
   if (!text) throw new OperationError('upstream_failure', 'AI assist returned an empty answer. Try again.');
   return { text };
 }

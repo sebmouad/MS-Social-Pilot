@@ -1,3 +1,4 @@
+import { alignInstagramSelection } from '@/platforms/instagram/selection';
 import { assertAdsOperationsSettled } from '@/modules/ads/management/retention';
 import { assertPublishingTargetsSettled, lockPublishingTargets } from '@/modules/publishing/server/guard';
 import { assertInboxDeletionsSettled, lockInboxChannel } from '@/modules/inbox/server/comment-guard';
@@ -96,7 +97,7 @@ export async function setConnectionSelections(actor: ConnectionMutationActor, it
           await assertInboxDeletionsSettled(tx, actor.workspaceId, [target.id]);
         }
         await tx.target.updateMany({ where: { id: target.id, workspaceId: actor.workspaceId }, data: { enabled: item.enabled } });
-        if (target.type === 'instagram') await tx.instagramAccount.updateMany({ where: { workspaceId: actor.workspaceId, igUserId: target.providerId }, data: { enabled: item.enabled } });
+        await alignInstagramSelection(tx, actor.workspaceId, target, item.enabled);
       } else {
         const account = await tx.adAccount.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, socialAccountId: true } });
         if (!account) throw new OperationError('unavailable', 'This advertising account is unavailable in the current workspace.');

@@ -5,7 +5,7 @@ import { Button } from '@/components/Button';
 import { aiCopy } from '../copy';
 import styles from './AiAssist.module.css';
 
-type Status = { available: boolean; kinds: readonly string[]; tones: readonly string[]; maxInputCharacters: number | null };
+type Status = { available: boolean; kinds: readonly string[]; tones: readonly string[]; maxInputCharacters: number | null; usage?: { budgetUsd: number | null; remainingUsd: number | null } };
 type Kind = keyof typeof aiCopy.en.kinds;
 type Tone = keyof typeof aiCopy.en.tones;
 
@@ -37,6 +37,7 @@ export function AiAssist({ status, text, onUse, disabled = false, locale = 'en' 
   return <section className={styles.assist} aria-label={c.region}>
     <h3>{c.heading}</h3>
     <p className={styles.note}>{c.note}</p>
+    {status.usage?.budgetUsd != null && status.usage.remainingUsd != null && <p className={styles.note} role="status">{status.usage.remainingUsd > 0 ? c.budgetLeft(new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' }).format(status.usage.remainingUsd)) : c.budgetUsed}</p>}
     <div className={styles.row}>
       <label className={styles.field}>{c.assist}<select value={kind} disabled={busy || disabled} onChange={e => { setKind(e.target.value); setResult(null); }}>{status.kinds.map(k => <option key={k} value={k}>{kindLabel(k)}</option>)}</select></label>
       {kind !== 'hashtags' && <label className={styles.field}><span>{c.tone} {c.toneOptional}</span><select value={tone} disabled={busy || disabled} onChange={e => setTone(e.target.value)}><option value="">{c.toneKeep}</option>{status.tones.map(t => <option key={t} value={t}>{c.tones[t as Tone] ?? t}</option>)}</select></label>}

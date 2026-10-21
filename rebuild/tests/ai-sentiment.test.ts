@@ -8,6 +8,7 @@ vi.mock('@/server/config/store', async () => {
 });
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: async (_w: string, fn: () => unknown) => fn() }));
 vi.mock('@/server/platforms/resource-lock', () => ({ withSelectedResourceOperation: async (_w: string, _r: unknown, fn: (tx: unknown, signal: AbortSignal) => unknown) => fn({ $executeRaw: m.execute }, new AbortController().signal) }));
+vi.mock('@/modules/ai/server/usage', async importOriginal => ({ ...await importOriginal<typeof import('@/modules/ai/server/usage')>(), recordUsage: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/server/jobs/access', () => ({ assertWorkspaceJobAccess: m.access }));
 vi.mock('@/modules/inbox/server/comment-guard', () => ({ lockInboxChannel: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/modules/inbox/server/providers', () => ({ inboxTargetWhere: vi.fn().mockResolvedValue({ enabled: true }) }));

@@ -1,4 +1,5 @@
 import type { FirstCommentRequest, PlatformCredential, PublishRequest, PublishResult, RemoteStatusRequest, RemoteStatus } from '../types';
+import type { InstagramJournalFactory } from './container-journal';
 import type { InstagramPolicy } from './config';
 import { InstagramError, type InstagramGraph } from './transport';
 export const hasScopes = (credential: PlatformCredential, required: readonly string[]) => required.length > 0 && required.every(scope => credential.grantedScopes?.includes(scope));
@@ -11,7 +12,7 @@ export function createInstagramPublisher(policy: InstagramPolicy, graph: Instagr
   const abort = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(new Error('Aborted')); };
   signal?.addEventListener('abort', abort, { once: true });
   if (signal?.aborted) abort();
-})) {
+}), journalFactory?: InstagramJournalFactory) {
   function invalid(): never { throw new InstagramError(graph.text('invalid'), 'rejected'); }
   async function ready(id: string, request: PublishRequest) {
     for (let attempt = 0; attempt < policy.pollAttempts; attempt++) {
@@ -34,9 +35,14 @@ export function createInstagramPublisher(policy: InstagramPolicy, graph: Instagr
       let url: URL; try { url = new URL(item.url); } catch { invalid(); }
       if (url.protocol !== 'https:' || url.username || url.password || item.localFile || item.altText || !['image', 'video'].includes(item.kind)) invalid();
     }
+    const journal = journalFactory?.(request);
+    let ordinal = 0;
     async function container(fields: Record<string, string>) {
+      const position = ++ordinal;
+      await journal?.begin('container', position);
       const result = await graph.request(`${request.target.id}/media`, request.credential.accessToken, fields, 'POST', request.signal);
       if (typeof result.id !== 'string' || !result.id) throw new InstagramError(graph.text('uncertain'), 'uncertain');
+      await journal?.receipt('container', position, result.id);
       await ready(result.id, request);
       return result.id;
     }
@@ -48,8 +54,16 @@ export function createInstagramPublisher(policy: InstagramPolicy, graph: Instagr
     } else {
       creationId = await container({ ...(format === 'image' ? { image_url: media[0]!.url } : { video_url: media[0]!.url, media_type: 'REELS' }), caption: request.text });
     }
-    const result = await graph.request(`${request.target.id}/media_publish`, request.credential.accessToken, { creation_id: creationId }, 'POST', request.signal);
+    await journal?.begin('publish', 0);
+    let result: Record<string, unknown>;
+    try {
+      result = await graph.request(`${request.target.id}/media_publish`, request.credential.accessToken, { creation_id: creationId }, 'POST', request.signal);
+    } catch {
+      // Once dispatch begins, keep the durable parent held even if the response is lost or malformed.
+      throw new InstagramError(graph.text('uncertain'), 'uncertain');
+    }
     if (typeof result.id !== 'string' || !result.id) throw new InstagramError(graph.text('uncertain'), 'uncertain');
+    await journal?.receipt('publish', 0, result.id);
     // A confirmed media_publish receipt survives a failed optional permalink read.
     let url: string | null = null;
     try { const post = await graph.request(result.id, request.credential.accessToken, { fields: 'permalink' }, 'GET', request.signal); url = typeof post.permalink === 'string' && post.permalink.startsWith('https://') ? post.permalink : null; } catch { /* confirmed receipt retained */ }

@@ -98,10 +98,10 @@ describe('Instagram platform fixtures', () => {
     expect(await adapter.getRemoteStatus!({ credential, target, remoteId: 'post' })).toEqual({ state: 'unknown' });
     expect(await adapter.getRemoteStatus!({ credential, target, remoteId: 'post' })).toEqual({ state: 'unknown' });
   });
-  it('does not advertise unsupported deletion, OAuth, analytics host or ads', () => {
+  it('declares installed connection and analytics while refusing unsupported deletion and ads', () => {
     const adapter = createInstagramAdapter(policy);
     expect(adapter.deleteRemote).toBeUndefined();
-    expect(adapter.capabilities).toMatchObject({ remoteDelete: 'unsupported', connection: 'unsupported', discovery: 'unsupported', analytics: 'unsupported', ads: 'unsupported' });
+    expect(adapter.capabilities).toMatchObject({ remoteDelete: 'unsupported', connection: 'supported', discovery: 'supported', analytics: 'supported', ads: 'unsupported' });
     expect(adapter.publishingFormats!.every(format => !format.remoteDelete && !format.scheduling.native)).toBe(true);
   });
   it('discovers only provided selected Pages and deduplicates linked accounts', async () => {

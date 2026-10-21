@@ -19,7 +19,29 @@ export type AiRequest = z.infer<typeof AI_REQUEST_SCHEMA>;
 
 export type AiResult = { kind: AiKind; text: string; hashtags: string[] };
 export type SummaryResult = { text: string };
-export type AiStatus = { available: boolean; kinds: readonly AiKind[]; tones: readonly Tone[]; maxInputCharacters: number | null };
+export type AiUsage = {
+  /** UTC month, YYYY-MM. */ month: string; requests: number;
+  /** Estimated spend over priced requests only; unpriced requests are counted separately, never as zero cost. */ spentUsd: number; unpricedRequests: number;
+  /** Null when no budget is set. */ budgetUsd: number | null; remainingUsd: number | null;
+};
+export type AiStatus = { available: boolean; kinds: readonly AiKind[]; tones: readonly Tone[]; maxInputCharacters: number | null; usage?: AiUsage };
+
+export type TokenPrice = { inputPerMillionUsd: number; outputPerMillionUsd: number };
+/** Estimated tokens for a text; providers return no counts through the port. */
+export const estimateTokens = (characters: number, charactersPerToken: number) => Math.ceil(Math.max(0, characters) / Math.max(1, charactersPerToken));
+/** The model's price, or the fallback; null when neither is priced (cost unknown). */
+export function resolvePrice(model: string, table: Record<string, TokenPrice>, fallback: TokenPrice): TokenPrice | null {
+  const own = Object.prototype.hasOwnProperty.call(table, model) ? table[model] : undefined;
+  const found = own ?? fallback;
+  return found.inputPerMillionUsd > 0 || found.outputPerMillionUsd > 0 ? found : null;
+}
+/** Cost in USD rounded to 1e-6, or null when unpriced. */
+export function estimateCostUsd(inputTokens: number, outputTokens: number, found: TokenPrice | null): number | null {
+  if (!found) return null;
+  return Math.round(((inputTokens * found.inputPerMillionUsd + outputTokens * found.outputPerMillionUsd) / 1_000_000) * 1e6) / 1e6;
+}
+export const utcMonthStart = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+export const utcMonthKey = (now: Date) => utcMonthStart(now).toISOString().slice(0, 7);
 
 /** Workspace writing preferences (Settings > Workspace operations). Style guidance only, never instructions. */
 export type AiContext = { brandVoice?: string | null; avoidWords?: string | null; defaultTone?: string | null };
