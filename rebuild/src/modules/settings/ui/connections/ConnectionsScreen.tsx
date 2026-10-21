@@ -47,7 +47,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
 
   return <PageFrame module="settings"><SettingsPage copy={uiCopy} active="settings/connections" title={t.title} description={t.description} locale={locale}>
     <a className={tableStyles.profilesLink} href="/settings/profiles"><IconVersions size={16} stroke={1.9} aria-hidden="true" />{uiCopy.profiles[locale].title}</a>
-    <ConnectionManager locale={locale} statusLabels={statusLabels} sources={accounts} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
+    <ConnectionManager locale={locale} statusLabels={statusLabels} sources={accounts.map(account => ({ ...account, platformName: providerName(account.provider) }))} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
     {notice('connected_partial', 'status', t.connectedPartial)}
     {notice('connected', 'status', t.connected)}
     {notice('oauth_cancelled', 'status', t.oauthCancelled)}

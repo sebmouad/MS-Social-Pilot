@@ -1,10 +1,79 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-21 against local HEAD `a910d774` (rounds 10–12 appended below; configuration schema **120**, deployed release recorded by the integrator as `a910d774`, not re-observed); reviewed the round 7–12 diffs. Statements below naming `ffdb1cdf` or schema 118 as current are superseded by the "Rounds 10–12" section.
-[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains the binding target,
-unchanged. This document describes implementation and gaps; deployment, source,
-automated tests, browser checks and live-provider evidence are separate claims.
-Older batch details remain in the linked feature documents and Git history.
+Updated 2026-10-21 against local HEAD `99c41554`, configuration schema **123**.
+[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding and unchanged.
+Current reconciliation below takes precedence over historical batch snapshots.
+Source, automated, browser, live-provider and production evidence remain distinct.
+
+## Current HEAD reconciliation — 2026-10-21
+
+Reviewed source: `99c41554`; registry schema **123**. This section supersedes
+older present-tense source claims below. It does not identify the deployed SHA.
+The last dated deployment statement in these docs names `a910d774`/120; confirm
+the actual release and migration receipts in a separately authorized session.
+The full contract remains active and incomplete.
+
+- **Ads inventory (`e050b3a6`):** neutral `ads_objects` stores objects independently
+  of delivery insights. Confirmed creates/renames/status/deletes update inventory
+  with audit/settlement; deletes retain hidden tombstones. Facebook account-edge
+  discovery populates campaigns/ad sets/ads without delivery, rejects incomplete
+  pagination and rechecks access before writes. Campaigns/Objects and existing
+  REST/MCP directory/management services can manage paused objects with no daily
+  rows; ownership and scope checks remain. Migration
+  `20261101120000_ads_object_inventory` is authored, not verified applied here.
+  Rehearsal pins/probes, export/erasure coverage, stale-sync/database rollback and
+  externally deleted-object reconciliation remain open; see the Ads server README.
+- **Live Ads (owner report in this lane request):** create, rename and delete were
+  verified in Ads Manager. This supersedes the blanket claim of no live Ads write
+  or pending grant for that run only. Object levels/identities, test account, exact
+  consent/audit receipts, final cleanup and zero spend are not supplied here; this
+  is not proof of every budget, status, creative, recovery or MCP operation.
+- **Contract fixes (`8d9ccbe7`):** connection lifecycle and account policy now live
+  in Settings; residual draft helpers live in Publishing, with shared compatibility
+  re-exports. Ads runtime locale, bilingual management transport/captions,
+  configurable recovery/creative/parent-id bounds and Facebook Ads presentation
+  copy are integrated. `storage.mediaPresentationPolicy`, `ui.loadingCopy` and
+  `root.errorCopy` are registered (old lane requests to register them are stale).
+  Shared validation has EN/FR defaults, but `shared.formValidationCopy` registration
+  and serialized Root delivery are still absent. Agency service now requires
+  `SELECT WORKSPACE <id>`; **AppShell still posts only workspaceId**, so switching
+  there is blocked until the caller sends the service confirmation. Sharing
+  copy-only edits now require exact service confirmation and preserve the address.
+  Audit report annotations and module handoffs retain historical pending claims;
+  use current source to determine what remains.
+- **Numbers (`d1702ef9`, `99c41554`):** channel Analytics excludes paid metrics;
+  Ads has separate reporting. Home spend uses retained numeric spend rather than
+  re-parsing provider fields. Empty stock totals stay unknown; daily stocks take
+  the latest observation per resource/day instead of summing overlapping windows.
+  Synthetic fixture checks cover currency separation, ratios, audience coverage
+  and retained-day freshness. See `src/modules/home/server/NUMBERS_EVIDENCE.md`.
+  Remaining adapter gaps: Home Page-only performance, external destination metric
+  coverage/deduplication, audience trend identity and nested reaction breakdowns.
+- **Design/accessibility/French:** merged Publishing/Inbox redesigns, Settings and
+  Root passes, thumbnails, Inbox scrolling/media URL recognition, table/focus and
+  EN/FR copy tests are source/unit/DOM evidence. The requested design rounds 1–2
+  are not a completed two-round browser record: HEAD includes the shared layer
+  labelled round 4 (`design-pass-round4.test.ts`). No new visual browser, keyboard,
+  contrast or screen-reader result was collected. Round 6 browser harness remains
+  partial; earlier matrix findings retain their dated scope.
+- **Smoke/performance/MCP:** auto-discovered page/route smoke checks exercise
+  anonymous/owner/member/viewer in EN/FR with synthetic mocks and server rendering.
+  They are not real browser or live HTTP/MCP tests. Known waivers include
+  signed-in 401 versus 403, sign-out Origin acceptance, validation-before-auth and
+  joined-row fixtures. Read-path/query-budget and Inbox search tests do not prove
+  production speed. Scoped MCP host/service and HTTP tests are execution evidence
+  with mocks, not a real authenticated MCP-client run.
+- **Requested work absent at this HEAD:** Instagram has discovery/metric helpers
+  and selection tests, but `PLATFORM_MODULES` installs Facebook only; no complete
+  Instagram module. Facebook Groups publishing/discovery is absent (Settings
+  channel groups are organization only). AI writing/recap/sentiment exists, but
+  rebuild AI agent management does not. Posts CSV is a bounded synchronous
+  `exportPublishingPosts` download, not an asynchronous export job; workspace ZIP
+  is separate. Do not mark these legacy capabilities complete.
+- **Missing sweep input:** `LEGACY_SWEEP_2026-10-21.md` is absent from this checkout.
+  Its missing rows cannot be reconciled from an unavailable report. Keep the
+  Instagram, Groups, AI-agent and async-CSV gaps above explicit; integrator must
+  supply the report and reconcile every additional row without reducing scope.
 
 ## Production status
 
@@ -19,10 +88,10 @@ These are recorded production outcomes in [RELEASE_GATES_PLAN.md](RELEASE_GATES_
 not fresh probes by this documentation worker. That log records 34 applied
 migrations, backup, health checks, ownership repair, owner sign-in confirmation,
 legacy configuration import and later AI/browser checks. Cutover happened; full
-contract completion is still unproven. The deployed release is recorded by the
-integrator as `ffdb1cdf` (schema 118), with migration
-`20261031180000_rebuild_ads_ad_creation` stated as applied in production; this
-review did not observe either and no receipt is in the repository, so confirm the
+contract completion is still unproven. An older integrator snapshot named `ffdb1cdf` (schema 118); the later dated
+statement names `a910d774`/120. Neither identifies the current deployment. Migration
+`20261031180000_rebuild_ads_ad_creation` was stated as applied in production; this
+review did not observe application and no receipt is in the repository, so confirm the
 applied migrations before claiming source live. The log also
 records the 2026-10-21 post-cutover rollback drill (**PASS**: backup restored to a
 scratch database, legacy and the installed rebuild started on spare ports; live
@@ -56,13 +125,13 @@ Facebook is the only installed customer platform. Instagram/other legacy connect
 code does not establish usable rebuild support. Shared services consume adapter
 capabilities, format catalogs and normalized measures, never provider branches.
 Encapsulation is not complete: shared legacy storage reads in `src/server/data.ts`
-and product account helpers in `src/server/account-settings.ts` still need coordinated
-moves. Registration of a module does not prove its workflows or health.
+still need coordinated moves. Account policy has moved to Settings; the shared
+account path retains audit infrastructure and compatibility exports. Registration of a module does not prove its workflows or health.
 
 ## Configuration and public origin
 
 `src/lib/config/registry.ts` aggregates module/platform declarations and
-`src/lib/config/shared-config.ts`. Local HEAD has schema version **118** (round 6 added `meta.adsCopy`, the Facebook
+`src/lib/config/shared-config.ts`. The historical round-9 snapshot had schema version **118** (round 6 added `meta.adsCopy`, the Facebook
 Ads action copy, owned by `src/platforms/facebook/ads-ui-config.ts`; round 7 added
 `analytics.reports.publicationDetails` (116); round 8 added
 `analytics.reports.topPostContent` (117); `meta.metricLabels` merges saved labels
@@ -134,7 +203,7 @@ not every cross-device persistence/security scenario.
 | Publishing | Drafts/composer, CSV, previews, list/calendar/queue, approvals, templates/labels/fields/notes/versions, bulk actions, first comments, recovery, best times, mix/recycle and short links | Shared UI/REST/MCP coverage documented in PARITY_PUBLISHING_INBOX; native/live and new scheduling runtime checks remain partial |
 | Inbox | Scoped threads/nested replies/reviews, sync, moderation/deletion recovery, assignment/notes/replies, quick filters, contact details, bulk actions and shortcuts | Contact-details REST and bulk UI/REST/MCP (`f5c21c96`) exist; provider history/metadata and live moderation remain partial |
 | Analytics | Catalog/series, previous-period points, comparison, posts, audience history, ad objects, pins, goals, reports/exports and charts | Stored-data surfaces share services; complete readable-provider collection, labels and provider history remain partial; response-report rounds 1–3 add comments, historical cycles, source/member breakdowns with disclosed stored-history limits |
-| Ads | Account/performance/directory/compare/export, hierarchy charts, creation options, durable confirmed management: campaign, ad set, paused ad and stored-image creative creation, status/budget/rename/assign/delete, missing-grant reconnect notice | Session REST/MCP plus key REST v1; management is off by default and awaits a live `ads_management` grant. The `ad.create` ledger CHECK migration exists (`20261031180000_rebuild_ads_ad_creation`, recorded applied in production by the owner/integrator); Ads copy resolves per request through the platform host, but entry points do not yet pass the customer locale. Mocked/fixture evidence only; see ADS_PARITY.md |
+| Ads | Account/performance/directory/compare/export, hierarchy charts, creation options, durable confirmed management: campaign, ad set, paused ad and stored-image creative creation, status/budget/rename/assign/delete, missing-grant reconnect notice | Session REST/MCP plus key REST v1; management ships off by default; the owner reports live create/rename/delete verified in Ads Manager. The `ad.create` ledger CHECK migration exists (`20261031180000_rebuild_ads_ad_creation`, recorded applied in production by the owner/integrator); Ads locale now propagates at the service boundary; inventory supports objects without delivery. Local fixture evidence and bounded owner-reported live evidence are distinct; see ADS_PARITY.md |
 | Settings | Connections/selection, profiles/watermark, team/invitations, account/security/sessions, appearance, notifications, exports/erasure and keys | Broad service parity; selection and disconnect callers (UI, REST, MCP) share the confirmed services; partial account export is exposed (session route, MCP tool, bilingual download). Live mail/security/data coverage remain gaps; shell appearance shares persistence |
 | Media / Feeds / AI | Media images/videos/import/quota; RSS/Atom/WordPress feeds; recipe planner; AI writing/recap/sentiment | Shared UI/REST/MCP slices; real storage/source/automation and current browser/live evidence vary by feature |
 | Tasks / Agency / Sharing / Integrations | Task workflows, Agency overview/clients/export/switching, review/bio links, webhooks, scoped REST/OAuth connectors | Shared services exist; credential-specific capabilities and remaining confirmation differences must remain explicit |
@@ -370,9 +439,9 @@ provider run**; schema 117):
   `PlatformAdsHost.configuredOperations(locale)` is resolved by `platformAds(provider,
   locale)` into a request-local host, with `withPlatformAdsLocale` and
   `withAdsErrorBoundary(operation, locale)` carrying the locale (neutral
-  `server/platforms/host.ts` and `registry.ts`; no provider branch). The Ads UI,
-  session REST and MCP entry points do not yet pass the customer locale, so Ads
-  messages are English there; the cutover rehearsal script and tests do not yet list
+  `server/platforms/host.ts` and `registry.ts`; no provider branch). At round 8 the Ads UI,
+  session REST and MCP entry points did not yet pass customer locale (fixed in
+  8d9ccbe7); the cutover rehearsal script and tests do not yet list
   the migration; recovery had not yet gained round 9 locked authority/visibility rechecks and
   still does not repeat the creation-only unrestricted-channel rule (see
   `src/modules/ads/server/README.md`).

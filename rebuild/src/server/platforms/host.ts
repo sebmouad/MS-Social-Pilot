@@ -91,10 +91,25 @@ export type PostPerformance = {
 };
 
 /** Channel totals over one window that monthly goals track, from stored data. Null means not stored, never zero. */
-export type GoalMeasures = { audienceGained: number | null; views: number | null; engagements: number | null };
+export type GoalMeasures = {
+  audienceGained: number | null; views: number | null; engagements: number | null;
+  /**
+   * Where each views/engagements figure came from. `page-daily` is a sum of daily channel flows; `post-cohort` is the sum of
+   * lifetime snapshots of posts published in the window. They are different quantities and a caller must not add or compare
+   * them with each other. Absent means every figure is `page-daily` (older adapters).
+   */
+  basis?: { views: GoalBasis | null; engagements: GoalBasis | null };
+  /** For `post-cohort` figures: posts in the window, and whether the bounded read dropped some. */
+  cohort?: { posts: number; truncated: boolean };
+};
+export type GoalBasis = 'page-daily' | 'post-cohort';
 
 /** Stored per-post measures summed over one channel's posts published in a window. `measuredPosts` is how many posts had that measure stored; null value means none did (unknown, never zero). */
-export type DestinationMeasures = { measures: Array<{ key: string; label: string; value: number | null; measuredPosts: number }> };
+export type DestinationMeasures = {
+  measures: Array<{ key: string; label: string; value: number | null; measuredPosts: number }>;
+  /** Posts in the cohort (each remote post counted once) and whether the bounded read dropped some. */
+  coverage?: { posts: number; truncated: boolean };
+};
 
 export type PostPerformanceRequest = { workspaceId: string; targetId: string; from: Date; to: Date; limit: number; offset?: number; sort?: string; direction?: 'asc' | 'desc' };
 

@@ -27,3 +27,12 @@ export function MetricPicker({ options, initial, label, locale = 'en', copy = ov
     { value: '', label }, ...options.map(option => ({ value: option.key, label: option.label, description: option.sourceLabel })),
   ]} /></div>;
 }
+
+/** Render service-authorized channels without interpreting their platform. */
+export function AnalyticsChannelChoices({ channels, selectedIds }: { channels: Array<{ id: string; name: string }>; selectedIds: readonly string[] }) {
+  const selected = new Set(selectedIds);
+  return channels.map(channel => <label key={channel.id}>
+    <input type="checkbox" name="channel" value={channel.id} defaultChecked={selected.has(channel.id)} />
+    <span>{channel.name}</span>
+  </label>);
+}

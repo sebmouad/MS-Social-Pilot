@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: db }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => 20000 }));
 
 import { facebookDestinationMeasures, readFacebookDestinationMeasures } from '../src/platforms/facebook/destination-measures';
 import { renderReport, type DestinationSummary } from '../src/modules/analytics/reports/generation/document';
@@ -18,7 +19,7 @@ describe('Facebook destination measures', () => {
     db.$queryRaw.mockResolvedValue([{ insights: { shares: 3 } }]);
     const out = await readFacebookDestinationMeasures({ workspaceId: 'w1', targetId: 't1', from: new Date(0), to: new Date() });
     expect(out.measures.find(m => m.key === 'shares')!.value).toBe(3);
-    const sql = db.$queryRaw.mock.calls[0]!.join(' ');
+    const sql = (db.$queryRaw.mock.calls[0]![0] as { sql: string }).sql;
     expect(sql).toContain(`t."workspaceId" =`); expect(sql).toContain(`pt.status = 'published'`);
   });
 });

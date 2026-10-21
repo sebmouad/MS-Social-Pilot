@@ -1,11 +1,28 @@
 # Content feeds (legacy parity wave 3)
 
 Status: **source/mock recovery evidence plus owner-recorded production planning, publication and first comments for one full day**.
-Updated 2026-10-21 against local HEAD `ffdb1cdf` (deployed per the owner/integrator;
-schema 118; not re-observed by this lane). The rebuild is in production;
+Updated 2026-10-21 against source HEAD `99c41554`, schema 123; deployment was
+not re-observed by this lane. The rebuild is in production;
 [RELEASE_GATES_PLAN.md](RELEASE_GATES_PLAN.md#production-log--2026-10-21) records
 the recipe run below. Original RSS/Atom mocked tests do not establish live checks
 of every feed kind. No fresh database, browser or provider calls in this doc pass.
+
+## Current source reconciliation — 2026-10-21
+
+Reviewed at `99c41554`, schema 123. Existing reuse policy, reviewer notices,
+caption decoding/control repair and recovery changes below are integrated source.
+HomeScreen still does not mount RecipeSupplyCard: the Home low-supply warning
+remains incomplete. Reuse defaults off; zero source cooldown alone does not
+permit repeats. The earlier pool-health description is historical; the shared
+supply policy below governs finite estimates and actual-publication reuse.
+
+The 40/40 publication/comment day remains owner-recorded production evidence.
+Retry/pause-cancel, uncertain-claim reconciliation, concurrent cross-slot allocation,
+large retained-history reads and actual notice delivery still lack runtime proof.
+Caption repair is service-only, with no UI/REST/MCP entry points; outcomes for the
+six planned captions remain unrecorded here. Do not equate source repair with
+stored-data repair. LEGACY_SWEEP_2026-10-21.md is absent at this HEAD, so any further
+Feeds inventory findings from it await integrator input. No new keys in this lane.
 
 ## Ownership
 
@@ -152,7 +169,7 @@ Ledger states: `planned` (post id stored), `claimed` (unfinished; older than `cl
 - **Pause and cancel** (`POST /api/feeds/wordpress/state` and MCP `set_recipe_source_state` with `cancelScheduled: true`, confirmation `PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS`). Allowed only while Root `feeds.wordpress.pauseCancelEnabled` is on. The pause is saved first; then the source's `planned` ledger posts scheduled in the future are cancelled one by one through Publishing's `cancelScheduledPost` as the signed-in member (so Publishing's rights, channel scope and platform-held-copy removal apply; the post returns to a draft). A slot is released (`failed`, reason `cancelled`) only after its post was cancelled; a refused cancel leaves slot and post untouched and is counted in `notCancelled`. At most `pauseCancelBatchSize` per request; `remaining: true` means repeat.
   Refused rows rotate behind untouched work by least-recent-attempt order (round 6);
   a fully refused batch still reports remaining work. A failure inside the cancel step never undoes the pause (`incomplete: true`). Resuming plans the freed times again.
-- **Pool health** in `get_recipe_source`, `GET /api/feeds/wordpress` and the UI ("Recipe supply"): per channel, eligible recipes (not planned or recently posted there, and not planned elsewhere when channels must differ) and `daysLeft = floor(eligible / (posts per day x channels sharing the pool))`; `null` when the cooldown is 0 (recipes may repeat). Flagged low under `feeds.wordpress.poolWarnDays`. `complete: false` means the scan limit was reached and the counts are lower bounds. The estimate does not count recipes that return after the cooldown. It needs a full library scan, so the result is cached per source for `poolCacheSeconds` (per process) and is `null` when the library cannot be read.
+- **Pool health** in `get_recipe_source`, `GET /api/feeds/wordpress` and the UI ("Recipe supply"): per channel, eligible recipes (not planned or recently posted there, and not planned elsewhere when channels must differ) and `daysLeft = floor(eligible / (posts per day x channels sharing the pool))`; the later shared supply policy supersedes the old zero-cooldown unlimited rule. Flagged low under `feeds.wordpress.poolWarnDays`. `complete: false` means the scan limit was reached and the counts are lower bounds. The estimate does not count recipes that return after the cooldown. It needs a full library scan, so the result is cached per source for `poolCacheSeconds` (per process) and is `null` when the library cannot be read.
 - **Worker log.** The `feedsPoll` line now ends with `recipes: sources=.. planned=.. failed=.. uncertain=.. unfilled=..` plus `reason=` and `stops=` (budget, no_pages, error, ...) or `recipes=off`.
 - New Root keys: `feeds.wordpress.poolWarnDays`, `poolCacheSeconds`, `pauseCancelEnabled`, `pauseCancelBatchSize`. Evidence: unit and service tests with fakes (`feeds-wordpress-planner`, `-recovery-service`, `-db-image`, `feeds-mcp`); no PostgreSQL, browser, MariaDB, Facebook or production run.
 - Superseded by round 6 (below): reconciliation by channel and time, and the starvation of later posts behind a refused first batch.

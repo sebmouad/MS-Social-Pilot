@@ -1,74 +1,33 @@
 # Active delivery goal
 
-Updated 2026-10-21 against local HEAD `a910d774` (since `960831df`; rounds 9–12). **Status: active; incomplete. Rebuild is in production.**
+Updated 2026-10-21 against source HEAD `99c41554`, registry schema **123**.
+**Status: active; incomplete.** The owner recorded production cutover on
+2026-10-20; current deployed SHA/schema were not re-observed by this lane.
 
-Latest state (integrator statement, not re-observed here): deployed release
-`a910d774`, configuration schema **120**. Since `960831df` the source adds the
-Facebook Page metric/label wiring, link and publication-distribution report
-details, recipe reuse and supply settings, Feeds reviewer notices, a live-defect
-fix for the empty Analytics post explorer (`806a0ef5`, `6e111754`), a Facebook
-OAuth fix to use the Root public origin (`c0e5386a`; the owner's reconnect retry
-is still pending, so no successful post-fix connection is recorded), and WordPress
-caption repairs (`a47a339c`, `a910d774`). Details and evidence kinds are in
-[AGENT_HANDOFF.md](AGENT_HANDOFF.md) (rounds 10–12). The browser round 6 lane
-hung and delivered only a partial harness change; no round 6 matrix result exists.
-The paragraphs below still describe the `960831df` snapshot where dated.
+Deliver the full modular, platform-neutral replacement in `rebuild/` under
+[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md): preserve useful legacy
+capabilities, one themed English/French experience, identical UI/REST/MCP
+capabilities through authorized shared services, typed Root configuration,
+complete data controls and verified provider/recovery outcomes. Deployment,
+source existence and passing tests do not establish full completion.
 
-Deliver the full modular, platform-neutral MS Social Pilot replacement in
-`rebuild/`: complete useful legacy capabilities, Facebook integration, one themed
-English/French customer experience, shared UI/REST/MCP services, typed Root
-configuration, safe data control, live-provider outcomes and verified recovery.
-[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding and unchanged;
-[LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md) preserves the inventory.
+[ARCHITECTURE.md](ARCHITECTURE.md#current-head-reconciliation--2026-10-21) records
+the current source delta: Ads inventory without delivery, contract fixes,
+Analytics/Home number corrections, smoke coverage and merged UI/localization
+passes. The owner reports Ads create/rename/delete verified in Ads Manager;
+that bounded live evidence does not prove every Ads operation, cleanup or MCP.
+Historical production records include the 40/40 recipe publications and comments
+and a scratch-database rollback drill, not a proxy cutback or latest-release restore.
 
-The owner cut over on **2026-10-20**. The rebuild serves
-`https://social.newsgeet.com`; legacy web/worker were disabled. Release `960831df`
-is recorded as the deployed release (integrator statement, not re-observed). Deploy with `rebuild/scripts/prod-deploy.sh`;
-legacy `socialpilot-deploy` is guarded. Recorded evidence and remaining
-operational checks are in [CUTOVER.md](CUTOVER.md) and the results sections of
-[RELEASE_GATES_PLAN.md](RELEASE_GATES_PLAN.md).
-
-Deployment does not close full parity, provider, configuration or recovery gaps.
-Since `46c6bdae`, source adds Ads runtime-locale copy through the neutral
-platform host (entry points do not yet pass the customer locale), the `ad.create`
-ledger migration `20261031180000_rebuild_ads_ad_creation` (recorded applied in
-production by the owner/integrator), a themed bilingual `not-found.tsx`, richer
-Facebook post-metric collection and labels, Published-posts and Top-posts report
-content, Facebook Ads error codes/copy and Inbox/Analytics focus and table polish
-(source and unit evidence). Configuration schema version is now **117**. Earlier
-(since `1240a9ce`), merged source added themed bilingual error boundaries
-(`error.tsx`, `global-error.tsx`), Settings single-selection/disconnect callers on
-the confirmed services, a session-only partial account export (route, MCP tool and
-Account download), Root workspace/directory/configuration/error services that own
-actor checks and confirmations, Ads paused-ad creation with a missing-grant
-reconnect notice, and fixes for the queue-cancel, Root activity, two-step, join
-and calendar-contrast browser findings.
-Remaining service differences (Agency switching, Sharing copy-only saves) and the
-gaps listed in [MCP_PARITY.md](MCP_PARITY.md) still prevent full parity.
-
-Evidence has advanced, by kind:
-
-- **Production (owner-recorded):** the post-cutover rollback drill passed on
-  2026-10-21 (restorable backup and a startable legacy and rebuild artifact on
-  spare ports; not a proxy cutback). The first full recipe day published 40/40
-  posts with 40/40 first comments across the 07:00, 11:00, 15:00 and 17:00
-  Europe/Paris slots; article links were removed from comments on owner request.
-- **Live provider (limited):** Graph v26.0 post-metric probe accepts current
-  metrics and rejects old ones.
-- **Browser (local production build, synthetic data):** Chromium rounds 1–2, then
-  Firefox and WebKit (Safari engine) rounds 3–4 on two themes. Defects remain and
-  the matrix is not a clean pass.
-- **Source and automated:** everything else, including Ads management, which is
-  off by default and awaits a live `ads_management` grant. Rounds 6–8 have no
-  recorded browser, PostgreSQL, provider or production run beyond the owner's
-  deployment and migration statement.
-
-None of these prove every workflow, full data portability, remaining provider and
-legacy scope, or every later merge. Which migrations are applied on production
-after the rollback drill still requires verification.
+Still missing at this HEAD: installed Instagram support, Facebook Groups,
+AI agent management and asynchronous Posts CSV. Shared validation Root delivery,
+AppShell workspace confirmation, migration rehearsal/Ads inventory data controls,
+current browser/FR/accessibility checks, live client execution and provider/data
+coverage remain open. The requested LEGACY_SWEEP_2026-10-21.md is absent; its
+additional missing rows must be reconciled when supplied. Never infer parity
+from this incomplete route inventory.
 
 Continue from [DELIVERY_PLAN.md](DELIVERY_PLAN.md) and
-[AGENT_HANDOFF.md](AGENT_HANDOFF.md). Keep the goal active until every requirement
-has evidence at its actual scope. Do not narrow completion to deployment, a test
-count, manifests or the next batch. Current worker scope is documentation only:
-no servers, deploy, push or production operations.
+[AGENT_HANDOFF.md](AGENT_HANDOFF.md). Retain the full
+[legacy inventory](LEGACY_CAPABILITY_PARITY.md) and release/recovery gates.
+This docs worker runs local checks only; no servers, deploy, push or production.

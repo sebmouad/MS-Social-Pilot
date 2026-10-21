@@ -1,6 +1,6 @@
 import { loadOverviewCopy } from '../server/overview-copy';
 import { overviewCopyDefaults, overviewText, type OverviewCopy } from '../overview-copy';
-import { AnalyticsFilters, MetricPicker } from './AnalyticsFilters';
+import { AnalyticsFilters, MetricPicker, AnalyticsChannelChoices } from './AnalyticsFilters';
 import { EmptyState } from '@/components/EmptyState';
 import { IconAlertTriangle, IconArrowsDiff, IconCalendarEvent, IconChartBar, IconPlugConnected, IconSend } from '@tabler/icons-react';
 import { MetricCard } from '@/components/MetricCard';
@@ -73,7 +73,6 @@ function Pagination({ query, parameter, page, pages, label, copy }: { copy: Over
 function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHref, profiles, locale, copy }: { copy: OverviewCopy; profiles?: ProfileDirectory; locale: 'en' | 'fr'; data: AnalyticsReadResult; query: string; exportHref?: string; connectionsHref?: string; explorerHref?: string }) {
   const t = overviewText(copy);
   const params = new URLSearchParams(query);
-  const selectedChannels = new Set(data.selected.channelIds);
   const comparison = data.period.comparison?.mode ?? 'none';
   const selectedMetric = params.get('metric') ?? '';
   const freshPage = (name: string) => <input type="hidden" name={name} value="1" />;
@@ -96,10 +95,10 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHr
       <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">{t("Channels")}</legend>
         {freshPage('filter')}
         {profiles && <GroupShortcut groups={profiles.groups} allowedIds={data.options.channels.map(channel => channel.id)} locale={locale} />}
-        {data.options.channels.length ? data.options.channels.map(channel => <label key={channel.id}>
-          <input type="checkbox" name="channel" value={channel.id} defaultChecked={selectedChannels.has(channel.id)} />
-          <span>{profiles?.channels.find(profile => profile.id === channel.id) ? profileChannelName(profiles.channels.find(profile => profile.id === channel.id)!) : channel.name}</span>
-        </label>) : <p className="small-note">{t("No channels available.")}</p>}
+        {data.options.channels.length ? <AnalyticsChannelChoices channels={data.options.channels.map(channel => {
+          const profile = profiles?.channels.find(profile => profile.id === channel.id);
+          return { id: channel.id, name: profile ? profileChannelName(profile) : channel.name };
+        })} selectedIds={data.selected.channelIds} /> : <p className="small-note">{t("No channels available.")}</p>}
       </fieldset>
       <label className="analytics-select-filter">{t("Search metrics")}
         <input type="search" name="search" maxLength={data.searchMaxLength} defaultValue={params.get('search') ?? ''} placeholder={t("Name or source")} />

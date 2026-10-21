@@ -87,3 +87,17 @@ it('browser sends changed selections with the shared exact count confirmation', 
   expect(fetch.mock.calls[0]![1].method).toBe('PATCH');
   expect(JSON.parse(fetch.mock.calls[0]![1].body)).toEqual({ items: [{ kind: 'target', id: 'channel', enabled: false }], confirmation: 'SET CONNECTION SELECTIONS 1' });
 });
+
+it.each(['en', 'fr'] as const)('renders discovered Instagram accounts with module branding in %s', async locale => {
+  await act(async () => root.render(createElement(ConnectionManager, {
+    sources: [{ ...source, provider: 'instagram', platformName: 'Instagram', tokenExpiresAt: null,
+      targets: [{ id: 'ig-studio', name: 'Atelier Atlas', type: 'channel', enabled: false }], adAccounts: [] }],
+    platforms: [], canManage: true, statusLabels: labels, initiallyOpen: true, locale,
+  })));
+  expect(container.querySelector('legend')?.textContent).toContain('Instagram');
+  const choice = container.querySelector<HTMLInputElement>('input[type=checkbox]')!;
+  expect(choice.closest('label')?.textContent).toContain('Atelier Atlas');
+  expect(choice.checked).toBe(false); expect(choice.disabled).toBe(false);
+  await act(async () => choice.click());
+  expect(choice.checked).toBe(true);
+});

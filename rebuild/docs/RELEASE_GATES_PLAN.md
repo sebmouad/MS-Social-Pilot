@@ -542,3 +542,52 @@ Owner/integrator statement, not re-observed here: deployed release `a910d774`, c
 - **Captions:** seven WordPress captions were affected; one already-published post was kept as it is. The repair outcome for the remaining six is not recorded here.
 - **Browser round 6:** the lane hung; only the harness and a date/time focus-ring change are committed (`d24fcd40`). No matrix result exists for rounds 6–12.
 - **Not shown by this entry:** migration receipts for the newest releases, a proxy cutback, media restoration, or any gate pass. Earlier results in this file remain dated and unchanged.
+
+
+### 2026-10-21 HEAD reconciliation (`99c41554`, schema 123)
+
+Documentation-only review of local source; no server, database, provider, deploy,
+push or production call. This entry does not assert a new deployed SHA.
+
+- Ads inventory migration `20261101120000_ads_object_inventory` and shared
+  directory/management paths now cover objects without delivery. Ownership checks
+  remain. Migration application/rehearsal pins, export/erasure coverage and actual
+  transaction/stale-sync/cascade proof are pending (Ads server README).
+- **Owner-reported live evidence in the lane request:** Ads create/rename/delete
+  verified in Ads Manager. Supersedes historical “no live Ads writes” for that
+  bounded run. No object-level receipt, cleanup/spend result or authenticated MCP
+  transcript supplied; remaining operations and full Gate A stay unproven.
+- Contract fixes and numbers corrections are merged, plus Settings/Root/Inbox/
+  Publishing and shared design source passes. Smoke tests use synthetic mocked
+  roles and EN/FR rendering/route calls. Performance/query-budget, localization,
+  focus and MCP host tests remain local automated evidence, not fresh browser,
+  actual database/client/provider or production results.
+- Instagram remains uninstalled; Groups, AI agent management and asynchronous
+  Posts CSV are absent at this HEAD. Missing LEGACY_SWEEP_2026-10-21.md prevents
+  reconciling its additional rows. No full parity/release claim is made.
+- Current source gaps include AppShell workspace confirmation, Root validation
+  copy delivery, inventory data controls/rehearsal, provider numbers semantics,
+  current browser findings and real transport/runtime evidence. See the current
+  architecture reconciliation and delivery plan for owners and next actions.
+
+Validation (from rebuild/, with --no-cache to avoid the external symlinked
+Vitest cache):
+
+- `npx tsc --noEmit -p . --incremental false`: PASS, exit 0, zero errors.
+- `npx vitest run --no-cache tests/parity-guard.test.ts tests/config-validation.test.ts tests/root-config-form.test.ts`:
+  parity guard 22/22 and config validation 7/7 PASS; Root form 10 passed,
+  1 timed out at 5000 ms (`makes every registered setting reachable through
+  owner-aware search`). The same timeout occurred in the full suite.
+- `npx vitest run --no-cache --exclude "**/facebook-diagnostic-transport.test.ts"`:
+  618 files passed, 2 failed, 49 skipped; 8,873 tests passed, 6 failed,
+  2,055 skipped (10,934 total). Five facebook-native-http loopback tests fail
+  with `listen EPERM: operation not permitted ::1` in this sandbox; the sixth
+  failure is the Root form timeout above. No app server was started and no live
+  provider was contacted. Full-suite status is FAILED, not release-ready proof.
+- `git diff --check`: PASS. No source/test file changed or added; no new
+  targeted implementation tests apply. All edits are owned docs, legacy edits
+  are confined to status cells, and this release-gate update is append-only.
+
+No new Root keys or visible screen changes; UI skill/visual-change reporting is
+not applicable. Working-tree changes are uncommitted for integration: Git metadata
+resolves outside writable roots. No push under the lane's explicit prohibition.

@@ -13,7 +13,7 @@ import { summarizeDisconnectCounts } from './preview';
 
 type Channel = { id: string; name: string; type: string; enabled: boolean };
 type AdAccount = { id: string; name: string; actId: string; enabled: boolean };
-type Source = { id: string; name: string; provider: string; invalidatedAt: Date | null; tokenExpiresAt: Date | null; targets: Channel[]; adAccounts: AdAccount[] };
+type Source = { id: string; name: string; provider: string; platformName?: string; invalidatedAt: Date | null; tokenExpiresAt: Date | null; targets: Channel[]; adAccounts: AdAccount[] };
 
 type Connectable = { id: string; name: string; mark: { text: string; color: string } };
 
@@ -106,7 +106,7 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
     {notice && !open && !disconnect && <p role="alert" className={styles['connection-error']}>{notice}</p>}
     {open && <ModalDialog className={styles['connection-dialog']} labelledBy="connection-dialog-title" onDismiss={() => setOpen(false)} busy={busy} initialFocus={initialSource && initialAction === 'manage' ? '[data-connection-source-focus]' : '[data-dialog-cancel]'}>
       <header><div><p className={styles['settings-eyebrow']}>{t.dialogEyebrow}</p><h2 id="connection-dialog-title">{t.dialogTitle}</h2><p>{t.dialogDetail}</p></div><button type="button" aria-label={t.close} disabled={busy} onClick={() => setOpen(false)}>×</button></header>
-      {sources.length ? sources.map(source => <fieldset id={`connection-source-${source.id}`} className={`${styles['connection-source']}${initialSourceId === source.id ? ` ${styles['connection-source--selected']}` : ''}`} data-connection-source-focus={initialSourceId === source.id ? '' : undefined} tabIndex={initialSourceId === source.id ? -1 : undefined} key={source.id}><legend>{source.name} <span>{source.provider.replace(/[_-]/g, ' ')}</span></legend>
+      {sources.length ? sources.map(source => <fieldset id={`connection-source-${source.id}`} className={`${styles['connection-source']}${initialSourceId === source.id ? ` ${styles['connection-source--selected']}` : ''}`} data-connection-source-focus={initialSourceId === source.id ? '' : undefined} tabIndex={initialSourceId === source.id ? -1 : undefined} key={source.id}><legend>{source.name} <span>{source.platformName ?? platforms.find(platform => platform.id === source.provider)?.name ?? source.provider.replace(/[_-]/g, ' ')}</span></legend>
         {connectionState(source) !== 'connected' && <p className={styles['settings-note']}>{fill(t.reconnectHint, { status: statusLabels[connectionState(source)] })}</p>}
         {source.targets.map(item => <label key={item.id}><input type="checkbox" checked={selected[`target:${item.id}`] ?? item.enabled} disabled={busy || (connectionState(source) !== 'connected' && !item.enabled)} onChange={event => toggle('target', item.id, event.currentTarget.checked)} /><span>{item.name || item.type}<small>{fill(t.channel, { type: item.type })}</small></span></label>)}
         {source.adAccounts.map(item => <label key={item.id}><input type="checkbox" checked={selected[`adAccount:${item.id}`] ?? item.enabled} disabled={busy || (connectionState(source) !== 'connected' && !item.enabled)} onChange={event => toggle('adAccount', item.id, event.currentTarget.checked)} /><span>{item.name}<small>{fill(t.adAccountLine, { id: item.actId })}</small></span></label>)}

@@ -252,3 +252,20 @@ describe('dedicated post composer', () => {
  expect(new FormData(form).getAll('targetIds')).toEqual(['target-a']);
  expect(JSON.parse(new FormData(form).get('destinationFormatsJson') as string)).toEqual({'target-a':'compact'});
  });
+
+it('uses Instagram destination format descriptors without offering undeclared formats', async () => {
+  const formats: PublishingFormatDescriptor[] = ['Photo', 'Reel', 'Story'].map(label => ({
+    id: label.toLowerCase(), label, media: { kinds: ['image', 'video'], maxImages: 1, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: false },
+    firstComment: false, remoteStatus: true, remoteDelete: false, scheduling: { application: true, native: false },
+  }));
+  await render([{ ...targets[0]!, id: 'ig-atlas', provider: 'instagram', name: 'Atelier Atlas', publishingFormats: formats, defaultPublishingFormatId: 'photo' },
+    { ...targets[0]!, id: 'unavailable', provider: 'instagram', name: 'Unavailable channel', canPublish: false }]);
+  expect(dock.textContent).toContain('Atelier Atlas');
+  expect(dock.textContent).not.toContain('Unavailable channel');
+  await act(async () => dock.querySelector<HTMLInputElement>('input[name=targetIds]')!.click());
+  expect(container.textContent).toContain('Atelier Atlas');
+  expect(dock.textContent).toContain('Photo');
+  expect(dock.textContent).toContain('Reel');
+  expect(dock.textContent).toContain('Story');
+  expect(dock.textContent).not.toContain('Live');
+});

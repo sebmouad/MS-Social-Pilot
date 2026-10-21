@@ -1,10 +1,9 @@
 # UI, REST and MCP parity inventory
 
-Updated 2026-10-21 against local HEAD `960831df` (rounds 6–8 reviewed for MCP-relevant changes; the tool inventory below was last counted at `46c6bdae`; merges since `1240a9ce`). This is a **source-level**
-inventory using module MCP declarations, HTTP routes, shared services and the
-lane matrices. It is not a fresh tools/list dump, real MCP-client run, database,
-browser or provider verification. Full parity remains **partial**. The automated declaration guard and exact
-mapping/exception policy are recorded below; they do not certify behavioral parity.
+Updated 2026-10-21 against local HEAD `99c41554`, schema **123**. This is a
+source inventory plus separately labelled local execution and owner-reported live
+evidence. Full parity remains **partial**; no actual authenticated MCP-client run
+was performed by this lane. Structural declarations do not prove behavior.
 
 The target is identical capabilities and service-owned authorization, tenant and
 resource scope, confirmations and domain audit through UI, REST and MCP. A tool
@@ -20,7 +19,7 @@ selected-resource, person-key and installation authority remain distinct.
 | Facebook Groups | No customer Group selection/publish UI, REST route or MCP operation is enabled. Private `configuredFacebookGroupOperations` is a provider port only, using neutral requests/results; it is not a new domain service or an authorization boundary. | Incomplete in all three surfaces. Fixture-tested discovery distinguishes missing grants/provider denial from an empty collection; private feed/link/single-photo transport requires fresh exact-Group discovery and maps create receipts to submitted, with identity-bound explicit status proof. Installed capabilities remain Page-only because current provider access is unverified and neutral per-kind descriptors/shared service integration are missing. No independent route/tool bypasses tenant, confirmation or audit services. See [Groups integration dependencies](../src/platforms/facebook/GROUPS.md). |
 | Inbox | List/thread/sync/reply/resolve, nested replies/reviews, moderation/deletion/recovery, productivity, assignment/notes/saved replies and contact details | Broad source coverage; GET `/api/inbox/threads/[key]/details` calls `readInboxContactDetails` (added in `8852d367`). `bulkInboxAction` now has UI, `POST /api/inbox/bulk` and `bulk_inbox_action` (`f5c21c96`); mocked route tests only |
 | Analytics | Overview/details/explorer/previous points, comparisons, posts/ad objects, demographics/history CSV, pins/goals, report exports/templates/schedules/runs/generation | Present at source; session HTTP and MCP share cores, key REST v1 delegates declared tools to host. Completeness of collected metrics and real transport/provider results remain unproven |
-| Ads | Accounts/performance/directory/rows/exports/compare/status, creation choices, creative sources/image/create/assignment, change preview/apply/history/recovery | Present at source with session routes and key REST v1 through owning MCP groups. `ad.create` (paused) uses the same `previewAdsManagement`/`performAdsManagement` path from `AdCreateForm`, session REST and `preview_ads_change`/`apply_ads_change`; a missing `ads_management` grant yields a reconnect notice and localized error. The ledger CHECK migration for `ad.create` (`20261031180000_rebuild_ads_ad_creation`) exists since `960831df` and is recorded applied in production by the owner/integrator; the Ads MCP tools do not yet pass the customer locale to the runtime Ads copy scope (English default). Live manager/grant/spend/creative outcomes remain partial |
+| Ads | Accounts/performance/directory/rows/exports/compare/status, creation choices, creative sources/image/create/assignment, change preview/apply/history/recovery | Present at source with session routes and key REST v1 through owning MCP groups. `ad.create` (paused) uses the same `previewAdsManagement`/`performAdsManagement` path from `AdCreateForm`, session REST and `preview_ads_change`/`apply_ads_change`; a missing `ads_management` grant yields a reconnect notice and localized error. The ledger CHECK migration for `ad.create` (`20261031180000_rebuild_ads_ad_creation`) exists since `960831df` and is recorded applied in production by the owner/integrator; the service now establishes request/host locale scope. Inventory supports paused objects without delivery. Owner-reported Ads Manager create/rename/delete verification is bounded; remaining spend/creative/recovery/client outcomes stay partial |
 | Settings connections | Directory/health, OAuth start, single/batch selection, disconnect preview/retain/delete | OAuth start UI/REST/session MCP share service; compatibility route also delegates. Single/batch MCP and REST selections call changeConnectionSelections; MCP and REST disconnect call changeConnectionDisconnect. Browser sends named retain/delete consent after final review. Targeted mocked transport and DOM tests cover caller parity; live client/provider and actual browser evidence remain separate |
 | Settings account/security/keys | Profile/password/session reads and changes; authenticator begin/enable/disable, passkey removal; workspace/person key list/issue/revoke | Session-only tools now exist; old claim that account/key issuance has no MCP is superseded. Bearer credentials cannot manage credentials/security. General authentication/passkey ceremony remains interactive |
 | Settings appearance | `appearanceSession`, GET/PATCH `/api/settings/appearance`, `get_appearance`, `update_appearance` | Shell ThemeProvider/mode toggle and Settings now share confirmed persistence (`2b42470b`); theme and mode are account-stored, cookies use Root lifetime, layout falls back to validated-session preferences. Cross-device/live persistence proof remains separate |
@@ -29,10 +28,29 @@ selected-resource, person-key and installation authority remain distinct.
 | Feeds | Source CRUD/check modes plus recipe read/save/preview/run/pause/resume | Shared UI/REST/MCP. Recipe tools: `get_recipe_source`, `save_recipe_source`, `preview_recipe_source`, `run_recipe_planner`, `set_recipe_source_state`, `retry_recipe_slots`. Feature off by default on new installs; production log records live source/image work and 80 scheduled posts. Owner-recorded first-day 07:00 and 11:00 batches each published 10/10 with comments; full transport/browser/retry/pause-cancel recovery evidence remains separate |
 | AI | Assist availability/write tools and HTTP/UI; report recap and stored sentiment use AI service internally | Present for advertised assist; internal jobs are not separate customer writes. OpenAI/Gemini limited live checks do not prove every consumer |
 | Tasks | List/create/checklist/update/move/delete/comments | Same `performTaskAction`; exact write confirmations now in service and sent by UI/REST/MCP. Real concurrent database and browser checks remain scoped gaps |
-| Agency | Overview/export via shared service, session Clients and workspace selection | Separate read-only person keys exist for overview; workspace keys cannot expand to person-wide reads. Session Clients/switching are present, not granted to person keys; REST switch versus MCP confirmation difference remains |
-| Sharing | Review/share link CRUD/rotate/revoke, feedback, eligible channels, bio controls | Shared UI/API/MCP source; copy-only edits remain version checked without confirmation, access changes confirmed. Browser/public provider/data coverage remains partial |
+| Agency | Overview/export via shared service, session Clients and workspace selection | Separate read-only person keys exist for overview; workspace keys cannot expand to person-wide reads. Session Clients/switching are present, not granted to person keys; service now requires exact SELECT WORKSPACE confirmation for REST/MCP; Agency UI supplies it, AppShell still omits it |
+| Sharing | Review/share link CRUD/rotate/revoke, feedback, eligible channels, bio controls | Shared UI/API/MCP source; copy-only and access edits now require exact shared-service confirmation; copy-only saves retain the address. Browser/public provider/data coverage remains partial |
 | Integrations | Webhooks/secrets/test/history, REST v1 and OAuth connector services | Session MCP secret reveal/rotate exist; bearer tools stay secret-free. OAuth browser consent is interactive. Not all module APIs are key-authenticated v1 endpoints |
 | Root | Configuration, operations/diagnostics/health, users/workspaces/plans/audit/errors, registration, installation transfer, connection refresh/disconnect/recovery | Private UI/HTTP/installation-session MCP source coverage; workspace/person keys excluded. Workspace create/rename, directory, configuration save and error resolution are shared services in `src/modules/root/server/` (`46c6bdae`). Backups UI is read-only; full operator inventory/configuration remains partial |
+
+## Current execution and missing-capability boundaries
+
+Ads inventory uses the existing directory/management mappings below; no new
+route/tool is needed. Common management services preserve ownership, exact
+confirmations, ledger/audit and held uncertain results. The owner-reported live
+Ads Manager run is distinct from MCP execution.
+
+Scoped MCP service/host, resource dispatch, Ads management and Reports host tests
+execute with mocks; there is no new real-client execution receipt here. Page/route
+smoke covers synthetic roles and EN/FR, with documented status/origin/join waivers;
+it does not verify every successful write or tenant isolation against PostgreSQL.
+The parity guard remains a structural check, not a substitute for those tests.
+
+No complete installed Instagram, Facebook Groups, AI-agent CRUD or async Posts
+CSV capability exists at this HEAD. Do not add fictional tool/route mappings.
+Caption repair remains a service-only export with no UI/REST/MCP entry points.
+The requested legacy sweep is absent; additional missing mapping rows cannot be
+inferred from it. Supply the report and implemented lane commits for reconciliation.
 
 ## Key-authenticated REST v1
 
@@ -52,15 +70,16 @@ Mocked route/host tests are not a live key/client verification of every tool.
   and `deletePublishingPost`, as do session REST; REST v1 create forwards exact
   `CREATE POST` consent to that boundary (`acb56bd7`). The old no-confirmation
   claim is superseded. Preserve actual lifecycle/scope and live evidence limits.
-- Reconcile Agency workspace switching (REST switch versus MCP confirmation) and
-  Sharing copy-only save policy with the binding service contract.
+- Fix AppShell workspace picker to send the service-required confirmation. Agency
+  service/MCP/REST now share exact consent; Sharing copy-only saves are confirmed.
 - Root service-boundary gaps from the 2026-10-21 exception closure are closed at
   source (`46c6bdae`; see the update below); verify in PostgreSQL and with a real
   installation-session MCP client.
-- Ads `ad.create`: the ledger operation-kind migration exists (round 8) and is
-  recorded applied in production; still open are the live `ads_management` grant,
-  passing the customer locale from Ads REST/MCP entry points into the shared
-  service scope, and a channel-scope check in recovery. No MCP client run.
+- Ads ad.create migration is authored and recorded applied historically; verify
+  current receipts plus the new ads_objects migration/rehearsal and data controls.
+  Service locale is integrated. Recovery rechecks current authority/scope under
+  lock; creation-only unrestricted-channel policy still needs reconciliation.
+  Owner reports live create/rename/delete in Ads Manager, without an MCP receipt.
 - Round 7–8 reports (Published posts, Top post content) run through the existing
   confirmed report-generation tools/routes; no new tool names or MCP surface.
   Mocked evidence only.
@@ -144,8 +163,8 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | create_ad_set | ads/campaigns | write | POST /api/ads/adsets | Shared customer operation; transport arguments may differ. |
 | update_ad | ads/campaigns | write | POST /api/ads/actions | Shared customer operation; transport arguments may differ. |
 | compare_ads_performance | ads/compare | read | GET /api/ads/compare | Shared customer operation; transport arguments may differ. |
-| list_ads_objects | ads/objects | read | GET /api/ads/directory | Shared customer operation; transport arguments may differ. |
-| get_ads_object | ads/objects | read | GET /api/ads/directory | GET directory with object identity; stored object detail, distinct from live status. |
+| list_ads_objects | ads/objects | read | GET /api/ads/directory | Objects UI, REST and MCP share directory service; includes inventory without delivery, with current account/tenant scope. |
+| get_ads_object | ads/objects | read | GET /api/ads/directory | Objects UI/REST/MCP share scoped detail including inventory-only identity and empty daily series; distinct from live status. |
 | get_ads_management_options | ads/campaigns | read | GET /api/ads/management | Shared customer operation; transport arguments may differ. |
 | get_ads_creative_image | ads/campaigns | read | GET /api/ads/management | Shared customer operation; transport arguments may differ. |
 | list_ads_creative_sources | ads/campaigns | read | GET /api/ads/management | Shared customer operation; transport arguments may differ. |
