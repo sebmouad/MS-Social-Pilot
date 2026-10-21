@@ -1,3 +1,4 @@
+import { storeInboxMetadata } from '@/modules/inbox/server/metadata';
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
 import { redact } from '@/server/root/legacy/authz';
 import { randomUUID } from 'node:crypto';
@@ -437,12 +438,14 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
               update: { snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: now },
               select: { id: true },
             });
+            if ('metadata' in conversation) await storeInboxMetadata(tx, { workspaceId: target.workspaceId, targetId: target.id }, 'conversation', stored.id, (conversation as { metadata?: unknown }).metadata);
             for (const message of conversation.messages) {
-              await tx.conversationMessage.upsert({
+              const storedMessage = await tx.conversationMessage.upsert({
                 where: { conversationId_remoteId: { conversationId: stored.id, remoteId: message.id } },
                 create: { id: `rebuild_${randomUUID()}`, conversationId: stored.id, remoteId: message.id, fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
                 update: { fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
               });
+              if ('metadata' in message) await storeInboxMetadata(tx, { workspaceId: target.workspaceId, targetId: target.id }, 'message', storedMessage.id, (message as { metadata?: unknown }).metadata);
               targetUpdated++;
             }
             targetUpdated++;
@@ -450,11 +453,12 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
           for (const batch of currentCommentBatches) for (const comment of orderInboxCommentBatch(batch.comments)) {
             signal.throwIfAborted();
             if (await inboxCommentSuppressed(tx, target.workspaceId, target.id, comment.id, comment.parentId)) continue;
-            await tx.postComment.upsert({
+            const storedComment = await tx.postComment.upsert({
               where: { postTargetId_remoteId: { postTargetId: batch.postTargetId, remoteId: comment.id } },
               create: { id: `rebuild_${randomUUID()}`, postTargetId: batch.postTargetId, remoteId: comment.id, parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, createdTime: comment.createdAt, fetchedAt: now },
               update: { parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, fetchedAt: now },
             });
+            if ('metadata' in comment) await storeInboxMetadata(tx, { workspaceId: target.workspaceId, targetId: target.id }, 'comment', storedComment.id, (comment as { metadata?: unknown }).metadata);
             targetUpdated++;
           }
           await fetched.recheck(signal);

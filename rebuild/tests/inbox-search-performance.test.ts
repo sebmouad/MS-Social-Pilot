@@ -57,13 +57,17 @@ describe('Inbox search query budget', () => {
     expect(first.total).toBe(96);
     expect(first.olderCursor).toBeTruthy();
     expect(first.newerCursor).toBeNull();
-    expect(mocks.query).toHaveBeenCalledTimes(3);
+    // One metadata read for the whole authorized page, rather than one per item.
+    expect(mocks.query).toHaveBeenCalledTimes(4);
+    const metadataQuery = mocks.query.mock.calls[3]![0] as { text: string; values: unknown[] };
+    expect(metadataQuery.text).toContain('"inboxMetadata" AS metadata');
+    expect(metadataQuery.values.filter(value => String(value).startsWith('conversation-'))).toHaveLength(25);
     expect(mocks.conversations).toHaveBeenCalledTimes(1);
     expect(mocks.conversations.mock.calls[0]![0].where.id.in).toHaveLength(25);
     page = [];
     const pastEnd = await readInboxList(actor, { q: 'matching', cursor: first.olderCursor! });
     expect(pastEnd).toMatchObject({ total: 96, items: [] });
-    expect(mocks.query).toHaveBeenCalledTimes(6);
+    expect(mocks.query).toHaveBeenCalledTimes(7);
     expect(mocks.conversations).toHaveBeenCalledTimes(1);
   });
 });

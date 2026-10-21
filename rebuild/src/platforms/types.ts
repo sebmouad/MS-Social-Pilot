@@ -146,6 +146,20 @@ export interface RemoteRescheduleRequest {
 }
 export interface InboxRequest { credential: PlatformCredential; targetId: string }
 export interface InboxCommentsRequest extends InboxRequest { remotePostId: string }
+/** Optional provider observations. An absent field means unknown/unread, not an empty result. */
+export interface InboxParticipant { id: string | null; name: string | null; pictureUrl?: string | null }
+export interface InboxAttachment { type: string | null; url: string | null }
+export interface InboxReaction { type: string; count: number }
+export interface InboxMetadata {
+  authorPictureUrl?: string | null;
+  attachments?: InboxAttachment[];
+  reactions?: InboxReaction[];
+  permalink?: string | null;
+  threadId?: string | null;
+  participants?: InboxParticipant[];
+  labels?: Array<{ id: string; name: string | null }>;
+  folder?: string | null;
+}
 export interface InboxItem {
   id: string;
   text: string;
@@ -156,6 +170,7 @@ export interface InboxItem {
   authorId?: string | null;
   authorName?: string | null;
   kind?: 'comment' | 'message';
+  metadata?: InboxMetadata;
 }
 /** A public review or recommendation left on a channel. Rating is 1 to 5 when the provider uses stars; recommendation covers providers that use a yes/no recommendation instead. */
 export interface InboxReview {
