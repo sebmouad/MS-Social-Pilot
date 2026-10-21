@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/server/config/store', () => ({runtimeConfig:vi.fn()}));
 import { DEFAULT_REPORT_UI_POLICY, REPORT_UI_POLICY_SCHEMA } from '../src/modules/analytics/report-ui-config';
+import { errorCopyDefaults } from '../src/modules/analytics/error-copy';
 import { runtimeConfig } from '../src/server/config/store';
 import { loadReportUiPolicy } from '@/modules/analytics/server/report-ui-policy';
 
@@ -24,7 +25,7 @@ describe('Root-managed Reports presentation policy',()=>{
     expect((await loadReportUiPolicy()).sectionOptions.map(item=>item.id)).toEqual(parsed.sectionOptions.map(item=>item.id).filter(id=>id!=='aiRecap'));
     expect((await loadReportUiPolicy()).rangeOptions).toEqual(parsed.rangeOptions);
     expect(runtimeConfig).toHaveBeenCalledWith('analytics.reports.ui');
-    vi.mocked(runtimeConfig).mockResolvedValue({} as never);
+    vi.mocked(runtimeConfig).mockImplementation((async (key: string) => key === 'analytics.errorCopy' ? errorCopyDefaults : {}) as never);
     await expect(loadReportUiPolicy()).rejects.toMatchObject({code:'unavailable'});
   });
 });

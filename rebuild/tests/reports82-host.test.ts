@@ -1,8 +1,9 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
+import {errorCopyDefaults} from '../src/modules/analytics/error-copy';
 const state=vi.hoisted(()=>({ports:null as any,delivery:true,jobs:true,smtp:true,target:{id:'channel-a',socialAccount:{provider:'test-provider'}} as any}));
 const mocks=vi.hoisted(()=>({register:vi.fn(),generator:vi.fn(),limits:vi.fn(),send:vi.fn(),owners:vi.fn(),purge:vi.fn(),due:vi.fn(),find:vi.fn(),workspace:vi.fn(),templates:vi.fn()}));
 vi.mock('@/server/data',()=>({prisma:{$queryRaw:mocks.workspace,target:{findFirst:mocks.find}}}));
-vi.mock('@/server/config/store',()=>({runtimeConfig:async(key:string)=>key==='jobs.enabled'?state.jobs:key==='analytics.reports.deliveryEnabled'?state.delivery:key==='analytics.defaultRangeDays'?30:key==='analytics.maxRangeDays'?366:undefined}));
+vi.mock('@/server/config/store',()=>({runtimeConfig:async(key:string)=>key==='analytics.errorCopy'?errorCopyDefaults:key==='jobs.enabled'?state.jobs:key==='analytics.reports.deliveryEnabled'?state.delivery:key==='analytics.defaultRangeDays'?30:key==='analytics.maxRangeDays'?366:undefined}));
 vi.mock('@/server/mail',()=>({mailReady:async()=>state.smtp,sendTransactionalMail:mocks.send}));
 vi.mock('@/server/jobs/access',()=>({assertWorkspaceJobAccess:mocks.owners}));
 vi.mock('@/server/data-control/guard',()=>({assertWorkspaceNotPurging:mocks.purge}));
