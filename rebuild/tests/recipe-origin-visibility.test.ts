@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: db }));
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('origin=recipe'), usePathname: () => '/publishing/calendar' }));
 
 import { loadPostOrigins, originFilterOptions, parseOriginFilter } from '../src/modules/publishing/ui/origins/load';
 import { safeOriginUrl, type PostOriginProvider } from '../src/modules/publishing/ui/origins/post-origin';
@@ -12,6 +13,10 @@ import { recipePostOrigin } from '../src/modules/feeds/ui/post-origin';
 import { originText, recipeOriginCopy } from '../src/modules/feeds/ui/origin-copy';
 import { RecipeStatusCard } from '../src/modules/feeds/ui/RecipeStatusCard';
 import { loadRecipeStatus } from '../src/modules/feeds/ui/recipe-status';
+import { feedsCopy, feedsText } from '../src/modules/feeds/copy';
+import { FEEDS_CONFIG } from '../src/modules/feeds/config';
+import { WORDPRESS_BOUNDS, WORDPRESS_DEFAULTS } from '../src/modules/feeds/wordpress/config';
+import { CalendarFilters } from '../src/modules/publishing/ui/calendar/CalendarFilters';
 import type { RecipeStatus } from '../src/modules/feeds/ui/recipe-status';
 
 const provider = (overrides: Partial<PostOriginProvider> = {}): PostOriginProvider => ({
@@ -73,7 +78,8 @@ describe('recipe provider', () => {
 
   it('has the same keys in English and French', () => {
     expect(Object.keys(recipeOriginCopy.fr).sort()).toEqual(Object.keys(recipeOriginCopy.en).sort());
-    expect(originText('fr', 'failuresDetail', { failed: 2, uncertain: 1 })).toBe('2 en échec, 1 à contrôler');
+    expect(feedsText('fr', 'recipeStatusProblemsDetail', { failed: 2, uncertain: 1 })).toBe('2 en échec, 1 à contrôler');
+    expect(originText('fr', 'badge')).toBe('Recette');
   });
 });
 
@@ -132,13 +138,41 @@ describe('recipe status', () => {
       .mockResolvedValueOnce([{ state: 'failed', count: BigInt(2) }, { state: 'uncertain', count: BigInt(1) }]);
     const now = new Date('2026-10-21T10:00:00Z');
     const status = await loadRecipeStatus({
-      workspaceId: 'w1', source: { id: 's1', enabled: true, lastRunAt: null, config: { timezone: 'UTC', horizonDays: 7 } }, available: true, pool: null, upcomingLimit: 5, allowedTargetIds: ['t1'], now,
+      workspaceId: 'w1', source: { id: 's1', enabled: true, lastRunAt: null, config: { timezone: 'UTC', horizonDays: 7 } }, available: true, pool: null, upcomingLimit: 5, failureWindowDays: 3, allowedTargetIds: ['t1'], now,
     });
     expect(status).toMatchObject({ state: 'active', publishedToday: 3, failed: 2, uncertain: 1, pool: null });
     expect(status.upcoming).toEqual([{ slotAt: '2026-10-21T18:00:00.000Z', targetName: 'Page One', title: 'Soup' }]);
     const published = db.$queryRaw.mock.calls[1]!.slice(1);
     expect(published).toContainEqual(new Date('2026-10-21T00:00:00.000Z'));
     expect(published).toContainEqual(new Date('2026-10-22T00:00:00.000Z'));
-    expect(db.$queryRaw.mock.calls[2]!.slice(1)).toContainEqual(new Date('2026-10-14T10:00:00.000Z'));
+    expect(db.$queryRaw.mock.calls[2]!.slice(1)).toContainEqual(new Date('2026-10-18T10:00:00.000Z'));
+    expect(db.$queryRaw.mock.calls[0]!.slice(1)).toContain(5);
+  });
+
+  it('reads its text from the Root feeds.copy catalog and keeps both languages in step', () => {
+    const catalog = { en: { ...feedsCopy.en, recipeStatusTitle: 'Custom title' }, fr: { ...feedsCopy.fr, recipeStatusTitle: 'Titre perso' } };
+    expect(renderToStaticMarkup(h(RecipeStatusCard, { status: base, locale: 'en', copy: catalog }))).toContain('Custom title');
+    expect(renderToStaticMarkup(h(RecipeStatusCard, { status: base, locale: 'fr', copy: catalog }))).toContain('Titre perso');
+    const keys = (lang: 'en' | 'fr') => Object.keys(feedsCopy[lang]).filter(key => key.startsWith('recipeStatus')).sort();
+    expect(keys('fr')).toEqual(keys('en'));
+    expect(keys('en').length).toBeGreaterThan(10);
+  });
+
+  it('declares dedicated Root settings for the slot count and the problem window', () => {
+    const keys = FEEDS_CONFIG.map(item => item.key);
+    expect(keys).toContain('feeds.wordpress.statusUpcomingCount');
+    expect(keys).toContain('feeds.wordpress.statusFailureWindowDays');
+    expect(WORDPRESS_DEFAULTS.statusUpcomingCount).toBeGreaterThanOrEqual(WORDPRESS_BOUNDS.statusUpcomingCount.min);
+    expect(WORDPRESS_DEFAULTS.statusFailureWindowDays).toBeLessThanOrEqual(WORDPRESS_BOUNDS.statusFailureWindowDays.max);
+  });
+});
+
+describe('calendar origin filter', () => {
+  it('offers the Created by choice only when origins exist and keeps the selection', () => {
+    expect(renderToStaticMarkup(h(CalendarFilters, { channels: [], today: '2026-10-21' }))).not.toContain('name="origin"');
+    const html = renderToStaticMarkup(h(CalendarFilters, { channels: [], today: '2026-10-21', locale: 'fr', origins: [{ kind: 'recipe', label: 'Automatisation des recettes' }] }));
+    expect(html).toContain('name="origin"');
+    expect(html).toContain('Créé par');
+    expect(html).toContain('value="recipe"');
   });
 });

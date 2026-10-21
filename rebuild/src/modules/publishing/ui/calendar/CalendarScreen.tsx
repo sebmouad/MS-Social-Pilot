@@ -13,13 +13,13 @@ import { channelBadgeInfo } from "@/lib/channel-badge";
 import { formatPostPreviewTime } from "@/components/PostPreview";
 import { moveCandidates } from "@/lib/reschedule";
 import { CalendarBoard } from "./CalendarBoard";
-import { loadPostOrigins } from "../origins/load";
+import { loadPostOrigins, parseOriginFilter } from "../origins/load";
 import { runtimeConfig } from '@/server/config/store';
 import type { BoardDay, BoardPost } from "./types";
 import styles from "./calendar.module.css";
 import { postContentSummary } from '@/modules/publishing/content-summary';
 
-type Params = { view?: string; date?: string; month?: string; channel?: string; status?: string };
+type Params = { view?: string; date?: string; month?: string; channel?: string; status?: string; origin?: string };
 const STATUSES = ["draft", "pending_approval", "rejected", "scheduled", "publishing", "published", "partially_failed", "failed", "cancelled"] as const;
 const MANAGERS = new Set(["owner", "admin", "editor"]);
 const DAY = 24 * 60 * 60 * 1000;
@@ -45,6 +45,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const anchor = isDateKey(params.date) ? params.date : month ? (month === today.slice(0, 7) ? today : `${month}-01`) : today;
 
   const channelId = params.channel || undefined;
+  const originKind = parseOriginFilter(params.origin);
   const status = (STATUSES as readonly string[]).includes(params.status ?? "") ? params.status as (typeof STATUSES)[number] : undefined;
 
   // The days on screen: a whole month grid (weeks start on the workspace's first weekday) or one week.
@@ -58,9 +59,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   const from = new Date(utcNoon(keys[0]!).getTime() - 2 * DAY);
   const to = new Date(utcNoon(keys[keys.length - 1]!).getTime() + 2 * DAY);
-  const { posts, channels, channelUnavailable } = await readPublishingCalendar({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { from, to, channelId, status });
+  const { posts: visiblePosts, channels, channelUnavailable } = await readPublishingCalendar({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { from, to, channelId, status });
 
-  const origins = await loadPostOrigins(viewer.workspaceId, posts.map(post => post.id), locale);
+  const origins = await loadPostOrigins(viewer.workspaceId, visiblePosts.map(post => post.id), locale);
+  // The origin filter narrows the already authorized read; it never widens it.
+  const posts = originKind ? visiblePosts.filter(post => origins.get(post.id)?.kind === originKind) : visiblePosts;
   const canEditCalendar = canAccessFeature(viewer.permissions, "publishing/calendar", "write");
   const canCreate = canAccessFeature(viewer.permissions, "publishing/posts", "write");
   const byDay = new Map<string, BoardPost[]>();
@@ -102,7 +105,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     posts: (byDay.get(key) ?? []).sort((a, b) => a.whenIso.localeCompare(b.whenIso)),
   }));
 
-  const filterQuery = `${channelId ? `&channel=${encodeURIComponent(channelId)}` : ""}${status ? `&status=${status}` : ""}`;
+  const filterQuery = `${channelId ? `&channel=${encodeURIComponent(channelId)}` : ""}${status ? `&status=${status}` : ""}${originKind ? `&origin=${encodeURIComponent(originKind)}` : ""}`;
   const href = (nextView: string, date: string) => `/publishing/calendar?view=${nextView}&date=${date}${filterQuery}`;
   const previous = view === "week" ? addDaysToKey(gridStart, -7) : `${adjacentCalendarMonth(selected.year, selected.month, -1)}-01`;
   const next = view === "week" ? addDaysToKey(gridStart, 7) : `${adjacentCalendarMonth(selected.year, selected.month, 1)}-01`;
