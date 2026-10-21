@@ -5,6 +5,7 @@ import { runtimeConfigBatch } from '@/server/config/store';
 import { FACEBOOK_METRIC_LABEL_DEFAULTS, FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS } from './config';
 import { facebookInsightCategories } from './data-normalization';
 import { prisma } from '@/server/data';
+import { Prisma } from '../../../generated/client';
 import { readFacebookPostPerformance } from './post-performance';
 import { readFacebookGoalMeasures } from './goals';
 import { readFacebookDestinationMeasures } from './destination-measures';
@@ -22,8 +23,31 @@ export function facebookMetricLabel(key: string): string | undefined {
   return metricNames[key] ?? (FACEBOOK_METRIC_LABEL_DEFAULTS as Record<string, { en: string; fr: string }>)[key]?.en;
 }
 
+const sentence = (text: string) => text.replace(/[._]+/g, ' ').trim().replace(/^\w/, c => c.toUpperCase());
+
+type LabelCatalog = Record<string, { en: string; fr: string }>;
+
+/**
+ * Readable name for a stored key: an Ads action (`actions:onsite_conversion.post_net_like`,
+ * `cost_per_action_type:link_click`) or a plain field. Catalog entries (shipped, then Root-saved)
+ * win; action types use `action:<type>` entries; unknown types fall back to a sentence-cased name.
+ */
+export function facebookAdLabel(key: string, catalog: LabelCatalog = FACEBOOK_METRIC_LABEL_DEFAULTS, locale: 'en' | 'fr' = 'en'): string {
+  const known = (name: string) => catalog[name]?.[locale] ?? (locale === 'en' ? metricNames[name] : undefined);
+  const exact = known(key);
+  if (exact) return exact;
+  const cut = key.indexOf(':');
+  if (cut > 0) {
+    const head = key.slice(0, cut), tail = key.slice(cut + 1);
+    const action = tail.split(':').map(part => known(`action:${part}`) ?? known(part) ?? sentence(part.replace(/^(onsite_conversion|offsite_conversion)\./, ''))).join(' · ');
+    const prefix = head === 'actions' ? undefined : known(head) ?? sentence(head);
+    return prefix ? `${action} · ${prefix}` : action;
+  }
+  return sentence(key.replace(/^page_/, ''));
+}
+
 function facebookLabel(key: string): string {
-  return facebookMetricLabel(key) ?? key.replace(/^page_/, '').replace(/[:_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return facebookAdLabel(key);
 }
 
 export function facebookPageMetricKind(key: string): AnalyticsKind {
@@ -51,13 +75,13 @@ const object = (value: unknown): Record<string, unknown> => value && typeof valu
 const dayKey = (date: Date) => date.toISOString().slice(0, 10);
 const overlappingPeopleNote = 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.';
 
-type PagePresentation = { locale?: 'en' | 'fr'; metricLabels?: Record<string, { en: string; fr: string }>; pageCopy?: typeof FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS };
+type PagePresentation = { locale?: 'en' | 'fr'; metricLabels?: Record<string, { en: string; fr: string }>; pageCopy?: Record<'en' | 'fr', Omit<(typeof FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS)['en'], 'postSeries' | 'postSeriesNote'> & { postSeries?: string; postSeriesNote?: string }> };
 
 function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: PageRow[], audienceAsOf?: Date, presentation: PagePresentation = {}): { metrics: AnalyticsMetricInput[]; audience: AnalyticsAudienceEntry[] } {
   const locale = presentation.locale ?? 'en';
   const copy = (presentation.pageCopy ?? FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS)[locale];
   const labels = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...presentation.metricLabels } as Record<string, { en: string; fr: string }>;
-  const label = (key: string) => labels[key]?.[locale] ?? facebookLabel(key);
+  const label = (key: string) => labels[key]?.[locale] ?? facebookMetricLabel(key) ?? key.replace(/^page_/, '').replace(/[:_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   const groups = new Map<string, PageRow[]>();
   for (const row of rows) { const key = `${row.metric}::${row.period ?? 'day'}`; const group = groups.get(key) ?? []; group.push(row); groups.set(key, group); }
   const metrics: AnalyticsMetricInput[] = [];
@@ -94,16 +118,54 @@ function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: P
   return { metrics, audience };
 }
 
+type PostRow = { createdTime: Date; insights: unknown; insightsSyncedAt: Date | null; target: { id: string; name: string } };
+
+/**
+ * Page-level series built from synced post insights, for Pages whose own Page insights are missing or sparse.
+ * A post's insight is a lifetime total as of its last sync, so each value is attributed to the day the post was
+ * published ("posts published that day"), never to the day the views happened. Posts without a stored value
+ * stay unknown. Non-additive measures (people reached/viewed) carry the overlap note.
+ */
+function postInputs(rows: PostRow[], selected: FacebookTarget[], presentation: PagePresentation = {}): AnalyticsMetricInput[] {
+  const locale = presentation.locale ?? 'en';
+  const copy = { ...FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS[locale], ...(presentation.pageCopy?.[locale] ?? {}) };
+  const labels = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...presentation.metricLabels } as LabelCatalog;
+  const series = new Map<string, { observations: AnalyticsObservation[]; syncedAt: Date }>();
+  for (const row of rows) {
+    const insights = object(row.insights);
+    for (const [key, raw] of Object.entries(insights)) {
+      const value = typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
+      if (value === null || facebookIdentifierField(key)) continue;
+      const entry = series.get(key) ?? { observations: [], syncedAt: new Date(0) };
+      entry.observations.push({ date: new Date(`${dayKey(row.createdTime)}T00:00:00Z`), channelId: row.target.id, channelLabel: row.target.name, value });
+      if (row.insightsSyncedAt && row.insightsSyncedAt > entry.syncedAt) entry.syncedAt = row.insightsSyncedAt;
+      series.set(key, entry);
+    }
+  }
+  return [...series].map(([key, { observations, syncedAt }]) => {
+    const covered = [...new Set(observations.map(item => item.channelId))].sort();
+    const overlapping = /unique|reach/.test(key);
+    return {
+      key: `post:${key}`, label: `${labels[key]?.[locale] ?? facebookAdLabel(key, labels, locale)} · ${copy.postSeries}`, sourceLabel: copy.source, kind: 'flow', unit: 'count', observations,
+      aggregationNote: overlapping ? `${copy.postSeriesNote} ${copy.overlap}` : copy.postSeriesNote,
+      coveredResourceIds: covered, available: selected.length, covered: covered.length, updatedAt: syncedAt, latestAt: new Date(Math.max(...observations.map(item => item.date.getTime()))),
+    } satisfies AnalyticsMetricInput;
+  });
+}
+
 type SelectedAdAccount = AnalyticsAdAccount;
 type ExtraValue = { observation: AnalyticsObservation; sourcePriority: number };
 
-function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): AnalyticsMetricInput[] {
+function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presentation: PagePresentation = {}): AnalyticsMetricInput[] {
+  const adCatalog = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...presentation.metricLabels } as LabelCatalog;
+  const facebookLabel = (key: string) => facebookAdLabel(key, adCatalog, presentation.locale ?? 'en');
+  const facebookMetricLabel = facebookLabel;
   const metrics: AnalyticsMetricInput[] = [];
   const byCurrency = new Map<string, AdRow[]>();
   for (const row of rows) { const currency = row.adAccount.currency ?? ''; const group = byCurrency.get(currency) ?? []; group.push(row); byCurrency.set(currency, group); }
   const availableForCurrency = (currency: string) => selectedAdAccounts.filter(account => (account.currency ?? '') === currency).length;
   const currencyKey = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => unit === 'currency' ? `${key}::${currency || 'unknown-currency'}` : key;
-  const currencyLabel = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => `${facebookMetricLabel(key) ?? facebookLabel(key)}${unit === 'currency' ? ` · ${currency || 'Unknown currency'}` : ''}`;
+  const currencyLabel = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => `${facebookLabel(key)}${unit === 'currency' ? ` · ${currency || 'Unknown currency'}` : ''}`;
   const latestSync = (source: AdRow[]) => source.length ? new Date(Math.max(...source.map(row => row.fetchedAt.getTime()))) : null;
   const extraUnit = (key: string, currency: string): AnalyticsMetricInput['unit'] => {
     const known = facebookAdMetricUnit(key, currency || null);
@@ -245,11 +307,11 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
     const latest = [...accounts.values()];
     if (values.size) metrics.push({ key: extras.has(key) ? `${key}::breakdown` : key, label: `${facebookLabel(key)} · Categories`, sourceLabel: 'Advertising', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...accounts.keys()].sort(), available: selectedAdAccounts.length, covered: accounts.size, latestAt: new Date(Math.max(...latest.map(item => item.date.getTime()))), updatedAt: new Date(Math.max(...latest.map(item => item.fetchedAt.getTime()))) });
   }
-  return [...metrics, ...deliveryBreakdownInputs(rows, selectedAdAccounts)].map(metric => ({ ...metric, resourceKind: 'ad-account' }));
+  return [...metrics, ...deliveryBreakdownInputs(rows, selectedAdAccounts, facebookLabel)].map(metric => ({ ...metric, resourceKind: 'ad-account' }));
 }
 
 /** Delivery dimensions retain daily/account/currency identity and never enter account totals. */
-function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[]): AnalyticsMetricInput[] {
+function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[], facebookLabel: (key: string) => string): AnalyticsMetricInput[] {
   const groups = new Map<string, { field: string; currency: string; history: NonNullable<AnalyticsMetricInput['breakdownHistory']> }>();
   for (const row of rows) {
     const payload = object(row.fields).delivery_breakdowns;
@@ -300,9 +362,9 @@ function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[]): 
 }
 
 /** Pure mapper kept at the Facebook boundary so stored-row semantics can be tested without storage. */
-export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienceRows: PageRow[]; adRows: AdRow[]; selectedTargets: FacebookTarget[]; selectedAdAccounts: SelectedAdAccount[]; audienceAsOf?: Date } & PagePresentation) {
+export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienceRows: PageRow[]; adRows: AdRow[]; postRows?: PostRow[]; selectedTargets: FacebookTarget[]; selectedAdAccounts: SelectedAdAccount[]; audienceAsOf?: Date } & PagePresentation) {
   const page = pageInputs(input.pageRows, input.selectedTargets, input.audienceRows, input.audienceAsOf, input);
-  return { metrics: [...page.metrics, ...adInputs(input.adRows, input.selectedAdAccounts)], audienceEntries: page.audience, audienceSelected: input.selectedTargets.length };
+  return { metrics: [...page.metrics, ...postInputs(input.postRows ?? [], input.selectedTargets, input), ...adInputs(input.adRows, input.selectedAdAccounts, input)], audienceEntries: page.audience, audienceSelected: input.selectedTargets.length };
 }
 
 /** Facebook-only adapter from the legacy Page and Ads tables to provider-neutral analytics inputs. */
@@ -337,8 +399,18 @@ export const facebookAnalyticsHost = {
       selectedAdAccountIds.length ? prisma.adInsight.findMany({ where: { adAccount: { workspaceId: request.workspaceId, id: { in: selectedAdAccountIds }, ...(adTargetCeiling === undefined ? {} : { socialAccountId: { in: socialAccountIds } }), enabled: true, socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, level: 'account', date: { gte: request.range.from, lte: request.range.to } }, orderBy: [{ date: 'asc' }], select: { date: true, spend: true, impressions: true, clicks: true, reach: true, cpc: true, cpm: true, cpp: true, ctr: true, frequency: true, actions: true, fields: true, fetchedAt: true, adAccount: { select: { id: true, name: true, currency: true } } } }) : Promise.resolve([]),
     ]);
     const selectedAdAccounts = adAccounts.filter(account => selectedAdAccountIds.includes(account.id));
-    const [presentation, locale] = await Promise.all([runtimeConfigBatch(['meta.metricLabels', 'meta.pageAnalyticsCopy']), analyticsLanguage()]);
-    const normalized = normalizeFacebookAnalytics({ locale, metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
+    const [presentation, locale] = await Promise.all([runtimeConfigBatch(['meta.metricLabels', 'meta.pageAnalyticsCopy', 'meta.postSeriesMaxPosts']), analyticsLanguage()]);
+    // Synced post insights give a Page-level series when Page insights are missing or sparse; same workspace, selection and date bounds.
+    const postRows = targetIds.length ? (await prisma.$queryRaw<Array<{ targetId: string; targetName: string; createdTime: Date; insights: unknown; insightsSyncedAt: Date }>>(Prisma.sql`
+      SELECT ep."targetId", t.name AS "targetName", ep."createdTime", ep.insights, ep."insightsSyncedAt"
+      FROM external_posts ep JOIN targets t ON t.id = ep."targetId"
+      JOIN social_accounts sa ON sa.id = t."socialAccountId"
+      WHERE ep."targetId" IN (${Prisma.join(targetIds)}) AND t."workspaceId" = ${request.workspaceId} AND t.type = 'page'
+        AND sa."workspaceId" = ${request.workspaceId} AND sa.provider = 'facebook' AND sa."invalidatedAt" IS NULL
+        AND ep."createdTime" >= ${request.range.from} AND ep."createdTime" <= ${request.range.to} AND ep."insightsSyncedAt" IS NOT NULL
+      ORDER BY ep."createdTime" DESC LIMIT ${presentation['meta.postSeriesMaxPosts'] as number}`))
+      .map(row => ({ createdTime: row.createdTime, insights: row.insights, insightsSyncedAt: row.insightsSyncedAt, target: { id: row.targetId, name: row.targetName } }) satisfies PostRow) : [];
+    const normalized = normalizeFacebookAnalytics({ locale, postRows: postRows as PostRow[], metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
     return { targets: visible.map(({ socialAccountId: _socialAccountId, providerId: _pageId, ...target }) => ({ ...target, providerId: FACEBOOK_PLATFORM_ID })), selectedTargets: selectedTargets.map(({ socialAccountId: _socialAccountId, providerId: _pageId, ...target }) => ({ ...target, providerId: FACEBOOK_PLATFORM_ID })), adAccounts, selectedAdAccountIds, ...normalized };
   },
 };

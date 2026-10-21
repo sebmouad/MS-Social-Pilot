@@ -1,8 +1,11 @@
 # Shared agent handoff
 
-Updated 2026-10-21 against local HEAD `ffdb1cdf` (round 9), reviewing current
-source, round 7–9 diffs and dated release/browser records. This supersedes the
-`960831df` continuation. The contract is unchanged; the full goal remains active.
+Updated 2026-10-21 against local HEAD `a910d774` (rounds 10–12 appended after
+round 9 below; deployed release recorded as `a910d774`, schema **120**, an
+owner/integrator statement not re-observed here). Earlier text reviewed `ffdb1cdf`
+and where it names `ffdb1cdf`/118 as current, the rounds 10–12 section supersedes
+it. Reviewed source, round 7–12 diffs and dated release/browser records. This
+supersedes the `960831df` continuation. The contract is unchanged; the full goal remains active.
 No fresh database, browser, provider or production observation was made by this
 documentation worker; production facts below are owner/integrator records.
 
@@ -255,6 +258,66 @@ no fresh browser, PostgreSQL or live-provider verification by this lane):
   `facebook-metric-config`, `facebook-analytics-selection`,
   `facebook-post-history`, `root-config-authority`, `report-link-details*`.
   No new screen, route, MCP tool or migration for these report details.
+
+## Rounds 10–12 (HEAD `a910d774`; schema 120)
+
+Evidence kinds are labelled per item. Nothing here is a fresh database, browser
+or provider run by this documentation lane.
+
+- **Round 10 (`75923335`, schema 119; source/unit):** Facebook Page insight
+  metric resolution before transport construction
+  (`configuredFacebookPageInsightMetrics`, `page-insights.ts`; the `.metrics`
+  projection gap in item 7 of the next actions is not shown closed here), media
+  rename REST (`/api/media-library/[id]`), feed preview disclosure and
+  reviewer notices (new active key `feeds.approvalNotificationsEnabled`, default
+  true; the local queued count is not SMTP delivery), Publishing/Settings
+  polish, and the Published-posts weekday/hour/attempt distributions (typed fields
+  inside `analytics.reports.publicationDetails`, no new key; see
+  `PUBLICATION_DISTRIBUTIONS.md`).
+- **Round 11 (`d6ff1f17`, schema 120; source/unit/mocked):** new Root keys
+  `feeds.wordpress.reuseEnabled` (false) and `feeds.wordpress.reuseCooldownDays`
+  (365) with the shared recipe supply view (details in FEEDS.md), supply card and
+  warning, Ads/Home/Root polish, and `mcp-scope-feeds-service` /
+  `mcp-scope-host-matrix` scoped-key tests (mocked ports; not a real MCP client).
+  `RecipeSupplyCard` is built; mounting it on Home was a stated integration need.
+  Confirm that mount before claiming the Home warning.
+- **Live-defect fixes (source plus regression tests; fakes):**
+  - `806a0ef5`: the Facebook analytics target reported the remote Page id as the
+    provider id, so the host lookup failed and no channel had post performance.
+    The target now reports the platform id. `6e111754`: the post explorer also
+    reads synced insights for posts the application published.
+  - `a47a339c`: Analytics no longer lists identifier-like metrics; the post
+    explorer is lighter with local dates (`facebook-analytics-live-defects`,
+    `analytics-posts-table-live-defects`). Whether production now shows post
+    performance has not been observed by this lane; the owner should confirm.
+- **Facebook OAuth (`c0e5386a`; source/unit):** callback checks, redirects and the
+  secure state cookie use the Root public origin (`app.publicOrigin`), not
+  `request.url`, which is the internal listener behind the proxy and had sent
+  browsers to localhost. **Reconnect is pending the owner's retry**; there is no
+  recorded successful connection after the fix.
+- **Recipe captions (`a47a339c`, `a910d774`; unit/mocked):** WordPress caption
+  text decodes the HTML5 named catalog and numeric references once and keeps
+  U+00A0/U+202F. The caption plugin stores a C0 control (seen U+0016) where French
+  typography needs U+202F, and Facebook rendered it as `0`. `stripCaptionControls`
+  maps such controls before `? ! : ; »` (and after `«`) to U+202F and drops other
+  C0 controls. Seven WordPress captions were affected (owner/integrator record).
+  One already-published post is kept as it is; the audited preview/apply repair
+  service (`caption-repair.ts`, `CAPTION_REPAIR.md`; owner/admin, dry-run receipt
+  then exact confirmation, planned/never-attempted posts only) cannot and does not
+  edit published content. The repair outcome for the other six is not recorded
+  here: confirm each stored caption privately without logging the text. The
+  independent RSS decoder in `feeds.ts` still maps `&nbsp;` to an ordinary space.
+- **Browser lane, round 6 (partial; harness only):** the lane hung. `d24fcd40`
+  holds the matrix script changes (WebKit on macOS uses Option+Tab so links and
+  buttons are reachable; end-of-tab-order detection replaces the false "trap" in
+  Firefox/WebKit headless; layout-settled focus measurement), a date/time input
+  focus ring in `tokens.css` and `browser-matrix-round6` jsdom tests. No matrix
+  was completed, so rounds 6–12 have no browser result and the round 5 findings
+  stay unrerun. A stray local `premium-audit.json` was untracked in `7095d92b`;
+  keep it out of Git.
+- **Production-side facts (owner/integrator, not re-observed):** deployed
+  `a910d774`, schema 120. The migration receipts and the proxy cutback gaps in
+  the next actions still apply.
 
 ## Browser evidence, not an all-green gate
 

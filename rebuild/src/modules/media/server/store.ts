@@ -3,13 +3,14 @@ import { lstat, mkdir, open, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { runtimeConfig } from '@/server/config/store';
 import { canonicalMediaRoot, validateWorkspaceId } from '@/server/data-control/storage';
-import { deleteUnusedWorkspaceImage, listWorkspaceImages, uploadWorkspaceImage, type WorkspaceImageListing } from '@/modules/publishing/server/media/storage';
+import { deleteUnusedWorkspaceImage, listWorkspaceImages, getWorkspaceImageMetadata, uploadWorkspaceImage, type WorkspaceImageListing } from '@/modules/publishing/server/media/storage';
 import { mediaError } from './messages';
 
 /** Storage port: the service never touches the filesystem directly, so tests inject a fake. */
 export interface MediaStore {
   /** `totalFiles`/`totalBytes` cover every stored image file, not just the returned page. */
   listImages(workspaceId: string, limit: number): Promise<{ items: WorkspaceImageListing[]; truncated: boolean; totalFiles?: number; totalBytes?: number }>;
+  inspectImage(workspaceId: string, id: string): Promise<Pick<WorkspaceImageListing, 'size' | 'mimeType' | 'createdAt'>>;
   putImage(actor: { userId: string; workspaceId: string }, file: File): Promise<{ id: string; mimeType: string }>;
   /** Writes a new video file exclusively and returns the key to record. */
   putVideo(workspaceId: string, id: string, bytes: Buffer): Promise<{ storageKey: string }>;
@@ -40,6 +41,7 @@ export const fsMediaStore: MediaStore = {
     const page = await listWorkspaceImages(workspaceId, { limit });
     return { items: page.items, truncated: page.nextCursor !== null, totalFiles: page.usage.files, totalBytes: page.usage.bytes };
   },
+  async inspectImage(workspaceId, id) { return getWorkspaceImageMetadata(workspaceId, id); },
   async putImage(actor, file) {
     const stored = await uploadWorkspaceImage(actor, file);
     return { id: stored.id, mimeType: stored.mimeType };

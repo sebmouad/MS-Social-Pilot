@@ -1,6 +1,6 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-21 against local HEAD `ffdb1cdf` (round 9); reviewed current source and the round 7–9 diffs.
+Updated 2026-10-21 against local HEAD `a910d774` (rounds 10–12 appended below; configuration schema **120**, deployed release recorded by the integrator as `a910d774`, not re-observed); reviewed the round 7–12 diffs. Statements below naming `ffdb1cdf` or schema 118 as current are superseded by the "Rounds 10–12" section.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains the binding target,
 unchanged. This document describes implementation and gaps; deployment, source,
 automated tests, browser checks and live-provider evidence are separate claims.
@@ -431,6 +431,43 @@ no fresh browser, PostgreSQL or live-provider verification by this lane):
   `facebook-metric-config`, `facebook-analytics-selection`,
   `facebook-post-history`, `root-config-authority`, `report-link-details*`.
   No new screen, route, MCP tool or migration for these report details.
+
+### Rounds 10–12 (`75923335` to `a910d774`; schema 120)
+
+Source and unit/mocked evidence unless stated; no fresh browser, PostgreSQL,
+provider or production observation by this documentation lane.
+
+- **Facebook ownership of analytics identity (`806a0ef5`, `6e111754`):** the
+  Facebook analytics target now reports the platform id (not the remote Page id)
+  to the shared host, which resolves the platform module by that id; before this,
+  shared post explorer and insights found no host and showed no post performance.
+  `facebook/post-performance.ts` also reads synced insights for app-published posts.
+  The shared Analytics code gained no provider branch. Production effect is unobserved here.
+- **Public origin (`c0e5386a`):** Facebook OAuth callback validation, redirects and
+  the secure state cookie derive from the Root public origin (see "Configuration and
+  public origin"), not `request.url`, which is the internal listener behind the proxy.
+  Files: `app/api/connections/[platform]/callback/route.ts`, `platforms/facebook/connection.ts`.
+  The owner's reconnect retry is pending; no successful post-fix connection is recorded.
+- **Page metrics (round 10):** `platforms/facebook/page-insights.ts` resolves the
+  configured Page metric list (additions and explicit exclusions) before constructing
+  the transport. The array-versus-policy registration gap noted for round 9 stays on
+  the ledger until `module.ts`, `runtime.ts`, `adset.ts` and `ads-ops` are shown to use it.
+- **Reports and Analytics:** Published posts adds weekday, UTC-hour and recorded-attempt
+  distributions (typed fields in `analytics.reports.publicationDetails`; saved-data
+  counts, not engagement or provider proof). The Analytics post explorer drops
+  identifier-like metrics and uses local dates.
+- **Feeds:** reviewer notices on held feed posts (`feeds.approvalNotificationsEnabled`),
+  WordPress reuse policy and supply view (`feeds.wordpress.reuseEnabled`,
+  `feeds.wordpress.reuseCooldownDays`), and caption text handling in
+  `modules/feeds/wordpress/text.ts` (entity decoding, C0 controls mapped to U+202F or
+  dropped) plus the audited repair service `caption-repair.ts`. See [FEEDS.md](FEEDS.md).
+- **Other:** media rename REST, Publishing/Settings/Ads/Home/Root polish, and scoped
+  MCP key tests (`mcp-scope-feeds-service`, `mcp-scope-host-matrix`, mocked ports).
+- **Schema:** 119 added `feeds.approvalNotificationsEnabled`; 120 added the two reuse
+  keys. This lane edits no registry.
+- **Browser:** round 6's lane hung. Only the matrix harness and a date/time focus ring
+  (`d24fcd40`, `tokens.css`) are committed; there is no round 6 result, so rounds 6–12
+  UI changes remain without a browser run.
 
 Historical 328/328 synthetic checks and the production Chrome sweep remain dated
 evidence. No browser round covers every later merge, and no declaration guard

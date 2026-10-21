@@ -1,10 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
-const state = vi.hoisted(() => ({ rename: vi.fn(), viewer: vi.fn() }));
+const state = vi.hoisted(() => ({ rename: vi.fn(), import: vi.fn(), viewer: vi.fn() }));
 vi.mock('@/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('@/server/request-origin', () => ({ requestOrigin: () => 'https://app.example' }));
-vi.mock('@/modules/media/server/library', () => ({ renameAsset: state.rename }));
+vi.mock('@/modules/media/server/library', () => ({ renameAsset: state.rename, importFromUrl: state.import }));
 vi.mock('@/modules/media/server/messages', () => ({ mediaMessage: async (message: string) => message, mediaError: async (code: OperationErrorCode, message: string) => new OperationError(code, message) }));
+import { POST } from '@/app/api/media-library/route';
+import { PATCH } from '@/app/api/media-library/[id]/route';
 import { renameMediaHttp } from '@/modules/media/server/http';
 import { renameMediaAction } from '@/modules/media/ui/rename-action';
 import { executeMediaTool } from '@/modules/media/mcp';
@@ -17,7 +19,8 @@ it('HTTP, server action and MCP pass the same intent to the shared service', asy
   expect((await renameMediaHttp(request(args), context)).status).toBe(200);
   await renameMediaAction({ ...args, id: 'm1' });
   await executeMediaTool(actor, 'rename_media_asset', { ...args, id: 'm1' });
-  expect(state.rename.mock.calls).toEqual(Array.from({ length: 3 }, () => [actor, { ...args, id: 'm1' }]));
+  expect((await PATCH(request(args), context)).status).toBe(200);
+  expect(state.rename.mock.calls.map(call => call.slice(0, 2))).toEqual(Array.from({ length: 4 }, () => [actor, { ...args, id: 'm1' }]));
 });
 it('HTTP refuses cross-origin requests and body identity substitution', async () => {
   expect((await renameMediaHttp(request(args, 'https://other.example'), context)).status).toBe(403);
@@ -28,4 +31,13 @@ it('HTTP refuses a missing session before calling the service', async () => {
   state.viewer.mockRejectedValue(new Error('no session'));
   expect((await renameMediaHttp(request(args), context)).status).toBe(401);
   expect(state.rename).not.toHaveBeenCalled();
+});
+
+it('REST and MCP import map the same named WebP intent to the shared service', async () => {
+  const input = { url: 'https://example.com/still.webp', name: 'Spring.webp', confirmation: 'IMPORT MEDIA https://example.com/still.webp' };
+  state.import.mockResolvedValue({ id: 'image1', converted: true, mimeType: 'image/png' });
+  const response = await POST(new Request('https://app.example/api/media-library', { method: 'POST', headers: { origin: 'https://app.example', 'content-type': 'application/json' }, body: JSON.stringify(input) }));
+  expect(response.status).toBe(201); expect(await response.json()).toMatchObject({ converted: true, mimeType: 'image/png' });
+  await executeMediaTool(actor, 'import_media_from_url', input);
+  expect(state.import.mock.calls.map(call => call.slice(0, 2))).toEqual([[actor, input], [actor, input]]);
 });

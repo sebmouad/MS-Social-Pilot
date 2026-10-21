@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
@@ -25,6 +25,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
   const day = (v: string) => Number.isFinite(Date.parse(v)) ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(v)) : t('unknownDate');
   const errorText = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : t('unconfirmed');
   const [assets, setAssets] = useState(items);
+  useEffect(() => setAssets(items), [items]);
   const [importing, setImporting] = useState(false);
   const [url, setUrl] = useState(''); const [name, setName] = useState('');
   const [renaming, setRenaming] = useState<Asset | null>(null);
@@ -55,7 +56,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
     const body = await response.json().catch(() => null);
     if (!response.ok || !body || typeof body.id !== 'string') throw new Error(errorText(body));
     setImporting(false); setUrl(''); setName(''); setConfirmation('');
-    say(t('imported')); router.refresh();
+    say(body.converted === true ? t('importedConverted') : t('imported')); router.refresh();
   }, t('importUnknown'));
   const performUpload = (file: File) => run(async () => {
     const form = new FormData(); form.set('imageFile', file);
@@ -104,7 +105,7 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
         <th scope="row"><span className={styles.name}>{a.name}</span><span className={styles.meta}>{a.mimeType} · {t('added', { date: day(a.createdAt) })}</span></th>
         <td>{size(a.size)}</td>
         <td>{a.inUse ? usedLabel(a.holderCount) : t('unused')}{a.holders && a.holders.length > 0 && <ul className={styles.holders}>{a.holders.map(h => <li key={h.postId}>{h.excerpt || t('untitled')} ({h.status.replace(/_/g, ' ')})</li>)}</ul>}</td>
-        {canWrite && workspaceWide && <td>{a.source === 'library' && <Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button>}<Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></td>}
+        {canWrite && workspaceWide && <td><Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button><Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></td>}
       </tr>)}
     </tbody></table></div> : <p className={styles.empty}>{filtered ? t('noMatch') : t('empty')}</p>}
     <nav className={styles.pagination} aria-label={t('pages')}>{page > 1 && <a href={query(page - 1)}>{t('previous')}</a>}<span>{t('page', { page })}</span>{hasMore && <a href={query(page + 1)}>{t('next')}</a>}</nav>

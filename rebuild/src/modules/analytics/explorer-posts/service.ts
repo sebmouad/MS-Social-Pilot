@@ -60,7 +60,9 @@ export async function readPosts(actor: Actor, raw: unknown, cap?: number, export
   rows.sort(comparePosts(input.sort, input.direction));
   const measures = [...new Map(rows.flatMap(row => row.measures.map(m => [m.key, { key: m.key, label: m.label, labelFr: m.labelFr }] as const))).values()];
   const items = rows.slice(offset, offset + pageSize);
-  return { input, period, options, selectedIds: selected.map(c => c.id), measures, items, pageSize, nextPage: rows.length > offset + pageSize ? input.page + 1 : null };
+  // Sorting by a measure no listed post has stored would order nothing, so only measures with a value are offered (the exported CSV keeps every measure).
+  const populatedMeasures = measures.filter(m => rows.some(row => row.measures.some(x => x.key === m.key && typeof x.value === 'number')));
+  return { input, period, options, selectedIds: selected.map(c => c.id), measures, populatedMeasures, items, pageSize, nextPage: rows.length > offset + pageSize ? input.page + 1 : null };
 
   } catch (error) { throw await localizeAnalyticsError(error); }
 }

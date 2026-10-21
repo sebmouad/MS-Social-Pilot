@@ -43,6 +43,7 @@ export function sniffMedia(bytes: Uint8Array): Sniffed | null {
   if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { kind: 'image', mimeType: 'image/jpeg' };
   if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return { kind: 'image', mimeType: 'image/png' };
   if (b.length >= 6 && ['GIF87a', 'GIF89a'].includes(b.toString('ascii', 0, 6))) return { kind: 'image', mimeType: 'image/gif' };
+  if (b.length >= 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return { kind: 'image', mimeType: 'image/webp' };
   if (b.length >= 12 && b.toString('ascii', 4, 8) === 'ftyp') return { kind: 'video', mimeType: b.toString('ascii', 8, 12) === 'qt  ' ? 'video/quicktime' : 'video/mp4' };
   if (b.length >= 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return { kind: 'video', mimeType: 'video/webm' };
   return null;

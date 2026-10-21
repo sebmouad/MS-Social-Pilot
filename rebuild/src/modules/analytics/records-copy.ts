@@ -375,6 +375,10 @@ export const recordsCopyDefaults = {
     "en": "URL",
     "fr": "URL"
   },
+  "Columns": {
+    "en": "Columns",
+    "fr": "Colonnes"
+  },
   "First metric": {
     "en": "First metric",
     "fr": "Première mesure"

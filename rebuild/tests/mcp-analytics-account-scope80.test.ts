@@ -5,7 +5,7 @@ const state = vi.hoisted(() => ({
   user: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), feature: vi.fn(), permission: vi.fn(), purge: vi.fn(), config: vi.fn(),
   targets: vi.fn(), adAccounts: vi.fn(), pageInsights: vi.fn(), adInsights: vi.fn(), groupBy: vi.fn(),
 }));
-vi.mock('../src/server/data', () => ({ prisma: {
+vi.mock('../src/server/data', () => ({ prisma: { $queryRaw: async () => [],
   user: { findUnique: state.user }, post: { groupBy: state.groupBy }, membership: { findUnique: async () => ({ role: 'member' }) },
   target: { findMany: state.targets }, adAccount: { findMany: state.adAccounts },
   pageInsight: { findMany: state.pageInsights }, adInsight: { findMany: state.adInsights },

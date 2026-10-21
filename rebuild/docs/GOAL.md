@@ -1,6 +1,18 @@
 # Active delivery goal
 
-Updated 2026-10-21 against local HEAD `960831df` (since `46c6bdae`; rounds 6–8). **Status: active; incomplete. Rebuild is in production.**
+Updated 2026-10-21 against local HEAD `a910d774` (since `960831df`; rounds 9–12). **Status: active; incomplete. Rebuild is in production.**
+
+Latest state (integrator statement, not re-observed here): deployed release
+`a910d774`, configuration schema **120**. Since `960831df` the source adds the
+Facebook Page metric/label wiring, link and publication-distribution report
+details, recipe reuse and supply settings, Feeds reviewer notices, a live-defect
+fix for the empty Analytics post explorer (`806a0ef5`, `6e111754`), a Facebook
+OAuth fix to use the Root public origin (`c0e5386a`; the owner's reconnect retry
+is still pending, so no successful post-fix connection is recorded), and WordPress
+caption repairs (`a47a339c`, `a910d774`). Details and evidence kinds are in
+[AGENT_HANDOFF.md](AGENT_HANDOFF.md) (rounds 10–12). The browser round 6 lane
+hung and delivered only a partial harness change; no round 6 matrix result exists.
+The paragraphs below still describe the `960831df` snapshot where dated.
 
 Deliver the full modular, platform-neutral MS Social Pilot replacement in
 `rebuild/`: complete useful legacy capabilities, Facebook integration, one themed

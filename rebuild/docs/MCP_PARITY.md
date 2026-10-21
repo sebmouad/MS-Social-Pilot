@@ -346,10 +346,10 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | delete_inbox_moderation_rule | inbox/conversations | write | POST /api/inbox/moderation | Shared customer operation; transport arguments may differ. |
 | run_inbox_moderation_rules | inbox/conversations | write | POST /api/inbox/moderation | Shared customer operation; transport arguments may differ. |
 | undo_inbox_moderation_action | inbox/conversations | write | POST /api/inbox/moderation | Shared customer operation; transport arguments may differ. |
-| list_media_library | publishing/media | read | GET /api/media-library | Shared customer operation; transport arguments may differ. |
-| import_media_from_url | publishing/media | write | POST /api/media-library | Shared customer operation; transport arguments may differ. |
+| list_media_library | publishing/media | read | GET /api/media-library | Shared readLibrary service includes saved image names in display/search; canonical image metadata is excluded from duplicate quota totals. Local query-shape/mocked evidence; PostgreSQL/client proof open. |
+| import_media_from_url | publishing/media | write | POST /api/media-library | Shared confirmed importFromUrl persists image names and converts still WebP to PNG under media.webpImportPolicy. UI submits this REST route; EN/FR guidance, real decoder and mocked host evidence only. |
 | delete_media_asset | publishing/media | write | DELETE /api/media-library/[id] | Shared customer operation; transport arguments may differ. |
-| rename_media_asset | publishing/media | write | PATCH /api/media-library/[id] | Shared customer operation; transport arguments may differ. |
+| rename_media_asset | publishing/media | write | PATCH /api/media-library/[id] | Shared confirmed renameAsset handles library rows and stored images, creating metadata on first rename. Service repeats all-channel authorization under lock and audits without names; UI action/actual PATCH/MCP mapping tests pass. Real database/client proof open. |
 | list_content_feeds | publishing/feeds | read | GET /api/feeds | Shared customer operation; transport arguments may differ. |
 | create_content_feed | publishing/feeds | write | POST /api/feeds | Shared customer operation; transport arguments may differ. |
 | update_content_feed | publishing/feeds | write | PUT /api/feeds/[id] | Shared customer operation; transport arguments may differ. |

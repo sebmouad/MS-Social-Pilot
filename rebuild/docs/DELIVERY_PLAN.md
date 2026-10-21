@@ -1,6 +1,36 @@
 # Shared delivery plan
 
-Updated 2026-10-21 against local HEAD `960831df`; reviewed merges since `46c6bdae` (rounds 6–8).
+Updated 2026-10-21 against local HEAD `a910d774`; the sections below were reviewed
+at `960831df` (rounds 6–8) and rounds 9–12 are summarised in the next block.
+
+## Rounds 9–12 delta (HEAD `a910d774`, schema 120)
+
+Deployed release is recorded by the owner/integrator as `a910d774` (schema 120);
+this lane did not observe it. Items below are source/unit evidence unless marked.
+
+- **Live-defect fixes:** `806a0ef5` (Facebook analytics targets report the platform
+  id, not the Page id, so the Analytics post explorer was empty) and `6e111754`
+  (the post explorer reads synced insights for app-published Facebook posts).
+  Regression tests are mocked; no fresh production observation is recorded here.
+- **Facebook OAuth:** `c0e5386a` uses the Root public origin for callback checks
+  and redirects (behind the proxy the internal listener made the redirect point at
+  localhost). Reconnect is **pending the owner's retry**; unverified until a
+  successful connection is observed.
+- **Recipe captions:** `a47a339c` decodes the HTML5 entity catalog, keeps nonbreaking
+  spaces and adds the audited preview/apply repair service; `a910d774` maps the C0
+  control (seen U+0016) before French high punctuation to U+202F and drops other C0
+  controls. Seven WordPress captions were affected; one already-published post is
+  kept as it is. Recipe supply (reuse settings, supply card) and Feeds reviewer
+  notices come from rounds 10–11.
+- **Rounds 10–11:** Facebook Page collection wiring, publication distributions and
+  link report details, media rename REST, Publishing/Settings and Ads/Home/Root
+  polish, MCP scoped-key matrix tests, schema 119 and 120.
+- **Browser round 6:** the lane hung. Only the harness (WebKit uses Option+Tab on
+  macOS, end-of-tab-order detection) and a date/time focus ring were committed
+  (`d24fcd40`). No round 6 result exists; rounds 6–12 UI changes remain unrerun.
+- **Order changes:** batch 1 now also confirms `a910d774` and migration receipts;
+  batch 5 reruns the browser matrix from scratch; add a successful Facebook
+  reconnect check after the OAuth fix.
 Goal remains active: [GOAL.md](GOAL.md). Binding target:
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md), unchanged. Current source
 and evidence: [ARCHITECTURE.md](ARCHITECTURE.md).

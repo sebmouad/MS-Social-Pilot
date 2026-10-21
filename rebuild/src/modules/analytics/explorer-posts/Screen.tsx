@@ -30,7 +30,7 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
     <label>{t("End (UTC)")}<input type="date" name="end" defaultValue={d.period.end} required /></label>
     <input type="hidden" name="filter" value="1" />
     <fieldset><legend>{t("Channels")}</legend>{d.options.map(c => <label key={c.id} className={styles.check}><input type="checkbox" name="channel" value={c.id} defaultChecked={d.selectedIds.includes(c.id)} />{c.name}</label>)}</fieldset>
-    <label>{t("Sort by")}<select name="sort" defaultValue={d.input.sort}><option value="publishedAt">{t("Publication date")}</option>{d.measures.map(m => <option key={m.key} value={m.key}>{measureLabel(m)}</option>)}</select></label>
+    <label>{t("Sort by")}<select name="sort" defaultValue={d.input.sort}><option value="publishedAt">{t("Publication date")}</option>{d.populatedMeasures.concat(d.measures.filter(m => m.key === d.input.sort && !d.populatedMeasures.some(p => p.key === m.key))).map(m => <option key={m.key} value={m.key}>{measureLabel(m)}</option>)}</select></label>
     <label>{t("Order")}<select name="direction" defaultValue={d.input.direction}><option value="desc">{t("Descending")}</option><option value="asc">{t("Ascending")}</option></select></label>
     <Button type="submit" variant="primary">{t("Apply")}</Button>
     <a href={`/api/analytics/posts?${query({ format: 'csv' })}`}>{t("Export selection (CSV)")}</a>

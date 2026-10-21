@@ -91,7 +91,7 @@ describe('platform analytics metadata', () => {
     expect(result.metrics.find(metric => metric.key === 'combined_quality')).toMatchObject({ kind: 'stock', coveredResourceIds: ['a1'] });
     expect(result.metrics.find(metric => metric.key === 'combined_quality::breakdown')).toMatchObject({ kind: 'breakdown', rows: [{ label: 'stable', value: 2 }], coveredResourceIds: ['a2'] });
     expect(result.metrics.find(metric => metric.key === 'combined_quality:nested')).toMatchObject({ kind: 'breakdown', rows: [{ label: 'newer', value: 4 }], coveredResourceIds: ['a2'] });
-    expect(result.metrics.find(metric => metric.key === 'action_values:purchase::USD')).toMatchObject({ kind: 'flow', unit: 'currency', label: 'Action Values Purchase · USD' });
+    expect(result.metrics.find(metric => metric.key === 'action_values:purchase::USD')).toMatchObject({ kind: 'flow', unit: 'currency', label: 'Purchases · Action value · USD' });
     expect(result.metrics.find(metric => metric.key === 'action_values:purchase::EUR')).toMatchObject({ kind: 'flow', unit: 'currency' });
     expect(result.metrics.find(metric => metric.key === 'cost_per_action_type:link_click::USD')).toMatchObject({ kind: 'ratio', unit: 'currency', totalOverride: null, displayTotal: 'Per-account values' });
     expect(result.metrics.find(metric => metric.key === 'cost_per_action_type:link_click::EUR')).toMatchObject({ kind: 'ratio', unit: 'currency' });

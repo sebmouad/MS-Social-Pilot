@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
-  settings: vi.fn(), targets: vi.fn(), adAccounts: vi.fn(), pageInsights: vi.fn(), adInsights: vi.fn(),
+  settings: vi.fn(), targets: vi.fn(), adAccounts: vi.fn(), pageInsights: vi.fn(), adInsights: vi.fn(), query: vi.fn(async () => []),
 }));
 vi.mock('../src/server/data', () => ({ prisma: {
   appSetting: { findMany: db.settings }, target: { findMany: db.targets }, adAccount: { findMany: db.adAccounts },
-  pageInsight: { findMany: db.pageInsights }, adInsight: { findMany: db.adInsights },
+  pageInsight: { findMany: db.pageInsights }, adInsight: { findMany: db.adInsights }, $queryRaw: db.query,
 } }));
 
 vi.mock('@/modules/analytics/server/error-copy', () => ({ analyticsLanguage: async () => 'fr' }));

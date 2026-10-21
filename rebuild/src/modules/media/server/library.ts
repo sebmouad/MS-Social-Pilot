@@ -14,6 +14,7 @@ import {
   libraryQuerySchema, importSchema, deleteSchema, likeContains, safeAssetName, sniffMedia, type AssetHolder, type LibraryAsset, type LibraryUsage,
 } from '../library';
 import { MEDIA_BOUNDS } from '../config';
+import { convertWebp } from './webp';
 
 const FEATURE = 'publishing/media' as const;
 type Tx = Prisma.TransactionClient;
@@ -81,7 +82,7 @@ async function attribute(db: Pick<Tx, '$queryRaw'>, workspaceId: string, assets:
 
 async function usageOf(db: Pick<Tx, '$queryRaw'>, workspaceId: string, store: MediaStore, quota: number, imageLimit: number): Promise<LibraryUsage> {
   const [totals, images] = await Promise.all([
-    db.$queryRaw<Array<{ bytes: bigint | number; count: bigint | number }>>`SELECT COALESCE(SUM(size), 0)::bigint AS bytes, COUNT(*)::bigint AS count FROM media WHERE "workspaceId" = ${workspaceId}`,
+    db.$queryRaw<Array<{ bytes: bigint | number; count: bigint | number }>>`SELECT COALESCE(SUM(size), 0)::bigint AS bytes, COUNT(*)::bigint AS count FROM media WHERE "workspaceId" = ${workspaceId} AND NOT (kind::text = 'image' AND "storageKey" IS NULL AND url = 'media:' || id)`,
     store.listImages(workspaceId, imageLimit),
   ]);
   const exact = images.totalFiles !== undefined && images.totalBytes !== undefined;
@@ -102,14 +103,20 @@ export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: M
   const window = page * l.pageSize + 1;
   return protect((async () => {
     const [rows, images, usage] = await Promise.all([
-      prisma.$queryRaw<Row[]>`SELECT id, filename, "mimeType", size, kind::text AS kind, url, "storageKey", width, height, "createdAt" FROM media WHERE "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL AND (${kind} = '' OR kind::text = ${kind}) AND (${q} = '' OR filename ILIKE ${likeContains(q)}) ORDER BY "createdAt" DESC, id ASC LIMIT ${window}`,
+      prisma.$queryRaw<Row[]>`SELECT id, filename, "mimeType", size, kind::text AS kind, url, "storageKey", width, height, "createdAt" FROM media WHERE "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL AND NOT (kind::text = 'image' AND "storageKey" IS NULL AND url = 'media:' || id) AND (${kind} = '' OR kind::text = ${kind}) AND (${q} = '' OR filename ILIKE ${likeContains(q)}) ORDER BY "createdAt" DESC, id ASC LIMIT ${window}`,
       kind === 'video' ? Promise.resolve({ items: [], truncated: false }) : store.listImages(actor.workspaceId, l.imageLimit),
       usageOf(prisma, actor.workspaceId, store, l.quota, l.imageLimit),
     ]);
+    // Canonical image rows carry names only; the file listing remains the authority for existence,
+    // bytes and age. Fetch names before applying search, so default names cannot resurrect a mismatch.
+    const imageIds = images.items.map(i => i.id);
+    const names = imageIds.length ? await prisma.$queryRaw<Array<{ id: string; filename: string }>>`SELECT id, filename FROM media WHERE "workspaceId" = ${actor.workspaceId} AND id = ANY(${imageIds}::text[]) AND kind::text = 'image' AND "storageKey" IS NULL AND url = 'media:' || id AND "derivedFromId" IS NULL` : [];
+    const imageNames = new Map(names.map(row => [row.id, row.filename]));
+    const imageName = (id: string) => imageNames.get(id) ?? nameFor(id);
     const known = new Set(rows.map(r => r.id.toLowerCase()));
     const candidates: Array<Source & { asset: Omit<LibraryAsset, 'inUse' | 'holderCount' | 'holders'> }> = [
       ...rows.map(r => ({ id: r.id, source: 'library' as const, url: r.url, storageKey: r.storageKey, asset: { id: r.id, kind: r.kind === 'video' ? 'video' as const : 'image' as const, mimeType: r.mimeType, name: r.filename, size: r.size, createdAt: r.createdAt, width: r.width, height: r.height, source: 'library' as const } })),
-      ...images.items.filter(i => !known.has(i.id.toLowerCase()) && (q === '' || nameFor(i.id).toLowerCase().includes(q.toLowerCase()))).map(i => ({ id: i.id, source: 'stored-image' as const, asset: { id: i.id, kind: 'image' as const, mimeType: i.mimeType, name: nameFor(i.id), size: i.size, createdAt: i.createdAt, width: null, height: null, source: 'stored-image' as const } })),
+      ...images.items.filter(i => !known.has(i.id.toLowerCase()) && (q === '' || imageName(i.id).toLowerCase().includes(q.toLowerCase()))).map(i => ({ id: i.id, source: 'stored-image' as const, asset: { id: i.id, kind: 'image' as const, mimeType: i.mimeType, name: imageName(i.id), size: i.size, createdAt: i.createdAt, width: null, height: null, source: 'stored-image' as const } })),
     ].sort((a, b) => b.asset.createdAt.getTime() - a.asset.createdAt.getTime() || a.id.localeCompare(b.id));
     const scope = query.usage ? candidates : candidates.slice((page - 1) * l.pageSize, page * l.pageSize + 1);
     const { byAsset, truncated } = await attribute(prisma, actor.workspaceId, scope, l.scan, l.holderExcerpt);
@@ -135,19 +142,24 @@ export async function importFromUrl(actor: ToolActor, input: unknown, deps: Medi
     const declaredOk = fetched.contentType === '' || fetched.contentType === 'application/octet-stream' || fetched.contentType === 'binary/octet-stream' || (sniffed !== null && fetched.contentType.startsWith(`${sniffed.kind}/`));
     if (!sniffed || !declaredOk) throw await bad('That address does not return a supported image or video.');
     if (sniffed.kind === 'video' && (!l.videoMimes.includes(sniffed.mimeType) || fetched.bytes.length > l.videoMax)) throw await bad('That video is not an accepted type or is larger than the allowed size.');
+    let bytes = fetched.bytes;
+    let mimeType = sniffed.mimeType;
+    const converted = mimeType === 'image/webp';
+    if (converted) { bytes = await convertWebp(bytes); mimeType = 'image/png'; }
     const name = safeAssetName(data.name, data.url, sniffed.kind === 'video' ? 'video' : 'image', l.nameMax);
     return transact(actor.workspaceId, l, async tx => {
       await lockActor(tx, actor, true);
       const usage = await usageOf(tx, actor.workspaceId, store, l.quota, l.imageLimit);
-      if (usage.usedBytes + fetched.bytes.length > l.quota) throw await mediaError('conflict', 'This workspace has reached its media storage limit. Delete unused media and try again.');
+      if (usage.usedBytes + bytes.length > l.quota) throw await mediaError('conflict', 'This workspace has reached its media storage limit. Delete unused media and try again.');
       if (sniffed.kind === 'image') {
-        const file = new File([new Uint8Array(fetched.bytes)], name, { type: sniffed.mimeType });
+        const file = new File([new Uint8Array(bytes)], name, { type: mimeType });
         const stored = await store.putImage({ userId: actor.userId, workspaceId: actor.workspaceId }, file);
         try {
-          await audit(tx, actor, 'media.imported', { assetId: stored.id, kind: 'image', size: fetched.bytes.length, host: new URL(fetched.finalUrl).hostname });
+          await saveImageName(tx, actor.workspaceId, stored.id, name, { mimeType: stored.mimeType, size: bytes.length, createdAt: new Date() });
+          await audit(tx, actor, 'media.imported', { assetId: stored.id, kind: 'image', size: bytes.length, converted, host: new URL(fetched.finalUrl).hostname });
           await lockActor(tx, actor, true);
         } catch (error) { await store.removeImage(actor.workspaceId, stored.id, true).catch(() => undefined); throw error; }
-        return { id: stored.id, kind: 'image' as const, mimeType: stored.mimeType, name, size: fetched.bytes.length, source: 'stored-image' as const };
+        return { id: stored.id, kind: 'image' as const, mimeType: stored.mimeType, name, size: bytes.length, source: 'stored-image' as const, converted };
       }
       const fileId = randomUUID(); const rowId = `med_${fileId}`;
       const { storageKey } = await store.putVideo(actor.workspaceId, fileId, fetched.bytes);
@@ -193,6 +205,8 @@ export async function deleteAsset(actor: ToolActor, input: unknown, deps: MediaD
       if (truncated || holders.some(h => COMMITTED_STATUSES.has(h.status))) throw await mediaError('conflict', 'This media is used by posts that are scheduled, publishing or awaiting approval. Change those posts first.');
     }
     if (isFile) {
+      // Metadata has no separate bytes. Remove it transactionally alongside the normal image action.
+      await tx.$executeRaw`DELETE FROM media WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} AND kind::text = 'image' AND "storageKey" IS NULL AND url = 'media:' || id`;
       await audit(tx, actor, 'media.deleted', { assetId: data.id, kind: 'image', affectedPosts: holders.map(h => h.postId), forced: force });
       const removal = await store.removeImage(actor.workspaceId, data.id, force);
       if (removal === 'missing') throw await mediaError('not_found', 'This media is unavailable in the current workspace.');
@@ -214,8 +228,17 @@ export async function deleteAsset(actor: ToolActor, input: unknown, deps: MediaD
 export { NetGuardError };
 
 
-/** Rename database-backed assets without changing their stable attachment identity. */
-export async function renameAsset(actor: ToolActor, input: unknown) {
+/** Image metadata uses the canonical media:<UUID> identity; file bytes are counted only by storage.
+ * The workspace FK gives metadata the same export/erasure ownership as other media rows.
+ * Refuse an id collision with a different workspace or a noncanonical media record.
+ */
+async function saveImageName(tx: Tx, workspaceId: string, id: string, name: string, image: { mimeType: string; size: number; createdAt: Date }) {
+  const changed = await tx.$executeRaw`INSERT INTO media (id, "workspaceId", filename, "mimeType", size, kind, url, "storageProvider", "storageKey", "createdAt") VALUES (${id}, ${workspaceId}, ${name}, ${image.mimeType}, ${image.size}, 'image', ${`media:${id}`}, 'local', NULL, ${image.createdAt}) ON CONFLICT (id) DO UPDATE SET filename = EXCLUDED.filename WHERE media."workspaceId" = EXCLUDED."workspaceId" AND media.kind::text = 'image' AND media."storageKey" IS NULL AND media.url = 'media:' || media.id AND media."derivedFromId" IS NULL`;
+  if (changed !== 1) throw await unavailable();
+}
+
+/** Rename assets without changing their stable attachment identity. */
+export async function renameAsset(actor: ToolActor, input: unknown, deps: MediaDeps = {}) {
   const l = await bounds();
   const { z } = await import('zod');
   const data = await parse(z.object({ id: z.string().min(1).max(l.identifierMax).regex(/^[A-Za-z0-9_-]+$/), name: z.string().trim().min(1).max(l.nameMax).refine(v => !/[\u0000-\u001f\u007f\\/]/.test(v)), confirmation: z.string() }).strict(), input);
@@ -225,6 +248,14 @@ export async function renameAsset(actor: ToolActor, input: unknown) {
   return protect(transact(actor.workspaceId, l, async tx => {
     const fresh = await lockActor(tx, actor, true);
     if (!fresh.workspaceWide) throw await mediaError('forbidden', 'Renaming media requires access to all channels.');
+    if (isImageFileId(data.id)) {
+      let image;
+      try { image = await (deps.store ?? fsMediaStore).inspectImage(actor.workspaceId, data.id); }
+      catch { throw await mediaError('not_found', 'This media is unavailable in the current workspace.'); }
+      await saveImageName(tx, actor.workspaceId, data.id, data.name, image);
+      await audit(tx, actor, 'media.renamed', { assetId: data.id });
+      return { id: data.id, name: data.name, renamed: true as const };
+    }
     const rows = await tx.$queryRaw<Array<{ filename: string }>>`SELECT filename FROM media WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL FOR UPDATE`;
     if (!rows[0]) throw await mediaError('not_found', 'This media is unavailable in the current workspace.');
     if (rows[0].filename !== data.name) {

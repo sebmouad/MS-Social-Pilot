@@ -533,3 +533,12 @@ records 80 scheduled posts, not 80 confirmed Facebook publications or comments.
 ### 2026-10-21 first full recipe day
 
 All four Europe/Paris slots (07:00, 11:00, 15:00, 17:00) published 10/10 posts with 10/10 first comments and no errors (40/40). 70 further plans pending on the rolling horizon.
+
+### 2026-10-21 rounds 9–12 release state (record only; appended by the documentation lane)
+
+Owner/integrator statement, not re-observed here: deployed release `a910d774`, configuration schema **120**. Included since `ffdb1cdf`: Facebook analytics target platform-id fix (`806a0ef5`), post explorer reads synced insights for app-published posts (`6e111754`), round 10/11 items (schemas 119 and 120), Facebook OAuth callback and redirects on the Root public origin (`c0e5386a`), recipe caption entity decoding and audited repair (`a47a339c`) and U+0016 control-byte mapping to U+202F (`a910d774`).
+
+- **Facebook reconnect:** pending the owner's retry after `c0e5386a`; no successful post-fix connection or live callback is recorded.
+- **Captions:** seven WordPress captions were affected; one already-published post was kept as it is. The repair outcome for the remaining six is not recorded here.
+- **Browser round 6:** the lane hung; only the harness and a date/time focus-ring change are committed (`d24fcd40`). No matrix result exists for rounds 6–12.
+- **Not shown by this entry:** migration receipts for the newest releases, a proxy cutback, media restoration, or any gate pass. Earlier results in this file remain dated and unchanged.

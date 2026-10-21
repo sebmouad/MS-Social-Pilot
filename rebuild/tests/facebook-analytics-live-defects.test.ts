@@ -43,7 +43,7 @@ describe('page metrics are emitted alongside ad metrics', () => {
 describe('Facebook analytics targets report the platform id', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    db.settings.mockResolvedValue([]); db.adAccounts.mockResolvedValue([]); db.pageInsights.mockResolvedValue([]); db.adInsights.mockResolvedValue([]);
+    db.settings.mockResolvedValue([]); db.adAccounts.mockResolvedValue([]); db.pageInsights.mockResolvedValue([]); db.adInsights.mockResolvedValue([]); db.query.mockResolvedValue([]);
     db.targets.mockResolvedValue([{ id: 'page-a', name: 'Page A', type: 'page', providerId: '1029384756', socialAccountId: 'src' }]);
   });
   it('maps providerId to "facebook", never the remote Page id, for visible and selected targets', async () => {
@@ -59,7 +59,7 @@ describe('app-published posts read insights from the matching external post', ()
   it('joins external_posts on target and remote id, preferring its snapshot only when the post target has none', async () => {
     db.query.mockResolvedValue([]);
     await facebookAnalyticsHost.postPerformance(request);
-    const query = db.query.mock.calls[0]![0] as { text: string; values: unknown[] };
+    const query = db.query.mock.calls.at(-1)![0] as { text: string; values: unknown[] };
     expect(query.text).toMatch(/LEFT JOIN external_posts ep ON ep\."targetId" = pt\."targetId" AND ep\."remoteId" = pt\."remotePostId"/);
     expect(query.text).toMatch(/CASE WHEN pt\."insightsSyncedAt" IS NULL AND ep\."insightsSyncedAt" IS NOT NULL THEN ep\.insights ELSE pt\.insights END/);
     expect(query.text).toMatch(/COALESCE\(pt\."insightsSyncedAt", ep\."insightsSyncedAt"\)/);

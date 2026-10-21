@@ -8,6 +8,8 @@ import { z } from 'zod';
 const row = (en: string, fr: string) => ({ en, fr });
 
 export const mediaMessages = {
+  'This WebP image could not be imported. Use a still PNG or JPEG image instead.': row('This WebP image could not be imported. Use a still PNG or JPEG image instead.', 'Cette image WebP ne peut pas être importée. Utilisez une image PNG ou JPEG fixe.'),
+  'Image conversion is busy. Try again shortly.': row('Image conversion is busy. Try again shortly.', 'La conversion d’images est occupée. Réessayez dans un instant.'),
   'Sign in with an active account to continue.': row('Sign in with an active account to continue.', 'Connectez-vous avec un compte actif pour continuer.'),
   'Sign in to an authorized workspace.': row('Sign in to an authorized workspace.', 'Connectez-vous à un espace autorisé.'),
   'This feature is unavailable in this workspace.': row('This feature is unavailable in this workspace.', 'Cette fonctionnalité n’est pas disponible dans cet espace.'),

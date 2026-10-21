@@ -73,7 +73,11 @@
 .analytics-insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
 
 /* Post explorer table. */
-.analytics-posts__controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; margin-bottom: 12px; }
+.analytics-posts__columns { margin-bottom: 12px; }
+.analytics-posts__columns summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.analytics-posts__columns summary:focus-visible { outline: 2px solid var(--focus-ring, currentColor); outline-offset: 2px; }
+.analytics-posts__columns fieldset { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 4px 12px; }
+.analytics-posts__column-option { display: flex; align-items: center; gap: 8px; min-height: 36px; }
 .analytics-posts__post { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .analytics-posts__text { display: grid; min-width: 0; }
 .analytics-posts__text a, .analytics-posts__text > span { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }

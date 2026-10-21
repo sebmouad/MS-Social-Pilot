@@ -24,7 +24,13 @@ export const VIDEO_MIME_CHOICES = ['video/mp4', 'video/quicktime', 'video/webm']
 const int = (range: { min: number; max: number }) => z.number().int().min(range.min).max(range.max);
 const G = 'Media library';
 
+export const webpImportPolicySchema = z.object({
+  enabled: z.boolean(), maxPixels: z.number().int().min(1).max(100000000),
+  maxConcurrent: z.number().int().min(1).max(8), timeoutMs: z.number().int().min(100).max(300000),
+  maxOutputBytes: z.number().int().min(1).max(104857600),
+}).strict();
 export const MEDIA_CONFIG = [
+  entry({ key: 'media.webpImportPolicy', group: G, label: 'WebP import conversion', kind: 'json', description: 'Convert still WebP imports to PNG for workspace image storage. Animated WebP is refused. Bounds cover decoded pixels, concurrent conversions per process, elapsed time and encoded output bytes.', defaultValue: { enabled: true, maxPixels: 16000000, maxConcurrent: 2, timeoutMs: 10000, maxOutputBytes: 26214400 }, schema: webpImportPolicySchema, consumption: 'active' }),
   entry({ key: 'media.libraryPageSize', group: G, label: 'Library page size', kind: 'number', description: 'Assets listed on one media library page.', defaultValue: MEDIA_DEFAULTS.pageSize, schema: int(MEDIA_BOUNDS.pageSize), consumption: 'active' }),
   entry({ key: 'media.workspaceQuotaBytes', group: G, label: 'Workspace storage quota (bytes)', kind: 'number', description: 'Total stored media bytes one workspace may hold; imports beyond it are refused.', defaultValue: MEDIA_DEFAULTS.workspaceQuotaBytes, schema: int(MEDIA_BOUNDS.workspaceQuotaBytes), consumption: 'active' }),
   entry({ key: 'media.videoMaxBytes', group: G, label: 'Maximum video size (bytes)', kind: 'number', description: 'Largest single video accepted into the library. A publishing provider may enforce a lower limit.', defaultValue: MEDIA_DEFAULTS.videoMaxBytes, schema: int(MEDIA_BOUNDS.videoMaxBytes), consumption: 'active' }),

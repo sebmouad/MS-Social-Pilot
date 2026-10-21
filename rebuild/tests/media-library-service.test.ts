@@ -1,6 +1,7 @@
+import sharp from 'sharp';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ auth: vi.fn(), workspace: vi.fn(), exec: [] as Array<{ sql: string; values: unknown[] }>, mediaRows: [] as unknown[], posts: [] as unknown[], used: 0, mediaRow: null as unknown, failAudit: false, overrides: {} as Record<string, unknown> }));
+const state = vi.hoisted(() => ({ auth: vi.fn(), workspace: vi.fn(), exec: [] as Array<{ sql: string; values: unknown[] }>, mediaRows: [] as unknown[], imageNames: [] as unknown[], queries: [] as Array<{ sql: string; values: unknown[] }>, posts: [] as unknown[], used: 0, mediaRow: null as unknown, failAudit: false, overrides: {} as Record<string, unknown> }));
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', async () => {
@@ -21,7 +22,8 @@ const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypmp42'), 
 const UUID = '11111111-2222-4333-8444-555555555555';
 const store = () => ({
   listImages: vi.fn(async () => ({ items: [{ id: UUID, size: 1000, mimeType: 'image/jpeg', createdAt: new Date('2026-05-01T00:00:00Z') }], truncated: false })),
-  putImage: vi.fn(async () => ({ id: UUID, mimeType: 'image/jpeg' })), putVideo: vi.fn(async (_w: string, id: string) => ({ storageKey: `w1/videos/${id}` })),
+  inspectImage: vi.fn(async () => ({ size: 1000, mimeType: 'image/jpeg', createdAt: new Date('2026-05-01T00:00:00Z') })),
+  putImage: vi.fn(async (_actor: unknown, _file: File) => ({ id: UUID, mimeType: 'image/jpeg' })), putVideo: vi.fn(async (_w: string, id: string) => ({ storageKey: `w1/videos/${id}` })),
   removeImage: vi.fn(async () => 'deleted' as const), removeStored: vi.fn(async () => 'deleted' as const),
 });
 const net = (bytes: Buffer, headers: Record<string, string> = {}) => ({ resolve: vi.fn(async () => ['93.184.216.34']), fetcher: vi.fn(async () => new Response(new Uint8Array(bytes), { status: 200, headers })) });
@@ -30,12 +32,13 @@ const sql = (s: TemplateStringsArray, v: unknown[]) => ({ sql: s.join('?'), valu
 const executed = (needle: string) => state.exec.filter(e => e.sql.includes(needle));
 
 beforeEach(() => {
-  vi.clearAllMocks(); state.exec = []; state.mediaRows = [vrow]; state.posts = []; state.used = 2000; state.mediaRow = vrow; state.failAudit = false; state.overrides = {};
+  vi.clearAllMocks(); state.exec = []; state.queries = []; state.imageNames = []; state.mediaRows = [vrow]; state.posts = []; state.used = 2000; state.mediaRow = vrow; state.failAudit = false; state.overrides = {};
   state.auth.mockResolvedValue({ role: 'owner', actor, workspaceWide: true });
   state.workspace.mockImplementation((_id: string, cb: () => Promise<unknown>) => cb());
   db.$transaction.mockImplementation(async (cb: (tx: typeof db) => Promise<unknown>) => cb(db));
   db.$queryRaw.mockImplementation(async (s: TemplateStringsArray, ...v: unknown[]) => {
-    const q = sql(s, v);
+    const q = sql(s, v); state.queries.push(q);
+    if (q.sql.includes('id = ANY')) return state.imageNames;
     if (q.sql.includes('memberships m JOIN users')) return [{ role: 'owner', disabledAt: null }];
     if (q.sql.includes('SUM(size)')) return [{ bytes: BigInt(state.used), count: BigInt(1) }];
     if (q.sql.includes('FROM posts p')) return state.posts;
@@ -241,4 +244,76 @@ describe('media rename', () => {
 it('the installed media MCP dispatcher executes the confirmed rename service', async () => {
   await expect(executeMediaTool(actor, 'rename_media_asset', { id: vrow.id, name: 'renamed.mp4', confirmation: `RENAME MEDIA ${vrow.id}` })).resolves.toMatchObject({ renamed: true, id: vrow.id });
   expect(executed('UPDATE media')).toHaveLength(1);
+});
+
+
+describe('round 11 stored image names and still WebP imports', () => {
+  it('persists the import name as canonical metadata without replacing its attachment identity', async () => {
+    const result = await importFromUrl(actor, { url: 'https://example.com/p.jpg', name: 'Spring launch.jpg', confirmation: 'IMPORT MEDIA https://example.com/p.jpg' }, { store: store() as never, net: net(JPEG) });
+    expect(result).toMatchObject({ id: UUID, source: 'stored-image', name: 'Spring launch.jpg' });
+    const saved = executed('INSERT INTO media')[0]!;
+    expect(saved.values).toEqual([UUID, 'w1', 'Spring launch.jpg', 'image/jpeg', JPEG.length, `media:${UUID}`, expect.any(Date)]);
+    expect(saved.sql).toContain('media."workspaceId" = EXCLUDED."workspaceId"');
+    expect(saved.sql).toContain('media."derivedFromId" IS NULL');
+  });
+  it('uses saved names for display and literal search, without reviving a default-name mismatch', async () => {
+    state.imageNames = [{ id: UUID, filename: 'Spring launch.jpg' }]; state.mediaRows = [];
+    const s = store();
+    const page = await readLibrary(actor, { q: 'SPRING' }, { store: s as never });
+    expect(page.items).toMatchObject([{ id: UUID, name: 'Spring launch.jpg', source: 'stored-image' }]);
+    expect((await readLibrary(actor, { q: 'Uploaded image' }, { store: s as never })).items).toEqual([]);
+    const query = state.queries.find(q => q.sql.includes('id = ANY'))!;
+    expect(query.values).toEqual(['w1', [UUID]]);
+    expect(state.queries.find(q => q.sql.includes('SUM(size)'))!.sql).toContain("url = 'media:' || id");
+    expect(state.queries.find(q => q.sql.includes('SELECT id, filename, "mimeType"'))!.sql).toContain("url = 'media:' || id");
+    expect(page.usage.usedBytes).toBe(3000);
+  });
+  it('does not display metadata when the underlying file is absent', async () => {
+    state.imageNames = [{ id: UUID, filename: 'Missing.jpg' }]; state.mediaRows = [];
+    const s = store(); s.listImages.mockResolvedValue({ items: [], truncated: false });
+    expect((await readLibrary(actor, {}, { store: s as never })).items).toEqual([]);
+  });
+  it('renames an uploaded image through MCP using the same audited, confirmed service', async () => {
+    const s = store();
+    const args = { id: UUID, name: 'Retained.jpg', confirmation: `RENAME MEDIA ${UUID}` };
+    expect(await executeMediaTool(actor, 'rename_media_asset', args, { store: s as never })).toEqual({ id: UUID, name: args.name, renamed: true });
+    expect(s.inspectImage).toHaveBeenCalledWith('w1', UUID);
+    expect(executed('INSERT INTO media')[0]!.values).toContain(`media:${UUID}`);
+    expect(executed('activity_logs')[0]!.values).toContain('media.renamed');
+    expect(JSON.stringify(executed('activity_logs'))).not.toContain(args.name);
+    expect(s.putImage).not.toHaveBeenCalled(); expect(s.removeImage).not.toHaveBeenCalled();
+  });
+  it('refuses missing images, scoped actors and audit failures without returning a rename receipt', async () => {
+    const s = store(), args = { id: UUID, name: 'x.jpg', confirmation: `RENAME MEDIA ${UUID}` };
+    s.inspectImage.mockRejectedValueOnce(new Error('/private/path'));
+    await expect(renameAsset(actor, args, { store: s as never })).rejects.toMatchObject({ code: 'not_found' });
+    expect(executed('INSERT INTO media')).toHaveLength(0);
+    state.auth.mockResolvedValueOnce({ workspaceWide: false });
+    await expect(renameAsset(actor, args, { store: s as never })).rejects.toMatchObject({ code: 'forbidden' });
+    state.failAudit = true;
+    await expect(renameAsset(actor, args, { store: s as never })).rejects.toMatchObject({ code: 'upstream_failure' });
+  });
+  it('clears name metadata on image deletion under the workspace lock', async () => {
+    await deleteAsset(actor, { id: UUID, confirmation: `DELETE MEDIA ${UUID}` }, { store: store() as never });
+    expect(executed('DELETE FROM media')[0]!.values).toEqual([UUID, 'w1']);
+    expect(executed('DELETE FROM media')[0]!.sql).toContain("url = 'media:' || id");
+  });
+  it('converts a real still WebP to PNG before storage and applies quota to converted bytes', async () => {
+    const webp = await sharp({ create: { width: 2, height: 3, channels: 3, background: 'red' } }).webp().toBuffer();
+    const s = store(); s.putImage.mockResolvedValue({ id: UUID, mimeType: 'image/png' });
+    const url = 'https://example.com/image.webp';
+    const result = await importFromUrl(actor, { url, confirmation: `IMPORT MEDIA ${url}` }, { store: s as never, net: net(webp, { 'content-type': 'image/webp' }) });
+    expect(result).toMatchObject({ converted: true, mimeType: 'image/png', source: 'stored-image' });
+    const file = s.putImage.mock.calls[0]![1] as File;
+    expect(file.type).toBe('image/png');
+    const metadata = await sharp(Buffer.from(await file.arrayBuffer())).metadata();
+    expect(metadata).toMatchObject({ format: 'png', width: 2, height: 3 });
+    expect(result.size).toBe(file.size);
+    expect(file.size).toBeGreaterThan(webp.length);
+    state.overrides['media.workspaceQuotaBytes'] = 1048576;
+    state.used = 1048576 - 1000 - webp.length; // store() contributes a separate 1000 image bytes.
+    const s2 = store();
+    await expect(importFromUrl(actor, { url, confirmation: `IMPORT MEDIA ${url}` }, { store: s2 as never, net: net(webp) })).rejects.toMatchObject({ code: 'conflict' });
+    expect(s2.putImage).not.toHaveBeenCalled();
+  });
 });

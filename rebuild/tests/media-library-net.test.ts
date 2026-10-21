@@ -7,6 +7,8 @@ describe('media content helpers', () => {
     expect(sniffMedia(Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypmp42')]))).toEqual({ kind: 'video', mimeType: 'video/mp4' });
     expect(sniffMedia(Buffer.from('<html><script>'))).toBeNull();
     expect(sniffMedia(Buffer.alloc(0))).toBeNull();
+    expect(sniffMedia(Buffer.from('RIFF0000WEBP'))).toEqual({ kind: 'image', mimeType: 'image/webp' });
+    expect(sniffMedia(Buffer.from('RIFF0000WAVE'))).toBeNull();
   });
   it('cleans names and builds reference sets', () => {
     expect(safeAssetName('../../etc/passwd', 'https://x.test/a.png', 'image')).toBe('etcpasswd');

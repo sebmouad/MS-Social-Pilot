@@ -252,3 +252,34 @@ Vite CJS deprecation and existing missing Tailwind content warnings were emitted
 there were no test failures. TypeScript uses `--incremental false` to avoid
 writing an unowned build-info artifact. This working tree is left uncommitted
 for the integrator; no push/deploy was authorized in this lane.
+
+### Rounds 10–12: reviewer notices, reuse keys and caption handling (HEAD `a910d774`)
+
+Evidence kinds: source and unit/mocked tests; the production statements are
+owner/integrator records, not observed by this documentation lane.
+
+- **Root keys and schema:** `feeds.approvalNotificationsEnabled` (round 10, schema
+  119) and `feeds.wordpress.reuseEnabled` / `feeds.wordpress.reuseCooldownDays`
+  (round 11, schema 120). The "Recipe supply lane" section above is now merged
+  (`d6ff1f17`); its "working tree" label is historical. Home mounting of
+  `RecipeSupplyCard` was a stated integration need; confirm it before claiming the
+  Home low-supply warning.
+- **Caption text (`a47a339c`, `a910d774`):** the WordPress path decodes the HTML5
+  named catalog and numeric references once, keeps U+00A0/U+202F, then
+  `stripCaptionControls` maps C0 controls (seen: U+0016) that precede `? ! : ; »`, or
+  follow `«`, to U+202F and removes any other C0 control except tab/newline. Cause
+  recorded by the integrator: the caption plugin stores U+0016 where French
+  typography needs U+202F, and Facebook rendered it as `0`. This resolves the
+  earlier note that no inspected source turned a nonbreaking space into `0`: the
+  damaged character was a control byte, not U+00A0. Tests:
+  `feeds-wordpress-caption`, `feeds-wordpress-caption-controls`,
+  `feeds-wordpress-caption-repair`.
+- **Affected data (owner/integrator record):** seven WordPress captions carried the
+  control byte. One had already been published and is kept as published; the
+  repair service refuses published, due, claimed or attempted records by design.
+  This document does not record the outcome for the other six planned captions:
+  verify stored text privately (code points, no logging) before treating them as
+  repaired.
+- **Still open:** the RSS decoder in `feeds.ts` (incomplete named catalog,
+  `&nbsp;` to an ordinary space); repair is a service export with no UI, REST or MCP
+  entry point; no live PostgreSQL/MariaDB locking evidence for the repair.
