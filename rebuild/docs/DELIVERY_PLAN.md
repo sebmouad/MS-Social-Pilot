@@ -1,72 +1,85 @@
 # Shared delivery plan
 
-Updated 2026-10-21 against local HEAD `8852d367`. Goal remains active:
-[GOAL.md](GOAL.md). Binding target: [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md).
-Current implementation: [ARCHITECTURE.md](ARCHITECTURE.md).
+Updated 2026-10-21 against local HEAD `1240a9ce`; reviewed merges since `8852d367`.
+Goal remains active: [GOAL.md](GOAL.md). Binding target:
+[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md), unchanged. Current source
+and evidence: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Position
 
-Production cutover occurred 2026-10-20; the rebuild serves social.newsgeet.com,
-legacy web/worker are recorded disabled and rebuild releases use
-`rebuild/scripts/prod-deploy.sh`. The legacy command is guarded. Follow-up work
-must preserve the single publisher and existing rollback assets. The results log
-in RELEASE_GATES_PLAN.md is evidence; its original pre-cutover plan is historical.
-No claim that all contract gates passed follows from the deployment.
+Owner-recorded cutover occurred 2026-10-20; rebuild serves social.newsgeet.com,
+legacy web/worker are recorded disabled, releases use `rebuild/scripts/prod-deploy.sh`
+and legacy deployment is guarded. Preserve one publisher and rollback assets.
+RELEASE_GATES_PLAN's dated results are evidence, not proof every gate passed or
+that every later commit/migration is deployed. This lane made no production calls.
 
-Recent integrated source includes the four light/dark theme palettes and shared
-components/charts, Home REST/MCP, AI providers, per-destination scheduling,
-expanded Analytics/Ads/Settings surfaces, key-authenticated Analytics/Ads REST v1,
-Facebook post history/hierarchy collection, WordPress recipes, and UI refinements
-for Publishing, Inbox, Tasks, Agency, Reports and Settings. Consult lane documents
-for actual evidence; older branch-only/migration-unapplied statements are snapshots,
-not a substitute for checking current source and the target database.
+Merged progress since the prior snapshot:
+
+- Root EN/FR catalogs cover Publishing/Inbox/Analytics/Ads/Home/Tasks/Agency, then
+  Feeds/Media/Sharing; `configOrDefault` validates runtime/default catalogs and
+  display policies, while `configValueOrDefault` checks outer shape. Feeds/Media/
+  Sharing service/public errors are localized. Residual strings/policies remain.
+- Appearance shell/Settings/session REST/MCP now share confirmed account theme/mode
+  persistence, audited writes and Root-lifetime cache cookies; layout falls back
+  to validated-session preferences. The former cookie-only gap is superseded.
+- Inbox bulk REST exists; Publishing draft aliases/canonical tools/session REST
+  share confirmed lifecycle boundaries, and v1 create forwards exact consent.
+  The guard maps 238 customer/person and 51 Root tools, with 24 exact protocol/
+  authority exceptions. All 48 former private Root REST exemptions are closed;
+  workspace create/rename MCP and directory GET exist. Structural mapping does
+  not prove service-owned authority/confirmation parity everywhere.
+- Recipe source/image/planning and first-day 07:00/11:00 batches (10/10 each with
+  comments) are owner-recorded live outcomes; the article link was removed from
+  comments by owner request. Date ordering, retry, pause-cancel, pool estimates,
+  worker summaries and origin/status badges are newer source/unit slices.
+- Live Graph v26.0 post metrics: media views, unique media views, reactions by
+  type, clicks and clicks by type accepted; impressions, unique impressions and
+  engaged users rejected. Time-window paging fixes are merged. Summary-edge
+  reaction mismatch and exhaustive collection remain open.
+- Worker fetch-then-write now covers Inbox, Page analytics/history and Ads, with
+  write-time binding/access checks. Signal/drain/abort/lease handling exists;
+  production stop-time and contention measurements are still needed.
+- Recent-table/account data-control audit, supplementary export/delete hooks,
+  partial account-export adapters and OAuthCode/profile purge guards exist.
+  Public export registration/UI and rehearsal/database proof remain pending.
+- Performance migration adds three Posts indexes and one Page-insights index;
+  scoped read reuse/request memoization and parallel Home cards reduce redundant
+  work in source tests, without measured production speedup.
+- Legacy response rounds 1–3 add stored root-comment waits, slowest/business-hours
+  measures, period context and historical resolution/reopening cycles, then
+  independent comment/conversation and member business-hours breakdowns. All use
+  the shared report generator; history/volume/live/download limits remain.
 
 ## Next reviewable batches
 
 | Order | Work | Required evidence / owner |
 | --- | --- | --- |
-| 1 | Reconcile current release/migrations and remaining operational checks | Release owner verifies deployed SHA, migration history/ownership, restorable backup/media and post-cutover rollback. Do not replay cutover or assume new pinned files applied |
-| 2 | Finish service/transport parity | Inbox owner adds REST bulk entry to `bulkInboxAction`; Settings owner unifies single/batch selection and disconnect confirmations; Sharing/Agency owners review confirmation differences. Preserve credential ceilings |
-| 3 | Finish appearance and configuration consumers | Shell/Settings owner routes global theme changes through appearance service and reads account theme when cookie absent. Integrations owner fixes inactive metadata and remaining request/UI caps. Module owners extract remaining copy/policy per CONFIG_LITERAL_AUDIT |
-| 4 | Verify per-destination scheduling | Publishing/Facebook owners exercise migration, mixed app/native holding, queue, approval, cancel/reschedule, first comments and worker exactly-once outcomes on PostgreSQL/browser/provider. Review hand-off coupling to mix/recycle and oldest-first fairness |
-| 5 | Verify recipe automation before enabling | Feeds owner rehearses migration/export/erasure, read-only MariaDB mapping, image storage, dry-run slot allocation, confirmations/scope, uncertain claims, approval and first-comment outcomes. Enable only after scoped live verification/cleanup |
-| 6 | Complete Facebook data coverage | Adapter owner verifies eligible current metrics and saved Root overrides; checks history completion against actual Page inventory, tenant cursor migration and Ads hierarchy/breakdowns. Extend conversation metadata through neutral persistence contracts |
-| 7 | Complete browser and language coverage | UI owners run current eight-palette desktop/phone, keyboard, failure and recovery checks with synthetic examples. Cover recent Inbox, Publishing, Reports, Tasks, Agency, Settings, Root and public changes; prior-theme matrices do not cover new palettes |
-| 8 | Close remaining legacy/provider and recovery gaps | Per-module evidence in LEGACY_CAPABILITY_PARITY; live Facebook/MCP reads/writes/cleanup, real mail/security/export/erasure/scale, complete Root controls, provider-native formats and other required connector decisions remain explicit |
+| 1 | Reconcile deployed release, migrations and recovery | Release owner checks deployed SHA, target migration/ownership, restorable database/media backup and post-cutover rollback. Check recent purge-gate and read-index migrations explicitly; do not replay cutover or infer application from pinned files |
+| 2 | Finish service/transport boundaries | Settings owner wires single MCP selection/disconnect to confirmed wrappers and fixes browser disconnect phrase. Root owner moves workspace identity/limits and directory authority into services, unifies config confirmation/availability and error-resolution policy. Agency/Sharing owners resolve remaining confirmation differences. Run real scoped MCP/client checks |
+| 3 | Expose partial account export and prove data controls | Settings owner adds session-only route/MCP registration and bilingual download/error UI; extend parity mappings. Release owner pins supplementary purge gates in rehearsal. Prove recent-table export/erasure, account deletion and trigger concurrency on isolated PostgreSQL; keep coverage explicitly partial |
+| 4 | Fix and rerun browser findings | App/auth/module owners fix themed EN/FR 404/error pages and soft statuses, misleading two-step errors, raw failure text, queue/Root activity input loss, calendar contrast and tokenless join. Rerun missing-image and saved-view session feedback fixes. Migrate synthetic preview DB before Feeds checks |
+| 5 | Verify scheduling and recipe recovery | Publishing/Feeds/Facebook owners exercise mixed native/app holds, approval, cancel/reschedule, first comments, retry uncertain claims, pause-cancel refused batches and supply exhaustion. Preserve ledger/locks and clean up identifiable test effects; live first batches do not prove recovery |
+| 6 | Verify reliability and performance at runtime | Worker owner measures stop/drain versus systemd timeout, DB contention and stale binding/purge races. Database owner applies/reviews index migration, checks query plans and representative volume/timing; retain authorization/resource checks |
+| 7 | Complete legacy/provider/configuration scope | Per-module work in LEGACY_CAPABILITY_PARITY; full Facebook collection/metadata, remaining connectors/format eligibility, live mail/security, complete Root/copy controls, report history/scale and actual REST/MCP/provider outcomes with cleanup remain explicit |
 
-Steps needing a database, browser/server, provider or production access belong
-to an authorized integration session, not this documentation worker. No whole
-suite was requested for this lane. Keep targeted test results, browser evidence,
-remote provider outcomes and production evidence separate.
+## Browser evidence and limits
 
-## Known open details
-
-- Latest contact-details REST is implemented (`8852d367`); Inbox bulk REST remains
-  absent. Do not reopen the already delegated OAuth compatibility route: it now
-  calls `connectionStartHttp`. Batch selection REST/UI now call the confirmed
-  `changeConnectionSelections`; the single MCP path still calls the lower core.
-- Analytics/Ads `/api/v1/<module>/<operation>` dispatches the owning MCP groups
-  through the authenticated host, retaining key scope and confirmations. This is
-  source/unit evidence, not a real key/client/provider pass for every operation.
-- Root registration tools and disconnect-with-delete are integrated; Agency
-  overview person credentials exist. Older notes saying they are missing are
-  superseded. Person keys remain read-only overview-only; session Clients and
-  workspace switching do not expand those credentials.
-- Config schema version is 104 in local source. This documentation batch adds no
-  keys. Reconcile future lane keys centrally; do not bump for prose changes.
-- Native formats remain subject to module switches/proofs and live eligibility.
-  Preserve held-photo cleanup ledger/lock; unreadable remote IDs are not deletion
-  evidence. Do not blindly resend an uncertain publication/comment/deletion.
-- Last recorded operational gaps include mail configuration/live delivery,
-  post-cutover rollback drill, Inbox provider calls holding long transactions
-  and worker shutdown exceeding systemd timeout. Revalidate before fixing; this
-  worker did not observe current runtime behavior.
+[BROWSER_MATRIX_2026-10-21.md](BROWSER_MATRIX_2026-10-21.md) records local production-build
+Chromium with synthetic PostgreSQL data. Round 1: 992 cells, no overflow after
+shared CSS fixes, 176 remaining findings. Round 2: dynamic/session/not-found/empty,
+representative system mode, keyboard walks and injected failures; scoped system
+and keyboard checks passed, but module/app defects remain. Feeds table was absent.
+Neither round verifies production/provider outcomes, every later merge, other
+browsers, screen readers or every confirmed write. Historical matrices remain dated.
 
 ## Delivery discipline
 
-Use independently owned reviewable batches; product logic stays in modules,
-Facebook rules in its platform, shared hosts neutral. Shared services own current
-auth/scope, exact confirmations and audits for every entry point. Keep the contract
-unchanged unless the owner makes an explicit architecture decision. Update this
-plan, architecture and handoff with behavior/evidence changes. Publication follows
-the active lane authorization; this worker must not push, deploy or touch production.
+Current schema version is 111; this documentation lane adds no Root keys and does
+not edit registry version. Historical lane instructions to bump old versions are
+not current integration work. Recheck current source instead of replaying reports.
+Product logic belongs to modules, Facebook rules to its platform, shared hosts
+stay neutral. Services own current auth/scope, exact consent and domain audit.
+Keep source, automated, browser, provider and production evidence distinct; no
+invented completion percentages. Lane authorization: owned documentation only,
+no whole suite, servers, deploy, push or production. Leave verified working-tree
+changes for integration if Git metadata is outside writable roots.
