@@ -1,6 +1,8 @@
 import { AnalyticsFilters, MetricPicker } from './AnalyticsFilters';
 import { EmptyState } from '@/components/EmptyState';
-import { IconChartBar } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCalendarEvent, IconChartBar, IconPlugConnected, IconSend } from '@tabler/icons-react';
+import { MetricCard } from '@/components/MetricCard';
+import { OverviewInsights } from './insights/OverviewInsights';
 import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { readChannelProfiles } from '@/modules/settings/channel-profiles/service';
@@ -221,22 +223,28 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           {data.period.comparison && <p>Compared with {data.period.comparison.mode === 'year' ? 'the same calendar dates last year' : 'the previous equal-length period'}: {formatDay(data.period.comparison.start)} to {formatDay(data.period.comparison.end)}.</p>}
         </>}
 
-      {failure && <section className="panel analytics-state" role="alert"><h2>Analytics could not be loaded</h2><p>{failure.error}</p><p>Use the sidebar to retry with these filters or reset them.</p></section>}
+      {failure && <section className="panel analytics-state"><EmptyState tone="error" title="Analytics could not be loaded" action={<a href={retryHref}>Try again with these filters</a>}>{failure.error} Use the sidebar to retry with these filters or reset them.</EmptyState></section>}
       {data && <>
         {!data.options.channels.length && !data.options.adAccounts.length
-          ? <section className="panel analytics-state"><h2>No selected resources are available</h2><p>Connect or enable a channel or ad account to see its stored metrics. Use the sidebar to open Connections.</p></section>
+          ? <section className="panel analytics-state"><EmptyState icon={<IconPlugConnected />} title="No selected resources are available" action={connectionsHref ? <a href={connectionsHref}>View connections</a> : undefined}>Connect or enable a channel or ad account to see its stored metrics.</EmptyState></section>
           : (data.options.channels.length > 0 || data.options.adAccounts.length > 0) && !data.selected.channelIds.length && !data.selected.adAccountIds.length
-            ? <section className="panel analytics-state"><h2>No resources selected</h2><p>Choose channels or ad accounts in the sidebar to see their stored metrics.</p></section>
+            ? <section className="panel analytics-state"><EmptyState icon={<IconChartBar />} title="No resources selected">Choose channels or ad accounts in the sidebar to see their stored metrics.</EmptyState></section>
             : null}
         {audienceSection(data)}
+        {data.selected.channelIds.length > 0 && <OverviewInsights locale={locale} workspaceId={viewer.workspaceId} window={data.period.range}
+          channels={data.options.channels.filter(channel => data!.selected.channelIds.includes(channel.id))} />}
         {data.selected.channelIds.length > 0 && <section className="panel analytics-publishing">
           <div className="analytics-panel-title"><div><h2>Publishing records</h2><p className="small-note">Matched to selected channels and dates. Published posts use publish date, scheduled posts use scheduled date, and failed posts use creation date.</p></div></div>
-          <div className="metric-grid"><article className="metric-card"><dl><dt>Published</dt><dd>{data.publishing.published}</dd></dl></article><article className="metric-card"><dl><dt>Scheduled</dt><dd>{data.publishing.scheduled}</dd></dl></article><article className="metric-card"><dl><dt>Failed or partial</dt><dd>{data.publishing.failed}</dd></dl></article></div>
+          <div className="metric-grid">
+            <MetricCard module="analytics" icon={<IconSend />} label="Published" value={data.publishing.published} />
+            <MetricCard module="analytics" icon={<IconCalendarEvent />} label="Scheduled" value={data.publishing.scheduled} />
+            <MetricCard module="analytics" icon={<IconAlertTriangle />} label="Failed or partial" value={data.publishing.failed} />
+          </div>
         </section>}
         {data.selected.adAccountIds.length > 0 && <p className="small-note analytics-ad-coverage">{data.selected.adAccountIds.length} ad accounts selected. Coverage is shown for each metric.</p>}
         {data.detail ? <MetricTable data={data} /> : data.metrics.items.length ? <section className="panel">
           <div className="analytics-panel-title"><div><h2>Available metrics</h2><p className="small-note">Stored measurements for the selected resources and range. Use the sidebar to open a metric's full series and resource detail.</p></div><span className="badge">{data.metrics.total} metrics</span></div>
-          <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric key={`${metric.sourceLabel}:${metric.key}`} metric={metric} comparison={data.comparisons[metric.key]} chartPoints={data.chartPoints} />)}</div>
+          <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric key={`${metric.sourceLabel}:${metric.key}`} locale={locale} metric={metric} comparison={data.comparisons[metric.key]} chartPoints={data.chartPoints} />)}</div>
         </section> : data.selected.channelIds.length || data.selected.adAccountIds.length
           ? <EmptyState title="No metrics match these filters" icon={<IconChartBar />} action={<a href="/analytics">Reset filters</a>}>Change the date range, metric search, or resource selection in the sidebar.</EmptyState>
           : null}

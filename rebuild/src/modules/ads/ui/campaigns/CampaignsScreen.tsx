@@ -1,4 +1,8 @@
 import { PageHeader } from '@/components/PageHeader';
+import { EmptyState } from '@/components/EmptyState';
+import { IconAd, IconSpeakerphone } from '@tabler/icons-react';
+import { CampaignCharts } from './CampaignCharts';
+import { HierarchyTable } from './HierarchyTable';
 import { headers } from 'next/headers';
 import { adsLocale } from '@/modules/ads/analysis/copy';
 import { describeAdsManagement } from '@/modules/ads/management/server';
@@ -66,7 +70,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   const sidebar = <AdsReportSidebar accounts={accounts} filters={filters} action="/ads/campaigns" kind="objects" policy={policy} page={objectPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
   return <PageFrame module="ads" sidebar={accounts.length ? sidebar : undefined}><div className="page-stack">
     <PageHeader module="ads" title={"Campaign, ad set, and ad results"} description={<>{accounts.length ? `Showing ${objectPage.from}–${objectPage.to} of ${objectPage.resultCount} objects · Page ${objectPage.page} of ${objectPage.pageCount}. Stored daily insight records · ${dateRangeLabel(filters)}. Select an account and date range in the sidebar.` : 'Connect an advertising account to review and manage its campaigns.'}</>} />
-    {!accounts.length ? <section className="panel empty-state"><h2>No ad accounts connected</h2><p>Connect and select an advertising account to see campaign results and available actions here.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <>
+    {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title="No ad accounts connected" action={<a className="text-link" href="/settings/connections">View connections</a>}>Connect and select an advertising account to see campaign results and available actions here.</EmptyState></section> : <>
     {objectPage.resultCount ? [...byAccount].map(([accountId, rows]) => {
       const account = accounts.find(item => item.id === accountId);
       const levels = [
@@ -74,34 +78,25 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
       ];
       return <section className="panel ads-results-panel" key={accountId}>
         <div className="analytics-panel-title"><div><h2>{rows[0]?.accountName ?? account?.name ?? 'Ad account'}</h2><p className="small-note">{account?.actId}{account?.currency ? ` · ${account.currency}` : ''}</p></div><span className="badge">{rows.length} objects</span></div>
+        <CampaignCharts accountName={rows[0]?.accountName ?? account?.name ?? 'Ad account'} rows={rows} locale={locale} />
         {levels.map(level => {
           const levelRows = rows.filter(row => row.level === level.value);
           if (!levelRows.length) return null;
-          return <div className="ads-result-level" key={level.value}><h3>{level.label}</h3><div className="ads-performance-mobile" role="region" aria-label={`${level.label} results`}>
-            {levelRows.map(row => <article className="ads-performance-card" key={row.key}>
-              <header className="ads-performance-card__heading"><div><strong>{row.name}</strong><small className="ads-object-id">{row.id}</small></div><span>{row.rows} daily row{row.rows === 1 ? '' : 's'}</span></header>
-              {readAvailability.get(accountId) || actionAvailability.get(accountId) ? <AdsObjectActions adAccountId={accountId} objectId={row.id} name={row.name} objectType={row.level as 'campaign' | 'adset' | 'ad'} currency={row.currency} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null}
-              <dl className="ads-performance-card__metrics">
-                <div><dt>Spend</dt><dd>{money(row.spend, row.currency)}</dd></div><div><dt>Impressions</dt><dd>{number.format(row.impressions)}</dd></div>
-                <div><dt>Latest reach</dt><dd>{number.format(row.reach)}<small>{date(row.reachDate)}</small></dd></div><div><dt>Clicks</dt><dd>{number.format(row.clicks)}</dd></div>
-                <div><dt>CPC</dt><dd>{money(row.cpc, row.currency)}</dd></div><div><dt>CPM</dt><dd>{money(row.cpm, row.currency)}</dd></div>
-                <div><dt>CTR</dt><dd>{row.ctr === null ? '—' : `${number.format(row.ctr)}%`}</dd></div><div><dt>CPP</dt><dd>{money(row.cpp, row.currency)}</dd></div>
-                <div><dt>Frequency</dt><dd>{row.frequency === null ? '—' : number.format(row.frequency)}</dd></div>
-              </dl>
-              <details className="ads-stored-details"><summary>Stored details</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details>
-            </article>)}
-          </div><div className="ui-table-wrap"><table className="ui-table ads-performance-table"><caption className="ui-visually-hidden">{`${level.label} results for ${account?.name ?? rows[0]?.accountName ?? "ad account"}`}</caption><thead><tr><th scope="col">{level.label.slice(0, -1)} name</th><th scope="col">Daily rows</th><th scope="col" className="is-end">Spend</th><th scope="col" className="is-end">Impressions</th><th scope="col" className="is-end">Latest reach</th><th scope="col" className="is-end">Clicks</th><th scope="col" className="is-end">CPC</th><th scope="col" className="is-end">CPM</th><th scope="col" className="is-end">CTR</th><th scope="col" className="is-end">CPP</th><th scope="col" className="is-end">Freq.</th><th scope="col">Stored details</th></tr></thead>
-            <tbody>{levelRows.map(row => <tr key={row.key}>
-              <td><strong>{row.name}</strong><small className="ads-object-id">{row.id}</small>{readAvailability.get(accountId) || actionAvailability.get(accountId) ? <AdsObjectActions adAccountId={accountId} objectId={row.id} name={row.name} objectType={row.level as 'campaign' | 'adset' | 'ad'} currency={row.currency} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null}</td>
-              <td>{row.rows}</td><td className="is-end">{money(row.spend, row.currency)}</td><td className="is-end">{number.format(row.impressions)}</td><td className="is-end">{number.format(row.reach)}<small>{date(row.reachDate)}</small></td><td className="is-end">{number.format(row.clicks)}</td><td className="is-end">{money(row.cpc, row.currency)}</td><td className="is-end">{money(row.cpm, row.currency)}</td><td className="is-end">{row.ctr === null ? '—' : `${number.format(row.ctr)}%`}</td><td className="is-end">{money(row.cpp, row.currency)}</td><td className="is-end">{row.frequency === null ? '—' : number.format(row.frequency)}</td>
-              <td><details className="ads-stored-details"><summary>{row.rows} daily row{row.rows === 1 ? '' : 's'}</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details></td>
-            </tr>)}</tbody></table></div></div>;
+          const slot = (row: typeof levelRows[number]) => readAvailability.get(accountId) || actionAvailability.get(accountId)
+            ? <AdsObjectActions adAccountId={accountId} objectId={row.id} name={row.name} objectType={row.level as 'campaign' | 'adset' | 'ad'} currency={row.currency} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null;
+          return <div className="ads-result-level" key={level.value}><h3>{level.label}</h3>
+            <HierarchyTable locale={locale} caption={`${level.label} results for ${account?.name ?? rows[0]?.accountName ?? 'ad account'}`} objectsHref="/ads/objects"
+              rows={levelRows.map(row => ({ key: row.key, id: row.id, name: row.name, level: row.level as 'campaign' | 'adset' | 'ad', currency: row.currency, spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, days: row.rows,
+                spendSeries: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => entry.spend) }))}
+              actions={Object.fromEntries(levelRows.map(row => [row.key, slot(row)]))}
+              details={Object.fromEntries(levelRows.map(row => [row.key, <details className="ads-stored-details" key={row.key}><summary>{row.rows} daily row{row.rows === 1 ? '' : 's'}</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details>]))} />
+          </div>;
         })}
         {viewer.permissions.pageScope.all && actionAvailability.get(accountId) && adsUi.get(accountId)?.adSet && rows.some(row => row.level === 'campaign') ? <div className="ads-result-level"><h3>Create ad sets</h3><p className="small-note">Choose a campaign already verified in this account’s stored performance history.</p>
           {adsUi.get(accountId)?.adSet ? rows.filter(row => row.level === 'campaign').map(row => <AdSetCreateForm key={row.id} adAccountId={accountId} campaignId={row.id} campaignName={row.name} currency={row.currency} config={adsUi.get(accountId)!.adSet!} ownerScope={{ userId: viewer.user.id, workspaceId }} />) : null}
         </div> : null}
       </section>;
-    }) : <section className="panel"><div className="empty-state"><h2>No campaign, ad set, or ad insights stored</h2><p>When insight rows are captured for the selected ad accounts and dates, each level will appear here with its saved metrics.</p><a className="text-link" href="/ads">Return to ad accounts →</a></div></section>}
+    }) : <section className="panel"><EmptyState icon={<IconSpeakerphone />} title="No campaign, ad set, or ad insights stored" action={<a className="text-link" href="/ads">Return to ad accounts →</a>}>When insight rows are captured for the selected ad accounts and dates, each level will appear here with its saved metrics.</EmptyState></section>}
     {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>Create a campaign</h2><p className="small-note">Each campaign is created paused under one enabled ad account.</p>
       {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={{ userId: viewer.user.id, workspaceId }} />)}
     </section> : null}

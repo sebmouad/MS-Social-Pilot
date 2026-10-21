@@ -2,6 +2,9 @@ import { BarChart } from '@/components/charts';
 import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { Button } from '@/components/Button';
+import { EmptyState } from '@/components/EmptyState';
+import { IconUsers } from '@tabler/icons-react';
+import { AudienceChart } from './AudienceCharts';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { readDemographics } from '@/modules/analytics/demographics/server/demographics';
@@ -58,11 +61,12 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
   return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/demographics">{filters}</WorkflowNav>}><div className={styles.root}>
     <PageHeader module="analytics" title={t('Audience history', 'Historique de l’audience')} description={<>{t('Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.', 'Catégories d’âge, de genre, de pays, de ville et de langue enregistrées telles que fournies. Chaque mesure reste distincte ; les nombres ne sont jamais additionnés entre dates ou sources.')}</>} />
       {data && <p>{data.period.start} — {data.period.end} UTC</p>}
-    {failed && <section id="demographics-error" role="alert" className={styles.panel}><h2>{t('History could not be loaded', 'Impossible de charger l’historique')}</h2><p>{t('Review your dates and channels, narrow the period, or retry. Your filters have been retained.', 'Vérifiez les dates et les canaux, réduisez la période ou réessayez. Vos filtres sont conservés.')}</p></section>}
+    {failed && <section id="demographics-error" className={styles.panel}><EmptyState tone="error" title={t('History could not be loaded', 'Impossible de charger l’historique')} action={<a href="/analytics/demographics">{t('Reset filters', 'Réinitialiser les filtres')}</a>}>{t('Review your dates and channels, narrow the period, or retry. Your filters have been retained.', 'Vérifiez les dates et les canaux, réduisez la période ou réessayez. Vos filtres sont conservés.')}</EmptyState></section>}
     {data && <section className={styles.panel}><h2>{t('Audience size', 'Taille de l’audience')}</h2><p>{data.audience.covered ? number.format(data.audience.total) : unknown} · {data.audience.covered} / {data.audience.selected} {t('selected channels', 'canaux sélectionnés')}</p><p>{t('Latest valid figure per covered channel. This is not a count of unique people across networks.', 'Dernière valeur valide de chaque canal couvert. Ce total ne représente pas des personnes uniques entre réseaux.')}</p></section>}
-    {data?.empty && <section className={styles.panel}><h2>{t('No stored breakdowns', 'Aucune répartition enregistrée')}</h2><p>{t('Not available for these channels and dates. Try another period or channel.', 'Non disponible pour ces canaux et ces dates. Essayez une autre période ou un autre canal.')}</p></section>}
+    {data?.empty && <section className={styles.panel}><EmptyState icon={<IconUsers />} title={t('No stored breakdowns', 'Aucune répartition enregistrée')} action={<a href="/analytics/demographics">{t('Reset filters', 'Réinitialiser les filtres')}</a>}>{t('Not available for these channels and dates. Try another period or channel.', 'Non disponible pour ces canaux et ces dates. Essayez une autre période ou un autre canal.')}</EmptyState></section>}
     {metrics.map(metric => <section key={metric.key} className={styles.panel}><h2>{metric.label}</h2><p>{metric.sourceLabel} · {metric.unit}</p>
       <p>{t('Channels with stored snapshots', 'Canaux avec des mesures enregistrées')} : {metric.historyCoverage.covered} / {metric.historyCoverage.selected} · {when(metric.historyCoverage.oldestAsOf)} — {when(metric.historyCoverage.newestAsOf)}</p>
+      <AudienceChart locale={fr ? 'fr' : 'en'} label={`${metric.label} · ${t('latest stored figures', 'dernières valeurs enregistrées')}`} rows={metric.rows} />
       {!metric.history.length && <p>{unknown}</p>}
       {metric.history.map(item => <details key={`${item.resourceId}:${item.asOf.toISOString()}`}><summary>{item.resourceLabel} · {t('As of', 'Au')} {when(item.asOf)}</summary>
         <p>{t('Fetched at', 'Collecté le')} {when(item.fetchedAt)}</p>
