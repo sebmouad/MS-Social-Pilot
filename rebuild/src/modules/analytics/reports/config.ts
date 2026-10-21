@@ -1,12 +1,16 @@
 import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
 
+export const RESPONSE_ANALYSIS_LIMITS = { messages: { default: 20000, min: 100, max: 100000 }, members: { default: 25, min: 1, max: 500 } } as const;
+
 const G = 'Analytics · Report workflows';
 const num = (key: string, label: string, description: string, defaultValue: number, min: number, max: number) =>
   entry({ key, group: G, label, kind: 'number', description, defaultValue, schema: z.number().int().min(min).max(max), consumption: 'active' });
 
 /** Root-managed bounds for report templates and schedule definitions. */
 export const REPORT_WORKFLOW_CONFIG = [
+  num('analytics.reports.responseMessageLimit', 'Response analysis records per source', 'Maximum stored messages and maximum stored comments examined separately for one channel report; partial coverage is disclosed.', RESPONSE_ANALYSIS_LIMITS.messages.default, RESPONSE_ANALYSIS_LIMITS.messages.min, RESPONSE_ANALYSIS_LIMITS.messages.max),
+  num('analytics.reports.responseMemberLimit', 'Response analysis member rows', 'Maximum replying members listed in one channel report; omitted members are disclosed.', RESPONSE_ANALYSIS_LIMITS.members.default, RESPONSE_ANALYSIS_LIMITS.members.min, RESPONSE_ANALYSIS_LIMITS.members.max),
   num('analytics.reports.pageSize', 'Report list page size', 'Templates or schedules listed on one page.', 25, 5, 100),
   num('analytics.reports.maxTemplates', 'Report templates per workspace', 'Most saved report templates one workspace may keep.', 50, 1, 500),
   num('analytics.reports.templateNameMaxCharacters', 'Template name limit', 'Longest report template name.', 60, 10, 200),

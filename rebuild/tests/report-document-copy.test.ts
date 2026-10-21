@@ -39,3 +39,31 @@ describe('Root report document copy', () => {
     expect(tiny.truncated).toBe(true);
   });
 });
+
+
+describe('response report parity additions', () => {
+  const responseTime = {
+    answered: 2, unanswered: 1, medianMs: 60000, businessMedianMs: 30000,
+    slowestMs: 120000, businessSlowestMs: 60000,
+    businessHours: { days: [1, 2, 3, 4, 5], start: 9, end: 18, timeZone: 'UTC' },
+    partial: false, comments: { answered: 1, unanswered: 1 },
+    resolve: { resolved: 1, unresolved: 1, medianMs: 180000, businessMedianMs: 60000 },
+  };
+  it('exports the same comment, slowest and business resolution figures in CSV, JSON and customer-readable formats', () => {
+    const out = renderReport(snapshot as never, { ...input, sections: ['responseTime'], responseTime }, bounds);
+    const records = JSON.parse(out.json!).records;
+    expect(records.find((r: { metric_key: string }) => r.metric_key === 'slowest_first_response_minutes').value).toBe(2);
+    expect(records.find((r: { metric_key: string }) => r.metric_key === 'median_resolve_business_minutes').value).toBe(1);
+    expect(out.csv).toContain('comment_answered_waits');
+    expect(out.html).toContain('Slowest first response: 2 min calendar time; 1 min within business hours.');
+    expect(out.text).toContain('Comment waits: 1 answered, 1 waiting at period end.');
+    expect(out.text).toContain('Resolve time within business hours: median 1 min.');
+  });
+  it('localizes every new label and preserves unknown business-hours measures', () => {
+    const out = renderReport(snapshot as never, { ...input, sections: ['responseTime'], responseTime: { ...responseTime, businessHours: null, businessSlowestMs: null, resolve: { ...responseTime.resolve, businessMedianMs: null } } }, bounds, reportDocumentCopyDefaults.fr, 'fr');
+    expect(out.html).toContain('Réponse initiale la plus lente');
+    expect(out.text).toContain('Résolution en heures ouvrées : médiane Non disponible.');
+    expect(out.csv).toContain('Délai médian de résolution');
+    expect(JSON.parse(out.json!).records.find((r: { metric_key: string }) => r.metric_key === 'median_resolve_business_minutes').value).toBeNull();
+  });
+});
