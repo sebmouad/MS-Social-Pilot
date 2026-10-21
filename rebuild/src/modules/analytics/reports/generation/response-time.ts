@@ -22,8 +22,8 @@ export type ResponseTimeSummary = {
   history?: { resolved: number; reopened: number; measuredCycles: number; medianMs: number | null; businessMedianMs: number | null };
   answered: number; unanswered: number; medianMs: number | null;
   slowestMs?: number | null; businessSlowestMs?: number | null;
-  comments?: { answered: number; unanswered: number };
-  conversations?: { answered: number; unanswered: number };
+  comments?: SourceResponseSummary;
+  conversations?: SourceResponseSummary;
   /** Median counting only business hours; null when no business hours are set or nothing was answered. */
   businessMedianMs: number | null;
   /** The hours and zone applied, or null when the workspace has no business hours. */
@@ -37,7 +37,13 @@ export type ResponseTimeSummary = {
   /** First visitor message in the period to the conversation's resolvedAt. Unresolved conversations are counted, never zero. */
   resolve?: ResolveSummary;
 };
-export type MemberResponse = { memberId: string | null; name: string; answered: number; medianMs: number | null };
+/** Separate source statistics; optional measures keep retained/older summaries readable. */
+export type SourceResponseSummary = {
+  answered: number; unanswered: number; total?: number; answeredPercent?: number | null;
+  medianMs?: number | null; businessMedianMs?: number | null;
+  slowestMs?: number | null; businessSlowestMs?: number | null; resolve?: ResolveSummary;
+};
+export type MemberResponse = { memberId: string | null; name: string; answered: number; medianMs: number | null; businessMedianMs?: number | null };
 export type ResolveSummary = { resolved: number; unresolved: number; medianMs: number | null; businessMedianMs?: number | null };
 
 export const OUTSIDE_APP_LABEL = responseTimeCopyDefaults.outside.en;
@@ -67,6 +73,7 @@ export function median(values: number[]): number | null {
 export function summarizeResponseTimes(messages: ResponseMessage[], partial = false, business: { hours: BusinessHoursSetting; timeZone: string } | null = null, memberNames: ReadonlyMap<string, string> = new Map(), copy: ResponseTimeCopy = responseTimeCopyDefaults, locale: 'en' | 'fr' = 'en', memberLimit: number = MEMBER_ROWS_CAP): ResponseTimeSummary {
   const waits: number[] = [];
   const byReplier = new Map<string | null, number[]>();
+  const businessByReplier = new Map<string | null, number[]>();
   const resolveWaits: number[] = [];
   const businessResolveWaits: number[] = [];
   let resolved = 0; let unresolved = 0;
@@ -92,7 +99,11 @@ export function summarizeResponseTimes(messages: ResponseMessage[], partial = fa
         waits.push(wait);
         const replier = m.sentById ?? null;
         byReplier.set(replier, [...(byReplier.get(replier) ?? []), wait]);
-        if (business) businessWaits.push(businessMs(waitingSince, m.createdTime, business.hours, business.timeZone));
+        if (business) {
+          const businessWait = businessMs(waitingSince, m.createdTime, business.hours, business.timeZone);
+          businessWaits.push(businessWait);
+          businessByReplier.set(replier, [...(businessByReplier.get(replier) ?? []), businessWait]);
+        }
         waitingSince = null;
       }
     } else {
@@ -104,6 +115,7 @@ export function summarizeResponseTimes(messages: ResponseMessage[], partial = fa
   if (waitingSince) unanswered += 1;
   const everyone: MemberResponse[] = [...byReplier].map(([memberId, list]) => ({
     memberId, answered: list.length, medianMs: median(list),
+    businessMedianMs: business ? median(businessByReplier.get(memberId) ?? []) : null,
     name: memberId === null ? copy.outside[locale] : memberNames.get(memberId) ?? copy.former[locale],
   })).sort((a, b) => b.answered - a.answered || a.name.localeCompare(b.name));
   return {
@@ -114,6 +126,18 @@ export function summarizeResponseTimes(messages: ResponseMessage[], partial = fa
     answered: waits.length, unanswered, medianMs: median(waits), partial,
     businessMedianMs: business ? median(businessWaits) : null,
     businessHours: business ? { ...business.hours, timeZone: business.timeZone } : null,
+  };
+}
+
+/** Uses the same wait arithmetic as the combined report; never averages source medians. */
+export function summarizeResponseSource(messages: ResponseMessage[], partial = false, business: { hours: BusinessHoursSetting; timeZone: string } | null = null): SourceResponseSummary {
+  const result = summarizeResponseTimes(messages, partial, business);
+  const total = result.answered + result.unanswered;
+  return {
+    total, answered: result.answered, unanswered: result.unanswered,
+    answeredPercent: total ? result.answered / total * 100 : null,
+    medianMs: result.medianMs, businessMedianMs: result.businessMedianMs,
+    slowestMs: result.slowestMs, businessSlowestMs: result.businessSlowestMs, resolve: result.resolve,
   };
 }
 
@@ -213,7 +237,7 @@ export async function readResponseTime(workspaceId: string, channelId: string, p
   const users = memberIds.length ? await prisma.user.findMany({ where: { id: { in: memberIds }, memberships: { some: { workspaceId } } }, select: { id: true, name: true } }) : [];
   const names = new Map(users.map(u => [u.id, u.name])); const copy = await responseCopy();
   const summary = summarizeResponseTimes(combined, partial, business, names, copy, locale, memberLimit);
-  const counts = (items: ResponseMessage[]) => { const result = summarizeResponseTimes(items); return { answered: result.answered, unanswered: result.unanswered }; };
+  const counts = (items: ResponseMessage[]) => summarizeResponseSource(items, partial, business);
   return { ...summary, comments: counts(commentMessages), conversations: counts(messages),
     history: { resolved: history.filter(event => event.createdAt >= from && event.resolved).length, reopened: history.filter(event => event.createdAt >= from && !event.resolved).length, measuredCycles: cycles.length, medianMs: median(cycles.map(cycle => calendarMs(cycle.startedAt, cycle.resolvedAt))), businessMedianMs: business ? median(cycles.map(cycle => businessMs(cycle.startedAt, cycle.resolvedAt, business.hours, business.timeZone))) : null },
     coverage: { storedOnly: true, messagesRead: Math.min(rows.length, messageLimit), commentsRead: Math.min(commentRows.length, messageLimit), eventsRead: history.length, messagesTruncated: rows.length > messageLimit, commentsTruncated: commentRows.length > messageLimit, eventsTruncated, incompleteGroupsExcluded: Number(splitConversation) + Number(splitPost), snapshotFallbackItems, periodStart: from.toISOString(), periodEndExclusive: to.toISOString() },

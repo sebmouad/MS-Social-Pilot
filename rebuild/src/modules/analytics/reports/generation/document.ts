@@ -90,7 +90,7 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     : t("Calendar time: median first response {v0}. Business hours are not set for this workspace, so no business-hours figure is shown.", { v0: formatDuration(response.medianMs) })) : '';
   const responseLine = response ? t("{v0} {v1} answered, {v2} waiting at period end. From stored Inbox messages{v3}.", { v0: responseBasis, v1: response.answered, v2: response.unanswered, v3: response.partial ? t("; only the earliest messages were read") : '' }) : '';
   const memberLine = (m: { name: string; answered: number; medianMs: number | null }) => t("{v0}: {v1} answered, median first response {v2}", { v0: clamp(m.name, 80), v1: m.answered, v2: formatDuration(m.medianMs) });
-  const memberLines = response?.members ? [...response.members.map(memberLine), ...(response.membersOmitted ? [t("{v0} more not listed", { v0: response.membersOmitted })] : [])] : [];
+  const memberLines = response?.members ? [...response.members.flatMap(m => [memberLine(m), ...(m.businessMedianMs !== undefined ? [t("{v0}: median first response within business hours {v1}.", { v0: clamp(m.name, 80), v1: formatDuration(m.businessMedianMs) })] : [])]), ...(response.membersOmitted ? [t("{v0} more not listed", { v0: response.membersOmitted })] : [])] : [];
   const resolveLine = response?.resolve ? t("Resolve time: median {v0} from the first visitor message to resolved; {v1} resolved, {v2} not resolved (not counted as zero).", { v0: formatDuration(response.resolve.medianMs), v1: response.resolve.resolved, v2: response.resolve.unresolved }) : '';
   const responseDetails = response ? [
     t("Stored comments and conversation messages; unavailable history is not included."),
@@ -107,6 +107,17 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     t("Resolve time within business hours: median {v0}.", { v0: formatDuration(response.resolve?.businessMedianMs ?? null) }),
     ...(response.comments ? [t("Comment waits: {v0} answered, {v1} waiting at period end.", { v0: response.comments.answered, v1: response.comments.unanswered })] : []),
   ] : [];
+  const sourceSummaries = response ? [
+    { prefix: 'comment', label: t("Comments"), summary: response.comments },
+    { prefix: 'conversation', label: t("Conversations"), summary: response.conversations },
+  ] : [];
+  for (const { label, summary: r } of sourceSummaries) if (r && r.total !== undefined) {
+    responseDetails.push(
+      t("{v0}: {v1} waits, {v2} answered, {v3} waiting; answered share {v4}.", { v0: label, v1: r.total, v2: r.answered, v3: r.unanswered, v4: r.answeredPercent == null ? t("Not available") : `${r.answeredPercent}%` }),
+      t("{v0}: median first response {v1} calendar time, {v2} within business hours; slowest {v3} calendar time, {v4} within business hours.", { v0: label, v1: formatDuration(r.medianMs ?? null), v2: formatDuration(r.businessMedianMs ?? null), v3: formatDuration(r.slowestMs ?? null), v4: formatDuration(r.businessSlowestMs ?? null) }),
+      t("{v0}: median resolution {v1} calendar time, {v2} within business hours; {v3} resolved, {v4} unresolved.", { v0: label, v1: formatDuration(r.resolve?.medianMs ?? null), v2: formatDuration(r.resolve?.businessMedianMs ?? null), v3: r.resolve?.resolved ?? 0, v4: r.resolve?.unresolved ?? 0 }),
+    );
+  }
   const recap = included.includes('aiRecap') ? input.recap ?? null : null;
   const recapText = recap ? (recap.state === 'ready' ? recap.text : RECAP_UNAVAILABLE) : '';
   const topPosts = included.includes('topPosts') ? input.topPosts ?? [] : null;
@@ -144,10 +155,28 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     rows.push(['response_time', 'slowest_first_response_minutes', t("Slowest first response (calendar time)"), t("Inbox"), '', '', response.slowestMs == null ? '' : Math.round(response.slowestMs / 60_000), 'minutes', response.partial ? 'partial' : '', t("Maximum observed answered wait; calendar time")]);
     rows.push(['response_time', 'slowest_first_response_business_minutes', t("Slowest first response (business hours)"), t("Inbox"), '', '', response.businessSlowestMs == null ? '' : Math.round(response.businessSlowestMs / 60_000), 'minutes', response.businessHours ? (response.partial ? 'partial' : '') : t("not set"), t("Maximum observed answered wait within business hours")]);
     rows.push(['response_time', 'median_resolve_business_minutes', t("Median resolve time (business hours)"), t("Inbox"), '', '', response.resolve?.businessMedianMs == null ? '' : Math.round(response.resolve.businessMedianMs / 60_000), 'minutes', response.businessHours ? (response.partial ? 'partial' : '') : t("not set"), t("Resolution waits within configured business hours; unresolved waits excluded, not zero")]);
-    if (response.comments) {
+    if (response.comments && response.comments.total === undefined) {
       rows.push(['response_time', 'comment_answered_waits', t("Comment waits answered"), t("Inbox"), '', '', response.comments.answered, 'waits', response.partial ? 'partial' : '', t("Count in period")]);
       rows.push(['response_time', 'comment_unanswered_waits', t("Comment waits unanswered"), t("Inbox"), '', '', response.comments.unanswered, 'waits', response.partial ? 'partial' : '', t("Count at period end")]);
     }
+    for (const { prefix, label, summary: r } of sourceSummaries) if (r && r.total !== undefined) {
+      const coverage = response.partial ? 'partial' : 'stored_only';
+      const add = (key: string, metric: string, value: number | null | undefined, unit: string, note: string) => rows.push(['response_time', `${prefix}_${key}`, metric, t("Inbox"), label, '', value ?? '', unit, coverage, note]);
+      add('total_waits', t("Total visitor waits"), r.total, 'waits', t("Count in period"));
+      add('answered_percent', t("Answered share"), r.answeredPercent, 'percent', t("Answered waits divided by all visitor waits; unavailable when there are no waits."));
+      add('answered_waits', t("Answered waits"), r.answered, 'waits', t("Count in period"));
+      add('unanswered_waits', t("Waiting at period end"), r.unanswered, 'waits', t("Count at period end"));
+      const minutes = (value: number | null | undefined) => value == null ? null : value / 60_000;
+      add('median_first_response_minutes', t("Median first response (calendar time)"), minutes(r.medianMs), 'minutes', t("Median wait until the channel replied; calendar time"));
+      add('median_first_response_business_minutes', t("Median first response (business hours)"), minutes(r.businessMedianMs), 'minutes', response.businessHours ? describeBusinessHours(response.businessHours) : t("not set"));
+      add('slowest_first_response_minutes', t("Slowest first response (calendar time)"), minutes(r.slowestMs), 'minutes', t("Maximum observed answered wait; calendar time"));
+      add('slowest_first_response_business_minutes', t("Slowest first response (business hours)"), minutes(r.businessSlowestMs), 'minutes', response.businessHours ? describeBusinessHours(response.businessHours) : t("not set"));
+      add('median_resolve_minutes', t("Median resolve time"), minutes(r.resolve?.medianMs), 'minutes', t("Count at period end"));
+      add('median_resolve_business_minutes', t("Median resolve time (business hours)"), minutes(r.resolve?.businessMedianMs), 'minutes', response.businessHours ? describeBusinessHours(response.businessHours) : t("not set"));
+      add('resolved_waits', t("Resolved"), r.resolve?.resolved, 'waits', t("Count at period end"));
+      add('unresolved_waits', t("Not resolved"), r.resolve?.unresolved, 'waits', t("Count at period end"));
+    }
+    for (const m of response.members ?? []) if (m.businessMedianMs !== undefined) rows.push(['response_time', 'member_first_response_business_minutes', t("Median first response by member (business hours)"), t("Inbox"), clamp(m.name, 80), '', m.businessMedianMs === null ? '' : m.businessMedianMs / 60_000, 'minutes', response.businessHours ? (response.partial ? 'partial' : 'stored_only') : t("not set"), t("First replies attributed to the responding member; configured workspace business hours only.")]);
     rows.push(['response_time', 'answered_waits', t("Answered waits"), t("Inbox"), '', '', response.answered, 'waits', response.partial ? 'partial' : '', t("Count in period")]);
     rows.push(['response_time', 'unanswered_waits', t("Waiting at period end"), t("Inbox"), '', '', response.unanswered, 'waits', response.partial ? 'partial' : '', t("Count at period end")]);
     for (const m of response.members ?? []) rows.push(['response_time', 'member_first_response_minutes', t("Median first response by member"), t("Inbox"), clamp(m.name, 80), '', m.medianMs === null ? '' : Math.round(m.medianMs / 60_000), 'minutes', t("{v0} answered", { v0: m.answered }), m.memberId === null ? t("Replies sent outside the app; calendar time") : t("Replies sent through this app; calendar time")]);

@@ -1,5 +1,18 @@
 import { z } from 'zod';
 const en = {
+  "Resolved": "Resolved",
+  "Comments": "Comments",
+  "Conversations": "Conversations",
+  "Answered share": "Answered share",
+  "Total visitor waits": "Total visitor waits",
+  "{v0}: {v1} waits, {v2} answered, {v3} waiting; answered share {v4}.": "{v0}: {v1} waits, {v2} answered, {v3} waiting; answered share {v4}.",
+  "{v0}: median first response {v1} calendar time, {v2} within business hours; slowest {v3} calendar time, {v4} within business hours.": "{v0}: median first response {v1} calendar time, {v2} within business hours; slowest {v3} calendar time, {v4} within business hours.",
+  "{v0}: median resolution {v1} calendar time, {v2} within business hours; {v3} resolved, {v4} unresolved.": "{v0}: median resolution {v1} calendar time, {v2} within business hours; {v3} resolved, {v4} unresolved.",
+  "{v0}: median first response within business hours {v1}.": "{v0}: median first response within business hours {v1}.",
+  "Median first response by member (business hours)": "Median first response by member (business hours)",
+  "First replies attributed to the responding member; configured workspace business hours only.": "First replies attributed to the responding member; configured workspace business hours only.",
+  "Answered waits divided by all visitor waits; unavailable when there are no waits.": "Answered waits divided by all visitor waits; unavailable when there are no waits.",
+
   "Incomplete threads or post discussions excluded at the read limit: {v0}.": "Incomplete threads or post discussions excluded at the read limit: {v0}.",
   "Historical resolution cycles": "Historical resolution cycles",
   "Historical resolution cycles: {v0} measured; median {v1} calendar time, {v2} within business hours.": "Historical resolution cycles: {v0} measured; median {v1} calendar time, {v2} within business hours.",
@@ -133,6 +146,19 @@ const en = {
   "Channel": "Channel"
 };
 const fr: typeof en = {
+  "Resolved": "Résolues",
+  "Comments": "Commentaires",
+  "Conversations": "Conversations",
+  "Answered share": "Part des attentes traitées",
+  "Total visitor waits": "Total des attentes de visiteurs",
+  "{v0}: {v1} waits, {v2} answered, {v3} waiting; answered share {v4}.": "{v0} : {v1} attentes, {v2} traitées, {v3} en attente ; part traitée {v4}.",
+  "{v0}: median first response {v1} calendar time, {v2} within business hours; slowest {v3} calendar time, {v4} within business hours.": "{v0} : première réponse médiane {v1} en temps calendaire, {v2} en heures ouvrées ; maximum {v3} en temps calendaire, {v4} en heures ouvrées.",
+  "{v0}: median resolution {v1} calendar time, {v2} within business hours; {v3} resolved, {v4} unresolved.": "{v0} : résolution médiane {v1} en temps calendaire, {v2} en heures ouvrées ; {v3} résolues, {v4} non résolues.",
+  "{v0}: median first response within business hours {v1}.": "{v0} : première réponse médiane en heures ouvrées {v1}.",
+  "Median first response by member (business hours)": "Première réponse médiane par membre (heures ouvrées)",
+  "First replies attributed to the responding member; configured workspace business hours only.": "Premières réponses attribuées au membre ayant répondu ; heures ouvrées configurées de l’espace uniquement.",
+  "Answered waits divided by all visitor waits; unavailable when there are no waits.": "Attentes traitées divisées par toutes les attentes de visiteurs ; indisponible en l’absence d’attentes.",
+
   "Incomplete threads or post discussions excluded at the read limit: {v0}.": "Conversations ou discussions de publication incomplètes exclues à la limite de lecture : {v0}.",
   "Historical resolution cycles": "Cycles de résolution historiques",
   "Historical resolution cycles: {v0} measured; median {v1} calendar time, {v2} within business hours.": "Cycles de résolution historiques : {v0} mesurés ; médiane de {v1} en temps calendaire, {v2} en heures ouvrées.",

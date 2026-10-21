@@ -112,6 +112,6 @@ it('applies comment workflow history by local root id, without mixing remote ids
 
 it('keeps French report guidance when a customized stored UI catalog predates the new copy', async () => {
   const { uiCopy, reportCopyDefaults } = await import('../src/modules/analytics/ui/reports/copy');
-  const key = Object.keys(reportCopyDefaults).find(key => key.startsWith('Response reports preserve'))!;
-  expect(uiCopy('fr', {})(key)).toContain('Les rapports de réponse');
+  const key = Object.keys(reportCopyDefaults).find(key => key.startsWith('Response reports separate'))!;
+  expect(uiCopy('fr', {})(key)).toContain('Les rapports distinguent');
 });

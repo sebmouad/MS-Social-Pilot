@@ -40,3 +40,18 @@ it('reads both sources under tenant/channel bounds, flags source truncation and 
   expect(summary).toMatchObject({ answered: 0, unanswered: 1, partial: true, comments: { answered: 0, unanswered: 0 }, conversations: { answered: 0, unanswered: 1 }, resolve: { resolved: 0, unresolved: 1 } });
   expect(db.postComment.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { createdTime: { lt: end }, postTarget: { targetId: 'target', target: { workspaceId: 'workspace' } } }, take: 101 }));
 });
+
+it('reads separate source durations and member business medians through the shared scoped reader', async () => {
+  db.target.findFirst.mockResolvedValue({ providerId: 'channel' });
+  db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => strings.join('').includes('root_activities') ? [] : [{ timezone: 'UTC', businessDays: [4], businessStart: 9, businessEnd: 18 }]);
+  db.user.findMany.mockResolvedValue([{ id: 'member', name: 'Example member' }]);
+  db.conversationMessage.findMany.mockResolvedValue([
+    { conversationId: 'c', createdTime: at(8), fromId: 'visitor', sentById: null, conversation: { resolvedAt: at(12) } },
+    { conversationId: 'c', createdTime: at(10), fromId: 'channel', sentById: 'member', conversation: { resolvedAt: at(12) } },
+  ]);
+  db.postComment.findMany.mockResolvedValue([row('root', 17), row('reply', 20, { parentRemoteId: 'root', fromId: 'channel', sentById: 'member' })]);
+  const summary = await readResponseTime('workspace', 'target', { start: '2026-10-01', end: '2026-10-01' });
+  expect(summary.conversations).toMatchObject({ total: 1, answeredPercent: 100, medianMs: 2 * 3600000, businessMedianMs: 3600000, resolve: { resolved: 1, businessMedianMs: 3 * 3600000 } });
+  expect(summary.comments).toMatchObject({ total: 1, answeredPercent: 100, medianMs: 3 * 3600000, businessMedianMs: 3600000, resolve: { unresolved: 1, medianMs: null } });
+  expect(summary.members).toMatchObject([{ memberId: 'member', answered: 2, medianMs: 2.5 * 3600000, businessMedianMs: 3600000 }]);
+});
