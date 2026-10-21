@@ -18,12 +18,14 @@ const identity = { userId: 'u', workspaceId: 'w', sessionTokenHash: 'hash' };
 const request = (path: string, body?: unknown, headers: Record<string, string> = {}) => new Request(`https://app.example.test${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { origin: 'https://app.example.test', ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 beforeEach(() => {
   vi.clearAllMocks(); m.viewer.mockResolvedValue({ user: { id: 'u' }, workspaceId: 'w' }); m.actor.mockResolvedValue(identity); m.authorize.mockResolvedValue(undefined);
-  m.appearance.mockResolvedValue({ theme: 'meta', mode: 'system', modePersistence: 'cookie' }); m.reveal.mockResolvedValue({ id: 'hook', secret: 'synthetic-signing-secret' }); m.rotate.mockResolvedValue({ id: 'hook', secret: 'new-synthetic-signing-secret' }); m.channels.mockResolvedValue([{ id: 'channel', name: 'Example channel' }]);
+  m.appearance.mockResolvedValue({ theme: 'meta', mode: 'system', modePersistence: 'account' }); m.reveal.mockResolvedValue({ id: 'hook', secret: 'synthetic-signing-secret' }); m.rotate.mockResolvedValue({ id: 'hook', secret: 'new-synthetic-signing-secret' }); m.channels.mockResolvedValue([{ id: 'channel', name: 'Example channel' }]);
 });
 it('REST and MCP appearance invoke exactly the same session service', async () => {
   const body = { theme: 'meta', mode: 'system', confirmation: 'UPDATE APPEARANCE' };
   expect((await GET(request('/api/settings/appearance'))).status).toBe(200);
   expect(m.appearance).toHaveBeenLastCalledWith(identity, undefined);
+  expect(await SESSION_PARITY_MCP.execute(viewer, 'get_appearance', {}, 10)).toMatchObject({ modePersistence: 'account' });
+  expect(m.appearance).toHaveBeenLastCalledWith(identity);
   expect((await PATCH(request('/api/settings/appearance', body))).status).toBe(200);
   expect(m.appearance).toHaveBeenLastCalledWith(identity, body);
   await SESSION_PARITY_MCP.execute(viewer, 'update_appearance', body, 10);
