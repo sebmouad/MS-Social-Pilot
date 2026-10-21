@@ -1,4 +1,3 @@
-import { headers } from 'next/headers';
 import { MetricViews } from './MetricViews';
 import { PageHeader } from '@/components/PageHeader';
 import { PageFrame } from '@/server/PageFrame';
@@ -37,9 +36,8 @@ function Detail({ data, locale }: { data: AnalyticsExplorerResult; locale: 'en' 
   </section>;
 }
 
-export default async function AnalyticsExplorerPage({ searchParams }: { searchParams: Promise<Search> }) {
+export default async function AnalyticsExplorerPage({ searchParams, locale = 'en' }: { searchParams: Promise<Search>; locale?: 'en' | 'fr' }) {
   const viewer = await requireViewer({ feature: 'analytics/explorer', channelScoped: true });
-  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
   const params = await searchParams; let data: AnalyticsExplorerResult | null = null; let failure = '';
   try { data = await readAnalyticsExplorer({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, params as Record<string, unknown>, { allowedChannelIds: viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, feature: 'analytics/explorer' }); }
   catch (error) { failure = operationFailure(error, 'Analytics Explorer could not be loaded. Change the filters or retry.').error; }

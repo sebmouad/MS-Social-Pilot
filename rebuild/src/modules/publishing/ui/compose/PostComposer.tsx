@@ -439,19 +439,6 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
             })}
           </ul>}
           {remoteScheduling?.offered && scheduleMode === 'remote' && appOnly.length > 0 && <small role="status">{holdCopy.appOnly.replace('{names}', appOnly.map(target => target.name).join(', '))}</small>}
-          {queueAvailable && <section className={styles.queueSlot} aria-label={copy.legend} aria-live="polite">
-            <h3>{copy.legend}</h3>
-            {!selected.length ? <p>{copy.chooseDestination}</p>
-              : queuePreview === 'loading' || queuePreview === null || previewSelection !== selectedKey ? <p>{copy.loading}</p>
-              : queuePreview.status === 'error' ? <><p>{copy.unavailable}</p><Button type="button" size="sm" disabled={pending || uploading || saved} onClick={() => setPreviewRefresh(value => value + 1)}>{copy.retryPreview}</Button></>
-              : queuePreview.status === 'full' ? <p>{copy.full}</p>
-              : <>
-                <p><strong>{fill(copy.next, { time: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) })}</strong></p>
-                {selected.length > 1 && <ul>{queuePreview.channels.map(channel => { const name = selected.find(target => target.id === channel.targetId)?.name ?? ''; return <li key={channel.targetId}>{channel.nextAt ? fill(copy.channelLine, { name, time: formatDate(new Date(channel.nextAt), schedule.timeZone) }) : fill(copy.channelFull, { name })}</li>; })}</ul>}
-                <small>{copy.estimate}</small>
-              </>}
-            <small>{copy.hint}</small>
-          </section>}
         </fieldset>
         {autosaveSeconds > 0 && <p className={styles.autosave} aria-live="polite">{autosave.status === 'saving' ? text.autosaveSaving : autosave.status === 'saved' && autosave.at ? text.autosaveSaved(autosave.at) : autosave.status === 'error' ? text.autosaveFailed : text.autosaveOn}</p>}
       </Step>
@@ -473,6 +460,19 @@ export function PostComposer({ profiles, targets, templates = [], imageRules, sc
           <Button form={FORM_ID} type="submit" name="intent" value="schedule" variant="primary" disabled={pending || uploading || saved} onClick={() => setMode('schedule')}>{uploading ? 'Uploading…' : saved ? 'Opening…' : pending ? 'Saving…' : 'Schedule post'}</Button>
           {queueAvailable && <Button form={FORM_ID} type="submit" name="intent" value="queue" disabled={pending || uploading || saved || !(queuePreview && typeof queuePreview === 'object' && queuePreview.status === 'ready' && previewSelection === selectedKey)} onClick={() => setMode('queue')}>{uploading ? 'Uploading…' : saved ? 'Opening…' : pending ? 'Saving…' : copy.button}</Button>}
         </div>
+        {queueAvailable && <section className={styles.queueSlot} aria-label={copy.legend} aria-live="polite">
+          <h3>{copy.legend}</h3>
+          {!selected.length ? <p>{copy.chooseDestination}</p>
+            : queuePreview === 'loading' || queuePreview === null || previewSelection !== selectedKey ? <p>{copy.loading}</p>
+            : queuePreview.status === 'error' ? <><p>{copy.unavailable}</p><Button type="button" size="sm" disabled={pending || uploading || saved} onClick={() => setPreviewRefresh(value => value + 1)}>{copy.retryPreview}</Button></>
+            : queuePreview.status === 'full' ? <p>{copy.full}</p>
+            : <>
+              <p><strong>{fill(copy.next, { time: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) })}</strong></p>
+              {selected.length > 1 && <ul>{queuePreview.channels.map(channel => { const name = selected.find(target => target.id === channel.targetId)?.name ?? ''; return <li key={channel.targetId}>{channel.nextAt ? fill(copy.channelLine, { name, time: formatDate(new Date(channel.nextAt), schedule.timeZone) }) : fill(copy.channelFull, { name })}</li>; })}</ul>}
+              <small>{copy.estimate}</small>
+            </>}
+          <small>{copy.hint}</small>
+        </section>}
         <fieldset className={styles.destinationList} disabled={pending || uploading || saved}>
           <legend>Destinations</legend>
           {profiles && <GroupShortcut groups={profiles.groups} allowedIds={targets.filter(target => target.canPublish).map(target => target.id)} onSelect={setSelectedTargets} locale={aiLocale} disabled={pending || uploading || saved} />}

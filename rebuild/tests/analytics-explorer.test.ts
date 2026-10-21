@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const state = vi.hoisted(() => ({ read: vi.fn(), config: vi.fn(), viewer: vi.fn() }));
+const state = vi.hoisted(() => ({ read: vi.fn(), config: vi.fn(), viewer: vi.fn(), headers: vi.fn() }));
+vi.mock('next/headers', () => ({ headers: state.headers }));
 vi.mock('../src/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: state.read }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
@@ -14,6 +15,7 @@ import { readAnalyticsExplorer } from '../src/modules/analytics/server/explorer'
 import { executeAnalyticsExplorerTool, analyticsExplorerToolDefinitions } from '../src/modules/analytics/explorer-mcp';
 import { GET } from '../src/app/api/analytics/explorer/route';
 import AnalyticsExplorerPage from '../src/modules/analytics/ui/explorer/ExplorerScreen';
+import AnalyticsExplorerRoute from '../src/app/analytics/explorer/page';
 import type { AnalyticsSnapshot } from '../src/modules/analytics/server/types';
 
 const metric = (key: string, label: string, sourceLabel: string, kind: 'flow' | 'stock' = 'flow') => ({
@@ -30,11 +32,27 @@ const snapshot = (): AnalyticsSnapshot => ({
 const actor = { userId: 'reader-a', workspaceId: 'workspace-a' };
 beforeEach(() => {
   vi.clearAllMocks(); state.read.mockResolvedValue(snapshot());
+  state.headers.mockImplementation(() => { throw new Error('Request headers are unavailable in components'); });
   state.config.mockImplementation(async (key: string) => ({ 'analytics.explorerSearchMaxCharacters': 500, 'analytics.searchMaxLength': 200, 'analytics.explorerPageSize': 1, 'analytics.detailPageSize': 1 }[key]));
   state.viewer.mockResolvedValue({ user: { id: actor.userId }, workspaceId: actor.workspaceId, permissions: { pageScope: { all: false, ids: ['channel-a'] } } });
 });
 
 describe('Analytics Explorer', () => {
+  it.each([
+    ['fr-FR,fr;q=0.9,en;q=0.8', 'Graphique'],
+    ['en-US,en;q=0.9', 'Chart'],
+    [null, 'Chart'],
+  ])('resolves %s in the server page and passes the locale to metric views', async (language, chartLabel) => {
+    state.headers.mockResolvedValueOnce(new Headers(language ? { 'accept-language': language } : {}));
+    const page = await AnalyticsExplorerRoute({ searchParams: Promise.resolve({ metric: 'reach' }) });
+    expect(page.type).toBe(AnalyticsExplorerPage);
+    // Once the page has resolved the request, its screen must render without headers.
+    const tree = await page.type(page.props);
+    const html = renderToStaticMarkup(tree);
+    expect(html).toContain(chartLabel);
+    expect(html).toContain('Reach');
+  });
+
   it('filters by exact provenance and metric kind, then paginates both metrics and detail rows', async () => {
     const result = await readAnalyticsExplorer(actor, { start: '2026-10-10', end: '2026-10-16', filter: '1', channel: 'channel-a', source: 'Community', kind: 'flow', page: '2', metric: 'reach', pointPage: '2', rowPage: '1' }, { allowedChannelIds: ['channel-a'], feature: 'analytics/explorer' });
     expect(state.read).toHaveBeenCalledWith(actor, expect.objectContaining({ start: '2026-10-10', channel: 'channel-a' }), { allowedChannelIds: ['channel-a'], feature: 'analytics/explorer' });
