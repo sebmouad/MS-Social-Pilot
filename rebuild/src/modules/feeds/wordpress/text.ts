@@ -29,4 +29,14 @@ export function decodeWordpressText(value: string): string {
   });
 }
 
-export const normalizeWordpressCaption = (value: string): string => decodeWordpressText(value).trim();
+/** Some caption generators store a C0 control byte (seen: U+0016) where French typography
+ * needs a narrow no-break space. Before French high punctuation it becomes U+202F; any other
+ * C0 control (except tab/newline) is dropped so it never reaches a provider. */
+export function stripCaptionControls(value: string): string {
+  return value
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]+(?=[?!:;»])/g, '\u202F')
+    .replace(/(«)[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]+/g, '$1\u202F')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+}
+
+export const normalizeWordpressCaption = (value: string): string => stripCaptionControls(decodeWordpressText(value)).trim();
