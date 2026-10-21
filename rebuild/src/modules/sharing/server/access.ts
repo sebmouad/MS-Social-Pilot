@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
+import { sharingError } from './messages';
 import { prisma } from '@/server/data';
 import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
 import { canUseFeature, canUseModule, loadEntitlements, entitledPlatformIds } from '@/server/entitlements';
@@ -14,10 +15,10 @@ import type { SharingLimits } from '../config';
 export type Tx = Prisma.TransactionClient;
 export type SharingAuthorization = { actor: SharingActor; area: SharingArea; role: string; scope: readonly string[] | null; providers: readonly string[]; canApprove: boolean; /** Publishing features the actor can currently read (entitled, granted, within any key ceiling). */ publishing: readonly string[] };
 
-export const bad = (message = 'Choose valid sharing details and confirm the exact action.') => new OperationError('invalid_request', message);
-export const missing = () => new OperationError('not_found', 'This item is unavailable in the current workspace.');
-export const unavailable = () => new OperationError('unavailable', 'Sharing is temporarily unavailable. Try again later.');
-export const exact = (actual: string, expected: string) => { if (actual !== expected) throw bad(); };
+export const bad = (message = 'Choose valid sharing details and confirm the exact action.', ...values: Array<string | number>) => sharingError('invalid_request', message, ...values);
+export const missing = () => sharingError('not_found', 'This item is unavailable in the current workspace.');
+export const unavailable = () => sharingError('unavailable', 'Sharing is temporarily unavailable. Try again later.');
+export const exact = async (actual: string, expected: string) => { if (actual !== expected) throw await bad(); };
 
 /** A feature is allowed only when current grants and any key ceiling both allow it. */
 function allowed(permissions: ScopedPermissions, ceiling: ScopedPermissions | undefined, feature: string, mode: 'read' | 'write') {
@@ -37,13 +38,13 @@ export function effectiveScope(grants: ScopedPermissions['pageScope'], ceiling: 
  * in progress. Public visitors never pass through here. Hiding a control is never the check.
  */
 export async function authorizeSharing(actor: SharingActor, area: SharingArea, access: 'read' | 'write'): Promise<SharingAuthorization> {
-  if (!actor?.userId || !actor.workspaceId) throw new OperationError('unauthorized', 'Sign in with an active workspace account.');
+  if (!actor?.userId || !actor.workspaceId) throw await sharingError('unauthorized', 'Sign in with an active workspace account.');
   const feature = AREA_FEATURE[area];
   const rows = await prisma.$queryRaw<Array<{ role: string; suspendedAt: Date | null }>>`SELECT m.role::text AS role, w."suspendedAt" FROM memberships m JOIN users u ON u.id = m."userId" JOIN workspaces w ON w.id = m."workspaceId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} AND u."disabledAt" IS NULL`;
   const row = rows[0];
-  if (!row) throw new OperationError('unauthorized', 'Sign in with an active account to manage sharing.');
-  if (!SHARING_MANAGER_ROLES.includes(row.role)) throw new OperationError('forbidden', 'Sharing is available to workspace owners and admins.');
-  if (row.suspendedAt && access === 'write') throw new OperationError('forbidden', 'This workspace is suspended.');
+  if (!row) throw await sharingError('unauthorized', 'Sign in with an active account to manage sharing.');
+  if (!SHARING_MANAGER_ROLES.includes(row.role)) throw await sharingError('forbidden', 'Sharing is available to workspace owners and admins.');
+  if (row.suspendedAt && access === 'write') throw await sharingError('forbidden', 'This workspace is suspended.');
   const [entitlements, permissions] = await Promise.all([
     loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }),
     loadPermissions(actor.userId, actor.workspaceId),
@@ -51,7 +52,7 @@ export async function authorizeSharing(actor: SharingActor, area: SharingArea, a
   if (!entitlements || entitlements.workspaceId !== actor.workspaceId || !permissions
     || !canUseModule(entitlements, SHARING_MODULE_ID) || !canUseFeature(entitlements, feature)
     || !allowed(permissions, actor.permissionCeiling, feature, access)) {
-    throw new OperationError('forbidden', 'Sharing is unavailable in this workspace.');
+    throw await sharingError('forbidden', 'Sharing is unavailable in this workspace.');
   }
   await assertWorkspaceNotPurging(actor.workspaceId);
   const approvals = canUseFeature(entitlements, 'publishing/approvals') && allowed(permissions, actor.permissionCeiling, 'publishing/approvals', 'write');
@@ -70,7 +71,7 @@ export async function authorizeSharing(actor: SharingActor, area: SharingArea, a
 export async function transact<T>(workspaceId: string, limits: SharingLimits, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return prisma.$transaction(async tx => {
     const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM workspaces WHERE id = ${workspaceId} FOR SHARE`;
-    if (!locked.length) throw new OperationError('unavailable', 'This workspace is unavailable.');
+    if (!locked.length) throw await sharingError('unavailable', 'This workspace is unavailable.');
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${workspaceId}))::text`;
     return fn(tx);
   }, { timeout: limits.transactionTimeoutMs!, maxWait: limits.transactionMaxWaitMs! });
@@ -84,12 +85,12 @@ type LockRow = { role: string; suspendedAt: Date | null; allPages?: boolean | nu
 export async function lockActor(tx: Tx, actor: SharingActor, area: SharingArea, alsoRead: readonly string[] = [], alsoWrite: readonly string[] = []) {
   const rows = await tx.$queryRaw<LockRow[]>`SELECT m.role::text AS role, w."suspendedAt", m."allPages" AS "allPages", COALESCE(m."disabledModules", ARRAY[]::TEXT[]) AS "memberDisabled", COALESCE(w."disabledModules", ARRAY[]::TEXT[]) AS "workspaceDisabled", COALESCE(w."clientAccess", ARRAY[]::TEXT[]) AS "clientAccess" FROM memberships m JOIN users u ON u.id = m."userId" JOIN workspaces w ON w.id = m."workspaceId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} AND u."disabledAt" IS NULL FOR SHARE OF m, u, w`;
   const row = rows[0];
-  if (!row || !SHARING_MANAGER_ROLES.includes(row.role)) throw new OperationError('unauthorized', 'Your active workspace access changed. Sign in again to continue.');
-  if (row.suspendedAt) throw new OperationError('forbidden', 'This workspace is suspended.');
+  if (!row || !SHARING_MANAGER_ROLES.includes(row.role)) throw await sharingError('unauthorized', 'Your active workspace access changed. Sign in again to continue.');
+  if (row.suspendedAt) throw await sharingError('forbidden', 'This workspace is suspended.');
   const purge = await tx.$queryRaw<Array<{ status: string }>>`SELECT status::text FROM workspace_data_purges WHERE "workspaceId" = ${actor.workspaceId}`;
-  if (purge[0] && purge[0].status !== 'completed') throw new OperationError('conflict', 'Workspace data deletion is in progress.');
+  if (purge[0] && purge[0].status !== 'completed') throw await sharingError('conflict', 'Workspace data deletion is in progress.');
   const fresh = resolvePermissions({ role: row.role, allPages: row.allPages === true, workspaceDisabledModules: row.workspaceDisabled ?? [], memberDisabledModules: row.memberDisabled ?? [], clientAccess: row.clientAccess ?? [], pageAccess: [] });
-  if (!canAccessFeature(fresh, AREA_FEATURE[area], 'write') || alsoRead.some(f => !canAccessFeature(fresh, f, 'read')) || alsoWrite.some(f => !canAccessFeature(fresh, f, 'write'))) throw new OperationError('forbidden', 'Sharing is unavailable in this workspace.');
+  if (!canAccessFeature(fresh, AREA_FEATURE[area], 'write') || alsoRead.some(f => !canAccessFeature(fresh, f, 'read')) || alsoWrite.some(f => !canAccessFeature(fresh, f, 'write'))) throw await sharingError('forbidden', 'Sharing is unavailable in this workspace.');
 }
 
 /**
@@ -100,7 +101,7 @@ export async function lockActor(tx: Tx, actor: SharingActor, area: SharingArea, 
 export async function audit(tx: Tx, actor: SharingActor, action: string, detail: Record<string, unknown>) {
   const recorded = actor.apiKeyId ? { ...detail, apiKeyId: actor.apiKeyId, authSource: 'api_key' } : detail;
   const count = await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.workspaceId}, ${actor.userId}, ${action}, ${JSON.stringify(recorded)}::jsonb, NOW())`;
-  if (count !== 1) throw new OperationError('unavailable', 'The change could not be recorded, so it was not saved.');
+  if (count !== 1) throw await sharingError('unavailable', 'The change could not be recorded, so it was not saved.');
 }
 
 /** Prisma reports a raw-query unique violation as P2010 with the database code in `meta`, a model write as P2002. */
@@ -114,8 +115,8 @@ export function isUnique(error: unknown) {
 export async function protect<T>(operation: Promise<T>, conflict = 'This address is already in use.'): Promise<T> {
   try { return await operation; } catch (error) {
     if (error instanceof OperationError) throw error;
-    if (isUnique(error)) throw new OperationError('conflict', conflict);
-    throw new OperationError('upstream_failure', 'The sharing operation could not be confirmed. Refresh before trying again.');
+    if (isUnique(error)) throw await sharingError('conflict', conflict);
+    throw await sharingError('upstream_failure', 'The sharing operation could not be confirmed. Refresh before trying again.');
   }
 }
 

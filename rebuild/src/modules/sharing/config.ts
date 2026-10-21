@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
 import { ownerCopy, ownerCopySchema } from './ui/owner-copy';
 import { publicCopyDefaults, publicCopySchema } from './ui/copy';
+import { answerNoticeDefault, answerNoticeSchema, sharingMessages, sharingMessagesSchema } from './messages';
 
 const n = (min: number, max: number) => z.number().int().min(min).max(max);
 const G = 'Sharing · Client links';
@@ -53,13 +54,14 @@ export const SHARING_LIMIT_CONFIG = [
 /** Root-managed visitor-facing copy. Empty means "show nothing"; values are rendered as plain text, never as markup. */
 export const SHARING_COPY_CONFIG = [
   text('sharing.copy.intro', G, 'Share page introduction', 'Short text shown under the title of every public share page. Leave empty to show none.', '', 300),
-  text('sharing.copy.answerNotice', G, 'Answer notice', 'Reminder shown next to the answer form on review pages.', 'Your name and answer are shared with the team that sent you this link.', 300),
+  entry({ key: 'sharing.copy.answerNotice', group: G, label: 'Answer notice', kind: 'json', description: 'Reminder shown next to the answer form on review pages, in English and French. The visitor\'s browser language picks the version; leave a language empty to show none. An earlier single text is read as the English notice.', defaultValue: answerNoticeDefault, schema: answerNoticeSchema, consumption: 'active' }),
   text('bio.copy.footer', B, 'Bio page footer', 'Small text shown at the bottom of every public bio page. Leave empty to show none.', '', 200),
 ] as const;
 
 /** Root-managed interface text, English and French: the signed-in screens and the signed-out visitor pages. */
 export const SHARING_UI_COPY_CONFIG = [
   entry({ key: 'sharing.ownerCopy', group: G, label: 'Sharing screen copy', kind: 'json', description: 'English and French labels, confirmations and feedback of the client links and bio page settings screens.', defaultValue: ownerCopy, schema: ownerCopySchema, consumption: 'active' }),
+  entry({ key: 'sharing.messages', group: G, label: 'Sharing failure messages', kind: 'json', description: 'English and French text of the failure and result replies of client links, the bio page and visitor answers in the app, REST API and MCP. The request\'s language picks the version; without one, English is used.', defaultValue: sharingMessages, schema: sharingMessagesSchema, consumption: 'active' }),
   entry({ key: 'sharing.publicCopy', group: G, label: 'Public share and bio page copy', kind: 'json', description: 'English and French text of the signed-out share, review and bio pages. The visitor\'s browser language picks the version.', defaultValue: publicCopyDefaults, schema: publicCopySchema, consumption: 'active' }),
 ] as const;
 

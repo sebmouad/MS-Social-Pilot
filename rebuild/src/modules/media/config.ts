@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
 import { copySchema } from '@/lib/config/copy-schema';
 import { mediaCopy } from './copy';
+import { mediaMessages, mediaMessagesSchema } from './messages';
 
 export const MEDIA_DEFAULTS = {
   pageSize: 48, workspaceQuotaBytes: 5368709120, videoMaxBytes: 536870912, importMaxBytes: 536870912,
@@ -45,4 +46,5 @@ export const MEDIA_CONFIG = [
   entry({ key: 'media.transactionTimeoutMs', group: G, label: 'Library transaction timeout (ms)', kind: 'number', description: 'Maximum duration of one library write.', defaultValue: MEDIA_DEFAULTS.transactionTimeoutMs, schema: int(MEDIA_BOUNDS.transactionTimeoutMs), consumption: 'active' }),
   entry({ key: 'media.transactionMaxWaitMs', group: G, label: 'Library transaction wait (ms)', kind: 'number', description: 'Maximum wait for a library write slot.', defaultValue: MEDIA_DEFAULTS.transactionMaxWaitMs, schema: int(MEDIA_BOUNDS.transactionMaxWaitMs), consumption: 'active' }),
   entry({ key: 'media.copy', group: G, label: 'Media library copy', kind: 'json', description: 'English and French media library labels, confirmations and feedback.', defaultValue: mediaCopy, schema: z.object({ en: copySchema(mediaCopy.en), fr: copySchema(mediaCopy.fr) }).strict(), consumption: 'active' }),
+  entry({ key: 'media.messages', group: G, label: 'Media library failure messages', kind: 'json', description: 'English and French text of the media library\'s failure replies in the app, REST API and MCP. The request\'s language picks the version; without one, English is used.', defaultValue: mediaMessages, schema: mediaMessagesSchema, consumption: 'active' }),
 ] as const;

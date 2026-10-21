@@ -1,4 +1,4 @@
-import { OperationError } from '@/lib/operation-error';
+import { feedsError } from './messages';
 import { runtimeConfigBatch } from '@/server/config/store';
 import { WORDPRESS_BOUNDS } from '../wordpress/config';
 import type { PlanConfig } from '../wordpress/recipe';
@@ -28,12 +28,12 @@ export type WordpressSettings = {
 /** One validated snapshot of every Root value the recipe source reads. A missing or invalid value makes the feature unavailable. */
 export async function loadWordpressSettings(): Promise<WordpressSettings> {
   let v: Record<string, unknown>;
-  try { v = await runtimeConfigBatch([...KEYS, ...SHARED]); } catch { throw new OperationError('unavailable', 'Recipe planning is temporarily unavailable. Refresh and try again.'); }
+  try { v = await runtimeConfigBatch([...KEYS, ...SHARED]); } catch { throw await feedsError('unavailable', 'Recipe planning is temporarily unavailable. Refresh and try again.'); }
   const w = (name: string) => v[`${P}${name}`];
   const s = (key: string) => v[key];
   const n = (value: unknown) => typeof value === 'number' ? value : Number.NaN;
   const transactionTimeout = n(s('feeds.transactionTimeoutMs')); const transactionWait = n(s('feeds.transactionMaxWaitMs'));
-  if (![transactionTimeout, transactionWait, n(s('data.workspaceOperationTimeoutMs'))].every(Number.isFinite) || transactionTimeout + transactionWait >= n(s('data.workspaceOperationTimeoutMs'))) throw new OperationError('unavailable', 'Recipe planning is temporarily unavailable. Refresh and try again.');
+  if (![transactionTimeout, transactionWait, n(s('data.workspaceOperationTimeoutMs'))].every(Number.isFinite) || transactionTimeout + transactionWait >= n(s('data.workspaceOperationTimeoutMs'))) throw await feedsError('unavailable', 'Recipe planning is temporarily unavailable. Refresh and try again.');
   const publishingMax = n(s('publishing.maxMessageCharacters'));
   const uploadMax = n(s('publishing.maxImageUploadBytes'));
   return {

@@ -2,7 +2,7 @@ import { prisma } from '@/server/data';
 import { canUseFeature, loadEntitlements } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
-import { OperationError } from '@/lib/operation-error';
+import { mediaError } from './messages';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import type { FeatureId } from '@/lib/product';
 import type { Entitlements } from '@/server/entitlements';
@@ -19,14 +19,14 @@ export type ToolAuthorization = { actor: ToolActor; role: string; permissions: S
  */
 export async function authorizeFeature(actor: ToolActor, feature: FeatureId, access: 'read' | 'write'): Promise<ToolAuthorization> {
   const user = await prisma.user.findUnique({ where: { id: actor.userId }, select: { disabledAt: true } });
-  if (!user || user.disabledAt) throw new OperationError('unauthorized', 'Sign in with an active account to continue.');
+  if (!user || user.disabledAt) throw await mediaError('unauthorized', 'Sign in with an active account to continue.');
   const [entitlements, permissions, membership] = await Promise.all([
     loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }),
     loadPermissions(actor.userId, actor.workspaceId),
     prisma.membership.findFirst({ where: { userId: actor.userId, workspaceId: actor.workspaceId }, select: { role: true } }),
   ]);
   if (!membership || !entitlements || !permissions || !canUseFeature(entitlements, feature) || !canAccessFeature(permissions, feature, access)) {
-    throw new OperationError('forbidden', 'This feature is unavailable in this workspace.');
+    throw await mediaError('forbidden', 'This feature is unavailable in this workspace.');
   }
   await assertWorkspaceNotPurging(actor.workspaceId);
   const currentGrants = permissions.pageScope.all ? undefined : permissions.pageScope.ids;

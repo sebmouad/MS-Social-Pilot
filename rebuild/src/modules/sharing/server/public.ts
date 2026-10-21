@@ -5,6 +5,7 @@ import { audit, authorizeSharing } from './access';
 import { KIND_PUBLISHING_FEATURES, SHARING_MANAGER_ROLES } from '../semantics';
 import { resourceAllowed } from './rate';
 import { OperationError } from '@/lib/operation-error';
+import { sharingError, sharingMessage } from './messages';
 import { prisma } from '@/server/data';
 import { DECISION_SCHEMA, TOKEN_SHAPE, hashToken, type ShareKind } from '../contracts';
 import { ids } from './links';
@@ -162,21 +163,21 @@ export async function linkShowsImage(link: PublicLink, mediaId: string): Promise
  * Every failure is the same `not_found`, so the visitor learns nothing about which check failed.
  */
 async function lockPublicLinkForMutation(tx: Prisma.TransactionClient, link: PublicLink, postId: string, decides: boolean) {
-  const gone = () => new OperationError('not_found', 'This link is not available.');
+  const gone = () => sharingError('not_found', 'This link is not available.');
   const live = await tx.$queryRaw<Array<{ id: string }>>`SELECT l.id FROM share_links l JOIN memberships m ON m."userId" = l."createdById" AND m."workspaceId" = l."workspaceId" JOIN users u ON u.id = m."userId" JOIN workspaces w ON w.id = l."workspaceId" WHERE l.id = ${link.id} AND l."workspaceId" = ${link.workspaceId} AND l."tokenHash" = ${link.tokenHash} AND l."revokedAt" IS NULL AND l."expiresAt" IS NOT NULL AND l."expiresAt" > NOW() AND (${decides}::boolean = false OR l.decides = true) AND w."suspendedAt" IS NULL AND u."disabledAt" IS NULL AND m.role::text = ANY(${[...SHARING_MANAGER_ROLES]}::text[]) FOR SHARE OF l, m, u, w`;
-  if (!live[0]) throw gone();
+  if (!live[0]) throw await gone();
   const purge = await tx.$queryRaw<Array<{ status: string }>>`SELECT status::text FROM workspace_data_purges WHERE "workspaceId" = ${link.workspaceId} AND status::text <> 'completed'`;
-  if (purge.length) throw gone();
+  if (purge.length) throw await gone();
   // Lock the post before resources on both advice and review paths.
   const lockedPost = await tx.$queryRaw<Array<{ id: string }>>`SELECT p.id FROM posts p WHERE p.id = ${postId} AND p."workspaceId" = ${link.workspaceId} FOR NO KEY UPDATE OF p`;
-  if (!lockedPost[0]) throw gone();
+  if (!lockedPost[0]) throw await gone();
   const list = link.creatorScope === null ? link.targetIds : link.targetIds.length ? link.targetIds.filter(id => link.creatorScope!.includes(id)) : [...link.creatorScope];
   // Recheck and lock the connection/selection in the same transaction as feedback.
   const currentTargets = await sharingChannels(tx, link.workspaceId, link.providers, link.targetIds.length || link.creatorScope !== null ? list : undefined, undefined, true);
   const eligibleIds = currentTargets.map(target => target.id);
-  if (!eligibleIds.length) throw gone();
+  if (!eligibleIds.length) throw await gone();
   const shown = await tx.$queryRaw<Array<{ id: string }>>`SELECT p.id FROM posts p WHERE p.id = ${postId} AND p."workspaceId" = ${link.workspaceId} AND p.status::text = ANY(${REVIEW_STATUSES}::text[]) AND (p."scheduledAt" IS NULL OR p."scheduledAt" >= NOW()) AND EXISTS (SELECT 1 FROM post_targets pt JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId" WHERE pt."postId" = p.id AND t.enabled = true AND t.id = ANY(${eligibleIds}::text[])) AND (${decides}::boolean = false OR NOT EXISTS (SELECT 1 FROM post_targets pt2 LEFT JOIN targets t2 ON t2.id = pt2."targetId" AND t2."workspaceId" = p."workspaceId" WHERE pt2."postId" = p.id AND NOT COALESCE(t2.enabled = true AND t2.id = ANY(${eligibleIds}::text[]), false))) FOR NO KEY UPDATE OF p`;
-  if (!shown[0]) throw gone();
+  if (!shown[0]) throw await gone();
 }
 
 export type DecisionResult ={ recorded: true; applied: boolean; decision: 'approved' | 'rejected' | 'comment'; message: string };
@@ -195,18 +196,18 @@ export async function submitDecision(token: string, address: string | null, inpu
   if (!visitorAllowed('share:decide', address, key, limits.decisionRateLimit!, limits.decisionRateWindowMs!, 1, limits.rateStoreCapacity!)
     || !resourceAllowed('share:decide', key, limits.decisionRateLimit! * limits.decisionLinkFactor!, limits.decisionRateWindowMs!, limits.rateStoreCapacity!)) return { ok: false, reason: 'rate_limited' };
   if (link.kind === 'calendar') return notFound;
-  const parsed = DECISION_SCHEMA.safeParse(input); if (!parsed.success) throw new OperationError('invalid_request', 'Enter your name and a valid answer.');
+  const parsed = DECISION_SCHEMA.safeParse(input); if (!parsed.success) throw await sharingError('invalid_request', 'Enter your name and a valid answer.');
   const data = parsed.data; const comment = data.comment?.trim() || null;
-  if (data.authorName.length > limits.authorNameMaxCharacters! || (comment?.length ?? 0) > limits.commentMaxCharacters!) throw new OperationError('invalid_request', 'Your name or comment is too long.');
-  if (data.decision !== 'approved' && !comment) throw new OperationError('invalid_request', data.decision === 'rejected' ? 'Tell the team what to change.' : 'Write a comment first.');
-  if (comment && !link.allowComments) throw new OperationError('invalid_request', 'Comments are switched off for this link.');
+  if (data.authorName.length > limits.authorNameMaxCharacters! || (comment?.length ?? 0) > limits.commentMaxCharacters!) throw await sharingError('invalid_request', 'Your name or comment is too long.');
+  if (data.decision !== 'approved' && !comment) throw await sharingError('invalid_request', data.decision === 'rejected' ? 'Tell the team what to change.' : 'Write a comment first.');
+  if (comment && !link.allowComments) throw await sharingError('invalid_request', 'Comments are switched off for this link.');
   const [post] = await loadPosts(link, 'review', 1, data.postId);
   if (!post) return notFound;
   const insert = async (tx: Pick<Prisma.TransactionClient, '$executeRaw'>) => {
     const stored = await tx.$executeRaw`INSERT INTO review_decisions (id, "shareLinkId", "postId", decision, comment, "authorName", "createdAt") VALUES (${randomUUID()}, ${link.id}, ${post.id}, ${data.decision}, ${comment}, ${data.authorName}, NOW())`;
-    if (stored !== 1) throw new OperationError('unavailable', 'Your answer could not be stored.');
+    if (stored !== 1) throw await sharingError('unavailable', 'Your answer could not be stored.');
   };
-  const unconfirmed = () => new OperationError('upstream_failure', 'Your answer could not be confirmed. Reload the page to see whether it was received before trying again.');
+  const unconfirmed = () => sharingError('upstream_failure', 'Your answer could not be confirmed. Reload the page to see whether it was received before trying again.');
   /** Why an answer was kept as advice instead of settling the post. Audited by code only, never with the body. */
   const advice = async (reason: 'comment' | 'link_cannot_decide' | 'authority_refused'): Promise<PublicAccess<null>> => {
     try {
@@ -219,12 +220,12 @@ export async function submitDecision(token: string, address: string | null, inpu
       return { ok: true, value: null };
     } catch (error) {
       if (error instanceof OperationError && error.code === 'not_found') return notFound;
-      throw unconfirmed();
+      throw await unconfirmed();
     }
   };
   let applied = false;
   if (data.decision !== 'comment' && link.decides) {
-    if (!post.canDecide) throw new OperationError('conflict', 'This post is no longer waiting for your decision.');
+    if (!post.canDecide) throw await sharingError('conflict', 'This post is no longer waiting for your decision.');
     const participant: ReviewParticipant = {
       // Same transaction as the status change: the link must still carry THIS token, be live and decide, its creator
       // must still be an active manager, and the post must still lie wholly inside the link.
@@ -240,18 +241,18 @@ export async function submitDecision(token: string, address: string | null, inpu
       await getReviewPort().review({ userId: link.createdById, workspaceId: link.workspaceId }, post.id, data.decision === 'approved' ? 'approve' : 'reject', reviewNote(data.decision), participant);
       applied = true;
     } catch (error) {
-      if (!(error instanceof OperationError)) throw unconfirmed();
-      if (error.code === 'conflict') throw new OperationError('conflict', 'This post is no longer waiting for your decision.');
+      if (!(error instanceof OperationError)) throw await unconfirmed();
+      if (error.code === 'conflict') throw await sharingError('conflict', 'This post is no longer waiting for your decision.');
       if (error.code === 'not_found') return notFound;
       // Only an authority/policy refusal (the creator may no longer approve) becomes advice. Database, participant and
       // unknown failures rolled the whole review back and are reported as unconfirmed, never as a received answer.
-      if (error.code !== 'forbidden' && error.code !== 'unauthorized') throw unconfirmed();
+      if (error.code !== 'forbidden' && error.code !== 'unauthorized') throw await unconfirmed();
       refused = true;
     }
     if (refused) { const stored = await advice('authority_refused'); if (!stored.ok) return stored; }
   } else {
     const stored = await advice(data.decision === 'comment' ? 'comment' : 'link_cannot_decide'); if (!stored.ok) return stored;
   }
-  const message = applied ? (data.decision === 'approved' ? 'Approved. Thank you.' : 'Changes requested. The team has been told.') : data.decision === 'comment' ? 'Comment sent to the team.' : 'Your answer was sent to the team, who will make the final call.';
+  const message = await sharingMessage(applied ? (data.decision === 'approved' ? 'Approved. Thank you.' : 'Changes requested. The team has been told.') : data.decision === 'comment' ? 'Comment sent to the team.' : 'Your answer was sent to the team, who will make the final call.');
   return { ok: true, value: { recorded: true, applied, decision: data.decision, message } };
 }

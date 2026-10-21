@@ -11,7 +11,9 @@ import type { FeatureId } from '@/lib/product';
 import { SettingsPage, SettingsPanel, styles } from '@/modules/settings/ui/_components';
 import { LinksManager } from './LinksManager';
 
-export const metadata: Metadata = { title: 'Client sharing' };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: ownerText(await loadOwnerCopy(await settingsLocale()))('Client sharing') };
+}
 
 export default async function SharingPage() {
   const viewer = await requireViewer({ feature: SHARING_FEATURE_ID });

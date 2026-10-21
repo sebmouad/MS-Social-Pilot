@@ -1,10 +1,10 @@
-import { OperationError } from '@/lib/operation-error';
+import { sharingError } from './messages';
 import { runtimeConfig, runtimeConfigBatch } from '@/server/config/store';
 import { resolveOwnerCopy, type OwnerCopy } from '../ui/owner-copy';
 import { publicCopy, publicCopyDefaults, publicCopySchema } from '../ui/copy';
 import { SHARING_COPY_CONFIG, SHARING_LIMIT_CONFIG, type SharingCopy, type SharingLimits } from '../config';
 
-const unavailable = () => new OperationError('unavailable', 'Sharing is temporarily unavailable. Try again later.');
+const unavailable = () => sharingError('unavailable', 'Sharing is temporarily unavailable. Try again later.');
 const short = (key: string) => key.replace(/^(sharing|bio)\./, (_, p: string) => (p === 'bio' ? 'bio_' : ''));
 
 /** Read and validate every sharing bound from Root configuration; fail closed when any is unreadable. */
@@ -13,13 +13,13 @@ export async function sharingLimits(read?: (key: string) => Promise<unknown>): P
   try {
     const batch = read ? null : await runtimeConfigBatch(SHARING_LIMIT_CONFIG.map(item => item.key));
     const values = read ? await Promise.all(SHARING_LIMIT_CONFIG.map(item => read(item.key))) : SHARING_LIMIT_CONFIG.map(item => batch![item.key]);
-    SHARING_LIMIT_CONFIG.forEach((item, index) => {
+    for (const [index, item] of SHARING_LIMIT_CONFIG.entries()) {
       const parsed = item.schema.safeParse(values[index]);
-      if (!parsed.success) throw unavailable();
+      if (!parsed.success) throw await unavailable();
       out[short(item.key)] = parsed.data as number;
-    });
-  } catch { throw unavailable(); }
-  if (out.defaultExpiryDays! > out.maxExpiryDays!) throw unavailable();
+    }
+  } catch { throw await unavailable(); }
+  if (out.defaultExpiryDays! > out.maxExpiryDays!) throw await unavailable();
   return out;
 }
 
@@ -35,9 +35,14 @@ export async function loadPublicCopy(locale: 'en' | 'fr') {
 }
 
 /** Visitor-facing copy from Root. Unreadable or invalid copy degrades to empty text rather than blocking the page. */
-export async function sharingCopy(read: (key: string) => Promise<unknown> = runtimeConfig): Promise<SharingCopy> {
+export async function sharingCopy(read: (key: string) => Promise<unknown> = runtimeConfig, locale: 'en' | 'fr' = 'en'): Promise<SharingCopy> {
   const [intro, notice, footer] = await Promise.all(SHARING_COPY_CONFIG.map(async item => {
-    try { const parsed = item.schema.safeParse(await read(item.key)); return parsed.success ? String(parsed.data) : ''; } catch { return ''; }
+    try {
+      const parsed = item.schema.safeParse(await read(item.key));
+      if (!parsed.success) return '';
+      // Per-language settings (the answer notice) hold { en, fr }; single-text settings are one string.
+      return typeof parsed.data === 'string' ? parsed.data : String((parsed.data as Record<string, string>)[locale] ?? '');
+    } catch { return ''; }
   }));
   return { intro: intro ?? '', answerNotice: notice ?? '', bioFooter: footer ?? '' };
 }

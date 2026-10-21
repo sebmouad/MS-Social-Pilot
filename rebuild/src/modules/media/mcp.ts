@@ -1,4 +1,4 @@
-import { OperationError } from '@/lib/operation-error';
+import { mediaError } from './server/messages';
 import { auditedReceipt, pageIdsFor, type McpToolGroup } from '@/server/mcp/kit';
 import { deleteAsset, importFromUrl, readLibrary, type MediaDeps } from './server/library';
 import type { ToolActor } from './server/access';
@@ -17,7 +17,7 @@ export async function executeMediaTool(actor: ToolActor, name: string, args: unk
   if (name === 'list_media_library') return readLibrary(actor, args ?? {}, deps);
   if (name === 'import_media_from_url') return importFromUrl(actor, args, deps);
   if (name === 'delete_media_asset') return deleteAsset(actor, args, deps);
-  throw new OperationError('invalid_request', 'Choose a supported media action.');
+  throw await mediaError('invalid_request', 'Choose a supported media action.');
 }
 
 /**

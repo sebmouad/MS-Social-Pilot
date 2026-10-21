@@ -13,7 +13,10 @@ import { ReviewActions } from './ReviewActions';
 import styles from './share.module.css';
 
 /** The address is a credential: never indexed, never sent onward in a Referer header. */
-export const metadata: Metadata = { title: 'Shared with you', robots: { index: false, follow: false, nocache: true }, referrer: 'no-referrer' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await loadPublicCopy(await authLocale());
+  return { title: t.share.pageTitle, robots: { index: false, follow: false, nocache: true }, referrer: 'no-referrer' };
+}
 
 const STATUS_TONE: Record<string, BadgeTone> = { awaiting_review: 'warning', planned: 'brand', published: 'success' };
 
@@ -29,7 +32,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
   const link = access.value;
   const mode = publicMode(link, Array.isArray(tab) ? tab[0] : tab);
   let view: Awaited<ReturnType<typeof loadPublicView>>;
-  const copy = await sharingCopy();
+  const copy = await sharingCopy(undefined, locale);
   try { view = await loadPublicView(link, mode); }
   catch { return <main className={styles.page}><div className={styles.body}><EmptyState tone="error" title={t.loadFailed} /></div></main>; }
   return <main className={styles.page}>
