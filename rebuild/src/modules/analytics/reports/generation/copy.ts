@@ -1,5 +1,13 @@
 import { z } from 'zod';
 const en = {
+  "Member slowest first response (calendar time)": "Member slowest first response (calendar time)",
+  "Member slowest first response (business hours)": "Member slowest first response (business hours)",
+  "Member answered waits resolved": "Member answered waits resolved",
+  "Member answered waits not resolved": "Member answered waits not resolved",
+  "Member median resolution (calendar time)": "Member median resolution (calendar time)",
+  "Member median resolution (business hours)": "Member median resolution (business hours)",
+  "Resolution is attributed to the first responder of the last visitor run before saved resolution, not to the person who marked it resolved. Unanswered runs are excluded.": "Resolution is attributed to the first responder of the last visitor run before saved resolution, not to the person who marked it resolved. Unanswered runs are excluded.",
+  "{v0} — {v1}: slowest first response {v2} calendar time, {v3} within business hours; {v4} answered waits resolved, {v5} not resolved; median resolution {v6} calendar time, {v7} within business hours.": "{v0} — {v1}: slowest first response {v2} calendar time, {v3} within business hours; {v4} answered waits resolved, {v5} not resolved; median resolution {v6} calendar time, {v7} within business hours.",
   "{v0}: {v1} recorded resolution cycles; median {v2} calendar time, {v3} within business hours.": "{v0}: {v1} recorded resolution cycles; median {v2} calendar time, {v3} within business hours.",
   "{v0}: {v1} resolution events, {v2} reopening events. Events may concern waits absent from stored visitor history.": "{v0}: {v1} resolution events, {v2} reopening events. Events may concern waits absent from stored visitor history.",
   "{v0} — {v1}: {v2} first replies; median {v3} calendar time, {v4} within business hours.": "{v0} — {v1}: {v2} first replies; median {v3} calendar time, {v4} within business hours.",
@@ -153,6 +161,14 @@ const en = {
   "Channel": "Channel"
 };
 const fr: typeof en = {
+  "Member slowest first response (calendar time)": "Première réponse la plus lente par membre (temps calendaire)",
+  "Member slowest first response (business hours)": "Première réponse la plus lente par membre (heures ouvrées)",
+  "Member answered waits resolved": "Attentes avec réponse résolues par membre",
+  "Member answered waits not resolved": "Attentes avec réponse non résolues par membre",
+  "Member median resolution (calendar time)": "Résolution médiane par membre (temps calendaire)",
+  "Member median resolution (business hours)": "Résolution médiane par membre (heures ouvrées)",
+  "Resolution is attributed to the first responder of the last visitor run before saved resolution, not to the person who marked it resolved. Unanswered runs are excluded.": "La résolution est attribuée au premier répondant de la dernière série de messages du visiteur avant la résolution enregistrée, pas à la personne ayant marqué la résolution. Les séries sans réponse sont exclues.",
+  "{v0} — {v1}: slowest first response {v2} calendar time, {v3} within business hours; {v4} answered waits resolved, {v5} not resolved; median resolution {v6} calendar time, {v7} within business hours.": "{v0} — {v1} : première réponse la plus lente {v2} en temps calendaire, {v3} en heures ouvrées ; {v4} attentes avec réponse résolues, {v5} non résolues ; résolution médiane {v6} en temps calendaire, {v7} en heures ouvrées.",
   "{v0}: {v1} recorded resolution cycles; median {v2} calendar time, {v3} within business hours.": "{v0} : {v1} cycles de résolution enregistrés ; médiane {v2} en temps calendaire, {v3} en heures ouvrées.",
   "{v0}: {v1} resolution events, {v2} reopening events. Events may concern waits absent from stored visitor history.": "{v0} : {v1} événements de résolution, {v2} de réouverture. Ces événements peuvent concerner des attentes absentes de l’historique enregistré des visiteurs.",
   "{v0} — {v1}: {v2} first replies; median {v3} calendar time, {v4} within business hours.": "{v0} — {v1} : {v2} premières réponses ; médiane {v3} en temps calendaire, {v4} en heures ouvrées.",

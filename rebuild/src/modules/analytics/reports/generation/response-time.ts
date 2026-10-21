@@ -1,3 +1,4 @@
+import { memberOutcomes, type MemberOutcome } from '../server/member-outcomes';
 import { historicalResolutionCycles, periodResponseMessages, type HistoricalCycle, type ResolutionEvent } from '../server/response-history';
 import { configValueOrDefault } from '@/server/config/config-or-default';
 import { cache } from 'react';
@@ -31,6 +32,7 @@ export type ResponseTimeSummary = {
   /** True when the message read hit its safety bound; figures then cover only the earliest messages read. */
   partial: boolean;
   /** Who answered, for replies sent through this app (by member) and outside it. Absent on summaries from older callers. */
+  memberOutcomes?: MemberOutcome[];
   members?: MemberResponse[];
   /** Members beyond MEMBER_ROWS_CAP that are not listed. */
   membersOmitted?: number;
@@ -41,6 +43,7 @@ export type ResponseHistorySummary = { resolved: number; reopened: number; measu
 /** Separate source statistics; optional measures keep retained/older summaries readable. */
 export type SourceResponseSummary = {
   history?: ResponseHistorySummary;
+  memberOutcomes?: MemberOutcome[];
   members?: MemberResponse[];
   membersOmitted?: number;
   answered: number; unanswered: number; total?: number; answeredPercent?: number | null;
@@ -123,6 +126,7 @@ export function summarizeResponseTimes(messages: ResponseMessage[], partial = fa
     name: memberId === null ? copy.outside[locale] : memberNames.get(memberId) ?? copy.former[locale],
   })).sort((a, b) => b.answered - a.answered || a.name.localeCompare(b.name));
   return {
+    memberOutcomes: memberOutcomes(messages, everyone.slice(0, memberLimit), business),
     members: everyone.slice(0, memberLimit), membersOmitted: Math.max(0, everyone.length - memberLimit),
     resolve: { resolved, unresolved, medianMs: median(resolveWaits), ...(business ? { businessMedianMs: median(businessResolveWaits) } : {}) },
     slowestMs: waits.length ? waits.reduce((max, value) => Math.max(max, value), 0) : null,
@@ -138,6 +142,7 @@ export function summarizeResponseSource(messages: ResponseMessage[], partial = f
   const result = summarizeResponseTimes(messages, partial, business, attribution.names, attribution.copy, attribution.locale, attribution.limit);
   const total = result.answered + result.unanswered;
   return {
+    memberOutcomes: result.memberOutcomes,
     members: result.members, membersOmitted: result.membersOmitted,
     total, answered: result.answered, unanswered: result.unanswered,
     answeredPercent: total ? result.answered / total * 100 : null,

@@ -1,6 +1,7 @@
 /** Module-owned customer copy. Root catalog registration is coordinated by the host owner. */
 export type UiLocale = 'en' | 'fr';
 const french: Record<string, string> = {
+  "Member details include slowest replies, resolved answered waits and median resolution times. Resolution is credited to the first responder of the last visitor run, not the person who marked it resolved.": "Les détails par membre comprennent les réponses les plus lentes, les attentes avec réponse résolues et les délais médians de résolution. La résolution est attribuée au premier répondant de la dernière série de messages du visiteur, pas à la personne ayant marqué la résolution.",
   "Response reports separate comments and conversations: answer shares, response and resolution times, member first replies, recorded resolution cycles and resolution/reopening counts. Business hours and saved-history limits remain explicit; events may concern waits missing from stored visitor history. Complete platform history is not guaranteed.": "Les rapports distinguent commentaires et conversations : parts traitées, délais de réponse et de résolution, premières réponses par membre, cycles de résolution enregistrés et nombres de résolutions/réouvertures. Les heures ouvrées et limites de l’historique restent explicites ; les événements peuvent concerner des attentes absentes de l’historique enregistré. L’historique complet de la plateforme n’est pas garanti.",
   "{0} existing schedule": "{0} planification existante",
   "{0} existing schedules": "{0} planifications existantes",

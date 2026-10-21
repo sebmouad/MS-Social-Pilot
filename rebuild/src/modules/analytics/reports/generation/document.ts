@@ -124,6 +124,12 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
     for (const member of r.members ?? []) responseDetails.push(t("{v0} — {v1}: {v2} first replies; median {v3} calendar time, {v4} within business hours.", { v0: label, v1: member.name, v2: member.answered, v3: formatDuration(member.medianMs), v4: formatDuration(member.businessMedianMs ?? null) }));
     if (r.membersOmitted) responseDetails.push(t("{v0}: {v1} more responding members not listed.", { v0: label, v1: r.membersOmitted }));
   }
+  if (response?.memberOutcomes) responseDetails.push(t("Resolution is attributed to the first responder of the last visitor run before saved resolution, not to the person who marked it resolved. Unanswered runs are excluded."));
+  const outcomeSources = response ? [
+    { prefix: '', label: t("Inbox"), outcomes: response.memberOutcomes },
+    ...sourceSummaries.map(({ prefix, label, summary }) => ({ prefix: `${prefix}_`, label, outcomes: summary?.memberOutcomes })),
+  ] : [];
+  for (const { label, outcomes } of outcomeSources) for (const member of outcomes ?? []) responseDetails.push(t("{v0} — {v1}: slowest first response {v2} calendar time, {v3} within business hours; {v4} answered waits resolved, {v5} not resolved; median resolution {v6} calendar time, {v7} within business hours.", { v0: label, v1: member.name, v2: formatDuration(member.slowestMs), v3: formatDuration(member.businessSlowestMs), v4: member.resolved, v5: member.unresolved, v6: formatDuration(member.medianResolveMs), v7: formatDuration(member.businessMedianResolveMs) }));
   const recap = included.includes('aiRecap') ? input.recap ?? null : null;
   const recapText = recap ? (recap.state === 'ready' ? recap.text : RECAP_UNAVAILABLE) : '';
   const topPosts = included.includes('topPosts') ? input.topPosts ?? [] : null;
@@ -198,6 +204,16 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
       if (r.membersOmitted !== undefined) add('members_omitted', t("Responding members not listed"), r.membersOmitted, 'members', t("Configured member row limit applies independently to each source."));
     }
     for (const m of response.members ?? []) if (m.businessMedianMs !== undefined) rows.push(['response_time', 'member_first_response_business_minutes', t("Median first response by member (business hours)"), t("Inbox"), clamp(m.name, 80), '', m.businessMedianMs === null ? '' : m.businessMedianMs / 60_000, 'minutes', response.businessHours ? (response.partial ? 'partial' : 'stored_only') : t("not set"), t("First replies attributed to the responding member; configured workspace business hours only.")]);
+    for (const { prefix, label, outcomes } of outcomeSources) for (const member of outcomes ?? []) {
+      const note = t("Resolution is attributed to the first responder of the last visitor run before saved resolution, not to the person who marked it resolved. Unanswered runs are excluded.");
+      const add = (key: string, metric: string, value: number | null, unit: string, business = false) => rows.push(['response_time', `${prefix}member_${key}`, metric, label, member.name, '', value ?? '', unit, business && !response.businessHours ? t("not set") : response.partial ? 'partial' : 'stored_only', note]);
+      add('slowest_first_response_minutes', t("Member slowest first response (calendar time)"), member.slowestMs === null ? null : member.slowestMs / 60_000, 'minutes');
+      add('slowest_first_response_business_minutes', t("Member slowest first response (business hours)"), member.businessSlowestMs === null ? null : member.businessSlowestMs / 60_000, 'minutes', true);
+      add('resolved_waits', t("Member answered waits resolved"), member.resolved, 'waits');
+      add('unresolved_waits', t("Member answered waits not resolved"), member.unresolved, 'waits');
+      add('median_resolve_minutes', t("Member median resolution (calendar time)"), member.medianResolveMs === null ? null : member.medianResolveMs / 60_000, 'minutes');
+      add('median_resolve_business_minutes', t("Member median resolution (business hours)"), member.businessMedianResolveMs === null ? null : member.businessMedianResolveMs / 60_000, 'minutes', true);
+    }
     rows.push(['response_time', 'answered_waits', t("Answered waits"), t("Inbox"), '', '', response.answered, 'waits', response.partial ? 'partial' : '', t("Count in period")]);
     rows.push(['response_time', 'unanswered_waits', t("Waiting at period end"), t("Inbox"), '', '', response.unanswered, 'waits', response.partial ? 'partial' : '', t("Count at period end")]);
     for (const m of response.members ?? []) rows.push(['response_time', 'member_first_response_minutes', t("Median first response by member"), t("Inbox"), clamp(m.name, 80), '', m.medianMs === null ? '' : Math.round(m.medianMs / 60_000), 'minutes', t("{v0} answered", { v0: m.answered }), m.memberId === null ? t("Replies sent outside the app; calendar time") : t("Replies sent through this app; calendar time")]);
