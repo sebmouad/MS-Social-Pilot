@@ -1,5 +1,5 @@
-import { useAdsMessage } from '@/modules/ads/ui/AdsCopyProvider';
 'use client';
+import { useAdsMessage } from '@/modules/ads/ui/AdsCopyProvider';
 import { adsTranslator, type AdsTranslator } from '../copy';
 import { useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 

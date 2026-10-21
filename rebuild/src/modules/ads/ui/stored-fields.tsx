@@ -1,5 +1,5 @@
-import { adsTranslator, type AdsTranslator } from '../copy';
 'use client';
+import { adsTranslator, type AdsTranslator } from '../copy';
 import { useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 import { sanitizeAdsReportJson } from '@/modules/ads/report-data';
 
