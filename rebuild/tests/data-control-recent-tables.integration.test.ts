@@ -81,6 +81,35 @@ describe.skipIf(!databaseUrl)('recent data-control tables on isolated PostgreSQL
     expect(await tx.$queryRaw`SELECT id FROM person_mcp_keys WHERE "userId" = ${id}`).toHaveLength(1);
   }));
 
+  it('gates legacy OAuth and indirectly owned profiles for every active purge state', async () => fixture(async (tx, id) => {
+    const queries = [
+      () => tx.$executeRaw`UPDATE "OAuthCode" SET scope = 'changed' WHERE id = ${id}`,
+      () => tx.$executeRaw`UPDATE rebuild_channel_profiles SET labels = ARRAY['Changed'] WHERE "targetId" = ${id}`,
+      // BEFORE triggers must run for INSERT too, even if the primary key already exists.
+      () => tx.$executeRaw`INSERT INTO rebuild_channel_profiles ("targetId", labels) VALUES (${id},ARRAY['Blocked'])`,
+      () => tx.$executeRaw`INSERT INTO "OAuthCode" (id,"codeHash","clientId","userId","workspaceId","redirectUri","codeChallenge",scope,"expiresAt") VALUES (${`${id}_new`},${`${id}_new_hash`},${id},${id},${id},'https://example.test/callback','synthetic','read',NOW() + interval '1 day')`,
+    ];
+    for (const status of ['requested', 'db_deleted']) {
+      await tx.$executeRaw`INSERT INTO workspace_data_purges ("workspaceId",status,"requestedById","mediaRoot","updatedAt") VALUES (${id},${status},${id},'/synthetic/recent',NOW()) ON CONFLICT ("workspaceId") DO UPDATE SET status = EXCLUDED.status`;
+      for (const write of queries) {
+        await tx.$executeRaw`SAVEPOINT supplementary_gate`;
+        await expect(write()).rejects.toMatchObject({ code: 'P2010', meta: { code: '55000' } });
+        await tx.$executeRaw`ROLLBACK TO SAVEPOINT supplementary_gate`;
+      }
+      // A foreign workspace remains writable throughout this purge.
+      await tx.$executeRaw`UPDATE "OAuthCode" SET scope = 'read' WHERE id = ${`${id}_foreign`}`;
+      await tx.$executeRaw`UPDATE rebuild_channel_profiles SET labels = ARRAY['Foreign'] WHERE "targetId" = ${`${id}_foreign`}`;
+    }
+    await tx.$executeRaw`UPDATE workspace_data_purges SET status = 'completed' WHERE "workspaceId" = ${id}`;
+    await queries[0](); await queries[1](); await queries[3]();
+    expect(await tx.$queryRaw`SELECT scope FROM "OAuthCode" WHERE id = ${id}`).toEqual([{ scope: 'changed' }]);
+    expect(await tx.$queryRaw`SELECT labels FROM rebuild_channel_profiles WHERE "targetId" = ${id}`).toEqual([{ labels: ['Changed'] }]);
+    // No workspace FK exists on legacy codes: the trigger also refuses post-deletion orphans.
+    await tx.$executeRaw`SAVEPOINT missing_parent`;
+    await expect(tx.$executeRaw`UPDATE "OAuthCode" SET "workspaceId" = ${`${id}_missing`} WHERE id = ${id}`).rejects.toMatchObject({ code: 'P2010', meta: { code: '23503' } });
+    await tx.$executeRaw`ROLLBACK TO SAVEPOINT missing_parent`;
+  }));
+
   it('exports personal preferences and removes non-FK mode storage with account deletion', async () => fixture(async (tx, id) => {
     const { exportAccountSupplementaryData, deleteAccountSupplementaryData } = await import('../src/server/data-control/account');
     const data = await exportAccountSupplementaryData(tx, id);

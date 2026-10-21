@@ -1,3 +1,4 @@
+import { deleteAccountSupplementaryData } from '@/server/data-control/account';
 import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { rootUserConfirmation, rootUserConfirmationSchema, rootUserIdSchema, type RootUserAction } from '@/lib/root-user-controls';
@@ -123,6 +124,7 @@ export async function deleteRootUser(actorId: string, userId: string, confirmati
     await tx.$executeRaw`UPDATE posts SET "reviewedById" = NULL WHERE "reviewedById" = ${userId}`;
     await tx.$executeRaw`UPDATE invitations SET "invitedById" = ${actorId} WHERE "invitedById" = ${userId}`;
     const revoked = await tx.$executeRaw`UPDATE mcp_api_keys SET "revokedAt" = COALESCE("revokedAt", NOW()), "createdById" = ${actorId} WHERE "createdById" = ${userId}`;
+    await deleteAccountSupplementaryData(tx, userId);
     await tx.$executeRaw`DELETE FROM users WHERE id = ${userId}`;
     await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, 'root.user_deleted', ${JSON.stringify({ userId, revokedApiKeys: revoked })}::jsonb, NOW())`;
     return { deleted: true as const, userId, revokedApiKeys: revoked };

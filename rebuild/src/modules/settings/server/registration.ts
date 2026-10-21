@@ -1,3 +1,4 @@
+import { deleteAccountSupplementaryData } from '@/server/data-control/account';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
@@ -200,6 +201,7 @@ export async function deleteUnverifiedRegistration(tx: Prisma.TransactionClient,
   await requireUnverifiedRegistration(tx, userId);
   // Production FKs cascade personal authentication material and detach historical Root activity.
   // Restrictive foreign keys refuse unexpected owned content rather than deleting workspace data.
+  await deleteAccountSupplementaryData(tx, userId);
   const removed = await tx.$executeRaw`DELETE FROM users WHERE id = ${userId}`;
   if (removed !== 1) throw new OperationError('conflict', 'This account changed. Reload before trying again.');
   return { deleted: true as const, userId };
