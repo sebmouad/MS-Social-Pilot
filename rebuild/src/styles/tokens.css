@@ -690,6 +690,8 @@
   --scrim: rgb(0 0 0 / 58%);
 } }
 
+/* Authored widths and min-heights (cards, inputs, rails) include padding and border; without this a 100%-wide card overflows phones. */
+*, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; background: var(--canvas); color: var(--ink); font-family: var(--font-sans); }
 html { scrollbar-color: var(--line-strong) var(--canvas); }
 * { scrollbar-color: var(--line-strong) transparent; }
@@ -782,6 +784,8 @@ h1, h2, h3 { text-wrap: balance; scroll-margin-top: 88px; }
 .ui-button[aria-busy=true]::after { content: ''; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: route-spin .8s linear infinite; }
 .ui-button__icon { display: inline-flex; }
 .ui-visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+/* Tables ignore width/overflow, so a hidden chart-data table would widen the page; block display clips it and keeps table roles in current browsers. */
+table.ui-visually-hidden { display: block; }
 .ui-table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .ui-table-wrap.is-empty { border-radius: var(--radius-md) var(--radius-md) 0 0; }
 .ui-table-empty { margin: -1px 0 0; padding: 30px 18px; border: 1px solid var(--line); border-radius: 0 0 var(--radius-md) var(--radius-md); background: var(--surface); color: var(--ink-soft); font-size: 13px; line-height: 1.5; text-align: center; }
@@ -931,7 +935,7 @@ select.ui-input { appearance: none; padding-right: 36px; background-image: linea
 .shell-subnav__link { gap: 10px; font-weight: 600; }
 .shell-subnav__glyph { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--mod); background: transparent; flex: 0 0 auto; transition: background var(--ease); }
 .shell-subnav__link:hover .shell-subnav__glyph { background: var(--mod-soft); }
-.shell-subnav__link.is-active { background: var(--mod-soft); color: var(--mod-ink); }
+.shell-subnav__link.is-active { background: var(--mod-soft); color: color-mix(in srgb, var(--mod-ink) 80%, var(--ink)); }
 .shell-subnav__link.is-active .shell-subnav__glyph { background: var(--mod); color: #fff; }
 :root[data-mode="dark"] .shell-subnav__link.is-active .shell-subnav__glyph { color: var(--canvas); }
 .shell-create { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }

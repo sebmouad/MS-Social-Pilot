@@ -1,11 +1,11 @@
 /** Read-only customer browser gate. Never prints credentials or browser payloads. */
 import { createHash } from 'node:crypto';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Locator, type Page } from 'playwright';
-import { THEME_COOKIE, THEMES } from '../src/lib/themes';
+import { MODE_COOKIE, THEME_COOKIE, THEMES } from '../src/lib/themes';
 
 export const VIEWPORTS = [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const;
 export const FAMILIES = ['/home', '/publishing', '/inbox', '/analytics', '/ads', '/settings', '/tasks', '/agency'];
@@ -266,12 +266,253 @@ export async function runMatrix(env: Readonly<Record<string, string | undefined>
   return finishReport({ startedAt, ...inventory, cells, fatal });
 }
 
+/* ---------------------------------------------------------------------------------------------
+ * Extended appearance matrix: theme x light/dark mode x viewport over customer, Root and public
+ * routes. Read-only like the customer gate. Records console/page errors, failed same-origin
+ * requests, horizontal overflow, control names, contrast spot checks and failure screenshots.
+ * ------------------------------------------------------------------------------------------- */
+export const EXTENDED_MODES = ['light', 'dark'] as const;
+/** Public pages are visited without a session; dynamic token pages are excluded and reported. */
+export const PUBLIC_ROUTES = ['/sign-in', '/sign-up', '/password-recovery', '/verify-email', '/join'] as const;
+export const CONTRAST_NORMAL = 4.5;
+export const CONTRAST_LARGE = 3;
+export const CONTRAST_SAMPLE_LIMIT = 600;
+export const SCREENSHOT_LIMIT = 150;
+export type RouteGroup = 'customer' | 'root' | 'public';
+export type ExtendedCell = {
+  group: RouteGroup; route: string; theme: string; mode: string; viewport: { width: number; height: number };
+  findings: Finding[]; details: string[]; blockedExternal: number; contrastSampled: number; screenshot?: string;
+};
+export type ExtendedReport = {
+  version: 1; startedAt: string; finishedAt: string; browser: 'chromium';
+  groups: Record<RouteGroup, string[]>; excludedDynamicRoutes: string[]; expectedCells: number;
+  cells: ExtendedCell[]; fatal: Finding[]; failures: number; passed: boolean;
+};
+
+export function discoverRootRoutes(appDir: string): { routes: string[]; excludedDynamicRoutes: string[] } {
+  const routes: string[] = [], excludedDynamicRoutes: string[] = [];
+  const dir = join(appDir, 'root');
+  function walk(current: string, parts: string[]) {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      if (entry.isDirectory() && !entry.name.startsWith('_') && !entry.name.startsWith('@')) walk(join(current, entry.name), [...parts, entry.name]);
+      else if (entry.name === 'page.tsx') (parts.some(part => part.includes('[')) ? excludedDynamicRoutes : routes).push(`/${['root', ...parts].join('/')}`);
+    }
+  }
+  walk(dir, []);
+  return { routes: routes.sort(), excludedDynamicRoutes: excludedDynamicRoutes.sort() };
+}
+
+export function contrastRatio(a: [number, number, number], b: [number, number, number]): number {
+  const lum = ([r, g, bl]: [number, number, number]) => {
+    const f = (v: number) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(bl);
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** Runs in the page. Resolves any CSS colour syntax through a canvas and composites translucent backgrounds. */
+async function contrastAudit(page: Page): Promise<{ sampled: number; failures: Array<{ label: string; ratio: number; fg: string; bg: string; text: string }> }> {
+  return page.evaluate(({ normal, large, limit }) => {
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    const rgba = (css: string): [number, number, number, number] => {
+      ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = css; ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data; return [r, g, b, a / 255];
+    };
+    const over = (top: [number, number, number, number], under: [number, number, number]): [number, number, number] =>
+      [0, 1, 2].map(i => Math.round(top[i] * top[3] + under[i] * (1 - top[3]))) as [number, number, number];
+    const lum = (c: number[]) => { const f = (v: number) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+    const ratio = (a: number[], b: number[]) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+    /** Effective background: stack ancestors' backgrounds; null when an image or gradient makes it unknowable. */
+    const background = (el: Element): [number, number, number] | null => {
+      const layers: Array<[number, number, number, number]> = [];
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (style.backgroundImage !== 'none') return null;
+        const c = rgba(style.backgroundColor);
+        if (c[3] > 0) { layers.push(c); if (c[3] === 1) break; }
+      }
+      let base: [number, number, number] = rgba(getComputedStyle(document.documentElement).backgroundColor)[3] === 1 ? rgba(getComputedStyle(document.documentElement).backgroundColor).slice(0, 3) as [number, number, number] : [255, 255, 255];
+      for (const layer of layers.reverse()) base = over(layer, base);
+      return base;
+    };
+    const failures: Array<{ label: string; ratio: number; fg: string; bg: string; text: string }> = [];
+    let sampled = 0;
+    const seen = new Set<Element>();
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node && sampled < limit; node = walker.nextNode()) {
+      const text = (node.textContent || '').trim();
+      const el = node.parentElement;
+      if (!text || !el || seen.has(el) || el.closest('script, style, noscript, svg, [aria-hidden="true"], [inert]')) continue;
+      seen.add(el);
+      const style = getComputedStyle(el), rect = el.getBoundingClientRect();
+      if (style.visibility === 'hidden' || style.display === 'none' || parseFloat(style.opacity) === 0 || rect.width < 1 || rect.height < 1) continue;
+      if (el.closest(':disabled, [aria-disabled="true"], [disabled]')) continue;
+      const bg = background(el); if (!bg) continue;
+      const fgRaw = rgba(style.color);
+      const opacity = (() => { let o = 1; for (let n: Element | null = el; n; n = n.parentElement) o *= parseFloat(getComputedStyle(n).opacity); return o; })();
+      const fg = over([fgRaw[0], fgRaw[1], fgRaw[2], fgRaw[3] * opacity], bg);
+      sampled++;
+      const size = parseFloat(style.fontSize), bold = parseInt(style.fontWeight, 10) >= 700;
+      const need = size >= 24 || (size >= 18.66 && bold) ? large : normal;
+      const r = ratio(fg, bg);
+      if (r < need) failures.push({ label: `${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`, ratio: Math.round(r * 100) / 100, fg: `rgb(${fg.join(',')})`, bg: `rgb(${bg.join(',')})`, text: text.slice(0, 24) });
+    }
+    return { sampled, failures };
+  }, { normal: CONTRAST_NORMAL, large: CONTRAST_LARGE, limit: CONTRAST_SAMPLE_LIMIT });
+}
+
+export function finishExtended(input: Pick<ExtendedReport, 'startedAt' | 'groups' | 'excludedDynamicRoutes' | 'cells' | 'fatal'>): ExtendedReport {
+  const fatal = [...input.fatal];
+  const expected = new Set<string>();
+  for (const group of Object.keys(input.groups) as RouteGroup[]) for (const route of input.groups[group])
+    for (const theme of THEMES) for (const mode of EXTENDED_MODES) for (const v of VIEWPORTS)
+      expected.add(`${group}|${route}|${theme.id}|${mode}|${v.width}x${v.height}`);
+  const seen = new Set<string>();
+  for (const cell of input.cells) {
+    const key = `${cell.group}|${cell.route}|${cell.theme}|${cell.mode}|${cell.viewport.width}x${cell.viewport.height}`;
+    if (!expected.has(key) || seen.has(key)) fatal.push({ code: 'UNEXPECTED_OR_DUPLICATE_CELL' });
+    seen.add(key);
+  }
+  if (seen.size !== expected.size) fatal.push({ code: 'INCOMPLETE_MATRIX' });
+  const failures = fatal.length + input.cells.reduce((n, cell) => n + cell.findings.length, 0);
+  return { ...input, fatal, version: 1, browser: 'chromium', finishedAt: new Date().toISOString(), expectedCells: expected.size, failures, passed: failures === 0 };
+}
+
+export async function runExtendedMatrix(env: Readonly<Record<string, string | undefined>> = process.env): Promise<ExtendedReport> {
+  const startedAt = new Date().toISOString();
+  const appDir = fileURLToPath(new URL('../src/app', import.meta.url));
+  const customer = discoverRoutes(appDir), root = discoverRootRoutes(appDir);
+  const groups: Record<RouteGroup, string[]> = { customer: customer.routes, root: root.routes, public: [...PUBLIC_ROUTES] };
+  const excludedDynamicRoutes = [...customer.excludedDynamicRoutes, ...root.excludedDynamicRoutes];
+  const cells: ExtendedCell[] = [], fatal: Finding[] = [];
+  const shotsDir = resolve(env.BROWSER_MATRIX_SHOTS || join(dirname(resolve(env.BROWSER_MATRIX_REPORT || '/tmp/msp-browser-matrix.json')), 'shots'));
+  let shots = 0;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  let phase = 'CONFIGURATION_FAILED';
+  try {
+    const base = guardBaseUrl(env.BASE_URL);
+    if (!env.QA_EMAIL || !env.QA_PASSWORD) throw new Error('QA_CREDENTIALS_REQUIRED');
+    phase = 'BROWSER_LAUNCH_FAILED';
+    browser = await chromium.launch({ headless: true });
+    const auth = await browser.newContext({ serviceWorkers: 'block' });
+    let signingIn = true;
+    const fence = async (context: typeof auth, authPhase: () => boolean) => {
+      await context.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), authPhase()) ? route.continue() : route.abort('blockedbyclient'));
+    };
+    await fence(auth, () => signingIn);
+    await auth.routeWebSocket('**/*', socket => socket.close());
+    phase = 'SIGN_IN_FAILED';
+    const login = await auth.newPage();
+    await login.goto(`${base}/sign-in`, { waitUntil: 'load', timeout: 60000 });
+    await login.locator('input[name=email]').fill(env.QA_EMAIL);
+    await login.locator('input[name=password]').fill(env.QA_PASSWORD);
+    await login.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await login.waitForURL(`${base}/home`, { timeout: 60000 });
+    await login.locator('main#main-content').waitFor();
+    signingIn = false;
+    const storage = await auth.storageState();
+    await auth.close();
+    phase = 'MATRIX_INTERRUPTED';
+    const only = env.MATRIX_ONLY?.split(',').filter(Boolean);
+    for (const theme of THEMES) for (const mode of EXTENDED_MODES) for (const viewport of VIEWPORTS) {
+      for (const group of ['customer', 'root', 'public'] as RouteGroup[]) {
+        const context = await browser.newContext({ viewport, serviceWorkers: 'block', ...(group === 'public' ? {} : { storageState: storage }) });
+        try {
+          await fence(context, () => false);
+          // /join looks up an invitation with a POST; it is a read-only preview (no token is supplied), so let it through.
+          if (group === 'public') await context.route(`${base}/api/auth/invitations/preview`, route => route.continue());
+          await context.routeWebSocket('**/*', socket => socket.close());
+          // tsx/esbuild wraps named functions with __name(); page.evaluate bodies need it defined in the page.
+          await context.addInitScript('window.__name = window.__name || (f => f);');
+          await context.addCookies([
+            { name: THEME_COOKIE, value: theme.id, url: base, sameSite: 'Lax' },
+            { name: MODE_COOKIE, value: mode, url: base, sameSite: 'Lax' },
+          ]);
+          for (const route of groups[group]) {
+            if (only && !only.some(prefix => route.startsWith(prefix))) continue;
+            const cell: ExtendedCell = { group, route, theme: theme.id, mode, viewport, findings: [], details: [], blockedExternal: 0, contrastSampled: 0 };
+            cells.push(cell);
+            const page = await context.newPage();
+            page.setDefaultTimeout(8000);
+            const add = (finding: Finding, detail?: string) => { cell.findings.push(finding); if (detail && cell.details.length < 12) cell.details.push(detail); };
+            page.on('console', message => { const f = browserFinding('console', message.type(), message.text()); if (f) add(f, `${f.code}: ${message.text().replace(/\s+/g, ' ').slice(0, 160)}`); });
+            page.on('pageerror', error => { const f = browserFinding('pageerror', 'error', error.message); if (f) add(f, `${f.code}: ${error.message.replace(/\s+/g, ' ').slice(0, 160)}`); });
+            page.on('response', response => {
+              const url = new URL(response.url());
+              if (url.origin === base && response.status() >= 400 && response.request().resourceType() !== 'document') add({ code: 'REQUEST_FAILED', count: response.status() }, `REQUEST_FAILED ${response.status()} ${url.pathname}`);
+            });
+            page.on('requestfailed', request => {
+              const failure = request.failure()?.errorText || '';
+              if (/blockedbyclient/i.test(failure)) { cell.blockedExternal++; return; }
+              if (/ERR_ABORTED/i.test(failure)) return; // navigation/prefetch cancelled by the page itself
+              add({ code: 'REQUEST_FAILED' }, `REQUEST_FAILED ${failure} ${new URL(request.url()).pathname}`);
+            });
+            try {
+              const response = await page.goto(`${base}${route}`, { waitUntil: 'load', timeout: 60000 });
+              if (!response || response.status() >= 400) add({ code: 'HTTP_FAILURE', count: response?.status() }, `HTTP_FAILURE ${response?.status()}`);
+              await page.locator('body').waitFor();
+              await page.evaluate(() => document.fonts.ready.then(() => undefined));
+              await page.waitForTimeout(400);
+              if (new URL(page.url()).origin !== base || new URL(page.url()).pathname !== route) add({ code: 'UNEXPECTED_REDIRECT' }, `UNEXPECTED_REDIRECT -> ${new URL(page.url()).pathname}`);
+              if (await page.locator('html').getAttribute('data-theme') !== theme.id) add({ code: 'THEME_NOT_APPLIED' });
+              if (await page.locator('html').getAttribute('data-mode') !== mode) add({ code: 'MODE_NOT_APPLIED' });
+              const overflow = await page.evaluate(() => {
+                const doc = document.documentElement, width = doc.clientWidth;
+                const wide = [...document.querySelectorAll('body *')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > width + 1 && !e.closest('[hidden], [inert], .sr-only') && getComputedStyle(e).position !== 'fixed'; });
+                const label = (e: Element) => `${e.tagName.toLowerCase()}${typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`;
+                return { amount: Math.max(doc.scrollWidth, document.body.scrollWidth) - width, culprits: wide.slice(0, 3).map(label) };
+              });
+              if (overflow.amount > 1) add({ code: 'HORIZONTAL_OVERFLOW', count: overflow.amount }, `HORIZONTAL_OVERFLOW ${overflow.amount}px: ${overflow.culprits.join(' | ')}`);
+              const named = { findings: [] as Finding[] };
+              const probe: Cell = { route, theme: theme.id, viewport, findings: named.findings, keyboard: { mainAction: 'Not available', dialog: 'Not available' } };
+              await auditControls(page, probe);
+              for (const f of named.findings.filter(f => f.code !== 'HORIZONTAL_OVERFLOW')) add(f, `${f.code} control #${f.control}`);
+              const contrast = await contrastAudit(page);
+              cell.contrastSampled = contrast.sampled;
+              if (contrast.failures.length) {
+                add({ code: 'CONTRAST_LOW', count: contrast.failures.length });
+                for (const f of contrast.failures.sort((a, b) => a.ratio - b.ratio).slice(0, 4)) if (cell.details.length < 12) cell.details.push(`CONTRAST ${f.ratio}:1 <${f.label}> "${f.text}" ${f.fg} on ${f.bg}`);
+              }
+              if (cell.findings.length && shots < SCREENSHOT_LIMIT) {
+                const file = `${group}${route.replace(/\//g, '_')}__${theme.id}-${mode}-${viewport.width}.png`;
+                await mkdir(shotsDir, { recursive: true });
+                await page.screenshot({ path: join(shotsDir, file), fullPage: false }).then(() => { cell.screenshot = file; shots++; }).catch(() => undefined);
+              }
+            } catch (error) { add({ code: 'ROUTE_CHECK_FAILED' }, `ROUTE_CHECK_FAILED ${(error as Error).message.split('\n')[0].slice(0, 140)}`); }
+            finally { await page.close(); }
+          }
+        } finally { await context.close(); }
+      }
+    }
+  } catch { fatal.push({ code: phase }); }
+  finally { if (browser) await browser.close().catch(() => { fatal.push({ code: 'BROWSER_CLOSE_FAILED' }); }); }
+  return finishExtended({ startedAt, groups, excludedDynamicRoutes, cells, fatal });
+}
+
+/** Optional: QA_CREDENTIALS_FILE points at a local JSON {email,password}, keeping secrets out of shell history. */
+function loadCredentialsFile() {
+  const file = process.env.QA_CREDENTIALS_FILE;
+  if (!file || (process.env.QA_EMAIL && process.env.QA_PASSWORD)) return;
+  const parsed = JSON.parse(readFileSync(file, 'utf8')) as { email?: string; password?: string };
+  process.env.QA_EMAIL ||= parsed.email; process.env.QA_PASSWORD ||= parsed.password;
+}
+
 async function main() {
-  const report = await runMatrix();
+  loadCredentialsFile();
   const output = resolve(process.env.BROWSER_MATRIX_REPORT || '/tmp/msp-browser-matrix.json');
   await mkdir(dirname(output), { recursive: true });
+  if (process.env.BROWSER_MATRIX_SCOPE === 'customer') {
+    const report = await runMatrix();
+    await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+    console.log(`Browser matrix: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
+    process.exitCode = report.passed ? 0 : 1;
+    return;
+  }
+  const report = await runExtendedMatrix();
   await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
-  console.log(`Browser matrix: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
+  console.log(`Extended browser matrix: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
   process.exitCode = report.passed ? 0 : 1;
 }
 
