@@ -1,6 +1,6 @@
 # UI, REST and MCP parity inventory
 
-Updated 2026-10-21 against the parity-guard exception worker tree. This is a **source-level**
+Updated 2026-10-21 against local HEAD `1240a9ce` (merges since `8852d367`). This is a **source-level**
 inventory using module MCP declarations, HTTP routes, shared services and the
 lane matrices. It is not a fresh tools/list dump, real MCP-client run, database,
 browser or provider verification. Full parity remains **partial**. The automated declaration guard and exact
@@ -16,16 +16,16 @@ selected-resource, person-key and installation authority remain distinct.
 | Module | Shared source coverage across UI / REST / MCP | Status and remaining limits |
 | --- | --- | --- |
 | Home | `readHomeOverview`, GET `/api/home/overview`, `get_home_overview` | Present; workspace-wide read intentionally refuses resource-limited keys |
-| Publishing | Drafts, create/edit/import, lists/search/export, publish/retry/sync, schedule/reschedule/cancel/queue, approvals, deletion/recovery, first-comment send/retry/record, templates/labels/fields/notes/versions, saved views, mix/recycle/best times/media | Broad source coverage. Per-destination schedule modes flow through session REST, key REST v1 and MCP. v1 create retains a no-confirmation contract; confirmation uniformity and real scheduling/provider evidence remain partial |
+| Publishing | Drafts, create/edit/import, lists/search/export, publish/retry/sync, schedule/reschedule/cancel/queue, approvals, deletion/recovery, first-comment send/retry/record, templates/labels/fields/notes/versions, saved views, mix/recycle/best times/media | Broad source coverage. Per-destination schedule modes flow through session REST, key REST v1 and MCP. Draft aliases and REST v1 create now use confirmed `api-writes` lifecycle boundaries (`acb56bd7`); real scheduling/provider and remaining write-boundary evidence stay partial |
 | Inbox | List/thread/sync/reply/resolve, nested replies/reviews, moderation/deletion/recovery, productivity, assignment/notes/saved replies and contact details | Broad source coverage; GET `/api/inbox/threads/[key]/details` calls `readInboxContactDetails` (added in `8852d367`). `bulkInboxAction` now has UI, `POST /api/inbox/bulk` and `bulk_inbox_action` (`f5c21c96`); mocked route tests only |
 | Analytics | Overview/details/explorer/previous points, comparisons, posts/ad objects, demographics/history CSV, pins/goals, report exports/templates/schedules/runs/generation | Present at source; session HTTP and MCP share cores, key REST v1 delegates declared tools to host. Completeness of collected metrics and real transport/provider results remain unproven |
 | Ads | Accounts/performance/directory/rows/exports/compare/status, creation choices, creative sources/image/create/assignment, change preview/apply/history/recovery | Present at source with session routes and key REST v1 through owning MCP groups. Live manager/grant/spend/creative outcomes remain partial |
 | Settings connections | Directory/health, OAuth start, single/batch selection, disconnect preview/retain/delete | OAuth start UI/REST/session MCP share service; compatibility route also delegates. REST single/batch selection and disconnect now use confirmed module services; batch UI/MCP share selection wrapper. Single MCP selection and disconnect MCP still confirm outside the lower core; browser disconnect payload is stale. See explicit caller fixes below |
 | Settings account/security/keys | Profile/password/session reads and changes; authenticator begin/enable/disable, passkey removal; workspace/person key list/issue/revoke | Session-only tools now exist; old claim that account/key issuance has no MCP is superseded. Bearer credentials cannot manage credentials/security. General authentication/passkey ceremony remains interactive |
-| Settings appearance | `appearanceSession`, GET/PATCH `/api/settings/appearance`, `get_appearance`, `update_appearance` | Settings surfaces covered; shell ThemeProvider still writes cookies directly, layout ignores account theme when cookie absent. Whole-app same-service requirement remains partial |
-| Settings workspace/data/notifications | Policy/operations, team/invitations, profiles/watermark, notification preferences/items, snapshot/ZIP/jobs/erasure | Broad source coverage. Snapshot JSON is partial; never equate it with complete ZIP export. Real data coverage, mail and concurrency need feature-specific proof |
+| Settings appearance | `appearanceSession`, GET/PATCH `/api/settings/appearance`, `get_appearance`, `update_appearance` | Shell ThemeProvider/mode toggle and Settings now share confirmed persistence (`2b42470b`); theme and mode are account-stored, cookies use Root lifetime, layout falls back to validated-session preferences. Cross-device/live persistence proof remains separate |
+| Settings workspace/data/notifications | Policy/operations, team/invitations, profiles/watermark, notification preferences/items, snapshot/ZIP/jobs/erasure | Broad source coverage. Snapshot JSON is partial; never equate it with complete ZIP export. Recent-table/account supplementary coverage and deletion hooks are implemented; partial account-export service/adapters still lack public route/MCP registration/UI. Purge-gate migration needs rehearsal integration and database proof; mail/concurrency remain open |
 | Media | Image/video library, usage/holders/quota, guarded import and delete | Shared service/API/MCP; complete UI workflows and storage/runtime proof still partial |
-| Feeds | Source CRUD/check modes plus recipe read/save/preview/run/pause/resume | Shared UI/REST/MCP. Recipe tools: `get_recipe_source`, `save_recipe_source`, `preview_recipe_source`, `run_recipe_planner`, `set_recipe_source_state`. Feature off by default on new installs; production log records live source/image work and 80 scheduled posts. Facebook delivery/comments, full transport/browser/recovery evidence remain separate |
+| Feeds | Source CRUD/check modes plus recipe read/save/preview/run/pause/resume | Shared UI/REST/MCP. Recipe tools: `get_recipe_source`, `save_recipe_source`, `preview_recipe_source`, `run_recipe_planner`, `set_recipe_source_state`, `retry_recipe_slots`. Feature off by default on new installs; production log records live source/image work and 80 scheduled posts. Owner-recorded first-day 07:00 and 11:00 batches each published 10/10 with comments; full transport/browser/retry/pause-cancel recovery evidence remains separate |
 | AI | Assist availability/write tools and HTTP/UI; report recap and stored sentiment use AI service internally | Present for advertised assist; internal jobs are not separate customer writes. OpenAI/Gemini limited live checks do not prove every consumer |
 | Tasks | List/create/checklist/update/move/delete/comments | Same `performTaskAction`; exact write confirmations now in service and sent by UI/REST/MCP. Real concurrent database and browser checks remain scoped gaps |
 | Agency | Overview/export via shared service, session Clients and workspace selection | Separate read-only person keys exist for overview; workspace keys cannot expand to person-wide reads. Session Clients/switching are present, not granted to person keys; REST switch versus MCP confirmation difference remains |
@@ -53,10 +53,17 @@ Mocked route/host tests are not a live key/client verification of every tool.
   `DISCONNECT <id> RETAIN` or `DISCONNECT <id> DELETE RELATED DATA` phrase to REST;
   its current missing retain/short `DELETE` payload is refused. Wrapper tests
   validate accepted single/batch and disconnect input, not these caller paths.
-- Route global theme changes through the appearance service, propagate its
-  cookie policy and use saved account preference when a valid cookie is absent.
-- Reconcile REST v1 Posts create's no-confirmation exception, Agency workspace
-  switching and Sharing copy-only save policy with the binding service contract.
+- Appearance caller/persistence source gaps are closed; verify cross-device/session
+  behavior beyond the scoped unit/render and system-mode browser evidence.
+- Publishing draft aliases now call `createPublishingPost`, `updatePublishingPost`
+  and `deletePublishingPost`, as do session REST; REST v1 create forwards exact
+  `CREATE POST` consent to that boundary (`acb56bd7`). The old no-confirmation
+  claim is superseded. Preserve actual lifecycle/scope and live evidence limits.
+- Reconcile Agency workspace switching and Sharing copy-only save policy with
+  the binding service contract.
+- Register the partial account-export HTTP/MCP adapters and add bilingual download
+  UI; adapters alone expose no new public capability. Extend this guard's mapping
+  when those routes/tools are installed, preserving session-only authority.
 - Finish operational/configurable copy, localization and ownership gaps recorded
   in CONFIG_LITERAL_AUDIT.md; recheck after integration instead of repeating old
   lane claims (OAuth compatibility and batch-selection wiring are already fixed).
@@ -73,7 +80,7 @@ Detailed matrices: [PARITY_PUBLISHING_INBOX.md](PARITY_PUBLISHING_INBOX.md),
 [PARITY_ANALYTICS_ADS_SETTINGS.md](PARITY_ANALYTICS_ADS_SETTINGS.md). The current
 source checks above supersede their stale integration warnings where named.
 
-## Documentation follow-up verification — 2026-10-21
+## Historical documentation follow-up verification — 2026-10-21
 
 From `rebuild/`, `npx tsc --noEmit -p .` passed with zero errors. Targeted
 `npx vitest run --no-cache` passed **60 tests / 6 files / zero skipped**:
@@ -285,9 +292,9 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | upload_workspace_image | publishing/media | write | POST /api/media | Shared customer operation; transport arguments may differ. |
 | list_posts | publishing/posts | read | GET /api/publishing/posts | Shared customer operation; transport arguments may differ. |
 | export_posts | publishing/posts | read | GET /api/publishing/posts/export | Shared customer operation; transport arguments may differ. |
-| create_draft | publishing/posts | write | POST /api/publishing/posts | Capability alias: create_post without scheduledAt. Legacy MCP draft service/confirmation differs; behavioral parity remains a gap. |
-| update_draft | publishing/posts | write | PATCH /api/publishing/posts/[id] | Capability alias: update_post for a draft. Legacy MCP draft service/confirmation differs; behavioral parity remains a gap. |
-| delete_draft | publishing/posts | write | DELETE /api/publishing/posts/[id] | Capability alias: delete_post with local deletion for a draft. Legacy MCP draft service/confirmation differs; behavioral parity remains a gap. |
+| create_draft | publishing/posts | write | POST /api/publishing/posts | Capability alias: create_post without scheduledAt. Closed in `acb56bd7`: same confirmed api-writes boundary as REST and canonical tool; mocked parity tests, no live-client proof. |
+| update_draft | publishing/posts | write | PATCH /api/publishing/posts/[id] | Capability alias: update_post for a draft. Closed in `acb56bd7`: same confirmed api-writes boundary as REST and canonical tool; mocked parity tests, no live-client proof. |
+| delete_draft | publishing/posts | write | DELETE /api/publishing/posts/[id] | Capability alias: delete_post with local deletion for a draft. Closed in `acb56bd7`: same confirmed api-writes boundary as REST and canonical tool; mocked parity tests, no live-client proof. |
 | publish_post | publishing/posts | write | POST /api/publishing/posts/[id]/[action] | Shared customer operation; transport arguments may differ. |
 | send_first_comment | publishing/posts | write | POST /api/publishing/first-comments/[action] | Shared customer operation; transport arguments may differ. |
 | retry_first_comment | publishing/posts | write | POST /api/publishing/first-comments/retry | Shared customer operation; transport arguments may differ. |
@@ -302,7 +309,7 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | finish_publication_projection | publishing/posts | write | POST /api/publishing/recovery | Shared customer operation; transport arguments may differ. |
 | adopt_legacy_publication | publishing/posts | write | POST /api/publishing/recovery | Shared customer operation; transport arguments may differ. |
 | duplicate_post | publishing/posts | write | POST /api/publishing/duplicate | Shared customer operation; transport arguments may differ. |
-| create_post | publishing/posts | write | POST /api/publishing/posts | POST accepts draft or scheduled content; REST v1 alias has a known confirmation gap. |
+| create_post | publishing/posts | write | POST /api/publishing/posts | POST accepts draft or scheduled content; REST v1 now forwards exact CREATE POST consent to the same confirmed boundary (`acb56bd7`). |
 | update_post | publishing/posts | write | PATCH /api/publishing/posts/[id] | Shared customer operation; transport arguments may differ. |
 | submit_post_for_approval | publishing/posts | write | POST /api/publishing/posts/[id]/[action] | Shared customer operation; transport arguments may differ. |
 | review_post | publishing/approvals | write | POST /api/publishing/posts/[id]/[action] | Shared customer operation; transport arguments may differ. |
@@ -372,7 +379,7 @@ never auto-approves a newly declared tool.
 | --- | --- | --- |
 | POST /api/oauth/connections/[platform]/start | start_connection | Compatibility connection start delegates to the same session connection-start HTTP service. |
 | GET /api/v1/posts | list_posts | Key-authenticated post directory; channel ceilings remain enforced. |
-| POST /api/v1/posts | create_post | Key-authenticated create; current no-confirmation policy remains an explicit behavioral gap. |
+| POST /api/v1/posts | create_post | Key-authenticated create; exact CREATE POST confirmation now enforced by shared api-writes (`acb56bd7`). |
 | POST /api/v1/posts/[id]/[action] | schedule_post, reschedule_post, cancel_scheduled_post, queue_post | Key-authenticated schedule/reschedule/cancel-schedule/queue selector; same lifecycle services. |
 | GET /api/v1/webhooks | list_webhooks | Key-authenticated webhook directory. |
 | POST /api/v1/webhooks | create_webhook | Key-authenticated webhook creation; secrets excluded. |
@@ -573,6 +580,27 @@ and remain open because service/UI files are outside this lane:
 - Architecture, delivery plan and handoff owners must record the new Root mapping,
   two MCP writes, directory GET and these remaining boundary gaps.
 
-Earlier customer findings remain: Publishing draft aliases still use legacy
-local helpers rather than HTTP lifecycle services; Settings caller/appearance
-and other confirmation gaps above are not closed by this private inventory work.
+Customer source findings were rechecked through `1240a9ce`: draft aliases and
+REST v1 create are unified by `acb56bd7`; appearance callers/account persistence
+are unified by `2b42470b`. Settings single-selection/disconnect callers and the
+Agency/Sharing confirmation differences remain open. Closing 48 Root inventory
+exceptions does not close the Root service-boundary gaps above. The 24 retained
+exact exceptions are authority/protocol boundaries, not accepted product omissions.
+
+## Catch-up evidence boundaries
+
+Copy catalogs and schema/default fallback (`38ab34f4`, `fb42b056`, `93944199`,
+`5e6841ee`) expand bilingual UI and service errors; they do not prove complete
+localization. Recipe origin/status visibility has unit/render evidence. Browser
+rounds 1–2 are Chromium/local production-build/synthetic-data evidence, with
+unresolved findings and no Feeds table in round 2; see
+[BROWSER_MATRIX_2026-10-21.md](BROWSER_MATRIX_2026-10-21.md). Owner-recorded recipe
+publications/comments and post-insights probes in RELEASE_GATES_PLAN, plus the
+owner's 11:00 batch report, establish those limited remote outcomes, not every
+MCP tool or cleanup/recovery path. Analytics legacy rounds 1–3 extend the same
+report generator behind UI/REST/MCP, with mocked transport/arithmetic/artifact
+evidence; complete history, live clients and report download behavior stay open.
+
+The current documentation lane adds no keys, source, routes or tools. Historical
+lane test counts above describe their original runs; current validation is recorded
+in AGENT_HANDOFF.md. Full parity remains partial.
