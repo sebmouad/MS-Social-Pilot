@@ -33,8 +33,12 @@ export async function readFacebookPostPerformance(request: PostPerformanceReques
   const value = key === 'publishedAt' ? Prisma.sql`EXTRACT(EPOCH FROM r."publishedAt")` : key === 'engagement' ? Prisma.sql`(SELECT SUM((v #>> '{}')::numeric) FROM jsonb_each(COALESCE(r.insights::jsonb, '{}'::jsonb)) e(k,v) WHERE k IN ('reactions','comments','shares') AND jsonb_typeof(v) = 'number')` : Prisma.sql`CASE WHEN jsonb_typeof(r.insights::jsonb -> ${key}) = 'number' THEN (r.insights::jsonb ->> ${key})::numeric END`;
   const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
     SELECT * FROM (
-      SELECT p.id AS "postId", p.message, pt."publishedAt", pt."remoteUrl", pt.insights, pt."insightsSyncedAt"
+      SELECT p.id AS "postId", p.message, pt."publishedAt", COALESCE(pt."remoteUrl", ep.permalink) AS "remoteUrl",
+        CASE WHEN pt."insightsSyncedAt" IS NULL AND ep."insightsSyncedAt" IS NOT NULL THEN ep.insights ELSE pt.insights END AS insights,
+        COALESCE(pt."insightsSyncedAt", ep."insightsSyncedAt") AS "insightsSyncedAt"
       FROM post_targets pt JOIN posts p ON p.id = pt."postId" JOIN targets t ON t.id = pt."targetId"
+      -- Post history stores current insights on the synced remote copy of an app-published post.
+      LEFT JOIN external_posts ep ON ep."targetId" = pt."targetId" AND ep."remoteId" = pt."remotePostId"
       WHERE t.id = ${request.targetId} AND t."workspaceId" = ${request.workspaceId} AND p."workspaceId" = ${request.workspaceId}
         AND pt.status = 'published' AND pt."publishedAt" >= ${request.from} AND pt."publishedAt" < ${request.to}
       UNION ALL
