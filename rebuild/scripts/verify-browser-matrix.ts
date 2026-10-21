@@ -25,9 +25,14 @@ export function selectThemes(raw: string | undefined): ThemeList {
 }
 /** WebKit refuses to store a `Secure` cookie from plain-http loopback (Chromium and Firefox treat loopback as secure). */
 let relaxSecureCookie = false;
+/** Safari on macOS (and Playwright's WebKit there) moves Tab only between form controls; Option+Tab also reaches links and buttons, which is what a keyboard user with "full keyboard access" gets. */
+let focusKey = 'Tab';
+export const tabKey = () => focusKey;
+export const focusKeyFor = (engine: EngineName, platform: string = process.platform) => (engine === 'webkit' && platform === 'darwin' ? 'Alt+Tab' : 'Tab');
 async function launchBrowser(env: Readonly<Record<string, string | undefined>>) {
   const name = engineName(env.MATRIX_BROWSER);
   relaxSecureCookie = name === 'webkit';
+  focusKey = focusKeyFor(name);
   return ENGINES[name].launch({ headless: true });
 }
 const passRoute = (route: Route) => route.continue();
@@ -131,7 +136,7 @@ async function tabTo(page: Page, target: Locator): Promise<boolean> {
   // Reset the sequential navigation start, then use only real Tab presses.
   await page.evaluate(() => { document.body.tabIndex = -1; document.body.focus(); document.body.removeAttribute('tabindex'); });
   for (let i = 0; i < 250; i++) {
-    await page.keyboard.press('Tab');
+    await page.keyboard.press(tabKey());
     if (await target.evaluate(element => element === document.activeElement)) return visibleFocus(target);
   }
   return false;
@@ -145,7 +150,7 @@ async function checkDialog(page: Page, opener: Locator, cell: Cell): Promise<boo
   await page.waitForTimeout(100);
   await auditControls(page, cell);
   const contained = await dialog.first().evaluate(element => element.contains(document.activeElement));
-  await page.keyboard.press('Tab');
+  await page.keyboard.press(tabKey());
   const focus = page.locator(':focus');
   const ring = await focus.count() === 1 && await visibleFocus(focus);
   const trapped = await dialog.first().evaluate(element => element.contains(document.activeElement));
@@ -189,7 +194,7 @@ async function checkDrawerMainAction(page: Page, drawer: Locator, cell: Cell) {
     // Only real Tab presses move focus, which starts inside the open drawer and must stay trapped there.
     let reached = false;
     for (let i = 0; i < 100 && !reached; i++) {
-      await page.keyboard.press('Tab');
+      await page.keyboard.press(tabKey());
       reached = await target.evaluate(element => element === document.activeElement);
     }
     cell.keyboard.mainAction = reached && await visibleFocus(target) ? 'passed' : 'failed';
@@ -679,6 +684,21 @@ export function finishKeyboard(input: Pick<KeyboardReport, 'startedAt' | 'groups
   return { ...input, fatal, version: 1, browser: input.browser ?? 'chromium', finishedAt: new Date().toISOString(), expectedCells: expected.size, failures, passed: failures === 0 };
 }
 
+/** True when no visible, enabled tabbable control follows the focused element in document order (the focused element is the end of the tab order). */
+export const NO_TABBABLE_AFTER_FOCUS = `(() => {
+  const current = document.activeElement;
+  if (!current) return true;
+  const tabbable = 'a[href], button, input:not([type=hidden]), select, textarea, summary, [tabindex]';
+  return ![...document.querySelectorAll(tabbable)].some(el => {
+    if (el === current || !(current.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) || current.contains(el)) return false;
+    if (el.disabled || el.getAttribute('tabindex') === '-1' || el.closest('[inert], [hidden]')) return false;
+    // A closed <details> hides everything but its own summary from the tab order (Firefox still reports a box for the content).
+    for (let node = el.parentElement; node; node = node.parentElement) if (node.tagName === 'DETAILS' && !node.open && !(el.tagName === 'SUMMARY' && el.parentElement === node)) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+  });
+})()`;
+
 type Stop = { index: number; tag: string; role: string; label: string; popup: string; expanded: string; ring: boolean; inViewport: boolean; inMain: boolean; inShell: boolean; inFilters: boolean; isSubmit: boolean; selectedTab: boolean; skip: boolean };
 
 /** Press Tab through the page once, tagging each stop so later checks can act on it without searching the tab order again. */
@@ -687,25 +707,38 @@ async function tabWalk(page: Page, limit: number): Promise<{ stops: Stop[]; trap
   const stops: Stop[] = [];
   let same = 0, trapped = false, truncated = true;
   for (let i = 0; i < limit; i++) {
-    await page.keyboard.press('Tab');
-    const stop = await page.evaluate((index) => {
+    await page.keyboard.press(tabKey());
+    const stop = await page.evaluate(async (index) => {
       const e = document.activeElement as HTMLElement | null;
       if (!e || e === document.body || e === document.documentElement) return null;
       if (e.hasAttribute('data-kbd-stop')) return { again: Number(e.getAttribute('data-kbd-stop')) };
       e.setAttribute('data-kbd-stop', String(index));
+      // Focus scrolls the control into view (smoothly in WebKit and Firefox); measure once the box stops moving.
+      let top = e.getBoundingClientRect().top;
+      // A smooth scroll can start a few frames after focus, so the box must hold still for several frames in a row.
+      for (let frame = 0, still = 0; frame < 90 && still < 8; frame++) { await new Promise(resolve => requestAnimationFrame(() => resolve(null))); const next = e.getBoundingClientRect().top; still = next === top ? still + 1 : 0; top = next; }
       const s = getComputedStyle(e), r = e.getBoundingClientRect();
       const outline = s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0 && !['transparent', 'rgba(0, 0, 0, 0)'].includes(s.outlineColor);
       const name = (e.getAttribute('aria-label') || e.textContent || (e as HTMLInputElement).placeholder || e.getAttribute('name') || '').replace(/\s+/g, ' ').trim().slice(0, 40);
       return {
         index, tag: e.tagName.toLowerCase(), role: e.getAttribute('role') || '', label: name, popup: e.getAttribute('aria-haspopup') || '', expanded: e.getAttribute('aria-expanded') || '',
-        ring: e.matches(':focus-visible') && (outline || s.boxShadow !== 'none'), inViewport: r.width > 0 && r.height > 0 && r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight,
+        ring: (e.matches(':focus-visible') || (e.matches('input:is([type=date], [type=time], [type=datetime-local], [type=month], [type=week])') && e.matches(':focus'))) && (outline || s.boxShadow !== 'none'), inViewport: r.width > 0 && r.height > 0 && r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight,
         inMain: !!e.closest('main'), inShell: !!e.closest('nav, aside, header'), inFilters: !!e.closest('#shell-filters'), isSubmit: e.matches('form button[type=submit], form input[type=submit], form button:not([type])'),
         selectedTab: e.getAttribute('role') === 'tab' && e.getAttribute('aria-selected') === 'true', skip: e.classList.contains('shell-skip-link'),
       };
     }, stops.length);
     // Focus sitting on the document (browser chrome next) is the end of the order; a page with no controls at all has no stops and cannot trap.
     if (!stop) { same++; if (same >= 4) { trapped = stops.length > 1; truncated = false; break; } continue; }
-    if ('again' in stop) { truncated = false; if (stop.again === stops.length - 1) { same++; if (same >= SEGMENT_TABS) { trapped = true; break; } continue; } break; }
+    if ('again' in stop) {
+      truncated = false;
+      if (stop.again === stops.length - 1) {
+        same++;
+        // Firefox and WebKit headless keep focus on the last control (no browser chrome follows); Chromium leaves the document. Only a stuck focus with controls still ahead is a trap.
+        if (same >= SEGMENT_TABS) { trapped = !(await page.evaluate(NO_TABBABLE_AFTER_FOCUS)); break; }
+        continue;
+      }
+      break;
+    }
     same = 0; stops.push(stop);
   }
   return { stops, trapped, truncated };
@@ -769,7 +802,7 @@ async function checkDialogFocused(page: Page, opener: Locator, cell: Cell): Prom
   await page.waitForTimeout(100);
   await auditControls(page, cell);
   const contained = await dialog.first().evaluate(element => element.contains(document.activeElement));
-  await page.keyboard.press('Tab');
+  await page.keyboard.press(tabKey());
   const focus = page.locator(':focus');
   const ring = await focus.count() === 1 && await visibleFocus(focus);
   const trapped = await dialog.first().evaluate(element => element.contains(document.activeElement));
@@ -844,7 +877,7 @@ export async function runKeyboardRound2(env: Readonly<Record<string, string | un
                   // Focus lands on main itself; when main has controls the next Tab enters it (an empty main has nothing to enter).
                   const landed = await page.evaluate(() => { const main = document.querySelector('main'); return !!main && (document.activeElement === main || main.contains(document.activeElement)); });
                   const tabbable = await page.locator('main :is(a[href], button:not(:disabled), input:not(:disabled):not([type=hidden]), select:not(:disabled), textarea:not(:disabled), [tabindex="0"])').count();
-                  if (landed && tabbable) { await page.keyboard.press('Tab'); ok = await page.evaluate(() => !!document.activeElement?.closest('main')); } else ok = landed;
+                  if (landed && tabbable) { await page.keyboard.press(tabKey()); ok = await page.evaluate(() => !!document.activeElement?.closest('main')); } else ok = landed;
                 }
                 cell.checks.skipLink = ok ? 'passed' : 'failed';
                 if (!ok) add({ code: 'SKIP_LINK_FAILED' }, `skip link is not the first stop or does not move focus into main; first stops: ${stops.slice(0, 3).map(s => `${s.tag}${s.role ? `[${s.role}]` : ''} "${s.label}"`).join(' -> ') || '(none)'}`);

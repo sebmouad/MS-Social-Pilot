@@ -701,6 +701,8 @@ input[type=checkbox], input[type=radio], progress { accent-color: var(--accent);
 a { color: inherit; text-decoration: none; }
 button, a, summary { touch-action: manipulation; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+/* WebKit focuses the editable segment inside a date/time field, so the field itself never matches :focus-visible and showed no ring; :focus covers it (these fields take the keyboard on click too). */
+input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"]):focus { outline: 3px solid var(--focus); outline-offset: 2px; }
 main:focus { outline: none; }
 .shell-module-rail :focus-visible { outline-color: var(--rail-active-ink); }
 h1, h2, h3 { text-wrap: balance; scroll-margin-top: 88px; }
