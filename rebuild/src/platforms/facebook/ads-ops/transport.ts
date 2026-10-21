@@ -7,7 +7,7 @@ export type FacebookAdsFetch = typeof fetch;
 
 /** Provider failure. `beforeWrite` means no mutating request was sent. */
 export class FacebookAdsOpsError extends Error {
-  constructor(message: string, readonly detail: { status: number; code?: number; transient?: boolean; beforeWrite?: boolean; definite?: boolean }, readonly issueCode: keyof FacebookAdsCopy = 'providerFailure') {
+  constructor(message: string, readonly detail: { status: number; code?: number; subcode?: number; providerMessage?: string; transient?: boolean; beforeWrite?: boolean; definite?: boolean }, readonly issueCode: keyof FacebookAdsCopy = 'providerFailure') {
     super(message);
     this.name = 'FacebookAdsOpsError';
   }
@@ -20,7 +20,7 @@ export function classifyFacebookAdsFailure(error: unknown): 'rejected' | 'uncert
   return isFacebookDefiniteRejection(error.detail.status, error.detail.code, error.detail.transient === true) ? 'rejected' : 'uncertain';
 }
 
-type GraphBody = { error?: { message?: unknown; code?: unknown; is_transient?: unknown } } & Record<string, unknown>;
+type GraphBody = { error?: { message?: unknown; code?: unknown; error_subcode?: unknown; error_user_msg?: unknown; is_transient?: unknown } } & Record<string, unknown>;
 
 export function createFacebookAdsTransport(rawConfig: FacebookConfig, fetchImpl: FacebookAdsFetch = fetch, text: FacebookAdsText = defaultFacebookAdsText) {
   const config = validateFacebookConfig(rawConfig);
@@ -51,7 +51,7 @@ export function createFacebookAdsTransport(rawConfig: FacebookConfig, fetchImpl:
     const payload = await response.json().catch(() => null) as GraphBody | null;
     if (!response.ok || payload?.error) {
       const code = typeof payload?.error?.code === 'number' ? payload.error.code : undefined;
-      throw new FacebookAdsOpsError(text('providerFailure'), { status: response.status, ...(code === undefined ? {} : { code }), transient: payload?.error?.is_transient === true, beforeWrite: !write }, 'providerFailure');
+      throw new FacebookAdsOpsError(text('providerFailure'), { status: response.status, ...(code === undefined ? {} : { code }), ...(typeof payload?.error?.error_subcode === 'number' ? { subcode: payload.error.error_subcode } : {}), providerMessage: String(payload?.error?.error_user_msg ?? payload?.error?.message ?? '').slice(0, 300), transient: payload?.error?.is_transient === true, beforeWrite: !write }, 'providerFailure');
     }
     if (!payload || typeof payload !== 'object') throw new FacebookAdsOpsError(text('responseUnreadable'), { status: response.status, beforeWrite: !write }, 'responseUnreadable');
     return payload;
