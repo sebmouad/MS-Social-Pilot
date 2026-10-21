@@ -179,12 +179,12 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
           const historyBinding = await prisma.target.findFirst({ where: { id: target.id, workspaceId: target.workspaceId, providerId: target.providerId, enabled: true }, select: { accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
           const historyScopes = await runtimeConfig('meta.pageInsightReadScopes') as string[];
           if (!historyBinding?.socialAccount || !usable(historyBinding.socialAccount, target.workspaceId, currentTime(now)) || !granted(historyBinding.socialAccount.scopes, historyScopes)) throw new OperationError('forbidden', 'History access unavailable.');
-          const historyKey = `facebook.history.${target.workspaceId}.${target.id}.${target.providerId}`;
-          const savedHistory = await tx.appSetting.findUnique({ where: { key: historyKey }, select: { value: true } });
+          const savedRows = await tx.$queryRaw<Array<{ cursor: import('./post-history').HistoryProgress }>>`SELECT cursor FROM rebuild_facebook_sync_cursors WHERE "workspaceId" = ${target.workspaceId} AND "targetId" = ${target.id} AND kind = 'post_history' AND "providerId" = ${target.providerId}`;
+          const savedHistory = savedRows[0];
           const historyEngine = await configuredFacebookEngine({ signal });
           // Post history is best-effort: a provider refusal is counted and logged, Page insights still persist.
           let history: Awaited<ReturnType<typeof historyEngine.getPostHistory>> | null = null;
-          try { history = await historyEngine.getPostHistory(decryptSecret(historyBinding.accessToken ?? historyBinding.socialAccount.accessToken), target.providerId, now, savedHistory?.value as import('./post-history').HistoryProgress | undefined); }
+          try { history = await historyEngine.getPostHistory(decryptSecret(historyBinding.accessToken ?? historyBinding.socialAccount.accessToken), target.providerId, now, savedHistory?.cursor as import('./post-history').HistoryProgress | undefined); }
           catch (historyError) { signal.throwIfAborted(); failedMetrics++; await logItemFailure('postHistory', target.id, historyError); }
           if (history?.failures.length) failedMetrics++;
           for (const post of history?.posts ?? []) {
@@ -193,7 +193,7 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
               ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
             persistedCount++;
           }
-          if (history) await tx.appSetting.upsert({ where: { key: historyKey }, create: { key: historyKey, value: history.progress, updatedAt: now }, update: { value: history.progress } });
+          if (history) await tx.$executeRaw`INSERT INTO rebuild_facebook_sync_cursors ("workspaceId", "targetId", "providerId", kind, cursor, "updatedAt") VALUES (${target.workspaceId}, ${target.id}, ${target.providerId}, 'post_history', ${JSON.stringify(history.progress)}::jsonb, ${now}) ON CONFLICT ("workspaceId", "targetId", kind) DO UPDATE SET "providerId" = EXCLUDED."providerId", cursor = EXCLUDED.cursor, "updatedAt" = EXCLUDED."updatedAt"`;
           for (const { metric, period, endTime, value, numeric } of observations) {
             signal.throwIfAborted();
             await tx.pageInsight.upsert({

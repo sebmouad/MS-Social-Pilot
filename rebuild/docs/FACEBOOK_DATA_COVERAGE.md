@@ -157,3 +157,81 @@ Round-2 verification: `npx tsc --noEmit -p .` passed with zero errors;
 `npx vitest run tests/facebook-job-freshness.test.ts tests/facebook-post-history.test.ts tests/facebook-data-coverage.test.ts tests/facebook-analytics-selection.test.ts tests/facebook-signing-runtime.test.ts tests/facebook-engine.test.ts --no-cache` passed 76 tests across six files. `git diff --check` passed.
 The signing runtime test mock was updated for the existing runtimeConfigBatch
 consumer. Only mocked Graph/service evidence; no full suite or servers run.
+
+## Round 3 — history cursors and production evidence
+
+Owner-supplied production evidence, dated **2026-10-21** (not rerun by this worker):
+whole Unix-second `since`/`until` requests returned **3 posts over 12 months**
+for one Page. Reactions, comments and shares worked. All six former defaults
+(`post_impressions`, `post_impressions_unique`, `post_engaged_users`, `post_clicks`,
+`post_video_views`, `post_video_view_time`) were refused by that Graph version.
+The refusal establishes their unavailability in that run; it does not establish
+that every video-specific endpoint or content type refuses every video metric.
+
+The Root-editable `meta.postHistoryPolicy.metrics` default now contains:
+
+| Metric | Documentation status in this worker | Live verification |
+| --- | --- | --- |
+| `post_media_view` | Replacement candidate; official reference fetch blocked (429) | Not verified |
+| `post_total_media_view_unique` | Replacement candidate; official reference fetch blocked (429) | Not verified |
+| `post_clicks_by_type` | Breakdown candidate; official reference fetch blocked (429) | Not verified |
+| `post_reactions_by_type_total` | Breakdown candidate; official reference fetch blocked (429) | Not verified |
+
+Official references attempted:
+https://developers.facebook.com/docs/graph-api/reference/insights/
+and https://developers.facebook.com/docs/graph-api/reference/page/published_posts/
+and https://developers.facebook.com/docs/graph-api/reference/page/feed/ .
+No candidate is represented as officially or live verified. No speculative video
+metric was added to defaults after the supplied refusals. Root may configure
+eligible metrics after verification; the collector requests **one metric at a
+time**, retaining other successful scalars/maps and recording each refused metric
+in `collectionFailures`. These tests prove isolation, not Graph eligibility.
+Changing source defaults does not overwrite an existing persisted Root policy:
+the integrator must review/update its configured metric list explicitly.
+
+`published_posts` remains the default. If Root selects `feed`, the adapter always
+requests `from` and accepts only an exact Page author ID. Visitor posts and posts
+without readable authorship are excluded before metric/reaction collection.
+Changing edges must not be used to inflate counts with visitor posts. The observed
+3-post count alone cannot prove missing history or its cause: lookback boundaries,
+Page-authored publication volume, current token visibility, deleted/unavailable
+content, content format/edge coverage and a still-incomplete page budget are
+possible limits. Check the saved `complete` flag and actual Page publication
+inventory; no feed-vs-published_posts live comparison was performed here.
+Stories, videos and Reels remain separate, eligibility-dependent collections.
+
+History progress now lives in `rebuild_facebook_sync_cursors`, keyed by workspace,
+target and kind (`post_history`), with provider identity, cursor JSON and update
+time. Reads require the current provider identity; writes stay inside the selected
+resource transaction with external posts and existing final authorization checks.
+The additive migration `20261031120000_rebuild_facebook_sync_cursors` copies
+unencrypted object-valued history settings using exact current target-bound keys,
+then removes all `facebook.history.*` settings. Unmatched/stale/nonobject history
+state is disposable progress and is removed rather than reattached to another
+target. The migration is transactional and unapplied by this worker.
+
+A real workspace FK makes the table discoverable by the existing catalog-based
+workspace export and children-first erasure service. A target FK cascades target
+deletion; a binding trigger checks tenant/provider identity; the shared purge
+write guard prevents resurrection during erasure. Migration checksum, allowlist,
+application and existing-object refusal are pinned in cutover rehearsal. Source
+checks cover this wiring; actual PostgreSQL migration/export/erasure remains an
+integrator verification gate. No Prisma model/client generation is required by
+these parameterized SQL reads/writes; schema synchronization belongs to integrator.
+
+Remaining ownership coordination: update architecture/handoff; verify replacements
+against accessible current official docs and live Graph; review existing Root
+metric overrides; apply migration only after backup/restore gates. The separate
+fair-batch `sync.cursor.*` settings used by Facebook jobs still hold progress in
+Root configuration and need a shared job-state design (not migrated into this
+workspace/target history table). No new Root keys or schema-version edit.
+
+Round-3 verification: `npx tsc --noEmit -p .` passed (0 errors).
+`npx vitest run tests/facebook-post-history.test.ts tests/facebook-sync-cursors.test.ts tests/facebook-job-freshness.test.ts tests/cutover-rehearsal.test.ts tests/facebook-data-coverage.test.ts tests/facebook-signing-runtime.test.ts --no-cache`
+passed **56 tests across 6 files**. `git diff --check` passed. No full suite,
+server, migration application, live Graph request, push or production operation.
+
+Local commit blocked: `git add` could not create the linked worktree metadata's
+`index.lock` (`Operation not permitted`); metadata is outside writable roots.
+All changes remain uncommitted. No push was attempted. Intended commit:
+`fix(facebook): isolate history sync state`.

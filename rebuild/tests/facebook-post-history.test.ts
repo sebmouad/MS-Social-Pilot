@@ -34,3 +34,44 @@ describe('Page history', () => {
   await expect(createFacebookPostHistory(config, policy, async () => response({ error: { message: 'secret' } })).collect('secret', 'page', now)).rejects.toThrow('History collection rejected');
  });
 });
+
+describe('round 3 history evidence', () => {
+ it('uses replacement defaults and permits Root overrides', () => {
+  const defaults = FACEBOOK_HISTORY_CONFIG[0].defaultValue;
+  expect(defaults.metrics).toEqual(['post_media_view', 'post_total_media_view_unique', 'post_clicks_by_type', 'post_reactions_by_type_total']);
+  expect(FACEBOOK_HISTORY_CONFIG[0].schema.safeParse({ ...defaults, metrics: ['custom_metric'] }).success).toBe(true);
+ });
+ it('uses unix seconds and retains metric successes around a refusal', async () => {
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+   const url = new URL(String(input));
+   if (url.pathname.endsWith('/published_posts')) {
+    expect(url.searchParams.get('since')).toMatch(/^\d+$/);
+    expect(url.searchParams.get('until')).toBe(String(Math.floor(now.getTime() / 1000)));
+    return response({ data: [{ id: 'p', created_time: '2026-10-01' }] });
+   }
+   const metric = url.searchParams.get('metric');
+   if (metric === 'refused') return response({ error: { code: 100 } });
+   return response({ data: [{ name: metric, values: [{ value: metric === 'post_media_view' ? 9 : { link_clicks: 3 } }] }] });
+  });
+  const result = await createFacebookPostHistory(config, { ...policy, metrics: ['post_media_view', 'refused', 'post_clicks_by_type'], reactionTypes: [] }, fetcher).collect('secret', 'page', now);
+  expect(result.failures).toEqual(['refused']);
+  expect(result.posts[0].insights).toMatchObject({ post_media_view: 9, post_clicks_by_type: { link_clicks: 3 }, collectionFailures: ['refused'] });
+  expect(fetcher).toHaveBeenCalledTimes(4);
+ });
+ it('excludes visitor and unknown-author feed posts', async () => {
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+   const url = new URL(String(input));
+   expect(url.pathname).toMatch(/\/feed$/);
+   expect(url.searchParams.get('fields')?.split(',')).toContain('from');
+   return response({ data: [
+    { id: 'owned', created_time: '2026-10-01', from: { id: 'page' } },
+    { id: 'visitor', created_time: '2026-10-01', from: { id: 'other' } },
+    { id: 'unknown', created_time: '2026-10-01' },
+   ] });
+  });
+  const result = await createFacebookPostHistory(config, { ...policy, edge: 'feed', metrics: [], reactionTypes: [] }, fetcher).collect('secret', 'page', now);
+  expect(result.posts.map(post => post.remoteId)).toEqual(['owned']);
+  expect(result.progress.complete).toBe(true);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+ });
+});

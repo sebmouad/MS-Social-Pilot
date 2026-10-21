@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ lock: vi.fn(), resourceLock: vi.fn(), access: vi.fn(), selected: vi.fn(), fresh: vi.fn(), read: vi.fn(), write: vi.fn() }));
+const state = vi.hoisted(() => ({ lock: vi.fn(), resourceLock: vi.fn(), access: vi.fn(), selected: vi.fn(), fresh: vi.fn(), read: vi.fn(), write: vi.fn(), history: vi.fn() }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: state.lock }));
 vi.mock('../src/server/jobs/access', () => ({ assertWorkspaceJobAccess: state.access }));
 vi.mock('../src/server/platforms/resource-lock', () => ({ withSelectedResourceOperation: async (workspaceId: string, resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => state.resourceLock(workspaceId, resource, run) }));
@@ -10,7 +10,7 @@ vi.mock('../src/server/data', () => ({ prisma: {
   appSetting: { findUnique: async () => null, upsert: async () => ({}) },
 } }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
-vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({ getPostHistory: async () => ({ posts: [], failures: [], progress: { after: null, complete: true, since: "2026-01-01", until: "2026-10-20" } }), getPageInsightObservations: state.read }) }));
+vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({ getPostHistory: state.history, getPageInsightObservations: state.read }) }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => {
   if (key === 'platforms.facebook.enabled') return true;
   if (key === 'sync.maxItemsPerJob') return 10;
@@ -28,19 +28,31 @@ const currentTarget = (accessToken: string, scopes = 'read_insights,pages_read_e
 beforeEach(() => {
   vi.clearAllMocks();
   state.lock.mockImplementation(async (_workspaceId: string, work: () => Promise<unknown>) => work());
-  state.resourceLock.mockImplementation(async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => run({ pageInsight: { upsert: state.write }, appSetting: { findUnique: async () => null, upsert: async () => ({}) } }, new AbortController().signal));
+  state.resourceLock.mockImplementation(async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => run({ pageInsight: { upsert: state.write }, $queryRaw: async () => [], $executeRaw: async () => 1 }, new AbortController().signal));
   state.access.mockResolvedValue(undefined);
   state.selected.mockResolvedValue([selectedTarget]);
   state.fresh.mockResolvedValue(currentTarget('new-page-token'));
   state.read.mockResolvedValue([]);
   state.write.mockResolvedValue({});
+  state.history.mockResolvedValue({ posts: [], failures: [], progress: { after: null, complete: true, since: "2026-01-01", until: "2026-10-20" } });
 });
 
 describe('Facebook background job freshness', () => {
+  it('resumes scoped cursor state and saves the next cursor inside the resource transaction', async () => {
+    const cursor = { after: 'next', complete: false, since: '2026-01-01', until: '2026-10-20' };
+    const query = vi.fn().mockResolvedValue([{ cursor }]);
+    const execute = vi.fn().mockResolvedValue(1);
+    state.resourceLock.mockImplementation(async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => run({ pageInsight: { upsert: state.write }, $queryRaw: query, $executeRaw: execute }, new AbortController().signal));
+    await syncPageAnalytics();
+    expect(state.history).toHaveBeenCalledWith('new-page-token', 'page-1', expect.any(Date), cursor);
+    expect(query.mock.calls[0].slice(1)).toEqual(['workspace-1', 'target-1', 'page-1']);
+    expect(execute.mock.calls[0].slice(1, 4)).toEqual(['workspace-1', 'target-1', 'page-1']);
+    expect(execute.mock.calls[0][4]).toBe(JSON.stringify((await state.history.mock.results[0].value).progress));
+  });
   it('reads the latest token and grant after the selected-resource lock is acquired', async () => {
     state.resourceLock.mockImplementation(async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => {
       state.fresh.mockResolvedValueOnce(currentTarget('rotated-token'));
-      return run({ pageInsight: { upsert: state.write }, appSetting: { findUnique: async () => null, upsert: async () => ({}) } }, new AbortController().signal);
+      return run({ pageInsight: { upsert: state.write }, $queryRaw: async () => [], $executeRaw: async () => 1 }, new AbortController().signal);
     });
     await syncPageAnalytics();
     expect(state.read).toHaveBeenCalledWith('rotated-token', 'page-1', expect.any(Date), expect.any(Date));
@@ -66,7 +78,7 @@ describe('Facebook background job freshness', () => {
   it('reports no successful rows when the selected-resource transaction rejects after writes', async () => {
     state.read.mockResolvedValue([{ metric: 'page_views_total', period: 'day', endTime: new Date('2026-10-16T00:00:00Z'), value: 3, numeric: 3 }]);
     state.resourceLock.mockImplementationOnce(async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => {
-      await run({ pageInsight: { upsert: state.write }, appSetting: { findUnique: async () => null, upsert: async () => ({}) } }, new AbortController().signal);
+      await run({ pageInsight: { upsert: state.write }, $queryRaw: async () => [], $executeRaw: async () => 1 }, new AbortController().signal);
       throw new Error('transaction commit failed');
     });
     expect(await syncPageAnalytics()).toMatchObject({ updated: 0, failed: 1 });

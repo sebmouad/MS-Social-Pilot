@@ -44,11 +44,13 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
       const identity = progress.after ?? '';
       if (seen.has(identity)) throw new Error('Repeated history cursor.');
       seen.add(identity);
-      const batch = await page(`${encodeURIComponent(pageId)}/${policy.edge}`, token, { fields: [...new Set(['id', 'created_time', ...policy.fields])].join(','), limit: String(config.pageSize), since: String(Math.floor(Date.parse(progress.since) / 1000)), until: String(Math.floor(Date.parse(progress.until) / 1000)), ...(progress.after ? { after: progress.after } : {}) });
+      const batch = await page(`${encodeURIComponent(pageId)}/${policy.edge}`, token, { fields: [...new Set(['id', 'created_time', ...(policy.edge === 'feed' ? ['from'] : []), ...policy.fields])].join(','), limit: String(config.pageSize), since: String(Math.floor(Date.parse(progress.since) / 1000)), until: String(Math.floor(Date.parse(progress.until) / 1000)), ...(progress.after ? { after: progress.after } : {}) });
       for (const raw of batch.rows) {
         const post = obj(raw); const createdTime = new Date(String(post.created_time));
         if (typeof post.id !== 'string' || !Number.isFinite(createdTime.getTime())) throw new Error('Invalid history post identity.');
         if (createdTime.getTime() < Date.parse(progress.since) || createdTime.getTime() > Date.parse(progress.until)) continue;
+        // A feed can include visitor posts. Missing authorship is unknown, never Page-owned.
+        if (policy.edge === 'feed' && obj(post.from).id !== pageId) continue;
         const insights: Record<string, unknown> = {};
         const postFailures: string[] = [];
         for (const [key, value] of [['shares', obj(post.shares).count], ['comments', obj(obj(post.comments).summary).total_count]] as const) { const n = number(value); if (n !== null) insights[key] = n; }
