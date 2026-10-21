@@ -115,7 +115,7 @@ export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: M
     const { byAsset, truncated } = await attribute(prisma, actor.workspaceId, scope, l.scan, l.holderExcerpt);
     let items = scope.map(c => { const h = byAsset.get(c.id) ?? []; return { ...c.asset, inUse: h.length > 0, holderCount: h.length, holders: auth.workspaceWide ? h.slice(0, l.listLimit) : null } satisfies LibraryAsset; });
     if (query.usage) items = items.filter(i => query.usage === 'used' ? i.inUse : !i.inUse).slice((page - 1) * l.pageSize, page * l.pageSize + 1);
-    return { items: items.slice(0, l.pageSize), page, pageSize: l.pageSize, hasMore: items.length > l.pageSize, usage, workspaceWide: auth.workspaceWide, usageMayBeIncomplete: truncated || usage.approximate, limits: { maxSearchCharacters: l.search } };
+    return { items: items.slice(0, l.pageSize), page, pageSize: l.pageSize, hasMore: items.length > l.pageSize, usage, workspaceWide: auth.workspaceWide, usageMayBeIncomplete: truncated || usage.approximate, limits: { maxSearchCharacters: l.search, maxNameCharacters: l.nameMax } };
   })());
 }
 
@@ -212,3 +212,26 @@ export async function deleteAsset(actor: ToolActor, input: unknown, deps: MediaD
   }));
 }
 export { NetGuardError };
+
+
+/** Rename database-backed assets without changing their stable attachment identity. */
+export async function renameAsset(actor: ToolActor, input: unknown) {
+  const l = await bounds();
+  const { z } = await import('zod');
+  const data = await parse(z.object({ id: z.string().min(1).max(l.identifierMax).regex(/^[A-Za-z0-9_-]+$/), name: z.string().trim().min(1).max(l.nameMax).refine(v => !/[\u0000-\u001f\u007f\\/]/.test(v)), confirmation: z.string() }).strict(), input);
+  if (data.confirmation !== `RENAME MEDIA ${data.id}`) throw await bad();
+  const auth = await authorizeFeature(actor, FEATURE, 'write');
+  if (!auth.workspaceWide) throw await mediaError('forbidden', 'Renaming media requires access to all channels.');
+  return protect(transact(actor.workspaceId, l, async tx => {
+    const fresh = await lockActor(tx, actor, true);
+    if (!fresh.workspaceWide) throw await mediaError('forbidden', 'Renaming media requires access to all channels.');
+    const rows = await tx.$queryRaw<Array<{ filename: string }>>`SELECT filename FROM media WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL FOR UPDATE`;
+    if (!rows[0]) throw await mediaError('not_found', 'This media is unavailable in the current workspace.');
+    if (rows[0].filename !== data.name) {
+      const changed = await tx.$executeRaw`UPDATE media SET filename = ${data.name} WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL`;
+      if (changed !== 1) throw await unavailable();
+      await audit(tx, actor, 'media.renamed', { assetId: data.id });
+    }
+    return { id: data.id, name: data.name, renamed: true as const };
+  }));
+}

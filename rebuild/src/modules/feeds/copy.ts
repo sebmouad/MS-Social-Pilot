@@ -52,6 +52,10 @@ export const feedsCopy = {
     hashtags: 'Hashtags (optional)',
     hashtagsHint: 'Inserted where {hashtags} appears in the post text.',
     preview: 'Preview',
+    entryPreview: 'Post text',
+    reviewQueued: '{count} review notifications queued. Posts remain in Approvals; this does not confirm email delivery.',
+    entryLink: 'Article link',
+    reviewNotice: 'Posts awaiting approval appear in Approvals. Review notifications follow each team member’s preferences; delivery is not guaranteed.',
     previewEmpty: 'This text produces an empty post.',
     sampleTitle: 'An example headline',
     sampleExcerpt: 'The first lines of the article appear here.',
@@ -174,6 +178,10 @@ export const feedsCopy = {
     hashtags: 'Hashtags (facultatif)',
     hashtagsHint: 'Insérés à la place de {hashtags} dans le texte de la publication.',
     preview: 'Aperçu',
+    entryPreview: 'Texte de la publication',
+    reviewQueued: '{count} notifications de validation mises en attente. Les publications restent dans Approbations ; cela ne confirme pas la livraison des e-mails.',
+    entryLink: 'Lien de l’article',
+    reviewNotice: 'Les publications à valider apparaissent dans Approbations. Les notifications suivent les préférences de chaque membre ; leur livraison n’est pas garantie.',
     previewEmpty: 'Ce texte produit une publication vide.',
     sampleTitle: 'Un exemple de titre',
     sampleExcerpt: 'Les premières lignes de l’article apparaissent ici.',
@@ -259,5 +267,5 @@ export type FeedsCopyCatalog = Record<FeedsLocale, Record<FeedsCopyKey, string>>
 
 /** `catalog` is the Root-managed `feeds.copy` value; the shipped defaults apply when it is not supplied. */
 export function feedsText(locale: FeedsLocale, key: FeedsCopyKey, values: Record<string, string | number> = {}, catalog: FeedsCopyCatalog = feedsCopy): string {
-  return (catalog[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+  return (catalog[locale]?.[key] ?? feedsCopy[locale][key]).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
 }

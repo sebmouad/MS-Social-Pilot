@@ -2,6 +2,48 @@
 
 Status: **integrated stored reports, durable object/creation services and stored-image creative creation, with scoped mocked verification; incomplete browser/database/live-provider/release coverage.** Management is off by default. The current proof and remaining gaps are recorded below. Target: [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md).
 
+Updated 2026-10-21 against HEAD `ffdb1cdf` (schema **118**). The owner/integrator
+records this release as deployed and `20261031180000_rebuild_ads_ad_creation` as
+applied in production; this documentation lane made no production calls and has
+no fresh migration receipt. Earlier batch sections below retain their dated scope;
+the current status here supersedes their local-only/application-pending statements.
+
+## Current ledger, runtime copy and recovery status
+
+- **Ledger gap closed in source:** root migration
+  `prisma/migrations/20261031180000_rebuild_ads_ad_creation/migration.sql` extends
+  `ads_operations_operation_kind` to accept `ad.create`. SHA-256:
+  `1769fa24129e6d74119e84d0677a2baf0c935cb73a4e722ae0a443b7fbc7120f`.
+  Source/checksum tests (`ads-ad-create-migration`) and mocked creation/recovery
+  tests are distinct from the owner's production-application record. An exact
+  database CHECK/history receipt and the cutover-rehearsal allowlist, checksum,
+  history-refusal parameters and post-apply probe remain follow-up work.
+- **Runtime copy wired at host level:** `configuredOperations(locale)` resolves
+  Root `meta.adsCopy` through the neutral platform host into a request-local
+  engine. Factory failures fail closed. UI/REST/MCP entry points still default to
+  English because they do not pass the customer locale; creation-form consent
+  templates must also agree with the live management preview.
+- **Round 9 scoped recovery authorization:** `resolveAdsOperation` checks current
+  account visibility before revealing state/confirmation, intersects membership
+  channel scope and key target/account ceilings, and checks a creative's exact
+  target. It repeats manager authorization and visibility after acquiring the
+  account/ledger locks, before compare-and-set settlement and audit. Retained
+  disabled/invalidated accounts remain eligible for local attestation without
+  provider grants or a remote call. Fakes in `ads-parity-management.test.ts` cover
+  pending/uncertain operations, scope/role revocation while waiting, empty
+  credential ceilings and invisible-account disclosure refusal. This is not
+  PostgreSQL concurrency, real-client or live-provider evidence.
+- **Remaining policy distinction:** creation of ad sets/ads requires unrestricted
+  channel scope; recovery permits a limited administrator whose current scope
+  reaches a target on the account connection (the round 9 tests explicitly allow
+  it). It does not repeat the creation-only unrestricted check. Do not describe
+  this as full creation/recovery policy equivalence; reconcile that policy with
+  the owning service/README before declaring parity complete.
+- Management remains off by default; live `ads_management` grant, paused creation,
+  edits, recovery, remote outcome verification and cleanup remain unproven.
+  Browser round 5 covers local synthetic Ads routes only, before rounds 6–9;
+  it is not management-write or current-copy browser evidence.
+
 ## What exists
 
 | Area | Path | Notes |
@@ -34,14 +76,14 @@ Directory management reads use `directory/management-port.ts`, an optional neutr
 
 Request identities bind to a normalized payload hash. Replays return the recorded outcome without sending another provider write; changed payloads under an existing identity are refused. Pending/uncertain creations retain their hold. A human attestation is not a provider receipt and does not assert a remote identity or current paused state.
 
-## Ledger migration (local preview only)
+## Initial ledger migration (historical local-preview record)
 
 Canonical migration: `prisma/migrations/20261018170000_rebuild_ads_operations/migration.sql` in the application repository. It includes immutable request identity/hash, per-actor request uniqueness, the open-object hold and resolution-shape constraints. Do not apply older proposal SQL from worker handoffs.
 
 
 Without this table every write fails closed (`unavailable`) before any provider call.
 
-## Current host wiring
+## Historical host wiring (batches 74–75; superseded above)
 
 - Published registry 67 includes analysis and management policies; pending creation integration adds version 68. Management stays off by default.
 - Facebook-owned host assembly provides its optional neutral object-operations engine.
@@ -349,13 +391,12 @@ application or production change.
   is withheld by `reconnect_required` (absent `ads_management` grant or invalid
   connection). The object manager and Campaigns screen show a bilingual reconnect notice
   linking to Settings → Connections. The thrown message is in the Ads catalog
-  (`grantMissing`), so API/MCP errors localize in French.
+  (`grantMissing`), so the service can localize errors; entry-point customer-locale plumbing remains open.
 - **Hierarchy.** Campaigns rows show their ancestor path (`Campaign › Ad set`) resolved by
   the platform's neutral `parentObjectId`, are ordered by it, and a note says levels
   overlap and must not be added together.
-- **Migration required before activation.** `ads_operations_operation_kind` (CHECK on
-  `operationType`) must list `ad.create`; `objectType` already allows `ad`. Until a root
-  `prisma/migrations` migration extends it, the ledger insert fails closed before any
-  provider call.
+- **Ledger follow-up closed in round 8.** Migration
+  `20261031180000_rebuild_ads_ad_creation` now permits `ad.create`; see current
+  status above for the owner-recorded application and remaining rehearsal evidence.
 - **New Root keys: none** (customer copy keys were added to the existing `ads.customerCopy`
   default catalog; `CONFIG_SCHEMA_VERSION` untouched).

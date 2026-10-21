@@ -16,3 +16,9 @@
 .thumbCount { position: absolute; right: 3px; bottom: 3px; padding: 0 5px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 78%, transparent); color: var(--surface); font-size: 10px; font-weight: 750; }
 
 .chipRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+
+.viewSwitch a { min-height: 44px; }
+.viewSwitch a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.viewSwitch a:not([aria-current="true"]):hover { background: var(--surface-hover); }
+.toolbarRow > * { min-width: 0; }
+@media (max-width: 560px) { .viewSwitch a { padding: 0 10px; } }

@@ -32,7 +32,7 @@ export default async function MediaScreen({ searchParams }: { searchParams: Prom
       {heading}
       <MediaLibrary items={result.items.map(i => ({ ...i, createdAt: i.createdAt.toISOString(), holders: i.holders?.map(h => ({ ...h, scheduledAt: h.scheduledAt?.toISOString() ?? null })) ?? null }))}
         usage={result.usage} page={result.page} hasMore={result.hasMore} filters={{ kind: (kind as string | undefined) ?? '', usage: (usage as string | undefined) ?? '', q: typeof q === 'string' ? q : '' }}
-        canWrite={canWrite} workspaceWide={result.workspaceWide} usageMayBeIncomplete={result.usageMayBeIncomplete} maxSearch={result.limits.maxSearchCharacters} locale={LOCALE} copy={copy} />
+        canWrite={canWrite} workspaceWide={result.workspaceWide} usageMayBeIncomplete={result.usageMayBeIncomplete} maxSearch={result.limits.maxSearchCharacters} maxName={result.limits.maxNameCharacters} locale={LOCALE} copy={copy} />
       <p className={styles.help}>{t('privacy')}</p>
     </>;
   } catch (error) {

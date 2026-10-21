@@ -1,8 +1,8 @@
 # Content feeds (legacy parity wave 3)
 
-Status: **source/mock evidence plus recorded production recipe planning**.
-Updated 2026-10-21 against local HEAD `6d3347fb` (deployed per the integrator;
-schema 115; round 6 recovery changes below). The rebuild is in production;
+Status: **source/mock recovery evidence plus owner-recorded production planning, publication and first comments for one full day**.
+Updated 2026-10-21 against local HEAD `ffdb1cdf` (deployed per the owner/integrator;
+schema 118; not re-observed by this lane). The rebuild is in production;
 [RELEASE_GATES_PLAN.md](RELEASE_GATES_PLAN.md#production-log--2026-10-21) records
 the recipe run below. Original RSS/Atom mocked tests do not establish live checks
 of every feed kind. No fresh database, browser or provider calls in this doc pass.
@@ -60,7 +60,7 @@ Content feeds are a feature of the Publishing product module (feature id `publis
 
 ## Root keys (registry version 84)
 
-Existing WIP keys plus `feeds.autoCheck.schedule`, `feeds.autoCheck.maxItemsPerFeed`, `feeds.autoCheck.disableAfterFailures`, `feeds.maxSpreadMinutes`, `feeds.queueLookaheadDays`, `feeds.fallbackDelayMinutes`, `feeds.fallbackSpacingMinutes`. All bounded, all consumed. Owned by Publishing in Root. Fetch, size, redirect, host, per-workspace count, name/message/target limits and transaction bounds are Root keys; no operational literal lives in code.
+Existing WIP keys plus `feeds.autoCheck.schedule`, `feeds.autoCheck.maxItemsPerFeed`, `feeds.autoCheck.disableAfterFailures`, `feeds.maxSpreadMinutes`, `feeds.queueLookaheadDays`, `feeds.fallbackDelayMinutes`, `feeds.fallbackSpacingMinutes`. All bounded, all consumed. Owned by Publishing in Root. Fetch, size, redirect, host, per-workspace count, name/message/target limits and transaction bounds are Root keys; residual defaults/literals are tracked in CONFIG_LITERAL_AUDIT.md.
 
 ## API and MCP
 
@@ -78,7 +78,7 @@ HTTP routes are same-origin for writes and call the same services. MCP group `co
 
 ## WordPress recipe planner (2026-10-21)
 
-Status: **implemented with mocked tests and owner-recorded production planning**.
+Status: **implemented with mocked recovery tests and owner-recorded production delivery for one full day**.
 Unit seams use mocked `mysql2`, an in-memory ledger and fake Publishing/image
 ports, with real `sharp` conversion. Separately, the 2026-10-21 production log
 records read-only MariaDB permission checks, image download/JPEG conversion and
@@ -102,7 +102,8 @@ Purpose: keep every selected Page continuously scheduled with recipes from the o
 | `server/wordpress.ts` | customer service: read, save, pause/resume, preview, run now |
 | `copy-recipes.ts`, `ui/RecipeSource.tsx` | en+fr copy and the screen section on `/publishing/feeds` |
 
-Migration `20261031140000_rebuild_wordpress_sources` (additive, SHA-256 `cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642`, pinned in `scripts/cutover-rehearsal.sh` and its test, **pinned source; the production recipe run is recorded separately, without an exact migration receipt in this feature report**): `wordpress_recipe_sources` (one per workspace; name, site, enabled, all-or-selected channels, JSON config overrides, last run) and `wordpress_recipe_plans` (the ledger). Both carry `workspaceId` FKs with cascade and the purge write gate, so catalog-driven export and erasure cover them.
+Migration `20261031140000_rebuild_wordpress_sources` (additive, SHA-256 `cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642`, pinned in `scripts/cutover-rehearsal.sh` and its test, **pinned source; the production recipe run is recorded separately, without an exact migration receipt in this feature report**): `wordpress_recipe_sources` (one per workspace; name, site, enabled, all-or-selected channels, JSON config overrides, last run) and `wordpress_recipe_plans` (the ledger). Both carry `workspaceId` FKs with cascade and the purge write gate, the ownership catalog declares export/erasure coverage. Exact PostgreSQL export,
+erasure and purge-race evidence remains separate from these declarations.
 
 ### Data mapping (verified production facts)
 
@@ -110,7 +111,9 @@ Migration `20261031140000_rebuild_wordpress_sources` (additive, SHA-256 `cce64ed
 - Caption: meta `_msrwa_facebook_caption`. Image: meta `_msrwa_facebook_generated` is an attachment ID; the attachment's `_wp_attached_file` gives the path, public address `{siteUrl}{uploadsPath}/{path}`. Recipe: meta `_msrwa_recipe` (JSON). Already shared: meta `fb_shared_at` (skipped when "skip shared" is on). A recipe needs all three of caption, image file and a recipe with at least one ingredient or step, otherwise it is not a candidate.
 - Link: `feeds.wordpress.permalinkTemplate` (`{siteUrl}/{slug}/`), e.g. ID 60938 becomes `https://recettes.newsgeet.com/potee-auvergnate-a-lancienne-fondante-et-doree/`.
 - Ingredients and steps may be strings or objects (`name/text/item`, `quantity/qty/amount`, `unit`, `note`, nested groups with `items`); group titles become heading lines.
-- First comment: template with `{title} {description} {ingredients} {steps} {servings} {prep} {cook} {total} {link}` (French default). Ingredients get bullets, steps are numbered. Over the limit (the smaller of `feeds.wordpress.firstCommentMaxCharacters` and `publishing.maxMessageCharacters`) steps are cut first, then ingredients, with a mark, and the link is always kept.
+- First comment: template with `{title} {description} {ingredients} {steps} {servings} {prep} {cook} {total} {link}` (French default). Ingredients get bullets, steps are numbered. Over the limit (the smaller of `feeds.wordpress.firstCommentMaxCharacters` and `publishing.maxMessageCharacters`) steps are cut first, then ingredients, with a mark, and a link is preserved only when the configured template contains `{link}`. The
+  owner removed the article link from production recipe comments; do not restore
+  it from the historical default/template description.
 - Image: downloaded with the address-pinned public fetch (feeds redirect/allow-http/host-allowlist settings apply, so the WordPress host must pass `feeds.hostAllowlist` when that list is not empty), checked by `inspectMediaSnapshot`, converted to JPEG (quality from Root, lowered stepwise until under `publishing.maxImageUploadBytes`), and stored as a workspace image referenced as `media:<id>`.
 
 ### Planning
@@ -130,18 +133,25 @@ Ledger states: `planned` (post id stored), `claimed` (unfinished; older than `cl
 
 ### Limitations and open work
 
-- The production log supersedes the original no-runtime claim for the recorded MariaDB/image/storage/planning path. Dependency lockfile integration is in `b940fad9`. Exact target migration history, export/erasure, crash recovery, real MCP/client scope, browser and Facebook publication/comment/cleanup outcomes still need their own evidence; the 80-post plan does not prove these.
+- The production log supersedes the original no-runtime claim for the recorded MariaDB/image/storage/planning path. Dependency lockfile integration is in `b940fad9`. Exact target migration history, export/erasure, crash recovery, real MCP/client scope, current browser and Facebook recovery/cleanup outcomes still need their own evidence.
+  The 40/40 publication/comment day below closes the original no-delivery-evidence
+  claim only for that recorded run; an 80-post plan alone does not prove delivery.
 - Chronological order now follows `post_date_gmt` (see Follow-ups below).
 - The pool of eligible recipes is finite (about 2,900 with caption and image). At 40 posts a day with a 365-day cooldown it is exhausted in about 70 days; the planner then reports unfilled slots instead of repeating.
 - A crash between creating the post and saving its ID leaves an `uncertain` row (slot consumed, no duplicate); the post itself is found in Publishing.
 - Planned posts are not removed when a source is paused unless the member asks to cancel them (Follow-ups below) or when a channel is deselected (they are ordinary scheduled posts).
 - The preview shows the original WordPress image address in an `<img>`; a strict `img-src` policy must allow the site, or a proxy would be needed.
-- Shortening marks, minutes suffix and the French default template are Root settings; the customer-facing error text of the service is English like the rest of the feeds service.
+- Shortening marks, minutes suffix and the French default template are Root settings; `feeds.copy` and `feeds.recipeCopy` now supply EN/FR customer copy, including
+  localized service errors through `server/messages.ts`. Residual parser defaults
+  and literals remain in CONFIG_LITERAL_AUDIT; this is not full extraction proof.
+
 ### Follow-ups (2026-10-21: order, retry, pause-cancel, pool health, log line)
 
 - **Order.** Candidates are read by `post_date_gmt` (newest or oldest first per the source `order`), ties by `ID`, with keyset paging over (date, ID). Undated (zero-date) rows sort last newest-first and first oldest-first. Source/unit evidence only; no query was run against the production MariaDB, where the `(post_date_gmt, ID)` sort has not been timed.
-- **Retry failed times** (`POST /api/feeds/wordpress/retry`, MCP `retry_recipe_slots`, confirmation `RETRY RECIPE SLOTS`; "Plan failed times again" in the UI when failed or uncertain times exist). Acts only on upcoming times of an active source. A `failed` time never produced a post and is planned again with another recipe, ignoring the `maxSlotAttempts` cap. An `uncertain` time is reconciled first: if its claim is younger than `claimLeaseSeconds`, or Publishing cannot be asked, it stays uncertain; if Publishing holds a post for that channel and time (any status, by scheduled time) the ledger records it as `planned` (reason `reconciled`) and nothing is created; only when none exists is it moved (conditionally, `uncertain` to `failed`, reason `not_created`) and planned again. Only the released and failed times are re-planned; the rest of the horizon is left alone. Residual risk: a post cancelled back to a draft has no scheduled time and is not found, and a hand-made post for the same channel and time is accepted as the slot's post.
-- **Pause and cancel** (`POST /api/feeds/wordpress/state` and MCP `set_recipe_source_state` with `cancelScheduled: true`, confirmation `PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS`). Allowed only while Root `feeds.wordpress.pauseCancelEnabled` is on. The pause is saved first; then the source's `planned` ledger posts scheduled in the future are cancelled one by one through Publishing's `cancelScheduledPost` as the signed-in member (so Publishing's rights, channel scope and platform-held-copy removal apply; the post returns to a draft). A slot is released (`failed`, reason `cancelled`) only after its post was cancelled; a refused cancel leaves slot and post untouched and is counted in `notCancelled`. At most `pauseCancelBatchSize` per request; `remaining: true` means repeat. A failure inside the cancel step never undoes the pause (`incomplete: true`). Resuming plans the freed times again.
+- **Retry failed times** (`POST /api/feeds/wordpress/retry`, MCP `retry_recipe_slots`, confirmation `RETRY RECIPE SLOTS`). Acts only on upcoming times of an active source. Definitively failed times can be planned with another recipe, ignoring `maxSlotAttempts`. Uncertain claims inside the lease stay held; older claims reconcile only by the ledger's stored post identity (round 6 below), never by matching channel/time. Missing/unreadable identity stays uncertain and is not blindly resent. Only released/failed times are replanned; the rest of the horizon is unchanged.
+- **Pause and cancel** (`POST /api/feeds/wordpress/state` and MCP `set_recipe_source_state` with `cancelScheduled: true`, confirmation `PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS`). Allowed only while Root `feeds.wordpress.pauseCancelEnabled` is on. The pause is saved first; then the source's `planned` ledger posts scheduled in the future are cancelled one by one through Publishing's `cancelScheduledPost` as the signed-in member (so Publishing's rights, channel scope and platform-held-copy removal apply; the post returns to a draft). A slot is released (`failed`, reason `cancelled`) only after its post was cancelled; a refused cancel leaves slot and post untouched and is counted in `notCancelled`. At most `pauseCancelBatchSize` per request; `remaining: true` means repeat.
+  Refused rows rotate behind untouched work by least-recent-attempt order (round 6);
+  a fully refused batch still reports remaining work. A failure inside the cancel step never undoes the pause (`incomplete: true`). Resuming plans the freed times again.
 - **Pool health** in `get_recipe_source`, `GET /api/feeds/wordpress` and the UI ("Recipe supply"): per channel, eligible recipes (not planned or recently posted there, and not planned elsewhere when channels must differ) and `daysLeft = floor(eligible / (posts per day x channels sharing the pool))`; `null` when the cooldown is 0 (recipes may repeat). Flagged low under `feeds.wordpress.poolWarnDays`. `complete: false` means the scan limit was reached and the counts are lower bounds. The estimate does not count recipes that return after the cooldown. It needs a full library scan, so the result is cached per source for `poolCacheSeconds` (per process) and is `null` when the library cannot be read.
 - **Worker log.** The `feedsPoll` line now ends with `recipes: sources=.. planned=.. failed=.. uncertain=.. unfilled=..` plus `reason=` and `stops=` (budget, no_pages, error, ...) or `recipes=off`.
 - New Root keys: `feeds.wordpress.poolWarnDays`, `poolCacheSeconds`, `pauseCancelEnabled`, `pauseCancelBatchSize`. Evidence: unit and service tests with fakes (`feeds-wordpress-planner`, `-recovery-service`, `-db-image`, `feeds-mcp`); no PostgreSQL, browser, MariaDB, Facebook or production run.

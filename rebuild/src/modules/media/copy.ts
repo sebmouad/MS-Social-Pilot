@@ -1,6 +1,7 @@
 /** Media library customer copy in both shipped languages; keys mirror legacy `media.*`. */
 export const mediaCopy = {
   en: {
+    rename: 'Rename', renameTitle: 'Rename media', renameName: 'File name', renamed: 'Media renamed.',
     title: 'Media library',
     description: 'Images and videos available to your posts.',
     privacy: 'Deleting media does not remove posts, but a post that used it may lose its attachment.',
@@ -75,6 +76,7 @@ export const mediaCopy = {
     unknownDate: 'Unknown',
   },
   fr: {
+    rename: 'Renommer', renameTitle: 'Renommer le média', renameName: 'Nom du fichier', renamed: 'Média renommé.',
     title: 'Médiathèque',
     description: 'Les images et vidéos disponibles pour vos publications.',
     privacy: 'Supprimer un média ne supprime pas les publications, mais une publication qui l’utilisait peut perdre sa pièce jointe.',
@@ -163,5 +165,5 @@ export type MediaCopyCatalog = Record<MediaLocale, Record<MediaCopyKey, string>>
 
 /** `catalog` is the Root-managed `media.copy` value; the shipped defaults apply when it is not supplied. */
 export function mediaText(locale: MediaLocale, key: MediaCopyKey, values: Record<string, string | number> = {}, catalog: MediaCopyCatalog = mediaCopy): string {
-  return (catalog[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+  return (catalog[locale]?.[key] ?? mediaCopy[locale][key]).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
 }

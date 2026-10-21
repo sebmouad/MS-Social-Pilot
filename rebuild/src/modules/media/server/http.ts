@@ -32,3 +32,17 @@ export const strictQuery = (request: Request, allowed: readonly string[]) => {
   if ([...params.keys()].some(key => !allowed.includes(key) || params.getAll(key).length !== 1)) throw new OperationError('invalid_request', 'Choose valid filters.');
   return params;
 };
+
+
+/** Integrator: export this as PATCH from /api/media-library/[id]/route.ts. */
+export async function renameMediaHttp(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!sameOrigin(request)) return reply({ code: 'forbidden' }, 403);
+  const actor = await viewerActor('publishing/media', true);
+  if (actor instanceof Response) return actor;
+  try {
+    const body = await readJson(request, 'Choose valid media details and confirm the exact action.');
+    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.hasOwn(body, 'id')) throw await mediaError('invalid_request', 'Choose valid media details and confirm the exact action.');
+    const { renameAsset } = await import('./library');
+    return reply(await renameAsset(actor, { ...body, id: (await context.params).id }));
+  } catch (error) { return failure(error, 'The media operation could not be confirmed. Refresh the library before trying again.'); }
+}

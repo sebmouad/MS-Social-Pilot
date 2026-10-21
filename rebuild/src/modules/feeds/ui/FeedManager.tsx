@@ -11,7 +11,7 @@ import styles from './feeds.module.css';
 type Handling = 'review' | 'schedule';
 export type Feed = { id: string; name: string; url: string; kind: 'rss' | 'wordpress'; enabled: boolean; messageTemplate: string; hashtags: string; targetIds: string[]; handling: Handling; spreadMinutes: number; failureCount: number; lastPolledAt: string | null; lastError: string | null; createdAt: string; updatedAt: string };
 type Limits = { maxNameCharacters: number; maxMessageCharacters: number; maxTargets: number; maxSpreadMinutes: number };
-type Checked = { feedId: string; notModified: boolean; draftsCreated: number; postsCreated: number; held: number; backlog: boolean; destinations: number; entries: Array<{ guid: string; title: string | null; link: string | null; message: string; isNew: boolean; eligible: boolean }> };
+type Checked = { feedId: string; notModified: boolean; draftsCreated: number; postsCreated: number; held: number; reviewerNotificationsQueued?: number; backlog: boolean; destinations: number; entries: Array<{ guid: string; title: string | null; link: string | null; message: string; isNew: boolean; eligible: boolean }> };
 type Review = { kind: 'save' | 'delete' | 'drafts' | 'posts'; feed?: Feed };
 const blank = { name: '', url: '', kind: 'rss' as 'rss' | 'wordpress', enabled: true, messageTemplate: '{title}\n\n{link}', hashtags: '', targetIds: [] as string[], handling: 'review' as Handling, spreadMinutes: 0 };
 const host = (url: string) => { try { return new URL(url).hostname; } catch { return url; } };
@@ -76,13 +76,14 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
   }, t('unknownCheck'));
   const toggle = (id: string) => setDraft(d => ({ ...d, targetIds: d.targetIds.includes(id) ? d.targetIds.filter(x => x !== id) : [...d.targetIds, id] }));
   const preview = sample(draft.messageTemplate, draft.hashtags, t);
-  const eligible = checked?.result.entries.filter(e => e.eligible).length ?? 0;
+  const eligible = checked?.result.entries.filter(e => e.eligible && e.message.trim()).length ?? 0;
   const reviewTitle = !review ? '' : t(review.kind === 'delete' ? 'reviewDeleteTitle' : review.kind === 'drafts' ? 'reviewDraftsTitle' : review.kind === 'posts' ? 'reviewPostsTitle' : 'reviewSaveTitle');
   const reviewText = !review ? '' : review.kind === 'delete' ? t('reviewDeleteDescription', { name: review.feed?.name ?? '' }) : review.kind === 'drafts' ? t('reviewDraftsDescription') : review.kind === 'posts' ? t('reviewPostsDescription', { handling: handlingText(review.feed!.handling) }) : t('reviewSaveDescription');
   const reviewAction = !review ? '' : t(review.kind === 'delete' ? 'confirmDelete' : review.kind === 'drafts' ? 'confirmDrafts' : review.kind === 'posts' ? 'confirmPosts' : 'confirmSave');
 
   return <div className={styles.root}>
     {notice && !formOpen && !review && <RouteNotice error={notice.error} focusKey={`feed-notice:${notice.key}`}>{notice.text}</RouteNotice>}
+    <p className={styles.help}>{t('reviewNotice')}</p>
     <p className={styles.help}>{automaticMinutes ? t('automatic', { minutes: automaticMinutes }) : t('manualOnly')}</p>
     <SidebarDock><div className={styles.search}>{canWrite && <Button variant="primary" onClick={() => begin()}>{t('add')}</Button>}</div></SidebarDock>
     {feeds.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('title')}</caption><thead><tr><th scope="col">{t('colFeed')}</th><th scope="col">{t('colChannels')}</th><th scope="col">{t('colHandling')}</th><th scope="col">{t('colChecked')}</th>{canWrite && <th scope="col">{t('colActions')}</th>}</tr></thead><tbody>
@@ -118,7 +119,8 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
 
     <Dialog open={Boolean(checked)} title={checked ? t('resultsTitle', { name: checked.feed.name }) : ''} description={checked?.result.notModified ? t('resultsUnchanged') : t('resultsNew', { count: eligible })} onClose={() => setChecked(null)}
       actions={<><Button data-dialog-cancel onClick={() => setChecked(null)}>{t('close')}</Button>{canWrite && checked && eligible > 0 && <><Button onClick={() => { const f = checked.feed; setChecked(null); setConfirmation(''); setReview({ kind: 'drafts', feed: f }); }}>{t('createDraftsAction')}</Button>{checked.feed.targetIds.length > 0 && <Button variant="primary" onClick={() => { const f = checked.feed; setChecked(null); setConfirmation(''); setReview({ kind: 'posts', feed: f }); }}>{t('createPostsAction')}</Button>}</>}</>}>
-      {checked && (checked.result.entries.length ? <ul className={styles.entries}>{checked.result.entries.map(e => <li key={e.guid}><strong>{e.title ?? e.guid}</strong><span className={styles.meta}>{t(e.eligible ? 'resultNew' : e.isNew ? 'resultOlder' : 'resultSeen')}</span></li>)}</ul> : <p className={styles.empty}>{t('resultsNone')}</p>)}
+      {checked && checked.result.held > 0 && <p>{t('reviewQueued', { count: checked.result.reviewerNotificationsQueued ?? 0 })}</p>}
+      {checked && (checked.result.entries.length ? <ul className={styles.entries}>{checked.result.entries.map(e => <li key={e.guid}><strong>{e.title ?? e.guid}</strong><span className={styles.meta}>{t(e.eligible ? 'resultNew' : e.isNew ? 'resultOlder' : 'resultSeen')}</span><details><summary>{t('entryPreview')}</summary><p className={styles.reviewPreview}>{e.message || t('previewEmpty')}</p>{e.link && /^https?:\/\//i.test(e.link) && <a href={e.link} target="_blank" rel="noopener noreferrer">{t('entryLink')}</a>}</details></li>)}</ul> : <p className={styles.empty}>{t('resultsNone')}</p>)}
       {checked?.result.backlog && <p className={styles.help}>{t('resultsBacklog')}</p>}
       {checked && checked.result.destinations === 0 && <p className={styles.help}>{t('resultsNoChannels')} {t('resultsNoChannelsPosts')}</p>}
     </Dialog>

@@ -132,3 +132,40 @@
 button.settings-row-actions__link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
 button.settings-row-actions__link:disabled { cursor: progress; opacity: .6; }
 .settings-health-list { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 12px; }
+
+
+/* UX polish: keyboard focus, touch targets, hover states and phone layout across Settings. */
+.settings-tabs a:focus-visible, .settings-row-actions a:focus-visible, button.settings-row-actions__link:focus-visible,
+.connection-danger-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.mcp-key-form button:not(:global(.ui-button)):focus-visible, .settings-panel button:not(:global(.ui-button)):focus-visible,
+.data-button:focus-visible, .data-danger-button:focus-visible, .connection-primary-button:focus-visible, .connection-danger-button:focus-visible,
+.connection-dialog footer button:focus-visible, .connection-dialog > header > button:focus-visible, .connection-toolbar > div > button:focus-visible { outline: none; box-shadow: var(--ui-ring); }
+.team-add-fields input:focus-visible, .team-add-fields select:focus-visible, .team-row-edit select:focus-visible,
+.data-delete-row input:focus-visible, .disconnect-confirm input:focus-visible, .mcp-key-token textarea:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
+.settings-tabs { scrollbar-width: thin; }
+.settings-tabs a:focus-visible { background: var(--surface-muted); }
+.settings-table tbody tr:hover td { background: var(--surface-hover); }
+.settings-table-wrap { max-width: 100%; }
+.settings-empty { border: 1px dashed var(--line-strong); border-radius: var(--radius-md); margin: 14px; background: var(--surface-raised); color: var(--ink-soft); }
+.settings-row-actions a, .settings-row-actions__link { min-height: 44px; }
+.settings-note { overflow-wrap: anywhere; }
+.settings-panel button:not(:global(.ui-button)):hover:not(:disabled), .mcp-key-form button:not(:global(.ui-button)):hover:not(:disabled) { background: var(--surface-hover); }
+.connection-source label:has(input:focus-visible), .connection-retention label:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 1px; border-radius: 6px; }
+.connection-source input, .connection-retention input { width: 18px; height: 18px; flex: 0 0 auto; }
+.connection-source label, .connection-retention label { min-height: 44px; }
+.connection-dialog > header > button { width: 44px; height: 44px; flex: 0 0 auto; }
+@media (max-width: 620px) {
+  .settings-heading { flex-direction: column; gap: 12px; }
+  .settings-tabs { width: 100%; }
+  .settings-panel__heading { flex-direction: column; gap: 10px; }
+  .connection-dialog { width: calc(100% - 16px); max-height: calc(100dvh - 16px); padding: 16px; }
+  .connection-dialog footer { bottom: -16px; margin: 0 -16px -16px; padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px)); flex-wrap: wrap; }
+  .connection-dialog footer > * { flex: 1 1 140px; min-height: 44px; }
+  .data-delete-row { width: 100%; }
+  .data-delete-row input, .disconnect-confirm input { width: 100%; }
+  .data-button, .data-danger-button { width: 100%; min-height: 44px; }
+  .team-row-actions button { min-height: 44px; }
+  .team-add-form { padding: 12px; }
+  .settings-account-item { padding: 12px; }
+  .connection-toolbar > div > button { min-height: 44px; }
+}

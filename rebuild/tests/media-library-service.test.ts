@@ -12,7 +12,8 @@ vi.mock('../src/modules/media/server/access', () => ({ authorizeFeature: state.a
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: state.workspace }));
 vi.mock('../src/modules/media/server/store', () => ({ fsMediaStore: {} }));
 
-import { deleteAsset, importFromUrl, readLibrary } from '../src/modules/media/server/library';
+import { executeMediaTool } from '../src/modules/media/mcp';
+import { deleteAsset, importFromUrl, readLibrary, renameAsset } from '../src/modules/media/server/library';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(60)]);
@@ -201,4 +202,43 @@ describe('deleting assets', () => {
     await expect(deleteAsset(actor, { id: 'med_clip_0001', confirmation: 'DELETE MEDIA med_clip_0001' }, { store: s2 as never })).rejects.toMatchObject({ code: 'upstream_failure' });
     expect(s2.removeStored).not.toHaveBeenCalled();
   });
+});
+
+
+describe('media rename', () => {
+  const input = { id: vrow.id, name: 'New clip.mp4', confirmation: `RENAME MEDIA ${vrow.id}` };
+  it('changes only the workspace-scoped filename and audits identity without copying names', async () => {
+    await expect(renameAsset(actor, input)).resolves.toEqual({ id: vrow.id, name: input.name, renamed: true });
+    const update = executed('UPDATE media')[0]!;
+    expect(update.values).toEqual([input.name, vrow.id, actor.workspaceId]);
+    expect(executed('activity_logs')[0]!.values).toContain('media.renamed');
+    expect(JSON.stringify(executed('activity_logs'))).not.toContain(input.name);
+  });
+  it('refuses bad confirmation, paths, controls, and Root name-limit violations before authorization', async () => {
+    for (const change of [{ confirmation: 'yes' }, { name: '../x' }, { name: 'a\\b' }, { name: 'x\u0000y' }, { name: '' }]) {
+      await expect(renameAsset(actor, { ...input, ...change })).rejects.toMatchObject({ code: 'invalid_request' });
+    }
+    state.overrides['media.assetNameMaxCharacters'] = 5;
+    await expect(renameAsset(actor, input)).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.auth).not.toHaveBeenCalled();
+  });
+  it('refuses scoped actors, stale access and assets absent from this workspace', async () => {
+    state.auth.mockResolvedValueOnce({ workspaceWide: false });
+    await expect(renameAsset(actor, input)).rejects.toMatchObject({ code: 'forbidden' });
+    expect(db.$transaction).not.toHaveBeenCalled();
+    state.auth.mockResolvedValueOnce({ workspaceWide: true }).mockResolvedValueOnce({ workspaceWide: false });
+    await expect(renameAsset(actor, input)).rejects.toMatchObject({ code: 'forbidden' });
+    expect(executed('UPDATE media')).toHaveLength(0);
+    state.auth.mockResolvedValue({ workspaceWide: true }); state.mediaRow = null;
+    await expect(renameAsset(actor, input)).rejects.toMatchObject({ code: 'not_found' });
+  });
+  it('fails the transaction when audit fails and performs no file operations', async () => {
+    state.failAudit = true;
+    await expect(renameAsset(actor, input)).rejects.toMatchObject({ code: 'upstream_failure' });
+  });
+});
+
+it('the installed media MCP dispatcher executes the confirmed rename service', async () => {
+  await expect(executeMediaTool(actor, 'rename_media_asset', { id: vrow.id, name: 'renamed.mp4', confirmation: `RENAME MEDIA ${vrow.id}` })).resolves.toMatchObject({ renamed: true, id: vrow.id });
+  expect(executed('UPDATE media')).toHaveLength(1);
 });

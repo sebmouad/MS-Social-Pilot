@@ -109,3 +109,31 @@
 .savedViewList a[aria-current="page"] { font-weight: 700; }
 .bulkBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
 .bulkBar > p:empty { display: none; }
+
+/* UX polish: filter controls, form fields and pagination share the themed focus ring and hover states. */
+.postFilters select:focus-visible, .postFilters input:focus-visible, .postFilters button:focus-visible,
+.draftForm input:focus-visible, .editForm input:focus-visible, .scheduleForm input[type="datetime-local"]:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
+.draftForm textarea:focus-visible, .editForm textarea:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
+.postFilters select:hover, .postFilters input:hover { border-color: var(--ink-faint); }
+.postFilters button:hover { background: var(--surface-hover); }
+.postFilters button:active { background: var(--surface-muted); }
+.postFilters a { min-height: 32px; display: inline-flex; align-items: center; }
+.postFilters a:focus-visible, .tab:focus-visible, .calendarNavigation a:focus-visible, .event:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.tabs { scrollbar-width: thin; }
+.tab { min-height: 44px; display: inline-flex; align-items: center; padding-bottom: 0; }
+.postPagination > span[aria-current="page"] { color: var(--ink); font-weight: 650; }
+.empty { border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-raised); }
+.event { transition: background-color .12s ease; }
+.event:hover { background: var(--accent-soft); filter: brightness(.97); }
+.errorNotice, .successNotice { margin: 0; }
+.editDetails summary { min-height: 36px; display: inline-flex; align-items: center; border-radius: 4px; }
+.editDetails summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 720px) {
+  .postPagination { flex-wrap: wrap; justify-content: center; }
+  .postPagination > a { flex: 1 1 140px; justify-content: center; }
+  .card { padding: 16px; }
+  .rowActions { min-width: 0; }
+  .editForm { min-width: 0; }
+  .mediaGrid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .event { transition: none; } }

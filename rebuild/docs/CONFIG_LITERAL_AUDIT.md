@@ -1,12 +1,55 @@
 # Configuration literal audit — current coverage and historical rounds
 
-Status updated 2026-10-21 against local HEAD `6d3347fb` plus this provider-error
-working-tree batch: **partial literal coverage; no rebuild or release completion
-claim**. Current source registry version is **115**; this lane does not edit it.
-Earlier key tables, counts and publication prose below are historical lane
-records. Current source consumers and the explicit residuals take precedence.
+Status updated 2026-10-21 against local HEAD `ffdb1cdf`: **partial literal
+coverage; no rebuild or release completion claim**. Current source registry version
+is **118**. Deployment of this SHA is an owner/integrator statement, not observed
+by this lane. No new Root key or schema edit belongs to this documentation batch.
+Earlier key tables, counts, verification and publication prose are historical lane
+records. Current source consumers and explicit residuals below take precedence.
 
-## Facebook provider-error mapping follow-up — 2026-10-21
+## Round 8–9 current configuration status
+
+- Root `meta.adsCopy` now reaches installed Ads operations through the neutral
+  `configuredOperations(locale)` host factory and request-local locale scope.
+  The old missing-production-caller finding below is closed at host level;
+  Campaigns UI, session REST and MCP still omit the customer locale (English
+  default). Independent creation-form consent templates also need live-preview
+  alignment. Stable issue codes and safe EN/FR errors do not prove every provider
+  engine uses this mapping.
+- `meta.metricLabels` merges saved entries over shipped Page/post/reaction labels;
+  existing custom labels survive and missing shipped labels are inherited.
+  Round 9 adds `page_fans`, `page_impressions`, `page_impressions_unique`.
+  New Root `meta.pageAnalyticsCopy` in `src/platforms/facebook/config.ts` owns
+  EN/FR Page source, latest-per-channel, categories and overlap labels;
+  `analytics.ts` reads both catalogs with runtimeConfigBatch and the request's
+  analytics locale for Page metrics/audience. Ads metric labels/notes and unknown
+  dynamic-label fallbacks there still contain English source literals.
+- `meta.postHistoryPolicy` now normalizes saved metrics as additions to shipped
+  defaults, then removes explicit `excludedMetrics` (exclusions win, including
+  future metric names). Legacy absence is not inferred as a deliberate removal.
+  Reads normalize purely; only a confirmed Root save persists the normalized
+  policy with the existing transactional audit. No worker/read silently writes it.
+  Video metrics still require positively identified video posts.
+- **Page metric merge is not integrated:** `facebookPageMetricPolicySchema` and
+  `FACEBOOK_PAGE_METRIC_DEFAULTS` implement the same additive/exclusion semantics
+  for legacy arrays or policy objects, but `facebook/module.ts` still registers
+  `meta.pageInsightMetrics` as `stringList`; `runtime.ts`, `adset.ts` and
+  `ads-ops/index.ts` still pass arrays into FacebookConfig. Wire the owning
+  registration and project normalized `.metrics` in all constructors together.
+  Schema tests alone do not prove this setting merges at runtime.
+- Existing report settings `analytics.reports.publicationDetails` (116),
+  `analytics.reports.topPostContent` (117), and new
+  `analytics.reports.linkDetails` (118) bound stored-data detail views. The latter
+  lives in `src/modules/analytics/reports/config.ts`, reads independent `links`
+  and `days` limits via runtimeConfig, and expands the existing bilingual
+  `analytics.reportDocumentCopy`. No new route/tool is needed. See
+  `src/modules/analytics/reports/LINK_REPORTS.md` for retention/cohort exclusions.
+- Source/test evidence: `facebook-page-labels`, `facebook-metric-config`,
+  `facebook-analytics-selection`, `facebook-post-history`, `root-config-authority`,
+  `report-link-details*`. These are unit/mocked/query-shape checks; no fresh
+  PostgreSQL, browser, provider or production evidence is implied.
+
+## Facebook provider-error mapping follow-up — 2026-10-21 (historical lane record)
 
 Owned changes: `src/platforms/facebook/ads-copy.ts`, `ads.ts`,
 `ads-ops/{index,transport,creative}.ts`, `tests/facebook-ads-copy.test.ts`, and
@@ -39,16 +82,11 @@ missing, invalid or older incomplete stored catalogs fall back to the complete
 registry default. That fallback replaces the whole catalog, so older partial
 customizations need reconciliation when Root next saves the expanded catalog.
 
-**Wiring limitation, found by source search:** `configuredFacebookAdsOps(locale)`
-has no production caller at this HEAD. `facebook/host.ts` installs static
-`facebookAdsOps`; the shared Ads service consumes that host. The configurable
-factory is tested, but this is not evidence that installed customer requests
-apply Root edits or French locale to every provider validation. Integrator must
-add a neutral locale-aware operations resolver to the host/service contract and
-install the configured factory in `facebook/host.ts`; shared code must not import
-Facebook or branch on provider. The synchronous pure validators keep catalog
-bootstrap defaults unless supplied request-resolved text. Do not mark full copy
-consumption complete from the existing active setting metadata.
+**Historical wiring finding (superseded at host level in round 8):** the
+configured factory is now installed and resolved by the neutral Ads host. Customer
+locale entry points and creation-form confirmation alignment remain open as
+listed above. Pure synchronous validators still use catalog defaults unless
+supplied request-resolved text.
 
 Residual provider mappings (not protocol exceptions):
 
@@ -67,7 +105,7 @@ Residual provider mappings (not protocol exceptions):
 - `ads.ts` remaining availability, reconnect and configured-UI failures still
   use English literals; its legacy campaign/ad-set pure validation now uses
   the catalog and stable issues. Their locale/configuration wiring is also
-  subject to the host limitation above.
+  subject to the entry-point locale limitation above.
 - Existing Ads name/content/title/URL parser bounds (100/5000/200/2048), choices
   and other operational literals remain an extraction gap; this batch changes
   error mapping only and does not reclassify them as protocol invariants.
@@ -369,7 +407,7 @@ Source: `src/lib/connection-health.ts`. Each of the following fields exists in b
 
 1. Root copy extraction now covers Operations, Backups, shared Diagnostics, worker health, platform publication evidence and Activity controls. It is **not** full Root copy coverage: `app/root/{page,users,workspaces,plans,privileges,errors,sessions,connections,lifecycle,registration,activity}/**`, `server/root/legacy/copy.ts`, `legacy/shared.ts` feature/group labels, Root navigation/filter components, other recovery controls and many service/wire descriptions still have source catalogs or inline copy. Activity page/filter copy beyond the extracted controls is still source text. These are operational-copy backlog, not constants.
 2. `lib/reschedule.ts` quick moves, bilingual labels, presentation locale/clock and generic failure now use `shared.reschedulePolicy` through the existing runtime-refreshed snapshot (see follow-up). Normal Publishing server callers already serialize moveOptions. Browser fallback calls without server options retain bootstrap defaults unless passed an explicit policy; other calendar grid labels/copy remain Publishing-owned. `lib/calendar-dates.ts` Gregorian representation and the excluded `lib/themes.ts` are unchanged. Do not claim all calendar copy is configurable.
-3. Media still has generated `Uploaded image {id.slice(0,8)}`, fallback image/video names, and the minimum reference-fragment length8 in `assetReferences`; module-level runtime copy/reference policy and locale plumbing remain. Feeds still has source `DEFAULT_MESSAGE_TEMPLATE`, HTML text normalization choices and safe/customer failure catalogs. AI still has source prompts, tone names and default summary language English; moving provider input syntax limits does not complete configurable prompts or EN/FR customer-copy coverage. Home UI/copy was outside this non-UI module lane.
+3. Media still has generated `Uploaded image {id.slice(0,8)}`, fallback image/video names, and the minimum reference-fragment length8 in `assetReferences`; module-level runtime copy/reference policy and locale plumbing remain. Feeds still has source `DEFAULT_MESSAGE_TEMPLATE` and HTML text normalization choices; its service/public failure catalogs now have localized readers. AI still has source prompts, tone names and default summary language English; moving provider input syntax limits does not complete configurable prompts or EN/FR customer-copy coverage. Home now declares `home.uiCopy`; `home.authCopy` retains pending route-integration metadata.
 4. The Root-gap follow-up replaces non-evidence recovery 200/300-character ceilings with existing Root identifier/confirmation settings and serializes limits to the corresponding dialogs. Other direct wire/service limits and internal messages were not exhaustively converted.
 5. New synchronous policies are refreshed by the existing Node startup lifecycle. Standalone scripts/worker processes do not start that Next lifecycle automatically; if they begin using these synchronous helper policies, invoke/maintain `refreshSynchronousPolicy` explicitly. Snapshot refresh is bounded by the existing origin reload interval; direct async service policy may observe a save slightly before another process’s synchronous snapshot. No cross-process immediate-apply claim is made.
 

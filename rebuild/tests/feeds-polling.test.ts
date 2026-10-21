@@ -15,6 +15,7 @@ vi.mock('../src/modules/feeds/server/access', async () => {
   const actual = await vi.importActual<typeof import('../src/modules/feeds/server/access')>('../src/modules/feeds/server/access');
   return { ...actual, authorizeFeeds: state.auth, authorizeFeedWrite: async (a: unknown) => state.auth(a, 'write') };
 });
+vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: vi.fn(async () => ({ queued: 1 })) }));
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: state.workspace }));
 vi.mock('@/modules/publishing/collaboration/server/executors', () => ({ allocateQueueTime: state.alloc }));
 vi.mock('@/modules/publishing/collaboration/server/versions', () => ({ loadVersionRetention: async () => 10, recordPostVersion: async () => true }));

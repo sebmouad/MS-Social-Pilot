@@ -14,7 +14,7 @@ export function PublishingPagination({ path, page, pages, locale = 'en', copy = 
   if (pages <= 1) return null;
   return <nav className={styles.postPagination} aria-label={copy.pagesLabel}>
     {page > 1 ? <a className="ui-button ui-button--secondary" href={`${path}?page=${page - 1}`}>{copy.previousPage}</a> : <span />}
-    <span>{copy.pageOf(page,pages)}</span>
+    <span aria-current="page">{copy.pageOf(page,pages)}</span>
     {page < pages ? <a className="ui-button ui-button--secondary" href={`${path}?page=${page + 1}`}>{copy.nextPage}</a> : <span />}
   </nav>;
 }

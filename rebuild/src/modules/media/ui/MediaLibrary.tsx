@@ -8,6 +8,7 @@ import { RouteNotice } from '@/components/RouteNotice';
 import { SidebarDock } from '@/components/SidebarDock';
 import { mediaText, type MediaCopyCatalog, type MediaCopyKey, type MediaLocale } from '../copy';
 import styles from './media.module.css';
+import { renameMediaAction } from './rename-action';
 
 const PATH = '/publishing/media';
 type Holder = { postId: string; status: string; scheduledAt: string | null; excerpt: string };
@@ -15,9 +16,9 @@ export type Asset = { id: string; kind: 'image' | 'video'; mimeType: string; nam
 type Usage = { usedBytes: number; quotaBytes: number; assetCount: number; approximate: boolean };
 const size = (n: number) => n >= 1073741824 ? `${(n / 1073741824).toFixed(1)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
-export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, workspaceWide, usageMayBeIncomplete, maxSearch, locale = 'en', copy }: {
+export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, workspaceWide, usageMayBeIncomplete, maxSearch, maxName, locale = 'en', copy }: {
   items: Asset[]; usage: Usage; page: number; hasMore: boolean; filters: { kind: string; usage: string; q: string };
-  canWrite: boolean; workspaceWide: boolean; usageMayBeIncomplete: boolean; maxSearch: number; locale?: MediaLocale; copy?: MediaCopyCatalog;
+  canWrite: boolean; workspaceWide: boolean; usageMayBeIncomplete: boolean; maxSearch: number; maxName: number; locale?: MediaLocale; copy?: MediaCopyCatalog;
 }) {
   const router = useRouter();
   const t = (key: MediaCopyKey, values?: Record<string, string | number>) => mediaText(locale, key, values, copy);
@@ -26,6 +27,8 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
   const [assets, setAssets] = useState(items);
   const [importing, setImporting] = useState(false);
   const [url, setUrl] = useState(''); const [name, setName] = useState('');
+  const [renaming, setRenaming] = useState<Asset | null>(null);
+  const [renameName, setRenameName] = useState('');
   const [removing, setRemoving] = useState<Asset | null>(null);
   const [force, setForce] = useState(false);
   const [confirmation, setConfirmation] = useState('');
@@ -70,8 +73,16 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
     router.refresh();
   }, t('deleteUnknown'));
 
+  const performRename = () => run(async () => {
+    if (!renaming) return;
+    const result = await renameMediaAction({ id: renaming.id, name: renameName.trim(), confirmation });
+    if (!('renamed' in result) || result.renamed !== true || result.id !== renaming.id || result.name !== renameName.trim()) throw new Error(errorText(result));
+    setAssets(cur => cur.map(a => a.id === result.id ? { ...a, name: result.name } : a));
+    setRenaming(null); say(t('renamed')); router.refresh();
+  }, t('unconfirmed'));
+
   return <div className={styles.root}>
-    {notice && !importing && !removing && <RouteNotice error={notice.error} focusKey={`media-notice:${notice.key}`}>{notice.text}</RouteNotice>}
+    {notice && !importing && !removing && !renaming && <RouteNotice error={notice.error} focusKey={`media-notice:${notice.key}`}>{notice.text}</RouteNotice>}
     <SidebarDock><form action={PATH} method="get" className={styles.filters} role="search">
       <label htmlFor="media-q">{t('search')}</label><input id="media-q" name="q" defaultValue={filters.q} maxLength={maxSearch} placeholder={t('searchPlaceholder')} />
       <label htmlFor="media-kind">{t('type')}</label><select id="media-kind" name="kind" defaultValue={filters.kind}><option value="">{t('typeAll')}</option><option value="image">{t('typeImage')}</option><option value="video">{t('typeVideo')}</option></select>
@@ -93,18 +104,25 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
         <th scope="row"><span className={styles.name}>{a.name}</span><span className={styles.meta}>{a.mimeType} · {t('added', { date: day(a.createdAt) })}</span></th>
         <td>{size(a.size)}</td>
         <td>{a.inUse ? usedLabel(a.holderCount) : t('unused')}{a.holders && a.holders.length > 0 && <ul className={styles.holders}>{a.holders.map(h => <li key={h.postId}>{h.excerpt || t('untitled')} ({h.status.replace(/_/g, ' ')})</li>)}</ul>}</td>
-        {canWrite && workspaceWide && <td><Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></td>}
+        {canWrite && workspaceWide && <td>{a.source === 'library' && <Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button>}<Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></td>}
       </tr>)}
     </tbody></table></div> : <p className={styles.empty}>{filtered ? t('noMatch') : t('empty')}</p>}
     <nav className={styles.pagination} aria-label={t('pages')}>{page > 1 && <a href={query(page - 1)}>{t('previous')}</a>}<span>{t('page', { page })}</span>{hasMore && <a href={query(page + 1)}>{t('next')}</a>}</nav>
     {canWrite && !workspaceWide && <p className={styles.help}>{t('deleteNeedsAll')}</p>}
+
+    <Dialog open={Boolean(renaming)} title={t('renameTitle')} onClose={() => !busy && setRenaming(null)} busy={busy}
+      actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setRenaming(null)}>{t('cancel')}</Button><Button variant="primary" disabled={busy || !renameName.trim() || confirmation !== `RENAME MEDIA ${renaming?.id}`} onClick={() => void performRename()}>{t('rename')}</Button></>}>
+      {notice?.error && <RouteNotice error focusKey={`media-rename-error:${notice.key}`}>{notice.text}</RouteNotice>}
+      <label>{t('renameName')}<input disabled={busy} maxLength={maxName} value={renameName} onChange={e => setRenameName(e.target.value)} /></label>
+      <label>{t('importConfirm', { phrase: `RENAME MEDIA ${renaming?.id ?? ''}` })}<input disabled={busy} autoComplete="off" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
+    </Dialog>
 
     <Dialog open={importing} title={t('importTitle')} description={t('importDescription')} onClose={() => !busy && setImporting(false)} busy={busy}
       actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setImporting(false)}>{t('cancel')}</Button><Button variant="primary" disabled={busy || !url.trim() || confirmation !== importWord} onClick={() => void performImport()}>{busy ? t('importing') : t('importAction')}</Button></>}>
       {notice?.error && <RouteNotice error focusKey={`media-import-error:${notice.key}`}>{notice.text}</RouteNotice>}
       <div className={styles.form}>
         <label>{t('importAddress')}<input disabled={busy} inputMode="url" placeholder="https://example.com/photo.jpg" value={url} onChange={e => setUrl(e.target.value)} /></label>
-        <label>{t('importName')}<input disabled={busy} maxLength={180} value={name} onChange={e => setName(e.target.value)} /></label>
+        <label>{t('importName')}<input disabled={busy} maxLength={maxName} value={name} onChange={e => setName(e.target.value)} /></label>
         <label className={styles.confirmLabel}>{t('importConfirm', { phrase: importWord })}<input autoComplete="off" disabled={busy} value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
       </div>
     </Dialog>

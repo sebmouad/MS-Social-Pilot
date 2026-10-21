@@ -349,6 +349,7 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | list_media_library | publishing/media | read | GET /api/media-library | Shared customer operation; transport arguments may differ. |
 | import_media_from_url | publishing/media | write | POST /api/media-library | Shared customer operation; transport arguments may differ. |
 | delete_media_asset | publishing/media | write | DELETE /api/media-library/[id] | Shared customer operation; transport arguments may differ. |
+| rename_media_asset | publishing/media | write | PATCH /api/media-library/[id] | Shared customer operation; transport arguments may differ. |
 | list_content_feeds | publishing/feeds | read | GET /api/feeds | Shared customer operation; transport arguments may differ. |
 | create_content_feed | publishing/feeds | write | POST /api/feeds | Shared customer operation; transport arguments may differ. |
 | update_content_feed | publishing/feeds | write | PUT /api/feeds/[id] | Shared customer operation; transport arguments may differ. |

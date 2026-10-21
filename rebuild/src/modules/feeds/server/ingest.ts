@@ -1,3 +1,5 @@
+import { runtimeConfig } from '@/server/config/store';
+import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
 import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -49,7 +51,7 @@ export type IngestOptions = {
   /** A worker run: audit rows carry no person, conditional requests are used, repeated failures can turn the feed off. */
   automatic?: boolean; disableAfterFailures?: number;
 };
-export type IngestResult = { feedId: string; notModified: boolean; entries: Array<Omit<CheckedEntry, 'publishedAt'> & { publishedAt: string | null }>; draftsCreated: number; postsCreated: number; held: number; backlog: boolean; destinations: number };
+export type IngestResult = { feedId: string; notModified: boolean; entries: Array<Omit<CheckedEntry, 'publishedAt'> & { publishedAt: string | null }>; draftsCreated: number; postsCreated: number; held: number; reviewerNotificationsQueued: number; backlog: boolean; destinations: number };
 
 type PollMark = { kind: 'ok'; validators: { etag: string | null; modified: string | null } | 'clear' | 'keep' } | { kind: 'error'; message: string };
 /** Poll bookkeeping: conditional-request validators and a safe, non-secret last error. Returns whether the feed was turned off. */
@@ -120,7 +122,7 @@ export async function ingestFeed(actor: FeedActor, feed: FeedRow, workspaceId: s
     // Items older than the subscription start are never ingested; undated items are treated as current.
     eligible: !seen.has(entry.guid) && (entry.publishedAt === null || entry.publishedAt.getTime() >= feed.ingestFrom.getTime()),
   }));
-  const base: IngestResult = { feedId: feed.id, notModified, entries: checked.map(c => ({ ...c, publishedAt: c.publishedAt?.toISOString() ?? null })), draftsCreated: 0, postsCreated: 0, held: 0, backlog, destinations: targetIds.length };
+  const base: IngestResult = { feedId: feed.id, notModified, entries: checked.map(c => ({ ...c, publishedAt: c.publishedAt?.toISOString() ?? null })), draftsCreated: 0, postsCreated: 0, held: 0, reviewerNotificationsQueued: 0, backlog, destinations: targetIds.length };
 
   if (options.mode === 'preview') { await recordPoll(workspaceId, feed, { kind: 'ok', validators: 'keep' }, options); return base; }
 
@@ -162,6 +164,8 @@ async function createPosts(actor: FeedActor, feed: FeedRow, workspaceId: string,
     }
   }
   const retention = await loadVersionRetention();
+  const notifyReviewers = await runtimeConfig('feeds.approvalNotificationsEnabled');
+  if (typeof notifyReviewers !== 'boolean') throw await feedsError('unavailable', 'Content feeds are temporarily unavailable. Refresh and try again.');
   return protect(transact(workspaceId, l, async tx => {
     await lockActor(tx, actor, true);
     const locked = await tx.$queryRaw<Array<{ enabled: boolean; targetIds: unknown; autoApprove: boolean; spreadMinutes: number }>>`SELECT enabled, "targetIds", "autoApprove", "spreadMinutes" FROM feed_sources WHERE id = ${feed.id} AND "workspaceId" = ${workspaceId} FOR UPDATE`;
@@ -183,7 +187,7 @@ async function createPosts(actor: FeedActor, feed: FeedRow, workspaceId: string,
     // or the workspace requires approval, whatever role the acting person or owner has.
     const hold = scheduled && (!autoApprove || requiresApproval);
 
-    let drafts = 0; let posts = 0; let held = 0;
+    let drafts = 0; let posts = 0; let held = 0; let reviewerNotificationsQueued = 0;
     for (const item of items) {
       const itemId = `fit_${randomUUID()}`;
       // The unique (feed, guid) pair is the de-duplication guard: a concurrent or repeated read cannot double-create.
@@ -207,6 +211,10 @@ async function createPosts(actor: FeedActor, feed: FeedRow, workspaceId: string,
           VALUES (${postId}, ${workspaceId}, ${actor.userId}, ${item.message}, ${item.link}, ${hold ? 'pending_approval' : 'scheduled'}::"PostStatus", ${at}, ${timezone}, 'worker'::"PublishMode", ${hold ? 'pending' : 'not_required'}::"ApprovalStatus", ${hold ? actor.userId : null}, ${hold ? options.now : null}, ${itemId}, NOW(), NOW())`;
         for (const targetId of group) await tx.$executeRaw`INSERT INTO post_targets (id, "postId", "targetId", "formatId", status, "createdAt", "updatedAt") VALUES (${randomUUID()}, ${postId}, ${targetId}, ${formats[targetId] ?? null}, 'pending'::"PostTargetStatus", NOW(), NOW())`;
         await recordPostVersion(tx, postId, options.automatic ? null : actor.userId, retention);
+        if (hold && notifyReviewers) {
+          const receipt = await emitWorkspaceAlert(tx, { workspaceId, eventId: postId, kind: 'approval_request', postId });
+          reviewerNotificationsQueued += receipt.queued;
+        }
         posts += 1; if (hold) held += 1;
       }
     }
@@ -214,6 +222,6 @@ async function createPosts(actor: FeedActor, feed: FeedRow, workspaceId: string,
       feedId: feed.id, ...(scheduled ? { posts, held, authorId: actor.userId, handling: autoApprove ? 'schedule' : 'review', approvalRequired: requiresApproval } : { drafts }), considered: items.length, ...(options.automatic ? { automatic: true } : {}),
     });
     await lockActor(tx, actor, true);
-    return { draftsCreated: drafts, postsCreated: posts, held };
+    return { draftsCreated: drafts, postsCreated: posts, held, reviewerNotificationsQueued };
   }));
 }

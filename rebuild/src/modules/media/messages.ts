@@ -12,6 +12,7 @@ export const mediaMessages = {
   'Sign in to an authorized workspace.': row('Sign in to an authorized workspace.', 'Connectez-vous à un espace autorisé.'),
   'This feature is unavailable in this workspace.': row('This feature is unavailable in this workspace.', 'Cette fonctionnalité n’est pas disponible dans cet espace.'),
   'Your active workspace access changed. Sign in again to continue.': row('Your active workspace access changed. Sign in again to continue.', 'Votre accès à l’espace a changé. Reconnectez-vous pour continuer.'),
+  'Renaming media requires access to all channels.': row('Renaming media requires access to all channels.', 'Renommer un média nécessite un accès à toutes les chaînes.'),
   'Choose a supported media action.': row('Choose a supported media action.', 'Choisissez une action média prise en charge.'),
   'Choose valid filters.': row('Choose valid filters.', 'Choisissez des filtres valides.'),
   'Choose valid media details and confirm the exact action.': row('Choose valid media details and confirm the exact action.', 'Indiquez des informations média valides et confirmez l’action exacte.'),

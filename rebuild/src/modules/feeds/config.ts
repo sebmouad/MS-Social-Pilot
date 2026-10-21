@@ -31,6 +31,7 @@ const int = (range: { min: number; max: number }) => z.number().int().min(range.
 const G = 'Content feeds';
 
 export const FEEDS_CONFIG = [
+  entry({ key: 'feeds.approvalNotificationsEnabled', group: G, label: 'Notify feed post reviewers', kind: 'boolean', description: 'Queue normal approval-request notifications atomically for each new feed post held for review. Existing notification preferences and delivery policies apply.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'feeds.pageSize', group: G, label: 'Feed page size', kind: 'number', description: 'Feeds listed on one page.', defaultValue: FEEDS_DEFAULTS.pageSize, schema: int(FEEDS_BOUNDS.pageSize), consumption: 'active' }),
   entry({ key: 'feeds.maxPerWorkspace', group: G, label: 'Feeds per workspace', kind: 'number', description: 'Maximum content feeds one workspace may keep.', defaultValue: FEEDS_DEFAULTS.maxPerWorkspace, schema: int(FEEDS_BOUNDS.maxPerWorkspace), consumption: 'active' }),
   entry({ key: 'feeds.fetchTimeoutMs', group: G, label: 'Feed fetch timeout (ms)', kind: 'number', description: 'Overall time allowed to read one feed, including redirects.', defaultValue: FEEDS_DEFAULTS.fetchTimeoutMs, schema: int(FEEDS_BOUNDS.fetchTimeoutMs), consumption: 'active' }),

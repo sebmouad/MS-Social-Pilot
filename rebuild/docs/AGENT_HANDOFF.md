@@ -1,11 +1,10 @@
 # Shared agent handoff
 
-Updated 2026-10-21 against local HEAD `960831df` (rounds 7 and 8), reviewing
-`git log 6d3347fb..HEAD`, the round 7 and 8 diffs, dated release and browser records
-and selected current source. This supersedes the previous `6d3347fb` continuation.
-The binding contract is unchanged; the full goal remains active. No fresh database,
-browser, provider or production observation was made by this documentation worker;
-production facts below are owner/integrator records.
+Updated 2026-10-21 against local HEAD `ffdb1cdf` (round 9), reviewing current
+source, round 7–9 diffs and dated release/browser records. This supersedes the
+`960831df` continuation. The contract is unchanged; the full goal remains active.
+No fresh database, browser, provider or production observation was made by this
+documentation worker; production facts below are owner/integrator records.
 
 ## Required context
 
@@ -17,7 +16,7 @@ release work; source and historical receipts do not identify current deployment.
 
 ## Production record
 
-Deployed release (integrator statement): `960831df`, configuration schema **117**,
+Deployed release (owner/integrator statement): `ffdb1cdf`, configuration schema **118**,
 with migration `20261031180000_rebuild_ads_ad_creation` applied in production
 (owner/integrator record; not observed here, and no receipt such as a
 `_prisma_migrations` row or CHECK probe is in the repository; confirm it). Owner cutover: 2026-10-20 22:09 CEST, release `5f1e52d7`, via
@@ -62,7 +61,7 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
   Sharing; last three include service/public error localization. `configOrDefault`
   validates runtime or registry default; `configValueOrDefault` checks outer shape
   only. Residual literals/prompts/dynamic labels and stale OAuth metadata remain
-  in CONFIG_LITERAL_AUDIT. Schema version is now **117**, not 104–116.
+  in CONFIG_LITERAL_AUDIT. Schema version is now **118**; historical version numbers below describe their batches.
 - Appearance (`2b42470b`): global shell and Settings save through confirmed
   appearance service; theme in users, mode under exact account key, transaction
   audit, Root-lifetime cookie cache and validated-session fallback in layout.
@@ -78,8 +77,9 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
   pause-cancel via Publishing, cached pool estimates, worker summaries, origin
   badges/filters, Feeds sidebar link, bilingual status/supply/next-time card and
   Root visibility bounds. Fake/unit/render evidence for follow-ups, not live
-  recovery. Refused first cancel batches can starve later posts; slot matching
-  can accept manual posts or miss cancelled drafts. Preserve uncertain ledgers.
+  recovery. Round 6 closes refused-batch starvation and channel/time reconciliation at
+  unit level (details below). Claims lacking a stored post id remain uncertain.
+  Preserve uncertain ledgers; live recovery is unproven.
 - Reliability (`e0584777`, `d511e39c`): Facebook Inbox, Page analytics/history and
   Ads fetch outside locked writes; current binding/access/purge rechecks before
   persistence. Signals stop claims, request safe stops, drain with Root grace/
@@ -103,14 +103,14 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
   re-export them. Mocked/unit evidence (`tests/root-config-authority.test.ts`,
   `root-workspace-controls.test.ts`, `root-directory.test.ts`); no PostgreSQL
   transaction, real MCP client or browser evidence.
-- Ads (`46c6bdae`): neutral paused `ad.create` through the shared management
-  service for UI (`AdCreateForm`), session REST and MCP, with a Facebook-owned
-  implementation; reconnect notice when the `ads_management` grant is absent;
-  Campaigns hierarchy path. Mocked/fixture tests only. **No migration at HEAD
-  extends the ledger operation-kind CHECK to `ad.create`** (searched
-  `prisma/migrations`), so ad creation fails closed before any provider call until
-  one is authored and applied. Management is off by default; the live
-  `ads_management` grant is pending; no live Ads write has been made.
+- Ads (`46c6bdae`, `960831df`, `ffdb1cdf`): paused `ad.create` through shared
+  management for UI, session REST and MCP, Facebook-owned transport, missing-grant
+  reconnect notice and hierarchy. The former ledger CHECK gap is closed by
+  `20261031180000_rebuild_ads_ad_creation` (source/checksum tests and owner-recorded
+  production application). Management is off by default; live `ads_management`
+  grant/write/cleanup evidence remains open. Runtime copy is resolved per request,
+  but entry points still omit customer locale. Recovery authority/scope follow-up
+  and residual policy distinction are detailed in round 9 below.
 - Performance (`245683ce`): migration `20261031160000_rebuild_read_path_indexes`
   under root prisma/migrations adds three Posts and one Page-insights indexes;
   Analytics exact-scope read reuse/request limits, Publishing adapter reuse and
@@ -137,8 +137,9 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
   provider or production run):
   - Ads copy: Facebook-owned `ads-copy.ts` (EN/FR labels, name validation, confirmation
     templates) behind new Root key `meta.adsCopy` (placeholders validated); Ads
-    `copy.ts` customer strings. `ad.create` is still blocked by the missing ledger
-    CHECK migration and `ads_management` grant.
+    `copy.ts` customer strings. The missing ledger CHECK at that round was closed
+    in round 8; the live
+    `ads_management` grant remains unverified.
   - Join: preview answers `{ invitation: null }` (200) for a missing/unknown token and
     `join-form.tsx` shows "link needed" from it (no 404; a 429 from the per-token limit
     is still possible).
@@ -173,7 +174,7 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
     separate observations (insight, summary edge, per-type edges) with
     `reactionProvenance` and a conflict flag instead of mixing them; lifetime
     insight responses are not paged and use the requested end as snapshot anchor.
-    Explicitly saved metric lists replace defaults.
+    That round's saved-list replacement is superseded by round 9 below.
   - Reports: Published posts views (destination content log with attempt counts,
     daily UTC counts, currently failed destinations) through the existing confirmed
     UI/REST/MCP generator; new key `analytics.reports.publicationDetails`. Tests
@@ -196,8 +197,8 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
     default English). A failing configured factory does not fall back to the static
     engine. **The UI, REST and MCP entry points do not yet pass the customer locale**
     (`CampaignsScreen.tsx`, `api/ads/management/route.ts`, `ads/mcp.ts`), so Ads
-    messages stay English there, and recovery does not recheck the unrestricted-
-    channel requirement. See `src/modules/ads/server/README.md`; test `ads-runtime-host`.
+    messages stay English there, and recovery does not repeat the creation-only unrestricted-channel
+    requirement; round 9 adds current scope/authority rechecks under lock. See `src/modules/ads/server/README.md`; test `ads-runtime-host`.
   - Facebook metric config: `FACEBOOK_METRIC_LABEL_DEFAULTS` adds Page/post/reaction
     labels; `meta.metricLabels` merges saved entries over shipped defaults so older
     stored catalogs gain new labels (`facebook-metric-config`).
@@ -211,6 +212,49 @@ Anthropic was blocked by account credit. Mail and live recovery remain open.
     (`inbox-analytics-ux-polish`, source-level assertions). No browser run.
   - Root keys added in these rounds: `analytics.reports.publicationDetails` (116) and
     `analytics.reports.topPostContent` (117). This documentation lane adds none.
+
+Round 9 (`ffdb1cdf`; source and unit/mocked/query-shape evidence; schema 118;
+no fresh browser, PostgreSQL or live-provider verification by this lane):
+
+- Ads recovery checks current account/channel visibility and independent key
+  ceilings before disclosing state/confirmation, then repeats manager authority
+  and account visibility under the account/ledger locks before settlement/audit.
+  Creative recovery checks the exact target; retained disabled accounts do not
+  need active provider grants for local attestation. Tests cover narrowed scope,
+  revoked role, empty ceilings and invisible-account refusal. This closes the
+  stale-authority/disclosure gap. A limited manager whose scope reaches the
+  account connection is still permitted to recover ad/ad-set creations; the
+  unrestricted-channel rule for creating them is not repeated. Reconcile that
+  remaining policy distinction rather than claiming identical creation/recovery
+  scope (see ADS_PARITY.md).
+- Facebook Page presentation reads Root `meta.metricLabels` and new
+  `meta.pageAnalyticsCopy` for EN/FR metric/audience labels, provenance,
+  latest-per-channel/category text and overlap notes. Saved labels override
+  shipped defaults, which now also include Page likes and older impressions.
+  Ads/dynamic-label English literals remain; this is not full analytics copy
+  extraction or provider completeness.
+- Post-history metric lists now merge saved additions with shipped defaults and
+  apply explicit `excludedMetrics` last (including future names). Legacy absence
+  is not an exclusion. Read normalization is pure; a confirmed Root save persists
+  normalized policy with the existing audit. The same Page-policy schema exists,
+  but `facebook/module.ts` still registers `meta.pageInsightMetrics` as an array;
+  `runtime.ts`, `adset.ts` and `ads-ops/index.ts` still consume arrays. Integrating
+  that declaration and all `.metrics` projections is outstanding.
+- Destinations reports add per-link lifetime inventory, retained period clicks
+  and independent daily UTC retained counts through the existing confirmed
+  UI/REST/MCP generator (`runReportNow`). New Root
+  `analytics.reports.linkDetails` bounds link/day rows; the existing bilingual
+  report-document catalog discloses clipping and retention gaps. The cohort is
+  posts currently published to the selected channel within the report period,
+  not clicks on every older post. Unattributed legacy links qualify only with
+  exactly one published destination; ambiguous links are excluded. No visitor
+  metadata, destination URL or slug is projected. Zero means no retained click
+  records; lifetime counters are separate. See
+  `../src/modules/analytics/reports/LINK_REPORTS.md`.
+- Relevant tests: `ads-parity-management`, `facebook-page-labels`,
+  `facebook-metric-config`, `facebook-analytics-selection`,
+  `facebook-post-history`, `root-config-authority`, `report-link-details*`.
+  No new screen, route, MCP tool or migration for these report details.
 
 ## Browser evidence, not an all-green gate
 
@@ -243,7 +287,7 @@ preview PostgreSQL database; none of it is production or provider evidence.
   `SavedViews.tsx`/`saved_saveFailed` unchanged). Firefox/WebKit and the dynamic/
   empty/system/keyboard/failure parts were not rerun.
 
-Unresolved (no browser run since round 5; rounds 6–8 changed source only):
+Unresolved (no browser run since round 5; rounds 6–9 have source/automated changes without a browser rerun):
 `not-found.tsx` exists since round 8 (unit render test) but has not been seen in a
 browser; unknown bio/share/Root ids answered HTTP 200 in round 4 (the collaboration
 post screen now calls `notFound()`, unit evidence); raw server text on Tasks, Labels,
@@ -259,7 +303,7 @@ and WAVE1 checks retain their dates.
 
 ## Next actions / edits outside this documentation lane
 
-1. Release owner verifies the exact deployed SHA (recorded `960831df`), migrations
+1. Release owner verifies the exact deployed SHA (recorded `ffdb1cdf`), migrations
    and ownership (purge-gate, read-index, inbox-metadata, trigram and ad-creation
    migrations; keep a receipt), media backup coverage and a proxy-level cutback;
    extend the rollback drill to the exact release (including the newest CHECK);
@@ -268,8 +312,9 @@ and WAVE1 checks retain their dates.
    Remaining: append it to `scripts/cutover-rehearsal.sh` (approved list, SHA-256
    from `src/modules/ads/server/README.md`, history-refusal parameter list, post-apply
    CHECK probe) with `tests/cutover-rehearsal.test.ts`; pass the customer locale from
-   the Ads UI/REST/MCP entry points; enforce the unrestricted-channel rule in
-   recovery; then obtain the live `ads_management` grant on a test account and
+   the Ads UI/REST/MCP entry points; reconcile the creation-only unrestricted-channel rule with limited-scope
+   recovery (round 9 already rechecks current role/account/channel/key scope
+   before disclosure and under lock); then obtain the live `ads_management` grant on a test account and
    exercise paused creation, status/budget/creative changes, recovery and cleanup
    with exact confirmations. Keep management off by default until then.
 3. Agency owner (workspace switching: REST versus MCP confirmation) and Sharing
@@ -290,18 +335,29 @@ and WAVE1 checks retain their dates.
    metrics/history, live REST/MCP scope, provider outcomes/cleanup and index plans/
    volume. Preserve unresolved photo-canary ledger/Page lock; failed Graph lookup
    is not absence proof. Unknown remote effects must not be blindly resent.
-7. Documentation outside ownership: ADS_PARITY.md may still state the ledger CHECK gap; FEEDS.md needs the 15:00/17:00 slots, the 40/40
-   day and the link-removal outcome; CONFIG_LITERAL_AUDIT needs latest catalogs/error
-   localization; operation docs should add data gates/read-index migration status
-   without claiming target application. Legacy round narratives retain historical
-   version-bump text; version 117 is current.
+7. Facebook owner: register `facebookPageMetricPolicySchema`/defaults in
+   `src/platforms/facebook/module.ts` for `meta.pageInsightMetrics` and project
+   `.metrics` in `runtime.ts`, `adset.ts`, `ads-ops/index.ts`; add consumer tests.
+   Do not infer exclusions from absent legacy entries or persist from reads.
+8. Documentation outside ownership: GOAL.md and DELIVERY_PLAN.md still name
+   `960831df`/117 and pre-round-9 recovery/metric/report status; MCP_PARITY.md and
+   LEGACY_CAPABILITY_PARITY.md need the scoped recovery/new policy distinction.
+   The Ads server README's recovery bullet must distinguish closed locked
+   visibility/authority rechecks from the remaining unrestricted-creation rule.
+   LINK_REPORTS.md's historical request to bump the schema is already integrated
+   (118). Operation docs still need exact target receipts/rehearsal coverage;
+   do not manufacture them from source or the owner's deployment statement.
 
 ## Current lane validation
 
-Only the six assigned docs are owned; LEGACY_CAPABILITY_PARITY changes are limited
-to the header date and existing Rebuild state cells. No contract, registry,
-source/test, migration, server, deploy, push or production edits/calls. No new Root
-keys; `CONFIG_SCHEMA_VERSION` is read as 117 from `src/lib/config/registry.ts` and
-not edited. No tests were run by this documentation lane. Pre-existing untracked node_modules links are not task changes.
-Validation results are in the lane report. Changes remain uncommitted in this
-worktree for integration; nothing was pushed.
+Only ADS_PARITY.md, FEEDS.md, CONFIG_LITERAL_AUDIT.md, ARCHITECTURE.md and
+AGENT_HANDOFF.md are owned. No source, tests, registry, contract, migration,
+server, deploy, push or production edits/calls. No new Root keys in this lane;
+round 9's existing `meta.pageAnalyticsCopy` and `analytics.reports.linkDetails`
+are documented, with `CONFIG_SCHEMA_VERSION` read as 118 and left unchanged.
+`npx tsc --noEmit -p .` passed with zero errors; `git diff --check` passed.
+No test file was changed or added. A focused six-file Vitest run passed 190
+tests (Ads recovery, Page labels/metric configuration, short-link reports and
+recipe recovery), using unit/mocked/query-shape evidence only. Pre-existing untracked node_modules links are untouched. Changes
+remain uncommitted for integration; nothing was pushed under this lane's explicit
+no-push instruction.

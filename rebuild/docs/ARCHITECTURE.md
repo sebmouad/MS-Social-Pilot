@@ -1,6 +1,6 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-21 against local HEAD `960831df` (round 8); reviewed `git log 6d3347fb..HEAD` and the round 7–8 diffs.
+Updated 2026-10-21 against local HEAD `ffdb1cdf` (round 9); reviewed current source and the round 7–9 diffs.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains the binding target,
 unchanged. This document describes implementation and gaps; deployment, source,
 automated tests, browser checks and live-provider evidence are separate claims.
@@ -20,7 +20,7 @@ not fresh probes by this documentation worker. That log records 34 applied
 migrations, backup, health checks, ownership repair, owner sign-in confirmation,
 legacy configuration import and later AI/browser checks. Cutover happened; full
 contract completion is still unproven. The deployed release is recorded by the
-integrator as `960831df` (schema 117), with migration
+integrator as `ffdb1cdf` (schema 118), with migration
 `20261031180000_rebuild_ads_ad_creation` stated as applied in production; this
 review did not observe either and no receipt is in the repository, so confirm the
 applied migrations before claiming source live. The log also
@@ -62,11 +62,12 @@ moves. Registration of a module does not prove its workflows or health.
 ## Configuration and public origin
 
 `src/lib/config/registry.ts` aggregates module/platform declarations and
-`src/lib/config/shared-config.ts`. Local HEAD has schema version **117** (round 6 added `meta.adsCopy`, the Facebook
+`src/lib/config/shared-config.ts`. Local HEAD has schema version **118** (round 6 added `meta.adsCopy`, the Facebook
 Ads action copy, owned by `src/platforms/facebook/ads-ui-config.ts`; round 7 added
 `analytics.reports.publicationDetails` (116); round 8 added
-`analytics.reports.topPostContent` (117); `meta.metricLabels` and
-`meta.postHistoryPolicy` changed defaults only). Runtime
+`analytics.reports.topPostContent` (117); `meta.metricLabels` merges saved labels
+over defaults and `meta.postHistoryPolicy` now merges saved metric additions with explicit exclusions;
+round 9 adds `meta.pageAnalyticsCopy` and `analytics.reports.linkDetails`). Runtime
 consumers use `runtimeConfig`; Root validates and transactionally audits saves,
 encrypts secrets and groups controls under Shared, Product and Platform owners.
 Database access and encryption trust material remain bootstrap dependencies.
@@ -185,8 +186,11 @@ contains `{link}`. The original link-preview observation is historical.
 `d68fc5c1` adds date/ID ordering, failed-slot retry with uncertain-slot reconciliation,
 pause-and-cancel via Publishing, cached pool-health estimates and recipe worker
 summaries. These follow-ups have fake/unit evidence, not live recovery proof.
-Refused cancels can starve later batches; reconciliation can accept a hand-made
-post at the same time or miss one returned to draft. `e43d16d2`/`6c2b7a6f` add
+Round 6 (`6d3347fb`) closes the earlier refusal-starvation and time-matching
+gaps at unit level: refused cancels rotate behind untouched work, and
+reconciliation uses the ledger's stored post id, including cancelled drafts.
+Missing/unreadable identity stays uncertain; claims without a stored id require
+manual reconciliation. This is not live recovery proof. `e43d16d2`/`6c2b7a6f` add
 recipe origin badges/filters in Posts and Calendar, a Feeds sidebar link and a
 bilingual status card (next times, published today, failed/uncertain, supply).
 Labels/visibility bounds are Root settings; unit/render evidence does not prove
@@ -369,11 +373,12 @@ provider run**; schema 117):
   `server/platforms/host.ts` and `registry.ts`; no provider branch). The Ads UI,
   session REST and MCP entry points do not yet pass the customer locale, so Ads
   messages are English there; the cutover rehearsal script and tests do not yet list
-  the migration; recovery does not recheck the unrestricted-channel rule (see
+  the migration; recovery had not yet gained round 9 locked authority/visibility rechecks and
+  still does not repeat the creation-only unrestricted-channel rule (see
   `src/modules/ads/server/README.md`).
 - Facebook configuration: shipped Page/post/reaction metric labels merge under saved
   `meta.metricLabels`; default `meta.postHistoryPolicy` metrics gain clicks and video
-  metrics. Explicitly saved lists still replace defaults.
+  metrics. That round's replacement behavior is superseded by round 9 additions/exclusions below.
 - Analytics and Inbox: Top posts report content (saved destination text, media
   references, optional image previews, article preview; Root
   `analytics.reports.topPostContent`; `reports/TOP_POST_CONTENT.md`); focus rings,
@@ -384,10 +389,54 @@ provider run**; schema 117):
   `report-top-post-content*`, `inbox-analytics-ux-polish`. The applied-migration claim
   is an owner record, not test evidence.
 
+Round 9 (`ffdb1cdf`; source and unit/mocked/query-shape evidence; schema 118;
+no fresh browser, PostgreSQL or live-provider verification by this lane):
+
+- Ads recovery checks current account/channel visibility and independent key
+  ceilings before disclosing state/confirmation, then repeats manager authority
+  and account visibility under the account/ledger locks before settlement/audit.
+  Creative recovery checks the exact target; retained disabled accounts do not
+  need active provider grants for local attestation. Tests cover narrowed scope,
+  revoked role, empty ceilings and invisible-account refusal. This closes the
+  stale-authority/disclosure gap. A limited manager whose scope reaches the
+  account connection is still permitted to recover ad/ad-set creations; the
+  unrestricted-channel rule for creating them is not repeated. Reconcile that
+  remaining policy distinction rather than claiming identical creation/recovery
+  scope (see ADS_PARITY.md).
+- Facebook Page presentation reads Root `meta.metricLabels` and new
+  `meta.pageAnalyticsCopy` for EN/FR metric/audience labels, provenance,
+  latest-per-channel/category text and overlap notes. Saved labels override
+  shipped defaults, which now also include Page likes and older impressions.
+  Ads/dynamic-label English literals remain; this is not full analytics copy
+  extraction or provider completeness.
+- Post-history metric lists now merge saved additions with shipped defaults and
+  apply explicit `excludedMetrics` last (including future names). Legacy absence
+  is not an exclusion. Read normalization is pure; a confirmed Root save persists
+  normalized policy with the existing audit. The same Page-policy schema exists,
+  but `facebook/module.ts` still registers `meta.pageInsightMetrics` as an array;
+  `runtime.ts`, `adset.ts` and `ads-ops/index.ts` still consume arrays. Integrating
+  that declaration and all `.metrics` projections is outstanding.
+- Destinations reports add per-link lifetime inventory, retained period clicks
+  and independent daily UTC retained counts through the existing confirmed
+  UI/REST/MCP generator (`runReportNow`). New Root
+  `analytics.reports.linkDetails` bounds link/day rows; the existing bilingual
+  report-document catalog discloses clipping and retention gaps. The cohort is
+  posts currently published to the selected channel within the report period,
+  not clicks on every older post. Unattributed legacy links qualify only with
+  exactly one published destination; ambiguous links are excluded. No visitor
+  metadata, destination URL or slug is projected. Zero means no retained click
+  records; lifetime counters are separate. See
+  `../src/modules/analytics/reports/LINK_REPORTS.md`.
+- Relevant tests: `ads-parity-management`, `facebook-page-labels`,
+  `facebook-metric-config`, `facebook-analytics-selection`,
+  `facebook-post-history`, `root-config-authority`, `report-link-details*`.
+  No new screen, route, MCP tool or migration for these report details.
+
 Historical 328/328 synthetic checks and the production Chrome sweep remain dated
 evidence. No browser round covers every later merge, and no declaration guard
 replaces actual MCP/provider verification. [MCP_PARITY.md](MCP_PARITY.md) records
 the structural guard and closed Root/draft inventory gaps alongside remaining
 behavioral gaps. [LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md) retains
 full scope; [DELIVERY_PLAN.md](DELIVERY_PLAN.md) orders follow-up. Full rebuild
-completion and the exact current production revision remain unproven.
+completion remains unproven; the deployed `ffdb1cdf` statement has not been
+independently re-observed by this documentation lane.

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
-  auth: vi.fn(), workspace: vi.fn(), alloc: vi.fn(), exec: [] as Array<{ sql: string; values: unknown[] }>, feedRows: [] as unknown[], knownGuids: [] as string[], failAudit: false,
+  notify: vi.fn(), auth: vi.fn(), workspace: vi.fn(), alloc: vi.fn(), exec: [] as Array<{ sql: string; values: unknown[] }>, feedRows: [] as unknown[], knownGuids: [] as string[], failAudit: false,
   overrides: {} as Record<string, unknown>, inserts: [] as string[], count: 0, requiresApproval: false, autoApprove: false, spread: 0, lockedTargets: ['t1'] as string[], bookedTimes: [] as Date[],
 }));
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $queryRawUnsafe: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
@@ -19,6 +19,7 @@ vi.mock('../src/modules/feeds/server/access', async () => {
     authorizeFeedWrite: async (actor: unknown) => { const r = await state.auth(actor, 'write'); if (!AUTHOR_ROLES.has(r.role)) throw new OperationError('forbidden', 'You do not have permission to manage feeds.'); return r; },
   };
 });
+vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: state.notify }));
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: state.workspace }));
 vi.mock('@/modules/publishing/collaboration/server/executors', () => ({ allocateQueueTime: state.alloc }));
 vi.mock('@/modules/publishing/collaboration/server/versions', () => ({ loadVersionRetention: async () => 10, recordPostVersion: async () => true }));
@@ -36,7 +37,7 @@ const formats = vi.fn(async (list: Array<{ id: string }>) => Object.fromEntries(
 const deps = { validateTargets: targets, resolveFormats: formats };
 
 beforeEach(() => {
-  vi.clearAllMocks(); state.exec = []; state.feedRows = [row()]; state.knownGuids = []; state.failAudit = false; state.overrides = {}; state.inserts = []; state.count = 0;
+  vi.clearAllMocks(); state.notify.mockReset().mockResolvedValue({ queued: 1 }); state.exec = []; state.feedRows = [row()]; state.knownGuids = []; state.failAudit = false; state.overrides = {}; state.inserts = []; state.count = 0;
   state.requiresApproval = false; state.autoApprove = false; state.spread = 0; state.lockedTargets = ['t1']; state.bookedTimes = [];
   state.auth.mockResolvedValue({ role: 'owner', actor, permissions: {}, entitlements: {}, workspaceWide: true });
   state.workspace.mockImplementation((_id: string, cb: () => Promise<unknown>) => cb());
@@ -308,5 +309,34 @@ describe('creating posts from a feed', () => {
     targets.mockRejectedValueOnce(Object.assign(new Error('x'), { code: 'forbidden', name: 'OperationError' }));
     await expect(run()).rejects.toBeTruthy();
     expect(posts()).toHaveLength(0);
+  });
+});
+
+
+describe('feed reviewer notifications', () => {
+  const check = () => checkFeed(actor, { id: 'feed_1', ...POSTS }, { ...deps, net: net(xml(['Hello'])), now: () => NOW });
+  it('queues one approval event for each newly held post in its transaction', async () => {
+    const result = await check();
+    expect(result.held).toBe(1);
+    expect(result.reviewerNotificationsQueued).toBe(1);
+    expect(state.notify).toHaveBeenCalledWith(db, expect.objectContaining({ workspaceId: 'w1', kind: 'approval_request', eventId: expect.any(String), postId: expect.any(String) }));
+    const event = state.notify.mock.calls[0][1];
+    expect(event.eventId).toBe(event.postId);
+  });
+  it('does not notify for scheduled, duplicate, draft or preview items', async () => {
+    state.autoApprove = true; await check(); expect(state.notify).not.toHaveBeenCalled();
+    state.autoApprove = false; state.knownGuids = ['g0']; await check(); expect(state.notify).not.toHaveBeenCalled();
+    state.knownGuids = [];
+    for (const mode of [{}, DRAFTS]) await checkFeed(actor, { id: 'feed_1', ...mode }, { ...deps, net: net(xml(['Hello'])), now: () => NOW });
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+  it('obeys the Root switch while retaining approval holds', async () => {
+    state.overrides['feeds.approvalNotificationsEnabled'] = false;
+    expect((await check()).held).toBe(1); expect(state.notify).not.toHaveBeenCalled();
+  });
+  it('refuses success when notification intent cannot be queued', async () => {
+    state.notify.mockRejectedValueOnce(new Error('queue failed'));
+    await expect(check()).rejects.toBeTruthy();
+    expect(executed('activity_logs').filter(e => e.values.includes('feeds.posts_created'))).toHaveLength(0);
   });
 });
