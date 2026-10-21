@@ -27,7 +27,7 @@ export async function listWebhooks(actor: IntegrationsActor) {
       (SELECT COUNT(*) FROM webhook_deliveries d WHERE d."endpointId" = e.id AND d.status = 'failed') AS failed
       FROM webhook_endpoints e WHERE e."workspaceId" = ${actor.workspaceId} ORDER BY e."createdAt" DESC, e.id DESC`;
     const webhooks: WebhookView[] = rows.map(row => ({ id: row.id, name: row.name, urlDisplay: displayUrl(row.url), events: toEvents(row.events), enabled: row.enabled, source: row.apiTokenId ? 'api_key' : 'dashboard', lastError: row.lastError, lastSentAt: row.lastSentAt, createdAt: row.createdAt, pending: Number(row.pending), failed: Number(row.failed) }));
-    return { available: rt.enabled.webhooks, webhooks, events: [...WEBHOOK_EVENTS], maxEndpoints: rt.limits.webhookMaxEndpoints };
+    return { available: rt.enabled.webhooks, webhooks, events: [...WEBHOOK_EVENTS], nameMaxLength: rt.limits.webhookNameMaxCharacters, urlMaxLength: rt.limits.webhookUrlMaxCharacters, maxEndpoints: rt.limits.webhookMaxEndpoints };
   })());
 }
 

@@ -1,4 +1,5 @@
-import { profileCopy } from '../../channel-profiles/copy';
+import { readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
+
 import { entitledPlatformIds } from '@/server/entitlements';
 import type { Metadata } from 'next';
 import { PageFrame } from '@/server/PageFrame';
@@ -16,7 +17,7 @@ import { IconPlugConnected } from '@tabler/icons-react';
 import { platformModule } from '@/platforms';
 import { connectionState } from '@/lib/connection-status';
 import { runtimeConfig } from '@/server/config/store';
-import { connectionsCopy } from './copy';
+
 
 export const metadata: Metadata = { title: 'Connections' };
 
@@ -24,7 +25,8 @@ const providerName = (provider: string) => platformModule(provider)?.name ?? pro
 
 export default async function ConnectionsPage({ searchParams }: { searchParams: Promise<{ notice?: string; select?: string; source?: string; action?: string }> }) {
   const [viewer, params, locale] = await Promise.all([requireViewer({ feature: 'settings/connections' }), searchParams, settingsLocale()]);
-  const t = connectionsCopy[locale];
+  const uiCopy = await readSettingsUiCopy();
+  const t = uiCopy.connections[locale];
   const allowedProviders = entitledPlatformIds(viewer.entitlements);
   const [accounts, adAccounts, platforms, statusLabels] = await Promise.all([listConnections(viewer.workspaceId, allowedProviders), getAdAccounts(viewer.workspaceId, allowedProviders), connectablePlatforms(allowedProviders), runtimeConfig('connections.statusLabels')]);
   const connectable = platforms.map(({ id, name, mark }) => ({ id, name, mark }));
@@ -41,8 +43,8 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const dayFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' });
   const notice = (key: string, tone: 'status' | 'alert', message: string) => params.notice === key && <p className={styles['settings-note']} role={tone}>{message}</p>;
 
-  return <PageFrame module="settings"><SettingsPage active="settings/connections" title={t.title} description={t.description} locale={locale}>
-    <a href="/settings/profiles">{profileCopy[locale].title}</a>
+  return <PageFrame module="settings"><SettingsPage copy={uiCopy} active="settings/connections" title={t.title} description={t.description} locale={locale}>
+    <a href="/settings/profiles">{uiCopy.profiles[locale].title}</a>
     <ConnectionManager locale={locale} statusLabels={statusLabels} sources={accounts} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
     {notice('connected_partial', 'status', t.connectedPartial)}
     {notice('connected', 'status', t.connected)}

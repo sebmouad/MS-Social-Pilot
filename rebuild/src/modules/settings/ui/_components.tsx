@@ -1,3 +1,6 @@
+import { SettingsCopyProvider } from './copy-context';
+import type { SettingsUiCopy } from './copy-catalog';
+import { settingsUiCopy } from './copy-catalog';
 import type { ReactNode } from 'react';
 import type { FeatureId } from '@/lib/product';
 import styles from './settings.module.css';
@@ -6,17 +9,18 @@ import { Badge } from '@/components/Badge';
 
 export { styles };
 
-export function SettingsPage({ active, title, description, children, locale = 'en' }: {
+export function SettingsPage({ active, title, description, children, copy = settingsUiCopy, locale = 'en' }: {
+  copy?: SettingsUiCopy;
   locale?: 'en' | 'fr';
   active: FeatureId;
   title: string;
   description: string;
   children: ReactNode;
 }) {
-  return <div className={styles['settings-page']} data-module="settings">
+  return <SettingsCopyProvider copy={copy}><div className={styles['settings-page']} data-module="settings">
     <PageHeader module="settings" title={title} description={description} />
     {children}
-  </div>;
+  </div></SettingsCopyProvider>;
 }
 
 export function SettingsPanel({ title, detail, children }: { title: string; detail?: string; children: ReactNode }) {

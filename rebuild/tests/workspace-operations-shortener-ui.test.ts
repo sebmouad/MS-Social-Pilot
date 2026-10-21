@@ -9,6 +9,7 @@ let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); }; HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
@@ -24,12 +25,11 @@ it.each(['en', 'fr'] as const)('renders the link shortening switch (%s) and save
   expect(container.textContent).toContain(t.shortenHint);
   await act(async () => box.click());
   expect(box.checked).toBe(true);
-  const confirmation = container.querySelector<HTMLInputElement>('form > label:last-of-type input')!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(confirmation, workspaceOperationsConfirmation('w1'));
-    confirmation.dispatchEvent(new Event('input', { bubbles: true }));
-  });
   await act(async () => { container.querySelector('form')!.requestSubmit(); });
+  expect(fetch).not.toHaveBeenCalled();
+  const dialog = container.querySelector('dialog')!;
+  expect(dialog.textContent).toContain('w1'); expect(dialog.querySelector('input')).toBeNull();
+  await act(async () => { [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === t.save)!.click(); });
   expect(fetch).toHaveBeenCalledOnce();
   expect(JSON.parse(fetch.mock.calls[0]![1].body).settings.shortenerEnabled).toBe(true);
 });

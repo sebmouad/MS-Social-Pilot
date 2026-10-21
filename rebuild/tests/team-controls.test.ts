@@ -46,8 +46,10 @@ async function addDialog(email = ' NEWPERSON@EXAMPLE.TEST ') {
   return container.querySelector<HTMLDialogElement>('dialog')!;
 }
 async function confirm(dialog: HTMLDialogElement, action: 'ADD' | 'UPDATE' | 'REMOVE', phrase: string) {
-  await enter(dialog.querySelector<HTMLInputElement>(`[aria-label="${action} confirmation"]`)!, phrase);
+  expect(dialog.querySelector(`[aria-label="${action} confirmation"]`)).toBeNull();
+  if (action === 'UPDATE') await click(button('Save access', dialog));
 }
+
 
 describe('Team controls lifecycle', () => {
   it('uses Root defaults for new members and accepts only a complete add receipt', async () => {
@@ -82,10 +84,13 @@ describe('Team controls lifecycle', () => {
     expect(dialog.textContent).toContain('Keep these grants or remove them explicitly');
 
     await confirm(dialog, 'UPDATE', 'UPDATE MEMBER member-1');
+    dialog = container.querySelector<HTMLDialogElement>('dialog[open]')!;
     await click(button('Save access', dialog));
     expect(dialog.open).toBe(true);
     expect(dialog.querySelector('[role=alert]')?.textContent).toBe('The update could not be saved.');
     expect(dialog.contains(document.activeElement)).toBe(true);
+    await click(button('Back', dialog));
+    dialog = container.querySelector<HTMLDialogElement>('dialog[open]')!;
     expect(dialog.querySelectorAll<HTMLInputElement>('fieldset label input[type="checkbox"]')[1]?.checked).toBe(true);
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({ targetIds: ['channel-a', 'channel-hidden'], allPages: false });
 
@@ -93,6 +98,7 @@ describe('Team controls lifecycle', () => {
     expect(dialog.textContent).toContain('Saving will remove 1 unavailable channel grant from this member');
     expect(dialog.textContent).not.toContain('channel-hidden');
     await confirm(dialog, 'UPDATE', 'UPDATE MEMBER member-1');
+    dialog = container.querySelector<HTMLDialogElement>('dialog[open]')!;
     await click(button('Save access', dialog));
     expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toMatchObject({ targetIds: ['channel-a'], allPages: false });
     expect(router.refresh).toHaveBeenCalledOnce();
@@ -103,8 +109,9 @@ describe('Team controls lifecycle', () => {
     vi.stubGlobal('fetch', vi.fn(async () => respond({ ok: true, id: 'another-member', updated: true })));
     await render();
     await click(button('Edit access'));
-    const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
+    let dialog = container.querySelector<HTMLDialogElement>('dialog')!;
     await confirm(dialog, 'UPDATE', 'UPDATE MEMBER member-1');
+    dialog = container.querySelector<HTMLDialogElement>('dialog[open]')!;
     await click(button('Save access', dialog));
     expect(dialog.open).toBe(true);
     expect(dialog.querySelector('[role=alert]')?.textContent).toMatch(/could not confirm whether this change completed.*refresh.*before retrying/i);

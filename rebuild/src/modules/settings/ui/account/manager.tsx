@@ -1,4 +1,5 @@
 'use client';
+import { useSettingsCopy } from '@/modules/settings/ui/copy-context';
 
 import { useEffect, useState } from 'react';
 import { DataTable, Badge, ConfirmDialog, useToast } from '@/components';
@@ -7,13 +8,13 @@ import { useConfirm } from '@/components/useConfirm';
 import type { AccountConfirmationCopy } from '../../account-confirmation-copy';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import styles from '@/modules/settings/ui/settings.module.css';
-import { accountCopy, fill } from './copy';
+import { fill } from './copy';
 
 type Session = { id: string; expiresAt: string; current: boolean };
 
-export function AccountManager({ initialName, email, passwordPolicy, canWrite, nameMaxLength, confirmationCopy, locale = 'en' }: { canWrite: boolean; nameMaxLength: number; confirmationCopy: AccountConfirmationCopy; initialName: string; email: string; passwordPolicy: { minLength: number; maxBytes: number }; locale?: 'en' | 'fr' }) {
+export function AccountManager({ initialName, email, passwordPolicy, canWrite, nameMaxLength, confirmationCopy, sessionRevision = 0, locale = 'en' }: { sessionRevision?: number; canWrite: boolean; nameMaxLength: number; confirmationCopy: AccountConfirmationCopy; initialName: string; email: string; passwordPolicy: { minLength: number; maxBytes: number }; locale?: 'en' | 'fr' }) {
   const toast = useToast();
-  const t = accountCopy[locale];
+  const t = useSettingsCopy('account', locale);
   const [confirm, confirmationDialog] = useConfirm(confirmationCopy);
   const [pendingSession, setPendingSession] = useState<string | null>(null);
   const [name, setName] = useState(initialName);
@@ -34,7 +35,7 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
       if (active) { setSessions(result.sessions); setNextOffset(result.nextOffset ?? null); }
     }).catch(() => { if (active) setNotice(t.sessionsFailed); });
     return () => { active = false; };
-  }, [t]);
+  }, [t, sessionRevision]);
 
   async function moreSessions() {
     if (busy || nextOffset === null) return;

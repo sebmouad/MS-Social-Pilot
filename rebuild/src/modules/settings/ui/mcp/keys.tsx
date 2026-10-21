@@ -1,4 +1,5 @@
 'use client';
+import { useSettingsCopy } from '@/modules/settings/ui/copy-context';
 
 import { useRef, useState } from 'react';
 import { DataTable, Badge, ConfirmDialog, useToast } from '@/components';
@@ -8,14 +9,14 @@ import { AutoTextarea } from '@/components/AutoTextarea';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import styles from '@/modules/settings/ui/settings.module.css';
 import { fill } from '@/modules/settings/ui/shell-copy';
-import { mcpCopy } from './copy';
+
 
 type Feature = { id: string; name: string; module: string; moduleLabel?:string; canRead: boolean; canWrite: boolean };
 type ApiKey = { id: string; name: string; tokenPrefix: string; readFeatures: string[]; writeFeatures: string[]; resourceScope?: {mode:string;ids?:string[];adAccountIds?:string[]}|null; expiresAt: string; revokedAt: string | null; createdAt: string; lastUsedAt: string | null };
 
 export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultLifetimeDays, resources, resourcesTruncated, locale = 'en' }: { features: Feature[]; initialKeys: ApiKey[]; maxLifetimeDays: number; defaultLifetimeDays:number; resources:Array<{id:string;name:string;kind:'channel'|'adAccount'}>; resourcesTruncated:boolean; locale?: 'en' | 'fr' }) {
   const toast = useToast();
-  const t = mcpCopy[locale];
+  const t = useSettingsCopy('mcp', locale);
   const [keys, setKeys] = useState(initialKeys);
   const [allResources,setAllResources]=useState(false); const [selectedResources,setSelectedResources]=useState<string[]>([]); const [consent,setConsent]=useState(false); const [pendingRevoke,setPendingRevoke]=useState<string|null>(null); const inFlight=useRef(false);
   const [name, setName] = useState('');

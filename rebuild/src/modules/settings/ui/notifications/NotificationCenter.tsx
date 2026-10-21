@@ -1,6 +1,7 @@
 'use client';
+import { useSettingsCopy } from '@/modules/settings/ui/copy-context';
 
-import { ADDITIONAL_NOTIFICATION_PREFERENCES, notificationPreferenceLabels } from '@/modules/settings/notifications/catalog';
+import { ADDITIONAL_NOTIFICATION_PREFERENCES } from '@/modules/settings/notifications/catalog';
 import { Switch, DataTable, Badge, EmptyState, ConfirmDialog, useToast } from '@/components';
 import { IconBell } from '@tabler/icons-react';
 import { useConfirm } from '@/components/useConfirm';
@@ -11,7 +12,7 @@ import { RouteNotice } from '@/components/RouteNotice';
 import { SidebarDock } from '@/components/SidebarDock';
 import type { NotificationPage, NotificationPreferenceView, NotificationRow } from '@/modules/settings/notifications/server';
 import { fill } from '@/modules/settings/ui/shell-copy';
-import { notificationsCopy } from './copy';
+
 import styles from './notifications.module.css';
 
 type Notice = { message: string; error: boolean; key: number } | null;
@@ -23,8 +24,8 @@ const UPDATE_CONFIRMATION = 'UPDATE NOTIFICATION PREFERENCES';
 export function NotificationCenter({ initialPreferences, initialPage, locale = initialPreferences?.locale ?? 'en' }: { initialPreferences: NotificationPreferenceView | null; initialPage: NotificationPage | null; locale?: 'en' | 'fr' }) {
   const toast = useToast();
   const retryFeedback = useRef<() => void>(() => {});
-  const labels = notificationPreferenceLabels[locale];
-  const t = notificationsCopy[locale];
+  const labels = useSettingsCopy('notificationLabels', locale);
+  const t = useSettingsCopy('notifications', locale);
   const eventName = (kind: NotificationRow['kind']) => kind === 'note_mention' ? t.eventMention : t.eventMix;
   const emailOutcome = (state: NotificationRow['emailState']) => {
     switch (state) {

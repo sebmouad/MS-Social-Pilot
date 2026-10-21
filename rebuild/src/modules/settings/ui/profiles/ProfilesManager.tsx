@@ -1,15 +1,16 @@
 'use client';
+import { useSettingsCopy } from '@/modules/settings/ui/copy-context';
 import { useRef, useState } from 'react';
 import { ConfirmDialog, useToast } from '@/components';
 import { Button } from '@/components/Button';
 import { useConfirm } from '@/components/useConfirm';
 import { saveGroupConfirmation, setLabelsConfirmation, deleteGroupConfirmation, type ProfileDirectory, type ChannelGroup } from '../../channel-profiles/contracts';
-import { profileCopy, profileConfirmationCopy, type ProfileConfirmationCopy } from '../../channel-profiles/copy';
+import { profileConfirmationCopy, type ProfileConfirmationCopy } from '../../channel-profiles/copy';
 import styles from './profiles.module.css';
 export function ProfilesManager({ initial, locale, canManage, confirmationCopy }: { initial: ProfileDirectory; locale: 'en' | 'fr'; canManage: boolean; confirmationCopy?: ProfileConfirmationCopy }) {
   const toast = useToast();
   const [removing, setRemoving] = useState<ChannelGroup | null>(null);
-  const c = profileCopy[locale]; const confirmation = confirmationCopy ?? profileConfirmationCopy[locale]; const [data, setData] = useState(initial); const [editing, setEditing] = useState<ChannelGroup | null>(null);
+  const c = useSettingsCopy('profiles', locale); const confirmation = confirmationCopy ?? profileConfirmationCopy[locale]; const [data, setData] = useState(initial); const [editing, setEditing] = useState<ChannelGroup | null>(null);
   const [name, setName] = useState(''); const [selected, setSelected] = useState<string[]>([]); const [busy, setBusy] = useState(false); const lock = useRef(false);
   const [message, setMessage] = useState(''); const [error, setError] = useState(false); const feedback = useRef<HTMLParagraphElement>(null); const nameInput = useRef<HTMLInputElement>(null);
   const [confirmSave, saveDialog] = useConfirm({ title: confirmation.title, cancel: confirmation.cancel, confirm: confirmation.confirm, danger: false });

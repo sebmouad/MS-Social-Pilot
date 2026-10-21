@@ -1,10 +1,11 @@
 'use client';
+import { useSettingsCopy } from '@/modules/settings/ui/copy-context';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { ConfirmDialog, useToast } from '@/components';
 import { DataTable } from '@/components/DataTable';
-import { exportCopy } from './export-copy';
+
 
 type ExportStatus = 'requested' | 'running' | 'ready' | 'failed' | 'expired';
 type ExportJob = { id: string; status: ExportStatus; createdAt: string; expiresAt: string | null };
@@ -18,7 +19,7 @@ function isJob(value: unknown): value is ExportJob {
 
 export function WorkspaceExports({ workspaceId, workspaceName = workspaceId, locale = 'en' }: { workspaceId: string; workspaceName?: string; locale?: 'en' | 'fr' }) {
   const toast = useToast();
-  const copy = exportCopy[locale];
+  const copy = useSettingsCopy('exports', locale);
   const [jobs, setJobs] = useState<ExportJob[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState(false);

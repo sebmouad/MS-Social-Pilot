@@ -5,6 +5,7 @@
  */
 export const workspaceOperationsCopy = {
   en: {
+    confirmationConsequence: 'Apply these settings to this workspace. This affects future workspace activity.',
     panelTitle: 'Workspace operations', panelDetail: 'Posting hours, link tagging, spacing, undo, AI voice and moderation defaults for this workspace.',
     hoursLegend: 'Posting hours and queue rules', weekStartsOn: 'First day of the week', weekStartsOnHint: 'The calendar’s first column, for everyone in this workspace.',
     businessHours: 'Business hours', businessFrom: 'From', businessTo: 'to', businessHoursHint: 'Days and hours on the workspace clock. Pick no day to count every hour.',
@@ -22,6 +23,7 @@ export const workspaceOperationsCopy = {
     days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], dayNames: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   },
   fr: {
+    confirmationConsequence: 'Appliquer ces paramètres à cet espace. Cela affecte ses prochaines activités.',
     panelTitle: 'Fonctionnement de l’espace', panelDetail: 'Heures de publication, balisage des liens, espacement, annulation, voix de l’IA et modération pour cet espace.',
     hoursLegend: 'Heures de publication et règles de file', weekStartsOn: 'Premier jour de la semaine', weekStartsOnHint: 'La première colonne du calendrier, pour tous les membres de cet espace.',
     businessHours: 'Heures d’ouverture', businessFrom: 'De', businessTo: 'à', businessHoursHint: 'Jours et heures selon l’horloge de l’espace. Ne cochez aucun jour pour compter toutes les heures.',
