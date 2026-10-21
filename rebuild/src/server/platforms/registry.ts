@@ -91,6 +91,14 @@ export async function connectablePlatforms(allowedProviders: readonly string[]):
   return (await platformStatuses()).filter((status) => allowedProviders.includes(status.module.id) && status.enabled && status.ready).map((status) => status.module);
 }
 
+/**
+ * Provider callbacks for access removal and erasure. Deliberately not gated by the Root enable switch:
+ * a person's removal request must be honoured even while the module is switched off.
+ */
+export function platformDataCallbacks(provider: string): PlatformHost['dataCallbacks'] | null {
+  return hostFor(provider)?.dataCallbacks ?? null;
+}
+
 /** The connection flow of an installed, switched-on module. */
 export async function connectionFlow(provider: string): Promise<PlatformHost['connection'] | null> {
   const host = hostFor(provider);

@@ -173,6 +173,11 @@ export interface PlatformInboxHost {
   };
 }
 
+/** Outcome of a provider's server-to-server deauthorize / data-deletion callback. */
+export type PlatformDataCallbackResult =
+  | { ok: true; affected: number; confirmationCode?: string }
+  | { ok: false; reason: 'invalid_signature' };
+
 export interface PlatformHost {
   diagnostics?: import('@/server/diagnostics/types').PlatformDiagnostics;
   inbox?: PlatformInboxHost;
@@ -181,6 +186,11 @@ export interface PlatformHost {
   /** Build the engine from Root settings. */
   adapter(): Promise<PlatformAdapter>;
   jobs?: Partial<Record<PlatformJobName, (now: Date, retryLimit: number, retryBackoff: RetryBackoff) => Promise<JobSummary>>>;
+  /** Provider-signed callbacks for access removal and data erasure; the module verifies the provider's signature. */
+  dataCallbacks?: {
+    deauthorize(signedRequest: string): Promise<PlatformDataCallbackResult>;
+    dataDeletion(signedRequest: string): Promise<PlatformDataCallbackResult>;
+  };
   connection: {
     /** Server-only renewal; null means this credential cannot be renewed. No persistence or UI data. */
     renewToken?(input: { accessToken: string; refreshToken: string | null; signal: AbortSignal }): Promise<{ accessToken: string; expiresAt: Date | null; refreshToken?: string | null } | null>;

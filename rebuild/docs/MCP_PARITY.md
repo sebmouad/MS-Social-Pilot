@@ -515,6 +515,8 @@ excepted.
 | POST /api/oauth/authorize | Interactive OAuth client consent under browser identity; delegated clients cannot grant themselves consent. |
 | POST /api/oauth/register | Public OAuth client bootstrap registration; separate protocol authority from workspace operations. |
 | POST /api/oauth/token | OAuth authorization-code/refresh-token exchange; authentication protocol, not a product operation. |
+| POST /api/platforms/[platform]/deauthorize | Provider-signed server-to-server "app removed" callback (Meta); authenticated by the provider's signature, not a workspace identity. Connection removal stays mapped through disconnect_connection. |
+| POST /api/platforms/[platform]/data-deletion | Provider-signed server-to-server erasure request (Meta); authenticated by the provider's signature. Returns a public status URL and code; not a workspace operation. |
 | POST /api/sharing/public/[token]/decision | External reviewer share-token decision; separate public reviewer authority from workspace MCP. Advisory approvals/change requests atomically queue author-eligible notices with the answer; applied decisions use Publishing notices. Authenticated link management/feedback and notification reads stay mapped; comments do not queue notices. |
 <!-- parity-rest-exceptions:end -->
 

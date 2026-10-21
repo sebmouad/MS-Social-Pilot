@@ -15,11 +15,11 @@ const routeOf = (file: string) => file.replace('../src/app', '').replace(/\/rout
 const paramsFor = (route: string) => Object.fromEntries([...route.matchAll(/\[(\.\.\.)?\[?(\w+)\]?\]/g)].map(match => [match[2], match[1] ? [] : 'smoke-id']));
 
 /** Routes that authenticate with something other than the workspace session cookie. */
-const NO_SESSION = /^\/(\.well-known|api\/(auth|oauth|v1|mcp|sharing\/public|connections\/\[platform\]\/callback)|bio|s\/|share)/;
+const NO_SESSION = /^\/(\.well-known|api\/(auth|oauth|v1|mcp|platforms|sharing\/public|connections\/\[platform\]\/callback)|bio|s\/|share)/;
 /** Bearer-token surfaces: anonymous callers must get 401, not a session redirect. */
 const BEARER = /^\/api\/(v1|mcp)/;
 /** Writes that are cross-origin by protocol (OAuth token exchange, dynamic registration, public decisions). */
-const CROSS_ORIGIN_BY_DESIGN = /^\/(api\/(oauth\/(token|register)|v1|mcp|sharing\/public)|\.well-known)/;
+const CROSS_ORIGIN_BY_DESIGN = /^\/(api\/(oauth\/(token|register)|v1|mcp|platforms|sharing\/public)|\.well-known)/;
 const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'] as const;
 const ROLES: SmokeRole[] = ['anonymous', 'owner', 'member', 'viewer'];
 const LOCALES: SmokeLocale[] = ['en', 'fr'];

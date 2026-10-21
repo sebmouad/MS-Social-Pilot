@@ -5,6 +5,7 @@ import type { PlatformHost } from '@/server/platforms/host';
 import { configuredFacebookAdapter, configuredFacebookOAuth } from './runtime';
 import { facebookGrantHealth } from './connection-health';
 import { finishFacebookConnection, startFacebookConnection } from './connection';
+import { handleFacebookDataDeletion, handleFacebookDeauthorize } from './data-callbacks';
 import { facebookAdsHost } from './ads';
 import { facebookAdsOps } from './ads-ops';
 import { facebookAnalyticsHost } from './analytics';
@@ -25,6 +26,7 @@ export const facebookHost = {
   ads: { ...facebookAdsHost, operations: facebookAdsOps, configuredOperations: configuredFacebookAdsOps },
   analytics: facebookAnalyticsHost,
   inbox: { replyPolicy: facebookReplyPolicy, canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, moderate: moderateFacebookComment, prepareDeleteComment: prepareDeleteFacebookComment, readCommentPresence: readFacebookCommentPresence, reviews: { sync: syncFacebookReviews } },
+  dataCallbacks: { deauthorize: handleFacebookDeauthorize, dataDeletion: handleFacebookDataDeletion },
   connection: {
     isReady: () => configuredFacebookOAuth().then(() => true, () => false),
     start: startFacebookConnection,
