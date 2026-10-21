@@ -1,9 +1,38 @@
 # Rebuild cutover plan
 
-The legacy app remains the production service throughout preparation. The
-existing `scripts/deploy/deploy.sh` and `socialpilot-deploy` commands continue
-to publish the legacy root package. Do not use either command to deploy the
-rebuild.
+## Current status — 2026-10-21
+
+**Cutover completed 2026-10-20 at 22:09 CEST.** The owner ran
+`rebuild/scripts/prod-cutover.sh` at `5f1e52d7`; the rebuild serves
+`https://social.newsgeet.com`. Recorded state: `social-pilot-rebuild` and
+`social-pilot-rebuild-worker` active/enabled; legacy `social-pilot` and worker
+inactive/disabled. Legacy release remains at `/srv/ms-social-pilot` for rollback.
+
+Use **`rebuild/scripts/prod-deploy.sh`** for rebuild releases (backup, build,
+reviewed migrations/ownership, swap, health/same-origin checks and automatic
+swap-back). Legacy `socialpilot-deploy` refuses while rebuild is enabled except
+status or a deliberate legacy override. Do not revive both publishers.
+
+Evidence: [RELEASE_GATES_PLAN.md results](RELEASE_GATES_PLAN.md#production-cutover--2026-10-20-2209-cest)
+records fresh backup, 34 live migrations, health, ownership repair and later
+owner sign-in. Root `app.publicOrigin` was set to the live HTTPS origin to fix
+proxy-related same-origin refusals; passkey origin/media root and legacy Meta
+settings were also corrected/imported. Subsequent deploy ownership fixes are in
+`9b29a5f4`. These are recorded outcomes, not new production checks by this worker.
+
+The full rebuild goal remains incomplete. Verify exact deployed SHA, later
+migration application/ownership, restorable backup/media and post-cutover rollback
+before asserting latest-release recovery. Mail/live Facebook writes and the
+recorded long Inbox transactions/worker shutdown behavior need follow-up. New
+per-destination scheduling, history cursor and recipe migrations are pinned in
+source; this status pass does not establish they ran on production.
+
+The procedures and dated evidence below are retained as **historical pre-cutover
+planning and batch records**, not current blockers or instructions to repeat the
+switch. Their old migration counts, legacy-service statements and guarded-script
+descriptions apply to those snapshots. Use current reviewed scripts and target
+migration history for any release. The contract remains unchanged; a completed
+switch alone does not establish every release gate or legacy capability.
 
 On 2026-10-15, a read-only schema-only dump from production restored into an
 isolated PostgreSQL 16 database. Both additive rebuild migrations applied to
@@ -26,14 +55,6 @@ three relevant services remained active, and the public health endpoint
 returned 200. This proves that particular backup can be restored, but it does
 not prove the exact future cutover backup, application behavior on restored
 data, media restoration, or proxy/service rollback.
-
-The rebuild currently listens on port 3200; production OpenLiteSpeed proxies to
-the legacy service on port 3100. No rebuild systemd units, proxy-switch
-configuration, or rebuild-specific production rollback is checked in. The
-production transition is therefore intentionally blocked. The scripts in
-`scripts/deploy/rebuild-*` can prepare and inspect a staging build, but the
-deploy and rollback commands refuse to make changes until a separately reviewed
-cutover runbook and host configuration are supplied.
 
 The 2026-10-16 first-comment batch maps three existing nullable legacy delivery
 columns (`firstCommentId`, `firstCommentAt`, `firstCommentError`). Its verifier
@@ -115,28 +136,19 @@ migration or a claim of the complete production-shaped cutover rehearsal.
    preserve them. A database restore is destructive and must be performed only
    under the separately reviewed recovery procedure.
 
-## Current blockers
+## Current verification gaps — status updated 2026-10-21
 
-- Rebuild feature coverage and legacy capability parity are incomplete; see
-  `docs/LEGACY_CAPABILITY_PARITY.md`. Passkey verification now has a
-  challenge-bound implementation, but its Root-managed origin and a real
-  enrolled credential still need production-shaped validation. Other gaps
-  include complete provider disconnect/data deletion, full Facebook
-  media and Ads lifecycles, broad scoped-role access, Root coverage of all
-  operational options, MCP parity, and live provider integration tests.
-- Production currently has no rebuild web or worker systemd unit and no
-  verified proxy switch from 3100 to 3200.
-- The rebuild schema is not a migration schema. Its 17 checksum-pinned
-  additive migrations still need application and data-impact review against a
-  sanitized production-shaped copy and a restore-aware plan.
-- There is no sanitized production-shaped staging evidence covering the full
-  authorization and write workflows, media, and provider callbacks.
-- A verified production backup/restore rehearsal for the exact cutover
-  artifact and a tested proxy/service rollback have not been recorded.
-
-Until these blockers are closed, `rebuild-deploy.sh` and
-`rebuild-rollback.sh` are guardrails that print the unresolved requirements and
-exit without SSH, service, proxy, database, or filesystem changes.
+- Full feature/legacy parity and UI/REST/MCP service/confirmation uniformity remain
+  incomplete; see LEGACY_CAPABILITY_PARITY.md and MCP_PARITY.md.
+- Production cutover, units/proxy and migration application are recorded for the
+  original release. Later migrations and the exact deployed source revision need
+  reconciliation; never infer target state from a checksum pin alone.
+- Post-cutover rollback, complete backup/media restore and production-shaped
+  authorization/write/export/erasure checks remain scope-specific evidence gaps.
+- Live Facebook formats, scheduling, Inbox/Ads operations and actual MCP clients
+  need outcome verification/cleanup. Preserve the held photo-canary ledger/lock.
+- Current-theme browser/keyboard/failure states and remaining mail/security/
+  operational checks are not closed by historical matrices or public health.
 
 ## Inbox deletion journal addition — 2026-10-16
 

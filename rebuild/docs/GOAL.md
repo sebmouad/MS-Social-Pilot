@@ -1,42 +1,28 @@
 # Active delivery goal
 
-Updated: 2026-10-19. **Status: active; incomplete.**
+Updated 2026-10-21. **Status: active; incomplete. Rebuild is in production.**
 
-Rebuild MS Social Pilot in `app/rebuild` as a production-ready modular,
-platform-neutral application with a complete Facebook adapter, branded selectable
-themes, comprehensive Publishing, Inbox, Analytics, Ads, Settings and private Root
-workflows, full authenticated MCP parity, typed Root-managed configuration, safe
-migration of needed legacy data, live platform testing, verified rollback, and
-production deployment after functional, authorization, data, browser, API and MCP
-checks pass. Work in reviewable committed batches using lower-cost agents for
-independent modules; report evidence and remaining limitations.
+Deliver the full modular, platform-neutral MS Social Pilot replacement in
+`rebuild/`: complete useful legacy capabilities, Facebook integration, one themed
+English/French customer experience, shared UI/REST/MCP services, typed Root
+configuration, safe data control, live-provider outcomes and verified recovery.
+[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding and unchanged;
+[LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md) preserves the inventory.
 
-This is the active user-approved objective, not a description of completed work.
-[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) defines the full requirements;
-[LEGACY_CAPABILITY_PARITY.md](LEGACY_CAPABILITY_PARITY.md) remains a mandatory
-capability inventory. Do not narrow the goal to implemented features, passing
-checks, one provider format, or the next batch.
+The owner cut over on **2026-10-20**. The rebuild serves
+`https://social.newsgeet.com`; legacy web/worker were disabled. Deploy with
+`rebuild/scripts/prod-deploy.sh`; legacy `socialpilot-deploy` is guarded. Recorded
+evidence and remaining operational checks are in [CUTOVER.md](CUTOVER.md) and the
+results sections of [RELEASE_GATES_PLAN.md](RELEASE_GATES_PLAN.md).
 
-Production remains on the legacy application. Publishing source to GitHub does
-not authorize bypassing the documented cutover gates. The existing
-`socialpilot-deploy` command still deploys legacy; see [CUTOVER.md](CUTOVER.md).
-
-Keep this goal active until the full objective has direct, scope-matched evidence.
-A passing build, test count, manifest or progress estimate does not establish
-completion. Only an explicit user instruction changes or pauses the objective.
+Deployment does not close full parity, configuration, localization, provider,
+current-theme browser or rollback evidence gaps. Vivid/Meta blue/Warm/Clean with
+light/dark, shared component/chart libraries, AI providers, per-destination
+scheduling and WordPress automation are implemented source slices with different
+verification scopes; do not infer they all ran live from the cutover record.
 
 Continue from [DELIVERY_PLAN.md](DELIVERY_PLAN.md) and
-[AGENT_HANDOFF.md](AGENT_HANDOFF.md). These documents are shared by Codex and Claude.
-
-Reports batch82 is verified local progress, not achievement of this full goal.
-See REPORT_WORKFLOWS.md and the current handoff for evidence and next work.
-
-Channel organization continuation (2026-10-20): selected-channel groups and
-per-channel profile labels have a local implementation on `codex/page-profiles`.
-This does not close Settings parity or change the overall goal. See
-[CHANNEL_PROFILES.md](CHANNEL_PROFILES.md) for migration and verification gaps.
-
-2026-10-20 scoped checkpoint: `codex/version-restore` implements cross-format
-version review and explicit adaptation against current destinations. This closes
-a source-level Publishing gap only; database/browser/live verification and the
-full objective remain open. See PUBLISHING_HISTORY.md.
+[AGENT_HANDOFF.md](AGENT_HANDOFF.md). Keep the goal active until every requirement
+has evidence at its actual scope. Do not narrow completion to deployment, a test
+count, manifests or the next batch. Current worker scope is documentation only:
+no servers, deploy, push or production operations.
