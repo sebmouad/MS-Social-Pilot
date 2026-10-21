@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ lock: vi.fn(), resourceLock: vi.fn(), access: vi.fn(), selected: vi.fn(), fresh: vi.fn(), read: vi.fn(), write: vi.fn(), history: vi.fn() }));
+const state = vi.hoisted(() => ({ query: vi.fn(), lock: vi.fn(), resourceLock: vi.fn(), access: vi.fn(), selected: vi.fn(), fresh: vi.fn(), read: vi.fn(), write: vi.fn(), history: vi.fn() }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: state.lock }));
 vi.mock('../src/server/jobs/access', () => ({ assertWorkspaceJobAccess: state.access }));
 vi.mock('../src/server/platforms/resource-lock', () => ({ withSelectedResourceOperation: async (workspaceId: string, resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => state.resourceLock(workspaceId, resource, run) }));
 vi.mock('../src/server/data', () => ({ prisma: {
+  $queryRaw: (...args: unknown[]) => state.query(...args),
   target: { findMany: state.selected, findFirst: state.fresh },
   pageInsight: { upsert: state.write },
   appSetting: { findUnique: async () => null, upsert: async () => ({}) },
@@ -29,6 +30,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.lock.mockImplementation(async (_workspaceId: string, work: () => Promise<unknown>) => work());
   state.resourceLock.mockImplementation(async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => run({ pageInsight: { upsert: state.write }, $queryRaw: async () => [], $executeRaw: async () => 1 }, new AbortController().signal));
+  state.query.mockResolvedValue([]);
   state.access.mockResolvedValue(undefined);
   state.selected.mockResolvedValue([selectedTarget]);
   state.fresh.mockResolvedValue(currentTarget('new-page-token'));
@@ -41,22 +43,21 @@ describe('Facebook background job freshness', () => {
   it('resumes scoped cursor state and saves the next cursor inside the resource transaction', async () => {
     const cursor = { after: 'next', complete: false, since: '2026-01-01', until: '2026-10-20' };
     const query = vi.fn().mockResolvedValue([{ cursor }]);
+    state.query.mockResolvedValue([{ cursor }]);
     const execute = vi.fn().mockResolvedValue(1);
     state.resourceLock.mockImplementation(async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => run({ pageInsight: { upsert: state.write }, $queryRaw: query, $executeRaw: execute }, new AbortController().signal));
     await syncPageAnalytics();
     expect(state.history).toHaveBeenCalledWith('new-page-token', 'page-1', expect.any(Date), cursor);
+    expect(state.query.mock.calls[0].slice(1)).toEqual(['workspace-1', 'target-1', 'page-1']);
     expect(query.mock.calls[0].slice(1)).toEqual(['workspace-1', 'target-1', 'page-1']);
     expect(execute.mock.calls[0].slice(1, 4)).toEqual(['workspace-1', 'target-1', 'page-1']);
     expect(execute.mock.calls[0][4]).toBe(JSON.stringify((await state.history.mock.results[0].value).progress));
   });
-  it('reads the latest token and grant after the selected-resource lock is acquired', async () => {
-    state.resourceLock.mockImplementation(async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => {
-      state.fresh.mockResolvedValueOnce(currentTarget('rotated-token'));
-      return run({ pageInsight: { upsert: state.write }, $queryRaw: async () => [], $executeRaw: async () => 1 }, new AbortController().signal);
-    });
+  it('reads the latest token and grant just before each provider request', async () => {
+    state.fresh.mockResolvedValueOnce(currentTarget('rotated-token'));
     await syncPageAnalytics();
     expect(state.read).toHaveBeenCalledWith('rotated-token', 'page-1', expect.any(Date), expect.any(Date));
-    expect(state.fresh).toHaveBeenCalledTimes(4); // analytics read, pre-write, history read and final persistence checks
+    expect(state.fresh).toHaveBeenCalledTimes(4); // analytics read, history read, write-phase recheck and final persistence checks
   });
 
   it('does not persist observations when current workspace job access disappears after the read', async () => {

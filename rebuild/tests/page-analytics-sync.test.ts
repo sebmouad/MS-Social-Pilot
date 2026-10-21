@@ -4,7 +4,7 @@ vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_w
 const state = vi.hoisted(() => ({ targets: vi.fn(), freshTarget: vi.fn(), upsert: vi.fn(), observations: vi.fn(), settingRead: vi.fn(), settingWrite: vi.fn(), access: vi.fn() }));
 vi.mock('../src/server/jobs/access', () => ({ assertWorkspaceJobAccess: state.access }));
 vi.mock('../src/server/platforms/resource-lock', () => ({ withSelectedResourceOperation: async (_workspaceId: string, _resource: unknown, run: (tx: unknown, signal: AbortSignal) => Promise<unknown>) => run({ pageInsight: { upsert: state.upsert }, appSetting: { findUnique: async () => null, upsert: async () => ({}) }, externalPost: { upsert: async () => ({}) }, $queryRaw: async () => [], $executeRaw: async () => 1 }, new AbortController().signal) }));
-vi.mock('../src/server/data', () => ({ prisma: { target: { findMany: state.targets, findFirst: state.freshTarget }, pageInsight: { upsert: state.upsert }, appSetting: { findUnique: state.settingRead, upsert: state.settingWrite } } }));
+vi.mock('../src/server/data', () => ({ prisma: { $queryRaw: async () => [], target: { findMany: state.targets, findFirst: state.freshTarget }, pageInsight: { upsert: state.upsert }, appSetting: { findUnique: state.settingRead, upsert: state.settingWrite } } }));
 vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({ getPageInsightObservations: state.observations, getPostHistory: async () => ({ posts: [], failures: [], progress: {} }) }), configuredFacebookAdapter: vi.fn() }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
 let facebookEnabled = true;
@@ -70,7 +70,7 @@ describe('Page analytics ingestion', () => {
     state.observations.mockRejectedValueOnce(new TypeError('temporary network issue')).mockResolvedValueOnce([]);
     await syncPageAnalytics(new Date('2026-01-04T12:00:00Z'), 1, { baseDelayMs: 0, maxDelayMs: 0 });
     expect(state.observations.mock.calls.map(call => call[0])).toEqual(['expired-token', 'new-token']);
-    expect(state.freshTarget).toHaveBeenCalledTimes(5); // +1: post-history re-reads the binding before its own request; // two provider attempts, then pre-write and final persistence checks
+    expect(state.freshTarget).toHaveBeenCalledTimes(5); // two provider attempts, the history read, then the write-phase recheck and final persistence check
   });
 
   it('does not reuse the old grant after a retry observes scope loss', async () => {

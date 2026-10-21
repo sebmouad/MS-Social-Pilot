@@ -70,6 +70,32 @@ function validDate(value: unknown): Date | null {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
 }
 
+/**
+ * Provider reads run here: no transaction and no selected-resource lock is open, so a slow
+ * Graph call never pins a database connection. Bounded by the resource timeout and job shutdown.
+ */
+async function withProviderWindow<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), await runtimeConfig('sync.resourceOperationTimeoutMs') as number);
+  const jobSignal = jobAbortSignal();
+  const onJobAbort = () => controller.abort();
+  jobSignal?.addEventListener('abort', onJobAbort, { once: true });
+  if (jobSignal?.aborted) controller.abort();
+  try {
+    return await run(controller.signal);
+  } finally {
+    clearTimeout(timer);
+    jobSignal?.removeEventListener('abort', onJobAbort);
+  }
+}
+
+/** Short admission check so a suspended or purging workspace triggers no provider traffic. */
+function admitWorkspace(workspaceId: string): Promise<void> { return withWorkspaceOperation(workspaceId, async () => undefined); }
+
+async function configuredScopes(key: 'meta.postReadScopes' | 'meta.pageInsightReadScopes' | 'meta.adsReadScopes'): Promise<string[]> {
+  return ((await runtimeConfig(key)) as string[]).map(scope => scope.trim()).filter(Boolean);
+}
+
 /** Refresh provider-side scheduled posts that already have remote IDs. */
 export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
   if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
@@ -84,6 +110,21 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
   for (const row of rows) {
     if (!row.remotePostId || row.post.workspaceId !== row.target.workspaceId) { result.skipped++; continue; }
     try {
+      await admitWorkspace(row.target.workspaceId);
+      // Provider read first, with no transaction or lock held.
+      const status = await withProviderWindow(signal => withRetries(async () => {
+        await assertFacebookJobAccess(row.target.workspaceId, jobFeatures.publishing);
+        const fresh = await prisma.postTarget.findFirst({ where: { id: row.id, postId: row.postId, status: 'scheduled_remote', remotePostId: row.remotePostId, post: { workspaceId: row.target.workspaceId }, target: { workspaceId: row.target.workspaceId, id: row.target.id, type: 'page', enabled: true, providerId: row.target.providerId, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } }, select: { remotePostId: true, target: { select: { workspaceId: true, enabled: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } } } });
+        const freshAccount = fresh?.target.socialAccount;
+        const scopes = await configuredScopes('meta.postReadScopes');
+        if (!fresh || fresh.remotePostId !== row.remotePostId || fresh.target.workspaceId !== row.target.workspaceId || !fresh.target.enabled || fresh.target.providerId !== row.target.providerId || !freshAccount || !usable(freshAccount, row.target.workspaceId, currentTime(now)) || !granted(freshAccount.scopes, scopes) || !fresh.target.accessToken && !freshAccount.accessToken) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
+        signal.throwIfAborted();
+        const engine = await configuredFacebookEngine({ signal });
+        const media = row.post.media;
+        const contentKind = Array.isArray(media) && media.some(item => item && typeof item === 'object' && (item as { kind?: unknown }).kind === 'video') ? 'video' : Array.isArray(media) && media.some(item => item && typeof item === 'object' && (item as { kind?: unknown }).kind === 'image') ? 'image' : 'text';
+        return engine.getStatus(decryptSecret(fresh.target.accessToken ?? freshAccount.accessToken), fresh.remotePostId!, { targetId: row.target.providerId, contentKind });
+      }, retryLimit, retryBackoff));
+      if (status.state !== 'published') { result.skipped++; continue; }
       await withWorkspaceOperation(row.target.workspaceId, async () => {
         const outcome = await withSelectedResourceOperation(row.target.workspaceId, { kind: 'target', id: row.target.id }, async (tx, signal) => {
           signal.throwIfAborted();
@@ -92,24 +133,9 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
           if (postLock[0]?.acquired !== true) return { updated: 0, skipped: 1 };
           await lockPublishingTargets(tx, row.target.workspaceId, [row.target.id]);
           await assertNoPostDeletionForRemoteIdentity(tx, row.target.workspaceId, row.target.id, row.remotePostId!);
-          const readStatus = async () => {
-            await assertFacebookJobAccess(row.target.workspaceId, jobFeatures.publishing);
-            const fresh = await prisma.postTarget.findFirst({ where: { id: row.id, postId: row.postId, status: 'scheduled_remote', remotePostId: row.remotePostId, post: { workspaceId: row.target.workspaceId }, target: { workspaceId: row.target.workspaceId, id: row.target.id, type: 'page', enabled: true, providerId: row.target.providerId, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } }, select: { remotePostId: true, target: { select: { workspaceId: true, enabled: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } } } });
-            const freshAccount = fresh?.target.socialAccount;
-            const scopes = ((await runtimeConfig('meta.postReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
-            if (!fresh || fresh.remotePostId !== row.remotePostId || fresh.target.workspaceId !== row.target.workspaceId || !fresh.target.enabled || fresh.target.providerId !== row.target.providerId || !freshAccount || !usable(freshAccount, row.target.workspaceId, currentTime(now)) || !granted(freshAccount.scopes, scopes) || !fresh.target.accessToken && !freshAccount.accessToken) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
-            signal.throwIfAborted();
-            const engine = await configuredFacebookEngine({ signal });
-            const media = row.post.media;
-            const contentKind = Array.isArray(media) && media.some(item => item && typeof item === 'object' && (item as { kind?: unknown }).kind === 'video') ? 'video' : Array.isArray(media) && media.some(item => item && typeof item === 'object' && (item as { kind?: unknown }).kind === 'image') ? 'image' : 'text';
-            return engine.getStatus(decryptSecret(fresh.target.accessToken ?? freshAccount.accessToken), fresh.remotePostId!, { targetId: row.target.providerId, contentKind });
-          };
-          const status = await withRetries(readStatus, retryLimit, retryBackoff);
-          if (status.state !== 'published') return { updated: 0, skipped: 1 };
-          signal.throwIfAborted();
           await assertFacebookJobAccess(row.target.workspaceId, jobFeatures.publishing);
           const stillBound = await prisma.postTarget.findFirst({ where: { id: row.id, postId: row.postId, status: 'scheduled_remote', remotePostId: row.remotePostId, post: { workspaceId: row.target.workspaceId }, target: { workspaceId: row.target.workspaceId, enabled: true, providerId: row.target.providerId, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } }, select: { id: true, remotePostId: true, target: { select: { accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } } } });
-          const currentScopes = ((await runtimeConfig('meta.postReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
+          const currentScopes = await configuredScopes('meta.postReadScopes');
           if (!stillBound || stillBound.remotePostId !== row.remotePostId || !stillBound.target.socialAccount || !usable(stillBound.target.socialAccount, row.target.workspaceId, currentTime(now)) || !granted(stillBound.target.socialAccount.scopes, currentScopes) || !stillBound.target.accessToken && !stillBound.target.socialAccount.accessToken) return { updated: 0, skipped: 1 };
           const changed = await tx.postTarget.updateMany({
             where: { id: row.id, postId: row.postId, targetId: row.target.id, status: 'scheduled_remote', remotePostId: row.remotePostId, post: { workspaceId: row.target.workspaceId } },
@@ -127,7 +153,7 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
           signal.throwIfAborted();
           await assertFacebookJobAccess(row.target.workspaceId, jobFeatures.publishing);
           const finalBinding = await tx.postTarget.findFirst({ where: { id: row.id, postId: row.postId, status: 'published', remotePostId: row.remotePostId, post: { workspaceId: row.target.workspaceId }, target: { workspaceId: row.target.workspaceId, enabled: true, providerId: row.target.providerId, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } }, select: { id: true, target: { select: { accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } } } });
-          const finalScopes = ((await runtimeConfig('meta.postReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
+          const finalScopes = await configuredScopes('meta.postReadScopes');
           if (!finalBinding?.target.socialAccount || !usable(finalBinding.target.socialAccount, row.target.workspaceId, currentTime(now)) || !granted(finalBinding.target.socialAccount.scopes, finalScopes) || !finalBinding.target.accessToken && !finalBinding.target.socialAccount.accessToken) throw new OperationError('forbidden', 'Facebook job access changed before status persistence completed.');
           return { updated: 1, skipped: 0 };
         });
@@ -140,6 +166,57 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
     }
   }
   return result;
+}
+
+type PageTarget = { id: string; workspaceId: string; providerId: string };
+type HistoryProgress = import('./post-history').HistoryProgress;
+type PostHistory = Awaited<ReturnType<Awaited<ReturnType<typeof configuredFacebookEngine>>['getPostHistory']>>;
+type PageFetch = {
+  observations: Awaited<ReturnType<Awaited<ReturnType<typeof configuredFacebookEngine>>['getPageInsightObservations']>>;
+  history: PostHistory | null;
+  /** Cursor the history read resumed from; the write phase only commits if it is unchanged. */
+  startCursor: HistoryProgress | undefined;
+  failedMetrics: number;
+};
+
+/** Current Page binding, or null when selection, connection, grant or token no longer allows the read. */
+async function currentPageBinding(target: PageTarget, now: Date): Promise<{ token: string } | null> {
+  const fresh = await prisma.target.findFirst({ where: { id: target.id, workspaceId: target.workspaceId, providerId: target.providerId, type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } }, select: { providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
+  const scopes = await configuredScopes('meta.pageInsightReadScopes');
+  if (!fresh?.socialAccount || !usable(fresh.socialAccount, target.workspaceId, currentTime(now)) || !granted(fresh.socialAccount.scopes, scopes) || !fresh.accessToken && !fresh.socialAccount.accessToken) return null;
+  return { token: decryptSecret(fresh.accessToken ?? fresh.socialAccount.accessToken) };
+}
+async function readHistoryCursor(db: Pick<typeof prisma, '$queryRaw'>, target: PageTarget): Promise<HistoryProgress | undefined> {
+  const rows = await db.$queryRaw<Array<{ cursor: HistoryProgress }>>`SELECT cursor FROM rebuild_facebook_sync_cursors WHERE "workspaceId" = ${target.workspaceId} AND "targetId" = ${target.id} AND kind = 'post_history' AND "providerId" = ${target.providerId}`;
+  return rows[0]?.cursor;
+}
+
+/** Read Page insights and post history from Facebook with no transaction or lock held. */
+async function fetchPageAnalytics(target: PageTarget, now: Date, today: Date, retryLimit: number, retryBackoff?: RetryBackoff): Promise<PageFetch> {
+  return withProviderWindow(async signal => {
+    const observations = await withRetries(async () => {
+      await assertFacebookJobAccess(target.workspaceId, jobFeatures.analytics);
+      const binding = await currentPageBinding(target, now);
+      if (!binding) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
+      signal.throwIfAborted();
+      const engine = await configuredFacebookEngine({ signal });
+      const lookbackDays = await readLookbackDays('meta.pageAnalyticsLookbackDays');
+      const since = new Date(today.getTime() - (lookbackDays - 1) * DAY_MS);
+      return engine.getPageInsightObservations(binding.token, target.providerId, since, now);
+    }, retryLimit, retryBackoff);
+    let failedMetrics = observations.failedMetrics?.length ? 1 : 0;
+    const historyBinding = await currentPageBinding(target, now);
+    if (!historyBinding) throw new OperationError('forbidden', 'History access unavailable.');
+    const startCursor = await readHistoryCursor(prisma, target);
+    // Post history is best-effort: a provider refusal is counted and logged, Page insights still persist.
+    let history: PostHistory | null = null;
+    try {
+      const historyEngine = await configuredFacebookEngine({ signal });
+      history = await historyEngine.getPostHistory(historyBinding.token, target.providerId, now, startCursor);
+    } catch (historyError) { signal.throwIfAborted(); failedMetrics++; await logItemFailure('postHistory', target.id, historyError); }
+    if (history?.failures.length) failedMetrics++;
+    return { observations, history, startCursor, failedMetrics };
+  });
 }
 
 /** Refresh current daily Page snapshots for enabled connections in their own workspace. */
@@ -155,47 +232,29 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
   const result: JobSummary = { examined: targets.length, updated: 0, skipped: 0, failed: 0 };
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   for (const target of targets) {
+    if (jobStopRequested()) break;
     try {
+      await admitWorkspace(target.workspaceId);
+      const fetched = await fetchPageAnalytics(target, now, today, retryLimit, retryBackoff);
       await withWorkspaceOperation(target.workspaceId, async () => {
         const outcome = await withSelectedResourceOperation(target.workspaceId, { kind: 'target', id: target.id }, async (tx, signal) => {
           let persistedCount = 0;
-          let failedMetrics = 0;
-          const observations = await withRetries(async () => {
-            await assertFacebookJobAccess(target.workspaceId, jobFeatures.analytics);
-            const fresh = await prisma.target.findFirst({ where: { id: target.id, workspaceId: target.workspaceId, providerId: target.providerId, type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } }, select: { providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
-            const scopes = ((await runtimeConfig('meta.pageInsightReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
-            if (!fresh?.socialAccount || !usable(fresh.socialAccount, target.workspaceId, currentTime(now)) || !granted(fresh.socialAccount.scopes, scopes) || !fresh.accessToken && !fresh.socialAccount.accessToken) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
-            signal.throwIfAborted();
-            const engine = await configuredFacebookEngine({ signal });
-            const lookbackDays = await readLookbackDays('meta.pageAnalyticsLookbackDays');
-            const since = new Date(today.getTime() - (lookbackDays - 1) * DAY_MS);
-            return engine.getPageInsightObservations(decryptSecret(fresh.accessToken ?? fresh.socialAccount.accessToken), fresh.providerId, since, now);
-          }, retryLimit, retryBackoff);
-          if (observations.failedMetrics?.length) failedMetrics++;
           await assertFacebookJobAccess(target.workspaceId, jobFeatures.analytics);
-          const stillBound = await prisma.target.findFirst({ where: { id: target.id, workspaceId: target.workspaceId, providerId: target.providerId, type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } }, select: { id: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
-          const currentScopes = ((await runtimeConfig('meta.pageInsightReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
-          if (!stillBound?.socialAccount || !usable(stillBound.socialAccount, target.workspaceId, currentTime(now)) || !granted(stillBound.socialAccount.scopes, currentScopes) || !stillBound.accessToken && !stillBound.socialAccount.accessToken) return { updated: 0, skipped: 1, failed: 0 };
-          // History and cursor commit atomically under the selected-resource lock.
-          const historyBinding = await prisma.target.findFirst({ where: { id: target.id, workspaceId: target.workspaceId, providerId: target.providerId, enabled: true }, select: { accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
-          const historyScopes = await runtimeConfig('meta.pageInsightReadScopes') as string[];
-          if (!historyBinding?.socialAccount || !usable(historyBinding.socialAccount, target.workspaceId, currentTime(now)) || !granted(historyBinding.socialAccount.scopes, historyScopes)) throw new OperationError('forbidden', 'History access unavailable.');
-          const savedRows = await tx.$queryRaw<Array<{ cursor: import('./post-history').HistoryProgress }>>`SELECT cursor FROM rebuild_facebook_sync_cursors WHERE "workspaceId" = ${target.workspaceId} AND "targetId" = ${target.id} AND kind = 'post_history' AND "providerId" = ${target.providerId}`;
-          const savedHistory = savedRows[0];
-          const historyEngine = await configuredFacebookEngine({ signal });
-          // Post history is best-effort: a provider refusal is counted and logged, Page insights still persist.
-          let history: Awaited<ReturnType<typeof historyEngine.getPostHistory>> | null = null;
-          try { history = await historyEngine.getPostHistory(decryptSecret(historyBinding.accessToken ?? historyBinding.socialAccount.accessToken), target.providerId, now, savedHistory?.cursor as import('./post-history').HistoryProgress | undefined); }
-          catch (historyError) { signal.throwIfAborted(); failedMetrics++; await logItemFailure('postHistory', target.id, historyError); }
-          if (history?.failures.length) failedMetrics++;
-          for (const post of history?.posts ?? []) {
-            await tx.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
-              VALUES (${`rebuild_${randomUUID()}`}, ${target.id}, ${post.remoteId}, ${post.message}, ${post.permalink}, ${post.statusType}, ${post.pictureUrl}, ${post.createdTime}, ${JSON.stringify(post.insights)}::jsonb, ${now}, ${now})
-              ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
-            persistedCount++;
+          if (!await currentPageBinding(target, now)) return { updated: 0, skipped: 1, failed: 0 };
+          // History and cursor commit atomically under the selected-resource lock; a cursor that moved
+          // while Facebook was being read means another run already advanced it, so keep that one.
+          const history = fetched.history;
+          if (history && JSON.stringify(await readHistoryCursor(tx, target) ?? null) === JSON.stringify(fetched.startCursor ?? null)) {
+            for (const post of history.posts) {
+              signal.throwIfAborted();
+              await tx.$executeRaw`INSERT INTO external_posts (id, "targetId", "remoteId", message, permalink, "statusType", "pictureUrl", "createdTime", insights, "insightsSyncedAt", "fetchedAt")
+                VALUES (${`rebuild_${randomUUID()}`}, ${target.id}, ${post.remoteId}, ${post.message}, ${post.permalink}, ${post.statusType}, ${post.pictureUrl}, ${post.createdTime}, ${JSON.stringify(post.insights)}::jsonb, ${now}, ${now})
+                ON CONFLICT ("targetId", "remoteId") DO UPDATE SET message = EXCLUDED.message, permalink = EXCLUDED.permalink, "statusType" = EXCLUDED."statusType", "pictureUrl" = EXCLUDED."pictureUrl", insights = EXCLUDED.insights, "insightsSyncedAt" = EXCLUDED."insightsSyncedAt", "fetchedAt" = EXCLUDED."fetchedAt"`;
+              persistedCount++;
+            }
+            await tx.$executeRaw`INSERT INTO rebuild_facebook_sync_cursors ("workspaceId", "targetId", "providerId", kind, cursor, "updatedAt") VALUES (${target.workspaceId}, ${target.id}, ${target.providerId}, 'post_history', ${JSON.stringify(history.progress)}::jsonb, ${now}) ON CONFLICT ("workspaceId", "targetId", kind) DO UPDATE SET "providerId" = EXCLUDED."providerId", cursor = EXCLUDED.cursor, "updatedAt" = EXCLUDED."updatedAt"`;
           }
-          if (history) await tx.$executeRaw`INSERT INTO rebuild_facebook_sync_cursors ("workspaceId", "targetId", "providerId", kind, cursor, "updatedAt") VALUES (${target.workspaceId}, ${target.id}, ${target.providerId}, 'post_history', ${JSON.stringify(history.progress)}::jsonb, ${now}) ON CONFLICT ("workspaceId", "targetId", kind) DO UPDATE SET "providerId" = EXCLUDED."providerId", cursor = EXCLUDED.cursor, "updatedAt" = EXCLUDED."updatedAt"`;
-          for (const { metric, period, endTime, value, numeric } of observations) {
+          for (const { metric, period, endTime, value, numeric } of fetched.observations) {
             signal.throwIfAborted();
             await tx.pageInsight.upsert({
               where: { targetId_metric_period_endTime: { targetId: target.id, metric, period, endTime } },
@@ -204,12 +263,10 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
             });
             persistedCount++;
           }
-        signal.throwIfAborted();
-        await assertFacebookJobAccess(target.workspaceId, jobFeatures.analytics);
-        const finalBinding = await prisma.target.findFirst({ where: { id: target.id, workspaceId: target.workspaceId, providerId: target.providerId, type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } }, select: { accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
-        const finalScopes = ((await runtimeConfig('meta.pageInsightReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
-        if (!finalBinding?.socialAccount || !usable(finalBinding.socialAccount, target.workspaceId, currentTime(now)) || !granted(finalBinding.socialAccount.scopes, finalScopes) || !finalBinding.accessToken && !finalBinding.socialAccount.accessToken) throw new OperationError('forbidden', 'Facebook job access changed before analytics persistence completed.');
-          return { updated: persistedCount, skipped: 0, failed: failedMetrics };
+          signal.throwIfAborted();
+          await assertFacebookJobAccess(target.workspaceId, jobFeatures.analytics);
+          if (!await currentPageBinding(target, now)) throw new OperationError('forbidden', 'Facebook job access changed before analytics persistence completed.');
+          return { updated: persistedCount, skipped: 0, failed: fetched.failedMetrics };
         });
         result.updated += outcome.updated;
         result.skipped += outcome.skipped;
@@ -218,6 +275,16 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
     } catch (error) { if (isAccessDenied(error)) result.skipped++; else { result.failed++; await logItemFailure('pageAnalytics', target.id, error); } }
   }
   return result;
+}
+
+type AdsAccount = { id: string; workspaceId: string; actId: string; name: string | null };
+
+/** Current ad-account binding, or null when selection, connection or grant no longer allows the read. */
+async function currentAdsBinding(account: AdsAccount, now: Date): Promise<{ token: string } | null> {
+  const fresh = await prisma.adAccount.findFirst({ where: { id: account.id, workspaceId: account.workspaceId, actId: account.actId, enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } }, select: { actId: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
+  const scopes = await configuredScopes('meta.adsReadScopes');
+  if (!fresh?.socialAccount || !usable(fresh.socialAccount, account.workspaceId, currentTime(now)) || !granted(fresh.socialAccount.scopes, scopes)) return null;
+  return { token: decryptSecret(fresh.socialAccount.accessToken) };
 }
 
 /** Refresh account-level Ads Insights for each enabled account in its own workspace. */
@@ -233,25 +300,25 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
   const result: JobSummary = { examined: accounts.length, updated: 0, skipped: 0, failed: 0 };
   const until = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   for (const account of accounts) {
+    if (jobStopRequested()) break;
     try {
+      await admitWorkspace(account.workspaceId);
+      // Provider read first, with no transaction or lock held.
+      const rows = await withProviderWindow(signal => withRetries(async () => {
+        await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
+        const binding = await currentAdsBinding(account, now);
+        if (!binding) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
+        signal.throwIfAborted();
+        const engine = await configuredFacebookEngine({ signal });
+        const lookbackDays = await readLookbackDays('meta.adsAnalyticsLookbackDays');
+        const since = new Date(until.getTime() - (lookbackDays - 1) * DAY_MS);
+        return engine.getAdInsights(binding.token, account.actId, since, until);
+      }, retryLimit, retryBackoff));
       await withWorkspaceOperation(account.workspaceId, async () => {
         const outcome = await withSelectedResourceOperation(account.workspaceId, { kind: 'adAccount', id: account.id }, async (tx, signal) => {
           let persistedCount = 0;
-          const rows = await withRetries(async () => {
-            await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
-            const fresh = await prisma.adAccount.findFirst({ where: { id: account.id, workspaceId: account.workspaceId, actId: account.actId, enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } }, select: { actId: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
-            const scopes = ((await runtimeConfig('meta.adsReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
-            if (!fresh?.socialAccount || !usable(fresh.socialAccount, account.workspaceId, currentTime(now)) || !granted(fresh.socialAccount.scopes, scopes)) throw new OperationError('forbidden', 'Facebook job access is no longer available.');
-            signal.throwIfAborted();
-            const engine = await configuredFacebookEngine({ signal });
-            const lookbackDays = await readLookbackDays('meta.adsAnalyticsLookbackDays');
-            const since = new Date(until.getTime() - (lookbackDays - 1) * DAY_MS);
-            return engine.getAdInsights(decryptSecret(fresh.socialAccount.accessToken), fresh.actId, since, until);
-          }, retryLimit, retryBackoff);
           await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
-          const stillBound = await prisma.adAccount.findFirst({ where: { id: account.id, workspaceId: account.workspaceId, actId: account.actId, enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } }, select: { id: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
-          const currentScopes = ((await runtimeConfig('meta.adsReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
-          if (!stillBound?.socialAccount || !usable(stillBound.socialAccount, account.workspaceId, currentTime(now)) || !granted(stillBound.socialAccount.scopes, currentScopes)) return { updated: 0, skipped: 1 };
+          if (!await currentAdsBinding(account, now)) return { updated: 0, skipped: 1 };
           for (const row of rows) {
             signal.throwIfAborted();
             const date = validDate(row.date_start);
@@ -274,11 +341,9 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
           }
           signal.throwIfAborted();
           await tx.adAccount.updateMany({ where: { id: account.id, workspaceId: account.workspaceId, actId: account.actId, enabled: true }, data: { lastSyncedAt: now } });
-        signal.throwIfAborted();
-        await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
-        const finalBinding = await prisma.adAccount.findFirst({ where: { id: account.id, workspaceId: account.workspaceId, actId: account.actId, enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } }, select: { socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } });
-        const finalScopes = ((await runtimeConfig('meta.adsReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean);
-        if (!finalBinding?.socialAccount || !usable(finalBinding.socialAccount, account.workspaceId, currentTime(now)) || !granted(finalBinding.socialAccount.scopes, finalScopes)) throw new OperationError('forbidden', 'Facebook job access changed before Ads persistence completed.');
+          signal.throwIfAborted();
+          await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
+          if (!await currentAdsBinding(account, now)) throw new OperationError('forbidden', 'Facebook job access changed before Ads persistence completed.');
           return { updated: persistedCount, skipped: 0 };
         });
         result.updated += outcome.updated;

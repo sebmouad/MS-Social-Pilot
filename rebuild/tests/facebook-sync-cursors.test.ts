@@ -27,6 +27,6 @@ describe('Facebook cursor persistence boundary', () => {
   const jobs = readFileSync('src/platforms/facebook/jobs.ts', 'utf8');
   expect(jobs).not.toContain('facebook.history.');
   expect(jobs).toContain('SELECT cursor FROM rebuild_facebook_sync_cursors WHERE "workspaceId" = ${target.workspaceId} AND "targetId" = ${target.id}');
-  expect(jobs).toContain('if (history) await tx.$executeRaw`INSERT INTO rebuild_facebook_sync_cursors');
+  expect(jobs).toContain('await tx.$executeRaw`INSERT INTO rebuild_facebook_sync_cursors');
  });
 });
