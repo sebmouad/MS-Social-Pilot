@@ -117,3 +117,11 @@
 .ads-creative-create input, .ads-creative-create select, .ads-creative-create textarea { width: 100%; min-width: 0; max-width: 100%; }
 .ads-creative-create p, .ads-creation-receipts { overflow-wrap: anywhere; }
 .ads-creation-receipts { white-space: pre-wrap; }
+
+/* Campaign hierarchy table and account charts. */
+.ads-hierarchy__name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ads-hierarchy__name > span:last-child { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.ads-hierarchy__spend { display: inline-grid; justify-items: end; gap: 2px; min-width: 96px; }
+.ads-campaign-charts { display: grid; gap: 16px; margin-bottom: 16px; }
+.ads-campaign-charts__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.ads-campaign-charts__grid h3 { margin: 0 0 8px; }
