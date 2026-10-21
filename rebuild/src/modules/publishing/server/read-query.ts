@@ -62,7 +62,7 @@ export async function publishingPostReadQuery(
     || ![Object.prototype, null].includes(Object.getPrototypeOf(input))
     || Object.keys(input).some(key => !['status', 'channelId', 'q', 'origin'].includes(key))) invalid(undefined, errorText);
   const [postStatus, channelId, q] = await Promise.all([parseStatus(input.status, errorText), parseChannel(input.channelId), publishingPostSearch(input.q)]);
-  const origin = parsePostOrigin(input.origin, originSources);
+  const origin = parsePostOrigin(input.origin, originSources, errorText);
   const access = await authorizePublishing(actor, feature, 'read');
   const targetIds = await selectedPublishingTargetIds(actor.workspaceId, access.entitlements, access.actor.allowedTargetIds);
   const authorId = access.actor.allowedTargetIds === undefined ? undefined : actor.userId;
@@ -76,7 +76,7 @@ export async function publishingPostReadQuery(
     ...(postStatus ? [{ status: postStatus } as Prisma.PostWhereInput] : []),
     ...(filterIds ? [{ targets: { some: { targetId: channelId?.startsWith('channel-group:') ? { in: filterIds } : channelId } } } as Prisma.PostWhereInput] : []),
     ...(q ? [publishingPostSearchWhere(q)] : []),
-    ...(origin ? [await postOriginWhere(actor.workspaceId, origin, originSources)] : []),
+    ...(origin ? [await postOriginWhere(actor.workspaceId, origin, originSources, errorText)] : []),
   ] };
   return {
     where,

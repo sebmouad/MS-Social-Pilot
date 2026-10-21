@@ -190,3 +190,63 @@ The not-found page needs the same component (the unknown-route page was the unbr
 Keyboard/dialog behaviour in Firefox and WebKit (the keyboard gate was not run there; Safari also needs Option+Tab for links by default), all four palettes in the two new engines (only vivid and warm),
 real Safari/iOS, the empty/dynamic/failure-injection parts in the new engines, screen readers, hover states, and anything live-provider or production. The injected server failure is a database outage only
 (not a thrown error inside one page, which `error.tsx` handles).
+
+# Round 4 (2026-10-21): Firefox and WebKit on dynamic, empty, not-found and failure states; page error boundary
+
+Same environment: a **local production build** (`next build` + `next start`, :3200) against the **synthetic** preview PostgreSQL database; Playwright Firefox and WebKit 27.2 (the Safari engine, not Safari).
+Not production, not live-provider evidence. Two themes (vivid, warm) × light/dark × 1440/390 unless stated. The preview database was brought up to date first: migrations `20261031120000` to `20261031170000`
+(sync cursors, WordPress sources, purge gates, read indexes, trigrams) were applied by hand because that database has no `_prisma_migrations` table, so Feeds paths now render. Round-2 style local fixtures (known share tokens,
+an error event, an OAuth client, four sessions) were seeded and **removed afterwards**; the QA user's own data is untouched.
+
+Harness additions: `tsx scripts/verify-browser-matrix.ts run.json KEY=value …` (later `KEY=value` arguments override the settings file, so one file serves every engine and part),
+`BROWSER_MATRIX_SCOPE=round4:boundary` (signed-in page-throw check; `MATRIX_SHOT=1` saves screenshots) and `round4:recovery` (retry really recovers). Unit tests: `tests/browser-matrix-round4.test.ts`.
+
+## Making one page throw (flag-free, no test route)
+
+Production code gets no hook. The operator breaks the one dependency of one page in the **synthetic** database: `ALTER TABLE labels RENAME TO labels_qa4_off`. `/publishing/labels` then throws while the layout and every other
+page keep working. Several other tables were tried first (`error_events`, `share_links`, `bio_pages`, `saved_views`, `snippets`); those pages degrade gracefully and never throw, which is good but cannot test the boundary.
+Restoring the name undoes it. `BOUNDARY_ROUTES` lists the page; `MATRIX_ONLY=/route` overrides it. A page that does *not* throw is reported as `BOUNDARY_NOT_SIMULATED`, never as a pass.
+
+## Results
+
+| Run | Scope | Cells | Findings |
+| --- | --- | --- | --- |
+| boundary, Chromium / Firefox / WebKit | `/publishing/labels` throws; 2 themes × light/dark × en/fr × 2 viewports | 16 / 16 each | **0** in all three: themed, translated, announced (`role=alert`), retry and way back, no digest/stack/driver text on screen, no sensitive text in the browser console (the digest appears only inside Next's own generic message) |
+| boundary recovery, Firefox | table restored while the boundary is shown, then "Try again" | 1 / 1 | **0**: the page renders again without a reload (defect 1) |
+| Firefox dynamic ids | collaboration post ×2, Root error/module/platform detail, bio, three share kinds | 72 / 72 | 24, one cause: seeded media with no stored file → share media 404 |
+| WebKit dynamic ids | same | 72 / 72 | 64: the same 24, 16 React #418 hydration warnings on `/root/modules/publishing` and `/root/platforms/facebook`, and the matching console errors |
+| Firefox / WebKit session states | `/`, `/access-limited`, OAuth consent, `/no-workspace`, `/two-step`, `/two-step/enroll`, signed-out redirects | 88 / 88 each | **0** |
+| Firefox / WebKit empty workspace | all 41 customer pages as a user with an empty workspace | 328 / 328 each | 1 each: calendar "Today" badge contrast 4.08:1 (warm dark, desktop) |
+| Firefox / WebKit not found | unknown route; Root, collaboration, bio and share unknown ids | 64 / 64 each | 48 each, one cause: unknown ids answer **HTTP 200** (soft 404). The unknown *route* answers 404 |
+| Firefox failure injection | 62 pages × 5 scenarios, meta/dark/1440 and warm/light/390 | 640 / 640 | 44 |
+| WebKit failure injection | same | 640 / 640 | 82: the Firefox set, 32 hydration warnings (`/settings/sharing`, `/root/operations`) and 6 `ResizeObserver loop` page errors on `/tasks` |
+
+The failure findings are the round-2 module findings, reproduced identically in both engines: raw server text on Analytics goals, Labels, Templates, Tasks, `/password-recovery`, `/verify-email`, `/inbox/moderation`;
+lost input after a failed write on `/root/activity`; the global boundary on a failed write on `/publishing/queue` and `/root/activity`; "The code was not accepted" for a failed `/two-step` request; the saved-view dialogs on Calendar
+and Posts reporting a 401 as a naming problem. No overflow, accessible-name, theme/mode, redirect or focus findings in either engine in these parts.
+
+## Defects fixed in my owned paths
+
+1. **"Try again" did not ask the server again.** `reset()` alone re-renders the boundary's children; a page whose *server* render failed stays failed. `src/app/error.tsx` now refreshes the route and resets inside a transition.
+   Evidence: with the dependency restored while the boundary was shown, one click returned the real page (Firefox, this build). I did not measure the old behaviour in a browser; it follows the documented Next.js behaviour.
+2. **`error.tsx` was English only, and unthemed in text, with no way back.** It now uses the shared `ErrorState` (EN/FR, theme tokens, retry plus "Back to home") and never prints or logs the error. `src/app/global-error.tsx` (new) uses `GlobalErrorState`
+   for the case where the layout itself fails (the database-outage case verified in round 3).
+
+## Findings for module/app owners (not fixed here)
+
+| Severity | Finding | Where | Owner |
+| --- | --- | --- | --- |
+| High | **`src/app/not-found.tsx` is still missing.** I ran this round with it and removed it again because `src/app/` is outside this lane's paths. Without it an unknown route shows the unbranded Next default. Contents: `'use client'; import { ErrorState, useErrorLocale } from '@/components/ErrorState'; export default function NotFound() { return <ErrorState kind="not-found" locale={useErrorLocale()} />; }` | `src/app/` | App shell |
+| High | Soft 404: unknown bio slug, share token, collaboration post and Root module/platform/error ids answer HTTP 200 (`loading.tsx` streams a shell before `notFound()` runs). Identical in Firefox and WebKit | `src/app/loading.tsx`, detail screens | App shell / Sharing / Root |
+| Medium | A page-level failure replaces the **whole** screen: the boundary sits above the shell, so the sidebar and phone menu disappear and the only way out is "Back to home". A boundary inside the shell segment would keep navigation | route-group layout | App shell |
+| Medium | The server log of the thrown page contains the Prisma message (`relation "labels" does not exist`), the error name/code and build-path stack frames. No secrets or customer data were found in the server output of this round (searched for connection string, secrets, cookie, password), but SQL error text is operator detail | Labels service / logging | Publishing / platform |
+| Medium | WebKit hydration warning (React #418) on `/root/operations`, `/root/modules/<id>`, `/root/platforms/<id>`: `Intl.DateTimeFormat('en-GB', {dateStyle, timeStyle})` writes "at" in WebKit, ", " elsewhere (`src/lib/root-time.ts`; `formatStableDateTime` in `LocalTime.tsx` avoids it). `/settings/sharing` (`LinksManager.tsx`) formats dates with the visitor's locale and zone in a server-rendered client component, so any visitor whose locale or zone differs from the server's gets the warning | `src/lib/root-time.ts`, Sharing UI | Root / Sharing |
+| Low | `ResizeObserver loop completed with undelivered notifications` (WebKit, `/tasks` after a failed write): a benign browser notice that surfaces as an uncaught page error | Tasks UI | Tasks |
+| Low | Calendar "Today" badge 4.08:1 (warm dark, desktop), unchanged since round 1 | `calendar.module.css` | Publishing |
+| Info | Seeded media with no stored file → 404 on `/share/<token>/media/<id>`, `/api/media/<id>` (data, not UI) | preview data | n/a |
+| Open | All round-2 module findings listed above remain | see round 2 | Tasks, Publishing, Analytics, Auth, Inbox, Root |
+
+## Not proven (round 4)
+
+The global-error path (database unreachable) was not re-run; round 3 covers it with the same shared component. Client-side render throws (a component crashing on a malformed response) were not exercised, only a server-side page throw.
+Only vivid and warm, one boundary page, one recovery check in Firefox only, no Firefox/WebKit keyboard walks or system-mode runs, no real Safari/iOS, screen readers, long content, or anything live-provider or production.

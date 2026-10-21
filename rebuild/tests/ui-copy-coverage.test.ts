@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { customerCopy as agencyCopy } from '../src/modules/agency/ui/copy';
 import { customerCopy as tasksCopy } from '../src/modules/tasks/ui/copy';
@@ -9,6 +10,8 @@ import { publicCopy, publicCopyDefaults, publicCopySchema } from '../src/modules
 import { mediaCopy } from '../src/modules/media/copy';
 import { feedsCopy } from '../src/modules/feeds/copy';
 import { recipeCopy } from '../src/modules/feeds/copy-recipes';
+import { publishingErrorCopy, publishingErrorText } from '../src/modules/publishing/error-catalog';
+import { parsePostOrigin } from '../src/modules/publishing/server/origin-source';
 import { MEDIA_CONFIG } from '../src/modules/media/config';
 import { FEEDS_CONFIG } from '../src/modules/feeds/config';
 import { SHARING_CONFIG } from '../src/modules/sharing/config';
@@ -94,5 +97,77 @@ describe('media and feeds keyed catalogs cover every key their screens use', () 
     for (const file of files) for (const match of readFileSync(file, 'utf8').matchAll(/\bt\(\s*'(\w+)'/g)) keys.add(match[1]!);
     expect([...keys].filter(key => !(key in catalog.en) || !(key in catalog.fr))).toEqual([]);
     expect(Object.keys(catalog.fr).sort()).toEqual(Object.keys(catalog.en).sort());
+  });
+});
+
+const USER_VISIBLE_ATTRS = new Set(['aria-label', 'title', 'placeholder', 'alt', 'label', 'aria-description', 'aria-placeholder']);
+
+/** Attributes whose multi-word string values are code, not copy. */
+const TECHNICAL_ATTRS = new Set(['className', 'style', 'href', 'src', 'id', 'name', 'htmlFor', 'role', 'pattern', 'accept', 'autoComplete', 'rel', 'target', 'sizes', 'srcSet', 'viewBox', 'd', 'sandbox']);
+
+/** String literals a JSX expression can render directly: plain, conditional and logical branches. */
+function collectLiterals(expr: ts.Node | undefined, emit: (text: string) => void): void {
+  if (!expr) return;
+  if (ts.isStringLiteralLike(expr)) { if (/\p{L}{2}/u.test(expr.text)) emit(expr.text); }
+  else if (ts.isConditionalExpression(expr)) { collectLiterals(expr.whenTrue, emit); collectLiterals(expr.whenFalse, emit); }
+  else if (ts.isBinaryExpression(expr) && [ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(expr.operatorToken.kind)) { collectLiterals(expr.left, emit); collectLiterals(expr.right, emit); }
+  else if (ts.isParenthesizedExpression(expr)) collectLiterals(expr.expression, emit);
+}
+
+/** Reviewed non-copy literals that may appear in customer UI source; every entry needs a reason. */
+const LITERAL_ALLOWLIST: Array<{ file: RegExp; text: string; reason: string }> = [
+  { file: /analytics\/ui\/demographics\/DemographicsScreen\.tsx$/, text: 'UTC', reason: 'Time-standard abbreviation after a stored UTC period; identical in English and French.' },
+  { file: /feeds\/ui\/FeedManager\.tsx$/, text: 'https://example.com/feed', reason: 'Input-format example for a URL field (the reserved example.com domain); not translatable copy.' },
+  { file: /feeds\/ui\/RecipeSource\.tsx$/, text: 'https://', reason: 'URL scheme prefix used as an input-format hint; not translatable copy.' },
+  { file: /media\/ui\/MediaLibrary\.tsx$/, text: 'https://example.com/photo.jpg', reason: 'Input-format example for an image URL field (the reserved example.com domain); not translatable copy.' },
+  { file: /settings\/ui\/workspace\/policy-form\.tsx$/, text: 'America/New_York', reason: 'IANA time-zone identifier example; the identifier syntax is not localized.' },
+  { file: /sharing\/ui\/bio-settings\/BioManager\.tsx$/, text: '/bio/', reason: 'Public URL path prefix shown in front of the editable address; a route, not translatable copy.' },
+  { file: /publishing\/ui\/posts\/PostActions\.tsx$/, text: 'message,firstComment,channels', reason: 'CSV column names are the import file contract, not display text; shown in a code element.' },
+  { file: /publishing\/ui\/posts\/PostActions\.tsx$/, text: 'firstCommentDelayMinutes', reason: 'Optional CSV column name from the import file contract; shown in a code element.' },
+];
+
+/** User-visible string literals in a screen: JSX text and text-bearing attributes. Copy must come from the module catalog. */
+function uiLiterals(file: string): string[] {
+  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const found: Array<{ text: string; entry: string }> = [];
+  const add = (node: ts.Node, text: string) => found.push({ text, entry: `${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1} ${JSON.stringify(text)}` });
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxText(node)) {
+      const text = node.getText().replace(/\s+/g, ' ').trim();
+      if (/\p{L}{2}/u.test(text)) add(node, text);
+    } else if (ts.isJsxExpression(node) && ts.isJsxElement(node.parent)) {
+      collectLiterals(node.expression, text => { if (/^\p{Lu}|\s/u.test(text)) add(node, text); });
+    } else if (ts.isJsxAttribute(node) && node.initializer) {
+      const attr = node.name.getText();
+      const visible = USER_VISIBLE_ATTRS.has(attr);
+      if (visible || !(TECHNICAL_ATTRS.has(attr) || attr.startsWith('data-'))) {
+        collectLiterals(ts.isJsxExpression(node.initializer) ? node.initializer.expression : node.initializer, text => { if (visible || /\s/.test(text)) add(node, text); });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found.filter(item => !LITERAL_ALLOWLIST.some(rule => rule.file.test(file) && rule.text === item.text)).map(item => item.entry);
+}
+
+describe('publishing origin filter error', () => {
+  it('comes from the publishing error catalog in both languages', () => {
+    expect(() => parsePostOrigin('unknown', [])).toThrow('Choose a valid post origin.');
+    expect(() => parsePostOrigin('unknown', [], publishingErrorText(publishingErrorCopy, 'fr'))).toThrow('Choisissez une origine de publication valide.');
+  });
+});
+
+describe('every module screen takes its visible text from the module catalog', () => {
+  const modules = readdirSync('src/modules').filter(name => statSync(join('src/modules', name)).isDirectory());
+  const screens = (name: string) => ['ui', 'components'].map(dir => join('src/modules', name, dir))
+    .filter(dir => { try { return statSync(dir).isDirectory(); } catch { return false; } })
+    .flatMap(walk).filter(file => /\.tsx$/.test(file) && !/\.test\./.test(file));
+
+  it.each(modules)('%s has no hardcoded JSX text or accessible-name literals', name => {
+    expect(screens(name).flatMap(uiLiterals)).toEqual([]);
+  });
+
+  it('keeps every allowlist entry reasoned', () => {
+    for (const rule of LITERAL_ALLOWLIST) expect(rule.reason.trim(), rule.text).not.toBe('');
   });
 });

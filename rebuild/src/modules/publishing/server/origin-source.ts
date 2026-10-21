@@ -1,4 +1,4 @@
-import { OperationError } from '@/lib/operation-error';
+import { defaultPublishingErrorText, PublishingOperationError, type PublishingErrorText } from '../error-catalog';
 import { INSTALLED_POST_ORIGIN_SOURCES } from '@/modules/installed-post-origins';
 
 /**
@@ -13,15 +13,15 @@ export interface PostOriginSource {
 }
 
 /** The requested origin when it names an installed source; anything else is a refused filter, never ignored. */
-export function parsePostOrigin(value: unknown, sources: readonly PostOriginSource[] = INSTALLED_POST_ORIGIN_SOURCES): string | undefined {
+export function parsePostOrigin(value: unknown, sources: readonly PostOriginSource[] = INSTALLED_POST_ORIGIN_SOURCES, errorText: PublishingErrorText = defaultPublishingErrorText): string | undefined {
   if (value === undefined || value === '') return undefined;
-  if (typeof value !== 'string' || !sources.some(source => source.kind === value)) throw new OperationError('invalid_request', 'Choose a valid post origin.');
+  if (typeof value !== 'string' || !sources.some(source => source.kind === value)) throw new PublishingOperationError('invalid_request', 'read_14', {}, errorText);
   return value;
 }
 
 /** Post-list condition for the origin, evaluated in the same query as every other filter so totals and pages are exact. */
-export async function postOriginWhere(workspaceId: string, kind: string, sources: readonly PostOriginSource[] = INSTALLED_POST_ORIGIN_SOURCES): Promise<{ id: { in: string[] } }> {
+export async function postOriginWhere(workspaceId: string, kind: string, sources: readonly PostOriginSource[] = INSTALLED_POST_ORIGIN_SOURCES, errorText: PublishingErrorText = defaultPublishingErrorText): Promise<{ id: { in: string[] } }> {
   const source = sources.find(candidate => candidate.kind === kind);
-  if (!source) throw new OperationError('invalid_request', 'Choose a valid post origin.');
+  if (!source) throw new PublishingOperationError('invalid_request', 'read_14', {}, errorText);
   return { id: { in: await source.matchingPostIds(workspaceId) } };
 }

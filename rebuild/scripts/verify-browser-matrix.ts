@@ -1,6 +1,6 @@
 /** Read-only customer browser gate. Never prints credentials or browser payloads. */
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1134,6 +1134,8 @@ export async function runFailureProbe(env: Readonly<Record<string, string | unde
 
 /* ----- round 3: server-rendered failure (the database is unreachable) -------------------------- */
 export const SERVER_ERROR_LOCALES = ['en', 'fr'] as const;
+/** Pages that throw while the layout still renders once the operator breaks their one dependency (the `labels` table; see the matrix doc). */
+export const BOUNDARY_ROUTES = ['/publishing/labels'] as const;
 export const SERVER_ERROR_ROUTES = ['/home', '/publishing/posts', '/inbox', '/analytics', '/ads', '/settings/team', '/root', '/sign-in'] as const;
 export type ServerErrorObservation = {
   status: number; theme: string | null; mode: string | null; wantTheme: string; wantMode: 'light' | 'dark'; locale: 'en' | 'fr';
@@ -1155,6 +1157,20 @@ export function classifyServerError(o: ServerErrorObservation): Finding[] {
   return out;
 }
 
+/* ----- round 4: one page throws while the layout still renders (the page error boundary) ------- */
+/** What a visitor or an attached debugger must never see: driver/SQL detail, stack frames, file paths, secrets, session cookies. */
+export const BOUNDARY_LOG_LEAK = /prisma|postgres|relation "|42P01|\bat \S+ \(|\bat async\b|node_modules|\.next\/|\/srv\/|\/private\/|127\.0\.0\.1:5|DATABASE_URL|ENCRYPTION_KEY|SESSION_SECRET|msp_session|password|OperationError|upstream_failure/i;
+export type BoundaryObservation = Omit<ServerErrorObservation, 'status'> & { status: number; logs: string[]; alerts: number; boundaryShown: boolean };
+/** Pure so the rules are unit-tested without a browser. The status is recorded by the caller: a streamed page error legitimately answers 200. */
+export function classifyBoundary(o: BoundaryObservation): Finding[] {
+  if (!o.boundaryShown) return [{ code: 'BOUNDARY_NOT_SIMULATED' }];
+  const out = classifyServerError({ ...o, status: 500 });
+  if (/\b\d{6,12}\b/.test(o.text)) out.push({ code: 'BOUNDARY_DIGEST_ON_SCREEN' });
+  if (o.alerts < 1) out.push({ code: 'BOUNDARY_NOT_ANNOUNCED' });
+  if (o.logs.some(line => BOUNDARY_LOG_LEAK.test(line) || line.includes(LEAK_MARKER))) out.push({ code: 'BOUNDARY_LOGS_DETAIL' });
+  return out;
+}
+
 export type ServerErrorCell = { route: string; theme: string; mode: 'light' | 'dark'; locale: 'en' | 'fr'; viewport: { width: number; height: number }; findings: Finding[]; details: string[] };
 export type ServerErrorReport = { version: 1; startedAt: string; finishedAt: string; browser: string; routes: string[]; expectedCells: number; cells: ServerErrorCell[]; fatal: Finding[]; failures: number; passed: boolean };
 export function finishServerError(input: Pick<ServerErrorReport, 'startedAt' | 'routes' | 'cells' | 'fatal'> & { themes?: ThemeList; browser?: string }): ServerErrorReport {
@@ -1166,7 +1182,7 @@ export function finishServerError(input: Pick<ServerErrorReport, 'startedAt' | '
 }
 
 /** BASE_URL must be a build started with an unreachable DATABASE_URL: every render then fails, which exercises the server-side error path. */
-export async function runServerError(env: Readonly<Record<string, string | undefined>>, routes: string[]): Promise<ServerErrorReport> {
+export async function runServerError(env: Readonly<Record<string, string | undefined>>, routes: string[], boundary = false): Promise<ServerErrorReport> {
   const startedAt = new Date().toISOString();
   const cells: ServerErrorCell[] = [], fatal: Finding[] = [];
   const themes = selectThemes(env.MATRIX_THEMES);
@@ -1176,9 +1192,16 @@ export async function runServerError(env: Readonly<Record<string, string | undef
     const base = guardBaseUrl(env.BASE_URL);
     phase = 'BROWSER_LAUNCH_FAILED';
     browser = await launchBrowser(env);
+    // Boundary mode: the layout works, so the visitor is signed in and one page fails (the operator makes it throw, see the matrix doc).
+    let storage: Awaited<ReturnType<BrowserContext['storageState']>> | undefined;
+    if (boundary) {
+      if (!env.QA_EMAIL || !env.QA_PASSWORD) throw new Error('QA_CREDENTIALS_REQUIRED');
+      phase = 'SIGN_IN_FAILED';
+      storage = await signIn(browser, base, env.QA_EMAIL, env.QA_PASSWORD);
+    }
     phase = 'MATRIX_INTERRUPTED';
     for (const theme of themes) for (const mode of ['light', 'dark'] as const) for (const locale of SERVER_ERROR_LOCALES) for (const viewport of VIEWPORTS) {
-      const context = await browser.newContext({ viewport, serviceWorkers: 'block', colorScheme: mode, locale: locale === 'fr' ? 'fr-FR' : 'en-US' });
+      const context = await browser.newContext({ viewport, serviceWorkers: 'block', colorScheme: mode, locale: locale === 'fr' ? 'fr-FR' : 'en-US', ...(storage ? { storageState: storage } : {}) });
       try {
         await context.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), false) ? route.continue() : route.abort('blockedbyclient'));
         await context.addInitScript('window.__name = window.__name || (f => f);');
@@ -1188,6 +1211,10 @@ export async function runServerError(env: Readonly<Record<string, string | undef
           cells.push(cell);
           const page = await context.newPage();
           page.setDefaultTimeout(8000);
+          // Everything the browser logs while the failure happens: a customer's debugger or a support screenshot must not expose internals.
+          const logs: string[] = [];
+          page.on('console', message => { if (logs.length < 50) logs.push(message.text().slice(0, 400)); });
+          page.on('pageerror', error => { if (logs.length < 50) logs.push(`${error.name}: ${error.message}`.slice(0, 400)); });
           try {
             const response = await page.goto(`${base}${route}`, { waitUntil: 'load', timeout: 60000 });
             await page.waitForTimeout(1500); // the client renders the boundary after hydration
@@ -1201,6 +1228,7 @@ export async function runServerError(env: Readonly<Record<string, string | undef
               return {
                 theme: root.getAttribute('data-theme'), mode: root.getAttribute('data-mode'), text: document.body.innerText || '',
                 retryButtons: [...document.querySelectorAll('button, a')].filter(e => /try again|réessayer|retry/i.test(e.textContent || '')).length,
+                alerts: document.querySelectorAll('[role=alert]').length,
                 homeLink: [...document.querySelectorAll('a[href]')].some(a => ['/', '/home', '/sign-in'].includes(new URL((a as HTMLAnchorElement).href).pathname)),
                 backgroundLuminance: 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b),
               };
@@ -1214,13 +1242,20 @@ export async function runServerError(env: Readonly<Record<string, string | undef
               const after = await read();
               retryKeepsPage = after.text.replace(/\s+/g, '').length >= 20 && after.retryButtons >= 1;
             }
-            const found = classifyServerError({ status: response?.status() ?? 0, theme: before.theme, mode: before.mode, wantTheme: theme.id, wantMode: mode, locale, text: before.text, retryButtons: before.retryButtons, retryKeepsPage, backgroundLuminance: before.backgroundLuminance, homeLink: before.homeLink });
+            const observed = { status: response?.status() ?? 0, theme: before.theme, mode: before.mode, wantTheme: theme.id, wantMode: mode, locale, text: before.text, retryButtons: before.retryButtons, retryKeepsPage, backgroundLuminance: before.backgroundLuminance, homeLink: before.homeLink };
+            const found = boundary
+              ? classifyBoundary({ ...observed, logs, alerts: before.alerts, boundaryShown: before.retryButtons > 0 && before.alerts > 0 })
+              : classifyServerError(observed);
             for (const f of found) { cell.findings.push(f); }
             if (found.length) cell.details.push(`status ${response?.status()} theme=${before.theme} mode=${before.mode} lum=${before.backgroundLuminance.toFixed(2)} text="${before.text.replace(/\s+/g, ' ').slice(0, 120)}"`);
             const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
             if (overflow > 1) cell.findings.push({ code: 'HORIZONTAL_OVERFLOW', count: overflow });
             const contrast = await contrastAudit(page);
             if (contrast.failures.length) { cell.findings.push({ code: 'CONTRAST_LOW', count: contrast.failures.length }); cell.details.push(...contrast.failures.slice(0, 2).map(f => `CONTRAST ${f.ratio}:1 "${f.text}"`)); }
+            if (env.MATRIX_SHOT && env.BROWSER_MATRIX_SHOTS) {
+              await mkdir(env.BROWSER_MATRIX_SHOTS, { recursive: true });
+              await page.screenshot({ path: join(env.BROWSER_MATRIX_SHOTS, `${boundary ? 'boundary' : 'servererror'}-${engineName(env.MATRIX_BROWSER)}-${theme.id}-${mode}-${locale}-${viewport.width}.png`) });
+            }
           } catch (error) { cell.findings.push({ code: 'ROUTE_CHECK_FAILED' }); cell.details.push((error as Error).message.split('\n')[0].slice(0, 140)); }
           finally { await page.close(); }
         }
@@ -1229,6 +1264,44 @@ export async function runServerError(env: Readonly<Record<string, string | undef
   } catch { fatal.push({ code: phase }); }
   finally { if (browser) await browser.close().catch(() => { fatal.push({ code: 'BROWSER_CLOSE_FAILED' }); }); }
   return finishServerError({ startedAt, routes, cells, fatal, themes, browser: engineName(env.MATRIX_BROWSER) });
+}
+
+/**
+ * "Try again" must really ask the server again. The operator restores the broken dependency and creates BOUNDARY_RECOVERY_FILE
+ * while this waits (the harness itself never changes server state); the retry must then show the page, not the boundary again.
+ */
+export async function runBoundaryRecovery(env: Readonly<Record<string, string | undefined>>, route: string): Promise<ServerErrorReport> {
+  const startedAt = new Date().toISOString();
+  const cell: ServerErrorCell = { route, theme: 'vivid', mode: 'light', locale: 'en', viewport: VIEWPORTS[0], findings: [], details: [] };
+  const fatal: Finding[] = [];
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  let phase = 'CONFIGURATION_FAILED';
+  try {
+    const base = guardBaseUrl(env.BASE_URL);
+    if (!env.QA_EMAIL || !env.QA_PASSWORD || !env.BOUNDARY_RECOVERY_FILE) throw new Error('QA_CREDENTIALS_REQUIRED');
+    browser = await launchBrowser(env);
+    phase = 'SIGN_IN_FAILED';
+    const storage = await signIn(browser, base, env.QA_EMAIL, env.QA_PASSWORD);
+    phase = 'MATRIX_INTERRUPTED';
+    const context = await browser.newContext({ viewport: cell.viewport, serviceWorkers: 'block', storageState: storage });
+    try {
+      await context.route('**/*', handler => allowRequest(handler.request().url(), base, handler.request().method(), false) ? handler.continue() : handler.abort('blockedbyclient'));
+      await context.addInitScript('window.__name = window.__name || (f => f);');
+      await context.addCookies([{ name: THEME_COOKIE, value: 'vivid', url: base, sameSite: 'Lax' }, { name: MODE_COOKIE, value: 'light', url: base, sameSite: 'Lax' }]);
+      const page = await context.newPage();
+      await page.goto(`${base}${route}`, { waitUntil: 'load', timeout: 60000 });
+      const retry = page.getByRole('button', { name: /try again|réessayer/i }).first();
+      await retry.waitFor({ state: 'visible', timeout: 10000 });
+      console.log('BOUNDARY_RECOVERY_WAITING');
+      for (let i = 0; i < 180 && !existsSync(env.BOUNDARY_RECOVERY_FILE); i++) await new Promise(done => setTimeout(done, 1000));
+      await retry.click();
+      const gone = await retry.waitFor({ state: 'detached', timeout: 10000 }).then(() => true, () => false);
+      if (!gone) { cell.findings.push({ code: 'BOUNDARY_RETRY_DID_NOT_RECOVER' }); cell.details.push(`still showing the error after retry: "${(await page.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 100)}"`); }
+    } finally { await context.close(); }
+  } catch { fatal.push({ code: phase }); }
+  finally { if (browser) await browser.close().catch(() => { fatal.push({ code: 'BROWSER_CLOSE_FAILED' }); }); }
+  const failures = fatal.length + cell.findings.length;
+  return { version: 1, startedAt, finishedAt: new Date().toISOString(), browser: engineName(env.MATRIX_BROWSER), routes: [route], expectedCells: 1, cells: [cell], fatal, failures, passed: failures === 0 };
 }
 
 /** Optional: QA_CREDENTIALS_FILE points at a local JSON {email,password}, keeping secrets out of shell history. */
@@ -1283,6 +1356,8 @@ function loadConfigArgument() {
   const file = process.argv[2];
   if (!file || !file.endsWith('.json')) return;
   const parsed = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+  // Later KEY=value arguments override the file, so one settings file serves every engine and part.
+  for (const arg of process.argv.slice(3)) { const match = /^([A-Z][A-Z0-9_]*)=(.*)$/.exec(arg); if (match) process.env[match[1]] = match[2]; }
   for (const [key, value] of Object.entries(parsed)) if (typeof value === 'string' && /^[A-Z][A-Z0-9_]*$/.test(key)) process.env[key] ||= value;
 }
 
@@ -1312,6 +1387,16 @@ async function main() {
   loadCredentialsFile();
   const output = resolve(process.env.BROWSER_MATRIX_REPORT || '/tmp/msp-browser-matrix.json');
   await mkdir(dirname(output), { recursive: true });
+  const round4 = /^round4:(boundary|recovery)$/.exec(process.env.BROWSER_MATRIX_SCOPE || '');
+  if (round4) {
+    const only = process.env.MATRIX_ONLY?.split(',').filter(Boolean);
+    const routes = only?.length ? only : [...BOUNDARY_ROUTES];
+    const report = round4[1] === 'boundary' ? await runServerError(process.env, routes, true) : await runBoundaryRecovery(process.env, routes[0]);
+    await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+    console.log(`Round 4 ${round4[1]}: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
+    process.exitCode = report.passed ? 0 : 1;
+    return;
+  }
   const round3 = /^round3:(system|servererror|notfound)$/.exec(process.env.BROWSER_MATRIX_SCOPE || '');
   if (round3) {
     const appDir = fileURLToPath(new URL('../src/app', import.meta.url));

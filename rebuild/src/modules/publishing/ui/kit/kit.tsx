@@ -89,7 +89,7 @@ export function PostImage({ src, alt, locale, className, linkClassName, href, ic
   }
   // eslint-disable-next-line @next/next/no-img-element
   const image = <img className={className} src={src} alt={alt} loading="lazy" onError={() => setFailedSrc(src)} />;
-  return href ? <a className={linkClassName} href={href} target="_blank" rel="noopener noreferrer" aria-label="Open image attachment">{image}</a> : image;
+  return href ? <a className={linkClassName} href={href} target="_blank" rel="noopener noreferrer" aria-label={copy.openImageAttachment}>{image}</a> : image;
 }
 
 export function MediaThumb({ url, alt, count, video, locale }: { url: string | null; alt: string; count: number; video?: boolean; locale?: KitLocale }) {
