@@ -98,3 +98,23 @@ it('refreshes active sessions after enabling a verification method', async () =>
   await input(section.querySelector<HTMLInputElement>('input[autocomplete=one-time-code]')!, '123456'); await click(button('Enable authenticator')); await click(button('Enable authenticator', container.querySelector('dialog')!));
   expect(container.textContent).not.toContain('Signed-in session'); expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/sessions'))).toHaveLength(2);
 });
+it('disables an authenticator only after confirmation and refreshes its switch and sessions', async () => {
+  const changed = vi.fn();
+  vi.mocked(fetch).mockResolvedValueOnce(response({ passkeys: [], required: false, twoStepEnabled: true }))
+    .mockResolvedValueOnce(response({ ok: true }))
+    .mockResolvedValueOnce(response({ passkeys: [], required: false, twoStepEnabled: false }));
+  await render(createElement(AccountSecurity, { canWrite: true, accountName: 'Synthetic owner', locale: 'en', onChanged: changed }));
+  await input(container.querySelector<HTMLInputElement>('input[type=password]')!, 'private-password');
+  expect(container.querySelector<HTMLButtonElement>('[role=switch]')!.disabled).toBe(true);
+  await input(container.querySelector<HTMLInputElement>('input[autocomplete=one-time-code]')!, '123456');
+  await click(container.querySelector('[role=switch]')!);
+  const dialog = container.querySelector('dialog')!;
+  expect(dialog.textContent).toContain('Synthetic owner');
+  expect(fetch).toHaveBeenCalledTimes(1);
+  await click(button('Disable authenticator', dialog));
+  expect(vi.mocked(fetch).mock.calls[1][0]).toBe('/api/settings/account/security/disable');
+  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[1][1]?.body))).toEqual({ currentPassword: 'private-password', code: '123456', confirmation: 'DISABLE ACCOUNT TWO STEP' });
+  expect(container.querySelector('[role=switch]')?.getAttribute('aria-checked')).toBe('false');
+  expect(container.querySelector<HTMLInputElement>('input[type=password]')!.value).toBe('');
+  expect(changed).toHaveBeenCalledOnce();
+});

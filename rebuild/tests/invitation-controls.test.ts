@@ -43,9 +43,6 @@ async function inviteDialog(email = ' NOURA@EXAMPLE.TEST ') {
   await click(button('Review invitation'));
   return container.querySelector<HTMLDialogElement>('dialog')!;
 }
-async function confirm(dialog: HTMLDialogElement, label: 'INVITE' | 'REVOKE', phrase: string) {
-  await enter(dialog.querySelector<HTMLInputElement>(`[aria-label="${label} confirmation"]`)!, phrase);
-}
 
 describe('Invitation controls', () => {
   it('reviews a canonical email, posts the exact confirmation and reports the sent receipt', async () => {
@@ -54,8 +51,8 @@ describe('Invitation controls', () => {
     const dialog = await inviteDialog();
     expect(dialog.textContent).toContain('noura@example.test');
     expect(dialog.textContent).toContain('No channels selected');
-    expect(dialog.textContent).toContain('INVITE MEMBER noura@example.test');
-    await confirm(dialog, 'INVITE', 'INVITE MEMBER noura@example.test');
+    expect(dialog.querySelector('input')).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
     await click(button('Create invitation', dialog));
     const [url, init] = vi.mocked(fetch).mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/api/settings/team/invitations');
@@ -71,7 +68,6 @@ describe('Invitation controls', () => {
     vi.stubGlobal('fetch', vi.fn(async () => respond({ ok: true, id: 'invite-new', delivery: 'failed', expiresAt: future })));
     await render();
     const dialog = await inviteDialog();
-    await confirm(dialog, 'INVITE', 'INVITE MEMBER noura@example.test');
     await click(button('Create invitation', dialog));
     expect(container.querySelector('[role=alert]')?.textContent).toMatch(/Invitation recorded.*email was not delivered.*reissue.*invalidates the previous link/i);
     expect(router.refresh).toHaveBeenCalledOnce();
@@ -82,7 +78,6 @@ describe('Invitation controls', () => {
     vi.stubGlobal('fetch', vi.fn(async () => respond({ ok: true, id: 'invite-new', delivery: 'uncertain', expiresAt: future })));
     await render();
     const dialog = await inviteDialog();
-    await confirm(dialog, 'INVITE', 'INVITE MEMBER noura@example.test');
     await click(button('Create invitation', dialog));
     expect(container.querySelector('[role=alert]')?.textContent).toMatch(/may have been sent.*check with the recipient and invitation list before reissuing/i);
   });
@@ -90,12 +85,13 @@ describe('Invitation controls', () => {
   it('lets an admin reissue a pending invite after an explicit link-invalidation review', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => respond({ ok: true, id: pending.id, delivery: 'sent', expiresAt: future })));
     await render({ invitations: [pending] });
-    expect(container.querySelector('select')?.querySelector('option[value="owner"]')).toBeNull();
+    await click(container.querySelector<HTMLButtonElement>('[role=combobox]')!);
+    expect([...document.querySelectorAll('[role=option]')].some(option => option.textContent === 'Owner')).toBe(false);
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     await click(button('Reissue'));
     let dialog = container.querySelector<HTMLDialogElement>('dialog')!;
     expect(dialog.textContent).toContain('invalidates the previous link');
     expect(dialog.textContent).toContain('No channels selected');
-    await confirm(dialog, 'INVITE', 'INVITE MEMBER noura@example.test');
     await click(button('Reissue invitation', dialog));
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body))).toEqual({ email: 'noura@example.test', role: 'contributor', confirmation: 'INVITE MEMBER noura@example.test' });
     expect(container.querySelector('[role=status]')?.textContent).toContain('previous invitation link is no longer valid');
@@ -103,13 +99,14 @@ describe('Invitation controls', () => {
     expect(container.querySelector<HTMLDialogElement>('dialog')).toBeNull();
   });
 
-  it('revokes only after the exact invitation confirmation and accepts a matching receipt', async () => {
+  it('posts the exact revoke confirmation only after consent and accepts a matching receipt', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => respond({ ok: true, id: pending.id, revoked: true })));
     await render({ invitations: [pending] });
     await click(button('Revoke'));
     const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
-    expect(dialog.textContent).toContain('REVOKE INVITATION invite-1');
-    await confirm(dialog, 'REVOKE', 'REVOKE INVITATION invite-1');
+    expect(dialog.textContent).toContain(pending.email);
+    expect(dialog.querySelector('input')).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
     await click(button('Revoke invitation', dialog));
     const [url, init] = vi.mocked(fetch).mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/api/settings/team/invitations');
@@ -133,11 +130,48 @@ describe('Invitation controls', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(done => { resolve = done; })));
     await render();
     const dialog = await inviteDialog();
-    await confirm(dialog, 'INVITE', 'INVITE MEMBER noura@example.test');
     const submit = button('Create invitation', dialog);
     await act(async () => { submit.click(); submit.click(); });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(submit.disabled).toBe(true);
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body)).confirmation).toBe('INVITE MEMBER noura@example.test');
     await act(async () => resolve?.(respond({ ok: true, id: 'invite-new', delivery: 'sent', expiresAt: future })));
   });
+  it('cancels review without sending and reviews an existing pending email as a reissue', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    await render({ invitations: [pending] });
+    await enter(container.querySelector<HTMLInputElement>('#team-invitation-email')!, pending.email);
+    expect(container.querySelector('[role=note]')?.textContent).toContain('pending');
+    await click(button('Review reissue'));
+    const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
+    expect(dialog.textContent).toContain('invalidates the previous link');
+    await click(button('Back', dialog));
+    expect(fetch).not.toHaveBeenCalled();
+    expect(container.querySelector('dialog')).toBeNull();
+    expect(container.querySelector<HTMLInputElement>('#team-invitation-email')?.value).toBe(pending.email);
+  });
+
+  it('keeps a failed request open for review and does not claim a confirmed invitation', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respond({ error: 'Review the invitation list before trying again.' }, false)));
+    await render();
+    const dialog = await inviteDialog();
+    await click(button('Create invitation', dialog));
+    expect(dialog.open).toBe(true);
+    expect(dialog.querySelector('[role=alert]')).not.toBeNull();
+    expect(router.refresh).not.toHaveBeenCalled();
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body)).confirmation).toBe('INVITE MEMBER noura@example.test');
+  });
+
+  it('rejects a revoke receipt for a different invitation and preserves the review', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respond({ ok: true, id: 'another-invitation', revoked: true })));
+    await render({ invitations: [pending] });
+    await click(button('Revoke'));
+    const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
+    await click(button('Revoke invitation', dialog));
+    expect(dialog.open).toBe(true);
+    expect(dialog.querySelector('[role=alert]')).not.toBeNull();
+    expect(router.refresh).not.toHaveBeenCalled();
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body))).toEqual({ id: pending.id, confirmation: 'REVOKE INVITATION invite-1' });
+  });
+
 });
