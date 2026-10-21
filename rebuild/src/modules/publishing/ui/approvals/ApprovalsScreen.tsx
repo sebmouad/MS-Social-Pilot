@@ -1,16 +1,13 @@
 import { IconChecklist } from '@tabler/icons-react';
-import { AutoTextarea } from '@/components/AutoTextarea';
-import { PostPreview } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
 import { readPublishingPostPage } from "@/modules/publishing/server/read";
-import { PageHeading, PublishingPagination } from "@/modules/publishing/ui/publishing-ui";
+import { PageHeading, PublishingPagination, formatDate } from "@/modules/publishing/ui/publishing-ui";
 import { EmptyPanel } from "../kit/kit";
 import { kitCopy, type KitLocale } from "../kit/copy";
 import { pageLocale } from "../kit/locale";
-import workflow from "@/modules/publishing/ui/workflow.module.css";
 import publishing from "@/modules/publishing/ui/publishing.module.css";
 import { reviewWithNoteAction } from "./actions";
-import { ReviewButtons } from "@/modules/publishing/ui/WorkflowSubmitButtons";
+import { ApprovalsTable } from "./ApprovalsTable";
 
 const NOTICES: Record<KitLocale, Record<string, { text: string; error?: boolean }>> = {
   en: {
@@ -46,18 +43,8 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     {listing.total === 0
       ? <EmptyPanel icon={<IconChecklist size={26} aria-hidden="true" />} title={copy.approvalsEmptyTitle} action={<a className="ui-button ui-button--secondary" href="/publishing/posts?status=draft">{copy.approvalsEmptyAction}</a>}>{copy.approvalsEmptyBody}</EmptyPanel>
       : <>
-        <ul className={workflow.items} aria-label={copy.approvalsList(listing.page, listing.pages)}>{listing.posts.map(post => {
-          const actions = canReview ? <div className={workflow.actions}>
-            <form noValidate className={workflow.form} action={reviewWithNoteAction}>
-              <input type="hidden" name="postId" value={post.id} />
-              <label htmlFor={`note-${post.id}`}>{copy.reviewNote}</label>
-              <AutoTextarea id={`note-${post.id}`} name="note" maxLength={500} rows={2} aria-describedby={`note-help-${post.id}`} placeholder={copy.reviewNotePlaceholder} />
-              <ReviewButtons locale={locale} />
-              <p className={workflow.help} id={`note-help-${post.id}`}>{copy.reviewHelp}</p>
-            </form>
-          </div> : <div className={workflow.actions}><p className={workflow.help}>{copy.reviewViewOnly}</p></div>;
-          return <li className={workflow.item} key={post.id}><PostPreview post={post} authorName={post.authorId === viewer.user.id ? viewer.user.name : (locale === 'fr' ? 'Membre de l’équipe' : 'Workspace member')} timeZone={timeZone} locale={locale} actions={actions} /></li>;
-        })}</ul>
+        <ApprovalsTable rows={listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }>, authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember, whenLabel: formatDate(post.createdAt, timeZone, true, locale) }))}
+          caption={copy.approvalsList(listing.page, listing.pages)} locale={locale} timeZone={timeZone} canReview={canReview} reviewAction={reviewWithNoteAction} />
         <PublishingPagination path="/publishing/approvals" page={listing.page} pages={listing.pages} locale={locale} />
       </>}
   </>;

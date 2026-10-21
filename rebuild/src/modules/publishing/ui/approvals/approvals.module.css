@@ -1,0 +1,5 @@
+.postCell { display: grid; gap: 6px; min-width: 0; }
+.toggle { justify-self: start; display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 6px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--accent); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.toggle:hover { background: var(--surface-muted); }
+.toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.preview { max-width: 560px; margin-top: 4px; }

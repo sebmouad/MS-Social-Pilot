@@ -16,10 +16,11 @@ export default async function LabelsPage({ searchParams }: { searchParams: Promi
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const canWrite = canAccessFeature(viewer.permissions, 'publishing/labels', 'write');
   const result = await readLabelPage(actor, { page, ...(query ? { q: query } : {}) });
-  const copy = kitCopy[await pageLocale()];
+  const locale = await pageLocale();
+  const copy = kitCopy[locale];
   return <>
     <PageHeading href="/publishing/labels" title={copy.labelsTitle} description={copy.labelsDescription} summary={copy.perPage(result.pageSize)} />
-    <LabelManager initialLabels={result.labels.map(item => ({ ...item, createdAt: item.createdAt.toISOString() }))} colors={[...LABEL_COLORS]} page={result.page} hasMore={result.hasMore} query={result.query} canWrite={canWrite} workspaceWide={result.workspaceWide} maxNameCharacters={result.limits.maxNameCharacters} maxSearchCharacters={result.limits.maxSearchCharacters} />
+    <LabelManager initialLabels={result.labels.map(item => ({ ...item, createdAt: item.createdAt.toISOString() }))} colors={[...LABEL_COLORS]} page={result.page} hasMore={result.hasMore} query={result.query} canWrite={canWrite} workspaceWide={result.workspaceWide} maxNameCharacters={result.limits.maxNameCharacters} maxSearchCharacters={result.limits.maxSearchCharacters} locale={locale} />
     <p className={styles.help}>{copy.labelsShared}</p>
   </>;
 }

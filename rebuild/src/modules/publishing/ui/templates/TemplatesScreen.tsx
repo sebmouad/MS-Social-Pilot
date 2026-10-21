@@ -22,10 +22,11 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
     readTemplatePage(actor, { page, ...(query ? { q: query } : {}) }),
     readTemplateLabels(actor),
   ]); } catch (error) { return <><PageHeading title="Templates" description="Save reusable post content for your workspace." /><RouteNotice error focusKey="template-load-error">{error instanceof OperationError ? error.message : 'Templates could not be loaded. Refresh and try again.'}</RouteNotice></>; }
-  const copy = kitCopy[await pageLocale()];
+  const locale = await pageLocale();
+  const copy = kitCopy[locale];
   return <>
     <PageHeading href="/publishing/templates" title={copy.templatesTitle} description={copy.templatesDescription} summary={copy.perPage(result.pageSize)} />
-    <TemplateManager initialTemplates={result.templates.map(item => ({ ...item, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() }))} labels={labels} page={result.page} hasMore={result.hasMore} query={result.query} canWrite={canWrite} limits={result.limits} />
+    <TemplateManager initialTemplates={result.templates.map(item => ({ ...item, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() }))} labels={labels} page={result.page} hasMore={result.hasMore} query={result.query} canWrite={canWrite} limits={result.limits} locale={locale} />
     <p className={styles.privacy}>{copy.templatesPrivate}</p>
   </>;
 }
