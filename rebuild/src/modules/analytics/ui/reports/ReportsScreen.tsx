@@ -68,7 +68,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/reports" />}><div className={styles.root}>
     <PageHeader module="analytics" title={t("Saved reports and schedules")} description={<>{canSchedule ? t("Reuse report layouts and have them prepared and emailed weekly or monthly for the channels you manage.") : canGenerate ? t("Reuse report layouts and prepare downloadable reports for the channels you manage.") : t("Reuse report layouts across your channels.")}</>} />
-    <p>{t("Response-time reports include stored comment replies, slowest first response and resolution within business hours. Missing history is excluded; unset business hours show no figure.")}</p>
+    <p>{t("Response reports preserve the original start of visitor waits, show recorded resolution and reopening cycles, and disclose saved-history coverage. Complete platform history is not guaranteed.")}</p>
     {failure && <section className={styles.panel} role="alert"><h2>{t("Reports could not be loaded")}</h2><p>{failure}</p><a href="/analytics/reports">{t("Return to the first page")}</a></section>}
     {data && <ReportsManager copy={copy.reports} downloadCopy={copy.downloads} locale={locale} page={page!} runsPage={runsPage!} runsHasMore={data.runs.hasMore} canManage={canManage} canSchedule={canSchedule} canGenerate={canGenerate}
       policy={data.policy} limits={{ nameMax: data.limits.nameMax, maxRecipients: data.limits.maxRecipients, maxRows: data.limits.maxRows, maxBytes: data.limits.maxBytes }}

@@ -16,7 +16,7 @@ a manifest, saved setting or unit test is not complete workflow proof. See
 | P0 | Eleven network connectors and publishing destinations in `src/lib/networks/index.ts` and `src/lib/networks/connect.ts` | Partial: Facebook is the only installed customer platform. Instagram and the other legacy destinations lack usable rebuild adapters. Removed provider APIs cannot be restored by configuration. | Adapter-level connection, discovery, publishing/status/delete, analytics, inbox, and ads where provider supports them; scoped UI/API/MCP and live tests. |
 | P0 | Facebook feed, photo, carousel, video, Reel, Story, Group and native scheduling in `src/lib/facebook/publish.ts` | Partial: Page feed/photo and native video/Reel/Story source, proof/recovery and app versus Meta-native scheduling exist. Per-destination choices, queue and mix/recycle share Publishing services. Private/default-off native paths and mocked tests do not establish every format live. Group publishing is not advertised. | Provider fixture and live create/status/delete tests for each supported format; visible choices limited to available capabilities. |
 | P0 | Analytics views, comparisons, post explorer, demographics, network analysis, pinned metrics and coverage in `src/app/(app)/analytics/AnalyticsScreen.tsx` and `src/lib/analytics-views.ts` | Partial: catalog/details/explorer, posts, comparisons, pins, goals, audience history/CSV and ad-object analysis have UI/REST/MCP. Shared charts now consume actual previous-period points. Facebook post history/reactions/hierarchy collection exists; exhaustive readable collection, eligible metrics, text metadata and dynamic bilingual labels remain incomplete. | Shared metric catalog feeding full UI, export, and MCP with date/channel/ad-account scope, comparison, availability, and refresh evidence. |
-| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
+| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: templates/schedules/runs, CSV/JSON/printable artifacts, response time/business hours, top posts, goals, destinations/link counts and AI recap exist. Downloads/UI were refined in 0589ddd0. Response reports now include first direct replies to stored root comments, slowest calendar/business-hours first response, and business-hours resolution through the same report generator used by UI downloads, REST and MCP. Round-2 response reports retain pre-period conversation context, reconstruct recorded resolution/reopening cycles, and disclose stored-history coverage and incomplete boundary exclusions in bilingual artifacts through the existing shared generator. Per-channel reports retain member attribution and disclose source limits; complete provider history, actual mail delivery, volume and current-browser proof remain open. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
 | P1 | Composer overrides, queue slots, approvals, labels, custom fields, notes, versions, templates, first-comment retries, and UTM/link preparation in `src/lib/posts.ts` and related API routes | Partial: composer, slots/approvals/templates/labels/fields/notes/version restore, delayed comments and rejected-only retry, best times, mix/recycle, UTM and shortening are integrated. Scheduling modes are per destination. Newest scheduling/restore/comment database/browser/provider checks remain open; unknown remote attempts stay held. | Full end-to-end tests on production-shaped staging, per-target behavior, provider create/status/delete and permission verification, bulk actions, scheduling rules, plus remaining legacy workflows. |
 | P1 | Post list filters, saved views, pagination, bulk actions, retry/duplicate, CSV export and public Posts v1 API in `src/app/(app)/posts/page.tsx` and `src/app/api/posts` | Partial: scoped lists/search/paging/views/export and bulk actions share services; key REST v1 Posts includes scheduling. Large asynchronous Posts CSV is absent (workspace ZIP is different); v1 create lacks the same confirmation contract as UI/MCP. | Full list/action/API parity with workspace authorization and large-data pagination tests. |
 | P1 | Publishing calendar navigation and month coverage in `src/app/(app)/calendar` | Partial: Month/Week/phone agenda, workspace-day grouping, previews, saved views and drag/keyboard moves exist. Shared lifecycle supports adapter-held cancel/reschedule. Calendar editing, queue-slot presentation, high-volume months and actual drag/remote-schedule browser/provider evidence remain open. | Browser and database tests with records on timezone and month boundaries, high-volume month, permissions, drag-and-drop E2E, and edit workflows. |
@@ -100,3 +100,76 @@ Integrator follow-up outside ownership: bump `CONFIG_SCHEMA_VERSION` for the two
 keys and changed catalogs; record this batch in ARCHITECTURE.md, DELIVERY_PLAN.md
 and AGENT_HANDOFF.md. No migration, server, deployment, push or production operation
 was performed by this worker.
+
+
+## Analytics response history — round 2 (2026-10-21)
+
+Ownership: `src/modules/analytics/`, targeted tests and this inventory. This batch
+extends three partial legacy response-report capabilities through the existing
+shared generator, rather than claiming three unrelated product modules complete:
+
+1. Period-correct visitor waits. Stored messages before the report start establish
+   the original visitor run; a continuation/reply inside the period cannot create
+   a new wait. Only waits starting inside the inclusive UTC period are counted;
+   replies at the exclusive end are excluded. Resolution belongs to the latest
+   preceding visitor run, matching the legacy wait model.
+2. Historical resolution/reopening reporting. Analytics reads the existing local
+   Inbox workflow audit under workspace/channel scope. State uses the last event
+   before the exclusive report end, so a later current-state reopen cannot erase
+   that earlier resolution. Historical completed visitor-to-resolution cycles
+   remain measurable after a subsequent reopen, in calendar/business hours.
+   Repeated resolve events cannot duplicate a measured cycle; reopening without
+   new visitor input creates no invented duration. Event counts and measured
+   cycles are deliberately different measures.
+3. Stored-history provenance. CSV/JSON/printable HTML/text expose record counts,
+   stored-only/unknown-platform completeness, saved-state fallback counts, event
+   counts and source truncation. Safety cuts exclude an incomplete final
+   conversation or post discussion instead of creating false waiting/resolve
+   figures. A truncated event history suppresses resolution durations. UI copy
+   explains these semantics in English/French; Root owns all added wording.
+
+Surfaces: Reports UI downloads and session REST
+`/api/analytics/report-workflows/run`, key REST
+`/api/v1/analytics/generate_report` and MCP `generate_report` continue to enter the
+same authorized report workflow/generator. This batch changes no transport auth,
+confirmation, credential ceiling or audit policy. The MCP operation description
+now documents history/context/coverage; no parallel report calculator was added.
+
+New Root key: `analytics.reports.responseEventLimit` (default 20,000, validated
+100–100,000). Existing `responseMessageLimit` now bounds each source including
+pre-period context; `responseMemberLimit` is unchanged. Existing catalogs
+`analytics.reportDocumentCopy` and `analytics.reportsCopy` gain wording. The
+registry schema version is intentionally unchanged for the integrator.
+
+Evidence: from `rebuild/`, `npx tsc --noEmit -p .` passed with zero errors.
+116 tests passed across nine targeted files with `npx vitest run ... --no-cache`:
+`analytics-response-history.test.ts` (14), `analytics-response-comments.test.ts`
+(5), `report-response-time.test.ts` (16), `report-document-copy.test.ts` (6),
+`analytics-parity-report-generation.test.ts` (39), `reports82-ui.test.ts` (15),
+`reports82-http-host.test.ts` (4), `reports82-mcp-host.test.ts` (6), and
+`ui-copy-coverage.test.ts` (11). `git diff --check` passed. Tests cover arithmetic,
+scoped query shape, context/boundaries, historical events/cycles, cut-thread
+exclusion, audit truncation, bilingual artifacts and old-catalog fallback; existing
+mocked UI/HTTP/MCP checks cover their common workflow entry paths. Older saved
+report document catalogs now fall back through schema validation; missing UI keys
+use the selected-language default. No database, interactive browser, provider or
+production execution occurred. No servers, deployment, commits or push were
+performed. Git worktree metadata is outside this worker's writable roots;
+verified changes remain in the working tree for integration.
+
+Remaining gaps: provider backfill/exhaustiveness is still unknown. Missing or
+pruned workflow events cannot be reconstructed: current saved-state fallback is
+explicit, and cannot recover an older resolution erased by an unrecorded reopen.
+Reads remain bounded; large old histories can exhaust a source ceiling before a
+recent requested period, yielding a disclosed partial report. Independent reads
+are not a repeatable-read snapshot under concurrent Inbox changes. Actual
+PostgreSQL query/volume, browser/theme/download and live transport/provider proof
+remain open. These limits supersede the round-1 blanket absence of period-start
+context and historical events, without claiming complete provider history.
+
+Integrator edits outside ownership: bump `CONFIG_SCHEMA_VERSION` for the new key
+and changed bilingual catalogs; update ARCHITECTURE.md, DELIVERY_PLAN.md and
+AGENT_HANDOFF.md with this batch and the remaining evidence limits. Consider a
+module-owned neutral completeness contract from Inbox/platform backfill and
+indexed audit-history access for large datasets; no provider/shared/schema files
+were changed in this lane.

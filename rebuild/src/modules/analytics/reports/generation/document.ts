@@ -94,6 +94,15 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   const resolveLine = response?.resolve ? t("Resolve time: median {v0} from the first visitor message to resolved; {v1} resolved, {v2} not resolved (not counted as zero).", { v0: formatDuration(response.resolve.medianMs), v1: response.resolve.resolved, v2: response.resolve.unresolved }) : '';
   const responseDetails = response ? [
     t("Stored comments and conversation messages; unavailable history is not included."),
+    t("Waits are counted only when their original visitor run starts in the report period."),
+    ...(response.coverage ? [
+      t("Stored history only; completeness on the connected platform is unknown."),
+      t("Incomplete threads or post discussions excluded at the read limit: {v0}.", { v0: response.coverage.incompleteGroupsExcluded }),
+      t("History read: {v0} messages, {v1} comments, {v2} workflow events.", { v0: response.coverage.messagesRead, v1: response.coverage.commentsRead, v2: response.coverage.eventsRead }),
+      t("{v0} items use current saved state because earlier workflow events are unavailable.", { v0: response.coverage.snapshotFallbackItems }),
+      ...(response.coverage.eventsTruncated ? [t("Workflow history reached its read limit; resolution times are unavailable.")] : []),
+    ] : []),
+    ...(response.history ? [t("Historical resolution cycles: {v0} measured; median {v1} calendar time, {v2} within business hours.", { v0: response.history.measuredCycles, v1: formatDuration(response.history.medianMs), v2: formatDuration(response.history.businessMedianMs) }), t("Only recorded resolution cycles with a visitor start in the period; reopening alone creates no duration."), t("Workflow events in period: {v0} resolutions, {v1} reopenings.", { v0: response.history.resolved, v1: response.history.reopened })] : []),
     t("Slowest first response: {v0} calendar time; {v1} within business hours.", { v0: formatDuration(response.slowestMs ?? null), v1: formatDuration(response.businessSlowestMs ?? null) }),
     t("Resolve time within business hours: median {v0}.", { v0: formatDuration(response.resolve?.businessMedianMs ?? null) }),
     ...(response.comments ? [t("Comment waits: {v0} answered, {v1} waiting at period end.", { v0: response.comments.answered, v1: response.comments.unanswered })] : []),
@@ -116,6 +125,20 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
   if (recap) rows.push(['ai_recap', 'ai_recap', t("AI recap (AI-generated)"), t("AI-generated"), '', '', recap.state === 'ready' ? recap.text : '', '', '', recap.state === 'ready' ? RECAP_LABEL : RECAP_UNAVAILABLE]);
   if (audience) for (const e of audience.entries) rows.push(['audience', e.metric, e.metricLabel, e.sourceLabel, e.name, e.asOf, e.value, 'people', t("{v0} of {v1} channels", { v0: audience.covered, v1: audience.selected }), t("Latest value per channel; not unique people")]);
   if (response) {
+    if (response.coverage) {
+      rows.push(['response_time', 'incomplete_groups_excluded', t("History coverage"), t("Inbox"), '', '', response.coverage.incompleteGroupsExcluded, 'groups', response.partial ? 'partial' : '', t("Incomplete threads or post discussions excluded at the read limit: {v0}.", { v0: response.coverage.incompleteGroupsExcluded })]);
+      rows.push(['response_time', 'stored_messages_read', t("Stored messages read"), t("Inbox"), '', '', response.coverage.messagesRead, 'records', response.coverage.messagesTruncated ? 'partial' : 'stored_only', t("Waits are counted only when their original visitor run starts in the report period.")]);
+      rows.push(['response_time', 'stored_comments_read', t("Stored comments read"), t("Inbox"), '', '', response.coverage.commentsRead, 'records', response.coverage.commentsTruncated ? 'partial' : 'stored_only', t("Stored history only; completeness on the connected platform is unknown.")]);
+      rows.push(['response_time', 'workflow_events_read', t("Workflow events read"), t("Inbox"), '', '', response.coverage.eventsRead, 'events', response.coverage.eventsTruncated ? 'partial' : '', t("Count at period end")]);
+      rows.push(['response_time', 'history_coverage', t("History coverage"), t("Inbox"), '', '', '', '', response.partial ? 'partial' : 'stored_only', t("Stored history only; completeness on the connected platform is unknown.")]);
+      rows.push(['response_time', 'snapshot_fallback_items', t("Saved-state fallback items"), t("Inbox"), '', '', response.coverage.snapshotFallbackItems, 'items', response.coverage.eventsTruncated ? 'partial' : '', t("{v0} items use current saved state because earlier workflow events are unavailable.", { v0: response.coverage.snapshotFallbackItems })]);
+    }
+    if (response.history) {
+      rows.push(['response_time', 'historical_resolve_minutes', t("Historical resolution cycles"), t("Inbox"), '', '', response.history.medianMs === null ? '' : Math.round(response.history.medianMs / 60_000), 'minutes', response.partial ? 'partial' : '', t("Only recorded resolution cycles with a visitor start in the period; reopening alone creates no duration.")]);
+      rows.push(['response_time', 'historical_resolve_business_minutes', t("Median resolve time (business hours)"), t("Inbox"), '', '', response.history.businessMedianMs === null ? '' : Math.round(response.history.businessMedianMs / 60_000), 'minutes', response.partial ? 'partial' : '', t("Only recorded resolution cycles with a visitor start in the period; reopening alone creates no duration.")]);
+      rows.push(['response_time', 'resolution_events', t("Resolution events"), t("Inbox"), '', '', response.history.resolved, 'events', response.partial ? 'partial' : '', t("Count in period")]);
+      rows.push(['response_time', 'reopening_events', t("Reopening events"), t("Inbox"), '', '', response.history.reopened, 'events', response.partial ? 'partial' : '', t("Count in period")]);
+    }
     rows.push(['response_time', 'median_first_response_minutes', t("Median first response (calendar time)"), t("Inbox"), '', '', response.medianMs === null ? '' : Math.round(response.medianMs / 60_000), 'minutes', response.partial ? 'partial' : '', t("Median wait until the channel replied; calendar time")]);
     rows.push(['response_time', 'median_first_response_business_minutes', t("Median first response (business hours)"), t("Inbox"), '', '', response.businessHours && response.businessMedianMs !== null ? Math.round(response.businessMedianMs / 60_000) : '', 'minutes', response.businessHours ? (response.partial ? 'partial' : '') : t("not set"), response.businessHours ? t("Median wait counting only business hours: {v0}", { v0: describeBusinessHours(response.businessHours) }) : t("Business hours are not set for this workspace; no figure")]);
     rows.push(['response_time', 'slowest_first_response_minutes', t("Slowest first response (calendar time)"), t("Inbox"), '', '', response.slowestMs == null ? '' : Math.round(response.slowestMs / 60_000), 'minutes', response.partial ? 'partial' : '', t("Maximum observed answered wait; calendar time")]);
@@ -125,12 +148,12 @@ export function renderReport(snapshot: Snapshot, input: { channelName: string; s
       rows.push(['response_time', 'comment_answered_waits', t("Comment waits answered"), t("Inbox"), '', '', response.comments.answered, 'waits', response.partial ? 'partial' : '', t("Count in period")]);
       rows.push(['response_time', 'comment_unanswered_waits', t("Comment waits unanswered"), t("Inbox"), '', '', response.comments.unanswered, 'waits', response.partial ? 'partial' : '', t("Count at period end")]);
     }
-    rows.push(['response_time', 'answered_waits', t("Answered waits"), t("Inbox"), '', '', response.answered, 'waits', '', t("Count in period")]);
-    rows.push(['response_time', 'unanswered_waits', t("Waiting at period end"), t("Inbox"), '', '', response.unanswered, 'waits', '', t("Count at period end")]);
+    rows.push(['response_time', 'answered_waits', t("Answered waits"), t("Inbox"), '', '', response.answered, 'waits', response.partial ? 'partial' : '', t("Count in period")]);
+    rows.push(['response_time', 'unanswered_waits', t("Waiting at period end"), t("Inbox"), '', '', response.unanswered, 'waits', response.partial ? 'partial' : '', t("Count at period end")]);
     for (const m of response.members ?? []) rows.push(['response_time', 'member_first_response_minutes', t("Median first response by member"), t("Inbox"), clamp(m.name, 80), '', m.medianMs === null ? '' : Math.round(m.medianMs / 60_000), 'minutes', t("{v0} answered", { v0: m.answered }), m.memberId === null ? t("Replies sent outside the app; calendar time") : t("Replies sent through this app; calendar time")]);
     if (response.resolve) {
       rows.push(['response_time', 'median_resolve_minutes', t("Median resolve time"), t("Inbox"), '', '', response.resolve.medianMs === null ? '' : Math.round(response.resolve.medianMs / 60_000), 'minutes', t("{v0} resolved", { v0: response.resolve.resolved }), t("First visitor message in the period to resolved; calendar time; unresolved conversations excluded, not zero")]);
-      rows.push(['response_time', 'unresolved_conversations', t("Not resolved"), t("Inbox"), '', '', response.resolve.unresolved, 'waits', '', t("Conversations with a visitor message in the period and no valid resolved time")]);
+      rows.push(['response_time', 'unresolved_conversations', t("Not resolved"), t("Inbox"), '', '', response.resolve.unresolved, 'waits', response.partial ? 'partial' : '', t("Conversations with a visitor message in the period and no valid resolved time")]);
     }
   }
   if (goals) for (const g of goals.goals) rows.push(['goal', g.metric, g.label, t("Goals"), '', goals.month.start, g.actual ?? '', 'target ' + g.target, `${g.percent}%`, t("{v0}; month {v1} to {v2} ({v3})", { v0: g.paceLabel, v1: goals.month.start, v2: goals.month.end, v3: goals.month.timeZone })]);

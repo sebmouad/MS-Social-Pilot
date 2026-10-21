@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 const db = vi.hoisted(() => ({ target: { findFirst: vi.fn() }, $queryRaw: vi.fn(), postComment: { findMany: vi.fn() }, conversationMessage: { findMany: vi.fn() }, user: { findMany: vi.fn() } }));
 vi.mock('@/server/data', () => ({ prisma: db }));
-vi.mock('@/server/config/store', async () => { const { responseTimeCopyDefaults } = await import('../src/modules/analytics/reports/generation/response-copy'); return { runtimeConfig: async (key: string) => key === 'analytics.reports.responseMessageLimit' ? 100 : key === 'analytics.reports.responseMemberLimit' ? 1 : responseTimeCopyDefaults }; });
+vi.mock('@/server/config/store', async () => { const { responseTimeCopyDefaults } = await import('../src/modules/analytics/reports/generation/response-copy'); return { runtimeConfig: async (key: string) => key === 'analytics.reports.responseMessageLimit' ? 100 : key === 'analytics.reports.responseEventLimit' ? 100 : key === 'analytics.reports.responseMemberLimit' ? 1 : responseTimeCopyDefaults }; });
 import { commentResponseMessages, readResponseTime, summarizeResponseTimes, type ResponseComment } from '../src/modules/analytics/reports/generation/response-time';
 const at = (hour: number) => new Date(Date.UTC(2026, 9, 1, hour));
 const end = at(24);
@@ -33,10 +33,10 @@ describe('comment first-response report coverage', () => {
 
 it('reads both sources under tenant/channel bounds, flags source truncation and excludes later conversation resolution', async () => {
   db.target.findFirst.mockResolvedValue({ providerId: 'channel' });
-  db.$queryRaw.mockResolvedValue([{ timezone: 'UTC', businessDays: [] }]);
+  db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => strings.join('').includes('root_activities') ? [] : [{ timezone: 'UTC', businessDays: [] }]);
   db.conversationMessage.findMany.mockResolvedValue([{ conversationId: 'c', createdTime: at(8), fromId: 'visitor', sentById: null, conversation: { resolvedAt: at(25) } }]);
   db.postComment.findMany.mockResolvedValue([row('root', 9), row('reply', 11, { parentRemoteId: 'root', fromId: 'channel' }), ...Array.from({ length: 99 }, (_, i) => row(`own-${i}`, 12, { fromId: 'channel' }))]);
   const summary = await readResponseTime('workspace', 'target', { start: '2026-10-01', end: '2026-10-01' });
-  expect(summary).toMatchObject({ answered: 1, unanswered: 1, partial: true, comments: { answered: 1, unanswered: 0 }, conversations: { answered: 0, unanswered: 1 }, resolve: { resolved: 0, unresolved: 2 } });
-  expect(db.postComment.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { createdTime: { gte: at(0), lt: end }, postTarget: { targetId: 'target', target: { workspaceId: 'workspace' } } }, take: 101 }));
+  expect(summary).toMatchObject({ answered: 0, unanswered: 1, partial: true, comments: { answered: 0, unanswered: 0 }, conversations: { answered: 0, unanswered: 1 }, resolve: { resolved: 0, unresolved: 1 } });
+  expect(db.postComment.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { createdTime: { lt: end }, postTarget: { targetId: 'target', target: { workspaceId: 'workspace' } } }, take: 101 }));
 });

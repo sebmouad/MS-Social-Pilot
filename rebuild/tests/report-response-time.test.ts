@@ -4,7 +4,7 @@ const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), target: { findFirst: vi.fn() 
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', async () => {
   const { responseTimeCopyDefaults } = await import('../src/modules/analytics/reports/generation/response-copy');
-  return { runtimeConfig: async (key: string) => key === 'analytics.reports.responseMessageLimit' ? 20000 : key === 'analytics.reports.responseMemberLimit' ? 25 : responseTimeCopyDefaults };
+  return { runtimeConfig: async (key: string) => key === 'analytics.reports.responseMessageLimit' ? 20000 : key === 'analytics.reports.responseEventLimit' ? 100 : key === 'analytics.reports.responseMemberLimit' ? 25 : responseTimeCopyDefaults };
 });
 
 import { formatDuration, readResponseTime, summarizeResponseTimes, MEMBER_ROWS_CAP, RESPONSE_TIME_MESSAGE_CAP } from '../src/modules/analytics/reports/generation/response-time';
@@ -37,7 +37,7 @@ describe('response time arithmetic', () => {
 describe('response time reader', () => {
   it('scopes to the workspace channel, treats app-sent or own-identity messages as replies and flags the cap', async () => {
     db.target.findFirst.mockResolvedValue({ providerId: 'PAGE' });
-    db.$queryRaw.mockResolvedValue([{ timezone: 'UTC', businessDays: [], businessStart: 9, businessEnd: 18 }]);
+    db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => strings.join('').includes('root_activities') ? [] : [{ timezone: 'UTC', businessDays: [], businessStart: 9, businessEnd: 18 }]);
     const rows = [
       { conversationId: 'a', createdTime: at(0), fromId: 'visitor', sentById: null },
       { conversationId: 'a', createdTime: at(4), fromId: 'PAGE', sentById: null },
@@ -106,7 +106,7 @@ describe('response time by member and resolve time', () => {
   });
   it('resolves names for workspace members only and reads resolvedAt with the messages', async () => {
     db.target.findFirst.mockResolvedValue({ providerId: 'PAGE' });
-    db.$queryRaw.mockResolvedValue([{ timezone: 'UTC', businessDays: [], businessStart: 9, businessEnd: 18 }]);
+    db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => strings.join('').includes('root_activities') ? [] : [{ timezone: 'UTC', businessDays: [], businessStart: 9, businessEnd: 18 }]);
     db.user.findMany.mockResolvedValue([{ id: 'u1', name: 'Amal' }]);
     db.conversationMessage.findMany.mockResolvedValue([
       { conversationId: 'a', createdTime: at(0), fromId: 'v', sentById: null, conversation: { resolvedAt: at(30) } },
@@ -159,7 +159,7 @@ describe('response time with business hours', () => {
   });
   it('reads the workspace hours and zone and applies them', async () => {
     db.target.findFirst.mockResolvedValue({ providerId: 'PAGE' });
-    db.$queryRaw.mockResolvedValue([{ timezone: 'Europe/Paris', businessDays: [1, 2, 3, 4, 5], businessStart: 9, businessEnd: 18 }]);
+    db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => strings.join('').includes('root_activities') ? [] : [{ timezone: 'Europe/Paris', businessDays: [1, 2, 3, 4, 5], businessStart: 9, businessEnd: 18 }]);
     db.conversationMessage.findMany.mockResolvedValue([
       { conversationId: 'a', createdTime: new Date('2026-10-02T15:30:00Z'), fromId: 'v', sentById: null },
       { conversationId: 'a', createdTime: new Date('2026-10-05T08:00:00Z'), fromId: 'PAGE', sentById: null },
@@ -172,7 +172,7 @@ describe('response time with business hours', () => {
     db.target.findFirst.mockResolvedValue({ providerId: 'PAGE' });
     db.conversationMessage.findMany.mockResolvedValue([]);
     for (const row of [{ timezone: 'UTC', businessDays: [], businessStart: 9, businessEnd: 18 }, { timezone: 'UTC', businessDays: [1], businessStart: 10, businessEnd: 10 }, { timezone: 'Not/AZone', businessDays: [1], businessStart: 9, businessEnd: 18 }]) {
-      db.$queryRaw.mockResolvedValue([row]);
+      db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => strings.join('').includes('root_activities') ? [] : [row]);
       const s = await readResponseTime('w1', 't1', { start: '2026-10-01', end: '2026-10-01' });
       expect(s.businessHours).toBeNull(); expect(s.businessMedianMs).toBeNull();
     }

@@ -67,3 +67,10 @@ describe('response report parity additions', () => {
     expect(JSON.parse(out.json!).records.find((r: { metric_key: string }) => r.metric_key === 'median_resolve_business_minutes').value).toBeNull();
   });
 });
+
+
+it('uses validated defaults when a stored report catalog predates new history labels', async () => {
+  state.config.mockImplementation(async key => key === 'analytics.reportDocumentLocale' ? 'fr' : key === 'analytics.responseTimeCopy' ? responseTimeCopyDefaults : { Audience: { en: 'Audience', fr: 'Audience' } });
+  const result = await loadReportDocumentCopy();
+  expect(result.copy['Historical resolution cycles']).toBe('Cycles de résolution historiques');
+});

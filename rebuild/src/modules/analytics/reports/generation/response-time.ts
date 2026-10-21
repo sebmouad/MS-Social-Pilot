@@ -1,3 +1,4 @@
+import { historicalResolutionCycles, periodResponseMessages, type ResolutionEvent } from '../server/response-history';
 import { configValueOrDefault } from '@/server/config/config-or-default';
 import { cache } from 'react';
 import { runtimeConfig } from '@/server/config/store';
@@ -17,6 +18,8 @@ import { businessHoursOrNull, businessMs, calendarMs, type BusinessHoursSetting 
  * figure is absent (`businessHours` null) and nothing is invented.
  */
 export type ResponseTimeSummary = {
+  coverage?: { storedOnly: true; messagesRead: number; commentsRead: number; eventsRead: number; messagesTruncated: boolean; commentsTruncated: boolean; eventsTruncated: boolean; incompleteGroupsExcluded: number; snapshotFallbackItems: number; periodStart: string; periodEndExclusive: string };
+  history?: { resolved: number; reopened: number; measuredCycles: number; medianMs: number | null; businessMedianMs: number | null };
   answered: number; unanswered: number; medianMs: number | null;
   slowestMs?: number | null; businessSlowestMs?: number | null;
   comments?: { answered: number; unanswered: number };
@@ -151,25 +154,59 @@ export async function readResponseTime(workspaceId: string, channelId: string, p
   const business = await readBusinessHours(workspaceId);
   const from = new Date(`${period.start}T00:00:00.000Z`);
   const to = new Date(new Date(`${period.end}T00:00:00.000Z`).getTime() + 86_400_000);
-  const [messageLimit, memberLimit] = await Promise.all([runtimeConfig('analytics.reports.responseMessageLimit'), runtimeConfig('analytics.reports.responseMemberLimit')]);
-  if (!Number.isInteger(messageLimit) || messageLimit < RESPONSE_ANALYSIS_LIMITS.messages.min || messageLimit > RESPONSE_ANALYSIS_LIMITS.messages.max || !Number.isInteger(memberLimit) || memberLimit < RESPONSE_ANALYSIS_LIMITS.members.min || memberLimit > RESPONSE_ANALYSIS_LIMITS.members.max) throw new Error('Invalid response report limits');
+  const [messageLimit, memberLimit, eventLimit] = await Promise.all([runtimeConfig('analytics.reports.responseMessageLimit'), runtimeConfig('analytics.reports.responseMemberLimit'), runtimeConfig('analytics.reports.responseEventLimit')]);
+  if (!Number.isInteger(eventLimit) || eventLimit < RESPONSE_ANALYSIS_LIMITS.events.min || eventLimit > RESPONSE_ANALYSIS_LIMITS.events.max || !Number.isInteger(messageLimit) || messageLimit < RESPONSE_ANALYSIS_LIMITS.messages.min || messageLimit > RESPONSE_ANALYSIS_LIMITS.messages.max || !Number.isInteger(memberLimit) || memberLimit < RESPONSE_ANALYSIS_LIMITS.members.min || memberLimit > RESPONSE_ANALYSIS_LIMITS.members.max) throw new Error('Invalid response report limits');
+  // Audit rows contain identifiers and state only. Keep tenant and channel predicates in SQL.
+  const events = await prisma.$queryRaw<Array<ResolutionEvent & { action: string }>>`
+    SELECT detail->>'itemId' AS "itemId", detail->>'kind' AS kind,
+      (action IN ('inbox.conversation_resolved', 'inbox.comment_resolved')) AS resolved, "createdAt", action
+    FROM root_activities
+    WHERE detail->>'workspaceId' = ${workspaceId} AND detail->>'targetId' = ${channelId}
+      AND action IN ('inbox.conversation_resolved', 'inbox.conversation_reopened', 'inbox.comment_resolved', 'inbox.comment_reopened')
+      AND "createdAt" < ${to}
+    ORDER BY "createdAt" ASC, id ASC LIMIT ${eventLimit + 1}`;
+  const history = events.slice(0, eventLimit);
+  const states = new Map<string, { resolved: boolean; createdAt: Date }>();
+  for (const event of history) states.set(JSON.stringify([event.kind, event.itemId]), event);
   const rows = await prisma.conversationMessage.findMany({
-    where: { createdTime: { gte: from, lt: to }, conversation: { targetId: channelId, target: { workspaceId } } },
+    where: { createdTime: { lt: to }, conversation: { targetId: channelId, target: { workspaceId } } },
     select: { conversationId: true, createdTime: true, fromId: true, sentById: true, conversation: { select: { resolvedAt: true } } },
     orderBy: [{ conversationId: 'asc' }, { createdTime: 'asc' }, { id: 'asc' }],
     take: messageLimit + 1,
   });
   const commentRows = await prisma.postComment.findMany({
-    where: { createdTime: { gte: from, lt: to }, postTarget: { targetId: channelId, target: { workspaceId } } },
-    select: { postTargetId: true, remoteId: true, parentRemoteId: true, fromId: true, sentById: true, createdTime: true, resolvedAt: true },
+    where: { createdTime: { lt: to }, postTarget: { targetId: channelId, target: { workspaceId } } },
+    select: { id: true, postTargetId: true, remoteId: true, parentRemoteId: true, fromId: true, sentById: true, createdTime: true, resolvedAt: true },
     orderBy: [{ postTargetId: 'asc' }, { createdTime: 'asc' }, { id: 'asc' }], take: messageLimit + 1,
   });
-  const partial = rows.length > messageLimit || commentRows.length > messageLimit;
-  const messages = rows.slice(0, messageLimit).map(r => ({
+  // A safety cut can split a thread. Exclude that entire final thread/post rather
+  // than inventing unanswered waits or attaching resolution to the wrong run.
+  const lastConversation = rows[messageLimit - 1]?.conversationId;
+  const lastPost = commentRows[messageLimit - 1]?.postTargetId;
+  const splitConversation = rows.length > messageLimit && rows[messageLimit]?.conversationId === lastConversation;
+  const splitPost = commentRows.length > messageLimit && commentRows[messageLimit]?.postTargetId === lastPost;
+  const completeRows = rows.slice(0, messageLimit).filter(row => !splitConversation || row.conversationId !== lastConversation);
+  const completeComments = commentRows.slice(0, messageLimit).filter(row => !splitPost || row.postTargetId !== lastPost);
+  const eventsTruncated = events.length > eventLimit;
+  const partial = rows.length > messageLimit || commentRows.length > messageLimit || eventsTruncated;
+  let snapshotFallbackItems = 0;
+  const seen = new Set<string>();
+  const resolvedAt = (kind: 'message' | 'comment', id: string, snapshot: Date | null | undefined) => {
+    const state = states.get(JSON.stringify([kind, id]));
+    if (!state && !seen.has(`${kind}:${id}`)) { snapshotFallbackItems += 1; seen.add(`${kind}:${id}`); }
+    // An incomplete event prefix cannot establish state at period end.
+    if (eventsTruncated) return null;
+    return state ? (state.resolved ? state.createdAt : null) : snapshot && snapshot < to ? snapshot : null;
+  };
+  const messages = periodResponseMessages(completeRows.map(r => ({
     conversationId: r.conversationId, createdTime: r.createdTime, fromChannel: r.sentById !== null || (r.fromId !== null && r.fromId === target.providerId),
-    sentById: r.sentById, resolvedAt: r.conversation?.resolvedAt && r.conversation.resolvedAt < to ? r.conversation.resolvedAt : null,
-  }));
-  const commentMessages = commentResponseMessages(commentRows.slice(0, messageLimit), target.providerId, to);
+    sentById: r.sentById, resolvedAt: resolvedAt('message', r.conversationId, r.conversation?.resolvedAt),
+  })), from, to);
+  const commentMessages = periodResponseMessages(commentResponseMessages(completeComments.map(row => ({ ...row, resolvedAt: resolvedAt('comment', row.id, row.resolvedAt) })), target.providerId, to), from, to);
+  const cycles = eventsTruncated ? [] : historicalResolutionCycles([
+    ...completeRows.map(row => ({ itemId: row.conversationId, kind: 'message' as const, createdTime: row.createdTime, fromChannel: row.sentById !== null || row.fromId === target.providerId })),
+    ...completeComments.filter(row => !row.parentRemoteId).map(row => ({ itemId: row.id, kind: 'comment' as const, createdTime: row.createdTime, fromChannel: row.sentById !== null || row.fromId === target.providerId })),
+  ], history, from, to);
   const combined = [...messages.map(m => ({ ...m, conversationId: `conversation:${m.conversationId}` })), ...commentMessages];
   // Names only, and only for current members of this workspace; anyone else shows as a former member.
   const memberIds = [...new Set(combined.map(m => m.sentById).filter((id): id is string => Boolean(id)))];
@@ -177,7 +214,10 @@ export async function readResponseTime(workspaceId: string, channelId: string, p
   const names = new Map(users.map(u => [u.id, u.name])); const copy = await responseCopy();
   const summary = summarizeResponseTimes(combined, partial, business, names, copy, locale, memberLimit);
   const counts = (items: ResponseMessage[]) => { const result = summarizeResponseTimes(items); return { answered: result.answered, unanswered: result.unanswered }; };
-  return { ...summary, comments: counts(commentMessages), conversations: counts(messages) };
+  return { ...summary, comments: counts(commentMessages), conversations: counts(messages),
+    history: { resolved: history.filter(event => event.createdAt >= from && event.resolved).length, reopened: history.filter(event => event.createdAt >= from && !event.resolved).length, measuredCycles: cycles.length, medianMs: median(cycles.map(cycle => calendarMs(cycle.startedAt, cycle.resolvedAt))), businessMedianMs: business ? median(cycles.map(cycle => businessMs(cycle.startedAt, cycle.resolvedAt, business.hours, business.timeZone))) : null },
+    coverage: { storedOnly: true, messagesRead: Math.min(rows.length, messageLimit), commentsRead: Math.min(commentRows.length, messageLimit), eventsRead: history.length, messagesTruncated: rows.length > messageLimit, commentsTruncated: commentRows.length > messageLimit, eventsTruncated, incompleteGroupsExcluded: Number(splitConversation) + Number(splitPost), snapshotFallbackItems, periodStart: from.toISOString(), periodEndExclusive: to.toISOString() },
+  };
 }
 
 export function formatDuration(ms: number | null, copy: ResponseTimeCopy = responseTimeCopyDefaults, locale: 'en' | 'fr' = 'en'): string {
