@@ -3,10 +3,10 @@ import { REBUILD_WORKER_PREFIX } from '../src/server/jobs/identity';
 import { prisma } from '../src/server/data';
 import { runtimeConfig } from '../src/server/config/store';
 import { createWorker, type JobName, type WorkerDependencies } from '../src/server/jobs/worker';
+import { runWorkerLoop } from '../src/server/jobs/run-loop';
 import type { RetryBackoff } from '../src/server/jobs/retry';
 
 const owner = `${REBUILD_WORKER_PREFIX}${hostname()}-${process.pid}`;
-let stopping = false;
 const log = (message: string, detail?: unknown) => console.log(`${new Date().toISOString()} [${owner}] ${message}`, detail ?? '');
 
 const dependencies: WorkerDependencies = {
@@ -123,15 +123,12 @@ async function main() {
   await prisma.$queryRaw`SELECT 1`;
   const worker = createWorker(dependencies, owner);
   log('replacement worker started');
-  for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { stopping = true; log(`${signal} received; draining jobs`); });
-  while (!stopping) {
-    try { await worker.tick(new Date()); }
-    catch (error) { log('worker tick failed', error); }
-    await new Promise(resolve => setTimeout(resolve, worker.pollIntervalMs));
-  }
-  const drainPollMs = await runtimeConfig('sync.workerDrainPollMs');
-  while (worker.running.size > 0) await new Promise(resolve => setTimeout(resolve, drainPollMs));
+  const stop = new AbortController();
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { if (!stop.signal.aborted) log(`${signal} received; draining jobs`); stop.abort(); });
+  await runWorkerLoop({ worker, readConfig: runtimeConfig, stop: stop.signal, log });
   await prisma.$disconnect();
+  // Abandoned jobs may still hold timers or sockets; leases are already released.
+  process.exit(0);
 }
 
 main().catch(error => { log('worker stopped unexpectedly', error); process.exitCode = 1; });
