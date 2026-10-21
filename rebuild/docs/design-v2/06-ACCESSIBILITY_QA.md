@@ -50,7 +50,7 @@ node --env-file=/path/outside/repo/preview.env ./node_modules/next/dist/bin/next
 
 # 5. screenshots (design review)
 PREVIEW_QA_EMAIL=preview-qa@example.test PREVIEW_QA_PASSWORD=... \
-  node scripts/preview-screenshots.cjs /path/outside/repo/shots /home /plan /create /inbox /results "/plan@390"
+  node scripts/preview-screenshots.cjs /path/outside/repo/shots /home /content /create /inbox /insights "/content@390"
 ```
 
 Known: `seed-tasks-preview.ts` and `seed-reports-preview.ts` refused on this database (details withheld by design); investigate before relying on Tasks/Reports fixtures. See also [../PREVIEW.md](../PREVIEW.md).

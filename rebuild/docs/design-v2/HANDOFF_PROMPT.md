@@ -24,7 +24,8 @@ Hard rules:
 - Tokens only; shared components only.
 - Required EN/FR copy through module catalogs. No English defaults.
 - Every number caveat goes in an ⓘ InfoTip (owner decision). Partial results show ⚠.
-- Keep v1 working behind ui.shellVersion until B10.
+- There is no v1/v2 switch: each batch replaces the old UI for everyone, so every batch must leave the whole app usable (use the Page tools adapter from B1 for pages not yet migrated).
+- Clean is the default theme: check Clean light/dark first.
 
 Verify before committing:
 - From rebuild/: npx tsc --noEmit -p .
@@ -66,7 +67,13 @@ Tools in the repo:
 - Branch `claude/upbeat-mendel-4ej064`, PR [sebmouad/MS-Social-Pilot#3](https://github.com/sebmouad/MS-Social-Pilot/pull/3). It contains the design audit and this design-v2 package.
 - Nothing in v2 is built yet. Merging the PR = owner approval of the direction (README decision record).
 - **Start with B0.** Its token fixes are small and close the audit's P1 accessibility defects, even before any layout work.
-- Open questions for the owner. Proceed with the proposal if there is no answer.
-  1. Area names: Plan / Results, or Publish / Analytics?
-  2. Should Tasks and Agency stay visible for every workspace, or only when used?
-  3. Keep Feed and Cards views in Plan, or Table only plus the SidePanel preview?
+- The owner answered every open question on 2026-10-21. See the README decision record:
+  - areas Home · Content · Inbox · Insights
+  - Tasks and Agency only when used
+  - Table + side preview, with no Feed or Cards views
+  - replace directly, with no switch
+  - Home first after sign-in
+  - phone first-class for Inbox replies, Create, post status and Insights numbers
+  - Root as the last UI batch
+  - Clean as the default theme
+- The order is B0 → B1 → B2 Create → B3 Content → B4 Inbox → B5 Insights → B6 Settings → B7 Home/Tasks/Agency → B8 Root → B9 verification, with the parity lane P alongside from B1.

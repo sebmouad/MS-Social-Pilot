@@ -6,6 +6,17 @@ Shared rules from 01–03 apply everywhere: channel scope, PageHeader, Filter mo
 
 ---
 
+## Phone priorities (owner decision 2026-10-21)
+
+The phone must be first-class for four tasks:
+
+1. **Inbox replies:** S8.
+2. **Create:** S7.
+3. **Post status:** S2 and Home "Needs attention".
+4. **Insights numbers:** S9.
+
+Each one passes at 390 px with one hand: the primary action is reachable at the bottom, there is no horizontal page scroll, and the ⓘ opens as a bottom sheet. Acceptance details are in 08.
+
 ## S0. App frame (all signed-in customer pages)
 
 - **Layout ≥1024 px:** `AppSidebar` (248/64) | content column (`--gutter` inset, max `--content-max`, centred). `TopBar` across the content column.
@@ -44,17 +55,17 @@ Shared rules from 01–03 apply everywhere: channel scope, PageHeader, Filter mo
 
 **Accessibility:** cards are `section`s with `h2`; KPI deltas carry text ("up 12% versus the previous 28 days").
 
-## S2. Plan › Posts `/plan`
+## S2. Content › Posts `/content`
 
 **Purpose:** find any post and act on it.
 
 **Header:** "Posts" + count chip. Actions: [Import CSV] (secondary, opens a Sheet) and [Create post] (primary). Tabs: Posts · Calendar · Queue · Approvals (badge) · Library.
 
-**Filter row:** Filter (status, label, origin: manual/feed/recipe, date range), chips, search, and a view switch (Table · Feed · Cards). The view switch is a segmented control that never wraps; on phone it becomes an icon-only `Menu`.
+**Filter row:** Filter (status, label, origin: manual/feed/recipe, date range), chips and search. There is no view switch: the table is the only list view, and the side preview shows each post as it will look (owner decision 2026-10-21).
 
 **Table columns:** select · Post (thumb 40 + first line of text + "1 media" meta) · Channels (avatars, max 3 + "+2") · Status (StatusChip + per-destination count "2/2") · When (scheduled or published time in the workspace zone) · Actions menu.
 
-**Row click:** opens `SidePanel` with the full `PostPreview`, destinations and their outcomes, first comment status, history and labels. It offers actions as buttons: Edit, Duplicate, Reschedule, Delete…. The URL becomes `/plan?post=<id>` so the panel can be shared. On phone it opens `/plan/post/[id]`.
+**Row click:** opens `SidePanel` with the full `PostPreview`, destinations and their outcomes, first comment status, history and labels. It offers actions as buttons: Edit, Duplicate, Reschedule, Delete…. The URL becomes `/content?post=<id>` so the panel can be shared. On phone it opens `/content/post/[id]`.
 
 **Bulk bar:** Reschedule, Add label, Approve (if allowed), Delete.
 
@@ -68,7 +79,7 @@ Shared rules from 01–03 apply everywhere: channel scope, PageHeader, Filter mo
 
 **Phone:** `ListRow`s with a 72 px row height, so about 8 posts fit per screen.
 
-## S3. Plan › Calendar `/plan/calendar`
+## S3. Content › Calendar `/content/calendar`
 
 - Header tabs as in S2.
 - Toolbar inside the content: ‹ Today › · "October 2026" · Month | Week segmented · Filter. This moves the calendar controls out of the sidebar.
@@ -79,20 +90,20 @@ Shared rules from 01–03 apply everywhere: channel scope, PageHeader, Filter mo
 - **Phone:** an agenda list grouped by day, with a sticky day header.
 - **Reuse:** `readPublishingCalendar`, `reschedulePost`, and the queue times read.
 
-## S4. Plan › Queue `/plan/queue`
+## S4. Content › Queue `/content/queue`
 
 - **Two panels.** Left (main): "Next in queue", the upcoming queued posts in order with their slot times, plus the "Add to queue" button. Right (side, 360): "Queue times", the weekly slot editor (day chips + time list + add time) with Save.
 - Mix and recycle settings sit under an "Automation" disclosure in the right panel.
 - **Reuse:** `list_queue_times` / `replace_queue_times` services, the content mix and recycle services.
 
-## S5. Plan › Approvals `/plan/approvals`
+## S5. Content › Approvals `/content/approvals`
 
 - A list of posts waiting for review, each with its preview inline at a readable measure (max 640).
 - Actions: [Approve] (primary) and [Request changes] (opens a textarea). Keyboard: A approves, R requests changes. Both show the existing confirmation.
 - Empty: "Nothing waiting for review."
 - **Reuse:** the existing approval/review services (`review_post` path).
 
-## S6. Plan › Library `/plan/library` (Media · Templates · Labels · Fields · Feeds)
+## S6. Content › Library `/content/library` (Media · Templates · Labels · Fields · Feeds)
 
 - Section tabs (link variant).
 - **Media:** a grid of thumbnails with name, type, size and usage count. Upload/import button; a sheet for details (rename, where used, delete).
@@ -124,11 +135,11 @@ Shared rules from 01–03 apply everywhere: channel scope, PageHeader, Filter mo
 
 **Validation:** inline at the field. Submitting with errors focuses the first invalid field. The server stays authoritative.
 
-**Recoverable failure:** keep everything and show a Notice in the ActionBar. Unknown outcome: "We couldn't confirm the save. Check Posts before trying again", with a link to Plan.
+**Recoverable failure:** keep everything and show a Notice in the ActionBar. Unknown outcome: "We couldn't confirm the save. Check Posts before trying again", with a link to Content.
 
 **Reuse:** `createPost` / `updatePost` / `createQueuedPost` / `reschedulePost` through the same server actions as today; `publishingDestinationChoices`; formats; best-time; media upload.
 
-**Phone:** a full-screen page with the preview as a "Preview" tab at the top (Edit | Preview) and the ActionBar fixed at the bottom.
+**Phone:** a full-screen page with the preview as a "Preview" tab at the top (Edit | Preview) and the ActionBar fixed at the bottom. Media offers "Take photo" and "Choose from library" through the native file picker (`accept="image/*,video/*"`, with a `capture` option). Channels show as a horizontally scrollable chip row. Schedule opens a bottom sheet with date, time and best-time chips.
 
 **Accessibility:** a dialog name ("New post"); Escape asks to keep the draft if there are unsaved changes; the channel chips are a group of toggle buttons (`aria-pressed`).
 
@@ -139,7 +150,7 @@ Shared rules from 01–03 apply everywhere: channel scope, PageHeader, Filter mo
   - Thread (flex).
   - Details (320, collapsible): contact, assignment, notes, tags, sentiment.
 - **1024–1279 px:** the details pane becomes a toggle drawer.
-- **< 1024 px:** list → thread as two pages.
+- **< 1024 px:** list → thread as two pages. On phone, the reply box stays fixed above the keyboard. Saved replies open as a bottom sheet. Resolve sits in the thread header. A conversation is reachable in 2 taps from the bottom bar.
 - **Header:** "Inbox" + waiting count, a [Sync now] secondary button, "Last synced 11:03" in an ⓘ, and the Filter button (channel type, status, hidden comments, assignee).
 - **Thread:** messages grouped by day. The reply box sits at the bottom: textarea, [Saved replies ▾] (a menu inserting text), [Reply] primary, [Resolve] secondary. Moderation actions (Hide, Delete…) live in the message menu.
 - **Keyboard:** J/K move, R reply, E resolve, `?` opens the shortcut sheet. The always-visible legend is removed.
@@ -150,17 +161,18 @@ Shared rules from 01–03 apply everywhere: channel scope, PageHeader, Filter mo
   - No channels with messages permission: an explanation plus "Manage channels".
   - Deletion in progress: today's durable flow (check status, finish removal).
 
-## S9. Results › Overview `/results`
+## S9. Insights › Overview `/insights`
 
-- **Header:** "Results"; [Download report] (secondary). Tabs: Overview · Explore · Audience · Posts · Compare · Ads · Reports. Filter row: DateRangePicker (presets + compare toggle) and Filter.
+- **Header:** "Insights"; [Download report] (secondary). Tabs: Overview · Explore · Audience · Posts · Compare · Ads · Reports. Filter row: DateRangePicker (presets + compare toggle) and Filter.
 - **Row 1:** 4 MetricTiles (Audience, Views, Engagements, Link clicks); pinned metrics append as extra tiles (max 8, then "Show all").
 - **Row 2:** the main chart (card): a metric switcher (tabs inside the card), a line chart over time with the previous period dashed, and "Show data".
-- **Row 3:** **Top posts** (5 rows: thumb, text, channel, views, engagements, link) | **Publishing activity** (published / scheduled / failed counts, with links into Plan filtered).
+- **Row 3:** **Top posts** (5 rows: thumb, text, channel, views, engagements, link) | **Publishing activity** (published / scheduled / failed counts, with links into Content filtered).
 - **Row 4** (if goals exist): goal progress bars.
+- **Phone:** the tiles form a 2×2 grid; the chart sits in its card with horizontal scroll for long ranges; the date range is a bottom sheet; top posts become ListRows.
 - All caveats move into ⓘ: period, UTC, coverage "2 of 4 channels", missing ≠ zero, overlap note for audience sums. Partial coverage turns the ⓘ into ⚠.
 - **Reuse:** `readAnalytics`, `readAnalyticsSnapshot`, pins, goals, the publishing summary. No new calculations.
 
-## S10. Results › Explore `/results/explore`
+## S10. Insights › Explore `/insights/explore`
 
 - **Two columns:**
   - Left (280, in-content list): search metrics, grouped by category (Audience, Content, Engagement, Video, Ads). Each item has a name and a tiny availability dot.
@@ -168,15 +180,15 @@ Shared rules from 01–03 apply everywhere: channel scope, PageHeader, Filter mo
 - The metric choice is in the URL (`?metric=`). On phone, the list is a full page, and choosing a metric navigates to its detail.
 - **Reuse:** `readAnalyticsExplorer`.
 
-## S11. Results › Audience, Posts, Compare, Reports
+## S11. Insights › Audience, Posts, Compare, Reports
 
 - **Audience:** follower trend chart, demographics (bar for age/gender, ranked list for countries and cities), unknown categories called "Not provided".
-- **Posts:** the post performance table (compact density): sortable columns, a search, the date range; clicking opens the same `SidePanel` as Plan with metrics added.
+- **Posts:** the post performance table (compact density): sortable columns, a search, the date range; clicking opens the same `SidePanel` as Content with metrics added.
 - **Compare:** pick 2–4 channels or ad accounts (multi-select with a cap) and a metric set; a small-multiples or grouped bar chart plus a table. Ads mode compares accounts in the same currency only; mixed currencies show the "different currencies" notice.
 - **Reports:** Templates · Schedules · History tabs (tables). [New report] opens a Sheet wizard: sections, period, format, recipients.
 - **Reuse:** existing demographics, explorer-posts, comparison and report-workflow services.
 
-## S12. Results › Ads `/results/ads` (sub-tabs Accounts · Campaigns · Manage)
+## S12. Insights › Ads `/insights/ads` (sub-tabs Accounts · Campaigns · Manage)
 
 - **Account switcher** in the filter row (`account=`; multi-select within one currency).
 - **Accounts:** one row per account (name, status, currency, spend, results, cost per result, CTR, last synced) plus a spend chart for the selected account. Today's per-account wall of tiles, chart and funnel is removed. The funnel moves into the row detail SidePanel.

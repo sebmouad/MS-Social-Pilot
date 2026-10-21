@@ -19,7 +19,7 @@ A screen must use these components instead of route-local controls. Each compone
 | `Tabs` | **Change**: link variant (URL) and panel variant; no mixing | |
 | `RouteNotice`, `Toast` | **Unify**: `Toast` for transient success; `Notice` (inline) for errors and warnings near the action | One feedback system |
 | `ModeToggle` | **Move** into the user menu (Theme: Light, Dark, Match device) | A 3-state cycle can look like a no-op |
-| `Breadcrumbs` | **Keep** only for detail pages (`/plan/post/[id]`, Root detail) | |
+| `Breadcrumbs` | **Keep** only for detail pages (`/content/post/[id]`, Root detail) | |
 | `Dialog`, `ModalDialog`, `ConfirmDialog`, `useConfirm`, `Drawer` | **Keep**; `Drawer` → `Sheet` (side or bottom) | |
 | `PostPreview` | **Change**: localize copy and dates (today `en-US`); stop importing from `modules/publishing` (move the needed helpers into a neutral `src/lib/post-preview`) | Shared → module dependency inversion |
 | `EmptyState`, `ErrorState`, `Skeleton`, `Badge`, `StatusChip`, `ChannelBadge`, `Avatar`, `PostThumb`, `AutoTextarea`, `FormValidation`, `Forms`, `InlineEdit`, `LocalTime`, `CsvExportButton`, `IndeterminateCheckbox`, `charts/*` | **Keep**, restyle with v2 tokens | |
@@ -47,14 +47,14 @@ Token names refer to [02-FOUNDATIONS.md](02-FOUNDATIONS.md).
 
 ### 2.3 BottomBar (phone < 760 px)
 
-`--bottombar-h` with safe-area padding, fixed. Five items: Home, Plan, **Create** (56 px circle, `--accent`, raised by 8 px, `aria-label="Create post"`), Inbox (badge), Results. Labels 11 px are always visible. Settings, Tasks and Agency move to the avatar menu.
+`--bottombar-h` with safe-area padding, fixed. Five items: Home, Content, **Create** (56 px circle, `--accent`, raised by 8 px, `aria-label="Create post"`), Inbox (badge), Insights. Labels 11 px are always visible. Settings, Tasks and Agency move to the avatar menu.
 
 ### 2.4 PageHeader
 
 ```
 [Title 28/750]  [count chip]                         [secondary] [Primary]
 [Tabs: link variant ……………………………………………………………………………………………………]
-[Filter ▾] [chip ×] [chip ×] [Clear all]          [search]   [view switch]
+[Filter ▾] [chip ×] [chip ×] [Clear all]          [search]
 ```
 
 - Title: `h1`, `--text-3xl` (desktop) / `--text-2xl` (phone). No module icon chip and no description line. If a sentence is truly needed, it goes in an ⓘ next to the title.
@@ -122,7 +122,7 @@ Label                          ⓘ
 ### 2.11 Sheet, SidePanel
 
 - `Sheet`: modal, full-screen on phone; side (480 px) or full-screen (composer) on desktop. It uses `ModalDialog` focus rules: initial focus, trap, Escape, restore focus.
-- `SidePanel`: non-modal right panel (440 px) for list item details, such as a post opened from Plan. The list stays usable, and Escape closes the panel. On phone it becomes a full page.
+- `SidePanel`: non-modal right panel (440 px) for list item details, such as a post opened from Content. The list stays usable, and Escape closes the panel. On phone it becomes a full page.
 
 ### 2.12 Notice and Toast
 

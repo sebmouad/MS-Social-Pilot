@@ -1,118 +1,160 @@
-# 08. Build plan
+# 08. Build plan (final, owner-approved 2026-10-21)
 
 ## Strategy
 
-- **Behind a switch.** A new Root key `ui.shellVersion` (`'v1' | 'v2'`, default `'v1'`) lives in `src/lib/config/shared-config.ts` with schema, label and description, and a `CONFIG_SCHEMA_VERSION` bump. `PageFrame` renders `AppShell` (v1) or `AppFrame` (v2). The owner can preview v2 in production and roll back without a deploy. Remove v1 in batch 10.
-- **Routes.** New routes (`/plan`, `/create`, `/results`, …) are thin pages that reuse module screens. When `ui.shellVersion = 'v2'`, old routes redirect (308, query mapped) from a small middleware table generated from manifests. Under v1, new routes still work, so v2 can be tested early.
-- **Small, reviewable batches.** One PR per batch, with screenshots (06 §3) and the checklist (06 §4).
-- **File ownership.** File ownership is listed per batch, so parallel agents never edit the same files (AGENTS.md). Shared files (`components.css`, `tokens.css`, `components/index.ts`) belong to the batch that lists them. Others ask.
-- **Never touch:** services' authorization or confirmations, provider modules, migrations, production deploys (separate gates).
+- **Replace directly (owner decision).** There is no v1/v2 switch. Each batch replaces the old UI for everyone once its checks pass, and it ships through the normal release (`rebuild/scripts/prod-deploy.sh`). Rollback is that script's swap-back to the previous release. Every batch must therefore leave the whole app usable and coherent.
+- **Transitional adapter.** B1 replaces the frame for every page at once. Pages not yet migrated still render their `SidebarDock` content, now shown in a "Page tools" panel opened from a header button: a side `Sheet` on desktop and a bottom sheet on phone. Each area batch removes its pages from the adapter. B9 deletes the adapter and `SidebarDock`.
+- **Routes.** An area batch adds its new routes (`/content/*`, `/create`, `/insights/*`, `/settings/*` changes) and, **in the same batch**, adds 308 redirects from the old routes. The redirect table lives in a small middleware generated from manifest declarations, maps query parameters (01 §5) and keeps unknown parameters. A test asserts every old route lands on an existing page.
+- **Small, reviewable batches.** One PR per batch, with screenshots (06 §3) and the review checklist (06 §4) filled in.
+- **File ownership** is listed per batch, so parallel agents never edit the same files (AGENTS.md). Shared files (`tokens.css`, `components.css`, `components/index.ts`, `src/lib/product.ts`, the middleware) belong to the batch that lists them. Other batches ask before touching them.
+- **Never touch in design batches:** service authorization, confirmations, audit, provider modules, migrations. The parity lane (P) changes services only where 07 says so.
+
+## Phone priorities (owner: all four)
+
+Every batch that touches these flows must pass them at 390 px, one-handed, with no horizontal scroll:
+
+1. **Inbox reply.** Open a conversation, reply with a saved reply and resolve it, all within 3 taps of the bottom bar.
+2. **Create.** Write, add a photo from the camera roll, choose channels, then schedule or publish. The action bar is always visible.
+3. **Check status.** Content › Posts shows status chips in compact rows. Failed posts are listed first on Home under "Needs attention".
+4. **Insights numbers.** 4 tiles in a 2×2 grid, the ⓘ opens a bottom sheet, and the main chart can be scrolled sideways inside its card.
 
 ## Batches
 
-### B0. Foundations and record (unblocks everything)
+### B0. Foundations, decisions, default theme
 
 **Owns:**
-- `src/styles/tokens.css`, `src/styles/components.css`, `src/styles/responsive.css`, `src/app/layout.tsx` (font), `src/lib/themes.ts`
-- tests `theme-contrast*.test.ts` + new `design-tokens-v2.test.ts`
-- `DESIGN.md`, `docs/ARCHITECTURE_CONTRACT.md` (§4 and §6 decision lines only), `docs/DESIGN_COMPONENTS.md`
+- `src/styles/tokens.css`, `src/styles/components.css`, `src/styles/responsive.css`
+- `src/app/layout.tsx` (font)
+- `src/lib/themes.ts`, plus `src/lib/config/shared-config.ts` (only the `theme.default` default → `clean`, with a `CONFIG_SCHEMA_VERSION` bump)
+- tests `theme-contrast*.test.ts` and a new `design-tokens-v2.test.ts`
+- `DESIGN.md`, `UX-CONTRACT.md`, `docs/DESIGN_COMPONENTS.md`
+- `docs/ARCHITECTURE_CONTRACT.md` (§4 and §6 decision lines only)
 - `.claude/skills/frontend-design/SKILL.md`, `.claude/skills/ux-copy-house/SKILL.md`
 
 **Work:**
-1. Delete the round-4 override layer and fold its values into the original declarations (02, rule zero).
-2. Apply the audit P1/P2 token fixes (02 §1.1), area colours (§1.2), type, size, radius and motion tokens (§2–4), the focus rule (§5) and the chart slot contrast (§6).
-3. Load Inter with `next/font`.
-4. Record the decisions:
-   - DESIGN.md: replace the "two left sidebars" layout section with a v2 summary + link.
-   - Contract §6: filters move to the page-header Filter button and the channel scope sits in the sidebar.
-   - Contract §4: route families `/plan`, `/create`, `/results` added.
-   - Quote the decision record from the README in each edit.
-5. Rewrite the two repo skills (`frontend-design`, `ux-copy-house`), which still describe the **legacy** app (`docs/DESIGN.md`, `messages/*.json`, `.card`, `brand-*`), to point at the rebuild and this folder.
+1. Delete the round-4 override layer (02, rule zero).
+2. Apply the audit P1/P2 token fixes (02 §1.1) and the area colours (§1.2).
+3. Apply the type, size, radius and motion tokens (§2–4), the focus rule (§5) and the chart slot contrast (§6).
+4. Load Inter with `next/font`.
+5. Make **Clean** the default for new users. Existing users keep their saved theme.
+6. Record every README decision in DESIGN.md, UX-CONTRACT.md and contract §4/§6, quoting the decision record.
+7. Rewrite the two repo skills, which describe the **legacy** app (`docs/DESIGN.md`, `messages/*.json`, `.card`, `brand-*`), to point at the rebuild and this folder.
 
 **Accept:**
-- All contrast tests pass, including system mode.
-- New tests pass: area-colour uniqueness, field borders use `--control-border`, no `data-mode="dark"` component rules, ≤9 font sizes in shared CSS.
-- Screenshots show no regression.
+- Contrast tests pass for 8 palettes and system mode.
+- New tests pass:
+  - area-colour uniqueness
+  - fields use `--control-border`
+  - no `data-mode="dark"` component rules
+  - at most 9 font sizes in shared CSS
+- Screenshots in Clean light/dark and Vivid show no regressions.
 
-### B1. Frame v2 (AppFrame, sidebar, scope, header, popovers)
+### B1. Frame (sidebar, channel scope, header, popovers, phone bar)
 
 **Owns:**
-- New `src/components/{AppFrame,AppSidebar,ChannelScopeList,ScopeSheet,TopBar,BottomBar,Popover,InfoTip,FilterButton,FilterSheet,PageHeader(v2),Notice,Sheet,SidePanel,ListRow,MetricTile,SplitButton,ActionBar,DateRangePicker}.tsx`
-- `Menu.tsx`, `Select.tsx` (popover port), `Tabs.tsx`
+- New `src/components/{AppFrame,AppSidebar,ChannelScopeList,ScopeSheet,TopBar,BottomBar,Popover,InfoTip,FilterButton,FilterSheet,PageHeader,Notice,Sheet,SidePanel,ListRow,MetricTile,SplitButton,ActionBar,DateRangePicker}.tsx`
+- `Menu.tsx`, `Select.tsx` (move onto Popover), `Tabs.tsx`
 - `src/server/PageFrame.tsx`
 - `src/server/context.ts` (`actorFromViewer`, `parseChannelScope`)
-- `src/lib/product.ts` (area/tab from manifests)
-- manifests' new `area`/`tab`/bilingual title fields (all `src/modules/*/manifest.ts`, data-only edits)
-- new `src/modules/shell/` (copy catalog + config), the `ui.shellVersion` config
+- `src/lib/product.ts` (areas and tabs from manifests)
+- every `src/modules/*/manifest.ts`: data-only edits for `area`, `tab` and bilingual titles
+- new `src/modules/shell/` (copy catalog `shell.copy` + config)
+- the redirect middleware skeleton
+- the "Page tools" adapter
 
-**Work:** components per 03, the channel scope per 01 §5 (cookie + URL + validation notice), and the phone bottom bar.
+**Work:**
+- Build the components per 03.
+- Build the channel scope per 01 §5: cookie + URL + validation notice.
+- Tasks and Agency show only when used (01 §4).
+- Sign-in lands on Home.
+- Phone bottom bar.
 
 **Accept:**
-- With v2 on, every existing page renders inside the new frame (still with old content).
-- Keyboard walk, focus trap and Escape work.
-- Scope chip and sidebar stay in sync.
-- No popover is clipped in a table, dialog or sidebar (test with Posts row menu on the last row).
+- Every existing page renders in the new frame with no lost function: dock content is reachable through Page tools.
+- Keyboard walk passes, with focus trap and Escape working.
+- The scope chip and the sidebar stay in sync.
+- No popover is clipped, including the row menu on the last table row and inside a dialog.
+- EN/FR covered.
 
 ### B2. Create (full-screen composer)
 
-**Owns:** `src/modules/publishing/ui/compose/**`, `PostAttachments`, new route `src/app/create/page.tsx`.
+**Owns:**
+- `src/modules/publishing/ui/compose/**`
+- `src/modules/publishing/components/PostAttachments*`
+- `src/app/create/page.tsx`
+- redirect from `/publishing/compose`
 
-**Work:** S7. Reuse today's server actions, so no service changes. Move destinations and time out of `SidebarDock`.
+**Work:** S7. Reuse today's server actions; services do not change. Move destinations and time out of the dock.
 
 **Accept:**
-- Draft, schedule, queue and publish-now paths work.
-- Failure keeps input.
-- Best times are shown.
-- Phone Edit/Preview tabs work.
-- EN/FR.
+- Draft, schedule, queue and publish-now all work.
+- A failure keeps the input.
+- Best times appear.
+- Phone priority 2 passes.
+- EN/FR covered.
 
-### B3. Plan
+### B3. Content
 
-**Owns:** `src/modules/publishing/ui/{posts,calendar,queue,approvals,labels,templates,media,collaboration}/**`, feeds UI, new `src/app/plan/**` routes, the redirect table entries.
+**Owns:**
+- `src/modules/publishing/ui/{posts,calendar,queue,approvals,labels,templates,media,collaboration}/**`
+- `src/modules/feeds/ui/**`, `src/modules/media/ui/**`
+- `src/app/content/**`
+- the Content redirect entries
 
-**Work:** S2–S6, `SidePanel` post detail, compact phone rows, queue slots on the calendar.
+**Work:**
+- S2–S6.
+- Table + `SidePanel` (remove the Feed and Cards views and their saved-view values; map old `view=` params to the table).
+- Compact phone rows.
+- Queue slots on the calendar.
 
 **Accept:**
 - Every old Publishing route redirects.
 - Bulk actions and paging work.
-- `?post=` panel deep link works.
-- 8 posts fit on a 390 px screen.
+- The `?post=` deep link opens the panel.
+- Phone priority 3 passes (at least 8 posts per screen).
 
 ### B4. Inbox
 
-**Owns:** `src/modules/inbox/ui/**`, the `/inbox/rules` route.
+**Owns:** `src/modules/inbox/ui/**`, `/inbox/rules`.
 
-**Work:** S8. Remove the always-on shortcut legend, quick filters as chips, the details pane.
+**Work:** S8.
 
 **Accept:**
-- Three-pane layout, two-page on phone.
+- Three panes on desktop, two pages on phone.
 - Shortcuts work.
-- Durable deletion flow unchanged.
+- The durable deletion flow is unchanged.
+- Phone priority 1 passes.
 
-### B5. Results
+### B5. Insights
 
-**Owns:** `src/modules/analytics/ui/**`, `src/modules/ads/ui/**`, `src/components/charts/**`, new `src/app/results/**`.
+**Owns:**
+- `src/modules/analytics/ui/**`, `src/modules/ads/ui/**`
+- `src/components/charts/**`
+- `src/app/insights/**`
+- the Insights redirect entries
 
 **Work:**
-- S9–S12; ⓘ for all caveats; chart fixes (02 §6).
-- Ads screens move to read services (07 P1).
-- Merge Ads reporting and Compare.
+- S9–S12, with ⓘ for every caveat.
+- The chart fixes (02 §6).
+- Merge Ads reporting and Compare into Insights.
+- Coordinate with P1 (Ads read services).
 
 **Accept:**
-- Results Overview fits in 2 desktop screens (≤1,800 px tall with sample data).
+- Overview is at most 1,800 px tall with the sample data.
 - Ads Accounts is one table.
-- Same numbers as REST/MCP for the fixture.
+- The numbers equal REST/MCP for the fixture.
+- Phone priority 4 passes.
 
 ### B6. Settings
 
-**Owns:** `src/modules/settings/ui/**`, sharing/integrations UI, `/settings/*` routes.
+**Owns:** `src/modules/settings/ui/**`, the sharing and integrations UI, the `/settings/*` routes and redirects.
 
-**Work:** S13. Workspace cards with a time-zone `Select`, a Channels card view, merged tabs.
+**Work:** S13.
 
 **Accept:**
 - Each card saves independently with feedback.
-- Disconnect flow unchanged.
-- No internal IDs on customer screens.
+- The disconnect flow is unchanged.
+- No internal IDs appear on customer screens.
 
 ### B7. Home, Tasks, Agency
 
@@ -121,57 +163,63 @@
 **Work:** S1 and S14.
 
 **Accept:**
-- Home "Needs attention" is driven by real counts.
+- "Needs attention" is driven by real counts.
 - Cards fail independently.
+- Tasks and Agency follow the "only when used" rule.
 
-### B8. Root alignment
+### P. Parity lane (parallel, from B1)
 
-**Owns:** `src/app/root/**`, `src/server/root/*.tsx` → move into `src/modules/root/ui/` (architecture debt).
+**Owns:** only the service files named in 07, `src/modules/integrations/server/rest-tools.ts`, `app/api/v1/**`, and their tests.
 
-**Work:** S15 with the same frame.
+**Work:** 07 P1–P9. Coordinate P1/P2 with B5 and P3/P4 with B2.
+
+**Accept:** each item's acceptance column in 07.
+
+### B8. Root (last UI batch, owner decision)
+
+**Owns:**
+- `src/app/root/**`
+- `src/server/root/*.tsx` and `src/server/jobs/*.tsx`, moved into `src/modules/root/ui/`
+
+**Work:** S15 with the same frame and components; keep the technical detail.
 
 **Accept:**
 - Root keyboard and phone paths work.
-- Nothing customer-facing changes.
+- No customer-facing change.
 
-### B9. Parity lane (can run in parallel from B1)
+### B9. Verification and cleanup
 
-**Owns:** `src/modules/*/server/**` (only the files named in 07), `src/modules/integrations/server/rest-tools.ts`, the `app/api/v1/**` routes, and their tests.
-
-**Work:** 07 P1–P9. Run it in parallel, but coordinate P1/P2 with B5 (Ads UI) and P3/P4 with B2.
-
-**Accept:** each item's acceptance column.
-
-### B10. Verification and switch-over
-
-**Owns:** browser matrix scripts and docs; the default of `ui.shellVersion`.
+**Owns:** the browser matrix scripts and docs; deletion of `SidebarDock`, the Page tools adapter and any dead v1 CSS.
 
 **Work:**
-- Run the full matrix (06 §3) in three engines, four themes, light/dark/system, desktop/phone, keyboard and failures.
+- Full matrix (06 §3): three engines, four themes, light/dark/system, desktop/phone, keyboard and injected failures.
 - Fix the findings.
-- Then set the default to `v2`, keep v1 for one release, and remove it after.
+- Update ARCHITECTURE.md, UX-CONTRACT.md, GOAL, DELIVERY_PLAN and AGENT_HANDOFF.
 
 **Accept:**
 - Zero open P1/P2 findings.
-- ARCHITECTURE.md, UX-CONTRACT.md, GOAL, DELIVERY_PLAN and AGENT_HANDOFF are updated.
+- No `SidebarDock` imports left.
+- Evidence recorded by kind.
 
 ## Order and parallelism
 
 ```
 B0 ─► B1 ─┬─► B2 ─► B3 ─┐
-          ├─► B4 ────────┼─► B10
-          ├─► B5 ────────┤
-          ├─► B6 ─► B7 ──┤
-          └─► B8 ────────┘
-B9 (parity) runs alongside from B1; coordinate with B2/B5.
+          ├─► B4 ────────┤
+          ├─► B5 ────────┼─► B8 (Root) ─► B9
+          └─► B6 ─► B7 ──┘
+P (parity) runs alongside from B1; coordinate with B2 and B5.
 ```
+
+Each arrow is a shipped release. Without parallel agents, follow the numeric order.
 
 ## Risks
 
 | Risk | Mitigation |
 |---|---|
-| Big-bang regressions | Switch `ui.shellVersion`; per-batch screenshots; old routes keep working until B10 |
-| Copy drift between EN/FR | Required copy props; extended copy-coverage and banned-word tests |
-| Losing a capability during merges | Route map 01 §6 is the checklist; a test asserts every old route redirects to an existing page |
-| Contract conflict | B0 records the decisions before any UI change ships |
-| Ads numbers differ after moving to services | Fixture-based equality test (07 P1) |
+| No switch, so every batch reaches all users | Small batches; screenshots and the browser check on the changed routes before release; `prod-deploy.sh` swap-back as rollback |
+| A half-migrated app feels inconsistent | B1 frame first, then the Page tools adapter; area batches in usage order (Create, Content, Inbox, Insights) |
+| Users miss the Feed/Cards views | The side preview shows the full post; saved views with `view=feed|cards` open the table with a one-time notice |
+| Losing a capability during merges | The route map (01 §6) is the checklist; the redirect test; LEGACY_CAPABILITY_PARITY rows checked per batch |
+| Ads numbers differ after the move to services | Fixture-based equality test (07 P1) |
+| EN/FR drift | Required copy props; copy-coverage and banned-word tests |

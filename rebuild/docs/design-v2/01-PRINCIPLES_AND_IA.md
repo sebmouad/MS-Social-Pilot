@@ -47,9 +47,9 @@ Sidebar (desktop ≥1024 px, 248 px; collapses to 64 px icon rail)
 ├─ Workspace switcher        (only if >1 workspace; Agency adds "All workspaces")
 ├─ [+ Create]                (primary; opens /create)
 ├─ Home
-├─ Plan                      (posts, calendar, queue, approvals, library)
+├─ Content                      (posts, calendar, queue, approvals, library)
 ├─ Inbox            (badge)  (conversations, comments, reviews, rules)
-├─ Results                   (overview, explore, audience, posts, ads, reports)
+├─ Insights                   (overview, explore, audience, posts, ads, reports)
 ├─ Tasks                     (only if the workspace uses tasks)
 ├─ Agency                    (only if the user has more than one client workspace)
 ├─ CHANNELS
@@ -62,21 +62,24 @@ Sidebar (desktop ≥1024 px, 248 px; collapses to 64 px icon rail)
 
 The rules:
 
-- **Area order** is fixed: Home, Plan, Inbox, Results, then optional areas. It never depends on entitlements, except that an area the user cannot use is absent.
-- **Tabs** inside an area are URL routes (`/plan/calendar`). They use the shared `Tabs` with links (Primer UnderlineNav). Never mix link tabs and panel tabs.
+- **Area order** is fixed: Home, Content, Inbox, Insights, then optional areas. It never depends on entitlements, except that an area the user cannot use is absent.
+- **Tabs** inside an area are URL routes (`/content/calendar`). They use the shared `Tabs` with links (Primer UnderlineNav). Never mix link tabs and panel tabs.
 - **Settings** uses an in-content section list on desktop (GitHub settings pattern) and a list page on phones. This replaces the context sidebar for Settings only.
 - **Root** uses the same shell with its own areas: Overview, People, Modules, Operations, Activity. It has no channel list. A visible "Root" badge stays in the header.
-- **Phone (<760 px):** a bottom bar with Home, Plan, **Create** (centre, raised), Inbox and Results. The top bar shows the scope chip ("All channels ▾"), which opens a bottom sheet with the channel list. Avatar menu holds Settings, Tasks, Agency, theme, language and sign out.
+- **Phone (<760 px):** a bottom bar with Home, Content, **Create** (centre, raised), Inbox and Insights. The top bar shows the scope chip ("All channels ▾"), which opens a bottom sheet with the channel list. Avatar menu holds Settings, Tasks, Agency, theme, language and sign out.
 - **Tablet (760–1023 px):** the sidebar is collapsed to the 64 px icon rail by default and expands as an overlay.
+
+- **Landing:** after sign-in, users land on **Home** (owner decision). A deep link that sent the user to sign in is honoured first.
+- **Optional areas:** Tasks appears once the workspace has a task, or an owner turns it on in Settings › Workspace. Agency appears when the user belongs to more than one client workspace. Hidden areas keep their routes, so links and MCP still work.
 
 ## 5. Channel scope (new shared behaviour)
 
 | Rule | Detail |
 |---|---|
-| Parameter | One URL parameter on every channel-aware page: `channel=<id>[,<id>…]`. Absent means all selected channels. Ad accounts use `account=<id>[,…]` on Results › Ads only. |
+| Parameter | One URL parameter on every channel-aware page: `channel=<id>[,<id>…]`. Absent means all selected channels. Ad accounts use `account=<id>[,…]` on Insights › Ads only. |
 | Persistence | Last scope is remembered per user and workspace in a cookie (`sp_scope_<workspaceId>`) and restored when the URL has none. The URL always wins. |
 | Authority | Display filter only. Services still apply the member's current authorization and selection. Unknown, unselected or unauthorized IDs are dropped, with a one-line notice: "1 channel is no longer available and was removed from the view." |
-| Pages that obey it | Home, Plan (all tabs), Inbox, Results (all tabs except Ads, which uses `account`), Tasks (linked posts), exports, reports (pre-filled). |
+| Pages that obey it | Home, Content (all tabs), Inbox, Insights (all tabs except Ads, which uses `account`), Tasks (linked posts), exports, reports (pre-filled). |
 | Pages that ignore it | Settings, Root, Create (Create pre-selects the scoped channels as destinations but lets you change them). |
 | Sidebar UI | Single click = only this channel. ⌘/Ctrl-click or the checkbox on hover = add/remove for multi-select. "All channels" resets. The status dot shows connection health (ok / reconnect needed). |
 | Migration | Replace `channelId`, `target`, `targets`, `targetIds` and `channels` query names in customer routes with `channel`. Keep old names readable for one release by mapping them at parse time. |
@@ -89,26 +92,26 @@ Every current capability keeps a home. Old routes redirect with HTTP 308, keepin
 |---|---|---|
 | `/home` | `/home` | Rebuilt summary (04) |
 | `/publishing/compose` | `/create` | Full screen; `?date=&time=` kept; `?post=<id>` edits a draft |
-| `/publishing/posts` | `/plan` (tab **Posts**) | Table default; Feed/Cards as a view switch |
-| `/publishing/calendar` | `/plan/calendar` | Month/Week; agenda on phone; queue slots shown |
-| `/publishing/queue` | `/plan/queue` | Queue times + next slots |
-| `/publishing/approvals` | `/plan/approvals` | Badge with count when >0 |
-| `/publishing/media` | `/plan/library` (section **Media**) | Library tab groups content assets |
-| `/publishing/templates` | `/plan/library/templates` | |
-| `/publishing/labels` | `/plan/library/labels` | |
-| `/publishing/collaboration` ("Organize") | `/plan/library/fields` | Custom fields and notes |
-| `/publishing/collaboration/post/[postId]` | `/plan/post/[postId]` | Post detail page (also opened as a side panel from lists) |
-| `/publishing/feeds` | `/plan/library/feeds` | Content feeds and the recipe source |
+| `/publishing/posts` | `/content` (tab **Posts**) | Table + side preview (Feed and Cards removed, owner 2026-10-21) |
+| `/publishing/calendar` | `/content/calendar` | Month/Week; agenda on phone; queue slots shown |
+| `/publishing/queue` | `/content/queue` | Queue times + next slots |
+| `/publishing/approvals` | `/content/approvals` | Badge with count when >0 |
+| `/publishing/media` | `/content/library` (section **Media**) | Library tab groups content assets |
+| `/publishing/templates` | `/content/library/templates` | |
+| `/publishing/labels` | `/content/library/labels` | |
+| `/publishing/collaboration` ("Organize") | `/content/library/fields` | Custom fields and notes |
+| `/publishing/collaboration/post/[postId]` | `/content/post/[postId]` | Post detail page (also opened as a side panel from lists) |
+| `/publishing/feeds` | `/content/library/feeds` | Content feeds and the recipe source |
 | `/inbox` | `/inbox` | Three panes |
 | `/inbox/moderation` | `/inbox/rules` | Tab |
-| `/analytics` | `/results` | Overview tab |
-| `/analytics/explorer` | `/results/explore` | |
-| `/analytics/demographics` | `/results/audience` | |
-| `/analytics/posts` | `/results/posts` | |
-| `/analytics/compare`, `/ads/compare` | `/results/compare` | One compare tool; channels or ad accounts |
-| `/analytics/ads`, `/ads`, `/ads/campaigns`, `/ads/objects` | `/results/ads`, `/results/ads/campaigns`, `/results/ads/manage` | Ads reporting and management in one tab group |
-| `/analytics/goals`, `/analytics/pins` | `/results` (Overview cards) + `/results/goals` | Pinned metrics appear on Overview |
-| `/analytics/reports`, `/reports` | `/results/reports` | |
+| `/analytics` | `/insights` | Overview tab |
+| `/analytics/explorer` | `/insights/explore` | |
+| `/analytics/demographics` | `/insights/audience` | |
+| `/analytics/posts` | `/insights/posts` | |
+| `/analytics/compare`, `/ads/compare` | `/insights/compare` | One compare tool; channels or ad accounts |
+| `/analytics/ads`, `/ads`, `/ads/campaigns`, `/ads/objects` | `/insights/ads`, `/insights/ads/campaigns`, `/insights/ads/manage` | Ads reporting and management in one tab group |
+| `/analytics/goals`, `/analytics/pins` | `/insights` (Overview cards) + `/insights/goals` | Pinned metrics appear on Overview |
+| `/analytics/reports`, `/reports` | `/insights/reports` | |
 | `/tasks` | `/tasks` | Optional area |
 | `/agency`, `/agency/clients` | `/agency`, `/agency/clients` | Optional area |
 | `/settings/workspace` | `/settings/workspace` | Split into cards (04) |
@@ -127,7 +130,7 @@ Result: 45 customer pages become 6 areas (4 core + 2 optional) with tabs and 1 S
 
 Manifests stay the source of routes (contract §2). v2 adds two optional manifest fields:
 
-- `area: 'home' | 'plan' | 'inbox' | 'results' | 'tasks' | 'agency' | 'settings'`: which area a page belongs to.
+- `area: 'home' | 'content' | 'inbox' | 'insights' | 'tasks' | 'agency' | 'settings'`: which area a page belongs to.
 - `tab: { label, order }`: its tab position inside the area.
 
 The shell builds the sidebar and tabs from these declarations. No central list is hand-edited (contract decision 2026-10-19). A module that contributes to an area does so through its own manifest. For example, Ads declares pages in `results` and Feeds in `plan`.

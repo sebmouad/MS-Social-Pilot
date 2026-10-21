@@ -2,7 +2,7 @@
 
 `src/styles/tokens.css` stays the single runtime source of tokens, and
 `src/lib/themes.ts` owns theme names, swatches and modes. The four themes
-(Vivid, Meta blue, Warm, Clean) × light/dark × system stay. v2 changes are
+(Vivid, Meta blue, Warm, Clean) × light/dark × system stay. **Clean is the default for new users** (owner decision 2026-10-21; Root `theme.default`), so every spec and screenshot must look right in Clean first. v2 changes are
 listed here. Each one must land in `tokens.css`, the contrast tests and
 `DESIGN.md` in the same batch.
 
@@ -29,9 +29,9 @@ hashed CSS-module names (`[class*="_card__"]`, `section[class*="_listPane__"]`).
 ### 1.2 Area colours (replace module identity in navigation)
 
 v2 navigation shows **areas**, not modules, so identity colours attach to areas:
-`--area-home`, `--area-plan`, `--area-inbox`, `--area-results`, `--area-tasks`,
+`--area-home`, `--area-content`, `--area-inbox`, `--area-insights`, `--area-tasks`,
 `--area-agency`, `--area-settings`, `--area-root`. Initially alias existing
-tokens (`--area-plan: var(--mod-publishing)`, `--area-results: var(--mod-analytics)` …).
+tokens (`--area-content: var(--mod-publishing)`, `--area-insights: var(--mod-analytics)` …).
 Keep `--mod-*` for module icons inside an area, such as the Ads tab icon.
 
 Rules, enforced by a new uniqueness test:

@@ -9,7 +9,7 @@ Plain, specific and calm. Say what happens, then what to do. Write for a busy so
 | Element | Rule | Example |
 |---|---|---|
 | Buttons | Verb + object, sentence case | "Schedule post", "Reconnect Facebook", "Delete from Facebook" |
-| Page titles | A noun; no description line | "Posts", "Results", "Inbox" |
+| Page titles | A noun; no description line | "Posts", "Insights", "Inbox" |
 | Empty state | What this is + why it is empty + one action | "No posts yet. Your scheduled and published posts appear here. [Create post]" |
 | No match | Different from empty | "No posts match these filters. [Clear filters]" |
 | Error | What happened + why + how to fix; pass a provider's refusal through as the reason | "Facebook refused the post: the image is larger than 8 MB. Choose a smaller image." |
@@ -64,9 +64,9 @@ Never remove a disclosure the contract requires (coverage, partial, non-additive
 | Key | EN | FR |
 |---|---|---|
 | `area.home` | Home | Accueil |
-| `area.plan` | Plan | Planifier |
+| `area.content` | Content | Contenu |
 | `area.inbox` | Inbox | Messages |
-| `area.results` | Results | Résultats |
+| `area.insights` | Insights | Statistiques |
 | `area.tasks` | Tasks | Tâches |
 | `area.agency` | Agency | Agence |
 | `nav.create` | Create | Créer |
@@ -79,5 +79,5 @@ Never remove a disclosure the contract requires (coverage, partial, non-additive
 | `composer.publishNow` | Publish now | Publier maintenant |
 | `composer.addToQueue` | Add to queue | Ajouter à la file |
 | `composer.saveDraft` | Save draft | Enregistrer le brouillon |
-| `results.vsPrevious` | vs previous period | vs période précédente |
+| `insights.vsPrevious` | vs previous period | vs période précédente |
 | `info.about` | About {name} | À propos de {name} |

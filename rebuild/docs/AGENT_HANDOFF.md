@@ -11,9 +11,9 @@ documentation worker; production facts below are owner/integrator records.
 
 ## Design v2 handoff (2026-10-21)
 
-The owner asked for a simpler, more efficient UI. The complete target and build plan are in
+The owner asked for a simpler, more efficient UI and approved the final plan on 2026-10-21. The areas are Home · Content · Inbox · Insights, Clean is the default theme, and the UI is replaced directly with no switch. The complete target and build plan are in
 [design-v2/](design-v2/README.md): IA and route map, tokens, components, screen specs,
-copy, QA, UI/REST/MCP parity findings, batches B0–B10, a paste-ready
+copy, QA, UI/REST/MCP parity findings, batches B0–B9 plus parity lane P, a paste-ready
 [handoff prompt](design-v2/HANDOFF_PROMPT.md) and a clickable
 [prototype](design-v2/prototype.html). Nothing is built yet. Start with B0: token and
 accessibility fixes from [DESIGN_AUDIT_2026-10-21.md](DESIGN_AUDIT_2026-10-21.md).
