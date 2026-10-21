@@ -7,6 +7,7 @@ import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { platformAnalytics } from '@/server/platforms/registry';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
+import { readChannelMeasures, readChannelPostHistory } from '@/modules/analytics/server/stored-reads';
 import { readInboxList } from '@/modules/inbox/server/read';
 import { readAdsDailyRows } from '@/modules/ads/server/report-read';
 import { readPublishingPostPage } from '@/modules/publishing/server/read';
@@ -72,9 +73,12 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
   const providers = readChannels.length ? new Map((await prisma.$queryRaw<Array<{ id: string; provider: string }>>`SELECT t.id, a.provider FROM targets t JOIN social_accounts a ON a.id = t."socialAccountId" AND a."workspaceId" = t."workspaceId" WHERE t."workspaceId" = ${actor.workspaceId} AND t.id = ANY(${readChannels.map(channel => channel.id)}::text[])`).map(row => [row.id, row.provider])) : new Map<string, string>();
   // Keep host/configuration promises inside this request; never retain tenant reads across requests.
   const hosts = new Map<string, ReturnType<typeof platformAnalytics>>();
-  const hostFor = async (channelId: string) => {
-    const provider = providers.get(channelId);
-    if (!provider) return null;
+  const providerChannels = new Map<string, typeof readChannels>();
+  for (const channel of readChannels) {
+    const provider = providers.get(channel.id);
+    if (provider) providerChannels.set(provider, [...(providerChannels.get(provider) ?? []), channel]);
+  }
+  const hostFor = (provider: string) => {
     if (!hosts.has(provider)) hosts.set(provider, platformAnalytics(provider));
     return hosts.get(provider)!;
   };
@@ -97,16 +101,16 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
     if (!snapshot) return { state: 'unavailable' };
     if (!readChannels.length) return { state: 'empty' };
     const interactionKeys = (config['home.interactionMeasureKeys'] as string[]);
-    const rows = await Promise.all(readChannels.map(async channel => {
-      const host = await hostFor(channel.id);
-      if (!host?.goalMeasures) return { channel, current: null, previous: null, mix: [] as Array<{ key: string; label: string; value: number | null }> };
-      const [current, previous, mix] = await Promise.all([
-        host.goalMeasures({ workspaceId: actor.workspaceId, targetId: channel.id, ...currentWindow }),
-        host.goalMeasures({ workspaceId: actor.workspaceId, targetId: channel.id, ...previousWindow }),
-        host.destinationMeasures ? host.destinationMeasures({ workspaceId: actor.workspaceId, targetId: channel.id, ...currentWindow }) : Promise.resolve({ measures: [] }),
-      ]);
-      return { channel, current, previous, mix: mix.measures.filter(measure => interactionKeys.includes(measure.key)) };
+    const groups = await Promise.all([...providerChannels].map(async ([provider, channels]) => {
+      const host = await hostFor(provider);
+      if (!host) return [];
+      return readChannelMeasures(host, { workspaceId: actor.workspaceId, targetIds: channels.map(channel => channel.id), current: currentWindow, previous: previousWindow });
     }));
+    const byId = new Map(groups.flat().map(row => [row.targetId, row]));
+    const rows = readChannels.map(channel => {
+      const row = byId.get(channel.id);
+      return { channel, current: row?.current ?? null, previous: row?.previous ?? null, mix: row?.mix.filter(measure => interactionKeys.includes(measure.key)) ?? [] };
+    });
     const views = periodTotals(rows.map(row => ({ current: row.current?.views ?? null, previous: row.previous?.views ?? null })));
     const engagements = periodTotals(rows.map(row => ({ current: row.current?.engagements ?? null, previous: row.previous?.engagements ?? null })));
     if (views.current === null && engagements.current === null) return { state: 'empty' };
@@ -122,12 +126,12 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
   const bestTimes = !allowed('analytics/posts') || !wantsAnalytics ? null : settled<Data<'bestTimes'>>(async () => {
     if (!snapshot) return { state: 'unavailable' };
     const from = new Date(now.getTime() - Number(config['home.heatmapLookbackDays']) * DAY);
-    const histories = await Promise.all(readChannels.map(async channel => {
-      const host = await hostFor(channel.id);
-      if (!host?.postPerformance) return [];
-      const posts = await host.postPerformance({ workspaceId: actor.workspaceId, targetId: channel.id, from, to: now, limit: Number(config['home.heatmapMaxPostsPerChannel']), sort: 'publishedAt', direction: 'desc' });
-      return posts.filter(post => post.publishedAt && post.publishedAt >= from && post.publishedAt < now && post.measuredAt && post.measuredAt <= now);
+    const groups = await Promise.all([...providerChannels].map(async ([provider, channels]) => {
+      const host = await hostFor(provider);
+      return host ? readChannelPostHistory(host, { workspaceId: actor.workspaceId, targetIds: channels.map(channel => channel.id), from, to: now,
+        limit: Number(config['home.heatmapMaxPostsPerChannel']), sort: 'publishedAt', direction: 'desc' }) : [];
     }));
+    const histories = groups.flat();
     const result = engagementHeatmap(histories, timeZone, Number(config['home.heatmapMinPosts']));
     return result.cells.length ? { state: 'ready', data: result } : { state: 'empty' };
   });
