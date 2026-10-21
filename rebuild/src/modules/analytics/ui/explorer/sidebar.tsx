@@ -8,15 +8,14 @@ import styles from './explorer.module.css';
 export function ExplorerSidebar({ data, exportHref, summaryHref, copy = workspaceCopyDefaults, locale = 'en', overviewCopy }: { overviewCopy?: OverviewCopy; copy?: WorkspaceCopy; locale?: 'en' | 'fr'; data: AnalyticsExplorerResult; exportHref?: string; summaryHref?: string }) {
   const t = workspaceText(copy, locale);
   const params = new URLSearchParams(data.query);
-  const channels = new Set(data.selected.channelIds); const accounts = new Set(data.selected.adAccountIds);
+  const channels = new Set(data.selected.channelIds);
   return <div className={styles.sidebar}>
     {summaryHref && <a href={summaryHref}>{t("Analytics summary")}</a>}
-    <form action="/analytics/explorer" method="get" className={styles.filters}>
+    <form noValidate action="/analytics/explorer" method="get" className={styles.filters}>
       <AnalyticsFilters copy={overviewCopy} locale={locale} title={t("Explore stored metrics")} path="/analytics/explorer" query={data.query}>
       <fieldset><legend>{t("Date range (UTC)")}</legend><label>{t("From")}<input type="date" name="start" defaultValue={data.period.start} /></label><label>{t("To")}<input type="date" name="end" defaultValue={data.period.end} /></label></fieldset>
       <label>{t("Compare with")}<select name="compare" defaultValue={params.get('compare') ?? 'none'}><option value="none">{t("No comparison")}</option><option value="previous">{t("Previous equal-length period")}</option><option value="year">{t("Same dates last year")}</option></select></label>
       <fieldset><legend>{t("Channels")}</legend><input type="hidden" name="filter" value="1" />{data.options.channels.length ? data.options.channels.map(channel => <label className={styles.check} key={channel.id}><input type="checkbox" name="channel" value={channel.id} defaultChecked={channels.has(channel.id)} /><span>{channel.name}</span></label>) : <p>{t("No available channels.")}</p>}</fieldset>
-      <fieldset><legend>{t("Ad accounts")}</legend><input type="hidden" name="adFilter" value="1" />{data.options.adAccounts.length ? data.options.adAccounts.map(account => <label className={styles.check} key={account.id}><input type="checkbox" name="adAccount" value={account.id} defaultChecked={accounts.has(account.id)} /><span>{account.name}{account.currency ? ` · ${account.currency}` : ''}</span></label>) : <p>{t("No available ad accounts.")}</p>}</fieldset>
       <label>{t("Search metrics")}<input type="search" name="search" maxLength={data.searchMaxCharacters} defaultValue={data.filters.search} placeholder={t("Metric name or source")} /></label>
       <label>{t("Source")}<select name="source" defaultValue={data.filters.source}><option value="">{t("All sources")}</option>{data.options.sources.map(source => <option key={source} value={source}>{source}</option>)}</select></label>
       <label>{t("Measurement type")}<select name="kind" defaultValue={data.filters.kind}><option value="all">{t("All types")}</option><option value="flow">{t("Period totals")}</option><option value="stock">{t("Latest resource values")}</option><option value="ratio">{t("Ratios")}</option><option value="breakdown">{t("Category breakdowns")}</option></select></label>

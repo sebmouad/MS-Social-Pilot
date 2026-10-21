@@ -35,3 +35,6 @@ export { FilterPanel, FilterSection, FilterChips, DatePresets } from "./FilterPa
 export type { ActiveFilter, DatePreset } from "./FilterPanel";
 export { Avatar, AvatarStack, avatarSlot, avatarInitials } from "./Avatar";
 export { computePopupPlacement } from "./usePopupPlacement";
+export { PostThumb } from "./PostThumb";
+export { postThumbnail } from "./post-thumbnail";
+export type { PostThumbnail } from "./post-thumbnail";

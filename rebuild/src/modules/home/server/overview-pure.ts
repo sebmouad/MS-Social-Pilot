@@ -13,10 +13,11 @@ export function sumKnown(values: readonly Known[]): Known {
 /** Totals over channels, plus a change that compares only channels known in both periods (equal coverage). */
 export function periodTotals(pairs: ReadonlyArray<{ current: Known; previous: Known }>) {
   const current = sumKnown(pairs.map(pair => pair.current));
-  const both = pairs.filter(pair => pair.current !== null && pair.previous !== null);
+  const finite = (value: Known) => typeof value === 'number' && Number.isFinite(value);
+  const both = pairs.filter(pair => finite(pair.current) && finite(pair.previous));
   const comparableCurrent = sumKnown(both.map(pair => pair.current)), comparablePrevious = sumKnown(both.map(pair => pair.previous));
   const change = comparableCurrent !== null && comparablePrevious !== null && comparablePrevious > 0 ? (comparableCurrent - comparablePrevious) / comparablePrevious : null;
-  return { current, previous: comparablePrevious, change, covered: pairs.filter(pair => pair.current !== null).length, comparable: both.length };
+  return { current, previous: comparablePrevious, change, covered: pairs.filter(pair => finite(pair.current)).length, comparable: both.length };
 }
 
 const median = (values: number[]) => {
@@ -79,12 +80,22 @@ export const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 export function lastDays(now: Date, days: number) { return { start: isoDay(new Date(now.getTime() - (days - 1) * DAY)), end: isoDay(now) }; }
 
 /** Spend per currency; rows in different currencies are never added together. */
-export function spendByCurrency(rows: ReadonlyArray<{ currency: string | null; spend: number; date: string }>) {
+export function spendByCurrency(rows: ReadonlyArray<{ currency: string | null; spend: number | string; date: string }>) {
   const groups = new Map<string, { currency: string | null; total: number; byDay: Map<string, number> }>();
   for (const row of rows) {
-    const key = row.currency ?? '';
-    const group = groups.get(key) ?? { currency: row.currency, total: 0, byDay: new Map<string, number>() };
-    group.total += row.spend; group.byDay.set(row.date, (group.byDay.get(row.date) ?? 0) + row.spend);
+    // Decimal strings are amounts in major currency units, never minor units.
+    // Reject malformed input rather than silently dropping spend or counting it as zero.
+    if (typeof row.spend !== 'number' && typeof row.spend !== 'string') throw new Error('Invalid spend');
+    if (typeof row.spend === 'string' && !/^[+-]?\d+(?:\.\d+)?$/.test(row.spend.trim())) throw new Error('Invalid spend');
+    const spend = Number(row.spend);
+    if (!Number.isFinite(spend)) throw new Error('Invalid spend');
+    const date = isoDay(new Date(row.date));
+    // Unknown currencies cannot safely be added together or displayed as money.
+    const key = row.currency?.trim().toUpperCase();
+    if (!key || !/^[A-Z]{3}$/.test(key)) throw new Error('Invalid currency');
+    const group = groups.get(key) ?? { currency: key, total: 0, byDay: new Map<string, number>() };
+    group.total += spend; group.byDay.set(date, (group.byDay.get(date) ?? 0) + spend);
+    if (!Number.isFinite(group.total)) throw new Error('Invalid spend');
     groups.set(key, group);
   }
   return [...groups.values()].map(group => ({ currency: group.currency, total: group.total, daily: [...group.byDay].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, value })) }));

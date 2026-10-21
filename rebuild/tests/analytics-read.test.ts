@@ -85,13 +85,34 @@ describe('shared Analytics read service', () => {
     expect(state.load).toHaveBeenCalledOnce();
   });
 
-  it('uses explicit empty channel filters while allowing ad-account-only reports', async () => {
-    const result = await readAnalytics(actor, { filter: '1', channel: [], adFilter: '1', adAccount: ['ad-2'] });
-    expect(result.selected).toEqual({ channelIds: [], adAccountIds: ['ad-2'] });
-    expect(result.metrics.items.map(item => item.key)).toEqual(['spend::USD']);
-    expect(result.audience).toMatchObject({ total: 0, covered: 0, selected: 0 });
-    expect(state.groupBy).not.toHaveBeenCalled();
-    expect(state.load.mock.calls.map(call => [call[1], call[4]])).toEqual([[[], ['ad-2']]]);
+  it('refuses ad-account selections instead of mixing paid reporting into channels', async () => {
+    await expect(readAnalytics(actor, { filter: '1', channel: [], adFilter: '1', adAccount: ['ad-2'] })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.load).not.toHaveBeenCalled();
+  });
+
+  it('defaults to channel-only reporting and never exposes ad account options', async () => {
+    const result = await readAnalyticsSnapshot(actor, { start: '2026-10-10', end: '2026-10-12', compare: 'previous' });
+    expect(result.selected).toEqual({ channelIds: ['channel-1', 'channel-2'], adAccountIds: [] });
+    expect(result.options.adAccounts).toEqual([]);
+    expect(result.allMetrics.map(metric => metric.key).sort()).toEqual(['followers', 'views']);
+    for (const call of state.load.mock.calls) {
+      expect(call[4]).toEqual([]);
+      expect(call[6]).toEqual({ accountIds: [] });
+    }
+  });
+
+  it('excludes paid resource metadata from metrics, catalog, search and comparisons', async () => {
+    const load = state.load.getMockImplementation()!;
+    state.load.mockImplementation(async (...args: unknown[]) => {
+      const result = await load(...args);
+      return { ...result, metrics: [...result.metrics, { key: 'paid-reach', label: 'Paid reach', sourceLabel: 'Any localized source', resourceKind: 'ad-account', kind: 'flow', unit: 'count', available: 1, observations: [{ date: day('2026-10-12'), channelId: 'ad-1', channelLabel: 'Account One', value: 40 }] }] };
+    });
+    const snapshot = await readAnalyticsSnapshot(actor, { start: '2026-10-10', end: '2026-10-12', compare: 'previous' });
+    expect(snapshot.options.metrics.map(metric => metric.key)).not.toContain('paid-reach');
+    expect(snapshot.allMetrics.map(metric => metric.key)).not.toContain('paid-reach');
+    expect(snapshot.comparisons).not.toHaveProperty('paid-reach');
+    await expect(readAnalytics(actor, { metric: 'paid-reach' })).rejects.toMatchObject({ code: 'forbidden' });
+    expect((await readAnalyticsSnapshot(actor, { search: 'paid' })).allMetrics).toEqual([]);
   });
 
   it('loads explicit selections once, including explicitly empty filters', async () => {
@@ -106,12 +127,12 @@ describe('shared Analytics read service', () => {
   });
 
   it('returns canonical UTC periods, same-scope previous comparisons, and publishing counts', async () => {
-    const result = await readAnalytics(actor, { start: '2026-10-10', end: '2026-10-12', compare: 'previous', filter: '1', channel: 'channel-1', adFilter: '1', adAccount: 'ad-2' });
+    const result = await readAnalytics(actor, { start: '2026-10-10', end: '2026-10-12', compare: 'previous', filter: '1', channel: 'channel-1', adFilter: '1', adAccount: [] });
     expect(result.period).toMatchObject({ start: '2026-10-10', end: '2026-10-12', comparison: { mode: 'previous', start: '2026-10-07', end: '2026-10-09' } });
-    expect(result.selected).toEqual({ channelIds: ['channel-1'], adAccountIds: ['ad-2'] });
+    expect(result.selected).toEqual({ channelIds: ['channel-1'], adAccountIds: [] });
     expect(result.publishing).toEqual({ published: 3, scheduled: 2, failed: 5 });
     expect(result.comparisons.views).toMatchObject({ previous: 6, delta: 3, status: 'comparable' });
-    expect(state.load.mock.calls.map(call => [call[1], call[4]])).toEqual([[['channel-1'], ['ad-2']], [['channel-1'], ['ad-2']]]);
+    expect(state.load.mock.calls.map(call => [call[1], call[4]])).toEqual([[['channel-1'], []], [['channel-1'], []]]);
     expect(result.query).toContain('filter=1'); expect(result.query).toContain('adFilter=1');
   });
 
@@ -136,9 +157,9 @@ describe('shared Analytics read service', () => {
   });
 
   it('applies metric search to export snapshots while keeping the full metric catalog available', async () => {
-    const snapshot = await readAnalyticsSnapshot(actor, { search: 'spend', page: '3', pointPage: '2' });
-    expect(snapshot.allMetrics.map(metric => metric.key)).toEqual(['spend::USD']);
-    expect(snapshot.options.metrics.map(metric => metric.key)).toEqual(['spend::USD', 'followers', 'views']);
+    const snapshot = await readAnalyticsSnapshot(actor, { search: 'views', page: '3', pointPage: '2' });
+    expect(snapshot.allMetrics.map(metric => metric.key)).toEqual(['views']);
+    expect(snapshot.options.metrics.map(metric => metric.key)).toEqual(['views', 'followers']);
     const query = new URLSearchParams(snapshot.query);
     expect(query.get('page')).toBe('3'); expect(query.get('pointPage')).toBe('2');
   });

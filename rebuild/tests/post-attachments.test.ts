@@ -215,8 +215,8 @@ describe('shared post attachment editor', () => {
   it('shows only supported add controls and hides local upload without MIME support', async () => {
     await render({ allowedKinds: ['image'], allowedMimeTypes: [] });
 
-    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Add image URL')).toBe(true);
-    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Add video URL')).toBe(false);
+    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Add media link')).toBe(true);
+    expect(Array.from(container.querySelectorAll('button')).some(button => /Add (image|video) URL/.test(button.textContent ?? ''))).toBe(false);
     expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Add local images')).toBe(false);
     expect(container.querySelector('input[data-testid="local-image-input"]')).toBeNull();
   });

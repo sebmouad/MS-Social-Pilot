@@ -3,11 +3,15 @@ import { recordsCopyDefaults, type RecordsCopy } from '../../records-copy';
 import { useMemo, useState } from 'react';
 import { IconChartBar, IconExternalLink } from '@tabler/icons-react';
 import { Avatar } from '@/components/Avatar';
+import { PostThumb } from '@/components/PostThumb';
+import type { PostThumbnail } from '@/components/post-thumbnail';
 import { DataTable } from '@/components/DataTable';
 import '../analytics.css';
 
 export type PostsTableRow = {
   key: string; text: string; url: string | null; channelName: string;
+  /** Image, video poster or stored picture to show beside the post; null shows a quiet placeholder. */
+  thumbnail?: PostThumbnail | null;
   publishedAt: string | null; measuredAt: string | null;
   /** Stored measure values by key; null is unknown, never zero. */
   measures: Record<string, number | null>;
@@ -55,10 +59,10 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
       emptyIcon={<IconChartBar />} emptyMessage={t("No published posts for this selection and period.")} emptyAction={emptyAction}
       columns={[
         { key: 'post', label: t("Post"), hideCardLabel: true, render: row => <span className="analytics-posts__post">
-          <Avatar name={row.channelName} size="sm" decorative />
+          <span data-module="analytics" className="analytics-posts__media"><PostThumb thumb={row.thumbnail ?? null} size="sm" /></span>
           <span className="analytics-posts__text">
             {row.url ? <a href={row.url} rel="noreferrer" target="_blank">{row.text || unavailable}<IconExternalLink size={14} aria-hidden="true" /></a> : <span>{row.text || unavailable}</span>}
-            <small>{row.channelName}</small>
+            <small className="analytics-posts__channel"><Avatar name={row.channelName} size="sm" decorative />{row.channelName}</small>
           </span>
         </span> },
         { key: 'publishedAt', label: t("Published"), render: row => when(row.publishedAt) },

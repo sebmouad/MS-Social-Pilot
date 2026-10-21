@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 import { Button, ChannelBadge, Dialog, StatusChip } from "@/components";
 import { OriginBadge } from "../origins/OriginBadge";
 import { PostPreview } from "@/components/PostPreview";
+import { PostThumb } from "@/components/PostThumb";
+import { postThumbnail } from "@/components/post-thumbnail";
 import { SidebarDock } from "@/components/SidebarDock";
 import { instantToWall, wallTimeToInstant } from "@/lib/calendar-dates";
 import { moveCandidates } from "@/lib/reschedule";
@@ -52,7 +54,10 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
   const postCard = (post: BoardPost) => <div key={post.id} className={styles.post} data-status={post.status} data-movable={post.movable || undefined} style={post.channels[0] ? { ["--chip" as string]: post.channels[0].mark.color } : undefined}
     draggable={post.movable} onDragStart={event => { dragged.current = post; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", post.id); }} onDragEnd={() => { dragged.current = null; setOver(null); }}>
     <div className={styles.postMeta}><time dateTime={post.whenIso}>{timeOf(post)}</time><StatusChip status={post.status} compact /></div>
-    <p className={styles.postText} title={post.text}>{post.text || copy.calendarNoText}</p>
+    <div className={styles.postBody}>
+      {post.preview && postThumbnail(post.preview.media) ? <PostThumb thumb={postThumbnail(post.preview.media)} size="sm" /> : null}
+      <p className={styles.postText} title={post.text}>{post.text || copy.calendarNoText}</p>
+    </div>
     {post.origin ? <OriginBadge origin={post.origin} compact /> : null}
     <div className={styles.postChannels}>{post.channels.length ? post.channels.slice(0, 4).map(channel => <ChannelBadge key={channel.id} name={channel.name} platformName={channel.platformName} mark={channel.mark} compact />) : <span className={styles.muted}>{copy.calendarNoChannels}</span>}{post.channels.length > 4 && <span className={styles.muted}>+{post.channels.length - 4}</span>}</div>
     {post.movable && <button type="button" className={styles.moveButton} aria-haspopup="dialog" onClick={() => startMove(post)}>{copy.move}<span className="ui-visually-hidden">{fillCopy(copy.movePostLabel, {text: post.text.slice(0, 40) || copy.noText, time: timeOf(post)})}</span></button>}

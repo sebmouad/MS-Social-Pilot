@@ -18,3 +18,5 @@
 .buttons{display:flex;flex-wrap:wrap;gap:.5rem}
 .notice{margin:0;padding:1rem;border:1px dashed var(--line-strong);border-radius:var(--radius-md);color:var(--ink-soft)}
 .error{margin:0;color:var(--danger);font-size:.85rem}
+
+.logo{width:auto;max-width:8rem;height:2.25rem;object-fit:contain}

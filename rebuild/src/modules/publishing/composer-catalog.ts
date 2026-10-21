@@ -1467,6 +1467,34 @@ export const composerCatalogDefaults = {
     "en": "Add video URL",
     "fr": "Ajouter une URL de vidéo"
   },
+  "attachments_addLink": {
+    "en": "Add media link",
+    "fr": "Ajouter un lien média"
+  },
+  "attachments_linkLabel": {
+    "en": "Media link {n} (image or video)",
+    "fr": "Lien média {n} (image ou vidéo)"
+  },
+  "attachments_typeLabel": {
+    "en": "Type",
+    "fr": "Type"
+  },
+  "attachments_detecting": {
+    "en": "Checking the link…",
+    "fr": "Vérification du lien…"
+  },
+  "attachments_detectedImage": {
+    "en": "Recognised as an image.",
+    "fr": "Reconnu comme une image."
+  },
+  "attachments_detectedVideo": {
+    "en": "Recognised as a video.",
+    "fr": "Reconnu comme une vidéo."
+  },
+  "attachments_detectUnknown": {
+    "en": "We could not tell what this link is. Choose its type below; it is checked again when the post is saved.",
+    "fr": "Nous n’avons pas pu reconnaître ce lien. Choisissez son type ci-dessous ; il sera revérifié à l’enregistrement."
+  },
   "attachments_addLocal": {
     "en": "Add local images",
     "fr": "Ajouter des images locales"

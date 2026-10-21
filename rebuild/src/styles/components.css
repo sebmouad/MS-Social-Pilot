@@ -361,3 +361,13 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
 .ui-avatar-stack { display: inline-flex; align-items: center; }
 .ui-avatar-stack .ui-avatar { box-shadow: 0 0 0 2px var(--surface); }
 .ui-avatar-stack .ui-avatar + .ui-avatar { margin-inline-start: -8px; }
+
+/* Post thumbnail (PostThumb): module-tinted tile, image fills it, play mark and count overlay. */
+.ui-post-thumb { --thumb: var(--post-thumb-md); position: relative; display: inline-grid; flex: 0 0 auto; place-items: center; width: var(--thumb); height: var(--thumb); overflow: hidden; border-radius: var(--radius-sm); background: var(--mod-soft, var(--surface-muted)); color: var(--mod, var(--ink-soft)); }
+.ui-post-thumb[data-size="sm"] { --thumb: var(--post-thumb-sm); }
+.ui-post-thumb[data-size="lg"] { --thumb: var(--post-thumb-lg); }
+.ui-post-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ui-post-thumb[data-empty] { border: 1px dashed var(--line-strong); }
+.ui-post-thumb__play { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; background: color-mix(in srgb, #000 28%, transparent); }
+.ui-post-thumb__count { position: absolute; right: 3px; bottom: 3px; padding: 0 5px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 78%, transparent); color: var(--surface); font-size: 10px; font-weight: 750; }
+@media (forced-colors: active) { .ui-post-thumb { border: 1px solid CanvasText; } }

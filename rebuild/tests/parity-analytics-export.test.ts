@@ -19,11 +19,11 @@ import { ANALYTICS_MCP } from '@/modules/analytics/mcp';
 const group = ANALYTICS_MCP.find(g => g.id === 'analytics-report-export')!;
 const viewer = { userId: 'user', workspaceId: 'workspace', allowedAdAccountIds: ['account-a'], adAccountTargetScope: { all: false, ids: ['channel-b'] } } as unknown as McpViewer;
 beforeEach(() => { vi.clearAllMocks(); m.config.mockResolvedValue(100); m.read.mockResolvedValue({ period: { start: '2026-10-01', end: '2026-10-02' } }); m.csv.mockReturnValue({ csv: 'sample\r\n', rowCount: 1, truncated: true }); });
-it('uses the same Analytics Reports snapshot/CSV core with independent resource ceilings', async () => {
-  const args = { targetIds: ['channel-a'], adAccountIds: ['account-a'], start: '2026-10-01', end: '2026-10-02', compare: 'previous' };
+it('uses the same Analytics Reports snapshot/CSV core with channel selection and credential ceilings', async () => {
+  const args = { targetIds: ['channel-a'], start: '2026-10-01', end: '2026-10-02', compare: 'previous' };
   const result = await group.execute(viewer, 'export_analytics_report', args, 2);
   expect(group.features.export_analytics_report).toBe('analytics/reports');
-  expect(m.read).toHaveBeenCalledWith(viewer, { filter: '1', channel: ['channel-a'], adFilter: '1', adAccount: ['account-a'], start: '2026-10-01', end: '2026-10-02', compare: 'previous' }, { allowedChannelIds: ['channel-a'], feature: 'analytics/reports' });
+  expect(m.read).toHaveBeenCalledWith(viewer, { filter: '1', channel: ['channel-a'], start: '2026-10-01', end: '2026-10-02', compare: 'previous' }, { allowedChannelIds: ['channel-a'], feature: 'analytics/reports' });
   expect(m.csv).toHaveBeenCalledWith(expect.anything(), 2);
   expect(result).toMatchObject({ fileName: 'report-2026-10-01-2026-10-02.csv', byteLength: 8, truncated: true });
 });
@@ -37,4 +37,13 @@ it('does not widen a service refusal or overlong credential selection', async ()
   await expect(group.execute(viewer, 'export_analytics_report', {}, 5)).rejects.toMatchObject({ code: 'forbidden' });
   await expect(group.execute({ ...viewer, maxResultItems: 1 }, 'export_analytics_report', { targetIds: ['a', 'b'] }, 1)).rejects.toMatchObject({ code: 'invalid_request' });
   expect(m.csv).not.toHaveBeenCalled();
+});
+
+it('advertises channel-only overview, metric details and export filters', () => {
+  const tools = ANALYTICS_MCP.flatMap(group => group.tools ?? []);
+  for (const name of ['get_analytics_overview', 'get_analytics_metric_details', 'export_analytics_report']) {
+    const schema = tools.find(tool => tool.name === name)!.inputSchema as { properties: Record<string, unknown> };
+    expect(schema.properties).toHaveProperty('targetIds');
+    expect(schema.properties).not.toHaveProperty('adAccountIds');
+  }
 });

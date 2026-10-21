@@ -4,6 +4,8 @@ import { Badge } from '@/components/Badge';
 import { EmptyState } from '@/components/EmptyState';
 import { MetricCard, type MetricDelta } from '@/components/MetricCard';
 import { PageHeader } from '@/components/PageHeader';
+import { PostThumb } from '@/components/PostThumb';
+import type { PostThumbnail } from '@/components/post-thumbnail';
 import { BarChart, DonutChart, HeatmapChart } from '@/components/charts';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -67,7 +69,7 @@ function Kpi({ title, icon, totals, overview, t, locale }: { title: string; icon
   const partial = totals.comparable > 0 && totals.comparable < totals.covered;
   return <Tile module="analytics" span="span4" href={HREF.analytics} linkLabel={fill(t.openModule, { name: t.moduleNames.analytics })}>
     <MetricCard module="analytics" icon={icon} label={title} value={totals.current === null ? null : number.format(totals.current)} unavailable={totals.current === null ? t.unknownFigure : undefined} delta={delta}
-      hint={!delta ? t.noComparison : partial ? fill(t.comparableNote, { comparable: totals.comparable, covered: totals.covered }) : undefined} />
+      hint={<>{fill(t.channelsNote, { covered: totals.covered, channels: overview.channelCount })}<br />{!delta ? t.noComparison : partial ? fill(t.comparableNote, { comparable: totals.comparable, covered: totals.covered }) : undefined}</>} />
   </Tile>;
 }
 
@@ -87,6 +89,7 @@ export default async function HomePage() {
   const days = overview.lookbackDays;
   const performance = overview.performance;
   const ready = performance?.state === 'ready' ? performance.data : null;
+  const readyAds = overview.ads?.state === 'ready' ? overview.ads.data : null;
 
   return <PageFrame module="home"><div className={styles.root}>
     <PageHeader module="home" title={`${t.greeting}, ${viewer.membership.workspace.name}`} description={t.lead}
@@ -122,6 +125,7 @@ export default async function HomePage() {
         <Card module="analytics" icon={<IconChartDonut size={20} />} title={t.interactions} t={t} span="span6" id="home-mix">
           {ready.interactions.length ? <DonutChart label={fill(t.interactionsLabel, { n: days })} locale={locale} totalLabel={t.interactionsTotal} slices={ready.interactions.map(item => ({ name: item.label, value: item.value }))} />
             : <p className={styles.note}>{t.interactionsEmpty}</p>}
+          {ready.truncated && <p className={styles.note}>{fill(t.truncatedNote, { n: ready.channels })}</p>}
         </Card>
       </>}
 
@@ -137,10 +141,13 @@ export default async function HomePage() {
       {overview.upcoming && <Card module="publishing" icon={<IconCalendarEvent size={20} />} title={t.upcoming} t={t} span="span4" id="home-upcoming">
         <Body section={overview.upcoming} t={t} empty={<Empty title={t.upcomingEmptyTitle} body={t.upcomingEmptyBody} action={t.upcomingEmptyAction} href="/publishing/compose" />}>
           {upcoming => <>
-            <ul className={styles.list}>{upcoming.items.map(item => <li className={styles.item} key={item.id}>
-              <strong>{item.text || '—'}</strong>
-              <span className={styles.meta}><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time><Badge tone="module" module="publishing">{t[MODE_COPY[item.mode]]}</Badge></span>
-              <span className={styles.meta}>{item.channels.join(', ')}</span>
+            <ul className={styles.list}>{upcoming.items.map(item => <li className={styles.item} key={item.id} data-module="publishing">
+              <PostThumb thumb={(item as typeof item & { thumbnail?: PostThumbnail | null }).thumbnail ?? null} size="md" />
+              <div className={styles.itemBody}>
+                <strong>{item.text || '—'}</strong>
+                <span className={styles.meta}><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time><Badge tone="module" module="publishing">{t[MODE_COPY[item.mode]]}</Badge></span>
+                <span className={styles.meta}>{item.channels.join(', ')}</span>
+              </div>
             </li>)}</ul>
             {upcoming.total > upcoming.items.length && <p className={styles.note}>{fill(t.upcomingMore, { n: upcoming.total })}</p>}
             <a className={styles.link} href="/publishing/queue">{t.viewQueue}</a>
@@ -154,11 +161,13 @@ export default async function HomePage() {
         </Tile>
         : overview.inbox.state === 'unavailable' ? <Card module="inbox" icon={<IconInbox size={20} />} title={t.inbox} t={t} span="span4" id="home-inbox"><Unavailable t={t} /></Card> : null)}
 
-      {overview.ads && (overview.ads.state === 'ready'
-        ? overview.ads.data.spend.map((group, _index, all) => <Tile key={group.currency ?? 'none'} module="ads" span="span4" href={HREF.ads} linkLabel={fill(t.openModule, { name: t.moduleNames.ads })}>
-          <MetricCard module="ads" icon={<IconSpeakerphone size={20} />} label={all.length > 1 && group.currency ? `${t.adSpend} · ${group.currency}` : t.adSpend}
-            value={new Intl.NumberFormat(locale, group.currency ? { style: 'currency', currency: group.currency } : undefined).format(group.total)} hint={fill(t.adSpendNote, { n: days })}
-            sparkline={all.length === 1 && group.daily.length > 1 ? group.daily.map(day => day.v) : undefined} sparklineLabel={fill(t.adSpendTrend, { n: days })} />
+      {overview.ads && (readyAds
+        ? readyAds.spend.map((group, _index, all) => <Tile key={group.currency ?? 'none'} module="ads" span="span4" href={HREF.ads} linkLabel={fill(t.openModule, { name: t.moduleNames.ads })}>
+          <MetricCard module="ads" icon={<IconSpeakerphone size={20} />} label={t.adSpend}
+            value={new Intl.NumberFormat(locale, group.currency ? { style: 'currency', currency: group.currency, currencyDisplay: 'code' } : undefined).format(group.total)}
+            hint={fill(t.adSpendNote, { n: days, from: dayFormat.format(new Date(readyAds.start)),
+              to: dayFormat.format(new Date(readyAds.end)), recorded: group.recordedDays, latest: dayFormat.format(new Date(group.lastDay)) })}
+            sparkline={all.length === 1 && group.recordedDays === days && group.daily.length > 1 ? group.daily.map(day => day.v) : undefined} sparklineLabel={fill(t.adSpendTrend, { n: days })} />
         </Tile>)
         : <Card module="ads" icon={<IconSpeakerphone size={20} />} title={t.adSpend} t={t} span="span4" id="home-ads">
           <Body section={overview.ads} t={t} empty={<Empty title={t.adsEmptyTitle} body={t.adsEmptyBody} action={t.adsEmptyAction} href={HREF.ads} />}>{() => null}</Body>

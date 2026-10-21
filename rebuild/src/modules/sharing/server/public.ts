@@ -1,3 +1,5 @@
+import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';
+import { sharingPresentationPolicy, publicWorkspaceLogo } from './presentation';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
 import type { ReviewParticipant } from '@/modules/publishing/server/lifecycle';
@@ -21,7 +23,7 @@ import { REVIEW_NOTE_MAX, getReviewPort } from './review-port';
  * scoped, currently enabled channels and post content already intended for review: never
  * author ids, remote ids, errors, approval notes, tokens, drafts or internal status.
  */
-export type PublicLink = { id: string; workspaceId: string; kind: ShareKind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; createdById: string; workspaceName: string; timezone: string; tokenHash: string; creatorScope: string[] | null; providers: readonly string[] };
+export type PublicLink = { id: string; workspaceId: string; kind: ShareKind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; createdById: string; workspaceName: string; workspaceLogoUrl?: string | null; timezone: string; tokenHash: string; creatorScope: string[] | null; providers: readonly string[] };
 export type PublicAccess<T> = { ok: true; value: T } | { ok: false; reason: 'not_found' | 'rate_limited' };
 type Row = Omit<PublicLink, 'targetIds' | 'workspaceName' | 'tokenHash' | 'creatorScope' | 'providers'> & { targetIds: unknown; workspaceName: string; tokenHash: string };
 const notFound = { ok: false, reason: 'not_found' } as const;
@@ -40,7 +42,7 @@ export async function resolvePublicLink(token: string, address: string | null, b
   // A known address is counted before the lookup. With an unknown address the per-link window is created only once
   // the link is found, so guessed tokens never create windows (the digest lookup itself is then limited at the proxy).
   if (address && !allowed()) return { ok: false, reason: 'rate_limited' };
-  const rows = await prisma.$queryRaw<Row[]>`SELECT l.id, l."workspaceId", l.kind, l.title, l.description, l."targetIds", l."daysBack", l."daysAhead", l."allowComments", l.decides, l."createdById", l."tokenHash", w.name AS "workspaceName", w.timezone FROM share_links l JOIN workspaces w ON w.id = l."workspaceId" WHERE l."tokenHash" = ${tokenHash} AND l."revokedAt" IS NULL AND l."expiresAt" IS NOT NULL AND l."expiresAt" > NOW() AND w."suspendedAt" IS NULL AND NOT EXISTS (SELECT 1 FROM workspace_data_purges p WHERE p."workspaceId" = w.id AND p.status <> 'completed') LIMIT 1`;
+  const rows = await prisma.$queryRaw<Row[]>`SELECT l.id, l."workspaceId", l.kind, l.title, l.description, l."targetIds", l."daysBack", l."daysAhead", l."allowComments", l.decides, l."createdById", l."tokenHash", w.name AS "workspaceName", w."logoUrl" AS "workspaceLogoUrl", w.timezone FROM share_links l JOIN workspaces w ON w.id = l."workspaceId" WHERE l."tokenHash" = ${tokenHash} AND l."revokedAt" IS NULL AND l."expiresAt" IS NOT NULL AND l."expiresAt" > NOW() AND w."suspendedAt" IS NULL AND NOT EXISTS (SELECT 1 FROM workspace_data_purges p WHERE p."workspaceId" = w.id AND p.status <> 'completed') LIMIT 1`;
   const row = rows[0]; if (!row) return notFound;
   // Corrupt legacy selections must never normalize into the intentional empty-array all-channels grant.
   if (!Array.isArray(row.targetIds) || row.targetIds.some(id => typeof id !== 'string' || !id.length)) return notFound;
@@ -54,8 +56,9 @@ export async function resolvePublicLink(token: string, address: string | null, b
   // Post content is Publishing data: it is served only while the creator can currently read the Publishing features this kind shows.
   const needed: readonly string[] | undefined = KIND_PUBLISHING_FEATURES[row.kind];
   if (!needed || needed.some(feature => !creator.publishing.includes(feature))) return notFound;
-  const { tokenHash: _stored, ...rest } = row; void _stored;
-  return { ok: true, value: { ...rest, decides: rest.decides && creator.canApprove, targetIds: ids(row.targetIds), tokenHash, providers: creator.providers, creatorScope: creator.scope === null ? null : [...creator.scope] } };
+  const presentation = await sharingPresentationPolicy();
+  const { tokenHash: _stored, workspaceLogoUrl, ...rest } = row; void _stored;
+  return { ok: true, value: { ...rest, workspaceLogoUrl: publicWorkspaceLogo(workspaceLogoUrl, presentation), decides: rest.decides && creator.canApprove, targetIds: ids(row.targetIds), tokenHash, providers: creator.providers, creatorScope: creator.scope === null ? null : [...creator.scope] } };
 }
 
 export type PublicStatus = 'awaiting_review' | 'planned' | 'published';
@@ -203,8 +206,10 @@ export async function submitDecision(token: string, address: string | null, inpu
   if (comment && !link.allowComments) throw await sharingError('invalid_request', 'Comments are switched off for this link.');
   const [post] = await loadPosts(link, 'review', 1, data.postId);
   if (!post) return notFound;
+  const presentation = await sharingPresentationPolicy();
+  const answerId = randomUUID();
   const insert = async (tx: Pick<Prisma.TransactionClient, '$executeRaw'>) => {
-    const stored = await tx.$executeRaw`INSERT INTO review_decisions (id, "shareLinkId", "postId", decision, comment, "authorName", "createdAt") VALUES (${randomUUID()}, ${link.id}, ${post.id}, ${data.decision}, ${comment}, ${data.authorName}, NOW())`;
+    const stored = await tx.$executeRaw`INSERT INTO review_decisions (id, "shareLinkId", "postId", decision, comment, "authorName", "createdAt") VALUES (${answerId}, ${link.id}, ${post.id}, ${data.decision}, ${comment}, ${data.authorName}, NOW())`;
     if (stored !== 1) throw await sharingError('unavailable', 'Your answer could not be stored.');
   };
   const unconfirmed = () => sharingError('upstream_failure', 'Your answer could not be confirmed. Reload the page to see whether it was received before trying again.');
@@ -215,6 +220,11 @@ export async function submitDecision(token: string, address: string | null, inpu
       await prisma.$transaction(async tx => {
         await lockPublicLinkForMutation(tx, link, post.id, false);
         await insert(tx);
+        // Applied answers already notify through Publishing; advisory decisions use its
+        // recipient eligibility, post-author restriction and personal email preferences.
+        if (data.decision !== 'comment' && presentation.advisoryDecisionNotificationsEnabled) {
+          await emitWorkspaceAlert(tx, { workspaceId: link.workspaceId, eventId: answerId, kind: 'approval_decision', postId: post.id });
+        }
         await audit(tx, { userId: link.createdById, workspaceId: link.workspaceId }, 'sharing.client_answer_recorded', { linkId: link.id, postId: post.id, decision: data.decision, applied: false, reason, commentCharacters: comment?.length ?? 0, via: 'share_link' });
       }, { timeout: limits.transactionTimeoutMs!, maxWait: limits.transactionMaxWaitMs! });
       return { ok: true, value: null };

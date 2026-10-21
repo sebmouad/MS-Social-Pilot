@@ -8,6 +8,8 @@ import { z } from 'zod';
 const row = (en: string, fr: string) => ({ en, fr });
 
 export const ownerCopy = {
+  'I confirm these changes. The address stays the same.': row('I confirm these changes. The address stays the same.', 'Je confirme ces modifications. L’adresse reste identique.'),
+  'When the team makes the final decision, client answers can notify the post author. Email follows their preferences; comments stay in Feedback.': row('When the team makes the final decision, client answers can notify the post author. Email follows their preferences; comments stay in Feedback.', 'Quand l’équipe prend la décision finale, les réponses du client peuvent avertir l’auteur de la publication. L’e-mail suit ses préférences ; les commentaires restent dans les retours.'),
   // Screens
   'Client sharing': row('Client sharing', 'Partage client'),
   'Give clients limited access to {0} without an account.': row('Give clients limited access to {0} without an account.', 'Donnez à vos clients un accès limité à {0}, sans compte.'),

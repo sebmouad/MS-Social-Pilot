@@ -208,7 +208,9 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     allowedKinds: allowedKinds(selected, formatChoices),
     allowMixedKinds: !selected.length || selected.every(target => mediaSupport(target, formatChoices)?.mixedKinds === true),
   });
-  const templateContentExists = Boolean(message.trim() || firstComment.trim() || link.trim() || attachments.items.length);
+  // The delay only matters with a first comment (or a value already set, e.g. from a template or an error to fix).
+  const showCommentDelay = Boolean(firstComment.trim() || firstCommentDelayError || (firstCommentDelayMinutes !== '' && Number(firstCommentDelayMinutes) !== 0));
+  const templateContentExists =Boolean(message.trim() || firstComment.trim() || link.trim() || attachments.items.length);
   const visibleTemplates = templates.filter(template => `${template.name} ${template.category} ${template.body}`.toLocaleLowerCase().includes(templateSearch.trim().toLocaleLowerCase()));
   function chooseTemplate(template: ComposerTemplate) {
     setTemplateChooserOpen(false);
@@ -397,10 +399,13 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
       <Step n={4} title={text.firstComment}>
       <label htmlFor="composer-first-comment">{ui.firstComment}<span>{ui.optional}</span></label>
       <AutoTextarea id="composer-first-comment" name="firstComment" disabled={saved} value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder={ui.commentPlaceholder} />
+      {!showCommentDelay && <input type="hidden" name="firstCommentDelayMinutes" value={firstCommentDelayMinutes} />}
+      {showCommentDelay && <>
       <label htmlFor="composer-first-comment-delay">{ui.commentDelay}<span>{ui.delayHint}</span></label>
       <input id="composer-first-comment-delay" name="firstCommentDelayMinutes" type="number" inputMode="numeric" min={0} max={maxFirstCommentDelayMinutes} step={1} value={firstCommentDelayMinutes} disabled={saved} aria-invalid={Boolean(firstCommentDelayError)} aria-describedby={`composer-first-comment-delay-help${firstCommentDelayError ? ' composer-first-comment-delay-error' : ''}`} onChange={event => { setFirstCommentDelayMinutes(event.currentTarget.value); setFirstCommentDelayError(''); }} />
       <p id="composer-first-comment-delay-help" className={styles.fieldHelp}>{fillComposerCopy(ui.delayRange, { max: maxFirstCommentDelayMinutes.toLocaleString() })} {ui.delayApplies}</p>
       {firstCommentDelayError && <p id="composer-first-comment-delay-error" className={styles.error} role="alert">{firstCommentDelayError}</p>}
+      </>}
       <input type="hidden" name="labelId" value={labelId} />
       <input type="hidden" name="queueLocale" value={aiLocale} />
       <input type="hidden" name="destinationFormatsJson" value={destinationFormatsJson} />

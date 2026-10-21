@@ -2,6 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveOwnerCopy } from '../src/modules/sharing/ui/owner-copy';
 import { LinksManager } from '../src/modules/sharing/ui/links/LinksManager';
 
 vi.mock('../src/modules/sharing/ui/links/sharing.module.css', () => ({ default: {} }));
@@ -83,13 +84,15 @@ describe('creating a link', () => {
 describe('editing a link', () => {
   const edit = async (links = [link()]) => { await mount(links); await click(button(/^Edit/)); };
 
-  it('sends a metadata-only edit with the version, without confirmation, and keeps the address', async () => {
+  it('sends a metadata-only edit with the version, with confirmation, and keeps the address', async () => {
     await edit();
     expect(document.body.textContent).not.toContain('replace the link');
     await type(field('Title'), 'Spring campaign v2');
-    expect(button('Save changes')).toBeTruthy();
+    expect(button('Save changes').disabled).toBe(true);
+    await click(checkbox('I confirm these changes.'));
+    if (button('Save changes').disabled) await click(checkbox('I confirm these changes.'));
     await click(button('Save changes'));
-    expect(body()).toEqual({ title: 'Spring campaign v2', expectedVersion: 'a'.repeat(32) });
+    expect(body()).toEqual({ title: 'Spring campaign v2', confirmation: 'UPDATE SHARE LINK shl_secret-internal-id', expectedVersion: 'a'.repeat(32) });
     expect(document.body.textContent).toContain('The address is unchanged');
     expect(document.body.textContent).not.toContain('Copy the new address');
   });
@@ -115,6 +118,7 @@ describe('editing a link', () => {
     await edit([link({ targetIds: ['c1', 'gone'] })]);
     expect(document.body.textContent).toContain('no longer available');
     await type(field('Title'), 'Renamed');
+    if (button('Save changes').disabled) await click(checkbox('I confirm these changes.'));
     await click(button('Save changes'));
     expect(body().targetIds).toBeUndefined();
     await click(button(/^Edit/)); // reopen
@@ -128,12 +132,14 @@ describe('editing a link', () => {
       : json({ links: [link({ title: 'Changed elsewhere', version: 'b'.repeat(32) })], page: 1, hasMore: false }));
     await edit();
     await type(field('Title'), 'My change');
+    if (button('Save changes').disabled) await click(checkbox('I confirm these changes.'));
     await click(button('Save changes'));
     expect(document.body.textContent).toContain('changed by someone else');
     expect(field('Title').value).toBe('My change');
     await click(button(/Reload latest/));
     expect(field('Title').value).toBe('Changed elsewhere');
     await type(field('Title'), 'Changed elsewhere again');
+    if (button('Save changes').disabled) await click(checkbox('I confirm these changes.'));
     await click(button('Save changes'));
     expect(writes().at(-1)![1].body).toContain('"expectedVersion":"' + 'b'.repeat(32) + '"');
   });
@@ -154,8 +160,9 @@ describe('editing a link', () => {
     expect(field('Type').disabled).toBe(true);
     expect(checkbox('Let visitors leave comments').disabled).toBe(true);
     await type(field('Title'), 'Old campaign');
+    if (button('Save changes').disabled) await click(checkbox('I confirm these changes.'));
     await click(button('Save changes'));
-    expect(body()).toEqual({ title: 'Old campaign', expectedVersion: 'a'.repeat(32) });
+    expect(body()).toEqual({ title: 'Old campaign', confirmation: 'UPDATE SHARE LINK shl_secret-internal-id', expectedVersion: 'a'.repeat(32) });
   });
 });
 
@@ -207,7 +214,20 @@ describe('feedback and customer wording', () => {
     await click(button(/^Edit/));
     expect(document.querySelectorAll<HTMLInputElement>('fieldset input[type=checkbox]:checked')).toHaveLength(0);
     await type(field('Title'), 'Renamed legacy');
+    if (button('Save changes').disabled) await click(checkbox('I confirm these changes.'));
     await click(button('Save changes'));
     expect(body().targetIds).toBeUndefined();
   });
 });
+
+ describe('French sharing confirmation and notification disclosure', () => {
+  it('requires acknowledgement for a title edit and discloses advisory email limits', async () => {
+    await mount([link()], { copy: resolveOwnerCopy('fr'), initial: { links: [link()], page: 1, hasMore: false, presentation: { workspaceName: 'Studio', workspaceLogoUrl: null, advisoryDecisionNotificationsEnabled: true } } });
+    expect(document.body.textContent).toContain('L’e-mail suit ses préférences');
+    await click(button(/^Modifier/));
+    await type(field('Titre'), 'Nouvelle campagne');
+    expect(button('Enregistrer les modifications').disabled).toBe(true);
+    await click(checkbox('Je confirme ces modifications.'));
+    expect(button('Enregistrer les modifications').disabled).toBe(false);
+  });
+ });

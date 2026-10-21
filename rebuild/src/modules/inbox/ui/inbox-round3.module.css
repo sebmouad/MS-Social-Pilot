@@ -26,9 +26,11 @@
 @media (pointer: coarse) { .quickToggle { min-height: 44px; } }
 
 /* Thread layout with the details panel. */
-.threadGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
-.threadMain { display: grid; align-content: start; gap: 16px; min-width: 0; }
-@media (min-width: 1280px) { .threadGrid { grid-template-columns: minmax(0, 1fr) 280px; align-items: start; } .threadGrid > .details { order: 2; } }
+.threadGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; min-height: 0; flex: 1 1 auto; }
+.threadMain { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 0; }
+@media (min-width: 1280px) { .threadGrid { grid-template-columns: minmax(0, 1fr) 280px; align-items: stretch; } .threadGrid > .details { order: 2; min-height: 0; overflow-y: auto; } }
+@media (min-width: 1280px) { .threadGrid { grid-template-rows: minmax(0, 1fr); } }
+@media (min-width: 901px) and (max-width: 1279px) { .threadGrid { grid-template-rows: auto minmax(0, 1fr); } }
 @media (max-width: 1279px) { .threadGrid > .details { order: -1; } }
 
 .details { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-sunken, var(--surface)); }

@@ -1,6 +1,7 @@
 import { reportDocumentCatalogDefaults, reportDocumentCopySchema } from './reports/generation/copy';
 import { overviewCopyCatalogDefaults, overviewCopySchema } from './overview-copy';
 import { responseTimeCopyDefaults, responseTimeCopySchema, errorCopyDefaults, errorCopySchema, recordsCopyDefaults, recordsCopySchema, workspaceCopyDefaults, workspaceCopySchema, demographicsCopyDefaults, demographicsCopySchema, reportCopyDefaults, goalsCopyDefaults, downloadCopyDefaults, reportCopySchema, goalsCopySchema, downloadCopySchema } from './copy';
+import { overviewOrderDefaults, overviewOrderSchema } from './overview-order';
 import { z } from 'zod';
 import { entry, cron } from '@/lib/config/entry';
 import { DEMOGRAPHICS_CONFIG } from './demographics/config';
@@ -37,6 +38,7 @@ export const ANALYTICS_MODULE_CONFIG = [
   ...ANALYTICS_EXPLORER_CONFIG,
   entry({ key: 'analytics.defaultRangeDays', group: 'Analytics metrics', label: 'Default analytics window (days)', kind: 'number', description: 'Default inclusive UTC calendar window; capped by the maximum range.', defaultValue: 30, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
   entry({ key: 'analytics.metricPageSize', group: 'Analytics metrics', label: 'Metrics per page', kind: 'number', description: 'Number of metric summaries shown on one Analytics page.', defaultValue: 12, schema: z.number().int().min(1).max(100), consumption: 'active' }),
+  entry({ key: 'analytics.overviewOrder', group: 'Analytics metrics', label: 'Overview metric order', kind: 'json', description: 'Which resource kind leads the overview, the metric-key fragments that rank first (views and reach, then engagement, then follows) and whether empty ratio or cost metrics sink to the end.', defaultValue: overviewOrderDefaults, schema: overviewOrderSchema, consumption: 'active' }),
   entry({ key: 'analytics.detailPageSize', group: 'Analytics metrics', label: 'Metric detail rows per page', kind: 'number', description: 'Number of dated values or resource/category rows on one detail page.', defaultValue: 50, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'analytics.chartPoints', group: 'Analytics metrics', label: 'Chart preview points', kind: 'number', description: 'Latest dated points shown in metric previews; full series remains available through detail pagination.', defaultValue: 28, schema: z.number().int().min(1).max(3660), consumption: 'active' }),
   entry({ key: 'analytics.searchMaxLength', group: 'Analytics metrics', label: 'Metric search length', kind: 'number', description: 'Maximum characters accepted by Analytics metric search.', defaultValue: 200, schema: z.number().int().min(1).max(2000), consumption: 'active' }),

@@ -42,12 +42,12 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 describe('dedicated post composer', () => {
   it('exposes a bounded accessible minute field and applies the template delay', async () => {
     await render(targets, [{ id: 'template-a', name: 'Welcome', category: '', body: 'Hello', hashtags: '', firstComment: 'Follow up', firstCommentDelayMinutes: 37, labelId: null }]);
-    const delay = container.querySelector<HTMLInputElement>('#composer-first-comment-delay')!;
-    expect(delay.labels?.[0]?.textContent).toMatch(/minutes/i);
-    expect(delay.min).toBe('0'); expect(delay.max).toBe('10080'); expect(delay.value).toBe('0');
     await act(async () => dock.querySelector<HTMLButtonElement>('button')!.click());
     const choose = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.trim() === 'Use template')!;
     await act(async () => choose.click());
+    const delay = container.querySelector<HTMLInputElement>('#composer-first-comment-delay')!;
+    expect(delay.labels?.[0]?.textContent).toMatch(/minutes/i);
+    expect(delay.min).toBe('0'); expect(delay.max).toBe('10080');
     expect(container.querySelector<HTMLInputElement>('#composer-first-comment-delay')?.value).toBe('37');
     expect(container.querySelector<HTMLTextAreaElement>('#composer-first-comment')?.value).toBe('Follow up');
   });
@@ -100,9 +100,19 @@ describe('dedicated post composer', () => {
     expect((mocks.action.mock.calls[0]![1] as FormData).get('message')).toBe('');
   });
 
+  it('shows the first-comment delay only once there is a first comment, and still submits its value', async () => {
+    await render();
+    expect(container.querySelector('#composer-first-comment-delay')).toBeNull();
+    expect(container.querySelector<HTMLInputElement>('input[type="hidden"][name="firstCommentDelayMinutes"]')?.value).toBe('0');
+    const comment = container.querySelector<HTMLTextAreaElement>('#composer-first-comment')!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
+    await act(async () => { setter.call(comment, 'Link in the first comment'); comment.dispatchEvent(new Event('input', { bubbles: true })); });
+    expect(container.querySelector('#composer-first-comment-delay')).not.toBeNull();
+  });
+
   it('rejects first-comment-only posts when attachment URL rows are still empty', async () => {
     await render();
-    const addImage = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.trim() === 'Add image URL')!;
+    const addImage = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.trim() === 'Add media link')!;
     await act(async () => addImage.click());
     const comment = container.querySelector<HTMLTextAreaElement>('#composer-first-comment')!;
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
@@ -121,7 +131,7 @@ describe('dedicated post composer', () => {
     await act(async () => dock.querySelector<HTMLInputElement>('input[name="targetIds"]')!.click());
 
     expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent?.trim() === 'Add local images')).toBe(false);
-    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent?.trim() === 'Add image URL')).toBe(true);
+    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent?.trim() === 'Add media link')).toBe(true);
   });
 
   it('uploads a selected file once and submits the post once after upload completes', async () => {
@@ -177,8 +187,16 @@ describe('dedicated post composer', () => {
   it('serializes remote media in visible order with each image description attached', async () => {
     await render();
     const addButton = (label: string) => Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent?.trim() === label)!;
-    await act(async () => addButton('Add image URL').click());
-    await act(async () => addButton('Add video URL').click());
+    await act(async () => addButton('Add media link').click());
+    await act(async () => addButton('Add media link').click());
+    expect(container.querySelectorAll('button').length).toBeGreaterThan(0);
+    expect(Array.from(container.querySelectorAll('button')).some(button => /Add (image|video) URL/.test(button.textContent ?? ''))).toBe(false);
+    // Linked media starts as an image; the person (or the loaded preview) can correct the type of the second link.
+    const typeSelect = container.querySelectorAll<HTMLSelectElement>('select')[1]!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(typeSelect, 'video');
+      typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     const urls = Array.from(container.querySelectorAll<HTMLInputElement>('input[name^="mediaUrl-"]'));
     const imageUrl = urls[0]!;
     const videoUrl = urls[1]!;

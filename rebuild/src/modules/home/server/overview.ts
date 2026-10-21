@@ -32,7 +32,7 @@ export type HomeOverview = {
   bestTimes: Section<{ cells: HeatmapCell[]; measuredPosts: number }> | null;
   upcoming: Section<{ total: number; items: Array<{ id: string; text: string; scheduledAt: string; channels: string[]; mode: ScheduleMode }> }> | null;
   inbox: Section<{ open: number }> | null;
-  ads: Section<{ spend: Array<{ currency: string | null; total: number; daily: TrendPoint[] }> }> | null;
+  ads: Section<{ start: string; end: string; spend: Array<{ currency: string | null; total: number; firstDay: string; lastDay: string; recordedDays: number; daily: TrendPoint[] }> }> | null;
 };
 
 /** Payload of one card, without its state wrapper. */
@@ -83,8 +83,8 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
     return hosts.get(provider)!;
   };
 
-  const currentWindow = { from: new Date(now.getTime() - lookbackDays * DAY), to: now };
-  const previousWindow = { from: new Date(now.getTime() - 2 * lookbackDays * DAY), to: currentWindow.from };
+  const currentWindow = { from: new Date(`${period.start}T00:00:00.000Z`), to: now };
+  const previousWindow = { from: new Date(currentWindow.from.getTime() - lookbackDays * DAY), to: currentWindow.from };
 
   const audience = !wantsAnalytics ? null : settled<Data<'audience'>>(async () => {
     if (!snapshot) return { state: 'unavailable' };
@@ -115,7 +115,7 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
     const engagements = periodTotals(rows.map(row => ({ current: row.current?.engagements ?? null, previous: row.previous?.engagements ?? null })));
     if (views.current === null && engagements.current === null) return { state: 'empty' };
     const topLimit = Number(config['home.topChannelsLimit']);
-    const topChannels = rows.flatMap(row => row.current?.engagements != null ? [{ id: row.channel.id, name: row.channel.name, engagements: row.current.engagements }] : [])
+    const topChannels = rows.flatMap(row => row.current?.engagements != null && Number.isFinite(row.current.engagements) ? [{ id: row.channel.id, name: row.channel.name, engagements: row.current.engagements }] : [])
       .sort((a, b) => b.engagements - a.engagements || a.name.localeCompare(b.name)).slice(0, topLimit);
     const mixByKey = new Map<string, { label: string; values: Known[] }>();
     for (const row of rows) for (const measure of row.mix) { const entry = mixByKey.get(measure.key) ?? { label: measure.label, values: [] }; entry.values.push(measure.value); mixByKey.set(measure.key, entry); }
@@ -161,7 +161,9 @@ export async function readHomeOverview(actor: HomeActor, now = new Date()): Prom
       rows.push(...result.rows.map(row => ({ currency: row.currency, spend: row.spend, date: row.date })));
       if (result.nextOffset === null) {
         if (!rows.length) return { state: 'empty' };
-        return { state: 'ready', data: { spend: spendByCurrency(rows).map(group => ({ currency: group.currency, total: group.total, daily: group.daily.map(day => ({ t: dayKey(day.date), v: day.value })) })) } };
+        return { state: 'ready', data: { ...period, spend: spendByCurrency(rows).map(group => ({ currency: group.currency, total: group.total,
+          firstDay: group.daily[0]!.date, lastDay: group.daily[group.daily.length - 1]!.date, recordedDays: group.daily.length,
+          daily: group.daily.map(day => ({ t: dayKey(day.date), v: day.value })) })) } };
       }
       offset = result.nextOffset;
     }

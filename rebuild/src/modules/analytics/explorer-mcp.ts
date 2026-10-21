@@ -8,11 +8,10 @@ export const analyticsExplorerTools = new Set<string>(['get_analytics_explorer']
 export const analyticsExplorerWriteTools = new Set<string>();
 export const analyticsExplorerToolDefinitions = [{
   name: 'get_analytics_explorer',
-  description: 'Explore bounded stored Analytics metrics for selected authorized channels and ad accounts. Search metrics, filter by exact source and data kind, inspect coverage/provenance and continue metric, date-series, or resource pagination. Missing values remain unknown, not zero. No provider request is made.',
+  description: 'Explore bounded stored Analytics metrics for selected authorized channels. Paid metrics are available through Ads reporting. Search metrics, filter by exact source and data kind, inspect coverage/provenance and continue metric, date-series, or resource pagination. Missing values remain unknown, not zero. No provider request is made.',
   inputSchema: { type: 'object', properties: {
     start: { type: 'string', description: 'Inclusive UTC date, YYYY-MM-DD.' }, end: { type: 'string', description: 'Inclusive UTC date, YYYY-MM-DD.' },
     compare: { type: 'string', enum: ['none', 'previous', 'year'] }, filter: { type: 'string', enum: ['1'] }, channel: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] },
-    adFilter: { type: 'string', enum: ['1'] }, adAccount: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] },
     search: { type: 'string' }, source: { type: 'string', maxLength: 200 }, kind: { type: 'string', enum: ['all', 'stock', 'flow', 'ratio', 'breakdown'] },
     metric: { type: 'string' }, page: { type: 'integer', minimum: 1 }, pointPage: { type: 'integer', minimum: 1 }, rowPage: { type: 'integer', minimum: 1 },
   }, additionalProperties: false },

@@ -1,6 +1,6 @@
 import { sharingError } from './messages';
 import { runtimeConfig, runtimeConfigBatch } from '@/server/config/store';
-import { resolveOwnerCopy, type OwnerCopy } from '../ui/owner-copy';
+import { ownerCopy, ownerCopySchema, resolveOwnerCopy, type OwnerCopy } from '../ui/owner-copy';
 import { publicCopy, publicCopyDefaults, publicCopySchema } from '../ui/copy';
 import { SHARING_COPY_CONFIG, SHARING_LIMIT_CONFIG, type SharingCopy, type SharingLimits } from '../config';
 
@@ -25,7 +25,11 @@ export async function sharingLimits(read?: (key: string) => Promise<unknown>): P
 
 /** Customer text of the signed-in sharing screens, resolved to one language for the browser. */
 export async function loadOwnerCopy(locale: 'en' | 'fr'): Promise<Record<string, string>> {
-  return resolveOwnerCopy(locale, await runtimeConfig('sharing.ownerCopy') as OwnerCopy);
+  // Saved catalogs from earlier releases acquire new phrases without losing valid overrides.
+  try {
+    const saved = ownerCopySchema.partial().safeParse(await runtimeConfig('sharing.ownerCopy'));
+    return resolveOwnerCopy(locale, { ...ownerCopy, ...(saved.success ? saved.data : {}) } as OwnerCopy);
+  } catch { return resolveOwnerCopy(locale); }
 }
 
 /** Visitor page text from Root; unreadable or invalid text degrades to the shipped defaults rather than blocking the page. */

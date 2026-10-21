@@ -36,7 +36,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
   try { view = await loadPublicView(link, mode); }
   catch { return <main className={styles.page}><div className={styles.body}><EmptyState tone="error" title={t.loadFailed} /></div></main>; }
   return <main className={styles.page}>
-    <header className={styles.header}><strong>{link.workspaceName}</strong><Badge tone="brand">{t.share.kinds[link.kind] ?? link.kind}</Badge></header>
+    <header className={styles.header}>{link.workspaceLogoUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img className={styles.logo} src={link.workspaceLogoUrl} alt="" referrerPolicy="no-referrer" />}<strong>{link.workspaceName}</strong><Badge tone="brand">{t.share.kinds[link.kind] ?? link.kind}</Badge></header>
     <div className={styles.body}>
       <PageHeader title={link.title} description={[copy.intro, link.description].filter(Boolean).join(' ') || undefined} />
       {link.kind === 'portal' && <nav aria-label={t.share.sections} className={styles.tabs}>

@@ -65,7 +65,14 @@ export const SHARING_UI_COPY_CONFIG = [
   entry({ key: 'sharing.publicCopy', group: G, label: 'Public share and bio page copy', kind: 'json', description: 'English and French text of the signed-out share, review and bio pages. The visitor\'s browser language picks the version.', defaultValue: publicCopyDefaults, schema: publicCopySchema, consumption: 'active' }),
 ] as const;
 
-export const SHARING_CONFIG = [...SHARING_LIMIT_CONFIG, ...SHARING_COPY_CONFIG, ...SHARING_UI_COPY_CONFIG] as const;
+export const sharingPresentationSchema = z.object({
+  showWorkspaceLogo: z.boolean(),
+  logoUrlMaxCharacters: z.number().int().min(64).max(4096),
+  advisoryDecisionNotificationsEnabled: z.boolean(),
+}).strict();
+export const SHARING_PRESENTATION_CONFIG = [entry({ key: 'sharing.presentationPolicy', group: G, label: 'Workspace branding and advisory decision notices', kind: 'json', description: 'Show the workspace HTTPS logo on public client links and notify post authors about advisory approvals/change requests. Email follows notification preferences; applied decisions are already notified by Publishing.', defaultValue: { showWorkspaceLogo: true, logoUrlMaxCharacters: 2048, advisoryDecisionNotificationsEnabled: true }, schema: sharingPresentationSchema, consumption: 'active' })] as const;
+
+export const SHARING_CONFIG = [...SHARING_LIMIT_CONFIG, ...SHARING_COPY_CONFIG, ...SHARING_UI_COPY_CONFIG, ...SHARING_PRESENTATION_CONFIG] as const;
 
 export type SharingLimits = Record<string, number>;
 export type SharingCopy = { intro: string; answerNotice: string; bioFooter: string };

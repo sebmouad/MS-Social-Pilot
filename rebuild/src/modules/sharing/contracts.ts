@@ -39,7 +39,7 @@ export const CREATE_LINK_SCHEMA = z.object({
 /**
  * Partial edit. `expectedVersion` is the `version` the editor last saw (a fingerprint of the editable fields and the
  * current secret); a mismatch is a conflict, never a silent overwrite. `expiresInDays` renews the lifetime from now.
- * `confirmation` is required only when the change alters access (see ACCESS_FIELDS).
+ * `confirmation` is required for every edit, including title/description changes.
  */
 export const UPDATE_LINK_SCHEMA = z.object({
   id,

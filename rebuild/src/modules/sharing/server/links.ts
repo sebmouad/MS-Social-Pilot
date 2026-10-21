@@ -8,6 +8,7 @@ import {
 } from '../contracts';
 import { KIND_PUBLISHING_FEATURES } from '../semantics';
 import { audit, authorizeSharing, bad, exact, lockActor, missing, pageSize, protect, transact, type SharingAuthorization } from './access';
+import { sharingPresentationPolicy, publicWorkspaceLogo } from './presentation';
 import { sharingLimits } from './limits';
 import { sharingChannels } from './channels';
 
@@ -34,7 +35,9 @@ export async function listShareLinks(actor: SharingActor, input: unknown = {}, o
   const rows = await protect(auth.scope === null
     ? prisma.$queryRaw<Row[]>`SELECT l.id, l.kind, l.title, l.description, l."targetIds", l."daysBack", l."daysAhead", l."allowComments", l.decides, l."revokedAt", l."expiresAt", l."createdAt", l."createdById", l."tokenHash", (SELECT COUNT(*) FROM review_decisions d WHERE d."shareLinkId" = l.id) AS decisions FROM share_links l WHERE l."workspaceId" = ${actor.workspaceId} ORDER BY l."createdAt" DESC, l.id ASC LIMIT ${size + 1} OFFSET ${offset}`
     : prisma.$queryRaw<Row[]>`SELECT l.id, l.kind, l.title, l.description, l."targetIds", l."daysBack", l."daysAhead", l."allowComments", l.decides, l."revokedAt", l."expiresAt", l."createdAt", l."createdById", l."tokenHash", (SELECT COUNT(*) FROM review_decisions d WHERE d."shareLinkId" = l.id) AS decisions FROM share_links l WHERE l."workspaceId" = ${actor.workspaceId} AND jsonb_array_length(l."targetIds") > 0 AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(l."targetIds") e WHERE e <> ALL(${[...auth.scope]}::text[])) ORDER BY l."createdAt" DESC, l.id ASC LIMIT ${size + 1} OFFSET ${offset}`);
-  return { links: rows.slice(0, size).map(summary), page, pageSize: size, hasMore: rows.length > size };
+  const presentation = await sharingPresentationPolicy();
+  const branding = await protect(prisma.$queryRaw<Array<{ name: string; logoUrl: string | null }>>`SELECT name, "logoUrl" FROM workspaces WHERE id = ${actor.workspaceId}`);
+  return { presentation: { workspaceName: branding[0]?.name ?? null, workspaceLogoUrl: publicWorkspaceLogo(branding[0]?.logoUrl, presentation), advisoryDecisionNotificationsEnabled: presentation.advisoryDecisionNotificationsEnabled }, links: rows.slice(0, size).map(summary), page, pageSize: size, hasMore: rows.length > size };
 }
 
 /** Channels the actor may put on a link (enabled, in-workspace, within scope); the owner picker reads this. */
@@ -138,11 +141,11 @@ export async function updateShareLink(actor: SharingActor, input: unknown) {
     if (data.decides !== undefined && data.decides !== row.decides) { changed.push('decides'); next.decides = data.decides; }
     if (data.expiresInDays !== undefined) changed.push('expiresInDays');
     if (!changed.length) throw await bad('Nothing was changed.');
+    await exact(data.confirmation ?? '', updateLinkConfirmation(row.id));
     const rotates = changed.some(field => (ACCESS_FIELDS as readonly string[]).includes(field));
 
     if (rotates) {
       if (row.revokedAt) throw await sharingError('conflict', 'This link was revoked and stays revoked. Create a new link to share again.');
-      if (data.confirmation !== updateLinkConfirmation(row.id)) throw await bad('Changing access replaces the link address. Confirm with: {0}', updateLinkConfirmation(row.id));
       const needed = KIND_PUBLISHING_FEATURES[next.kind];
       if (needed.some(feature => !auth.publishing.includes(feature))) throw await sharingError('forbidden', 'You need Publishing access to share posts.');
       // A new secret is a new bearer capability: a link that decides (before or after this edit) is only re-issued by someone who may approve now.

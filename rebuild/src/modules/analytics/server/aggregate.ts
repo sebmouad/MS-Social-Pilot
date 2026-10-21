@@ -1,4 +1,5 @@
 import { workspaceCopyDefaults, workspaceText, type WorkspaceCopy } from '../workspace-copy';
+import type { OverviewOrder } from '../overview-order';
 import { aggregateValues, type AnalyticsAudienceEntry, type AnalyticsKind, type AnalyticsMetricInput } from './catalog';
 
 export type MetricView = {
@@ -79,6 +80,18 @@ function metricView(input: AnalyticsMetricInput, copy: WorkspaceCopy, locale: 'e
     ...(input.breakdownHistory ? { breakdownHistory: input.breakdownHistory } : {}),
     rows: rows.slice().sort((a, b) => b.value - a.value),
   };
+}
+
+const ratioUnits = new Set(['currency', 'percent', 'multiple']);
+
+/** Overview order: configured resource kind first, then empty ratios last, then configured priority, source and label. */
+export function orderOverviewMetrics(metrics: MetricView[], order: OverviewOrder): MetricView[] {
+  const fragments = order.headlinePriority.map(item => item.toLocaleLowerCase());
+  const resourceRank = (metric: MetricView) => { const index = order.resourceOrder.indexOf(metric.resourceKind); return index < 0 ? order.resourceOrder.length : index; };
+  const priority = (metric: MetricView) => { const key = metric.key.toLocaleLowerCase(); const index = fragments.findIndex(item => key.includes(item)); return index < 0 ? fragments.length : index; };
+  const emptyRatio = (metric: MetricView) => order.demoteEmptyRatios && (metric.kind === 'ratio' || ratioUnits.has(metric.unit)) && (metric.total === null || metric.total === 0) ? 1 : 0;
+  return metrics.slice().sort((a, b) => resourceRank(a) - resourceRank(b) || emptyRatio(a) - emptyRatio(b) || priority(a) - priority(b)
+    || (a.sourceLabel === b.sourceLabel ? a.label.localeCompare(b.label) : a.sourceLabel.localeCompare(b.sourceLabel)));
 }
 
 /** Generic aggregation over normalized inputs. It has no provider/schema knowledge. */

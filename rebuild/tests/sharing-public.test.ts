@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, defaults, install, state } from './sharing-helpers';
 
 vi.mock('@/server/platforms/resource-visibility', () => ({ selectedResourceConnectionWhere: async () => ({provider:{in:['test-provider']}}) }));
+const alerts = vi.hoisted(() => ({ emit: vi.fn(async () => ({ queued: 1 })) }));
+vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: alerts.emit }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (defaults as Record<string, unknown>)[key], runtimeConfigBatch: async (keys: readonly string[]) => Object.fromEntries(keys.map(key => [key, (defaults as Record<string, unknown>)[key]])) }));
 vi.mock('@/server/entitlements', async () => (await import('./sharing-helpers')).entitlementMock());
@@ -451,3 +453,69 @@ describe('public bio', () => {
     expect(view.links).toHaveLength(1); expect(view.truncated).toBe(true);
   });
 });
+
+ describe('advisory client decision notifications', () => {
+  it('queues advisory decisions atomically with the answer and leaves comments quiet', async () => {
+    world({ link: linkRow({ decides: false }) });
+    await submitDecision(TOKEN, '7.1.1.1', { postId: 'p1', authorName: 'Client', decision: 'rejected', comment: 'Please revise' });
+    expect(alerts.emit).toHaveBeenCalledOnce();
+    expect(alerts.emit).toHaveBeenCalledWith(db, expect.objectContaining({ workspaceId: 'workspace-a', postId: 'p1', kind: 'approval_decision' }));
+    const eventId = (alerts.emit.mock.calls as unknown as Array<[unknown, { eventId: string }]>)[0]![1].eventId;
+    expect(state.executions.find(e => e.sql.startsWith('INSERT INTO review_decisions'))!.values).toContain(eventId);
+    alerts.emit.mockClear();
+    await submitDecision(TOKEN, '7.1.1.2', { postId: 'p1', authorName: 'Client', decision: 'comment', comment: 'A note' });
+    expect(alerts.emit).not.toHaveBeenCalled();
+  });
+  it('does not duplicate the Publishing lifecycle notification for applied answers', async () => {
+    world();
+    await submitDecision(TOKEN, '7.1.1.3', { postId: 'p1', authorName: 'Client', decision: 'approved' });
+    expect(review).toHaveBeenCalledOnce();
+    expect(alerts.emit).not.toHaveBeenCalled();
+  });
+  it('holds the answer as unconfirmed if queuing fails', async () => {
+    world({ link: linkRow({ decides: false }) });
+    alerts.emit.mockRejectedValueOnce(new Error('queue failed'));
+    await expect(submitDecision(TOKEN, '7.1.1.4', { postId: 'p1', authorName: 'Client', decision: 'approved' })).rejects.toMatchObject({ code: 'upstream_failure' });
+  });
+ });
+
+ describe('public workspace branding policy', () => {
+  it('projects only an HTTPS workspace logo from the authorized link workspace', async () => {
+    world({ link: linkRow({ workspaceLogoUrl: 'https://images.example.test/logo.png' }) });
+    const access = await resolvePublicLink(TOKEN, '7.2.1.1');
+    expect(access).toMatchObject({ ok: true, value: { workspaceLogoUrl: 'https://images.example.test/logo.png' } });
+    expect(state.queries.find(q => q.sql.includes('FROM share_links l JOIN workspaces'))!.sql).toContain('w."logoUrl"');
+    for (const workspaceLogoUrl of ['http://example.test/logo', 'javascript:alert(1)', 'https://secret@example.test/logo', 'data:image/png;base64,x']) {
+      world({ link: linkRow({ workspaceLogoUrl }) });
+      expect(await resolvePublicLink(TOKEN, '7.2.1.2')).toMatchObject({ ok: true, value: { workspaceLogoUrl: null } });
+    }
+  });
+  it('consumes the Root logo switch, URL bound and advisory notice switch', async () => {
+    const key = 'sharing.presentationPolicy'; const settings = defaults as Record<string, unknown>; const original = settings[key];
+    try {
+      settings[key] = { showWorkspaceLogo: false, logoUrlMaxCharacters: 64, advisoryDecisionNotificationsEnabled: false };
+      world({ link: linkRow({ decides: false, workspaceLogoUrl: 'https://images.example.test/logo.png' }) });
+      expect(await resolvePublicLink(TOKEN, '7.2.1.3')).toMatchObject({ ok: true, value: { workspaceLogoUrl: null } });
+      await submitDecision(TOKEN, '7.2.1.3', { postId: 'p1', authorName: 'Client', decision: 'approved' });
+      expect(alerts.emit).not.toHaveBeenCalled();
+      settings[key] = { showWorkspaceLogo: true, logoUrlMaxCharacters: 64, advisoryDecisionNotificationsEnabled: true };
+      world({ link: linkRow({ workspaceLogoUrl: 'https://images.example.test/' + 'x'.repeat(70) }) });
+      expect(await resolvePublicLink(TOKEN, '7.2.1.4')).toMatchObject({ ok: true, value: { workspaceLogoUrl: null } });
+      settings[key] = {};
+      await expect(resolvePublicLink(TOKEN, '7.2.1.5')).rejects.toMatchObject({ code: 'unavailable' });
+    } finally { settings[key] = original; }
+  });
+ });
+
+ describe('existing saved sharing catalogs', () => {
+  it('adds new French phrases while retaining valid saved overrides', async () => {
+    const { loadOwnerCopy } = await import('@/modules/sharing/server/limits');
+    const settings = defaults as Record<string, unknown>; const original = settings['sharing.ownerCopy'];
+    try {
+      settings['sharing.ownerCopy'] = { Title: { en: 'Campaign title', fr: 'Titre de campagne' } };
+      const copy = await loadOwnerCopy('fr');
+      expect(copy.Title).toBe('Titre de campagne');
+      expect(copy['I confirm these changes. The address stays the same.']).toBe('Je confirme ces modifications. L’adresse reste identique.');
+    } finally { settings['sharing.ownerCopy'] = original; }
+  });
+ });

@@ -84,7 +84,7 @@ describe('readHomeOverview', () => {
       expect(host.postPerformanceBatch).toHaveBeenCalledTimes(1);
       const ids = channels.filter((_, channelIndex) => channelIndex % 2 === (index === 0 ? 1 : 0)).map(channel => channel.id);
       expect(host.channelMeasuresBatch.mock.calls[0]![0]).toMatchObject({ workspaceId: actor.workspaceId, targetIds: ids,
-        current: { to: now }, previous: { to: new Date(now.getTime() - 28 * 86_400_000) } });
+        current: { from: new Date('2026-09-23T00:00:00Z'), to: now }, previous: { from: new Date('2026-08-26T00:00:00Z'), to: new Date('2026-09-23T00:00:00Z') } });
       expect(host.postPerformanceBatch).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: actor.workspaceId, targetIds: ids,
         limit: config['home.heatmapMaxPostsPerChannel'], sort: 'publishedAt', direction: 'desc', to: now }));
       expect(host.goalMeasures).not.toHaveBeenCalled();
@@ -158,5 +158,31 @@ describe('readHomeOverview', () => {
   it('refuses a user without current workspace access', async () => {
     mocks.permissions.mockResolvedValue(null);
     await expect(readHomeOverview(actor, now)).rejects.toMatchObject({ code: 'forbidden' });
+  });
+
+  it('returns the requested UTC period and actual latest spend day without inventing missing-day zeros', async () => {
+    mocks.ads.mockResolvedValue({ rows: [
+      { currency: 'USD', spend: 12.3, date: '2026-10-15T00:00:00.000Z' },
+      { currency: 'USD', spend: 0.7, date: '2026-10-16T00:00:00.000Z' },
+    ], nextOffset: null });
+    const overview = await readHomeOverview(actor, now);
+    expect(overview.ads).toMatchObject({ state: 'ready', data: { start: '2026-09-23', end: '2026-10-20', spend: [
+      { currency: 'USD', total: 13, firstDay: '2026-10-15', lastDay: '2026-10-16', recordedDays: 2 },
+    ] } });
+    expect(mocks.ads).toHaveBeenCalledWith(actor, { start: '2026-09-23', end: '2026-10-20', level: 'account', offset: 0 });
+  });
+
+  it('excludes nonfinite channel engagements from the ranking as well as totals', async () => {
+    mocks.host.mockResolvedValue({ goalMeasures: async ({ targetId }: { targetId: string }) => ({ views: 5, engagements: targetId === 'c1' ? Infinity : 10 }) });
+    expect((await readHomeOverview(actor, now)).performance).toMatchObject({ state: 'ready', data: {
+      engagements: { current: 10, covered: 1 }, topChannels: [{ id: 'c2', name: 'Beta', engagements: 10 }],
+    } });
+  });
+
+  it('isolates an unknown spend currency without hiding other cards', async () => {
+    mocks.ads.mockResolvedValue({ rows: [{ currency: null, spend: 12, date: '2026-10-16' }], nextOffset: null });
+    const overview = await readHomeOverview(actor, now);
+    expect(overview.ads).toEqual({ state: 'unavailable' });
+    expect(overview.inbox).toEqual({ state: 'ready', data: { open: 4 } });
   });
 });

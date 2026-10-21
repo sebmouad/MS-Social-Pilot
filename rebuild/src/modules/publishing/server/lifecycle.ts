@@ -307,9 +307,10 @@ export async function schedulePost(actor: PublishingActor, postId: string, sched
 export type RescheduleInput = { postId: string; date: string; time: string; timeZone: string };
 
 /**
- * Move a still-local scheduled post to a new workspace-local date and time.
+ * Move a scheduled post to a new workspace-local date and time.
  * The wall-clock time is interpreted in the workspace time zone (DST-aware) and
- * must be in the future. Posts already handed to the platform cannot be moved.
+ * must be in the future. Existing platform-held copies move before the local time;
+ * deferred destinations are offered the new time after the local change commits.
  */
 export async function reschedulePost(actor: PublishingActor, input: RescheduleInput) {
   const errorText = await loadPublishingErrorText();
@@ -323,7 +324,7 @@ export async function reschedulePost(actor: PublishingActor, input: RescheduleIn
 export async function reschedulePostToInstant(actor: PublishingActor, postId: string, scheduledAt: Date) {
   const errorText = await loadPublishingErrorText();
   const input = { postId };
-  return withPublishingOperation(actor, { postId: input.postId }, async ({ actor, signal, lockTargets }) => {
+  const result = await withPublishingOperation(actor, { postId: input.postId }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
     await assertPostScope(actor, input.postId);
     if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime())) throw new PublishingOperationError('invalid_request', 'chooseAValidDateAndTime', {}, errorText);
@@ -347,6 +348,15 @@ export async function reschedulePostToInstant(actor: PublishingActor, postId: st
     });
     return { scheduledAt };
   });
+  // Re-enter the shared publication boundary only after releasing the reschedule
+  // locks. It rechecks current access, approval and each destination's saved mode;
+  // the expected instant prevents this follow-up from acting on a concurrent move.
+  // A failed handoff must not report the already-committed time change as failed:
+  // uncertain attempts retain their journal and the ordinary recovery path.
+  if (await runtimeConfig('publishing.remoteScheduling.offered').catch(() => false) === true) {
+    await holdScheduledPostAtProvider(actor, postId, scheduledAt).catch(() => null);
+  }
+  return result;
 }
 
 /** Cancel a locally queued post back to draft while it is still pending delivery. */
@@ -490,10 +500,10 @@ const NO_HOLD: RemoteHoldSummary = { held: 0, deferred: 0, reasons: [] };
  * Hand a scheduled post chosen for platform-held scheduling to the destinations that can hold it. Destinations that cannot
  * (unsupported, too soon, too far) stay with the application worker. Returns null when the post did not choose platform holding.
  */
-export async function holdScheduledPostAtProvider(actor: PublishingActor, postId: string) {
+export async function holdScheduledPostAtProvider(actor: PublishingActor, postId: string, expectedScheduledAt?: Date) {
   const rows = await prisma.$queryRaw<Array<{ publishMode: string }>>`SELECT "publishMode"::text AS "publishMode" FROM posts WHERE id = ${postId} AND "workspaceId" = ${actor.workspaceId} AND status::text = 'scheduled'`;
   if (rows[0]?.publishMode !== 'native') return null;
-  return publishPost(actor, postId, undefined, { nativeSchedule: true, nativeFallback: true });
+  return publishPost(actor, postId, expectedScheduledAt, { nativeSchedule: true, nativeFallback: true });
 }
 
 export async function publishPost(actor: PublishingActor, postId: string, expectedScheduledAt?: Date, options: { retryOnly?: boolean; nativeSchedule?: boolean; nativeFallback?: boolean } = {}) {

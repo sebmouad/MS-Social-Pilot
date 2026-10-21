@@ -3,6 +3,8 @@ import { usePublishingCopy } from '../kit/CopyProvider';
 import { Avatar, ScheduleBadge } from '../kit/kit';
 import { type KitLocale } from '../kit/copy';
 import { remotePlatformName } from '../remote-platform-name';
+import { PostThumb } from '@/components/PostThumb';
+import { postThumbnail } from '@/components/post-thumbnail';
 import { postContentSummary } from '@/modules/publishing/content-summary';
 import styles from './queue.module.css';
 
@@ -40,9 +42,12 @@ export function QueueTimeline({ posts, timeZone, locale = 'en', maxPerChannel }:
             const remote = post.targets.some(row => row.target.id === channel.id && row.status === 'scheduled_remote');
             const platformName = remote ? remotePlatformName({ targets: post.targets.filter(row => row.target.id === channel.id) }) : undefined;
             return <li key={post.id} className={styles.slot}>
-              <time className={styles.slotTime} dateTime={post.scheduledAt?.toISOString()}>{post.scheduledAt ? time.format(post.scheduledAt) : copy.queueUnscheduled}</time>
-              <span className={styles.slotText}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
-              <ScheduleBadge mode={remote ? 'remote' : 'application'} locale={locale} platformName={platformName} />
+              <PostThumb thumb={postThumbnail(post.media)} size="sm" />
+              <div className={styles.slotBody}>
+                <time className={styles.slotTime} dateTime={post.scheduledAt?.toISOString()}>{post.scheduledAt ? time.format(post.scheduledAt) : copy.queueUnscheduled}</time>
+                <span className={styles.slotText}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
+                <ScheduleBadge mode={remote ? 'remote' : 'application'} locale={locale} platformName={platformName} />
+              </div>
             </li>;
           })}
         </ol>

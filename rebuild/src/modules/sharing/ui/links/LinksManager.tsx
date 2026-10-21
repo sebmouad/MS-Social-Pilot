@@ -11,7 +11,7 @@ type Kind = 'review' | 'calendar' | 'portal';
 type Link = { id: string; kind: Kind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; status: 'active' | 'expired' | 'revoked'; expiresAt: string | null; createdAt: string; feedbackCount: number; version: string };
 type Feedback = { id: string; decision: 'approved' | 'rejected' | 'comment'; comment: string | null; authorName: string; createdAt: string; postStatus: string | null; postPreview: string | null };
 type Props = {
-  initial: { links: Link[]; page: number; hasMore: boolean }; channels: Array<{ id: string; name: string }>; canApprove: boolean;
+  initial: { presentation?: { workspaceName: string | null; workspaceLogoUrl: string | null; advisoryDecisionNotificationsEnabled: boolean }; links: Link[]; page: number; hasMore: boolean }; channels: Array<{ id: string; name: string }>; canApprove: boolean;
   /** maxDaysBack, maxDaysAhead and maxTargets are optional host hints; the service enforces the real Root bounds either way. */
   limits: { titleMax: number; descriptionMax: number; defaultExpiryDays: number; maxExpiryDays: number; maxDaysBack?: number; maxDaysAhead?: number; maxTargets?: number };
   /** Phrase → text in the viewer's language (see `owner-copy.ts`); English when the host does not supply it. */
@@ -97,7 +97,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
   const hasChange = Object.keys(patch).length > 0;
   // A new link needs an explicit tick; an edit may not untick everything, because nothing ticked must never read as "all".
   const needsChannel = editor?.mode === 'create' || (!revoked && baseline.length > 0);
-  const canSubmit = !busy && Boolean(draft.title.trim()) && !(needsChannel && draft.selected.length === 0) && (editor?.mode === 'create' ? acknowledged : hasChange && (!changesAccess || acknowledged));
+  const canSubmit = !busy && Boolean(draft.title.trim()) && !(needsChannel && draft.selected.length === 0) && (editor?.mode === 'create' ? acknowledged : hasChange && acknowledged);
 
   const submit = (event: React.FormEvent) => { event.preventDefault(); if (!editor || !canSubmit) return; void guarded(async () => {
     if (editor.mode === 'create') {
@@ -112,7 +112,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
       return;
     }
     const link = editor.link;
-    const result = await request(`/api/sharing/links/${encodeURIComponent(link.id)}`, { method: 'PATCH', body: JSON.stringify({ ...patch, expectedVersion: link.version, ...(changesAccess ? { confirmation: `UPDATE SHARE LINK ${link.id}` } : {}) }) });
+    const result = await request(`/api/sharing/links/${encodeURIComponent(link.id)}`, { method: 'PATCH', body: JSON.stringify({ ...patch, expectedVersion: link.version, confirmation: `UPDATE SHARE LINK ${link.id}` }) });
     if (result.rotated === true && typeof result.url !== 'string') throw new Error(t('The link was saved but its new address could not be shown. Rotate it to get a new one.'));
     setEditor(null); if (typeof result.url === 'string') setSecret({ url: result.url, title: draft.title.trim() || link.title, replaced: true });
     setMessage(result.rotated === true ? t('Link saved. The previous address no longer works.') : t('Link saved. The address is unchanged.'));
@@ -171,6 +171,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
   return <div className={styles.manager}>
     <div className={styles.actions}><Button variant="primary" disabled={busy} onClick={openCreate}>{t('New share link')}</Button></div>
     {message && <p className={failed ? styles.error : styles.message} role={failed ? 'alert' : 'status'}>{message}</p>}
+    {initial.presentation?.advisoryDecisionNotificationsEnabled && <p className={styles.message}>{t('When the team makes the final decision, client answers can notify the post author. Email follows their preferences; comments stay in Feedback.')}</p>}
     <DataTable columns={columns} rows={links} rowKey={link => link.id} caption={t('Share links')} emptyMessage={t('No share links yet. Create one to invite a client to review posts or see the calendar.')} />
     {(page > 1 || hasMore) && <div className={styles.actions}><Button size="sm" disabled={busy || page <= 1} onClick={() => void guarded(async () => { await load(page - 1); }, pageFailure)}>{t('Previous page')}</Button><span className={styles.message}>{t('Page {0}', page)}</span><Button size="sm" disabled={busy || !hasMore} onClick={() => void guarded(async () => { await load(page + 1); }, pageFailure)}>{t('Next page')}</Button></div>}
 
@@ -197,7 +198,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
         <label className={styles.check}><input type="checkbox" disabled={busy || revoked} checked={draft.allowComments} onChange={event => set({ allowComments: event.target.checked })} /><span>{t('Let visitors leave comments')}</span></label>
         {draft.kind !== 'calendar' && <label className={styles.check}><input type="checkbox" disabled={busy || revoked || (!canApprove && !draft.decides)} checked={draft.decides} onChange={event => set({ decides: event.target.checked })} /><span>{canApprove ? t('Their approval or change request settles the post in your review queue') : t('Their approval or change request settles the post in your review queue (needs approval permission)')}</span></label>}
         {!creating && changesAccess && <p className={styles.warning} role="status">{t('These changes replace the link’s address. The old address and any page already open with it stop working immediately; you will get a new address to send.')}</p>}
-        {(creating || changesAccess) && <label className={styles.check}><input type="checkbox" disabled={busy} checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /><span>{creating ? t('I understand that anyone who has the address can open this link without signing in until it expires or I revoke it.') : t('I understand the old address will stop working and I must send the new one.')}</span></label>}
+        {(creating || hasChange) && <label className={styles.check}><input type="checkbox" disabled={busy} checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /><span>{creating ? t('I understand that anyone who has the address can open this link without signing in until it expires or I revoke it.') : changesAccess ? t('I understand the old address will stop working and I must send the new one.') : t('I confirm these changes. The address stays the same.')}</span></label>}
         {dialogError && <div className={styles.confirm}><p className={styles.error} role="alert">{dialogError}</p>{stale && <><small>{t('Your entries are kept above until you reload.')}</small><Button size="sm" disabled={busy} onClick={reloadLatest}>{t('Reload latest and discard my changes')}</Button></>}</div>}
       </form>
     </Dialog>

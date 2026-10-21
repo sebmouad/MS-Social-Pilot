@@ -16,6 +16,9 @@ export type PostAttachmentDraftItem = PostMediaItem & {
   file?: File;
   error?: string;
   errorField?: 'alt' | 'attachment';
+  /** Link items only: the type follows what the link turns out to be until the person picks one. */
+  autoKind?: boolean;
+  detect?: 'pending' | 'image' | 'video' | 'unknown';
 };
 
 export type PostAttachmentOptions = {
@@ -41,6 +44,8 @@ export type PostAttachmentsController = {
   maxMedia: number;
   setError(message: string): void;
   addRemote(kind: PostMediaKind): void;
+  /** Adds one media link whose image/video type is detected from the link itself. */
+  addLink(): void;
   addLocalImage(file: File): void;
   addLocalImages(files: readonly File[]): void;
   updateItem(clientId: string, change: Partial<PostAttachmentDraftItem>): void;
@@ -103,7 +108,7 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
     setError('');
   }, []);
 
-  const add = useCallback((kind: PostMediaKind, source: 'url' | 'upload', file?: File) => {
+  const add = useCallback((kind: PostMediaKind, source: 'url' | 'upload', file?: File, auto = false) => {
     const current = itemsRef.current;
     if (current.length >= options.maxMedia) {
       setError(fillComposerCopy(c.limit, { max: options.maxMedia }));
@@ -122,11 +127,18 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
       url: '',
       ...(kind === 'image' ? { altText: '' } : {}),
       ...(file ? { file } : {}),
+      ...(auto ? { autoKind: true, detect: 'pending' as const } : {}),
     };
     setItems(previous => [...previous, item]);
     itemsRef.current = [...current, item];
     setError('');
   }, [options.allowedKinds, options.allowMixedKinds, options.maxMedia, c]);
+
+  const addLink = useCallback(() => {
+    const first = itemsRef.current[0];
+    const guess = !options.allowMixedKinds && first ? first.kind : options.allowedKinds.includes('image') ? 'image' : options.allowedKinds[0] ?? 'image';
+    add(guess, 'url', undefined, true);
+  }, [add, options.allowMixedKinds, options.allowedKinds]);
 
   const addLocalImages = useCallback((files: readonly File[]) => {
     if (!files.length) return;
@@ -295,6 +307,7 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
     allowedKinds: options.allowedKinds, allowedMimeTypes: options.allowedMimeTypes,
     maxAltCharacters: options.maxAltCharacters, maxMedia: options.maxMedia, setError,
     addRemote: kind => add(kind, 'url'),
+    addLink,
     addLocalImage, addLocalImages,
     updateItem: update, removeItem, reorder, validate, prepareUploads,
   };
@@ -303,6 +316,9 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
 export function PostAttachments({ controller, disabled = false }: { controller: PostAttachmentsController; disabled?: boolean }) {
   const c = useAttachmentCopy();
   const fileInput = useRef<HTMLInputElement>(null);
+  // A link is only tried once it is pasted or the field is left, not on every keystroke.
+  const [committed, setCommitted] = useState<Record<string, string>>({});
+  const commit = (clientId: string, value: string) => setCommitted(current => current[clientId] === value.trim() ? current : { ...current, [clientId]: value.trim() });
   const canAddImages = controller.allowedKinds.includes('image');
   const canUploadLocalImages = canAddImages && controller.allowedMimeTypes.length > 0;
   const canAddVideos = controller.allowedKinds.includes('video');
@@ -332,8 +348,7 @@ export function PostAttachments({ controller, disabled = false }: { controller: 
       }}
     />}
     {controller.maxMedia > 0 && (canAddImages || canAddVideos) && <div className={styles.addControls}>
-      {canAddImages && <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => controller.addRemote('image')}>{c.addImage}</Button>}
-      {canAddVideos && <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => controller.addRemote('video')}>{c.addVideo}</Button>}
+      <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => controller.addLink()}>{c.addLink}</Button>
       {canUploadLocalImages && <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => fileInput.current?.click()}>{c.addLocal}</Button>}
     </div>}
     {controller.maxMedia === 0 ? <p className={styles.empty}>{c.unavailable}</p>
@@ -344,15 +359,18 @@ export function PostAttachments({ controller, disabled = false }: { controller: 
     {controller.items.length === 0 ? <p className={styles.empty}>{c.empty}</p> : <ol className={styles.list}>
       {controller.items.map((item, index) => <li className={styles.item} key={item.clientId} id={`${controller.idPrefix}-media-item-${item.clientId}`} tabIndex={item.error && item.source === 'upload' ? -1 : undefined} aria-describedby={item.error && item.source === 'upload' ? `${controller.idPrefix}-media-error-${item.clientId}` : undefined}>
         <div className={styles.itemHeading}><strong>{item.kind === 'image' ? c.image : c.video} {index + 1}</strong>{item.file && <span>{item.file.name}</span>}</div>
-        {item.source === 'url' ? <label className="ui-field">
-          <span>{fillComposerCopy(c.urlLabel, { kind: item.kind === 'image' ? c.imageUrl : c.videoUrl, n: index + 1 })}</span>
-          <input className="ui-input" id={`${controller.idPrefix}-media-url-${item.clientId}`} name={`mediaUrl-${item.clientId}`} type="url" disabled={disabled || controller.uploading} value={item.url.startsWith('media:') ? `/api/media/${item.url.slice('media:'.length)}` : item.url} onChange={event => {
-            const value = event.currentTarget.value;
-            const mediaPrefix = '/api/media/';
-            const stored = value.startsWith(mediaPrefix) ? `media:${value.slice(mediaPrefix.length)}` : value;
-            controller.updateItem(item.clientId, { url: stored });
-          }} aria-invalid={item.error ? true : undefined} aria-describedby={item.error ? `${controller.idPrefix}-media-error-${item.clientId}` : undefined} />
-        </label> : <div className={styles.localStatus}>{item.file ? c.ready : c.saved}</div>}
+        {item.source === 'url' ? <>
+          <label className="ui-field">
+            <span>{fillComposerCopy(c.linkLabel, { n: index + 1 })}</span>
+            <input className="ui-input" id={`${controller.idPrefix}-media-url-${item.clientId}`} name={`mediaUrl-${item.clientId}`} type="url" disabled={disabled || controller.uploading} value={item.url.startsWith('media:') ? `/api/media/${item.url.slice('media:'.length)}` : item.url} onChange={event => {
+              const value = event.currentTarget.value;
+              const mediaPrefix = '/api/media/';
+              const stored = value.startsWith(mediaPrefix) ? `media:${value.slice(mediaPrefix.length)}` : value;
+              controller.updateItem(item.clientId, { url: stored, ...(item.autoKind ? { detect: 'pending' as const } : {}) });
+            }} onBlur={event => commit(item.clientId, event.currentTarget.value)} onPaste={event => { const input = event.currentTarget; setTimeout(() => commit(item.clientId, input.value), 0); }} aria-invalid={item.error ? true : undefined} aria-describedby={item.error ? `${controller.idPrefix}-media-error-${item.clientId}` : undefined} />
+          </label>
+          <MediaLinkDetector item={item} controller={controller} disabled={disabled || controller.uploading} committed={committed[item.clientId] ?? ''} />
+        </> : <div className={styles.localStatus}>{item.file ? c.ready : c.saved}</div>}
         {item.kind === 'image' && <label className="ui-field">
           <span>{fillComposerCopy(c.descriptionLabel, { n: index + 1 })} <span>{c.optional}</span></span>
           <input className="ui-input" id={`${controller.idPrefix}-media-alt-${item.clientId}`} name={`mediaAlt-${item.clientId}`} type="text" disabled={disabled || controller.uploading} maxLength={controller.maxAltCharacters} value={item.altText ?? ''} onChange={event => controller.updateItem(item.clientId, { altText: event.currentTarget.value })} aria-invalid={item.error && item.errorField === 'alt' ? true : undefined} aria-describedby={item.error && item.errorField === 'alt' ? `${controller.idPrefix}-media-error-${item.clientId}` : undefined} />
@@ -367,6 +385,41 @@ export function PostAttachments({ controller, disabled = false }: { controller: 
     </ol>}
     {controller.uploading && <p className={styles.uploadStatus} role="status">{c.uploading}</p>}
   </section>;
+}
+
+/**
+ * Settles whether a link is an image or a video by letting the browser load it
+ * (image first, then video), shows what loaded as the preview, and lets the person
+ * correct the type. The server still inspects the real bytes at import.
+ */
+function MediaLinkDetector({ item, controller, disabled, committed }: { item: PostAttachmentDraftItem; controller: PostAttachmentsController; disabled: boolean; committed: string }) {
+  const c = useAttachmentCopy();
+  const probable = Boolean(item.autoKind) && committed === item.url.trim() && safeRemoteUrl(committed);
+  const [probe, setProbe] = useState<'image' | 'video'>('image');
+  const url = item.url.trim();
+  const { updateItem, allowedKinds } = controller;
+  useEffect(() => setProbe(item.kind), [url]); // eslint-disable-line react-hooks/exhaustive-deps
+  const settle = useCallback((kind: 'image' | 'video') => {
+    if (!item.autoKind || !allowedKinds.includes(kind)) { if (item.autoKind) updateItem(item.clientId, { detect: kind }); return; }
+    updateItem(item.clientId, { kind, detect: kind, ...(kind === 'image' ? { altText: item.altText ?? '' } : {}) });
+  }, [item.autoKind, item.clientId, item.altText, allowedKinds, updateItem]);
+  const failed = () => {
+    if (probe === 'image') setProbe('video');
+    else if (item.autoKind) updateItem(item.clientId, { detect: 'unknown' });
+  };
+  const status = !item.autoKind ? '' : item.detect === 'unknown' ? c.detectUnknown : item.detect === 'pending' ? (probable ? c.detecting : '') : item.detect === 'image' ? c.detectedImage : item.detect === 'video' ? c.detectedVideo : '';
+  return <div className={styles.linkDetector}>
+    {probable && (probe === 'image'
+      ? <img key={`i-${url}`} className={styles.linkPreview} src={url} alt="" onLoad={() => settle('image')} onError={failed} />
+      : <video key={`v-${url}`} className={styles.linkPreview} muted preload="metadata" src={url} onLoadedMetadata={() => settle('video')} onError={failed} />)}
+    <label className="ui-field">
+      <span>{c.typeLabel}</span>
+      <select className="ui-input" disabled={disabled} value={item.kind} onChange={event => controller.updateItem(item.clientId, { kind: event.currentTarget.value as PostMediaKind, autoKind: false, detect: undefined })}>
+        {controller.allowedKinds.map(kind => <option key={kind} value={kind}>{kind === 'image' ? c.image : c.video}</option>)}
+      </select>
+    </label>
+    {status && <p className={styles.localStatus} role="status">{status}</p>}
+  </div>;
 }
 
 export function AuthoringMediaPreview({ controller }: { controller: PostAttachmentsController }) {

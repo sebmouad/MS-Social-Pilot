@@ -45,8 +45,6 @@ const adRow = (account: (typeof accounts)[number], day: string) => ({
 
 const base = { userId: 'key-user', workspaceId: 'w' };
 const range = { start: '2026-10-01', end: '2026-10-07' };
-const adIds = (result: { options: { adAccounts: Array<{ id: string }> } }) => result.options.adAccounts.map(item => item.id);
-const loadedAdRequests = () => state.adAccounts.mock.calls.map(call => call[0].where);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -66,95 +64,44 @@ beforeEach(() => {
   state.adInsights.mockImplementation(async ({ where }: { where: Where }) => accounts.filter(account => matchesAccount(account, where.adAccount)).map(account => adRow(account, '2026-10-03')));
 });
 
-describe('Analytics independent ad-account ceiling', () => {
-  it('keeps old behavior when neither ceiling field is supplied', async () => {
-    const result = await readAnalytics(base, range);
-    expect(adIds(result)).toEqual(['ad-1', 'ad-2', 'ad-3']);
-    expect(result.metrics.items.some(item => item.sourceLabel === 'Advertising')).toBe(true);
-  });
-
-  it('empty [] shows no ad accounts, metrics, options or detail, while undefined shows them', async () => {
-    const none = await readAnalytics({ ...base, allowedAdAccountIds: [] }, range);
-    expect(none.options.adAccounts).toEqual([]);
-    expect(none.selected.adAccountIds).toEqual([]);
-    expect(none.metrics.items.filter(item => item.sourceLabel === 'Advertising')).toEqual([]);
-    expect(none.options.metrics.filter(item => item.sourceLabel === 'Advertising')).toEqual([]);
-    expect(state.adInsights).not.toHaveBeenCalled();
+describe('channel Analytics stays separate from Ads regardless of credential account grants', () => {
+  it.each([undefined, [], ['ad-1'], ['ad-1', 'ad-2', 'ad-3']])('excludes paid reads with account ceiling %j', async allowedAdAccountIds => {
+    const actor = { ...base, allowedAdAccountIds, adAccountTargetScope: { all: true as const } };
+    const result = await readAnalytics(actor, { ...range, compare: 'previous' });
+    expect(result.options.adAccounts).toEqual([]);
+    expect(result.selected.adAccountIds).toEqual([]);
+    expect(result.metrics.items.some(metric => metric.resourceKind === 'ad-account')).toBe(false);
     expect(state.adAccounts).not.toHaveBeenCalled();
-    const open = await readAnalytics({ ...base, allowedAdAccountIds: undefined }, range);
-    expect(adIds(open)).toEqual(['ad-1', 'ad-2', 'ad-3']);
-    const adKey = open.options.metrics.find(item => item.sourceLabel === 'Advertising')!.key;
-    // Metric detail for an Ads metric is refused when nothing in Ads is readable.
-    await expect(readAnalytics({ ...base, allowedAdAccountIds: [] }, { ...range, metric: adKey })).rejects.toMatchObject({ code: 'forbidden' });
+    expect(state.adInsights).not.toHaveBeenCalled();
   });
 
-  it('explicit account ceiling excludes sibling accounts on the same connection and refuses an out-of-scope query', async () => {
-    const actor = { ...base, allowedAdAccountIds: ['ad-1'] };
-    const result = await readAnalytics(actor, range);
-    expect(adIds(result)).toEqual(['ad-1']);
-    expect(result.selected.adAccountIds).toEqual(['ad-1']);
-    expect(state.adInsights.mock.calls.every(call => call[0].where.adAccount.id.in.join() === 'ad-1')).toBe(true);
-    for (const outside of ['ad-2', 'ad-3']) {
-      await expect(readAnalytics(actor, { ...range, adFilter: '1', adAccount: outside })).rejects.toMatchObject({ code: 'forbidden' });
-    }
-    await expect(readAnalytics(actor, { ...range, adFilter: '1', adAccount: ['ad-1', 'ad-2'] })).rejects.toMatchObject({ code: 'forbidden' });
-  });
-
-  it('account-only key with no channels reads its account through independent membership grants', async () => {
-    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['page-1', 'page-2'] } });
-    const actor = { ...base, allowedAdAccountIds: ['ad-1'], adAccountTargetScope: { all: false as const, ids: ['page-1', 'page-2'] } };
+  it('an account-only key has no channel metrics and cannot import its paid scope', async () => {
+    const actor = { ...base, allowedAdAccountIds: ['ad-1'], adAccountTargetScope: { all: true as const } };
     const result = await readAnalytics(actor, range, { allowedChannelIds: [] });
     expect(result.options.channels).toEqual([]);
-    expect(adIds(result)).toEqual(['ad-1']);
-    expect(result.metrics.items.some(item => item.sourceLabel === 'Advertising')).toBe(true);
-    // Without the independent scope the empty channel ceiling still erases Ads, as before.
-    const legacy = await readAnalytics({ ...base, allowedAdAccountIds: ['ad-1'] }, range, { allowedChannelIds: [] });
-    expect(legacy.options.adAccounts).toEqual([]);
-  });
-
-  it('the key\'s selected channels do not grant sibling accounts or accounts on other connections', async () => {
-    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['page-1'] } });
-    // Membership covers only page-1 (connection sa-1); the key selected page-3 (connection sa-2) as a channel.
-    const actor = { ...base, allowedAdAccountIds: ['ad-1', 'ad-3'], adAccountTargetScope: { all: false as const, ids: ['page-1'] } };
-    const result = await readAnalytics(actor, range, { allowedChannelIds: ['page-3'] });
-    expect(result.options.channels).toEqual([]);
-    expect(adIds(result)).toEqual(['ad-1']);
-    await expect(readAnalytics(actor, { ...range, adFilter: '1', adAccount: 'ad-3' }, { allowedChannelIds: ['page-3'] })).rejects.toMatchObject({ code: 'forbidden' });
-  });
-
-  it('membership grants are intersected fresh: revoked or foreign grant ids add nothing', async () => {
-    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['page-3'] } });
-    const actor = { ...base, adAccountTargetScope: { all: false as const, ids: ['page-1', 'page-2'] } };
-    const result = await readAnalytics(actor, range);
+    expect(result.metrics.items).toEqual([]);
     expect(result.options.adAccounts).toEqual([]);
-    state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['page-1'] } });
-    expect(adIds(await readAnalytics({ ...base, adAccountTargetScope: { all: true } }, range))).toEqual(['ad-1', 'ad-2']);
-    expect(adIds(await readAnalytics({ ...base, adAccountTargetScope: { all: true }, allowedAdAccountIds: ['ad-2'] }, range))).toEqual(['ad-2']);
+    expect(state.adAccounts).not.toHaveBeenCalled();
   });
 
-  it('applies the same ceiling to the initial, current and comparison loads', async () => {
-    const actor = { ...base, allowedAdAccountIds: ['ad-2'], adAccountTargetScope: { all: true as const } };
-    const result = await readAnalytics(actor, { ...range, compare: 'previous' });
-    expect(adIds(result)).toEqual(['ad-2']);
-    expect(state.adAccounts.mock.calls.length).toBeGreaterThanOrEqual(3);
-    for (const where of loadedAdRequests()) expect(where.id).toEqual({ in: ['ad-2'] });
-    for (const call of state.adInsights.mock.calls) expect(call[0].where.adAccount.id).toEqual({ in: ['ad-2'] });
+  it('refuses explicit paid filters on overview, export snapshots, explorer and comparison', async () => {
+    const actor = { ...base, allowedAdAccountIds: ['ad-1'] };
+    const paidInput = { ...range, adFilter: '1', adAccount: 'ad-1' };
+    for (const read of [readAnalytics, readAnalyticsSnapshot, readAnalyticsExplorer]) {
+      await expect(read(actor, paidInput)).rejects.toMatchObject({ code: 'invalid_request' });
+    }
+    await expect(readAnalyticsComparison(actor, { mode: 'period', adAccount: ['ad-1'], a: { start: '2026-10-01', end: '2026-10-03' }, b: { start: '2026-10-04', end: '2026-10-07' } })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.adAccounts).not.toHaveBeenCalled();
+    expect(state.adInsights).not.toHaveBeenCalled();
   });
 
-  it('comparison and explorer details cannot escape the account ceiling', async () => {
-    const actor = { ...base, allowedAdAccountIds: ['ad-1'], adAccountTargetScope: { all: true as const } };
-    const compared = await readAnalyticsComparison(actor, { mode: 'period', a: { start: '2026-10-01', end: '2026-10-03' }, b: { start: '2026-10-04', end: '2026-10-07' } });
-    expect(JSON.stringify(compared)).not.toMatch(/ad-2|ad-3|Ads Two|Ads Three/);
-    await expect(readAnalyticsComparison(actor, { mode: 'period', adAccount: ['ad-2'], a: { start: '2026-10-01', end: '2026-10-03' }, b: { start: '2026-10-04', end: '2026-10-07' } })).rejects.toMatchObject({ code: 'forbidden' });
-    const snapshot = await readAnalyticsSnapshot(actor, range);
-    const adMetric = snapshot.allMetrics.find(metric => metric.sourceLabel === 'Advertising')!;
-    const detail = await readAnalyticsExplorer(actor, { ...range, metric: adMetric.key });
-    expect(JSON.stringify(detail)).not.toMatch(/ad-2|ad-3|Ads Two|Ads Three/);
-    await expect(readAnalyticsExplorer(actor, { ...range, adFilter: '1', adAccount: 'ad-3' })).rejects.toMatchObject({ code: 'forbidden' });
-    const none = { ...actor, allowedAdAccountIds: [] as string[] };
-    const emptyCompare = await readAnalyticsComparison(none, { mode: 'period', a: { start: '2026-10-01', end: '2026-10-03' }, b: { start: '2026-10-04', end: '2026-10-07' } });
-    expect(JSON.stringify(emptyCompare)).not.toMatch(/Advertising|Ads One|ad-1/);
-    const emptyExplorer = await readAnalyticsExplorer(none, range);
-    expect(JSON.stringify(emptyExplorer)).not.toMatch(/Advertising|Ads One|ad-1/);
+  it('refuses paid metric detail keys and keeps explorer and comparisons channel-only', async () => {
+    await expect(readAnalytics(base, { ...range, metric: 'facebook:spend::USD' })).rejects.toMatchObject({ code: 'forbidden' });
+    const explorer = await readAnalyticsExplorer(base, range);
+    expect(explorer.options.adAccounts).toEqual([]);
+    const compared = await readAnalyticsComparison(base, { mode: 'period', a: { start: '2026-10-01', end: '2026-10-03' }, b: { start: '2026-10-04', end: '2026-10-07' } });
+    expect(JSON.stringify(compared)).not.toMatch(/Advertising|Ads One|ad-1/);
+    expect(state.adAccounts).not.toHaveBeenCalled();
+    expect(state.adInsights).not.toHaveBeenCalled();
   });
 });

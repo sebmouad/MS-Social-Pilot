@@ -9,11 +9,11 @@ export const analyticsManifest = {
   title: 'Analytics',
   href: '/analytics',
   pages: [
-    { id: 'analytics/overview', title: 'Analytics', href: '/analytics', description: 'Explore every available metric in one place.' },
+    { id: 'analytics/overview', title: 'Analytics', href: '/analytics', description: 'Explore channel audience, performance and post metrics.' },
     { id: 'analytics/explorer', title: 'Metric explorer', href: '/analytics/explorer', navigation: false, description: 'Inspect every available stored metric, source and resource.' },
     { id: 'analytics/demographics', title: 'Audience', href: '/analytics/demographics', description: 'Understand available audience breakdowns and coverage.' },
     { id: 'analytics/compare', title: 'Compare', href: '/analytics/compare', description: 'Compare periods and selected resource groups with honest metric semantics.' },
-    { id: 'analytics/ads', title: 'Ad objects', href: '/analytics/ads', description: 'Analyze stored campaigns, ad sets and ads with coverage and export.' },
+    { id: 'analytics/ads', title: 'Ads reporting', href: '/analytics/ads', description: 'Explore paid campaign, ad set and ad performance separately from channel analytics.' },
     { id: 'analytics/posts', title: 'Posts', href: '/analytics/posts', description: 'Explore and export stored per-post measures.' },
     { id: 'analytics/goals', title: 'Goals', href: '/analytics/goals', description: 'Set monthly goals per channel and track progress.' },
     { id: 'analytics/pins', title: 'Pinned metrics', href: '/analytics/pins', description: 'Keep a personal view of available metrics.' },

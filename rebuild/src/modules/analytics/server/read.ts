@@ -13,7 +13,9 @@ import { prisma } from '@/server/data';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
-import { buildAnalytics, type MetricView } from '@/modules/analytics/server/aggregate';
+import { overviewOrderSchema } from '../overview-order';
+import { configOrDefault } from '@/server/config/config-or-default';
+import { buildAnalytics, orderOverviewMetrics, type MetricView } from '@/modules/analytics/server/aggregate';
 import { loadAnalytics, type AnalyticsAdScope } from '@/modules/analytics/server/data';
 import { AnalyticsComparisonError, analyticsDateRange, compareAnalytics } from './comparison';
 import { buildPreviousPoints } from './previous-points';
@@ -68,6 +70,8 @@ function parseInput(input: unknown, searchMaxLength: number): ParsedInput {
   };
   const channels = uniqueIds(value.channel);
   const adAccounts = uniqueIds(value.adAccount);
+  // Paid reporting has its own Ads surface; never silently reinterpret an Ads selection.
+  if (adAccounts.length) throw invalid();
   if ((channels.length > 0 && value.filter !== '1') || (adAccounts.length > 0 && value.adFilter !== '1')) throw invalid();
   const search = value.search?.trim();
   if (search && search.length > searchMaxLength) throw invalid();
@@ -139,15 +143,7 @@ async function authorizeAnalytics(actor: AnalyticsReadActor, constraints: Analyt
   const allowedChannelIds = constraints.allowedChannelIds === undefined
     ? granted
     : constraints.allowedChannelIds.filter(id => granted === undefined || granted.includes(id));
-  const scope = actor.adAccountTargetScope;
-  const adScope: AnalyticsAdScope = {
-    ...(actor.allowedAdAccountIds === undefined ? {} : { accountIds: [...actor.allowedAdAccountIds] }),
-    ...(scope === undefined ? {} : {
-      independentTargets: true,
-      ...(scope.all ? (granted === undefined ? {} : { targetIds: [...granted] }) : { targetIds: scope.ids.filter(id => granted === undefined || granted.includes(id)) }),
-    }),
-  };
-  return { allowedChannelIds, allowedProviders: entitledPlatformIds(entitlements), adScope };
+  return { allowedChannelIds, allowedProviders: entitledPlatformIds(entitlements) };
 }
 
 const runtimeLimits = cache(async () => {
@@ -173,11 +169,11 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
     if (error instanceof AnalyticsComparisonError) throw invalid();
     throw error;
   }
-  const initial = await loadAnalytics(actor.workspaceId, input.filter ? idList(input.channel) : [], period.range, access.allowedChannelIds, input.adFilter ? idList(input.adAccount) : undefined, access.allowedProviders, access.adScope);
+  const initial = await loadAnalytics(actor.workspaceId, input.filter ? idList(input.channel) : [], period.range, access.allowedChannelIds, [], access.allowedProviders, { accountIds: [] });
   const channelOptions = initial.targets;
-  const adAccountOptions = initial.adAccounts;
+  const adAccountOptions: typeof initial.adAccounts = [];
   const requestedChannelIds = input.filter ? idList(input.channel) : channelOptions.map(item => item.id);
-  const requestedAdIds = input.adFilter ? idList(input.adAccount) : initial.selectedAdIds;
+  const requestedAdIds: string[] = [];
   if (!requestedChannelIds.every(id => channelOptions.some(item => item.id === id)) || !requestedAdIds.every(id => adAccountOptions.some(item => item.id === id))) throw forbiddenResource();
   const selectedChannelIds = channelOptions.filter(item => requestedChannelIds.includes(item.id)).map(item => item.id);
   const selectedAdIds = adAccountOptions.filter(item => requestedAdIds.includes(item.id)).map(item => item.id);
@@ -188,19 +184,19 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
   // Reuse only an exact returned scope; validation above still rejects dropped or unavailable IDs.
   const currentData = sameIds(initial.selectedTargets.map(item => item.id), selectedChannelIds) && sameIds(initial.selectedAdIds, selectedAdIds)
     ? initial
-    : await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, access.adScope);
+    : await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, { accountIds: [] });
   const selectedReturnedChannels = currentData.selectedTargets.map(item => item.id);
   if (!sameIds(selectedReturnedChannels, selectedChannelIds) || !sameIds(currentData.selectedAdIds, selectedAdIds)) throw forbiddenResource();
   assertUniqueMetricKeys(currentData.metrics);
   const [copy, locale] = await Promise.all([metricCopy(), analyticsLanguage()]);
-  const view = buildAnalytics(currentData.metrics, currentData.audienceEntries, currentData.audienceSelected, copy, locale);
-  const allMetrics = view.metrics;
+  const view = buildAnalytics(currentData.metrics.filter(metric => metric.resourceKind !== 'ad-account'), currentData.audienceEntries, currentData.audienceSelected, copy, locale);
+  const allMetrics = orderOverviewMetrics(view.metrics, await configOrDefault('analytics.overviewOrder', overviewOrderSchema));
   const comparisonData = period.comparison
-    ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, access.adScope)
+    ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, { accountIds: [] })
     : null;
   if (comparisonData && (!sameIds(comparisonData.selectedTargets.map(item => item.id), selectedChannelIds) || !sameIds(comparisonData.selectedAdIds, selectedAdIds))) throw forbiddenResource();
   if (comparisonData) assertUniqueMetricKeys(comparisonData.metrics);
-  const comparisonMetrics = comparisonData ? buildAnalytics(comparisonData.metrics, comparisonData.audienceEntries, comparisonData.audienceSelected, copy, locale).metrics : [];
+  const comparisonMetrics = comparisonData ? buildAnalytics(comparisonData.metrics.filter(metric => metric.resourceKind !== 'ad-account'), comparisonData.audienceEntries, comparisonData.audienceSelected, copy, locale).metrics : [];
   let comparisonMap: ReturnType<typeof compareAnalytics> | null = null;
   try {
     if (period.comparison) comparisonMap = compareAnalytics(allMetrics, comparisonMetrics);

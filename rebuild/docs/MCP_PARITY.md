@@ -163,20 +163,20 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | delete_task | tasks/board | write | POST /api/tasks | Shared customer operation; transport arguments may differ. |
 | add_task_comment | tasks/board | write | POST /api/tasks | Shared customer operation; transport arguments may differ. |
 | delete_task_comment | tasks/board | write | POST /api/tasks | Shared customer operation; transport arguments may differ. |
-| list_share_links | settings/sharing | read | GET /api/sharing/links | Shared customer operation; transport arguments may differ. |
+| list_share_links | settings/sharing | read | GET /api/sharing/links | Same authorized list service, including safe workspace logo and Root advisory-decision notification policy; no secret address is listed. |
 | list_shareable_channels | settings/sharing | read | GET /api/sharing/channels | Shared customer operation; transport arguments may differ. |
 | list_share_feedback | settings/sharing | read | GET /api/sharing/links/[id]/feedback | Shared customer operation; transport arguments may differ. |
 | create_share_link | settings/sharing | write | POST /api/sharing/links | Shared customer operation; transport arguments may differ. |
-| update_share_link | settings/sharing | write | PATCH /api/sharing/links/[id] | Shared customer operation; transport arguments may differ. |
+| update_share_link | settings/sharing | write | PATCH /api/sharing/links/[id] | Same locked, scoped, audited service; every edit requires UPDATE SHARE LINK <id>, including title/description. Metadata keeps the address; access changes replace it. |
 | revoke_share_link | settings/sharing | write | POST /api/sharing/links/[id] | Shared customer operation; transport arguments may differ. |
 | rotate_share_link | settings/sharing | write | POST /api/sharing/links/[id] | Shared customer operation; transport arguments may differ. |
 | delete_share_link | settings/sharing | write | DELETE /api/sharing/links/[id] | Shared customer operation; transport arguments may differ. |
 | get_bio_page | settings/bio | read | GET /api/sharing/bio | Shared customer operation; transport arguments may differ. |
 | save_bio_page | settings/bio | write | PUT /api/sharing/bio | Shared customer operation; transport arguments may differ. |
 | delete_bio_page | settings/bio | write | DELETE /api/sharing/bio | Shared customer operation; transport arguments may differ. |
-| export_analytics_report | analytics/reports | read | GET /api/reports/export | Shared customer operation; transport arguments may differ. |
+| export_analytics_report | analytics/reports | read | GET /api/reports/export | Shared channel-only overview snapshot/CSV service, with Root and credential limits. Paid exports stay in Ads reporting. |
 | get_analytics_posts | analytics/posts | read | GET /api/analytics/posts | Shared customer operation; transport arguments may differ. |
-| get_analytics_ad_objects | analytics/ads | read | GET /api/analytics/ad-objects | Shared customer operation; transport arguments may differ. |
+| get_analytics_ad_objects | analytics/ads | read | GET /api/analytics/ad-objects | Separate Analytics > Ads reporting experience with independent account/date filters; shared readAdObjects service. |
 | list_report_templates | analytics/reports | read | GET /api/analytics/report-workflows/templates | Shared customer operation; transport arguments may differ. |
 | manage_report_template | analytics/reports | write | POST /api/analytics/report-workflows/templates | Shared customer operation; transport arguments may differ. |
 | list_report_schedules | analytics/reports | read | GET /api/analytics/report-workflows/schedules | Shared customer operation; transport arguments may differ. |
@@ -191,9 +191,9 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | set_analytics_goals | analytics/goals | write | POST /api/analytics/goals | Shared customer operation; transport arguments may differ. |
 | get_analytics_demographics | analytics/demographics | read | GET /api/analytics/demographics | Shared customer operation; transport arguments may differ. |
 | compare_analytics | analytics/compare | read | POST /api/analytics/comparison | Shared customer operation; transport arguments may differ. |
-| get_analytics_explorer | analytics/explorer | read | GET /api/analytics/explorer | Shared customer operation; transport arguments may differ. |
-| get_analytics_overview | analytics/overview | read | GET /api/analytics | Shared customer operation; transport arguments may differ. |
-| get_analytics_metric_details | analytics/overview | read | GET /api/analytics | Analytics metric query selects detail; source-level capability correspondence only. |
+| get_analytics_explorer | analytics/explorer | read | GET /api/analytics/explorer | Shared channel-only read service; paid metrics remain in separate Ads reporting. |
+| get_analytics_overview | analytics/overview | read | GET /api/analytics | Shared channel-only read service, also used by UI and exports; nonempty ad-account selections are refused. |
+| get_analytics_metric_details | analytics/overview | read | GET /api/analytics | Channel metric query selects detail; paid metric keys are unavailable here. Source-level capability correspondence only. |
 | get_appearance | settings/appearance | read | GET /api/settings/appearance | Shared customer operation; transport arguments may differ. |
 | update_appearance | settings/appearance | write | PATCH /api/settings/appearance | Shared customer operation; transport arguments may differ. |
 | reveal_webhook_secret | settings/webhooks | write | POST /api/webhooks/[id]/secret/reveal | Shared customer operation; transport arguments may differ. |
@@ -495,7 +495,7 @@ excepted.
 | POST /api/oauth/authorize | Interactive OAuth client consent under browser identity; delegated clients cannot grant themselves consent. |
 | POST /api/oauth/register | Public OAuth client bootstrap registration; separate protocol authority from workspace operations. |
 | POST /api/oauth/token | OAuth authorization-code/refresh-token exchange; authentication protocol, not a product operation. |
-| POST /api/sharing/public/[token]/decision | External reviewer share-token decision; separate public reviewer authority from workspace MCP. Authenticated link management/feedback reads stay mapped. |
+| POST /api/sharing/public/[token]/decision | External reviewer share-token decision; separate public reviewer authority from workspace MCP. Advisory approvals/change requests atomically queue author-eligible notices with the answer; applied decisions use Publishing notices. Authenticated link management/feedback and notification reads stay mapped; comments do not queue notices. |
 <!-- parity-rest-exceptions:end -->
 
 Manifest-only view aliases explicitly reuse covered feature capabilities. Neither

@@ -47,6 +47,31 @@ describe('home overview arithmetic', () => {
     expect(groups.find(group => group.currency === 'EUR')).toMatchObject({ total: 16, daily: [{ date: '2026-10-01', value: 15 }, { date: '2026-10-02', value: 1 }] });
     expect(groups.find(group => group.currency === 'USD')?.total).toBe(7);
   });
+
+  it('adds decimal spend strings numerically and groups ISO days', () => {
+    expect(spendByCurrency([
+      { currency: 'USD', spend: '12.30', date: '2026-10-16T00:00:00.000Z' },
+      { currency: 'USD', spend: '0.70', date: '2026-10-16' },
+    ])).toEqual([{ currency: 'USD', total: 13, daily: [{ date: '2026-10-16', value: 13 }] }]);
+  });
+
+  it.each(['', ' ', '12oops', '1,200.50', 'Infinity', 'NaN'])('withholds invalid spend rather than treating %j as zero', spend => {
+    expect(() => spendByCurrency([{ currency: 'USD', spend, date: '2026-10-16' }])).toThrow();
+  });
+
+  it('does not count nonfinite performance figures as covered or comparable', () => {
+    expect(periodTotals([{ current: 5, previous: Number.NaN }, { current: Infinity, previous: 2 }]))
+      .toEqual({ current: 5, previous: null, change: null, covered: 1, comparable: 0 });
+  });
+
+  it.each([null, '', 'DOLLARS'])('withholds spend with an unknown or malformed currency: %j', currency => {
+    expect(() => spendByCurrency([{ currency, spend: 10, date: '2026-10-16' }])).toThrow();
+  });
+
+  it('normalizes currency codes before grouping', () => {
+    expect(spendByCurrency([{ currency: ' usd ', spend: 1, date: '2026-10-16' }, { currency: 'USD', spend: 2, date: '2026-10-16' }]))
+      .toMatchObject([{ currency: 'USD', total: 3 }]);
+  });
 });
 
 describe('best-time heatmap', () => {

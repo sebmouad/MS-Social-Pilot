@@ -74,7 +74,6 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHr
   const t = overviewText(copy);
   const params = new URLSearchParams(query);
   const selectedChannels = new Set(data.selected.channelIds);
-  const selectedAccounts = new Set(data.selected.adAccountIds);
   const comparison = data.period.comparison?.mode ?? 'none';
   const selectedMetric = params.get('metric') ?? '';
   const freshPage = (name: string) => <input type="hidden" name={name} value="1" />;
@@ -101,13 +100,6 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHr
           <input type="checkbox" name="channel" value={channel.id} defaultChecked={selectedChannels.has(channel.id)} />
           <span>{profiles?.channels.find(profile => profile.id === channel.id) ? profileChannelName(profiles.channels.find(profile => profile.id === channel.id)!) : channel.name}</span>
         </label>) : <p className="small-note">{t("No channels available.")}</p>}
-      </fieldset>
-      <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">{t("Ad accounts")}</legend>
-        {freshPage('adFilter')}
-        {data.options.adAccounts.length ? data.options.adAccounts.map(account => <label key={account.id}>
-          <input type="checkbox" name="adAccount" value={account.id} defaultChecked={selectedAccounts.has(account.id)} />
-          <span>{account.name}{account.currency ? ` · ${account.currency}` : ''}</span>
-        </label>) : <p className="small-note">{t("No ad accounts available.")}</p>}
       </fieldset>
       <label className="analytics-select-filter">{t("Search metrics")}
         <input type="search" name="search" maxLength={data.searchMaxLength} defaultValue={params.get('search') ?? ''} placeholder={t("Name or source")} />
@@ -212,7 +204,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     failure = operationFailure(error, t("Analytics could not be loaded. Try again or reset the filters."));
   }
 
-  const canExport = data !== null && (data.selected.channelIds.length > 0 || data.selected.adAccountIds.length > 0)
+  const canExport = data !== null && data.selected.channelIds.length > 0
     && canUseFeature(viewer.entitlements, 'analytics/reports') && canAccessFeature(viewer.permissions, 'analytics/reports');
   const canManageConnections = canUseFeature(viewer.entitlements, 'settings/connections') && canAccessFeature(viewer.permissions, 'settings/connections');
   const exportQuery = data ? new URLSearchParams(data.query) : null;
@@ -225,7 +217,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const retryQuery = rawQuery(params);
   const retryHref = `/analytics${retryQuery ? `?${retryQuery}` : ''}`;
 
-  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar copy={copy} profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length && !data.options.adAccounts.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar copy={copy} retryHref={retryHref} /> : undefined}>
+  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar copy={copy} profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar copy={copy} retryHref={retryHref} /> : undefined}>
     <div className="page-stack">
       <PageHeader module="analytics" title={t("Performance")} />
         {data && <><p title={t("These are inclusive stored calendar-date boundaries in UTC.")}>{t("Stored calendar dates (UTC): {start} to {end}.", { start: formatDay(data.period.start, locale), end: formatDay(data.period.end, locale) })}</p>
@@ -234,9 +226,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
       {failure && <section className="panel analytics-state"><EmptyState tone="error" title={t("Analytics could not be loaded")} action={<a href={retryHref}>{t("Try again with these filters")}</a>}>{failure.error} {t("Use the sidebar to retry with these filters or reset them.")}</EmptyState></section>}
       {data && <>
-        {!data.options.channels.length && !data.options.adAccounts.length
+        {!data.options.channels.length
           ? <section className="panel analytics-state"><EmptyState icon={<IconPlugConnected />} title={t("No selected resources are available")} action={connectionsHref ? <a href={connectionsHref}>{t("View connections")}</a> : undefined}>{t("Connect or enable a channel or ad account to see its stored metrics.")}</EmptyState></section>
-          : (data.options.channels.length > 0 || data.options.adAccounts.length > 0) && !data.selected.channelIds.length && !data.selected.adAccountIds.length
+          : data.options.channels.length > 0 && !data.selected.channelIds.length
             ? <section className="panel analytics-state"><EmptyState icon={<IconChartBar />} title={t("No resources selected")}>{t("Choose channels or ad accounts in the sidebar to see their stored metrics.")}</EmptyState></section>
             : null}
         {audienceSection(data, copy, locale)}
@@ -250,11 +242,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             <MetricCard module="analytics" icon={<IconAlertTriangle />} label={t("Failed or partial")} value={data.publishing.failed} />
           </div>
         </section>}
-        {data.selected.adAccountIds.length > 0 && <p className="small-note analytics-ad-coverage">{t("{count} ad accounts selected. Coverage is shown for each metric.", { count: data.selected.adAccountIds.length })}</p>}
         {data.detail ? <MetricTable copy={copy} locale={locale} data={data} /> : data.metrics.items.length ? <section className="panel">
           <div className="analytics-panel-title"><div><h2>{t("Available metrics")}</h2><p className="small-note">{t("Stored measurements for the selected resources and range. Use the sidebar to open a metric's full series and resource detail.")}</p></div><span className="badge">{t("{count} metrics", { count: data.metrics.total })}</span></div>
           <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric copy={copy} key={`${metric.sourceLabel}:${metric.key}`} locale={locale} metric={metric} comparison={data.comparisons[metric.key]} previousPoints={data.previousPoints[metric.key]} chartPoints={data.chartPoints} />)}</div>
-        </section> : data.selected.channelIds.length || data.selected.adAccountIds.length
+        </section> : data.selected.channelIds.length
           ? <EmptyState title={t("No metrics match these filters")} icon={<IconChartBar />} action={<a href="/analytics">{t("Reset filters")}</a>}>{t("Change the date range, metric search, or resource selection in the sidebar.")}</EmptyState>
           : null}
       </>}

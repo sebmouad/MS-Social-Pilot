@@ -19,10 +19,11 @@ const db = vi.hoisted(() => ({
   $queryRaw: vi.fn(),
 }));
 const adapters = vi.hoisted(() => ({ holding: { publish: vi.fn(), getRemoteStatus: vi.fn(), deleteRemote: vi.fn(), rescheduleRemote: vi.fn() }, plain: { publish: vi.fn() } }));
+const policy = vi.hoisted(() => ({ offered: true }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({
   'publishing.collab.versionRetention': 50, 'publishing.maxMessageCharacters': 10000, 'publishing.maxTargetsPerPost': 20, 'publishing.maxRemoteMediaPerPost': 4, 'publishing.maxImageAltCharacters': 500,
-  'publishing.remoteScheduling.leadMarginSeconds': 60, 'publishing.remoteScheduling.offered': true, 'publishing.remoteScheduling.defaultMode': 'application',
+  'publishing.remoteScheduling.leadMarginSeconds': 60, 'publishing.remoteScheduling.offered': policy.offered, 'publishing.remoteScheduling.defaultMode': 'application',
 })[key] }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}), hasPlatformCapability: () => true }));
 const media = { kinds: ['image', 'video'], maxImages: null, maxVideos: 1, mixedKinds: false, linkWithMedia: false, imageAltText: true };
@@ -42,12 +43,13 @@ import { publishDestinationInOperation } from '@/modules/publishing/server/publi
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const target = (id: string, provider: string) => ({ id, name: `Page ${id}`, type: 'page', providerId: `page-${id}`, canPublish: true, enabled: true, accessToken: 'token', socialAccount: { provider, invalidatedAt: null, tokenExpiresAt: null, scopes: 'publish' } });
-const row = (id: string, provider: string) => ({ id: `pt-${id}`, formatId: 'post', status: 'pending', remotePostId: null, target: target(id, provider) });
+const row = (id: string, provider: string) => ({ id: `pt-${id}`, formatId: 'post', status: 'pending', remotePostId: null as string | null, target: target(id, provider) });
 const at = (seconds: number) => new Date(Date.now() + seconds * 1000);
 const scheduled = (when: Date) => ({ id: 'p1', authorId: 'u1', format: 'post', message: 'Hello', firstComment: 'First', link: null, media: [], status: 'scheduled', scheduledAt: when, targets: [row('a', 'holding'), row('b', 'plain')] });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  policy.offered = true;
   attemptFirstComment.mockResolvedValue({ state: 'sent' });
   db.membership.findUnique.mockResolvedValue({ role: 'owner' });
   db.post.update.mockResolvedValue({});
@@ -56,6 +58,98 @@ beforeEach(() => {
   db.postTarget.findMany.mockResolvedValue([]);
   db.post.updateMany.mockResolvedValue({ count: 1 });
   db.$transaction.mockImplementation(async (work: (tx: typeof db) => Promise<unknown>) => work(db));
+});
+
+describe('reschedule re-offers deferred platform destinations', () => {
+  function deferredPost(oldTime: Date, modes = ['remote', 'application']) {
+    let current = scheduled(oldTime);
+    db.post.findFirst.mockImplementation(async () => current);
+    db.post.updateMany.mockImplementation(async ({ data }: { data: { scheduledAt: Date } }) => {
+      current = { ...current, scheduledAt: data.scheduledAt };
+      return { count: 1 };
+    });
+    db.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => {
+      const query = sql.join('');
+      if (query.includes('SELECT "publishMode"')) return [{ publishMode: 'native' }];
+      if (query.includes('SELECT id, "scheduleMode"')) return modes.map((scheduleMode, i) => ({ id: `pt-${i ? 'b' : 'a'}`, scheduleMode }));
+      return [];
+    });
+    return { change: (value: ReturnType<typeof scheduled>) => { current = value; } };
+  }
+
+  it.each([120, 7000000])('offers a previously out-of-window time (%s seconds) at the new accepted time', async oldSeconds => {
+    deferredPost(at(oldSeconds));
+    const when = at(10800);
+    const result = await reschedulePostToInstant(actor, 'p1', when);
+    expect(result.scheduledAt).toEqual(when);
+    expect(adapters.holding.publish).toHaveBeenCalledTimes(1);
+    expect(adapters.holding.publish).toHaveBeenCalledWith(expect.objectContaining({ scheduledAt: when }));
+    expect(adapters.plain.publish).not.toHaveBeenCalled();
+    expect(db.post.updateMany.mock.invocationCallOrder[0]).toBeLessThan(adapters.holding.publish.mock.invocationCallOrder[0]!);
+    expect(attemptFirstComment).not.toHaveBeenCalled();
+    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'scheduled' }) }));
+  });
+
+  it('keeps application choices and still-too-soon remote choices local', async () => {
+    deferredPost(at(120));
+    await reschedulePostToInstant(actor, 'p1', at(240));
+    expect(publishDestinationInOperation).not.toHaveBeenCalled();
+    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'scheduled' }) }));
+  });
+
+  it('never changes an application destination to platform scheduling', async () => {
+    deferredPost(at(120), ['application', 'remote']);
+    await reschedulePostToInstant(actor, 'p1', at(10800));
+    expect(publishDestinationInOperation).not.toHaveBeenCalled();
+  });
+
+  it('honors Root withdrawing new platform holds', async () => {
+    policy.offered = false;
+    deferredPost(at(120));
+    await reschedulePostToInstant(actor, 'p1', at(10800));
+    expect(publishDestinationInOperation).not.toHaveBeenCalled();
+    expect(db.$queryRaw.mock.calls.some(([sql]) => sql.join('').includes('SELECT "publishMode"'))).toBe(false);
+  });
+
+  it('refuses a stale follow-up after another operation moves the post', async () => {
+    const state = deferredPost(at(120));
+    db.$queryRaw.mockImplementation(async () => {
+      state.change(scheduled(at(18000)));
+      return [{ publishMode: 'native' }];
+    });
+    const when = at(10800);
+    await expect(reschedulePostToInstant(actor, 'p1', when)).resolves.toMatchObject({ scheduledAt: when });
+    expect(publishDestinationInOperation).not.toHaveBeenCalled();
+    expect(db.post.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps the committed time change successful when a provider result is uncertain', async () => {
+    deferredPost(at(120));
+    vi.mocked(publishDestinationInOperation).mockResolvedValueOnce('needs_review');
+    const when = at(10800);
+    await expect(reschedulePostToInstant(actor, 'p1', when)).resolves.toMatchObject({ scheduledAt: when });
+    expect(publishDestinationInOperation).toHaveBeenCalledTimes(1);
+    expect(db.post.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'publishing' }) }));
+    expect(attemptFirstComment).not.toHaveBeenCalled();
+  });
+
+  it('does not create another copy of an already-held destination', async () => {
+    const oldTime = at(10800);
+    deferredPost(oldTime).change(mixed(oldTime));
+    db.postTarget.findMany.mockResolvedValue([heldRow()]);
+    await reschedulePostToInstant(actor, 'p1', at(18000));
+    expect(adapters.holding.rescheduleRemote).toHaveBeenCalledTimes(1);
+    expect(publishDestinationInOperation).not.toHaveBeenCalled();
+    expect(attemptFirstComment).not.toHaveBeenCalled();
+  });
+
+  it('rechecks membership before a follow-up dispatch', async () => {
+    deferredPost(at(120));
+    db.membership.findUnique.mockResolvedValueOnce({ role: 'owner' }).mockResolvedValueOnce(null);
+    await expect(reschedulePostToInstant(actor, 'p1', at(10800))).resolves.toBeTruthy();
+    expect(publishDestinationInOperation).not.toHaveBeenCalled();
+    expect(db.post.update).not.toHaveBeenCalled();
+  });
 });
 
 const heldRow = () => ({ id: 'pt-a', targetId: 'a', formatId: 'post', remotePostId: 'remote-a', post: { format: 'post' }, target: target('a', 'holding') });

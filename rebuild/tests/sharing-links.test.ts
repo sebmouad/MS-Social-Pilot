@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, defaults, install, state } from './sharing-helpers';
 
 vi.mock('@/server/platforms/resource-visibility', () => ({ selectedResourceConnectionWhere: async () => ({provider:{in:['test-provider']}}) }));
+vi.mock('@/app/api/sharing/_http', () => ({
+  withSharingErrors: (handler: unknown) => handler,
+  ownerActor: async () => ({ userId: 'user-a', workspaceId: 'workspace-a' }),
+  sameOrigin: () => true,
+  reply: (body: unknown, status = 200) => Response.json(body, { status }),
+  failure: (error: { code?: string }) => Response.json({ code: error.code }, { status: error.code === 'invalid_request' ? 400 : 409 }),
+  absolute: (_request: Request, path: string) => `https://example.test${path}`,
+}));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => (defaults as Record<string, unknown>)[key], runtimeConfigBatch: async (keys: readonly string[]) => Object.fromEntries(keys.map(key => [key, (defaults as Record<string, unknown>)[key]])) }));
 vi.mock('@/server/entitlements', async () => (await import('./sharing-helpers')).entitlementMock());
@@ -307,7 +315,7 @@ describe('editing links', () => {
   const stored = (extra: object = {}) => ({ ...linkRow(['t1']), kind: 'review', description: null, daysBack: 7, daysAhead: 30, allowComments: true, decides: false, tokenHash: 'old-hash', ...extra });
   const versionOf = (row = stored()) => linkVersion({ ...row, targetIds: row.targetIds as string[], kind: row.kind }, row.tokenHash);
   const world = (row: object = stored(), extra: (sqlText: string) => unknown = () => undefined) => { state.respond = sqlText => sqlText.includes('FROM share_links WHERE id') ? [row] : extra(sqlText); };
-  const ok = (extra: object) => ({ id: 'shl_1', expectedVersion: versionOf(), ...extra });
+  const ok = (extra: object) => ({ id: 'shl_1', confirmation: 'UPDATE SHARE LINK shl_1', expectedVersion: versionOf(), ...extra });
   const confirm = { confirmation: 'UPDATE SHARE LINK shl_1' };
   const auditDetail = () => JSON.parse(String(state.executions.find(e => e.sql.includes('activity_logs'))!.values[4]));
   const accessUpdate = () => state.executions.find(e => e.sql.includes('UPDATE share_links SET kind'));
@@ -339,10 +347,13 @@ describe('editing links', () => {
     }
   });
 
-  it('requires the exact confirmation only for access changes and writes nothing without it', async () => {
+  it('requires the exact confirmation for every change and writes nothing without it', async () => {
     world();
-    await expect(updateShareLink(actor, ok({ allowComments: false }))).rejects.toMatchObject({ code: 'invalid_request', message: expect.stringContaining('UPDATE SHARE LINK shl_1') });
+    await expect(updateShareLink(actor, ok({ allowComments: false, confirmation: undefined }))).rejects.toMatchObject({ code: 'invalid_request', message: expect.any(String) });
     await expect(updateShareLink(actor, ok({ allowComments: false, confirmation: 'update share link shl_1' }))).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.executions).toHaveLength(0);
+    await expect(updateShareLink(actor, ok({ title: 'Only a name', confirmation: undefined }))).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(updateShareLink(actor, ok({ title: 'Only a name', confirmation: 'wrong' }))).rejects.toMatchObject({ code: 'invalid_request' });
     expect(state.executions).toHaveLength(0);
     await expect(updateShareLink(actor, ok({ title: 'Only a name' }))).resolves.toMatchObject({ rotated: false });
   });
@@ -395,7 +406,7 @@ describe('editing links', () => {
     const legacy = stored({ targetIds: [] });
     world(legacy);
     const v = versionOf(legacy);
-    await expect(updateShareLink(actor, { id: 'shl_1', expectedVersion: v, title: 'Legacy renamed' })).resolves.toMatchObject({ rotated: false });
+    await expect(updateShareLink(actor, { id: 'shl_1', confirmation: 'UPDATE SHARE LINK shl_1', expectedVersion: v, title: 'Legacy renamed' })).resolves.toMatchObject({ rotated: false });
     world(legacy, sqlText => sqlText.includes('FROM targets') ? [{ id: 't1' }] : undefined);
     await updateShareLink(actor, { id: 'shl_1', expectedVersion: v, targetIds: ['t1'], ...confirm });
     expect(accessUpdate()!.values).toContain(JSON.stringify(['t1']));
@@ -418,7 +429,7 @@ describe('editing links', () => {
     state.canApprove = true; await expect(updateShareLink(actor, ok({ kind: 'calendar', decides: true, ...confirm }))).rejects.toMatchObject({ code: 'invalid_request' });
     const decides = stored({ decides: true });
     world(decides); state.canApprove = false; // already deciding: renaming does not need the permission, and is not an access change
-    await expect(updateShareLink(actor, { id: 'shl_1', expectedVersion: versionOf(decides), title: 'Renamed' })).resolves.toMatchObject({ rotated: false });
+    await expect(updateShareLink(actor, { id: 'shl_1', confirmation: 'UPDATE SHARE LINK shl_1', expectedVersion: versionOf(decides), title: 'Renamed' })).resolves.toMatchObject({ rotated: false });
     expect(state.executions.filter(e => e.sql.startsWith('UPDATE share_links'))).toHaveLength(1);
   });
 
@@ -443,7 +454,7 @@ describe('editing links', () => {
     const v = versionOf(revoked);
     for (const change of [{ expiresInDays: 30 }, { allowComments: false }, { targetIds: ['t1', 't2'] }]) await expect(updateShareLink(actor, { id: 'shl_1', expectedVersion: v, ...change, ...confirm })).rejects.toMatchObject({ code: 'conflict' });
     expect(state.executions).toHaveLength(0);
-    await expect(updateShareLink(actor, { id: 'shl_1', expectedVersion: v, title: 'Archive name' })).resolves.toMatchObject({ rotated: false });
+    await expect(updateShareLink(actor, { id: 'shl_1', confirmation: 'UPDATE SHARE LINK shl_1', expectedVersion: v, title: 'Archive name' })).resolves.toMatchObject({ rotated: false });
     expect(metaUpdate()!.sql).not.toContain('revokedAt = NULL'); expect(JSON.stringify(state.executions)).not.toContain('"revokedAt" = ');
   });
 
@@ -463,9 +474,9 @@ describe('editing links', () => {
     world();
     expect(sharingWriteTools.has('update_share_link')).toBe(true); expect(SHARING_TOOL_ACCESS.update_share_link).toEqual({ feature: 'settings/sharing', mode: 'write' });
     const tool = sharingToolDefinitions.find(t => t.name === 'update_share_link')!;
-    expect('required' in tool.inputSchema ? tool.inputSchema.required : []).toEqual(['id', 'expectedVersion']); expect(tool.description).toContain('UPDATE SHARE LINK <id>');
+    expect('required' in tool.inputSchema ? tool.inputSchema.required : []).toEqual(['id', 'expectedVersion', 'confirmation']); expect(tool.description).toContain('UPDATE SHARE LINK <id>');
     await expect(executeSharingTool(actor, 'update_share_link', ok({ title: 'Via MCP' }))).resolves.toMatchObject({ rotated: false });
-    await expect(executeSharingTool(actor, 'update_share_link', ok({ allowComments: false }))).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(executeSharingTool(actor, 'update_share_link', ok({ allowComments: false, confirmation: undefined }))).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(executeSharingTool(actor, 'update_share_link', ok({ allowComments: false, ...confirm }))).resolves.toMatchObject({ rotated: true, path: expect.stringMatching(/^\/share\//) });
   });
 });
@@ -495,7 +506,7 @@ describe('capability minting never exceeds the caller’s current rights', () =>
     }
     untouched();
     world(stored());
-    await expect(updateShareLink(key(settingsOnly), { id: 'shl_1', expectedVersion: versionOf(), title: 'Rename only' })).resolves.toMatchObject({ rotated: false });
+    await expect(updateShareLink(key(settingsOnly), { id: 'shl_1', confirmation: 'UPDATE SHARE LINK shl_1', expectedVersion: versionOf(), title: 'Rename only' })).resolves.toMatchObject({ rotated: false });
     await expect(revokeShareLink(key(settingsOnly), { id: 'shl_1', confirmation: 'REVOKE SHARE LINK shl_1' })).resolves.toMatchObject({ status: 'revoked' });
     await expect(deleteShareLink(key(settingsOnly), { id: 'shl_1', confirmation: 'DELETE SHARE LINK shl_1' })).resolves.toMatchObject({ deleted: true });
   });
@@ -540,7 +551,7 @@ describe('capability minting never exceeds the caller’s current rights', () =>
     }
     // Metadata-only edits mint nothing and stay allowed; a caller with approval write can still re-issue.
     world(deciding);
-    await expect(updateShareLink(noApprove, { id: 'shl_1', expectedVersion: versionOf(deciding), title: 'Renamed' })).resolves.toMatchObject({ rotated: false });
+    await expect(updateShareLink(noApprove, { id: 'shl_1', confirmation: 'UPDATE SHARE LINK shl_1', expectedVersion: versionOf(deciding), title: 'Renamed' })).resolves.toMatchObject({ rotated: false });
     state.executions = []; world(deciding);
     await expect(updateShareLink(actor, { id: 'shl_1', expectedVersion: versionOf(deciding), expiresInDays: 10, confirmation: confirmUpdate })).resolves.toMatchObject({ rotated: true });
   });
@@ -561,10 +572,36 @@ describe('capability minting never exceeds the caller’s current rights', () =>
     const raw = JSON.stringify(state.executions.find(e => e.sql.includes('activity_logs'))!.values);
     expect(raw).not.toContain(secret); expect(raw).not.toContain(hashToken(secret));
     state.executions = []; world(stored());
-    await updateShareLink(key([], 'key_42'), { id: 'shl_1', expectedVersion: versionOf(), title: 'Renamed' });
+    await updateShareLink(key([], 'key_42'), { id: 'shl_1', confirmation: 'UPDATE SHARE LINK shl_1', expectedVersion: versionOf(), title: 'Renamed' });
     expect(auditOf()).toEqual({ linkId: 'shl_1', changed: ['title'], rotated: false, apiKeyId: 'key_42', authSource: 'api_key' });
     state.executions = []; world(stored());
     await rotateShareLink(actor, rotateInput);
     expect(auditOf()).toEqual({ linkId: 'shl_1' });
   });
 });
+
+ describe('confirmed title edits through the existing REST entry point', () => {
+  it('refuses an unconfirmed edit and persists an exactly confirmed one without rotating', async () => {
+    const { PATCH } = await import('@/app/api/sharing/links/[id]/route');
+    const stored = { ...linkRow(['t1']), kind: 'review', description: null, daysBack: 7, daysAhead: 30, allowComments: true, decides: false, tokenHash: 'old-hash' };
+    state.respond = text => text.includes('FROM share_links WHERE id') ? [stored] : undefined;
+    const expectedVersion = linkVersion({ ...stored, targetIds: ['t1'] }, stored.tokenHash);
+    const request = (confirmation?: string) => new Request('https://example.test/api/sharing/links/shl_1', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'New name', expectedVersion, ...(confirmation ? { confirmation } : {}) }) });
+    const context = { params: Promise.resolve({ id: 'shl_1' }) };
+    expect((await PATCH(request(), context)).status).toBe(400);
+    expect(state.executions).toHaveLength(0);
+    const response = await PATCH(request('UPDATE SHARE LINK shl_1'), context);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ id: 'shl_1', rotated: false, changed: ['title'] });
+    expect(state.executions.filter(e => e.sql.includes('UPDATE share_links'))).toHaveLength(1);
+  });
+ });
+
+ describe('sharing presentation through MCP', () => {
+  it('returns the same safe branding and advisory policy as the REST list service', async () => {
+    state.respond = text => text.startsWith('SELECT name, "logoUrl" FROM workspaces') ? [{ name: 'Example studio', logoUrl: 'https://images.example.test/logo.png' }] : undefined;
+    const result = await executeSharingTool(actor, 'list_share_links', {});
+    expect(result).toMatchObject({ presentation: { workspaceName: 'Example studio', workspaceLogoUrl: 'https://images.example.test/logo.png', advisoryDecisionNotificationsEnabled: true } });
+    expect(state.queries.find(q => q.sql.startsWith('SELECT name, "logoUrl"'))!.values).toEqual(['workspace-a']);
+  });
+ });

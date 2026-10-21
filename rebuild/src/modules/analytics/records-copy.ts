@@ -116,8 +116,8 @@ export const recordsCopyDefaults = {
     "fr": "Publicités"
   },
   "Ad-object analysis": {
-    "en": "Ad-object analysis",
-    "fr": "Analyse des objets publicitaires"
+    "en": "Ads reporting",
+    "fr": "Rapports publicitaires"
   },
   "Start (UTC, inclusive)": {
     "en": "Start (UTC, inclusive)",

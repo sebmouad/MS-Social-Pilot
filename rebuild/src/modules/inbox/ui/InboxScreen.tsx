@@ -26,6 +26,7 @@ import { InboxFilterPanel } from './InboxFilterPanel';
 import { InboxShortcuts } from './InboxShortcuts';
 import { BulkBar } from './BulkBar';
 import { ContactDetails } from './ContactDetails';
+import { ThreadScroll } from './ThreadScroll';
 import { InboxSelectionProvider, SelectBox, type SelectableItem } from './InboxSelection';
 import { SavedRepliesManager } from './SavedRepliesManager';
 import { readInboxContactDetails } from '@/modules/inbox/server/details';
@@ -149,6 +150,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         </div>
       </header>
       <div className={r3.threadGrid}><div className={r3.threadMain}>
+      <ThreadScroll label={copy.historyLabel} resetKey={`${thread.kind}:${thread.id}:${requestedHistoryCursor ?? ''}:${history.shown}`}>
       {thread.postText ?<p className={styles.postContext}><strong>{copy.onYourPost}</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}</p> : null}
       <p className={styles.contextNote}>{thread.kind === 'review' ? reviewLabel(locale, 'note') : copy.syncedNote}</p>
       <div className={styles.historyHead}>
@@ -159,6 +161,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       <ol className={styles.entries} aria-label={copy.historyLabel}>
         {(thread.kind === 'comment' ? thread.entries.filter(entry => entry.parentId === null) : thread.entries).map(entry => renderEntry(entry))}
       </ol>
+      </ThreadScroll>
       {canResolve ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canResolve} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} locale={locale} /> : null}
       {thread.kind === 'review'
         ? (canWrite && capabilities.replyToReviews ? <ReplyBox key={thread.id} id={thread.id} kind="review" locale={locale} allowed headline="" /> : <p>{reviewLabel(locale, 'replyUnavailable')}</p>)

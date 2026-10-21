@@ -29,7 +29,7 @@ const full = () => ({
     { id: 'p1', text: 'Launch day', scheduledAt: '2026-10-21T09:00:00.000Z', channels: ['Alpha'], mode: 'platform' },
     { id: 'p2', text: 'Recap', scheduledAt: '2026-10-22T09:00:00.000Z', channels: ['Beta'], mode: 'app' }] } },
   inbox: { state: 'ready', data: { open: 7 } },
-  ads: { state: 'ready', data: { spend: [{ currency: 'EUR', total: 250, daily: [{ t: '2026-10-18', v: 100 }, { t: '2026-10-19', v: 150 }] }] } },
+  ads: { state: 'ready', data: { start: '2026-09-23', end: '2026-10-20', spend: [{ currency: 'EUR', total: 250, firstDay: '2026-10-18', lastDay: '2026-10-19', recordedDays: 2, daily: [{ t: '2026-10-18', v: 100 }, { t: '2026-10-19', v: 150 }] }] } },
 });
 
 beforeEach(() => {
@@ -65,7 +65,8 @@ describe('Home overview screen', () => {
     expect(html).toContain('[heatmap:Typical engagement by weekday and hour]');
     expect(html).toContain('Held on the platform');
     expect(html).toContain('Sent by the app');
-    expect(html).toContain('€250.00');
+    expect(html).toContain('EUR');
+    expect(html).toContain('250.00');
     for (const href of ['/analytics', '/publishing/posts', '/inbox', '/ads']) expect(html).toContain(`href="${href}"`);
     expect(html).toContain('Welcome back, Example workspace');
     expect(html).toContain('Last 28 days');
@@ -119,5 +120,17 @@ describe('Home overview screen', () => {
     state.viewer.mockResolvedValue({ user: { id: 'member' }, workspaceId, membership: { workspace: { name: 'Example workspace' } }, entitlements: { platformCapabilities: { facebook: true } }, permissions: { pageScope: { all: false, ids: ['channel-allowed'] } } });
     await HomePage();
     expect(state.selectedTargets).toHaveBeenCalledWith(workspaceId, ['channel-allowed'], ['facebook']);
+  });
+
+  it.each(['en', 'fr'])('labels USD and the actual stored-data period in %s', async locale => {
+    state.locale.mockResolvedValue(locale);
+    const data = full();
+    data.ads.data.spend[0] = { currency: 'USD', total: 13, firstDay: '2026-10-15', lastDay: '2026-10-16', recordedDays: 2, daily: [] };
+    state.overview.mockResolvedValue(data);
+    const html = renderToStaticMarkup(await HomePage());
+    expect(html).toContain('USD');
+    expect(html).toContain(locale === 'en' ? 'Latest stored day: Oct 16, 2026' : 'Dernier jour enregistré : 16 oct. 2026');
+    expect(html).toContain(locale === 'en' ? '2 of 28 days' : '2 jours sur 28');
+    expect(html).toContain('UTC');
   });
 });
