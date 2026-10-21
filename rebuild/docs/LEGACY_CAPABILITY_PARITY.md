@@ -230,3 +230,72 @@ changes remain in the working tree for integration.
 Integrator edits outside ownership: reconcile `CONFIG_SCHEMA_VERSION` for the
 changed catalogs, and record this batch and evidence limits in ARCHITECTURE.md,
 DELIVERY_PLAN.md and AGENT_HANDOFF.md. No migrations or host wiring are needed.
+
+## Analytics source workflows — round 4 (2026-10-21)
+
+Ownership: `src/modules/analytics/`, targeted tests, and this inventory. This
+batch extends three partial legacy response-report capabilities from
+`src/components/analysis/ResponseTimeView.tsx` and `src/lib/response-time.ts`:
+
+1. Member first replies split by comments/conversations. Each source includes
+   numeric answered-wait counts and calendar/business-hours medians, computed
+   from that source's waits. Current workspace membership bounds name lookup;
+   former-member/outside-app buckets retain English/French wording. The Root
+   member row limit applies independently to combined and source summaries;
+   omitted counts appear in artifacts, without changing the full summary totals.
+2. Historical resolution cycles split by source. Both sources expose measured
+   cycle counts and calendar/business-hours medians. The combined median still
+   uses actual cycles, never averaged source medians. Same-valued local comment
+   and conversation IDs cannot mix cycles. Duplicate resolves, reopen without
+   visitor input, safety-cut threads and truncated audit history keep the prior
+   conservative behavior; unset hours remain unavailable, genuine zero remains zero.
+3. Recorded resolution/reopening counts split by source, independently from
+   measured cycles and saved period-end state. Repeated recorded actions and
+   actions without stored visitor history count as events, not extra durations;
+   bilingual artifacts explicitly explain that distinction. Counts on a truncated
+   event prefix remain marked partial rather than claiming complete history.
+
+UI report preparation/downloads, session REST
+`/api/analytics/report-workflows/run`, key REST
+`/api/v1/analytics/generate_report`, and MCP `generate_report` reuse the existing
+confirmed, scoped and audited report workflow/generator. CSV/JSON/printable HTML
+and text carry all three additions; Reports guidance and MCP discovery describe
+them. Existing retained summaries without these optional fields remain readable.
+No new routes, permissions, service authorization paths or provider calls exist.
+
+Root settings: no new keys. Existing typed `analytics.reportDocumentCopy` and
+`analytics.reportsCopy` gain bilingual wording. Existing runtime response member,
+message/event and artifact limits govern the additions; the response-member
+setting description now explains independent source bounds. Registry schema
+version is intentionally unchanged for the integrator.
+
+Verification: `npx tsc --noEmit -p .` passed with zero errors. From `rebuild/`,
+133 tests passed across 11 targeted files with `npx vitest run ... --no-cache`:
+`analytics-response-source-workflows.test.ts` (10 new),
+`analytics-response-source-parity.test.ts` (6),
+`analytics-response-comments.test.ts` (6), `analytics-response-history.test.ts`
+(14), `report-response-time.test.ts` (16), `report-document-copy.test.ts` (6),
+`analytics-parity-report-generation.test.ts` (39), `reports82-ui.test.ts` (15),
+`reports82-http-host.test.ts` (4), `reports82-mcp-host.test.ts` (6), and
+`ui-copy-coverage.test.ts` (11). `git diff --check` passed. New reader/arithmetic
+and artifact checks cover source identity, attribution, per-source omissions,
+cycles versus events, history cuts, missing hours, escaping, bilingual catalogs
+and output limits. Existing mocked host/UI/service checks cover the common
+transport paths; no real HTTP/MCP client, PostgreSQL, browser, provider, mail or
+production verification is claimed. No whole suite, server, deploy or push ran.
+
+Remaining gaps: legacy multi-channel response comparison is still represented
+by separate per-channel reports, not one cross-channel response table. Missing
+provider/audit history, bounded oldest-first reads, saved-state fallback and
+concurrent-read consistency remain as disclosed in rounds 2–3. A recorded action
+without stored visitor input cannot reconstruct a cycle. Broader report copy/
+format literals and complete provider history remain open. Interactive download,
+theme/viewport, database volume and actual REST/MCP/provider proof remain open.
+These three report slices do not establish full Analytics or legacy parity.
+
+Integrator edits outside ownership: reconcile `CONFIG_SCHEMA_VERSION` for the
+changed catalogs and update ARCHITECTURE.md, DELIVERY_PLAN.md and AGENT_HANDOFF.md
+with the batch and evidence limits. No migration or host wiring is needed.
+Changes are left uncommitted in this worktree for integration; linked Git metadata
+is outside this worker's writable roots. Existing untracked node_modules links
+are unrelated and were not modified.
