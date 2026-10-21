@@ -47,7 +47,7 @@ export async function readAnalyticsExplorer(actor: Actor, rawInput: unknown = {}
   const detail = selected ? (() => {
     const metric = metricView(selected);
     const { points, rows, ...summary } = metric;
-    return { metric: summary, ...(snapshot.previousPoints[selected.key]?.length ? { previousPoints: snapshot.previousPoints[selected.key] } : {}), points: pageSlice(points, pointPage, boundedDetailSize), rows: pageSlice(rows, rowPage, boundedDetailSize) };
+    return { metric: summary, ...(snapshot.previousPoints?.[selected.key]?.length ? { previousPoints: snapshot.previousPoints[selected.key] } : {}), points: pageSlice(points, pointPage, boundedDetailSize), rows: pageSlice(rows, rowPage, boundedDetailSize) };
   })() : null;
   const options = {
     channels: snapshot.options.channels.map(({ id, name }) => ({ id, name })),

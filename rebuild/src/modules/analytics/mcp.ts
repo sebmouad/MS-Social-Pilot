@@ -174,7 +174,7 @@ export const ANALYTICS_MCP: readonly McpToolGroup[] = [
         const boundedMetrics = metrics.map(metric => ({
           ...metric,
           comparison: snapshot.comparisons[metric.key] ?? null,
-          previousPoints: (snapshot.previousPoints[metric.key] ?? []).slice(0, cap),
+          previousPoints: (snapshot.previousPoints?.[metric.key] ?? []).slice(0, cap),
           points: metric.points.slice(0, cap),
           rows: metric.rows.slice(0, cap),
           pointsTruncated: metric.points.length > cap,
@@ -199,7 +199,7 @@ export const ANALYTICS_MCP: readonly McpToolGroup[] = [
         const pageLimit = Math.min(limit, cap);
         const details = metric[kind];
         const items = details.slice(offset, offset + pageLimit);
-        return { period: snapshot.period, range: snapshot.period.range, metric: { key: metric.key, label: metric.label, sourceLabel: metric.sourceLabel, unit: metric.unit, kind: metric.kind, aggregationLabel: metric.aggregationLabel, aggregationNote: metric.aggregationNote, coverage: metric.coverage, available: metric.available }, comparison: snapshot.comparisons[metric.key] ?? null, previousPoints: (snapshot.previousPoints[metric.key] ?? []).slice(0, cap), detailKind: kind, totalCount: details.length, offset, items, nextOffset: offset + items.length < details.length ? offset + items.length : null };
+        return { period: snapshot.period, range: snapshot.period.range, metric: { key: metric.key, label: metric.label, sourceLabel: metric.sourceLabel, unit: metric.unit, kind: metric.kind, aggregationLabel: metric.aggregationLabel, aggregationNote: metric.aggregationNote, coverage: metric.coverage, available: metric.available }, comparison: snapshot.comparisons[metric.key] ?? null, previousPoints: (snapshot.previousPoints?.[metric.key] ?? []).slice(0, cap), detailKind: kind, totalCount: details.length, offset, items, nextOffset: offset + items.length < details.length ? offset + items.length : null };
       }
         default: throw new OperationError('invalid_request', `Unknown tool: ${name}`);
       }
