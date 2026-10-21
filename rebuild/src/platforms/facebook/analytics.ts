@@ -1,3 +1,5 @@
+const FACEBOOK_PLATFORM_ID = 'facebook'; // installed platform id (module.ts), not the Page's remote id
+
 import { analyticsLanguage } from '@/modules/analytics/server/error-copy';
 import { runtimeConfigBatch } from '@/server/config/store';
 import { FACEBOOK_METRIC_LABEL_DEFAULTS, FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS } from './config';
@@ -331,6 +333,6 @@ export const facebookAnalyticsHost = {
     const selectedAdAccounts = adAccounts.filter(account => selectedAdAccountIds.includes(account.id));
     const [presentation, locale] = await Promise.all([runtimeConfigBatch(['meta.metricLabels', 'meta.pageAnalyticsCopy']), analyticsLanguage()]);
     const normalized = normalizeFacebookAnalytics({ locale, metricLabels: presentation['meta.metricLabels'] as PagePresentation['metricLabels'], pageCopy: presentation['meta.pageAnalyticsCopy'] as PagePresentation['pageCopy'], pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
-    return { targets: visible.map(({ socialAccountId: _socialAccountId, ...target }) => target), selectedTargets: selectedTargets.map(({ socialAccountId: _socialAccountId, ...target }) => target), adAccounts, selectedAdAccountIds, ...normalized };
+    return { targets: visible.map(({ socialAccountId: _socialAccountId, providerId: _pageId, ...target }) => ({ ...target, providerId: FACEBOOK_PLATFORM_ID })), selectedTargets: selectedTargets.map(({ socialAccountId: _socialAccountId, providerId: _pageId, ...target }) => ({ ...target, providerId: FACEBOOK_PLATFORM_ID })), adAccounts, selectedAdAccountIds, ...normalized };
   },
 };
