@@ -5,11 +5,13 @@ import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { prisma } from '@/server/data';
 import { checkUrlShape } from '@/modules/publishing/server/media/network/net-guard';
 import { WORDPRESS_BOUNDS } from '../wordpress/config';
-import { pauseRecipeSourceConfirmation, planConfigPatchSchema, resumeRecipeSourceConfirmation, runRecipePlannerConfirmation, saveRecipeSourceConfirmation, type PlanConfig } from '../wordpress/recipe';
+import { pauseAndCancelRecipeSourceConfirmation, pauseRecipeSourceConfirmation, planConfigPatchSchema, resumeRecipeSourceConfirmation, retryRecipeSlotsConfirmation, runRecipePlannerConfirmation, saveRecipeSourceConfirmation, type PlanConfig } from '../wordpress/recipe';
 import { authorizeFeedWrite, authorizeFeeds, type FeedActor, type FeedAuthorization } from './access';
 import { audit, bad, lockActor, protect, type Tx } from './core';
 import { commentFor, configOf, defaultPlannerPorts, openDatabase, planSource, recipeSummaryRecord, scanCandidates, type PlannerPorts } from './wordpress-planner';
 import { loadWordpressSettings, patchLimits, type WordpressSettings } from './wordpress-settings';
+import { cachedPoolHealth, computePoolHealth, forgetPoolHealth, type PoolHealth } from './wordpress-pool';
+import { cancelPlannedPosts, retryRecipeSlots } from './wordpress-recovery';
 import { countPlans, selectPlans, selectSource, type LedgerRow, type SourceRow } from './wordpress-store';
 
 /**
@@ -26,7 +28,7 @@ const saveSchema = (s: WordpressSettings) => z.object({
   allTargets: z.boolean(), targetIds: z.array(z.string().regex(ID).max(s.identifierMax)).max(s.maxTargets),
   config: planConfigPatchSchema(patchLimits(s)).optional(), confirmation: z.string(),
 }).strict();
-const stateSchema = z.object({ enabled: z.boolean(), confirmation: z.string() }).strict();
+const stateSchema = z.object({ enabled: z.boolean(), cancelScheduled: z.boolean().optional(), confirmation: z.string() }).strict();
 const confirmSchema = z.object({ confirmation: z.string() }).strict();
 
 const parse = <S extends z.ZodTypeAny>(schema: S, input: unknown): z.output<S> => { const r = schema.safeParse(input ?? {}); if (!r.success) throw bad(); return r.data; };
@@ -62,6 +64,22 @@ async function selectablePages(workspaceId: string, s: WordpressSettings, auth: 
 
 /* ----- read ----- */
 
+/** Pool health for the source's channels the viewer may see; null when the library cannot be read right now. */
+async function readPool(s: WordpressSettings, source: SourceRow, ports: PlannerPorts, auth: FeedAuthorization): Promise<PoolHealth | null> {
+  try {
+    const now = ports.now();
+    const health = await cachedPoolHealth(source.id, s.poolCacheSeconds, now, async () => {
+      const db = await openDatabase(ports, s);
+      if (!db) throw new Error('library_unavailable');
+      try { return await computePoolHealth({ settings: s, ports, db, source, now }); } finally { await db.close(); }
+    });
+    const allowed = auth.actor.allowedTargetIds;
+    if (allowed === undefined) return health;
+    const pages = health.pages.filter(p => allowed.includes(p.targetId));
+    return { ...health, pages, low: pages.some(p => p.low) };
+  } catch { return null; }
+}
+
 export async function readRecipeSource(actor: FeedActor, input: unknown = {}, deps: RecipeDeps = {}) {
   const s = await loadWordpressSettings();
   const query = parse(readSchema(s.pageNumberMax), input);
@@ -72,18 +90,20 @@ export async function readRecipeSource(actor: FeedActor, input: unknown = {}, de
     const page = query.page ?? 1;
     const ports = { ...defaultPlannerPorts(), ...deps };
     const configured = Boolean(await ports.databaseUrl().catch(() => null));
-    const [pages, plans, counts] = await Promise.all([
+    const poolReady = Boolean(source) && s.enabled && configured;
+    const [pages, plans, counts, pool] = await Promise.all([
       selectablePages(actor.workspaceId, s, auth),
       source ? selectPlans(actor.workspaceId, source.id, (page - 1) * s.ledgerPageSize, s.ledgerPageSize + 1) : Promise.resolve([] as LedgerRow[]),
       source ? countPlans(actor.workspaceId, source.id) : Promise.resolve({} as Record<string, number>),
+      poolReady && source ? readPool(s, source, ports, auth) : Promise.resolve(null),
     ]);
     const allowed = auth.actor.allowedTargetIds;
     const shown = (allowed === undefined ? plans : plans.filter(p => allowed.includes(p.targetId)));
     return {
       source: source ? viewOf(s, source) : null, defaults: { ...s.defaults, siteUrl: s.siteUrl } as PlanConfig & { siteUrl: string }, pages,
       plans: { items: shown.slice(0, s.ledgerPageSize).map(planView), page, pageSize: s.ledgerPageSize, hasMore: plans.length > s.ledgerPageSize }, counts,
-      available: s.enabled && configured, scopedView: scoped(auth),
-      limits: { maxNameCharacters: s.sourceNameMax, maxTemplateCharacters: s.textMax, maxTargets: s.maxTargets, horizonDays: WORDPRESS_BOUNDS.horizonDays, cooldownDays: WORDPRESS_BOUNDS.repostCooldownDays, ageDays: WORDPRESS_BOUNDS.maxAgeDays, delayMinutes: WORDPRESS_BOUNDS.firstCommentDelayMinutes, commentMaxCharacters: s.commentMax },
+      pool, available: s.enabled && configured, scopedView: scoped(auth),
+      limits: { maxNameCharacters: s.sourceNameMax, maxTemplateCharacters: s.textMax, maxTargets: s.maxTargets, horizonDays: WORDPRESS_BOUNDS.horizonDays, cooldownDays: WORDPRESS_BOUNDS.repostCooldownDays, ageDays: WORDPRESS_BOUNDS.maxAgeDays, delayMinutes: WORDPRESS_BOUNDS.firstCommentDelayMinutes, commentMaxCharacters: s.commentMax, pauseCancel: s.pauseCancel.enabled },
     };
   })());
 }
@@ -123,6 +143,7 @@ export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: R
     } else {
       await tx.$executeRaw`INSERT INTO wordpress_recipe_sources (id, "workspaceId", name, "siteUrl", enabled, "allTargets", "targetIds", config, "createdAt", "updatedAt") VALUES (${id}, ${actor.workspaceId}, ${data.name}, ${normalized}, ${enabled}, ${data.allTargets}, ${JSON.stringify(targetIds)}::jsonb, ${JSON.stringify(config)}::jsonb, NOW(), NOW())`;
     }
+    forgetPoolHealth(id);
     await audit(tx, actor.workspaceId, actor, existing ? 'feeds.recipe_source_updated' : 'feeds.recipe_source_created', { sourceId: id, host: new URL(normalized).hostname, allTargets: data.allTargets, targetCount: targetIds.length, enabled });
     await lockActor(tx, actor, true);
     const saved = await tx.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT id FROM wordpress_recipe_sources WHERE id = $1 AND "workspaceId" = $2`, id, actor.workspaceId);
@@ -131,23 +152,66 @@ export async function saveRecipeSource(actor: FeedActor, input: unknown, deps: R
   })).then(async result => ({ ...result, source: viewOf(s, (await selectSource(actor.workspaceId))!) }));
 }
 
-/** Pause or resume automatic planning for the workspace source. Pausing never removes posts already scheduled. */
-export async function setRecipeSourceState(actor: FeedActor, input: unknown) {
+/**
+ * Pause or resume automatic planning for the workspace source. Pausing keeps posts already scheduled unless the member
+ * also asks (with the matching confirmation, and while Root allows it) to cancel the source's scheduled, unpublished
+ * posts; those are cancelled through Publishing after the pause is saved, so a failure never undoes the pause.
+ */
+export async function setRecipeSourceState(actor: FeedActor, input: unknown, deps: RecipeDeps = {}) {
   const s = await loadWordpressSettings();
   const data = parse(stateSchema, input);
-  if (data.confirmation !== (data.enabled ? resumeRecipeSourceConfirmation : pauseRecipeSourceConfirmation)) throw bad();
+  const cancel = data.cancelScheduled === true;
+  if (cancel && data.enabled) throw bad();
+  if (data.confirmation !== (data.enabled ? resumeRecipeSourceConfirmation : cancel ? pauseAndCancelRecipeSourceConfirmation : pauseRecipeSourceConfirmation)) throw bad();
+  if (cancel && !s.pauseCancel.enabled) throw new OperationError('unavailable', 'Cancelling scheduled posts is not available right now. Pause without cancelling, or cancel the posts in Publishing.');
   const auth = await authorizeFeedWrite(actor);
-  return protect(transact(actor.workspaceId, s, async tx => {
+  const paused = await protect(transact(actor.workspaceId, s, async tx => {
     await lockActor(tx, actor, true);
     const rows = await tx.$queryRaw<Array<{ id: string; allTargets: boolean; targetIds: unknown }>>`SELECT id, "allTargets", "targetIds" FROM wordpress_recipe_sources WHERE "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const row = rows[0];
     const ids = Array.isArray(row?.targetIds) ? (row!.targetIds as unknown[]).filter((v): v is string => typeof v === 'string') : [];
     if (!row || (scoped(auth) && (row.allTargets || !ids.every(id => auth.actor.allowedTargetIds!.includes(id))))) throw notFound();
     await tx.$executeRaw`UPDATE wordpress_recipe_sources SET enabled = ${data.enabled}, "lastError" = NULL, "updatedAt" = NOW() WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId}`;
-    await audit(tx, actor.workspaceId, actor, data.enabled ? 'feeds.recipe_source_resumed' : 'feeds.recipe_source_paused', { sourceId: row.id });
+    await audit(tx, actor.workspaceId, actor, data.enabled ? 'feeds.recipe_source_resumed' : 'feeds.recipe_source_paused', { sourceId: row.id, cancelScheduled: cancel });
     await lockActor(tx, actor, true);
     return { id: row.id, enabled: data.enabled };
   }));
+  if (!cancel) return paused;
+  const ports = { ...defaultPlannerPorts(), ...deps };
+  let cancellation: CancelOutcomeView;
+  try {
+    const source = await selectSource(actor.workspaceId);
+    if (!source) throw notFound();
+    cancellation = { ...(await cancelPlannedPosts({ settings: s, ports, now: ports.now() }, source, auth)), incomplete: false };
+    await audit(prisma as unknown as Tx, actor.workspaceId, actor, 'feeds.recipe_source_posts_cancelled', { sourceId: paused.id, cancelled: cancellation.cancelled, notCancelled: cancellation.notCancelled, remaining: cancellation.remaining }).catch(() => undefined);
+  } catch { cancellation = { cancelled: 0, notCancelled: 0, remaining: true, incomplete: true }; }
+  return { ...paused, cancellation };
+}
+type CancelOutcomeView = Awaited<ReturnType<typeof cancelPlannedPosts>> & { incomplete: boolean };
+
+/**
+ * Plan again the upcoming slots that failed or whose outcome was uncertain, as the signed-in member. Uncertain slots are
+ * checked against Publishing first and are never planned a second time when a post exists; see retryRecipeSlots.
+ */
+export async function retryRecipeSlotsNow(actor: FeedActor, input: unknown, deps: RecipeDeps = {}) {
+  const s = await loadWordpressSettings();
+  const data = parse(confirmSchema, input);
+  if (data.confirmation !== retryRecipeSlotsConfirmation) throw bad();
+  const { auth, source } = await authorizedSource(actor);
+  if (!s.enabled) throw new OperationError('unavailable', 'Recipe planning is not available right now.');
+  if (!source.enabled) throw new OperationError('conflict', 'This recipe source is paused. Resume it to plan posts.');
+  const ports = { ...defaultPlannerPorts(), ...deps };
+  const db = await openDatabase(ports, s);
+  if (!db) throw new OperationError('unavailable', 'The recipe library could not be reached. Try again later.');
+  try {
+    const outcome = await retryRecipeSlots({ settings: s, ports, db, now: ports.now() }, source, auth);
+    forgetPoolHealth(source.id);
+    await audit(prisma as unknown as Tx, actor.workspaceId, actor, 'feeds.recipe_slots_retried', { sourceId: source.id, ...outcome }).catch(() => undefined);
+    return { sourceId: source.id, ...outcome };
+  } catch (error) {
+    if (error instanceof OperationError) throw error;
+    throw new OperationError('upstream_failure', 'Planning could not be completed. Check the planned posts before trying again.');
+  } finally { await db.close(); }
 }
 
 /* ----- preview and run ----- */
@@ -199,6 +263,7 @@ export async function runRecipePlannerNow(actor: FeedActor, input: unknown, deps
   const now = ports.now();
   try {
     const outcome = await planSource({ settings: s, ports, db, budget: { left: s.runBudget }, now }, source, auth);
+    forgetPoolHealth(source.id);
     await ports.store.recordRun(actor.workspaceId, source.id, { at: now, error: null, summary: recipeSummaryRecord(outcome, now) }).catch(() => undefined);
     await audit(prisma as unknown as Tx, actor.workspaceId, actor, 'feeds.recipe_planner_run', { sourceId: source.id, planned: outcome.planned, failed: outcome.failed, uncertain: outcome.uncertain, unfilled: outcome.unfilled }).catch(() => undefined);
     return outcome;

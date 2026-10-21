@@ -5,7 +5,7 @@ import type { FeedActor } from './server/access';
 import { FEEDS_FEATURE_ID } from './manifest';
 import { FEEDS_BOUNDS } from './config';
 import { SLOTS_MAX, WORDPRESS_BOUNDS, WORDPRESS_DEFAULTS } from './wordpress/config';
-import { previewRecipeSource, readRecipeSource, runRecipePlannerNow, saveRecipeSource, setRecipeSourceState } from './server/wordpress';
+import { previewRecipeSource, readRecipeSource, retryRecipeSlotsNow, runRecipePlannerNow, saveRecipeSource, setRecipeSourceState } from './server/wordpress';
 
 const fields = {
   name: { type: 'string', minLength: 1, maxLength: FEEDS_BOUNDS.nameMaxCharacters.max }, url: { type: 'string', maxLength: FEEDS_BOUNDS.urlMaxCharacters.max }, kind: { enum: ['rss', 'wordpress'] }, enabled: { type: 'boolean' },
@@ -34,15 +34,16 @@ const recipeConfigSchema = {
   },
 } as const;
 export const recipeToolDefinitions = [
-  { name: 'get_recipe_source', description: 'Read the workspace WordPress recipe source: its channels, times, first-comment template, state and the planned-posts ledger. A member or key limited to some channels sees it only when all its channels are inside that access.', inputSchema: { type: 'object', properties: { page: { type: 'integer', minimum: 1, maximum: FEEDS_BOUNDS.pageNumberMax.max } }, additionalProperties: false } },
+  { name: 'get_recipe_source', description: 'Read the workspace WordPress recipe source: its channels, times, first-comment template, state, the planned-posts ledger and the recipe pool health (eligible recipes left per channel, estimated days until they run out, and whether that is below the warning threshold; null when the recipe library cannot be read). A member or key limited to some channels sees it only when all its channels are inside that access.', inputSchema: { type: 'object', properties: { page: { type: 'integer', minimum: 1, maximum: FEEDS_BOUNDS.pageNumberMax.max } }, additionalProperties: false } },
   { name: 'save_recipe_source', description: 'Create or replace the workspace recipe source. A new source starts paused unless enabled is true. Saving never publishes. Confirmation must exactly match SAVE RECIPE SOURCE <name>.', inputSchema: { type: 'object', required: ['name', 'siteUrl', 'allTargets', 'targetIds', 'confirmation'], properties: { name: { type: 'string', minLength: 1, maxLength: WORDPRESS_BOUNDS.sourceNameMaxCharacters.max }, siteUrl: { type: 'string', maxLength: FEEDS_BOUNDS.urlMaxCharacters.max }, enabled: { type: 'boolean' }, allTargets: { type: 'boolean', description: 'Plan for every selected channel Publishing accepts.' }, targetIds: { type: 'array', items: { type: 'string', maxLength: FEEDS_BOUNDS.identifierMaxCharacters.max }, maxItems: FEEDS_BOUNDS.maxTargets.max }, config: recipeConfigSchema, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'preview_recipe_source', description: 'Show the next recipes exactly as they will post (image address, caption and first comment). Creates nothing.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'run_recipe_planner', description: 'Fill the unplanned posting times now with scheduled posts, one different recipe per channel and time. Posts are created through Publishing and follow its approval rules. Confirmation must exactly match RUN RECIPE PLANNER.', inputSchema: { type: 'object', required: ['confirmation'], properties: { confirmation: { type: 'string' } }, additionalProperties: false } },
-  { name: 'set_recipe_source_state', description: 'Pause or resume automatic planning. Pausing keeps posts already scheduled. Confirmation must exactly match PAUSE RECIPE SOURCE or RESUME RECIPE SOURCE.', inputSchema: { type: 'object', required: ['enabled', 'confirmation'], properties: { enabled: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'set_recipe_source_state', description: 'Pause or resume automatic planning. Pausing keeps posts already scheduled. Confirmation must exactly match PAUSE RECIPE SOURCE or RESUME RECIPE SOURCE. With enabled false and cancelScheduled true (when Root allows it; see limits.pauseCancel in get_recipe_source) the source\'s scheduled, not yet published posts are also cancelled through Publishing and return to drafts; confirmation must then exactly match PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS. The result reports cancelled, notCancelled and remaining; repeat while remaining is true.', inputSchema: { type: 'object', required: ['enabled', 'confirmation'], properties: { enabled: { type: 'boolean' }, cancelScheduled: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'retry_recipe_slots', description: 'Plan again the upcoming posting times that failed or whose result was uncertain. A failed time never produced a post. An uncertain time is checked in Publishing first: when a post exists it is recorded and not duplicated; only a time confirmed to have no post is planned again; one that cannot be confirmed yet stays uncertain. Confirmation must exactly match RETRY RECIPE SLOTS.', inputSchema: { type: 'object', required: ['confirmation'], properties: { confirmation: { type: 'string' } }, additionalProperties: false } },
 ] as const;
 export const recipeTools = new Set<string>(recipeToolDefinitions.map(tool => tool.name));
 export const feedTools = new Set<string>([...feedToolDefinitions.map(tool => tool.name), ...recipeTools]);
-export const feedWriteTools = new Set<string>(['create_content_feed', 'update_content_feed', 'delete_content_feed', 'check_content_feed', 'save_recipe_source', 'preview_recipe_source', 'run_recipe_planner', 'set_recipe_source_state']);
+export const feedWriteTools = new Set<string>(['create_content_feed', 'update_content_feed', 'delete_content_feed', 'check_content_feed', 'save_recipe_source', 'preview_recipe_source', 'run_recipe_planner', 'set_recipe_source_state', 'retry_recipe_slots']);
 
 export async function executeFeedTool(actor: FeedActor, name: string, args: unknown, deps: FeedDeps = {}) {
   if (name === 'get_recipe_source') return readRecipeSource(actor, args ?? {});
@@ -50,6 +51,7 @@ export async function executeFeedTool(actor: FeedActor, name: string, args: unkn
   if (name === 'preview_recipe_source') return previewRecipeSource(actor, args ?? {});
   if (name === 'run_recipe_planner') return runRecipePlannerNow(actor, args);
   if (name === 'set_recipe_source_state') return setRecipeSourceState(actor, args);
+  if (name === 'retry_recipe_slots') return retryRecipeSlotsNow(actor, args);
   if (name === 'list_content_feeds') return readFeeds(actor, args ?? {});
   if (name === 'create_content_feed') return createFeed(actor, args, deps);
   if (name === 'update_content_feed') return updateFeed(actor, args, deps);
@@ -93,7 +95,8 @@ export const FEEDS_MCP: readonly McpToolGroup[] = [{
     }
     if (name === 'get_recipe_source' || name === 'preview_recipe_source') return result;
     if (name === 'save_recipe_source') { const saved = result as Awaited<ReturnType<typeof saveRecipeSource>>; return auditedReceipt(viewer, name, { sourceId: saved.id, created: saved.created }, saved); }
-    if (name === 'set_recipe_source_state') { const state = result as Awaited<ReturnType<typeof setRecipeSourceState>>; return auditedReceipt(viewer, name, { sourceId: state.id, enabled: state.enabled }, state); }
+    if (name === 'set_recipe_source_state') { const state = result as Awaited<ReturnType<typeof setRecipeSourceState>>; return auditedReceipt(viewer, name, { sourceId: state.id, enabled: state.enabled, ...('cancellation' in state ? { cancelled: state.cancellation.cancelled, notCancelled: state.cancellation.notCancelled } : {}) }, state); }
+    if (name === 'retry_recipe_slots') { const retry = result as Awaited<ReturnType<typeof retryRecipeSlotsNow>>; return auditedReceipt(viewer, name, { sourceId: retry.sourceId, reconciled: retry.reconciled, released: retry.released, planned: retry.planned, failed: retry.failed, uncertain: retry.uncertain }, retry); }
     if (name === 'run_recipe_planner') { const run = result as Awaited<ReturnType<typeof runRecipePlannerNow>>; return auditedReceipt(viewer, name, { sourceId: run.sourceId, planned: run.planned, failed: run.failed, uncertain: run.uncertain, unfilled: run.unfilled }, run); }
     const checked = result as Awaited<ReturnType<typeof checkFeed>>;
     // A preview changes nothing, so only a creating mode leaves an MCP audit receipt.

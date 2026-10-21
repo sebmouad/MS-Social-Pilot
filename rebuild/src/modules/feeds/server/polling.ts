@@ -58,6 +58,15 @@ export type PollDeps = {
 /** Due predicate shared by the candidate scan and the claim: $1 interval s, $2 backoff ceiling. */
 const DUE = `("lastPolledAt" IS NULL OR "lastPolledAt" + (LEAST(power(2, LEAST("pollErrorCount", 30)), $2::double precision) * $1::double precision) * interval '1 second' <= NOW())`;
 
+/** One log line for the `feedsPoll` job: feed reading totals, then the recipe planner's totals and stop reasons. */
+export function formatFeedPollSummary(result: FeedPollSummary): string {
+  const feeds = `${result.reason ? `${result.reason} ` : ''}examined=${result.examined} claimed=${result.claimed} posts=${result.postsCreated} held=${result.held} skipped=${result.skipped} failed=${result.failed}`;
+  const r = result.recipes;
+  if (!r) return `${feeds} recipes=off`;
+  const reasons = [...new Set(r.outcomes.flatMap(o => o.reason ? [o.reason] : []))];
+  return `${feeds} recipes: sources=${r.sources} planned=${r.planned} failed=${r.failed} uncertain=${r.uncertain} unfilled=${r.unfilled}${r.reason ? ` reason=${r.reason}` : ''}${reasons.length ? ` stops=${reasons.join(',')}` : ''}`;
+}
+
 /**
  * The `feedsPoll` job: RSS/Atom/WordPress-REST reading, then the WordPress recipe planner. The planner has its own
  * Root master switch (`feeds.wordpress.enabled`) and its own source switches, independent of automatic feed reading,

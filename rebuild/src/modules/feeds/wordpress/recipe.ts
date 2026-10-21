@@ -227,3 +227,5 @@ export const saveRecipeSourceConfirmation = (name: string) => `SAVE RECIPE SOURC
 export const runRecipePlannerConfirmation = 'RUN RECIPE PLANNER';
 export const pauseRecipeSourceConfirmation = 'PAUSE RECIPE SOURCE';
 export const resumeRecipeSourceConfirmation = 'RESUME RECIPE SOURCE';
+export const retryRecipeSlotsConfirmation = 'RETRY RECIPE SLOTS';
+export const pauseAndCancelRecipeSourceConfirmation = 'PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS';

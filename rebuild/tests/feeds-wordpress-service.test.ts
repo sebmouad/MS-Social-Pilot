@@ -166,7 +166,8 @@ const fakePorts = (rows: Array<ReturnType<typeof wpRow>>, ledger: LedgerRow[] = 
   const ports: Partial<PlannerPorts> = {
     databaseUrl: async () => 'mysql://x', now: () => NOW, validateTarget,
     openDb: async () => ({ candidates: async q => (q.afterId === null ? rows : []), attachments: async ids => new Map(ids.map(id => [id, `2026/10/${id}.webp`] as const)), ping: async () => undefined, close }),
-    store: { enabledSources: async () => [], pages: async () => state.pages, ledgerSince: async () => ledger, expireStale: async () => 0, claim: async () => 'claim', settle: async () => undefined, recordRun: async (_w, _s, run) => { recorded.push(run); } },
+    store: { enabledSources: async () => [], pages: async () => state.pages, ledgerSince: async () => ledger, expireStale: async () => 0, claim: async () => 'claim', settle: async () => undefined, recordRun: async (_w, _s, run) => { recorded.push(run); }, unresolved: async () => [], plannedUpcoming: async () => [], settleIf: async () => true },
+    cancelPost: vi.fn(async () => undefined), postForSlot: vi.fn(async () => null),
     createPost: vi.fn(async () => ({ id: 'post1' })),
     image: { download: async () => Buffer.from('w'), inspect: async () => undefined, convert: async () => Buffer.from('j'), store: async () => ({ id: 'm1' }) },
   };

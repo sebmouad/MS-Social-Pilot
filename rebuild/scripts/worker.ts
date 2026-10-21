@@ -23,9 +23,8 @@ const dependencies: WorkerDependencies = {
       return Object.entries(result).map(([key, count]) => `${key}=${count}`).join(' ');
     }
     if (job === 'feedsPoll') {
-      const { runFeedPolling } = await import('@/modules/feeds/server/polling');
-      const result = await runFeedPolling();
-      return `${result.reason ? `${result.reason} ` : ''}examined=${result.examined} claimed=${result.claimed} posts=${result.postsCreated} held=${result.held} skipped=${result.skipped} failed=${result.failed}`;
+      const { formatFeedPollSummary, runFeedPolling } = await import('@/modules/feeds/server/polling');
+      return formatFeedPollSummary(await runFeedPolling());
     }
     if (job === 'workspaceExports') {
       const { runWorkspaceExports } = await import('../src/modules/settings/server/exports');

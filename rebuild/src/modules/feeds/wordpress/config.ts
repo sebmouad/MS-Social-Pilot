@@ -16,6 +16,7 @@ export const WORDPRESS_DEFAULTS = {
   firstCommentMaxCharacters: 8000, firstCommentDelayMinutes: 0, minutesSuffix: ' min', truncationMark: '…',
   jpegQuality: 88, jpegMinQuality: 60, jpegQualityStep: 8, imageMaxBytes: 8388608, imageMaxPixels: 40000000, imageFetchTimeoutMs: 20000,
   sourceNameMaxCharacters: 120, textMaxCharacters: 10000, titleMaxCharacters: 300,
+  poolWarnDays: 14, poolCacheSeconds: 900, pauseCancelEnabled: true, pauseCancelBatchSize: 100,
 } as const;
 export const WORDPRESS_BOUNDS = {
   dbConnectTimeoutMs: { min: 500, max: 60000 }, dbQueryTimeoutMs: { min: 1000, max: 120000 }, dbPoolSize: { min: 1, max: 4 },
@@ -26,6 +27,7 @@ export const WORDPRESS_BOUNDS = {
   jpegQuality: { min: 40, max: 100 }, jpegMinQuality: { min: 30, max: 100 }, jpegQualityStep: { min: 1, max: 30 },
   imageMaxBytes: { min: 102400, max: 33554432 }, imageMaxPixels: { min: 1000000, max: 268402689 }, imageFetchTimeoutMs: { min: 1000, max: 120000 },
   sourceNameMaxCharacters: { min: 10, max: 240 }, textMaxCharacters: { min: 500, max: 20000 }, titleMaxCharacters: { min: 40, max: 1000 },
+  poolWarnDays: { min: 1, max: 3650 }, poolCacheSeconds: { min: 0, max: 86400 }, pauseCancelBatchSize: { min: 1, max: 500 },
 } as const;
 const int = (range: { min: number; max: number }) => z.number().int().min(range.min).max(range.max);
 
@@ -93,4 +95,8 @@ export const WORDPRESS_CONFIG = [
   num(`${P}sourceNameMaxCharacters`, 'Recipe source name limit', 'Longest recipe source name.', WORDPRESS_DEFAULTS.sourceNameMaxCharacters, WORDPRESS_BOUNDS.sourceNameMaxCharacters),
   num(`${P}textMaxCharacters`, 'Recipe template length limit', 'Longest first-comment template saved with a source.', WORDPRESS_DEFAULTS.textMaxCharacters, WORDPRESS_BOUNDS.textMaxCharacters),
   num(`${P}titleMaxCharacters`, 'Recorded title length', 'Longest recipe title kept in the planned-posts record.', WORDPRESS_DEFAULTS.titleMaxCharacters, WORDPRESS_BOUNDS.titleMaxCharacters),
+  num(`${P}poolWarnDays`, 'Recipe pool warning (days)', 'A channel is flagged as running low when its remaining eligible recipes last fewer days than this at the current posting times.', WORDPRESS_DEFAULTS.poolWarnDays, WORDPRESS_BOUNDS.poolWarnDays),
+  num(`${P}poolCacheSeconds`, 'Recipe pool check cache (seconds)', 'How long a computed recipe pool health result is reused before the recipe library is scanned again; 0 scans on every view.', WORDPRESS_DEFAULTS.poolCacheSeconds, WORDPRESS_BOUNDS.poolCacheSeconds),
+  flag(`${P}pauseCancelEnabled`, 'Allow cancelling scheduled posts on pause', 'When on, pausing a recipe source may also cancel its scheduled, not yet published posts (only when the member asks and confirms).', WORDPRESS_DEFAULTS.pauseCancelEnabled),
+  num(`${P}pauseCancelBatchSize`, 'Posts cancelled per pause request', 'Most scheduled posts one pause request cancels; repeat the request to continue.', WORDPRESS_DEFAULTS.pauseCancelBatchSize, WORDPRESS_BOUNDS.pauseCancelBatchSize),
 ] as const;

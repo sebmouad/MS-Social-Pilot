@@ -6,7 +6,7 @@ import type { Mapping } from './recipe';
  */
 export type DbSettings = { url: string; tablePrefix: string; connectTimeoutMs: number; queryTimeoutMs: number; poolSize: number };
 export type WpCandidateRow = { id: string; title: string; slug: string; publishedAt: Date | null; caption: string; imageId: string; recipe: string };
-export type CandidateQuery = { mapping: Mapping; order: 'newest' | 'oldest'; skipShared: boolean; maxAgeDays: number; afterId: string | null; limit: number; now: Date };
+export type CandidateQuery = { mapping: Mapping; order: 'newest' | 'oldest'; skipShared: boolean; maxAgeDays: number; afterId: string | null; afterDate?: Date | null; limit: number; now: Date };
 export type WpDb = {
   candidates(query: CandidateQuery): Promise<WpCandidateRow[]>;
   /** attachment ID -> relative file path under the uploads folder */
@@ -50,7 +50,14 @@ export async function openWordpressDb(settings: DbSettings, factory: PoolFactory
     async candidates(q) {
       const where: string[] = ['p.post_type = ?', 'p.post_status = ?', "cap.meta_value <> ''", "img.meta_value <> ''", "rec.meta_value <> ''"];
       const values: unknown[] = [q.mapping.captionMetaKey, q.mapping.imageMetaKey, q.mapping.recipeMetaKey, q.mapping.postType, q.mapping.postStatus];
-      if (q.afterId !== null) { where.push(q.order === 'newest' ? 'p.ID < ?' : 'p.ID > ?'); values.push(q.afterId); }
+      if (q.afterId !== null) {
+        // Keyset paging over (publish date, ID) in the scan's direction; undated (zero-date) rows sort last newest-first and first oldest-first.
+        const newest = q.order === 'newest';
+        const cmp = newest ? '<' : '>';
+        if (q.afterDate) { where.push(`(p.post_date_gmt ${cmp} ? OR (p.post_date_gmt = ? AND p.ID ${cmp} ?))`); values.push(q.afterDate, q.afterDate, q.afterId); }
+        else if (newest) { where.push("(p.post_date_gmt < '1971-01-01' AND p.ID < ?)"); values.push(q.afterId); }
+        else { where.push("((p.post_date_gmt < '1971-01-01' AND p.ID > ?) OR p.post_date_gmt >= '1971-01-01')"); values.push(q.afterId); }
+      }
       if (q.maxAgeDays > 0) { where.push('p.post_date_gmt >= ?'); values.push(new Date(q.now.getTime() - q.maxAgeDays * 86_400_000)); }
       if (q.skipShared && q.mapping.skipMetaKey) { where.push(`NOT EXISTS (SELECT 1 FROM ${meta} s WHERE s.post_id = p.ID AND s.meta_key = ? AND s.meta_value <> '')`); values.push(q.mapping.skipMetaKey); }
       values.push(q.limit);
@@ -61,7 +68,7 @@ export async function openWordpressDb(settings: DbSettings, factory: PoolFactory
         JOIN ${meta} rec ON rec.post_id = p.ID AND rec.meta_key = ?
         WHERE ${where.join(' AND ')}
         GROUP BY p.ID, p.post_title, p.post_name, p.post_date_gmt
-        ORDER BY p.ID ${q.order === 'newest' ? 'DESC' : 'ASC'} LIMIT ?`;
+        ORDER BY p.post_date_gmt ${q.order === 'newest' ? 'DESC' : 'ASC'}, p.ID ${q.order === 'newest' ? 'DESC' : 'ASC'} LIMIT ?`;
       return rowsOf(await run(sql, values)).map(r => ({ id: text(r['id']), title: text(r['title']), slug: text(r['slug']), publishedAt: asDate(r['publishedAt']), caption: text(r['caption']).trim(), imageId: text(r['imageId']).trim(), recipe: text(r['recipe']) }));
     },
     async attachments(ids, attachedFileMetaKey) {

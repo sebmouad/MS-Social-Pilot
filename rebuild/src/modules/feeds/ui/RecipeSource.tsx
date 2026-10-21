@@ -20,10 +20,19 @@ export type RecipeSourceData = {
 export type RecipePlan = { id: string; targetId: string; targetName: string; wpPostId: string; slotAt: string; state: 'claimed' | 'planned' | 'uncertain' | 'failed'; postId: string | null; title: string; permalink: string | null; reason: string | null };
 export type RecipeView = {
   source: RecipeSourceData | null; defaults: RecipeConfig & { siteUrl: string }; pages: Array<{ id: string; name: string }>; plans: { items: RecipePlan[]; page: number; hasMore: boolean };
-  counts: Record<string, number>; available: boolean; limits: { maxNameCharacters: number; maxTemplateCharacters: number };
+  counts: Record<string, number>; available: boolean; limits: { maxNameCharacters: number; maxTemplateCharacters: number; pauseCancel?: boolean };
+  pool?: RecipePool | null;
 };
+export type RecipePool = { asOf: string; complete: boolean; warnDays: number; low: boolean; pages: Array<{ targetId: string; targetName: string; eligible: number; daysLeft: number | null; low: boolean }> };
 type Preview = { items: Array<{ wpPostId: string; title: string; permalink: string; imageUrl: string; caption: string; firstComment: string }> };
-type Review = 'save' | 'pause' | 'resume' | 'run';
+type Review = 'save' | 'pause' | 'resume' | 'run' | 'retry';
+const PAUSE_PHRASE = 'PAUSE RECIPE SOURCE';
+const PAUSE_CANCEL_PHRASE = 'PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS';
+const REVIEW_COPY: Record<Review, { title: RecipeCopyKey; text: RecipeCopyKey; action: RecipeCopyKey }> = {
+  save: { title: 'saveTitle', text: 'saveDescription', action: 'confirmSave' }, pause: { title: 'pauseTitle', text: 'pauseDescription', action: 'confirmPause' },
+  resume: { title: 'resumeTitle', text: 'resumeDescription', action: 'confirmResume' }, run: { title: 'runTitle', text: 'runDescription', action: 'confirmRun' },
+  retry: { title: 'retryTitle', text: 'retryDescription', action: 'confirmRetry' },
+};
 type Draft = { name: string; siteUrl: string; allTargets: boolean; targetIds: string[]; config: RecipeConfig };
 
 const SLOT = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -38,6 +47,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const [draft, setDraft] = useState(() => initialDraft(initial));
   const [review, setReview] = useState<Review | null>(null);
   const [confirmation, setConfirmation] = useState('');
+  const [cancelPosts, setCancelPosts] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ error: boolean; text: string; key: number } | null>(null);
@@ -45,7 +55,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const source = view.source;
   const say = (text: string, error = false) => setNotice(v => ({ error, text, key: (v?.key ?? 0) + 1 }));
   const errorText = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : t('unknownError');
-  const phrase = review === 'save' ? `SAVE RECIPE SOURCE ${draft.name.trim()}` : review === 'pause' ? 'PAUSE RECIPE SOURCE' : review === 'resume' ? 'RESUME RECIPE SOURCE' : 'RUN RECIPE PLANNER';
+  const phrase = review === 'save' ? `SAVE RECIPE SOURCE ${draft.name.trim()}` : review === 'pause' ? (cancelPosts ? PAUSE_CANCEL_PHRASE : PAUSE_PHRASE) : review === 'resume' ? 'RESUME RECIPE SOURCE' : review === 'retry' ? 'RETRY RECIPE SLOTS' : 'RUN RECIPE PLANNER';
   const confirmParts = copy[locale].typeToConfirm.split('{phrase}');
   const when = (value: string | null, zone: string) => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: zone }).format(new Date(value)) : '';
   const zone = source?.config.timezone ?? draft.config.timezone;
@@ -80,8 +90,13 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
       await call('/api/feeds/wordpress', 'PUT', { name: draft.name.trim(), siteUrl: draft.siteUrl.trim(), allTargets: draft.allTargets, targetIds: draft.allTargets ? [] : draft.targetIds, config: configPatch(draft.config, view.defaults), confirmation: phrase });
       await reload(); say(t('savedNotice'));
     } else if (review === 'pause' || review === 'resume') {
-      await call('/api/feeds/wordpress/state', 'POST', { enabled: review === 'resume', confirmation: phrase });
-      await reload(); say(t(review === 'resume' ? 'resumedNotice' : 'pausedNotice'));
+      const body = await call('/api/feeds/wordpress/state', 'POST', { enabled: review === 'resume', ...(review === 'pause' && cancelPosts ? { cancelScheduled: true } : {}), confirmation: phrase }) as { cancellation?: { cancelled: number; notCancelled: number; remaining: boolean; incomplete: boolean } };
+      await reload();
+      const c = body?.cancellation;
+      say(!c ? t(review === 'resume' ? 'resumedNotice' : 'pausedNotice') : c.incomplete ? t('pauseCancelIncomplete') : `${t('pauseCancelNotice', { cancelled: c.cancelled, notCancelled: c.notCancelled })}${c.remaining ? ` ${t('pauseCancelMore')}` : ''}`, Boolean(c?.incomplete));
+    } else if (review === 'retry') {
+      const body = await call('/api/feeds/wordpress/retry', 'POST', { confirmation: phrase }) as { planned: number; reconciled: number; unconfirmed: number; failed: number };
+      await reload(); say(t('retryNotice', { planned: body.planned, reconciled: body.reconciled, unconfirmed: body.unconfirmed, failed: body.failed }));
     } else if (review === 'run') {
       const body = await call('/api/feeds/wordpress/run', 'POST', { confirmation: phrase }) as { planned: number; failed: number; unfilled: number };
       await reload(); say(t('runNotice', { planned: body.planned, failed: body.failed, unfilled: body.unfilled }));
@@ -93,9 +108,11 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
   const toggle = (id: string) => setDraft(d => ({ ...d, targetIds: d.targetIds.includes(id) ? d.targetIds.filter(x => x !== id) : [...d.targetIds, id] }));
   const stateText = (p: RecipePlan) => t(p.state === 'planned' ? 'statePlanned' : p.state === 'claimed' ? 'stateClaimed' : p.state === 'uncertain' ? 'stateUncertain' : 'stateFailed');
   const reasonText = (reason: string | null) => { const key = reason ? `reason${reason.charAt(0).toUpperCase()}${reason.slice(1)}` : ''; return key in copy[locale] ? t(key as RecipeCopyKey) : ''; };
-  const reviewTitle = review ? t(review === 'save' ? 'saveTitle' : review === 'pause' ? 'pauseTitle' : review === 'resume' ? 'resumeTitle' : 'runTitle') : '';
-  const reviewText = review ? t(review === 'save' ? 'saveDescription' : review === 'pause' ? 'pauseDescription' : review === 'resume' ? 'resumeDescription' : 'runDescription') : '';
-  const reviewAction = review ? t(review === 'save' ? 'confirmSave' : review === 'pause' ? 'confirmPause' : review === 'resume' ? 'confirmResume' : 'confirmRun') : '';
+  const reviewTitle = review ? t(REVIEW_COPY[review].title) : '';
+  const reviewText = review ? t(review === 'pause' && cancelPosts ? 'pauseCancelDescription' : REVIEW_COPY[review].text) : '';
+  const reviewAction = review ? t(REVIEW_COPY[review].action) : '';
+  const unresolved = (view.counts['failed'] ?? 0) + (view.counts['uncertain'] ?? 0);
+  const openReview = (next: Review) => { setConfirmation(''); setCancelPosts(false); setReview(next); };
   const lastRun = source?.lastRunAt ? t('lastRun', { when: when(source.lastRunAt, zone), planned: source.lastSummary?.planned ?? 0, failed: source.lastSummary?.failed ?? 0, unfilled: source.lastSummary?.unfilled ?? 0 }) : t('neverRun');
   const statusKey: RecipeCopyKey = !source ? 'statusNew' : source.enabled ? 'statusActive' : 'statusPaused';
 
@@ -107,8 +124,21 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     <p className={styles.help}><span className={styles.badge}>{t(statusKey)}</span> {lastRun}{source?.lastError && <span className={styles.meta}>{source.lastError}</span>}</p>
     {canWrite && source && <div className={styles.actions}>
       <Button disabled={busy} onClick={() => void loadPreview()}>{busy ? t('previewing') : t('preview')}</Button>
-      <Button disabled={busy || !source.enabled || !view.available} onClick={() => { setConfirmation(''); setReview('run'); }}>{t('run')}</Button>
-      <Button disabled={busy} onClick={() => { setConfirmation(''); setReview(source.enabled ? 'pause' : 'resume'); }}>{t(source.enabled ? 'pause' : 'resume')}</Button>
+      <Button disabled={busy || !source.enabled || !view.available} onClick={() => openReview('run')}>{t('run')}</Button>
+      {unresolved > 0 && <Button disabled={busy || !source.enabled || !view.available} onClick={() => openReview('retry')}>{t('retry')}</Button>}
+      <Button disabled={busy} onClick={() => openReview(source.enabled ? 'pause' : 'resume')}>{t(source.enabled ? 'pause' : 'resume')}</Button>
+    </div>}
+
+    {source && view.pool !== undefined && <div aria-live="polite">
+      <h3 className={styles.sectionTitle}>{t('poolHeading')}</h3>
+      {view.pool ? <>
+        {view.pool.low && <RouteNotice error focusKey="recipe-pool-low">{t('poolLow', { count: view.pool.pages.filter(p => p.low).length, days: view.pool.warnDays })}</RouteNotice>}
+        <p className={styles.help}>{t('poolIntro')} {!view.pool.complete && t('poolPartial')} {t('poolAsOf', { when: when(view.pool.asOf, zone) })}</p>
+        <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('poolHeading')}</caption>
+          <thead><tr><th scope="col">{t('colChannel')}</th><th scope="col">{t('colEligible')}</th><th scope="col">{t('colDays')}</th></tr></thead>
+          <tbody>{view.pool.pages.map(p => <tr key={p.targetId}><th scope="row">{p.targetName}</th><td>{p.eligible}</td><td>{p.daysLeft === null ? t('daysUnlimited') : p.daysLeft}{p.low && <span className={styles.meta}>{t('poolRowLow')}</span>}</td></tr>)}</tbody>
+        </table></div>
+      </> : <p className={styles.help}>{t('poolUnknown')}</p>}
     </div>}
 
     {preview && <div aria-live="polite"><h3 className={styles.sectionTitle}>{t('previewTitle')}</h3>
@@ -180,6 +210,7 @@ export function RecipeSource({ initial, locale, canWrite, copy = recipeCopy }: {
     <Dialog open={Boolean(review)} title={reviewTitle} description={reviewText} onClose={() => !busy && setReview(null)} busy={busy}
       actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setReview(null)}>{t('cancel')}</Button><Button variant="primary" disabled={busy || !review || confirmation !== phrase} onClick={() => void perform()}>{reviewAction}</Button></>}>
       {notice?.error && <RouteNotice error focusKey={`recipe-review-error:${notice.key}`}>{notice.text}</RouteNotice>}
+      {review === 'pause' && view.limits.pauseCancel && <label className={styles.inline}><input type="checkbox" disabled={busy} checked={cancelPosts} onChange={e => { setCancelPosts(e.target.checked); setConfirmation(''); }} /> {t('pauseCancelOption')}<span className={styles.help}>{t('pauseCancelHint')}</span></label>}
       {review && <label className={styles.confirmLabel}>{confirmParts[0]}<code>{phrase}</code>{confirmParts[1]}<input autoComplete="off" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>}
     </Dialog>
   </section>;

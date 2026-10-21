@@ -25,11 +25,26 @@ describe('read-only WordPress database access', () => {
     expect(call.sql).toContain('JOIN `wp_postmeta` cap');
     expect(call.sql).toContain('p.ID < ?');
     expect(call.sql).toContain('NOT EXISTS (SELECT 1 FROM `wp_postmeta` s');
-    expect(call.sql).toContain('ORDER BY p.ID DESC LIMIT ?');
+    expect(call.sql).toContain('ORDER BY p.post_date_gmt DESC, p.ID DESC LIMIT ?');
     expect(call.sql).not.toMatch(/INSERT|UPDATE|DELETE|REPLACE|DROP|ALTER/i);
     expect(call.sql).not.toContain('_msrwa');
     expect(call.values).toEqual(['_msrwa_facebook_caption', '_msrwa_facebook_generated', '_msrwa_recipe', 'post', 'publish', '61000', new Date(NOW.getTime() - 30 * 86_400_000), 'fb_shared_at', 200]);
     expect(call.timeout).toBe(9000);
+  });
+
+  it('pages by publish date then ID, in the direction of the scan', async () => {
+    const p = pool(() => []);
+    const db = await openWordpressDb(settings, p.factory);
+    const at = new Date('2026-09-30T10:00:00Z');
+    await db.candidates({ mapping, order: 'newest', skipShared: false, maxAgeDays: 0, afterId: '70', afterDate: at, limit: 10, now: NOW });
+    await db.candidates({ mapping, order: 'oldest', skipShared: false, maxAgeDays: 0, afterId: '70', afterDate: at, limit: 10, now: NOW });
+    await db.candidates({ mapping, order: 'oldest', skipShared: false, maxAgeDays: 0, afterId: '70', afterDate: null, limit: 10, now: NOW });
+    const [newest, oldest, undated] = p.query.mock.calls.map(c => c[0]);
+    expect(newest.sql).toContain('(p.post_date_gmt < ? OR (p.post_date_gmt = ? AND p.ID < ?))');
+    expect(newest.values).toEqual(expect.arrayContaining([at, '70']));
+    expect(newest.sql).toContain('ORDER BY p.post_date_gmt DESC, p.ID DESC');
+    expect(oldest.sql).toContain('(p.post_date_gmt > ? OR (p.post_date_gmt = ? AND p.ID > ?))');
+    expect(undated.sql).toContain("p.post_date_gmt >= '1971-01-01'");
   });
 
   it('can include shared recipes, read oldest first and omit age and cursor', async () => {
@@ -39,9 +54,9 @@ describe('read-only WordPress database access', () => {
     const call = p.query.mock.calls[0]![0];
     expect(call.sql).toContain('FROM `posts` p');
     expect(call.sql).toContain('p.ID > ?');
-    expect(call.sql).toContain('ORDER BY p.ID ASC');
+    expect(call.sql).toContain('ORDER BY p.post_date_gmt ASC, p.ID ASC');
     expect(call.sql).not.toContain('NOT EXISTS');
-    expect(call.sql).not.toContain('post_date_gmt >=');
+    expect(call.sql).not.toContain('post_date_gmt >= ?');
   });
 
   it('maps attachment IDs to files, ignores non-numeric IDs and skips the query when empty', async () => {

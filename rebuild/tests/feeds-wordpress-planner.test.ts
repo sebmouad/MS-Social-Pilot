@@ -4,6 +4,9 @@ import { WORDPRESS_DEFAULTS } from '../src/modules/feeds/wordpress/config';
 import { RecipeImageError } from '../src/modules/feeds/wordpress/image';
 import type { CandidateQuery, WpCandidateRow, WpDb } from '../src/modules/feeds/wordpress/db';
 import { planSource, runRecipePlanning, type PlannedPostInput, type PlannerPorts } from '../src/modules/feeds/server/wordpress-planner';
+import { cancelPlannedPosts, retryRecipeSlots } from '../src/modules/feeds/server/wordpress-recovery';
+import { computePoolHealth } from '../src/modules/feeds/server/wordpress-pool';
+import { formatFeedPollSummary } from '../src/modules/feeds/server/polling';
 import type { ClaimInput, LedgerRow, RecipeStore, Settlement, SourceRow } from '../src/modules/feeds/server/wordpress-store';
 import type { WordpressSettings } from '../src/modules/feeds/server/wordpress-settings';
 import type { FeedAuthorization } from '../src/modules/feeds/server/access';
@@ -22,7 +25,8 @@ const settings = (over: Partial<WordpressSettings> = {}): WordpressSettings => (
   },
   minLeadMinutes: 5, targetTypes: ['page'], runBudget: 500, maxSourcesPerRun: 50, claimLeaseSeconds: 300, maxSlotAttempts: 3, previewCount: 5, ledgerPageSize: 50, commentMax: 8000, minutesSuffix: ' min', truncationMark: '…',
   image: { fetch: { timeoutMs: 1000, maxBytes: 1_000_000, maxRedirects: 2, allowHttp: false, hostAllowlist: [] }, maxPixels: 10_000_000, quality: 88, minQuality: 60, qualityStep: 8, maxOutputBytes: 1_000_000 },
-  altMax: 100, sourceNameMax: 120, textMax: 10000, titleMax: 300, maxTargets: 50, identifierMax: 80, pageNumberMax: 100000, transaction: { timeoutMs: 20000, maxWaitMs: 5000 }, ...over,
+  altMax: 100, sourceNameMax: 120, textMax: 10000, titleMax: 300, maxTargets: 50, identifierMax: 80, pageNumberMax: 100000, transaction: { timeoutMs: 20000, maxWaitMs: 5000 },
+  poolWarnDays: 14, poolCacheSeconds: 0, pauseCancel: { enabled: true, batchSize: 100 }, ...over,
 });
 
 const recipeJson = (n: number) => JSON.stringify({ title: `Recette ${n}`, description: 'Délicieuse', servings: 4, prep_minutes: 10, cook_minutes: 20, total_minutes: 30, ingredients: [`ingrédient ${n}`], steps: [{ text: `étape ${n}` }] });
@@ -58,6 +62,13 @@ function memoryStore(pages: Array<{ id: string; name: string }>, sources: Source
     },
     async settle(_workspaceId, id, s: Settlement) { const row = rows.find(r => r.id === id)!; row.state = s.state; row.postId = s.postId ?? null; row.reason = s.reason ?? null; if (s.skipped) row.skipped = s.skipped; },
     async recordRun(_w, sourceId, run) { runs.push({ sourceId, error: run.error, summary: run.summary }); },
+    unresolved: async (sourceId, from, limit) => rows.filter(r => r.sourceId === sourceId && r.slotAt.getTime() >= from.getTime() && (r.state === 'failed' || r.state === 'uncertain')).sort((a, b) => a.slotAt.getTime() - b.slotAt.getTime()).slice(0, limit),
+    plannedUpcoming: async (sourceId, from, limit) => rows.filter(r => r.sourceId === sourceId && r.slotAt.getTime() > from.getTime() && r.state === 'planned' && r.postId).sort((a, b) => a.slotAt.getTime() - b.slotAt.getTime()).slice(0, limit),
+    async settleIf(_workspaceId, id, expected, s) {
+      const row = rows.find(r => r.id === id);
+      if (!row || row.state !== expected || row.postId !== (s.expectedPostId ?? null)) return false;
+      row.state = s.state; row.postId = s.postId ?? null; row.reason = s.reason ?? null; return true;
+    },
   };
   return { store, rows, runs };
 }
@@ -75,6 +86,7 @@ function harness(opts: { pages?: number; rows?: number; settings?: Partial<Wordp
     validateTarget: vi.fn(async () => undefined),
     createPost: vi.fn(async (actor, input) => { posts.push({ actor, input }); return { id: `post${++postCounter}` }; }),
     image: { download: vi.fn(async () => Buffer.from('w')), inspect: vi.fn(async () => undefined), convert: vi.fn(async () => Buffer.from('j')), store: vi.fn(async () => ({ id: `m${postCounter + 1}` })) },
+    cancelPost: vi.fn(async () => undefined), postForSlot: vi.fn(async () => null),
     qualify: vi.fn(async () => auth), store: mem.store, now: () => NOW,
   };
   const cfg = settings(opts.settings);
@@ -337,5 +349,138 @@ describe('automatic runs', () => {
     expect(summary.outcomes[0]).toMatchObject({ reason: 'error' });
     expect(summary.planned).toBe(8);
     expect(h.runs.find(r => r.sourceId === 's1')!.error).toBe('Planning could not be completed.');
+  });
+});
+
+describe('scanning by publish date', () => {
+  it('pages with the date and ID of the last row so ordering follows the publish date, not the ID', async () => {
+    const rows = wpRows(120).map((r, i) => ({ ...r, publishedAt: new Date(Date.UTC(2026, 8, 30 - Math.floor(i / 60), 8, 0, 0)) }));
+    const h = harness({ pages: 10 });
+    h.wp.queries.length = 0;
+    const wp = fakeDb(rows);
+    await planSource({ ...h.ctx(), db: wp.db }, source(), auth);
+    expect(wp.queries[0]).toMatchObject({ afterId: null, afterDate: null });
+    expect(wp.queries[1]).toMatchObject({ afterId: rows[49]!.id, afterDate: rows[49]!.publishedAt });
+  });
+});
+
+describe('retrying slots', () => {
+  const addRow = (h: ReturnType<typeof harness>, over: Partial<LedgerRow>) => {
+    const row: LedgerRow = { id: `r${h.rows.length + 1}`, sourceId: 's1', targetId: 'page1', wpPostId: '1', slotAt: new Date('2026-10-21T13:00:00Z'), state: 'failed', postId: null, title: 'T', permalink: null, reason: 'x', skipped: [], claimedAt: new Date(NOW.getTime() - 3_600_000), ...over };
+    h.rows.push(row); return row;
+  };
+
+  it('revives a failed slot past its attempt cap and plans only the chosen slots', async () => {
+    const h = harness({ pages: 2 });
+    const capped = addRow(h, { skipped: ['5000', '4999', '4998'] });
+    const result = await retryRecipeSlots({ settings: h.cfg, ports: h.ports, db: h.wp.db, now: NOW }, source(), auth);
+    expect(result).toMatchObject({ considered: 1, planned: 1, failed: 0 });
+    expect(h.posts).toHaveLength(1);
+    expect(h.posts[0]!.input.targetIds).toEqual(['page1']);
+    expect(h.posts[0]!.input.scheduledAt.toISOString()).toBe('2026-10-21T13:00:00.000Z');
+    expect(['5000', '4999', '4998']).not.toContain(h.rows.find(r => r.id === capped.id)!.wpPostId);
+    expect(h.rows.find(r => r.id === capped.id)).toMatchObject({ state: 'planned', postId: 'post1' });
+    // an ordinary run does not revive it, which is why the manual retry exists
+    const again = harness({ pages: 2 });
+    addRow(again, { skipped: ['5000', '4999', '4998'] });
+    expect((await planSource(again.ctx(), source(), auth)).planned).toBeGreaterThan(0);
+    expect(again.rows.find(r => r.id === 'r1')).toMatchObject({ state: 'failed' });
+  });
+
+  it('records the existing post of an uncertain slot instead of creating another', async () => {
+    const h = harness({ pages: 1 });
+    const row = addRow(h, { state: 'uncertain', reason: 'unconfirmed' });
+    vi.mocked(h.ports.postForSlot).mockResolvedValue({ id: 'existing' });
+    const result = await retryRecipeSlots({ settings: h.cfg, ports: h.ports, db: h.wp.db, now: NOW }, source(), auth);
+    expect(result).toMatchObject({ reconciled: 1, released: 0, planned: 0 });
+    expect(h.rows.find(r => r.id === row.id)).toMatchObject({ state: 'planned', postId: 'existing', reason: 'reconciled' });
+    expect(h.ports.postForSlot).toHaveBeenCalledWith('w1', 'page1', row.slotAt);
+    expect(h.posts).toHaveLength(0);
+  });
+
+  it('releases and re-plans an uncertain slot only when Publishing holds no post for it', async () => {
+    const h = harness({ pages: 1 });
+    addRow(h, { state: 'uncertain', reason: 'unconfirmed' });
+    const result = await retryRecipeSlots({ settings: h.cfg, ports: h.ports, db: h.wp.db, now: NOW }, source(), auth);
+    expect(result).toMatchObject({ reconciled: 0, released: 1, planned: 1 });
+    expect(h.posts).toHaveLength(1);
+    expect(h.rows[0]).toMatchObject({ state: 'planned', postId: 'post1' });
+  });
+
+  it('leaves an uncertain slot alone while its claim may still be in flight or Publishing cannot be checked', async () => {
+    const h = harness({ pages: 2 });
+    addRow(h, { state: 'uncertain', claimedAt: new Date(NOW.getTime() - 60_000) });
+    addRow(h, { state: 'uncertain', targetId: 'page2' });
+    vi.mocked(h.ports.postForSlot).mockRejectedValue(new Error('down'));
+    const result = await retryRecipeSlots({ settings: h.cfg, ports: h.ports, db: h.wp.db, now: NOW }, source(), auth);
+    expect(result).toMatchObject({ considered: 2, unconfirmed: 2, released: 0, planned: 0 });
+    expect(h.ports.postForSlot).toHaveBeenCalledTimes(1);
+    expect(h.rows.map(r => r.state)).toEqual(['uncertain', 'uncertain']);
+    expect(h.posts).toHaveLength(0);
+  });
+
+  it('does not touch a slot another actor settled in the meantime', async () => {
+    const h = harness({ pages: 1 });
+    const row = addRow(h, { state: 'uncertain' });
+    vi.mocked(h.ports.postForSlot).mockImplementation(async () => { row.state = 'planned'; row.postId = 'late'; return null; });
+    const result = await retryRecipeSlots({ settings: h.cfg, ports: h.ports, db: h.wp.db, now: NOW }, source(), auth);
+    expect(result).toMatchObject({ released: 0, planned: 0 });
+    expect(h.posts).toHaveLength(0);
+    expect(row).toMatchObject({ state: 'planned', postId: 'late' });
+  });
+
+  it('is limited to the channels a restricted member may use', async () => {
+    const h = harness({ pages: 2 });
+    addRow(h, { targetId: 'page2' });
+    const limited = { ...auth, actor: { ...auth.actor, allowedTargetIds: ['page1'] } } as FeedAuthorization;
+    const result = await retryRecipeSlots({ settings: h.cfg, ports: h.ports, db: h.wp.db, now: NOW }, source(), limited);
+    expect(result.considered).toBe(0);
+    expect(h.posts).toHaveLength(0);
+  });
+});
+
+describe('cancelling planned posts', () => {
+  it('cancels through Publishing and frees only the slots whose post was cancelled', async () => {
+    const h = harness({ pages: 1 });
+    await planSource(h.ctx(), source(), auth);
+    expect(h.rows).toHaveLength(8);
+    vi.mocked(h.ports.cancelPost).mockImplementation(async (_actor, postId) => { if (postId === 'post2') throw new Error('published'); });
+    const out = await cancelPlannedPosts({ settings: h.cfg, ports: h.ports, now: NOW }, source(), auth);
+    expect(out).toEqual({ cancelled: 7, notCancelled: 1, remaining: false });
+    expect(h.rows.filter(r => r.state === 'failed' && r.reason === 'cancelled')).toHaveLength(7);
+    expect(h.rows.find(r => r.postId === 'post2')).toMatchObject({ state: 'planned' });
+  });
+});
+
+describe('recipe pool health', () => {
+  it('counts recipes each channel can still receive and the days they last', async () => {
+    const h = harness({ pages: 2, rows: 40 });
+    await planSource({ ...h.ctx(), budget: { left: 4 } }, source(), auth);
+    const health = await computePoolHealth({ settings: { ...h.cfg, poolWarnDays: 3 }, ports: h.ports, db: h.wp.db, source: source(), now: NOW });
+    expect(health).toMatchObject({ complete: true, candidates: 40, slotsPerDay: 4, warnDays: 3 });
+    // 4 recipes are planned in the horizon and block themselves; 36 remain for a pool shared by 2 channels at 4 posts a day
+    expect(health.pages.map(p => p.eligible)).toEqual([36, 36]);
+    expect(health.pages.map(p => p.daysLeft)).toEqual([4, 4]);
+    expect(health.low).toBe(false);
+    expect((await computePoolHealth({ settings: { ...h.cfg, poolWarnDays: 5 }, ports: h.ports, db: h.wp.db, source: source(), now: NOW })).low).toBe(true);
+  });
+
+  it('has no exhaustion date when recipes may repeat immediately and marks a capped scan as a lower bound', async () => {
+    const h = harness({ pages: 1, rows: 40, settings: { candidateMaxScan: 10, candidateBatchSize: 10 } });
+    const unlimited = source({ config: { cooldownDays: 0 } });
+    const health = await computePoolHealth({ settings: h.cfg, ports: h.ports, db: h.wp.db, source: unlimited, now: NOW });
+    expect(health.pages[0]).toMatchObject({ daysLeft: null, low: false });
+    expect(health.complete).toBe(false);
+  });
+});
+
+describe('the worker log line', () => {
+  const base = { examined: 2, claimed: 2, postsCreated: 1, held: 0, skipped: 0, failed: 0, outcomes: [] };
+  it('prints the recipe planner totals and stop reasons', () => {
+    const recipes = { sources: 1, planned: 12, failed: 1, uncertain: 0, unfilled: 3, outcomes: [{ sourceId: 's1', planned: 12, failed: 1, uncertain: 0, unfilled: 3, slots: 8, pages: 10, excludedPages: 0, scanned: 90, reason: 'budget' }] };
+    expect(formatFeedPollSummary({ ...base, recipes })).toBe('examined=2 claimed=2 posts=1 held=0 skipped=0 failed=0 recipes: sources=1 planned=12 failed=1 uncertain=0 unfilled=3 stops=budget');
+  });
+  it('says when the planner did not run', () => {
+    expect(formatFeedPollSummary({ ...base, reason: 'disabled' })).toBe('disabled examined=2 claimed=2 posts=1 held=0 skipped=0 failed=0 recipes=off');
   });
 });

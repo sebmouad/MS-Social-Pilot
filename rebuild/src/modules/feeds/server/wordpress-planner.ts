@@ -1,4 +1,5 @@
 import { OperationError } from '@/lib/operation-error';
+import { prisma } from '@/server/data';
 import { runtimeSecret } from '@/server/config/store';
 import { defaultFetchDeps, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import { allocateRecipes, buildImageUrl, buildPermalink, parseRecipe, renderComment, resolveConfig, slotInstants, type PlanConfig, type Recipe, type SlotNeed } from '../wordpress/recipe';
@@ -16,6 +17,10 @@ export type PlannerPorts = {
   openDb(settings: DbSettings): Promise<WpDb>;
   validateTarget(actor: FeedActor, targetId: string): Promise<void>;
   createPost(actor: FeedActor, input: PlannedPostInput): Promise<{ id: string }>;
+  /** Publishing's own cancel of a queued post (back to draft); throws when the post can no longer be cancelled. */
+  cancelPost(actor: FeedActor, postId: string): Promise<void>;
+  /** The post Publishing holds for this channel and time, whatever its state; null when none exists. */
+  postForSlot(workspaceId: string, targetId: string, slotAt: Date): Promise<{ id: string } | null>;
   image: ImagePorts;
   qualify(workspaceId: string): Promise<FeedAuthorization | null>;
   store: RecipeStore;
@@ -35,6 +40,11 @@ export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): Planne
       const { createPost } = await import('@/modules/publishing/server/lifecycle');
       return createPost({ userId: actor.userId, workspaceId: actor.workspaceId, ...(actor.allowedTargetIds === undefined ? {} : { allowedTargetIds: actor.allowedTargetIds }) }, input);
     },
+    async cancelPost(actor, postId) {
+      const { cancelScheduledPost } = await import('@/modules/publishing/server/lifecycle');
+      await cancelScheduledPost({ userId: actor.userId, workspaceId: actor.workspaceId, ...(actor.allowedTargetIds === undefined ? {} : { allowedTargetIds: actor.allowedTargetIds }) }, postId);
+    },
+    postForSlot: (workspaceId, targetId, slotAt) => prisma.post.findFirst({ where: { workspaceId, scheduledAt: slotAt, targets: { some: { targetId } } }, select: { id: true }, orderBy: { createdAt: 'asc' } }),
     image: defaultImagePorts(net),
     qualify: workspaceId => qualifyingOwner(workspaceId),
     store: prismaRecipeStore,
@@ -53,12 +63,12 @@ export type Scan = { candidates: Candidate[]; scanned: number; exhausted: boolea
  */
 export async function scanCandidates(db: WpDb, settings: WordpressSettings, source: Pick<SourceRow, 'siteUrl'>, config: PlanConfig, now: Date, enough: (candidates: Candidate[]) => boolean): Promise<Scan> {
   const candidates: Candidate[] = [];
-  let afterId: string | null = null; let scanned = 0; let exhausted = false;
+  let afterId: string | null = null; let afterDate: Date | null = null; let scanned = 0; let exhausted = false;
   while (scanned < settings.candidateMaxScan) {
     const limit = Math.min(settings.candidateBatchSize, settings.candidateMaxScan - scanned);
-    const rows = await db.candidates({ mapping: config.mapping, order: config.order, skipShared: config.skipShared, maxAgeDays: config.maxAgeDays, afterId, limit, now });
+    const rows = await db.candidates({ mapping: config.mapping, order: config.order, skipShared: config.skipShared, maxAgeDays: config.maxAgeDays, afterId, afterDate, limit, now });
     if (!rows.length) { exhausted = true; break; }
-    scanned += rows.length; afterId = rows[rows.length - 1]!.id;
+    scanned += rows.length; afterId = rows[rows.length - 1]!.id; afterDate = rows[rows.length - 1]!.publishedAt;
     const files = await db.attachments(rows.map(r => r.imageId), config.mapping.attachedFileMetaKey);
     for (const row of rows) {
       const file = files.get(row.imageId);
@@ -79,9 +89,9 @@ export const commentFor = (settings: WordpressSettings, config: PlanConfig, c: P
 
 /* ----- ledger views ----- */
 
-type LedgerView = { blocked: Map<string, Set<string>>; taken: Set<string>; byKey: Map<string, LedgerRow> };
-const slotKey = (targetId: string, slotAt: Date) => `${targetId}|${slotAt.getTime()}`;
-function ledgerView(rows: readonly LedgerRow[], now: Date): LedgerView {
+export type LedgerView = { blocked: Map<string, Set<string>>; taken: Set<string>; byKey: Map<string, LedgerRow> };
+export const slotKey = (targetId: string, slotAt: Date) => `${targetId}|${slotAt.getTime()}`;
+export function ledgerView(rows: readonly LedgerRow[], now: Date): LedgerView {
   const blocked = new Map<string, Set<string>>(); const taken = new Set<string>(); const byKey = new Map<string, LedgerRow>();
   const add = (page: string, id: string) => { const set = blocked.get(page) ?? new Set<string>(); set.add(id); blocked.set(page, set); };
   for (const row of rows) {
@@ -98,7 +108,11 @@ function ledgerView(rows: readonly LedgerRow[], now: Date): LedgerView {
 /* ----- one source ----- */
 
 export type SourceOutcome = { sourceId: string; planned: number; failed: number; uncertain: number; unfilled: number; slots: number; pages: number; excludedPages: number; scanned: number; reason?: string };
-type Ctx = { settings: WordpressSettings; ports: PlannerPorts; db: WpDb; budget: { left: number }; now: Date };
+export type Ctx = {
+  settings: WordpressSettings; ports: PlannerPorts; db: WpDb; budget: { left: number }; now: Date;
+  /** Manual retry: only these slots (see slotKey) are planned, and a failed slot is revived even past its attempt cap. */
+  retry?: ReadonlySet<string>;
+};
 const DEFINITIVE = new Set(['invalid_request', 'forbidden', 'unauthorized', 'unavailable', 'conflict', 'not_found']);
 const AUTHORITY = new Set(['forbidden', 'unauthorized', 'unavailable']);
 const safeName = (slug: string) => `${slug.replace(/[^A-Za-z0-9-]/g, '').slice(0, 80) || 'recipe'}-fb.jpg`;
@@ -131,8 +145,10 @@ export async function planSource(ctx: Ctx, source: SourceRow, auth: FeedAuthoriz
 
   const needs: SlotNeed[] = []; const reviving = new Map<string, LedgerRow>();
   for (const slotAt of slots) for (const page of pages) {
-    const row = view.byKey.get(slotKey(page.id, slotAt));
-    if (row && !(row.state === 'failed' && row.skipped.length < settings.maxSlotAttempts)) continue;
+    const key = slotKey(page.id, slotAt);
+    if (ctx.retry && !ctx.retry.has(key)) continue;
+    const row = view.byKey.get(key);
+    if (row && !(row.state === 'failed' && (ctx.retry !== undefined || row.skipped.length < settings.maxSlotAttempts))) continue;
     needs.push({ targetId: page.id, slotAt, ...(row ? { avoid: new Set(row.skipped) } : {}) });
     if (row) reviving.set(slotKey(page.id, slotAt), row);
   }

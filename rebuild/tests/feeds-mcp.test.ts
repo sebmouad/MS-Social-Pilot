@@ -84,17 +84,21 @@ describe('content feeds MCP surface', () => {
 describe('recipe source MCP parity', () => {
   const group = FEEDS_MCP[0]!;
   it('exposes get, save, preview, run and pause/resume with exact confirmations on the writes', () => {
-    expect(recipeToolDefinitions.map(t => t.name)).toEqual(['get_recipe_source', 'save_recipe_source', 'preview_recipe_source', 'run_recipe_planner', 'set_recipe_source_state']);
+    expect(recipeToolDefinitions.map(t => t.name)).toEqual(['get_recipe_source', 'save_recipe_source', 'preview_recipe_source', 'run_recipe_planner', 'set_recipe_source_state', 'retry_recipe_slots']);
     const tool = (name: string) => recipeToolDefinitions.find(t => t.name === name)!;
     expect(tool('save_recipe_source').description).toContain('SAVE RECIPE SOURCE <name>');
     expect(tool('run_recipe_planner').description).toContain('RUN RECIPE PLANNER');
     expect(tool('set_recipe_source_state').description).toContain('PAUSE RECIPE SOURCE');
     expect(tool('set_recipe_source_state').description).toContain('RESUME RECIPE SOURCE');
-    for (const name of ['save_recipe_source', 'run_recipe_planner', 'set_recipe_source_state']) expect((tool(name).inputSchema as unknown as { required: string[] }).required).toContain('confirmation');
+    expect(tool('set_recipe_source_state').description).toContain('PAUSE RECIPE SOURCE AND CANCEL SCHEDULED POSTS');
+    expect(tool('retry_recipe_slots').description).toContain('RETRY RECIPE SLOTS');
+    expect(tool('get_recipe_source').description).toContain('pool');
+    for (const name of ['save_recipe_source', 'run_recipe_planner', 'set_recipe_source_state', 'retry_recipe_slots']) expect((tool(name).inputSchema as unknown as { required: string[] }).required).toContain('confirmation');
     expect((tool('preview_recipe_source').inputSchema as unknown as { required?: string[] }).required).toBeUndefined();
     expect(group.tools.map(t => t.name)).toEqual(expect.arrayContaining([...recipeTools]));
     for (const name of recipeTools) expect(group.features[name]).toBe(FEEDS_FEATURE_ID);
-    expect(group.selfLockedWrites).toEqual(expect.arrayContaining(['save_recipe_source', 'run_recipe_planner', 'set_recipe_source_state']));
+    expect(group.selfLockedWrites).toEqual(expect.arrayContaining(['save_recipe_source', 'run_recipe_planner', 'set_recipe_source_state', 'retry_recipe_slots']));
+    expect(group.writeTools).toContain('retry_recipe_slots');
   });
 
   it('keeps every recipe-source Root key under the feeds.wordpress prefix, with the database address as the only secret', () => {
