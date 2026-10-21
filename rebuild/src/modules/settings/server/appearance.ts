@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { appearanceModeKey as modeKey } from './appearance-data';
 import { z } from 'zod';
 import { MODE_COOKIE, THEME_COOKIE, THEMES, MODES, isThemeId, isModeId, type ModeId } from '@/lib/themes';
 import { OperationError } from '@/lib/operation-error';
@@ -9,8 +10,6 @@ import { auditAccountMutation } from '@/server/account-settings';
 import { authorizeAccountSession, type AccountActor } from './account';
 
 export const appearanceConfirmation = 'UPDATE APPEARANCE';
-// This is account data, not a Root configuration key. User identity is never taken from input.
-const modeKey = (userId: string) => `settings.appearance.user.${userId}.mode`;
 async function storedAppearance(userId: string) {
   const [user, savedMode, defaultTheme, defaultMode] = await Promise.all([
     prisma.$queryRaw<Array<{ theme: string }>>`SELECT theme FROM users WHERE id = ${userId} AND "disabledAt" IS NULL`,

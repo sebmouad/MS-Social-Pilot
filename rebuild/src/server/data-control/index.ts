@@ -14,7 +14,7 @@ type DataControlTransaction = import('../../../generated/client').Prisma.Transac
 type WorkspaceTable = { tableName: string };
 const MAPPED_DIRECT_TABLES = new Set(['posts', 'targets', 'ad_accounts', 'social_accounts', 'instagram_accounts']);
 const EXCLUDED_WORKSPACE_TABLES = new Set(['memberships', 'workspace_data_purges']);
-const SENSITIVE_FIELD = /(?:access.?token|refresh.?token|token|secret|password|credential|private.?key|client.?secret|api.?key)/i;
+const SENSITIVE_FIELD = /(?:access.?token|refresh.?token|token|secret|password|credential|private.?key|client.?secret|api.?key|code.?hash|code.?challenge)/i;
 const SAFE_SECURITY_METADATA = new Set(['credentialsExcluded', 'auditLogExcluded', 'providerCredentialsExcluded', 'secretsExcluded']);
 
 /** Discover tables whose workspace ownership is enforced by a real FK, excluding identity and membership. */
@@ -80,6 +80,8 @@ function tableSql(table: string) {
 const ownedBy = (foreignKey: string, parentTable: string) =>
   `child."${foreignKey}" IN (SELECT "id" FROM ${tableSql(parentTable)} WHERE "workspaceId" = $1)`;
 const INDIRECT_WORKSPACE_TABLES = [
+  // Legacy OAuth codes carry tenant identity without a workspace/user FK.
+  { table: 'OAuthCode', where: 'child."workspaceId" = $1' },
   { table: 'bio_links', where: ownedBy('pageId', 'bio_pages') },
   { table: 'external_posts', where: ownedBy('targetId', 'targets') },
   { table: 'feed_items', where: ownedBy('feedSourceId', 'feed_sources') },
@@ -90,6 +92,7 @@ const INDIRECT_WORKSPACE_TABLES = [
   { table: 'notification_mutes', where: ownedBy('targetId', 'targets') },
   { table: 'page_group_targets', where: `(${ownedBy('groupId', 'page_groups')} OR ${ownedBy('targetId', 'targets')})` },
   { table: 'page_reviews', where: ownedBy('targetId', 'targets') },
+  { table: 'rebuild_channel_profiles', where: ownedBy('targetId', 'targets') },
   { table: 'page_videos', where: ownedBy('targetId', 'targets') },
   { table: 'post_field_values', where: `(${ownedBy('postId', 'posts')} OR ${ownedBy('fieldId', 'custom_fields')})` },
   { table: 'post_labels', where: `(${ownedBy('postId', 'posts')} OR ${ownedBy('labelId', 'labels')})` },
@@ -222,7 +225,7 @@ export async function exportWorkspaceData(actor: DataControlActor) {
         'conversations', 'conversation_messages', ...legacy.tables, ...INDIRECT_WORKSPACE_TABLES.map(({ table }) => table),
       ])),
       complete: false,
-      omitted: ['instance-wide audit and authentication records', 'tables outside the current application Prisma schema'],
+      omitted: ['instance-wide audit and authentication records', 'account-wide appearance preferences and person credentials (separate account data)', 'installation-wide operational records', 'tables without a registered workspace ownership path'],
     },
     security: { credentialsExcluded: true, auditLogExcluded: true, note: 'Provider access tokens and instance-wide audit records are excluded.' },
   }) as Record<string, any>;

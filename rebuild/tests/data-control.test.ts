@@ -75,10 +75,15 @@ describe('workspace data controls', () => {
       adAccount: { findMany: vi.fn().mockResolvedValue([]) },
       instagramAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'ig1', workspaceId: 'w1', socialAccountId: 's1', targetId: 't1', igUserId: 'ig-user', username: 'studio', name: 'Studio IG', profilePictureUrl: 'https://cdn.test/profile.jpg', followersCount: 8, followsCount: 4, mediaCount: 2, enabled: true, lastSyncedAt: new Date('2026-01-01'), createdAt: new Date('2025-01-01'), updatedAt: new Date('2026-01-01'), insights: [{ id: 'ii1', metric: 'followers', value: { count: 8, access_token: 'must-redact' } }], media: [{ id: 'im1', remoteId: 'remote1', caption: 'A post', mediaUrl: 'https://cdn.test/media.jpg', insights: { reach: 20 }, timestamp: new Date('2026-01-01') }] }]) },
       post: { findMany: vi.fn().mockResolvedValue([]) },
-      $queryRaw: vi.fn().mockResolvedValue([{ tableName: 'media' }, { tableName: 'rebuild_inbox_deletions' }]),
+      $queryRaw: vi.fn().mockResolvedValue([{ tableName: 'media' }, { tableName: 'rebuild_inbox_deletions' }, { tableName: 'wordpress_recipe_sources' }, { tableName: 'wordpress_recipe_plans' }, { tableName: 'rebuild_facebook_sync_cursors' }, { tableName: 'mcp_oauth_codes' }]),
       $queryRawUnsafe: vi.fn().mockImplementation(async (sql: string) => {
         if (sql.startsWith('SELECT COUNT')) return [{ count: BigInt(0) }];
         if (sql.includes('"rebuild_inbox_deletions"')) return [{ id: 'deletion1', workspaceId: 'w1', state: 'completed', remoteId: 'opaque_remote' }];
+        if (sql.includes('"wordpress_recipe_sources"')) return [{ id: 'recipe', workspaceId: 'w1', config: { password: 'recipe-secret', timezone: 'UTC' } }];
+        if (sql.includes('"wordpress_recipe_plans"')) return [{ id: 'plan', state: 'uncertain' }];
+        if (sql.includes('"rebuild_facebook_sync_cursors"')) return [{ targetId: 't1', cursor: { after: 'page-2' } }];
+        if (sql.includes('"mcp_oauth_codes"')) return [{ codeHash: 'authorization-secret', codeChallenge: 'challenge-secret' }];
+        if (sql.includes('"rebuild_channel_profiles"')) return [{ targetId: 't1', labels: ['Recipes'] }];
         if (sql.includes('"media"')) return [{ id: 'm1', workspaceId: 'w1', ordinal: BigInt(5), accessToken: 'legacy-secret', settings: { client_secret: 'nested-secret', label: 'ok' } }];
         if (sql.includes('"external_posts"')) return [{ id: 'ep1', message: 'outside post', insights: { reach: 5, api_key: 'nested-legacy-secret' } }];
         return [];
@@ -98,9 +103,14 @@ describe('workspace data controls', () => {
     expect(JSON.stringify(data)).not.toContain('legacy-secret');
     expect(JSON.stringify(data)).not.toContain('nested-secret');
     expect(JSON.stringify(data)).not.toContain('nested-legacy-secret');
-    expect(data.coverage).toMatchObject({ directlyOwnedLegacyTables: ['media', 'rebuild_inbox_deletions'], directlyOwnedLegacyRowCounts: { media: 1, rebuild_inbox_deletions: 1 }, directlyOwnedLegacyTablesComplete: true, complete: false });
+    expect(data.coverage).toMatchObject({ directlyOwnedLegacyTables: ['media', 'rebuild_inbox_deletions', 'wordpress_recipe_sources', 'wordpress_recipe_plans', 'rebuild_facebook_sync_cursors', 'mcp_oauth_codes'], directlyOwnedLegacyRowCounts: { media: 1, rebuild_inbox_deletions: 1 }, directlyOwnedLegacyTablesComplete: true, complete: false });
     expect(mocks.prisma.$queryRawUnsafe).toHaveBeenCalledWith('SELECT * FROM "public"."media" WHERE "workspaceId" = $1', 'w1');
     expect(data.legacyTables.rebuild_inbox_deletions).toEqual([{ id: 'deletion1', workspaceId: 'w1', state: 'completed', remoteId: 'opaque_remote' }]);
+    expect(data.legacyTables.wordpress_recipe_plans).toEqual([{ id: 'plan', state: 'uncertain' }]);
+    expect(data.legacyTables.rebuild_facebook_sync_cursors).toEqual([{ targetId: 't1', cursor: { after: 'page-2' } }]);
+    expect(data.indirectTables.rebuild_channel_profiles).toEqual([{ targetId: 't1', labels: ['Recipes'] }]);
+    expect(JSON.stringify(data)).not.toMatch(/recipe-secret|authorization-secret|challenge-secret/);
+    expect(data.legacyTables.mcp_oauth_codes).toEqual([{ codeHash: '[REDACTED]', codeChallenge: '[REDACTED]' }]);
     expect(data.security).toMatchObject({ credentialsExcluded: true, auditLogExcluded: true });
     mocks.runtimeConfig.mockImplementation(async (key: string) => key === 'data.maxArchiveBytes' ? 100 : undefined);
     await expect(exportWorkspaceData({ userId: 'u1', workspaceId: 'w1' })).rejects.toThrow('exceeds the configured archive size limit');
@@ -150,6 +160,25 @@ describe('workspace data controls', () => {
     });
     expect(mocks.prisma.postTarget.findMany).toHaveBeenCalledWith({ where: { OR: [{ postId: { in: ['p1'] } }, { targetId: { in: ['t1'] } }] }, select: { id: true } });
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('deletes recent direct tables before their dependencies without disabling purge gates', async () => {
+    const { tx } = makePurgeClient();
+    const tables = ['targets', 'wordpress_recipe_sources', 'wordpress_recipe_plans', 'rebuild_facebook_sync_cursors'];
+    tx.$queryRaw.mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('SELECT child.relname AS child')
+      ? [{ child: 'wordpress_recipe_plans', parent: 'wordpress_recipe_sources' }, { child: 'wordpress_recipe_plans', parent: 'targets' }, { child: 'rebuild_facebook_sync_cursors', parent: 'targets' }]
+      : tables.map(tableName => ({ tableName })));
+    const { deleteWorkspaceDatabaseRows } = await import('../src/server/data-control');
+    await deleteWorkspaceDatabaseRows(tx as never, 'w1');
+    const sql = tx.$executeRawUnsafe.mock.calls.map(call => String(call[0]));
+    const position = (table: string) => sql.findIndex(statement => statement.startsWith(`DELETE FROM "public"."${table}"`));
+    expect(position('wordpress_recipe_plans')).toBeLessThan(position('wordpress_recipe_sources'));
+    expect(position('wordpress_recipe_plans')).toBeLessThan(position('targets'));
+    expect(position('rebuild_facebook_sync_cursors')).toBeLessThan(position('targets'));
+    expect(position('rebuild_channel_profiles')).toBeLessThan(position('targets'));
+    expect(position('OAuthCode')).toBeGreaterThanOrEqual(0);
+    expect(sql.every(statement => statement.startsWith('DELETE FROM'))).toBe(true);
+    expect(tx.$executeRawUnsafe.mock.calls.every((call: unknown[]) => call[1] === 'w1')).toBe(true);
   });
 
   it('requires exact typed confirmation before starting the purge', async () => {
