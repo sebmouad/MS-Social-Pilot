@@ -55,7 +55,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   let listing: Awaited<ReturnType<typeof readPublishingPostPage>> | null = null;
   let listingError: string | null = null;
   try {
-    listing = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status, channelId: selectedChannel, q });
+    listing = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status, channelId: selectedChannel, q, origin: originKind });
   } catch (error) {
     if (!(error instanceof OperationError) || !isOperationErrorCode(error.code)) throw error;
     listingError = safeOperationError(error, copy);
@@ -83,10 +83,8 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     return { canEdit, canDuplicate };
   };
   const origins = await loadPostOrigins(viewer.workspaceId, listing.posts.map(post => post.id), locale);
-  // Narrowed after the page is read: the shared read model has no origin filter yet, so page counts are those of the unfiltered list.
-  const shownPosts = originKind ? listing.posts.filter(post => origins.get(post.id)?.kind === originKind) : listing.posts;
   const originOptions = originKind ? await originFilterOptions(viewer.workspaceId, locale) : [];
-  const rows: PostsTableRow[] = shownPosts.map(post => ({ ...post, origin: origins.get(post.id) ?? null, media: post.media as Array<{ kind: string; url: string; altText?: string }>, ...authority(post), whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy) }));
+  const rows: PostsTableRow[] = listing.posts.map(post => ({ ...post, origin: origins.get(post.id) ?? null, media: post.media as Array<{ kind: string; url: string; altText?: string }>, ...authority(post), whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy) }));
   const noticeText = notice ? postsNotice(notice, locale, noticeCatalog) ?? undefined : undefined;
   const pageLink = (page: number) => {
     const params = new URLSearchParams({ page: String(page) });

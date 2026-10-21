@@ -6,6 +6,7 @@ import { PostStatus, type Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
 import { authorizePublishing } from './access';
+import { parsePostOrigin, postOriginWhere, type PostOriginSource } from './origin-source';
 import { publishingPostVisibilityWhere, selectedPublishingTargetIds } from './read-scope';
 import type { PublishingActor, PublishingFeature } from './types';
 
@@ -52,14 +53,16 @@ export function publishingPostSearchWhere(q: string): Prisma.PostWhereInput {
 /** Current authorized scope and validated search/status/channel filters for Posts and export. */
 export async function publishingPostReadQuery(
   actor: PublishingActor,
-  input: { status?: string; channelId?: string; q?: string },
+  input: { status?: string; channelId?: string; q?: string; origin?: string },
   feature: PublishingFeature = 'publishing/posts',
-): Promise<{ where: Prisma.PostWhereInput; filters: { status?: PostStatus; channelId?: string; q: string }; channelUnavailable: boolean; scope: { targetIds: string[]; authorId?: string } }> {
+  originSources?: readonly PostOriginSource[],
+): Promise<{ where: Prisma.PostWhereInput; filters: { status?: PostStatus; channelId?: string; q: string; origin?: string }; channelUnavailable: boolean; scope: { targetIds: string[]; authorId?: string } }> {
   const errorText = await loadPublishingErrorText();
   if (!input || typeof input !== 'object' || Array.isArray(input)
     || ![Object.prototype, null].includes(Object.getPrototypeOf(input))
-    || Object.keys(input).some(key => !['status', 'channelId', 'q'].includes(key))) invalid(undefined, errorText);
+    || Object.keys(input).some(key => !['status', 'channelId', 'q', 'origin'].includes(key))) invalid(undefined, errorText);
   const [postStatus, channelId, q] = await Promise.all([parseStatus(input.status, errorText), parseChannel(input.channelId), publishingPostSearch(input.q)]);
+  const origin = parsePostOrigin(input.origin, originSources);
   const access = await authorizePublishing(actor, feature, 'read');
   const targetIds = await selectedPublishingTargetIds(actor.workspaceId, access.entitlements, access.actor.allowedTargetIds);
   const authorId = access.actor.allowedTargetIds === undefined ? undefined : actor.userId;
@@ -73,10 +76,11 @@ export async function publishingPostReadQuery(
     ...(postStatus ? [{ status: postStatus } as Prisma.PostWhereInput] : []),
     ...(filterIds ? [{ targets: { some: { targetId: channelId?.startsWith('channel-group:') ? { in: filterIds } : channelId } } } as Prisma.PostWhereInput] : []),
     ...(q ? [publishingPostSearchWhere(q)] : []),
+    ...(origin ? [await postOriginWhere(actor.workspaceId, origin, originSources)] : []),
   ] };
   return {
     where,
-    filters: { ...(postStatus ? { status: postStatus } : {}), ...(channelId ? { channelId } : {}), q },
+    filters: { ...(postStatus ? { status: postStatus } : {}), ...(channelId ? { channelId } : {}), q, ...(origin ? { origin } : {}) },
     channelUnavailable: Boolean(channelId && !filterIds?.some(id => targetIds.includes(id))),
     scope: { targetIds, ...(authorId ? { authorId } : {}) },
   };
