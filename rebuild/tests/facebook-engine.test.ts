@@ -73,8 +73,8 @@ describe('Facebook Graph adapter', () => {
     const before = Date.now();
     const token = await engine.exchangeForLongLivedToken({ accessToken: 'short-token', appId: 'app-id', appSecret: 'app-secret' });
     expect(token.accessToken).toBe('long-token');
-    expect(token.expiresAt.getTime()).toBeGreaterThanOrEqual(before + 5_184_000_000 - 100);
-    expect(token.expiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 5_184_000_000 + 100);
+    expect(token.expiresAt!.getTime()).toBeGreaterThanOrEqual(before + 5_184_000_000 - 100);
+    expect(token.expiresAt!.getTime()).toBeLessThanOrEqual(Date.now() + 5_184_000_000 + 100);
   });
 
   it('publishes only the post and returns its id before any comment dispatch', async () => {
@@ -390,3 +390,11 @@ describe('Facebook Graph adapter', () => {
  expect(fetcher).not.toHaveBeenCalled();
  });
  });
+
+describe('Facebook long-lived token without expiry', () => {
+  it('accepts a non-expiring token (no expires_in) with a null expiry', async () => {
+    const fetchImpl = (async () => new Response(JSON.stringify({ access_token: 'long', token_type: 'bearer' }), { status: 200 })) as unknown as typeof fetch;
+    const engine = createFacebookEngine(config, fetchImpl);
+    await expect(engine.exchangeForLongLivedToken({ accessToken: 'short', appId: 'app', appSecret: 'secret' })).resolves.toEqual({ accessToken: 'long', expiresAt: null });
+  });
+});

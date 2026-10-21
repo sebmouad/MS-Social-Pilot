@@ -31,7 +31,8 @@ export interface FacebookPage { id: string; name: string; category: string | nul
 export interface FacebookCurrentUser { id: string; name: string; pictureUrl: string | null }
 export interface FacebookGrantedPermission { permission: string; status: 'granted' | 'declined' | string }
 export interface FacebookTokenExchangeInput { accessToken: string; appId: string; appSecret: string }
-export interface FacebookLongLivedToken { accessToken: string; expiresAt: Date }
+/** expiresAt is null when Meta omits expires_in (non-expiring Facebook Login for Business tokens). */
+export interface FacebookLongLivedToken { accessToken: string; expiresAt: Date | null }
 export interface FacebookAdAccount { id: string; name: string; currency: string | null; status: number | null }
 export type FacebookMedia = { kind: 'image' | 'video'; url: string; altText?: string; localFile?: { bytes: Uint8Array; mimeType: string; fileName: string } };
 export interface FacebookPublishInput {
@@ -279,10 +280,13 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       catch (error) { throw new FacebookApiError(error instanceof Error ? error.message : 'Facebook token exchange failed.', 0); }
       const payload: unknown = await response.json().catch(() => null); const data = object(payload);
       if (!response.ok || data.error) throw graphError(payload, response.status);
-      if (typeof data.access_token !== 'string' || !data.access_token || typeof data.expires_in !== 'number' || !Number.isFinite(data.expires_in) || data.expires_in <= 0) {
+      const expiresIn = data.expires_in;
+      const validExpiry = expiresIn === undefined || (typeof expiresIn === 'number' && Number.isFinite(expiresIn) && expiresIn > 0);
+      if (typeof data.access_token !== 'string' || !data.access_token || !validExpiry) {
         throw new FacebookApiError('Facebook returned an invalid long-lived token or expiry.', response.status);
       }
-      const expiresAt = new Date(Date.now() + data.expires_in * 1000);
+      if (typeof expiresIn !== 'number') return { accessToken: data.access_token, expiresAt: null };
+      const expiresAt = new Date(Date.now() + expiresIn * 1000);
       if (!Number.isFinite(expiresAt.getTime())) throw new FacebookApiError('Facebook returned an invalid token expiry.', response.status);
       return { accessToken: data.access_token, expiresAt };
     },
