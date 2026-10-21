@@ -150,7 +150,7 @@ async function authorizeAnalytics(actor: AnalyticsReadActor, constraints: Analyt
   return { allowedChannelIds, allowedProviders: entitledPlatformIds(entitlements), adScope };
 }
 
-async function runtimeLimits() {
+const runtimeLimits = cache(async () => {
   const [defaultDays, maxDays, metricPageSize, detailPageSize, chartPoints, searchMaxLength, reportMaxChannels] = await Promise.all([
     runtimeConfig('analytics.defaultRangeDays'), runtimeConfig('analytics.maxRangeDays'), runtimeConfig('analytics.metricPageSize'),
     runtimeConfig('analytics.detailPageSize'), runtimeConfig('analytics.chartPoints'), runtimeConfig('analytics.searchMaxLength'),
@@ -159,7 +159,7 @@ async function runtimeLimits() {
   const values = [defaultDays, maxDays, metricPageSize, detailPageSize, chartPoints, searchMaxLength, reportMaxChannels].map(Number);
   if (values.some(value => !Number.isSafeInteger(value) || value < 1)) throw await analyticsError('unavailable', "Analytics settings are unavailable. Contact your workspace administrator.");
   return { defaultDays: Math.min(values[0]!, values[1]!), maxDays: values[1]!, metricPageSize: values[2]!, detailPageSize: values[3]!, chartPoints: values[4]!, searchMaxLength: values[5]!, reportMaxChannels: values[6]! };
-}
+});
 
 async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constraints: AnalyticsReadConstraints): Promise<{ snapshot: AnalyticsSnapshot; input: ParsedInput; limits: Awaited<ReturnType<typeof runtimeLimits>>; catalogMetrics: MetricView[] }> {
   const access = await authorizeAnalytics(actor, constraints);
@@ -173,7 +173,7 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
     if (error instanceof AnalyticsComparisonError) throw invalid();
     throw error;
   }
-  const initial = await loadAnalytics(actor.workspaceId, [], period.range, access.allowedChannelIds, undefined, access.allowedProviders, access.adScope);
+  const initial = await loadAnalytics(actor.workspaceId, input.filter ? idList(input.channel) : [], period.range, access.allowedChannelIds, input.adFilter ? idList(input.adAccount) : undefined, access.allowedProviders, access.adScope);
   const channelOptions = initial.targets;
   const adAccountOptions = initial.adAccounts;
   const requestedChannelIds = input.filter ? idList(input.channel) : channelOptions.map(item => item.id);
@@ -184,7 +184,11 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
   if (!sameIds(selectedChannelIds, requestedChannelIds) || !sameIds(selectedAdIds, requestedAdIds)) throw forbiddenResource();
   if (selectedChannelIds.length > limits.reportMaxChannels || selectedAdIds.length > limits.reportMaxChannels) throw invalid();
 
-  const currentData = await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, access.adScope);
+  // Discovery already contains the requested measures for explicit channel selections (and ad-only workspaces).
+  // Reuse only an exact returned scope; validation above still rejects dropped or unavailable IDs.
+  const currentData = sameIds(initial.selectedTargets.map(item => item.id), selectedChannelIds) && sameIds(initial.selectedAdIds, selectedAdIds)
+    ? initial
+    : await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, access.adScope);
   const selectedReturnedChannels = currentData.selectedTargets.map(item => item.id);
   if (!sameIds(selectedReturnedChannels, selectedChannelIds) || !sameIds(currentData.selectedAdIds, selectedAdIds)) throw forbiddenResource();
   assertUniqueMetricKeys(currentData.metrics);

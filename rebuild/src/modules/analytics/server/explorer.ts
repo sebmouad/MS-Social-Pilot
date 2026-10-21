@@ -1,7 +1,7 @@
 import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
 import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { ANALYTICS_EXPLORER_CONFIG } from '../explorer-config';
-import { OperationError } from '@/lib/operation-error';
+import { cache } from 'react';
 import { runtimeConfig } from '@/server/config/store';
 import { readAnalyticsSnapshot } from './read';
 import type { AnalyticsReadActor, AnalyticsReadConstraints } from './types';
@@ -27,14 +27,19 @@ function metricView(metric: Awaited<ReturnType<typeof readAnalyticsSnapshot>>['a
   return { key: metric.key, label: metric.label, sourceLabel: metric.sourceLabel, kind: metric.kind, unit: metric.unit, total: metric.total, ...(metric.displayTotal ? { displayTotal: metric.displayTotal } : {}), aggregationLabel: metric.aggregationLabel, ...(metric.aggregationNote ? { aggregationNote: metric.aggregationNote } : {}), coverage: metric.coverage, available: metric.available, latestAt: metric.latestAt, points: metric.points, rows: metric.rows };
 }
 
+// React memoization is request-scoped; entry-point authorization remains in the shared reader.
+const explorerLimits = cache(async () => {
+  const keys = [...new Set([...ANALYTICS_EXPLORER_CONFIG.map(definition => definition.key), 'analytics.searchMaxLength', 'analytics.detailPageSize'])];
+  const settings = new Map(await Promise.all(keys.map(async key => [key, await runtimeConfig(key)] as const)));
+  for (const definition of ANALYTICS_EXPLORER_CONFIG) {
+    if (!definition.schema.safeParse(settings.get(definition.key)).success) throw await analyticsError('unavailable', "Analytics Explorer settings are unavailable.");
+  }
+  return ['analytics.explorerSearchMaxCharacters', 'analytics.searchMaxLength', 'analytics.explorerPageSize', 'analytics.detailPageSize'].map(key => Number(settings.get(key)));
+});
+
 export async function readAnalyticsExplorer(actor: Actor, rawInput: unknown = {}, constraints: AnalyticsReadConstraints = {}, responseCap?: number): Promise<AnalyticsExplorerResult> {
   try {
-  for (const definition of ANALYTICS_EXPLORER_CONFIG) {
-    if (!definition.schema.safeParse(await runtimeConfig(definition.key)).success) throw await analyticsError('unavailable', "Analytics Explorer settings are unavailable.");
-  }
-  const [explorerSearchLimit, readerSearchLimit, pageSize, detailSize] = await Promise.all([
-    runtimeConfig('analytics.explorerSearchMaxCharacters'), runtimeConfig('analytics.searchMaxLength'), runtimeConfig('analytics.explorerPageSize'), runtimeConfig('analytics.detailPageSize'),
-  ]).then(values => values.map(Number));
+  const [explorerSearchLimit, readerSearchLimit, pageSize, detailSize] = await explorerLimits();
   if ([explorerSearchLimit, readerSearchLimit, pageSize, detailSize].some(value => !Number.isSafeInteger(value) || value < 1)) throw await analyticsError('unavailable', "Analytics Explorer settings are unavailable.");
   if (responseCap !== undefined && (!Number.isSafeInteger(responseCap) || responseCap < 1)) throw await analyticsError('invalid_request', "Choose a valid Analytics result limit.");
   const searchLimit = Math.min(explorerSearchLimit, readerSearchLimit);

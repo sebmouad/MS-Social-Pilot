@@ -71,6 +71,14 @@ describe('Analytics Explorer', () => {
     expect(result.query).toContain('kind=flow');
   });
 
+  it('reads each Explorer setting once instead of rereading validated keys', async () => {
+    await readAnalyticsExplorer(actor);
+    expect(state.config.mock.calls.map(([key]) => key).sort()).toEqual([
+      'analytics.detailPageSize', 'analytics.explorerPageSize', 'analytics.explorerSearchMaxCharacters', 'analytics.searchMaxLength',
+    ]);
+    expect(state.read).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects duplicate or invalid filters and returns to the list when active filters exclude the selected metric', async () => {
     await expect(readAnalyticsExplorer(actor, { filter: '1', channel: ['channel-a', 'channel-a'] })).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(readAnalyticsExplorer(actor, { metric: '', source: '', kind: 'all' })).resolves.toMatchObject({ detail: null });

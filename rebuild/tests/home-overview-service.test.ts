@@ -58,6 +58,31 @@ describe('readHomeOverview', () => {
     expect(performance.data.interactions).toEqual([{ key: 'reactions', label: 'Reactions', value: 10 }]);
   });
 
+  it('resolves a shared provider once across performance and heatmap reads', async () => {
+    await readHomeOverview(actor, now);
+    expect(mocks.host).toHaveBeenCalledTimes(1);
+    expect(mocks.host).toHaveBeenCalledWith('p');
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(1);
+    expect(mocks.batch).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts other cards while a performance read is pending', async () => {
+    let finish!: (value: { views: number; engagements: number }) => void;
+    const pending = new Promise<{ views: number; engagements: number }>(resolve => { finish = resolve; });
+    const started = vi.fn();
+    mocks.host.mockResolvedValue({ goalMeasures: () => { started(); return pending; }, postPerformance: vi.fn(async () => []) });
+    const reading = readHomeOverview(actor, now);
+    try {
+      await vi.waitFor(() => {
+        expect(started).toHaveBeenCalled();
+        expect(mocks.posts).toHaveBeenCalledTimes(1);
+        expect(mocks.inbox).toHaveBeenCalledTimes(1);
+        expect(mocks.ads).toHaveBeenCalledTimes(1);
+      });
+    } finally { finish({ views: 1, engagements: 1 }); }
+    expect((await reading).performance?.state).toBe('ready');
+  });
+
   it('omits cards for modules the viewer cannot use', async () => {
     mocks.canUse.mockImplementation((_e: unknown, feature: string) => feature.startsWith('publishing/'));
     const overview = await readHomeOverview(actor, now);
