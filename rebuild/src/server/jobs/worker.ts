@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { cronMatches } from './cron';
+import { runWithJobContext } from './job-context';
 import type { RetryBackoff } from './retry';
 
 export type JobName = (typeof moduleManifests)[number]['jobs'][number]['name'];
@@ -28,6 +29,9 @@ export type WorkerDependencies = {
 export function createWorker(deps: WorkerDependencies, owner: string) {
   const startedMinute = new Map<JobName, number>();
   const running = new Set<JobName>();
+  const leaseTokens = new Map<JobName, string>();
+  const shutdownAbort = new AbortController();
+  let stopping = false;
   let lastHeartbeat = 0;
   // Bootstrap fallback prevents a hot loop if the first configuration read fails.
   // Successful ticks replace it with the current stored value.
@@ -49,6 +53,12 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     try { acquired = await deps.tryLease(job.name, owner, token, new Date(Date.now() + leaseMs)); }
     catch (error) { running.delete(job.name); throw error; }
     if (!acquired) { running.delete(job.name); return; }
+    if (stopping) {
+      await deps.releaseLease(job.name, token).catch(error => deps.logger(`lease release failed for ${job.name}`, error));
+      running.delete(job.name);
+      return;
+    }
+    leaseTokens.set(job.name, token);
     const startedAt = new Date();
     let attempts = 0;
     let outcome = 'ok';
@@ -61,7 +71,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     }, Math.max(1, Math.floor(leaseMs / renewalDivisor)));
     try {
       attempts = 1;
-      summary = await deps.execute(job.name, new Date(), retryLimit, retryBackoff);
+      summary = await runWithJobContext({ signal: shutdownAbort.signal, stopRequested: () => stopping }, () => deps.execute(job.name, new Date(), retryLimit, retryBackoff));
       if (/failed=[1-9]/.test(summary)) { outcome = 'failed'; errorText = `Some workspace sync items failed: ${summary}`; }
       deps.logger(`[${job.name}] ${summary}`);
     } catch (error) {
@@ -73,8 +83,33 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
       const finishedAt = new Date();
       await deps.writeRun({ id: randomUUID(), job: job.name, owner, startedAt, finishedAt, outcome, attempts, ...(summary ? { summary: summary.slice(0, summaryLimit) } : {}), ...(errorText ? { error: errorText.slice(0, errorLimit) } : {}) }).catch(error => deps.logger(`run audit write failed for ${job.name}`, error));
       await deps.releaseLease(job.name, token).catch(error => deps.logger(`lease release failed for ${job.name}`, error));
+      leaseTokens.delete(job.name);
       running.delete(job.name);
     }
+  }
+
+  /**
+   * Stop claiming work, give in-flight jobs `graceMs` to finish at their own safe
+   * points, then abort the rest and release their leases so another worker can
+   * take over. Resolves with the jobs that were abandoned.
+   */
+  async function shutdown(graceMs: number, pollMs: number): Promise<{ abandoned: JobName[] }> {
+    stopping = true;
+    const waitUntil = async (deadline: number) => {
+      while (running.size > 0 && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, Math.min(pollMs, Math.max(1, deadline - Date.now()))));
+    };
+    await waitUntil(Date.now() + graceMs);
+    if (running.size === 0) return { abandoned: [] };
+    shutdownAbort.abort();
+    // Aborted jobs get one more poll to unwind and write their own run record.
+    await waitUntil(Date.now() + pollMs);
+    const abandoned = [...running];
+    for (const name of abandoned) {
+      const token = leaseTokens.get(name);
+      if (token) await deps.releaseLease(name, token).catch(error => deps.logger(`lease release failed for ${name}`, error));
+      deps.logger(`[${name}] abandoned at shutdown after ${graceMs}ms grace`);
+    }
+    return { abandoned };
   }
 
   async function tick(now = new Date()): Promise<void> {
@@ -96,7 +131,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     pollIntervalMs = Math.max(1, Math.trunc(workerPollSeconds)) * SECOND_MS;
     const retryBackoff = { baseDelayMs: Math.max(1, Math.trunc(retryBaseDelayMs)), maxDelayMs: Math.max(1, Math.trunc(retryMaxDelayMs)) };
     const leaseMs = Math.max(1, Math.trunc(leaseMinutes)) * MINUTE_MS;
-    if (enabled) {
+    if (enabled && !stopping) {
       let available = Math.max(0, Math.trunc(maxConcurrent) - running.size);
       for (const job of orderedJobs) {
         if (!available) break;
@@ -114,7 +149,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     }
   }
 
-  return { tick, get running() { return new Set(running); }, get pollIntervalMs() { return pollIntervalMs; } };
+  return { tick, shutdown, get running() { return new Set(running); }, get pollIntervalMs() { return pollIntervalMs; } };
 }
 
 export const workerConfigKeys = jobs.map(job => job.configKey);
