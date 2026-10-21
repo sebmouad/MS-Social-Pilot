@@ -1,7 +1,7 @@
 /** Module-owned customer copy. Root catalog registration is coordinated by the host owner. */
 export type UiLocale = 'en' | 'fr';
 const french: Record<string, string> = {
-  "Response reports preserve the original start of visitor waits, show recorded resolution and reopening cycles, and disclose saved-history coverage. Complete platform history is not guaranteed.": "Les rapports de réponse conservent le début initial des attentes, présentent les cycles de résolution et de réouverture enregistrés et précisent la couverture de l’historique sauvegardé. L’historique complet de la plateforme n’est pas garanti.",
+  "Response reports separate comment and conversation answer shares, response and resolution times, and show member response times within business hours. Original wait starts, recorded resolution cycles and saved-history coverage remain explicit; complete platform history is not guaranteed.": "Les rapports distinguent les parts traitées, délais de réponse et de résolution des commentaires et conversations, et présentent les délais par membre en heures ouvrées. Les débuts des attentes, cycles de résolution enregistrés et limites de l’historique restent explicites ; l’historique complet de la plateforme n’est pas garanti.",
   "{0} existing schedule": "{0} planification existante",
   "{0} existing schedules": "{0} planifications existantes",
   "not confirmed": "non confirmé",

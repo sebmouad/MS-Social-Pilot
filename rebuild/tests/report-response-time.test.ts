@@ -86,9 +86,9 @@ describe('response time by member and resolve time', () => {
   it('attributes each first reply to its member, counts replies outside the app and never invents a zero', () => {
     const s = summarizeResponseTimes(messages, false, null, names);
     expect(s.members).toEqual([
-      { memberId: 'u1', name: 'Amal', answered: 2, medianMs: 20 * 60_000 },
-      { memberId: null, name: 'Outside the app', answered: 1, medianMs: 4 * 60_000 },
-      { memberId: 'u2', name: 'Youssef', answered: 1, medianMs: 10 * 60_000 },
+      { memberId: 'u1', name: 'Amal', answered: 2, medianMs: 20 * 60_000, businessMedianMs: null },
+      { memberId: null, name: 'Outside the app', answered: 1, medianMs: 4 * 60_000, businessMedianMs: null },
+      { memberId: 'u2', name: 'Youssef', answered: 1, medianMs: 10 * 60_000, businessMedianMs: null },
     ]);
     expect(s.membersOmitted).toBe(0);
     expect(summarizeResponseTimes([]).members).toEqual([]);
@@ -96,7 +96,7 @@ describe('response time by member and resolve time', () => {
   });
   it('labels a sender who is no longer a member and keeps emails out of the summary', () => {
     const s = summarizeResponseTimes(thread('a', null, [0, 'v'], [5, 'gone']), false, null, names);
-    expect(s.members).toEqual([{ memberId: 'gone', name: 'Former member', answered: 1, medianMs: 5 * 60_000 }]);
+    expect(s.members).toEqual([{ memberId: 'gone', name: 'Former member', answered: 1, medianMs: 5 * 60_000, businessMedianMs: null }]);
   });
   it('measures resolve time from the first visitor message and counts unresolved or earlier-resolved conversations separately', () => {
     const s = summarizeResponseTimes(messages, false, null, names);
@@ -113,8 +113,10 @@ describe('response time by member and resolve time', () => {
       { conversationId: 'a', createdTime: at(5), fromId: null, sentById: 'u1', conversation: { resolvedAt: at(30) } },
     ]);
     const s = await readResponseTime('w1', 't1', { start: '2026-10-01', end: '2026-10-01' });
-    expect(s.members).toEqual([{ memberId: 'u1', name: 'Amal', answered: 1, medianMs: 5 * 60_000 }]);
+    expect(s.members).toEqual([{ memberId: 'u1', name: 'Amal', answered: 1, medianMs: 5 * 60_000, businessMedianMs: null }]);
     expect(s.resolve).toEqual({ resolved: 1, unresolved: 0, medianMs: 30 * 60_000 });
+    expect(s.conversations).toMatchObject({ total: 1, answeredPercent: 100, medianMs: 5 * 60_000, businessMedianMs: null, resolve: { resolved: 1, medianMs: 30 * 60_000 } });
+    expect(s.comments).toMatchObject({ total: 0, answeredPercent: null, medianMs: null });
     const q = db.user.findMany.mock.calls.at(-1)![0];
     expect(q.where).toEqual({ id: { in: ['u1'] }, memberships: { some: { workspaceId: 'w1' } } });
     expect(q.select).toEqual({ id: true, name: true });
