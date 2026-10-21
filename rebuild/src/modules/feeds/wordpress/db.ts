@@ -1,4 +1,5 @@
 import type { Mapping } from './recipe';
+import { normalizeWordpressCaption } from './text';
 
 /**
  * Read-only access to the WordPress database. Only SELECT statements are ever issued; the account is expected to
@@ -69,7 +70,7 @@ export async function openWordpressDb(settings: DbSettings, factory: PoolFactory
         WHERE ${where.join(' AND ')}
         GROUP BY p.ID, p.post_title, p.post_name, p.post_date_gmt
         ORDER BY p.post_date_gmt ${q.order === 'newest' ? 'DESC' : 'ASC'}, p.ID ${q.order === 'newest' ? 'DESC' : 'ASC'} LIMIT ?`;
-      return rowsOf(await run(sql, values)).map(r => ({ id: text(r['id']), title: text(r['title']), slug: text(r['slug']), publishedAt: asDate(r['publishedAt']), caption: text(r['caption']).trim(), imageId: text(r['imageId']).trim(), recipe: text(r['recipe']) }));
+      return rowsOf(await run(sql, values)).map(r => ({ id: text(r['id']), title: text(r['title']), slug: text(r['slug']), publishedAt: asDate(r['publishedAt']), caption: normalizeWordpressCaption(text(r['caption'])), imageId: text(r['imageId']).trim(), recipe: text(r['recipe']) }));
     },
     async attachments(ids, attachedFileMetaKey) {
       const unique = [...new Set(ids.filter(id => /^\d{1,20}$/.test(id)))];
@@ -80,4 +81,18 @@ export async function openWordpressDb(settings: DbSettings, factory: PoolFactory
     async ping() { await run('SELECT 1 AS ok'); },
     async close() { await pool.end().catch(() => undefined); },
   };
+}
+
+/** Exact authoritative caption for maintenance, independent of candidate eligibility.
+ * Ambiguous duplicate meta values are refused rather than choosing MAX arbitrarily. */
+export async function readWordpressCaption(settings: DbSettings, mapping: Mapping, wpPostId: string, factory: PoolFactory = defaultPoolFactory): Promise<string | null> {
+  if (!PREFIX.test(settings.tablePrefix) || !/^\d{1,20}$/.test(wpPostId)) throw new Error('invalid_wordpress_identity');
+  const pool = await factory(settings);
+  try {
+    const rows = rowsOf(await pool.query({
+      sql: `SELECT DISTINCT m.meta_value AS caption FROM \`${settings.tablePrefix}posts\` p JOIN \`${settings.tablePrefix}postmeta\` m ON m.post_id = p.ID WHERE p.ID = ? AND m.meta_key = ? AND p.post_type = ? AND p.post_status = ?`,
+      values: [wpPostId, mapping.captionMetaKey, mapping.postType, mapping.postStatus], timeout: settings.queryTimeoutMs,
+    }));
+    return rows.length === 1 ? text(rows[0]!['caption']) : null;
+  } finally { await pool.end(); }
 }

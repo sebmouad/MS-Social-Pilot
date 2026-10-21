@@ -3,7 +3,8 @@ import { headers } from 'next/headers';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { Button } from '@/components/Button';
-import { DataTable } from '@/components/DataTable';
+import { PostsTable } from '@/modules/analytics/ui/posts/PostsTable';
+import { postsTableMeasures, postsTableRows } from '@/modules/analytics/ui/posts/rows';
 import { readPosts } from './service';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 import local from './screen.module.css';
@@ -22,7 +23,6 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
     const q = new URLSearchParams({ start: d.period.start, end: d.period.end, sort: d.input.sort, direction: d.input.direction, page: String(d.input.page), filter: '1' });
     d.selectedIds.forEach(id => q.append('channel', id)); Object.entries(patch).forEach(([k, v]) => q.set(k, v)); return q.toString();
   };
-  const unavailable = t("Not available");
   const measureLabel = (m: { label: string; labelFr?: string }) => fr ? m.labelFr ?? m.label : m.label;
   const sidebar = <form action="/analytics/posts" className={styles.filters}>
     <h2>{t("Post explorer")}</h2>
@@ -37,12 +37,6 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
     <nav aria-label={t("Pages")} className={styles.actions}>{d.input.page > 1 && <a href={`?${query({ page: String(d.input.page - 1) })}`}>{t("Previous")}</a>}<span>{t("Page")} {d.input.page}</span>{d.nextPage && <a href={`?${query({ page: String(d.nextPage) })}`}>{t("Next")}</a>}</nav>
   </form>;
   return <PageFrame module="analytics" scopedAccess sidebar={sidebar}><div className={`${styles.root} ${local.content}`}><header className={styles.heading}><h1>{t("Post explorer")}</h1><p>{t("Published posts with stored measures. Measures are snapshots, not period totals. Missing data is not available.")}</p></header>
-    <DataTable caption={t("Published posts")} rows={d.items} rowKey={p => `${p.channelId}:${p.postId}`} emptyMessage={t("No published posts for this selection and period.")} columns={[
-      { key: 'post', label: t("Post"), render: p => p.url ? <a href={p.url} rel="noreferrer" target="_blank">{p.text || unavailable}</a> : p.text || unavailable },
-      { key: 'channel', label: t("Channel"), render: p => p.channelName },
-      { key: 'publishedAt', label: t("Published (UTC)"), render: p => p.publishedAt?.toISOString() ?? unavailable },
-      { key: 'measuredAt', label: t("Measured (UTC)"), render: p => p.measuredAt?.toISOString() ?? unavailable },
-      ...d.measures.map(m => ({ key: m.key, label: measureLabel(m), render: (p: typeof d.items[number]) => { const value = p.measures.find(v => v.key === m.key)?.value; return value == null ? unavailable : new Intl.NumberFormat(fr ? 'fr' : 'en').format(value); } })),
-    ]} />
+    <PostsTable copy={copy} rows={postsTableRows(d.items)} measures={postsTableMeasures(d.measures, fr ? 'fr' : 'en')} locale={fr ? 'fr' : 'en'} />
   </div></PageFrame>;
 }

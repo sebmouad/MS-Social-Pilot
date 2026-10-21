@@ -39,6 +39,11 @@ export function facebookAdMetricUnit(key: string, _currency?: string | null): An
   return 'count';
 }
 
+/** Identity, naming and date-window fields of an insights payload; they describe the row and are never measures, even when numeric-looking. */
+export function facebookIdentifierField(key: string): boolean {
+  return /(^|:)([a-z0-9]+_)*(id|ids|name|currency|start|stop)$/i.test(key) || /(^|:)(date_start|date_stop|objective|account_id)$/.test(key);
+}
+
 type PageRow = { metric: string; period: string | null; endTime: Date; fetchedAt: Date; numeric: number | null; value: unknown; target: { id: string; name: string } };
 type AdRow = { date: Date; spend: number; impressions: number; clicks: number; reach: number; cpc: number | null; cpm: number | null; cpp: number | null; ctr: number | null; frequency: number | null; actions: unknown; fields: unknown; fetchedAt: Date; adAccount: { id: string; name: string; currency: string | null } };
 type FacebookTarget = AnalyticsTarget & { socialAccountId: string | null };
@@ -181,6 +186,7 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
     breakdowns.set(key, accounts);
   };
   const readField = (key: string, row: AdRow, raw: unknown, sourcePriority: number, knownAction = false) => {
+    if (facebookIdentifierField(key)) return;
     if (Array.isArray(raw)) {
       const categories: Array<[string, unknown]> = [];
       raw.forEach((entry, index) => {

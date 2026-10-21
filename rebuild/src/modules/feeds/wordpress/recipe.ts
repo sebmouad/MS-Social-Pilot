@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { addDaysToKey, instantToWall, wallTimeToInstant } from '@/lib/calendar-dates';
 import { META_KEY, SLOT_TIME, SLOTS_MAX } from './config';
+import { decodeWordpressText } from './text';
 
 /** Pure logic of the WordPress recipe source: field mapping, recipe parsing, comment rendering, slots and allocation. */
 export type Mapping = { captionMetaKey: string; imageMetaKey: string; recipeMetaKey: string; skipMetaKey: string; attachedFileMetaKey: string; postType: string; postStatus: string };
@@ -60,7 +61,7 @@ const GROUP_KEYS = ['items', 'ingredients', 'steps', 'list'] as const;
 const HEADING_KEYS = ['title', 'name', 'section', 'group', 'heading', 'label'] as const;
 const QUANTITY_KEYS = ['quantity', 'qty', 'amount'] as const;
 const NOTE_KEYS = ['note', 'notes', 'preparation', 'comment'] as const;
-const clean = (value: string) => value.replace(/\s+/g, ' ').trim();
+const clean = (value: string) => decodeWordpressText(value).replace(/[^\S\u00a0\u202f]+/g, ' ').trim();
 const asText = (value: unknown): string => typeof value === 'string' ? clean(value) : typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
 
 function lines(value: unknown, keys: readonly string[], depth = 0): Line[] {
@@ -98,7 +99,7 @@ export function parseRecipe(raw: unknown, fallbackTitle: string, minutesSuffix: 
   const steps = lines(r['steps'], STEP_KEYS);
   if (!ingredients.some(l => !l.heading) && !steps.some(l => !l.heading)) return null;
   return {
-    title: asText(r['title']) || fallbackTitle, description: asText(r['description']), servings: asText(r['servings']),
+    title: asText(r['title']) || asText(fallbackTitle), description: asText(r['description']), servings: asText(r['servings']),
     prep: duration(r['prep_minutes'], minutesSuffix), cook: duration(r['cook_minutes'], minutesSuffix), total: duration(r['total_minutes'], minutesSuffix),
     ingredients, steps,
   };

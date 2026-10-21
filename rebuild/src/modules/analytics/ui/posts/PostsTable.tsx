@@ -22,17 +22,24 @@ const NONE = '__none__';
  * stored measures, and a bar under the first metric scaled to the largest known value on the page.
  * Per-post history is not stored, so no trend line is drawn.
  */
-export function PostsTable({ rows, measures, locale, emptyAction, copy = recordsCopyDefaults }: {
+export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, copy = recordsCopyDefaults }: {
   copy?: RecordsCopy; rows: PostsTableRow[]; measures: PostsTableMeasure[]; locale: 'en' | 'fr'; emptyAction?: React.ReactNode;
 }) {
   const fr = locale === 'fr';
   const t = (key: keyof RecordsCopy) => copy[key][locale];
   const unavailable = t("Not available");
-  const [first, setFirst] = useState(measures[0]?.key ?? NONE);
-  const [second, setSecond] = useState(measures[1]?.key ?? NONE);
+  // A measure with no stored value on this page is not offered: it would only add a column of dashes.
+  const measures = useMemo(() => allMeasures.filter(measure => rows.some(row => typeof row.measures[measure.key] === 'number')), [allMeasures, rows]);
+  const [picked, setPicked] = useState<{ first?: string; second?: string }>({});
+  const offered = (key: string | undefined, fallback: string) => key !== undefined && (key === NONE || measures.some(measure => measure.key === key)) ? key : fallback;
+  const first = offered(picked.first, measures[0]?.key ?? NONE);
+  const second = offered(picked.second, measures[1]?.key ?? NONE);
+  const setFirst = (key: string) => setPicked(current => ({ ...current, first: key }));
+  const setSecond = (key: string) => setPicked(current => ({ ...current, second: key }));
   const number = useMemo(() => new Intl.NumberFormat(locale), [locale]);
-  const date = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }), [locale]);
-  const when = (value: string | null) => value ? `${date.format(new Date(value))} UTC` : unavailable;
+  // Viewer's own timezone; the server render may differ from the browser, so the <time> text may update on hydration.
+  const date = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }), [locale]);
+  const when = (value: string | null) => value ? <time dateTime={value} suppressHydrationWarning>{date.format(new Date(value))}</time> : unavailable;
   const options = measures.map(measure => ({ value: measure.key, label: measure.label }));
   const chosen = [first, second].filter((key, index, all) => key !== NONE && all.indexOf(key) === index).map(key => measures.find(measure => measure.key === key)).filter((measure): measure is PostsTableMeasure => Boolean(measure));
   const peak = (key: string) => Math.max(0, ...rows.map(row => row.measures[key]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value)));

@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const query = vi.hoisted(() => vi.fn());
 vi.mock('@/server/data', () => ({ prisma: { $queryRaw: query } }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => ({}) }));
 import { facebookPostPerformance, readFacebookPostPerformance } from '@/platforms/facebook/post-performance';
 beforeEach(() => query.mockReset().mockResolvedValue([]));
 it('retains additional stored numeric measures and leaves absent values unknown', () => {
@@ -15,5 +16,5 @@ it('sorts the complete stored population in SQL and binds offset, measure key an
   const sql = query.mock.calls[0][0];
   expect(sql.text).toContain('ASC NULLS LAST'); expect(sql.text).not.toContain('LIMIT 2000');
   expect(sql.values).toEqual(expect.arrayContaining(['reach', 'w', 't', 3001, 2001]));
-  expect(sql.text).toContain("= 'number' THEN CASE WHEN");
+  expect(sql.text).toMatch(/jsonb_typeof\(r\.insights::jsonb -> \$\d+\) = 'number' THEN/);
 });
