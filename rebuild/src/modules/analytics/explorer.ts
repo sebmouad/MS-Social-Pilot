@@ -21,7 +21,7 @@ export type AnalyticsExplorerResult = {
   filters: { search: string; source: string; kind: string };
   searchMaxCharacters: number;
   metrics: { items: AnalyticsExplorerMetric[]; total: number; page: number; pages: number; pageSize: number };
-  detail: null | { metric: AnalyticsExplorerMetric; points: { items: AnalyticsExplorerMetricData['points']; total: number; page: number; pages: number; pageSize: number }; rows: { items: AnalyticsExplorerMetricData['rows']; total: number; page: number; pages: number; pageSize: number } };
+  detail: null | { metric: AnalyticsExplorerMetric; previousPoints?: Array<{ date: string; value: number | null; previousDate: string }>; points: { items: AnalyticsExplorerMetricData['points']; total: number; page: number; pages: number; pageSize: number }; rows: { items: AnalyticsExplorerMetricData['rows']; total: number; page: number; pages: number; pageSize: number } };
   query: string;
 };
 

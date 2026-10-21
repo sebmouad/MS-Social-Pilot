@@ -244,7 +244,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         {data.selected.adAccountIds.length > 0 && <p className="small-note analytics-ad-coverage">{data.selected.adAccountIds.length} ad accounts selected. Coverage is shown for each metric.</p>}
         {data.detail ? <MetricTable data={data} /> : data.metrics.items.length ? <section className="panel">
           <div className="analytics-panel-title"><div><h2>Available metrics</h2><p className="small-note">Stored measurements for the selected resources and range. Use the sidebar to open a metric's full series and resource detail.</p></div><span className="badge">{data.metrics.total} metrics</span></div>
-          <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric key={`${metric.sourceLabel}:${metric.key}`} locale={locale} metric={metric} comparison={data.comparisons[metric.key]} chartPoints={data.chartPoints} />)}</div>
+          <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric key={`${metric.sourceLabel}:${metric.key}`} locale={locale} metric={metric} comparison={data.comparisons[metric.key]} previousPoints={data.previousPoints[metric.key]} chartPoints={data.chartPoints} />)}</div>
         </section> : data.selected.channelIds.length || data.selected.adAccountIds.length
           ? <EmptyState title="No metrics match these filters" icon={<IconChartBar />} action={<a href="/analytics">Reset filters</a>}>Change the date range, metric search, or resource selection in the sidebar.</EmptyState>
           : null}

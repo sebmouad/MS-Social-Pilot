@@ -1,4 +1,5 @@
 import type { MetricView } from '@/modules/analytics/server/aggregate';
+import type { PreviousPoint } from './previous-points';
 import type { AnalyticsAdAccount, AnalyticsAudienceEntry, AnalyticsTarget } from '@/modules/analytics/server/catalog';
 
 /** Fresh original-membership channel grants that authorize Ads data, independent of any credential's channel selection. */
@@ -39,6 +40,8 @@ export type AnalyticsSnapshot = {
   audience: { entries: AnalyticsAudienceEntry[]; total: number; covered: number; selected: number };
   publishing: { published: number; scheduled: number; failed: number };
   comparisons: Record<string, AnalyticsComparisonValue>;
+  /** Previous-period series per metric key, aligned by relative day index to the current range; null marks a day with no stored value. */
+  previousPoints: Record<string, PreviousPoint[]>;
   query: string;
   chartPoints: number;
   searchMaxLength: number;

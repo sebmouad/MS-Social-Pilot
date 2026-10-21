@@ -33,14 +33,14 @@ export function AnalyticsMetricComparison({ metric, comparison }: { metric: Metr
   return <p className="analytics-metric__comparison">Previous period: {previous}. Change: {change}{relative}.</p>;
 }
 
-function SeriesPreview({ metric, chartPoints, previousPoints }: { metric: MetricView; chartPoints: number; previousPoints?: DatedValues }) {
+function SeriesPreview({ metric, chartPoints, previousPoints, locale }: { metric: MetricView; chartPoints: number; previousPoints?: DatedValues; locale: 'en' | 'fr' }) {
   const points = metric.points.slice(-chartPoints);
   const comparison = previousSeries(points, previousPoints, metric.unit);
   if (metric.kind === 'breakdown' && metric.rows.length) return <DonutChart label={metric.label} slices={metric.rows.map(row => ({ name: row.label, value: row.value }))} />;
   if (!points.length && metric.rows.length) return <BarChart label={metric.label} orientation="horizontal" categories={metric.rows.map(row => row.label)} series={[{ id: metric.key, name: metric.label, values: metric.rows.map(row => row.value) }]} />;
   if (!points.length) return <p className="analytics-series-note">No dated series is stored for this metric.</p>;
   return <div className="analytics-series-preview">
-    <TimeSeriesChart label={metric.label} format={metric.unit === 'percent' ? { style: 'percent' } : undefined} series={[{ id: metric.key, name: metric.label,
+    <TimeSeriesChart locale={locale} label={metric.label} format={metric.unit === 'percent' ? { style: 'percent' } : undefined} series={[{ id: metric.key, name: metric.label,
       points: points.map(point => ({ t: point.date, v: Number.isFinite(point.value) ? (metric.unit === 'percent' ? point.value / 100 : point.value) : null })), ...(comparison ? { comparison } : {}) }]} />
     <p>Latest {points.length} of {metric.points.length} stored dates shown. Open this metric in the sidebar's Metric detail selector for the full series and resource values.</p>
   </div>;
@@ -72,7 +72,7 @@ export default function AnalyticsMetric({ metric, comparison, chartPoints, previ
       {metric.latestAt && <p>Latest data {new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.latestAt)}</p>}
       {metric.updatedAt && <p>Last synced {new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.updatedAt)}</p>}
     </div></div>
-    <SeriesPreview metric={metric} chartPoints={chartPoints} previousPoints={previousPoints} />
+    <SeriesPreview metric={metric} chartPoints={chartPoints} previousPoints={previousPoints} locale={locale} />
     {metric.coverage < metric.available && <p className="analytics-coverage">Values are available for {metric.coverage} of {metric.available} selected {detailLabel}. Missing values are unknown, not zero.</p>}
     <AnalyticsMetricComparison metric={metric} comparison={comparison} />
   </article>;

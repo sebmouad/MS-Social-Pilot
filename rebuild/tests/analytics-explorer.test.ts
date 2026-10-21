@@ -24,7 +24,7 @@ const metric = (key: string, label: string, sourceLabel: string, kind: 'flow' | 
 const snapshot = (): AnalyticsSnapshot => ({
   period: { start: '2026-10-10', end: '2026-10-16', range: { from: new Date('2026-10-10T00:00:00Z'), to: new Date('2026-10-16T23:59:59.999Z') }, comparison: null },
   options: { channels: [{ id: 'channel-a', name: 'Channel A', type: 'page' }], adAccounts: [], metrics: [metric('reach', 'Reach', 'Community'), metric('views', 'Views', 'Community'), metric('likes', 'Likes', 'Content')].map(({ key, label, sourceLabel }) => ({ key, label, sourceLabel })) },
-  selected: { channelIds: ['channel-a'], adAccountIds: [] }, audience: { entries: [], total: 0, covered: 0, selected: 1 }, publishing: { published: 0, scheduled: 0, failed: 0 }, comparisons: {}, query: 'start=2026-10-10&end=2026-10-16&filter=1&channel=channel-a', chartPoints: 25, searchMaxLength: 200, exportRowLimit: 1000,
+  selected: { channelIds: ['channel-a'], adAccountIds: [] }, audience: { entries: [], total: 0, covered: 0, selected: 1 }, publishing: { published: 0, scheduled: 0, failed: 0 }, comparisons: {}, previousPoints: {}, query: 'start=2026-10-10&end=2026-10-16&filter=1&channel=channel-a', chartPoints: 25, searchMaxLength: 200, exportRowLimit: 1000,
   allMetrics: [metric('reach', 'Reach', 'Community'), metric('views', 'Views', 'Community', 'stock'), metric('likes', 'Likes', 'Content')],
 });
 const actor = { userId: 'reader-a', workspaceId: 'workspace-a' };

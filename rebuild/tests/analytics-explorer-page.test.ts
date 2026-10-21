@@ -41,6 +41,7 @@ const base = (): AnalyticsReadResult => ({
   metrics: { items: [valueMetric], total: 2, page: 1, pages: 2, pageSize: 1 },
   detail: null,
   comparisons: { 'spend-usd': { previous: 100, delta: 25.5, percent: 25.5, status: 'comparable' as const } },
+  previousPoints: {},
   query: 'start=2026-10-10&end=2026-10-16&compare=previous&filter=1&channel=channel-a&adFilter=1&adAccount=account-a&search=spend&page=1&pointPage=1&rowPage=1',
   chartPoints: 28,
   searchMaxLength: 200,
