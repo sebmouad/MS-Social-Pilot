@@ -185,7 +185,7 @@ Rebuild evidence paths under `rebuild/src/`.
 | `auth`, `sessions`, `totp`, `two-step`, `passkeys`, `crypto`, `email-tokens`, `rate-limit`, `client-ip`, `owner-guard` | `server/auth*.ts`, `two-step.ts`, `totp.ts`, `secret-crypto.ts`, `rate-limit.ts`, `client-ip.ts` | done |
 | `email/*`, `notify`, `invite-path` | `server/mail/*`, `modules/settings/notifications/*` | done (live SMTP unproven) |
 | `posts`, `post-bulk`, `post-versions`, `post-version-diff`, `post-notes`, `post-templates*`, `queue-actions`, `first-comment`, `approvals`, `composer-state`, `evergreen`, `stagger`, `links`, `slug`, `best-times`, `queue-suggestions`, `content-mix` | `modules/publishing/**` | done |
-| `facebook/publish`, `graph`, `oauth`, `permissions`, `insights`, `edges`, `metrics`, `ads`, `analytics`, `budget*`, `call-source`, `opengraph` | `platforms/facebook/**` | done / partial (Group publishing absent; opengraph preview missing) |
+| `facebook/publish`, `graph`, `oauth`, `permissions`, `insights`, `edges`, `metrics`, `ads`, `analytics`, `budget*`, `call-source`, `opengraph` | `platforms/facebook/**` | done / partial (opengraph preview missing); Group publishing dropped: Meta removed the Groups API 2024-04-22 |
 | `facebook/instagram*`, `instagram` | `platforms/instagram/{discovery,analytics}.ts` | partial (no publishing) |
 | `networks/*` (9 connectors) | none | missing |
 | `inbox`, `inbox-notes`, `inbox-response`, `moderation*`, `reply-template`, `response-time`, `negative-comments`, `mentions` | `modules/inbox/**`, `modules/ai/server/sentiment.ts` | done |
@@ -234,7 +234,7 @@ Legacy `app_settings` keys (`src/lib/settings/definitions.ts`) vs rebuild regist
 | `operator.*` (10 keys), `site.public` | none | missing (gap 2) |
 | `facebook.appId/appSecret/graphVersion/graphBaseUrl/scopes/requestTimeoutSeconds` | `meta.appId/appSecret/graphVersion/graphBaseUrl/oauthScopes/requestTimeoutMs` | done (imported) |
 | `facebook.uploadTimeoutSeconds` | `facebook.native.*` keys | partial |
-| `features.groups/messaging/instagram/ads` | `ads.managementEnabled`, module/platform enablement | partial (groups absent) |
+| `features.groups/messaging/instagram/ads` | `ads.managementEnabled`, module/platform enablement | done (groups dropped: Meta API removed) |
 | `scheduler.pollSeconds/concurrency/maxAttempts/staleLockMinutes` | `jobs.enabled`, `jobs.order`, `notifications.maxAttempts`, worker keys | partial |
 | `scheduler.rssPollMinutes`, `evergreenCheckMinutes`, `nativeReconcileMinutes`, `tokenExpiryCheckHours`, `bulkRowLimit` | `feeds.autoCheck.*`, `publishing.automation.*`, `notifications.connectionWarningDays`, `publishing.maxImportRows` | done |
 | `analytics.refreshHours/pageInsightsHours/edgeSyncHours/instagramSyncHours/adsSyncHours/postBatch/commentPostLimit/videoLimit/edgeWindowDays/adWindowDays/tokenWarningDays` | `meta.postHistoryPolicy`, `meta.pageInsightMetrics`, `data.insightDefaultDays`, `inbox.sync*`, `notifications.connectionWarningDays` | partial (per-key equivalence not audited) |

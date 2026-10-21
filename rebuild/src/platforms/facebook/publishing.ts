@@ -37,8 +37,6 @@ export interface FacebookAdAccount { id: string; name: string; currency: string 
 export type FacebookMedia = { kind: 'image' | 'video'; url: string; altText?: string; localFile?: { bytes: Uint8Array; mimeType: string; fileName: string } };
 export interface FacebookPublishInput {
   targetId: string; accessToken: string; text?: string; link?: string | null; operationId?: string;
-  /** Private Group compatibility calls use a user token and Group photo semantics. */
-  targetKind?: 'page' | 'group';
   media?: readonly FacebookMedia[];
   /** Whole unix seconds: Facebook holds the post (`published=false` + `scheduled_publish_time`) until then. */
   scheduledUnix?: number;
@@ -70,8 +68,6 @@ export interface FacebookEngine {
   getCurrentUser(accessToken: string): Promise<FacebookCurrentUser>;
   getGrantedPermissions(accessToken: string): Promise<string[]>;
   discoverPages(accessToken: string): Promise<FacebookPage[]>;
-  discoverGroups(accessToken: string): Promise<import('../types').PlatformTarget[]>;
-  getGroupStatus(accessToken: string, remoteId: string, targetId: string): Promise<RemoteStatus>;
   discoverAdAccounts(accessToken: string): Promise<FacebookAdAccount[]>;
   publish(input: FacebookPublishInput): Promise<FacebookPublished>;
   getStatus(accessToken: string, remoteId: string, context: { targetId: string; contentKind?: 'text' | 'image' | 'video'; nativeFormat?: 'video' | 'reel' | 'story_photo' | 'story_video' }): Promise<RemoteStatus>;
@@ -312,30 +308,6 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const raw = await pages<JsonObject>(collectionUrl('me/accounts', token, 'id,name,category,access_token'), token);
       return raw.map(toPage).filter((p): p is FacebookPage => p !== null);
     },
-    async discoverGroups(token) {
-      const url = new URL(collectionUrl('me/groups', token, 'id,name'));
-      url.searchParams.set('admin_only', 'true');
-      // Strict paging: a truncated collection cannot establish target authority.
-      const { items: raw } = await pagesCore<JsonObject>(url.toString(), token, config.maxPages, true, url.pathname);
-      const targets = new Map<string, import('../types').PlatformTarget>();
-      for (const row of raw) {
-        if (typeof row.id === 'string' && /^\d+$/.test(row.id) && typeof row.name === 'string' && row.name.trim()) {
-          targets.set(row.id, { id: row.id, name: row.name, kind: 'group' });
-        }
-      }
-      return [...targets.values()];
-    },
-    async getGroupStatus(token, remoteId, targetId) {
-      const unknown = (): RemoteStatus => ({ state: 'unknown' });
-      if (!/^\d+$/.test(targetId) || !/^[A-Za-z0-9_:-]+$/.test(remoteId)) return unknown();
-      const raw = object(await request(encodeURIComponent(remoteId), { token, params: { fields: 'id,to,is_published,created_time' } }));
-      if (raw.id !== remoteId || raw.is_published !== true) return unknown();
-      const recipients = object(raw.to).data;
-      // Explicit contradictory ownership overrides even a composite-id prefix.
-      if (raw.to !== undefined && (!Array.isArray(recipients) || !recipients.some(item => object(item).id === targetId))) return unknown();
-      if (!remoteId.startsWith(`${targetId}_`) && !(Array.isArray(recipients) && recipients.some(item => object(item).id === targetId))) return unknown();
-      return { state: 'published', remoteId, targetId, publishedAt: date(raw.created_time) };
-    },
     async discoverAdAccounts(token) {
       const raw = await pages<JsonObject>(collectionUrl('me/adaccounts', token, 'id,name,currency,account_status'), token);
       return raw.filter(x => typeof x.id === 'string').map(x => ({ id: x.id as string, name: typeof x.name === 'string' ? x.name : x.id as string,
@@ -343,9 +315,6 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     },
     async publish(input) {
       const media = input.media ?? [];
-      if (input.targetKind === 'group' && (input.scheduledUnix !== undefined || media.length > 1 || media.some(item => item.kind !== 'image'))) {
-        throw new FacebookApiError('Group publishing supports feed or single-photo posts without native scheduling.', 400, 100);
-      }
       if (!Array.isArray(media) || media.some(item => !item || (item.kind !== 'image' && item.kind !== 'video') || typeof item.url !== 'string' || !item.url.trim() || (item.kind === 'video' && item.localFile))) {
         throw new FacebookApiError('Facebook received an unsupported media attachment.', 0);
       }
@@ -375,7 +344,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
           body: { file_url: videos[0].url, description: input.text?.trim() || undefined, ...hold } });
       } else if (images.length === 1) {
         payload = await request(`${encodeURIComponent(input.targetId)}/photos`, { method: 'POST', token: input.accessToken,
-          body: { url: images[0].localFile ? undefined : images[0].url, [input.targetKind === 'group' ? 'message' : 'caption']: input.text?.trim() || undefined, alt_text_custom: images[0].altText, ...hold }, file: images[0].localFile });
+          body: { url: images[0].localFile ? undefined : images[0].url, caption: input.text?.trim() || undefined, alt_text_custom: images[0].altText, ...hold }, file: images[0].localFile });
         if (Object.prototype.hasOwnProperty.call(payload, 'post_id') && (typeof payload.post_id !== 'string' || !payload.post_id.trim())) {
           throw new FacebookApiError('Facebook returned an invalid photo post id.', 200);
         }
