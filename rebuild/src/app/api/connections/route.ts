@@ -3,14 +3,14 @@ import { operationFailure } from '@/lib/operation-error';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
-import { disconnectSocialAccount, previewSocialAccountDeletion } from '@/server/connection-mutations';
+import { previewSocialAccountDeletion } from '@/server/connection-mutations';
 import { changeConnectionSelections } from '@/modules/settings/server/connection-selection';
+import { changeConnectionDisconnect } from '@/modules/settings/server/connection-disconnect';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
 
-const disconnectSchema = z.object({ socialAccountId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), mode: z.enum(['retain', 'delete']).default('retain'), confirmation: z.string().max(20).optional() });
 const previewSchema = z.object({ socialAccountId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/) });
 
 export async function POST(request: Request) {
@@ -48,9 +48,8 @@ export async function DELETE(request: Request) {
   try { viewer = await requireViewer({ feature: 'settings/connections' }); }
   catch { return reply({ error: 'Not authorized.' }, 401); }
   try {
-    const input = disconnectSchema.parse(await request.json());
-    const result = await withWorkspaceOperation(viewer.workspaceId, () => disconnectSocialAccount({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input.socialAccountId, input.mode, input.confirmation));
-    return reply({ ok: true, ...result });
+    const input: unknown = await request.json();
+    return reply(await changeConnectionDisconnect({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input));
   } catch (error) {
     return connectionError(error, 'The source could not be disconnected.');
   }

@@ -14,3 +14,20 @@ it.each([{ items, confirmation: 'SET CONNECTION SELECTIONS 1' }, { items: [...it
   await expect(changeConnectionSelections(actor, input)).rejects.toMatchObject({ code: 'invalid_request' });
   expect(m.change).not.toHaveBeenCalled();
 });
+it.each(['target', 'adAccount'] as const)('accepts the existing single %s protocol through the confirmed batch service', async kind => {
+  await expect(changeConnectionSelections(actor, { kind, id: 'one', enabled: false, confirmation: `SET CONNECTION ${kind} one DISABLED` })).resolves.toEqual({ ok: true, changed: 1 });
+  expect(m.change).toHaveBeenCalledTimes(1);
+  expect(m.change).toHaveBeenCalledWith(actor, [{ kind, id: 'one', enabled: false }]);
+});
+it.each([
+  { kind: 'target', id: 'one', enabled: true, confirmation: 'SET CONNECTION target one DISABLED' },
+  { kind: 'target', id: 'one', enabled: 'true', confirmation: 'SET CONNECTION target one ENABLED' },
+  { kind: 'target', id: 'one', enabled: true, confirmation: 'SET CONNECTION target two ENABLED' },
+  { kind: 'target', id: 'one', enabled: true, confirmation: 'SET CONNECTION target one ENABLED', workspaceId: 'other' },
+])('refuses invalid single selections and stale consent %j', async input => {
+  await expect(changeConnectionSelections(actor, input)).rejects.toMatchObject({ code: 'invalid_request' }); expect(m.change).not.toHaveBeenCalled();
+});
+it('retains service authorization and scope failures', async () => {
+  const error = new Error('scope denied'); m.change.mockRejectedValueOnce(error);
+  await expect(changeConnectionSelections(actor, { items, confirmation: 'SET CONNECTION SELECTIONS 2' })).rejects.toBe(error);
+});
