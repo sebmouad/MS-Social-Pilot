@@ -1,7 +1,8 @@
+import { changeConnectionDisconnect } from './server/connection-disconnect';
 import { readConnectionDirectory } from './server/connection-directory';
 import { OperationError } from '@/lib/operation-error';
-import { disconnectSocialAccount, previewSocialAccountDeletion } from '@/server/connection-mutations';
-import { auditedReceipt, requireConfirmation, requiredString } from '@/server/mcp/kit';
+import { previewSocialAccountDeletion } from '@/server/connection-mutations';
+import { requiredString } from '@/server/mcp/kit';
 import type { McpViewer } from '@/server/mcp/types';
 
 const sourceId = { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' };
@@ -23,14 +24,8 @@ export async function listConnectionDirectory(viewer: McpViewer, cap: number, in
 export async function executeConnectionDirectoryTool(viewer: McpViewer, name: string, args: Record<string, unknown>, cap: number) {
   const actor = { userId: viewer.userId, workspaceId: viewer.workspaceId };
   if (name === 'list_connections') return listConnectionDirectory(viewer, cap, args);
+  if (name === 'disconnect_connection') return changeConnectionDisconnect(actor, args);
   const socialAccountId = requiredString(args, 'socialAccountId');
   if (name === 'preview_connection_disconnect') return { socialAccountId, counts: await previewSocialAccountDeletion(actor, socialAccountId) };
-  if (name === 'disconnect_connection') {
-    if (args.mode !== 'retain' && args.mode !== 'delete') throw new OperationError('invalid_request', 'mode must be retain or delete.');
-    const mode = args.mode;
-    requireConfirmation(args, mode === 'retain' ? `DISCONNECT ${socialAccountId} RETAIN` : `DISCONNECT ${socialAccountId} DELETE RELATED DATA`);
-    const result = await disconnectSocialAccount(actor, socialAccountId, mode, mode === 'delete' ? 'DELETE' : undefined);
-    return auditedReceipt(viewer, name, { socialAccountId, mode }, { socialAccountId, ...result, providerAccessRevoked: false });
-  }
   throw new OperationError('invalid_request', `Unknown tool: ${name}`);
 }

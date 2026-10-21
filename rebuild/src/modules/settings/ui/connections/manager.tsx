@@ -80,7 +80,7 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
     inFlight.current = true;
     setBusy(true); setNotice('');
     try {
-      const response = await fetch('/api/connections', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ socialAccountId: disconnect.id, mode: disconnectMode, ...(disconnectMode === 'delete' ? { confirmation: 'DELETE' } : {}) }) });
+      const response = await fetch('/api/connections', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ socialAccountId: disconnect.id, mode: disconnectMode, confirmation: `DISCONNECT ${disconnect.id} ${disconnectMode === 'retain' ? 'RETAIN' : 'DELETE RELATED DATA'}` }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? t.disconnectFailed);
       toast.notify({ title: disconnectMode === 'delete' ? t.disconnectDelete : t.disconnectRetain }); setDisconnect(null); setDisconnectMode('retain'); router.refresh(); return null;

@@ -140,7 +140,7 @@ export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, n
     range: { from: adsIsoDay(filters.since), to: adsIsoDay(filters.until), endExclusive: true as const },
     daily: [...rows].sort((a, b) => a.date.getTime() - b.date.getTime()).map(flow), live,
     management: management
-      ? { available: true as const, canManage: management.canManage, operations: management.operations.filter(op => op.objectTypes.includes(level as DirectoryLevel)) }
+      ? { available: true as const, canManage: management.canManage, needsReconnect: management.needsReconnect === true, operations: management.operations.filter(op => op.objectTypes.includes(level as DirectoryLevel)) }
       : { available: false as const, canManage: false as const, operations: [] },
   };
 

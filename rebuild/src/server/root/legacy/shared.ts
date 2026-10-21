@@ -70,7 +70,7 @@ export const planUpdateSchema = z.object({ patch: planPatchSchema, confirmation:
 export const planAssignSchema = z.object({ userId: idSchema, planKey: z.string().min(1).refine(withinSynchronousLimit('root.planKeyMaxCharacters')).nullable(), confirmation: confirmationSchema }).strict();
 export const roleChangeSchema = z.object({ membershipId: idSchema, role: z.enum(WORKSPACE_ROLES), confirmation: confirmationSchema }).strict();
 export const transferSchema = z.object({ workspaceId: idSchema, newOwnerEmail: z.string().trim().toLowerCase().email().refine(withinSynchronousLimit('root.emailMaxCharacters')), previousOwners: z.enum(['keep', 'demote_admin']), confirmation: confirmationSchema }).strict();
-export const errorResolveSchema = z.object({ resolved: z.boolean() }).strict();
+export const errorResolveSchema = z.object({ resolved: z.boolean(), confirmation: z.string().min(1) }).strict();
 
 /** Stable first-party download protocol, shared by the server and confirmed download control. */
 export const ROOT_PRIVILEGE_CSV_FORMAT = 'root-privileges-v1';

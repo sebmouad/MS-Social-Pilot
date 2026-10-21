@@ -1,5 +1,6 @@
 import { configOrDefault } from '@/server/config/config-or-default';
 import { AccountSettings } from './settings';
+import { AccountExport } from './export';
 import { readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
 import { canAccessFeature } from '@/server/permissions';
 import { runtimeConfig } from '@/server/config/store';
@@ -44,6 +45,7 @@ export default async function AccountPage() {
 
   return <PageFrame module="settings" scopedAccess><SettingsPage copy={uiCopy} active="settings/account" title={t.title} description={t.description} locale={locale}>
     <AccountSettings canWrite={canAccessFeature(viewer.permissions, 'settings/account', 'write')} nameMaxLength={nameMaxLength} confirmationCopy={confirmationCopy} locale={locale} initialName={account.name} email={account.email} passwordPolicy={passwordPolicy} />
+    <AccountExport locale={locale} maxBytes={await runtimeConfig('data.maxArchiveBytes')} />
     <PersonKeysManager locale={locale} initial={personKeys} />
     <SettingsPanel title={t.contextTitle}>
       <dl className={styles['settings-account-grid']}>{values.map(item => <div className={styles['settings-account-item']} key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>

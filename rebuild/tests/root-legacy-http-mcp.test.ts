@@ -151,13 +151,23 @@ describe('strict query parsing', () => {
 });
 
 
+describe('REST error action confirmation', () => {
+  it('requires confirmation and forwards it to the shared service', async () => {
+    const request = (body: unknown) => new Request('https://app.example.test/api/root/errors/e1', { method: 'POST', headers: { origin: 'https://app.example.test', 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    expect((await resolveError(request({ resolved: true }), ctx('e1'))).status).toBe(400);
+    expect(h.errs.setRootErrorResolved).not.toHaveBeenCalled();
+    await resolveError(request({ resolved: true, confirmation: 'RESOLVE ROOT ERROR e1' }), ctx('e1'));
+    expect(h.errs.setRootErrorResolved).toHaveBeenCalledWith('root', 'e1', true, 'RESOLVE ROOT ERROR e1');
+  });
+});
+
 describe('MCP error action confirmation', () => {
   it('requires the exact explicit confirmation and rejects stray read arguments', async () => {
     const viewer = { userId: 'root', isInstanceOwner: true } as never;
     await expect(callRootLegacyTool(viewer, 'set_root_error_resolved', { id: 'e1', resolved: true })).rejects.toMatchObject({ code: 'invalid_request' });
     expect(h.errs.setRootErrorResolved).not.toHaveBeenCalled();
     await callRootLegacyTool(viewer, 'set_root_error_resolved', { id: 'e1', resolved: true, confirmation: 'RESOLVE ROOT ERROR e1' });
-    expect(h.errs.setRootErrorResolved).toHaveBeenCalledWith('root', 'e1', true);
+    expect(h.errs.setRootErrorResolved).toHaveBeenCalledWith('root', 'e1', true, 'RESOLVE ROOT ERROR e1');
     await expect(callRootLegacyTool(viewer, 'get_root_error', { id: 'e1', extra: true })).rejects.toMatchObject({ code: 'invalid_request' });
   });
 });

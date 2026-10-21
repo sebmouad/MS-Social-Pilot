@@ -12,10 +12,10 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Workspaces · Root' };
 
 export default async function RootWorkspacesPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
-  await requireRootPage();
+  const actor = await requireRootPage();
   const params = await searchParams;
-  const [pageSize, defaultTimezone, maxName] = await Promise.all([runtimeConfig('root.directoryPageSize'), runtimeConfig('root.defaultWorkspaceTimezone'), runtimeConfig('root.workspaceNameMaxCharacters')]);
-  const data = await listRootWorkspaces(params, pageSize);
+  const [defaultTimezone, maxName] = await Promise.all([runtimeConfig('root.defaultWorkspaceTimezone'), runtimeConfig('root.workspaceNameMaxCharacters')]);
+  const data = await listRootWorkspaces(actor.id, params);
   const url = (page: number) => `/root/workspaces?${new URLSearchParams({ ...(data.query ? { q: data.query } : {}), page: String(page) })}`;
   return <RootFrame active="/root/workspaces"><PageHeader module="root" title="Workspaces" description={<>{data.total} {data.query ? 'matching workspaces' : 'workspaces across this installation'}.</>} /><RootDirectorySearch kind="workspaces" query={data.query} />
     <CreateRootWorkspace defaultTimezone={defaultTimezone} maxName={maxName} />

@@ -28,7 +28,9 @@ export function VerifyForm({ hasPasskey, locale = 'en' }: { hasPasskey: boolean;
         window.location.assign(result.nextUrl === '/join' ? '/join' : '/home');
         return;
       }
-      setError(response.status === 429 ? copy.tooMany : t.rejected);
+      // Only a real rejection (401 with the verification code) means the code was wrong; other failures are not about the code.
+      const body = await response.json().catch(() => null) as { code?: unknown } | null;
+      setError(response.status === 429 ? copy.tooMany : response.status === 401 && body?.code === 'VERIFICATION_FAILED' ? t.rejected : t.unavailable);
     } catch { setError(t.unavailable); }
     setBusy(null);
   }

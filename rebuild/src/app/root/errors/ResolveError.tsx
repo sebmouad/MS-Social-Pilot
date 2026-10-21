@@ -12,7 +12,7 @@ export function ResolveError({ id, resolved }: { id: string; resolved: boolean }
   async function toggle() {
     setBusy(true); setError('');
     try {
-      const response = await fetch(`/api/root/errors/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resolved: !resolved }) });
+      const response = await fetch(`/api/root/errors/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ resolved: !resolved, confirmation: `${resolved ? 'REOPEN' : 'RESOLVE'} ROOT ERROR ${id}` }) });
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok || typeof payload !== 'object' || payload === null || (payload as { ok?: unknown }).ok !== true) setError('The change could not be confirmed. Reload before repeating it.');
       else router.refresh();

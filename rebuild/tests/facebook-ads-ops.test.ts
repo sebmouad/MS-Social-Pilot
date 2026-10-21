@@ -57,9 +57,9 @@ describe('Facebook ads operations', () => {
   });
 
   it('advertises exactly the implemented operations', () => {
-    expect(FACEBOOK_ADS_OPERATIONS.map(op => op.id).sort()).toEqual(['adset.create', 'budget.set', 'campaign.create', 'creative.assign', 'creative.create', 'delete', 'rename', 'status.set']);
+    expect(FACEBOOK_ADS_OPERATIONS.map(op => op.id).sort()).toEqual(['ad.create', 'adset.create', 'budget.set', 'campaign.create', 'creative.assign', 'creative.create', 'delete', 'rename', 'status.set']);
     expect(FACEBOOK_ADS_OPERATIONS.find(op => op.id === 'budget.set')!.objectTypes).not.toContain('ad');
-    expect(FACEBOOK_ADS_OPERATIONS.filter(op => op.spendChanging).map(op => op.id).sort()).toEqual(['adset.create', 'budget.set', 'campaign.create', 'creative.assign', 'status.set']);
+    expect(FACEBOOK_ADS_OPERATIONS.filter(op => op.spendChanging).map(op => op.id).sort()).toEqual(['ad.create', 'adset.create', 'budget.set', 'campaign.create', 'creative.assign', 'status.set']);
   });
 
   it('verifies ownership with a signed read, then sends one signed form write', async () => {

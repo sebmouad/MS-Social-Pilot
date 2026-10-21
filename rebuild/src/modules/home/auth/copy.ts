@@ -55,6 +55,7 @@ const en = {
   join: {
     title: 'Join a workspace', createdTitle: 'Your account is ready', opening: 'Opening your invitation…',
     openFailed: 'This invitation could not be opened. Ask for a new invitation.', unconfirmed: 'This invitation could not be confirmed. Open the email link again.', loadFailed: 'The invitation could not be loaded. Open the email link again.',
+    missingLink: 'There is no invitation to open here. Use the link from your invitation email, or ask the person who invited you to send a new one.',
     unconfirmedAction: 'The operation could not be confirmed. Check your account before trying again.',
     switchFailed: 'Sign-out could not be confirmed. Try again before switching accounts.',
     createdBody: 'Your account and workspace membership were created. Sign in to complete any required verification.', signIn: 'Sign in',
@@ -130,6 +131,7 @@ const fr: CatalogLocale = {
   join: {
     title: 'Rejoindre un espace', createdTitle: 'Votre compte est prêt', opening: 'Ouverture de votre invitation…',
     openFailed: 'Cette invitation n’a pas pu être ouverte. Demandez-en une nouvelle.', unconfirmed: 'Cette invitation n’a pas pu être confirmée. Ouvrez de nouveau le lien reçu par e-mail.', loadFailed: 'L’invitation n’a pas pu être chargée. Ouvrez de nouveau le lien reçu par e-mail.',
+    missingLink: 'Il n’y a aucune invitation à ouvrir ici. Utilisez le lien de votre e-mail d’invitation, ou demandez à la personne qui vous a invité de vous en renvoyer un.',
     unconfirmedAction: 'L’opération n’a pas pu être confirmée. Vérifiez votre compte avant de réessayer.',
     switchFailed: 'La déconnexion n’a pas pu être confirmée. Réessayez avant de changer de compte.',
     createdBody: 'Votre compte et votre appartenance à l’espace ont été créés. Connectez-vous pour terminer la vérification éventuellement requise.', signIn: 'Se connecter',

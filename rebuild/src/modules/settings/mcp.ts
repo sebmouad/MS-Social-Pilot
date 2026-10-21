@@ -1,6 +1,7 @@
 import { changeConnectionSelections } from './server/connection-selection';
 import { exportWorkspaceArchive } from '@/server/data-control/archive';
 import { ACCOUNT_MCP } from './account-mcp';
+import { ACCOUNT_EXPORT_MCP } from './server/account-export-mcp';
 import { SESSION_PARITY_MCP } from './session-parity-mcp';
 import { CONNECTION_START_MCP } from './connection-start-mcp';
 import { AGENCY_SESSION_MCP } from '@/modules/agency/mcp';
@@ -12,7 +13,6 @@ import { canUseFeature, entitledPlatformIds, requireFeature } from '@/server/ent
 import { canAccessFeature } from '@/server/permissions';
 import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
 import { publishingTargetChoices } from '@/modules/publishing/server/destinations';
-import { setConnectionSelections } from '@/server/connection-mutations';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '@/server/data-control';
 import { auditedReceipt, canManageData, pageIdsFor, requireConfirmation, type McpToolGroup } from '@/server/mcp/kit';
 import { teamToolDefinitions, teamTools, executeTeamTool, invitationAvailability } from './team-mcp';
@@ -28,6 +28,7 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
   CONNECTION_START_MCP,
   AGENCY_SESSION_MCP,
   ACCOUNT_MCP,
+  ACCOUNT_EXPORT_MCP,
   WORKSPACE_EXPORT_MCP,
   CHANNEL_PROFILES_MCP,
   WATERMARK_MCP,
@@ -137,17 +138,10 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
         return executeConnectionDirectoryTool(viewer, name, args, cap);
       case 'set_connection_selections':
         return changeConnectionSelections({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args);
-      case 'set_connection_selection': {
+      case 'set_connection_selection':
         requireFeature(viewer.entitlements, 'settings/connections');
-        const kind = args.kind === 'target' || args.kind === 'adAccount' ? args.kind : null;
-        const id = typeof args.id === 'string' ? args.id : '';
-        const enabled = args.enabled === true;
-        if (!kind || !id || typeof args.enabled !== 'boolean') throw new OperationError('invalid_request', 'kind, id, and enabled are required.');
-        const action = enabled ? 'ENABLED' : 'DISABLED';
-        requireConfirmation(args, `SET CONNECTION ${kind} ${id} ${action}`);
-        await setConnectionSelections(viewer, [{ kind, id, enabled }]);
-        return auditedReceipt(viewer, name, { kind, id, enabled }, { kind, id, enabled });
-      }
+        await changeConnectionSelections({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args);
+        return auditedReceipt(viewer, name, { kind: args.kind, id: args.id, enabled: args.enabled }, { kind: args.kind, id: args.id, enabled: args.enabled });
         default: throw new OperationError('invalid_request', `Unknown tool: ${name}`);
       }
     },

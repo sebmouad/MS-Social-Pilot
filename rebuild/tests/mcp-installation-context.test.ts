@@ -5,7 +5,10 @@ vi.mock('../src/server/root/registration-admin', async importOriginal => ({
   ...state.registration,
 }));
 const state = vi.hoisted(() => ({ refreshConnection: vi.fn(), registration: { listRootRegistration: vi.fn(), revokeRootRegistrationInvitation: vi.fn(), controlRootRegistrationAccount: vi.fn() }, actor: vi.fn(), read: vi.fn(), save: vi.fn(), workspaces: vi.fn(), activity: vi.fn(), access: vi.fn(), lock: vi.fn(), post: vi.fn(), execute: vi.fn(), diagnostics: vi.fn(), diagnosticRun: vi.fn(), operations: vi.fn(), deletions: vi.fn(), confirmDeletion: vi.fn(), publishingRead: vi.fn() }));
-vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.actor }, post: { findMany: state.post }, $executeRaw: state.execute } }));
+vi.mock('../src/server/data', () => {
+  const tx = { user: { findUnique: state.actor }, post: { findMany: state.post }, appSetting: { upsert: state.save, deleteMany: vi.fn() }, $queryRaw: vi.fn(), $executeRaw: state.execute };
+  return { prisma: { ...tx, $transaction: async (fn: (db: unknown) => unknown) => fn(tx) } };
+});
 vi.mock('../src/server/config/store', () => ({ readConfig: state.read, saveConfig: state.save, runtimeConfig: async () => 100 }));
 vi.mock('../src/server/root/inbox-deletions', () => ({ listRootInboxDeletions: state.deletions, confirmRootInboxDeletion: state.confirmDeletion }));
 vi.mock('../src/server/root/diagnostics', () => ({ listRootDiagnostics: state.diagnostics, runRootDiagnostics: state.diagnosticRun }));
@@ -55,7 +58,7 @@ describe('installation-only MCP context', () => {
     await call('list_root_activity', { limit: 100 });
     expect(state.activity).toHaveBeenCalledWith('root', { limit: 100 }, 10);
     await invoke('resources/read', { uri: 'msp://root/workspaces' });
-    expect(state.workspaces).toHaveBeenCalledWith({ q: undefined, page: undefined }, 10);
+    expect(state.workspaces).toHaveBeenCalledWith('root', { q: undefined, page: undefined }, 10);
     await call('set_root_workspace_access', { workspaceId: 'workspace-a', suspended: false, confirmation: 'RESTORE WORKSPACE workspace-a' });
     expect(state.access).toHaveBeenCalledWith('root', 'workspace-a', false, 'RESTORE WORKSPACE workspace-a');
     expect(state.lock).not.toHaveBeenCalled();
@@ -106,8 +109,8 @@ describe('installation-only MCP context', () => {
     expect(state.save).not.toHaveBeenCalled();
     const input = { key: 'mcp.enabled', value: true, confirmation: 'SET ROOT CONFIG mcp.enabled' };
     expect((await (await call('set_root_config', input)).json()).result.structuredContent.saved).toBe(true);
-    expect(state.save).toHaveBeenCalledWith({ key: 'mcp.enabled', value: true, clear: false }, 'root');
-    expect(state.execute).not.toHaveBeenCalled();
+    expect(state.save).toHaveBeenCalledWith(expect.objectContaining({ where: { key: 'mcp.enabled' }, create: expect.objectContaining({ value: true, encrypted: false }) }));
+    expect(state.execute).toHaveBeenCalledOnce();
     state.read.mockRejectedValueOnce(new Error('postgres://private-password@host'));
     const failure = (await (await call('get_root_config')).json()).result;
     expect(failure.structuredContent.code).toBe('upstream_failure');

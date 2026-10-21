@@ -935,6 +935,10 @@ export const publishingActionCopy = {
     "en": "Cancelling…",
     "fr": "Annulation…"
   },
+  "workflow_cancelFailed": {
+    "en": "The schedule could not be cancelled. Check your connection and try again; the post is unchanged until it is confirmed.",
+    "fr": "La programmation n’a pas pu être annulée. Vérifiez votre connexion et réessayez ; la publication reste inchangée tant que ce n’est pas confirmé."
+  },
   "comment_not_requested": { "en": "No first comment requested", "fr": "Aucun premier commentaire demandé" },
   "comment_awaiting_post": { "en": "First comment awaits publication", "fr": "Le premier commentaire attend la publication" },
   "comment_ready": { "en": "First comment has not been sent", "fr": "Le premier commentaire n’a pas été envoyé" },

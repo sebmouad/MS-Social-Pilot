@@ -14,7 +14,7 @@ import { PageHeading, PublishingPagination } from "@/modules/publishing/ui/publi
 import { EmptyPanel } from "../kit/kit";
 import { pageLocale } from "../kit/locale";
 import workflow from "@/modules/publishing/ui/workflow.module.css";
-import { CancelScheduleButton } from "@/modules/publishing/ui/WorkflowSubmitButtons";
+import { CancelScheduleForm } from "./CancelScheduleForm";
 import { canCancelQueuedPost } from "@/modules/publishing/ui/workflow-access";
 import { cancelScheduledPostAction } from "@/modules/publishing/ui/posts/actions";
 
@@ -56,7 +56,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         const mayMove = mayCancel && post.scheduledAt && post.targets.every(target => target.status === "pending" && !target.remotePostId);
         const wall = post.scheduledAt ? instantToWall(post.scheduledAt, timeZone) : null;
         const actions = <div className={workflow.actions}>
-          {mayCancel ? <><form noValidate action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><CancelScheduleButton locale={locale} /></form><p className={workflow.help}>{copy.queueCancelHelp}</p></>
+          {mayCancel ? <><CancelScheduleForm postId={post.id} action={cancelScheduledPostAction} locale={locale} /><p className={workflow.help}>{copy.queueCancelHelp}</p></>
             : <p className={workflow.help}>{viewer.permissions.features["publishing/posts"].write ? copy.queueCancelOnly : copy.queueViewOnly}</p>}
           {mayMove && wall ? <RescheduleQueuedPost postId={post.id} date={wall.date} time={wall.time} timeZone={timeZone} text={post.message} /> : null}
           {due ? <p className={workflow.help} role="status">{copy.queueDue}</p> : null}

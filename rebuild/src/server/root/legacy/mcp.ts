@@ -133,8 +133,8 @@ export async function callRootLegacyTool(viewer: RootMcpActor, name: string, arg
     case 'get_root_error': { const { id: errorId, ...extra } = args; reject(extra); return getRootError(id, typeof errorId === 'string' ? errorId : ''); }
     case 'set_root_error_resolved': {
       const { id: errorId, resolved, confirmation, ...extra } = args; reject(extra);
-      if (typeof errorId !== 'string' || typeof resolved !== 'boolean' || typeof confirmation !== 'string' || confirmation.length > synchronousPolicy('root.confirmationMaxCharacters') || confirmation !== `${resolved ? 'RESOLVE' : 'REOPEN'} ROOT ERROR ${errorId}`) throw new OperationError('invalid_request', 'Enter the exact error action confirmation.');
-      return setRootErrorResolved(id, errorId, resolved);
+      if (typeof errorId !== 'string' || typeof resolved !== 'boolean' || typeof confirmation !== 'string') throw new OperationError('invalid_request', 'Enter the exact error action confirmation.');
+      return setRootErrorResolved(id, errorId, resolved, confirmation);
     }
     case 'get_root_backup_status': reject(args); return readRootBackupStatus(id, undefined, cap);
     case 'get_root_diagnostics_summary': reject(args); return readRootDiagnosticsSummary(id, undefined, cap);

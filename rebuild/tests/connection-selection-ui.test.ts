@@ -53,3 +53,37 @@ describe('connection selection recovery', () => {
     expect(container.textContent).toContain('Reconnect needed');
   });
 });
+
+it.each(['retain', 'delete'] as const)('browser sends exact %s consent after final review', async mode => {
+  await act(async () => root.unmount()); root = createRoot(container);
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ counts: { channels: 1 }, ok: true }) });
+  vi.stubGlobal('fetch', fetch);
+  await act(async () => root.render(createElement(ConnectionManager, { sources: [source], platforms: [], canManage: true, statusLabels: labels, initialSourceId: 'source', initialAction: 'disconnect' })));
+  const clickText = async (text: string) => {
+    const button = [...document.querySelectorAll('button')].find(button => button.textContent === text)!;
+    expect(button).toBeTruthy(); await act(async () => button.click());
+  };
+  if (mode === 'delete') {
+    await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=radio]')[1]!.click());
+    await clickText('Preview related rows');
+  }
+  const label = mode === 'retain' ? 'Disconnect and retain data' : 'Disconnect and delete data';
+  await clickText(label);
+  expect(fetch.mock.calls.filter(([, options]) => options.method === 'DELETE')).toHaveLength(0);
+  await clickText(label);
+  const writes = fetch.mock.calls.filter(([, options]) => options.method === 'DELETE');
+  expect(writes).toHaveLength(1);
+  expect(JSON.parse(writes[0]![1].body)).toEqual({ socialAccountId: 'source', mode, confirmation: `DISCONNECT source ${mode === 'retain' ? 'RETAIN' : 'DELETE RELATED DATA'}` });
+});
+
+it('browser sends changed selections with the shared exact count confirmation', async () => {
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, changed: 1 }) });
+  vi.stubGlobal('fetch', fetch);
+  await act(async () => container.querySelector<HTMLInputElement>('input[type=checkbox]')!.click());
+  const save = [...container.querySelectorAll('button')].find(button => button.textContent === 'Save selections')!;
+  await act(async () => save.click());
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch.mock.calls[0]![0]).toBe('/api/connections');
+  expect(fetch.mock.calls[0]![1].method).toBe('PATCH');
+  expect(JSON.parse(fetch.mock.calls[0]![1].body)).toEqual({ items: [{ kind: 'target', id: 'channel', enabled: false }], confirmation: 'SET CONNECTION SELECTIONS 1' });
+});

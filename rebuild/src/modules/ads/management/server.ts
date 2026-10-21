@@ -71,6 +71,11 @@ export function parseNeutralOperation(raw: unknown): AdsNeutralOperation {
       countryCode: text(value.countryCode, /^[A-Z]{2}$/, defaultAdsText('validation013')), optimizationGoal: text(value.optimizationGoal, CREATE_TOKEN, defaultAdsText('validation014')),
     };
   }
+  if (type === 'ad.create') {
+    keys(['type', 'objectType', 'parentId', 'name', 'creativeId']);
+    if (objectType !== 'ad' || typeof value.name !== 'string') throw new OperationError('invalid_request', defaultAdsText('adCreateName'));
+    return { type, objectType, parentId: text(value.parentId, SAFE_ID, defaultAdsText('adCreateParent')), name: value.name.trim(), creativeId: text(value.creativeId, SAFE_ID, defaultAdsText('validation025')) };
+  }
   if (type === 'creative.create') {
     keys(['type', 'objectType', 'name', 'targetId', 'mediaId', 'format', 'message', 'title', 'linkUrl']);
     if (objectType !== 'creative' || typeof value.name !== 'string' || !['image', 'link'].includes(String(value.format)) || typeof value.message !== 'string' || typeof value.title !== 'string' || value.message.length > 5000 || value.title.length > 200) throw new OperationError('invalid_request', defaultAdsText('validation015'));
@@ -168,12 +173,13 @@ function ledgerObjectId(operation: AdsNeutralOperation) {
   if (operation.type === 'creative.create') return '@create-creative';
   if (operation.type === 'campaign.create') return '@create-campaign';
   if (operation.type === 'adset.create') return `@create-adset:${operation.parentId}`;
+  if (operation.type === 'ad.create') return `@create-ad:${operation.parentId}`;
   return operation.objectId;
 }
 
 /** Ad set creation needs unrestricted page scope (the parent can't be bounded to channel targets). */
 function assertCreationScope(operation: AdsNeutralOperation, pageScope: AdsPageScope, allowedTargetIds?: readonly string[]) {
-  if (operation.type === 'adset.create' && (!pageScope.all || allowedTargetIds !== undefined)) throw new OperationError('forbidden', defaultAdsText('validation027'));
+  if ((operation.type === 'adset.create' || operation.type === 'ad.create') && (!pageScope.all || allowedTargetIds !== undefined)) throw new OperationError('forbidden', defaultAdsText('validation027'));
 }
 
 async function assertOwnedObject(accountDbId: string, operation: AdsNeutralOperation) {
@@ -181,6 +187,11 @@ async function assertOwnedObject(accountDbId: string, operation: AdsNeutralOpera
   if (operation.type === 'adset.create') {
     const parent = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: 'campaign', objectId: operation.parentId }, select: { id: true } });
     if (!parent) throw new OperationError('not_found', await adsServiceText('service042'));
+    return;
+  }
+  if (operation.type === 'ad.create') {
+    const parent = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: 'adset', objectId: operation.parentId }, select: { id: true } });
+    if (!parent) throw new OperationError('not_found', await adsServiceText('adCreateParentMissing'));
     return;
   }
   const owned = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: objectLevel[operation.objectType], objectId: operation.objectId }, select: { id: true } });
@@ -251,7 +262,7 @@ export async function describeAdsManagement(actor: AdsManageActor, adAccountId: 
     const policy = await loadAdsManagementPolicy();
     return { canManage: true as const, operations: ctx.ops.operations.map(item => ({ ...item })), canListCreatives: Boolean(ctx.ops.listCreatives), limits: { nameMaxCharacters: policy.nameMaxCharacters, maxBudgetMinor: policy.maxBudgetMinor } };
   } catch (error) {
-    if (error instanceof OperationError && ['forbidden', 'unauthorized', 'unavailable', 'reconnect_required', 'not_found'].includes(error.code)) return { canManage: false as const, operations: [], canListCreatives: false };
+    if (error instanceof OperationError && ['forbidden', 'unauthorized', 'unavailable', 'reconnect_required', 'not_found'].includes(error.code)) return { canManage: false as const, needsReconnect: error.code === 'reconnect_required', operations: [], canListCreatives: false };
     throw error;
   }
 
@@ -288,11 +299,11 @@ export type AdsManagementOutcome =
   | { outcome: 'uncertain'; operationId: string; message: string };
 
 /** Present only when the provider proved a creation (or a recorded success is replayed). Never on pending/uncertain/rejected. */
-export type AdsCreatedObject = { objectType: 'campaign' | 'adset' | 'creative'; remoteId: string };
+export type AdsCreatedObject = { objectType: 'campaign' | 'adset' | 'ad' | 'creative'; remoteId: string };
 type AdsLedgerStatus = { status: string; remoteId: string | null; operationType?: string; objectType?: string };
 function createdFrom(ledger: { operationType?: string; objectType?: string }, remoteId: string | null): { created?: AdsCreatedObject } {
-  if (!remoteId || (ledger.operationType !== 'campaign.create' && ledger.operationType !== 'adset.create' && ledger.operationType !== 'creative.create')) return {};
-  return { created: { objectType: ledger.operationType === 'campaign.create' ? 'campaign' : ledger.operationType === 'creative.create' ? 'creative' : 'adset', remoteId } };
+  if (!remoteId || (ledger.operationType !== 'campaign.create' && ledger.operationType !== 'adset.create' && ledger.operationType !== 'ad.create' && ledger.operationType !== 'creative.create')) return {};
+  return { created: { objectType: ledger.operationType === 'campaign.create' ? 'campaign' : ledger.operationType === 'creative.create' ? 'creative' : ledger.operationType === 'ad.create' ? 'ad' : 'adset', remoteId } };
 }
 class AdsIntentNoLongerPending extends Error {
   constructor(readonly ledger: AdsLedgerStatus) { super(defaultAdsText('validation029')); }
@@ -400,7 +411,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
         assertCreationScope(operation, current.pageScope, actor.allowedTargetIds);
         await validateWithPolicy(current.ops, operation);
         creative = await creativeContext(actor, current, operation);
-        if (operation.type === 'adset.create') await assertOwnedObject(current.account.id, operation);
+        if (operation.type === 'adset.create' || operation.type === 'ad.create') await assertOwnedObject(current.account.id, operation);
         if (current.ops.confirmation(operation, { adAccountId: current.account.id, currency: current.account.currency }) !== expected) throw new OperationError('conflict', await adsServiceText('service056'));
         signal.throwIfAborted();
       } catch (error) {

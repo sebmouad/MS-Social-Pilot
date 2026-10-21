@@ -1,3 +1,4 @@
+import { readRootConfig, saveRootConfig } from '@/modules/root/server/configuration';
 import { listRootInboxDeletions, confirmRootInboxDeletion } from '../root/inbox-deletions';
 import { listRootPostDeletions, recordRootPostDeletionOutcome } from '../root/post-deletions';
 import { adoptRootLegacyPublication, finishRootPublicationProjection, listRootPublicationAttempts, recordRootPublicationOutcome } from '../root/publication-attempts';
@@ -5,8 +6,8 @@ import { z } from 'zod';
 import { listRootDiagnostics, runRootDiagnostics } from '../root/diagnostics';
 import { loadRootOperations } from '../root/operations';
 import { prisma } from '../data';
-import { readConfig, runtimeConfig, saveConfig } from '../config/store';
-import { CONFIG_BY_KEY, CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/config/registry';
+import { runtimeConfig } from '../config/store';
+import { CONFIG_SCHEMA_VERSION } from '@/lib/config/registry';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { setRootWorkspaceAccess } from '../root/workspace-access';
 import { listRootWorkspaces } from '../root/directory';
@@ -133,27 +134,25 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
       }
       case 'get_root_config':
         if (Object.keys(args).length) throw new OperationError('invalid_request', 'This read does not accept filters.');
-        return { schemaVersion: CONFIG_SCHEMA_VERSION, definitions: safeConfigShape(), values: await readConfig() };
+        return await readRootConfig(viewer.userId);
       case 'list_root_activity':
         return await listRootActivity(viewer.userId, args, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
       case 'create_root_workspace': {
         const parsed = z.object({ name: z.string().trim().min(1), ownerEmail: z.string().trim().email(), timezone: z.string().optional(), confirmation: z.string().min(1) }).strict().safeParse(args);
         if (!parsed.success) throw new OperationError('invalid_request', 'Enter a workspace name, owner email and exact confirmation.');
         const input = parsed.data;
-        if (input.name.length > await runtimeConfig('root.workspaceNameMaxCharacters')) throw new OperationError('invalid_request', 'Choose a shorter workspace name.');
-        return await createRootWorkspace(viewer.userId, { ...input, timezone: input.timezone ?? await runtimeConfig('root.defaultWorkspaceTimezone') });
+        return await createRootWorkspace(viewer.userId, input);
       }
       case 'rename_root_workspace': {
         const parsed = z.object({ workspaceId: z.string().min(1), name: z.string().trim().min(1), confirmation: z.string().min(1) }).strict().safeParse(args);
         if (!parsed.success) throw new OperationError('invalid_request', 'Choose a workspace, a name and the exact confirmation.');
         const input = parsed.data;
-        if (input.workspaceId.length > await runtimeConfig('root.identifierMaxCharacters') || input.name.length > await runtimeConfig('root.workspaceNameMaxCharacters')) throw new OperationError('invalid_request', 'Choose a valid workspace and a shorter name.');
         return await renameRootWorkspace(viewer.userId, input.workspaceId, input.name, input.confirmation);
       }
       case 'list_root_workspaces': {
         if (Object.keys(args).some(key => !['q', 'page'].includes(key)) || args.q !== undefined && typeof args.q !== 'string' || args.page !== undefined && (typeof args.page !== 'number' || !Number.isSafeInteger(args.page) || args.page < 1)) throw new OperationError('invalid_request', 'Choose a valid workspace query and page.');
         const cap = viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems'));
-        return await listRootWorkspaces({ q: args.q as string | undefined, page: args.page === undefined ? undefined : String(args.page) }, Math.min(cap, Number(await runtimeConfig('root.directoryPageSize'))));
+        return await listRootWorkspaces(viewer.userId, { q: args.q as string | undefined, page: args.page === undefined ? undefined : String(args.page) }, cap);
       }
       case 'set_root_workspace_access':
         if (Object.keys(args).some(key => !['workspaceId', 'suspended', 'confirmation'].includes(key)) || typeof args.workspaceId !== 'string' || !args.workspaceId.trim() || typeof args.suspended !== 'boolean' || typeof args.confirmation !== 'string' || !args.confirmation.length) throw new OperationError('invalid_request', 'Invalid workspace access change.');
@@ -162,16 +161,7 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
         const parsed = configInput.safeParse(args);
         if (!parsed.success) throw new OperationError('invalid_request', 'Enter a valid configuration change and exact confirmation.');
         const input = parsed.data;
-        const definition = CONFIG_BY_KEY.get(input.key);
-        if (!definition) throw new OperationError('invalid_request', 'Unknown configuration key.');
-        const clear = input.clear === true;
-        if (clear && definition.kind !== 'secret') throw new OperationError('invalid_request', 'Only secret values can be cleared.');
-        if (!clear && (!definition.schema.safeParse(input.value).success || definition.kind === 'secret' && input.value === '')) throw new OperationError('invalid_request', 'Choose a valid value for this setting, or use its clear-secret action.');
-        const expected = `${clear ? 'CLEAR ROOT SECRET' : 'SET ROOT CONFIG'} ${input.key}`;
-        if (input.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat the call with confirmation exactly: ${expected}`);
-        // The shared service commits the setting and value-free audit atomically.
-        // A separate after-commit MCP audit must not turn a saved change into a failure.
-        await saveConfig({ key: input.key, value: input.value, clear }, viewer.userId);
+        await saveRootConfig(input, viewer.userId);
         return { key: input.key, saved: true, schemaVersion: CONFIG_SCHEMA_VERSION };
       }
       default: throw new OperationError('invalid_request', 'Unknown installation tool.');

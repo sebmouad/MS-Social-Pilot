@@ -28,7 +28,7 @@ export function VerifyEmailForm({ locale = 'en' }: { locale?: AuthLocale }) {
       try {
         const response = await fetch('/api/auth/verify-email', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ token }) });
         const body = await response.json().catch(() => ({})) as { error?: string };
-        if (!response.ok) { setError(response.status === 429 ? copy.tooMany : body.error ?? t.linkInvalid); setState('failed'); return; }
+        if (!response.ok) { setError(response.status === 429 ? copy.tooMany : (response.status < 500 ? body.error : undefined) ?? t.linkInvalid); setState('failed'); return; }
         setState('confirmed');
       } catch { setError(copy.offline); setState('failed'); }
     })();
@@ -44,7 +44,7 @@ export function VerifyEmailForm({ locale = 'en' }: { locale?: AuthLocale }) {
     try {
       const response = await fetch('/api/auth/verify-email/resend', { method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ email: String(new FormData(event.currentTarget).get('email') ?? '') }) });
       const body = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) { setError(response.status === 429 ? copy.tooMany : body.error ?? t.sendFailed); return; }
+      if (!response.ok) { setError(response.status === 429 ? copy.tooMany : (response.status < 500 ? body.error : undefined) ?? t.sendFailed); return; }
       setState('resent');
     } catch { setError(copy.offline); }
     finally { setPending(false); }

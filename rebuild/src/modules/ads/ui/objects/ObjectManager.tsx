@@ -18,9 +18,9 @@ type Detail = {
   totals: { spend: number; impressions: number; clicks: number; cpc: number | null; ctr: number | null; cpm: number | null };
   daily: Array<{ date: string; spend: number; impressions: number; clicks: number }>;
   live: { available: boolean; configuredStatus?: string | null; effectiveStatus?: string | null };
-  management: { available: boolean; canManage: boolean; operations: AdsOperationSupport[] };
+  management: { available: boolean; canManage: boolean; needsReconnect?: boolean; operations: AdsOperationSupport[] };
 };
-type Capabilities = { canManage: boolean; canListCreatives?: boolean; operations: AdsOperationSupport[]; limits?: AdsOpsLimits };
+type Capabilities = { canManage: boolean; needsReconnect?: boolean; canListCreatives?: boolean; operations: AdsOperationSupport[]; limits?: AdsOpsLimits };
 type Creative = { id: string; name: string | null; title: string | null; body: string | null };
 type Pending = {
   operation: AdsNeutralOperation;
@@ -66,6 +66,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
 
   const supports = (capabilities?.operations ?? detail?.management.operations ?? []).filter(operation => operation.id !== 'campaign.create' && operation.id !== 'adset.create');
   const canManage = capabilities?.canManage ?? detail?.management.canManage ?? false;
+  const needsReconnect = !canManage && (capabilities?.needsReconnect ?? detail?.management.needsReconnect ?? false);
   const limits = capabilities?.limits;
   const supportFor = (opId: string) => supports.find(item => item.id === opId && item.objectTypes.includes(level));
 
@@ -195,7 +196,8 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
         <dl className="ads-compare-grid"><div><dt>{t('text019')}</dt><dd>{detail.currency ? `${detail.currency} ` : ''}{number.format(detail.totals.spend)}</dd></div><div><dt>{t('text020')}</dt><dd>{number.format(detail.totals.impressions)}</dd></div><div><dt>{t('text022')}</dt><dd>{number.format(detail.totals.clicks)}</dd></div><div><dt>{t('text064')}</dt><dd>{detail.totals.cpc === null ? t('text094') : number.format(detail.totals.cpc)}</dd></div><div><dt>{t('text063')}</dt><dd>{detail.totals.ctr === null ? t('text094') : `${number.format(detail.totals.ctr)}%`}</dd></div><div><dt>{t('text065')}</dt><dd>{detail.totals.cpm === null ? t('text094') : number.format(detail.totals.cpm)}</dd></div></dl>
         <details><summary>{t('text095')}</summary><ul>{detail.daily.map(day => <li key={day.date}>{t('objectDailyLine', { date: day.date, currency: detail.currency ? `${detail.currency} ` : '', spend: number.format(day.spend), impressions: number.format(day.impressions), clicks: number.format(day.clicks) })}</li>)}</ul></details>
         <p className="small-note">{detail.live.available ? t('text249', { value0: detail.live.configuredStatus ?? t('text094'), value1: detail.live.effectiveStatus ?? t('text094') }) : t('text098')}</p>
-        {!canManage || !supports.length ? <p className="small-note">{t('viewOnlyObject', { kind: t(level) })}</p> : operationBlocked ? <p className="small-note">{t('text101')}<a href="/ads/objects#changes">{t('text102')}</a>{t('text103')}</p> : <>
+        {needsReconnect ? <p className="small-note" role="note">{t('needsReconnectObject', { kind: t(level) })} <a href="/settings/connections">{t('needsReconnectAction')}</a></p>
+          : !canManage || !supports.length ? <p className="small-note">{t('viewOnlyObject', { kind: t(level) })}</p> : operationBlocked ? <p className="small-note">{t('text101')}<a href="/ads/objects#changes">{t('text102')}</a>{t('text103')}</p> : <>
           {statusSupport && statusInput?.kind === 'choice' ? <div className="ads-object-manager__row">{statusInput.options.map(option => {
             if (option.value !== 'paused' && option.value !== 'active') return null;
             const status = option.value as 'paused' | 'active';

@@ -43,7 +43,7 @@ const host: AdsOpsHost = {
   operations: [{ id: 'status.set', objectTypes: ['campaign', 'ad'], spendChanging: true, label: 'Pause or resume' }, { id: 'rename', objectTypes: ['campaign'], spendChanging: false, label: 'Rename' },
     { id: 'campaign.create', objectTypes: ['campaign'], spendChanging: true, label: 'Create campaign' }, { id: 'adset.create', objectTypes: ['adset'], spendChanging: true, label: 'Create ad set' }],
   validate: op => { if (op.type === 'rename' && !op.name) throw new OperationError('invalid_request', 'Enter a name.'); },
-  confirmation: op => op.type === 'campaign.create' ? `CREATE PAUSED CAMPAIGN ${op.name}` : op.type === 'adset.create' ? `CREATE PAUSED AD SET ${op.name} UNDER ${op.parentId}` : op.type === 'creative.create' ? `CREATE CREATIVE ${op.name}` : `CONFIRM ${op.type === 'status.set' ? (op.status === 'paused' ? 'pause' : 'resume') : op.type} ${op.objectId}`,
+  confirmation: op => op.type === 'campaign.create' ? `CREATE PAUSED CAMPAIGN ${op.name}` : op.type === 'adset.create' ? `CREATE PAUSED AD SET ${op.name} UNDER ${op.parentId}` : op.type === 'creative.create' ? `CREATE CREATIVE ${op.name}` : op.type === 'ad.create' ? `CREATE PAUSED AD ${op.name} UNDER ${op.parentId} WITH ${op.creativeId}` : `CONFIRM ${op.type === 'status.set' ? (op.status === 'paused' ? 'pause' : 'resume') : op.type} ${op.objectId}`,
   execute: (...args) => execute(...args), classifyFailure: error => classify(error),
   listCreatives: vi.fn(async () => ({ items: [], next: null })),
 };
@@ -247,7 +247,7 @@ describe('Ads management service', () => {
   it('fails closed when no module registered its operations', async () => {
     clearAdsOpsHosts();
     await expect(performAdsManagement(actor, { adAccountId: 'acc1', operation: pause, confirmation: CONFIRM })).rejects.toMatchObject({ code: 'unavailable' });
-    expect(await describeAdsManagement(actor, 'acc1')).toEqual({ canManage: false, operations: [], canListCreatives: false });
+    expect(await describeAdsManagement(actor, 'acc1')).toEqual({ canManage: false, needsReconnect: false, operations: [], canListCreatives: false });
   });
 
   it('previews without writing and advertises capabilities only to managers', async () => {

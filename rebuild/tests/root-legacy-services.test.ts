@@ -61,6 +61,14 @@ beforeEach(() => {
   actor(true);
 });
 
+describe('Root error confirmation service boundary', () => {
+  it('refuses an unconfirmed direct error state change', async () => {
+    actor();
+    await expect(setRootErrorResolved('root', 'e1', true)).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(writes()).toEqual([]);
+  });
+});
+
 describe('Root-only authorization', () => {
   const calls: Array<[string, () => Promise<unknown>]> = [
     ['listRootPlans', () => listRootPlans('u')],
@@ -339,16 +347,16 @@ describe('error browser', () => {
 
   it('resolves and reopens with audit, and does nothing when the state already matches', async () => {
     when(/FROM error_events WHERE id/, [{ id: 'e1', resolvedAt: null }]);
-    expect(await setRootErrorResolved('root', 'e1', true)).toMatchObject({ changed: true });
+    expect(await setRootErrorResolved('root', 'e1', true, 'RESOLVE ROOT ERROR e1')).toMatchObject({ changed: true });
     expect(audits()[0]!.values[2]).toBe('root.error_resolved');
     h.executed.length = 0;
-    expect(await setRootErrorResolved('root', 'e1', false)).toMatchObject({ changed: false });
+    expect(await setRootErrorResolved('root', 'e1', false, 'REOPEN ROOT ERROR e1')).toMatchObject({ changed: false });
     expect(h.executed).toHaveLength(0);
     h.rules.length = 0; when(/FROM error_events WHERE id/, [{ id: 'e1', resolvedAt: new Date() }]);
-    await setRootErrorResolved('root', 'e1', false);
+    await setRootErrorResolved('root', 'e1', false, 'REOPEN ROOT ERROR e1');
     expect(audits()[0]!.values[2]).toBe('root.error_reopened');
     h.rules.length = 0; when(/FROM error_events WHERE id/, []);
-    await expect(setRootErrorResolved('root', 'zz', true)).rejects.toMatchObject({ code: 'not_found' });
+    await expect(setRootErrorResolved('root', 'zz', true, 'RESOLVE ROOT ERROR zz')).rejects.toMatchObject({ code: 'not_found' });
   });
 });
 

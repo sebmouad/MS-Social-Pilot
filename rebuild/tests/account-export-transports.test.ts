@@ -7,6 +7,7 @@ vi.mock('@/server/context', () => ({ requireViewer: m.viewer }));
 vi.mock('@/server/request-origin', () => ({ requestOrigin: () => 'https://example.test' }));
 vi.mock('@/modules/settings/server/account', () => ({}));
 vi.mock('@/modules/settings/server/account-security', () => ({}));
+import { GET } from '@/app/api/settings/account/export/route';
 import { accountHttp } from '@/modules/settings/server/account-http';
 import { ACCOUNT_EXPORT_MCP } from '@/modules/settings/server/account-export-mcp';
 const actor = { userId: 'self', workspaceId: 'w1', sessionTokenHash: 'session-hash' };
@@ -18,9 +19,9 @@ beforeEach(() => {
   const content = '{"name":"Émilie"}';
   m.export.mockResolvedValue({ mimeType: 'application/json', content, bytes: Buffer.byteLength(content) });
 });
-describe('account export transport adapters (host registration pending)', () => {
+describe('registered account export transport adapters', () => {
   it('returns an uncached JSON attachment through the same service', async () => {
-    const response = await accountHttp(new Request('https://example.test/api/settings/account/export'), 'export');
+    const response = await GET(new Request('https://example.test/api/settings/account/export'));
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(response.headers.get('content-disposition')).toBe('attachment');

@@ -12,6 +12,8 @@ const db = vi.hoisted(() => ({
   pageInsight: { findMany: vi.fn() },
   conversation: { findMany: vi.fn() },
   postComment: { findMany: vi.fn() },
+  appSetting: { upsert: vi.fn() },
+  $queryRaw: vi.fn(),
   $executeRaw: vi.fn(),
   $transaction: vi.fn(),
   membership: { findUnique: vi.fn() },
@@ -351,7 +353,7 @@ describe('MCP workspace boundaries', () => {
   it('routes Root workspace operations through shared services with bounded reads and strict input types', async () => {
     const invoke = (name: string, args: Record<string, unknown>) => handleMcpMessage({ ...viewer, isInstanceOwner: true }, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
     await invoke('list_root_workspaces', { q: 'Studio', page: 2 });
-    expect(rootWorkspaces.list).toHaveBeenCalledWith({ q: 'Studio', page: '2' }, 25);
+    expect(rootWorkspaces.list).toHaveBeenCalledWith('user-a', { q: 'Studio', page: '2' }, 100);
     const invalid = await (await invoke('set_root_workspace_access', { workspaceId: 'workspace-b', suspended: 'true', confirmation: 'yes' })).json();
     expect(invalid.result.structuredContent.code).toBe('invalid_request');
     expect(rootWorkspaces.change).not.toHaveBeenCalled();
@@ -990,7 +992,7 @@ describe('MCP workspace boundaries', () => {
   it('uses the existing selection mutation and prevents non-admin selection changes', async () => {
     const response = await call('set_connection_selection', { kind: 'target', id: 'page-a', enabled: false, confirmation: 'SET CONNECTION target page-a DISABLED' });
     expect((await response.json()).result.structuredContent).toEqual({ kind: 'target', id: 'page-a', enabled: false, mcpAuditRecorded: true });
-    expect(mutations.select).toHaveBeenCalledWith(viewer, [{ kind: 'target', id: 'page-a', enabled: false }]);
+    expect(mutations.select).toHaveBeenCalledWith(expect.objectContaining({ userId: viewer.userId, workspaceId: viewer.workspaceId }), [{ kind: 'target', id: 'page-a', enabled: false }]);
 
     const editor = { ...viewer, role: 'editor' };
     const denied = await handleMcpMessage(editor, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'set_connection_selection', arguments: { kind: 'target', id: 'page-a', enabled: false, confirmation: 'SET CONNECTION target page-a DISABLED' } } });
@@ -1403,13 +1405,14 @@ describe('MCP workspace boundaries', () => {
   });
 
   it('requires an exact Root confirmation and reuses registry validation and audit', async () => {
+    db.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
     const root = { ...viewer, isInstanceOwner: true };
     const missing = await handleMcpMessage(root, { jsonrpc: '2.0', id: 14, method: 'tools/call', params: { name: 'set_root_config', arguments: { key: 'mcp.enabled', value: false } } });
     expect((await missing.json()).result.isError).toBe(true);
     expect(rootConfig.save).not.toHaveBeenCalled();
     const saved = await handleMcpMessage(root, { jsonrpc: '2.0', id: 15, method: 'tools/call', params: { name: 'set_root_config', arguments: { key: 'mcp.enabled', value: false, confirmation: 'SET ROOT CONFIG mcp.enabled' } } });
     expect((await saved.json()).result.structuredContent).toMatchObject({ key: 'mcp.enabled', saved: true });
-    expect(rootConfig.save).toHaveBeenCalledWith({ key: 'mcp.enabled', value: false, clear: false }, 'user-a');
-    expect(db.$executeRaw).not.toHaveBeenCalled(); // Domain service owns its atomic audit.
+    expect(db.appSetting.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { key: 'mcp.enabled' }, create: expect.objectContaining({ value: false, encrypted: false }) }));
+    expect(db.$executeRaw).toHaveBeenCalledOnce(); // Shared service owns the atomic audit.
   });
 });

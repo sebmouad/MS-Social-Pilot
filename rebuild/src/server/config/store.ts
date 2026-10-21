@@ -1,17 +1,10 @@
-import { applyConnectionHealthCopy } from '@/lib/connection-health';
-import { applySynchronousPolicy } from '@/server/synchronous-policy';
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { z } from 'zod';
-import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, type ConfigKey, type ConfigValue } from '@/lib/config/registry';
+import { createDecipheriv } from 'node:crypto';
+import { CONFIG_BY_KEY, CONFIG_REGISTRY, type ConfigKey, type ConfigValue } from '@/lib/config/registry';
 import { prisma } from '@/server/data';
-import { Prisma } from '../../../generated/client';
 
-// AES-256-GCM envelope v1 invariants: key width and recommended nonce width.
+// AES-256-GCM envelope v1 invariant: key width.
 // These cannot vary without a separately versioned encryption format.
 const CONFIG_SECRET_KEY_BYTES = 32;
-const CONFIG_SECRET_IV_BYTES = 12;
-// Audit identifiers use random entropy rather than an operational record limit.
-const CONFIG_AUDIT_ID_BYTES = 12;
 
 const secretKey = () => {
   const encoded = process.env.ENCRYPTION_KEY;
@@ -20,13 +13,6 @@ const secretKey = () => {
   if (key.length !== CONFIG_SECRET_KEY_BYTES) throw new Error('ENCRYPTION_KEY must decode to 32 bytes.');
   return key;
 };
-
-function encrypt(value: string): string {
-  const iv = randomBytes(CONFIG_SECRET_IV_BYTES);
-  const cipher = createCipheriv('aes-256-gcm', secretKey(), iv);
-  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-  return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join(':');
-}
 
 function decrypt(value: string): string {
   const parts = value.split(':');
@@ -95,46 +81,4 @@ export async function readConfig() {
   });
 }
 
-const writeSchema = z.object({ key: z.string(), value: z.unknown(), clear: z.boolean().optional() });
-export async function saveConfig(input: unknown, actorId: string) {
-  const requestResult = writeSchema.safeParse(input);
-  if (!requestResult.success) throw new Error('Invalid value: expected a key and value.');
-  const request = requestResult.data;
-  const definition = CONFIG_BY_KEY.get(request.key as ConfigKey);
-  if (!definition) throw new Error('Unknown configuration key.');
-  if (request.clear && definition.kind !== 'secret') throw new Error('Only secret values can be cleared.');
-  if (definition.kind === 'secret' && request.clear) {
-    await prisma.$transaction(async (tx) => {
-      await tx.appSetting.deleteMany({ where: { key: definition.key } });
-      await audit(tx, actorId, definition.key, 'cleared');
-    });
-    return;
-  }
-  const checked = definition.schema.safeParse(request.value);
-  if (!checked.success) throw new Error(checked.error.issues[0]?.message ?? 'Invalid value.');
-  if (definition.kind === 'secret' && checked.data === '') throw new Error('Enter a secret or use Clear saved secret.');
-  const encrypted = definition.kind === 'secret';
-  const value = encrypted ? encrypt(String(checked.data)) : checked.data;
-  await prisma.$transaction(async (tx) => {
-    await tx.appSetting.upsert({
-      where: { key: definition.key },
-      create: { key: definition.key, value, encrypted, updatedAt: new Date() },
-      update: { value, encrypted, updatedAt: new Date() },
-    });
-    await audit(tx, actorId, definition.key, encrypted ? 'secret updated' : 'value updated');
-  });
-  applySynchronousPolicy(definition.key, checked.data);
-  if (definition.key === 'connections.healthCopy') applyConnectionHealthCopy(checked.data);
-  if (definition.key === 'app.publicOrigin' || definition.key === 'app.developmentOrigins') await (await import('@/server/request-origin')).refreshPublicOrigin();
-}
-
-async function audit(tx: Prisma.TransactionClient, actorId: string, key: string, change: string) {
-  // Existing installation-wide audit table from the legacy schema. Parameterized
-  // values keep the query safe; the secret itself is never included in detail.
-  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`cfg_${randomBytes(CONFIG_AUDIT_ID_BYTES).toString('hex')}`}, ${actorId}, 'config.changed', ${JSON.stringify(configAuditDetail(key, change))}::jsonb, NOW())`;
-}
-
-/** Stable, value-free audit payload for validating Root setting changes. */
-export function configAuditDetail(key: string, change: string) {
-  return { key, change, schemaVersion: CONFIG_SCHEMA_VERSION };
-}
+export { saveRootConfig as saveConfig, configAuditDetail } from '@/modules/root/server/configuration';

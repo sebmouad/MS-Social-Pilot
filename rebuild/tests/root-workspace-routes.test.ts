@@ -21,22 +21,22 @@ describe('Root workspace mutation routes', () => {
   });
 
   it('rejects cross-origin create and rename before actor lookup', async () => {
-    expect((await POST(create('https://evil.example'))).status).toBe(403);
+    expect((await POST(create('https://evil.example'), undefined)).status).toBe(403);
     expect((await PATCH(rename('https://evil.example'), { params: Promise.resolve({ id: 'ws-1' }) })).status).toBe(403);
     expect(state.currentRootActor).not.toHaveBeenCalled();
   });
 
   it('restricts both routes to installation owner', async () => {
     state.currentRootActor.mockResolvedValue({ id: 'viewer', isInstanceOwner: false });
-    expect((await POST(create('https://app.example.test'))).status).toBe(404);
+    expect((await POST(create('https://app.example.test'), undefined)).status).toBe(404);
     expect((await PATCH(rename('https://app.example.test'), { params: Promise.resolve({ id: 'ws-1' }) })).status).toBe(404);
     expect(state.createRootWorkspace).not.toHaveBeenCalled();
     expect(state.renameRootWorkspace).not.toHaveBeenCalled();
   });
 
   it('applies Root defaults and passes validated changes to service', async () => {
-    expect((await POST(create('https://app.example.test'))).status).toBe(201);
-    expect(state.createRootWorkspace).toHaveBeenCalledWith('root', { name: 'Acme', ownerEmail: 'owner@example.com', confirmation: 'CREATE Acme FOR owner@example.com', timezone: 'UTC' });
+    expect((await POST(create('https://app.example.test'), undefined)).status).toBe(201);
+    expect(state.createRootWorkspace).toHaveBeenCalledWith('root', { name: 'Acme', ownerEmail: 'owner@example.com', confirmation: 'CREATE Acme FOR owner@example.com' });
     expect((await PATCH(rename('https://app.example.test'), { params: Promise.resolve({ id: 'ws-1' }) })).status).toBe(200);
     expect(state.renameRootWorkspace).toHaveBeenCalledWith('root', 'ws-1', 'Acme Studio', 'RENAME Acme TO Acme Studio');
   });

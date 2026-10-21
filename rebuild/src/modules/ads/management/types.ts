@@ -5,7 +5,7 @@
  */
 export type AdsObjectType = 'campaign' | 'adset' | 'ad';
 export type AdsManagedObjectType = AdsObjectType | 'creative';
-export type AdsOperationId = 'status.set' | 'budget.set' | 'rename' | 'creative.assign' | 'delete' | 'campaign.create' | 'adset.create' | 'creative.create';
+export type AdsOperationId = 'status.set' | 'budget.set' | 'rename' | 'creative.assign' | 'delete' | 'campaign.create' | 'adset.create' | 'ad.create' | 'creative.create';
 
 export type AdsNeutralOperation =
   | { type: 'status.set'; objectType: AdsObjectType; objectId: string; status: 'active' | 'paused' }
@@ -17,6 +17,8 @@ export type AdsNeutralOperation =
   | { type: 'campaign.create'; objectType: 'campaign'; name: string; objective: string }
   /** parentId is an existing campaign remote id; the shared service verifies it belongs to the account from stored history. */
   | { type: 'adset.create'; objectType: 'adset'; parentId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }
+  /** parentId is an existing ad set remote id verified from stored history; creativeId is an existing account creative. The platform module always creates the ad paused. */
+  | { type: 'ad.create'; objectType: 'ad'; parentId: string; name: string; creativeId: string }
   /** Stored workspace image and selected channel identity; never an arbitrary image URL or remote identity. No delivery or assignment. */
   | { type: 'creative.create'; objectType: 'creative'; name: string; targetId: string; mediaId: string; format: 'image' | 'link'; message: string; title: string; linkUrl?: string };
 
@@ -65,7 +67,7 @@ export interface AdsOpsHost {
 }
 
 export const AD_OBJECT_TYPES: readonly AdsObjectType[] = ['campaign', 'adset', 'ad'];
-export const AD_OPERATION_IDS: readonly AdsOperationId[] = ['status.set', 'budget.set', 'rename', 'creative.assign', 'delete', 'campaign.create', 'adset.create', 'creative.create'];
+export const AD_OPERATION_IDS: readonly AdsOperationId[] = ['status.set', 'budget.set', 'rename', 'creative.assign', 'delete', 'campaign.create', 'adset.create', 'ad.create', 'creative.create'];
 
-export type AdsCreationOperation = Extract<AdsNeutralOperation, { type: 'campaign.create' | 'adset.create' | 'creative.create' }>;
-export function isCreationOperation(operation: AdsNeutralOperation): operation is AdsCreationOperation { return operation.type === 'campaign.create' || operation.type === 'adset.create' || operation.type === 'creative.create'; }
+export type AdsCreationOperation = Extract<AdsNeutralOperation, { type: 'campaign.create' | 'adset.create' | 'ad.create' | 'creative.create' }>;
+export function isCreationOperation(operation: AdsNeutralOperation): operation is AdsCreationOperation { return operation.type === 'campaign.create' || operation.type === 'adset.create' || operation.type === 'ad.create' || operation.type === 'creative.create'; }

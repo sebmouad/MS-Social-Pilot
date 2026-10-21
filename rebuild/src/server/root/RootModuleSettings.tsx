@@ -1,3 +1,4 @@
+import { readRootConfig } from '@/modules/root/server/configuration';
 import { headers } from 'next/headers';
 import { rootCopyLocale } from '@/server/root/legacy/copy';
 import { ROOT_INTERFACE_COPY, type RootInterfaceCatalog } from '@/lib/config/root-interface-copy';
@@ -16,11 +17,11 @@ import { requireRootPage } from '@/server/config/access';
 export async function RootModuleSettings({ kind, id, title, description, children, groupPrefix }: {
   kind: 'product' | 'platform'; id: string; title: string; description: string; children?: ReactNode; groupPrefix?: string;
 }) {
-  await requireRootPage();
+  const actor = await requireRootPage();
   const definitions = safeConfigShape().filter(setting => setting.owner.kind === kind && setting.owner.id === id)
     .sort((a, b) => Number(!a.key.startsWith('entitlements.')) - Number(!b.key.startsWith('entitlements.')));
   let values: Awaited<ReturnType<typeof readConfig>> | null = null;
-  try { values = await readConfig(); } catch { /* Keep the Root navigation available during a store outage. */ }
+  try { values = (await readRootConfig(actor.id)).values; } catch { /* Keep the Root navigation available during a store outage. */ }
   const locale = rootCopyLocale((await headers()).get('accept-language'));
   const interfaceCopy = ((values?.find(value => value.key === 'root.interfaceCopy')?.value ?? ROOT_INTERFACE_COPY) as RootInterfaceCatalog)[locale];
   const keys = new Set(definitions.map(definition => definition.key));

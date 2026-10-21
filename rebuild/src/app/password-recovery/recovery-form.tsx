@@ -37,7 +37,7 @@ export function PasswordRecoveryForm({ locale = 'en' }: { locale?: AuthLocale })
     setReady(true);
   }, []);
 
-  const failure = (result: Result, fallback: string) => result.status === 429 ? copy.tooMany : result.status === undefined ? copy.offline : result.error ?? fallback;
+  const failure = (result: Result, fallback: string) => result.status === 429 ? copy.tooMany : result.status === undefined ? copy.offline : ((result.status ?? 0) < 500 ?result.error : undefined) ?? fallback;
 
   async function requestLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(null);

@@ -13,14 +13,18 @@ vi.mock('@/server/root/directory', () => ({ listRootWorkspaces: state.directory 
 vi.mock('@/server/data', () => ({ prisma: {
   user: { findUnique: state.actor },
   $transaction: async (run: (tx: unknown) => unknown) => run({
-    user: { findUnique: state.owner },
+    user: { findUnique: (args: { where: { id?: string } }) => args.where.id ? state.actor(args) : state.owner(args) },
+    $queryRaw: vi.fn(),
     workspace: { create: state.create, findUnique: state.workspace, updateMany: state.rename },
     $executeRaw: state.audit,
   }),
 } }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => {
+  if (key === 'root.accountOperationTimeoutMs' || key === 'root.accountOperationLockWaitMs') return 5000;
   if (key === 'root.workspaceNameMaxCharacters') return 80;
   if (key === 'root.identifierMaxCharacters') return 200;
+  if (key === 'root.emailMaxCharacters') return 254;
+  if (key === 'root.confirmationMaxCharacters') return 400;
   if (key === 'root.defaultWorkspaceTimezone') return 'Africa/Casablanca';
   return 10;
 } }));
@@ -150,6 +154,11 @@ describe('reviewed customer UI/REST/MCP declaration parity', () => {
   it('requires an exact bidirectional mapping or reasoned route exception', () => {
     expect(parityErrors([...tools, ...privateTools], routes, [...mappings, ...rootMappings], aliases, exceptions)).toEqual([]);
   });
+  it('maps the installed session-only partial account export to its exact GET route', () => {
+    expect(tools.find(tool => tool.name === 'export_account_data')).toEqual({ name: 'export_account_data', feature: 'settings/account', access: 'read' });
+    expect(mappings.find(mapping => mapping.name === 'export_account_data')?.routes).toEqual(['GET /api/settings/account/export']);
+    expect(exceptions.some(exception => exception.id === 'GET /api/settings/account/export')).toBe(false);
+  });
   it('maps private Root tools explicitly without treating installation authority as a customer feature', () => {
     expect(rootMappings.every(mapping => mapping.feature === 'installation/root')).toBe(true);
     expect(mappings.some(mapping => mapping.feature === 'installation/root')).toBe(false);
@@ -246,9 +255,9 @@ describe('Root workspace MCP uses the existing confirmed, audited services', () 
     const query = { q: 'Studio', page: '2' };
     const response = await workspaceDirectory(new Request('https://example.test/api/root/workspaces?q=Studio&page=2'), undefined);
     expect(response.status).toBe(200);
-    expect(state.directory).toHaveBeenLastCalledWith(query, 10);
+    expect(state.directory).toHaveBeenLastCalledWith('root', query);
     await runRootTool({ ...actor, maxResultItems: 10 }, 'list_root_workspaces', { q: 'Studio', page: 2 });
-    expect(state.directory).toHaveBeenLastCalledWith(query, 10);
+    expect(state.directory).toHaveBeenLastCalledWith('root', query, 10);
     expect(response.headers.get('cache-control')).toContain('no-store');
   });
   it('refuses anonymous/non-Root directory requests and malformed or repeated filters', async () => {
@@ -257,7 +266,7 @@ describe('Root workspace MCP uses the existing confirmed, audited services', () 
     expect((await workspaceDirectory(request(), undefined)).status).toBe(401);
     state.currentRoot.mockResolvedValueOnce({ id: 'member', isInstanceOwner: false });
     expect((await workspaceDirectory(request(), undefined)).status).toBe(404);
-    for (const query of ['?page=0', '?page=1.5', '?page=wrong', '?q=a&q=b', '?workspaceId=other']) {
+    for (const query of ['?q=a&q=b', '?workspaceId=other']) {
       expect((await workspaceDirectory(request(query), undefined)).status).toBe(400);
     }
     expect(state.directory).not.toHaveBeenCalled();

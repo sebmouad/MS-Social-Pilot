@@ -22,6 +22,7 @@ export const FACEBOOK_ADS_OPERATIONS: readonly AdsOperationSupport[] = [
   { id: 'delete', objectTypes: ['campaign', 'adset', 'ad'], spendChanging: false, irreversible: true, label: 'Delete' },
   { id: 'creative.create', objectTypes: ['creative'], spendChanging: false, label: 'Create unattached creative' },
   { id: 'campaign.create', objectTypes: ['campaign'], spendChanging: true, label: 'Create paused campaign', inputs: [{ name: 'name', kind: 'text' }, { name: 'objective', kind: 'choice', options: FACEBOOK_CAMPAIGN_OBJECTIVES }] },
+  { id: 'ad.create', objectTypes: ['ad'], spendChanging: true, label: 'Create paused ad', inputs: [{ name: 'name', kind: 'text' }, { name: 'creativeId', kind: 'creative-ref' }] },
   { id: 'adset.create', objectTypes: ['adset'], spendChanging: true, label: 'Create paused ad set', inputs: [
     { name: 'name', kind: 'text' }, { name: 'budget', kind: 'money-minor', budgetKinds: ['daily'] },
     { name: 'countryCode', kind: 'choice', options: facebookCountryOptions() }, { name: 'optimizationGoal', kind: 'choice', options: FACEBOOK_ADSET_OPTIMIZATION_GOALS },
@@ -52,6 +53,12 @@ export function validateFacebookAdsOperation(operation: AdsNeutralOperation, lim
   const support = FACEBOOK_ADS_OPERATIONS.find(item => item.id === operation.type);
   if (!support || !support.objectTypes.includes(operation.objectType)) throw new OperationError('unavailable', 'This change is not available.');
   if (operation.type === 'campaign.create' || operation.type === 'adset.create') return validateCreation(operation, nameMax, limits);
+  if (operation.type === 'ad.create') {
+    if (operation.objectType !== 'ad' || typeof operation.name !== 'string' || !validName(operation.name, nameMax)) throw new OperationError('invalid_request', `Names must contain 1 to ${nameMax} printable characters.`);
+    if (typeof operation.parentId !== 'string' || !SAFE_ID.test(operation.parentId)) throw new OperationError('invalid_request', 'Choose a valid parent ad set.');
+    if (typeof operation.creativeId !== 'string' || !SAFE_ID.test(operation.creativeId)) throw new OperationError('invalid_request', 'Choose a valid creative.');
+    return;
+  }
   if (operation.type === 'creative.create') {
     if (!validName(operation.name, nameMax) || !SAFE_ID.test(operation.targetId) || !/^[A-Za-z0-9_.-]{1,150}$/.test(operation.mediaId) || !['image', 'link'].includes(operation.format) || operation.message.length > 5000 || operation.title.length > 200) throw new OperationError('invalid_request', 'Enter valid creative details.');
     if (operation.format === 'link') {
@@ -74,6 +81,7 @@ export function facebookAdsConfirmation(operation: AdsNeutralOperation, context:
   }
   const where = `IN ACCOUNT ${context.adAccountId}`;
   if (operation.type === 'campaign.create') return `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(operation.name.trim())} ${where} WITH OBJECTIVE ${operation.objective}`;
+  if (operation.type === 'ad.create') return `CREATE PAUSED FACEBOOK AD ${JSON.stringify(operation.name.trim())} UNDER AD SET ${operation.parentId} ${where} WITH CREATIVE ${operation.creativeId}`;
   if (operation.type === 'adset.create') return `CREATE PAUSED FACEBOOK AD SET ${JSON.stringify(operation.name.trim())} UNDER CAMPAIGN ${operation.parentId} ${where} WITH DAILY BUDGET ${operation.dailyBudgetMinor} MINOR UNITS${context.currency ? ` ${context.currency}` : ''} TARGETING ${operation.countryCode} OPTIMIZED FOR ${operation.optimizationGoal}`;
   const subject = `FACEBOOK ${label(operation.objectType)} ${operation.objectId}`;
   switch (operation.type) {
@@ -122,6 +130,22 @@ async function executeCreation(transport: FacebookAdsTransport, token: string, c
   return { remoteId: result.id };
 }
 
+/** An ad starts paused under a verified ad set with a verified existing creative; status is never taken from the caller. */
+async function executeAdCreation(transport: FacebookAdsTransport, token: string, context: AdsOpsContext, operation: Extract<AdsNeutralOperation, { type: 'ad.create' }>) {
+  // A campaign or ad has no sibling shape of an ad set: an ad set carries a campaign_id and no adset_id.
+  const parent = await transport.get(encodeURIComponent(operation.parentId), token, { fields: 'id,account_id,campaign_id,adset_id' }, context.signal);
+  if (parent.id !== operation.parentId || !belongs(parent, context.accountId) || typeof parent.campaign_id !== 'string' || parent.adset_id !== undefined) {
+    throw new FacebookAdsOpsError('This ad set does not belong to the selected ad account.', { status: 0, beforeWrite: true });
+  }
+  await verifyOwned(transport, token, context.accountId, operation.creativeId, 'creative', context.signal);
+  const result = await transport.post(`${encodeURIComponent(context.accountId)}/ads`, token, {
+    name: operation.name.trim(), adset_id: operation.parentId, creative: JSON.stringify({ creative_id: operation.creativeId }), status: FACEBOOK_CREATE_STATUS,
+  }, context.signal);
+  if (typeof result.id !== 'string' || !SAFE_ID.test(result.id)) throw new FacebookAdsOpsError('Facebook did not confirm the new object.', { status: 200 });
+  await context.recordReceipt?.({ remoteId: result.id });
+  return { remoteId: result.id };
+}
+
 async function configuredCreationUi(): Promise<AdsUiSchema> {
   const checked = FACEBOOK_ADS_CREATION_UI_SCHEMA.safeParse(await runtimeConfig('meta.adsCreationUi'));
   if (!checked.success) throw new FacebookAdsOpsError('Creation policy is unavailable.', { status: 0, beforeWrite: true });
@@ -158,6 +182,7 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
       const token = context.credential.accessToken;
       if (!SAFE_ID.test(context.accountId)) throw new FacebookAdsOpsError('Invalid ad account.', { status: 0, beforeWrite: true });
       if (operation.type === 'creative.create') return executeFacebookCreative(transport, context, operation);
+      if (operation.type === 'ad.create') return executeAdCreation(transport, token, context, operation);
       if (operation.type === 'campaign.create' || operation.type === 'adset.create') return executeCreation(transport, token, context, operation);
       await verifyOwned(transport, token, context.accountId, operation.objectId, 'object', context.signal);
       const path = encodeURIComponent(operation.objectId);

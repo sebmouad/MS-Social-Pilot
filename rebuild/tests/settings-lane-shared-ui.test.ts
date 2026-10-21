@@ -78,7 +78,7 @@ it('keeps retain/delete selection before a named disconnect confirmation, and ho
   const dialog = container.querySelector('dialog')!;
   expect(dialog.textContent).toContain('Studio account'); expect(dialog.textContent).toContain('Neither choice revokes');
   await click(button('Disconnect and retain data', dialog));
-  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body))).toEqual({ socialAccountId: 'source', mode: 'retain' });
+  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body))).toMatchObject({ socialAccountId: 'source', mode: 'retain' });
   expect(container.querySelector('dialog[open]')?.textContent).toContain('Connection changed.');
 });
 

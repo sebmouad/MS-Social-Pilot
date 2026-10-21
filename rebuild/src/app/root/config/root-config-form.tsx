@@ -65,7 +65,7 @@ export function RootConfigForm({ definitions, initialValues, availability, group
     setFieldErrors(current => { const next = { ...current }; delete next[key]; return next; });
     setMessage({ text: operation === 'save' ? copy.saving : copy.clearing, error: false });
     try {
-      const response = await fetch('/api/root/config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, value, ...(operation === 'clear' ? { clear: true } : {}) }) });
+      const response = await fetch('/api/root/config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, value, confirmation: `${operation === 'clear' ? 'CLEAR ROOT SECRET' : 'SET ROOT CONFIG'} ${key}`, ...(operation === 'clear' ? { clear: true } : {}) }) });
       const result = await response.json() as { error?: unknown; values?: unknown };
       if (!response.ok) {
         return failure(typeof result.error === 'string' && result.error ? result.error : (operation === 'save' ? copy.saveFailure : copy.clearFailure));

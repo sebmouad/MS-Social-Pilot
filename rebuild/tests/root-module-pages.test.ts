@@ -14,6 +14,7 @@ vi.mock('../src/server/root/RootFrame', () => ({ RootFrame: 'main' }));
 vi.mock('../src/app/root/config/root-config-form', () => ({ RootConfigForm: state.form }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('Not found'); } }));
+vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: async () => ({ isInstanceOwner: true, disabledAt: null }) } } }));
 import { RootModuleSettings } from '../src/server/root/RootModuleSettings';
 import ProductPage from '../src/app/root/modules/[id]/page';
 import PlatformPage from '../src/app/root/platforms/[id]/page';

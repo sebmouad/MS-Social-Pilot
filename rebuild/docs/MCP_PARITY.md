@@ -20,10 +20,10 @@ selected-resource, person-key and installation authority remain distinct.
 | Inbox | List/thread/sync/reply/resolve, nested replies/reviews, moderation/deletion/recovery, productivity, assignment/notes/saved replies and contact details | Broad source coverage; GET `/api/inbox/threads/[key]/details` calls `readInboxContactDetails` (added in `8852d367`). `bulkInboxAction` now has UI, `POST /api/inbox/bulk` and `bulk_inbox_action` (`f5c21c96`); mocked route tests only |
 | Analytics | Overview/details/explorer/previous points, comparisons, posts/ad objects, demographics/history CSV, pins/goals, report exports/templates/schedules/runs/generation | Present at source; session HTTP and MCP share cores, key REST v1 delegates declared tools to host. Completeness of collected metrics and real transport/provider results remain unproven |
 | Ads | Accounts/performance/directory/rows/exports/compare/status, creation choices, creative sources/image/create/assignment, change preview/apply/history/recovery | Present at source with session routes and key REST v1 through owning MCP groups. Live manager/grant/spend/creative outcomes remain partial |
-| Settings connections | Directory/health, OAuth start, single/batch selection, disconnect preview/retain/delete | OAuth start UI/REST/session MCP share service; compatibility route also delegates. REST single/batch selection and disconnect now use confirmed module services; batch UI/MCP share selection wrapper. Single MCP selection and disconnect MCP still confirm outside the lower core; browser disconnect payload is stale. See explicit caller fixes below |
+| Settings connections | Directory/health, OAuth start, single/batch selection, disconnect preview/retain/delete | OAuth start UI/REST/session MCP share service; compatibility route also delegates. Single/batch MCP and REST selections call changeConnectionSelections; MCP and REST disconnect call changeConnectionDisconnect. Browser sends named retain/delete consent after final review. Targeted mocked transport and DOM tests cover caller parity; live client/provider and actual browser evidence remain separate |
 | Settings account/security/keys | Profile/password/session reads and changes; authenticator begin/enable/disable, passkey removal; workspace/person key list/issue/revoke | Session-only tools now exist; old claim that account/key issuance has no MCP is superseded. Bearer credentials cannot manage credentials/security. General authentication/passkey ceremony remains interactive |
 | Settings appearance | `appearanceSession`, GET/PATCH `/api/settings/appearance`, `get_appearance`, `update_appearance` | Shell ThemeProvider/mode toggle and Settings now share confirmed persistence (`2b42470b`); theme and mode are account-stored, cookies use Root lifetime, layout falls back to validated-session preferences. Cross-device/live persistence proof remains separate |
-| Settings workspace/data/notifications | Policy/operations, team/invitations, profiles/watermark, notification preferences/items, snapshot/ZIP/jobs/erasure | Broad source coverage. Snapshot JSON is partial; never equate it with complete ZIP export. Recent-table/account supplementary coverage and deletion hooks are implemented; partial account-export service/adapters still lack public route/MCP registration/UI. Purge-gate migration needs rehearsal integration and database proof; mail/concurrency remain open |
+| Settings workspace/data/notifications | Policy/operations, team/invitations, profiles/watermark, notification preferences/items, snapshot/ZIP/jobs/erasure | Broad source coverage. Snapshot JSON is partial; never equate it with complete ZIP export. Recent-table/account supplementary coverage and deletion hooks are implemented; partial account export now has a session-only GET route, installed MCP tool and bilingual Account download control through the same service. Coverage remains partial. Purge-gate migration needs rehearsal integration and database proof; mail/concurrency remain open |
 | Media | Image/video library, usage/holders/quota, guarded import and delete | Shared service/API/MCP; complete UI workflows and storage/runtime proof still partial |
 | Feeds | Source CRUD/check modes plus recipe read/save/preview/run/pause/resume | Shared UI/REST/MCP. Recipe tools: `get_recipe_source`, `save_recipe_source`, `preview_recipe_source`, `run_recipe_planner`, `set_recipe_source_state`, `retry_recipe_slots`. Feature off by default on new installs; production log records live source/image work and 80 scheduled posts. Owner-recorded first-day 07:00 and 11:00 batches each published 10/10 with comments; full transport/browser/retry/pause-cancel recovery evidence remains separate |
 | AI | Assist availability/write tools and HTTP/UI; report recap and stored sentiment use AI service internally | Present for advertised assist; internal jobs are not separate customer writes. OpenAI/Gemini limited live checks do not prove every consumer |
@@ -45,14 +45,6 @@ Mocked route/host tests are not a live key/client verification of every tool.
 ## Explicit remaining deviations
 
 - Inbox bulk REST is implemented; verify actual client/scope/provider outcomes.
-- Finish Settings caller wiring after `f5c21c96`: `src/modules/settings/mcp.ts`
-  single `set_connection_selection` should call `changeConnectionSelections`;
-  `src/modules/settings/connections-mcp.ts` disconnect should call
-  `changeConnectionDisconnect` rather than confirming only in the executor.
-  `src/modules/settings/ui/connections/manager.tsx` must send the named
-  `DISCONNECT <id> RETAIN` or `DISCONNECT <id> DELETE RELATED DATA` phrase to REST;
-  its current missing retain/short `DELETE` payload is refused. Wrapper tests
-  validate accepted single/batch and disconnect input, not these caller paths.
 - Appearance caller/persistence source gaps are closed; verify cross-device/session
   behavior beyond the scoped unit/render and system-mode browser evidence.
 - Publishing draft aliases now call `createPublishingPost`, `updatePublishingPost`
@@ -61,9 +53,9 @@ Mocked route/host tests are not a live key/client verification of every tool.
   claim is superseded. Preserve actual lifecycle/scope and live evidence limits.
 - Reconcile Agency workspace switching and Sharing copy-only save policy with
   the binding service contract.
-- Register the partial account-export HTTP/MCP adapters and add bilingual download
-  UI; adapters alone expose no new public capability. Extend this guard's mapping
-  when those routes/tools are installed, preserving session-only authority.
+- Partial account export is registered in HTTP/MCP and exposed in the bilingual
+  Account UI with explicit coverage/exclusions. Mapping and targeted automated
+  checks cover those surfaces; real browser/MCP/database verification remains open.
 - Finish operational/configurable copy, localization and ownership gaps recorded
   in CONFIG_LITERAL_AUDIT.md; recheck after integration instead of repeating old
   lane claims (OAuth compatibility and batch-selection wiring are already fixed).
@@ -204,6 +196,7 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | enable_account_two_step | settings/account | write | POST /api/settings/account/security/enable | Shared customer operation; transport arguments may differ. |
 | disable_account_two_step | settings/account | write | POST /api/settings/account/security/disable | Shared customer operation; transport arguments may differ. |
 | remove_account_passkey | settings/account | write | DELETE /api/settings/account/passkeys | Shared customer operation; transport arguments may differ. |
+| export_account_data | settings/account | read | GET /api/settings/account/export | Session-only partial profile/appearance/safe-metadata export through exportAccountData; no workspace content or secrets. |
 | get_account | settings/account | read | GET /api/settings/account | Shared customer operation; transport arguments may differ. |
 | update_account_profile | settings/account | write | PATCH /api/settings/account | Shared customer operation; transport arguments may differ. |
 | change_account_password | settings/account | write | POST /api/settings/account | Shared customer operation; transport arguments may differ. |
@@ -244,10 +237,10 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | delete_notification | settings/notifications | write | DELETE /api/notifications | Shared customer operation; transport arguments may differ. |
 | list_pages | settings/connections | read | GET /api/v1/pages | Shared customer operation; transport arguments may differ. |
 | set_connection_selections | settings/connections | write | PATCH /api/connections | REST items array and MCP batch tool use the confirmed selection wrapper. |
-| set_connection_selection | settings/connections | write | PATCH /api/connections | Single selection is representable as one items entry in batch REST. MCP still uses lower core and different confirmation; caller unification remains a gap. |
+| set_connection_selection | settings/connections | write | PATCH /api/connections | REST and MCP accept the same single payload and exact SET CONNECTION <kind> <id> ENABLED/DISABLED consent through changeConnectionSelections. |
 | list_connections | settings/connections | read | GET /api/settings/connections | Shared customer operation; transport arguments may differ. |
 | preview_connection_disconnect | settings/connections | read | POST /api/connections | Shared customer operation; transport arguments may differ. |
-| disconnect_connection | settings/connections | write | DELETE /api/connections | REST confirmed wrapper versus MCP lower core; caller/confirmation parity remains a gap. |
+| disconnect_connection | settings/connections | write | DELETE /api/connections | REST and MCP call changeConnectionDisconnect; browser sends exact named RETAIN or DELETE RELATED DATA consent after review. Mocked transport/DOM evidence only. |
 | preview_workspace_data_deletion | settings/data | read | POST /api/settings/data | Shared customer operation; transport arguments may differ. |
 | export_workspace_archive | settings/data | read | GET /api/settings/data | Shared customer operation; transport arguments may differ. |
 | export_workspace_data | settings/data | read | GET /api/settings/data/snapshot | Shared customer operation; transport arguments may differ. |
@@ -604,3 +597,27 @@ evidence; complete history, live clients and report download behavior stay open.
 The current documentation lane adds no keys, source, routes or tools. Historical
 lane test counts above describe their original runs; current validation is recorded
 in AGENT_HANDOFF.md. Full parity remains partial.
+
+## Partial personal account export exposure — 2026-10-21
+
+`GET /api/settings/account/export` delegates to `accountHttp(request, 'export')`;
+Settings installs the existing `ACCOUNT_EXPORT_MCP` group (`export_account_data`).
+Both reach `exportAccountData` through the current session actor. Bearer/API-key
+credentials remain refused. Account settings provides an English/French download
+with explicit included/excluded coverage, pending state and safe retry guidance.
+It validates JSON format/version, partial-coverage marker and exact UTF-8 bytes
+before handing the file to the browser. Success describes preparation, not proof
+of a locally saved file. Unmount aborts the request and suppresses late downloads.
+
+No new Root registry keys: copy fields extend `settings.uiCopy.account.en/fr`,
+and both service and UI consume `data.maxArchiveBytes`. Its description now
+covers workspace archives and partial personal JSON. The integrator owns the
+configuration schema-version bump and reconciliation of stored copy overrides.
+The inventory now includes 239 customer/person tools (51 private Root tools).
+
+Evidence: `npx tsc --noEmit -p .` passes with zero errors. Targeted Vitest with
+`--no-cache` covers account-export UI (16), transport (6), service (8), parity
+guard (22), and Settings copy parity (48). These are synthetic DOM/mocked checks;
+no browser, live MCP, PostgreSQL, provider or production check was performed.
+Complete portability, supplementary purge migration rehearsal and concurrency
+proof remain open. No server, deployment or push was run in this lane.

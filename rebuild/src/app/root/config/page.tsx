@@ -1,3 +1,4 @@
+import { readRootConfig } from '@/modules/root/server/configuration';
 import { headers } from 'next/headers';
 import { rootCopyLocale } from '@/server/root/legacy/copy';
 import { ROOT_INTERFACE_COPY, type RootInterfaceCatalog } from '@/lib/config/root-interface-copy';
@@ -16,11 +17,11 @@ export async function generateMetadata() {
 }
 
 export default async function RootConfigPage({ searchParams }: { searchParams: Promise<{ search?: string | string[] }> }) {
-  await requireRootPage();
+  const actor = await requireRootPage();
   // readConfig validates the same registry snapshot used by HTTP and MCP and masks secrets.
   // Registry defaults keep the recovery screen available if the store cannot be read.
   let values: Awaited<ReturnType<typeof readConfig>> | null = null;
-  try { values = await readConfig(); } catch { /* Render a recoverable store state. */ }
+  try { values = (await readRootConfig(actor.id)).values; } catch { /* Render a recoverable store state. */ }
   const copy = (values?.find(value => value.key === 'root.configCopy')?.value ?? ROOT_CONFIG_COPY) as RootConfigCopy;
   const searchLimit = Number(values?.find(value => value.key === 'root.configSearchMaxCharacters')?.value ?? CONFIG_BY_KEY.get('root.configSearchMaxCharacters')!.defaultValue);
   const locale = rootCopyLocale((await headers()).get('accept-language'));

@@ -138,7 +138,7 @@ it('uses shared switches and selects, retaining the saved boolean after a failed
   await act(async () => root.render(createElement(RootConfigForm, { definitions: [boolean, selection], initialValues: [{ key: boolean.key, value: false, isSet: true, source: 'database' }], availability: AVAILABILITY_CATALOG, initialSearch: ' ' })));
   const switchButton = container.querySelector<HTMLButtonElement>('[role=switch]')!;
   expect(switchButton).not.toBeNull(); await act(async () => switchButton.click());
-  expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ key: boolean.key, value: true });
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ key: boolean.key, value: true, confirmation: `SET ROOT CONFIG ${boolean.key}` });
   expect(switchButton.getAttribute('aria-checked')).toBe('false');
   const search = container.querySelector<HTMLInputElement>('#root-config-search')!;
   await fill(search, selection.key);
@@ -170,6 +170,6 @@ it('names the secret in a shared confirmation and retains the dialog on failure'
   expect(document.activeElement?.textContent).toBe('Cancel');
   const confirm = [...dialog.querySelectorAll('button')].find(button => button.textContent === 'Clear saved secret')!;
   await act(async () => confirm.click());
-  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ key: definition.key, value: '', clear: true });
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ key: definition.key, value: '', clear: true, confirmation: `CLEAR ROOT SECRET ${definition.key}` });
   expect(document.querySelector('dialog [role=alert]')?.textContent).toContain('Could not clear');
 });

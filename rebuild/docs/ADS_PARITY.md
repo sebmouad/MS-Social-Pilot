@@ -327,3 +327,35 @@ Final local verification from `rebuild/`:
 
 No install, client generation, server, push or deployment was run. Browser,
 PostgreSQL migration/concurrency and live-provider evidence remain unverified.
+
+## Management completeness — paused ad creation, missing grant, hierarchy
+
+Status: source and fixture tests only. No live Graph call, browser run, migration
+application or production change.
+
+- **Create ad.** Neutral `ad.create` (`parentId` = ad set in stored history, `creativeId`
+  = existing account creative, `name`) goes through the same `previewAdsManagement` /
+  `performAdsManagement` service as every other change, so the Campaigns UI
+  (`AdCreateForm`), session REST (`/api/ads/management`) and MCP (`preview_ads_change` /
+  `apply_ads_change`) share parsing, authority, exact confirmation, ledger and recovery.
+  The journal key is `@create-ad:<adSetId>` (one unresolved creation per ad set). Scope
+  must be unrestricted, as for ad sets. Facebook (`ads-ops/index.ts`) verifies the ad set
+  (carries a campaign, is not an ad) and the creative belong to the account, then posts
+  `/{act}/ads` with a module-fixed `PAUSED` status; a missing id stays uncertain.
+- **Existing objects.** Pause/resume, daily/lifetime budget, rename, creative assign and
+  delete keep the shared path; fixtures now exercise every Facebook write body and the
+  spend-changing/irreversible confirmations.
+- **Missing grant.** `describeAdsManagement` returns `needsReconnect: true` when management
+  is withheld by `reconnect_required` (absent `ads_management` grant or invalid
+  connection). The object manager and Campaigns screen show a bilingual reconnect notice
+  linking to Settings → Connections. The thrown message is in the Ads catalog
+  (`grantMissing`), so API/MCP errors localize in French.
+- **Hierarchy.** Campaigns rows show their ancestor path (`Campaign › Ad set`) resolved by
+  the platform's neutral `parentObjectId`, are ordered by it, and a note says levels
+  overlap and must not be added together.
+- **Migration required before activation.** `ads_operations_operation_kind` (CHECK on
+  `operationType`) must list `ad.create`; `objectType` already allows `ad`. Until a root
+  `prisma/migrations` migration extends it, the ledger insert fails closed before any
+  provider call.
+- **New Root keys: none** (customer copy keys were added to the existing `ads.customerCopy`
+  default catalog; `CONFIG_SCHEMA_VERSION` untouched).
