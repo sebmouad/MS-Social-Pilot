@@ -1,0 +1,6 @@
+.origin { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .3rem .5rem; min-width: 0; max-width: 100%; font-size: .78rem; color: var(--ink-soft); }
+.source { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 14rem; }
+.link { display: inline-flex; align-items: center; gap: .2rem; color: var(--accent); text-decoration: underline; text-underline-offset: .18em; font-weight: 600; }
+.link:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 32%, transparent); outline-offset: 2px; border-radius: 3px; }
+.origin[data-compact] { font-size: .72rem; }
+.above { margin-bottom: .4rem; }

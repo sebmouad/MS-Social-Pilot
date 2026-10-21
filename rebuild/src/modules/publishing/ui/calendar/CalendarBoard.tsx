@@ -7,6 +7,7 @@ import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { useRef, useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button, ChannelBadge, Dialog, StatusChip } from "@/components";
+import { OriginBadge } from "../origins/OriginBadge";
 import { PostPreview } from "@/components/PostPreview";
 import { SidebarDock } from "@/components/SidebarDock";
 import { instantToWall, wallTimeToInstant } from "@/lib/calendar-dates";
@@ -52,6 +53,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     draggable={post.movable} onDragStart={event => { dragged.current = post; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", post.id); }} onDragEnd={() => { dragged.current = null; setOver(null); }}>
     <div className={styles.postMeta}><time dateTime={post.whenIso}>{timeOf(post)}</time><StatusChip status={post.status} compact /></div>
     <p className={styles.postText} title={post.text}>{post.text || copy.calendarNoText}</p>
+    {post.origin ? <OriginBadge origin={post.origin} compact /> : null}
     <div className={styles.postChannels}>{post.channels.length ? post.channels.slice(0, 4).map(channel => <ChannelBadge key={channel.id} name={channel.name} platformName={channel.platformName} mark={channel.mark} compact />) : <span className={styles.muted}>{copy.calendarNoChannels}</span>}{post.channels.length > 4 && <span className={styles.muted}>+{post.channels.length - 4}</span>}</div>
     {post.movable && <button type="button" className={styles.moveButton} aria-haspopup="dialog" onClick={() => startMove(post)}>{copy.move}<span className="ui-visually-hidden">{fillCopy(copy.movePostLabel, {text: post.text.slice(0, 40) || copy.noText, time: timeOf(post)})}</span></button>}
     {post.preview && <button type="button" className={styles.viewButton} aria-haspopup="dialog" aria-label={fillCopy(copy.viewPostLabel, {text:post.text.slice(0,60) || copy.noText})} onClick={() => setPreviewPost(post)}>{copy.viewPost}</button>}

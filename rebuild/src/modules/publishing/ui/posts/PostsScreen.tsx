@@ -22,6 +22,10 @@ import tableStyles from "./posts-table.module.css";
 import styles from "@/modules/publishing/ui/publishing.module.css";
 import previewStyles from '@/components/PostPreview.module.css';
 import { PostRowActions } from "./PostActions";
+import { loadPostOrigins, originFilterOptions, parseOriginFilter } from "../origins/load";
+import { originCopy } from "../origins/copy";
+import { OriginBadge } from "../origins/OriginBadge";
+import originStyles from "../origins/origin.module.css";
 import { runtimeConfig } from '@/server/config/store';
 import { RouteNotice } from '@/components/RouteNotice';
 import { PostStatus } from '../../../../../generated/client';
@@ -30,9 +34,10 @@ import { canAccessFeature } from '@/server/permissions';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import { OperationError, isOperationErrorCode } from '@/lib/operation-error';
 
-export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; recovery?: string; page?: string; status?: string; channel?: string; q?: string; view?: string }> }) {
+export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; recovery?: string; page?: string; status?: string; channel?: string; q?: string; view?: string; origin?: string }> }) {
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
-  const { notice, recovery, page: pageParam, status, channel, q, view: viewParam } = await searchParams;
+  const { notice, recovery, page: pageParam, status, channel, q, view: viewParam, origin: originParam } = await searchParams;
+  const originKind = parseOriginFilter(originParam);
   const locale = await pageLocale();
   const { catalog, copy: localizedCopy } = await loadPublishingCopy();
   const noticeCatalog = await loadPublishingNoticeCopy();
@@ -77,13 +82,18 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
       && !post.targets.some(target => target.status === 'processing' || target.status === 'scheduled_remote');
     return { canEdit, canDuplicate };
   };
-  const rows: PostsTableRow[] = listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }>, ...authority(post), whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy) }));
+  const origins = await loadPostOrigins(viewer.workspaceId, listing.posts.map(post => post.id), locale);
+  // Narrowed after the page is read: the shared read model has no origin filter yet, so page counts are those of the unfiltered list.
+  const shownPosts = originKind ? listing.posts.filter(post => origins.get(post.id)?.kind === originKind) : listing.posts;
+  const originOptions = originKind ? await originFilterOptions(viewer.workspaceId, locale) : [];
+  const rows: PostsTableRow[] = shownPosts.map(post => ({ ...post, origin: origins.get(post.id) ?? null, media: post.media as Array<{ kind: string; url: string; altText?: string }>, ...authority(post), whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy) }));
   const noticeText = notice ? postsNotice(notice, locale, noticeCatalog) ?? undefined : undefined;
   const pageLink = (page: number) => {
     const params = new URLSearchParams({ page: String(page) });
     if (status) params.set('status', status);
     if (channel) params.set('channel', channel);
     if (q) params.set('q', q);
+    if (originKind) params.set('origin', originKind);
     if (viewParam === 'table' || viewParam === 'feed' || viewParam === 'cards') params.set('view', viewParam);
     return `/publishing/posts?${params}`;
   };
@@ -100,11 +110,12 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     </details> : undefined}
   />;
   const canBulk = canWritePosts && canAuthorDrafts;
-  const filterHref = (omit: 'status' | 'channel' | 'q') => {
+  const filterHref = (omit: 'status' | 'channel' | 'q' | 'origin') => {
     const params = new URLSearchParams();
     if (status && omit !== 'status') params.set('status', status);
     if (channel && omit !== 'channel') params.set('channel', channel);
     if (q && omit !== 'q') params.set('q', q);
+    if (originKind && omit !== 'origin') params.set('origin', originKind);
     if (viewParam === 'table' || viewParam === 'feed' || viewParam === 'cards') params.set('view', viewParam);
     const query = params.toString();
     return `/publishing/posts${query ? `?${query}` : ''}`;
@@ -113,8 +124,9 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     ...(selectedStatus ? [{ key: 'status', label: copy.status, value: statusLabel(selectedStatus), removeHref: filterHref('status') }] : []),
     ...(selectedChannel ? [{ key: 'channel', label: copy.channel, value: targetChoices.find(target => target.id === selectedChannel)?.name ?? selectedChannel, removeHref: filterHref('channel') }] : []),
     ...(q?.trim() ? [{ key: 'q', label: copy.search, value: q.trim(), removeHref: filterHref('q') }] : []),
+    ...(originKind ? [{ key: 'origin', label: originCopy[locale].createdBy, value: originOptions.find(option => option.kind === originKind)?.label ?? originKind, removeHref: filterHref('origin') }] : []),
   ];
-  const viewHref = (next: 'table' | 'feed' | 'cards') => { const params = new URLSearchParams({ view: next }); if (status) params.set('status', status); if (channel) params.set('channel', channel); if (q) params.set('q', q); return `/publishing/posts?${params}`; };
+  const viewHref = (next: 'table' | 'feed' | 'cards') => { const params = new URLSearchParams({ view: next }); if (status) params.set('status', status); if (channel) params.set('channel', channel); if (q) params.set('q', q); if (originKind) params.set('origin', originKind); return `/publishing/posts?${params}`; };
   const newPostLink = canWritePosts ? <a className="ui-button ui-button--primary" href="/publishing/compose"><IconPlus size={16} aria-hidden="true" /> {copy.newPost}</a> : undefined;
   const emptyState = chips.length
     ? <EmptyPanel title={copy.postsNoMatchTitle} action={<a className="ui-button ui-button--secondary" href="/publishing/posts">{copy.resetFilters}</a>}>{copy.postsNoMatchBody}</EmptyPanel>
@@ -132,7 +144,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
       {view === 'table'
         ? <PostsTable rows={rows} caption={copy.postsCaption(listing.page, listing.pages)} locale={locale} selectable={canBulk} canRetry={canPublish} manage={canAuthorDrafts ? manageProps : null} empty={emptyState} />
         : rows.length ? <ul className={view === 'feed' ? previewStyles.feedList : previewStyles.cardsGrid}>
-          {rows.map(post => <li key={post.id}>{previewFor(post, view === 'feed' ? 'feed' : 'card')}</li>)}
+          {rows.map(post => <li key={post.id}>{post.origin ? <div className={originStyles.above}><OriginBadge origin={post.origin} /></div> : null}{previewFor(post, view === 'feed' ? 'feed' : 'card')}</li>)}
         </ul> : emptyState}
       {listing.pages > 1 ? <nav className={styles.postPagination} aria-label={copy.pagesLabel}>
         {listing.page > 1 ? <a className="ui-button ui-button--secondary" href={pageLink(listing.page - 1)}>{copy.previousPage}</a> : <span />}

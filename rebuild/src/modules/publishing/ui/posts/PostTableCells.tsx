@@ -4,12 +4,15 @@ import { StatusChip } from '@/components';
 import { postContentSummary } from '@/modules/publishing/content-summary';
 import { AttentionHint, AvatarStack, MediaThumb, ScheduleBadge, isSafeImageUrl } from '../kit/kit';
 import { type KitLocale } from '../kit/copy';
+import { OriginBadge } from '../origins/OriginBadge';
+import type { PostOriginView } from '../origins/post-origin';
 import styles from './posts-table.module.css';
 
 type Media = { kind: string; url: string; altText?: string };
 type Row = {
   message: string; link: string | null; media: unknown; status: string;
   scheduledAt: Date | null; publishedAt: Date | null;
+  origin?: PostOriginView | null;
   targets: Array<{ status: string; target: { id: string; name: string; pictureUrl: string | null; platformName?: string | null } }>;
 };
 
@@ -36,6 +39,7 @@ export function PostCell({ post, locale = 'en' }: { post: Row; locale?: KitLocal
     <div className={styles.cellText}>
       <span className={styles.message}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
       {media.length ? <span className={styles.sub}>{media.length} {copy.mediaCount}</span> : null}
+      {post.origin ? <OriginBadge origin={post.origin} /> : null}
     </div>
   </div>;
 }

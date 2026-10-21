@@ -99,3 +99,42 @@ export const prismaRecipeStore: RecipeStore = {
     await prisma.$executeRaw`UPDATE wordpress_recipe_sources SET "lastRunAt" = ${run.at}, "lastError" = ${run.error}, "lastSummary" = ${JSON.stringify(run.summary)}::jsonb WHERE id = ${sourceId} AND "workspaceId" = ${workspaceId}`;
   },
 };
+
+/* ----- read model for Publishing (origin lookup) and the Feeds status card; every statement is workspace-scoped ----- */
+
+export type PostOriginRow = { postId: string; sourceId: string; sourceName: string; title: string; permalink: string | null };
+/** Recipe automation provenance of the given posts; posts the automation did not create are absent. */
+export async function selectOriginsByPostIds(workspaceId: string, postIds: readonly string[]): Promise<PostOriginRow[]> {
+  if (!postIds.length) return [];
+  return prisma.$queryRaw<PostOriginRow[]>`SELECT DISTINCT ON (p."postId") p."postId" AS "postId", p."sourceId" AS "sourceId", s.name AS "sourceName", p.title, p.permalink
+    FROM wordpress_recipe_plans p JOIN wordpress_recipe_sources s ON s.id = p."sourceId" AND s."workspaceId" = p."workspaceId"
+    WHERE p."workspaceId" = ${workspaceId} AND p."postId" = ANY(${[...postIds]}::text[]) ORDER BY p."postId", p."slotAt" DESC`;
+}
+/** Whether the workspace has a recipe source at all. */
+export async function hasRecipeSource(workspaceId: string): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ one: number }>>`SELECT 1 AS one FROM wordpress_recipe_sources WHERE "workspaceId" = ${workspaceId} LIMIT 1`;
+  return rows.length > 0;
+}
+
+export type StatusSnapshot = {
+  upcoming: Array<{ slotAt: Date; targetName: string; title: string }>;
+  publishedToday: number;
+  unresolved: { failed: number; uncertain: number };
+};
+/** Next planned slots, posts published inside [dayStart, dayEnd) and unresolved slots since `failuresSince`. */
+export async function selectStatusSnapshot(workspaceId: string, sourceId: string, input: { now: Date; dayStart: Date; dayEnd: Date; failuresSince: Date; upcomingLimit: number; targetIds?: readonly string[] }): Promise<StatusSnapshot> {
+  const unscoped = input.targetIds === undefined;
+  const ids = [...(input.targetIds ?? [])];
+  const [upcoming, published, unresolved] = await Promise.all([
+    prisma.$queryRaw<Array<{ slotAt: Date; targetName: string | null; title: string }>>`SELECT p."slotAt" AS "slotAt", t.name AS "targetName", p.title FROM wordpress_recipe_plans p
+      LEFT JOIN targets t ON t.id = p."targetId" AND t."workspaceId" = p."workspaceId"
+      WHERE p."workspaceId" = ${workspaceId} AND p."sourceId" = ${sourceId} AND p."slotAt" > ${input.now} AND p.state = 'planned' AND p."postId" IS NOT NULL AND (${unscoped} OR p."targetId" = ANY(${ids}::text[]))
+      ORDER BY p."slotAt" ASC, p.id ASC LIMIT ${input.upcomingLimit}`,
+    prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM wordpress_recipe_plans p JOIN posts po ON po.id = p."postId" AND po."workspaceId" = p."workspaceId"
+      WHERE p."workspaceId" = ${workspaceId} AND p."sourceId" = ${sourceId} AND po.status = 'published' AND po."publishedAt" >= ${input.dayStart} AND po."publishedAt" < ${input.dayEnd} AND (${unscoped} OR p."targetId" = ANY(${ids}::text[]))`,
+    prisma.$queryRaw<Array<{ state: string; count: bigint }>>`SELECT p.state, COUNT(*)::bigint AS count FROM wordpress_recipe_plans p
+      WHERE p."workspaceId" = ${workspaceId} AND p."sourceId" = ${sourceId} AND p."slotAt" >= ${input.failuresSince} AND p.state IN ('failed', 'uncertain') AND (${unscoped} OR p."targetId" = ANY(${ids}::text[])) GROUP BY p.state`,
+  ]);
+  const count = (state: string) => Number(unresolved.find(row => row.state === state)?.count ?? 0);
+  return { upcoming: upcoming.map(row => ({ slotAt: row.slotAt, targetName: row.targetName ?? '', title: row.title })), publishedToday: Number(published[0]?.count ?? 0), unresolved: { failed: count('failed'), uncertain: count('uncertain') } };
+}

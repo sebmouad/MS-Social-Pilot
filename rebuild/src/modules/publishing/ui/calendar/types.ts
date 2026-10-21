@@ -19,6 +19,8 @@ export type BoardPost = {
   /** Scoped source row used by the shared full post preview dialog. */
   preview?: PostPreviewPost;
   authorName?: string;
+  /** Set when an installed automation created the post. */
+  origin?: import("../origins/post-origin").PostOriginView;
   /** The viewer may move this post: still waiting to publish and editable by them. */
   movable: boolean;
 };

@@ -8,6 +8,7 @@ import { DataTable, Drawer, type TableColumn } from '@/components';
 import { type KitLocale } from '../kit/copy';
 import { BulkPostActions } from './BulkPostActions';
 import { PostRowActions } from './PostActions';
+import type { PostOriginView } from '../origins/post-origin';
 import { ChannelsCell, PostCell, StatusCell } from './PostTableCells';
 
 type ManageProps = ComponentProps<typeof PostRowActions>;
@@ -16,6 +17,8 @@ export type PostsTableRow = ManageProps['post'] & {
   targets: Array<ManageProps['post']['targets'][number] & { remoteUrl: string | null; target: { id: string; type: string; name: string; pictureUrl: string | null; platformName?: string | null } }>;
   /** Publish time already formatted in the workspace time zone on the server, so hydration cannot disagree. */
   whenLabel: string;
+  /** Set when an installed automation created the post. */
+  origin?: PostOriginView | null;
   /** Per-row authority decided by the server; the actions re-check on submit. */
   canEdit: boolean; canDuplicate: boolean;
 };
