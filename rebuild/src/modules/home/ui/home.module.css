@@ -14,7 +14,7 @@
 .cardHead { display: flex; align-items: center; gap: .65rem; min-width: 0; }
 .cardHead h2 { flex: 1; min-width: 0; margin: 0; font-size: .98rem; letter-spacing: -.01em; }
 .chip { display: inline-grid; place-items: center; flex: 0 0 auto; width: 2.1rem; height: 2.1rem; border-radius: .7rem; color: var(--tone); background: color-mix(in srgb, var(--tone) 14%, var(--surface)); }
-.open { display: inline-flex; align-items: center; gap: .25rem; min-height: 44px; padding: 0 .35rem; color: var(--tone); font-size: .8rem; font-weight: 700; text-decoration: none; border-radius: var(--radius-sm); }
+.open { display: inline-flex; align-items: center; gap: .25rem; min-height: 44px; padding: 0 .35rem; color: color-mix(in srgb, var(--tone) 70%, var(--ink)); font-size: .8rem; font-weight: 700; text-decoration: none; border-radius: var(--radius-sm); }
 .open:hover { text-decoration: underline; }
 .open:focus-visible, .link:focus-visible { outline: 3px solid color-mix(in srgb, var(--tone) 40%, transparent); outline-offset: 2px; }
 
@@ -31,4 +31,4 @@
 .item { display: grid; gap: .25rem; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-muted); min-width: 0; }
 .item strong { overflow-wrap: anywhere; font-size: .88rem; font-weight: 650; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; color: var(--ink-soft); font-size: .76rem; }
-.link { color: var(--tone); font-weight: 700; font-size: .85rem; }
+.link { color: color-mix(in srgb, var(--tone) 70%, var(--ink)); font-weight: 700; font-size: .85rem; }

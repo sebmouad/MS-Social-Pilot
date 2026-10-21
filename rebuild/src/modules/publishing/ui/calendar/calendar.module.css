@@ -87,9 +87,9 @@
 .post:hover { box-shadow: 0 3px 10px color-mix(in srgb, var(--ink) 14%, transparent); }
 .post[data-status="published"] { opacity: .88; }
 .day[data-today] { background: var(--mod-soft, var(--accent-soft)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
-.day[data-today] .dayHead time { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 50%; background: var(--mod, var(--accent)); color: var(--on-accent, #fff); }
+.day[data-today] .dayHead time { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--mod, var(--accent)) 72%, black); color: #fff; }
 .weekHead[data-today] { background: var(--mod-soft, var(--accent-soft)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
-.todayTag { background: var(--mod, var(--accent)); }
+.todayTag { background: color-mix(in srgb, var(--mod, var(--accent)) 72%, black); color: #fff; }
 .day:hover .add { color: var(--mod-ink, var(--accent)); }
 .empty { border-color: var(--mod, var(--line-strong)); background: var(--mod-soft, transparent); }
 @media (prefers-reduced-motion: reduce) { .post { transition: none; } }
