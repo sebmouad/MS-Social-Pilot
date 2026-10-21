@@ -29,13 +29,27 @@ const formatDay = (value: string) => new Date(`${value}T12:00:00.000Z`).toLocale
 function metricView(input: AnalyticsMetricInput, copy: WorkspaceCopy, locale: 'en' | 'fr'): MetricView {
   const t = workspaceText(copy, locale);
   const byDay = new Map<string, number>();
+  const latestPerDay = new Map<string, AnalyticsMetricInput['observations'][number]>();
+  const snapshotRollup = input.kind === 'stock' || input.rollup === 'latest-per-channel';
   const byChannel = new Map<string, { label: string; values: Array<{ date: Date; value: number }> }>();
   for (const observation of input.observations) {
     const day = isoDay(observation.date);
-    byDay.set(day, (byDay.get(day) ?? 0) + observation.value);
+    if (snapshotRollup) {
+      const identity = JSON.stringify([day, observation.channelId]);
+      const previous = latestPerDay.get(identity);
+      if (!previous || observation.date >= previous.date) latestPerDay.set(identity, observation);
+    } else {
+      byDay.set(day, (byDay.get(day) ?? 0) + observation.value);
+    }
     const channel = byChannel.get(observation.channelId) ?? { label: observation.channelLabel, values: [] };
     channel.values.push({ date: observation.date, value: observation.value });
     byChannel.set(observation.channelId, channel);
+  }
+  // A stock or overlapping-window snapshot replaces earlier snapshots for the
+  // same resource/day; only additive flows sum every observation.
+  for (const observation of latestPerDay.values()) {
+    const day = isoDay(observation.date);
+    byDay.set(day, (byDay.get(day) ?? 0) + observation.value);
   }
   const points = [...byDay].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, label: formatDay(date), value }));
   const observedResourceIds = [...new Set(input.observations.map(observation => observation.channelId).filter(id => id !== 'total'))].sort();
@@ -68,7 +82,7 @@ function metricView(input: AnalyticsMetricInput, copy: WorkspaceCopy, locale: 'e
     unit: input.unit,
     kind: input.kind,
     total: input.totalOverride !== undefined ? input.totalOverride : input.kind === 'breakdown' ? null : input.kind === 'stock' || input.rollup === 'latest-per-channel'
-      ? generatedRows.reduce((sum, row) => sum + row.value, 0)
+      ? generatedRows.length ? generatedRows.reduce((sum, row) => sum + row.value, 0) : null
       : aggregateValues(totalValues, input.kind),
     ...(input.displayTotal ? { displayTotal: input.displayTotal } : {}),
     latestAt,

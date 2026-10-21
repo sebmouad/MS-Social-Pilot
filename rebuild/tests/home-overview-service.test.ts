@@ -186,3 +186,34 @@ describe('readHomeOverview', () => {
     expect(overview.inbox).toEqual({ state: 'ready', data: { open: 4 } });
   });
 });
+
+
+it('projects ten authorized Pages with partial coverage into every numeric Home card', async () => {
+  const channels = Array.from({ length: 10 }, (_, i) => ({ id: `example-${i}`, name: `Example ${i}` }));
+  mocks.snapshot.mockResolvedValue(snapshot({ options: { channels }, selected: { channelIds: channels.map(c => c.id) },
+    audience: { entries: channels.slice(0, 8).map(c => ({ id: c.id, metric: 'audience', asOf: new Date('2026-10-16') })), total: 2800, covered: 8, selected: 10 } }));
+  mocks.queryRaw.mockResolvedValue(channels.map(c => ({ id: c.id, provider: 'example' })));
+  mocks.host.mockResolvedValue({
+    channelMeasuresBatch: async () => channels.map((c, i) => ({ targetId: c.id,
+      current: { views: i < 8 ? (i + 1) * 100 : null, engagements: i < 8 ? (i + 1) * 10 : null },
+      previous: { views: i < 6 ? (i + 1) * 80 : null, engagements: i < 6 ? (i + 1) * 8 : null },
+      mix: [{ key: 'reactions', label: 'Reactions', value: i < 8 ? i + 1 : null }],
+    })), postPerformanceBatch: async () => [],
+  });
+  mocks.ads.mockResolvedValue({ rows: [{ currency: 'USD', spend: 10.25, date: '2026-10-15' }, { currency: 'USD', spend: 20.75, date: '2026-10-16' }], nextOffset: null });
+  mocks.posts.mockResolvedValue({ total: 40, posts: [{ id: 'upcoming', message: 'Example scheduled post', scheduledAt: new Date('2026-10-22'), targets: [] }] });
+  mocks.inbox.mockResolvedValue({ total: 17 });
+  const result = await readHomeOverview(actor, new Date('2026-10-21T12:00:00Z'));
+  expect(result.audience).toMatchObject({ state: 'ready', data: { total: 2800, covered: 8, selected: 10, asOf: '2026-10-16T00:00:00.000Z' } });
+  expect(result.performance).toMatchObject({ state: 'ready', data: {
+    channels: 10, truncated: false,
+    views: { current: 3600, previous: 1680, change: 0.25, covered: 8, comparable: 6 },
+    engagements: { current: 360, previous: 168, change: 0.25, covered: 8, comparable: 6 },
+    interactions: [{ key: 'reactions', value: 36 }],
+  } });
+  if (result.performance?.state !== 'ready') throw new Error('Missing performance fixture');
+  expect(result.performance.data.topChannels[0]).toEqual({ id: 'example-7', name: 'Example 7', engagements: 80 });
+  expect(result.upcoming).toMatchObject({ state: 'ready', data: { total: 40 } });
+  expect(result.inbox).toEqual({ state: 'ready', data: { open: 17 } });
+  expect(result.ads).toMatchObject({ state: 'ready', data: { start: '2026-09-24', end: '2026-10-21', spend: [{ currency: 'USD', total: 31, firstDay: '2026-10-15', lastDay: '2026-10-16', recordedDays: 2 }] } });
+});
