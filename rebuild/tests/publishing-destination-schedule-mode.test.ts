@@ -116,14 +116,14 @@ describe('per-destination scheduling choice: parsing and resolution', () => {
 
 describe('REST v1: compose, schedule, reschedule, cancel and queue with a scoped key', () => {
   it('compose accepts scheduleMode and per-destination modes and reports the outcome', async () => {
-    const response = await postsRoute.POST(keyed('/api/v1/posts', { message: 'Hi', targetIds: ['t1', 't2'], scheduledAt: future, scheduleMode: 'application', destinationScheduleModes: { t1: 'remote' } }));
+    const response = await postsRoute.POST(keyed('/api/v1/posts', { confirmation: 'CREATE POST', message: 'Hi', targetIds: ['t1', 't2'], scheduledAt: future, scheduleMode: 'application', destinationScheduleModes: { t1: 'remote' } }));
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ id: 'post-1', scheduleMode: 'remote', destinationScheduleModes: { t1: 'remote', t2: 'application' }, remoteHold: { held: 1 } });
     expect(svc.createPost).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: 'workspace-a' }), expect.objectContaining({ scheduleMode: 'application', destinationScheduleModes: { t1: 'remote' }, scheduledAt: expect.any(Date) }));
   });
   it('compose refuses a scheduling place without a time and an unknown mode', async () => {
-    expect((await postsRoute.POST(keyed('/api/v1/posts', { message: 'Hi', targetIds: ['t1'], scheduleMode: 'remote' }))).status).toBe(400);
-    expect((await postsRoute.POST(keyed('/api/v1/posts', { message: 'Hi', targetIds: ['t1'], scheduledAt: future, destinationScheduleModes: { t1: 'platform' } }))).status).toBe(400);
+    expect((await postsRoute.POST(keyed('/api/v1/posts', { confirmation: 'CREATE POST', message: 'Hi', targetIds: ['t1'], scheduleMode: 'remote' }))).status).toBe(400);
+    expect((await postsRoute.POST(keyed('/api/v1/posts', { confirmation: 'CREATE POST', message: 'Hi', targetIds: ['t1'], scheduledAt: future, destinationScheduleModes: { t1: 'platform' } }))).status).toBe(400);
     expect(svc.createPost).not.toHaveBeenCalled();
   });
   it('schedule needs the exact confirmation and passes both choices to the shared service', async () => {

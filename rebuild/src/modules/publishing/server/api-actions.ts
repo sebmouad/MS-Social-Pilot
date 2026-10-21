@@ -16,11 +16,11 @@ import { queuePostRequest } from './queue';
 /**
  * Key-authenticated (REST v1) entry points for compose, schedule, reschedule, cancel and queue. They call the same Publishing
  * services as the app and MCP; the key's feature/write grant and channel ceiling were enforced by the caller and are enforced again
- * by those services. Writes beyond creation ask for the same exact confirmation strings as the MCP tools of the same name.
+ * by those services. All writes ask for the same exact confirmation strings as the MCP tools of the same name.
  */
 const MODE = z.enum(SCHEDULE_MODES);
 const DESTINATION_MODES = z.record(z.string().min(1), MODE);
-const CREATE = REST_POST_CREATE_SCHEMA.extend({ scheduleMode: MODE.optional(), destinationScheduleModes: DESTINATION_MODES.optional() }).strict();
+const CREATE = REST_POST_CREATE_SCHEMA.extend({ confirmation: z.string().optional(), scheduleMode: MODE.optional(), destinationScheduleModes: DESTINATION_MODES.optional() }).strict();
 const INSTANT = z.string().datetime({ offset: true });
 const WHEN = z.object({ scheduledAt: INSTANT, confirmation: z.string() }).strict();
 const SCHEDULE = WHEN.extend({ scheduleMode: MODE.optional(), destinationScheduleModes: DESTINATION_MODES.optional() }).strict();
@@ -37,7 +37,7 @@ export async function keyCreatePost(viewer: McpViewer, input: unknown) {
   if (!data.scheduledAt && (data.scheduleMode || data.destinationScheduleModes)) throw new PublishingOperationError('invalid_request', 'chooseAScheduledAtBeforeChoosingWhereTheScheduleIs', {}, errorText);
   await assertRestPostLimits(data);
   const result = await createPostForApi(publishingActor(viewer), {
-    message: data.message, targetIds: data.targetIds, ...(data.firstComment === undefined ? {} : { firstComment: data.firstComment }),
+    confirmation: data.confirmation, message: data.message, targetIds: data.targetIds, ...(data.firstComment === undefined ? {} : { firstComment: data.firstComment }),
     ...(data.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: data.firstCommentDelayMinutes }),
     ...(data.link === undefined ? {} : { link: data.link }), ...(data.media === undefined ? {} : { media: data.media }),
     ...(data.destinationFormats === undefined ? {} : { destinationFormats: data.destinationFormats }),

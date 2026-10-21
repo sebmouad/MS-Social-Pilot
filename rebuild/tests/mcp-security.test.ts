@@ -282,7 +282,7 @@ describe('MCP workspace boundaries', () => {
     expect(publishingReads.list).not.toHaveBeenCalled();
   });
   it.each([
-    ['create_draft', { message: 'Hello', confirmation: 'CREATE DRAFT' }, () => mutations.create, { id: 'new-post', status: 'draft' }],
+    ['create_draft', { message: 'Hello', confirmation: 'CREATE POST' }, () => publishingMutations.create, { id: 'new-post', status: 'draft' }],
     ['duplicate_post', { postId: 'post-a', requestId: '5a985a8a-8234-494c-a2f7-a269ea50d111', confirmation: 'DUPLICATE POST post-a' }, () => postDuplicate, { sourcePostId: 'post-a', postId: '5a985a8a-8234-494c-a2f7-a269ea50d111', draftCreated: true }],
     ['reply_to_inbox', { kind: 'message', id: 'conversation-a', text: 'Hello', confirmation: 'REPLY message conversation-a' }, () => inboxMutations.reply, { ok: true, itemId: 'conversation-a' }],
     ['publish_post', { postId: 'post-a', confirmation: 'PUBLISH POST post-a' }, () => publishingMutations.publish, { postId: 'post-a', published: 1 }],
@@ -968,14 +968,16 @@ describe('MCP workspace boundaries', () => {
     expect((await missing.json()).result.isError).toBe(true);
     expect(mutations.create).not.toHaveBeenCalled();
 
-    const created = await call('create_draft', { message: ' hello ', confirmation: 'CREATE DRAFT' });
+    const created = await call('create_draft', { message: ' hello ', confirmation: 'CREATE POST' });
     expect((await created.json()).result.structuredContent).toEqual({ id: 'new-post', status: 'draft', mcpAuditRecorded: true });
-    expect(mutations.create).toHaveBeenCalledWith(viewer, 'hello');
+    expect(publishingMutations.create).toHaveBeenCalledWith({ userId: viewer.userId, workspaceId: viewer.workspaceId }, expect.objectContaining({ message: ' hello ', targetIds: [] }));
+    expect(mutations.create).not.toHaveBeenCalled();
     expect(db.$executeRaw).toHaveBeenCalled();
 
-    const deleted = await call('delete_draft', { postId: 'post-a', confirmation: 'DELETE DRAFT post-a' });
-    expect((await deleted.json()).result.structuredContent).toEqual({ id: 'post-a', deleted: true, mcpAuditRecorded: true });
-    expect(mutations.remove).toHaveBeenCalledWith(viewer, 'post-a');
+    const deleted = await call('delete_draft', { postId: 'post-a', confirmation: 'DELETE POST post-a LOCAL' });
+    expect((await deleted.json()).result.structuredContent).toMatchObject({ postId: 'post-a', localConfirmed: true, state: 'completed', mcpAuditRecorded: true });
+    expect(publishingMutations.remove).toHaveBeenCalledWith({ userId: viewer.userId, workspaceId: viewer.workspaceId }, 'post-a', false);
+    expect(mutations.remove).not.toHaveBeenCalled();
   });
 
   it('blocks MCP writes before a mutation while workspace deletion is pending', async () => {

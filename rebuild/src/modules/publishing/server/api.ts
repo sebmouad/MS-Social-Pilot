@@ -1,18 +1,16 @@
-import { loadPublishingMediaText } from './media-copy';
 import { loadPublishingCopy } from './customer-copy';
 import { prisma } from '@/server/data';
 import { firstCommentLabels, FIRST_COMMENT_REJECTED, firstCommentState } from '../first-comment-state';
-import { parsePublishingMedia } from '../media-support';
 import type { ScheduleMode } from '../remote-scheduling';
 import type { DestinationScheduleModes } from './schedule-modes';
-import { createPost } from './lifecycle';
+import { createPublishingPost } from './api-writes';
 import { readPublishingPostList } from './read';
 import type { PublishingActor } from './types';
 
 /**
  * Thin seams for key-authenticated surfaces (MCP list_posts, REST /api/v1/posts). They wrap the existing Publishing services without
  * adding or duplicating rules: authorization, channel ceilings, approval holds, format and media validation and audit all live in
- * `readPublishingPostList` and `createPost`.
+ * `readPublishingPostList` and the confirmed create boundary in `api-writes`.
  */
 
 /** The bounded post list with per-destination first-comment state, exactly as the MCP `list_posts` tool returns it. */
@@ -29,21 +27,16 @@ export async function listPostsWithFirstComment(actor: PublishingActor, input: u
 export type ApiPostInput = {
   message: string; targetIds: string[]; firstComment?: string; firstCommentDelayMinutes?: number; link?: string;
   media?: unknown; destinationFormats?: Record<string, string>; scheduledAt?: Date;
-  scheduleMode?: ScheduleMode; destinationScheduleModes?: DestinationScheduleModes;
+  scheduleMode?: ScheduleMode; destinationScheduleModes?: DestinationScheduleModes; confirmation?: string;
 };
 
 /**
- * Create a post as the actor: a local draft, or (with `scheduledAt`) a scheduled one. The shared `createPost` decides whether a
+ * Create a post as the actor: a local draft, or (with `scheduledAt`) a scheduled one. The shared lifecycle decides whether a
  * contributor's scheduled post is held for approval; the resulting status is read back so callers see the real outcome.
  */
 export async function createPostForApi(actor: PublishingActor, input: ApiPostInput) {
-  const mediaText = await loadPublishingMediaText();
-  const media = parsePublishingMedia(input.media ?? [], mediaText);
-  const created = await createPost(actor, {
-    message: input.message, firstComment: input.firstComment ?? '',
-    ...(input.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: input.firstCommentDelayMinutes }),
-    destinationFormats: input.destinationFormats, targetIds: input.targetIds, link: input.link, media,
-    ...(input.scheduledAt ? { scheduledAt: input.scheduledAt, ...(input.scheduleMode ? { scheduleMode: input.scheduleMode } : {}), ...(input.destinationScheduleModes ? { destinationScheduleModes: input.destinationScheduleModes } : {}) } : {}),
+  const created = await createPublishingPost(actor, {
+    ...input, ...(input.scheduledAt ? { scheduledAt: input.scheduledAt.toISOString() } : {}),
   });
   const { id } = created;
   const row = await prisma.post.findFirst({ where: { id, workspaceId: actor.workspaceId }, select: { status: true, scheduledAt: true } });

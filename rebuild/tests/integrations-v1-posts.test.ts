@@ -38,7 +38,7 @@ const viewer = (over: Record<string, unknown> = {}, features: Record<string, { r
   workspace: { id: 'workspace-a', name: 'Acme', timezone: 'UTC' }, maxResultItems: 100, resourceRestricted: !pageScope.all,
   permissions: { pageScope, features }, ...over,
 });
-const valid = { message: 'Hello', targetIds: ['t1'] };
+const valid = { message: 'Hello', targetIds: ['t1'], confirmation: 'CREATE POST' };
 const future = new Date(Date.now() + 86_400_000).toISOString();
 
 beforeEach(() => {
@@ -120,6 +120,13 @@ describe('POST /api/v1/posts', () => {
     expect((await post(valid)).status).toBe(403);
     expect(publishing.createPost).not.toHaveBeenCalled(); expect(db.$executeRaw).not.toHaveBeenCalled();
   });
+  it.each([undefined, 'CREATE DRAFT', 'CREATE POST ', 'CREATE POST other'])('refuses missing or different creation consent: %s', async confirmation => {
+    const response = await post({ ...valid, confirmation });
+    expect(response.status).toBe(400);
+    expect(await body(response)).toMatchObject({ code: 'invalid_request' });
+    expect(publishing.createPost).not.toHaveBeenCalled();
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+  });
   it('creates a draft through the Publishing service as the key owner and writes an audit receipt naming the key', async () => {
     const response = await post({ ...valid, firstComment: 'First!', link: 'https://example.com/a', media: [{ kind: 'image', url: 'https://example.com/i.png', altText: 'Alt' }] });
     expect(response.status).toBe(201);
@@ -146,10 +153,10 @@ describe('POST /api/v1/posts', () => {
   it('passes the selected-channel ceiling to the service; a destination outside it is refused and leaves no receipt', async () => {
     state.key = viewer({}, grants(true, true), { all: false, ids: ['t1'] });
     publishing.createPost.mockImplementation(async (_actor: unknown, input: { targetIds: string[] }) => { if (input.targetIds.includes('t2')) throw new OperationError('forbidden', 'Choose a channel this key can use.'); return { id: 'post-1' }; });
-    expect((await post({ message: 'ok', targetIds: ['t1'] })).status).toBe(201);
+    expect((await post({ message: 'ok', targetIds: ['t1'], confirmation: 'CREATE POST' })).status).toBe(201);
     expect(publishing.createPost.mock.calls[0]![0]).toEqual({ userId: 'user-a', workspaceId: 'workspace-a', allowedTargetIds: ['t1'] });
     db.$executeRaw.mockClear();
-    const refused = await post({ message: 'no', targetIds: ['t1', 't2'] });
+    const refused = await post({ message: 'no', targetIds: ['t1', 't2'], confirmation: 'CREATE POST' });
     expect(refused.status).toBe(403);
     expect(db.$executeRaw).not.toHaveBeenCalled();
   });
@@ -190,10 +197,10 @@ describe('POST /api/v1/posts', () => {
   });
   it('uses current Root field and collection limits after contract parsing', async () => {
     state.config['integrations.api.messageMaxCharacters'] = 3;
-    expect((await post({ message: 'Hello', targetIds: ['t1'] })).status).toBe(400);
+    expect((await post({ message: 'Hello', targetIds: ['t1'], confirmation: 'CREATE POST' })).status).toBe(400);
     state.config['integrations.api.messageMaxCharacters'] = 100;
     state.config['integrations.api.targetIdsMaxItems'] = 1;
-    expect((await post({ message: 'Hi', targetIds: ['t1', 't2'] })).status).toBe(400);
+    expect((await post({ message: 'Hi', targetIds: ['t1', 't2'], confirmation: 'CREATE POST' })).status).toBe(400);
     expect(publishing.createPost).not.toHaveBeenCalled();
   });
   it('maps a service failure to a safe error without internals', async () => {
