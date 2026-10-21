@@ -1,3 +1,4 @@
+vi.mock('server-only', () => ({}));
 vi.mock('@/modules/settings/channel-profiles/service', () => ({ readChannelProfiles: async () => ({ channels: [], groups: [] }) }));
 import { describe, expect, it, vi } from 'vitest';
 import { isValidElement, type ReactNode } from 'react';
@@ -8,7 +9,7 @@ vi.mock('@/server/permissions', () => ({ canAccessFeature: () => true }));
 vi.mock('@/server/entitlements', () => ({ canUseFeature: () => false }));
 vi.mock('@/modules/publishing/server/templates', () => ({ readTemplatePage: vi.fn() }));
 vi.mock('@/modules/publishing/server/destinations', () => ({ publishingDestinationChoices: async () => [] }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => ({
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'publishing.uiCopy' ? (await import('@/modules/publishing/ui/kit/copy')).publishingCopyDefaults : key === 'publishing.actionCopy' ? (await import('@/modules/publishing/action-catalog')).publishingActionCopy : key === 'publishing.composerCopy' ? (await import('@/modules/publishing/composer-catalog')).composerCatalogDefaults : ({
   'publishing.allowedImageMimeTypes': ['image/png'], 'publishing.maxImageUploadBytes': 5000,
   'publishing.maxImageAltCharacters': 120, 'publishing.maxMessageCharacters': 500,
   'publishing.maxRemoteMediaPerPost': 6, 'publishing.maxFirstCommentDelayMinutes': 45,

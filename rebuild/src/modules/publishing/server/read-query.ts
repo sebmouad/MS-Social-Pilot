@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { readChannelProfiles } from '@/modules/settings/channel-profiles/service';
 import { PostStatus, type Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
@@ -6,31 +9,34 @@ import { authorizePublishing } from './access';
 import { publishingPostVisibilityWhere, selectedPublishingTargetIds } from './read-scope';
 import type { PublishingActor, PublishingFeature } from './types';
 
-function invalid(message = 'Choose valid Publishing filters.'): never {
+function invalid(message: string | undefined = undefined, errorText: PublishingErrorText = defaultPublishingErrorText): never {
+  message ??= errorText('read_0');
   throw new OperationError('invalid_request', message);
 }
 
-function parseStatus(value: unknown): PostStatus | undefined {
+function parseStatus(value: unknown, errorText: PublishingErrorText = defaultPublishingErrorText): PostStatus | undefined {
   if (value === undefined || value === '') return undefined;
-  if (typeof value !== 'string' || !Object.values(PostStatus).includes(value as PostStatus)) invalid('Choose a valid post status.');
+  if (typeof value !== 'string' || !Object.values(PostStatus).includes(value as PostStatus)) invalid(errorText('read_1'), errorText);
   return value as PostStatus;
 }
 
 async function parseChannel(value: unknown): Promise<string | undefined> {
+  const errorText = await loadPublishingErrorText();
   if (value === undefined || value === '') return undefined;
   const max = await runtimeConfig('publishing.identifierMaxCharacters');
-  if (typeof value !== 'string' || value !== value.trim() || value.length > max || /[\u0000-\u001f\u007f]/.test(value)) invalid('Choose a valid channel filter.');
+  if (typeof value !== 'string' || value !== value.trim() || value.length > max || /[\u0000-\u001f\u007f]/.test(value)) invalid(errorText('read_2'), errorText);
   return value;
 }
 
 /** Normalize and validate the shared literal post-search input. */
 export async function publishingPostSearch(value: unknown): Promise<string> {
+  const errorText = await loadPublishingErrorText();
   if (value === undefined) return '';
   const max = await runtimeConfig('publishing.searchMaxCharacters');
-  if (typeof value !== 'string') invalid('Enter valid post search text.');
-  if (/[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u2028\u2029]/.test(value)) invalid('Search must fit on one line.');
+  if (typeof value !== 'string') invalid(errorText('read_3'), errorText);
+  if (/[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u2028\u2029]/.test(value)) invalid(errorText('read_4'), errorText);
   const q = value.trim();
-  if (q.length > max) invalid(`Search must be ${max.toLocaleString()} characters or fewer.`);
+  if (q.length > max) invalid(errorText('read_5', {value0: max.toLocaleString()}), errorText);
   return q;
 }
 
@@ -49,10 +55,11 @@ export async function publishingPostReadQuery(
   input: { status?: string; channelId?: string; q?: string },
   feature: PublishingFeature = 'publishing/posts',
 ): Promise<{ where: Prisma.PostWhereInput; filters: { status?: PostStatus; channelId?: string; q: string }; channelUnavailable: boolean; scope: { targetIds: string[]; authorId?: string } }> {
+  const errorText = await loadPublishingErrorText();
   if (!input || typeof input !== 'object' || Array.isArray(input)
     || ![Object.prototype, null].includes(Object.getPrototypeOf(input))
-    || Object.keys(input).some(key => !['status', 'channelId', 'q'].includes(key))) invalid();
-  const [postStatus, channelId, q] = await Promise.all([parseStatus(input.status), parseChannel(input.channelId), publishingPostSearch(input.q)]);
+    || Object.keys(input).some(key => !['status', 'channelId', 'q'].includes(key))) invalid(undefined, errorText);
+  const [postStatus, channelId, q] = await Promise.all([parseStatus(input.status, errorText), parseChannel(input.channelId), publishingPostSearch(input.q)]);
   const access = await authorizePublishing(actor, feature, 'read');
   const targetIds = await selectedPublishingTargetIds(actor.workspaceId, access.entitlements, access.actor.allowedTargetIds);
   const authorId = access.actor.allowedTargetIds === undefined ? undefined : actor.userId;

@@ -1,3 +1,4 @@
+import { inboxServiceText } from './service-copy';
 import { z } from 'zod';
 import { Prisma } from '../../../../generated/client';
 import { prisma } from '@/server/data';
@@ -11,7 +12,7 @@ import type { InboxReadActor, InboxReadConstraints, InboxLimits, InboxListItem, 
 
 const targetSelect = { id: true, name: true, providerId: true, socialAccount: { select: { provider: true } } } as const;
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
-const invalid = () => new OperationError('invalid_request', 'Choose valid Inbox filters, or reset to the latest items.');
+const invalid = async () => new OperationError('invalid_request', await inboxServiceText('service3'));
 type Key = { id: string; kind: 'message' | 'comment' | 'review'; time: Date };
 
 async function readLimits(): Promise<InboxLimits> {
@@ -26,11 +27,11 @@ function seek(cursor: InboxCursor | null) {
   const operator = cursor.direction === 'older' ? Prisma.sql`<` : Prisma.sql`>`;
   return Prisma.sql`WHERE (time, kind COLLATE "C", id COLLATE "C") ${operator} (${cursor.at}::timestamp, ${cursor.kind}::text COLLATE "C", ${cursor.id}::text COLLATE "C")`;
 }
-function pageKeys(rows: Key[], take: number, cursor: InboxCursor | null, fingerprint: string, maxCharacters: number): { keys: Key[] } & InboxPageCursors {
+function pageKeys(rows: Key[], take: number, cursor: InboxCursor | null, fingerprint: string, maxCharacters: number, cursorError: string): { keys: Key[] } & InboxPageCursors {
   const more = rows.length > take;
   const keys = rows.slice(0, take);
   if (cursor?.direction === 'newer') keys.reverse();
-  const encode = (key: Key | undefined, direction: 'older' | 'newer') => key ? encodeInboxCursor(key, direction, fingerprint, maxCharacters) : null;
+  const encode = (key: Key | undefined, direction: 'older' | 'newer') => key ? encodeInboxCursor(key, direction, fingerprint, maxCharacters, cursorError) : null;
   return { keys, olderCursor: cursor?.direction === 'newer' || more ? encode(keys.at(-1), 'older') : null, newerCursor: cursor && (cursor.direction === 'older' || more) ? encode(keys[0], 'newer') : null };
 }
 const literalSearch = (value: string) => `%${value.replace(/[\\%_]/g, character => `\\${character}`)}%`;
@@ -67,16 +68,17 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
   const access = await readAccess(actor, constraints);
   const limits = await readLimits();
   const parsed = z.object({ channelId: idSchema.optional(), kind: z.enum(['all', 'message', 'comment', 'review']).default('all'), state: z.enum(['open', 'resolved', 'all']).default('open'), hidden: z.enum(['visible', 'all']).default('visible'), q: z.string().trim().max(limits.searchMaxCharacters).default(''), cursor: z.string().max(limits.cursorMaxCharacters).optional(), limit: z.number().int().positive().safe().optional(), quick: z.array(z.enum(INBOX_QUICK_FILTERS)).max(INBOX_QUICK_FILTERS.length).default([]) }).strict().safeParse(input);
-  if (!parsed.success) throw invalid();
+  if (!parsed.success) throw await invalid();
   const { channelId, kind, state, hidden, q, limit: requestedLimit } = parsed.data;
   const quick = INBOX_QUICK_FILTERS.filter(filter => parsed.data.quick.includes(filter));
   const mentionPrefix = quick.includes('mentions') ? await runtimeConfig('inbox.mentionPrefix') : '';
-  if (quick.includes('mentions') && (typeof mentionPrefix !== 'string' || !mentionPrefix)) throw new OperationError('unavailable', 'The Mentions filter is currently unavailable.');
-  if (channelId && !access.channelIds.includes(channelId)) throw new OperationError('forbidden', 'Selected channel is unavailable. Choose another channel or reset the filters.');
+  if (quick.includes('mentions') && (typeof mentionPrefix !== 'string' || !mentionPrefix)) throw new OperationError('unavailable', await inboxServiceText('service45'));
+  if (channelId && !access.channelIds.includes(channelId)) throw new OperationError('forbidden', await inboxServiceText('service46'));
   const channelIds = channelId ? [channelId] : access.channelIds;
   const take = Math.min(requestedLimit ?? limits.listPageSize, limits.listPageSize, constraints.maxItems ?? limits.listPageSize);
+  const cursorError = await inboxServiceText('cursorInvalid');
   const fingerprint = inboxFilterFingerprint({ workspaceId: actor.workspaceId, channelIds: [...channelIds].sort(), kind, state, hidden, q, ...(quick.length ? { quick } : {}) });
-  const cursor = readInboxCursor(parsed.data.cursor, fingerprint, limits.cursorMaxCharacters);
+  const cursor = readInboxCursor(parsed.data.cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
   const filters = { channelId: channelId ?? null, kind, state, hidden, q };
   const base = { ...(quick.length ? { quick } : {}), filters, channels: access.channels, timeZone: access.timeZone, limits, limit: take, cursor: parsed.data.cursor ?? null };
   if (!channelIds.length) return { ...base, items: [], total: 0, olderCursor: null, newerCursor: null, lastSynced: null };
@@ -103,7 +105,7 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
     prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`SELECT COUNT(*) AS count FROM (${activity}) AS activity`),
     inboxLastSynced(actor.workspaceId, channelIds),
   ]);
-  const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters);
+  const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
   const items = await hydrateItems(actor.workspaceId, keys);
   return { ...base, ...cursors, items, total: Number(counts[0]?.count ?? 0), lastSynced };
 }
@@ -182,24 +184,25 @@ export async function readInboxThread(actor: InboxReadActor, input: unknown, con
   const access = await readAccess(actor, constraints);
   const limits = await readLimits();
   const parsed = z.object({ key: z.string().regex(/^(message|comment|review):[A-Za-z0-9_-]{1,200}$/), cursor: z.string().max(limits.cursorMaxCharacters).optional(), limit: z.number().int().positive().safe().optional() }).strict().safeParse(input);
-  if (!parsed.success) throw invalid();
+  if (!parsed.success) throw await invalid();
   const { key, cursor: encoded, limit: requestedLimit } = parsed.data;
   const [kind, id] = key.split(':') as ['message' | 'comment' | 'review', string];
   if (kind === 'review') {
-    if (encoded !== undefined) throw invalid();
+    if (encoded !== undefined) throw await invalid();
     const [review] = access.channelIds.length ? await readReviews(actor.workspaceId, [id], access.channelIds) : [];
-    if (!review) throw new OperationError('not_found', 'This review is unavailable. Choose another Inbox item.');
+    if (!review) throw new OperationError('not_found', await inboxServiceText('service47'));
     const entry: ThreadEntry = { id: review.id, author: review.reviewerName || 'Visitor', text: review.reviewText ?? '', time: review.createdTime, fromChannel: false, sentBy: null, parentId: null, depth: 0, hidden: false };
     return { thread: { kind, id, rating: review.rating, recommendation: recommendationOf(review.recommendationType), target: { id: review.target.id, name: review.target.name, providerId: review.target.providerId, provider: review.target.socialAccount?.provider ?? null }, resolved: Boolean(review.resolvedAt), hidden: false, postText: null, entries: [entry], lastInbound: null }, history: { olderCursor: null, newerCursor: null, total: 1, shown: 1, limit: 1, cursor: null } };
   }
   const take = Math.min(requestedLimit ?? limits.threadPageSize, limits.threadPageSize, constraints.maxItems ?? limits.threadPageSize);
+  const cursorError = await inboxServiceText('cursorInvalid');
   const fingerprint = inboxFilterFingerprint({ workspaceId: actor.workspaceId, channelIds: [...access.channelIds].sort(), thread: key });
-  const cursor = readInboxCursor(encoded, fingerprint, limits.cursorMaxCharacters);
-  if (cursor && cursor.kind !== kind) throw invalid();
-  if (!access.channelIds.length) throw new OperationError('not_found', 'This conversation is unavailable. Choose another Inbox item.');
+  const cursor = readInboxCursor(encoded, fingerprint, limits.cursorMaxCharacters, cursorError);
+  if (cursor && cursor.kind !== kind) throw await invalid();
+  if (!access.channelIds.length) throw new OperationError('not_found', await inboxServiceText('service23'));
   const conversation = kind === 'message' ? await prisma.conversation.findFirst({ where: { id, targetId: { in: access.channelIds }, target: { workspaceId: actor.workspaceId } }, select: { id: true, resolvedAt: true, target: { select: targetSelect } } }) : null;
   const comment = kind === 'comment' ? await prisma.postComment.findFirst({ where: { id, parentRemoteId: null, postTarget: { targetId: { in: access.channelIds }, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, postTargetId: true, message: true, fromName: true, fromId: true, sentById: true, createdTime: true, resolvedAt: true, isHidden: true, postTarget: { select: { target: { select: targetSelect }, post: { select: { message: true } } } } } }) : null;
-  if (!conversation && !comment) throw new OperationError('not_found', 'This conversation is unavailable. Choose another Inbox item.');
+  if (!conversation && !comment) throw new OperationError('not_found', await inboxServiceText('service23'));
   const target = conversation?.target ?? comment!.postTarget.target;
   const source = conversation ? Prisma.sql`SELECT id, 'message'::text AS kind, "createdTime" AS time FROM conversation_messages WHERE "conversationId" = ${id}`
     : Prisma.sql`SELECT id, 'comment'::text AS kind, "createdTime" AS time FROM post_comments WHERE "postTargetId" = ${comment!.postTargetId} AND "remoteId" IN (
@@ -214,7 +217,7 @@ export async function readInboxThread(actor: InboxReadActor, input: unknown, con
     prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`SELECT COUNT(*) AS count FROM (${source}) AS history`),
     conversation ? prisma.conversationMessage.findFirst({ where: { conversationId: id, sentById: null, fromId: { not: null }, NOT: { fromId: target.providerId } }, orderBy: [{ createdTime: 'desc' }, { id: 'desc' }], select: { fromId: true, createdTime: true } }) : Promise.resolve(null),
   ]);
-  const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters);
+  const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
   const ids = keys.map(item => item.id);
   const select = { id: true, message: true, fromName: true, fromId: true, sentById: true, createdTime: true } as const;
   type Stored = { id: string; message: string | null; fromName: string | null; fromId: string | null; sentById: string | null; createdTime: Date; remoteId?: string; parentRemoteId?: string | null; isHidden?: boolean };

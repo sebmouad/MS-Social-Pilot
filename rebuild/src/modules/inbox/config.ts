@@ -1,3 +1,4 @@
+import { inboxCustomerCopy, inboxCustomerCopySchema } from './customer-copy';
 import { z } from 'zod';
 import { entry, cron } from '@/lib/config/entry';
 import { INBOX_PRODUCTIVITY_CONFIG } from './productivity-config';
@@ -7,6 +8,7 @@ import { INBOX_DETAILS_CONFIG } from './details-config';
 
 /** Every Root setting this product module declares. The registry merges installed modules; edit only here. */
 export const INBOX_MODULE_CONFIG = [
+  entry({ key: 'inbox.customerCopy', group: 'Inbox · Language', label: 'Inbox customer copy', kind: 'json', description: 'English and French labels, empty states, dialogs, feedback, moderation and productivity copy.', defaultValue: inboxCustomerCopy, schema: inboxCustomerCopySchema, consumption: 'active' }),
   ...INBOX_PRODUCTIVITY_CONFIG,
   ...INBOX_MODERATION_CONFIG,
   ...INBOX_SYNC_CONFIG,

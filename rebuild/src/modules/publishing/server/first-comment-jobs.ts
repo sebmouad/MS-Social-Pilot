@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
@@ -60,8 +63,9 @@ async function readCandidates(now: Date, limit: number, maxDelayMinutes: number)
 
 /** Continue due first comments only; the normal author-bound service owns authorization and dispatch. */
 export async function runDueFirstComments(now = new Date()): Promise<DueFirstCommentSummary> {
+  const errorText = await loadPublishingErrorText();
   const [limit, maxDelayMinutes] = await Promise.all([runtimeConfig('sync.maxItemsPerJob'), runtimeConfig('publishing.maxFirstCommentDelayMinutes')]);
-  if (!positiveInteger(limit) || limit < 1 || !positiveInteger(maxDelayMinutes)) throw new OperationError('unavailable', 'Automatic first-comment settings are unavailable.');
+  if (!positiveInteger(limit) || limit < 1 || !positiveInteger(maxDelayMinutes)) throw new PublishingOperationError('unavailable', 'automaticFirstcommentSettingsAreUnavailable', {}, errorText);
   const rows = await readCandidates(now, limit, maxDelayMinutes);
   const result: DueFirstCommentSummary = { ...empty(), examined: rows.length };
   for (const row of rows) {

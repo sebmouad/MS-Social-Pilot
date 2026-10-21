@@ -1,3 +1,4 @@
+import { inboxServiceText } from './service-copy';
 import { platformInbox } from '@/server/platforms/registry';
 import type { ReplyRule } from './threads';
 
@@ -11,5 +12,5 @@ export interface InboxReplyPolicyRequest {
 /** Presentation metadata only. Mutations must recheck current authorization and policy. */
 export async function inboxReplyPolicy(provider: string | null, input: InboxReplyPolicyRequest): Promise<ReplyRule> {
   const host = provider ? await platformInbox(provider) : null;
-  return host ? host.replyPolicy(input) : { allowed: false, headline: 'Replies are not available for this channel.' };
+  return host ? host.replyPolicy(input) : { allowed: false, headline: await inboxServiceText('replyUnavailable') };
 }

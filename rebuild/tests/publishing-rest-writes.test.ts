@@ -121,3 +121,9 @@ describe('Publishing REST writes share one entry contract', () => {
     expect((await commentRoute(post('/x', {}), ctx('', 'bogus'))).status).toBe(404);
   });
 });
+
+// Error copy is supplied by Root at runtime; this isolated test uses its validated defaults.
+vi.mock('../src/modules/publishing/server/error-copy', async () => {
+  const { defaultPublishingErrorText } = await import('../src/modules/publishing/error-catalog');
+  return { loadPublishingErrorText: async () => defaultPublishingErrorText };
+});

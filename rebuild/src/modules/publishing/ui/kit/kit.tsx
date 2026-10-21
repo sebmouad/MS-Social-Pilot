@@ -1,8 +1,10 @@
+'use client';
+import { usePublishingCopy } from './CopyProvider';
 import type { ReactNode } from 'react';
 import { IconAlertTriangle, IconClockHour4, IconPlayerPlay, IconSend } from '@tabler/icons-react';
 import { Badge, EmptyState, PageHeader } from '@/components';
 import { ModuleGlyph, PageGlyph } from '@/components/icons';
-import { kitCopy, type KitLocale } from './copy';
+import { type KitLocale } from './copy';
 import styles from './kit.module.css';
 
 /**
@@ -36,7 +38,7 @@ export function Avatar({ name, src, size = 28 }: { name: string; src?: string | 
 
 /** Overlapping channel avatars with a names tooltip and a "+n" counter. */
 export function AvatarStack({ channels, max = 4, locale = 'en' }: { channels: Array<{ id: string; name: string; pictureUrl?: string | null }>; max?: number; locale?: KitLocale }) {
-  const copy = kitCopy[locale];
+  const copy = usePublishingCopy(locale);
   if (!channels.length) return <span className={styles.muted}>{copy.noDestinations}</span>;
   const shown = channels.slice(0, max);
   const extra = channels.length - shown.length;
@@ -60,7 +62,7 @@ export function EmptyPanel({ module = 'publishing', icon, title, children, actio
 
 /** Who sends the post at the scheduled time: this app, or the platform itself. */
 export function ScheduleBadge({ mode, locale = 'en', platformName }: { mode: 'application' | 'remote'; locale?: KitLocale; platformName?: string }) {
-  const copy = kitCopy[locale];
+  const copy = usePublishingCopy(locale);
   const remote = mode === 'remote';
   // The platform's own name comes from its module metadata; shared code never names a provider.
   return <span className={styles.schedule} title={remote ? copy.scheduledRemoteHint : copy.scheduledAppHint}>
@@ -70,7 +72,8 @@ export function ScheduleBadge({ mode, locale = 'en', platformName }: { mode: 'ap
 }
 
 export function AttentionHint({ locale = 'en' }: { locale?: KitLocale }) {
-  return <span className={styles.attention}><IconAlertTriangle size={12} stroke={1.9} aria-hidden="true" />{kitCopy[locale].needsAttention}</span>;
+  const copy = usePublishingCopy(locale);
+  return <span className={styles.attention}><IconAlertTriangle size={12} stroke={1.9} aria-hidden="true" />{copy.needsAttention}</span>;
 }
 
 export function MediaThumb({ url, alt, count, video }: { url: string | null; alt: string; count: number; video?: boolean }) {

@@ -1,4 +1,5 @@
 'use client';
+import { useInboxCatalog } from '../ui/copy-context';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/Button';
 import { useConfirm } from '@/components/useConfirm';
@@ -11,7 +12,8 @@ type Data = { rules: Rule[]; log: LogRow[]; channels: { id: string; name: string
 const blank = (): ModerationRuleInput => ({ name: '', enabled: true, targetIds: [], match: 'links', keywords: [], action: 'hide', replyText: null, dailyCap: 20, oncePerUser: true });
 
 export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean; locale?: ModerationLocale }) {
-  const t = (key: Parameters<typeof moderationText>[1], values?: Record<string, string | number>) => moderationText(locale, key, values);
+  const copy = useInboxCatalog('moderationCopy')[locale];
+  const t = (key: Parameters<typeof moderationText>[1], values?: Record<string, string | number>) => (copy[key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => values && name in values ? String(values[name]) : whole);
   const [data, setData] = useState<Data | null>(null);
   const [draft, setDraft] = useState<ModerationRuleInput | null>(null);
   const [editing, setEditing] = useState<string | null>(null);

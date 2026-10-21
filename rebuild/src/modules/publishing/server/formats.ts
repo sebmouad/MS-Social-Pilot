@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { OperationError } from '@/lib/operation-error';
 import type { PlatformAdapter, PublishMedia } from '@/platforms/types';
 import { platformFor } from '@/server/platforms/registry';
@@ -14,6 +17,7 @@ export async function resolveAuthorizedDestinationFormats(
   content: { media: readonly PublishMedia[]; link?: string | null; firstComment?: string | null; scheduled?: boolean },
   existing?: { formats: ReadonlyMap<string, string | null>; legacyFormat: string },
 ): Promise<Record<string, string>> {
+  const errorText = await loadPublishingErrorText();
   const explicit = parseDestinationFormats(input, targets.map(target => target.id), maxTargets);
   const result: Record<string, string> = Object.create(null);
   const adapters = new Map<string,Promise<PlatformAdapter|null>>();
@@ -21,7 +25,7 @@ export async function resolveAuthorizedDestinationFormats(
     const provider = target.socialAccount?.provider;
     if (provider && !adapters.has(provider)) adapters.set(provider, platformFor(provider, 'publishing'));
     const adapter = provider ? await adapters.get(provider)! : null;
-    if (!adapter?.publish) throw new OperationError('unavailable', 'A selected destination is unavailable.');
+    if (!adapter?.publish) throw new PublishingOperationError('unavailable', 'aSelectedDestinationIsUnavailable', {}, errorText);
     const formatId = resolveDestinationFormat({
       explicit: explicit[target.id], stored: existing?.formats.get(target.id),
       legacy: existing?.formats.has(target.id) ? existing.legacyFormat : undefined,

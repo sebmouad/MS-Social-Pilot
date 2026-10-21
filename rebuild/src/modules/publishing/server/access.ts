@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { prisma } from '@/server/data';
 import { canUseFeature, loadEntitlements } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
@@ -12,8 +15,9 @@ export async function authorizePublishing(
   feature: PublishingFeature = 'publishing/posts',
   access: 'read' | 'write' = 'write',
 ): Promise<PublishingAuthorization> {
+  const errorText = await loadPublishingErrorText();
   const user = await prisma.user.findUnique({ where: { id: actor.userId }, select: { disabledAt: true } });
-  if (!user || user.disabledAt) throw new OperationError('unauthorized', 'Sign in with an active account to manage posts.');
+  if (!user || user.disabledAt) throw new PublishingOperationError('unauthorized', 'signInWithAnActiveAccountToManagePosts', {}, errorText);
 
   const [entitlements, permissions, membership] = await Promise.all([
     loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }),
@@ -21,7 +25,7 @@ export async function authorizePublishing(
     prisma.membership.findFirst({ where: { userId: actor.userId, workspaceId: actor.workspaceId }, select: { role: true } }),
   ]);
   if (!membership || !entitlements || !permissions || !canUseFeature(entitlements, feature) || !canAccessFeature(permissions, feature, access)) {
-    throw new OperationError('forbidden', 'Publishing access is unavailable in this workspace.');
+    throw new PublishingOperationError('forbidden', 'publishingAccessIsUnavailableInThisWorkspace', {}, errorText);
   }
   await assertWorkspaceNotPurging(actor.workspaceId);
 

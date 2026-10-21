@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -13,11 +16,12 @@ export type AssignablePost = { id: string; message: string; status: string; sche
 
 /** Posts the caller may see (and, for contributors, only their own), newest first, with labels, for bulk assignment. One page = the bulk limit. */
 export async function listAssignablePosts(actor: PublishingActor, input: unknown = {}) {
-  const query = parse(SCHEMA, input);
+  const errorText = await loadPublishingErrorText();
+  const query = parse(SCHEMA, input, undefined, errorText);
   const limit = await bounds();
   const searchMax = await runtimeConfig('publishing.searchMaxCharacters');
-  if (!Number.isSafeInteger(searchMax) || searchMax < 1) throw new OperationError('unavailable', 'Search is temporarily unavailable.');
-  if ((query.q?.length ?? 0) > searchMax) throw new OperationError('invalid_request', 'The search is too long.');
+  if (!Number.isSafeInteger(searchMax) || searchMax < 1) throw new PublishingOperationError('unavailable', 'collaboration_38', {}, errorText);
+  if ((query.q?.length ?? 0) > searchMax) throw new PublishingOperationError('invalid_request', 'collaboration_39', {}, errorText);
   const auth = await authorizePublishing(actor, POSTS, 'read');
   const selected = await selectedPublishingTargetIds(actor.workspaceId, auth.entitlements, auth.actor.allowedTargetIds);
   const own = auth.actor.allowedTargetIds !== undefined || auth.role === 'contributor' ? actor.userId : undefined;

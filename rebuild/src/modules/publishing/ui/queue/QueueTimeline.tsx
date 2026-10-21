@@ -1,6 +1,8 @@
+'use client';
+import { usePublishingCopy } from '../kit/CopyProvider';
 import { Avatar, ScheduleBadge } from '../kit/kit';
-import { kitCopy, type KitLocale } from '../kit/copy';
-import { remotePlatformName } from '../posts/PostTableCells';
+import { type KitLocale } from '../kit/copy';
+import { remotePlatformName } from '../remote-platform-name';
 import { postContentSummary } from '@/modules/publishing/content-summary';
 import styles from './queue.module.css';
 
@@ -24,7 +26,7 @@ export function groupByChannel(posts: TimelinePost[]) {
 
 /** Upcoming slots per channel. Times are formatted by the server in the workspace time zone. */
 export function QueueTimeline({ posts, timeZone, locale = 'en', maxPerChannel }: { posts: TimelinePost[]; timeZone: string; locale?: KitLocale; maxPerChannel: number }) {
-  const copy = kitCopy[locale];
+  const copy = usePublishingCopy(locale);
   const channels = groupByChannel(posts);
   const time = new Intl.DateTimeFormat(locale, { timeZone, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   return <div className={styles.channels}>
@@ -36,10 +38,10 @@ export function QueueTimeline({ posts, timeZone, locale = 'en', maxPerChannel }:
         <ol className={styles.slots} aria-label={`${copy.queueTimeline} ${channel.name}`}>
           {shown.map(post => {
             const remote = post.targets.some(row => row.target.id === channel.id && row.status === 'scheduled_remote');
-            const platformName = remote ? remotePlatformName({ ...post, publishedAt: null, targets: post.targets.filter(row => row.target.id === channel.id) }) : undefined;
+            const platformName = remote ? remotePlatformName({ targets: post.targets.filter(row => row.target.id === channel.id) }) : undefined;
             return <li key={post.id} className={styles.slot}>
               <time className={styles.slotTime} dateTime={post.scheduledAt?.toISOString()}>{post.scheduledAt ? time.format(post.scheduledAt) : copy.queueUnscheduled}</time>
-              <span className={styles.slotText}>{postContentSummary(post.message, post.media, post.link) || copy.noText}</span>
+              <span className={styles.slotText}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
               <ScheduleBadge mode={remote ? 'remote' : 'application'} locale={locale} platformName={platformName} />
             </li>;
           })}

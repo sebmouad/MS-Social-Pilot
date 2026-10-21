@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { runtimeConfig } from '@/server/config/store';
 import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay';
 import { resolveAuthorizedDestinationFormats } from '@/modules/publishing/server/formats';
@@ -31,20 +34,21 @@ type Policy = { timezone: string; requiresApproval: boolean };
 type Stored = { format: string; approvalStatus: string; firstCommentDelayMinutes: number };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
 const MANAGERS = new Set(['owner', 'admin', 'editor']);
-const unavailable = () => new OperationError('conflict', 'This post is not ready for automatic scheduling. Review its content, approval and destinations.');
+const unavailable = (errorText: PublishingErrorText = defaultPublishingErrorText) => new PublishingOperationError('conflict', 'thisPostIsNotReadyForAutomaticSchedulingReview', {}, errorText);
 
 /** A system job keeps the original author's current publishing authority. Owner
  * qualification supplements that authority; it never impersonates an owner. */
 async function prepare(tx: Tx, workspaceId: string, postId: string, feature: Feature, replacementText?: string) {
+  const errorText = await loadPublishingErrorText();
   const postKey = JSON.stringify(['publishing-post', workspaceId, postId]);
   const locked = await tx.$queryRaw<Array<{ acquired: boolean }>>`SELECT pg_try_advisory_xact_lock(hashtextextended(${postKey}, 0)) AS acquired`;
-  if (locked[0]?.acquired !== true) throw unavailable();
+  if (locked[0]?.acquired !== true) throw unavailable(errorText);
   await tx.$queryRaw`SELECT id FROM posts WHERE id=${postId} AND "workspaceId"=${workspaceId} FOR UPDATE`;
   const post = await tx.post.findFirst({ where: { id: postId, workspaceId }, select: {
     id: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, publishedAt: true,
     targets: { select: { id: true, targetId: true, formatId: true, status: true, remotePostId: true } },
   } });
-  if (!post || !post.targets.length || !Array.isArray(post.media)) throw unavailable();
+  if (!post || !post.targets.length || !Array.isArray(post.media)) throw unavailable(errorText);
   const ids = post.targets.map(target => target.targetId);
   await lockPublishingTargets(tx, workspaceId, ids);
   await lockSelectedResources(tx, workspaceId, ids.map(id => ({ kind: 'target', id })));
@@ -52,31 +56,31 @@ async function prepare(tx: Tx, workspaceId: string, postId: string, feature: Fea
   await assertNoPendingPostDeletionForAliases(tx, workspaceId, [postId], post.targets.map(target => target.id));
   const actor = { userId: post.authorId, workspaceId };
   const auth = await lockActor(tx, actor, feature, true);
-  if (!WRITERS.has(auth.role)) throw unavailable();
+  if (!WRITERS.has(auth.role)) throw unavailable(errorText);
   await authorizePublishing(auth.actor, 'publishing/posts', 'write');
   const policies = await tx.$queryRaw<Policy[]>`SELECT timezone, "requiresApproval" FROM workspaces WHERE id=${workspaceId} FOR SHARE`;
   const policy = policies[0];
-  if (!policy || !isValidTimeZone(policy.timezone) || typeof policy.requiresApproval !== 'boolean') throw unavailable();
+  if (!policy || !isValidTimeZone(policy.timezone) || typeof policy.requiresApproval !== 'boolean') throw unavailable(errorText);
   const stored = (await tx.$queryRaw<Stored[]>`SELECT format, "approvalStatus"::text AS "approvalStatus", "firstCommentDelayMinutes" FROM posts WHERE id=${postId} AND "workspaceId"=${workspaceId}`)[0];
-  if (!stored) throw unavailable();
+  if (!stored) throw unavailable(errorText);
   parseFirstCommentDelay(stored.firstCommentDelayMinutes, await runtimeConfig('publishing.maxFirstCommentDelayMinutes'));
   const config = await limits();
-  const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as unknown as PublishMedia[] }, config.maxMedia, config.maxAlt);
-  const message = validatePostContent(replacementText ?? post.message, config.maxText, attachments);
-  const firstComment = validFirstComment(post.firstComment ?? '', config.maxText);
+  const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as unknown as PublishMedia[] }, config.maxMedia, config.maxAlt, errorText);
+  const message = validatePostContent(replacementText ?? post.message, config.maxText, attachments, errorText);
+  const firstComment = validFirstComment(post.firstComment ?? '', config.maxText, errorText);
   const media = await resolvePublishMedia(workspaceId, attachments.media);
   const destinations = await validateTargets(auth.actor, ids, config.maxTargets, media, Boolean(firstComment), attachments.link);
   const destinationFormats = await resolveAuthorizedDestinationFormats(destinations, undefined, config.maxTargets, {media,link:attachments.link,firstComment,scheduled:true},{formats:new Map(post.targets.map(t=>[t.targetId,t.formatId ?? null])),legacyFormat:stored.format});
   const targets = await tx.target.findMany({ where: { id: { in: ids }, workspaceId, enabled: true, canPublish: true },
     select: { id: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true } } } });
-  if (targets.length !== ids.length) throw unavailable();
+  if (targets.length !== ids.length) throw unavailable(errorText);
   for (const target of targets) {
     const provider = target.socialAccount?.provider;
-    if (!provider || !hasPlatformCapability(auth.entitlements, provider)) throw unavailable();
+    if (!provider || !hasPlatformCapability(auth.entitlements, provider)) throw unavailable(errorText);
     await assertWorkspaceJobAccess(workspaceId, { provider, anyFeatureOf: [feature] });
     const adapter = await platformFor(provider, 'publishing');
     if (!adapter || !readPublishingCredential(target, adapter, 'publishing') ||
-      (firstComment && !readPublishingCredential(target, adapter, 'firstComment'))) throw unavailable();
+      (firstComment && !readPublishingCredential(target, adapter, 'firstComment'))) throw unavailable(errorText);
   }
   await authorizePublishing(auth.actor, feature, 'write');
   await authorizePublishing(auth.actor, 'publishing/posts', 'write');
@@ -84,8 +88,9 @@ async function prepare(tx: Tx, workspaceId: string, postId: string, feature: Fea
 }
 
 async function systemAudit(tx: Tx, workspaceId: string, action: string, detail: object) {
+  const errorText = await loadPublishingErrorText();
   const changed = await tx.$executeRaw`INSERT INTO activity_logs (id, "workspaceId", "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${workspaceId}, NULL, ${action}, ${JSON.stringify(detail)}::jsonb, NOW())`;
-  if (changed !== 1) throw unavailable();
+  if (changed !== 1) throw unavailable(errorText);
 }
 
 /** Transactional system entry points, shared by the installed workers. No

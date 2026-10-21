@@ -1,12 +1,12 @@
 'use client';
+import { useInboxCatalog } from './copy-context';
 
 import { useRef, useState } from 'react';
 import { FilterPanel, FilterSection, Select, TextInput } from '@/components';
 import { Button } from '@/components/Button';
 import { reviewText } from '@/modules/inbox/reviews-copy';
 import { INBOX_QUICK_FILTERS, type InboxQuickFilter } from '@/modules/inbox/server/types';
-import { inboxCopy, type InboxLocale } from './copy';
-import { round3Copy } from './round3-copy';
+import type { InboxLocale } from './copy';
 import styles from './inbox-round3.module.css';
 
 type Filters = { channelId: string | null; kind: string; state: string; hidden: string; q: string };
@@ -19,8 +19,9 @@ export function InboxFilterPanel({ action, filters, channels, locale, thread, li
   action: string; filters: Filters; channels: Array<{ id: string; name: string }>; locale: InboxLocale; thread?: string;
   limit?: number; maxLimit?: number; searchMaxCharacters?: number; resetHref: string; disabledLimit: boolean; quick?: readonly InboxQuickFilter[];
 }) {
-  const copy = inboxCopy[locale];
-  const quickCopy = round3Copy[locale].quick;
+  const reviews = useInboxCatalog('reviewCopy');
+  const copy = useInboxCatalog('inboxCopy')[locale];
+  const quickCopy = useInboxCatalog('round3Copy')[locale].quick;
   const [quickOn, setQuickOn] = useState<readonly InboxQuickFilter[]>(quick);
   const toggleQuick = (filter: InboxQuickFilter) => { setQuickOn(current => current.includes(filter) ? current.filter(item => item !== filter) : [...current, filter]); apply(); };
   const form = useRef<HTMLFormElement>(null);
@@ -49,7 +50,7 @@ export function InboxFilterPanel({ action, filters, channels, locale, thread, li
       </FilterSection>
       <FilterSection label={copy.type}>
         <Select name="type" aria-label={copy.type} value={kind} onChange={value => { setKind(value); apply(); }}
-          options={[{ value: 'all', label: copy.allTypes }, { value: 'message', label: copy.messages }, { value: 'comment', label: copy.comments }, { value: 'review', label: reviewText(locale, 'reviews') }]} />
+          options={[{ value: 'all', label: copy.allTypes }, { value: 'message', label: copy.messages }, { value: 'comment', label: copy.comments }, { value: 'review', label: reviewText(locale, 'reviews', {}, reviews) }]} />
       </FilterSection>
       <FilterSection label={copy.status}>
         <Select name="status" aria-label={copy.status} value={state} onChange={value => { setState(value); apply(); }}

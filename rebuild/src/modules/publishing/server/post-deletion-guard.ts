@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 
@@ -10,6 +13,7 @@ export async function assertNoPendingPostDeletionForAliases(
   postIds: readonly string[],
   postTargetIds: readonly string[],
 ): Promise<void> {
+  const errorText = await loadPublishingErrorText();
   const uniquePostIds = [...new Set(postIds)];
   const uniquePostTargetIds = [...new Set(postTargetIds)];
   if (!uniquePostIds.length && !uniquePostTargetIds.length) return;
@@ -22,7 +26,7 @@ export async function assertNoPendingPostDeletionForAliases(
         OR "localPostTargetIds" && ${uniquePostTargetIds}::text[]
       )
     LIMIT 1`;
-  if (rows.length) throw new OperationError('conflict', 'A remote deletion needs review before this post can be changed. Check its deletion status first.');
+  if (rows.length) throw new PublishingOperationError('conflict', 'aRemoteDeletionNeedsReviewBeforeThisPostCan', {}, errorText);
 }
 
 /** Get only destination aliases recorded for this workspace and removed local post. */
@@ -44,6 +48,7 @@ export async function assertPostDeletionTargetsSettled(
   workspaceId: string,
   targetIds?: readonly string[],
 ): Promise<void> {
+  const errorText = await loadPublishingErrorText();
   if (targetIds?.length === 0) return;
   const rows = targetIds === undefined
     ? await tx.$queryRaw<Array<{ id: string }>>`
@@ -55,7 +60,7 @@ export async function assertPostDeletionTargetsSettled(
       WHERE "workspaceId" = ${workspaceId} AND state = ANY(${ACTIVE_DELETION_STATES}::text[])
         AND "targetId" = ANY(${[...new Set(targetIds)]}::text[])
       LIMIT 1`;
-  if (rows.length) throw new OperationError('conflict', 'A remote deletion needs review before this data or connection can be removed. Check its deletion status first.');
+  if (rows.length) throw new PublishingOperationError('conflict', 'aRemoteDeletionNeedsReviewBeforeThisDataOr', {}, errorText);
 }
 
 /** Prevent background status sync from reviving any non-rejected remote deletion identity. */
@@ -65,10 +70,11 @@ export async function assertNoPostDeletionForRemoteIdentity(
   targetId: string,
   remoteId: string,
 ): Promise<void> {
+  const errorText = await loadPublishingErrorText();
   const rows = await tx.$queryRaw<Array<{ id: string }>>`
     SELECT id FROM rebuild_post_deletions
     WHERE "workspaceId" = ${workspaceId} AND "targetId" = ${targetId} AND "remoteId" = ${remoteId}
       AND state <> 'rejected'
     LIMIT 1`;
-  if (rows.length) throw new OperationError('conflict', 'This remote post has a deletion record and cannot be restored by status sync.');
+  if (rows.length) throw new PublishingOperationError('conflict', 'thisRemotePostHasADeletionRecordAndCannot', {}, errorText);
 }

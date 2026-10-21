@@ -1,4 +1,5 @@
 'use client';
+import { useInboxCatalog } from './copy-context';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,7 +9,6 @@ import { useToast } from '@/components/Toast';
 import { BULK_INVERSE, bulkConfirmation, type BulkAction } from '@/modules/inbox/bulk';
 import { runBulkInboxAction } from './bulk-action';
 import { useInboxSelection, type SelectableItem } from './InboxSelection';
-import { round3Copy } from './round3-copy';
 import type { InboxLocale } from './copy';
 import styles from './inbox-round3.module.css';
 
@@ -21,7 +21,7 @@ const ASKS_FIRST: readonly BulkAction[] = ['hide', 'unhide', 'delete'];
  * service decides again on the server. Partly failed requests keep the failed items selected so none are lost.
  */
 export function BulkBar({ locale, maxItems }: { locale: InboxLocale; maxItems: number }) {
-  const copy = round3Copy[locale].bulk;
+  const copy = useInboxCatalog('round3Copy')[locale].bulk;
   const selection = useInboxSelection();
   const toast = useToast();
   const router = useRouter();

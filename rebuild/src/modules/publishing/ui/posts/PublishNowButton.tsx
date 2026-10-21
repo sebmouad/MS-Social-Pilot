@@ -2,11 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import { publishPostAction } from "./actions";
 
-/** Strings for the undo-send countdown; the Publishing catalog resolves the locale. */
-export const publishNowCopy = {
-  en: { publish: "Publish now", undo: "Undo", countdown: (seconds: number) => `Publishing in ${seconds} s` },
-  fr: { publish: "Publier maintenant", undo: "Annuler", countdown: (seconds: number) => `Publication dans ${seconds} s` },
-} as const;
+import { usePublishingActionText } from '../WorkflowSubmitButtons';
+import { publishingActionCopy, publishingActionText } from '../../action-catalog';
+/** Compatibility export for consumers that need bootstrap defaults. */
+export const publishNowCopy = Object.fromEntries((['en', 'fr'] as const).map(locale => {
+  const t = publishingActionText(publishingActionCopy, locale);
+  return [locale, { publish: t('publishNow'), undo: t('undo'), countdown: (seconds: number) => t('countdown', { seconds }) }];
+})) as Record<'en' | 'fr', { publish: string; undo: string; countdown: (seconds: number) => string }>;
 
 /**
  * "Publish now" with the workspace's undo-send window: nothing is sent while the
@@ -15,9 +17,10 @@ export const publishNowCopy = {
  */
 export function PublishNowButton({ postId, undoSendSeconds, disabled = false }: { postId: string; undoSendSeconds: number; disabled?: boolean }) {
   const [remaining, setRemaining] = useState<number | null>(null);
-  const [copy, setCopy] = useState<(typeof publishNowCopy)[keyof typeof publishNowCopy]>(publishNowCopy.en);
+  const t = usePublishingActionText();
+  const copy = { publish: t('publishNow'), undo: t('undo'), countdown: (seconds: number) => t('countdown', { seconds }) };
   const formRef = useRef<HTMLFormElement>(null);
-  useEffect(() => { setCopy((document.documentElement.lang || navigator.language).toLowerCase().startsWith("fr") ? publishNowCopy.fr : publishNowCopy.en); }, []);
+
   useEffect(() => {
     if (remaining === null) return;
     if (remaining <= 0) { setRemaining(null); formRef.current?.requestSubmit(); return; }

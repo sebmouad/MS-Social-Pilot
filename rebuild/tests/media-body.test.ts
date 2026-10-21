@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MediaBodyTooLarge, readBoundedImageForm } from '@/modules/publishing/server/media/body';
 
 describe('bounded image multipart parsing', () => {
@@ -20,4 +20,10 @@ describe('bounded image multipart parsing', () => {
     const request = new Request('http://localhost/api/media', { method: 'POST', headers: { 'content-type': 'multipart/form-data; boundary=test', 'content-length': '999' }, body: 'small' });
     await expect(readBoundedImageForm(request, 12)).rejects.toBeInstanceOf(MediaBodyTooLarge);
   });
+});
+
+// Error copy is supplied by Root at runtime; this isolated test uses its validated defaults.
+vi.mock('../src/modules/publishing/server/error-copy', async () => {
+  const { defaultPublishingErrorText } = await import('../src/modules/publishing/error-catalog');
+  return { loadPublishingErrorText: async () => defaultPublishingErrorText };
 });

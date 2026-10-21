@@ -1,3 +1,4 @@
+import { inboxServiceText } from './service-copy';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '../../../../generated/client';
 import { z } from 'zod';
@@ -26,13 +27,13 @@ import {
 export type ModerationRuleRow = ModerationRuleInput & { id: string; createdAt: Date; updatedAt: Date };
 export type ModerationLogRow = { id: string; ruleId: string | null; ruleName: string; targetId: string; authorName: string | null; message: string; action: string; error: string | null; undoneAt: Date | null; createdAt: Date; undoable: boolean };
 
-const invalid = (message = 'Choose a valid moderation rule action.') => new OperationError('invalid_request', message);
+const invalid = async (message?: string) => new OperationError('invalid_request', message ?? await inboxServiceText('moderationAction'));
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function limits() {
   const values = await Promise.all([runtimeConfig('inbox.moderationRuleLimit'), runtimeConfig('inbox.moderationLogLimit'), runtimeConfig('inbox.moderationFreshHours'), runtimeConfig('inbox.moderationRunMaxComments')]);
   const checked = z.tuple([z.number().int().min(1).max(500), z.number().int().min(1).max(1000), z.number().int().min(1).max(720), z.number().int().min(1).max(5000)]).safeParse(values);
-  if (!checked.success) throw new OperationError('unavailable', 'Moderation rules are currently unavailable.');
+  if (!checked.success) throw new OperationError('unavailable', await inboxServiceText('service26'));
   const [ruleLimit, logLimit, freshHours, runMaxComments] = checked.data;
   return { ruleLimit, logLimit, freshHours, runMaxComments };
 }
@@ -73,26 +74,26 @@ export async function readInboxModeration(actor: InboxReadActor) {
   };
 }
 
-function validateRule(rule: ModerationRuleInput, channelIds: readonly string[], every: boolean): ModerationRuleInput {
+async function validateRule(rule: ModerationRuleInput, channelIds: readonly string[], every: boolean): Promise<ModerationRuleInput> {
   const problem = moderationRuleProblem(rule);
-  if (problem === 'keywords') throw invalid('Add at least one word to look for.');
-  if (problem === 'reply') throw invalid('Write the reply to send.');
+  if (problem === 'keywords') throw await invalid(await inboxServiceText('keywordsRequired'));
+  if (problem === 'reply') throw await invalid(await inboxServiceText('replyRequired'));
   const targetIds = [...new Set(rule.targetIds)];
-  if (targetIds.length === 0 && !every) throw new OperationError('forbidden', 'Choose the channels this rule applies to.');
-  if (targetIds.some(id => !channelIds.includes(id))) throw new OperationError('not_found', 'One or more chosen channels are unavailable.');
+  if (targetIds.length === 0 && !every) throw new OperationError('forbidden', await inboxServiceText('service27'));
+  if (targetIds.some(id => !channelIds.includes(id))) throw new OperationError('not_found', await inboxServiceText('service28'));
   return { ...rule, targetIds, keywords: [...new Set(rule.keywords)], replyText: rule.action === 'reply' ? rule.replyText : rule.replyText || null };
 }
 
 export async function performInboxModerationAction(actor: InboxReadActor, input: unknown) {
   const parsed = moderationActionSchema.safeParse(input);
-  if (!parsed.success) throw invalid();
+  if (!parsed.success) throw await invalid();
   const value = parsed.data;
   const expected = value.action === 'rule.create' ? moderationConfirmation.create(value.rule.name)
     : value.action === 'rule.update' ? moderationConfirmation.update(value.id)
     : value.action === 'rule.delete' ? moderationConfirmation.remove(value.id)
     : value.action === 'rules.run' ? moderationConfirmation.run(value.channelId)
     : moderationConfirmation.undo(value.id);
-  if (value.confirmation !== expected) throw invalid(`Confirmation required: ${expected}`);
+  if (value.confirmation !== expected) throw await invalid(await inboxServiceText('confirmationRequired', { expected }));
   if (value.action === 'rules.run') return runInboxModerationRules(actor, value.channelId);
   if (value.action === 'action.undo') return undoInboxModerationAction(actor, value.id);
 
@@ -104,18 +105,18 @@ export async function performInboxModerationAction(actor: InboxReadActor, input:
     return prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['inbox-moderation-rules', actor.workspaceId])}, 0))::text`;
       if (value.action === 'rule.create') {
-        const rule = validateRule(value.rule, channelIds, every);
+        const rule = await validateRule(value.rule, channelIds, every);
         const count = await tx.$queryRaw<Array<{ count: bigint | number }>>`SELECT COUNT(*)::int AS count FROM moderation_rules WHERE "workspaceId" = ${actor.workspaceId}`;
-        if (Number(count[0]?.count ?? 0) >= cap.ruleLimit) throw new OperationError('conflict', `This workspace already has the maximum of ${cap.ruleLimit} moderation rules.`);
+        if (Number(count[0]?.count ?? 0) >= cap.ruleLimit) throw new OperationError('conflict', await inboxServiceText('ruleLimit', { limit: cap.ruleLimit }));
         const id = randomUUID();
         await tx.$executeRaw`INSERT INTO moderation_rules (id, "workspaceId", name, enabled, "targetIds", match, keywords, action, "replyText", "dailyCap", "oncePerUser", "createdAt", "updatedAt") VALUES (${id}, ${actor.workspaceId}, ${rule.name}, ${rule.enabled}, ${rule.targetIds}::text[], ${rule.match}, ${rule.keywords}::text[], ${rule.action}, ${rule.replyText}, ${rule.dailyCap}, ${rule.oncePerUser}, NOW(), NOW())`;
         await audit(actor, 'inbox.moderation_rule_created', { ruleId: id, targetIds: rule.targetIds, action: rule.action }, tx);
         return { ok: true as const, action: value.action, id };
       }
       const rows = await tx.$queryRaw<Array<{ targetIds: string[] }>>`SELECT "targetIds" FROM moderation_rules WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
-      if (!rows[0] || !ruleVisible(rows[0].targetIds, channelIds, every)) throw new OperationError('not_found', 'This moderation rule is unavailable.');
+      if (!rows[0] || !ruleVisible(rows[0].targetIds, channelIds, every)) throw new OperationError('not_found', await inboxServiceText('service29'));
       if (value.action === 'rule.update') {
-        const rule = validateRule(value.rule, channelIds, every);
+        const rule = await validateRule(value.rule, channelIds, every);
         await tx.$executeRaw`UPDATE moderation_rules SET name = ${rule.name}, enabled = ${rule.enabled}, "targetIds" = ${rule.targetIds}::text[], match = ${rule.match}, keywords = ${rule.keywords}::text[], action = ${rule.action}, "replyText" = ${rule.replyText}, "dailyCap" = ${rule.dailyCap}, "oncePerUser" = ${rule.oncePerUser}, "updatedAt" = NOW() WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
         await audit(actor, 'inbox.moderation_rule_updated', { ruleId: value.id, targetIds: rule.targetIds, action: rule.action, enabled: rule.enabled }, tx);
       } else {
@@ -139,7 +140,7 @@ export async function runInboxModerationRules(actor: InboxReadActor, channelId: 
   const access = await authorizeInbox(actor, ceiling(actor), 'write');
   const cap = await limits();
   const channelIds = channelId ? access.channelIds.filter(id => id === channelId) : access.channelIds;
-  if (channelId && !channelIds.length) throw new OperationError('not_found', 'This channel is unavailable in the Inbox.');
+  if (channelId && !channelIds.length) throw new OperationError('not_found', await inboxServiceText('service30'));
   const every = await hasEveryChannel(actor);
   const rules = (await readRules(actor.workspaceId)).filter(rule => rule.enabled && ruleVisible(rule.targetIds, access.channelIds, every));
   if (!rules.length || !channelIds.length) return { ok: true as const, action: 'rules.run' as const, examined: 0, acted: 0, failed: 0, skipped: 0 };
@@ -186,7 +187,7 @@ export async function runInboxModerationRules(actor: InboxReadActor, channelId: 
         await audit(actor, 'inbox.moderation_rule_applied', { ruleId: rule.id, actionId: claimId, targetId: comment.targetId, commentId: comment.id, action: rule.action });
       } catch (error) {
         result.failed++;
-        const reason = error instanceof OperationError ? error.message : 'The channel did not confirm this action.';
+        const reason = error instanceof OperationError ? error.message : await inboxServiceText('actionUnconfirmed');
         await prisma.$executeRaw`UPDATE moderation_actions SET error = ${reason.slice(0, 500)} WHERE id = ${claimId} AND "workspaceId" = ${actor.workspaceId}`;
       }
       // One rule per comment: a hidden comment needs no reply as well.
@@ -201,10 +202,10 @@ export async function undoInboxModerationAction(actor: InboxReadActor, actionId:
   const access = await authorizeInbox(actor, ceiling(actor), 'write');
   const rows = await prisma.$queryRaw<Array<{ id: string; targetId: string; remoteCommentId: string; action: string; error: string | null; undoneAt: Date | null; ruleName: string }>>`SELECT id, "targetId", "remoteCommentId", action, error, "undoneAt", "ruleName" FROM moderation_actions WHERE id = ${actionId} AND "workspaceId" = ${actor.workspaceId}`;
   const row = rows[0];
-  if (!row || !access.channelIds.includes(row.targetId)) throw new OperationError('not_found', 'This moderation action is unavailable.');
-  if (row.action !== 'hide' || row.error || row.undoneAt) throw new OperationError('conflict', 'This moderation action cannot be undone.');
+  if (!row || !access.channelIds.includes(row.targetId)) throw new OperationError('not_found', await inboxServiceText('service31'));
+  if (row.action !== 'hide' || row.error || row.undoneAt) throw new OperationError('conflict', await inboxServiceText('service32'));
   const comment = await prisma.postComment.findFirst({ where: { remoteId: row.remoteCommentId, postTarget: { targetId: row.targetId, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } }, select: { id: true } });
-  if (!comment) throw new OperationError('not_found', 'The comment is no longer stored, so this action cannot be undone here.');
+  if (!comment) throw new OperationError('not_found', await inboxServiceText('service33'));
   await withWorkspaceOperation(actor.workspaceId, () => moderateInboxComment(actor, { id: comment.id, hidden: false }));
   const changed = await prisma.$executeRaw`UPDATE moderation_actions SET "undoneAt" = NOW(), "undoneById" = ${actor.userId} WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} AND "undoneAt" IS NULL`;
   await audit(actor, 'inbox.moderation_action_undone', { actionId: row.id, targetId: row.targetId, commentId: comment.id });

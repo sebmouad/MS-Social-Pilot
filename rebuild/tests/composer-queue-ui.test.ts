@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({ preview: vi.fn(), save: vi.fn(), push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: h.push }) }));
 vi.mock('@/modules/publishing/ui/compose/queue-actions', () => ({ previewQueueAction: h.preview, saveQueueComposerAction: h.save }));
 vi.mock('@/modules/publishing/ui/posts/actions', () => ({ createPostWithRecoveryAction: vi.fn() }));
+import { composerCatalogDefaults, type ComposerCatalog } from '@/modules/publishing/composer-catalog';
 import { PostComposer } from '@/modules/publishing/ui/compose/PostComposer';
 import { SidebarDockContext } from '@/components/SidebarDock';
 let root: ReturnType<typeof createRoot>, container: HTMLDivElement, dock: HTMLDivElement;
@@ -16,9 +17,9 @@ beforeEach(() => {
   h.preview.mockResolvedValue({ status: 'ready', scheduledAt: '2026-10-23T10:00:00Z', channels: [{ targetId: 'a', nextAt: '2026-10-23T10:00:00Z' }] });
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); dock.remove(); });
-async function render(locale: 'en' | 'fr' = 'en', queueAvailable = true) {
+async function render(locale: 'en' | 'fr' = 'en', queueAvailable = true, copyCatalog?: ComposerCatalog) {
   await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: dock }, createElement(PostComposer, {
-    targets: [{ id: 'a', name: 'Studio channel', type: 'channel', provider: null, canPublish: true }], queueAvailable, aiLocale: locale,
+    copyCatalog, targets: [{ id: 'a', name: 'Studio channel', type: 'channel', provider: null, canPublish: true }], queueAvailable, aiLocale: locale,
     imageRules: { allowedMimeTypes: [], maxUploadBytes: 5000, maxAltCharacters: 120, maxMessageCharacters: 500, maxMedia: 2 },
     schedule: { date: '', time: '', timeZone: 'UTC' }, authorName: 'Team', createdAt: new Date('2026-10-20T00:00:00Z'), createdAtDisplay: 'Oct 20', maxFirstCommentDelayMinutes: 10080,
   }))));
@@ -60,4 +61,15 @@ it('blocks unavailable previews and hides queue without permission', async () =>
   expect(queueButton().disabled).toBe(true);
   await render('en', false);
   expect(queueButton()).toBeNull();
+});
+
+it('renders edited Root composer labels and queue actions in French', async () => {
+  const catalog = structuredClone(composerCatalogDefaults);
+  catalog.ui_postText.fr = 'Texte personnalisé ';
+  catalog.ui_saveDraft.fr = 'Conserver maintenant';
+  catalog.queue_button.fr = 'Créneau personnalisé';
+  await render('fr', true, catalog);
+  expect(container.querySelector('label[for="composer-message"]')?.textContent).toContain('Texte personnalisé');
+  expect(dock.querySelector('button[value="draft"]')?.textContent).toBe('Conserver maintenant');
+  expect(queueButton().textContent).toBe('Créneau personnalisé');
 });

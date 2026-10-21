@@ -1,3 +1,4 @@
+import { inboxServiceText } from './service-copy';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '@/server/data';
@@ -31,22 +32,22 @@ async function findItem(actor: InboxReadActor, allowedChannelIds: string[], inpu
 /** Resolve/reopen stored Inbox state. This workflow makes no platform call. */
 export async function setInboxWorkflowResolved(actor: InboxReadActor, input: unknown, constraints: InboxReadConstraints = {}) {
   const parsed = inputSchema.safeParse(input);
-  if (!parsed.success) throw new OperationError('invalid_request', 'Choose a valid Inbox item and resolution state.');
+  if (!parsed.success) throw new OperationError('invalid_request', await inboxServiceText('service48'));
   const value = parsed.data;
   const initialAccess = await authorizeInbox(actor, constraints, 'write');
-  if (!await findItem(actor, initialAccess.channelIds, value)) throw new OperationError('not_found', `This ${value.kind === 'message' ? 'conversation' : value.kind} is unavailable in the current workspace.`);
+  if (!await findItem(actor, initialAccess.channelIds, value)) throw new OperationError('not_found', await inboxServiceText('kindUnavailable', { kind: value.kind === 'message' ? 'conversation' : value.kind }));
 
   return withWorkspaceOperation(actor.workspaceId, async () => {
     // Refresh grants after a possible lock wait, immediately before local work.
     const access = await authorizeInbox(actor, constraints, 'write');
-    if (!access.channelIds.length) throw new OperationError('not_found', 'This Inbox item is unavailable in the current workspace.');
+    if (!access.channelIds.length) throw new OperationError('not_found', await inboxServiceText('service7'));
     const [timeout, maxWait] = await Promise.all([runtimeConfig('inbox.workflowTransactionTimeoutMs'), runtimeConfig('inbox.workflowTransactionMaxWaitMs')]);
     return prisma.$transaction(async tx => {
       if (value.kind === 'review') {
         const resolvedAt = value.resolved ? new Date() : null;
         const rows = await tx.$queryRaw<Array<{ targetId: string }>>`UPDATE page_reviews r SET "resolvedAt" = ${resolvedAt}
           FROM targets t WHERE r.id = ${value.id} AND t.id = r."targetId" AND t."workspaceId" = ${actor.workspaceId} AND t.id = ANY(${access.channelIds}) RETURNING r."targetId"`;
-        if (!rows[0]) throw new OperationError('not_found', 'This review is unavailable in the current workspace.');
+        if (!rows[0]) throw new OperationError('not_found', await inboxServiceText('service6'));
         const reviewDetail = JSON.stringify({ workspaceId: actor.workspaceId, targetId: rows[0].targetId, itemId: value.id, kind: value.kind });
         await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.userId}, ${`inbox.review_${value.resolved ? 'resolved' : 'reopened'}`}, ${reviewDetail}::jsonb, NOW())`;
         return { ok: true, kind: value.kind, id: value.id, resolved: value.resolved };
@@ -57,11 +58,11 @@ export async function setInboxWorkflowResolved(actor: InboxReadActor, input: unk
       const changed = value.kind === 'message'
         ? await tx.conversation.updateMany({ where: scope, data: { resolvedAt: value.resolved ? new Date() : null } })
         : await tx.postComment.updateMany({ where: scope, data: { resolvedAt: value.resolved ? new Date() : null } });
-      if (!changed.count) throw new OperationError('not_found', `This ${value.kind === 'message' ? 'conversation' : 'comment'} is unavailable in the current workspace.`);
+      if (!changed.count) throw new OperationError('not_found', await inboxServiceText('kindUnavailable', { kind: value.kind === 'message' ? 'conversation' : 'comment' }));
       const item = value.kind === 'message'
         ? await tx.conversation.findFirst({ where: scope, select: { targetId: true } })
         : await tx.postComment.findFirst({ where: scope, select: { postTarget: { select: { targetId: true } } } }).then(row => row ? { targetId: row.postTarget.targetId } : null);
-      if (!item) throw new OperationError('not_found', `This ${value.kind === 'message' ? 'conversation' : 'comment'} is unavailable in the current workspace.`);
+      if (!item) throw new OperationError('not_found', await inboxServiceText('kindUnavailable', { kind: value.kind === 'message' ? 'conversation' : 'comment' }));
       const action = `inbox.${value.kind === 'message' ? 'conversation' : 'comment'}_${value.resolved ? 'resolved' : 'reopened'}`;
       const detail = JSON.stringify({ workspaceId: actor.workspaceId, targetId: item.targetId, itemId: value.id, kind: value.kind });
       await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.userId}, ${action}, ${detail}::jsonb, NOW())`;

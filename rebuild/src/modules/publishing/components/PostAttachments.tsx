@@ -5,6 +5,8 @@ import { flushSync } from 'react-dom';
 import { Button } from '@/components/Button';
 import { FieldError } from '@/components/FormValidation';
 import styles from './PostAttachments.module.css';
+import { useAttachmentCopy } from '../ui/compose/CopyProvider';
+import { fillComposerCopy } from '../composer-catalog';
 
 export type PostMediaKind = 'image' | 'video';
 export type PostMediaItem = { kind: PostMediaKind; url: string; altText?: string };
@@ -13,6 +15,7 @@ export type PostAttachmentDraftItem = PostMediaItem & {
   source: 'url' | 'upload';
   file?: File;
   error?: string;
+  errorField?: 'alt' | 'attachment';
 };
 
 export type PostAttachmentOptions = {
@@ -83,6 +86,7 @@ function uploadedImageReference(value: string): boolean {
 }
 
 export function usePostAttachments(options: PostAttachmentOptions): PostAttachmentsController {
+  const c = useAttachmentCopy();
   const idPrefix = `post-attachments-${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
   const [items, setItems] = useState<PostAttachmentDraftItem[]>(() => fromSaved(options.initialMedia));
   const [uploading, setUploading] = useState(false);
@@ -95,22 +99,22 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
   const mediaJson = useMemo(() => JSON.stringify(media), [media]);
 
   const update = useCallback((clientId: string, change: Partial<PostAttachmentDraftItem>) => {
-    setItems(current => current.map(item => item.clientId === clientId ? { ...item, ...change, error: undefined } : item));
+    setItems(current => current.map(item => item.clientId === clientId ? { ...item, ...change, error: undefined, errorField: undefined } : item));
     setError('');
   }, []);
 
   const add = useCallback((kind: PostMediaKind, source: 'url' | 'upload', file?: File) => {
     const current = itemsRef.current;
     if (current.length >= options.maxMedia) {
-      setError(`Choose up to ${options.maxMedia} media attachments.`);
+      setError(fillComposerCopy(c.limit, { max: options.maxMedia }));
       return;
     }
     if (!options.allowedKinds.includes(kind)) {
-      setError(`This post cannot include ${kind === 'image' ? 'images' : 'videos'} for the selected destinations.`);
+      setError(fillComposerCopy(c.kindDenied, { kind: kind === 'image' ? c.images : c.videos }));
       return;
     }
     if (!options.allowMixedKinds && current.some(item => item.kind !== kind)) {
-      setError('Choose one media type for this post.');
+      setError(c.oneType);
       return;
     }
     const item: PostAttachmentDraftItem = {
@@ -122,25 +126,25 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
     setItems(previous => [...previous, item]);
     itemsRef.current = [...current, item];
     setError('');
-  }, [options.allowedKinds, options.allowMixedKinds, options.maxMedia]);
+  }, [options.allowedKinds, options.allowMixedKinds, options.maxMedia, c]);
 
   const addLocalImages = useCallback((files: readonly File[]) => {
     if (!files.length) return;
     const current = itemsRef.current;
     if (current.length + files.length > options.maxMedia) {
-      setError(`Choose up to ${options.maxMedia} media attachments. Remove an item or choose fewer images.`);
+      setError(fillComposerCopy(c.limitMany, { max: options.maxMedia }));
       return;
     }
     if (!options.allowedKinds.includes('image')) {
-      setError('Images are not available for the selected destinations.');
+      setError(c.imagesUnavailable);
       return;
     }
     if (options.allowedMimeTypes.length === 0) {
-      setError('Local image uploads are unavailable for the selected destinations.');
+      setError(c.uploadsUnavailable);
       return;
     }
     if (!options.allowMixedKinds && current.some(item => item.kind !== 'image')) {
-      setError('Choose one media type for this post.');
+      setError(c.oneType);
       return;
     }
     const additions = files.map(file => ({ clientId: newId(), kind: 'image' as const, source: 'upload' as const, url: '', altText: '', file }));
@@ -148,7 +152,7 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
     itemsRef.current = updated;
     setItems(updated);
     setError('');
-  }, [options.allowedKinds, options.allowedMimeTypes, options.allowMixedKinds, options.maxMedia]);
+  }, [options.allowedKinds, options.allowedMimeTypes, options.allowMixedKinds, options.maxMedia, c]);
   const addLocalImage = useCallback((file: File) => addLocalImages([file]), [addLocalImages]);
 
   const removeItem = useCallback((clientId: string) => {
@@ -175,43 +179,44 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
   const validate = useCallback(() => {
     let firstInvalidId: string | undefined;
     const errors = new Map<string, string>();
+    const altErrors = new Set<string>();
     const current = itemsRef.current;
     if (current.length > options.maxMedia) {
-      errors.set(current[options.maxMedia]?.clientId ?? current[0]?.clientId ?? '', `Choose up to ${options.maxMedia} media attachments.`);
+      errors.set(current[options.maxMedia]?.clientId ?? current[0]?.clientId ?? '', fillComposerCopy(c.limit, { max: options.maxMedia }));
     }
     for (const [index, item] of current.entries()) {
-      if (!options.allowedKinds.includes(item.kind)) errors.set(item.clientId, `This media type is not available for the selected destinations.`);
-      else if (!options.allowMixedKinds && current.some(other => other.kind !== item.kind)) errors.set(item.clientId, 'Choose one media type for this post.');
-      else if (item.kind === 'image' && item.altText?.length && item.altText.length > options.maxAltCharacters) errors.set(item.clientId, `Image descriptions must be ${options.maxAltCharacters} characters or fewer.`);
+      if (!options.allowedKinds.includes(item.kind)) errors.set(item.clientId, c.kindUnavailable);
+      else if (!options.allowMixedKinds && current.some(other => other.kind !== item.kind)) errors.set(item.clientId, c.oneType);
+      else if (item.kind === 'image' && item.altText?.length && item.altText.length > options.maxAltCharacters) { errors.set(item.clientId, fillComposerCopy(c.descriptionMax, { max: options.maxAltCharacters })); altErrors.add(item.clientId); }
       else if (item.file) {
-        if (options.allowedMimeTypes.length === 0) errors.set(item.clientId, 'Local image uploads are unavailable for the selected destinations. Remove this file or choose another supported attachment.');
+        if (options.allowedMimeTypes.length === 0) errors.set(item.clientId, c.uploadsUnsupported);
         else if (!options.allowedMimeTypes.includes(item.file.type) || item.file.size < 1 || item.file.size > options.maxUploadBytes) {
-          errors.set(item.clientId, `Choose an allowed image up to ${Math.ceil(options.maxUploadBytes / 1048576)} MB.`);
+          errors.set(item.clientId, fillComposerCopy(c.uploadSize, { max: Math.ceil(options.maxUploadBytes / 1048576) }));
         }
       } else if (item.source === 'upload') {
-        if (!uploadedImageReference(item.url)) errors.set(item.clientId, 'Choose the image file again before saving.');
+        if (!uploadedImageReference(item.url)) errors.set(item.clientId, c.chooseAgain);
       } else if (!safeRemoteUrl(item.url)) {
-        errors.set(item.clientId, 'Enter a complete HTTPS URL without a username or password.');
+        errors.set(item.clientId, c.invalidUrl);
       }
       if (errors.has(item.clientId) && !firstInvalidId) firstInvalidId = item.clientId;
       if (index >= options.maxMedia && !firstInvalidId) firstInvalidId = item.clientId;
     }
     if (errors.size) {
-      setItems(currentItems => currentItems.map(item => ({ ...item, error: errors.get(item.clientId) })));
-      setError('Review the highlighted media attachments before saving.');
+      setItems(currentItems => currentItems.map(item => ({ ...item, error: errors.get(item.clientId), errorField: errors.has(item.clientId) ? (altErrors.has(item.clientId) ? 'alt' as const : 'attachment' as const) : undefined })));
+      setError(c.review);
       if (firstInvalidId) {
         const firstInvalid = current.find(item => item.clientId === firstInvalidId)!;
-        const targetId = errors.get(firstInvalidId)?.toLowerCase().includes('description')
+        const targetId = altErrors.has(firstInvalid.clientId)
           ? `${idPrefix}-media-alt-${firstInvalid.clientId}`
           : firstInvalid.source === 'upload' ? `${idPrefix}-media-item-${firstInvalid.clientId}` : `${idPrefix}-media-url-${firstInvalid.clientId}`;
         requestAnimationFrame(() => document.getElementById(targetId)?.focus());
       }
       return false;
     }
-    setItems(currentItems => currentItems.map(item => ({ ...item, error: undefined })));
+    setItems(currentItems => currentItems.map(item => ({ ...item, error: undefined, errorField: undefined })));
     setError('');
     return true;
-  }, [idPrefix, options.allowedKinds, options.allowMixedKinds, options.maxAltCharacters, options.maxMedia, options.allowedMimeTypes, options.maxUploadBytes]);
+  }, [idPrefix, options.allowedKinds, options.allowMixedKinds, options.maxAltCharacters, options.maxMedia, options.allowedMimeTypes, options.maxUploadBytes, c]);
 
   const prepareUploads = useCallback(async () => {
     if (busy.current) return false;
@@ -226,14 +231,14 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
         if (!item.file) continue;
         if (options.allowedMimeTypes.length === 0) {
           flushSync(() => setItems(current => current.map(existing => existing.clientId === item.clientId
-            ? { ...existing, error: 'Local image uploads are unavailable for the selected destinations. Remove this file or choose another supported attachment.' }
+            ? { ...existing, error: c.uploadsUnsupported }
             : existing)));
           succeeded = false;
           continue;
         }
         if (!options.allowedMimeTypes.includes(item.file.type) || item.file.size < 1 || item.file.size > options.maxUploadBytes) {
           flushSync(() => setItems(current => current.map(existing => existing.clientId === item.clientId
-            ? { ...existing, error: `Choose an allowed image up to ${Math.ceil(options.maxUploadBytes / 1048576)} MB.` }
+            ? { ...existing, error: fillComposerCopy(c.uploadSize, { max: Math.ceil(options.maxUploadBytes / 1048576) }) }
             : existing)));
           succeeded = false;
           continue;
@@ -243,11 +248,11 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
           body.append('imageFile', item.file);
           const response = await fetch('/api/media', { method: 'POST', body });
           const result = await response.json().catch(() => ({})) as { reference?: unknown; error?: unknown };
-          if (!response.ok || typeof result.reference !== 'string' || !uploadedImageReference(result.reference)) throw new Error('The image could not be uploaded. Try again.');
+          if (!response.ok || typeof result.reference !== 'string' || !uploadedImageReference(result.reference)) throw new Error(c.uploadFailed);
           flushSync(() => {
             setItems(current => {
               const updated = current.map(existing => existing.clientId === item.clientId
-                ? { ...existing, url: result.reference as string, file: undefined, error: undefined }
+                ? { ...existing, url: result.reference as string, file: undefined, error: undefined, errorField: undefined }
                 : existing);
               itemsRef.current = updated;
               return updated;
@@ -256,7 +261,7 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
         } catch {
           succeeded = false;
           flushSync(() => setItems(current => current.map(existing => existing.clientId === item.clientId
-            ? { ...existing, error: 'The image could not be uploaded. Try again.' }
+            ? { ...existing, error: c.uploadFailed }
             : existing)));
         }
       }
@@ -277,13 +282,13 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
         return false;
       }
       // Flush validation and confirmed references before the caller resubmits its form.
-      flushSync(() => setItems(currentItems => currentItems.map(item => ({ ...item, error: undefined }))));
+      flushSync(() => setItems(currentItems => currentItems.map(item => ({ ...item, error: undefined, errorField: undefined }))));
       return true;
     } finally {
       busy.current = false;
       flushSync(() => setUploading(false));
     }
-  }, [idPrefix, options.allowedMimeTypes, options.maxUploadBytes, validate]);
+  }, [idPrefix, options.allowedMimeTypes, options.maxUploadBytes, validate, c]);
 
   return {
     idPrefix, items, media, mediaJson, uploading, error,
@@ -296,6 +301,7 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
 }
 
 export function PostAttachments({ controller, disabled = false }: { controller: PostAttachmentsController; disabled?: boolean }) {
+  const c = useAttachmentCopy();
   const fileInput = useRef<HTMLInputElement>(null);
   const canAddImages = controller.allowedKinds.includes('image');
   const canUploadLocalImages = canAddImages && controller.allowedMimeTypes.length > 0;
@@ -308,7 +314,7 @@ export function PostAttachments({ controller, disabled = false }: { controller: 
   };
 
   return <section className={styles.attachments} aria-labelledby={`${controller.idPrefix}-title`}>
-    <h3 id={`${controller.idPrefix}-title`}>Media attachments <span>(optional)</span></h3>
+    <h3 id={`${controller.idPrefix}-title`}>{c.heading}<span>{c.optional}</span></h3>
     {canUploadLocalImages && <input
       ref={fileInput}
       className={styles.filePicker}
@@ -317,7 +323,7 @@ export function PostAttachments({ controller, disabled = false }: { controller: 
       multiple
       accept={controller.allowedMimeTypes.join(',')}
       data-testid="local-image-input"
-      aria-label="Choose a local image"
+      aria-label={c.chooseImage}
       disabled={disabled || controller.uploading}
       onChange={event => {
         const files = Array.from(event.currentTarget.files ?? []);
@@ -326,44 +332,45 @@ export function PostAttachments({ controller, disabled = false }: { controller: 
       }}
     />}
     {controller.maxMedia > 0 && (canAddImages || canAddVideos) && <div className={styles.addControls}>
-      {canAddImages && <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => controller.addRemote('image')}>Add image URL</Button>}
-      {canAddVideos && <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => controller.addRemote('video')}>Add video URL</Button>}
-      {canUploadLocalImages && <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => fileInput.current?.click()}>Add local images</Button>}
+      {canAddImages && <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => controller.addRemote('image')}>{c.addImage}</Button>}
+      {canAddVideos && <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => controller.addRemote('video')}>{c.addVideo}</Button>}
+      {canUploadLocalImages && <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => fileInput.current?.click()}>{c.addLocal}</Button>}
     </div>}
-    {controller.maxMedia === 0 ? <p className={styles.empty}>Media attachments are unavailable for this workspace.</p>
-      : atLimit ? <p className={styles.empty}>{controller.items.length} of {controller.maxMedia} media attachments are used. Remove an attachment before adding another.</p>
-      : controller.allowedKinds.length === 0 && <p className={styles.empty}>Choose destinations that support images or videos to add media. Your draft can still be saved.</p>}
+    {controller.maxMedia === 0 ? <p className={styles.empty}>{c.unavailable}</p>
+      : atLimit ? <p className={styles.empty}>{fillComposerCopy(c.used, { used: controller.items.length, max: controller.maxMedia })}</p>
+      : controller.allowedKinds.length === 0 && <p className={styles.empty}>{c.chooseDestinations}</p>}
     {controller.error && <FieldError id={`${controller.idPrefix}-global-error`}>{controller.error}</FieldError>}
     <input type="hidden" name="mediaJson" value={controller.mediaJson} readOnly />
-    {controller.items.length === 0 ? <p className={styles.empty}>No media attachments added.</p> : <ol className={styles.list}>
+    {controller.items.length === 0 ? <p className={styles.empty}>{c.empty}</p> : <ol className={styles.list}>
       {controller.items.map((item, index) => <li className={styles.item} key={item.clientId} id={`${controller.idPrefix}-media-item-${item.clientId}`} tabIndex={item.error && item.source === 'upload' ? -1 : undefined} aria-describedby={item.error && item.source === 'upload' ? `${controller.idPrefix}-media-error-${item.clientId}` : undefined}>
-        <div className={styles.itemHeading}><strong>{item.kind === 'image' ? 'Image' : 'Video'} {index + 1}</strong>{item.file && <span>{item.file.name}</span>}</div>
+        <div className={styles.itemHeading}><strong>{item.kind === 'image' ? c.image : c.video} {index + 1}</strong>{item.file && <span>{item.file.name}</span>}</div>
         {item.source === 'url' ? <label className="ui-field">
-          <span>{item.kind === 'image' ? 'Image URL' : 'Video URL'} attachment {index + 1}</span>
+          <span>{fillComposerCopy(c.urlLabel, { kind: item.kind === 'image' ? c.imageUrl : c.videoUrl, n: index + 1 })}</span>
           <input className="ui-input" id={`${controller.idPrefix}-media-url-${item.clientId}`} name={`mediaUrl-${item.clientId}`} type="url" disabled={disabled || controller.uploading} value={item.url.startsWith('media:') ? `/api/media/${item.url.slice('media:'.length)}` : item.url} onChange={event => {
             const value = event.currentTarget.value;
             const mediaPrefix = '/api/media/';
             const stored = value.startsWith(mediaPrefix) ? `media:${value.slice(mediaPrefix.length)}` : value;
             controller.updateItem(item.clientId, { url: stored });
           }} aria-invalid={item.error ? true : undefined} aria-describedby={item.error ? `${controller.idPrefix}-media-error-${item.clientId}` : undefined} />
-        </label> : <div className={styles.localStatus}>{item.file ? 'Local image ready to upload' : 'Saved workspace image'}</div>}
+        </label> : <div className={styles.localStatus}>{item.file ? c.ready : c.saved}</div>}
         {item.kind === 'image' && <label className="ui-field">
-          <span>Image description attachment {index + 1} <span>(optional)</span></span>
-          <input className="ui-input" id={`${controller.idPrefix}-media-alt-${item.clientId}`} name={`mediaAlt-${item.clientId}`} type="text" disabled={disabled || controller.uploading} maxLength={controller.maxAltCharacters} value={item.altText ?? ''} onChange={event => controller.updateItem(item.clientId, { altText: event.currentTarget.value })} aria-invalid={item.error && /description/i.test(item.error) ? true : undefined} aria-describedby={item.error && /description/i.test(item.error) ? `${controller.idPrefix}-media-error-${item.clientId}` : undefined} />
+          <span>{fillComposerCopy(c.descriptionLabel, { n: index + 1 })} <span>{c.optional}</span></span>
+          <input className="ui-input" id={`${controller.idPrefix}-media-alt-${item.clientId}`} name={`mediaAlt-${item.clientId}`} type="text" disabled={disabled || controller.uploading} maxLength={controller.maxAltCharacters} value={item.altText ?? ''} onChange={event => controller.updateItem(item.clientId, { altText: event.currentTarget.value })} aria-invalid={item.error && item.errorField === 'alt' ? true : undefined} aria-describedby={item.error && item.errorField === 'alt' ? `${controller.idPrefix}-media-error-${item.clientId}` : undefined} />
         </label>}
         {item.error && <FieldError id={`${controller.idPrefix}-media-error-${item.clientId}`}>{item.error}</FieldError>}
         <div className={styles.itemActions}>
-          <Button size="sm" variant="quiet" aria-label={`Move attachment ${index + 1} up`} disabled={disabled || controller.uploading || index === 0} onClick={() => move(index, -1)}>Move up</Button>
-          <Button size="sm" variant="quiet" aria-label={`Move attachment ${index + 1} down`} disabled={disabled || controller.uploading || index === controller.items.length - 1} onClick={() => move(index, 1)}>Move down</Button>
-          <Button size="sm" variant="quiet" aria-label={`Remove attachment ${index + 1}`} disabled={disabled || controller.uploading} onClick={() => controller.removeItem(item.clientId)}>Remove</Button>
+          <Button size="sm" variant="quiet" aria-label={fillComposerCopy(c.moveUpLabel, { n: index + 1 })} disabled={disabled || controller.uploading || index === 0} onClick={() => move(index, -1)}>{c.moveUp}</Button>
+          <Button size="sm" variant="quiet" aria-label={fillComposerCopy(c.moveDownLabel, { n: index + 1 })} disabled={disabled || controller.uploading || index === controller.items.length - 1} onClick={() => move(index, 1)}>{c.moveDown}</Button>
+          <Button size="sm" variant="quiet" aria-label={fillComposerCopy(c.removeLabel, { n: index + 1 })} disabled={disabled || controller.uploading} onClick={() => controller.removeItem(item.clientId)}>{c.remove}</Button>
         </div>
       </li>)}
     </ol>}
-    {controller.uploading && <p className={styles.uploadStatus} role="status">Uploading images…</p>}
+    {controller.uploading && <p className={styles.uploadStatus} role="status">{c.uploading}</p>}
   </section>;
 }
 
 export function AuthoringMediaPreview({ controller }: { controller: PostAttachmentsController }) {
+  const c = useAttachmentCopy();
   const [objectUrls, setObjectUrls] = useState<Record<string, string>>({});
   useEffect(() => {
     const urls = Object.fromEntries(controller.items.filter(item => item.file).map(item => [item.clientId, URL.createObjectURL(item.file!)]));
@@ -371,14 +378,14 @@ export function AuthoringMediaPreview({ controller }: { controller: PostAttachme
     return () => Object.values(urls).forEach(url => URL.revokeObjectURL(url));
   }, [controller.items]);
   if (!controller.items.length) return null;
-  return <ol className={styles.previewList} aria-label="Attachment preview">
+  return <ol className={styles.previewList} aria-label={c.preview}>
     {controller.items.map((item, index) => {
       const localId = item.url.startsWith('media:') ? item.url.slice('media:'.length) : '';
       const src = item.file ? objectUrls[item.clientId] : localId ? (MEDIA_ID.test(localId) ? `/api/media/${encodeURIComponent(localId)}` : '') : safeRemoteUrl(item.url) ? item.url : '';
       return <li key={item.clientId}>
-        <span>{index + 1}. {item.kind === 'image' ? 'Image' : 'Video'}</span>
-        {item.kind === 'image' && src ? <img src={src} alt={item.altText?.trim() || 'Selected post image'} /> : null}
-        {item.kind === 'video' && src ? <video controls preload="metadata" src={src} aria-label={`Video attachment ${index + 1}`} /> : null}
+        <span>{index + 1}. {item.kind === 'image' ? c.image : c.video}</span>
+        {item.kind === 'image' && src ? <img src={src} alt={item.altText?.trim() || c.selectedImage} /> : null}
+        {item.kind === 'video' && src ? <video controls preload="metadata" src={src} aria-label={fillComposerCopy(c.videoLabel, { n: index + 1 })} /> : null}
         {item.kind === 'image' && item.altText?.trim() && <small>{item.altText}</small>}
       </li>;
     })}

@@ -1,3 +1,4 @@
+import { inboxServiceText } from './service-copy';
 import { z } from 'zod';
 import { Prisma } from '../../../../generated/client';
 import { prisma } from '@/server/data';
@@ -9,13 +10,13 @@ import { sentimentTrend, type InboxContactDetails, type SentimentPoint } from '.
 import type { InboxReadActor, InboxReadConstraints } from './types';
 
 const keySchema = z.object({ key: z.string().regex(/^(message|comment|review):[A-Za-z0-9_-]{1,200}$/) }).strict();
-const unavailable = () => new OperationError('not_found', 'This conversation is unavailable. Choose another Inbox item.');
+const unavailable = async () => new OperationError('not_found', await inboxServiceText('service23'));
 const targetSelect = { id: true, name: true, providerId: true, socialAccount: { select: { provider: true } } } as const;
 
 async function limits() {
   const values = await Promise.all([runtimeConfig('inbox.relatedPostsLimit'), runtimeConfig('inbox.sentimentTrendLimit')]);
   const checked = z.tuple([z.number().int().min(1).max(100), z.number().int().min(2).max(100)]).safeParse(values);
-  if (!checked.success) throw new OperationError('unavailable', 'Conversation details are currently unavailable.');
+  if (!checked.success) throw new OperationError('unavailable', await inboxServiceText('service24'));
   return { relatedPostsLimit: checked.data[0], sentimentTrendLimit: checked.data[1] };
 }
 
@@ -27,10 +28,10 @@ async function limits() {
  */
 export async function readInboxContactDetails(actor: InboxReadActor, input: unknown, constraints: InboxReadConstraints = {}): Promise<InboxContactDetails> {
   const parsed = keySchema.safeParse(input);
-  if (!parsed.success) throw new OperationError('invalid_request', 'Choose a valid conversation.');
+  if (!parsed.success) throw new OperationError('invalid_request', await inboxServiceText('service25'));
   const access = await authorizeInbox(actor, constraints);
   const [kind, id] = parsed.data.key.split(':') as ['message' | 'comment' | 'review', string];
-  if (!access.channelIds.length) throw unavailable();
+  if (!access.channelIds.length) throw await unavailable();
   const cap = await limits();
   const scope = { targetId: { in: [...access.channelIds] }, target: { workspaceId: actor.workspaceId } };
 
@@ -39,9 +40,9 @@ export async function readInboxContactDetails(actor: InboxReadActor, input: unkn
       SELECT r.id, r."targetId", r."reviewerName", r."createdTime", r."resolvedAt" FROM page_reviews r JOIN targets t ON t.id = r."targetId"
       WHERE r.id = ${id} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(access.channelIds)})`);
     const review = rows[0];
-    if (!review) throw unavailable();
+    if (!review) throw await unavailable();
     const target = await prisma.target.findFirst({ where: { id: review.targetId, workspaceId: actor.workspaceId }, select: targetSelect });
-    if (!target) throw unavailable();
+    if (!target) throw await unavailable();
     return {
       kind, id, person: { name: review.reviewerName || 'Visitor', remoteId: null }, channel: { id: target.id, name: target.name, provider: target.socialAccount?.provider ?? null },
       firstSeen: review.createdTime, messageCount: 1, identityKnown: false, relatedPosts: [], relatedPostsMore: false,
@@ -55,7 +56,7 @@ export async function readInboxContactDetails(actor: InboxReadActor, input: unkn
   let ownComment: { postTargetId: string; createdTime: Date; sentiment: string | null } | null = null;
   if (kind === 'message') {
     const conversation = await prisma.conversation.findFirst({ where: { id, ...scope }, select: { assigneeId: true, unreadCount: true, resolvedAt: true, target: { select: targetSelect } } });
-    if (!conversation) throw unavailable();
+    if (!conversation) throw await unavailable();
     target = conversation.target;
     // The other side of the conversation is whoever wrote the newest message that is not the channel's own.
     const inbound = await prisma.conversationMessage.findFirst({ where: { conversationId: id, sentById: null, NOT: { fromId: target.providerId } }, orderBy: [{ createdTime: 'desc' }, { id: 'desc' }], select: { fromId: true, fromName: true } });
@@ -63,7 +64,7 @@ export async function readInboxContactDetails(actor: InboxReadActor, input: unkn
     state = { resolved: Boolean(conversation.resolvedAt), hidden: false, unread: conversation.unreadCount, assignee: null, assigneeId: conversation.assigneeId };
   } else {
     const comment = await prisma.postComment.findFirst({ where: { id, parentRemoteId: null, postTarget: { ...scope, post: { workspaceId: actor.workspaceId } } }, select: { fromId: true, fromName: true, resolvedAt: true, isHidden: true, assigneeId: true, postTargetId: true, createdTime: true, sentiment: true, postTarget: { select: { target: { select: targetSelect } } } } });
-    if (!comment) throw unavailable();
+    if (!comment) throw await unavailable();
     target = comment.postTarget.target;
     person = { name: comment.fromName || 'Visitor', remoteId: comment.fromId };
     ownComment = { postTargetId: comment.postTargetId, createdTime: comment.createdTime, sentiment: comment.sentiment };

@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { randomUUID, createHash } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
@@ -20,15 +23,18 @@ type Context = { actor: PublishingActor; role: string; signal: AbortSignal; dueA
 type CommentReceipt = { ok: true; postId: string; postTargetId: string; state: 'sent' | 'needs_review' | 'ready' | 'scheduled' };
 const receipt = (input: Input, state: CommentReceipt['state']): CommentReceipt => ({ ok: true, postId: input.postId, postTargetId: input.postTargetId, state });
 
-async function validId(id: unknown, message = 'Choose a valid publishing record.') {
+async function validId(id: unknown, message: string | undefined = undefined) {
+  const errorText = await loadPublishingErrorText();
+  message ??= errorText('chooseAValidPublishingRecord');
   const max = await runtimeConfig('publishing.identifierMaxCharacters');
   if (typeof id !== 'string' || !id.trim() || id !== id.trim() || id.length > max || /[\u0000-\u001f\u007f]/.test(id)) throw new OperationError('invalid_request', message);
 }
 
 async function delivery(context: Context, input: Input) {
+  const errorText = await loadPublishingErrorText();
   const authority = await authorizePublishing(context.actor, 'publishing/posts', 'write');
   context = { ...context, actor: authority.actor, role: authority.role };
-  if (!['owner', 'admin', 'editor', 'contributor'].includes(context.role)) throw new OperationError('forbidden', 'You cannot manage first comments.');
+  if (!['owner', 'admin', 'editor', 'contributor'].includes(context.role)) throw new PublishingOperationError('forbidden', 'youCannotManageFirstComments', {}, errorText);
   await validId(input.postTargetId);
   const row = await prisma.postTarget.findFirst({
     where: { id: input.postTargetId, postId: input.postId, post: { workspaceId: context.actor.workspaceId }, target: { workspaceId: context.actor.workspaceId } },
@@ -38,25 +44,26 @@ async function delivery(context: Context, input: Input) {
     },
   });
   if (!row || (context.actor.allowedTargetIds !== undefined && !context.actor.allowedTargetIds.includes(row.targetId)) ||
-    (!['owner', 'admin', 'editor'].includes(context.role) && row.post.authorId !== context.actor.userId)) throw new OperationError('not_found', 'This publishing record is unavailable.');
-  if (row.target.workspaceId !== context.actor.workspaceId || row.target.socialAccount?.workspaceId !== context.actor.workspaceId || !row.target.enabled) throw new OperationError('not_found', 'This publishing destination is unavailable.');
-  if (!row.post.firstComment?.trim() || row.status !== 'published' || !row.remotePostId) throw new OperationError('conflict', 'The post must be confirmed published before managing its first comment.');
+    (!['owner', 'admin', 'editor'].includes(context.role) && row.post.authorId !== context.actor.userId)) throw new PublishingOperationError('not_found', 'thisPublishingRecordIsUnavailable', {}, errorText);
+  if (row.target.workspaceId !== context.actor.workspaceId || row.target.socialAccount?.workspaceId !== context.actor.workspaceId || !row.target.enabled) throw new PublishingOperationError('not_found', 'thisPublishingDestinationIsUnavailable', {}, errorText);
+  if (!row.post.firstComment?.trim() || row.status !== 'published' || !row.remotePostId) throw new PublishingOperationError('conflict', 'thePostMustBeConfirmedPublishedBeforeManagingIts', {}, errorText);
   return row;
 }
 
 /** Internal continuation of the already-guarded publish operation. No post is created here. */
 export async function attemptFirstCommentInOperation(context: Context, input: Input): Promise<CommentReceipt> {
+  const errorText = await loadPublishingErrorText();
   const { actor, signal } = context;
   const row = await delivery(context, input);
   const state = firstCommentState(row.post.firstComment, row);
   if (context.retryRejected) {
-    if (state !== 'ready' || row.firstCommentError !== FIRST_COMMENT_REJECTED || row.firstCommentAt || row.firstCommentId) throw new OperationError('conflict', 'Only a definitely rejected first comment can be retried. Refresh this post and review its current outcome.');
+    if (state !== 'ready' || row.firstCommentError !== FIRST_COMMENT_REJECTED || row.firstCommentAt || row.firstCommentId) throw new PublishingOperationError('conflict', 'onlyADefinitelyRejectedFirstCommentCanBeRetried', {}, errorText);
   } else if (row.firstCommentError === FIRST_COMMENT_REJECTED && state === 'ready') {
-    throw new OperationError('conflict', 'This first comment was rejected. Use the separately confirmed retry action.');
+    throw new PublishingOperationError('conflict', 'thisFirstCommentWasRejectedUseTheSeparatelyConfirmed', {}, errorText);
   }
   if (state === 'sent') return receipt(input, 'sent');
   if (state !== 'ready') return receipt(input, 'needs_review');
-  if (context.automatic && (row.post.authorId !== actor.userId || row.firstCommentError !== null)) throw new OperationError('conflict', 'This first comment requires a manual decision before retrying.');
+  if (context.automatic && (row.post.authorId !== actor.userId || row.firstCommentError !== null)) throw new PublishingOperationError('conflict', 'thisFirstCommentRequiresAManualDecisionBeforeRetrying', {}, errorText);
   const maxDelay = await runtimeConfig('publishing.maxFirstCommentDelayMinutes');
   const delay = parseFirstCommentDelay(row.post.firstCommentDelayMinutes, maxDelay);
   if (context.dueAt) {
@@ -71,17 +78,17 @@ export async function attemptFirstCommentInOperation(context: Context, input: In
   ]);
   if (!provider || !source || connectionState(source) !== 'connected' || !row.target.enabled || !row.target.canPublish || !row.target.accessToken ||
     !entitlements || !hasPlatformCapability(entitlements, provider) || !adapter?.publishFirstComment || !adapter.supportsTargetKind?.(row.target.type, 'publishing')) {
-    throw new OperationError('unavailable', 'This destination cannot send its first comment right now. Check its connection, then try again.');
+    throw new PublishingOperationError('unavailable', 'thisDestinationCannotSendItsFirstCommentRightNow', {}, errorText);
   }
   const credential = readPublishingCredential(row.target, adapter, 'firstComment');
-  if (!credential) throw new OperationError('unavailable', 'Reconnect this destination before sending its first comment.');
+  if (!credential) throw new PublishingOperationError('unavailable', 'reconnectThisDestinationBeforeSendingItsFirstComment', {}, errorText);
   if (context.automatic) await assertWorkspaceJobAccess(actor.workspaceId, { provider: provider!, anyFeatureOf: ['publishing/posts'] });
   const selectedFormat = availablePublishingFormats(adapter.publishingFormats).find(format => format.id === (row.formatId ?? row.post.format));
-  if (!selectedFormat?.firstComment) throw new OperationError('unavailable', 'This publishing format cannot send a first comment.');
+  if (!selectedFormat?.firstComment) throw new PublishingOperationError('unavailable', 'thisPublishingFormatCannotSendAFirstComment', {}, errorText);
   const snapshot = createHash('sha256').update(JSON.stringify(row)).digest('hex');
   const maxId = await runtimeConfig('publishing.identifierMaxCharacters');
   const [receiptTimeout, receiptMaxWait] = await Promise.all([runtimeConfig('publishing.transactionTimeoutMs'), runtimeConfig('publishing.transactionMaxWaitMs')]);
-  if (![maxId, receiptTimeout, receiptMaxWait].every(value => Number.isSafeInteger(value) && value > 0)) throw new OperationError('unavailable', 'First comment receipt storage is unavailable.');
+  if (![maxId, receiptTimeout, receiptMaxWait].every(value => Number.isSafeInteger(value) && value > 0)) throw new PublishingOperationError('unavailable', 'firstCommentReceiptStorageIsUnavailable', {}, errorText);
   const saveReceipt = <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => prisma.$transaction(work, { timeout: receiptTimeout, maxWait: receiptMaxWait });
   const attemptedAt = new Date();
   const claim = await withPublishingTransaction(signal, async tx => {
@@ -100,20 +107,20 @@ export async function attemptFirstCommentInOperation(context: Context, input: In
     if (createHash('sha256').update(JSON.stringify(fresh)).digest('hex') !== snapshot || !currentAdapter?.publishFirstComment ||
       !currentCredential || currentCredential.accessToken !== credential.accessToken || JSON.stringify(currentCredential.grantedScopes) !== JSON.stringify(credential.grantedScopes) ||
       currentAdapter.statusPolicyFingerprint !== adapter.statusPolicyFingerprint || !currentEntitlements || !hasPlatformCapability(currentEntitlements, provider!) ||
-      !availablePublishingFormats(currentAdapter.publishingFormats).some(format => format.id === selectedFormat.id && format.firstComment)) throw new OperationError('conflict', 'This first comment or connection changed. Refresh before continuing.');
+      !availablePublishingFormats(currentAdapter.publishingFormats).some(format => format.id === selectedFormat.id && format.firstComment)) throw new PublishingOperationError('conflict', 'thisFirstCommentOrConnectionChangedRefreshBeforeContinuing', {}, errorText);
     const result = await tx.postTarget.updateMany({ where: { id: row.id, postId: input.postId, status: 'published', remotePostId: row.remotePostId,
       firstCommentId: null, firstCommentAt: null, firstCommentError: row.firstCommentError }, data: { firstCommentAt: attemptedAt, firstCommentError: null } });
     if (result.count === 1) await audit(tx, actor, context.retryRejected ? 'publishing.first_comment_retry_started' : 'publishing.first_comment_started', { ...input, ...(context.retryRejected ? { previousOutcome: 'rejected' } : {}) });
     return result;
   });
-  if (claim.count !== 1) throw new OperationError('conflict', 'The first comment changed. Refresh this post before continuing.');
+  if (claim.count !== 1) throw new PublishingOperationError('conflict', 'theFirstCommentChangedRefreshThisPostBeforeContinuing', {}, errorText);
   let remoteId: string;
   let providerResolved = false;
   try {
     signal.throwIfAborted();
     const result = await adapter.publishFirstComment({ credential, remotePostId: row.remotePostId!, text: row.post.firstComment!, signal });
     providerResolved = true;
-    if (typeof result.remoteId !== 'string' || !result.remoteId.trim() || result.remoteId !== result.remoteId.trim() || result.remoteId.length > maxId || /[\u0000-\u001f\u007f]/.test(result.remoteId)) throw new OperationError('upstream_failure', 'The comment outcome needs review.');
+    if (typeof result.remoteId !== 'string' || !result.remoteId.trim() || result.remoteId !== result.remoteId.trim() || result.remoteId.length > maxId || /[\u0000-\u001f\u007f]/.test(result.remoteId)) throw new PublishingOperationError('upstream_failure', 'theCommentOutcomeNeedsReview', {}, errorText);
     remoteId = result.remoteId;
   } catch (error) {
     let rejected = false;
@@ -123,7 +130,7 @@ export async function attemptFirstCommentInOperation(context: Context, input: In
       await saveReceipt(async tx => {
         const result = await tx.postTarget.updateMany({ where: { id: row.id, postId: input.postId, targetId: row.targetId, status: 'published', remotePostId: row.remotePostId, post: { workspaceId: actor.workspaceId }, firstCommentId: null, firstCommentAt: attemptedAt },
           data: { firstCommentAt: rejected ? null : attemptedAt, firstCommentError: rejected ? FIRST_COMMENT_REJECTED : 'rebuild:first_comment_uncertain' } });
-        if (result.count !== 1) throw new OperationError('conflict', 'The first comment changed. Refresh this post before continuing.');
+        if (result.count !== 1) throw new PublishingOperationError('conflict', 'theFirstCommentChangedRefreshThisPostBeforeContinuing', {}, errorText);
         await audit(tx, actor, rejected ? 'publishing.first_comment_rejected' : 'publishing.first_comment_uncertain', input);
       });
       recorded = true;
@@ -133,7 +140,7 @@ export async function attemptFirstCommentInOperation(context: Context, input: In
   try {
     await saveReceipt(async tx => {
       const result = await tx.postTarget.updateMany({ where: { id: row.id, postId: input.postId, targetId: row.targetId, status: 'published', post: { workspaceId: actor.workspaceId }, remotePostId: row.remotePostId, firstCommentId: null, firstCommentAt: attemptedAt }, data: { firstCommentId: remoteId, firstCommentError: null } });
-      if (result.count !== 1) throw new OperationError('conflict', 'The first comment changed. Refresh this post before continuing.');
+      if (result.count !== 1) throw new PublishingOperationError('conflict', 'theFirstCommentChangedRefreshThisPostBeforeContinuing', {}, errorText);
       await audit(tx, actor, 'publishing.first_comment_sent', { ...input, remoteId });
     });
     return receipt(input, 'sent');
@@ -152,31 +159,33 @@ export async function sendFirstComment(actor: PublishingActor, input: Input): Pr
 
 /** A separate human decision; never clears an uncertain attempt or resends the post. */
 export async function retryFirstComment(actor: PublishingActor, input: unknown): Promise<CommentReceipt> {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', 'Choose one failed first comment and confirm its retry.');
+  const errorText = await loadPublishingErrorText();
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new PublishingOperationError('invalid_request', 'chooseOneFailedFirstCommentAndConfirmItsRetry', {}, errorText);
   const values = input as Record<string, unknown>;
-  if (Object.keys(values).some(key => !['postId', 'postTargetId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Choose one failed first comment and confirm its retry.');
+  if (Object.keys(values).some(key => !['postId', 'postTargetId', 'confirmation'].includes(key))) throw new PublishingOperationError('invalid_request', 'chooseOneFailedFirstCommentAndConfirmItsRetry', {}, errorText);
   await validId(values.postId);
   await validId(values.postTargetId);
-  if (values.confirmation !== `RETRY FIRST COMMENT ${values.postTargetId}`) throw new OperationError('invalid_request', 'Confirm retrying this exact first comment.');
+  if (values.confirmation !== `RETRY FIRST COMMENT ${values.postTargetId}`) throw new PublishingOperationError('invalid_request', 'confirmRetryingThisExactFirstComment', {}, errorText);
   const ids = { postId: values.postId as string, postTargetId: values.postTargetId as string };
   return withPublishingOperation(actor, { postId: ids.postId }, context => attemptFirstCommentInOperation({ ...context, retryRejected: true }, ids));
 }
 
 /** Explicit human attestation, never a claim of automatic provider verification. */
 export async function recordFirstCommentOutcome(actor: PublishingActor, input: Input & { outcome: 'sent' | 'not_sent'; remoteId?: string; confirmation: string }): Promise<CommentReceipt> {
-  if (!['sent', 'not_sent'].includes(input.outcome) || input.confirmation !== `RECORD FIRST COMMENT ${input.postTargetId} ${input.outcome === 'sent' ? 'SENT' : 'NOT SENT'}`) throw new OperationError('invalid_request', 'Confirm this exact first-comment outcome.');
+  const errorText = await loadPublishingErrorText();
+  if (!['sent', 'not_sent'].includes(input.outcome) || input.confirmation !== `RECORD FIRST COMMENT ${input.postTargetId} ${input.outcome === 'sent' ? 'SENT' : 'NOT SENT'}`) throw new PublishingOperationError('invalid_request', 'confirmThisExactFirstcommentOutcome', {}, errorText);
   if (input.outcome === 'sent') await validId(input.remoteId, 'Enter a valid platform comment ID.');
   return withPublishingOperation(actor, { postId: input.postId }, async context => {
     const row = await delivery(context, input);
     if (row.firstCommentId) {
       if (input.outcome === 'sent' && row.firstCommentId === input.remoteId) return receipt({ postId: input.postId, postTargetId: input.postTargetId }, 'sent');
-      throw new OperationError('conflict', 'This first comment already has a recorded outcome.');
+      throw new PublishingOperationError('conflict', 'thisFirstCommentAlreadyHasARecordedOutcome', {}, errorText);
     }
-    if (firstCommentState(row.post.firstComment, row) !== 'needs_review') throw new OperationError('conflict', 'This first comment has no uncertain attempt to review.');
+    if (firstCommentState(row.post.firstComment, row) !== 'needs_review') throw new PublishingOperationError('conflict', 'thisFirstCommentHasNoUncertainAttemptToReview', {}, errorText);
     await withPublishingTransaction(context.signal, async tx => {
       const result = await tx.postTarget.updateMany({ where: { id: row.id, postId: input.postId, firstCommentId: null, firstCommentAt: row.firstCommentAt, firstCommentError: row.firstCommentError },
         data: input.outcome === 'sent' ? { firstCommentId: input.remoteId!, firstCommentAt: row.firstCommentAt ?? new Date(), firstCommentError: null } : { firstCommentId: null, firstCommentAt: null, firstCommentError: null } });
-      if (result.count !== 1) throw new OperationError('conflict', 'The first comment changed. Refresh this post before continuing.');
+      if (result.count !== 1) throw new PublishingOperationError('conflict', 'theFirstCommentChangedRefreshThisPostBeforeContinuing', {}, errorText);
       await audit(tx, actor, 'publishing.first_comment_outcome_recorded', { postId: input.postId, postTargetId: input.postTargetId, outcome: input.outcome, verification: 'external_human_attestation', previousAttemptAt: row.firstCommentAt?.toISOString() ?? null, ...(input.outcome === 'sent' ? { remoteId: input.remoteId } : {}) });
     });
     return receipt({ postId: input.postId, postTargetId: input.postTargetId }, input.outcome === 'sent' ? 'sent' : 'ready');

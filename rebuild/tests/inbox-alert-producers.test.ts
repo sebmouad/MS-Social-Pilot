@@ -1,3 +1,4 @@
+vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ query: vi.fn(), execute: vi.fn(), transaction: vi.fn(), emit: vi.fn(), sentiment: vi.fn(), available: vi.fn(), access: vi.fn(), target: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: { target: { findFirst: mocks.target }, $transaction: mocks.transaction } }));

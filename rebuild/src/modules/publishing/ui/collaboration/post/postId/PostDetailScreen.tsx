@@ -1,3 +1,11 @@
+import { ComposerCopyProvider } from '@/modules/publishing/ui/compose/CopyProvider';
+import { headers } from 'next/headers';
+import { catalogGroup, fillComposerCopy } from '../../../../composer-catalog';
+import { PublishingCopyProvider } from '@/modules/publishing/ui/kit/CopyProvider';
+import { loadPublishingCopy } from '@/modules/publishing/server/customer-copy';
+import { PublishingActionCopyProvider } from '@/modules/publishing/ui/WorkflowSubmitButtons';
+import { loadPublishingActionCopy } from '@/modules/publishing/server/action-copy';
+import { loadComposerCopy } from '../../../../server/composer-copy';
 import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
 import { SidebarDock } from '@/components/SidebarDock';
 import { parsePostCollaborationSearch } from '@/modules/publishing/collaboration/search';
@@ -15,11 +23,14 @@ import { readCollaborationLabels } from '@/modules/publishing/collaboration/serv
 import { PageHeading } from '@/modules/publishing/ui/publishing-ui';
 import { PostPanel } from '@/modules/publishing/ui/collaboration/PostPanel';
 
-export default async function PostCollaborationPage({ params, searchParams }: { params: Promise<{ postId: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+async function PostCollaborationPageContent({ params, searchParams }: { params: Promise<{ postId: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   ensurePublishingCollaboration();
   const { postId } = await params;
   const viewer = await requireViewer({ feature: 'publishing/collaboration', channelScoped: true });
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
+  const copyCatalog = await loadComposerCopy();
+  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
+  const copy = catalogGroup(copyCatalog, 'collab', locale);
   const canWrite = canAccessFeature(viewer.permissions, 'publishing/collaboration', 'write');
   const caps = collaborationCapabilities();
   try {
@@ -30,15 +41,15 @@ export default async function PostCollaborationPage({ params, searchParams }: { 
       caps.recycle ? readRecycle(actor, { postId }) : Promise.resolve(null),
     ]);
     return <>
-      <PageHeading title="Organize post" description="Manage labels, custom fields and internal team notes." />
-      <SidebarDock><nav aria-label="Post organization pages">
-        <p><a href="/publishing/collaboration?view=assign">Back to all posts</a></p>
-        <p>Notes · page {notes.page}</p>
-        {notes.page > 1 && <p><a href={pageUrl(notes.page - 1, versions.page)}>Newer notes</a></p>}
-        {notes.hasMore && <p><a href={pageUrl(notes.page + 1, versions.page)}>Older notes</a></p>}
-        {(versions.versions.length > 0 || versions.page > 1) && <><p>History · page {versions.page}</p>{versions.page > 1 && <p><a href={pageUrl(notes.page, versions.page - 1)}>Newer versions</a></p>}{versions.hasMore && <p><a href={pageUrl(notes.page, versions.page + 1)}>Older versions</a></p>}</>}
+      <PageHeading title={copy.postTitle} description={copy.postHelp} />
+      <SidebarDock><nav aria-label={copy.postNav}>
+        <p><a href="/publishing/collaboration?view=assign">{copy.back}</a></p>
+        <p>{fillComposerCopy(copy.notesPage, { page: notes.page })}</p>
+        {notes.page > 1 && <p><a href={pageUrl(notes.page - 1, versions.page)}>{copy.newerNotes}</a></p>}
+        {notes.hasMore && <p><a href={pageUrl(notes.page + 1, versions.page)}>{copy.olderNotes}</a></p>}
+        {(versions.versions.length > 0 || versions.page > 1) && <><p>{fillComposerCopy(copy.historyPage, { page: versions.page })}</p>{versions.page > 1 && <p><a href={pageUrl(notes.page, versions.page - 1)}>{copy.newerVersions}</a></p>}{versions.hasMore && <p><a href={pageUrl(notes.page, versions.page + 1)}>{copy.olderVersions}</a></p>}</>}
       </nav></SidebarDock>
-      <PostPanel timeZone={viewer.membership.workspace.timezone} key={`${postId}:${notes.page}:${versions.page}`} notesCanAdd={notes.page === 1} postId={postId} canWrite={canWrite} labels={labels.labels.map(({ id, name }) => ({ id, name }))} assigned={assigned.labels.map(l => l.id)}
+      <PostPanel copyCatalog={copyCatalog} timeZone={viewer.membership.workspace.timezone} key={`${postId}:${notes.page}:${versions.page}`} notesCanAdd={notes.page === 1} postId={postId} canWrite={canWrite} labels={labels.labels.map(({ id, name }) => ({ id, name }))} assigned={assigned.labels.map(l => l.id)}
         fields={fields.fields.map(f => ({ id: f.id, name: f.name, kind: f.kind, options: f.options, value: f.value }))}
         fieldValueMax={fields.maxCharacters}
         notes={notes.notes.map(n => ({ id: n.id, body: n.body, authorId: n.authorId, authorName: n.authorName, createdAt: n.createdAt.toISOString() }))}
@@ -48,6 +59,12 @@ export default async function PostCollaborationPage({ params, searchParams }: { 
         recycle={recycle ? { enabled: recycle.enabled, everyDays: recycle.everyDays, limit: recycle.limit, count: recycle.count, nextAt: recycle.nextAt?.toISOString() ?? null, variants: recycle.variants, isRepeat: recycle.isRepeat, maxIntervalDays: recycle.limits.maxIntervalDays, maxRepeats: recycle.limits.maxRepeats, defaultIntervalDays: recycle.limits.defaultIntervalDays, maxVariants: recycle.limits.maxVariants } : null} />
     </>;
   } catch (error) {
-    return <><PageHeading title="Organize post" description="Manage labels, custom fields and internal team notes." /><RouteNotice error focusKey="collab-post-error">{error instanceof OperationError ? error.message : 'This post could not be loaded. Refresh and try again.'}</RouteNotice></>;
+    return <><PageHeading title={copy.postTitle} description={copy.postHelp} /><RouteNotice error focusKey="collab-post-error">{error instanceof OperationError ? error.message : copy.postFailure}</RouteNotice></>;
   }
+}
+
+export default async function PostCollaborationPage(props: Parameters<typeof PostCollaborationPageContent>[0]) {
+  const [{ catalog }, actions, composerCatalog] = await Promise.all([loadPublishingCopy(), loadPublishingActionCopy(), loadComposerCopy()]);
+  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
+  return <PublishingCopyProvider catalog={catalog}><PublishingActionCopyProvider catalog={actions} locale={locale}><ComposerCopyProvider catalog={composerCatalog} locale={locale}>{await PostCollaborationPageContent(props)}</ComposerCopyProvider></PublishingActionCopyProvider></PublishingCopyProvider>;
 }

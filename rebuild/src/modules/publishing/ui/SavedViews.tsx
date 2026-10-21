@@ -2,28 +2,30 @@
 
 import { useEffect, useId, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { deleteSavedViewConfirmation, normalizeSavedViewQuery, savedViewCopy, SAVED_VIEW_BOUNDS, type SavedViewRecord, type SavedViewScreen } from '@/modules/publishing/saved-views';
+import { deleteSavedViewConfirmation, normalizeSavedViewQuery, SAVED_VIEW_BOUNDS, type SavedViewRecord, type SavedViewScreen } from '@/modules/publishing/saved-views';
+import { usePublishingActionText } from './WorkflowSubmitButtons';
+import { actionSavedViewCopy } from '../action-catalog';
 import styles from './publishing.module.css';
 
 /** Sidebar list of the viewer's own saved filter combinations for Posts or Calendar. */
 export function SavedViews({ screen }: { screen: SavedViewScreen }) {
   const params = useSearchParams();
-  const [copy, setCopy] = useState(savedViewCopy('en'));
+  const t = usePublishingActionText();
+  const copy = actionSavedViewCopy(t);
   const [views, setViews] = useState<SavedViewRecord[] | null>(null);
   const [name, setName] = useState('');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const id = useId();
 
-  useEffect(() => { setCopy(savedViewCopy(document.documentElement.lang || navigator.language)); }, []);
   useEffect(() => {
     let active = true;
     fetch(`/api/publishing/saved-views?screen=${screen}`, { cache: 'no-store' })
       .then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<{ views: SavedViewRecord[]; unavailable?: boolean }>; })
-      .then(body => { if (!active) return; setViews(body.views); if (body.unavailable) setMessage({ text: savedViewCopy(document.documentElement.lang).loadFailed, error: true }); })
-      .catch(() => { if (active) { setViews([]); setMessage({ text: savedViewCopy(document.documentElement.lang).loadFailed, error: true }); } });
+      .then(body => { if (!active) return; setViews(body.views); if (body.unavailable) setMessage({ text: copy.loadFailed, error: true }); })
+      .catch(() => { if (active) { setViews([]); setMessage({ text: copy.loadFailed, error: true }); } });
     return () => { active = false; };
-  }, [screen]);
+  }, [screen, copy.loadFailed]);
 
   const current = normalizeSavedViewQuery(screen, params.toString());
   async function save(event: React.FormEvent<HTMLFormElement>) {

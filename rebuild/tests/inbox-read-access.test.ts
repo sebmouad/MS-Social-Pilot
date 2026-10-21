@@ -1,3 +1,4 @@
+vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ user: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), feature: vi.fn(), platform: vi.fn(), providers: vi.fn(), permission: vi.fn(), purge: vi.fn(), channels: vi.fn(), workspace: vi.fn(), where: vi.fn(), query: vi.fn(), config: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.user }, target: { findMany: state.channels }, workspace: { findUnique: state.workspace }, $queryRaw: state.query } }));

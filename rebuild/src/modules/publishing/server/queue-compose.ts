@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { getBestTimeSuggestions } from './best-time';
 import { isValidTimeZone } from '@/lib/calendar-dates';
 import { OperationError } from '@/lib/operation-error';
@@ -21,17 +24,18 @@ export type QueuePreview = {
  * estimate: the save allocates under the workspace lock and reports the time it really assigned.
  */
 export async function previewQueueTimes(actor: PublishingActor, targetIds: readonly string[]): Promise<QueuePreview> {
+  const errorText = await loadPublishingErrorText();
   const auth = await authorizePublishing(actor, 'publishing/queue', 'read');
   const max = (await limits()).maxTargets;
-  if (!Array.isArray(targetIds) || targetIds.some(id => typeof id !== 'string')) throw new OperationError('invalid_request', 'Choose valid destinations.');
+  if (!Array.isArray(targetIds) || targetIds.some(id => typeof id !== 'string')) throw new PublishingOperationError('invalid_request', 'chooseValidDestinations', {}, errorText);
   const ids = [...new Set(targetIds)];
-  if (!ids.length || ids.length > max) throw new OperationError('invalid_request', 'Choose at least one destination to see its queue time.');
+  if (!ids.length || ids.length > max) throw new PublishingOperationError('invalid_request', 'chooseAtLeastOneDestinationToSeeItsQueue', {}, errorText);
   const allowed = auth.actor.allowedTargetIds;
-  if (allowed && ids.some(id => !allowed.includes(id))) throw new OperationError('forbidden', 'One or more destinations are outside your channel access.');
+  if (allowed && ids.some(id => !allowed.includes(id))) throw new PublishingOperationError('forbidden', 'oneOrMoreDestinationsAreOutsideYourChannelAccess', {}, errorText);
   await validateTargets(auth.actor, ids, max);
   const rows = await prisma.$queryRaw<Array<{ timezone: string; bestTimeMode: string }>>`SELECT timezone, "bestTimeMode" FROM workspaces WHERE id = ${actor.workspaceId}`;
   const timezone = rows[0]?.timezone;
-  if (typeof timezone !== 'string' || !isValidTimeZone(timezone)) throw new OperationError('unavailable', 'Workspace scheduling settings are unavailable.');
+  if (typeof timezone !== 'string' || !isValidTimeZone(timezone)) throw new PublishingOperationError('unavailable', 'workspaceSchedulingSettingsAreUnavailable', {}, errorText);
   const days = (await bounds()).queueLookaheadDays;
   const now = new Date();
   const suggested = rows[0]?.bestTimeMode === 'apply' ? (await getBestTimeSuggestions(auth.actor, { targetIds: ids }, now)).suggestions : [];

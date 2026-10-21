@@ -1,3 +1,4 @@
+import { actionSavedViewCopy, publishingActionCopy, publishingActionText } from './action-catalog';
 import { z } from 'zod';
 
 /**
@@ -55,19 +56,7 @@ export type SavedViewRecord = { id: string; name: string; screen: SavedViewScree
 
 export type SavedViewLocale = 'en' | 'fr';
 export const SAVED_VIEW_COPY = {
-  en: {
-    heading: 'Saved views', empty: 'No saved views yet. Apply filters, then save them here.', nameLabel: 'View name', save: 'Save current view',
-    saving: 'Saving…', saved: 'View saved.', remove: 'Remove', removeLabel: (name: string) => `Remove saved view ${name}`, removed: 'View removed.',
-    loadFailed: 'Saved views could not be loaded. Refresh the page and try again.', saveFailed: 'The view could not be saved. Check its name and try again.',
-    removeFailed: 'The view could not be removed. Refresh and try again.', nameRequired: 'Enter a name for this view.', limit: 'You have reached the saved view limit for this screen. Remove one first.',
-    invalid: 'These filters cannot be saved. Reset the filters and try again.',
-  },
-  fr: {
-    heading: 'Vues enregistrées', empty: 'Aucune vue enregistrée. Appliquez des filtres, puis enregistrez-les ici.', nameLabel: 'Nom de la vue', save: 'Enregistrer la vue actuelle',
-    saving: 'Enregistrement…', saved: 'Vue enregistrée.', remove: 'Supprimer', removeLabel: (name: string) => `Supprimer la vue enregistrée ${name}`, removed: 'Vue supprimée.',
-    loadFailed: 'Impossible de charger les vues enregistrées. Actualisez la page et réessayez.', saveFailed: "La vue n'a pas pu être enregistrée. Vérifiez son nom et réessayez.",
-    removeFailed: "La vue n'a pas pu être supprimée. Actualisez et réessayez.", nameRequired: 'Saisissez un nom pour cette vue.', limit: 'Vous avez atteint la limite de vues enregistrées pour cet écran. Supprimez-en une d’abord.',
-    invalid: 'Ces filtres ne peuvent pas être enregistrés. Réinitialisez les filtres et réessayez.',
-  },
-} as const;
+  en: actionSavedViewCopy(publishingActionText(publishingActionCopy, 'en')),
+  fr: actionSavedViewCopy(publishingActionText(publishingActionCopy, 'fr')),
+};
 export const savedViewCopy = (locale: string | null | undefined) => SAVED_VIEW_COPY[locale?.toLowerCase().startsWith('fr') ? 'fr' : 'en'];

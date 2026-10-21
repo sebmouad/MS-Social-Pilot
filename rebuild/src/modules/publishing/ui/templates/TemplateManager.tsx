@@ -8,41 +8,11 @@ import { DataTable } from '@/components/DataTable';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
 import { SidebarDock } from '@/components/SidebarDock';
+import { templateCopyDefaults, resolveTemplateCopy, type TemplateCopyCatalog } from './copy';
 import styles from './templates.module.css';
 
 export type Template = { id: string; name: string; category: string; body: string; hashtags: string; firstComment: string; firstCommentDelayMinutes: number; labelId: string | null; createdAt: string; updatedAt: string };
-const COPY = {
-  en: {
-    requestFailed: 'The request could not be confirmed. Refresh the list and check the current template before trying again.',
-    saveUnknown: 'The save result is unknown. Refresh the list and check the current template before trying again.', deleteUnknown: 'The deletion result is unknown. Refresh and check the template before retrying.',
-    needNameAndBody: 'Enter a template name and message before saving.', updated: 'Template updated.', created: 'Template created. It is ready to select in the post composer.', deleted: 'Template deleted. Existing drafts and published posts are unchanged.',
-    unknownDate: 'Unknown', search: 'Search templates', searchPlaceholder: 'Name, category or message', searchButton: 'Search', clear: 'Clear', newTemplate: 'New template',
-    caption: 'Reusable post templates', template: 'Template', category: 'Category', preview: 'Message preview', updatedColumn: 'Updated', noHashtags: 'No hashtags', includesComment: ' · Includes first comment', uncategorized: 'Uncategorized',
-    edit: 'Edit', delete: 'Delete', actionsFor: (name: string) => `Actions for ${name}`, noMatch: 'No templates match this search.', empty: 'No templates yet. Create one to reuse message text, hashtags and a first comment in the post composer.', clearSearch: 'Clear search',
-    pages: 'Template pages', previous: 'Previous page', next: 'Next page', page: (n: number) => `Page ${n}`,
-    help: 'Templates are shared with workspace members who can create posts. They save message text, hashtags, first comment and an optional label; media and links are chosen separately in the composer.',
-    editTitle: 'Edit template', newTitle: 'New template', dialogDescription: 'Templates save reusable post content. Saving a template does not create or publish a post.',
-    cancel: 'Cancel', saving: 'Saving…', saveChanges: 'Save changes', createTemplate: 'Create template',
-    name: 'Name', optional: '(optional)', message: 'Message', hashtags: 'Hashtags', firstComment: 'First comment', delay: 'Wait before the first comment', delayHint: '(minutes; 0 sends it right after publication)',
-    delayHelp: (max: number) => `Choose a whole number from 0 to ${max.toLocaleString('en')} minutes.`, label: 'Label', noLabel: 'No label', mediaHelp: 'Media and links are selected separately in the composer.',
-    deleteTitle: 'Delete template', deleteBody: (name: string) => `This removes “${name}” from your workspace. Posts already created from it remain unchanged.`, deleteConfirm: 'Delete template', deleting: 'Deleting…', deleteFailed: 'Could not delete the template. Nothing was changed.',
-  },
-  fr: {
-    requestFailed: 'La demande n’a pas pu être confirmée. Actualisez la liste et vérifiez le modèle avant de réessayer.',
-    saveUnknown: 'Le résultat de l’enregistrement est inconnu. Actualisez la liste et vérifiez le modèle avant de réessayer.', deleteUnknown: 'Le résultat de la suppression est inconnu. Actualisez et vérifiez le modèle avant de réessayer.',
-    needNameAndBody: 'Saisissez un nom et un message avant d’enregistrer.', updated: 'Modèle mis à jour.', created: 'Modèle créé. Vous pouvez le choisir dans le composeur de publication.', deleted: 'Modèle supprimé. Les brouillons et publications existants ne changent pas.',
-    unknownDate: 'Inconnue', search: 'Rechercher des modèles', searchPlaceholder: 'Nom, catégorie ou message', searchButton: 'Rechercher', clear: 'Effacer', newTemplate: 'Nouveau modèle',
-    caption: 'Modèles de publication réutilisables', template: 'Modèle', category: 'Catégorie', preview: 'Aperçu du message', updatedColumn: 'Mis à jour', noHashtags: 'Aucun hashtag', includesComment: ' · Avec premier commentaire', uncategorized: 'Sans catégorie',
-    edit: 'Modifier', delete: 'Supprimer', actionsFor: (name: string) => `Actions pour ${name}`, noMatch: 'Aucun modèle ne correspond à cette recherche.', empty: 'Aucun modèle pour l’instant. Créez-en un pour réutiliser un message, des hashtags et un premier commentaire dans le composeur.', clearSearch: 'Effacer la recherche',
-    pages: 'Pages de modèles', previous: 'Page précédente', next: 'Page suivante', page: (n: number) => `Page ${n}`,
-    help: 'Les modèles sont partagés avec les membres de l’espace qui peuvent créer des publications. Ils enregistrent le message, les hashtags, le premier commentaire et une étiquette facultative ; les médias et les liens se choisissent dans le composeur.',
-    editTitle: 'Modifier le modèle', newTitle: 'Nouveau modèle', dialogDescription: 'Un modèle conserve du contenu réutilisable. L’enregistrer ne crée ni ne publie aucune publication.',
-    cancel: 'Annuler', saving: 'Enregistrement…', saveChanges: 'Enregistrer', createTemplate: 'Créer le modèle',
-    name: 'Nom', optional: '(facultatif)', message: 'Message', hashtags: 'Hashtags', firstComment: 'Premier commentaire', delay: 'Délai avant le premier commentaire', delayHint: '(minutes ; 0 l’envoie juste après la publication)',
-    delayHelp: (max: number) => `Choisissez un nombre entier de 0 à ${max.toLocaleString('fr')} minutes.`, label: 'Étiquette', noLabel: 'Aucune étiquette', mediaHelp: 'Les médias et les liens se choisissent séparément dans le composeur.',
-    deleteTitle: 'Supprimer le modèle', deleteBody: (name: string) => `Cela retire « ${name} » de votre espace. Les publications déjà créées à partir de ce modèle ne changent pas.`, deleteConfirm: 'Supprimer le modèle', deleting: 'Suppression…', deleteFailed: 'Impossible de supprimer le modèle. Rien n’a été modifié.',
-  },
-};
+
 function validReceipt(value: unknown): value is Template {
   if (!value || typeof value !== 'object') return false;
   const item = value as Record<string, unknown>;
@@ -54,8 +24,8 @@ const empty = { name: '', category: '', body: '', hashtags: '', firstComment: ''
 function errorText(body: unknown, fallback: string) { return body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : fallback; }
 function time(value: string, locale: 'en' | 'fr', unknown: string) { const parsed = new Date(value); return Number.isFinite(parsed.getTime()) ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(parsed) + ' UTC' : unknown; }
 
-export function TemplateManager({ initialTemplates, labels, page, hasMore, query, canWrite = true, limits, locale = 'en' }: { initialTemplates: Template[]; labels: Array<{ id: string; name: string }>; page: number; hasMore: boolean; query: string; canWrite?: boolean; locale?: 'en' | 'fr'; limits: { maxSearchCharacters: number; maxNameCharacters: number; maxCategoryCharacters: number; maxBodyCharacters: number; maxHashtagsCharacters: number; maxFirstCommentCharacters: number; maxFirstCommentDelayMinutes: number } }) {
-  const t = COPY[locale];
+export function TemplateManager({ catalog = templateCopyDefaults, initialTemplates, labels, page, hasMore, query, canWrite = true, limits, locale = 'en' }: { catalog?: TemplateCopyCatalog; initialTemplates: Template[]; labels: Array<{ id: string; name: string }>; page: number; hasMore: boolean; query: string; canWrite?: boolean; locale?: 'en' | 'fr'; limits: { maxSearchCharacters: number; maxNameCharacters: number; maxCategoryCharacters: number; maxBodyCharacters: number; maxHashtagsCharacters: number; maxFirstCommentCharacters: number; maxFirstCommentDelayMinutes: number } }) {
+  const t = resolveTemplateCopy(catalog)[locale];
   const [templates, setTemplates] = useState(initialTemplates);
   const [draft, setDraft] = useState<typeof empty>(empty);
   const [editing, setEditing] = useState<Template | null>(null);

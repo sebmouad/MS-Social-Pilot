@@ -1,3 +1,4 @@
+import { actionBulkCopy, publishingActionCopy, publishingActionText } from './action-catalog';
 import { z } from 'zod';
 
 /**
@@ -40,37 +41,7 @@ export function summarizeBulk(action: BulkAction, items: BulkItemResult[]): Bulk
 
 export type BulkLocale = 'en' | 'fr';
 export const BULK_COPY = {
-  en: {
-    select: (label: string) => `Select post ${label}`, selectAll: 'Select all posts on this page', selected: (n: number) => `${n} selected`, clear: 'Clear selection',
-    actions: { delete: 'Delete locally', duplicate: 'Duplicate', reschedule: 'Reschedule', retry: 'Retry failed destinations' },
-    titles: { delete: 'Delete selected posts locally?', duplicate: 'Duplicate selected posts?', reschedule: 'Reschedule selected posts?', retry: 'Retry failed destinations?' },
-    descriptions: {
-      delete: 'Removes the selected posts from this workspace. Published copies stay on their platforms; delete a post individually to remove it from a platform too.',
-      duplicate: 'Creates a new unscheduled draft for each selected post.',
-      reschedule: 'Moves selected posts that are still waiting to publish to the chosen workspace date and time. Other posts are skipped.',
-      retry: 'Sends again only to destinations that clearly failed. Destinations with an uncertain or pending result are not sent again; check them first.',
-    },
-    date: 'Date', time: 'Time', cancel: 'Cancel', confirm: 'Confirm', working: 'Working…',
-    summary: (r: { done: number; needsReview: number; skipped: number; failed: number }) => `${r.done} done, ${r.needsReview} need review, ${r.skipped} skipped, ${r.failed} failed.`,
-    unconfirmed: 'The result could not be confirmed. Refresh Posts and check each post before trying again.',
-    retryOne: 'Retry failed destinations', retryOneHelp: (n: number) => `${n} destination${n === 1 ? '' : 's'} failed and can be sent again.`,
-    whenRequired: 'Choose a future date and time.', tryAgain: 'Try again',
-  },
-  fr: {
-    select: (label: string) => `Sélectionner la publication ${label}`, selectAll: 'Sélectionner toutes les publications de cette page', selected: (n: number) => `${n} sélectionnée${n > 1 ? 's' : ''}`, clear: 'Effacer la sélection',
-    actions: { delete: 'Supprimer localement', duplicate: 'Dupliquer', reschedule: 'Reprogrammer', retry: 'Relancer les destinations en échec' },
-    titles: { delete: 'Supprimer localement les publications sélectionnées ?', duplicate: 'Dupliquer les publications sélectionnées ?', reschedule: 'Reprogrammer les publications sélectionnées ?', retry: 'Relancer les destinations en échec ?' },
-    descriptions: {
-      delete: 'Retire les publications sélectionnées de cet espace de travail. Les copies publiées restent sur leurs plateformes ; supprimez une publication individuellement pour la retirer aussi de la plateforme.',
-      duplicate: 'Crée un nouveau brouillon non programmé pour chaque publication sélectionnée.',
-      reschedule: "Déplace à la date et à l'heure choisies (fuseau de l'espace de travail) les publications encore en attente. Les autres sont ignorées.",
-      retry: "Renvoie uniquement vers les destinations clairement en échec. Les destinations au résultat incertain ou en attente ne sont pas renvoyées ; vérifiez-les d'abord.",
-    },
-    date: 'Date', time: 'Heure', cancel: 'Annuler', confirm: 'Confirmer', working: 'En cours…',
-    summary: (r: { done: number; needsReview: number; skipped: number; failed: number }) => `${r.done} terminée(s), ${r.needsReview} à vérifier, ${r.skipped} ignorée(s), ${r.failed} en échec.`,
-    unconfirmed: "Le résultat n'a pas pu être confirmé. Actualisez les publications et vérifiez chacune avant de réessayer.",
-    retryOne: 'Relancer les destinations en échec', retryOneHelp: (n: number) => `${n} destination${n > 1 ? 's' : ''} en échec peu${n > 1 ? 'vent' : 't'} être renvoyée${n > 1 ? 's' : ''}.`,
-    whenRequired: 'Choisissez une date et une heure futures.', tryAgain: 'Réessayer',
-  },
-} as const;
+  en: actionBulkCopy(publishingActionText(publishingActionCopy, 'en')),
+  fr: actionBulkCopy(publishingActionText(publishingActionCopy, 'fr')),
+};
 export const bulkCopy = (locale: string | null | undefined) => BULK_COPY[locale?.toLowerCase().startsWith('fr') ? 'fr' : 'en'];

@@ -1,5 +1,6 @@
 "use server";
 
+import { publishingErrorClassificationMessage } from '@/modules/publishing/error-catalog';
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireViewer } from "@/server/context";
@@ -26,7 +27,7 @@ export async function reviewWithNoteAction(data: FormData) {
     revalidatePath("/publishing/queue");
   } catch (error) {
     if (typeof error === "object" && error !== null && "digest" in error && typeof error.digest === "string" && error.digest.startsWith("NEXT_REDIRECT")) throw error;
-    const message = error instanceof Error ? error.message : "";
+    const message = publishingErrorClassificationMessage(error);
     notice = /500 characters/.test(message) ? "failed-note" : /permission|cannot review|your own post/i.test(message) ? "failed-access" : "failed";
   }
   redirect(`${PATH}?notice=${notice}`);

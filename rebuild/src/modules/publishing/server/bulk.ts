@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { createHash } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -13,9 +16,9 @@ export function itemRequestId(requestId: string, postId: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-const failure = (postId: string, error: unknown): BulkItemResult => {
+const failure = (postId: string, error: unknown, errorText: PublishingErrorText = defaultPublishingErrorText): BulkItemResult => {
   if (error instanceof OperationError) return { postId, outcome: error.code === 'conflict' ? 'skipped' : 'failed', code: error.code, message: error.message };
-  return { postId, outcome: 'needs_review', code: 'unconfirmed', message: 'The result could not be confirmed. Check this post before another action.' };
+  return { postId, outcome: 'needs_review', code: 'unconfirmed', message: errorText('theResultCouldNotBeConfirmedCheckThisPost') };
 };
 
 /**
@@ -23,18 +26,19 @@ const failure = (postId: string, error: unknown): BulkItemResult => {
  * once up front for a fast refusal and again by every per-post service.
  */
 export async function runBulkPostAction(actor: PublishingActor, input: unknown): Promise<BulkResult> {
+  const errorText = await loadPublishingErrorText();
   const parsed = BULK_SCHEMA.safeParse(input);
-  if (!parsed.success) throw new OperationError('invalid_request', 'Choose posts and an action, then confirm.');
+  if (!parsed.success) throw new PublishingOperationError('invalid_request', 'choosePostsAndAnActionThenConfirm', {}, errorText);
   const { action, requestId, confirmation, date, time } = parsed.data;
   const postIds = [...new Set(parsed.data.postIds)];
-  if (postIds.length !== parsed.data.postIds.length) throw new OperationError('invalid_request', 'Each post can be selected once.');
-  if (confirmation !== bulkConfirmation(action, postIds.length)) throw new OperationError('invalid_request', 'Confirm the exact bulk action.');
-  if (action === 'reschedule' && (!date || !time)) throw new OperationError('invalid_request', 'Choose a future date and time.');
+  if (postIds.length !== parsed.data.postIds.length) throw new PublishingOperationError('invalid_request', 'eachPostCanBeSelectedOnce', {}, errorText);
+  if (confirmation !== bulkConfirmation(action, postIds.length)) throw new PublishingOperationError('invalid_request', 'confirmTheExactBulkAction', {}, errorText);
+  if (action === 'reschedule' && (!date || !time)) throw new PublishingOperationError('invalid_request', 'chooseAFutureDateAndTime', {}, errorText);
   const auth = await authorizePublishing(actor, 'publishing/posts', 'write');
   let timeZone = '';
   if (action === 'reschedule') {
     const workspace = await prisma.workspace.findUnique({ where: { id: auth.actor.workspaceId }, select: { timezone: true } });
-    if (!workspace?.timezone) throw new OperationError('unavailable', 'This workspace has no valid time zone.');
+    if (!workspace?.timezone) throw new PublishingOperationError('unavailable', 'thisWorkspaceHasNoValidTimeZone', {}, errorText);
     timeZone = workspace.timezone;
   }
   const items: BulkItemResult[] = [];
@@ -52,12 +56,12 @@ export async function runBulkPostAction(actor: PublishingActor, input: unknown):
       } else {
         // Retry only failed posts; a draft or scheduled post must never be published by a retry.
         const current = await prisma.post.findFirst({ where: { id: postId, workspaceId: auth.actor.workspaceId }, select: { status: true } });
-        if (current?.status !== 'failed' && current?.status !== 'partially_failed') { items.push({ postId, outcome: 'skipped', code: 'conflict', message: 'Only posts with failed destinations can be retried.' }); continue; }
+        if (current?.status !== 'failed' && current?.status !== 'partially_failed') { items.push({ postId, outcome: 'skipped', code: 'conflict', message: errorText('onlyPostsWithFailedDestinationsCanBeRetried') }); continue; }
         const result = await publishPost(actor, postId, undefined, { retryOnly: true });
         items.push({ postId, outcome: result.failed || result.needsReconciliation || result.firstCommentsNeedingReview || result.firstCommentsNotSent ? 'needs_review' : 'done' });
       }
     } catch (error) {
-      items.push(failure(postId, error));
+      items.push(failure(postId, error, errorText));
     }
   }
   return summarizeBulk(action, items);

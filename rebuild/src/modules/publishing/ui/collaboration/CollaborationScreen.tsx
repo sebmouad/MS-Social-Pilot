@@ -1,3 +1,11 @@
+import { ComposerCopyProvider } from '@/modules/publishing/ui/compose/CopyProvider';
+import { headers } from 'next/headers';
+import { loadComposerCopy } from '../../server/composer-copy';
+import { catalogGroup } from '../../composer-catalog';
+import { PublishingCopyProvider } from '@/modules/publishing/ui/kit/CopyProvider';
+import { loadPublishingCopy } from '@/modules/publishing/server/customer-copy';
+import { PublishingActionCopyProvider } from '@/modules/publishing/ui/WorkflowSubmitButtons';
+import { loadPublishingActionCopy } from '@/modules/publishing/server/action-copy';
 import { queueDefaultSlotSchema } from '@/modules/publishing/queue-config';
 import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
 import { runtimeConfig } from '@/server/config/store';
@@ -21,10 +29,12 @@ import { ContentMix } from './ContentMix';
 import { FieldsManager } from './FieldsManager';
 import { QueueTimes } from './QueueTimes';
 
-const TITLES: Record<ViewId, string> = { assign: 'Labels on posts', fields: 'Custom fields', queue: 'Queue times', mix: 'Content mix' };
 
-export default async function CollaborationPage({ searchParams }: { searchParams: Promise<{ view?: string; page?: string; q?: string }> }) {
+async function CollaborationPageContent({ searchParams }: { searchParams: Promise<{ view?: string; page?: string; q?: string }> }) {
   ensurePublishingCollaboration();
+  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
+  const copy = catalogGroup(await loadComposerCopy(), 'collab', locale);
+  const TITLES: Record<ViewId, string> = { assign: copy.assign, fields: copy.fields, queue: copy.queue, mix: copy.mix };
   const params = await searchParams;
   const caps = collaborationCapabilities();
   const available: ViewId[] = ['assign', 'fields', ...(caps.queueTimes ? ['queue' as const] : []), ...(caps.contentMix ? ['mix' as const] : [])];
@@ -37,7 +47,7 @@ export default async function CollaborationPage({ searchParams }: { searchParams
   });
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const canWrite = canAccessFeature(viewer.permissions, feature, 'write');
-  const failure = (error: unknown) => <><PageHeading title={TITLES[view]} description="Organize posts for your team." /><RouteNotice error focusKey="collab-load-error">{error instanceof OperationError ? error.message : 'This page could not be loaded. Refresh and try again.'}</RouteNotice></>;
+  const failure = (error: unknown) => <><PageHeading title={TITLES[view]} description={copy.intro} /><RouteNotice error focusKey="collab-load-error">{error instanceof OperationError ? error.message : copy.loadFailure}</RouteNotice></>;
   try {
     const maxCharacters = await runtimeConfig('publishing.searchMaxCharacters');
     const filters = parseCollaborationSearch(params, visibleViews, maxCharacters);
@@ -45,22 +55,28 @@ export default async function CollaborationPage({ searchParams }: { searchParams
     if (view === 'assign') {
       const { page, q } = filters;
       const [result, labels] = await Promise.all([listAssignablePosts(actor, { page, ...(q ? { q } : {}) }), readCollaborationLabels(actor)]);
-      return <>{nav}<PageHeading title="Labels on posts" description="Tag many posts at once, or open a post to organize it in detail." />
+      return <>{nav}<PageHeading title={copy.assign} description={copy.assignHelp} />
         <BulkLabels initialPosts={result.posts.map(p => ({ ...p, scheduledAt: p.scheduledAt?.toISOString() ?? null }))} labels={labels.labels.map(({ id, name, color }) => ({ id, name, color }))} page={result.page} hasMore={result.hasMore} query={result.query} canWrite={canWrite} bulkLimit={result.bulkLimit} labelsPerPost={result.labelsPerPostLimit} searchMaxCharacters={maxCharacters} /></>;
     }
     if (view === 'fields') {
       const [fields, limit] = await Promise.all([readCustomFields(actor), bounds()]);
       const canManage = canWrite && (viewer.membership.role === 'owner' || viewer.membership.role === 'admin') && viewer.permissions.pageScope.all;
-      return <>{nav}<PageHeading title="Custom fields" description="Track campaign codes, products or requesters on every post." />
+      return <>{nav}<PageHeading title={copy.fields} description={copy.fieldsHelp} />
         <FieldsManager initialFields={fields} canManage={canManage} limits={{ fieldLimit: limit.fieldLimit, nameMax: limit.fieldNameMax, optionMax: limit.fieldOptionMax, optionsMax: limit.fieldOptionsLimit }} /></>;
     }
     if (view === 'queue') {
       const [result, limit] = await Promise.all([readQueueSlots(actor), bounds()]);
-      return <>{nav}<PageHeading title="Queue times" description="Choose the weekly times queued posts publish at." />
+      return <>{nav}<PageHeading title={copy.queue} description={copy.queueHelp} />
         <QueueTimes initialSlot={queueDefaultSlotSchema.parse(await runtimeConfig('publishing.queue.defaultSlot'))} timeZone={viewer.membership.workspace.timezone} slots={result.slots} targets={result.targets.map(({ id, name }) => ({ id, name }))} canEditShared={result.canEditShared} canEditChannels={result.canEditChannels} limit={limit.queueSlotLimit} /></>;
     }
     const mix = await readContentMix(actor);
-    return <>{nav}<PageHeading title="Content mix" description="Balance what each channel posts by label." />
+    return <>{nav}<PageHeading title={copy.mix} description={copy.mixHelp} />
       <ContentMix targets={mix.targets.map(({ id, name }) => ({ id, name }))} groups={mix.groups} labels={mix.labels.map(({ id, name }) => ({ id, name }))} rules={mix.rules} status={mix.status} windowDays={mix.windowDays} maxPerWeek={mix.maxPerWeek} mixAutoFill={mix.mixAutoFill} canEditChannels={mix.canEditChannels} canEditGroups={mix.canEditGroups} canEditAutoFill={mix.canEditAutoFill} /></>;
   } catch (error) { return failure(error); }
+}
+
+export default async function CollaborationPage(props: Parameters<typeof CollaborationPageContent>[0]) {
+  const [{ catalog }, actions, composerCatalog] = await Promise.all([loadPublishingCopy(), loadPublishingActionCopy(), loadComposerCopy()]);
+  const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
+  return <PublishingCopyProvider catalog={catalog}><PublishingActionCopyProvider catalog={actions} locale={locale}><ComposerCopyProvider catalog={composerCatalog} locale={locale}>{await CollaborationPageContent(props)}</ComposerCopyProvider></PublishingActionCopyProvider></PublishingCopyProvider>;
 }

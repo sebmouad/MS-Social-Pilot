@@ -19,14 +19,14 @@ export const reviewCopy = {
 } as const;
 export type ReviewLocale = keyof typeof reviewCopy;
 export type ReviewCopyKey = keyof typeof reviewCopy.en;
-export function reviewText(locale: ReviewLocale, key: ReviewCopyKey, values: Record<string, string | number> = {}): string {
-  return (reviewCopy[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+export function reviewText(locale: ReviewLocale, key: ReviewCopyKey, values: Record<string, string | number> = {}, copy: { en: Record<ReviewCopyKey, string>; fr: Record<ReviewCopyKey, string> } = reviewCopy): string {
+  return (copy[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
 }
 
 /** One line describing what a reviewer left; missing data is stated, never shown as zero stars. */
-export function reviewSummary(locale: ReviewLocale, review: { rating: number | null; recommendation: 'positive' | 'negative' | null }): string {
-  if (review.rating !== null) return reviewText(locale, 'stars', { count: review.rating });
-  if (review.recommendation === 'positive') return reviewText(locale, 'recommends');
-  if (review.recommendation === 'negative') return reviewText(locale, 'notRecommends');
-  return reviewText(locale, 'noRating');
+export function reviewSummary(locale: ReviewLocale, review: { rating: number | null; recommendation: 'positive' | 'negative' | null }, copy: { en: Record<ReviewCopyKey, string>; fr: Record<ReviewCopyKey, string> } = reviewCopy): string {
+  if (review.rating !== null) return reviewText(locale, 'stars', { count: review.rating }, copy);
+  if (review.recommendation === 'positive') return reviewText(locale, 'recommends', {}, copy);
+  if (review.recommendation === 'negative') return reviewText(locale, 'notRecommends', {}, copy);
+  return reviewText(locale, 'noRating', {}, copy);
 }

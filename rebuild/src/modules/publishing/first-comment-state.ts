@@ -1,3 +1,4 @@
+import { kitCopy } from './ui/kit/copy';
 /** Product states are fixed persistence semantics, not configurable provider rules. */
 export type FirstCommentState = 'not_requested' | 'awaiting_post' | 'ready' | 'sent' | 'needs_review';
 export const FIRST_COMMENT_REJECTED = 'rebuild:first_comment_rejected';
@@ -18,10 +19,14 @@ export function firstCommentState(text: string | null | undefined, row: FirstCom
   return 'ready';
 }
 
-export const FIRST_COMMENT_LABELS: Record<FirstCommentState, string> = {
-  not_requested: 'No first comment requested',
-  awaiting_post: 'First comment awaits publication',
-  ready: 'First comment has not been sent',
-  sent: 'First comment recorded as sent',
-  needs_review: 'First comment needs review',
-};
+/** Synchronous compatibility consumers use defaults; request readers pass the current catalog. */
+export function firstCommentLabels(copy = kitCopy.en): Record<FirstCommentState, string> {
+  return {
+    not_requested: copy.firstComment_not_requested,
+    awaiting_post: copy.firstComment_awaiting_post,
+    ready: copy.firstComment_ready,
+    sent: copy.firstComment_sent,
+    needs_review: copy.firstComment_needs_review,
+  };
+}
+export const FIRST_COMMENT_LABELS = firstCommentLabels();

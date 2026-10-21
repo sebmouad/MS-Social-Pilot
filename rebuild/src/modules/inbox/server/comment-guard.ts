@@ -1,3 +1,5 @@
+import { inboxServiceCopy } from '../service-copy';
+import { inboxServiceText } from './service-copy';
 import type { Prisma } from '../../../../generated/client';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -15,7 +17,7 @@ export async function withInboxChannelOperation<T>(workspaceId: string, targetId
     runtimeConfig('data.workspaceOperationTimeoutMs'),
   ]);
   const guardTimeout = timeout + 2 * localTimeout + maxWait;
-  if (guardTimeout >= workspaceTimeout) throw new OperationError('unavailable', 'Comment actions are temporarily unavailable. Contact your workspace administrator.');
+  if (guardTimeout >= workspaceTimeout) throw new OperationError('unavailable', await inboxServiceText('service14'));
   return prisma.$transaction(async tx => {
     await lockInboxChannel(tx, workspaceId, targetId);
     const controller = new AbortController();
@@ -34,7 +36,7 @@ export async function withInboxChannelOperation<T>(workspaceId: string, targetId
 export async function lockInboxChannel(tx: Prisma.TransactionClient, workspaceId: string, targetId: string): Promise<void> {
   const key = JSON.stringify(['inbox-comments', workspaceId, targetId]);
   const rows = await tx.$queryRaw<Array<{ acquired: boolean }>>`SELECT pg_try_advisory_xact_lock(hashtextextended(${key}, 0)) AS acquired`;
-  if (rows[0]?.acquired !== true) throw new OperationError('conflict', 'Another comment action is running for this channel. Check its outcome before continuing.');
+  if (rows[0]?.acquired !== true) throw new OperationError('conflict', await inboxServiceText('service15'));
 }
 
 /** Never discard unresolved evidence or remove the resource needed to recover. */
@@ -42,7 +44,7 @@ export async function assertInboxDeletionsSettled(tx: Prisma.TransactionClient, 
   const rows = targetIds === undefined
     ? await tx.$queryRaw<Array<{ pending: boolean }>>`SELECT EXISTS (SELECT 1 FROM rebuild_inbox_deletions WHERE "workspaceId" = ${workspaceId} AND state IN ('started', 'uncertain', 'remote_confirmed')) AS pending`
     : await tx.$queryRaw<Array<{ pending: boolean }>>`SELECT EXISTS (SELECT 1 FROM rebuild_inbox_deletions WHERE "workspaceId" = ${workspaceId} AND "targetId" = ANY(${targetIds}) AND state IN ('started', 'uncertain', 'remote_confirmed')) AS pending`;
-  if (rows[0]?.pending === true) throw new OperationError('conflict', 'A comment deletion needs recovery before this data or connection can be removed. Check its deletion status first.');
+  if (rows[0]?.pending === true) throw new OperationError('conflict', await inboxServiceText('service16'));
 }
 
 /** Called inside a channel-locked persistence transaction, including worker sync. */
@@ -59,9 +61,9 @@ export async function inboxCommentSuppressed(tx: Prisma.TransactionClient, works
 }
 
 /** Parent-first ordering lets tombstones propagate across an unordered batch. */
-export function orderInboxCommentBatch<T extends { id: string; parentId?: string | null }>(items: readonly T[]): T[] {
+export function orderInboxCommentBatch<T extends { id: string; parentId?: string | null }>(items: readonly T[], errorMessage: string = inboxServiceCopy.historyUnsafe.en): T[] {
   const byId = new Map(items.map(item => [item.id, item]));
-  if (byId.size !== items.length) throw new OperationError('upstream_failure', 'Comment history could not be safely synchronized.');
+  if (byId.size !== items.length) throw new OperationError('upstream_failure', errorMessage);
   const children = new Map<string, T[]>();
   const ready: T[] = [];
   for (const item of items) {
@@ -73,6 +75,6 @@ export function orderInboxCommentBatch<T extends { id: string; parentId?: string
     const item = ready[index]!; ordered.push(item);
     ready.push(...children.get(item.id) ?? []);
   }
-  if (ordered.length !== items.length) throw new OperationError('upstream_failure', 'Comment history could not be safely synchronized.');
+  if (ordered.length !== items.length) throw new OperationError('upstream_failure', errorMessage);
   return ordered;
 }

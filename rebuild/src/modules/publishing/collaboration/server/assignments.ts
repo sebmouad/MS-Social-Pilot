@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { authorizePublishing } from '../../server/access';
@@ -9,7 +12,8 @@ export type PostLabel = { id: string; name: string; color: string };
 
 /** Labels currently on one post (read access plus whole-post visibility). */
 export async function readPostLabels(actor: PublishingActor, postId: unknown): Promise<{ postId: string; labels: PostLabel[] }> {
-  const id = parse(ID, postId);
+  const errorText = await loadPublishingErrorText();
+  const id = parse(ID, postId, undefined, errorText);
   const auth = await authorizePublishing(actor, POSTS, 'read');
   await visiblePost(prisma, auth, id);
   const labels = await protect(prisma.$queryRaw<PostLabel[]>`SELECT l.id, l.name, l.color FROM post_labels pl JOIN labels l ON l.id = pl."labelId" WHERE pl."postId" = ${id} AND l."workspaceId" = ${actor.workspaceId} ORDER BY l.name ASC, l.id ASC`);
@@ -22,20 +26,21 @@ export async function readPostLabels(actor: PublishingActor, postId: unknown): P
  * otherwise nothing changes. Single-post assignment is a bulk call with one post.
  */
 export async function assignLabels(actor: PublishingActor, input: unknown) {
-  const data = parse(ASSIGN_SCHEMA, input);
-  exact(data.confirmation, assignConfirmation(data.mode, data.postIds.length));
+  const errorText = await loadPublishingErrorText();
+  const data = parse(ASSIGN_SCHEMA, input, undefined, errorText);
+  exact(data.confirmation, assignConfirmation(data.mode, data.postIds.length), errorText);
   const limit = await bounds();
-  if (data.postIds.length > limit.bulkPostLimit || data.labelIds.length > limit.labelsPerPostLimit) throw bad(`Choose at most ${limit.bulkPostLimit} posts and ${limit.labelsPerPostLimit} labels.`);
+  if (data.postIds.length > limit.bulkPostLimit || data.labelIds.length > limit.labelsPerPostLimit) throw bad(errorText('collaboration_0', {value0: limit.bulkPostLimit, value1: limit.labelsPerPostLimit}), errorText);
   await authorizePublishing(actor, POSTS, 'write');
   return protect(transact(actor.workspaceId, limit, async tx => {
     const auth = await lockActor(tx, actor, POSTS, true);
     for (const postId of data.postIds) {
       const post = await visiblePost(tx, auth, postId, true);
-      assertMayEdit(auth, post);
+      assertMayEdit(auth, post, errorText);
     }
     if (data.labelIds.length) {
       const found = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM labels WHERE "workspaceId" = ${actor.workspaceId} AND id = ANY(${data.labelIds}::text[])`;
-      if (found.length !== data.labelIds.length) throw new OperationError('invalid_request', 'Choose labels from this workspace.');
+      if (found.length !== data.labelIds.length) throw new PublishingOperationError('invalid_request', 'collaboration_1', {}, errorText);
     }
     const before = await tx.$queryRaw<Array<{ postId: string; labelId: string }>>`SELECT "postId", "labelId" FROM post_labels WHERE "postId" = ANY(${data.postIds}::text[])`;
     if (data.mode === 'remove') {
@@ -47,7 +52,7 @@ export async function assignLabels(actor: PublishingActor, input: unknown) {
     const after = await tx.$queryRaw<Array<{ postId: string; labelId: string }>>`SELECT "postId", "labelId" FROM post_labels WHERE "postId" = ANY(${data.postIds}::text[]) ORDER BY "postId", "labelId"`;
     const perPost = new Map<string, string[]>(data.postIds.map(id => [id, []]));
     for (const row of after) perPost.get(row.postId)?.push(row.labelId);
-    for (const [postId, labelIds] of perPost) if (labelIds.length > limit.labelsPerPostLimit) throw new OperationError('conflict', `A post can carry at most ${limit.labelsPerPostLimit} labels. Nothing was changed.`);
+    for (const [postId, labelIds] of perPost) if (labelIds.length > limit.labelsPerPostLimit) throw new PublishingOperationError('conflict', 'collaboration_2', {value0: limit.labelsPerPostLimit}, errorText);
     const beforeSet = new Set(before.map(r => `${r.postId}\u0000${r.labelId}`));
     const afterSet = new Set(after.map(r => `${r.postId}\u0000${r.labelId}`));
     const added = [...afterSet].filter(k => !beforeSet.has(k)).length;

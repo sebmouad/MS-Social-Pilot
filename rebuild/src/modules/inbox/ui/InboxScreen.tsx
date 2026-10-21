@@ -1,3 +1,6 @@
+import { loadInboxCustomerCopy } from '@/modules/inbox/server/customer-copy';
+import { resolveInboxCatalog } from '@/modules/inbox/customer-copy';
+import { InboxCopyProvider } from '@/modules/inbox/ui/copy-context';
 import { IconInbox, IconInboxOff, IconMessages, IconPlugConnected } from '@tabler/icons-react';
 import { ChannelBadge, EmptyState } from '@/components';
 import { OperationError, operationFailure } from '@/lib/operation-error';
@@ -27,8 +30,6 @@ import { InboxSelectionProvider, SelectBox, type SelectableItem } from './InboxS
 import { SavedRepliesManager } from './SavedRepliesManager';
 import { readInboxContactDetails } from '@/modules/inbox/server/details';
 import type { InboxContactDetails } from '@/modules/inbox/details';
-import { inboxCopy } from './copy';
-import { round3Copy } from './round3-copy';
 import { inboxLocale } from './locale';
 import styles from './inbox.module.css';
 import r3 from './inbox-round3.module.css';
@@ -59,8 +60,11 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const viewer = await requireViewer({ feature: 'inbox/conversations', channelScoped: true });
   const params = await searchParams;
   const locale = await inboxLocale();
-  const copy = inboxCopy[locale];
-  const extra = round3Copy[locale];
+  const catalog = await loadInboxCustomerCopy();
+  const copy = resolveInboxCatalog('inboxCopy', catalog)[locale];
+  const reviews = resolveInboxCatalog('reviewCopy', catalog);
+  const reviewLabel = (language: Parameters<typeof reviewText>[0], key: Parameters<typeof reviewText>[1], values?: Record<string, string | number>) => reviewText(language, key, values, reviews);
+  const extra = resolveInboxCatalog('round3Copy', catalog)[locale];
   const actor ={ userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const constraints = viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids };
 
@@ -131,24 +135,24 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     };
     const historyNoun = thread.kind === 'comment' ? copy.replies : copy.messagesNoun;
     const openingItemPresent = Boolean(listPage?.items.some(item => item.key === `${thread.kind}:${thread.id}`));
-    threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? copy.openConversation : thread.kind === 'review' ? reviewText(locale, 'openReview') : copy.openComment}>
+    threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? copy.openConversation : thread.kind === 'review' ? reviewLabel(locale, 'openReview') : copy.openComment}>
       <a className={styles.back} href={clearThreadHref}>{copy.back}</a>
       {!openingItemPresent && listPage ? <p className={styles.contextNote}>{copy.outsideList}</p> : null}
       <header className={styles.threadHead}>
-        <h2>{thread.kind === 'message' ? copy.conversationWith(first?.author ?? copy.aVisitor) : thread.kind === 'review' ? reviewText(locale, 'reviewBy', { name: thread.entries[0]?.author ?? copy.aVisitor }) : copy.commentBy(thread.entries[0]?.author ?? copy.aVisitor)}</h2>
+        <h2>{thread.kind === 'message' ? copy.conversationWith(first?.author ?? copy.aVisitor) : thread.kind === 'review' ? reviewLabel(locale, 'reviewBy', { name: thread.entries[0]?.author ?? copy.aVisitor }) : copy.commentBy(thread.entries[0]?.author ?? copy.aVisitor)}</h2>
         <div className={styles.threadTags}>
           <ChannelBadge name={thread.target.name} platformName={badge.platformName} mark={badge.mark} />
-          <InboxTag icon={thread.kind === 'message' ? 'message' : 'comment'}>{thread.kind === 'message' ? copy.message : thread.kind === 'review' ? reviewText(locale, 'review') : copy.comment}</InboxTag>
-          {thread.kind === 'review' ? <InboxTag icon="comment">{reviewSummary(locale, thread)}</InboxTag> : null}
+          <InboxTag icon={thread.kind === 'message' ? 'message' : 'comment'}>{thread.kind === 'message' ? copy.message : thread.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
+          {thread.kind === 'review' ? <InboxTag icon="comment">{reviewSummary(locale, thread, reviews)}</InboxTag> : null}
           {thread.resolved ? <InboxTag icon="resolved" tone="ok">{copy.resolvedTag}</InboxTag> : <InboxTag icon="needsReply" tone="warn">{copy.openTag}</InboxTag>}
           {thread.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}
         </div>
       </header>
       <div className={r3.threadGrid}><div className={r3.threadMain}>
       {thread.postText ?<p className={styles.postContext}><strong>{copy.onYourPost}</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}</p> : null}
-      <p className={styles.contextNote}>{thread.kind === 'review' ? reviewText(locale, 'note') : copy.syncedNote}</p>
+      <p className={styles.contextNote}>{thread.kind === 'review' ? reviewLabel(locale, 'note') : copy.syncedNote}</p>
       <div className={styles.historyHead}>
-        <h3>{thread.kind === 'comment' ? copy.commentHistory : thread.kind === 'review' ? reviewText(locale, 'reviewHistory') : copy.conversationHistory}</h3>
+        <h3>{thread.kind === 'comment' ? copy.commentHistory : thread.kind === 'review' ? reviewLabel(locale, 'reviewHistory') : copy.conversationHistory}</h3>
         <span>{copy.historyShown(history.shown, history.total, historyNoun)}</span>
       </div>
       {history.cursor && history.shown === 0 ? <p className={styles.contextNote}>{copy.noHistory}</p> : null}
@@ -157,10 +161,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       </ol>
       {canResolve ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canResolve} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} locale={locale} /> : null}
       {thread.kind === 'review'
-        ? (canWrite && capabilities.replyToReviews ? <ReplyBox key={thread.id} id={thread.id} kind="review" allowed headline="" /> : <p>{reviewText(locale, 'replyUnavailable')}</p>)
+        ? (canWrite && capabilities.replyToReviews ? <ReplyBox key={thread.id} id={thread.id} kind="review" locale={locale} allowed headline="" /> : <p>{reviewLabel(locale, 'replyUnavailable')}</p>)
         : <ThreadTools kind={thread.kind} id={thread.id} canWrite={canWrite} canReply={capabilities.reply} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} locale={locale} />}
       </div>
-      <ContactDetails details={details} locale={locale} timeZone={timeZone} />
+      <ContactDetails catalog={catalog} details={details} locale={locale} timeZone={timeZone} />
       </div>
     </section>;
   }
@@ -200,7 +204,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     </div>
     {listPage ? <div className={styles.navigationGroup}>
       <p className={styles.filterHeading}>{copy.conversations}</p>
-      <nav className={styles.pagination} aria-label={locale === 'fr' ? 'Pages de la liste' : 'Inbox list pages'}>
+      <nav className={styles.pagination} aria-label={catalog['navigation.listPages'][locale]}>
         {listPage.olderCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.olderCursor })}>{copy.older}</a> : <span aria-disabled="true">{copy.older}</span>}
         {listPage.cursor ? <a href={inboxHref({ ...listPagingLocation, cursor: undefined })}>{copy.latest}</a> : <span aria-disabled="true">{copy.latest}</span>}
         {listPage.newerCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.newerCursor })}>{copy.newer}</a> : <span aria-disabled="true">{copy.newer}</span>}
@@ -208,7 +212,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     </div> : null}
     {threadPage ? <div className={styles.navigationGroup}>
       <p className={styles.filterHeading}>{thread?.kind === 'comment' ? copy.replyHistory : copy.messageHistory}</p>
-      <nav className={styles.pagination} aria-label={locale === 'fr' ? 'Pages de l’historique' : 'Conversation history pages'}>
+      <nav className={styles.pagination} aria-label={catalog['navigation.historyPages'][locale]}>
         {threadPage.history.olderCursor ? <a href={inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}), thread: `${thread!.kind}:${thread!.id}`, historyCursor: threadPage.history.olderCursor })}>{copy.earlier}</a> : <span aria-disabled="true">{copy.earlier}</span>}
         {threadPage.history.cursor ? <a href={inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}), thread: `${thread!.kind}:${thread!.id}` })}>{copy.latest}</a> : <span aria-disabled="true">{copy.latest}</span>}
         {threadPage.history.newerCursor ? <a href={inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}), thread: `${thread!.kind}:${thread!.id}`, historyCursor: threadPage.history.newerCursor })}>{copy.newer}</a> : <span aria-disabled="true">{copy.newer}</span>}
@@ -218,7 +222,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   // Applied filters stay visible in the content header; each chip links to the same view without that one filter.
   const without = (...keys: Array<keyof InboxLocation>) => inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => !keys.includes(key as keyof InboxLocation))), ...(requestedThread ? { thread: requestedThread } : {}) });
-  const typeLabel = filters.kind === 'message' ? copy.messages : filters.kind === 'comment' ? copy.comments : reviewText(locale, 'reviews');
+  const typeLabel = filters.kind === 'message' ? copy.messages : filters.kind === 'comment' ? copy.comments : reviewLabel(locale, 'reviews');
   const chips: UrlFilterChip[] = [
     ...(filters.channelId ? [{ key: 'channel', label: copy.channel, value: visibleChannels.find(item => item.id === filters.channelId)?.name ?? filters.channelId, removeHref: without('channel', 'cursor') }] : []),
     ...(filters.kind !== 'all' ? [{ key: 'type', label: copy.type, value: typeLabel, removeHref: without('type', 'cursor') }] : []),
@@ -233,13 +237,13 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const lastSynced = listPage?.lastSynced ?? null;
   const noChannels = listPage !== null && visibleChannels.length === 0;
 
-  return <PageFrame module="inbox" scopedAccess sidebar={sidebar}><div className={styles.page}>
+  return <InboxCopyProvider catalog={catalog}><PageFrame module="inbox" scopedAccess sidebar={sidebar}><div className={styles.page}>
     <InboxHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} actions={visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true) : null} timeZone={timeZone} locale={locale} /> : undefined} />
     <div className={r3.tools}>
       {visibleChannels.length > 0 ? <SavedRepliesManager locale={locale} canWrite={canWriteReplies} /> : null}
       <InboxShortcuts locale={locale} />
     </div>
-    {listPage && listPage.items.length > 0 ? <ShortcutHint locale={locale} /> : null}
+    {listPage && listPage.items.length > 0 ? <ShortcutHint catalog={catalog} locale={locale} /> : null}
     <UrlFilterChips chips={chips} resetHref={resetHref} labels={{ active: copy.activeFilters, remove: copy.removeFilter, reset: copy.resetFilters }} />
     {listError ? <div role="alert" className={styles.alert}><p>{listError.error}</p><a href={resetHref}>{copy.resetAndReturn}</a></div> : null}
     {threadOutcome.error ? <div role="alert" className={styles.alert}><p>{threadOutcome.error.error}</p><a href={clearThreadHref}>{copy.returnToList}</a></div> : null}
@@ -256,11 +260,11 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             <PersonAvatar name={item.author} size={38} />
             <div className={styles.itemBody}>
             <div className={styles.itemTop}><span className={styles.author}>{item.unread > 0 || item.needsReply ? <span className={styles.unreadDot} role="img" aria-label={copy.unread} /> : null}{item.author}</span><time dateTime={item.time.toISOString()}>{formatInboxTime(item.time, timeZone)}</time></div>
-            <p className={styles.preview}>{item.kind === 'review' && !item.preview ? reviewText(locale, 'noText') : item.preview.length > 180 ? `${item.preview.slice(0, 180)}…` : item.preview}</p>
+            <p className={styles.preview}>{item.kind === 'review' && !item.preview ? reviewLabel(locale, 'noText') : item.preview.length > 180 ? `${item.preview.slice(0, 180)}…` : item.preview}</p>
             <div className={styles.itemMeta}>
               <ChannelBadge name={item.target.name} platformName={badge.platformName} mark={badge.mark} compact />
-              <InboxTag icon={item.kind === 'message' ? 'message' : 'comment'}>{item.kind === 'message' ? copy.message : item.kind === 'review' ? reviewText(locale, 'review') : copy.comment}</InboxTag>
-              {item.kind === 'review' ? <InboxTag icon="comment">{reviewSummary(locale, item)}</InboxTag> : null}
+              <InboxTag icon={item.kind === 'message' ? 'message' : 'comment'}>{item.kind === 'message' ? copy.message : item.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
+              {item.kind === 'review' ? <InboxTag icon="comment">{reviewSummary(locale, item, reviews)}</InboxTag> : null}
               {item.sentiment ? <InboxTag icon={item.sentiment} tone={SENTIMENT_TONE[item.sentiment]} title={copy.sentimentHint}>{copy.sentiment[item.sentiment]}</InboxTag> : null}
               {item.unread > 0 ? <InboxTag icon="unread" tone="warn">{copy.nUnread(item.unread)}</InboxTag> : null}
               {item.needsReply ? <InboxTag icon="needsReply" tone="warn">{copy.needsReply}</InboxTag> : null}
@@ -281,5 +285,5 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       </section>
       {threadView ?? <section className={`${styles.threadPane} ${styles.pick}`} aria-label={copy.openConversation}><EmptyState icon={<IconMessages size={26} />} title={copy.selectTitle}>{copy.selectBody}</EmptyState></section>}
     </div> : null}
-  </div></PageFrame>;
+  </div></PageFrame></InboxCopyProvider>;
 }

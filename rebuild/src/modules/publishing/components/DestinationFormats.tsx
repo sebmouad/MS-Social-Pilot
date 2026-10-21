@@ -1,3 +1,4 @@
+import { composerCatalogDefaults, catalogGroup, fillComposerCopy, type ComposerCatalog } from '../composer-catalog';
 import type { PublishingFormatDescriptor } from '@/platforms/types';
 
 export type DestinationFormatTarget = {
@@ -17,7 +18,9 @@ export function effectiveDestinationFormat(target: DestinationFormatTarget, valu
  * Per-destination format choices for selected destinations only. Provider-neutral: labels and
  * options come from module descriptors. The parent owns form serialization.
  */
-export function DestinationFormats({ targets, selectedIds, values, onChange, formId, disabled }: {
+export function DestinationFormats({ targets, selectedIds, values, onChange, formId, disabled, copyCatalog = composerCatalogDefaults, locale = 'en' }: {
+  copyCatalog?: ComposerCatalog;
+  locale?: 'en' | 'fr';
   targets: readonly DestinationFormatTarget[];
   selectedIds: readonly string[];
   values: Record<string, string>;
@@ -25,6 +28,7 @@ export function DestinationFormats({ targets, selectedIds, values, onChange, for
   formId?: string;
   disabled?: boolean;
 }) {
+  const copy = catalogGroup(copyCatalog, 'ui', locale);
   const rows = targets.filter(target => selectedIds.includes(target.id) && target.publishingFormats?.length);
   if (!rows.length) return null;
   return <>
@@ -35,12 +39,12 @@ export function DestinationFormats({ targets, selectedIds, values, onChange, for
       const selectId = `destination-format-${formId ?? "controls"}-${target.id}`;
       if (formats.length === 1 && known) {
         return <div key={target.id} className="ui-field">
-          <span>Format for {target.name}</span>
+          <span>{fillComposerCopy(copy.formatFor, { name: target.name })}</span>
           <strong>{known.label}</strong>
         </div>;
       }
       return <div key={target.id} className="ui-field">
-        <label htmlFor={selectId}>Format for {target.name}</label>
+        <label htmlFor={selectId}>{fillComposerCopy(copy.formatFor, { name: target.name })}</label>
         <select
           id={selectId}
           name={`destinationFormat-${target.id}`}
@@ -52,10 +56,10 @@ export function DestinationFormats({ targets, selectedIds, values, onChange, for
           aria-describedby={known ? undefined : `${selectId}-note`}
           onChange={event => onChange(target.id, event.currentTarget.value)}
         >
-          {!known && <option value={value}>Unavailable format (saved)</option>}
+          {!known && <option value={value}>{copy.unavailableFormat}</option>}
           {formats.map(format => <option key={format.id} value={format.id}>{format.label}</option>)}
         </select>
-        {!known && <span id={`${selectId}-note`} className="ui-field-error">The saved format is no longer available for this destination. Choose another format before scheduling.</span>}
+        {!known && <span id={`${selectId}-note`} className="ui-field-error">{copy.unavailableFormatHelp}</span>}
       </div>;
     })}
   </>;

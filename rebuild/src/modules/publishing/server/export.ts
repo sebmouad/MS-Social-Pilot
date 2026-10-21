@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { PostStatus, Prisma, type Prisma as PrismaTypes } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -10,17 +13,18 @@ const COLUMNS = [
   'post_id', 'author_id', 'message', 'first_comment', 'firstCommentDelayMinutes', 'link', 'media_json', 'status',
   'scheduled_at', 'published_at', 'created_at', 'destinations_json',
 ] as const;
-const TOO_LARGE = 'This export exceeds the synchronous limit. Narrow your filters and try again.';
+
 
 type ExportFilters = { status?: PostStatus; channelId?: string; q: string };
 
-function invalid(message = 'Choose valid Publishing export filters.'): never {
+function invalid(message: string | undefined = undefined, errorText: PublishingErrorText = defaultPublishingErrorText): never {
+  message ??= errorText('chooseValidPublishingExportFilters');
   throw new OperationError('invalid_request', message);
 }
 
-function safeCap(value: unknown, label: string): number {
+function safeCap(value: unknown, label: string, errorText: PublishingErrorText = defaultPublishingErrorText): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
-    throw new OperationError('unavailable', `The Publishing ${label} limit is unavailable.`);
+    throw new PublishingOperationError('unavailable', 'thePublishingValue0LimitIsUnavailable', {value0: label}, errorText);
   }
   return value;
 }
@@ -84,15 +88,16 @@ export async function exportPublishingPosts(
   input: unknown = {},
   constraints: { maxItems?: number } = {},
 ) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) invalid();
+  const errorText = await loadPublishingErrorText();
+  if (!input || typeof input !== 'object' || Array.isArray(input)) invalid(undefined, errorText);
   const values = input as Record<string, unknown>;
-  if (Object.keys(values).some(key => !['q', 'status', 'channelId'].includes(key))) invalid();
-  if (Object.values(values).some(value => value !== undefined && typeof value !== 'string')) invalid();
+  if (Object.keys(values).some(key => !['q', 'status', 'channelId'].includes(key))) invalid(undefined, errorText);
+  if (Object.values(values).some(value => value !== undefined && typeof value !== 'string')) invalid(undefined, errorText);
   if (!constraints || typeof constraints !== 'object' || Array.isArray(constraints)
-    || Object.keys(constraints).some(key => key !== 'maxItems')) invalid('Choose a valid Publishing export result limit.');
+    || Object.keys(constraints).some(key => key !== 'maxItems')) invalid(errorText('read_13'), errorText);
   const requested = constraints.maxItems;
   if (requested !== undefined && (typeof requested !== 'number' || !Number.isSafeInteger(requested) || requested < 1)) {
-    invalid('Choose a valid Publishing export result limit.');
+    invalid(errorText('read_13'), errorText);
   }
 
   const queryInput = {
@@ -105,16 +110,16 @@ export async function exportPublishingPosts(
     runtimeConfig('publishing.exportMaxPosts'),
     runtimeConfig('publishing.exportMaxBytes'),
   ]);
-  const rootPostLimit = safeCap(configuredPosts, 'post export');
-  const byteLimit = safeCap(configuredBytes, 'export byte');
+  const rootPostLimit = safeCap(configuredPosts, 'post export', errorText);
+  const byteLimit = safeCap(configuredBytes, 'export byte', errorText);
   const maxPosts = requested === undefined ? rootPostLimit : Math.min(rootPostLimit, requested);
-  const batchSize = safeCap(await runtimeConfig('publishing.exportBatchSize'), 'export batch');
-  const timeout = safeCap(await runtimeConfig('publishing.transactionTimeoutMs'), 'transaction timeout');
-  const maxWait = safeCap(await runtimeConfig('publishing.transactionMaxWaitMs'), 'transaction wait');
+  const batchSize = safeCap(await runtimeConfig('publishing.exportBatchSize'), 'export batch', errorText);
+  const timeout = safeCap(await runtimeConfig('publishing.transactionTimeoutMs'), 'transaction timeout', errorText);
+  const maxWait = safeCap(await runtimeConfig('publishing.transactionMaxWaitMs'), 'transaction wait', errorText);
   let csv = `${COLUMNS.map(column => `"${column}"`).join(',')}\r\n`;
   let byteLength = Buffer.byteLength(csv, 'utf8');
   let count = 0;
-  if (byteLength > byteLimit) throw new OperationError('invalid_request', TOO_LARGE);
+  if (byteLength > byteLimit) throw new OperationError('invalid_request', errorText('read_12'));
   await prisma.$transaction(async tx => {
     let cursor: { createdAt: Date; id: string } | undefined;
     while (true) {
@@ -136,12 +141,12 @@ export async function exportPublishingPosts(
           } },
         },
       });
-      if (posts.length > remaining) throw new OperationError('invalid_request', TOO_LARGE);
+      if (posts.length > remaining) throw new OperationError('invalid_request', errorText('read_12'));
       for (const post of posts) {
         const line = `${rowValues(post as Parameters<typeof rowValues>[0]).map(csvCell).join(',')}\r\n`;
         const lineBytes = Buffer.byteLength(line, 'utf8');
         const nextBytes = byteLength + lineBytes;
-        if (nextBytes > byteLimit) throw new OperationError('invalid_request', TOO_LARGE);
+        if (nextBytes > byteLimit) throw new OperationError('invalid_request', errorText('read_12'));
         csv += line;
         byteLength = nextBytes;
         count++;

@@ -1,8 +1,9 @@
 'use client';
+import { usePublishingCopy } from './CopyProvider';
 
 import { IconFilterOff } from '@tabler/icons-react';
 import { Button, FilterChips } from '@/components';
-import { kitCopy, type KitLocale } from './copy';
+import { type KitLocale } from './copy';
 import styles from './kit.module.css';
 
 export type UrlFilterChip = { key: string; label: string; value: string; removeHref: string };
@@ -13,8 +14,8 @@ export type UrlFilterChip = { key: string; label: string; value: string; removeH
  * Navigation is a plain location change, which keeps the component usable wherever it is rendered.
  */
 export function UrlFilterChips({ chips, resetHref, locale = 'en', labels }: { chips: UrlFilterChip[]; resetHref: string; locale?: KitLocale; labels?: { active: string; remove: string; reset: string } }) {
+  const copy = usePublishingCopy(locale);
   if (!chips.length) return <span />;
-  const copy = kitCopy[locale];
   const go = (href: string) => window.location.assign(href);
   return <div className={styles.chipRow}>
     <FilterChips filters={chips} label={labels?.active ?? copy.activeFilters} removeLabel={labels?.remove ?? copy.removeFilter}

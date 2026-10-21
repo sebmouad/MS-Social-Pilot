@@ -5,30 +5,18 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { useConfirm } from '@/components/useConfirm';
 
-export const firstCommentRetryCopy = {
-  en: {
-    retry: 'Retry failed first comment', title: 'Retry this first comment?', cancel: 'Cancel',
-    description: 'The platform definitely rejected the previous attempt. Send the saved comment again now, overriding its saved delay. An uncertain result will stay held for review.',
-    confirmation: 'Type to confirm', pending: 'Retrying…', failed: 'The retry could not be completed. Refresh Posts and review the current comment state.',
-    held: 'The result is uncertain. Close this dialog and refresh Posts to review the outcome before another action.',
-    sent: 'First comment recorded as sent.', rejected: 'The platform rejected the comment again. Review it before making a separately confirmed retry.',
-    status: 'First comment failed: the platform rejected it.', unavailable: 'Not available',
-  },
-  fr: {
-    retry: 'Réessayer le premier commentaire échoué', title: 'Réessayer ce premier commentaire ?', cancel: 'Annuler',
-    description: 'La plateforme a définitivement refusé la tentative précédente. Envoyer à nouveau le commentaire enregistré maintenant, sans attendre le délai prévu. Un résultat incertain restera bloqué pour vérification.',
-    confirmation: 'Saisissez pour confirmer', pending: 'Nouvelle tentative…', failed: 'La nouvelle tentative a échoué. Actualisez les publications et vérifiez l’état actuel du commentaire.',
-    held: 'Le résultat est incertain. Fermez cette fenêtre et actualisez les publications pour vérifier le résultat avant toute autre action.',
-    sent: 'Premier commentaire enregistré comme envoyé.', rejected: 'La plateforme a de nouveau refusé le commentaire. Vérifiez-le avant une nouvelle tentative confirmée séparément.',
-    status: 'Échec du premier commentaire : la plateforme l’a refusé.', unavailable: 'Non disponible',
-  },
-};
+import { usePublishingActionText } from '../WorkflowSubmitButtons';
+import { publishingActionCopy, publishingActionText } from '../../action-catalog';
+const retryKeys = ['retry', 'title', 'cancel', 'description', 'confirmation', 'pending', 'failed', 'held', 'sent', 'rejected', 'status', 'unavailable'] as const;
+export const firstCommentRetryCopy = Object.fromEntries((['en', 'fr'] as const).map(locale => {
+  const t = publishingActionText(publishingActionCopy, locale);
+  return [locale, Object.fromEntries(retryKeys.map(key => [key, t(`retry_${key}`)]))];
+})) as Record<'en' | 'fr', Record<typeof retryKeys[number], string>>;
 
 type State = 'sent' | 'ready' | 'needs_review';
 export function FirstCommentRetry({ postId, postTargetId, destinationName, onSettled }: { postId: string; postTargetId: string; destinationName?: string | null; onSettled: (state: State) => void }) {
-  const [locale, setLocale] = useState<'en' | 'fr'>('en');
-  useEffect(() => { setLocale(/^fr\b/i.test(document.documentElement.lang || navigator.language) ? 'fr' : 'en'); }, []);
-  const c = firstCommentRetryCopy[locale];
+  const t = usePublishingActionText();
+  const c = Object.fromEntries(retryKeys.map(key => [key, t(`retry_${key}`)])) as Record<typeof retryKeys[number], string>;
   const router = useRouter();
   const running = useRef(false);
   const held = useRef(false);

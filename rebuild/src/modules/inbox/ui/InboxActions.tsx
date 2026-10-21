@@ -1,4 +1,5 @@
 'use client';
+import { useInboxCatalog } from './copy-context';
 import { AutoTextarea } from '@/components/AutoTextarea';
 
 import { useId, useRef, useState, type FormEvent } from 'react';
@@ -8,7 +9,6 @@ import { useToast } from '@/components/Toast';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { isOperationErrorCode } from '@/lib/operation-error';
 import styles from './inbox.module.css';
-import { REPLY_COPY } from './reply-copy';
 import { actionCopy } from './action-copy';
 import type { InboxLocale } from './copy';
 
@@ -28,13 +28,13 @@ function deleteReceipt(value: unknown, itemId: string, operationId?: string): De
   return value as DeleteReceipt;
 }
 
-async function readDeleteStatus(itemId: string): Promise<DeleteReceipt | null> {
+async function readDeleteStatus(itemId: string, errorText: string): Promise<DeleteReceipt | null> {
   const response = await fetch(`/api/inbox/deletions?itemId=${encodeURIComponent(itemId)}`, { cache: 'no-store' });
   const body: unknown = await response.json();
-  if (!response.ok || !isRecord(body) || !('operation' in body)) throw new Error('Could not check deletion status.');
+  if (!response.ok || !isRecord(body) || !('operation' in body)) throw new Error(errorText);
   if (body.operation === null) return null;
   const receipt = deleteReceipt(body.operation, itemId);
-  if (!receipt) throw new Error('Could not check deletion status.');
+  if (!receipt) throw new Error(errorText);
   return receipt;
 }
 
@@ -42,8 +42,7 @@ function completeDeletion(receipt: DeleteReceipt) {
   return receipt.state === 'completed' && receipt.remoteConfirmed && receipt.localConfirmed;
 }
 
-async function send(payload: Record<string, unknown>, locale: InboxLocale = 'en'): Promise<Outcome> {
-  const uncertainOutcome = actionCopy[locale].uncertain;
+async function send(payload: Record<string, unknown>, locale: InboxLocale = 'en', uncertainOutcome = actionCopy[locale].uncertain): Promise<Outcome> {
   try {
     const response = await fetch('/api/inbox/actions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     let body: unknown;
@@ -65,11 +64,11 @@ export function InboxSyncBar({ targetId, lastSynced, timeZone, disabled = false,
   const [result, setResult] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [syncedNow, setSyncedNow] = useState<string | null>(null);
   const router = useRouter();
-  const copy = actionCopy[locale];
+  const copy = useInboxCatalog('actionCopy')[locale];
 
   async function sync() {
     setBusy(true); setResult(null);
-    const outcome = await send({ action: 'sync', ...(targetId ? { targetId } : {}) }, locale);
+    const outcome = await send({ action: 'sync', ...(targetId ? { targetId } : {}) }, locale, copy.uncertain);
     setBusy(false);
     if (!outcome.ok) { setResult({ kind: 'error', text: outcome.error }); return; }
     const fields = ['conversationCount', 'messageCount', 'commentCount', 'targetCount', 'failedCount'] as const;
@@ -104,14 +103,14 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   const [deleteStatus, setDeleteStatus] = useState<DeleteStatus>({ kind: 'loading' });
   const router = useRouter();
   const toast = useToast();
-  const copy = actionCopy[locale];
+  const copy = useInboxCatalog('actionCopy')[locale];
   // A deleted reply leaves the thread open; a deleted opening comment returns to the list.
   const leave = () => { if (reply) router.refresh(); else router.replace(listHref); };
   const noun = copy.noun(reply);
 
   async function run(kindOfAction: 'resolve' | 'hide' | 'delete', payload: Record<string, unknown>, message: string, undo?: Record<string, unknown>, undoMessage?: string) {
     setBusy(kindOfAction); setError(''); setDone('');
-    const outcome = await send(payload, locale);
+    const outcome = await send(payload, locale, copy.uncertain);
     setBusy(null);
     if (!outcome.ok) {
       if (kindOfAction === 'delete') setDeleteStatus({ kind: 'error' });
@@ -135,7 +134,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
     }
     setDone(message);
     // Resolve and hide are reversible, so they offer Undo instead of asking first.
-    if (undo) toast.undoable(message, () => { void send(undo, locale).then(result => { if (result.ok) { setDone(undoMessage ?? ''); router.refresh(); } else toast.notify({ tone: 'error', title: result.error }); }); }, copy.undo);
+    if (undo) toast.undoable(message, () => { void send(undo, locale, copy.uncertain).then(result => { if (result.ok) { setDone(undoMessage ?? ''); router.refresh(); } else toast.notify({ tone: 'error', title: result.error }); }); }, copy.undo);
     router.refresh();
     return true;
   }
@@ -143,7 +142,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   async function checkDeletionStatus() {
     setBusy('delete'); setError('');
     try {
-      const receipt = await readDeleteStatus(id);
+      const receipt = await readDeleteStatus(id, copy.statusError);
       if (receipt && completeDeletion(receipt)) {
         setDeleteStatus({ kind: 'operation', receipt });
         setDone(copy.deletedDone);
@@ -161,7 +160,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   async function finishDeletion() {
     if (deleteStatus.kind !== 'operation' || deleteStatus.receipt.state !== 'remote_confirmed') return;
     setBusy('delete'); setError('');
-    const outcome = await send({ action: 'finish_delete', operationId: deleteStatus.receipt.operationId, confirmation: `FINISH DELETION ${deleteStatus.receipt.operationId}` }, locale);
+    const outcome = await send({ action: 'finish_delete', operationId: deleteStatus.receipt.operationId, confirmation: `FINISH DELETION ${deleteStatus.receipt.operationId}` }, locale, copy.uncertain);
     setBusy(null);
     if (!outcome.ok) { setError(outcome.error); return; }
     const receipt = deleteReceipt(outcome.body, id, deleteStatus.receipt.operationId);
@@ -177,7 +176,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   async function openDeleteDialog() {
     setError(''); setDeleteStatus({ kind: 'loading' }); setConfirming(true);
     try {
-      const receipt = await readDeleteStatus(id);
+      const receipt = await readDeleteStatus(id, copy.statusError);
       if (receipt && completeDeletion(receipt)) {
         setDeleteStatus({ kind: 'operation', receipt });
         setDone(copy.deletedDone); setConfirming(false); leave();
@@ -224,7 +223,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
 /** Reply composer with a character count and the platform's reply rule in plain words. */
 export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000, value, onChange, locale = 'en' }: { locale?: 'en' | 'fr'; id: string; kind: Kind; allowed: boolean; headline: string; detail?: string; maxLength?: number; value?: string; onChange?: (value: string) => void }) {
   const validation = useFormValidation();
-  const copy = REPLY_COPY[locale];
+  const copy = useInboxCatalog('REPLY_COPY')[locale];
   const inFlight = useRef(false);
   const [localText, setLocalText] = useState('');
   const text = value ?? localText;
@@ -245,7 +244,7 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
     if (!validation.validate(event.currentTarget)) return;
     inFlight.current = true;
     setBusy(true); setError(''); setSent('');
-    const outcome = await send({ action: 'reply', id, kind, text }, locale);
+    const outcome = await send({ action: 'reply', id, kind, text }, locale, copy.unconfirmed);
     inFlight.current = false; setBusy(false);
     if (!outcome.ok) { setError(locale === 'fr' ? copy.unconfirmed : outcome.error); return; }
     updateText(''); setSent(copy.sent);

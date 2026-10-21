@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({ viewer: vi.fn(), create: vi.fn(), update: vi.fn(), schedule: vi.fn(), refresh: vi.fn(), preview: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: h.refresh }));
 vi.mock('@/server/context', () => ({ requireViewer: h.viewer }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => 10080 }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'publishing.composerCopy' ? (await import('@/modules/publishing/composer-catalog')).composerCatalogDefaults : 10080 }));
 vi.mock('@/modules/publishing/server/lifecycle', () => ({ updatePost: h.update, schedulePost: h.schedule }));
 vi.mock('@/modules/publishing/server/queue-compose', () => ({
   createQueuedPost: h.create, previewQueueTimes: h.preview,

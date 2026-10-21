@@ -1,10 +1,13 @@
 "use client";
+import { useComposerCatalog } from '../compose/CopyProvider';
+import { usePublishingActionText } from '@/modules/publishing/ui/WorkflowSubmitButtons';
+import { actionBulkCopy, defaultPublishingActionText, type PublishingActionText } from '@/modules/publishing/action-catalog';
 import { SidebarDock } from '@/components/SidebarDock';
 import { DestinationFormats, effectiveDestinationFormat } from '@/modules/publishing/components/DestinationFormats';
 import { usePreserveFormState } from '@/components/usePreserveFormState';
 import { AutoTextarea } from '@/components/AutoTextarea';
 
-import { retryableDestinationCount, bulkCopy } from "@/modules/publishing/bulk";
+import { retryableDestinationCount } from "@/modules/publishing/bulk";
 import { PublishNowButton } from "./PublishNowButton";
 import { cancelScheduledPostAction, deletePostWithRecoveryAction, importPostsAction, publishPostAction, recordFirstCommentOutcomeAction, schedulePostAction, sendFirstCommentAction, submitForApprovalAction, syncPostAction, updatePostWithRecoveryAction, type ComposerValues, type FirstCommentActionState, type PostDeleteActionState, type PostEditActionState } from "./actions";
 import { startTransition, useActionState, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
@@ -15,13 +18,13 @@ import styles from "@/modules/publishing/ui/publishing.module.css";
 import { csvDestinationLabel } from '@/lib/publishing/csv-destinations';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { validateFields } from '@/lib/ui/form-validation';
-import { FIRST_COMMENT_LABELS, FIRST_COMMENT_REJECTED, firstCommentState } from '@/modules/publishing/first-comment-state';
+import { FIRST_COMMENT_REJECTED, firstCommentState } from '@/modules/publishing/first-comment-state';
 import { PublicationRecovery } from './PublicationRecovery';
 import { FirstCommentRetry } from './FirstCommentRetry';
 import { DuplicatePost } from './DuplicatePost';
 import { QueuePostButton } from './QueuePostButton';
 import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
-import { publishingMediaIssue } from '@/modules/publishing/media-support';
+import { publishingMediaIssue, publishingMediaFormatter } from '@/modules/publishing/media-support';
 import type { PublishingFormatDescriptor, PublishingMediaSupport } from '@/platforms/types';
 import { formatPostPreviewTime } from '@/components/PostPreview';
 
@@ -50,32 +53,32 @@ function localUploadRules(targets: TargetChoice[], rules: ImageRules) {
   };
 }
 
-function localUploadIssue(targets: TargetChoice[], items: ReturnType<typeof usePostAttachments>['items']) {
+function localUploadIssue(targets: TargetChoice[], items: ReturnType<typeof usePostAttachments>['items'], t: PublishingActionText) {
   for (const target of targets) {
     for (const item of items.filter(candidate => candidate.source === 'upload' && candidate.file)) {
       const upload = target.localImageUpload;
       const file = item.file!;
-      if (!upload) return `${target.name} does not currently support local image uploads. Remove the uploaded image or choose another destination.`;
-      if (!upload.mimeTypes.includes(file.type)) return `${target.name} does not accept ${file.type || 'this image format'}. Choose another image or destination.`;
-      if (file.size > upload.maxBytes) return `${target.name} accepts images up to ${Math.ceil(upload.maxBytes / 1048576)} MB. Choose another image or destination.`;
+      if (!upload) return t('noUpload', { destination: target.name });
+      if (!upload.mimeTypes.includes(file.type)) return t('uploadType', { destination: target.name, format: file.type || t('imageFormat') });
+      if (file.size > upload.maxBytes) return t('uploadSize', { destination: target.name, size: Math.ceil(upload.maxBytes / 1048576) });
     }
   }
   return null;
 }
 
-function selectedMediaIssue(targets: TargetChoice[], media: readonly PostMediaItem[], link: string, items: ReturnType<typeof usePostAttachments>['items']) {
+function selectedMediaIssue(targets: TargetChoice[], media: readonly PostMediaItem[], link: string, items: ReturnType<typeof usePostAttachments>['items'], t: PublishingActionText, mediaText: ReturnType<typeof publishingMediaFormatter>) {
   const completeMedia = items.map(item => ({ kind: item.kind, url: item.url || 'media:pending', ...(item.altText === undefined ? {} : { altText: item.altText }) }));
   for (const target of targets) {
-    const issue = publishingMediaIssue(target.publishingMedia, completeMedia.length ? completeMedia : media, link);
+    const issue = publishingMediaIssue(target.publishingMedia, completeMedia.length ? completeMedia : media, link, mediaText);
     if (issue) return `${target.name}: ${issue}`;
   }
-  return localUploadIssue(targets, items);
+  return localUploadIssue(targets, items, t);
 }
 
-function postValidationErrors(form: HTMLFormElement, hasOtherContent = false) {
+function postValidationErrors(form: HTMLFormElement, hasOtherContent = false, t: PublishingActionText = defaultPublishingActionText) {
   return validateFields(form, {
-    message: { empty: hasOtherContent ? '' : 'Add post text, a link, or media before saving. A first comment alone is not a post.' },
-    link: { invalid: 'Enter a complete link, such as https://example.com.' },
+    message: { empty: hasOtherContent ? '' : t('addPostTextALinkOrMedia') },
+    link: { invalid: t('enterACompleteLinkSuchAsHttpsexamplecom') },
   });
 }
 
@@ -97,26 +100,27 @@ function parseInitialMedia(value: string): PostMediaItem[] {
 }
 
 export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
+  const t = usePublishingActionText();
   const [error, setError] = useState('');
   return <form noValidate action={importPostsAction} className={styles.draftForm} onSubmit={event => {
     const input = event.currentTarget.elements.namedItem('csv');
     if (!(input instanceof HTMLInputElement) || !input.files?.[0]?.size) {
-      event.preventDefault(); setError('Choose a non-empty CSV file to import.'); input instanceof HTMLInputElement && input.focus();
+      event.preventDefault(); setError(t('chooseANonemptyCSVFileToImport')); input instanceof HTMLInputElement && input.focus();
     } else setError('');
   }}>
-    <label htmlFor="posts-csv">Import posts from CSV</label>
-    <p className={styles.help}>Required header: <code>message,firstComment,channels</code>. Optional: <code>firstCommentDelayMinutes</code> (whole minutes; defaults to 0). Use the channel labels below; separate multiple channels with semicolons. Leave channels empty to import a local draft. Imported posts remain drafts.</p>
+    <label htmlFor="posts-csv">{t('importPostsFromCSV')}</label>
+    <p className={styles.help}>{t('requiredHeader')} <code>message,firstComment,channels</code>{t('optional')} <code>firstCommentDelayMinutes</code> {t('wholeMinutesDefaultsTo0UseThe')}</p>
     <ul className={styles.targetReference}>{targets.filter(target => target.canPublish).map(target => <li key={target.id}>{csvDestinationLabel(target)}</li>)}</ul>
     <input id="posts-csv" type="file" name="csv" accept=".csv,text/csv" required aria-invalid={Boolean(error)} aria-describedby={error ? 'posts-csv-error' : undefined} />
     {error && <p id="posts-csv-error" className={styles.formError}>{error}</p>}
-    <button className="ui-button ui-button--secondary" type="submit">Import CSV</button>
+    <button className="ui-button ui-button--secondary" type="submit">{t('importCSV')}</button>
   </form>;
 }
 
 export function PostRowActions({ post, targets, canEdit, canPublish, imageRules, canDuplicate = false, canOrganize = false, canQueue = false, timeZone = 'UTC', undoSendSeconds = 0 }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules; canDuplicate?: boolean; canOrganize?: boolean; canQueue?: boolean; timeZone?: string; undoSendSeconds?: number }) {
+  const t = usePublishingActionText();
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [retryCopy, setRetryCopy] = useState<ReturnType<typeof bulkCopy>>(bulkCopy('en'));
-  useEffect(() => { setRetryCopy(bulkCopy(document.documentElement.lang || navigator.language)); }, []);
+  const retryCopy = actionBulkCopy(t);
   const [editPending, setEditPending] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const [duplicatePending, setDuplicatePending] = useState(false);
@@ -128,32 +132,33 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules,
   const isQueueEligible = canEdit && ['draft', 'rejected'].includes(post.status) && queueDestinations.length > 0;
   const isQueued = post.status === 'scheduled';
   return <div className={styles.rowActions}>
-    {canOrganize && <a className="ui-button ui-button--secondary ui-button--sm" href={`/publishing/collaboration/post/${encodeURIComponent(post.id)}`}>Organize post</a>}
+    {canOrganize && <a className="ui-button ui-button--secondary ui-button--sm" href={`/publishing/collaboration/post/${encodeURIComponent(post.id)}`}>{t('organizePost')}</a>}
     {canDuplicate ? <DuplicatePost postId={post.id} disabled={rowPending} onPendingChange={setDuplicatePending} /> : null}
-    {canQueue ? <QueuePostButton postId={post.id} postMessage={post.message} destinations={queueDestinations.map(target => target.target.name ?? 'Destination')} timeZone={timeZone} eligible={isQueueEligible} /> : null}
+    {canQueue ? <QueuePostButton postId={post.id} postMessage={post.message} destinations={queueDestinations.map(target => target.target.name ?? t('destination'))} timeZone={timeZone} eligible={isQueueEligible} /> : null}
     {canEdit && isDraft ? <details className={styles.editDetails}>
-      <summary onClick={event => { if (rowPending) event.preventDefault(); }}>Edit post</summary>
+      <summary onClick={event => { if (rowPending) event.preventDefault(); }}>{t('editPost')}</summary>
       <PostEditForm post={post} targets={targets} selected={selected} imageRules={imageRules} disabled={rowPending} onPendingChange={setEditPending} />
     </details> : null}
     {canPublish && isDraft && post.targets.length ? <PublishNowButton postId={post.id} undoSendSeconds={undoSendSeconds} disabled={rowPending} /> : null}
     {canPublish && retryableDestinationCount(post) > 0 ? <RetryFailedButton postId={post.id} count={retryableDestinationCount(post)} copy={retryCopy} disabled={rowPending} /> : null}
     {canEdit && isDraft && post.targets.length ? <>
-      <form noValidate action={submitForApprovalAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={rowPending}>Submit for approval</button></form>
+      <form noValidate action={submitForApprovalAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={rowPending}>{t('submitForApproval')}</button></form>
       <ScheduleForm postId={post.id} disabled={rowPending}/>
     </> : null}
-    {canEdit && isQueued ? <form noValidate action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={rowPending}>Cancel schedule</button></form> : null}
-    {hasRemote ? <form noValidate action={syncPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={rowPending}>Sync status</button></form> : null}
+    {canEdit && isQueued ? <form noValidate action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={rowPending}>{t('cancelSchedule')}</button></form> : null}
+    {hasRemote ? <form noValidate action={syncPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={rowPending}>{t('syncStatus')}</button></form> : null}
     <PublicationRecovery postId={post.id} excerpt={post.message} targets={post.targets.map(item => ({ id: item.id, name: item.target.name, status: item.status, remotePostId: item.remotePostId }))} />
-    {post.firstComment?.trim() ? <section className={styles.help} aria-label="First comment status">
-      <strong>First comment delivery</strong>
+    {post.firstComment?.trim() ? <section className={styles.help} aria-label={t('firstCommentStatus')}>
+      <strong>{t('firstCommentDelivery')}</strong>
       {post.targets.map(target => <FirstCommentControl key={target.id} postId={post.id} postComment={post.firstComment!} delayMinutes={post.firstCommentDelayMinutes ?? 0} timeZone={timeZone} target={target} />)}
     </section> : null}
-    <Button variant="danger" size="sm" type="button" disabled={rowPending} onClick={() => setDeleteOpen(true)}>Delete locally</Button>
+    <Button variant="danger" size="sm" type="button" disabled={rowPending} onClick={() => setDeleteOpen(true)}>{t('deleteLocally')}</Button>
     {deleteOpen && <PostDeleteDialog postId={post.id} postMessage={post.message} hasRemote={hasRemote} onDismiss={() => setDeleteOpen(false)} onPendingChange={setDeletePending} />}
   </div>;
 }
 
 function FirstCommentControl({ postId, postComment, delayMinutes, timeZone, target }: { postId: string; postComment: string; delayMinutes: number; timeZone: string; target: PostRow['targets'][number] }) {
+  const t = usePublishingActionText();
   const [mode, setMode] = useState<'send' | 'record' | null>(null);
   const [localState, setLocalState] = useState<FirstCommentActionState['state'] | null>(null);
   const controlRef = useRef<HTMLDivElement>(null);
@@ -172,27 +177,28 @@ function FirstCommentControl({ postId, postComment, delayMinutes, timeZone, targ
   const dueAt = publishedAt && Number.isFinite(publishedAt.getTime()) ? new Date(publishedAt.getTime() + delayMinutes * 60_000) : null;
   const rejected = displayState === 'ready' && target.firstCommentError === FIRST_COMMENT_REJECTED;
   const isScheduled = !rejected && displayState === 'ready' && delayMinutes > 0;
-  const stateText = displayState === 'scheduled' ? 'First comment is scheduled'
-    : isScheduled && dueAt ? `First comment scheduled for ${formatPostPreviewTime(dueAt, timeZone)} (${timeZone.replaceAll('_', ' ')})`
-      : isScheduled ? `First comment waits ${delayMinutes.toLocaleString()} minutes after publication`
-        : FIRST_COMMENT_LABELS[displayState];
+  const stateText = displayState === 'scheduled' ? t('firstCommentIsScheduled')
+    : isScheduled && dueAt ? t('firstCommentScheduled', { time: formatPostPreviewTime(dueAt, timeZone), zone: timeZone.replaceAll('_', ' ') })
+      : isScheduled ? t('firstCommentWait', { minutes: delayMinutes.toLocaleString() })
+        : t(`comment_${displayState}`);
   const open = (next: 'send' | 'record') => setMode(next);
 
-  return <div ref={controlRef} className={styles.firstCommentRow} role="group" aria-label={`First comment delivery for ${target.target.name ?? 'this destination'}`} tabIndex={-1} data-first-comment-control>
-    <span>{target.target.name ?? 'Destination'}{rejected ? ':' : `: ${stateText}`}</span>
+  return <div ref={controlRef} className={styles.firstCommentRow} role="group" aria-label={t('firstCommentDeliveryFor', { destination: target.target.name ?? t('thisDestination') })} tabIndex={-1} data-first-comment-control>
+    <span>{target.target.name ?? t('destination')}{rejected ? ':' : `: ${stateText}`}</span>
     {rejected ? <FirstCommentRetry postId={postId} postTargetId={target.id} destinationName={target.target.name} onSettled={next => { setLocalState(next); if (next !== 'ready') requestAnimationFrame(() => controlRef.current?.focus()); }} /> : null}
-    {displayState === 'ready' && !rejected ? <Button type="button" size="sm" onClick={() => open('send')}>{delayMinutes > 0 ? 'Send now' : 'Send first comment'}</Button> : null}
-    {displayState === 'needs_review' ? <Button type="button" size="sm" onClick={() => open('record')}>Record comment outcome</Button> : null}
+    {displayState === 'ready' && !rejected ? <Button type="button" size="sm" onClick={() => open('send')}>{delayMinutes > 0 ? t('sendNow') : t('sendFirstComment')}</Button> : null}
+    {displayState === 'needs_review' ? <Button type="button" size="sm" onClick={() => open('record')}>{t('recordCommentOutcome')}</Button> : null}
     {mode ? <FirstCommentDialog key={`${target.id}:${mode}`} mode={mode} postId={postId} postComment={postComment} delayMinutes={delayMinutes} target={target} onDismiss={() => setMode(null)} onProgress={setLocalState} onComplete={state => { focusAfterComplete.current = true; setLocalState(state); setMode(null); }} /> : null}
   </div>;
 }
 
 function FirstCommentDialog({ mode, postId, postComment, delayMinutes, target, onDismiss, onProgress, onComplete }: { mode: 'send' | 'record'; postId: string; postComment: string; delayMinutes: number; target: PostRow['targets'][number]; onDismiss: () => void; onProgress: (state: FirstCommentActionState['state']) => void; onComplete: (state: FirstCommentActionState['state']) => void }) {
+  const t = usePublishingActionText();
   const [acknowledged, setAcknowledged] = useState(false);
   const [outcome, setOutcome] = useState<'sent' | 'not_sent'>('not_sent');
   const [remoteId, setRemoteId] = useState('');
-  const [sendState, sendAction, sendPending] = useActionState(runSendFirstCommentWithRecovery, { status: 'idle', postId, postTargetId: target.id } satisfies FirstCommentActionState);
-  const [recordState, recordAction, recordPending] = useActionState(runRecordFirstCommentWithRecovery, { status: 'idle', postId, postTargetId: target.id } satisfies FirstCommentActionState);
+  const [sendState, sendAction, sendPending] = useActionState((previous: FirstCommentActionState, data: FormData) => runSendFirstCommentWithRecovery(previous, data, t), { status: 'idle', postId, postTargetId: target.id } satisfies FirstCommentActionState);
+  const [recordState, recordAction, recordPending] = useActionState((previous: FirstCommentActionState, data: FormData) => runRecordFirstCommentWithRecovery(previous, data, t), { status: 'idle', postId, postTargetId: target.id } satisfies FirstCommentActionState);
   const activeResult = mode === 'send' ? sendState : recordState;
   const pending = sendPending || recordPending;
   useEffect(() => {
@@ -210,14 +216,14 @@ function FirstCommentDialog({ mode, postId, postComment, delayMinutes, target, o
       <input type="hidden" name="postId" value={postId} />
       <input type="hidden" name="postTargetId" value={target.id} />
       <input type="hidden" name="confirmation" value={acknowledged ? `SEND FIRST COMMENT ${target.id}` : ''} />
-      <div className="ui-dialog__header"><div><h2 id={`first-comment-title-${target.id}`}>Send the first comment now?</h2><p>This sends the saved comment to {target.target.name ?? 'this destination'} once{delayMinutes > 0 ? ', without waiting for its saved delay' : ''}.</p></div></div>
+      <div className="ui-dialog__header"><div><h2 id={`first-comment-title-${target.id}`}>{t('sendTheFirstCommentNow')}</h2><p>{t('thisSendsTheSavedCommentTo')} {target.target.name ?? t('thisDestination')} {t('once')}{delayMinutes > 0 ? t('sendDelayOverride') : ''}.</p></div></div>
       <div className="ui-dialog__body">
         <p className={styles.help}>{postComment}</p>
-        <p>If the platform accepts it but the response is delayed, the result will need review. Check its current status before any further action.</p>
-        <label className={styles.confirmCheck}><input type="checkbox" name="acknowledged" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.currentTarget.checked)} /> I understand the result may be delayed and I will check status before repeating.</label>
-        {sendState.status === 'error' ? <p className="ui-error" role="alert" data-first-comment-error tabIndex={-1}>{sendState.message ?? 'The send result could not be confirmed. Check its current state before another action.'}</p> : null}
+        <p>{t('ifThePlatformAcceptsItButThe')}</p>
+        <label className={styles.confirmCheck}><input type="checkbox" name="acknowledged" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.currentTarget.checked)} /> {t('iUnderstandTheResultMayBeDelayed')}</label>
+        {sendState.status === 'error' ? <p className="ui-error" role="alert" data-first-comment-error tabIndex={-1}>{sendState.message ?? t('theSendResultCouldNotBeConfirmed')}</p> : null}
       </div>
-      <div className="ui-dialog__actions"><Button type="button" data-first-comment-cancel disabled={pending} onClick={onDismiss}>Cancel</Button><Button variant="primary" type="submit" disabled={pending || !acknowledged || sendState.state === 'ready'}>Send now</Button></div>
+      <div className="ui-dialog__actions"><Button type="button" data-first-comment-cancel disabled={pending} onClick={onDismiss}>{t('cancel')}</Button><Button variant="primary" type="submit" disabled={pending || !acknowledged || sendState.state === 'ready'}>{t('sendNow')}</Button></div>
     </form> : <form noValidate onSubmit={event => {
       event.preventDefault();
       if (!acknowledged || pending || (outcome === 'sent' && !remoteId.trim())) return;
@@ -227,34 +233,34 @@ function FirstCommentDialog({ mode, postId, postComment, delayMinutes, target, o
       <input type="hidden" name="postId" value={postId} />
       <input type="hidden" name="postTargetId" value={target.id} />
       <input type="hidden" name="confirmation" value={acknowledged ? `RECORD FIRST COMMENT ${target.id} ${outcome === 'sent' ? 'SENT' : 'NOT SENT'}` : ''} />
-      <div className="ui-dialog__header"><div><h2 id={`first-comment-title-${target.id}`}>Record the platform check</h2><p>This records your manual check. The app will not contact or verify the platform.</p></div></div>
+      <div className="ui-dialog__header"><div><h2 id={`first-comment-title-${target.id}`}>{t('recordThePlatformCheck')}</h2><p>{t('thisRecordsYourManualCheckTheApp')}</p></div></div>
       <div className="ui-dialog__body">
-        <p>The original request may still complete later. Confirm the current platform outcome before choosing below.</p>
-        <fieldset className={styles.targetPicker} disabled={pending}><legend>What did you verify?</legend>
-          <label><input type="radio" name="outcomeChoice" value="not_sent" checked={outcome === 'not_sent'} onChange={() => setOutcome('not_sent')} /> The comment is not present</label>
-          <label><input type="radio" name="outcomeChoice" value="sent" checked={outcome === 'sent'} onChange={() => setOutcome('sent')} /> The comment is present</label>
+        <p>{t('theOriginalRequestMayStillCompleteLater')}</p>
+        <fieldset className={styles.targetPicker} disabled={pending}><legend>{t('whatDidYouVerify')}</legend>
+          <label><input type="radio" name="outcomeChoice" value="not_sent" checked={outcome === 'not_sent'} onChange={() => setOutcome('not_sent')} /> {t('theCommentIsNotPresent')}</label>
+          <label><input type="radio" name="outcomeChoice" value="sent" checked={outcome === 'sent'} onChange={() => setOutcome('sent')} /> {t('theCommentIsPresent')}</label>
         </fieldset>
         <input type="hidden" name="outcome" value={outcome} />
-        {outcome === 'sent' ? <label className="ui-field" htmlFor={`first-comment-remote-id-${target.id}`}><span>Platform comment ID</span><input className="ui-input" id={`first-comment-remote-id-${target.id}`} name="remoteId" value={remoteId} onChange={event => setRemoteId(event.currentTarget.value)} required disabled={pending} /></label> : <input type="hidden" name="remoteId" value="" />}
-        <label className={styles.confirmCheck}><input type="checkbox" name="acknowledged" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.currentTarget.checked)} /> I checked the platform outside this app and understand a late result may still appear.</label>
-        {recordState.status === 'error' ? <p className="ui-error" role="alert" data-first-comment-error tabIndex={-1}>{recordState.message ?? 'The outcome could not be recorded. Check the current state before trying again.'}</p> : null}
+        {outcome === 'sent' ? <label className="ui-field" htmlFor={`first-comment-remote-id-${target.id}`}><span>{t('platformCommentID')}</span><input className="ui-input" id={`first-comment-remote-id-${target.id}`} name="remoteId" value={remoteId} onChange={event => setRemoteId(event.currentTarget.value)} required disabled={pending} /></label> : <input type="hidden" name="remoteId" value="" />}
+        <label className={styles.confirmCheck}><input type="checkbox" name="acknowledged" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.currentTarget.checked)} /> {t('iCheckedThePlatformOutsideThisApp')}</label>
+        {recordState.status === 'error' ? <p className="ui-error" role="alert" data-first-comment-error tabIndex={-1}>{recordState.message ?? t('theOutcomeCouldNotBeRecordedCheck')}</p> : null}
       </div>
-      <div className="ui-dialog__actions"><Button type="button" data-first-comment-cancel disabled={pending} onClick={onDismiss}>Cancel</Button><Button variant="primary" type="submit" disabled={pending || !acknowledged || (outcome === 'sent' && !remoteId.trim())}>Record result</Button></div>
+      <div className="ui-dialog__actions"><Button type="button" data-first-comment-cancel disabled={pending} onClick={onDismiss}>{t('cancel')}</Button><Button variant="primary" type="submit" disabled={pending || !acknowledged || (outcome === 'sent' && !remoteId.trim())}>{t('recordResult')}</Button></div>
     </form>}
   </ModalDialog>;
 }
 
-export async function runSendFirstCommentWithRecovery(previous: FirstCommentActionState, data: FormData): Promise<FirstCommentActionState> {
+export async function runSendFirstCommentWithRecovery(previous: FirstCommentActionState, data: FormData, t: PublishingActionText = defaultPublishingActionText): Promise<FirstCommentActionState> {
   const postId = typeof data.get('postId') === 'string' ? String(data.get('postId')) : previous.postId;
   const postTargetId = typeof data.get('postTargetId') === 'string' ? String(data.get('postTargetId')) : previous.postTargetId;
   try { return await sendFirstCommentAction(previous, data); }
   catch (error) {
     if (isActionRedirect(error)) throw error;
-    return { status: 'error', postId, postTargetId, state: 'needs_review', message: 'The send result is unconfirmed. Check the platform and current post before sending or recording an outcome.' };
+    return { status: 'error', postId, postTargetId, state: 'needs_review', message: t('theSendResultIsUnconfirmedCheckThe') };
   }
 }
 
-export async function runRecordFirstCommentWithRecovery(previous: FirstCommentActionState, data: FormData): Promise<FirstCommentActionState> {
+export async function runRecordFirstCommentWithRecovery(previous: FirstCommentActionState, data: FormData, t: PublishingActionText = defaultPublishingActionText): Promise<FirstCommentActionState> {
   const postId = typeof data.get('postId') === 'string' ? String(data.get('postId')) : previous.postId;
   const postTargetId = typeof data.get('postTargetId') === 'string' ? String(data.get('postTargetId')) : previous.postTargetId;
   const submittedOutcome = data.get('outcome');
@@ -264,16 +270,18 @@ export async function runRecordFirstCommentWithRecovery(previous: FirstCommentAc
   try { return await recordFirstCommentOutcomeAction(previous, data); }
   catch (error) {
     if (isActionRedirect(error)) throw error;
-    return { status: 'error', postId, postTargetId, state: 'needs_review', outcome, remoteId, message: 'The outcome is unconfirmed. Check the current post before repeating or taking another action.' };
+    return { status: 'error', postId, postTargetId, state: 'needs_review', outcome, remoteId, message: t('theOutcomeIsUnconfirmedCheckTheCurrent') };
   }
 }
 
 function PostEditForm({ post, targets, selected, imageRules, disabled, onPendingChange }: { post: PostRow; targets: TargetChoice[]; selected: Set<string>; imageRules: ImageRules; disabled: boolean; onPendingChange: (pending: boolean) => void }) {
+  const t = usePublishingActionText();
+  const { catalog, locale } = useComposerCatalog();
   const initialValues: Partial<ComposerValues> = {
     intent: '', mediaJson: JSON.stringify(post.media), destinationFormatsJson: JSON.stringify(Object.fromEntries(post.targets.map(t => [t.target.id, t.formatId ?? post.format]).filter((entry): entry is [string,string] => typeof entry[1] === 'string'))), message: post.message, firstComment: post.firstComment ?? '', firstCommentDelayMinutes: String(post.firstCommentDelayMinutes ?? 0), link: post.link ?? '',
     targetIds: [...selected], scheduleDate: '', scheduleTime: '',
   };
-  const [actionState, formAction, pending] = useActionState(runUpdatePostWithRecovery, { status: 'idle', values: initialValues } satisfies PostEditActionState);
+  const [actionState, formAction, pending] = useActionState((previous: PostEditActionState, data: FormData) => runUpdatePostWithRecovery(previous, data, t), { status: 'idle', values: initialValues } satisfies PostEditActionState);
   const [values, setValues] = useState<Partial<ComposerValues>>(initialValues);
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -315,9 +323,9 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
     const linkField = form.elements.namedItem('link');
     const link = linkField instanceof HTMLInputElement ? linkField.value : '';
     const hasOtherContent = Boolean(link.trim() || attachments.items.some(item => item.file || item.url.trim()));
-    if (!validation.validate(form, postValidationErrors(form, hasOtherContent))) { event.preventDefault(); return; }
+    if (!validation.validate(form, postValidationErrors(form, hasOtherContent, t))) { event.preventDefault(); return; }
     if (!attachments.validate()) { event.preventDefault(); focusAlert(form); return; }
-    const issue = selectedMediaIssue(formatTargets, attachments.media, link, attachments.items);
+    const issue = selectedMediaIssue(formatTargets, attachments.media, link, attachments.items, t, publishingMediaFormatter(catalog, locale));
     if (issue) { event.preventDefault(); attachments.setError(issue); return; }
     const hasPendingUploads = attachments.items.some(item => item.source === 'upload' && item.file);
     if (!hasPendingUploads) { setUploadMessage(''); return; }
@@ -326,11 +334,11 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
     if (form.dataset.uploading === 'true') return;
     form.dataset.uploading = 'true';
     setUploading(true);
-    setUploadMessage('Uploading images…');
+    setUploadMessage(t('uploadingImages'));
     const submitter = (event.nativeEvent as SubmitEvent).submitter;
     try {
       if (!await attachments.prepareUploads()) {
-        setUploadMessage('Some images could not be uploaded. Your order and descriptions are still here; fix the marked items and retry.');
+        setUploadMessage(t('someImagesCouldNotBeUploadedYour'));
         return;
       }
       setUploadMessage('');
@@ -338,7 +346,7 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
       flushSync(() => setUploading(false));
       form.requestSubmit(submitter instanceof HTMLElement ? submitter as HTMLButtonElement : undefined);
     } catch {
-      setUploadMessage('We could not upload every image. Your post details are still here; try again.');
+      setUploadMessage(t('weCouldNotUploadEveryImageYour'));
     } finally {
       form.dataset.uploading = 'false';
       setUploading(false);
@@ -350,31 +358,32 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
   }}>
     <input type="hidden" name="postId" value={post.id} />
     <input type="hidden" name="destinationFormatsJson" value={serializedFormats} />
-    <SidebarDock><fieldset className="ui-field"><legend>Post formats</legend><DestinationFormats targets={targets} selectedIds={selectedTargets.map(target=>target.id)} values={formatChoices} onChange={(id,value) => setValues(current => ({...current,destinationFormatsJson:JSON.stringify({...readFormatValues(current.destinationFormatsJson),[id]:value})}))} formId={`post-edit-${post.id}`} disabled={disabled || pending || uploading} /></fieldset></SidebarDock>
+    <SidebarDock><fieldset className="ui-field"><legend>{t('postFormats')}</legend><DestinationFormats copyCatalog={catalog} locale={locale} targets={targets} selectedIds={selectedTargets.map(target=>target.id)} values={formatChoices} onChange={(id,value) => setValues(current => ({...current,destinationFormatsJson:JSON.stringify({...readFormatValues(current.destinationFormatsJson),[id]:value})}))} formId={`post-edit-${post.id}`} disabled={disabled || pending || uploading} /></fieldset></SidebarDock>
     <fieldset className={styles.formFields}>
-      <label htmlFor={`message-${post.id}`}>Post text <span>(optional with a link or media)</span></label>
+      <label htmlFor={`message-${post.id}`}>{t('postText')} <span>{t('optionalWithALinkOrMedia')}</span></label>
       <AutoTextarea id={`message-${post.id}`} name="message" value={values.message ?? post.message} onChange={event => setValue('message', event.currentTarget.value)} rows={4} disabled={disabled || pending || uploading} aria-invalid={Boolean(validation.errors.message)} aria-describedby={validation.errors.message ? `message-error-${post.id}` : undefined} />
       {validation.errors.message && <p id={`message-error-${post.id}`} className={styles.formError} role="alert">{validation.errors.message}</p>}
-      <label htmlFor={`comment-${post.id}`}>First comment <span>(optional)</span></label>
+      <label htmlFor={`comment-${post.id}`}>{t('firstComment')} <span>{t('optional2')}</span></label>
       <AutoTextarea id={`comment-${post.id}`} name="firstComment" value={values.firstComment ?? post.firstComment ?? ''} onChange={event => setValue('firstComment', event.currentTarget.value)} rows={2} disabled={disabled || pending || uploading} />
-      <label htmlFor={delayField.id}>Wait before the first comment <span>(minutes; 0 sends it right after publication)</span></label>
+      <label htmlFor={delayField.id}>{t('waitBeforeTheFirstComment')} <span>{t('minutes0SendsItRightAfterPublication')}</span></label>
       <input name="firstCommentDelayMinutes" type="number" inputMode="numeric" min={0} max={imageRules.maxFirstCommentDelayMinutes} step={1} value={values.firstCommentDelayMinutes ?? String(post.firstCommentDelayMinutes ?? 0)} onChange={event => setValue('firstCommentDelayMinutes', event.currentTarget.value)} disabled={disabled || pending || uploading} {...delayField} />
-      <p id={`comment-delay-help-${post.id}`} className={styles.help}>Choose a whole number from 0 to {imageRules.maxFirstCommentDelayMinutes.toLocaleString()} minutes.</p>
+      <p id={`comment-delay-help-${post.id}`} className={styles.help}>{t('chooseAWholeNumberFrom0To')} {imageRules.maxFirstCommentDelayMinutes.toLocaleString()} {t('minutes')}</p>
       <FieldError {...validation.errorProps('firstCommentDelayMinutes')} />
-      <label htmlFor={`link-${post.id}`}>Link <span>(optional)</span></label><input id={`link-${post.id}`} name="link" type="url" value={values.link ?? post.link ?? ''} onChange={event => setValue('link', event.currentTarget.value)} disabled={disabled || pending || uploading} aria-invalid={Boolean(validation.errors.link)} aria-describedby={validation.errors.link ? `link-error-${post.id}` : undefined} />
+      <label htmlFor={`link-${post.id}`}>{t('link')} <span>{t('optional2')}</span></label><input id={`link-${post.id}`} name="link" type="url" value={values.link ?? post.link ?? ''} onChange={event => setValue('link', event.currentTarget.value)} disabled={disabled || pending || uploading} aria-invalid={Boolean(validation.errors.link)} aria-describedby={validation.errors.link ? `link-error-${post.id}` : undefined} />
       {validation.errors.link && <p id={`link-error-${post.id}`} className={styles.formError} role="alert">{validation.errors.link}</p>}
       <PostAttachments controller={attachments} disabled={disabled || pending || uploading} />
       <AuthoringMediaPreview controller={attachments} />
       <TargetPicker targets={targets} selected={targetIds} disabled={disabled || pending || uploading} onSelectionChange={next => setValues(current => ({ ...current, targetIds: [...next] }))} />
-      {actionState.status === 'error' && <p className={styles.formError} role="alert" data-edit-error tabIndex={-1}>{actionState.message ?? 'The post could not be saved. Your changes are still here; try again.'}</p>}
+      {actionState.status === 'error' && <p className={styles.formError} role="alert" data-edit-error tabIndex={-1}>{actionState.message ?? t('thePostCouldNotBeSavedYour')}</p>}
       {uploadMessage && <p className={styles.formError} role="status">{uploadMessage}</p>}
-      <Button size="sm" type="submit" disabled={disabled || pending || uploading}>{uploading ? 'Uploading…' : pending ? 'Saving…' : 'Save post'}</Button>
+      <Button size="sm" type="submit" disabled={disabled || pending || uploading}>{uploading ? t('uploading') : pending ? t('saving') : t('savePost')}</Button>
     </fieldset>
   </form>;
 }
 
 function PostDeleteDialog({ postId, postMessage, hasRemote, onDismiss, onPendingChange }: { postId: string; postMessage: string; hasRemote: boolean; onDismiss: () => void; onPendingChange: (pending: boolean) => void }) {
-  const [actionState, formAction, pending] = useActionState(runDeletePostWithRecovery, { status: 'idle', deleteRemote: false } satisfies PostDeleteActionState);
+  const t = usePublishingActionText();
+  const [actionState, formAction, pending] = useActionState((previous: PostDeleteActionState, data: FormData) => runDeletePostWithRecovery(previous, data, t), { status: 'idle', deleteRemote: false } satisfies PostDeleteActionState);
   const [deleteRemote, setDeleteRemote] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -390,29 +399,29 @@ function PostDeleteDialog({ postId, postMessage, hasRemote, onDismiss, onPending
   return <ModalDialog className="ui-dialog" labelledBy={`delete-title-${postId}`} onDismiss={onDismiss} busy={pending} initialFocus={initialFocus}>
     <form ref={formRef} noValidate onSubmit={event => event.preventDefault()}>
       <input type="hidden" name="postId" value={postId} />
-      <div className="ui-dialog__header"><div><h2 id={`delete-title-${postId}`}>Delete this post locally?</h2><p>This permanently removes the post and its local publishing history.</p></div></div>
+      <div className="ui-dialog__header"><div><h2 id={`delete-title-${postId}`}>{t('deleteThisPostLocally')}</h2><p>{t('thisPermanentlyRemovesThePostAndIts')}</p></div></div>
       <div className="ui-dialog__body">
-        <p><strong>Post text</strong></p>
+        <p><strong>{t('postText')}</strong></p>
         <p className={styles.help} style={{ overflowWrap: 'anywhere', display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 3, overflow: 'hidden' }}>{postMessage}</p>
-        <p>{hasRemote ? 'Choose whether to request deletion of recorded remote posts. Unconfirmed outcomes stay available here for review.' : 'No remote post is recorded for this item; only the local post and its history will be removed.'}</p>
-        {hasRemote ? <label className={styles.confirmCheck}><input type="checkbox" name="deleteRemote" checked={deleteRemote} disabled={pending} onChange={event => setDeleteRemote(event.currentTarget.checked)} /> Also request deletion of recorded remote posts.</label> : null}
-        {actionState.receipt ? <section aria-label="Deletion status">
-          <p role={actionState.status === 'error' ? 'alert' : 'status'}><strong>Deletion status:</strong> {actionState.receipt.state.replaceAll('_', ' ')}. {actionState.message}</p>
+        <p>{hasRemote ? t('chooseWhetherToRequestDeletionOfRecorded') : t('noRemotePostIsRecordedForThis')}</p>
+        {hasRemote ? <label className={styles.confirmCheck}><input type="checkbox" name="deleteRemote" checked={deleteRemote} disabled={pending} onChange={event => setDeleteRemote(event.currentTarget.checked)} /> {t('alsoRequestDeletionOfRecordedRemotePosts')}</label> : null}
+        {actionState.receipt ? <section aria-label={t('deletionStatus')}>
+          <p role={actionState.status === 'error' ? 'alert' : 'status'}><strong>{t('deletionStatus2')}</strong> {t(`deletion_${actionState.receipt.state}`)}. {actionState.message}</p>
           {actionState.receipt.operations.map(operation => <div className={styles.firstCommentRow} key={operation.operationId}>
-            <span>{operation.targetName ?? 'Destination'}: {deletionOperationLabel(operation.state, operation.remoteConfirmed)}</span>
+            <span>{operation.targetName ?? t('destination')}: {deletionOperationLabel(operation.state, operation.remoteConfirmed, t)}</span>
             {['started', 'uncertain'].includes(operation.state) ? <>
-              <Button type="button" size="sm" disabled={pending || !acknowledged} onClick={() => submit('record', { operationId: operation.operationId, outcome: 'deleted' })}>Record deleted</Button>
-              <Button type="button" size="sm" disabled={pending || !acknowledged} onClick={() => submit('record', { operationId: operation.operationId, outcome: 'not_deleted' })}>Record not deleted</Button>
+              <Button type="button" size="sm" disabled={pending || !acknowledged} onClick={() => submit('record', { operationId: operation.operationId, outcome: 'deleted' })}>{t('recordDeleted')}</Button>
+              <Button type="button" size="sm" disabled={pending || !acknowledged} onClick={() => submit('record', { operationId: operation.operationId, outcome: 'not_deleted' })}>{t('recordNotDeleted')}</Button>
             </> : null}
           </div>)}
         </section> : null}
         {actionState.receipt?.operations.some(operation => operation.state === 'started' || operation.state === 'uncertain') ? <div>
-          <p>The original request may still complete later. For each destination, check the platform yourself before recording an outcome.</p>
-          <label className={styles.confirmCheck}><input type="checkbox" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.currentTarget.checked)} /> I checked the platform outside this app and understand a late deletion result may still appear.</label>
+          <p>{t('theOriginalRequestMayStillCompleteLater2')}</p>
+          <label className={styles.confirmCheck}><input type="checkbox" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.currentTarget.checked)} /> {t('iCheckedThePlatformOutsideThisApp2')}</label>
         </div> : null}
-        {actionState.status === 'error' && <p className="ui-error" role="alert" data-dialog-error tabIndex={-1}>{actionState.message ?? 'We could not confirm whether this post was deleted. Check its current status before trying again.'}</p>}
+        {actionState.status === 'error' && <p className="ui-error" role="alert" data-dialog-error tabIndex={-1}>{actionState.message ?? t('weCouldNotConfirmWhetherThisPost')}</p>}
       </div>
-      <div className="ui-dialog__actions"><Button type="button" data-dialog-cancel disabled={pending} onClick={onDismiss}>Close</Button><Button type="button" disabled={pending} onClick={() => submit('status')}>Check deletion status</Button>{actionState.receipt?.state === 'local_pending' ? <Button variant="danger" type="button" disabled={pending} onClick={() => submit('finish')}>Finish local removal</Button> : <Button variant="danger" type="button" disabled={pending || actionState.receipt?.operations.some(operation => operation.state === 'started' || operation.state === 'uncertain')} onClick={() => submit('start')}>{actionState.receipt?.operations.some(operation => operation.state === 'rejected') ? 'New deletion request' : 'Delete post'}</Button>}</div>
+      <div className="ui-dialog__actions"><Button type="button" data-dialog-cancel disabled={pending} onClick={onDismiss}>{t('close')}</Button><Button type="button" disabled={pending} onClick={() => submit('status')}>{t('checkDeletionStatus')}</Button>{actionState.receipt?.state === 'local_pending' ? <Button variant="danger" type="button" disabled={pending} onClick={() => submit('finish')}>{t('finishLocalRemoval')}</Button> : <Button variant="danger" type="button" disabled={pending || actionState.receipt?.operations.some(operation => operation.state === 'started' || operation.state === 'uncertain')} onClick={() => submit('start')}>{actionState.receipt?.operations.some(operation => operation.state === 'rejected') ? t('newDeletionRequest') : t('deletePost')}</Button>}</div>
     </form>
   </ModalDialog>;
 
@@ -434,27 +443,27 @@ function PostDeleteDialog({ postId, postMessage, hasRemote, onDismiss, onPending
   }
 }
 
-function deletionOperationLabel(state: string, remoteConfirmed: boolean): string {
-  if (remoteConfirmed) return 'Remote deletion confirmed';
+function deletionOperationLabel(state: string, remoteConfirmed: boolean, t: PublishingActionText = defaultPublishingActionText): string {
+  if (remoteConfirmed) return t('remoteDeletionConfirmed');
   switch (state) {
-    case 'started': return 'Request started';
-    case 'uncertain': return 'Outcome unconfirmed';
-    case 'remote_confirmed': return 'Remote deletion confirmed';
-    case 'completed': return 'Local cleanup completed';
-    case 'rejected': return 'Not deleted';
-    default: return 'Needs review';
+    case 'started': return t('requestStarted');
+    case 'uncertain': return t('outcomeUnconfirmed');
+    case 'remote_confirmed': return t('remoteDeletionConfirmed');
+    case 'completed': return t('localCleanupCompleted');
+    case 'rejected': return t('notDeleted');
+    default: return t('needsReview');
   }
 }
 
-export async function runUpdatePostWithRecovery(previous: PostEditActionState, data: FormData): Promise<PostEditActionState> {
+export async function runUpdatePostWithRecovery(previous: PostEditActionState, data: FormData, t: PublishingActionText = defaultPublishingActionText): Promise<PostEditActionState> {
   try { return await updatePostWithRecoveryAction(previous, data); }
   catch (error) {
     if (isActionRedirect(error)) throw error;
-    return { status: 'error', message: 'We could not confirm whether this post was saved. Your changes are still here; check the post before trying again.', values: valuesFromFormData(data) };
+    return { status: 'error', message: t('weCouldNotConfirmWhetherThisPost2'), values: valuesFromFormData(data) };
   }
 }
 
-export async function runDeletePostWithRecovery(previous: PostDeleteActionState, data: FormData): Promise<PostDeleteActionState> {
+export async function runDeletePostWithRecovery(previous: PostDeleteActionState, data: FormData, t: PublishingActionText = defaultPublishingActionText): Promise<PostDeleteActionState> {
   const deleteRemote = data.get('deleteRemote') === 'on';
   try {
     const result = await deletePostWithRecoveryAction(previous, data);
@@ -464,7 +473,7 @@ export async function runDeletePostWithRecovery(previous: PostDeleteActionState,
   catch (error) {
     if (isActionRedirect(error)) throw error;
     const operationId = data.get('operationId');
-    return { status: 'error', message: 'The deletion result is unconfirmed. Check deletion status before trying again.', deleteRemote, ...(previous.receipt ? { receipt: previous.receipt } : {}), ...(typeof operationId === 'string' ? { operationId } : {}) };
+    return { status: 'error', message: t('theDeletionResultIsUnconfirmedCheckDeletion'), deleteRemote, ...(previous.receipt ? { receipt: previous.receipt } : {}), ...(typeof operationId === 'string' ? { operationId } : {}) };
   }
 }
 
@@ -478,6 +487,7 @@ function valuesFromFormData(data: FormData): Partial<ComposerValues> {
 }
 
 function ScheduleForm({ postId, disabled = false }: { postId: string; disabled?: boolean }) {
+  const t = usePublishingActionText();
   const validation = useFormValidation();
   return <form noValidate action={schedulePostAction} className={styles.scheduleForm} onSubmit={event => {
     if (disabled) { event.preventDefault(); return; }
@@ -492,22 +502,23 @@ function ScheduleForm({ postId, disabled = false }: { postId: string; disabled?:
   }}>
     <input type="hidden" name="postId" value={postId}/>
     <fieldset disabled={disabled} className={styles.formFields}>
-      <label>Schedule (your local time) <input {...validation.fieldProps('localScheduledAt')} type="datetime-local" name="localScheduledAt" required/></label>
+      <label>{t('scheduleYourLocalTime')} <input {...validation.fieldProps('localScheduledAt')} type="datetime-local" name="localScheduledAt" required/></label>
       <FieldError {...validation.errorProps('localScheduledAt')} /><input type="hidden" name="scheduledAt"/>
-      <button className="ui-button ui-button--secondary ui-button--sm" type="submit">Add to queue</button>
+      <button className="ui-button ui-button--secondary ui-button--sm" type="submit">{t('addToQueue')}</button>
     </fieldset>
   </form>;
 }
 
 function TargetPicker({ targets, selected = new Set<string>(), onSelectionChange, disabled = false }: { targets: TargetChoice[]; selected?: Set<string>; onSelectionChange?: (selected: Set<string>) => void; disabled?: boolean }) {
+  const t = usePublishingActionText();
   const supported = targets.filter(target => target.canPublish);
   return <fieldset className={styles.targetPicker}>
-    <legend>Destinations <span>(optional)</span></legend>
+    <legend>{t('destinations')} <span>{t('optional2')}</span></legend>
     {supported.length ? supported.map(target => <label key={target.id}>
       <input type="checkbox" name="targetIds" value={target.id} disabled={disabled} {...(onSelectionChange ? { checked: selected.has(target.id), onChange: (event: ChangeEvent<HTMLInputElement>) => { const next = new Set(selected); if (event.currentTarget.checked) next.add(target.id); else next.delete(target.id); onSelectionChange(next); } } : { defaultChecked: selected.has(target.id) })} />
       <span>{target.name}</span>
-    </label>) : <p>No enabled destinations can publish right now.</p>}
-    <small>Only enabled destinations that support publishing are shown.</small>
+    </label>) : <p>{t('noEnabledDestinationsCanPublishRightNow')}</p>}
+    <small>{t('onlyEnabledDestinationsThatSupportPublishingAre')}</small>
   </fieldset>;
 }
 

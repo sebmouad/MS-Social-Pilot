@@ -1,21 +1,16 @@
-"use client";
+import type { ComponentProps } from 'react';
+import { loadPublishingCopy } from '../server/customer-copy';
+import { loadPublishingActionCopy } from '../server/action-copy';
+import { PublishingCopyProvider } from './kit/CopyProvider';
+import { PublishingActionCopyProvider } from './WorkflowSubmitButtons';
+import { PublishingSidebarClient } from './PublishingSidebarClient';
 
-import type { ChannelGroup } from '@/modules/settings/channel-profiles/contracts';
-import { usePathname } from "next/navigation";
-import { PostFilters } from "./posts/PostFilters";
-import { CalendarFilters } from "./calendar/CalendarFilters";
-import { SavedViews } from "./SavedViews";
-
-/** Chooses the sidebar controls for the current publishing page. */
-export function PublishingSidebar({ groups, locale, channels, today, searchMaxCharacters, exportMaxPosts, exportMaxBytes }: { groups?: ChannelGroup[]; locale?: 'en' | 'fr'; channels: Array<{ id: string; name: string }>; today: string; searchMaxCharacters: number; exportMaxPosts: number; exportMaxBytes: number }) {
-  const pathname = usePathname();
-  return pathname.startsWith("/publishing/collaboration")
-    ? <div aria-label="Organization tools"><p className="shell-subnav__label">Organize</p><p className="help">Manage labels, custom fields and team notes.</p></div>
-    : pathname === "/publishing/labels"
-    ? <div aria-label="Label tools"><p className="shell-subnav__label">Labels</p><p className="help">Organize and manage workspace content labels.</p></div>
-    : pathname === "/publishing/templates"
-    ? <div aria-label="Template tools"><p className="shell-subnav__label">Templates</p><p className="help">Search workspace templates or create a reusable post message from here.</p></div>
-    : pathname === "/publishing/calendar"
-    ? <><CalendarFilters channels={channels} today={today} /><SavedViews screen="calendar" /></>
-    : <><PostFilters groups={groups} locale={locale} channels={channels} currentMonth={today.slice(0, 7)} searchMaxCharacters={searchMaxCharacters} exportMaxPosts={exportMaxPosts} exportMaxBytes={exportMaxBytes} />{pathname === "/publishing/posts" ? <SavedViews screen="posts" /> : null}</>;
+/** The shell mounts this server boundary separately from the route content. */
+export async function PublishingSidebar(props: ComponentProps<typeof PublishingSidebarClient>) {
+  const [{ catalog }, actionCatalog] = await Promise.all([loadPublishingCopy(), loadPublishingActionCopy()]);
+  return <PublishingCopyProvider catalog={catalog} locale={props.locale}>
+    <PublishingActionCopyProvider catalog={actionCatalog} locale={props.locale}>
+      <PublishingSidebarClient {...props} />
+    </PublishingActionCopyProvider>
+  </PublishingCopyProvider>;
 }

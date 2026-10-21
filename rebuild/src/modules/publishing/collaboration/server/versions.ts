@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -11,10 +14,11 @@ import type { Tx } from './core';
 
 /** Consume the same typed policy Root validates, without duplicating its bounds. */
 export async function loadVersionRetention(): Promise<number> {
+  const errorText = await loadPublishingErrorText();
   const definition = COLLAB_CONFIG.find(item => item.key === 'publishing.collab.versionRetention');
-  if (!definition) throw new OperationError('unavailable', 'Version history is temporarily unavailable.');
+  if (!definition) throw new PublishingOperationError('unavailable', 'collaboration_52', {}, errorText);
   const value = await runtimeConfig(definition.key);
-  if (!definition.schema.safeParse(value).success || typeof value !== 'number') throw new OperationError('unavailable', 'Version history is temporarily unavailable.');
+  if (!definition.schema.safeParse(value).success || typeof value !== 'number') throw new PublishingOperationError('unavailable', 'collaboration_52', {}, errorText);
   return value;
 }
 
@@ -26,7 +30,8 @@ export type PostVersionRecord = {
 const LOCKED_STATUSES = new Set(['published', 'publishing', 'partially_failed', 'cancelled', 'scheduled']);
 
 export async function readPostVersions(actor: PublishingActor, input: unknown) {
-  const query = parse(VERSION_LIST, input);
+  const errorText = await loadPublishingErrorText();
+  const query = parse(VERSION_LIST, input, undefined, errorText);
   const limit = await bounds();
   const auth = await authorizePublishing(actor, POSTS, 'read');
   const post = await visiblePost(prisma, auth, query.postId);
@@ -40,7 +45,8 @@ export async function readPostVersions(actor: PublishingActor, input: unknown) {
  * Skips the write when nothing changed since the latest version; prunes beyond the retention bound.
  */
 export async function recordPostVersion(tx: Tx, postId: string, authorId: string | null, retention: number): Promise<boolean> {
-  if (!Number.isSafeInteger(retention) || retention < 1) throw new OperationError('unavailable', 'Version history is temporarily unavailable.');
+  const errorText = await loadPublishingErrorText();
+  if (!Number.isSafeInteger(retention) || retention < 1) throw new PublishingOperationError('unavailable', 'collaboration_52', {}, errorText);
   const inserted = await tx.$executeRaw`
     INSERT INTO post_versions (id, "postId", "authorId", "createdAt", message, "firstComment", "firstCommentDelayMinutes", link, media, format, "destinationFormats", "targetIds", "labelIds", "scheduledAt", timezone)
     SELECT 'ver_' || gen_random_uuid()::text, p.id, ${authorId},
@@ -67,19 +73,20 @@ export async function recordPostVersion(tx: Tx, postId: string, authorId: string
  * Without a registered lifecycle port the request is refused and nothing changes.
  */
 export async function requestVersionRestore(actor: PublishingActor, input: unknown) {
-  const data = parse(VERSION_RESTORE, input); exact(data.confirmation, restoreVersionConfirmation(data.versionId));
+  const errorText = await loadPublishingErrorText();
+  const data = parse(VERSION_RESTORE, input, undefined, errorText); exact(data.confirmation, restoreVersionConfirmation(data.versionId), errorText);
   const port = collaborationPorts().versions;
-  if (!port) throw new OperationError('unavailable', 'Restoring earlier versions is not available yet.');
+  if (!port) throw new PublishingOperationError('unavailable', 'collaboration_53', {}, errorText);
   const limit = await bounds();
   await authorizePublishing(actor, POSTS, 'write');
   const snapshot = await protect(transact(actor.workspaceId, limit, async tx => {
     const auth = await lockActor(tx, actor, POSTS, true);
     const post = await visiblePost(tx, auth, data.postId, true);
-    assertMayEdit(auth, post);
-    if (LOCKED_STATUSES.has(post.status)) throw new OperationError('conflict', 'This post can no longer be edited, so an earlier version cannot be restored.');
+    assertMayEdit(auth, post, errorText);
+    if (LOCKED_STATUSES.has(post.status)) throw new PublishingOperationError('conflict', 'collaboration_54', {}, errorText);
     const rows = await tx.$queryRaw<Array<Omit<VersionSnapshot, 'versionId'> & { id: string }>>`SELECT v.id, v.message, v."firstComment", v."firstCommentDelayMinutes", v.link, v.media, v.format, v."destinationFormats", v."targetIds", v."labelIds", v."scheduledAt", v.timezone FROM post_versions v JOIN posts p ON p.id = v."postId" WHERE v.id = ${data.versionId} AND v."postId" = ${data.postId} AND p."workspaceId" = ${actor.workspaceId}`;
     const row = rows[0];
-    if (!row) throw new OperationError('not_found', 'This version is unavailable for the post.');
+    if (!row) throw new PublishingOperationError('not_found', 'collaboration_55', {}, errorText);
     await audit(tx, actor, 'publishing.version_restore_requested', { postId: data.postId, versionId: row.id });
     const { id, ...rest } = row;
     return { versionId: id, ...rest } satisfies VersionSnapshot;
@@ -89,7 +96,7 @@ export async function requestVersionRestore(actor: PublishingActor, input: unkno
   try { outcome = await port.restorePostVersion({ actor, postId: data.postId, snapshot, ...(data.mode ? { mode: data.mode } : {}), ...(data.reviewToken ? { reviewToken: data.reviewToken } : {}) }); }
   catch (error) {
     if (error instanceof OperationError) throw error;
-    throw new OperationError('upstream_failure', 'The restore could not be confirmed. Open the post and check its current content before trying again.');
+    throw new PublishingOperationError('upstream_failure', 'collaboration_56', {}, errorText);
   }
   if (outcome.restored !== false) try { await transact(actor.workspaceId, limit, tx => audit(tx, actor, 'publishing.version_restored', { postId: data.postId, versionId: snapshot.versionId, status: outcome.status, approvalReset: outcome.approvalReset })); } catch { /* the lifecycle has its own audit; the request was audited above */ }
   return { postId: outcome.postId, versionId: snapshot.versionId, status: outcome.status, approvalReset: outcome.approvalReset, ...(outcome.restored === undefined ? {} : { restored: outcome.restored }), ...(outcome.review ? { review: outcome.review } : {}) };

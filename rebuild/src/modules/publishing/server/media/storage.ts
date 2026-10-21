@@ -1,3 +1,4 @@
+import { loadPublishingErrorText } from '../error-copy';
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { mkdir, open, lstat, realpath, readdir, unlink } from 'node:fs/promises';
@@ -53,12 +54,13 @@ async function ensureRealDirectory(dir: string, parent: string, create: boolean)
 }
 
 async function workspaceImageDirectory(workspaceId: string, create: boolean): Promise<string> {
+  const errorText = await loadPublishingErrorText();
   validateWorkspaceId(workspaceId);
   const configuredRoot = await runtimeConfig('storage.mediaRoot') as string;
-  if (!configuredRoot) throw new MediaStorageUnavailable();
+  if (!configuredRoot) throw new MediaStorageUnavailable(errorText);
   let root: string;
   try { root = await canonicalMediaRoot(configuredRoot); }
-  catch { throw new MediaStorageUnavailable(); }
+  catch { throw new MediaStorageUnavailable(errorText); }
   const workspaceDir = path.join(root, workspaceId);
   await ensureRealDirectory(workspaceDir, root, create);
   const imageDir = path.join(workspaceDir, 'images');
@@ -67,14 +69,15 @@ async function workspaceImageDirectory(workspaceId: string, create: boolean): Pr
 }
 
 export async function uploadWorkspaceImage(actor: MediaActor, file: File): Promise<WorkspaceImage> {
+  const errorText = await loadPublishingErrorText();
   const maxBytes = await runtimeConfig('publishing.maxImageUploadBytes') as number;
   const allowed = await runtimeConfig('publishing.allowedImageMimeTypes') as string[];
-  if (!(file instanceof File)) throw new MediaValidationError('invalid_file');
-  if (file.size < 1 || file.size > maxBytes) throw new MediaValidationError('too_large');
+  if (!(file instanceof File)) throw new MediaValidationError('invalid_file', errorText);
+  if (file.size < 1 || file.size > maxBytes) throw new MediaValidationError('too_large', errorText);
   const mimeType = file.type.toLowerCase();
-  if (!allowed.includes(mimeType) || !allowedSignatures[mimeType]) throw new MediaValidationError('invalid_type');
+  if (!allowed.includes(mimeType) || !allowedSignatures[mimeType]) throw new MediaValidationError('invalid_type', errorText);
   const bytes = Buffer.from(await file.arrayBuffer());
-  if (!bytes.length || bytes.length > maxBytes || !allowedSignatures[mimeType]!(bytes)) throw new MediaValidationError('invalid_content');
+  if (!bytes.length || bytes.length > maxBytes || !allowedSignatures[mimeType]!(bytes)) throw new MediaValidationError('invalid_content', errorText);
   const id = randomUUID();
   const dir = await workspaceImageDirectory(actor.workspaceId, true);
   const filePath = path.join(dir, id);
@@ -162,15 +165,16 @@ function detectedImageMime(bytes: Buffer): string | undefined {
 
 /** Return a bounded, tenant-scoped page of stored image metadata without reading image bytes. */
 export async function listWorkspaceImages(workspaceId: string, options: { limit: number; cursor?: string; holderVisibility?: HolderVisibility }): Promise<{ items: WorkspaceImageListing[]; nextCursor: string | null; usage: WorkspaceImageUsage }> {
+  const errorText = await loadPublishingErrorText();
   const { limit, cursor } = options;
-  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new MediaValidationError('invalid_listing_limit');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new MediaValidationError('invalid_listing_limit', errorText);
   let after: { mtimeMs: number; id: string } | undefined;
   if (cursor) {
     try {
       const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { mtimeMs?: unknown; id?: unknown };
       if (typeof parsed.mtimeMs !== 'number' || !Number.isFinite(parsed.mtimeMs) || typeof parsed.id !== 'string' || !IMAGE_ID.test(parsed.id)) throw new Error();
       after = { mtimeMs: parsed.mtimeMs, id: parsed.id };
-    } catch { throw new MediaValidationError('invalid_cursor'); }
+    } catch { throw new MediaValidationError('invalid_cursor', errorText); }
   }
   const dir = await workspaceImageDirectory(workspaceId, false).catch(error => {
     if (typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT') return null;

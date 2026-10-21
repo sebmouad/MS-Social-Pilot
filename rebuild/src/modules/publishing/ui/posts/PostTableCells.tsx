@@ -1,7 +1,9 @@
+'use client';
+import { usePublishingCopy } from '../kit/CopyProvider';
 import { StatusChip } from '@/components';
 import { postContentSummary } from '@/modules/publishing/content-summary';
 import { AttentionHint, AvatarStack, MediaThumb, ScheduleBadge, isSafeImageUrl } from '../kit/kit';
-import { kitCopy, type KitLocale } from '../kit/copy';
+import { type KitLocale } from '../kit/copy';
 import styles from './posts-table.module.css';
 
 type Media = { kind: string; url: string; altText?: string };
@@ -28,11 +30,11 @@ function thumbUrl(item: Media | undefined) {
 export function PostCell({ post, locale = 'en' }: { post: Row; locale?: KitLocale }) {
   const media = mediaList(post.media);
   const first = media[0];
-  const copy = kitCopy[locale];
+  const copy = usePublishingCopy(locale);
   return <div className={styles.cell}>
     <MediaThumb url={thumbUrl(first)} alt={first?.altText?.trim() || ''} count={media.length} video={first?.kind === 'video'} />
     <div className={styles.cellText}>
-      <span className={styles.message}>{postContentSummary(post.message, post.media, post.link) || copy.noText}</span>
+      <span className={styles.message}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
       {media.length ? <span className={styles.sub}>{media.length} {copy.mediaCount}</span> : null}
     </div>
   </div>;
@@ -45,10 +47,8 @@ export function ChannelsCell({ post, locale = 'en' }: { post: Row; locale?: KitL
 }
 
 /** The platform names holding a post remotely, from the read model; empty when the module metadata is unknown. */
-export function remotePlatformName(post: Row) {
-  const names = [...new Set(post.targets.filter(row => row.status === 'scheduled_remote').flatMap(row => row.target.platformName ? [row.target.platformName] : []))];
-  return names.length ? names.join(' + ') : undefined;
-}
+export { remotePlatformName } from '../remote-platform-name';
+import { remotePlatformName } from '../remote-platform-name';
 
 /** Overall status plus the per-destination outcome summary and who schedules it. */
 export function StatusCell({ post, locale = 'en' }: { post: Row; locale?: KitLocale }) {

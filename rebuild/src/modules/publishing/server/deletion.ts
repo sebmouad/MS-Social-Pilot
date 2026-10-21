@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
@@ -20,37 +23,41 @@ export type PostDeletionReceipt = {
 };
 const managers = new Set(['owner', 'admin', 'editor']);
 const writers = new Set([...managers, 'contributor']);
-const missing = () => new OperationError('not_found', 'This post or deletion is unavailable in the current workspace.');
+const missing = (errorText: PublishingErrorText = defaultPublishingErrorText) => new PublishingOperationError('not_found', 'thisPostOrDeletionIsUnavailableInTheCurrent', {}, errorText);
 const confirmed = (row: Journal) => row.state === 'remote_confirmed' || row.state === 'completed';
 
 async function validId(id: unknown) {
+  const errorText = await loadPublishingErrorText();
   const max = await runtimeConfig('publishing.identifierMaxCharacters');
-  if (typeof id !== 'string' || !id.trim() || id !== id.trim() || id.length > max || /[\u0000-\u001f\u007f]/.test(id)) throw new OperationError('invalid_request', 'Choose a valid publishing record.');
+  if (typeof id !== 'string' || !id.trim() || id !== id.trim() || id.length > max || /[\u0000-\u001f\u007f]/.test(id)) throw new PublishingOperationError('invalid_request', 'chooseAValidPublishingRecord', {}, errorText);
 }
 async function audit(tx: Prisma.TransactionClient, actorId: string, workspaceId: string, action: string, detail: object) {
   await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, ${action}, ${JSON.stringify({ workspaceId, ...detail })}::jsonb, NOW())`;
 }
 async function history(actor: PublishingActor, postId: string) {
+  const errorText = await loadPublishingErrorText();
   const max = await runtimeConfig('publishing.deletionMaxAliases');
   const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localPostIds", "localPostTargetIds", state
     FROM rebuild_post_deletions WHERE "workspaceId" = ${actor.workspaceId} AND ${postId} = ANY("localPostIds") ORDER BY "createdAt" DESC, id DESC LIMIT ${max + 1}`;
-  if (rows.length > max) throw new OperationError('unavailable', 'This deletion history needs administrator review.');
-  if (actor.allowedTargetIds !== undefined && rows.some(row => !actor.allowedTargetIds!.includes(row.targetId))) throw missing();
+  if (rows.length > max) throw new PublishingOperationError('unavailable', 'thisDeletionHistoryNeedsAdministratorReview', {}, errorText);
+  if (actor.allowedTargetIds !== undefined && rows.some(row => !actor.allowedTargetIds!.includes(row.targetId))) throw missing(errorText);
   return rows;
 }
 async function localPost(actor: PublishingActor, postId: string) {
+  const errorText = await loadPublishingErrorText();
   const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: {
     id: true, authorId: true, targets: { select: { id: true, targetId: true, status: true, remotePostId: true,
       target: { select: { id: true, workspaceId: true, name: true, type: true, enabled: true, accessToken: true,
         socialAccount: { select: { provider: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true } } } } } },
   } });
-  if (post && actor.allowedTargetIds !== undefined && !post.targets.length && post.authorId !== actor.userId) throw missing();
-  if (post?.targets.some(row => row.target.workspaceId !== actor.workspaceId || (actor.allowedTargetIds !== undefined && !actor.allowedTargetIds.includes(row.targetId)))) throw missing();
+  if (post && actor.allowedTargetIds !== undefined && !post.targets.length && post.authorId !== actor.userId) throw missing(errorText);
+  if (post?.targets.some(row => row.target.workspaceId !== actor.workspaceId || (actor.allowedTargetIds !== undefined && !actor.allowedTargetIds.includes(row.targetId)))) throw missing(errorText);
   return post;
 }
 async function result(actor: PublishingActor, postId: string): Promise<PostDeletionReceipt> {
+  const errorText = await loadPublishingErrorText();
   const [rows, post] = await Promise.all([history(actor, postId), localPost(actor, postId)]);
-  if (!post && !rows.length) throw missing();
+  if (!post && !rows.length) throw missing(errorText);
   const ids = [...new Set(rows.map(row => row.targetId))];
   const targets = ids.length ? await prisma.target.findMany({ where: { workspaceId: actor.workspaceId, id: { in: ids } }, select: { id: true, name: true } }) : [];
   const active = rows.filter(row => row.state !== 'rejected');
@@ -74,24 +81,26 @@ async function remoteJournal(workspaceId: string, provider: string, targetId: st
   return rows[0];
 }
 async function checkWriter(actor: PublishingActor, role: string, postId: string, remote: boolean) {
-  if (!writers.has(role) || (remote && !managers.has(role))) throw new OperationError('forbidden', 'You do not have permission to perform this deletion.');
+  const errorText = await loadPublishingErrorText();
+  if (!writers.has(role) || (remote && !managers.has(role))) throw new PublishingOperationError('forbidden', 'youDoNotHavePermissionToPerformThisDeletion', {}, errorText);
   const post = await localPost(actor, postId);
   if (!post) {
-    if (!managers.has(role) || !(await history(actor, postId)).length) throw missing();
+    if (!managers.has(role) || !(await history(actor, postId)).length) throw missing(errorText);
     return null;
   }
-  if (role === 'contributor' && post.authorId !== actor.userId) throw missing();
-  if (post.targets.some(row => row.status === 'processing')) throw new OperationError('conflict', 'A publishing result needs review before this post can be removed.');
+  if (role === 'contributor' && post.authorId !== actor.userId) throw missing(errorText);
+  if (post.targets.some(row => row.status === 'processing')) throw new PublishingOperationError('conflict', 'aPublishingResultNeedsReviewBeforeThisPostCan', {}, errorText);
   return post;
 }
 
 /** Trusted helper: callers own authority and workspace/destination exclusion. No remote dispatch. */
 export async function recordPostDeletionOutcomeInTransaction(tx: Prisma.TransactionClient, actorId: string, input: { operationId: string; workspaceId: string; outcome: 'deleted' | 'not_deleted' }): Promise<{ ok: true; operationId: string; state: 'remote_confirmed' | 'rejected' }> {
-  if (!['deleted', 'not_deleted'].includes(input.outcome)) throw new OperationError('invalid_request', 'Choose a valid deletion outcome.');
+  const errorText = await loadPublishingErrorText();
+  if (!['deleted', 'not_deleted'].includes(input.outcome)) throw new PublishingOperationError('invalid_request', 'chooseAValidDeletionOutcome', {}, errorText);
   const rows = await tx.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localPostIds", "localPostTargetIds", state FROM rebuild_post_deletions WHERE id = ${input.operationId} AND "workspaceId" = ${input.workspaceId} FOR UPDATE`;
   const row = rows[0];
-  if (!row) throw missing();
-  if (!['started', 'uncertain'].includes(row.state)) throw new OperationError('conflict', 'This deletion already has a recorded outcome.');
+  if (!row) throw missing(errorText);
+  if (!['started', 'uncertain'].includes(row.state)) throw new PublishingOperationError('conflict', 'thisDeletionAlreadyHasARecordedOutcome', {}, errorText);
   const state = input.outcome === 'deleted' ? 'remote_confirmed' : 'rejected';
   await tx.$executeRaw`UPDATE rebuild_post_deletions SET state = ${state}, reason = ${input.outcome === 'deleted' ? 'local_pending' : 'external_not_deleted'}, "remoteConfirmedAt" = ${input.outcome === 'deleted' ? new Date() : null}, "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${row.id} AND "workspaceId" = ${input.workspaceId}`;
   await audit(tx, actorId, input.workspaceId, 'publishing.post_deletion_outcome_recorded', { operationId: row.id, targetId: row.targetId, outcome: input.outcome, verification: 'external_human_attestation' });
@@ -100,17 +109,18 @@ export async function recordPostDeletionOutcomeInTransaction(tx: Prisma.Transact
 
 /** Atomically clear all references to confirmed remote identities; delete only the requested local post. */
 async function finish(actor: PublishingActor, postId: string, signal: AbortSignal): Promise<PostDeletionReceipt> {
+  const errorText = await loadPublishingErrorText();
   const current = await result(actor, postId);
   if (current.localConfirmed || current.state !== 'local_pending') return current;
   await withPublishingTransaction(signal, async tx => {
     const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { targetId: true, remotePostId: true } } } });
     const rows = await tx.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localPostIds", "localPostTargetIds", state FROM rebuild_post_deletions WHERE "workspaceId" = ${actor.workspaceId} AND ${postId} = ANY("localPostIds") AND state <> 'rejected' ORDER BY id FOR UPDATE`;
-    if (rows.some(row => !confirmed(row)) || post?.targets.some(target => target.remotePostId && !rows.some(row => row.targetId === target.targetId && row.remoteId === target.remotePostId && confirmed(row)))) throw new OperationError('conflict', 'Confirm every platform deletion before removing this local post.');
+    if (rows.some(row => !confirmed(row)) || post?.targets.some(target => target.remotePostId && !rows.some(row => row.targetId === target.targetId && row.remoteId === target.remotePostId && confirmed(row)))) throw new PublishingOperationError('conflict', 'confirmEveryPlatformDeletionBeforeRemovingThisLocalPost', {}, errorText);
     const max = await runtimeConfig('publishing.deletionMaxAliases');
     const aliasPosts = new Set<string>();
     for (const row of rows) {
       const aliases = await tx.postTarget.findMany({ where: { targetId: row.targetId, remotePostId: row.remoteId, post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId, socialAccount: { provider: row.provider } } }, select: { id: true, postId: true }, take: max + 1 });
-      if (aliases.length > max || new Set([...row.localPostIds, ...aliases.map(alias => alias.postId)]).size > max || new Set([...row.localPostTargetIds, ...aliases.map(alias => alias.id)]).size > max) throw new OperationError('unavailable', 'This deletion has too many stored references. Ask an administrator to review it.');
+      if (aliases.length > max || new Set([...row.localPostIds, ...aliases.map(alias => alias.postId)]).size > max || new Set([...row.localPostTargetIds, ...aliases.map(alias => alias.id)]).size > max) throw new PublishingOperationError('unavailable', 'thisDeletionHasTooManyStoredReferencesAskAn', {}, errorText);
       for (const alias of aliases) aliasPosts.add(alias.postId);
       await tx.postTarget.updateMany({ where: { id: { in: aliases.map(alias => alias.id) }, targetId: row.targetId, remotePostId: row.remoteId, post: { workspaceId: actor.workspaceId } }, data: { status: 'cancelled', remotePostId: null, remoteUrl: null } });
       await tx.$executeRaw`UPDATE rebuild_post_deletions SET state = 'completed', reason = NULL, "completedAt" = COALESCE("completedAt", CURRENT_TIMESTAMP), "updatedAt" = CURRENT_TIMESTAMP,
@@ -131,19 +141,21 @@ async function finish(actor: PublishingActor, postId: string, signal: AbortSigna
 }
 
 export async function finishPostDeletion(actor: PublishingActor, input: { postId: string; confirmation: string }): Promise<PostDeletionReceipt> {
-  if (input.confirmation !== `FINISH POST DELETION ${input.postId}`) throw new OperationError('invalid_request', 'Confirm recovery for this exact post.');
+  const errorText = await loadPublishingErrorText();
+  if (input.confirmation !== `FINISH POST DELETION ${input.postId}`) throw new PublishingOperationError('invalid_request', 'confirmRecoveryForThisExactPost', {}, errorText);
   return withPublishingOperation(actor, { postId: input.postId, includeInbox: true, allowDeletionRecovery: true, allowMissingPost: true }, async context => {
     await checkWriter(context.actor, context.role, input.postId, true);
     return finish(context.actor, input.postId, context.signal);
   });
 }
 export async function recordPostDeletionOutcome(actor: PublishingActor, input: { postId: string; operationId: string; outcome: 'deleted' | 'not_deleted'; confirmation: string; verifiedOnPlatform: true }): Promise<PostDeletionReceipt> {
+  const errorText = await loadPublishingErrorText();
   await validId(input.operationId);
-  if (input.verifiedOnPlatform !== true || !['deleted', 'not_deleted'].includes(input.outcome) || input.confirmation !== `RECORD POST DELETION ${input.operationId} ${input.outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}`) throw new OperationError('invalid_request', 'Verify the platform result and confirm this exact deletion outcome.');
+  if (input.verifiedOnPlatform !== true || !['deleted', 'not_deleted'].includes(input.outcome) || input.confirmation !== `RECORD POST DELETION ${input.operationId} ${input.outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}`) throw new PublishingOperationError('invalid_request', 'verifyThePlatformResultAndConfirmThisExactDeletion', {}, errorText);
   return withPublishingOperation(actor, { postId: input.postId, includeInbox: true, allowDeletionRecovery: true, allowMissingPost: true }, async context => {
     await checkWriter(context.actor, context.role, input.postId, true);
     const rows = await history(context.actor, input.postId);
-    if (!rows.some(row => row.id === input.operationId)) throw missing();
+    if (!rows.some(row => row.id === input.operationId)) throw missing(errorText);
     await withPublishingTransaction(context.signal, tx => recordPostDeletionOutcomeInTransaction(tx, context.actor.userId, { ...input, workspaceId: actor.workspaceId }));
     return result(context.actor, input.postId);
   });
@@ -151,7 +163,8 @@ export async function recordPostDeletionOutcome(actor: PublishingActor, input: {
 
 /** One persisted intent per remote identity. An unconfirmed result never causes another automatic request. */
 export async function deletePostDurably(actor: PublishingActor, postId: string, deleteRemote: boolean): Promise<PostDeletionReceipt> {
-  if (typeof deleteRemote !== 'boolean') throw new OperationError('invalid_request', 'Choose whether to remove remote publications.');
+  const errorText = await loadPublishingErrorText();
+  if (typeof deleteRemote !== 'boolean') throw new PublishingOperationError('invalid_request', 'chooseWhetherToRemoveRemotePublications', {}, errorText);
   return withPublishingOperation(actor, { postId, includeInbox: true, allowDeletionRecovery: true, allowMissingPost: true }, async context => {
     const { actor, role, signal } = context;
     const post = await checkWriter(actor, role, postId, deleteRemote);
@@ -175,23 +188,23 @@ export async function deletePostDurably(actor: PublishingActor, postId: string, 
     for (const row of post.targets.filter(row => row.remotePostId)) {
       const source = row.target.socialAccount;
       const provider = source?.provider;
-      if (!provider) throw new OperationError('unavailable', 'A destination connection needs review before remote deletion.');
+      if (!provider) throw new PublishingOperationError('unavailable', 'aDestinationConnectionNeedsReviewBeforeRemoteDeletion', {}, errorText);
       const existing = await remoteJournal(actor.workspaceId, provider, row.targetId, row.remotePostId!);
       if (existing) {
         // Attach a newly encountered local alias without creating another remote request.
         await withPublishingTransaction(signal, async tx => {
-          if (new Set([...existing.localPostIds, postId]).size > max || new Set([...existing.localPostTargetIds, row.id]).size > max) throw new OperationError('unavailable', 'This deletion has too many stored references.');
+          if (new Set([...existing.localPostIds, postId]).size > max || new Set([...existing.localPostTargetIds, row.id]).size > max) throw new PublishingOperationError('unavailable', 'thisDeletionHasTooManyStoredReferences', {}, errorText);
           await tx.$executeRaw`UPDATE rebuild_post_deletions SET "localPostIds" = ARRAY(SELECT DISTINCT unnest("localPostIds" || ARRAY[${postId}])), "localPostTargetIds" = ARRAY(SELECT DISTINCT unnest("localPostTargetIds" || ARRAY[${row.id}])), "updatedAt" = CURRENT_TIMESTAMP WHERE id = ${existing.id}`;
         });
         if (!confirmed(existing)) return result(actor, postId);
         continue;
       }
       const adapter = await platformFor(provider, 'remoteDelete');
-      if (!source || !entitlements || !hasPlatformCapability(entitlements, provider) || !adapter?.deleteRemote || !row.target.enabled || connectionState(source) !== 'connected' || !row.target.accessToken) throw new OperationError('reconnect_required', 'Reconnect each selected destination before remote deletion. The local post is preserved.');
+      if (!source || !entitlements || !hasPlatformCapability(entitlements, provider) || !adapter?.deleteRemote || !row.target.enabled || connectionState(source) !== 'connected' || !row.target.accessToken) throw new PublishingOperationError('reconnect_required', 'reconnectEachSelectedDestinationBeforeRemoteDeletionTheLocal', {}, errorText);
       const credential = readPublishingCredential(row.target, adapter, 'remoteDelete');
-      if (!credential) throw new OperationError('reconnect_required', 'Reconnect this destination before remote deletion.');
+      if (!credential) throw new PublishingOperationError('reconnect_required', 'reconnectThisDestinationBeforeRemoteDeletion', {}, errorText);
       const aliases = await prisma.postTarget.findMany({ where: { targetId: row.targetId, remotePostId: row.remotePostId, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } }, select: { id: true, postId: true }, take: max + 1 });
-      if (aliases.length > max) throw new OperationError('unavailable', 'This publication has too many stored references. Ask an administrator to review it.');
+      if (aliases.length > max) throw new PublishingOperationError('unavailable', 'thisPublicationHasTooManyStoredReferencesAskAn', {}, errorText);
       prepared.push({ row, provider, aliases, dispatch: () => adapter.deleteRemote!({ credential, remoteId: row.remotePostId!, signal }) });
     }
     for (const item of prepared) {

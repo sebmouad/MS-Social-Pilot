@@ -1,11 +1,11 @@
 'use client';
+import { useInboxCatalog } from './copy-context';
 
 import { useCallback, useEffect, useState } from 'react';
 import { IconMessageCircleSearch, IconPencil, IconTrash } from '@tabler/icons-react';
 import { Button, ConfirmDialog, Drawer, EmptyState, Field, Menu, Skeleton, TextInput } from '@/components';
 import { useToast } from '@/components/Toast';
 import { isOperationErrorCode } from '@/lib/operation-error';
-import { round3Copy } from './round3-copy';
 import type { InboxLocale } from './copy';
 import styles from './inbox-round3.module.css';
 
@@ -27,7 +27,7 @@ async function call(init?: { method: 'POST'; body: unknown }, query = 'view=save
  * on the server and shown here as usage, so a full library explains itself instead of failing silently.
  */
 export function SavedRepliesManager({ locale, canWrite }: { locale: InboxLocale; canWrite: boolean }) {
-  const copy = round3Copy[locale].replies;
+  const copy = useInboxCatalog('round3Copy')[locale].replies;
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState<Loaded | null>(null);

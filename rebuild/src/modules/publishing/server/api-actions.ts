@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { auditedReceipt, publishingActor } from '@/server/mcp/kit';
@@ -23,14 +26,15 @@ const WHEN = z.object({ scheduledAt: INSTANT, confirmation: z.string() }).strict
 const SCHEDULE = WHEN.extend({ scheduleMode: MODE.optional(), destinationScheduleModes: DESTINATION_MODES.optional() }).strict();
 const CONFIRM_ONLY = z.object({ confirmation: z.string() }).strict();
 
-const confirmed = (actual: string, expected: string) => {
-  if (actual !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat the call with confirmation exactly: ${expected}`);
+const confirmed = (actual: string, expected: string, errorText: PublishingErrorText = defaultPublishingErrorText) => {
+  if (actual !== expected) throw new PublishingOperationError('invalid_request', 'confirmationRequiredRepeatTheCallWithConfirmationExactlyValue0', {value0: expected}, errorText);
 };
 
 /** Compose: a draft, or a scheduled post with an optional platform-held choice per post or per destination. */
 export async function keyCreatePost(viewer: McpViewer, input: unknown) {
+  const errorText = await loadPublishingErrorText();
   const data = parse(CREATE, input, 'Check the post details: message, targetIds, an optional future scheduledAt and optional scheduleMode.');
-  if (!data.scheduledAt && (data.scheduleMode || data.destinationScheduleModes)) throw new OperationError('invalid_request', 'Choose a scheduledAt before choosing where the schedule is held.');
+  if (!data.scheduledAt && (data.scheduleMode || data.destinationScheduleModes)) throw new PublishingOperationError('invalid_request', 'chooseAScheduledAtBeforeChoosingWhereTheScheduleIs', {}, errorText);
   await assertRestPostLimits(data);
   const result = await createPostForApi(publishingActor(viewer), {
     message: data.message, targetIds: data.targetIds, ...(data.firstComment === undefined ? {} : { firstComment: data.firstComment }),
@@ -47,24 +51,25 @@ export async function keyCreatePost(viewer: McpViewer, input: unknown) {
 export const KEY_POST_ACTIONS = ['schedule', 'reschedule', 'cancel-schedule', 'queue'] as const;
 
 export async function keyPostAction(viewer: McpViewer, postId: string, action: string, input: unknown) {
+  const errorText = await loadPublishingErrorText();
   const actor = publishingActor(viewer);
   switch (action) {
     case 'schedule': {
       const data = parse(SCHEDULE, input, 'Send scheduledAt, confirmation and optional scheduleMode.');
-      confirmed(data.confirmation, `SCHEDULE POST ${postId} ${data.scheduledAt}`);
+      confirmed(data.confirmation, `SCHEDULE POST ${postId} ${data.scheduledAt}`, errorText);
       const date = new Date(data.scheduledAt);
       const outcome = await schedulePost(actor, postId, date, { ...(data.scheduleMode ? { scheduleMode: data.scheduleMode } : {}), ...(data.destinationScheduleModes ? { destinationScheduleModes: data.destinationScheduleModes } : {}) });
       return auditedReceipt(viewer, 'rest.schedule_post', { postId, scheduledAt: date.toISOString(), scheduleMode: outcome.scheduleMode }, { postId, status: 'scheduled', scheduledAt: date.toISOString(), scheduleMode: outcome.scheduleMode, destinationScheduleModes: outcome.destinationScheduleModes, remoteHold: outcome.remoteHold });
     }
     case 'reschedule': {
       const data = parse(WHEN, input, 'Send scheduledAt and confirmation.');
-      confirmed(data.confirmation, `RESCHEDULE POST ${postId} ${data.scheduledAt}`);
+      confirmed(data.confirmation, `RESCHEDULE POST ${postId} ${data.scheduledAt}`, errorText);
       const outcome = await reschedulePostToInstant(actor, postId, new Date(data.scheduledAt));
       return auditedReceipt(viewer, 'rest.reschedule_post', { postId, scheduledAt: outcome.scheduledAt.toISOString() }, { postId, status: 'scheduled', scheduledAt: outcome.scheduledAt.toISOString() });
     }
     case 'cancel-schedule': {
       const data = parse(CONFIRM_ONLY, input, 'Send the confirmation.');
-      confirmed(data.confirmation, `CANCEL SCHEDULE ${postId}`);
+      confirmed(data.confirmation, `CANCEL SCHEDULE ${postId}`, errorText);
       await cancelScheduledPost(actor, postId);
       return auditedReceipt(viewer, 'rest.cancel_scheduled_post', { postId }, { postId, status: 'draft' });
     }
@@ -74,6 +79,6 @@ export async function keyPostAction(viewer: McpViewer, postId: string, action: s
         { postId, scheduledAt: outcome.scheduledAt.toISOString(), status: outcome.status, scheduleMode: outcome.scheduleMode, destinationScheduleModes: outcome.destinationScheduleModes, remoteHold: outcome.remoteHold });
     }
     default:
-      throw new OperationError('not_found', 'Unknown post action.');
+      throw new PublishingOperationError('not_found', 'unknownPostAction', {}, errorText);
   }
 }

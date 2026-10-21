@@ -1,3 +1,8 @@
+import { PublishingCopyProvider } from '@/modules/publishing/ui/kit/CopyProvider';
+import { loadPublishingCopy } from '@/modules/publishing/server/customer-copy';
+import { PublishingActionCopyProvider } from '@/modules/publishing/ui/WorkflowSubmitButtons';
+import { loadPublishingActionCopy } from '@/modules/publishing/server/action-copy';
+import { loadComposerCopy } from '../../server/composer-copy';
 import { readChannelProfiles } from '@/modules/settings/channel-profiles/service';
 import { headers } from 'next/headers';
 import { requireViewer } from '@/server/context';
@@ -14,9 +19,10 @@ import { aiStatus } from '@/modules/ai/server/ai';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import styles from '@/modules/publishing/ui/publishing.module.css';
 
-export default async function ComposePage({ searchParams }: { searchParams: Promise<{ date?: string; time?: string }> }) {
+async function ComposePageContent({ searchParams }: { searchParams: Promise<{ date?: string; time?: string }> }) {
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
   const params = await searchParams;
+  const copyCatalog = await loadComposerCopy();
   const canCreate = canAccessFeature(viewer.permissions, 'publishing/posts', 'write');
   const [allowedMimeTypes, maxUploadBytes, maxAltCharacters, maxMessageCharacters, maxMedia, maxFirstCommentDelayMinutes, choices, autosaveSeconds] = await Promise.all([
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'),
@@ -41,8 +47,13 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
     timeZone: viewer.membership.workspace.timezone,
   };
   return <>
-    <PageHeading href="/publishing/compose" title={aiLocale === 'fr' ? 'Créer une publication' : 'Create a post'} description={aiLocale === 'fr' ? 'Choisissez les destinations, rédigez votre publication, puis enregistrez un brouillon ou programmez-la.' : 'Choose destinations, write your post, then save a draft or schedule it.'} />
-    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer autosaveSeconds={Number(autosaveSeconds)} remoteScheduling={remoteScheduling} profiles={profiles ?? undefined} queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={aiLocale} targets={choices} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || 'You'} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
-      : <section className={styles.card}><p>You do not have permission to create posts in this workspace.</p></section>}
+    <PageHeading href="/publishing/compose" title={copyCatalog.screenTitle[aiLocale]} description={copyCatalog.screenDescription[aiLocale]} />
+    {canCreate ? <section className={`${styles.card} ${styles.createCard}`}><PostComposer copyCatalog={copyCatalog} autosaveSeconds={Number(autosaveSeconds)} remoteScheduling={remoteScheduling} profiles={profiles ?? undefined} queueAvailable={queueAvailable} aiStatus={aiAssist} aiLocale={aiLocale} targets={choices} templates={templates} maxFirstCommentDelayMinutes={Number(maxFirstCommentDelayMinutes)} spacingGapMinutes={spacingGapMinutes} imageRules={{ allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters), maxMessageCharacters: Number(maxMessageCharacters), maxMedia: Number(maxMedia) }} schedule={schedule} authorName={viewer.user.name || copyCatalog.authorFallback[aiLocale]} createdAt={createdAt} createdAtDisplay={formatPostPreviewTime(createdAt, schedule.timeZone)} /></section>
+      : <section className={styles.card}><p>{copyCatalog.noPermission[aiLocale]}</p></section>}
   </>;
+}
+
+export default async function ComposePage(props: Parameters<typeof ComposePageContent>[0]) {
+  const [{ catalog }, actions] = await Promise.all([loadPublishingCopy(), loadPublishingActionCopy()]);
+  return <PublishingCopyProvider catalog={catalog}><PublishingActionCopyProvider catalog={actions}>{await ComposePageContent(props)}</PublishingActionCopyProvider></PublishingCopyProvider>;
 }

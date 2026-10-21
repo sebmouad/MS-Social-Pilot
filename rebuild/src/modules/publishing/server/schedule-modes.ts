@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
@@ -8,33 +11,34 @@ export type DestinationScheduleModes = Record<string, ScheduleMode>;
 export type ResolvedScheduleModes = { postMode: ScheduleMode; byTarget: Map<string, ScheduleMode> };
 
 /** Strictly parse the optional per-destination map; a malformed map is refused rather than partly applied. */
-export function parseDestinationScheduleModes(value: unknown): DestinationScheduleModes | undefined {
+export function parseDestinationScheduleModes(value: unknown, errorText: PublishingErrorText = defaultPublishingErrorText): DestinationScheduleModes | undefined {
   if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'object' || Array.isArray(value)) throw new OperationError('invalid_request', 'Choose a scheduling place for each destination.');
+  if (typeof value !== 'object' || Array.isArray(value)) throw new PublishingOperationError('invalid_request', 'chooseASchedulingPlaceForEachDestination', {}, errorText);
   const result: DestinationScheduleModes = {};
   for (const [targetId, mode] of Object.entries(value)) {
     const parsed = typeof mode === 'string' ? parseScheduleMode(mode) : undefined;
-    if (!targetId || targetId.length > 200 || !parsed) throw new OperationError('invalid_request', `Choose ${SCHEDULE_MODES.join(' or ')} for each destination.`);
+    if (!targetId || targetId.length > 200 || !parsed) throw new PublishingOperationError('invalid_request', 'chooseValue0ForEachDestination', {value0: SCHEDULE_MODES.join(' or ')}, errorText);
     result[targetId] = parsed;
   }
   return result;
 }
 
 /** The composer submits the per-destination overrides as JSON; an empty value or an empty object means "no overrides". */
-export function parseDestinationScheduleModesJson(raw: unknown): DestinationScheduleModes | undefined {
+export function parseDestinationScheduleModesJson(raw: unknown, errorText: PublishingErrorText = defaultPublishingErrorText): DestinationScheduleModes | undefined {
   if (raw === undefined || raw === null || raw === '') return undefined;
-  if (typeof raw !== 'string') throw new OperationError('invalid_request', 'Choose a scheduling place for each destination.');
+  if (typeof raw !== 'string') throw new PublishingOperationError('invalid_request', 'chooseASchedulingPlaceForEachDestination', {}, errorText);
   let value: unknown;
-  try { value = JSON.parse(raw); } catch { throw new OperationError('invalid_request', 'Choose a scheduling place for each destination.'); }
-  const parsed = parseDestinationScheduleModes(value);
+  try { value = JSON.parse(raw); } catch { throw new PublishingOperationError('invalid_request', 'chooseASchedulingPlaceForEachDestination', {}, errorText); }
+  const parsed = parseDestinationScheduleModes(value, errorText);
   return parsed && Object.keys(parsed).length ? parsed : undefined;
 }
 
 /** Requested mode, falling back to the Root default; platform holding is refused outright when Root withdrew the choice. */
 export async function effectiveScheduleMode(requested: ScheduleMode | undefined): Promise<ScheduleMode> {
+  const errorText = await loadPublishingErrorText();
   parseScheduleMode(requested);
   const offered = await runtimeConfig('publishing.remoteScheduling.offered') === true;
-  if (requested === 'remote' && !offered) throw new OperationError('invalid_request', 'Platform-held scheduling is not available. Choose application scheduling.');
+  if (requested === 'remote' && !offered) throw new PublishingOperationError('invalid_request', 'platformheldSchedulingIsNotAvailableChooseApplicationScheduling', {}, errorText);
   if (requested) return requested;
   return offered && await runtimeConfig('publishing.remoteScheduling.defaultMode') === 'remote' ? 'remote' : 'application';
 }
@@ -44,10 +48,11 @@ export async function effectiveScheduleMode(requested: ScheduleMode | undefined)
  * destination that is not on the post are refused, and a platform-held override is refused when Root withdrew the choice.
  */
 export async function resolveScheduleModes(targetIds: readonly string[], postLevel: ScheduleMode | undefined, overrides?: DestinationScheduleModes): Promise<ResolvedScheduleModes> {
+  const errorText = await loadPublishingErrorText();
   const postMode = await effectiveScheduleMode(postLevel);
   const known = new Set(targetIds);
   for (const [targetId, mode] of Object.entries(overrides ?? {})) {
-    if (!known.has(targetId)) throw new OperationError('invalid_request', 'A scheduling choice names a destination that is not on this post.');
+    if (!known.has(targetId)) throw new PublishingOperationError('invalid_request', 'aSchedulingChoiceNamesADestinationThatIsNot', {}, errorText);
     if (mode === 'remote') await effectiveScheduleMode('remote');
   }
   return { postMode, byTarget: new Map(targetIds.map(id => [id, overrides?.[id] ?? postMode])) };

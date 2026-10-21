@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { randomUUID, createHash } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { OperationError } from '@/lib/operation-error';
@@ -15,10 +18,11 @@ import type { PlatformAdapter, RemoteStatus } from '@/platforms/types';
 
 const targetSelection = { id: true, name: true, workspaceId: true, providerId: true, type: true, enabled: true, accessToken: true,
   socialAccount: { select: { id: true, workspaceId: true, provider: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } } as const;
-const unavailable = () => new OperationError('conflict', 'This publication connection or access changed. Refresh its status before continuing.');
+const unavailable = (errorText: PublishingErrorText = defaultPublishingErrorText) => new PublishingOperationError('conflict', 'thisPublicationConnectionOrAccessChangedRefreshItsStatus', {}, errorText);
 const managers = new Set(['owner', 'admin', 'editor']);
 
 async function authorizedPost(actor: PublishingActor, postId: string) {
+  const errorText = await loadPublishingErrorText();
   const access = await authorizePublishing(actor, 'publishing/posts', 'write');
   const ids = await selectedPublishingTargetIds(actor.workspaceId, access.entitlements, access.actor.allowedTargetIds);
   const post = await prisma.post.findFirst({ where: { AND: [{ id: postId }, publishingPostVisibilityWhere(actor.workspaceId, ids,
@@ -26,7 +30,7 @@ async function authorizedPost(actor: PublishingActor, postId: string) {
     select: { id: true, authorId: true, format: true, media: true, targets: { select: { id: true, targetId: true, formatId: true,
       status: true, remotePostId: true, publishedAt: true, target: { select: targetSelection } } } } });
   if (!post || !managers.has(access.role) && post.authorId !== actor.userId) {
-    throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
+    throw new PublishingOperationError('not_found', 'thisPostIsUnavailableInTheCurrentWorkspace', {}, errorText);
   }
   return { access, post };
 }
@@ -50,6 +54,7 @@ function matched(status: RemoteStatus, remoteId: string, remoteTargetId: string)
 
 /** UI and MCP use this same current-authorized, read-only provider reconciliation. */
 export async function syncPublicationStatus(actor: PublishingActor, postId: string): Promise<{ synced: number }> {
+  const errorText = await loadPublishingErrorText();
   return withPublishingOperation(actor, { postId, allowPublicationRecovery: true }, async ({ actor: currentActor, signal }) => {
     const initial = await authorizedPost(currentActor, postId);
     const parents = await prisma.$queryRaw<PublicationRow[]>`SELECT * FROM rebuild_publication_attempts
@@ -86,7 +91,7 @@ export async function syncPublicationStatus(actor: PublishingActor, postId: stri
         await tx.$executeRaw`LOCK TABLE app_settings IN SHARE MODE`;
         const membership = await tx.$queryRaw<Array<{ id: string }>>`SELECT m.id FROM memberships m JOIN users u ON u.id=m."userId"
           WHERE m."workspaceId"=${actor.workspaceId} AND m."userId"=${actor.userId} AND u."disabledAt" IS NULL FOR SHARE OF m,u`;
-        if (membership.length !== 1) throw unavailable();
+        if (membership.length !== 1) throw unavailable(errorText);
         await tx.$queryRaw`SELECT t.id FROM targets t JOIN social_accounts s ON s.id=t."socialAccountId"
           WHERE t.id=${item.targetId} AND t."workspaceId"=${actor.workspaceId} AND s."workspaceId"=${actor.workspaceId} FOR SHARE OF t,s`;
         const fresh = await authorizedPost(currentActor, postId);
@@ -94,7 +99,7 @@ export async function syncPublicationStatus(actor: PublishingActor, postId: stri
         const adapter = await platformFor(provider, 'remoteStatus');
         if (!destination || (destination.formatId ?? fresh.post.format) !== prepared.formatId || contentKind(fresh.post.media) !== prepared.kind || !adapter || adapter.statusPolicyFingerprint !== prepared.fingerprint ||
           stamp(destination.target) !== prepared.binding || !credential(destination.target, adapter, actor.workspaceId) ||
-          !hasPlatformCapability(fresh.access.entitlements, provider)) throw unavailable();
+          !hasPlatformCapability(fresh.access.entitlements, provider)) throw unavailable(errorText);
         if (pending) {
           return reconcileSubmittedPublicationInTransaction(tx, currentActor, { operationId: parent!.id, postId,
             postTargetId: item.id, targetId: item.targetId, provider, remoteId, remoteTargetId: prepared.target.providerId }, status);

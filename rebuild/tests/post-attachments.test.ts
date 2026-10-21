@@ -329,3 +329,19 @@ describe('shared post attachment editor', () => {
     expect(container.textContent).toMatch(/choose up to 2 media attachments/i);
   });
 });
+
+it('uses edited French attachment copy and focuses the description field without matching its wording', async () => {
+  const { ComposerCopyProvider } = await import('@/modules/publishing/ui/compose/CopyProvider');
+  const { composerCatalogDefaults } = await import('@/modules/publishing/composer-catalog');
+  const catalog = structuredClone(composerCatalogDefaults);
+  catalog.attachments_descriptionMax.fr = 'Texte alternatif trop long : {max}.';
+  catalog.attachments_heading.fr = 'Médias de campagne ';
+  await act(async () => root.render(createElement(ComposerCopyProvider, { catalog, locale: 'fr', children: createElement(Harness, { initialMedia: [{ kind: 'image', url: 'https://images.example/test.jpg', altText: 'A'.repeat(31) }] }) })));
+  expect(container.querySelector('h3')?.textContent).toContain('Médias de campagne');
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-testid="validate"]')!.click());
+  await act(async () => new Promise(resolve => requestAnimationFrame(() => resolve())));
+  const input = container.querySelector<HTMLInputElement>('input[name^="mediaAlt-"]')!;
+  expect(input.getAttribute('aria-invalid')).toBe('true');
+  expect(document.activeElement).toBe(input);
+  expect(container.textContent).toContain('Texte alternatif trop long : 30.');
+});

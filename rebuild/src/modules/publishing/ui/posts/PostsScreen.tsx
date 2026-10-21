@@ -1,3 +1,10 @@
+import { loadComposerCopy } from '../../server/composer-copy';
+import { ComposerCopyProvider } from '../compose/CopyProvider';
+import { kitCopy as defaultCopy } from '../kit/copy';
+import { loadPublishingCopy, loadPublishingNoticeCopy } from '../../server/customer-copy';
+import { PublishingCopyProvider } from '../kit/CopyProvider';
+import { loadPublishingActionCopy } from '../../server/action-copy';
+import { PublishingActionCopyProvider } from '../WorkflowSubmitButtons';
 import { statusLabel } from "@/components";
 import { IconPlus } from "@tabler/icons-react";
 import { PostPreview, type PostPreviewPost } from "@/components/PostPreview";
@@ -6,7 +13,6 @@ import { readPublishingPostPage } from "@/modules/publishing/server/read";
 import { publishingDestinationChoices } from '@/modules/publishing/server/destinations';
 import { PageHeading, formatDate } from "@/modules/publishing/ui/publishing-ui";
 import { EmptyPanel, FilterChips, type FilterChip } from "../kit/kit";
-import { kitCopy } from "../kit/copy";
 import { pageLocale } from "../kit/locale";
 import { PostsTable, type PostsTableRow } from "./PostsTable";
 import { PostsViewSwitch } from "./PostsViewSwitch";
@@ -28,7 +34,11 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
   const { notice, recovery, page: pageParam, status, channel, q, view: viewParam } = await searchParams;
   const locale = await pageLocale();
-  const copy = kitCopy[locale];
+  const { catalog, copy: localizedCopy } = await loadPublishingCopy();
+  const noticeCatalog = await loadPublishingNoticeCopy();
+  const actionCatalog = await loadPublishingActionCopy();
+  const composerCatalog = await loadComposerCopy();
+  const copy = localizedCopy[locale];
   const view = viewParam === 'feed' || viewParam === 'cards' ? viewParam : 'table';
   const [allowedMimeTypes, maxUploadBytes, maxAltCharacters, maxMedia, maxFirstCommentDelayMinutes] = await Promise.all([
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'), runtimeConfig('publishing.maxRemoteMediaPerPost'), runtimeConfig('publishing.maxFirstCommentDelayMinutes'),
@@ -43,11 +53,11 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     listing = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status, channelId: selectedChannel, q });
   } catch (error) {
     if (!(error instanceof OperationError) || !isOperationErrorCode(error.code)) throw error;
-    listingError = safeOperationError(error, locale);
+    listingError = safeOperationError(error, copy);
   }
   if (!listing) return <>
     <PageHeading title={copy.postsTitle} description={copy.postsDescription} />
-    <RouteNotice className={styles.errorNotice} error focusKey={`posts-read-error:${q ?? ''}:${status ?? ''}:${channel ?? ''}`}>{`${listingError ?? safeOperationError(null, locale)} ${locale === 'fr' ? 'Réinitialisez les filtres de la barre latérale et réessayez.' : 'Reset the sidebar filters and try again.'}`}</RouteNotice>
+    <RouteNotice className={styles.errorNotice} error focusKey={`posts-read-error:${q ?? ''}:${status ?? ''}:${channel ?? ''}`}>{`${listingError ?? safeOperationError(null, copy)} ${copy.resetAndRetry}`}</RouteNotice>
   </>;
   const targetChoices = await publishingDestinationChoices(viewer);
   const undoSendSeconds = await loadWorkspaceOperations(viewer.workspaceId).then(value => value.undoSendSeconds, () => 0);
@@ -67,8 +77,8 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
       && !post.targets.some(target => target.status === 'processing' || target.status === 'scheduled_remote');
     return { canEdit, canDuplicate };
   };
-  const rows: PostsTableRow[] = listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }>, ...authority(post), whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale) }));
-  const noticeText = notice ? postsNotice(notice, locale) ?? undefined : undefined;
+  const rows: PostsTableRow[] = listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }>, ...authority(post), whenLabel: formatDate(post.scheduledAt ?? post.publishedAt, timeZone, true, locale, copy) }));
+  const noticeText = notice ? postsNotice(notice, locale, noticeCatalog) ?? undefined : undefined;
   const pageLink = (page: number) => {
     const params = new URLSearchParams({ page: String(page) });
     if (status) params.set('status', status);
@@ -80,13 +90,13 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const manageProps = { targets: targetChoices, canPublish, canOrganize, canQueue, imageRules, timeZone, undoSendSeconds };
   const previewFor = (post: (typeof rows)[number], variant: 'feed' | 'card') => <PostPreview
     post={post as PostPreviewPost}
-    authorName={post.authorId === viewer.user.id ? viewer.user.name : (locale === 'fr' ? 'Membre de l’équipe' : 'Workspace member')}
+    authorName={post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember}
     timeZone={timeZone}
     variant={variant}
     locale={locale}
     actions={canAuthorDrafts ? <details className={previewStyles.managePost}>
       <summary>{copy.manage}</summary>
-      {post.canEdit ? <PostRowActions post={post} canEdit canDuplicate={post.canDuplicate} {...manageProps} /> : <span className={styles.noActions}>{locale === 'fr' ? 'Les actions sont réservées à l’auteur et aux responsables de l’espace.' : 'Post actions are limited to its author and workspace managers.'}</span>}
+      {post.canEdit ? <PostRowActions post={post} canEdit canDuplicate={post.canDuplicate} {...manageProps} /> : <span className={styles.noActions}>{copy.actionsLimited}</span>}
     </details> : undefined}
   />;
   const canBulk = canWritePosts && canAuthorDrafts;
@@ -110,7 +120,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     ? <EmptyPanel title={copy.postsNoMatchTitle} action={<a className="ui-button ui-button--secondary" href="/publishing/posts">{copy.resetFilters}</a>}>{copy.postsNoMatchBody}</EmptyPanel>
     : <EmptyPanel title={copy.postsEmptyTitle} action={newPostLink}>{copy.postsEmptyBody}</EmptyPanel>;
   const headerActions = <>{canManageDrafts ? <ImportCsv targets={targetChoices} locale={locale} /> : null}{newPostLink}</>;
-  return <>
+  return <PublishingCopyProvider catalog={catalog} locale={locale}><PublishingActionCopyProvider catalog={actionCatalog} locale={locale}><ComposerCopyProvider catalog={composerCatalog} locale={locale}>
     <PageHeading href="/publishing/posts" actions={headerActions} title={copy.postsTitle} description={copy.postsDescription} summary={copy.postsSummary(listing.total, listing.page, listing.pages)}/>
     {listing.channelUnavailable ? <p className={styles.errorNotice} role="status">{copy.unavailableChannel}</p> : null}
     {noticeText ? <RouteNotice className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} error={notice?.startsWith('failed')} focusKey={`${notice}:${recovery ?? ''}`}>{noticeText}</RouteNotice> : null}
@@ -130,15 +140,14 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
         {listing.page < listing.pages ? <a className="ui-button ui-button--secondary" href={pageLink(listing.page + 1)}>{copy.nextPage}</a> : <span />}
       </nav> : null}
     </section>
-  </>;
+  </ComposerCopyProvider></PublishingActionCopyProvider></PublishingCopyProvider>;
 }
 
-function safeOperationError(error: unknown, locale: 'en' | 'fr') {
-  const fr = locale === 'fr';
+function safeOperationError(error: unknown, copy: typeof defaultCopy.en) {
   const code = error instanceof OperationError && isOperationErrorCode(error.code) ? error.code : null;
   if (code === 'invalid_request' && error instanceof OperationError) return error.message;
-  if (code === 'unauthorized' || code === 'forbidden') return fr ? 'Vous n’avez pas le droit de consulter ces publications.' : 'You do not have permission to read these posts.';
-  if (code === 'not_found') return fr ? 'Ces publications ne sont plus disponibles.' : 'These posts are no longer available.';
-  if (code === 'unavailable' || code === 'conflict') return fr ? 'Les publications sont momentanément indisponibles.' : 'Posts are temporarily unavailable.';
-  return fr ? 'Les publications n’ont pas pu être chargées. Actualisez la page et réessayez.' : 'Posts could not be loaded. Refresh the page and try again.';
+  if (code === 'unauthorized' || code === 'forbidden') return copy.permissionError;
+  if (code === 'not_found') return copy.missingError;
+  if (code === 'unavailable' || code === 'conflict') return copy.unavailableError;
+  return copy.loadError;
 }

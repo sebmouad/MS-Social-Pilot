@@ -1,3 +1,4 @@
+import { kitCopy } from './kit/copy';
 import type { PostSummary } from "@/server/data";
 import type { ReactNode } from "react";
 import styles from "./publishing.module.css";
@@ -9,13 +10,12 @@ export function PageHeading({ title, description, eyebrow = "Publishing", summar
   return <ModuleHeader module="publishing" href={href} eyebrow={eyebrow} title={title} description={description} summary={summary} actions={actions} />;
 }
 
-export function PublishingPagination({ path, page, pages, locale = 'en' }: { path: string; page: number; pages: number; locale?: 'en' | 'fr' }) {
+export function PublishingPagination({ path, page, pages, locale = 'en', copy = kitCopy[locale] }: { path: string; page: number; pages: number; locale?: 'en' | 'fr'; copy?: typeof kitCopy.en }) {
   if (pages <= 1) return null;
-  const fr = locale === 'fr';
-  return <nav className={styles.postPagination} aria-label={fr ? "Pages de publications" : "Post pages"}>
-    {page > 1 ? <a className="ui-button ui-button--secondary" href={`${path}?page=${page - 1}`}>{fr ? 'Page précédente' : 'Previous page'}</a> : <span />}
-    <span>{fr ? `Page ${page} sur ${pages}` : `Page ${page} of ${pages}`}</span>
-    {page < pages ? <a className="ui-button ui-button--secondary" href={`${path}?page=${page + 1}`}>{fr ? 'Page suivante' : 'Next page'}</a> : <span />}
+  return <nav className={styles.postPagination} aria-label={copy.pagesLabel}>
+    {page > 1 ? <a className="ui-button ui-button--secondary" href={`${path}?page=${page - 1}`}>{copy.previousPage}</a> : <span />}
+    <span>{copy.pageOf(page,pages)}</span>
+    {page < pages ? <a className="ui-button ui-button--secondary" href={`${path}?page=${page + 1}`}>{copy.nextPage}</a> : <span />}
   </nav>;
 }
 
@@ -23,16 +23,16 @@ export function PostMessage({ message, media, link }: { message: string; media?:
   return <span className={styles.message}>{postContentSummary(message, media, link)}</span>;
 }
 
-export function PostTargets({ post }: { post: PostSummary }) {
+export function PostTargets({ post, copy = kitCopy.en }: { post: PostSummary; copy?: typeof kitCopy.en }) {
   const names = [...new Set(post.targets.map(({ target }) => target.name))];
-  return <span className={styles.targets}>{names.length ? names.join(", ") : "No destinations"}</span>;
+  return <span className={styles.targets}>{names.length ? names.join(", ") : copy.noDestinations}</span>;
 }
 
 export function StatusBadge({ status }: { status: string }) {
   return <span className={styles.badge} data-status={status}>{status.replaceAll("_", " ")}</span>;
 }
 
-export function formatDate(date: Date | null, timeZone: string, withTime = true, locale?: 'en' | 'fr') {
-  if (!date) return locale === 'fr' ? "Non programmée" : "Not scheduled";
+export function formatDate(date: Date | null, timeZone: string, withTime = true, locale?: 'en' | 'fr', copy = kitCopy[locale ?? 'en']) {
+  if (!date) return copy.notScheduled;
   return new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", ...(withTime ? { timeStyle: "short" as const } : {}) }).format(date);
 }

@@ -1,3 +1,7 @@
+import { reschedulePolicySchema } from '@/lib/config/reschedule-policy';
+import { pageLocale } from '../kit/locale';
+import { loadPublishingCopy } from '../../server/customer-copy';
+import { PublishingCopyProvider } from '../kit/CopyProvider';
 import { requireViewer } from "@/server/context";
 import { readPublishingCalendar } from "@/modules/publishing/server/read";
 import { canAccessFeature } from "@/server/permissions";
@@ -19,10 +23,16 @@ const MANAGERS = new Set(["owner", "admin", "editor"]);
 const DAY = 24 * 60 * 60 * 1000;
 
 const utcNoon = (key: string) => new Date(`${key}T12:00:00Z`);
-const formatUtc = (key: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" }).format(utcNoon(key));
+
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<Params> }) {
   const viewer = await requireViewer({ feature: "publishing/calendar", channelScoped: true });
+  const locale = await pageLocale();
+  const { catalog, copy: localizedCopy } = await loadPublishingCopy();
+  const copy = localizedCopy[locale];
+  const formatUtc = (key: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { ...options, timeZone: "UTC" }).format(utcNoon(key));
+  const reschedulePolicy = reschedulePolicySchema.parse(await runtimeConfig('shared.reschedulePolicy'));
+  const movePolicy = { ...reschedulePolicy, locale: locale === "fr" ? "fr-FR" as const : "en-US" as const };
   const defaultScheduleTime = await runtimeConfig('publishing.defaultScheduleTime') as string;
   const timeZone = viewer.membership.workspace.timezone;
   const params = await searchParams;
@@ -60,11 +70,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     const movable = canEditCalendar && post.status === "scheduled" && post.targets.length > 0 && post.targets.every(target => target.status === "pending" && !target.remotePostId)
       && (MANAGERS.has(viewer.membership.role) || post.authorId === viewer.user.id);
     byDay.set(key, [...(byDay.get(key) ?? []), {
-      id: post.id, text: postContentSummary(post.message, post.media, post.link).slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable,
-      authorName: post.authorId === viewer.user.id ? viewer.user.name : "Workspace member",
+      id: post.id, text: postContentSummary(post.message, post.media, post.link, copy).slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable,
+      authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember,
       clockLabel: formatPostPreviewTime(when, timeZone),
       wallTime,
-      moveOptions: movable ? moveCandidates(when.toISOString(), timeZone, now.getTime()) : undefined,
+      moveOptions: movable ? moveCandidates(when.toISOString(), timeZone, now.getTime(), movePolicy) : undefined,
       preview: {
         id: post.id, authorId: post.authorId, message: post.message, firstComment: post.firstComment, link: post.link, media: post.media,
         status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, createdAt: post.createdAt,
@@ -99,11 +109,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   })();
   const unit = view === "week" ? "week" : "month";
 
-  return <>
-    <PageHeading title="Calendar" description="Plan, check and reschedule posts in your workspace time zone." />
-    {channelUnavailable ? <p role="status">The selected channel is unavailable. Choose another channel or reset the sidebar filters.</p> : null}
+  return <PublishingCopyProvider catalog={catalog} locale={locale}>
+    <PageHeading title={copy.calendarTitle} description={copy.calendarDescription} />
+    {channelUnavailable ? <p role="status">{copy.unavailableChannel}</p> : null}
     <h2 className={styles.range} aria-live="polite">{rangeLabel}</h2>
     <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime}
       navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} />
-  </>;
+  </PublishingCopyProvider>;
 }

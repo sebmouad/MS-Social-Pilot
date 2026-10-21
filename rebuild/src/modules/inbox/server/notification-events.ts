@@ -1,3 +1,4 @@
+import { inboxServiceText } from './service-copy';
 import { createHash } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -33,7 +34,7 @@ export async function runInboxAlertProducers(now = new Date()) {
             OR EXISTS (SELECT 1 FROM conversation_messages m JOIN conversations cv ON cv.id = m."conversationId"
               WHERE cv."targetId" = t.id AND m."firstSeenAt" > ${setting.inboxDigestAt} AND m."firstSeenAt" <= ${now}
                 AND m."fromId" IS DISTINCT FROM t."providerId")) ORDER BY t.id LIMIT ${limit + 1}`;
-        if (targets.length > limit) throw new OperationError('unavailable', 'The inbox digest channel limit needs review.');
+        if (targets.length > limit) throw new OperationError('unavailable', await inboxServiceText('service34'));
         for (const target of targets) {
           await emitWorkspaceAlert(tx, { workspaceId: setting.workspaceId, recipientId: setting.userId, eventId: eventId('inbox', setting.id, now.toISOString(), target.id), kind: 'inbox_digest', targetId: target.id });
           digests++;

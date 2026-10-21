@@ -3,7 +3,9 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Dialog, Field, TextInput, useToast } from '@/components';
-import { BULK_ACTIONS, bulkConfirmation, bulkCopy, type BulkAction, type BulkResult } from '@/modules/publishing/bulk';
+import { BULK_ACTIONS, bulkConfirmation, type BulkAction, type BulkResult } from '@/modules/publishing/bulk';
+import { usePublishingActionText } from '../WorkflowSubmitButtons';
+import { actionBulkCopy } from '../../action-catalog';
 import type { KitLocale } from '../kit/copy';
 import styles from '@/modules/publishing/ui/publishing.module.css';
 
@@ -11,11 +13,11 @@ import styles from '@/modules/publishing/ui/publishing.module.css';
  * Bulk toolbar for the rows chosen in the shared table. The table owns the selection; this owns the
  * action choice, the confirmation dialog and the outcome, which is reported in a toast with Retry on failure.
  */
-export function BulkPostActions({ selected, onClear, canRetry, locale = 'en' }: { selected: string[]; onClear: () => void; canRetry: boolean; locale?: KitLocale }) {
+export function BulkPostActions({ selected, onClear, canRetry, locale }: { selected: string[]; onClear: () => void; canRetry: boolean; locale?: KitLocale }) {
   const router = useRouter();
   const toast = useToast();
   const inFlight = useRef(false);
-  const copy = bulkCopy(locale);
+  const copy = actionBulkCopy(usePublishingActionText(locale));
   const [action, setAction] = useState<BulkAction | null>(null);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');

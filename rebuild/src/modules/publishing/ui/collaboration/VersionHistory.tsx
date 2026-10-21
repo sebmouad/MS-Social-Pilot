@@ -6,22 +6,22 @@ import { useConfirm } from '@/components/useConfirm';
 import { restoreVersionConfirmation } from '../../collaboration/schemas';
 import type { RestoreReview } from '../../server/version-restore-plan';
 import { send, useAction } from './collab-client';
-import { versionCopy } from './version-copy';
+import { catalogGroup, composerCatalogDefaults, type ComposerCatalog } from '../../composer-catalog';
 import styles from './collaboration.module.css';
 
 type Version = { id: string; authorName: string | null; createdAt: string; message: string };
 type Receipt = { postId: string; versionId: string; approvalReset: boolean; restored: boolean; review: RestoreReview };
-export function VersionHistory({ postId, versions, restore, canWrite, canRestoreNow, timeZone }: { postId: string; versions: Version[]; restore: boolean; canWrite: boolean; canRestoreNow: boolean; timeZone: string }) {
+export function VersionHistory({ postId, versions, restore, canWrite, canRestoreNow, timeZone, copyCatalog = composerCatalogDefaults }: { copyCatalog?: ComposerCatalog; postId: string; versions: Version[]; restore: boolean; canWrite: boolean; canRestoreNow: boolean; timeZone: string }) {
   const [locale, setLocale] = useState<'en' | 'fr'>('en');
   useEffect(() => { setLocale(/^fr\b/i.test(document.documentElement.lang || navigator.language) ? 'fr' : 'en'); }, []);
-  const c = versionCopy[locale];
+  const c = catalogGroup(copyCatalog, 'version', locale);
   const [target, setTarget] = useState<{ version: Version; review: RestoreReview } | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const action = useAction();
   const [confirm, confirmationDialog] = useConfirm({ title: c.confirm, cancel: c.cancel, confirm: c.confirm, danger: false });
   async function preview(version: Version) {
     await action.run(async () => {
-      const result = await send<Receipt>('POST', '/api/publishing/versions', { postId, versionId: version.id, mode: 'preview', confirmation: restoreVersionConfirmation(version.id) });
+      const result = await action.send<Receipt>('POST', '/api/publishing/versions', { postId, versionId: version.id, mode: 'preview', confirmation: restoreVersionConfirmation(version.id) });
       if (result.postId !== postId || result.versionId !== version.id || result.restored !== false || !result.review) throw new Error(c.failed);
       setTarget({ version, review: result.review }); setReviewOpen(true);
       return '';
@@ -33,7 +33,7 @@ export function VersionHistory({ postId, versions, restore, canWrite, canRestore
     const summary = [c.description, ...target.review.issues.map(i => i[locale])].join('\n');
     if (!await confirm(summary)) { setReviewOpen(true); return; }
     const ok = await action.run(async () => {
-      const result = await send<Receipt>('POST', '/api/publishing/versions', { postId, versionId: target.version.id, mode: target.review.exact ? 'exact' : 'closest', reviewToken: target.review.token, confirmation: restoreVersionConfirmation(target.version.id) });
+      const result = await action.send<Receipt>('POST', '/api/publishing/versions', { postId, versionId: target.version.id, mode: target.review.exact ? 'exact' : 'closest', reviewToken: target.review.token, confirmation: restoreVersionConfirmation(target.version.id) });
       if (result.postId !== postId || result.versionId !== target.version.id || result.restored !== true) throw new Error(c.failed);
       return result.approvalReset ? c.approval : c.success;
     });

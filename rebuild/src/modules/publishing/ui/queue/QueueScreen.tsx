@@ -1,3 +1,7 @@
+import { loadPublishingCopy } from '../../server/customer-copy';
+import { PublishingCopyProvider } from '../kit/CopyProvider';
+import { loadPublishingActionCopy } from '../../server/action-copy';
+import { PublishingActionCopyProvider } from '../WorkflowSubmitButtons';
 import { IconCalendarPlus, IconClockHour4 } from '@tabler/icons-react';
 import { SidebarDock } from '@/components/SidebarDock';
 import { Tabs } from '@/components';
@@ -8,7 +12,6 @@ import { readPublishingPostPage } from "@/modules/publishing/server/read";
 import { addDaysToKey, instantToWall, workspaceDateKey } from "@/lib/calendar-dates";
 import { PageHeading, PublishingPagination } from "@/modules/publishing/ui/publishing-ui";
 import { EmptyPanel } from "../kit/kit";
-import { kitCopy } from "../kit/copy";
 import { pageLocale } from "../kit/locale";
 import workflow from "@/modules/publishing/ui/workflow.module.css";
 import { CancelScheduleButton } from "@/modules/publishing/ui/WorkflowSubmitButtons";
@@ -23,7 +26,9 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   const viewer = await requireViewer({ feature: "publishing/queue", channelScoped: true });
   const timeZone = viewer.membership.workspace.timezone;
   const locale = await pageLocale();
-  const copy = kitCopy[locale];
+  const { catalog, copy: localizedCopy } = await loadPublishingCopy();
+  const actionCatalog = await loadPublishingActionCopy();
+  const copy = localizedCopy[locale];
   const { page: pageParam } = await searchParams;
   const requestedPage = pageParam && /^[1-9]\d*$/.test(pageParam) && Number.isSafeInteger(Number(pageParam)) ? Number(pageParam) : 1;
   const [listing, slotsPerChannel] = await Promise.all([
@@ -40,7 +45,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     groups.set(key, [...(groups.get(key) ?? []), post]);
   }
   const dayHeading = (key: string) => key === "unscheduled" ? copy.queueUnscheduled : `${key === today ? `${copy.queueToday} · ` : key === tomorrow ? `${copy.queueTomorrow} · ` : ""}${new Intl.DateTimeFormat(locale, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }).format(new Date(`${key}T12:00:00Z`))}`;
-  const authorName = (authorId: string) => authorId === viewer.user.id ? viewer.user.name : (locale === 'fr' ? 'Membre de l’équipe' : 'Workspace member');
+  const authorName = (authorId: string) => authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember;
 
   const byDay = <>
     {[...groups.entries()].map(([key, posts]) => <section key={key} className={workflow.group} aria-labelledby={`queue-${key}`}>
@@ -61,7 +66,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     </section>)}
   </>;
 
-  return <>
+  return <PublishingCopyProvider catalog={catalog} locale={locale}><PublishingActionCopyProvider catalog={actionCatalog} locale={locale}>
     <SidebarDock><a className="text-link" href="/publishing/collaboration?view=queue">{copy.queueQueueTimes}</a></SidebarDock>
     <PageHeading href="/publishing/queue" title={copy.queueTitle} description={copy.queueDescription(timeZone.replaceAll("_", " "))} summary={copy.queueSummary(listing.total, listing.page, listing.pages)}
       actions={<a className="ui-button ui-button--secondary" href="/publishing/collaboration?view=queue"><IconClockHour4 size={16} aria-hidden="true" /> {copy.queueQueueTimes}</a>} />
@@ -69,10 +74,10 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       ? <EmptyPanel icon={<IconCalendarPlus size={26} aria-hidden="true" />} title={copy.queueEmptyTitle} action={<span className={styles.emptyActions}><a className="ui-button ui-button--primary" href="/publishing/compose">{copy.queueEmptyAction}</a><a className="ui-button ui-button--secondary" href="/publishing/calendar">{copy.queueCalendar}</a></span>}>{copy.queueEmptyBody}</EmptyPanel>
       : <>
         <Tabs label={copy.queueTitle} items={[
-          { id: 'day', label: locale === 'fr' ? 'Par jour' : 'By day', count: listing.posts.length, content: byDay },
+          { id: 'day', label: copy.byDay, count: listing.posts.length, content: byDay },
           { id: 'channel', label: copy.queueByChannel, content: <QueueTimeline posts={listing.posts} timeZone={timeZone} locale={locale} maxPerChannel={Number(slotsPerChannel)} /> },
         ]} />
-        <PublishingPagination path="/publishing/queue" page={listing.page} pages={listing.pages} locale={locale} />
+        <PublishingPagination path="/publishing/queue" page={listing.page} pages={listing.pages} locale={locale} copy={copy} />
       </>}
-  </>;
+  </PublishingActionCopyProvider></PublishingCopyProvider>;
 }

@@ -1,3 +1,4 @@
+vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ host: vi.fn(), providers: vi.fn(), policy: vi.fn() }));
 vi.mock('../src/server/platforms/registry', () => ({ platformInbox: state.host, inboxPlatformIds: state.providers, platformFor: vi.fn() }));

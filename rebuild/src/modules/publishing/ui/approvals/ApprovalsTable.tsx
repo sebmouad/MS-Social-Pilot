@@ -1,11 +1,12 @@
 'use client';
+import { usePublishingCopy } from '../kit/CopyProvider';
 
 import { useState } from 'react';
 import { IconChevronDown, IconChevronRight, IconChecklist } from '@tabler/icons-react';
 import { AutoTextarea } from '@/components/AutoTextarea';
 import { Button, DataTable, Drawer, type TableColumn } from '@/components';
 import { PostPreview, type PostPreviewPost } from '@/components/PostPreview';
-import { kitCopy, type KitLocale } from '../kit/copy';
+import { type KitLocale } from '../kit/copy';
 import { ReviewButtons } from '../WorkflowSubmitButtons';
 import { ChannelsCell, PostCell } from '../posts/PostTableCells';
 import workflow from '../workflow.module.css';
@@ -18,7 +19,7 @@ export type ApprovalRow = PostPreviewPost & { authorName: string; whenLabel: str
  * the decision (with its optional note) happens in a side drawer so the list stays visible.
  */
 export function ApprovalsTable({ rows, caption, locale = 'en', timeZone, canReview, reviewAction }: { rows: ApprovalRow[]; caption: string; locale?: KitLocale; timeZone: string; canReview: boolean; reviewAction: (data: FormData) => void | Promise<void> }) {
-  const copy = kitCopy[locale];
+  const copy = usePublishingCopy(locale);
   const [open, setOpen] = useState<string[]>([]);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const current = rows.find(row => row.id === reviewing) ?? null;

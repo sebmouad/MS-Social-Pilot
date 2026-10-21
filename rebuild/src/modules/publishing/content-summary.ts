@@ -1,5 +1,7 @@
+import { kitCopy, fillCopy } from './ui/kit/copy';
+export type ContentSummaryCopy = Pick<typeof kitCopy.en, 'summaryImageOne' | 'summaryImageMany' | 'summaryVideoOne' | 'summaryVideoMany' | 'summaryLink' | 'summaryAnd' | 'summaryWith' | 'summaryEmpty'>;
 /** Short, provider-neutral identity for post list/calendar items without a caption. */
-export function postContentSummary(message: string, media: unknown, link: string | null | undefined): string {
+export function postContentSummary(message: string, media: unknown, link: string | null | undefined, copy: ContentSummaryCopy = kitCopy.en): string {
   const caption = message.trim();
   if (caption) return caption;
 
@@ -18,8 +20,8 @@ export function postContentSummary(message: string, media: unknown, link: string
   const imageCount = mediaKinds.filter(kind => kind === 'image').length;
   const videoCount = mediaKinds.filter(kind => kind === 'video').length;
   const parts: string[] = [];
-  if (imageCount) parts.push(`${imageCount} ${imageCount === 1 ? 'image' : 'images'}`);
-  if (videoCount) parts.push(`${videoCount} ${videoCount === 1 ? 'video' : 'videos'}`);
+  if (imageCount) parts.push(`${imageCount} ${imageCount === 1 ? copy.summaryImageOne : copy.summaryImageMany}`);
+  if (videoCount) parts.push(`${videoCount} ${videoCount === 1 ? copy.summaryVideoOne : copy.summaryVideoMany}`);
 
   let hasValidLink = false;
   if (link?.trim()) {
@@ -28,6 +30,6 @@ export function postContentSummary(message: string, media: unknown, link: string
       hasValidLink = (parsed.protocol === 'https:' || parsed.protocol === 'http:') && !parsed.username && !parsed.password;
     } catch { /* a malformed saved link is not presented as valid content */ }
   }
-  if (hasValidLink) parts.push('link');
-  return parts.length ? `Post with ${parts.join(' and ')}` : 'Post with no content';
+  if (hasValidLink) parts.push(copy.summaryLink);
+  return parts.length ? fillCopy(copy.summaryWith, { parts: parts.join(copy.summaryAnd) }) : copy.summaryEmpty;
 }

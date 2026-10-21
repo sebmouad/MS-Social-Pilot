@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { z } from 'zod';
 import { addDaysToKey, instantToWall, isValidTimeZone, weekdayOfKey, wallTimeToInstant } from '@/lib/calendar-dates';
 import { OperationError } from '@/lib/operation-error';
@@ -17,18 +20,19 @@ export type BestTimeSuggestions = { mode: 'suggest' | 'apply'; timeZone: string;
 
 /** UI, HTTP, MCP and queue all read the same current authority, selected destinations and stored-only measures. */
 export async function getBestTimeSuggestions(actor: PublishingActor, input: unknown, now = new Date()): Promise<BestTimeSuggestions> {
+  const errorText = await loadPublishingErrorText();
   const auth = await authorizePublishing(actor, 'publishing/posts', 'read');
   const parsed = inputSchema.safeParse(input);
   const maxTargets = (await limits()).maxTargets;
   if (!parsed.success || parsed.data.targetIds.length > maxTargets || new Set(parsed.data.targetIds).size !== parsed.data.targetIds.length) {
-    throw new OperationError('invalid_request', 'Choose valid distinct destinations. / Choisissez des destinations distinctes valides.');
+    throw new PublishingOperationError('invalid_request', 'chooseValidDistinctDestinationsChoisissezDesDestinationsDistinctesValides', {}, errorText);
   }
   const ids = parsed.data.targetIds;
-  if (auth.actor.allowedTargetIds && ids.some(id => !auth.actor.allowedTargetIds!.includes(id))) throw new OperationError('forbidden', 'A destination is outside your channel access. / Une destination est hors de votre accès.');
+  if (auth.actor.allowedTargetIds && ids.some(id => !auth.actor.allowedTargetIds!.includes(id))) throw new PublishingOperationError('forbidden', 'aDestinationIsOutsideYourChannelAccessUneDestination', {}, errorText);
   const targets = await validateTargets(auth.actor, ids, maxTargets);
   const [workspace] = await prisma.$queryRaw<Array<{ timezone: string; bestTimeMode: string }>>`SELECT timezone, "bestTimeMode" FROM workspaces WHERE id = ${actor.workspaceId}`;
   if (!workspace || !isValidTimeZone(workspace.timezone) || !['suggest', 'apply'].includes(workspace.bestTimeMode)) {
-    throw new OperationError('unavailable', 'Workspace timing settings are unavailable. / Les paramètres horaires sont indisponibles.');
+    throw new PublishingOperationError('unavailable', 'workspaceTimingSettingsAreUnavailableLesParamtresHorairesSont', {}, errorText);
   }
   const result: BestTimeSuggestions = { mode: workspace.bestTimeMode as 'suggest' | 'apply', timeZone: workspace.timezone, suggestions: [] };
   // Only members with current Analytics Posts read access contribute stored performance.

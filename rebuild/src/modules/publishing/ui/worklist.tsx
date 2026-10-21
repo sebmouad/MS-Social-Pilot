@@ -1,3 +1,4 @@
+import { kitCopy } from './kit/copy';
 import type { ReactNode } from "react";
 import { ChannelBadge } from "@/components";
 import { channelBadgeInfo } from "@/lib/channel-badge";
@@ -6,10 +7,10 @@ import styles from "./worklist.module.css";
 type RowTarget = { target: { id: string; name: string } };
 
 /** Channel badges for a post row; the provider of each channel comes from the connected-channel list. */
-export function RowChannels({ targets, providers }: { targets: RowTarget[]; providers: ReadonlyMap<string, string | null> }) {
+export function RowChannels({ targets, providers, copy = kitCopy.en }: { targets: RowTarget[]; providers: ReadonlyMap<string, string | null>; copy?: typeof kitCopy.en }) {
   const unique = [...new Map(targets.map(({ target }) => [target.id, target])).values()];
-  if (!unique.length) return <span className={styles.muted}>No channels chosen</span>;
-  return <ul className={styles.channels} aria-label="Channels">{unique.map(target => {
+  if (!unique.length) return <span className={styles.muted}>{copy.noChannelsChosen}</span>;
+  return <ul className={styles.channels} aria-label={copy.columnChannels}>{unique.map(target => {
     const info = channelBadgeInfo(providers.get(target.id));
     return <li key={target.id}><ChannelBadge name={target.name} platformName={info.platformName} mark={info.mark} /></li>;
   })}</ul>;

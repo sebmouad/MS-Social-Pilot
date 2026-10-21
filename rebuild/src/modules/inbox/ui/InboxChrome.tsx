@@ -1,3 +1,4 @@
+import { resolveInboxCatalog, type InboxCustomerCopy } from '../customer-copy';
 import type { ReactNode } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { ShortcutHint as Keycap } from '@/components/ShortcutHint';
@@ -22,14 +23,12 @@ export function PersonAvatar({ name, size = 36 }: { name: string; size?: number 
   return <span className={styles.avatar} style={{ width: size, height: size, ['--avatar-hue' as string]: hue(name) }} aria-hidden="true">{initials(name)}</span>;
 }
 
-export const SHORTCUT_COPY = {
-  en: { title: 'Keyboard shortcuts', next: 'next', previous: 'previous', reply: 'reply', resolve: 'resolve or reopen', open: 'Open a conversation to reply or resolve it.' },
-  fr: { title: 'Raccourcis clavier', next: 'suivante', previous: 'précédente', reply: 'répondre', resolve: 'résoudre ou rouvrir', open: 'Ouvrez une conversation pour répondre ou la résoudre.' },
-} as const;
+export { SHORTCUT_COPY } from '../shortcut-copy';
+
 
 /** The keys InboxShortcuts listens for, shown as shared keycaps next to what they do. */
-export function ShortcutHint({ locale = 'en' }: { locale?: 'en' | 'fr' }) {
-  const copy = SHORTCUT_COPY[locale];
+export function ShortcutHint({ locale = 'en', catalog }: { locale?: 'en' | 'fr'; catalog?: InboxCustomerCopy }) {
+  const copy = resolveInboxCatalog('SHORTCUT_COPY', catalog)[locale];
   return <p className={styles.shortcuts} aria-label={copy.title}>
     <span><Keycap chord="j" /> {copy.next}</span><span><Keycap chord="k" /> {copy.previous}</span><span><Keycap chord="r" /> {copy.reply}</span><span><Keycap chord="e" /> {copy.resolve}</span>
   </p>;

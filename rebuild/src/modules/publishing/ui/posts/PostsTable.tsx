@@ -1,10 +1,11 @@
 'use client';
+import { usePublishingCopy } from '../kit/CopyProvider';
 
 import { useState, type ComponentProps, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconExternalLink, IconPencil } from '@tabler/icons-react';
 import { DataTable, Drawer, type TableColumn } from '@/components';
-import { kitCopy, type KitLocale } from '../kit/copy';
+import { type KitLocale } from '../kit/copy';
 import { BulkPostActions } from './BulkPostActions';
 import { PostRowActions } from './PostActions';
 import { ChannelsCell, PostCell, StatusCell } from './PostTableCells';
@@ -25,7 +26,7 @@ export type PostsTableManage = Pick<ManageProps, 'targets' | 'canPublish' | 'can
  * that keeps the list visible while one post is managed. Empty and no-match states come from the caller.
  */
 export function PostsTable({ rows, caption, locale = 'en', selectable, canRetry, manage, empty }: { rows: PostsTableRow[]; caption: string; locale?: KitLocale; selectable: boolean; canRetry: boolean; manage: PostsTableManage | null; empty: ReactNode }) {
-  const copy = kitCopy[locale];
+  const copy = usePublishingCopy(locale);
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
   const [managing, setManaging] = useState<string | null>(null);

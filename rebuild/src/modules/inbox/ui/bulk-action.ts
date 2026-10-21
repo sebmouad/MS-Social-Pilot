@@ -1,4 +1,6 @@
 'use server';
+import { inboxServiceText } from '../server/service-copy';
+import { inboxServiceCopy } from '../service-copy';
 
 import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';
@@ -17,7 +19,7 @@ export async function runBulkInboxAction(input: unknown): Promise<BulkActionOutc
     const constraints = viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids };
     return await bulkInboxAction({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input, constraints);
   } catch (error) {
-    const failure = operationFailure(error, 'The selection could not be updated. Check the items before trying again.');
+    const failure = operationFailure(error, await inboxServiceText('selectionFailed').catch(() => inboxServiceCopy.selectionFailed.en));
     return { ok: false, error: failure.error, code: failure.code };
   }
 }

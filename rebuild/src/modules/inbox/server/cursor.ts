@@ -1,3 +1,4 @@
+import { inboxServiceCopy } from '../service-copy';
 import { createHash } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 
@@ -15,8 +16,8 @@ const FILTER_PATTERN = /^[a-f0-9]{64}$/;
 const TIMESTAMP_PATTERN = /^(?!0000)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const CURSOR_FIELDS = ['v', 'at', 'kind', 'id', 'direction', 'filter'] as const;
 
-function invalidCursor(): OperationError {
-  return new OperationError('invalid_request', 'This Inbox cursor is invalid or no longer matches these filters. Reset to the latest Inbox items.');
+function invalidCursor(message: string): OperationError {
+  return new OperationError('invalid_request', message);
 }
 
 function validLimit(maxCharacters: number): boolean {
@@ -42,13 +43,13 @@ function validCursor(value: unknown): value is InboxCursor {
 }
 
 /** Hash the normalized service scope and filters used to produce a page. */
-export function inboxFilterFingerprint(input: unknown): string {
+export function inboxFilterFingerprint(input: unknown, errorMessage: string = inboxServiceCopy.cursorInvalid.en): string {
   try {
     const serialized = JSON.stringify(input);
-    if (typeof serialized !== 'string') throw invalidCursor();
+    if (typeof serialized !== 'string') throw invalidCursor(errorMessage);
     return createHash('sha256').update(serialized).digest('hex');
   } catch {
-    throw invalidCursor();
+    throw invalidCursor(errorMessage);
   }
 }
 
@@ -58,6 +59,7 @@ export function encodeInboxCursor(
   direction: 'older' | 'newer',
   filter: string,
   maxCharacters: number,
+  errorMessage: string = inboxServiceCopy.cursorInvalid.en,
 ): string {
   try {
     if (!validLimit(maxCharacters) || !anchor || !(anchor.time instanceof Date) ||
@@ -65,32 +67,32 @@ export function encodeInboxCursor(
         (anchor.kind !== 'message' && anchor.kind !== 'comment' && anchor.kind !== 'review') ||
         typeof anchor.id !== 'string' || !ID_PATTERN.test(anchor.id) ||
         (direction !== 'older' && direction !== 'newer') ||
-        typeof filter !== 'string' || !FILTER_PATTERN.test(filter)) throw invalidCursor();
+        typeof filter !== 'string' || !FILTER_PATTERN.test(filter)) throw invalidCursor(errorMessage);
     const cursor: InboxCursor = { v: 1, at: anchor.time.toISOString(), kind: anchor.kind, id: anchor.id, direction, filter };
     const encoded = Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
-    if (encoded.length > maxCharacters) throw invalidCursor();
+    if (encoded.length > maxCharacters) throw invalidCursor(errorMessage);
     return encoded;
   } catch {
-    throw invalidCursor();
+    throw invalidCursor(errorMessage);
   }
 }
 
 /** Decode only canonical, bounded cursors bound to the current filter fingerprint. */
-export function readInboxCursor(encoded: unknown, filter: string, maxCharacters: number): InboxCursor | null {
+export function readInboxCursor(encoded: unknown, filter: string, maxCharacters: number, errorMessage: string = inboxServiceCopy.cursorInvalid.en): InboxCursor | null {
   if (encoded === undefined) return null;
   try {
     if (!validLimit(maxCharacters) || typeof encoded !== 'string' || !encoded ||
         encoded.length > maxCharacters || !/^[A-Za-z0-9_-]+$/.test(encoded) ||
-        typeof filter !== 'string' || !FILTER_PATTERN.test(filter)) throw invalidCursor();
+        typeof filter !== 'string' || !FILTER_PATTERN.test(filter)) throw invalidCursor(errorMessage);
     const decoded = Buffer.from(encoded, 'base64url');
-    if (decoded.toString('base64url') !== encoded) throw invalidCursor();
+    if (decoded.toString('base64url') !== encoded) throw invalidCursor(errorMessage);
     const json = decoded.toString('utf8');
     const parsed: unknown = JSON.parse(json);
-    if (!validCursor(parsed) || parsed.filter !== filter) throw invalidCursor();
+    if (!validCursor(parsed) || parsed.filter !== filter) throw invalidCursor(errorMessage);
     const canonical: InboxCursor = { v: 1, at: parsed.at, kind: parsed.kind, id: parsed.id, direction: parsed.direction, filter: parsed.filter };
-    if (JSON.stringify(canonical) !== json) throw invalidCursor();
+    if (JSON.stringify(canonical) !== json) throw invalidCursor(errorMessage);
     return canonical;
   } catch {
-    throw invalidCursor();
+    throw invalidCursor(errorMessage);
   }
 }

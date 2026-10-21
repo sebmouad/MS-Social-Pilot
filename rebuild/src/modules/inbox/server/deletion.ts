@@ -1,3 +1,4 @@
+import { inboxServiceText } from './service-copy';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Prisma } from '../../../../generated/client';
@@ -17,7 +18,7 @@ function receipt(row: Journal) {
   return { ok: true as const, operationId: row.id, itemId: row.localItemId, state: row.state,
     remoteConfirmed: row.state === 'remote_confirmed' || row.state === 'completed', localConfirmed: row.state === 'completed' };
 }
-const missing = () => new OperationError('not_found', 'This comment or deletion is unavailable in the current workspace.');
+const missing = async () => new OperationError('not_found', await inboxServiceText('service17'));
 
 async function findJournal(workspaceId: string, itemId: string) {
   const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state
@@ -52,15 +53,15 @@ async function findRemoteJournal(workspaceId: string, provider: string, targetId
 
 export async function getInboxDeletion(actor: InboxReadActor, input: { itemId: string }, constraints: InboxReadConstraints = {}) {
   const parsed = idSchema.safeParse(input.itemId);
-  if (!parsed.success) throw new OperationError('invalid_request', 'Choose a valid comment.');
+  if (!parsed.success) throw new OperationError('invalid_request', await inboxServiceText('service18'));
   const access = await authorizeInbox(actor, constraints);
   let row = await findJournal(actor.workspaceId, parsed.data);
-  if (row && !access.channelIds.includes(row.targetId)) throw missing();
+  if (row && !access.channelIds.includes(row.targetId)) throw await missing();
   if (!row) {
     const comment = await prisma.postComment.findFirst({ where: { id: parsed.data,
       postTarget: { targetId: { in: access.channelIds }, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } },
       select: { id: true, remoteId: true, postTarget: { select: { targetId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
-    if (!comment) throw missing();
+    if (!comment) throw await missing();
     const provider = comment.postTarget.target.socialAccount?.provider;
     if (provider) row = await findRemoteJournal(actor.workspaceId, provider, comment.postTarget.targetId, comment.remoteId);
   }
@@ -78,7 +79,7 @@ export async function finish(row: Journal, actor: InboxReadActor, auditExtra: Re
     const locked = await tx.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state
       FROM rebuild_inbox_deletions WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const current = locked[0];
-    if (!current) throw missing();
+    if (!current) throw await missing();
     if (current.state !== 'remote_confirmed') return receipt(current);
     const family = await storedFamily(tx, actor.workspaceId, current.targetId, current.remoteId);
     await tx.postComment.deleteMany({ where: {
@@ -99,17 +100,17 @@ export async function finish(row: Journal, actor: InboxReadActor, auditExtra: Re
  * is never interpreted here as proof of absence or as safe to repeat.
  */
 export async function deleteInboxCommentDurably(actor: InboxReadActor, input: { id: string; confirmation: string }, constraints: InboxReadConstraints = {}) {
-  if (!idSchema.safeParse(input.id).success || input.confirmation !== `DELETE COMMENT ${input.id}`) throw new OperationError('invalid_request', 'Confirm deletion of this exact comment.');
+  if (!idSchema.safeParse(input.id).success || input.confirmation !== `DELETE COMMENT ${input.id}`) throw new OperationError('invalid_request', await inboxServiceText('service19'));
   await authorizeInbox(actor, constraints, 'write');
-  if (await runtimeConfig('inbox.deletionRetention') !== 'until_workspace_erasure') throw new OperationError('unavailable', 'Comment deletion is unavailable.');
+  if (await runtimeConfig('inbox.deletionRetention') !== 'until_workspace_erasure') throw new OperationError('unavailable', await inboxServiceText('service20'));
   return withWorkspaceOperation(actor.workspaceId, async () => {
     const access = await authorizeInbox(actor, constraints, 'write');
     const previous = await findJournal(actor.workspaceId, input.id);
     if (previous) {
-      if (!access.channelIds.includes(previous.targetId)) throw missing();
+      if (!access.channelIds.includes(previous.targetId)) throw await missing();
       return withInboxChannelOperation(actor.workspaceId, previous.targetId, async () => {
         const current = await authorizeInbox(actor, constraints, 'write');
-        if (!current.channelIds.includes(previous.targetId)) throw missing();
+        if (!current.channelIds.includes(previous.targetId)) throw await missing();
         return { ...await finish(previous, actor), itemId: input.id };
       });
     }
@@ -117,11 +118,11 @@ export async function deleteInboxCommentDurably(actor: InboxReadActor, input: { 
       postTarget: { targetId: { in: access.channelIds }, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } },
       select: { remoteId: true, postTarget: { select: { targetId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
     const provider = item?.postTarget.target.socialAccount?.provider;
-    if (!item || !provider) throw missing();
+    if (!item || !provider) throw await missing();
     const targetId = item.postTarget.targetId;
     return withInboxChannelOperation(actor.workspaceId, targetId, async signal => {
       const refreshed = await authorizeInbox(actor, constraints, 'write');
-      if (!refreshed.channelIds.includes(targetId)) throw missing();
+      if (!refreshed.channelIds.includes(targetId)) throw await missing();
       const existingRemote = await findRemoteJournal(actor.workspaceId, provider, targetId, item.remoteId);
       if (existingRemote) return { ...await finish(existingRemote, actor), itemId: input.id };
       const stillPresent = await prisma.postComment.findFirst({ where: { id: input.id, remoteId: item.remoteId,
@@ -129,10 +130,10 @@ export async function deleteInboxCommentDurably(actor: InboxReadActor, input: { 
       if (!stillPresent) {
         const concurrent = await findJournal(actor.workspaceId, input.id);
         if (concurrent && concurrent.targetId === targetId) return finish(concurrent, actor);
-        throw missing();
+        throw await missing();
       }
       const host = await platformInbox(provider);
-      if (!host?.prepareDeleteComment) throw new OperationError('unavailable', 'Comment deletion is unavailable for this channel.');
+      if (!host?.prepareDeleteComment) throw new OperationError('unavailable', await inboxServiceText('service21'));
       // Preparation validates current remote credentials before a durable intent.
       const dispatch = await host.prepareDeleteComment(actor, { targetId, remoteId: item.remoteId });
       const operationId = randomUUID();
@@ -149,7 +150,7 @@ export async function deleteInboxCommentDurably(actor: InboxReadActor, input: { 
       const claimed = inserted[0];
       if (!claimed) {
         const existing = await findRemoteJournal(actor.workspaceId, provider, targetId, item.remoteId);
-        if (!existing) throw missing();
+        if (!existing) throw await missing();
         return { ...await finish(existing, actor), itemId: input.id };
       }
       // Intent is committed before dispatch. No timer clears it for another try.
@@ -168,16 +169,16 @@ export async function deleteInboxCommentDurably(actor: InboxReadActor, input: { 
 
 /** Recovery never contacts a provider: only a persisted confirmation can finish. */
 export async function finishInboxDeletion(actor: InboxReadActor, input: { operationId: string; confirmation: string }, constraints: InboxReadConstraints = {}) {
-  if (!idSchema.safeParse(input.operationId).success || input.confirmation !== `FINISH DELETION ${input.operationId}`) throw new OperationError('invalid_request', 'Confirm this exact deletion recovery.');
+  if (!idSchema.safeParse(input.operationId).success || input.confirmation !== `FINISH DELETION ${input.operationId}`) throw new OperationError('invalid_request', await inboxServiceText('service22'));
   await authorizeInbox(actor, constraints, 'write');
   return withWorkspaceOperation(actor.workspaceId, async () => {
     const access = await authorizeInbox(actor, constraints, 'write');
     const rows = await prisma.$queryRaw<Journal[]>`SELECT id, "workspaceId", "targetId", provider, "remoteId", "localItemId", state FROM rebuild_inbox_deletions WHERE id = ${input.operationId} AND "workspaceId" = ${actor.workspaceId}`;
     const row = rows[0];
-    if (!row || !access.channelIds.includes(row.targetId)) throw missing();
+    if (!row || !access.channelIds.includes(row.targetId)) throw await missing();
     return withInboxChannelOperation(actor.workspaceId, row.targetId, async () => {
       const current = await authorizeInbox(actor, constraints, 'write');
-      if (!current.channelIds.includes(row.targetId)) throw missing();
+      if (!current.channelIds.includes(row.targetId)) throw await missing();
       return finish(row, actor);
     });
   });

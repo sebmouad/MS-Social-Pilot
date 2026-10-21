@@ -1,3 +1,4 @@
+vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 import { beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ query: vi.fn(), comment: vi.fn(), access: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { $queryRaw: state.query, postComment: { findFirst: state.comment } } }));

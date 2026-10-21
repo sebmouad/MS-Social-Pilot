@@ -6,16 +6,20 @@ import { SidebarDock } from '@/components/SidebarDock';
 import { replaceSlotsConfirmation, slotKey } from '@/modules/publishing/collaboration/schemas';
 import { ConfirmDialog, send, useAction } from './collab-client';
 import styles from './collaboration.module.css';
+import { useCollaborationCopy } from '../compose/CopyProvider';
+import { fillComposerCopy } from '../../composer-catalog';
 
 type Slot = { dayOfWeek: number; hour: number; minute: number };
 type Stored = Slot & { id: string; targetId: string | null };
 type AddInput = { dayOfWeek: number; time: string };
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 const pad = (n: number) => String(n).padStart(2, '0');
 const sorted = (slots: Slot[]) => [...slots].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.hour - b.hour || a.minute - b.minute);
 const scopeKey = (scope: string) => scope || 'shared';
 
 export function QueueTimes({ slots, targets, canEditShared, canEditChannels, limit, initialSlot, timeZone }: { slots: Stored[]; targets: Array<{ id: string; name: string }>; canEditShared: boolean; canEditChannels: boolean; limit: number; initialSlot: Slot; timeZone: string }) {
+  const c = useCollaborationCopy();
+  const DAYS = [c.day0, c.day1, c.day2, c.day3, c.day4, c.day5, c.day6];
   const [stored, setStored] = useState(slots);
   const [scope, setScope] = useState('');
   const canEdit = scope === '' ? canEditShared : canEditChannels;
@@ -44,10 +48,10 @@ export function QueueTimes({ slots, targets, canEditShared, canEditChannels, lim
   };
   const addTime = () => {
     const match = /^(?:[01]\d|2[0-3]):[0-5]\d$/.exec(add.time);
-    if (!match) { setAddErrors(values => ({ ...values, [scopeKey(scope)]: 'Enter a valid time before adding this slot.' })); return; }
+    if (!match) { setAddErrors(values => ({ ...values, [scopeKey(scope)]: c.enter_a_valid_time_before_adding_this_slot })); return; }
     const [hour, minute] = add.time.split(':').map(Number);
     const next = { dayOfWeek: add.dayOfWeek, hour: hour!, minute: minute! };
-    if (rows.some(row => slotKey(row) === slotKey(next))) { setAddErrors(values => ({ ...values, [scopeKey(scope)]: 'That time is already in this timetable.' })); return; }
+    if (rows.some(row => slotKey(row) === slotKey(next))) { setAddErrors(values => ({ ...values, [scopeKey(scope)]: c.that_time_is_already_in_this_timetable })); return; }
     setRowsDraft([...rows, next]);
     changeAdd(initialAdd);
   };
@@ -57,43 +61,43 @@ export function QueueTimes({ slots, targets, canEditShared, canEditChannels, lim
     const savedTargetId = targetId;
     const savedRows = rows;
     const ok = await action.run(async () => {
-      const result = await send<{ targetId: string | null; count: number }>('PUT', '/api/publishing/queue-slots', { targetId: savedTargetId, slots: savedRows, confirmation: replaceSlotsConfirmation(savedTargetId) });
-      if (result.count !== savedRows.length || result.targetId !== savedTargetId) throw new Error('The saved times could not be verified. Refresh to see the current timetable.');
+      const result = await action.send<{ targetId: string | null; count: number }>('PUT', '/api/publishing/queue-slots', { targetId: savedTargetId, slots: savedRows, confirmation: replaceSlotsConfirmation(savedTargetId) });
+      if (result.count !== savedRows.length || result.targetId !== savedTargetId) throw new Error(c.the_saved_times_could_not_be_verified_refresh_to_see_the_current);
       setStored(existing => [...existing.filter(item => item.targetId !== savedTargetId), ...savedRows.map(row => ({ ...row, id: slotKey(row), targetId: savedTargetId }))]);
       setDrafts(values => { const next = { ...values }; delete next[scopeKey(savedScope)]; return next; });
       setAddInputs(values => { const next = { ...values }; delete next[scopeKey(savedScope)]; return next; });
       setAddErrors(values => { const next = { ...values }; delete next[scopeKey(savedScope)]; return next; });
-      return `Queue times saved (${result.count}).`;
+      return fillComposerCopy(c.queueSaved, { count: result.count });
     });
     if (ok) setReview(false);
   }
 
   const unsaved = (value: string) => Boolean(drafts[scopeKey(value)]);
   return <div className={styles.root}>
-    <SidebarDock><section className={styles.section} aria-label="Queue timetable selection">
-      <h2>Timetable</h2>
-      <label className={styles.form}><span className={styles.meta}>Apply times for</span><select value={scope} onChange={event => setScope(event.currentTarget.value)} disabled={action.busy}>
-        <option value="">Shared by all channels{unsaved('') ? ' · Unsaved changes' : ''}</option>
-        {targets.map(target => <option key={target.id} value={target.id}>{target.name}{unsaved(target.id) ? ' · Unsaved changes' : ''}</option>)}
+    <SidebarDock><section className={styles.section} aria-label={c.queue_timetable_selection}>
+      <h2>{c.timetable}</h2>
+      <label className={styles.form}><span className={styles.meta}>{c.apply_times_for}</span><select value={scope} onChange={event => setScope(event.currentTarget.value)} disabled={action.busy}>
+        <option value="">{c.sharedChannels}{unsaved('') ? c.unsaved_changes : ''}</option>
+        {targets.map(target => <option key={target.id} value={target.id}>{target.name}{unsaved(target.id) ? c.unsaved_changes : ''}</option>)}
       </select></label>
-      <p className={styles.help}>Times use {timeZone.replaceAll('_', ' ')}. Shared times are available to every channel. A channel’s own times are additional; a post for multiple channels can use one only when every selected channel has that same time.</p>
+      <p className={styles.help}>{fillComposerCopy(c.queueZoneHelp, { zone: timeZone.replaceAll('_', ' ') })}</p>
     </section></SidebarDock>
     <div>{action.banner}</div>
-    <section className={styles.section}><h2>{scope === '' ? 'Shared queue times' : `${targets.find(target => target.id === scope)?.name ?? 'Channel'} queue times`}</h2>
-      <p className={styles.help}>Queued posts take the next available saved time. Saving changes affects future queue placements; posts already scheduled keep their time.</p>
-      <p className={styles.help}>The workspace timezone is {timeZone.replaceAll('_', ' ')}.</p>
-      {rows.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{scope === '' ? 'Shared queue times' : 'Channel queue times'}</caption><thead><tr><th scope="col">Day</th><th scope="col">Time</th>{canEdit && <th scope="col">Actions</th>}</tr></thead>
-        <tbody>{rows.map(row => <tr key={slotKey(row)}><th scope="row">{DAYS[row.dayOfWeek]}</th><td>{pad(row.hour)}:{pad(row.minute)}</td>{canEdit && <td><Button size="sm" variant="danger" disabled={action.busy} onClick={() => setRowsDraft(rows.filter(item => slotKey(item) !== slotKey(row)))}>Remove</Button></td>}</tr>)}</tbody></table></div>
-        : <p className={styles.empty}>{scope === '' ? 'No shared queue times yet.' : 'This channel has no own times and currently uses the shared times.'}</p>}
+    <section className={styles.section}><h2>{scope === '' ? c.shared_queue_times : fillComposerCopy(c.channelQueueTitle, { name: targets.find(target => target.id === scope)?.name ?? c.channel })}</h2>
+      <p className={styles.help}>{c.queued_posts_take_the_next_available_saved_time_saving_changes_affects_future}</p>
+      <p className={styles.help}>{fillComposerCopy(c.workspaceZone, { zone: timeZone.replaceAll('_', ' ') })}</p>
+      {rows.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{scope === '' ? c.shared_queue_times : c.channel_queue_times}</caption><thead><tr><th scope="col">{c.day}</th><th scope="col">{c.time}</th>{canEdit && <th scope="col">{c.actions}</th>}</tr></thead>
+        <tbody>{rows.map(row => <tr key={slotKey(row)}><th scope="row">{DAYS[row.dayOfWeek]}</th><td>{pad(row.hour)}:{pad(row.minute)}</td>{canEdit && <td><Button size="sm" variant="danger" disabled={action.busy} onClick={() => setRowsDraft(rows.filter(item => slotKey(item) !== slotKey(row)))}>{c.remove}</Button></td>}</tr>)}</tbody></table></div>
+        : <p className={styles.empty}>{scope === '' ? c.no_shared_queue_times_yet : c.this_channel_has_no_own_times_and_currently_uses_the_shared_times}</p>}
       {canEdit ? <form noValidate className={styles.slotRow} onSubmit={event => { event.preventDefault(); if (!action.busy && rows.length < limit) addTime(); }}>
-        <label className={styles.form}><span className={styles.meta}>Day</span><select value={add.dayOfWeek} disabled={action.busy} onChange={event => changeAdd({ ...add, dayOfWeek: Number(event.currentTarget.value) })}>{DAYS.map((day, index) => <option key={day} value={index}>{day}</option>)}</select></label>
-        <label className={styles.form}><span className={styles.meta}>Time ({timeZone.replaceAll('_', ' ')})</span><input type="time" value={add.time} disabled={action.busy} aria-invalid={Boolean(addErrors[scopeKey(scope)])} aria-describedby={addErrors[scopeKey(scope)] ? timeErrorId : undefined} onChange={event => changeAdd({ ...add, time: event.currentTarget.value })} /></label>
-        <Button type="submit" disabled={action.busy || rows.length >= limit}>Add time</Button>
+        <label className={styles.form}><span className={styles.meta}>{c.day}</span><select value={add.dayOfWeek} disabled={action.busy} onChange={event => changeAdd({ ...add, dayOfWeek: Number(event.currentTarget.value) })}>{DAYS.map((day, index) => <option key={day} value={index}>{day}</option>)}</select></label>
+        <label className={styles.form}><span className={styles.meta}>{fillComposerCopy(c.timeZoneLabel, { zone: timeZone.replaceAll('_', ' ') })}</span><input type="time" value={add.time} disabled={action.busy} aria-invalid={Boolean(addErrors[scopeKey(scope)])} aria-describedby={addErrors[scopeKey(scope)] ? timeErrorId : undefined} onChange={event => changeAdd({ ...add, time: event.currentTarget.value })} /></label>
+        <Button type="submit" disabled={action.busy || rows.length >= limit}>{c.add_time}</Button>
         {addErrors[scopeKey(scope)] ? <p id={timeErrorId} className="ui-field-error" role="alert">{addErrors[scopeKey(scope)]}</p> : null}
-        {rows.length >= limit ? <p className={styles.help}>This timetable has reached its limit of {limit} times.</p> : null}
-      </form> : <p className={styles.help}>Only workspace owners and admins can change queue times{scope === '' ? ' for all channels' : ''}.</p>}
-      {canEdit && <div className={styles.actions}><Button variant="primary" disabled={draft === null || action.busy} onClick={() => setReview(true)}>Review changes</Button>{draft && <Button disabled={action.busy} onClick={resetCurrentDraft}>Discard changes</Button>}</div>}
+        {rows.length >= limit ? <p className={styles.help}>{fillComposerCopy(c.queueLimit, { max: limit })}</p> : null}
+      </form> : <p className={styles.help}>{fillComposerCopy(c.queuePermissions, { scope: scope === '' ? c.for_all_channels : '' })}</p>}
+      {canEdit && <div className={styles.actions}><Button variant="primary" disabled={draft === null || action.busy} onClick={() => setReview(true)}>{c.review_changes}</Button>{draft && <Button disabled={action.busy} onClick={resetCurrentDraft}>{c.discard_changes}</Button>}</div>}
     </section>
-    <ConfirmDialog feedback={action.feedback} open={review} title="Review queue times" confirmationMode="review" description={`This replaces the ${scope === '' ? 'shared' : targets.find(target => target.id === scope)?.name ?? 'selected channel'} timetable with ${rows.length} time${rows.length === 1 ? '' : 's'}. Posts already scheduled keep their time.`} confirmation={confirmation} actionLabel="Save queue times" busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void save()}><ul>{rows.map(row => <li key={slotKey(row)}>{DAYS[row.dayOfWeek]} {pad(row.hour)}:{pad(row.minute)} {timeZone.replaceAll('_', ' ')}</li>)}</ul></ConfirmDialog>
+    <ConfirmDialog feedback={action.feedback} open={review} title={c.review_queue_times} confirmationMode="review" description={fillComposerCopy(c.queueReview, { scope: scope === '' ? c.shared : targets.find(target => target.id === scope)?.name ?? c.selected_channel, count: rows.length, plural: rows.length === 1 ? '' : 's' })} confirmation={confirmation} actionLabel={c.save_queue_times} busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void save()}><ul>{rows.map(row => <li key={slotKey(row)}>{DAYS[row.dayOfWeek]} {pad(row.hour)}:{pad(row.minute)} {timeZone.replaceAll('_', ' ')}</li>)}</ul></ConfirmDialog>
   </div>;
 }

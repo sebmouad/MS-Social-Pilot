@@ -1,3 +1,4 @@
+vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OperationError } from '@/lib/operation-error';
 

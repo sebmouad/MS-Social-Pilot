@@ -7,6 +7,8 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('../src/modules/publishing/ui/calendar/actions', () => ({ reschedulePostAction: vi.fn() }));
 
 import { SidebarDockContext } from '../src/components/SidebarDock';
+import { PublishingCopyProvider } from '../src/modules/publishing/ui/kit/CopyProvider';
+import { publishingCopyDefaults } from '../src/modules/publishing/ui/kit/copy';
 import { CalendarBoard } from '../src/modules/publishing/ui/calendar/CalendarBoard';
 import { reschedulePostAction } from '../src/modules/publishing/ui/calendar/actions';
 import type { BoardDay, BoardPost } from '../src/modules/publishing/ui/calendar/types';
@@ -33,11 +35,11 @@ const days: BoardDay[] = [{ key: '2026-10-15', label: 'Thu 15', longLabel: 'Thur
 const showModal = vi.fn(function (this: HTMLDialogElement) { this.setAttribute('open', ''); this.tabIndex = -1; });
 const close = vi.fn(function (this: HTMLDialogElement) { this.removeAttribute('open'); });
 
-async function render(dayOverrides: Partial<BoardDay> = {}) {
-  await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: sidebar }, createElement(CalendarBoard, {
+async function render(dayOverrides: Partial<BoardDay> = {}, locale: 'en' | 'fr' = 'en', catalog = publishingCopyDefaults) {
+  await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: sidebar }, createElement(PublishingCopyProvider, { catalog, locale, children: createElement(CalendarBoard, {
     view: 'week', days: days.map(day => ({ ...day, ...dayOverrides })), timeZone: 'UTC', nowIso: '2026-10-14T09:00:00.000Z', canCreate: false, filterQuery: '&status=published', defaultScheduleTime: '09:00',
     navigation: { previous: '/publishing/calendar?view=week&date=2026-10-08&status=published', today: '/publishing/calendar?view=week&date=2026-10-14&status=published', next: '/publishing/calendar?view=week&date=2026-10-22&status=published', unit: 'week' },
-  }))));
+  }) }))));
 }
 
 beforeEach(() => {
@@ -129,4 +131,17 @@ describe('calendar post preview and navigation', () => {
     await act(async () => [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Move post')!.click());
     expect(container.textContent).toContain('Post moved to Fri, Oct 16, 11:30 PM');
   });
+});
+
+it('keeps French calendar controls and custom Root copy in the sidebar and move dialog', async () => {
+  const catalog = structuredClone(publishingCopyDefaults);
+  catalog.moveScheduled.fr = 'Changer l’horaire';
+  catalog.calendarNavigation.fr = 'Parcourir par {unit}';
+  await render({}, 'fr', catalog);
+  expect(sidebar.querySelector('nav')?.getAttribute('aria-label')).toBe('Parcourir par semaine');
+  expect(sidebar.textContent).toContain('Aujourd’hui');
+  const move = [...container.querySelectorAll('button')].find(button => button.textContent?.startsWith('Déplacer'))!;
+  await act(async () => move.click());
+  expect(container.querySelector('dialog')?.textContent).toContain('Changer l’horaire');
+  expect(container.querySelector('dialog')?.textContent).toContain('Actuellement programmée pour');
 });

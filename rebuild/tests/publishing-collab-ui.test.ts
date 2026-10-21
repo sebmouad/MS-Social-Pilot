@@ -38,3 +38,20 @@ describe('custom field review recovery', () => {
     expect(container.textContent).toContain('Retry campaign');
   });
 });
+
+it('uses the same edited French catalog for forms and unconfirmed requests', async () => {
+  const { ComposerCopyProvider } = await import('@/modules/publishing/ui/compose/CopyProvider');
+  const { composerCatalogDefaults } = await import('@/modules/publishing/composer-catalog');
+  const catalog = structuredClone(composerCatalogDefaults);
+  catalog.collab_new_field.fr = 'Ajouter un champ client';
+  catalog.collab_the_request_could_not_be_confirmed_refresh_and_check_the_current_state.fr = 'Vérifiez les champs enregistrés avant de réessayer.';
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+  await act(async () => root.render(createElement(ComposerCopyProvider, { catalog, locale: 'fr', children: createElement(FieldsManager, { initialFields: [], canManage: true, limits: { fieldLimit: 20, nameMax: 60, optionMax: 60, optionsMax: 30 } }) })));
+  await click(button('Ajouter un champ client'));
+  await enter(container.querySelector<HTMLInputElement>('input')!, 'Campagne');
+  await click(button('Vérifier'));
+  const dialog = container.querySelector<HTMLDialogElement>('dialog')!;
+  await enter(dialog.querySelector<HTMLInputElement>('input')!, 'CREATE FIELD Campagne');
+  await click(button('Confirmer l’enregistrement', dialog));
+  expect(dialog.textContent).toContain('Vérifiez les champs enregistrés avant de réessayer.');
+});

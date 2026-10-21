@@ -11,7 +11,8 @@ import { parseFirstCommentDelay } from '@/modules/publishing/first-comment-delay
 import { runtimeConfig } from '@/server/config/store';
 import { wallTimeToInstant } from '@/lib/calendar-dates';
 import type { ComposerActionState as BaseState } from '@/modules/publishing/ui/posts/actions';
-import { queueCopy } from './queue-copy';
+import { loadComposerCopy } from '../../server/composer-copy';
+import { catalogGroup } from '../../composer-catalog';
 
 export type QueueComposerState = BaseState & {
   values: BaseState['values'] & { draftPostId?: string };
@@ -29,14 +30,14 @@ export async function previewQueueAction(targetIds: string[]): Promise<QueuePrev
     const channels = preview.channels.map(channel => ({ targetId: channel.targetId, nextAt: channel.nextAt?.toISOString() ?? null }));
     return preview.scheduledAt ? { status: 'ready', scheduledAt: preview.scheduledAt.toISOString(), channels } : { status: 'full', channels };
   } catch {
-    return { status: 'error', message: queueCopy.en.unavailable };
+    return { status: 'error', message: catalogGroup(await loadComposerCopy(), 'queue', 'en').unavailable };
   }
 }
 
 /** Queue creation and recovery use the same lifecycle/queue services as HTTP and MCP. */
 export async function saveQueueComposerAction(previous: QueueComposerState, data: FormData): Promise<QueueComposerState> {
   const field = (key: string) => typeof data.get(key) === 'string' ? String(data.get(key)) : '';
-  const copy = queueCopy[field('queueLocale') === 'fr' ? 'fr' : 'en'];
+  const copy = catalogGroup(await loadComposerCopy(), 'queue', field('queueLocale') === 'fr' ? 'fr' : 'en');
   const values = { ...previous.values, ...Object.fromEntries([...data.entries()].filter(([, value]) => typeof value === 'string')), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') };
   // Recovery still goes through updatePost and its current whole-post authorization.
   // A draft started by autosave arrives as a hidden field; either way updatePost re-authorizes the whole post.

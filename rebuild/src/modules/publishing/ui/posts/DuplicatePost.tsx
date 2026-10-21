@@ -1,4 +1,5 @@
 "use client";
+import { usePublishingActionText } from '@/modules/publishing/ui/WorkflowSubmitButtons';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -13,7 +14,6 @@ type DuplicateReceipt = {
   replayed: boolean;
 };
 
-const UNKNOWN_RESULT = 'The copy result could not be confirmed.';
 
 function isDuplicateReceipt(value: unknown): value is DuplicateReceipt {
   if (!value || typeof value !== 'object') return false;
@@ -25,6 +25,7 @@ function isDuplicateReceipt(value: unknown): value is DuplicateReceipt {
 }
 
 export function DuplicatePost({ postId: sourceId, disabled = false, onPendingChange }: { postId: string; disabled?: boolean; onPendingChange?: (pending: boolean) => void }) {
+  const t = usePublishingActionText();
   const router = useRouter();
   const requestId = useRef<string | null>(null);
   const inFlight = useRef(false);
@@ -63,20 +64,20 @@ export function DuplicatePost({ postId: sourceId, disabled = false, onPendingCha
             return;
           }
         }
-        setError(UNKNOWN_RESULT);
+        setError(t('theCopyResultCouldNotBeConfirmed'));
         return;
       }
       if (!isDuplicateReceipt(receipt)
         || receipt.sourcePostId !== sourceId
         || receipt.postId !== requestId.current
         || receipt.draftCreated !== true) {
-        throw new Error(UNKNOWN_RESULT);
+        throw new Error(t('theCopyResultCouldNotBeConfirmed'));
       }
       requestId.current = null;
       router.push('/publishing/posts?status=draft&notice=duplicated');
       router.refresh();
     } catch {
-      setError(UNKNOWN_RESULT);
+      setError(t('theCopyResultCouldNotBeConfirmed'));
     } finally {
       inFlight.current = false;
       onPendingChange?.(false);
@@ -86,9 +87,9 @@ export function DuplicatePost({ postId: sourceId, disabled = false, onPendingCha
 
   return <div aria-busy={pending || undefined}>
     <Button type="button" variant="secondary" disabled={disabled || pending} onClick={() => void duplicate()}>
-      {pending ? 'Copying…' : 'Duplicate as draft'}
+      {pending ? t('copying') : t('duplicateAsDraft')}
     </Button>
-    <p className={styles.help}>Creates a new unscheduled draft with the content, first comment, media, and currently selected destinations copied. No changes are made on destinations.</p>
-    {error ? <p className={styles.formError} role="alert" tabIndex={-1} ref={errorRef}>{error} <a href="/publishing/posts?status=draft" target="_blank" rel="noopener noreferrer">Check Drafts</a> before trying again.</p> : null}
+    <p className={styles.help}>{t('createsANewUnscheduledDraftWithThe')}</p>
+    {error ? <p className={styles.formError} role="alert" tabIndex={-1} ref={errorRef}>{error} <a href="/publishing/posts?status=draft" target="_blank" rel="noopener noreferrer">{t('checkDrafts')}</a> {t('beforeTryingAgain')}</p> : null}
   </div>;
 }

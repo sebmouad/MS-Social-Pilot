@@ -1,5 +1,7 @@
+import { loadPublishingMediaText } from './media-copy';
+import { loadPublishingCopy } from './customer-copy';
 import { prisma } from '@/server/data';
-import { FIRST_COMMENT_LABELS, FIRST_COMMENT_REJECTED, firstCommentState } from '../first-comment-state';
+import { firstCommentLabels, FIRST_COMMENT_REJECTED, firstCommentState } from '../first-comment-state';
 import { parsePublishingMedia } from '../media-support';
 import type { ScheduleMode } from '../remote-scheduling';
 import type { DestinationScheduleModes } from './schedule-modes';
@@ -15,11 +17,12 @@ import type { PublishingActor } from './types';
 
 /** The bounded post list with per-destination first-comment state, exactly as the MCP `list_posts` tool returns it. */
 export async function listPostsWithFirstComment(actor: PublishingActor, input: unknown, maxItems: number) {
+  const labels = firstCommentLabels((await loadPublishingCopy()).copy.en);
   const posts = await readPublishingPostList(actor, input, { maxItems });
   return posts.map(post => ({ ...post, targets: post.targets.map(row => {
     const state = firstCommentState(post.firstComment, row);
     return { id: row.id, status: row.status, remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, publishedAt: row.publishedAt, target: row.target,
-      firstComment: { state, retryAvailable: state === 'ready' && row.firstCommentError === FIRST_COMMENT_REJECTED, label: FIRST_COMMENT_LABELS[state], ...(row.firstCommentAt ? { attemptedAt: row.firstCommentAt } : {}), ...(row.firstCommentId ? { remoteCommentId: row.firstCommentId } : {}), errorPresent: Boolean(row.firstCommentError) } };
+      firstComment: { state, retryAvailable: state === 'ready' && row.firstCommentError === FIRST_COMMENT_REJECTED, label: labels[state], ...(row.firstCommentAt ? { attemptedAt: row.firstCommentAt } : {}), ...(row.firstCommentId ? { remoteCommentId: row.firstCommentId } : {}), errorPresent: Boolean(row.firstCommentError) } };
   }) }));
 }
 
@@ -34,7 +37,8 @@ export type ApiPostInput = {
  * contributor's scheduled post is held for approval; the resulting status is read back so callers see the real outcome.
  */
 export async function createPostForApi(actor: PublishingActor, input: ApiPostInput) {
-  const media = parsePublishingMedia(input.media ?? []);
+  const mediaText = await loadPublishingMediaText();
+  const media = parsePublishingMedia(input.media ?? [], mediaText);
   const created = await createPost(actor, {
     message: input.message, firstComment: input.firstComment ?? '',
     ...(input.firstCommentDelayMinutes === undefined ? {} : { firstCommentDelayMinutes: input.firstCommentDelayMinutes }),

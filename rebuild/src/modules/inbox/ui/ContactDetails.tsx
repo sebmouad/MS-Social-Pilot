@@ -1,11 +1,11 @@
+import { resolveInboxCatalog, type InboxCustomerCopy } from '../customer-copy';
 import { IconUserOff } from '@tabler/icons-react';
 import { ChannelBadge, EmptyState } from '@/components';
 import { channelBadgeInfo } from '@/lib/channel-badge';
 import type { InboxContactDetails } from '@/modules/inbox/details';
 import { PersonAvatar } from './InboxChrome';
 import { InboxTag } from './InboxTags';
-import { inboxCopy, type InboxLocale } from './copy';
-import { round3Copy } from './round3-copy';
+import type { InboxLocale } from './copy';
 import styles from './inbox-round3.module.css';
 
 const TONE = { positive: 'ok', neutral: 'neutral', negative: 'danger' } as const;
@@ -15,9 +15,9 @@ const TONE = { positive: 'ok', neutral: 'neutral', negative: 'danger' } as const
  * the labels the team sees, and how their comments read over time. It renders stored facts only; anything the
  * stored data cannot say is shown as unknown rather than as zero or neutral.
  */
-export function ContactDetails({ details, locale, timeZone }: { details: InboxContactDetails | null; locale: InboxLocale; timeZone: string }) {
-  const copy = round3Copy[locale].details;
-  const list = inboxCopy[locale];
+export function ContactDetails({ details, locale, timeZone, catalog }: { details: InboxContactDetails | null; locale: InboxLocale; timeZone: string; catalog?: InboxCustomerCopy }) {
+  const copy = resolveInboxCatalog('round3Copy', catalog)[locale].details;
+  const list = resolveInboxCatalog('inboxCopy', catalog)[locale];
   if (!details) {
     return <aside className={styles.details} aria-label={copy.region}><EmptyState icon={<IconUserOff size={24} />} title={copy.title}>{copy.loadError}</EmptyState></aside>;
   }

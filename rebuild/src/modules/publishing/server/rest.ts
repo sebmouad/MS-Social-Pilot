@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { revalidatePath } from 'next/cache';
 import { requestOrigin } from '@/server/request-origin';
 import { requireViewer } from '@/server/context';
@@ -15,20 +18,20 @@ function sameOrigin(request: Request) {
 }
 
 /** Same exact confirmation strings as the MCP tools: REST and MCP writes ask for the same deliberate acknowledgement. */
-export function requireBodyConfirmation(body: Record<string, unknown>, expected: string) {
-  if (body.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat the call with confirmation exactly: ${expected}`);
+export function requireBodyConfirmation(body: Record<string, unknown>, expected: string, errorText: PublishingErrorText = defaultPublishingErrorText) {
+  if (body.confirmation !== expected) throw new PublishingOperationError('invalid_request', 'confirmationRequiredRepeatTheCallWithConfirmationExactlyValue0', {value0: expected}, errorText);
 }
 
-export function bodyString(body: Record<string, unknown>, key: string) {
+export function bodyString(body: Record<string, unknown>, key: string, errorText: PublishingErrorText = defaultPublishingErrorText) {
   const value = body[key];
-  if (typeof value !== 'string' || !value.trim()) throw new OperationError('invalid_request', `${key} is required.`);
+  if (typeof value !== 'string' || !value.trim()) throw new PublishingOperationError('invalid_request', 'value0IsRequired', {value0: key}, errorText);
   return value.trim();
 }
 
-export function bodyInstant(body: Record<string, unknown>, key: string) {
-  const text = bodyString(body, key);
+export function bodyInstant(body: Record<string, unknown>, key: string, errorText: PublishingErrorText = defaultPublishingErrorText) {
+  const text = bodyString(body, key, errorText);
   const date = new Date(text);
-  if (!Number.isFinite(date.getTime()) || !/^\d{4}-\d\d-\d\dT/.test(text)) throw new OperationError('invalid_request', `${key} must be an ISO date-time.`);
+  if (!Number.isFinite(date.getTime()) || !/^\d{4}-\d\d-\d\dT/.test(text)) throw new PublishingOperationError('invalid_request', 'value0MustBeAnISODatetime', {value0: key}, errorText);
   return { text, date };
 }
 
@@ -39,6 +42,7 @@ type Handler = (context: { actor: PublishingActor; body: Record<string, unknown>
  * the shared service the handler calls; business rules never live in the route.
  */
 export async function publishingWrite(request: Request, handle: Handler, options: { status?: number; failure?: string; body?: boolean } = {}) {
+  const errorText = await loadPublishingErrorText();
   if (!sameOrigin(request)) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
   let viewer;
   try { viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true }); }
@@ -46,8 +50,8 @@ export async function publishingWrite(request: Request, handle: Handler, options
   try {
     let body: Record<string, unknown> = {};
     if (options.body !== false) {
-      const parsed: unknown = await request.json().catch(() => { throw new OperationError('invalid_request', 'Send a valid JSON request.'); });
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new OperationError('invalid_request', 'Send a valid JSON request.');
+      const parsed: unknown = await request.json().catch(() => { throw new PublishingOperationError('invalid_request', 'sendAValidJSONRequest', {}, errorText); });
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new PublishingOperationError('invalid_request', 'sendAValidJSONRequest', {}, errorText);
       body = parsed as Record<string, unknown>;
     }
     const scope = viewer.permissions.pageScope;

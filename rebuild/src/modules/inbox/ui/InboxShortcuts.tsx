@@ -1,9 +1,9 @@
 'use client';
+import { useInboxCatalog } from './copy-context';
 
 import { useEffect, useState } from 'react';
 import { IconKeyboard } from '@tabler/icons-react';
 import { Button, Dialog, ShortcutHint } from '@/components';
-import { round3Copy } from './round3-copy';
 import type { InboxLocale } from './copy';
 import styles from './inbox-round3.module.css';
 
@@ -16,7 +16,7 @@ const TYPING = /^(input|textarea|select)$/i;
  * permissions and confirmations stay in the shared actions. The same keys are listed in the guide this button opens.
  */
 export function InboxShortcuts({ locale = 'en' }: { locale?: InboxLocale }) {
-  const copy = round3Copy[locale].shortcuts;
+  const copy = useInboxCatalog('round3Copy')[locale].shortcuts;
   const [guide, setGuide] = useState(false);
   useEffect(() => {
     function onKey(event: KeyboardEvent) {

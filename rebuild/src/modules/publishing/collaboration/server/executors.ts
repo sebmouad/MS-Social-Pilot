@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -119,13 +122,15 @@ type DueRow = { id: string; workspaceId: string; message: string; firstComment: 
 type CursorKey = 'publishing.automation.recycleCursor' | 'publishing.automation.mixCursor';
 
 async function readCursor(key: CursorKey): Promise<string> {
+  const errorText = await loadPublishingErrorText();
   const value = await runtimeConfig(key);
-  if (typeof value !== 'string' || (value !== '' && !ID.safeParse(value).success)) throw new OperationError('unavailable', 'Automatic scheduling scan state is unavailable.');
+  if (typeof value !== 'string' || (value !== '' && !ID.safeParse(value).success)) throw new PublishingOperationError('unavailable', 'collaboration_27', {}, errorText);
   return value;
 }
 
 /** Advance a Root-managed keyset cursor only if its observed value is still current. */
 async function advanceCursor(key: CursorKey, observed: string, next: string): Promise<void> {
+  const errorText = await loadPublishingErrorText();
   if (next === observed) return;
   const existing = await prisma.appSetting.findUnique({ where: { key }, select: { value: true, encrypted: true } });
   if (existing ? existing.encrypted || existing.value !== observed : observed !== '') return;
@@ -135,7 +140,7 @@ async function advanceCursor(key: CursorKey, observed: string, next: string): Pr
       : await tx.$executeRaw`INSERT INTO app_settings (key, value, encrypted, "updatedAt") VALUES (${key}, ${JSON.stringify(next)}::jsonb, FALSE, NOW()) ON CONFLICT (key) DO NOTHING`;
     if (changed !== 1) return;
     const audited = await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, NULL, 'publishing.automation_cursor_advanced', ${JSON.stringify({ key })}::jsonb, NOW())`;
-    if (audited !== 1) throw new OperationError('unavailable', 'Automatic scheduling scan state could not be recorded.');
+    if (audited !== 1) throw new PublishingOperationError('unavailable', 'collaboration_28', {}, errorText);
   });
 }
 
@@ -146,8 +151,9 @@ async function advanceCursor(key: CursorKey, observed: string, next: string): Pr
  * `eligible` lets the host apply its owner/plan/module rules per workspace; an ineligible workspace is left untouched.
  */
 export async function runRecycleCycle(options: { now?: Date; workspaceId?: string; eligible?: (workspaceId: string) => Promise<boolean>; lifecycle?: AutomationLifecycle } = {}): Promise<RecycleRunResult> {
-  if (typeof options.eligible !== 'function' || !options.lifecycle || typeof options.lifecycle.recycle !== 'function' || typeof options.lifecycle.stop !== 'function') throw new OperationError('unavailable', 'Automatic scheduling is unavailable until workspace access and publishing lifecycle can be verified.');
-  if (options.workspaceId !== undefined && !ID.safeParse(options.workspaceId).success) throw new OperationError('invalid_request', 'Invalid workspace ID.');
+  const errorText = await loadPublishingErrorText();
+  if (typeof options.eligible !== 'function' || !options.lifecycle || typeof options.lifecycle.recycle !== 'function' || typeof options.lifecycle.stop !== 'function') throw new PublishingOperationError('unavailable', 'collaboration_29', {}, errorText);
+  if (options.workspaceId !== undefined && !ID.safeParse(options.workspaceId).success) throw new PublishingOperationError('invalid_request', 'collaboration_30', {}, errorText);
   const now = options.now ?? new Date();
   const limit = await bounds();
   const result: RecycleRunResult = { checked: 0, created: 0, finished: 0, skipped: 0, failed: 0 };
@@ -173,6 +179,7 @@ export async function runRecycleCycle(options: { now?: Date; workspaceId?: strin
 }
 
 async function recycleOne(workspaceId: string, postId: string, now: Date, limit: CollabBounds, lifecycle: AutomationLifecycle): Promise<'created' | 'finished' | 'created_finished' | 'skipped'> {
+  const errorText = await loadPublishingErrorText();
   return transact(workspaceId, limit, async tx => {
     const rows = await tx.$queryRaw<DueRow[]>`SELECT id, "workspaceId", message, "firstComment", "firstCommentDelayMinutes", format, link, "linkPreview", media, "mediaKeys", "publishMode"::text AS "publishMode", timezone, "authorId", "recycleEveryDays", "recycleLimit", "recycleCount", "recycleNextAt", variants FROM posts WHERE id = ${postId} AND "workspaceId" = ${workspaceId} AND "recycleEnabled" = TRUE AND "recycleNextAt" <= ${now} AND status::text IN ('published', 'partially_failed') FOR UPDATE SKIP LOCKED`;
     const post = rows[0];
@@ -191,7 +198,7 @@ async function recycleOne(workspaceId: string, postId: string, now: Date, limit:
     const variantsValid = Array.isArray(post.variants) && post.variants.length <= limit.variantsLimit && post.variants.every((value): value is string => typeof value === 'string' && value.trim().length > 0 && value.length <= limit.variantMaxCharacters);
     if (!Number.isInteger(post.recycleEveryDays) || post.recycleEveryDays! < 1 || post.recycleEveryDays! > limit.recycleMaxIntervalDays ||
       (post.recycleLimit !== null && (!Number.isInteger(post.recycleLimit) || post.recycleLimit < 1 || post.recycleLimit > limit.recycleMaxRepeats)) ||
-      !Number.isInteger(post.recycleCount) || post.recycleCount < 0 || !variantsValid) throw new OperationError('unavailable', 'The saved recycle policy is outside current workspace limits.');
+      !Number.isInteger(post.recycleCount) || post.recycleCount < 0 || !variantsValid) throw new PublishingOperationError('unavailable', 'collaboration_31', {}, errorText);
     if (post.recycleLimit !== null && post.recycleCount >= post.recycleLimit) return stop('repeat_limit');
     const count = post.recycleCount + 1;
     const next = nextRecycleAt({ everyDays: post.recycleEveryDays, limit: post.recycleLimit, count, from: post.recycleNextAt ?? now, now });
@@ -222,8 +229,9 @@ const MANAGERS = new Set(['owner', 'admin', 'editor']);
  * SMTP delivery happens later and cannot undo scheduling.
  */
 export async function runContentMix(options: { now?: Date; workspaceId?: string; eligible?: (workspaceId: string) => Promise<boolean>; lifecycle?: AutomationLifecycle; enqueueNotice?: (tx: Tx, notice: MixDryNotice & { eventId: string }) => Promise<void> } = {}): Promise<MixRunResult> {
-  if (typeof options.eligible !== 'function' || !options.lifecycle || typeof options.lifecycle.schedule !== 'function') throw new OperationError('unavailable', 'Automatic scheduling is unavailable until workspace access and publishing lifecycle can be verified.');
-  if (options.workspaceId !== undefined && !ID.safeParse(options.workspaceId).success) throw new OperationError('invalid_request', 'Invalid workspace ID.');
+  const errorText = await loadPublishingErrorText();
+  if (typeof options.eligible !== 'function' || !options.lifecycle || typeof options.lifecycle.schedule !== 'function') throw new PublishingOperationError('unavailable', 'collaboration_29', {}, errorText);
+  if (options.workspaceId !== undefined && !ID.safeParse(options.workspaceId).success) throw new PublishingOperationError('invalid_request', 'collaboration_30', {}, errorText);
   const now = options.now ?? new Date();
   const limit = await bounds();
   const result: MixRunResult = { workspaces: 0, scheduled: 0, dry: 0, skipped: 0, failed: 0 };

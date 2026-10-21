@@ -1,3 +1,6 @@
+
+import { PublishingOperationError, defaultPublishingErrorText, type PublishingErrorText } from '@/modules/publishing/error-catalog';
+import { loadPublishingErrorText } from '@/modules/publishing/server/error-copy';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -15,13 +18,14 @@ export async function preparePublicationLinks(input: {
   workspaceId: string; postId: string; targetId: string; message: string; link: string | null;
   settings: UtmSettings & { shortenerEnabled?: boolean }; targetName?: string; date?: Date;
 }) {
+  const errorText = await loadPublishingErrorText();
   if (!input.link && !/https?:\/\//.test(input.message)) return { message: input.message, link: input.link };
   const replacements = new Map<string, string>();
   const hasUtm = Boolean(input.settings.utmSource || input.settings.utmMedium || input.settings.utmCampaignTemplate);
   let base = '', days = 0;
   if (input.settings.shortenerEnabled) {
     [base, days] = await Promise.all([runtimeConfig('publishing.shortLinkBaseUrl'), runtimeConfig('publishing.shortLinkRetentionDays')]);
-    if (!base) throw new OperationError('unavailable', 'Link shortening is unavailable. Try again later.');
+    if (!base) throw new PublishingOperationError('unavailable', 'linkShorteningIsUnavailableTryAgainLater', {}, errorText);
   }
   const transform = async (raw: string) => {
     if (replacements.has(raw)) return replacements.get(raw)!;

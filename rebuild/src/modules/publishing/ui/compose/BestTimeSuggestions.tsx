@@ -3,15 +3,12 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/Button';
 import type { BestTimeSuggestions as Suggestions } from '@/modules/publishing/server/best-time';
 
-const copy = {
-  en: { title: 'Suggested times', choose: 'Choose destinations to see suggested times.', loading: 'Loading suggested times…', unknown: 'Not available. More measured post history is needed for these destinations.', error: 'Suggested times are unavailable. Try again.', retry: 'Retry', hint: 'Based on stored performance, not a prediction. Times use', apply: 'Queue mode prefers these times when free; otherwise it uses your timetable.', suggest: 'Queue mode uses your timetable. Choose a suggestion to fill the schedule.' },
-  fr: { title: 'Horaires suggérés', choose: 'Choisissez des destinations pour voir les suggestions.', loading: 'Chargement des suggestions…', unknown: 'Non disponible. Il faut davantage de publications mesurées pour ces destinations.', error: 'Les suggestions horaires sont indisponibles. Réessayez.', retry: 'Réessayer', hint: 'Selon les performances enregistrées, sans prédiction. Fuseau horaire :', apply: 'La file privilégie ces horaires libres, puis utilise votre calendrier habituel.', suggest: 'La file utilise votre calendrier habituel. Choisissez une suggestion pour remplir la programmation.' },
-};
+import { catalogGroup, composerCatalogDefaults, type ComposerCatalog } from '../../composer-catalog';
 type State = { key: string; status: 'ready'; data: Suggestions } | { key: string; status: 'error' };
 
 /** Cancel and fence selection changes so an old destination's timing can never fill the current schedule. */
-export function BestTimeSuggestions({ targetIds, locale, disabled, onChoose }: { targetIds: readonly string[]; locale: 'en' | 'fr'; disabled: boolean; onChoose: (wall: { date: string; time: string }) => void }) {
-  const t = copy[locale];
+export function BestTimeSuggestions({ targetIds, locale, disabled, onChoose, copyCatalog = composerCatalogDefaults }: { copyCatalog?: ComposerCatalog; targetIds: readonly string[]; locale: 'en' | 'fr'; disabled: boolean; onChoose: (wall: { date: string; time: string }) => void }) {
+  const t = catalogGroup(copyCatalog, 'bestTime', locale);
   const key = JSON.stringify([...targetIds].sort());
   const [state, setState] = useState<State | null>(null);
   const [refresh, setRefresh] = useState(0);

@@ -37,3 +37,9 @@ it('does not report deletion for a missing receipt or malformed request', async 
   data.delete('intent');
   expect(await deletePostWithRecoveryAction({ status: 'idle', deleteRemote: false }, data)).toMatchObject({ status: 'error' });
 });
+
+// Error copy is supplied by Root at runtime; this isolated test uses its validated defaults.
+vi.mock('../src/modules/publishing/server/error-copy', async () => {
+  const { defaultPublishingErrorText } = await import('../src/modules/publishing/error-catalog');
+  return { loadPublishingErrorText: async () => defaultPublishingErrorText };
+});
