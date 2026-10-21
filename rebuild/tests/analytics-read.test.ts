@@ -91,7 +91,18 @@ describe('shared Analytics read service', () => {
     expect(result.metrics.items.map(item => item.key)).toEqual(['spend::USD']);
     expect(result.audience).toMatchObject({ total: 0, covered: 0, selected: 0 });
     expect(state.groupBy).not.toHaveBeenCalled();
-    expect(state.load.mock.calls.slice(1).map(call => [call[1], call[4]])).toEqual([[[], ['ad-2']]]);
+    expect(state.load.mock.calls.map(call => [call[1], call[4]])).toEqual([[[], ['ad-2']]]);
+  });
+
+  it('loads explicit selections once, including explicitly empty filters', async () => {
+    await readAnalyticsSnapshot(actor, { filter: '1', channel: ['channel-1'], adFilter: '1', adAccount: [] });
+    expect(state.load).toHaveBeenCalledTimes(1);
+    expect(state.load.mock.calls[0]?.[1]).toEqual(['channel-1']);
+    expect(state.load.mock.calls[0]?.[4]).toEqual([]);
+    state.load.mockClear();
+    await readAnalyticsSnapshot(actor, { filter: '1', channel: [], adFilter: '1', adAccount: [] });
+    expect(state.load).toHaveBeenCalledTimes(1);
+    expect(state.groupBy).toHaveBeenCalledTimes(1);
   });
 
   it('returns canonical UTC periods, same-scope previous comparisons, and publishing counts', async () => {
@@ -100,7 +111,7 @@ describe('shared Analytics read service', () => {
     expect(result.selected).toEqual({ channelIds: ['channel-1'], adAccountIds: ['ad-2'] });
     expect(result.publishing).toEqual({ published: 3, scheduled: 2, failed: 5 });
     expect(result.comparisons.views).toMatchObject({ previous: 6, delta: 3, status: 'comparable' });
-    expect(state.load.mock.calls.slice(1).map(call => [call[1], call[4]])).toEqual([[['channel-1'], ['ad-2']], [['channel-1'], ['ad-2']]]);
+    expect(state.load.mock.calls.map(call => [call[1], call[4]])).toEqual([[['channel-1'], ['ad-2']], [['channel-1'], ['ad-2']]]);
     expect(result.query).toContain('filter=1'); expect(result.query).toContain('adFilter=1');
   });
 

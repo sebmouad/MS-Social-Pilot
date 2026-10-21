@@ -21,10 +21,13 @@ export async function selectedPublishingTargetIds(
     },
     select: { id: true, type: true, socialAccount: { select: { provider: true } } },
   });
+  // One adapter/configuration read per provider for this authorized read, not per destination.
+  const adapters = new Map<string, ReturnType<typeof platformFor>>();
   const eligible = await Promise.all(targets.map(async target => {
     const provider = target.socialAccount?.provider;
     if (!provider || !hasPlatformCapability(entitlements, provider)) return null;
-    const adapter = await platformFor(provider, 'publishing');
+    if (!adapters.has(provider)) adapters.set(provider, platformFor(provider, 'publishing'));
+    const adapter = await adapters.get(provider);
     return adapter?.publish && adapter.supportsTargetKind?.(target.type, 'publishing') ? target.id : null;
   }));
   return eligible.filter((id): id is string => id !== null);

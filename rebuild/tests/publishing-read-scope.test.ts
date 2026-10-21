@@ -34,6 +34,18 @@ describe('publishing read scope', () => {
       workspaceId: 'workspace-1', enabled: true,
       id: { in: ['selected-supported', 'unentitled'] }, socialAccount: { is: expect.objectContaining({ workspaceId: 'workspace-1', invalidatedAt: null }) },
     }) }));
+    expect(platformFor).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves a provider once for 96 selected destinations and rechecks on the next read', async () => {
+    const targets = Array.from({ length: 96 }, (_, index) => ({ id: `channel-${index}`, type: index % 2 ? 'supported' : 'unsupported', socialAccount: { provider: 'facebook' } }));
+    const findMany = vi.spyOn(prisma.target, 'findMany').mockResolvedValue(targets as never);
+    platformFor.mockResolvedValue({ publish: vi.fn(), supportsTargetKind: (kind: string) => kind === 'supported' });
+    expect(await selectedPublishingTargetIds('workspace-1', entitlements)).toHaveLength(48);
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(platformFor).toHaveBeenCalledTimes(1);
+    platformFor.mockResolvedValue(null);
+    expect(await selectedPublishingTargetIds('workspace-1', entitlements)).toEqual([]);
     expect(platformFor).toHaveBeenCalledTimes(2);
   });
 
