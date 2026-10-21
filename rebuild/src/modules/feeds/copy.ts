@@ -218,6 +218,10 @@ export function feedsLocale(acceptLanguage: string | null | undefined): FeedsLoc
 }
 export type FeedsCopyKey = keyof typeof feedsCopy.en;
 
-export function feedsText(locale: FeedsLocale, key: FeedsCopyKey, values: Record<string, string | number> = {}): string {
-  return (feedsCopy[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+/** Root-edited catalog shape: same keys in both languages. */
+export type FeedsCopyCatalog = Record<FeedsLocale, Record<FeedsCopyKey, string>>;
+
+/** `catalog` is the Root-managed `feeds.copy` value; the shipped defaults apply when it is not supplied. */
+export function feedsText(locale: FeedsLocale, key: FeedsCopyKey, values: Record<string, string | number> = {}, catalog: FeedsCopyCatalog = feedsCopy): string {
+  return (catalog[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
 }

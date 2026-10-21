@@ -158,6 +158,10 @@ export function mediaLocale(acceptLanguage: string | null | undefined): MediaLoc
 }
 export type MediaCopyKey = keyof typeof mediaCopy.en;
 
-export function mediaText(locale: MediaLocale, key: MediaCopyKey, values: Record<string, string | number> = {}): string {
-  return (mediaCopy[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
+/** Root-edited catalog shape: same keys in both languages. */
+export type MediaCopyCatalog = Record<MediaLocale, Record<MediaCopyKey, string>>;
+
+/** `catalog` is the Root-managed `media.copy` value; the shipped defaults apply when it is not supplied. */
+export function mediaText(locale: MediaLocale, key: MediaCopyKey, values: Record<string, string | number> = {}, catalog: MediaCopyCatalog = mediaCopy): string {
+  return (catalog[locale][key] as string).replace(/\{(\w+)\}/g, (whole, name: string) => name in values ? String(values[name]) : whole);
 }

@@ -1,5 +1,7 @@
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig, runtimeConfigBatch } from '@/server/config/store';
+import { resolveOwnerCopy, type OwnerCopy } from '../ui/owner-copy';
+import { publicCopy, publicCopyDefaults, publicCopySchema } from '../ui/copy';
 import { SHARING_COPY_CONFIG, SHARING_LIMIT_CONFIG, type SharingCopy, type SharingLimits } from '../config';
 
 const unavailable = () => new OperationError('unavailable', 'Sharing is temporarily unavailable. Try again later.');
@@ -19,6 +21,17 @@ export async function sharingLimits(read?: (key: string) => Promise<unknown>): P
   } catch { throw unavailable(); }
   if (out.defaultExpiryDays! > out.maxExpiryDays!) throw unavailable();
   return out;
+}
+
+/** Customer text of the signed-in sharing screens, resolved to one language for the browser. */
+export async function loadOwnerCopy(locale: 'en' | 'fr'): Promise<Record<string, string>> {
+  return resolveOwnerCopy(locale, await runtimeConfig('sharing.ownerCopy') as OwnerCopy);
+}
+
+/** Visitor page text from Root; unreadable or invalid text degrades to the shipped defaults rather than blocking the page. */
+export async function loadPublicCopy(locale: 'en' | 'fr') {
+  try { return publicCopy(locale, publicCopySchema.parse(await runtimeConfig('sharing.publicCopy')) as typeof publicCopyDefaults); }
+  catch { return publicCopy(locale); }
 }
 
 /** Visitor-facing copy from Root. Unreadable or invalid copy degrades to empty text rather than blocking the page. */

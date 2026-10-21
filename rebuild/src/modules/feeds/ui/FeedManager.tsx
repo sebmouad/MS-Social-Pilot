@@ -5,7 +5,7 @@ import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
 import { SidebarDock } from '@/components/SidebarDock';
-import { feedsCopy, feedsText, type FeedsCopyKey, type FeedsLocale } from '../copy';
+import { feedsCopy, feedsText, type FeedsCopyCatalog, type FeedsCopyKey, type FeedsLocale } from '../copy';
 import styles from './feeds.module.css';
 
 type Handling = 'review' | 'schedule';
@@ -21,8 +21,8 @@ const sample = (template: string, hashtags: string, t: (key: FeedsCopyKey) => st
   .replace(/\{\{?\s*title\s*\}?\}/gi, t('sampleTitle')).replace(/\{\{?\s*(excerpt|description)\s*\}?\}/gi, t('sampleExcerpt'))
   .replace(/\{\{?\s*link\s*\}?\}/gi, 'https://example.com/article').replace(/\{\{?\s*hashtags\s*\}?\}/gi, hashtags.trim()).replace(/\n{3,}/g, '\n\n').trim();
 
-export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = true, limits, locale, automaticMinutes }: { initialFeeds: Feed[]; channels: Array<{ id: string; name: string }>; page: number; hasMore: boolean; canWrite?: boolean; limits: Limits; locale: FeedsLocale; automaticMinutes: number | null }) {
-  const t = (key: FeedsCopyKey, values: Record<string, string | number> = {}) => feedsText(locale, key, values);
+export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = true, limits, locale, automaticMinutes, copy = feedsCopy }: { initialFeeds: Feed[]; channels: Array<{ id: string; name: string }>; page: number; hasMore: boolean; canWrite?: boolean; limits: Limits; locale: FeedsLocale; automaticMinutes: number | null; copy?: FeedsCopyCatalog }) {
+  const t = (key: FeedsCopyKey, values: Record<string, string | number> = {}) => feedsText(locale, key, values, copy);
   const [feeds, setFeeds] = useState(initialFeeds);
   const [draft, setDraft] = useState(blank);
   const [editing, setEditing] = useState<Feed | null>(null);
@@ -39,7 +39,7 @@ export function FeedManager({ initialFeeds, channels, page, hasMore, canWrite = 
   const errorText = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : t('unknownRequest');
   const saveWord = editing ? `UPDATE FEED ${editing.id}` : `CREATE FEED ${draft.name.trim()}`;
   const wordFor = (r: Review) => r.kind === 'delete' ? `DELETE FEED ${r.feed!.id}` : r.kind === 'drafts' ? `CREATE FEED DRAFTS ${r.feed!.id}` : r.kind === 'posts' ? `CREATE FEED POSTS ${r.feed!.id}` : saveWord;
-  const confirmParts = feedsCopy[locale].typeToConfirm.split('{phrase}');
+  const confirmParts = copy[locale].typeToConfirm.split('{phrase}');
   const handlingText = (h: Handling) => t(h === 'schedule' ? 'handlingSchedule' : 'handlingReview');
 
   function begin(feed?: Feed) { setEditing(feed ?? null); setDraft(feed ? { name: feed.name, url: feed.url, kind: feed.kind, enabled: feed.enabled, messageTemplate: feed.messageTemplate, hashtags: feed.hashtags, targetIds: feed.targetIds, handling: feed.handling, spreadMinutes: feed.spreadMinutes } : blank); setNotice(null); setFormOpen(true); }

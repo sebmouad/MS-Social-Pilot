@@ -11,7 +11,7 @@ export const MEDIA_PAGES = [
 
 /** Must equal the keys of MEDIA_CONFIG (checked by tests/media-library-module.test.ts). */
 export const MEDIA_ROOT_KEYS = [
-  'media.libraryPageSize', 'media.workspaceQuotaBytes', 'media.videoMaxBytes', 'media.allowedVideoMimeTypes', 'media.importMaxBytes',
+  'media.copy', 'media.libraryPageSize', 'media.workspaceQuotaBytes', 'media.videoMaxBytes', 'media.allowedVideoMimeTypes', 'media.importMaxBytes',
   'media.importTimeoutMs', 'media.importMaxRedirects', 'media.importAllowHttp', 'media.importHostAllowlist', 'media.holderScanLimit',
   'media.holderListLimit', 'media.imageListLimit', 'media.holderExcerptCharacters', 'media.identifierMaxCharacters', 'media.pageNumberMax', 'media.importUrlMaxCharacters', 'media.assetNameMaxCharacters', 'media.searchMaxCharacters', 'media.transactionTimeoutMs', 'media.transactionMaxWaitMs',
 ] as const;

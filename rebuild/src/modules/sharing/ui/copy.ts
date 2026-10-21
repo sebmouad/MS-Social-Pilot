@@ -1,6 +1,7 @@
+import { z } from 'zod';
 import type { AuthLocale } from '@/modules/home/auth/copy';
 
-/** Copy for the signed-out share and bio pages. The visitor's browser language decides; owner-written text is never translated. */
+/** Copy for the signed-out share and bio pages. The visitor's browser language decides; owner-written text is never translated. Root can edit every line (`sharing.publicCopy`); `{0}` marks a value supplied by the page. */
 const en = {
   rateLimited: 'Too many visits just now. Please wait a few minutes and try again.',
   loadFailed: 'This page could not be loaded. Please try again shortly.',
@@ -11,9 +12,9 @@ const en = {
     emptyReviewTitle: 'Nothing to review', emptyReview: 'Nothing is waiting for review right now.',
     emptyCalendarTitle: 'Nothing planned', emptyCalendar: 'Nothing is planned in this period.',
     noDate: 'No date yet', channels: 'Selected channels', noText: 'No text', video: 'Video attachment',
-    moreFiles: (n: number) => `${n} more uploaded ${n === 1 ? 'file' : 'files'} attached (no preview)`,
+    moreFilesOne: '1 more uploaded file attached (no preview)', moreFilesMany: '{0} more uploaded files attached (no preview)',
     lastAnswer: 'Last answer', approved: 'approved', changes: 'changes requested', commented: 'comment sent',
-    truncated: (n: number) => `Only the first ${n} posts are shown.`,
+    truncated: 'Only the first {0} posts are shown.',
   },
   review: {
     name: 'Your name', comment: 'Comment', approve: 'Approve', requestChanges: 'Request changes', sendComment: 'Send comment',
@@ -23,7 +24,9 @@ const en = {
   bio: { title: 'Links', noLinks: 'No links yet.' },
 };
 
-const fr: typeof en = {
+type Catalog = typeof en;
+
+const fr: Catalog = {
   rateLimited: 'Trop de visites en ce moment. Patientez quelques minutes puis réessayez.',
   loadFailed: 'Cette page n’a pas pu être chargée. Réessayez dans un instant.',
   share: {
@@ -33,9 +36,9 @@ const fr: typeof en = {
     emptyReviewTitle: 'Rien à relire', emptyReview: 'Rien n’attend de relecture pour le moment.',
     emptyCalendarTitle: 'Rien de planifié', emptyCalendar: 'Rien n’est planifié sur cette période.',
     noDate: 'Pas encore de date', channels: 'Canaux sélectionnés', noText: 'Aucun texte', video: 'Vidéo jointe',
-    moreFiles: (n: number) => `${n} ${n === 1 ? 'autre fichier envoyé joint' : 'autres fichiers envoyés joints'} (sans aperçu)`,
+    moreFilesOne: '1 autre fichier envoyé joint (sans aperçu)', moreFilesMany: '{0} autres fichiers envoyés joints (sans aperçu)',
     lastAnswer: 'Dernière réponse', approved: 'approuvée', changes: 'modifications demandées', commented: 'commentaire envoyé',
-    truncated: (n: number) => `Seules les ${n} premières publications sont affichées.`,
+    truncated: 'Seules les {0} premières publications sont affichées.',
   },
   review: {
     name: 'Votre nom', comment: 'Commentaire', approve: 'Approuver', requestChanges: 'Demander des modifications', sendComment: 'Envoyer le commentaire',
@@ -45,5 +48,21 @@ const fr: typeof en = {
   bio: { title: 'Liens', noLinks: 'Pas encore de liens.' },
 };
 
-export type PublicCopy = typeof en;
-export const publicCopy = (locale: AuthLocale): PublicCopy => locale === 'fr' ? fr : en;
+export const publicCopyDefaults = { en, fr };
+
+/** Exact catalog shape for both languages: unknown or missing keys are rejected, blank text too. */
+const shape = (value: unknown): z.ZodTypeAny => typeof value === 'string'
+  ? z.string().trim().min(1).max(4000)
+  : z.object(Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, shape(item)]))).strict();
+export const publicCopySchema = z.object({ en: shape(en), fr: shape(fr) }).strict();
+
+const fill = (template: string, count: number) => template.replace('{0}', String(count));
+
+/** What the pages read: the catalog's templates with count-filling helpers. */
+export type PublicCopy = Omit<Catalog, 'share'> & { share: Omit<Catalog['share'], 'moreFilesOne' | 'moreFilesMany' | 'truncated'> & { moreFiles: (count: number) => string; truncated: (count: number) => string } };
+
+export const publicCopy = (locale: AuthLocale, catalog: typeof publicCopyDefaults = publicCopyDefaults): PublicCopy => {
+  const text = locale === 'fr' ? catalog.fr : catalog.en;
+  const { moreFilesOne, moreFilesMany, truncated, ...share } = text.share;
+  return { ...text, share: { ...share, moreFiles: count => count === 1 ? moreFilesOne : fill(moreFilesMany, count), truncated: count => fill(truncated, count) } };
+};
