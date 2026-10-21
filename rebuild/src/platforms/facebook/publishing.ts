@@ -260,7 +260,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       url.searchParams.set('redirect_uri', input.redirectUri); url.searchParams.set('code', input.code);
       let response: Response;
       try { response = await fetchImpl(url, { redirect: 'error', signal: AbortSignal.timeout(config.requestTimeoutMs) }); }
-      catch (error) { throw new FacebookApiError(error instanceof Error ? error.message : 'Facebook token exchange failed.', 0); }
+      catch (error) { throw new FacebookApiError(error instanceof Error ? `${error.message}${error.cause instanceof Error ? `: ${error.cause.message}` : ''}` : 'Facebook token exchange failed.', 0); }
       const payload: unknown = await response.json().catch(() => null); const data = object(payload);
       if (!response.ok || data.error) throw graphError(payload, response.status);
       if (typeof data.access_token !== 'string' || !data.access_token) throw new FacebookApiError('Facebook did not return an access token.', response.status);

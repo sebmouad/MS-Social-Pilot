@@ -86,7 +86,7 @@ export async function finishFacebookConnection(request: NextRequest, viewer: Con
     });
   } catch (error) {
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
-    console.warn('[facebook-connect] callback failed', { stage, category: error instanceof FacebookApiError ? 'provider_error' : 'internal_error', name: error instanceof Error ? error.name : 'unknown', code: error instanceof FacebookApiError ? (error as { code?: unknown }).code : undefined });
+    console.warn('[facebook-connect] callback failed', { stage, category: error instanceof FacebookApiError ? 'provider_error' : 'internal_error', name: error instanceof Error ? error.name : 'unknown', code: error instanceof FacebookApiError ? error.code : undefined, status: error instanceof FacebookApiError ? error.status : undefined, subcode: error instanceof FacebookApiError ? error.subcode : undefined, message: error instanceof Error ? error.message.replace(/https?:\/\/\S+/g, '[url]').replace(/(secret|token|code)=\S+/gi, '$1=[redacted]').slice(0, 300) : undefined, cause: error instanceof Error && error.cause instanceof Error ? error.cause.message.slice(0, 200) : undefined });
     await recordFacebookConnectionFailure(actor, stage, error instanceof FacebookApiError ? 'provider_error' : 'internal_error').catch(() => undefined);
     // The audit stores only a stage/category. Provider messages and credentials stay server-side.
     return finish(request, 'connect_failed');
