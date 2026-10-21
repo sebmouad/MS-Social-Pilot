@@ -1,5 +1,6 @@
 "use client";
 import { usePublishingCopy } from '../kit/CopyProvider';
+import { originCopy } from '../origins/copy';
 
 import { useSearchParams } from "next/navigation";
 import { PublishingChannelOptions } from '@/modules/publishing/ui/PublishingChannelOptions';
@@ -12,7 +13,7 @@ const STATUS_CHOICES = [
 ] as const;
 
 /** Calendar view, date, channel and status filters for the sidebar. */
-export function CalendarFilters({ channels, today }: { channels: Array<{ id: string; name: string }>; today: string }) {
+export function CalendarFilters({ channels, today, origins = [], locale = "en" }: { channels: Array<{ id: string; name: string }>; today: string; origins?: Array<{ kind: string; label: string }>; locale?: "en" | "fr" }) {
   const copy = usePublishingCopy();
   const validation = useFormValidation();
   const params = useSearchParams();
@@ -37,6 +38,13 @@ export function CalendarFilters({ channels, today }: { channels: Array<{ id: str
       <option value="">{copy.allStatuses}</option>
       {STATUS_CHOICES.map((value) => <option value={value} key={value}>{value === 'pending_approval' || value === 'partially_failed' ? copy[`calendarStatus_${value}`] : copy[`status_${value}`]}</option>)}
     </select>
+    {origins.length ? <>
+      <label htmlFor="calendar-origin-filter">{originCopy[locale].filterLabel}</label>
+      <select id="calendar-origin-filter" name="origin" defaultValue={params.get("origin") ?? ""}>
+        <option value="">{originCopy[locale].anyOrigin}</option>
+        {origins.map(option => <option value={option.kind} key={option.kind}>{option.label}</option>)}
+      </select>
+    </> : null}
     <button type="submit">{copy.apply}</button>
     <a href="/publishing/calendar">{copy.reset}</a>
   </form>;
