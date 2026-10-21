@@ -1,11 +1,13 @@
 # UI = REST = MCP parity: Publishing and Inbox
 
-Status: **source-level matrix, mocked-service tests only** (no PostgreSQL, browser or live-provider run). Written 2026-10-20.
+Status: **source-level matrix and scoped mocked-service/route tests**. Updated
+2026-10-21 against local HEAD `6fb0e57f`; no fresh PostgreSQL, browser or
+live-provider run. Separate recorded production outcomes are in RELEASE_GATES_PLAN.md.
 Rule: each customer action reaches one shared service; REST and MCP are thin entries that ask for the same exact confirmation string
 and the service re-checks tenant, role, feature, channel scope and audit. "—" means the action does not exist on that surface
 because it is not an action there (a pure screen), not a gap. **GAP** marks a missing surface.
 
-Confirmation strings are identical on REST (`confirmation` in the JSON body) and MCP (`confirmation` argument).
+Confirmation strings match on the listed confirmed REST/MCP paths (`confirmation` in JSON/tool arguments); REST v1 create retains the exception documented below.
 Session-authenticated REST also requires a same-origin `Origin` header.
 
 ## Publishing
@@ -117,7 +119,9 @@ Behaviour (one implementation, `modules/publishing/server/lifecycle.ts` + `sched
 
 | Customer action (UI) | Shared service | REST | MCP tool | Confirmation |
 | --- | --- | --- | --- | --- |
-| List, filter, search, paginate | `readInboxList` | `GET /api/inbox` | `list_inbox` | read |
+| List, filter, search, paginate (including unread/unanswered/negative/mentions quick filters) | `readInboxList` | `GET /api/inbox` | `list_inbox` | read |
+| Stored contact, related posts and classified-comment sentiment trend | `readInboxContactDetails` | `GET /api/inbox/threads/{key}/details` (`8852d367`) | `get_inbox_contact_details` | read |
+| Bulk resolve/reopen/hide/unhide/delete | `bulkInboxAction` | `POST /api/inbox/bulk` (`f5c21c96`) | `bulk_inbox_action` | `BULK <ACTION> <distinct count> INBOX ITEMS` |
 | Open a thread / history | `readInboxThread` | `GET /api/inbox/threads/{key}` | `get_inbox_thread` | read |
 | Sync now | `syncInbox` | `POST /api/inbox/actions` `{action:'sync'}` | `sync_inbox` (new) | `SYNC INBOX [<channel>]` |
 | Reply (message, comment, review) | `replyToInbox` | `POST /api/inbox/actions` `{action:'reply'}` | `reply_to_inbox` | `REPLY <kind> <id>` |
@@ -129,10 +133,24 @@ Behaviour (one implementation, `modules/publishing/server/lifecycle.ts` + `sched
 | Moderation rules, log, run, undo | `moderation.ts` | `GET/POST /api/inbox/moderation` | `get_inbox_moderation` `create/update/delete_inbox_moderation_rule` `run_inbox_moderation_rules` `undo_inbox_moderation_action` | per tool |
 | Assign, private notes, saved replies, productivity | `productivity.ts` | `GET/POST /api/inbox/productivity` | `get_inbox_productivity` `assign_inbox_item` `*_inbox_private_note` `*_inbox_saved_reply` `list_inbox_saved_replies` | per tool |
 
+Bulk REST is a same-origin, session-authenticated thin entry to the same service
+as UI/MCP. It refuses URL filters; validation, Root bounds, scope and per-item
+outcomes remain service-owned. A failed item does not roll back successful items;
+hide/unhide/delete are comments-only. Contact details are stored-data reads;
+unclassified sentiment is unknown. Quick filters combine with AND semantics;
+unread concerns conversations and negative uses stored comment classification.
+`inbox-bulk-route.test.ts` is mocked route evidence, not remote moderation proof.
+
+The worker's Facebook Inbox sync now fetches outside the transaction/lock and
+rechecks current binding/authority inside the write phase (`e0584777`);
+`inbox-sync-fetch-then-write.test.ts` checks those seams with mocks. Production
+transaction duration and remote concurrent-revocation behavior need live evidence.
+
 ## Remaining gaps (not closed here)
 
-- The new `post_targets."scheduleMode"` migration is pinned in `scripts/cutover-rehearsal.sh` but has **not been applied** to any
-  database and the full rehearsal was not run; PostgreSQL, browser and live-Graph checks of per-destination holding are still open.
+- The new `post_targets."scheduleMode"` migration is pinned in `scripts/cutover-rehearsal.sh` but was **not applied** to a
+  database by the original scheduling lane. Current target application needs an exact migration receipt;
+  the full rehearsal and PostgreSQL/browser/live-Graph checks of per-destination holding remain open.
 - Mix/recycle hand-off is a pass after each run, not a dedicated job: posts whose platform-chosen destinations can never be held
   (module without native scheduling) are re-examined every run until their time (bounded by `handOffBatch`, oldest first), and a
   hand-over only happens when a mix/recycle run occurs. A dedicated worker job in `src/server/jobs` would remove that coupling.

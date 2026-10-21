@@ -4,7 +4,7 @@ This contract records observable behavior for the rebuild. It does not override 
 
 ## Product context
 
-The product serves teams publishing to selected social channels, managing responses and ads, and reporting results. Current UI language is English. The workspace timezone governs publishing dates; API timestamps remain absolute. Target accessibility is WCAG 2.2 AA. The user selects a theme in Appearance; visual rules live in [DESIGN.md](DESIGN.md).
+The product serves teams publishing to selected social channels, managing responses and ads, and reporting results. Customer copy is required in English and French; merged Root-editable module catalogs provide partial source coverage. Full localization and browser verification remain open. The workspace timezone governs publishing dates; API timestamps remain absolute. Target accessibility is WCAG 2.2 AA. The user selects a theme in Appearance; visual rules live in [DESIGN.md](DESIGN.md).
 
 ## Business-context sources
 
@@ -25,12 +25,12 @@ There is no released billing or legal-copy contract for the rebuild. Do not inve
 | Capability | Canonical owner | Source of truth | Allowed variants | Verification |
 |---|---|---|---|---|
 | Navigation | `src/components/AppShell.tsx` | Module manifests and private Root manifest | Desktop module rail plus contextual sidebar; phone bottom rail and one contextual drawer | Root drawer Tab/Escape/focus-return checked in Chrome; scope, failure and desktop-transition regressions |
-| Theme and Scrollbar | `src/styles/tokens.css` | `DESIGN.md` | Grove, Coast, Clay, Nightfall | Publishing mobile Lighthouse accessibility 100 in all four themes; shared muted-text contrast test passes; other screens and scrollbar checks pending |
+| Theme and Scrollbar | `src/styles/tokens.css` | `DESIGN.md` | Vivid, Meta blue, Warm, Clean; each light/dark plus system mode | Older Publishing Lighthouse/Chrome results used Grove/Coast/Clay/Nightfall. They are historical evidence; the current eight-palette all-route matrix and scrollbar checks remain open |
 | Read-only table | `src/components/DataTable.tsx` | Server list query | Sortable or static columns | Posts now has scoped database pagination; other table pagination parity pending |
 | Post preview | `src/components/PostPreview.tsx` | Scoped post list and destination records | Feed and Cards, alongside default Table | First comment, safe media/link handling and destination outcomes covered; local Chrome filter/view checks |
 | Post attachments | `src/modules/publishing/components/PostAttachments.tsx` | Root ceilings, shared authoring validation and adapter media metadata | Ordered remote media / local images; trusted unsaved preview distinct from saved validation | Order, description association, upload retry, multi-editor focus and actual local HTTP/MCP/browser checks; wider release matrix remains open |
 | Table Selection | No shared owner yet | `UX-CONTRACT.md` | None until a shared owner exists | Define before bulk table actions |
-| Select/Listbox | Native `<select>` | `DESIGN.md` and this contract | Browser-owned popup in English UI | Posts filter selection persisted after navigation in a 390px Chrome mobile preview; keyboard checks pending |
+| Select/Listbox | Native `<select>` | `DESIGN.md` and this contract | Browser-owned popup; application labels English/French | Posts filter selection persisted after navigation in a 390px Chrome mobile preview; keyboard checks pending |
 | Date | Native date/time inputs | Workspace timezone policy | Date or datetime-local | Date-only parsing and browser checks pending |
 | Form | `src/components/FormValidation.tsx`, `src/lib/ui/form-validation.ts` and domain services | Server validation | Client-validated mutation; server-validated GET/action | Shared constraints, associations and focus tested; migration and browser evidence below |
 | Multiline input | `src/components/AutoTextarea.tsx` | `DESIGN.md` | Controlled, uncontrolled and read-only | Growth/shrink/reset/ref behavior tested with synthetic DOM geometry; real browser layout checks pending |
@@ -557,3 +557,24 @@ with copy describing allocation-time preference. Unit/jsdom evidence only; see
 
 
 Root connection Refresh token (2026-10-20) uses shared Button/useConfirm, names the connection, requires exact `REFRESH CONNECTION <id>`, retains confirmation on unconfirmed errors and returns focus after an explicit renewed/not renewable/failed receipt. Copy is en/fr; unknown expiry is Not available. Provider/credential details never enter the dialog or feedback. DOM evidence and browser/live limits: docs/ROOT_CONNECTION_REFRESH.md.
+
+## Current language and theme evidence — 2026-10-21
+
+Source checked at `6fb0e57f`: Publishing, Inbox, Analytics, Ads, Home, Tasks and
+Agency have module-owned Root-editable English/French catalogs (merged through
+`38ab34f4`). Schema-checked readers use `configOrDefault` (`fb42b056`): missing,
+unreadable or invalid stored catalogs fall back to the registry default validated
+by the same schema. `configValueOrDefault` only checks broad type/array shape;
+it is not equivalent to full schema validation. These fallback mechanisms do
+not establish that all customer strings use a catalog.
+
+`tests/ui-copy-coverage.test.ts` checks literal `t(...)` keys in Agency, Tasks and
+Analytics Reports screens and nonempty English/French entries in those catalogs.
+Other module copy tests have their own scopes; this test does not scan every
+module, dynamic metric label, error, browser control or downloaded report.
+Remaining Root/service copy, AI prompt language and other literal gaps are in
+[CONFIG_LITERAL_AUDIT.md](docs/CONFIG_LITERAL_AUDIT.md). Current palettes are
+Vivid/Meta blue/Warm/Clean in light/dark; older Grove/Coast/Clay/Nightfall browser
+results retain only their original dated scope. Verify current language, keyboard,
+failure recovery, desktop/phone and theme states with synthetic local data;
+production planning/provider results cannot substitute for that UI evidence.

@@ -1,10 +1,41 @@
 # Shared infrastructure and Root literal audit — round 2
 
-Scope: this assigned worker lane. **Partial literal coverage; no rebuild or release completion claim.**
+Status updated 2026-10-21 against local HEAD `6fb0e57f`: **partial literal
+coverage; no rebuild or release completion claim**. Round-two key tables, test
+counts, owned-file lists and publication prose below are historical lane records,
+now integrated in Git. Their earlier “working tree only” and “merge this file”
+instructions are not current publication status. This documentation pass adds no
+Root keys and does not change `CONFIG_SCHEMA_VERSION` (current source: 106).
 
-The hard owned-path rule excludes `rebuild/docs/`. This is the requested audit update prepared inside owned `src/lib/config/`; the integrator must merge it into `rebuild/docs/CONFIG_LITERAL_AUDIT.md`. The round-one document remains historical evidence. No unowned source or documentation was edited.
+The original extraction declared 96 keys. The two OAuth consent limits now have
+route/screen readers, but their owning metadata still says `configured` and
+“route integration is pending”; fix that metadata rather than reporting absent
+consumers. Existing `auth.passwordMaxBytes`, `settings.accountNameMaxLength` and
+`data.postPageMaxItems` remain reused settings.
 
-`CONFIG_SCHEMA_VERSION` is unchanged. This batch adds **96 Root keys: 94 consumed keys and two explicitly configured-but-inactive OAuth consent keys**. The complete list below includes defaults and declarations. Existing `auth.passwordMaxBytes`, `settings.accountNameMaxLength` and `data.postPageMaxItems` are reused, without duplicate Root declarations.
+## Integrated follow-ups (source/unit; not browser/live proof)
+
+- Copy catalogs merged through `38ab34f4` (registry 105) cover source slices of
+  Publishing, Inbox, Analytics, Ads, Home, Tasks and Agency, declared in each
+  module's `config.ts`. This supersedes the earlier Home-outside-lane snapshot;
+  whole-app copy coverage is still incomplete. `ui-copy-coverage.test.ts` checks
+  Agency/Tasks/Analytics Reports literal translation keys and nonempty en/fr
+  entries, not every string across all seven modules.
+- `fb42b056` routes schema-checked catalog/display-policy reads through
+  `src/server/config/config-or-default.ts:configOrDefault`: unreadable, missing
+  or invalid values fall back to the registry default validated by the same
+  schema. `configValueOrDefault` is weaker (broad type/array shape only); do not
+  present it as full catalog validation or universal operational-policy fallback.
+- `e0584777` implements worker drain/abort and Inbox fetch-then-write. Current
+  shared Root keys `sync.workerShutdownGraceMs` and `sync.workerDrainPollMs` bound
+  drain behavior (registry 106 includes grace). Source/mocked tests do not prove
+  production systemd timing or database contention is resolved.
+- Still needed in `src/modules/integrations/config.ts`: mark
+  `integrations.oauth.authorizationStateMaxCharacters` and
+  `integrations.oauth.scopeMaxCharacters` active and remove pending-reader prose.
+  Generalize `integrations.api.postsBodyMaxBytes`'s label/description from Posts
+  to REST JSON requests: the limit also feeds Analytics/Ads `keyToolEndpoint`.
+  Keep the existing key name; this is metadata correction, not a new setting.
 
 ## Runtime behavior and shared boundaries
 
@@ -247,7 +278,7 @@ Source: `src/lib/connection-health.ts`. Each of the following fields exists in b
 4. The Root-gap follow-up replaces non-evidence recovery 200/300-character ceilings with existing Root identifier/confirmation settings and serializes limits to the corresponding dialogs. Other direct wire/service limits and internal messages were not exhaustively converted.
 5. New synchronous policies are refreshed by the existing Node startup lifecycle. Standalone scripts/worker processes do not start that Next lifecycle automatically; if they begin using these synchronous helper policies, invoke/maintain `refreshSynchronousPolicy` explicitly. Snapshot refresh is bounded by the existing origin reload interval; direct async service policy may observe a save slightly before another process’s synchronous snapshot. No cross-process immediate-apply claim is made.
 
-## Exact edits needed outside owned paths
+## Original lane handoff (historical; current metadata gaps listed above)
 
 1. Integrator: merge this file into `rebuild/docs/CONFIG_LITERAL_AUDIT.md` and update `ARCHITECTURE.md`, relevant UX/operations notes, `DELIVERY_PLAN.md` and `AGENT_HANDOFF.md` with the batch scope, the evidence below, inactive keys and remaining gaps. These docs are outside the hard owned paths and remain untouched here.
 2. Integrator: reconcile and bump `CONFIG_SCHEMA_VERSION` in excluded `src/lib/config/registry.ts` for all 96 listed keys alongside other lanes. No module-install registry hand edit is needed for module keys.
@@ -257,7 +288,7 @@ Source: `src/lib/connection-health.ts`. Each of the following fields exists in b
 6. Existing Publishing CalendarScreen already serializes helper-produced moveOptions, so its normal quick moves and server action result timestamps use the new runtime-refreshed policy without Publishing edits. If a future caller relies on the browser fallback without moveOptions, pass the validated serializable policy via the optional final helper argument. Full grid/editor language selection and other calendar copy still require Publishing work. Settings-owned registration/invitation validation may still cap names/passwords differently from the shared HTTP/helper snapshot; reconcile those service schemas when expanding those policies.
 7. Existing provider-owned legacy storage reads in `src/server/data.ts` remain a prior boundary gap; no new provider branching was added. Moving those reads behind provider/module contracts is a separate lane.
 
-## Verification and publication status
+## Original lane verification and publication status (historical)
 
 From `rebuild/`, final `npx tsc --noEmit -p .`: **zero errors**. Final targeted Vitest: **831 passed / 58 files / zero skipped**. `git diff --check`: clean. The exact targeted command is included below. Earlier intermediate runs exposed and corrected policy-default parameter literal inference, a new-config test mock, MCP copy mock/forwarding, and field-error classification tied to English copy. No full suite, build, server, browser, real database, live-provider, migration, deployment or production operation was run.
 
@@ -380,7 +411,7 @@ npx vitest run --no-cache tests/account-settings.test.ts tests/ai-assist.test.ts
 - `tests/zip-policy.test.ts`
 
 
-## Root-gap follow-up — 2026-10-20
+## Root-gap follow-up — 2026-10-20 (historical lane record; now merged)
 
 This worker changed only the assigned OAuth, shared-config/reschedule, Root recovery/UI callers and tests, plus this explicitly requested audit. No schema-version edit, commit, push, server, deployment, database or provider run.
 

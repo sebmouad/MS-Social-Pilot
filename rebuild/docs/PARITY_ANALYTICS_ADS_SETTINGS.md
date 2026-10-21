@@ -1,9 +1,9 @@
 # Analytics, Ads, Settings, Tasks and Agency action parity
 
-Source audit: 2026-10-20, this worktree. This is a capability/action matrix, not a
+Source audit updated 2026-10-21 against local HEAD `6fb0e57f`. This is a capability/action matrix, not a
 release-completion claim. Paths below are relative to `rebuild/src/`.
-The specifically requested matrix is the only documentation file changed outside
-the lane's module/API/test ownership. No central configuration version was changed.
+Earlier batch ownership, new-key lists and verification totals below are historical
+lane records. This documentation-only follow-up changes no source or Root keys.
 
 **Evidence:** `Present` means source entry points call the indicated core; it does
 not mean browser, PostgreSQL, live provider or production verification. `Added`
@@ -85,13 +85,13 @@ explicitly listed below rather than treated as equal capabilities.
 | Customer action / UI | REST | MCP tool | Shared core / status |
 | --- | --- | --- | --- |
 | View discovered/selected connections and health | **GET `/api/settings/connections?offset=…`** | `list_connections` | **`settings/server/connection-directory.ts`** with fresh manager/tenant/feature checks + shared `listConnections`/health; Added REST/shared paginated read |
-| Connect/reconnect provider: start authorization | POST `/api/oauth/connections/[platform]/start` | `start_connection` | `settings/server/connection-start.ts`; same exact `START CONNECTION <platform>`, current session/manager/platform checks, audit and provider-owned state cookies. Returns authorization URL only; Added. Old route delegation remains an integration gap below |
+| Connect/reconnect provider: start authorization | POST `/api/oauth/connections/[platform]/start` | `start_connection` | `settings/server/connection-start.ts`; same exact `START CONNECTION <platform>`, current session/manager/platform checks, audit and provider-owned state cookies. Returns authorization URL only; Added. Compatibility `/api/connections/[platform]/start` also delegates to `connectionStartHttp` |
 | Complete provider consent | Provider authorization URL then existing callback | Open `start_connection` receipt in the same signed-in browser | External provider consent requires human navigation; no app secret or replacement consent tool. Callback/state validation remains provider-owned |
-| Enable/disable channel or ad account | PATCH `/api/connections` | `set_connection_selection` | `server/connection-mutations.ts:setConnectionSelections`; Present, confirmation difference below |
-| Save multiple selection changes atomically | PATCH `/api/connections` | **`set_connection_selections`** | Same core, module wrapper checks Root batch bound and exact `SET CONNECTION SELECTIONS <count>`; Added MCP |
+| Enable/disable channel or ad account | PATCH `/api/connections` | `set_connection_selection` | `settings/server/connection-selection.ts:changeConnectionSelections` now validates single or batch consent for REST; single MCP still calls the lower core (see below) |
+| Save multiple selection changes atomically | PATCH `/api/connections` | **`set_connection_selections`** | UI/REST/MCP use `changeConnectionSelections`; Root batch bound and exact `SET CONNECTION SELECTIONS <count>` checked before atomic scoped/audited core |
 | Preview disconnect-related record counts | POST `/api/connections` | `preview_connection_disconnect` | `previewSocialAccountDeletion`; Present |
-| Disconnect retaining related records | DELETE `/api/connections` (`mode=retain`) | `disconnect_connection` (`mode=retain`) | `disconnectSocialAccount`; exact tool `DISCONNECT <id> RETAIN`; local credential removal only; Present |
-| Disconnect deleting related records | DELETE same (`mode=delete`) | `disconnect_connection` (`mode=delete`) | Same service; UI `DELETE`, MCP exact scoped phrase; Present |
+| Disconnect retaining related records | DELETE `/api/connections` (`mode=retain`) | `disconnect_connection` (`mode=retain`) | REST now uses `changeConnectionDisconnect`, requiring `DISCONNECT <id> RETAIN`; MCP still confirms in its executor before calling the lower core; browser payload mismatch below. Local credential removal only |
+| Disconnect deleting related records | DELETE same (`mode=delete`) | `disconnect_connection` (`mode=delete`) | REST confirmed service requires `DISCONNECT <id> DELETE RELATED DATA`; MCP uses that phrase in its executor; browser still sends `DELETE` (open wiring gap) |
 | Read channel groups/profile labels | GET `/settings/profiles/operations`; **GET `/api/settings/profiles`** | `list_channel_profiles` | `settings/channel-profiles/service.ts`; Added REST alias (existing module HTTP handler already serves UI route) |
 | Create channel group | POST same (`action=saveGroup`) | `save_channel_group` | Same profile service; exact confirmation enforced in service; Present |
 | Edit channel group | POST same (`action=saveGroup,id`) | `save_channel_group` | Same service; exact confirmation enforced in service; Present |
@@ -117,6 +117,9 @@ explicitly listed below rather than treated as equal capabilities.
 | Change password and revoke other sessions | POST `/api/settings/account` | **`change_account_password`** | Same service; `CHANGE ACCOUNT PASSWORD`, verifies current password, compare-and-set hash, content-free audit; Added MCP/refactored REST |
 | List/page own active sessions | GET `/api/settings/account/sessions?offset=…` | **`list_account_sessions`** | Same service; current session identified, hashes removed, Root/key ceiling; Added MCP/refactored REST |
 | Revoke another active session | DELETE `/api/settings/account/sessions` | **`revoke_account_session`** | Same service; `REVOKE ACCOUNT SESSION <id>`, cannot revoke current/foreign session; Added MCP/refactored REST |
+| Read account security | GET `/api/settings/account/security` | `get_account_security` | Session-only account-security service; no bearer credential management |
+| Begin / enable / disable authenticator | POST `/api/settings/account/security/{setup,enable,disable}` | `begin_account_two_step` / `enable_account_two_step` / `disable_account_two_step` | Shared session service, current identity/confirmation and code/password checks; enrollment remains an interactive ceremony |
+| Remove own passkey | DELETE `/api/settings/account/passkeys` | `remove_account_passkey` | Shared session service, exact confirmation; verify actual browser/security outcomes separately |
 | Read/change appearance | GET/PATCH `/api/settings/appearance` | `get_appearance` / `update_appearance` | `settings/server/appearance.ts`; theme stored in existing `users.theme`, display mode cookie-only (no mode column). Same session authority, `UPDATE APPEARANCE`, transactional audit and cookies; Added. Settings picker uses this REST service |
 | Preview workspace erasure | POST `/api/settings/data` | `preview_workspace_data_deletion` | `server/data-control`; Present |
 | Export synchronous ZIP with media | GET `/api/settings/data` | **`export_workspace_archive`** | Same `server/data-control/archive.ts:exportWorkspaceArchive`; Added MCP |
@@ -199,11 +202,16 @@ owned by `modules/sharing` and `modules/integrations`. Round 2 adds a thin Setti
 
 This batch does **not** certify the existing implementations as uniformly confirmed:
 
-- Connections' existing HTTP selection route accepts `{items}` without confirmation;
-  MCP single/batch tools require exact text. `server/connection-mutations.ts` owns
-  tenant/role/audit but has no confirmation input for selections. The new batch
-  wrapper cannot secure the older route. Fix requires the connection service and
-  `/api/connections/route.ts` owners, then the Connections manager's payload/dialog.
+- `f5c21c96` merged REST single/batch selection and retain/delete disconnect
+  through confirmed module services. Batch UI/REST/MCP already share the selection
+  wrapper. Source recheck still finds single MCP `set_connection_selection` in
+  `settings/mcp.ts` confirming in its executor then calling `setConnectionSelections`;
+  `settings/connections-mcp.ts` likewise calls `disconnectSocialAccount` directly.
+  Route both through the module wrappers to make confirmation service-owned.
+  `settings/ui/connections/manager.tsx` still submits `DELETE` for delete and no
+  confirmation for retain: both now fail the stricter REST contract. Send the
+  named `DISCONNECT <id> RETAIN|DELETE RELATED DATA` confirmation from the dialog.
+  Mocked wrapper/REST tests pass; they do not prove browser/MCP callers are wired.
 - Tasks now require and validate confirmation for every write inside
   `TASK_ACTION_SCHEMA` / `performTaskAction`. MCP preserves the value; REST and
   UI send the same create/checklist/update/move/comment/delete confirmations.
@@ -226,14 +234,12 @@ This batch does **not** certify the existing implementations as uniformly confir
 
 1. `src/lib/config/registry.ts`: integrator increments `CONFIG_SCHEMA_VERSION` once
    for any unregistered Root keys in the round-specific lists below. This lane deliberately did not edit it.
-2. OAuth compatibility entry: `src/app/api/connections/[platform]/start/route.ts`
-   is outside this lane. Replace its inline implementation with a thin call to
-   `connectionStartHttp(request, (await params).platform)` from
-   `modules/settings/server/connection-start-http.ts`. All owned UI callers now
-   use `/api/oauth/connections/[platform]/start`, the same service as session MCP.
-   The old route still lacks the new confirmation/audit boundary until delegated.
-   Selection confirmations still need the connection service and old
-   `/api/connections/route.ts` owners, including removal of the fixed 250 ceiling.
+2. OAuth compatibility delegation is complete: both start routes call
+   `connectionStartHttp` in `modules/settings/server/connection-start-http.ts`.
+   REST selection now uses `changeConnectionSelections` (no old fixed 250 route
+   ceiling); REST disconnect uses `changeConnectionDisconnect`. Remaining edits
+   are the single MCP selection/disconnect and browser disconnect callers named
+   above; no provider-credential authority should expand to close these gaps.
 3. Global appearance: `src/app/layout.tsx` still initializes from cookies/Root
    defaults only. Integrator should load the authenticated user's existing
    `users.theme` when there is no valid theme cookie, through the Settings service.
