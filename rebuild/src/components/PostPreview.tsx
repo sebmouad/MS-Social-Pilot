@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { StatusChip } from '@/components/StatusChip';
 import styles from './PostPreview.module.css';
 import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
-import { ScheduleBadge } from '@/modules/publishing/ui/kit/kit';
+import { PostImage, ScheduleBadge } from '@/modules/publishing/ui/kit/kit';
 import type { KitLocale } from '@/modules/publishing/ui/kit/copy';
 
 export type PostPreviewPost = {
@@ -127,9 +127,7 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
 
     {mediaOverride !== undefined ? mediaOverride : media.length ? <div className={styles.media}>
       {media.map((item, index) => item.kind === 'image'
-        ? <a className={styles.imageLink} href={item.url} target="_blank" rel="noopener noreferrer" aria-label="Open image attachment" key={`${item.url}-${index}`}>
-            <img src={item.url} alt={item.altText?.trim() || 'Post image'} loading="lazy" />
-          </a>
+        ? <PostImage key={`${item.url}-${index}`} src={item.url} href={item.url} alt={item.altText?.trim() || 'Post image'} locale={locale} linkClassName={styles.imageLink} />
         : item.kind === 'video'
           ? <video className={styles.video} controls preload="metadata" aria-label="Video attachment" key={`${item.url}-${index}`}>
               <source src={item.url} />
