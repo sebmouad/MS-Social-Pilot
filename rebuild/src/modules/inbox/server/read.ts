@@ -100,14 +100,26 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
     WHERE ${kind === 'all' || kind === 'review'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('r')} ${narrow('review')}
       ${q ? Prisma.sql`AND (r."reviewText" ILIKE ${pattern} ESCAPE ${'\\'} OR r."reviewerName" ILIKE ${pattern} ESCAPE ${'\\'})` : Prisma.empty}`;
   const order = cursor?.direction === 'newer' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-  const [rows, counts, lastSynced] = await Promise.all([
-    prisma.$queryRaw<Key[]>(Prisma.sql`SELECT id, kind, time FROM (${activity}) AS activity ${seek(cursor)} ORDER BY time ${order}, kind COLLATE "C" ${order}, id COLLATE "C" ${order} LIMIT ${take + 1}`),
-    prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`SELECT COUNT(*) AS count FROM (${activity}) AS activity`),
+  // Search is the expensive filter: evaluate it once for both the exact total
+  // and the requested page. LEFT JOIN preserves the total beyond the last page.
+  const activityPage = q ? prisma.$queryRaw<Array<{ id: string | null; kind: Key['kind'] | null; time: Date | null; count: bigint }>>(Prisma.sql`
+    WITH activity AS MATERIALIZED (${activity}),
+      totals AS (SELECT COUNT(*) AS count FROM activity),
+      page AS (SELECT id, kind, time FROM activity ${seek(cursor)} ORDER BY time ${order}, kind COLLATE "C" ${order}, id COLLATE "C" ${order} LIMIT ${take + 1})
+    SELECT page.id, page.kind, page.time, totals.count FROM totals LEFT JOIN page ON true
+    ORDER BY page.time ${order}, page.kind COLLATE "C" ${order}, page.id COLLATE "C" ${order}`)
+    .then(result => ({ rows: result.flatMap(row => row.id !== null && row.kind !== null && row.time !== null ? [{ id: row.id, kind: row.kind, time: row.time }] : []), total: Number(result[0]?.count ?? 0) }))
+    : Promise.all([
+      prisma.$queryRaw<Key[]>(Prisma.sql`SELECT id, kind, time FROM (${activity}) AS activity ${seek(cursor)} ORDER BY time ${order}, kind COLLATE "C" ${order}, id COLLATE "C" ${order} LIMIT ${take + 1}`),
+      prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`SELECT COUNT(*) AS count FROM (${activity}) AS activity`),
+    ]).then(([rows, counts]) => ({ rows, total: Number(counts[0]?.count ?? 0) }));
+  const [{ rows, total }, lastSynced] = await Promise.all([
+    activityPage,
     inboxLastSynced(actor.workspaceId, channelIds),
   ]);
   const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
   const items = await hydrateItems(actor.workspaceId, keys);
-  return { ...base, ...cursors, items, total: Number(counts[0]?.count ?? 0), lastSynced };
+  return { ...base, ...cursors, items, total, lastSynced };
 }
 
 type ReviewRow = { id: string; targetId: string; reviewerName: string | null; rating: number | null; recommendationType: string | null; reviewText: string | null; createdTime: Date; resolvedAt: Date | null };

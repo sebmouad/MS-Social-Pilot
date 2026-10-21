@@ -66,6 +66,33 @@ describe('readHomeOverview', () => {
     expect(mocks.batch).toHaveBeenCalledTimes(1);
   });
 
+  it('batches 40 authorized channels by provider for measures and bounded post history', async () => {
+    const channels = Array.from({ length: 40 }, (_, index) => ({ id: `c${index}`, name: `Channel ${index}` }));
+    mocks.snapshot.mockResolvedValue(snapshot({ options: { channels }, selected: { channelIds: channels.map(channel => channel.id) } }));
+    mocks.queryRaw.mockResolvedValue(channels.map((channel, index) => ({ id: channel.id, provider: index % 2 ? 'p' : 'q' })));
+    const hosts = ['p', 'q'].map(() => ({
+      channelMeasuresBatch: vi.fn(async (request: { targetIds: string[] }) => request.targetIds.map(targetId => ({ targetId,
+        current: { audienceGained: null, views: 10, engagements: 2 }, previous: { audienceGained: null, views: 5, engagements: 1 }, mix: [] }))),
+      postPerformanceBatch: vi.fn(async () => []), goalMeasures: vi.fn(), destinationMeasures: vi.fn(), postPerformance: vi.fn(),
+    }));
+    mocks.host.mockImplementation(async provider => hosts[provider === 'p' ? 0 : 1]);
+    const overview = await readHomeOverview(actor, now);
+    expect(overview.performance).toMatchObject({ state: 'ready', data: { channels: 40, views: { current: 400, previous: 200 } } });
+    expect(mocks.host).toHaveBeenCalledTimes(2);
+    for (const [index, host] of hosts.entries()) {
+      expect(host.channelMeasuresBatch).toHaveBeenCalledTimes(1);
+      expect(host.postPerformanceBatch).toHaveBeenCalledTimes(1);
+      const ids = channels.filter((_, channelIndex) => channelIndex % 2 === (index === 0 ? 1 : 0)).map(channel => channel.id);
+      expect(host.channelMeasuresBatch.mock.calls[0]![0]).toMatchObject({ workspaceId: actor.workspaceId, targetIds: ids,
+        current: { to: now }, previous: { to: new Date(now.getTime() - 28 * 86_400_000) } });
+      expect(host.postPerformanceBatch).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: actor.workspaceId, targetIds: ids,
+        limit: config['home.heatmapMaxPostsPerChannel'], sort: 'publishedAt', direction: 'desc', to: now }));
+      expect(host.goalMeasures).not.toHaveBeenCalled();
+      expect(host.destinationMeasures).not.toHaveBeenCalled();
+      expect(host.postPerformance).not.toHaveBeenCalled();
+    }
+  });
+
   it('starts other cards while a performance read is pending', async () => {
     let finish!: (value: { views: number; engagements: number }) => void;
     const pending = new Promise<{ views: number; engagements: number }>(resolve => { finish = resolve; });
