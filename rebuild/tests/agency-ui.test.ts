@@ -89,3 +89,18 @@ describe('Agency sidebar filters', () => {
     expect(form.textContent).not.toMatch(/email/i);
   });
 });
+
+// The quick switch reuses the existing session-selection service rather than constructing another authority path.
+it('quick-switches only to an explicitly selected workspace from the scoped list', async () => {
+  const { WorkspaceQuickSwitch } = await import('../src/modules/agency/ui/WorkspaceQuickSwitch');
+  vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
+  await render(createElement(SidebarDockContext.Provider, { value: dock }, createElement(WorkspaceQuickSwitch, { locale: 'fr', workspaces: [{ id: 'w2', name: 'Acme' }] })));
+  expect(dock.textContent).toContain('Changer d’espace');
+  expect(dock.querySelector('.ui-button')).toBeNull();
+  await click(dock.querySelector<HTMLElement>('[role="combobox"]')!);
+  const choice = [...dock.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent === 'Acme')!;
+  await click(choice);
+  await click(dock.querySelector<HTMLElement>('button[aria-label="Ouvrir l’espace: Acme"]')!);
+  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ workspaceId: 'w2' });
+  expect(assign).toHaveBeenCalledWith('/home');
+});

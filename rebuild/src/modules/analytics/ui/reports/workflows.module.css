@@ -64,3 +64,15 @@
   .sidebarPager { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
   .sidebarPager > a { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 }
+
+.panelHeading h2 { display: flex; align-items: center; gap: .5rem; }
+.panelHeading h2 svg { color: var(--mod, var(--accent)); flex-shrink: 0; }
+.checks { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
+.form .sectionChoice { display: flex; align-items: center; gap: .65rem; min-width: 0; padding: .85rem; border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink); background: var(--surface); cursor: pointer; }
+.sectionChoice:has(input:checked) { border-color: var(--mod, var(--accent)); background: var(--mod-soft, var(--accent-soft)); }
+.sectionChoice:has(input:focus-visible) { outline: 3px solid var(--focus); }
+.sectionChoice input { flex: 0 0 auto; accent-color: var(--accent); }
+.sectionChoice svg { flex: 0 0 auto; color: var(--mod, var(--accent)); }
+.sectionChoice span { overflow-wrap: anywhere; }
+.form .frequency { max-height: none; overflow: visible; }
+.printFrame { position: fixed; width: 1px; height: 1px; inset: 0 auto auto 0; border: 0; }

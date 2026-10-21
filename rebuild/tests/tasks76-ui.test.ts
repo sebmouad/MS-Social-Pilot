@@ -90,3 +90,58 @@ it('keeps an inline title draft open after a service refusal', async () => {
   expect(input.value).toBe('A revised title'); expect(container.querySelector('.ui-inline-edit [role=alert]')).not.toBeNull();
   expect(refresh).not.toHaveBeenCalled();
 });
+
+const renderBoard = async (overrides: Partial<Parameters<typeof TaskBoard>[0]> = {}) => act(async () => {
+  root.render(createElement(TaskBoard, { tasks: [task], assignees: [], canCreate: true, limits: TASK_DEFAULT_LIMITS, today: '2026-10-18', summary: { todo: 1, doing: 0, done: 0, overdue: 0 }, view: 'board', filtered: false, ...overrides }));
+});
+const dragEvent = (element: Element, type: string) => {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'dataTransfer', { value: { setData: vi.fn(), dropEffect: 'none', effectAllowed: 'none' } });
+  element.dispatchEvent(event); return event;
+};
+describe('Task kanban polish', () => {
+  it('moves a dragged task with the same service confirmation as the visible status button', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ ok: true }) } as Response);
+    await renderBoard();
+    // Initial list mode persists inside the mounted component: remount with a new key to use Board.
+    await act(async () => root.render(createElement(TaskBoard, { key: 'kanban', tasks: [task], assignees: [], canCreate: true, limits: TASK_DEFAULT_LIMITS, today: '2026-10-18', summary: { todo: 1, doing: 0, done: 0, overdue: 0 }, view: 'board', filtered: false })));
+    const column = container.querySelector('section[aria-label="In progress"]')!;
+    await act(async () => { dragEvent(container.querySelector('[draggable="true"]')!, 'dragstart'); });
+    await act(async () => { expect(dragEvent(column, 'dragover').defaultPrevented).toBe(true); });
+    expect(column.getAttribute('data-drop-active')).toBe('true');
+    await act(async () => { dragEvent(column, 'drop'); });
+    expect(sent()).toEqual([{ action: 'task.transition', id: task.id, status: 'doing', confirmation: 'MOVE TASK task-a TO doing' }]);
+    expect(column.hasAttribute('data-drop-active')).toBe(false);
+    expect(container.textContent).toContain('Moved to In progress.');
+  });
+
+  it('ignores external drags and same-column drops, and offers no drag handle for read-only tasks', async () => {
+    await act(async () => root.render(createElement(TaskBoard, { key: 'readonly', tasks: [{ ...task, canEdit: false }], assignees: [], canCreate: false, limits: TASK_DEFAULT_LIMITS, today: '2026-10-18', summary: { todo: 1, doing: 0, done: 0, overdue: 0 }, view: 'board', filtered: false })));
+    expect(container.querySelector('[draggable="true"]')).toBeNull();
+    await act(async () => { dragEvent(container.querySelector('section[aria-label="Done"]')!, 'drop'); });
+    expect(fetch).not.toHaveBeenCalled();
+    await act(async () => root.render(createElement(TaskBoard, { key: 'editable', tasks: [task], assignees: [], canCreate: false, limits: TASK_DEFAULT_LIMITS, today: '2026-10-18', summary: { todo: 1, doing: 0, done: 0, overdue: 0 }, view: 'board', filtered: false })));
+    await act(async () => { dragEvent(container.querySelector('[draggable="true"]')!, 'dragstart'); dragEvent(container.querySelector('section[aria-label="To do"]')!, 'drop'); });
+    expect(fetch).not.toHaveBeenCalled(); expect(button('Start').tagName).toBe('BUTTON');
+  });
+
+  it('keeps the source card and status actions after a refused move', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false, json: async () => ({ error: 'This task changed. Refresh before moving.' }) } as Response);
+    await act(async () => root.render(createElement(TaskBoard, { key: 'failure', tasks: [task], assignees: [], canCreate: false, limits: TASK_DEFAULT_LIMITS, today: '2026-10-18', summary: { todo: 1, doing: 0, done: 0, overdue: 0 }, view: 'board', filtered: false })));
+    await click(button('Start'));
+    expect(container.querySelector('section[aria-label="To do"]')?.textContent).toContain(task.title);
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Refresh before moving');
+    expect(button('Start').disabled).toBe(false); expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('localizes task actions and due urgency, uses shared Avatars and discloses the scoped linked-post preview', async () => {
+    await renderBoard({ locale: 'fr', tasks: [{ ...task, assignee: { id: 'member', name: 'Sara Martin' }, dueOn: '2026-10-18', post: { id: 'post', preview: 'Launch preview', status: 'draft' } }] });
+    expect(container.textContent).toContain('Commencer'); expect(container.textContent).toContain('aujourd’hui');
+    expect(container.querySelector('.ui-avatar')?.textContent).toBe('SM');
+    const preview = container.querySelector('details')!;
+    expect(preview.querySelector('summary')?.textContent).toBe('Publication liée');
+    expect(preview.textContent).toContain('Launch preview');
+    expect(container.querySelector('.ui-badge--warning')).toBeTruthy();
+    expect(container.querySelector('button[aria-label="Modifier Review campaign"]')).toBeTruthy();
+  });
+});
