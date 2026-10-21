@@ -1,6 +1,10 @@
 # Content feeds (legacy parity wave 3)
 
-Status: SOURCE and MOCKED TESTS. No real PostgreSQL run, no browser check, no live network call, no live provider call. Production remains legacy.
+Status: **source/mock evidence plus recorded production recipe planning**.
+Updated 2026-10-21 against local HEAD `6fb0e57f`. The rebuild is in production;
+[RELEASE_GATES_PLAN.md](RELEASE_GATES_PLAN.md#production-log--2026-10-21) records
+the recipe run below. Original RSS/Atom mocked tests do not establish live checks
+of every feed kind. No fresh database, browser or provider calls in this doc pass.
 
 ## Ownership
 
@@ -73,7 +77,15 @@ HTTP routes are same-origin for writes and call the same services. MCP group `co
 
 ## WordPress recipe planner (2026-10-21)
 
-Status: SOURCE and MOCKED TESTS (mocked `mysql2` pool, in-memory ledger, fake Publishing and image ports; real `sharp` conversion). No real MariaDB, PostgreSQL, browser, live Facebook or production run. **Nothing is enabled**: the Root master switch `feeds.wordpress.enabled` defaults off and a new source starts paused. The integrator configures and dry-runs first.
+Status: **implemented with mocked tests and owner-recorded production planning**.
+Unit seams use mocked `mysql2`, an in-memory ledger and fake Publishing/image
+ports, with real `sharp` conversion. Separately, the 2026-10-21 production log
+records read-only MariaDB permission checks, image download/JPEG conversion and
+80 scheduled posts across 10 Pages (0 failed, 0 unfilled) over a two-day horizon.
+The configured production source is live; shipped Root default
+`feeds.wordpress.enabled=false` and new-source paused defaults still apply to
+new installations/sources. Planning is not proof of Facebook publication,
+first-comment delivery, every transport or browser interaction.
 
 Purpose: keep every selected Page continuously scheduled with recipes from the owner's WordPress site. Each configured time on each Page gets a **different** recipe: Facebook image and caption in the post, the canonical recipe in the first comment. Read-only access to WordPress; the application never writes to it.
 
@@ -89,7 +101,7 @@ Purpose: keep every selected Page continuously scheduled with recipes from the o
 | `server/wordpress.ts` | customer service: read, save, pause/resume, preview, run now |
 | `copy-recipes.ts`, `ui/RecipeSource.tsx` | en+fr copy and the screen section on `/publishing/feeds` |
 
-Migration `20261031140000_rebuild_wordpress_sources` (additive, SHA-256 `cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642`, pinned in `scripts/cutover-rehearsal.sh` and its test, **not applied to any database**): `wordpress_recipe_sources` (one per workspace; name, site, enabled, all-or-selected channels, JSON config overrides, last run) and `wordpress_recipe_plans` (the ledger). Both carry `workspaceId` FKs with cascade and the purge write gate, so catalog-driven export and erasure cover them.
+Migration `20261031140000_rebuild_wordpress_sources` (additive, SHA-256 `cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642`, pinned in `scripts/cutover-rehearsal.sh` and its test, **pinned source; the production recipe run is recorded separately, without an exact migration receipt in this feature report**): `wordpress_recipe_sources` (one per workspace; name, site, enabled, all-or-selected channels, JSON config overrides, last run) and `wordpress_recipe_plans` (the ledger). Both carry `workspaceId` FKs with cascade and the purge write gate, so catalog-driven export and erasure cover them.
 
 ### Data mapping (verified production facts)
 
@@ -117,7 +129,7 @@ Ledger states: `planned` (post id stored), `claimed` (unfinished; older than `cl
 
 ### Limitations and open work
 
-- Not run against MariaDB, PostgreSQL, a browser or Facebook. The raw SQL, the migration, the real `sharp`/media-storage path and the first dry run on production are unverified. `mysql2` is pinned in `rebuild/package.json` (3.24.5) but no lockfile or install was updated here.
+- The production log supersedes the original no-runtime claim for the recorded MariaDB/image/storage/planning path. Dependency lockfile integration is in `b940fad9`. Exact target migration history, export/erasure, crash recovery, real MCP/client scope, browser and Facebook publication/comment/cleanup outcomes still need their own evidence; the 80-post plan does not prove these.
 - Chronological order uses `ID` (newest first by `ID`), not `post_date_gmt`.
 - The pool of eligible recipes is finite (about 2,900 with caption and image). At 40 posts a day with a 365-day cooldown it is exhausted in about 70 days; the planner then reports unfilled slots instead of repeating.
 - A crash between creating the post and saving its ID leaves an `uncertain` row (slot consumed, no duplicate); the post itself is found in Publishing.

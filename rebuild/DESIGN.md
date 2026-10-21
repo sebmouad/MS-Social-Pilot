@@ -40,7 +40,7 @@ components:
 
 The app is a social operations desk: a stable work surface where a team can move from channel to post to response to result without losing context. Its signature is a persistent, clearly labeled module rail with route-specific controls attached to that rail. Dense data and consequential actions stay quiet and legible.
 
-The audience is workspace owners, publishers, analysts, and client reviewers. The primary job is to select connected channels, publish responsibly, respond, and understand performance. This is an authenticated product UI, not a marketing page. Current UI language is English; dates follow the workspace timezone where a route provides one. Product support for other locales is not yet established. Desktop supports long sessions; the phone layout supports checking status and acting on a short task.
+The audience is workspace owners, publishers, analysts, and client reviewers. The primary job is to select connected channels, publish responsibly, respond, and understand performance. This is an authenticated product UI, not a marketing page. Customer copy is required in English and French; dates follow the workspace timezone where a route provides one. Root-editable bilingual catalogs now cover source slices of Publishing, Inbox, Analytics, Ads, Home, Tasks and Agency. This is partial localization with unit/render evidence, not full translated-route or browser clearance. Desktop supports long sessions; the phone layout supports checking status and acting on a short task.
 
 Do not use pill-shaped control groups that wrap unpredictably, nested settings menus, decorative metrics without clear provenance, or provider setup jargon in customer screens. The design should remain recognizable across Vivid, Meta blue, Warm and Clean, in light and dark modes.
 
@@ -82,7 +82,7 @@ Small controls use 8px corners, tables and grouped controls 12px, and prominent 
 
 Buttons use brand/neutral/danger intent with solid, outline, or quiet emphasis. All enabled actions need hover, focus-visible, pressed, and busy states; disabled actions need an explanation when the reason is not obvious. Danger stays separated from frequent safe actions. Tables use native semantics, a named caption, sortable header buttons, and `aria-sort` on the header. Empty states explain the next possible action. Route loading and errors use shared states; errors offer retry.
 
-Forms use visible labels, preserve entered values on recoverable failure, and identify the field that needs correction. `FormValidation` supplies associated field-error text, native-constraint checks without browser bubbles, and first-invalid focus; domain services remain authoritative. `AutoTextarea` is the canonical multiline control: it keeps natural document height, grows/shrinks with content and width, resets with the form, and removes the resize handle. It inherits each route's existing themed field styles. Field errors use the shared danger token through `.ui-field-error`. Browser-owned selects and date pickers are currently accepted for English-only flows; authored popup styling is not promised. Dialogs for destructive or permission changes must keep focus inside, support Escape, restore focus, name the affected object, and hold their state until the server confirms success. This remains a migration target for older screen-local overlays.
+Forms use visible labels, preserve entered values on recoverable failure, and identify the field that needs correction. `FormValidation` supplies associated field-error text, native-constraint checks without browser bubbles, and first-invalid focus; domain services remain authoritative. `AutoTextarea` is the canonical multiline control: it keeps natural document height, grows/shrinks with content and width, resets with the form, and removes the resize handle. It inherits each route's existing themed field styles. Field errors use the shared danger token through `.ui-field-error`. Browser-owned selects and date pickers follow the device/browser locale; application-owned labels must have English/French copy. Authored popup styling is not promised. Dialogs for destructive or permission changes must keep focus inside, support Escape, restore focus, name the affected object, and hold their state until the server confirms success. This remains a migration target for older screen-local overlays.
 
 The line icons in `src/components/AppShell.tsx` use a consistent light stroke and retain text labels. Motion communicates a state change, not decoration; reduced-motion preferences suppress it. Product copy names what the user controls and omits internal module/provider setup details.
 
@@ -135,8 +135,9 @@ paging. Templates, schedules and history are separate semantic tables within
 one work area; each table owns narrow-screen horizontal overflow. No third
 menu, wrapping pill group or new visual identity is introduced. Shared Dialog,
 Button, FormValidation, AutoTextarea and RouteNotice retain their established
-roles. Native English selects/date controls are accepted under the existing
-platform-owned popup decision. Preparation offers CSV and a downloaded printable
+roles. Native selects/date controls follow the browser-owned popup decision;
+application labels use the selected English/French catalog. Browser-owned
+control text can follow the device locale. Preparation offers CSV and a downloaded printable
 page, with explicit UTC periods and honest preparation/delivery status.
 
 ## Publishing format controls (batch85)
@@ -199,3 +200,24 @@ Group shortcuts live beside the current channel controls in the existing sidebar
 and composer. Profile labels are text beside channel names, independent of post
 labels. English/French strings follow request language. Browser/theme/viewport
 verification remains open; DOM interaction evidence is in CHANNEL_PROFILES.md.
+
+## Current language and theme evidence — 2026-10-21
+
+Source checked at `6fb0e57f`: Publishing, Inbox, Analytics, Ads, Home, Tasks and
+Agency have module-owned Root-editable English/French catalogs (merged through
+`38ab34f4`). Schema-checked readers use `configOrDefault` (`fb42b056`): missing,
+unreadable or invalid stored catalogs fall back to the registry default validated
+by the same schema. `configValueOrDefault` only checks broad type/array shape;
+it is not equivalent to full schema validation. These fallback mechanisms do
+not establish that all customer strings use a catalog.
+
+`tests/ui-copy-coverage.test.ts` checks literal `t(...)` keys in Agency, Tasks and
+Analytics Reports screens and nonempty English/French entries in those catalogs.
+Other module copy tests have their own scopes; this test does not scan every
+module, dynamic metric label, error, browser control or downloaded report.
+Remaining Root/service copy, AI prompt language and other literal gaps are in
+[CONFIG_LITERAL_AUDIT.md](docs/CONFIG_LITERAL_AUDIT.md). Current palettes are
+Vivid/Meta blue/Warm/Clean in light/dark; older Grove/Coast/Clay/Nightfall browser
+results retain only their original dated scope. Verify current language, keyboard,
+failure recovery, desktop/phone and theme states with synthetic local data;
+production planning/provider results cannot substitute for that UI evidence.

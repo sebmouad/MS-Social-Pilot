@@ -1,11 +1,21 @@
 # Release gates runbook
 
-Status: **plan, nothing in it has been run.** Written 2026-10-20 on branch
-`claude/release-plan` from the current tree. It orders the remaining release gates
-of [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) section 10 (gates 5-8, plus
-the data half of gate 6). It does not change the contract, [CUTOVER.md](CUTOVER.md)
-or the goal, and it authorizes nothing by itself. Production stays on the legacy
-app; `socialpilot-deploy` still deploys legacy.
+Status: **cutover recorded; full release gates remain incomplete.** Updated
+2026-10-21 against local HEAD `6fb0e57f`. The owner-recorded cutover on
+2026-10-20 22:09 CEST put the rebuild at `https://social.newsgeet.com`, with
+legacy web/worker disabled. Releases use `rebuild/scripts/prod-deploy.sh`;
+legacy `socialpilot-deploy` is guarded. See the dated results below and
+[CUTOVER.md](CUTOVER.md). This documentation pass made no production calls.
+
+Sections A–C retain the original 2026-10-20 pre-cutover plan and assumptions as
+historical procedures, not current host state or instructions to replay cutover.
+The results log records backup, migration, health, sign-in, provider reads and
+recipe planning outcomes; it does not establish every contract gate passed.
+Mail/live delivery, complete Facebook write/MCP verification and cleanup, current
+browser/authorization coverage, exact-release recovery and a post-cutover rollback
+drill remain evidence gaps. Revalidate deployed SHA, migration state and ownership
+before a later release; historical migration counts/ports are not current policy.
+The binding [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) is unchanged.
 
 Legend: **[OWNER]** needs the owner (credentials, host, approval, a decision).
 **[AGENT]** can be done by a coding session once its inputs exist. **[GATE]** a
@@ -15,7 +25,7 @@ Order: A (live Facebook) and B (migration/rollback rehearsal) are independent an
 can run in parallel; C (cutover) needs both to pass, plus gates 1-4 of the contract
 (parity inventory, functional, authorization, browser), which are tracked elsewhere.
 
-## Facts this plan relies on (revalidate before acting)
+## Original pre-cutover assumptions (historical; superseded where results differ)
 
 - Rebuild listens on 3200; legacy on 3100 behind OpenLiteSpeed. No rebuild systemd
   units or proxy switch are checked in. `scripts/deploy/rebuild-deploy.sh` and
@@ -360,7 +370,7 @@ Rule: exactly one process family may publish or sync at any time.
 
 ### C3. `socialpilot-deploy` rewiring  **[AGENT after Gate B, OWNER approval]**
 
-Today `socialpilot-deploy` (installed from `scripts/deploy/server-deploy.sh`) and
+At plan-writing time, `socialpilot-deploy` (installed from `scripts/deploy/server-deploy.sh`) and
 `deploy.sh` deploy the legacy package; the `rebuild-deploy.sh` and `rebuild-rollback.sh`
 guards exit 78. Rewiring work, done only after the host files exist and are reviewed:
 
@@ -386,7 +396,11 @@ since cutover and decide preservation; (6) database restore only by separate dec
 
 ### C5. Go / no-go checklist  **[OWNER decides]**
 
-All must be yes; any no is no-go.
+Original pre-cutover acceptance checklist: all were required for go. Cutover
+occurred as recorded below; that event does not retrospectively prove these
+checks passed. Continue tracking unresolved contract gates on the actual release.
+The chosen deployment path is now `rebuild/scripts/prod-deploy.sh`, with legacy
+command guarded; the C3 rewiring proposal is historical.
 
 1. Parity inventory complete and reviewed; no inert controls, no advertised-but-unverified
    capability (native formats and Ads writes off unless Gate A rows passed).
@@ -490,3 +504,22 @@ each gate is actually run; never claim a gate from this plan alone.
 - **Deploy script bug:** generated ownership statements lacked terminators, so multi-table releases left new tables owned by `postgres` (permission denied). Fixed in `prod-deploy.sh`/`prod-cutover.sh`; ownership applied; 0 non-app-owned tables.
 - **WordPress recipe automation:** read-only MariaDB account `msp_wp_reader` (SELECT on `newsgeet.wp_posts`/`wp_postmeta` only; writes and other tables denied, verified) stored as Root secret `feeds.wordpress.databaseUrl`. Mapping: FB image `_msrwa_facebook_generated` → attachment `_wp_attached_file` → WebP downloaded and converted to JPEG (verified 1024×1280, 330 KB); caption `_msrwa_facebook_caption`; first comment = canonical recipe `_msrwa_recipe` via template with link; skips `fb_shared_at`. The WP plugin MS-FB-Posts does not post to Facebook (verified), so no double posting. Source "Recettes newsgeet" on all 10 Pages, slots 07:00/11:00/15:00/17:00 Europe/Paris, 2-day horizon: planner run created 80 scheduled posts (0 failed, 0 unfilled). Eligible pool ≈2,900 recipes (~70 days at 40/day with 365-day per-Page cooldown) plus new site recipes.
 - **Full suite:** 5,112 passed / 241 skipped. 51/51 pages healthy in production.
+
+### Integrated reliability and parity follow-up — 2026-10-21 (source/unit)
+
+Local commits `f5c21c96` and `e0584777` add Inbox bulk REST and confirmed Settings
+services, plus worker signal/drain handling and Facebook Inbox fetch-then-write.
+Provider Inbox reads now occur outside the workspace transaction/resource lock;
+write-time access/binding checks and suppression guards remain. Worker shutdown
+stops claims, drains within Root `sync.workerShutdownGraceMs`, then aborts and
+releases abandoned leases using `sync.workerDrainPollMs`. These supersede the
+source defects noted in the 23:00–23:30 entry, which remains a dated observation.
+No fresh production restart timing, systemd timeout compatibility or database
+contention measurement is established here. Settings callers still need wiring
+follow-ups listed in [MCP_PARITY.md](MCP_PARITY.md).
+
+Copy catalogs merged through `38ab34f4` (registry 105); `fb42b056` adds validated
+registry-default fallback for schema-checked catalogs/display policies. Registry
+106 includes shutdown grace. These are source changes, not proof that all current
+commits are deployed or every customer string is translated. The recipe log above
+records 80 scheduled posts, not 80 confirmed Facebook publications or comments.
