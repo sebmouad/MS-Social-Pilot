@@ -129,7 +129,7 @@ export const inboxServiceCopy = {
   },
   "service33": {
     "en": "The comment is no longer stored, so this action cannot be undone here.",
-    "fr": "Le commentaire n’est plus enregistré : cette action ne peut pas être annulée ici."
+    "fr": "Le commentaire n’est plus enregistré : cette action ne peut pas être annulée ici."
   },
   "service34": {
     "en": "The inbox digest channel limit needs review.",
@@ -205,7 +205,7 @@ export const inboxServiceCopy = {
   },
   "confirmationRequired": {
     "en": "Confirmation required: {expected}",
-    "fr": "Confirmation requise : {expected}"
+    "fr": "Confirmation requise : {expected}"
   },
   "ruleLimit": {
     "en": "This workspace already has the maximum of {limit} moderation rules.",

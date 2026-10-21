@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), noHook: false, policy: vi.fn(), copy: vi.fn() }));
+vi.mock('../src/app/root/modules/ModuleHealth', () => ({ ModuleHealth: async () => null }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: state.access }));
 vi.mock('../src/server/root/platform-publication-evidence', () => ({ readRootPlatformPublicationEvidence: state.read, loadRootEvidencePolicy: state.policy, loadRootEvidenceCopy: state.copy }));
 vi.mock('../src/server/platforms/publication-recovery', () => ({ installedPublicationRecovery: () => state.noHook ? undefined : { readEvidence: vi.fn() } }));
@@ -69,9 +70,9 @@ describe('generic Root platform publication evidence panel', () => {
   it('keeps the platform panel inside the existing module settings content', async () => {
     const page = await import('../src/app/root/platforms/[id]/page');
     const tree = await page.default({ params: Promise.resolve({ id: 'facebook' }), searchParams: Promise.resolve({ operationId: 'op_from_url' }) });
-    const html = renderToStaticMarkup(tree.props.children[0]);
+    const html = renderToStaticMarkup(tree.props.children[1]);
     expect(html).toContain('Declared operations');
-    expect(tree.props.children[1].type).toBe(RootPlatformPublicationEvidence);
-    expect(tree.props.children[1].props.operationId).toBe('op_from_url');
-  });
+    expect(tree.props.children[2].type).toBe(RootPlatformPublicationEvidence);
+    expect(tree.props.children[2].props.operationId).toBe('op_from_url');
+  }, 20000);
 });

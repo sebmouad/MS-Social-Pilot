@@ -16,7 +16,7 @@ export const agencyExportCopy = {
     available: 'Available', suspended: 'Suspended', deleting: 'Data deletion in progress', owner: 'Owner', admin: 'Admin', yes: 'Yes', no: 'No',
   },
   fr: {
-    title: 'Exporter la vue des espaces', help: 'Exporte la recherche, le tri et le filtre d’attention appliqués. La limite d’espaces reste applicable. Les totaux ignorent le filtre d’attention ; la couverture et les valeurs indisponibles sont incluses. Cette vue interne d’agence n’est pas un rapport client public.',
+    title: 'Exporter la vue des espaces', help: 'Exporte la recherche, le tri et le filtre d’attention appliqués. La limite d’espaces reste applicable. Les totaux ignorent le filtre d’attention ; la couverture et les valeurs indisponibles sont incluses. Cette vue interne d’agence n’est pas un rapport client public.',
     csv: 'Exporter en CSV', json: 'Exporter en JSON', pending: 'Préparation…', prepared: 'Export préparé. Consultez vos téléchargements.',
     failed: 'Impossible de préparer l’export. Vérifiez vos accès et vos filtres, puis réessayez.', unavailable: 'Non disponible',
     notes: 'Périmètre', workspaceId: 'Identifiant de l’espace', record: 'Enregistrement', workspace: 'Espace', measure: 'Mesure', value: 'Valeur', of: 'Sur',

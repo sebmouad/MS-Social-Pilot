@@ -9,7 +9,13 @@ import type { InboxLocale } from './copy';
 
 
 
-export function ThreadTools({ kind, id, canWrite, canReply, allowed, headline, detail, locale = 'en' }: { kind: 'message' | 'comment'; id: string; canWrite: boolean; canReply: boolean; allowed: boolean; headline: string; detail?: string; locale?: InboxLocale }) {
+type ThreadToolsProps = { kind: 'message' | 'comment'; id: string; canWrite: boolean; canReply: boolean; allowed: boolean; headline: string; detail?: string; locale?: InboxLocale };
+
+export function ThreadTools(props: ThreadToolsProps) {
+  return <ThreadToolsState key={`${props.kind}:${props.id}`} {...props} />;
+}
+
+function ThreadToolsState({ kind, id, canWrite, canReply, allowed, headline, detail, locale = 'en' }: ThreadToolsProps) {
   const copy = useInboxCatalog('threadToolsCopy')[locale];
   const [draft, setDraft] = useState('');
   const [confirm, confirmDialog] = useConfirm({ title: copy.replaceTitle, cancel: copy.keep, confirm: copy.replace, danger: false });

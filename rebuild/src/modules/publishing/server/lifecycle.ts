@@ -31,6 +31,7 @@ import { preparePublicationLinks } from './short-links';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import { recordPostVersion, loadVersionRetention } from '@/modules/publishing/collaboration/server/versions';
 import { cancelHeldDestinations, rescheduleHeldDestinations } from '@/modules/publishing/server/remote-hold';
+import { isWaitingToReschedule } from '../schedule-state';
 import { parseScheduleMode, remoteHoldDecision, type RemoteFallbackReason, type ScheduleMode } from '@/modules/publishing/remote-scheduling';
 import { anyRemote, clearScheduleModes, destinationMode, resolveScheduleModes, storeScheduleModes, summaryMode, type DestinationScheduleModes } from '@/modules/publishing/server/schedule-modes';
 
@@ -338,7 +339,7 @@ export async function reschedulePostToInstant(actor: PublishingActor, postId: st
     await publishingTransaction(signal, async tx => {
       const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, message: true, firstComment: true, format: true, link: true, media: true, targets: { select: { status: true, formatId: true, remotePostId: true, target: { select: { socialAccount: { select: { provider: true } } } } } } } });
       if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new PublishingOperationError('conflict', 'thisPostCannotBeRescheduled', {}, errorText);
-      if (post.status !== 'scheduled' || post.targets.some(target => target.status === 'scheduled_remote' ? false : target.status !== 'pending' || target.remotePostId)) throw new PublishingOperationError('conflict', 'onlyPostsThatAreStillWaitingToPublishCan', {}, errorText);
+      if (!isWaitingToReschedule(post)) throw new PublishingOperationError('conflict', 'onlyPostsThatAreStillWaitingToPublishCan', {}, errorText);
       await assertStoredPostMediaCompatible(actor.workspaceId, post);
       await recordPostVersion(tx, post.id, actor.userId, retention);
       const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'scheduled' }, data: { scheduledAt, updatedAt: new Date() } });

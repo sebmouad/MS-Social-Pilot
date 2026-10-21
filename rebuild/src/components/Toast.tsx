@@ -35,7 +35,7 @@ function ToastView({ toast, dismissLabel, onDismiss }: { toast: ToastItem; dismi
     return () => clearTimeout(timer);
   }, [duration, paused, onDismiss]);
   const Icon = ICONS[toast.tone];
-  return <li className={`ui-toast ui-toast--${toast.tone}`} role={toast.tone === "error" ? "alert" : "status"}
+  return <li className={`ui-toast ui-toast--${toast.tone}`} role={toast.tone === "error" ? "alert" : "status"} aria-live={toast.tone === "error" ? "assertive" : "polite"} aria-atomic="true"
     onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
     <Icon size={20} stroke={1.75} aria-hidden="true" className="ui-toast__icon" />
     <div className="ui-toast__text"><strong>{toast.title}</strong>{toast.description && <p>{toast.description}</p>}</div>

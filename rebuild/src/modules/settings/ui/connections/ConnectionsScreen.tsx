@@ -12,8 +12,10 @@ import { ConnectionManager } from './manager';
 import { connectablePlatforms, platformGrantHealth } from '@/server/platforms/registry';
 import { summarizeConnectionHealth, connectionHealthText, type ConnectionHealthCopyKey } from '@/lib/connection-health';
 import { ConnectionRowMenu } from './row-menu';
-import { DataTable, EmptyState } from '@/components';
-import { IconPlugConnected } from '@tabler/icons-react';
+import { Avatar, DataTable, EmptyState } from '@/components';
+import { GrantChips } from './GrantChips';
+import tableStyles from './connections.module.css';
+import { IconPlugConnected, IconVersions } from '@tabler/icons-react';
 import { platformModule } from '@/platforms';
 import { connectionState } from '@/lib/connection-status';
 import { runtimeConfig } from '@/server/config/store';
@@ -44,7 +46,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const notice = (key: string, tone: 'status' | 'alert', message: string) => params.notice === key && <p className={styles['settings-note']} role={tone}>{message}</p>;
 
   return <PageFrame module="settings"><SettingsPage copy={uiCopy} active="settings/connections" title={t.title} description={t.description} locale={locale}>
-    <a href="/settings/profiles">{uiCopy.profiles[locale].title}</a>
+    <a className={tableStyles.profilesLink} href="/settings/profiles"><IconVersions size={16} stroke={1.9} aria-hidden="true" />{uiCopy.profiles[locale].title}</a>
     <ConnectionManager locale={locale} statusLabels={statusLabels} sources={accounts} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
     {notice('connected_partial', 'status', t.connectedPartial)}
     {notice('connected', 'status', t.connected)}
@@ -60,10 +62,10 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
       {[...new Set(accounts.map(account => account.provider))].map(provider => <section key={provider} aria-label={providerName(provider)}>
         <h3>{providerName(provider)}</h3>
         <DataTable caption={`${t.socialPanel} · ${providerName(provider)}`} rows={accounts.filter(account => account.provider === provider)} rowKey={account => account.id} emptyMessage={t.noSocial} columns={[
-          { key: 'account', label: t.account, render: account => <><span className={styles['connection-mark']} aria-hidden="true">{account.name.slice(0, 1)}</span><strong>{account.name}</strong><span className={styles['settings-table__secondary']}>{fill(t.added, { date: dayFormat.format(account.createdAt) })}</span></> },
+          { key: 'account', label: t.account, render: account => <div className={tableStyles.account}><Avatar name={account.name} size="md" decorative /><div className={tableStyles.accountText}><strong>{account.name}</strong><span className={tableStyles.accountMeta}>{fill(t.added, { date: dayFormat.format(account.createdAt) })}</span></div></div> },
           { key: 'channels', label: t.channels, render: account => account.targets.length ? <><span>{fill(t.selectedOf, { enabled: account.targets.filter(target => target.enabled).length, total: account.targets.length })}</span><div className={styles['settings-inline-list']}>{account.targets.map(target => <div key={target.id} className={styles['settings-chip']} data-disabled={!target.enabled}>{target.name || target.type}{!target.enabled && t.notSelectedSuffix}</div>)}</div></> : t.noChannels },
           { key: 'status', label: t.status, render: account => { const health = healthById.get(account.id)!; return <><Status tone={health.token === 'valid' ? 'good' : 'warning'}>{text(`token.${health.token}`)}</Status><span className={styles['settings-table__secondary']}>{account.tokenExpiresAt ? text('token.expiresOn', { date: dateFormat.format(account.tokenExpiresAt) }) : text('token.noExpiry')}</span>
-            {health.grants.length > 0 && <ul className={styles['settings-health-list']} aria-label={text('permissions')}>{health.grants.map(group => <li key={group.id}>{group.label}: {text(group.state)}</li>)}</ul>}
+            <GrantChips grants={health.grants} locale={locale} label={text('permissions')} />
             {health.missing.length > 0 && <span className={styles['settings-table__secondary']}>{text('missingSummary', { labels: health.missing.map(group => group.label).join(', ') })}</span>}
             {health.grants.length > 0 && health.grants.every(group => group.state === 'unknown') && <span className={styles['settings-table__secondary']}>{text('unknownSummary')}</span>}</>; } },
           ...(canManage ? [{ key: 'actions', label: t.actions, render: (account: (typeof accounts)[number]) => <ConnectionRowMenu id={account.id} name={account.name} platformId={account.provider} manageLabel={t.manageSelection} disconnectLabel={t.disconnect} actionsLabel={t.actions} reconnectLabel={text('reconnect')} busyLabel={text('reconnecting')} failedLabel={text('reconnectFailed')} /> }] : []),

@@ -1,5 +1,6 @@
 import { configOrDefault } from '@/server/config/config-or-default';
 import { reschedulePolicySchema } from '@/lib/config/reschedule-policy';
+import { IconCalendarMonth } from '@tabler/icons-react';
 import { pageLocale } from '../kit/locale';
 import { loadPublishingCopy } from '../../server/customer-copy';
 import { PublishingCopyProvider } from '../kit/CopyProvider';
@@ -18,6 +19,7 @@ import { runtimeConfig } from '@/server/config/store';
 import type { BoardDay, BoardPost } from "./types";
 import styles from "./calendar.module.css";
 import { postContentSummary } from '@/modules/publishing/content-summary';
+import { isWaitingToReschedule } from '../../schedule-state';
 
 type Params = { view?: string; date?: string; month?: string; channel?: string; status?: string; origin?: string };
 const STATUSES = ["draft", "pending_approval", "rejected", "scheduled", "publishing", "published", "partially_failed", "failed", "cancelled"] as const;
@@ -73,7 +75,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     const wallTime = instantToWall(when, timeZone);
     const key = workspaceDateKey(when, timeZone);
     const channelsOfPost = [...new Map(post.targets.map(({ target }) => [target.id, { id: target.id, name: target.name, ...channelBadgeInfo(target.socialAccount?.provider) }])).values()];
-    const movable = canEditCalendar && post.status === "scheduled" && post.targets.length > 0 && post.targets.every(target => target.status === "pending" && !target.remotePostId)
+    const movable = canEditCalendar && post.targets.length > 0 && isWaitingToReschedule(post)
       && (MANAGERS.has(viewer.membership.role) || post.authorId === viewer.user.id);
     byDay.set(key, [...(byDay.get(key) ?? []), {
       id: post.id, text: postContentSummary(post.message, post.media, post.link, copy).slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable,
@@ -86,7 +88,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         id: post.id, authorId: post.authorId, message: post.message, firstComment: post.firstComment, link: post.link, media: post.media,
         status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, createdAt: post.createdAt,
         displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone),
-        targets: post.targets.map(({ status, remotePostId, remoteUrl, target }) => ({ status, remotePostId, remoteUrl, target })),
+        targets: post.targets.map(({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target }) => ({ id, status, remotePostId, remoteUrl, firstCommentId, firstCommentAt, firstCommentError, target })),
       },
     }]);
   }
@@ -119,7 +121,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   return <PublishingCopyProvider catalog={catalog} locale={locale}>
     <PageHeading title={copy.calendarTitle} description={copy.calendarDescription} />
     {channelUnavailable ? <p role="status">{copy.unavailableChannel}</p> : null}
-    <h2 className={styles.range} aria-live="polite">{rangeLabel}</h2>
+    <div className={styles.rangeBar}><span className={styles.rangeChip} aria-hidden="true"><IconCalendarMonth size={18} stroke={2} /></span><h2 className={styles.range} aria-live="polite">{rangeLabel}</h2></div>
     <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime}
       navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} />
   </PublishingCopyProvider>;

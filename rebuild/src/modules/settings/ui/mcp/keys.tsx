@@ -39,10 +39,23 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
     setWriteFeatures(current => checked ? [...new Set([...current, id])] : current.filter(item => item !== id));
     if (checked) setReadFeatures(current => [...new Set([...current, id])]);
   };
+  const readable = features.filter(feature => feature.canRead).map(feature => feature.id);
+  const writable = features.filter(feature => feature.canWrite).map(feature => feature.id);
+  const applyPreset = (kind: 'read' | 'readWrite' | 'none') => {
+    setConsent(false); validation.clear('features');
+    setReadFeatures(kind === 'none' ? [] : readable);
+    setWriteFeatures(kind === 'readWrite' ? writable : []);
+  };
+  const toggleModule = (module: string, on: boolean) => {
+    setConsent(false); validation.clear('features');
+    const inModule = features.filter(feature => feature.module === module);
+    setReadFeatures(current => on ? [...new Set([...current, ...inModule.filter(f => f.canRead).map(f => f.id)])] : current.filter(id => !inModule.some(f => f.id === id)));
+    if (!on) setWriteFeatures(current => current.filter(id => !inModule.some(f => f.id === id)));
+  };
   async function createKey(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if(inFlight.current)return;
-    if (!validation.validate(event.currentTarget, { ...(!name.trim() ? { name: t.nameRequired } : {}), ...(!readFeatures.length ? { features: t.featureRequired } : {}) })) return;
+    if (!validation.validate(event.currentTarget, { ...(!name.trim() ? { name: t.nameRequired } : {}), ...(!readFeatures.length ? { features: t.featureRequired } : {}), ...(!Number.isInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > maxLifetimeDays ? { expiresInDays: fill(t.lifetimeRange, { max: maxLifetimeDays }) } : {}) })) return;
     if(!consent||(!allResources&&resourcesTruncated))return;
     inFlight.current=true;setBusy(true); setNotice(''); setNewToken(''); setTokenVisible(false); setCopyNotice('');
     try {
@@ -80,10 +93,17 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays, defaultL
     <form method="post" noValidate className={styles['mcp-key-form']} onSubmit={createKey}>
       <div className={styles['mcp-key-fields']}>
         <label>{t.keyName}<input name="name" required maxLength={100} value={name} onChange={event => { setName(event.currentTarget.value); setConsent(false); validation.clear('name'); }} autoComplete="off" placeholder={t.namePlaceholder} disabled={busy} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /></label>
-        <label>{t.lifetime}<input name="expiresInDays" type="number" min={1} max={maxLifetimeDays} value={expiresInDays} onChange={event => { setExpiresInDays(Number(event.currentTarget.value));setConsent(false); validation.clear('expiresInDays'); }} disabled={busy} {...validation.fieldProps('expiresInDays')} /><FieldError {...validation.errorProps('expiresInDays')} /></label>
+        <label>{t.lifetime}<input name="expiresInDays" type="number" min={1} max={maxLifetimeDays} value={expiresInDays} onChange={event => { setExpiresInDays(Number(event.currentTarget.value));setConsent(false); validation.clear('expiresInDays'); }} disabled={busy} {...validation.fieldProps('expiresInDays')} /><small className={styles['mcp-key-hint']}>{fill(t.lifetimeHint, { max: maxLifetimeDays })}</small><FieldError {...validation.errorProps('expiresInDays')} /></label>
       </div>
       <fieldset aria-invalid={validation.errors.features ? true : undefined}><legend>{t.allowedFeatures}</legend>
+        <div className={styles['mcp-key-presets']} role="group" aria-label={t.presets}>
+          <Button type="button" disabled={busy} onClick={() => applyPreset('read')}>{t.presetRead}</Button>
+          <Button type="button" disabled={busy} onClick={() => applyPreset('readWrite')}>{t.presetReadWrite}</Button>
+          <Button type="button" disabled={busy || !readFeatures.length} onClick={() => applyPreset('none')}>{t.presetClear}</Button>
+          <span className={styles['mcp-key-summary']} role="status">{fill(t.summary, { read: readFeatures.length, write: writeFeatures.length })}</span>
+        </div>
         <div className={styles['mcp-key-feature-grid']}>{[...new Set(features.map(feature=>feature.module))].map(module=><fieldset className={styles['mcp-key-feature-group']} key={module}><legend>{features.find(feature=>feature.module===module)?.moduleLabel??module}</legend>
+        <label className={styles['mcp-key-module-all']}><input type="checkbox" aria-label={fill(t.moduleAllLabel, { module: features.find(feature=>feature.module===module)?.moduleLabel??module })} checked={features.some(f=>f.module===module&&f.canRead)&&features.filter(f=>f.module===module&&f.canRead).every(f=>readFeatures.includes(f.id))} disabled={busy} onChange={event=>toggleModule(module,event.currentTarget.checked)} /> {t.moduleAll}</label>
         {features.filter(feature=>feature.module===module).map(feature => <div key={feature.id} className={styles['mcp-key-feature']}>
           <span>{feature.name} </span>
           <label><input aria-label={fill(t.readLabel, { module: feature.moduleLabel??feature.module, name: feature.name })} type="checkbox" name={feature.canRead ? 'features' : undefined} value={feature.id} checked={readFeatures.includes(feature.id)} onChange={event => { toggleRead(feature.id, event.currentTarget.checked); validation.clear('features'); }} disabled={!feature.canRead || busy} {...(feature.canRead && !features.slice(0, features.indexOf(feature)).some(item => item.canRead) ? validation.fieldProps('features') : {})} /> {t.read}</label>

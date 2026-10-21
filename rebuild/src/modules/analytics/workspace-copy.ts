@@ -1,7 +1,7 @@
 export const workspaceCopyDefaults = {
   "Differences are shown only where both sides measure the same thing with the same coverage. Reach and breakdowns are never subtracted, and missing data is unknown, not zero.": {
     "en": "Differences are shown only where both sides measure the same thing with the same coverage. Reach and breakdowns are never subtracted, and missing data is unknown, not zero.",
-    "fr": "Les différences sont affichées uniquement lorsque les deux côtés mesurent la même chose avec la même couverture. La portée et les répartitions ne sont jamais soustraites ; les données manquantes sont inconnues, jamais nulles."
+    "fr": "Les différences sont affichées uniquement lorsque les deux côtés mesurent la même chose avec la même couverture. La portée et les répartitions ne sont jamais soustraites ; les données manquantes sont inconnues, jamais nulles."
   },
   "Choose what to compare": {
     "en": "Choose what to compare",
@@ -125,7 +125,7 @@ export const workspaceCopyDefaults = {
   },
   "Keep the measures you watch most in one place. Pins are personal; values come from stored analytics for the resources you can access.": {
     "en": "Keep the measures you watch most in one place. Pins are personal; values come from stored analytics for the resources you can access.",
-    "fr": "Regroupez vos mesures favorites. Vos épingles sont personnelles ; les valeurs proviennent des statistiques enregistrées des ressources accessibles."
+    "fr": "Regroupez vos mesures favorites. Vos épingles sont personnelles ; les valeurs proviennent des statistiques enregistrées des ressources accessibles."
   },
   "Pinned metrics could not be loaded": {
     "en": "Pinned metrics could not be loaded",
@@ -205,7 +205,7 @@ export const workspaceCopyDefaults = {
   },
   "Coverage:": {
     "en": "Coverage:",
-    "fr": "Couverture :"
+    "fr": "Couverture :"
   },
   "selected resources. Missing measurements are unknown, not zero.": {
     "en": "selected resources. Missing measurements are unknown, not zero.",
@@ -253,7 +253,7 @@ export const workspaceCopyDefaults = {
   },
   "Comparison range:": {
     "en": "Comparison range:",
-    "fr": "Période de comparaison :"
+    "fr": "Période de comparaison :"
   },
   "to": {
     "en": "to",
@@ -505,7 +505,7 @@ export const workspaceCopyDefaults = {
   },
   "Not available for your current channels, so its value is unknown. You can remove it.": {
     "en": "Not available for your current channels, so its value is unknown. You can remove it.",
-    "fr": "Indisponible pour vos canaux actuels ; sa valeur est inconnue. Vous pouvez la retirer."
+    "fr": "Indisponible pour vos canaux actuels ; sa valeur est inconnue. Vous pouvez la retirer."
   },
   "Removing…": {
     "en": "Removing…",
@@ -609,11 +609,11 @@ export const workspaceCopyDefaults = {
   },
   "One side has no stored measurement, so the difference is unknown.": {
     "en": "One side has no stored measurement, so the difference is unknown.",
-    "fr": "Un côté ne contient aucune mesure enregistrée ; la différence est inconnue."
+    "fr": "Un côté ne contient aucune mesure enregistrée ; la différence est inconnue."
   },
   "Different channels or ad accounts reported on each side, so no difference is calculated.": {
     "en": "Different channels or ad accounts reported on each side, so no difference is calculated.",
-    "fr": "Les canaux ou comptes renseignés diffèrent entre les deux côtés ; aucune différence n’est calculée."
+    "fr": "Les canaux ou comptes renseignés diffèrent entre les deux côtés ; aucune différence n’est calculée."
   },
   "This measure cannot be subtracted across the two sides (for example reach, breakdowns or incomplete coverage).": {
     "en": "This measure cannot be subtracted across the two sides (for example reach, breakdowns or incomplete coverage).",
@@ -637,15 +637,15 @@ export const workspaceCopyDefaults = {
   },
   "Some selected resources have no value, so the difference is unknown.": {
     "en": "Some selected resources have no value, so the difference is unknown.",
-    "fr": "Certaines ressources sélectionnées n’ont aucune valeur ; la différence est inconnue."
+    "fr": "Certaines ressources sélectionnées n’ont aucune valeur ; la différence est inconnue."
   },
   "Audience adds the latest valid figure for each covered channel; it is not a count of unique people across networks.": {
     "en": "Audience adds the latest valid figure for each covered channel; it is not a count of unique people across networks.",
-    "fr": "L’audience additionne la dernière valeur valide de chaque canal couvert ; elle ne compte pas les personnes uniques entre réseaux."
+    "fr": "L’audience additionne la dernière valeur valide de chaque canal couvert ; elle ne compte pas les personnes uniques entre réseaux."
   },
   "No difference is shown because of this measure's aggregation caveat: {0}": {
     "en": "No difference is shown because of this measure's aggregation caveat: {0}",
-    "fr": "Aucune différence n’est affichée en raison de cette limite d’agrégation : {0}"
+    "fr": "Aucune différence n’est affichée en raison de cette limite d’agrégation : {0}"
   },
   "Never": {
     "en": "Never",

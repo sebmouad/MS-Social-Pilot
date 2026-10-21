@@ -7,8 +7,10 @@ import type { ReactNode } from 'react';
 import { AppShell } from '@/components';
 import { requireRootPage } from '@/server/config/access';
 import { rootManifest } from '@/modules/root/manifest';
+import { RootPageGlyph } from '../../app/root/root-nav-icons';
 import './root-directory.css';
 import '../../app/root/root-control-center.css';
+import '../../app/root/root-nav.css';
 import '../../app/root/config/root-config.css';
 
 export async function RootFrame({ active, children, controls }: { active: string; children: ReactNode; controls?: ReactNode }) {
@@ -18,7 +20,7 @@ export async function RootFrame({ active, children, controls }: { active: string
   const sidebar = <nav className="root-directory-nav" aria-label="Root sections">
     {rootManifest.sections.map(section => <details key={section.title} open={section.pages.some(page => active === page.href)}>
       <summary>{section.title}</summary>
-      {section.pages.map(page => <a key={page.href} href={page.href} aria-current={active === page.href ? 'page' : undefined} className={active === page.href ? 'is-active' : undefined}>{page.title}</a>)}
+      {section.pages.map(page => <a key={page.href} href={page.href} aria-current={active === page.href ? 'page' : undefined} className={active === page.href ? 'is-active' : undefined}><span className="root-nav-glyph"><RootPageGlyph href={page.href} /></span>{page.title}</a>)}
     </details>)}
   </nav>;
   return <RootInterfaceProvider copy={catalog[locale]}><AppShell activeModule="settings" enabledModules={[]} enabledFeatures={[]} rootAccess installationMode userName={actor.name} workspaceName="Installation" sidebar={<>{sidebar}{controls}</>}>

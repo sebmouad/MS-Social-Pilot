@@ -2,7 +2,7 @@ import { loadOverviewCopy } from '../server/overview-copy';
 import { overviewCopyDefaults, overviewText, type OverviewCopy } from '../overview-copy';
 import { AnalyticsFilters, MetricPicker } from './AnalyticsFilters';
 import { EmptyState } from '@/components/EmptyState';
-import { IconAlertTriangle, IconCalendarEvent, IconChartBar, IconPlugConnected, IconSend } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowsDiff, IconCalendarEvent, IconChartBar, IconPlugConnected, IconSend } from '@tabler/icons-react';
 import { MetricCard } from '@/components/MetricCard';
 import { OverviewInsights } from './insights/OverviewInsights';
 import { PageHeader } from '@/components/PageHeader';
@@ -220,9 +220,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar copy={copy} profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar copy={copy} retryHref={retryHref} /> : undefined}>
     <div className="page-stack">
       <PageHeader module="analytics" title={t("Performance")} />
-        {data && <><p title={t("These are inclusive stored calendar-date boundaries in UTC.")}>{t("Stored calendar dates (UTC): {start} to {end}.", { start: formatDay(data.period.start, locale), end: formatDay(data.period.end, locale) })}</p>
-          {data.period.comparison && <p>{t("Compared with {period}: {start} to {end}.", { period: data.period.comparison.mode === "year" ? t("the same calendar dates last year") : t("the previous equal-length period"), start: formatDay(data.period.comparison.start, locale), end: formatDay(data.period.comparison.end, locale) })}</p>}
-        </>}
+        {data && <ul className="analytics-period" aria-label={t("Report filters")}>
+          <li className="analytics-period__chip" title={t("These are inclusive stored calendar-date boundaries in UTC.")}><IconCalendarEvent size={15} stroke={1.9} aria-hidden="true" /><span>{formatDay(data.period.start, locale)} – {formatDay(data.period.end, locale)}</span><small>{t("UTC")}</small></li>
+          {data.period.comparison && <li className="analytics-period__chip" data-kind="compare"><IconArrowsDiff size={15} stroke={1.9} aria-hidden="true" /><span>{t("Compared with {period}: {start} to {end}.", { period: data.period.comparison.mode === "year" ? t("the same calendar dates last year") : t("the previous equal-length period"), start: formatDay(data.period.comparison.start, locale), end: formatDay(data.period.comparison.end, locale) })}</span></li>}
+        </ul>}
 
       {failure && <section className="panel analytics-state"><EmptyState tone="error" title={t("Analytics could not be loaded")} action={<a href={retryHref}>{t("Try again with these filters")}</a>}>{failure.error} {t("Use the sidebar to retry with these filters or reset them.")}</EmptyState></section>}
       {data && <>

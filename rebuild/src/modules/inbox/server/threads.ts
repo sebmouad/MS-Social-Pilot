@@ -19,6 +19,6 @@ export function commentNeedsReply(replies: ThreadMessage[], channelAccountId: st
 
 export type ReplyRule = { allowed: boolean; headline: string; detail?: string };
 
-export function formatInboxTime(date: Date, timeZone: string, withZone = false): string {
-  return new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', ...(withZone ? { timeZoneName: 'short' as const } : {}) }).format(date);
+export function formatInboxTime(date: Date, timeZone: string, withZone = false, locale: 'en' | 'fr' = 'en'): string {
+  return new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', ...(withZone ? { timeZoneName: 'short' as const } : {}) }).format(date);
 }

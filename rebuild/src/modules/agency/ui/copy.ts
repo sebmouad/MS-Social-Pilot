@@ -256,7 +256,7 @@ export const customerCopy = {
   },
   "This workspace is suspended, so its clients are not shown.": {
     "en": "This workspace is suspended, so its clients are not shown.",
-    "fr": "Cet espace est suspendu ; ses clients ne sont pas affichés."
+    "fr": "Cet espace est suspendu ; ses clients ne sont pas affichés."
   },
   "Data deletion is in progress for this workspace.": {
     "en": "Data deletion is in progress for this workspace.",
@@ -360,15 +360,15 @@ export const customerCopy = {
   },
   "More than {0} workspaces match this search; only the first {1} by name are shown. Search for more of the name to narrow them.": {
     "en": "More than {0} workspaces match this search; only the first {1} by name are shown. Search for more of the name to narrow them.",
-    "fr": "Plus de {0} espaces correspondent à cette recherche ; seuls les {1} premiers par nom sont affichés. Précisez le nom pour réduire les résultats."
+    "fr": "Plus de {0} espaces correspondent à cette recherche ; seuls les {1} premiers par nom sont affichés. Précisez le nom pour réduire les résultats."
   },
   "You manage more than {0} workspaces; only the first {1} by name are shown. Search by name to find another workspace.": {
     "en": "You manage more than {0} workspaces; only the first {1} by name are shown. Search by name to find another workspace.",
-    "fr": "Vous gérez plus de {0} espaces ; seuls les {1} premiers par nom sont affichés. Recherchez un nom pour trouver un autre espace."
+    "fr": "Vous gérez plus de {0} espaces ; seuls les {1} premiers par nom sont affichés. Recherchez un nom pour trouver un autre espace."
   },
   "You manage more than {0} workspaces; only the first {1} by name are shown. Search by workspace name to find another.": {
     "en": "You manage more than {0} workspaces; only the first {1} by name are shown. Search by workspace name to find another.",
-    "fr": "Vous gérez plus de {0} espaces ; seuls les {1} premiers par nom sont affichés. Recherchez un nom pour trouver un autre espace."
+    "fr": "Vous gérez plus de {0} espaces ; seuls les {1} premiers par nom sont affichés. Recherchez un nom pour trouver un autre espace."
   },
   " The needs-attention filter only looked at those {0}.": {
     "en": " The needs-attention filter only looked at those {0}.",

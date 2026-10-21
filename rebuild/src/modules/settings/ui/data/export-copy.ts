@@ -13,7 +13,7 @@ export const exportCopy = {
   },
   fr: {
     request: 'Demander une archive ZIP', title: 'Préparer une archive de l’espace',
-    description: 'L’archive est préparée en arrière-plan. Elle inclut un instantané de la base et les médias stockés ; son manifeste décrit les données incluses et les exclusions.',
+    description: 'L’archive est préparée en arrière-plan. Elle inclut un instantané de la base et les médias stockés ; son manifeste décrit les données incluses et les exclusions.',
     confirmation: 'Saisissez la confirmation exacte ci-dessous pour demander l’archive.', cancel: 'Annuler', pending: 'Demande en cours…',
     requested: 'Archive demandée. Vous pouvez quitter cet écran pendant sa préparation.',
     failure: 'La demande n’a pas pu être confirmée. Actualisez l’historique avant de réessayer.',

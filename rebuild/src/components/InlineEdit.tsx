@@ -50,7 +50,7 @@ export function InlineEdit({ value, onSave, label, editLabel = "Edit", saveLabel
       <button ref={editRef} type="button" className="ui-icon-button" disabled={disabled} aria-label={`${editLabel} ${label}`} onClick={() => { setDraft(value); setEditing(true); }}><IconPencil size={16} stroke={1.75} aria-hidden="true" /></button>
     </span>;
   }
-  return <span className="ui-inline-edit is-editing">
+  return <span className="ui-inline-edit is-editing" aria-busy={busy || undefined}>
     <input ref={inputRef} className="ui-input ui-inline-edit__input" value={draft} maxLength={maxLength} disabled={busy} aria-label={label} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined}
       onChange={event => setDraft(event.target.value)}
       onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void save(); } else if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancel(); } }} />

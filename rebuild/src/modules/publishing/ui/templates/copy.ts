@@ -127,7 +127,7 @@ export const templateCopyDefaults = {
   },
   "help": {
     "en": "Templates are shared with workspace members who can create posts. They save message text, hashtags, first comment and an optional label; media and links are chosen separately in the composer.",
-    "fr": "Les modèles sont partagés avec les membres de l’espace qui peuvent créer des publications. Ils enregistrent le message, les hashtags, le premier commentaire et une étiquette facultative ; les médias et les liens se choisissent dans le composeur."
+    "fr": "Les modèles sont partagés avec les membres de l’espace qui peuvent créer des publications. Ils enregistrent le message, les hashtags, le premier commentaire et une étiquette facultative ; les médias et les liens se choisissent dans le composeur."
   },
   "editTitle": {
     "en": "Edit template",
@@ -183,7 +183,7 @@ export const templateCopyDefaults = {
   },
   "delayHint": {
     "en": "(minutes; 0 sends it right after publication)",
-    "fr": "(minutes ; 0 l’envoie juste après la publication)"
+    "fr": "(minutes ; 0 l’envoie juste après la publication)"
   },
   "delayHelp.variant0": {
     "en": "Choose a whole number from 0 to {v0} minutes.",

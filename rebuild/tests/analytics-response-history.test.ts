@@ -71,7 +71,7 @@ describe('shared report reader and bilingual artifacts', () => {
       const out = renderReport(base as never, { channelName: 'Channel', sections: ['responseTime'], generatedAt: to, responseTime: report }, { maxRows: 100, maxBytes: 50000 }, reportDocumentCopyDefaults[locale], locale);
       expect(out.csv).toContain('historical_resolve_minutes'); expect(out.csv).toContain('reopening_events');
       expect(out.json).toContain('stored_messages_read'); expect(out.json).toContain('history_coverage');
-      expect(out.html).toContain(locale === 'en' ? 'Historical resolution cycles: 1 measured' : 'Cycles de résolution historiques : 1 mesurés');
+      expect(out.html).toContain(locale === 'en' ? 'Historical resolution cycles: 1 measured' : 'Cycles de résolution historiques : 1 mesurés');
       expect(out.text).toContain(locale === 'en' ? 'completeness on the connected platform is unknown' : 'son exhaustivité sur la plateforme connectée est inconnue');
     }
   });

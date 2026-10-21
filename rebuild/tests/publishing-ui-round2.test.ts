@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   action: vi.fn(async (_previous: unknown, _data: FormData): Promise<ComposerActionState> => ({ status: 'error', message: 'safe failure', values: {} })),
   autosave: vi.fn(async (_id: string | null, _data: FormData) => ({ status: 'saved' as const, draftPostId: 'draft-1', savedAt: '2026-10-20T10:00:00.000Z' })),
+  saveExisting: vi.fn(async (_previous: unknown, _data: FormData): Promise<ComposerActionState> => ({ status: 'error', message: 'safe failure', values: {} })),
   targetRows: vi.fn(async () => [] as Array<{ id: string; socialAccount: { provider: string } | null }>),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }) }));
@@ -21,7 +22,7 @@ vi.mock('../src/modules/publishing/ui/posts/actions', async importOriginal => ({
 vi.mock('../src/modules/publishing/ui/compose/queue-actions', () => ({
   autosaveDraftAction: mocks.autosave,
   previewQueueAction: vi.fn(async () => ({ status: 'error', message: 'unavailable' })),
-  saveQueueComposerAction: vi.fn(),
+  saveQueueComposerAction: mocks.saveExisting,
 }));
 vi.mock('../src/server/data', () => ({ prisma: { target: { findMany: mocks.targetRows } } }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async () => 50) }));
@@ -216,6 +217,12 @@ describe('composer steps, scheduling words and autosave', () => {
     expect(container.querySelector('form section')!.textContent).toContain('Facebook');
   });
 
+  it('keeps the selected Page thumbnail in the destination summary', async () => {
+    await render({ targets: [{ ...targets[0], pictureUrl: 'https://images.example.test/studio.jpg' }] });
+    await act(async () => dock.querySelector<HTMLInputElement>('input[name="targetIds"]')!.click());
+    expect(container.querySelector('form section img')?.getAttribute('src')).toBe('https://images.example.test/studio.jpg');
+  });
+
   it('is written in French when the page language is French', async () => {
     await render({ aiLocale: 'fr' });
     expect([...container.querySelectorAll('form section h2')].map(heading => heading.textContent)).toEqual(['Destinations', 'Contenu', 'Médias', 'Premier commentaire', 'Programmation']);
@@ -255,6 +262,46 @@ describe('composer steps, scheduling words and autosave', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
     expect(mocks.autosave).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain('Autosave paused');
+  });
+
+  it('serializes slow background saves and saves the latest recipe to the same draft', async () => {
+    vi.useFakeTimers();
+    let finish!: (value: Awaited<ReturnType<typeof mocks.autosave>>) => void;
+    mocks.autosave.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await render({ autosaveSeconds: 5 });
+    await type('#composer-message', 'WordPress recipe: apple tart');
+    await act(async () => { await vi.advanceTimersByTimeAsync(5100); });
+    await type('#composer-message', 'WordPress recipe: apple tart with cinnamon');
+    await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+    expect(mocks.autosave).toHaveBeenCalledTimes(1);
+    await act(async () => finish({ status: 'saved', draftPostId: 'recipe-draft', savedAt: '2026-10-20T10:00:00Z' }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(5100); });
+    expect(mocks.autosave).toHaveBeenCalledTimes(2);
+    expect(mocks.autosave.mock.calls[1]![0]).toBe('recipe-draft');
+    expect(mocks.autosave.mock.calls[1]![1].get('message')).toBe('WordPress recipe: apple tart with cinnamon');
+  });
+
+  it('submits once after an in-flight autosave and preserves ten Page destinations and schedule intent', async () => {
+    vi.useFakeTimers();
+    let finish!: (value: Awaited<ReturnType<typeof mocks.autosave>>) => void;
+    mocks.autosave.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const pages = Array.from({ length: 10 }, (_, index) => ({ ...targets[0], id: `page-${index + 1}`, name: `Recipe Page ${index + 1}` }));
+    await render({ targets: pages, autosaveSeconds: 5 });
+    await act(async () => { dock.querySelectorAll<HTMLInputElement>('input[name="targetIds"]').forEach(input => input.click()); });
+    await type('#composer-message', 'WordPress recipe: apple tart');
+    await type('#composer-first-comment', 'Ingredients and preparation');
+    await act(async () => { await vi.advanceTimersByTimeAsync(5100); });
+    const button = dock.querySelector<HTMLButtonElement>('button[name="intent"][value="schedule"]')!;
+    await act(async () => { button.click(); button.click(); });
+    expect(mocks.saveExisting).not.toHaveBeenCalled();
+    await act(async () => finish({ status: 'saved', draftPostId: 'recipe-draft', savedAt: '2026-10-20T10:00:00Z' }));
+    expect(mocks.saveExisting).toHaveBeenCalledTimes(1);
+    const data = mocks.saveExisting.mock.calls[0]![1];
+    expect(data.get('draftPostId')).toBe('recipe-draft');
+    expect(data.get('intent')).toBe('schedule');
+    expect(data.getAll('targetIds')).toEqual(pages.map(page => page.id));
+    expect(data.get('firstComment')).toBe('Ingredients and preparation');
+    expect(mocks.action).not.toHaveBeenCalled();
   });
 
   it('says autosave paused, keeps the text, and does not retry in a loop when the save fails', async () => {

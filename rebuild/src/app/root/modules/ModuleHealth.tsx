@@ -16,16 +16,16 @@ export async function ModuleHealth({ scope }: { scope?: string }) {
   let data;
   try { data = await loadRootModuleHealth(actor.id, scope); }
   catch { return <section className="root-control__notice" role="alert" lang={locale}><h2>{t.title}</h2><p>{t.error}</p></section>; }
-  return <section className="root-control__panel" lang={locale}>
+  return <section className="root-control__panel root-module-health" lang={locale}>
     <h2>{t.title}</h2><p>{t.help}</p>
     <p>{t.timing}: <time dateTime={data.checkedAt}>{data.checkedAt}</time> · {data.durationMs} ms</p>
     <p>{t.audit}: <code>{data.id}</code> · <a href="/root/activity">{t.audit}</a></p>
     {(['shared', 'product', 'platform'] as const).map(kind => data.modules.some(m => m.kind === kind) ? <section key={kind}>
       <h3>{t[kind]}</h3>
-      {data.modules.filter(m => m.kind === kind).map(m => <article key={m.id}>
+      {data.modules.filter(m => m.kind === kind).map(m => <article className="root-module-health__module" key={m.id}>
         <h4>{m.title} · <Badge tone={m.status === 'pass' ? 'success' : m.status === 'fail' ? 'danger' : 'warning'} icon={<IconActivity size={14} />}>{t[m.status]}</Badge> · {m.durationMs} ms</h4>
         <p>{m.available === true ? t.enabled : m.available === false ? t.disabled : t.unavailable}</p>
-        <details><summary>{t.config} · {m.configuration.some(c => c.status === 'fail') ? t.fail : m.configuration.length && m.configuration.every(c => c.status === 'pass') ? t.pass : t.unknown}</summary>
+        <details className="root-module-health__configuration"><summary>{t.config} · {m.configuration.some(c => c.status === 'fail') ? t.fail : m.configuration.length && m.configuration.every(c => c.status === 'pass') ? t.pass : t.unknown}</summary>
           <ul>{m.configuration.map(c => <li key={c.key}><code>{c.key}</code>: {t[c.status]}</li>)}</ul>
         </details>
         {m.worker ? <p>Worker: {t[m.worker.status]} · {m.worker.seenAt ?? t.unavailable}</p> : null}

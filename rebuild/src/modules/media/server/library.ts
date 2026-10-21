@@ -80,10 +80,10 @@ async function attribute(db: Pick<Tx, '$queryRaw'>, workspaceId: string, assets:
   return { byAsset, truncated: rows.length > scan };
 }
 
-async function usageOf(db: Pick<Tx, '$queryRaw'>, workspaceId: string, store: MediaStore, quota: number, imageLimit: number): Promise<LibraryUsage> {
+async function usageOf(db: Pick<Tx, '$queryRaw'>, workspaceId: string, store: MediaStore, quota: number, imageLimit: number, imageListing?: ReturnType<MediaStore['listImages']>): Promise<LibraryUsage> {
   const [totals, images] = await Promise.all([
     db.$queryRaw<Array<{ bytes: bigint | number; count: bigint | number }>>`SELECT COALESCE(SUM(size), 0)::bigint AS bytes, COUNT(*)::bigint AS count FROM media WHERE "workspaceId" = ${workspaceId} AND NOT (kind::text = 'image' AND "storageKey" IS NULL AND url = 'media:' || id)`,
-    store.listImages(workspaceId, imageLimit),
+    imageListing ?? store.listImages(workspaceId, imageLimit),
   ]);
   const exact = images.totalFiles !== undefined && images.totalBytes !== undefined;
   const imageBytes = exact ? images.totalBytes! : images.items.reduce((sum, item) => sum + item.size, 0);
@@ -102,10 +102,13 @@ export async function readLibrary(actor: ToolActor, input: unknown = {}, deps: M
   const page = query.page ?? 1; const q = query.q ?? ''; const kind = query.kind ?? '';
   const window = page * l.pageSize + 1;
   return protect((async () => {
+    // File inspection is expensive; listing and quota share one request-local
+    // result. Writes still obtain their own fresh inventory under the lock.
+    const imageListing = store.listImages(actor.workspaceId, l.imageLimit);
     const [rows, images, usage] = await Promise.all([
       prisma.$queryRaw<Row[]>`SELECT id, filename, "mimeType", size, kind::text AS kind, url, "storageKey", width, height, "createdAt" FROM media WHERE "workspaceId" = ${actor.workspaceId} AND "derivedFromId" IS NULL AND NOT (kind::text = 'image' AND "storageKey" IS NULL AND url = 'media:' || id) AND (${kind} = '' OR kind::text = ${kind}) AND (${q} = '' OR filename ILIKE ${likeContains(q)}) ORDER BY "createdAt" DESC, id ASC LIMIT ${window}`,
-      kind === 'video' ? Promise.resolve({ items: [], truncated: false }) : store.listImages(actor.workspaceId, l.imageLimit),
-      usageOf(prisma, actor.workspaceId, store, l.quota, l.imageLimit),
+      kind === 'video' ? Promise.resolve({ items: [], truncated: false }) : imageListing,
+      usageOf(prisma, actor.workspaceId, store, l.quota, l.imageLimit, imageListing),
     ]);
     // Canonical image rows carry names only; the file listing remains the authority for existence,
     // bytes and age. Fetch names before applying search, so default names cannot resurrect a mismatch.

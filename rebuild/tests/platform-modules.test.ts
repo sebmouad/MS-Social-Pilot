@@ -30,7 +30,7 @@ describe('platform modules', () => {
       expect(CONFIG_BY_KEY.get(module.enabledKey)?.kind).toBe('boolean');
       for (const key of module.requiredSettings) expect(CONFIG_BY_KEY.has(key)).toBe(true);
     }
-    for (const entry of PLATFORM_CONFIG) expect(entry.group.startsWith('Facebook · ')).toBe(true);
+    for (const entry of PLATFORM_CONFIG) expect(entry.group.startsWith('Facebook · ') || entry.group.startsWith('Instagram · ')).toBe(true);
   });
 
   it('a switched-off module behaves as if it were not installed', async () => {

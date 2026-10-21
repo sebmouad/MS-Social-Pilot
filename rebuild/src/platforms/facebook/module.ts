@@ -1,4 +1,4 @@
-import { FACEBOOK_DATA_DETAIL_CONFIG, FACEBOOK_HISTORY_CONFIG, FACEBOOK_DATA_CONFIG } from './config';
+import { FACEBOOK_DATA_DETAIL_CONFIG, FACEBOOK_HISTORY_CONFIG, FACEBOOK_DATA_CONFIG, FACEBOOK_GROUP_CONFIG } from './config';
 import { z } from 'zod';
 import { FACEBOOK_NATIVE_CONFIG, FACEBOOK_NATIVE_TRANSPORT_CONFIG } from './native-config';
 import { entry, url, stringList } from '@/lib/config/entry';
@@ -31,6 +31,7 @@ export const facebookModule = {
 export const FACEBOOK_ANALYTICS_LOOKBACK_DAYS_SCHEMA = z.number().int().min(1).max(366);
 
 const facebookConfigEntries = [
+  ...FACEBOOK_GROUP_CONFIG,
   ...FACEBOOK_DATA_CONFIG,
   ...FACEBOOK_HISTORY_CONFIG,
   ...FACEBOOK_DATA_DETAIL_CONFIG,

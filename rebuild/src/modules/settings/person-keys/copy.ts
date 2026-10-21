@@ -10,7 +10,7 @@ export const personKeyCopy = {
   fr: {
     account: 'Compte', title: 'Identifiants MCP Agence', help: 'Vue en lecture seule des espaces pour lesquels vous disposez actuellement d’un accès Agence propriétaire ou administrateur. Chaque appel revérifie les accès. Cette clé ne permet aucune écriture, aucun accès à l’annuaire clients ou à l’administration privée. Les futurs espaces éligibles sont inclus automatiquement.',
     name: 'Nom de la clé', days: 'Durée (jours)', create: 'Créer une clé Agence', revoke: 'Révoquer', cancel: 'Annuler', confirm: 'Confirmer', exact: 'Saisir exactement', pending: 'Enregistrement…',
-    createNotice: 'Créer cet identifiant personnel en lecture seule pour la vue Agence, avec le nom et la durée affichés ?', revokeNotice: 'Révoquer cet identifiant maintenant ? Les clients qui l’utilisent perdront l’accès.',
+    createNotice: 'Créer cet identifiant personnel en lecture seule pour la vue Agence, avec le nom et la durée affichés ?', revokeNotice: 'Révoquer cet identifiant maintenant ? Les clients qui l’utilisent perdront l’accès.',
     secret: 'Copiez ce secret maintenant. Il ne sera affiché qu’une seule fois.', dismiss: 'Masquer le secret', loading: 'Chargement des identifiants…', empty: 'Aucun identifiant Agence actif.', retry: 'Réessayer',
     expires: 'Expiration', prefix: 'Préfixe', unavailable: 'Non disponible', truncated: 'D’autres clés actives existent. Révoquez une clé affichée puis rechargez la liste pour les voir.',
     failed: 'Impossible de terminer cette demande. Vérifiez vos accès et réessayez.', revoked: 'Identifiant révoqué.', created: 'Identifiant créé.',

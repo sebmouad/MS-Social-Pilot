@@ -141,11 +141,11 @@ export const recordsCopyDefaults = {
   },
   "Parent ID (optional; select one account)": {
     "en": "Parent ID (optional; select one account)",
-    "fr": "ID parent (facultatif ; choisissez un compte)"
+    "fr": "ID parent (facultatif ; choisissez un compte)"
   },
   "Object ID (optional; select one account)": {
     "en": "Object ID (optional; select one account)",
-    "fr": "ID objet (facultatif ; choisissez un compte)"
+    "fr": "ID objet (facultatif ; choisissez un compte)"
   },
   "Name": {
     "en": "Name",
@@ -229,11 +229,11 @@ export const recordsCopyDefaults = {
   },
   "Figures sum stored daily reports only. Missing days are unknown. Levels overlap; never add campaigns, ad sets and ads together. Each object and account stays separate.": {
     "en": "Figures sum stored daily reports only. Missing days are unknown. Levels overlap; never add campaigns, ad sets and ads together. Each object and account stays separate.",
-    "fr": "Les chiffres additionnent uniquement les rapports quotidiens enregistrés. Les jours manquants sont inconnus. Les niveaux se chevauchent ; ne cumulez pas campagnes, ensembles et publicités. Chaque objet et compte reste séparé."
+    "fr": "Les chiffres additionnent uniquement les rapports quotidiens enregistrés. Les jours manquants sont inconnus. Les niveaux se chevauchent ; ne cumulez pas campagnes, ensembles et publicités. Chaque objet et compte reste séparé."
   },
   "Currency comes from current account metadata; no conversion or historical currency verification. Reach, frequency and cost per person are latest-day snapshots, not period totals. Additional measures remain unaggregated.": {
     "en": "Currency comes from current account metadata; no conversion or historical currency verification. Reach, frequency and cost per person are latest-day snapshots, not period totals. Additional measures remain unaggregated.",
-    "fr": "La devise provient des métadonnées actuelles du compte ; aucune conversion ni vérification historique. Portée, fréquence et coût par personne sont des instantanés du dernier jour, pas des totaux de période. Les mesures supplémentaires ne sont pas agrégées."
+    "fr": "La devise provient des métadonnées actuelles du compte ; aucune conversion ni vérification historique. Portée, fréquence et coût par personne sont des instantanés du dernier jour, pas des totaux de période. Les mesures supplémentaires ne sont pas agrégées."
   },
   "Accounts with matching stored data": {
     "en": "Accounts with matching stored data",

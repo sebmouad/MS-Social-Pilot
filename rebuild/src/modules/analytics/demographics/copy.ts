@@ -45,7 +45,7 @@ export const demographicsCopyDefaults = {
   },
   "Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.": {
     "en": "Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.",
-    "fr": "Catégories d’âge, de genre, de pays, de ville et de langue enregistrées telles que fournies. Chaque mesure reste distincte ; les nombres ne sont jamais additionnés entre dates ou sources."
+    "fr": "Catégories d’âge, de genre, de pays, de ville et de langue enregistrées telles que fournies. Chaque mesure reste distincte ; les nombres ne sont jamais additionnés entre dates ou sources."
   },
   "History could not be loaded": {
     "en": "History could not be loaded",

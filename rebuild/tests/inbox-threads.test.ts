@@ -57,6 +57,10 @@ describe('reply rule wording', () => {
     expect(replyRule({ kind: 'comment' }).allowed).toBe(true);
   });
 
+  it('formats customer history dates in French as well as English', () => {
+    expect(formatInboxTime(new Date('2026-10-15T23:30:00Z'), 'UTC', false, 'fr')).toBe('15 oct., 23:30');
+  });
+
   it('formats times in the given zone with an optional abbreviation', () => {
     expect(formatInboxTime(new Date('2026-10-15T23:30:00Z'), 'Pacific/Honolulu')).toBe('Oct 15, 1:30 PM');
     expect(formatInboxTime(new Date('2026-10-15T23:30:00Z'), 'UTC', true)).toBe('Oct 15, 11:30 PM UTC');

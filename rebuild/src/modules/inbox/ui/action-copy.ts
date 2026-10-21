@@ -29,7 +29,7 @@ export const actionCopy = {
   },
   fr: {
     syncNow: 'Synchroniser', syncing: 'Synchronisation…', lastSynced: 'Dernière synchronisation', notSynced: 'Pas encore synchronisé',
-    synced: (c: SyncCounts) => `${pluralFr(c.targets, 'canal', 'canaux')} vérifié${c.targets > 1 ? 's' : ''} : ${pluralFr(c.conversations, 'conversation')} (${pluralFr(c.messages, 'message')}) et ${pluralFr(c.comments, 'commentaire')} à jour.${c.reviews === null ? '' : ` ${pluralFr(c.reviews, 'avis', 'avis')} à jour.`}${c.failed ? ` ${pluralFr(c.failed, 'canal', 'canaux')} n’${c.failed > 1 ? 'ont' : 'a'} pas pu être lu${c.failed > 1 ? 's' : ''}. Reconnectez-le dans Connexions, puis synchronisez à nouveau.` : ''}`,
+    synced: (c: SyncCounts) => `${pluralFr(c.targets, 'canal', 'canaux')} vérifié${c.targets > 1 ? 's' : ''} : ${pluralFr(c.conversations, 'conversation')} (${pluralFr(c.messages, 'message')}) et ${pluralFr(c.comments, 'commentaire')} à jour.${c.reviews === null ? '' : ` ${pluralFr(c.reviews, 'avis', 'avis')} à jour.`}${c.failed ? ` ${pluralFr(c.failed, 'canal', 'canaux')} n’${c.failed > 1 ? 'ont' : 'a'} pas pu être lu${c.failed > 1 ? 's' : ''}. Reconnectez-${c.failed > 1 ? 'les' : 'le'} dans Connexions, puis synchronisez à nouveau.` : ''}`,
     uncertain: 'Le résultat n’est pas confirmé. Vérifiez l’état actuel de la boîte de réception et de la plateforme avant de répéter cette action.',
     readOnly: 'Vous pouvez lire cette conversation, mais pas la modifier.',
     reopen: 'Rouvrir', markResolved: 'Marquer comme résolue', reopened: 'Conversation rouverte.', resolvedDone: 'Marquée comme résolue.',
@@ -37,7 +37,7 @@ export const actionCopy = {
     hide: (noun: string) => `Masquer ${noun}`, unhide: (noun: string) => `Afficher ${noun}`, delete: (noun: string) => `Supprimer ${noun}`, keep: (noun: string) => `Garder ${noun}`,
     hiddenDone: (cap: string) => `${cap} est masqué(e).`, visibleDone: (cap: string) => `${cap} est de nouveau visible.`, deletedDone: 'Commentaire supprimé.',
     undo: 'Annuler', retry: 'Réessayer', failedTitle: 'L’action n’a pas abouti',
-    deleteTitle: (noun: string) => `Supprimer ${noun} ?`, statusTitle: 'État de la suppression du commentaire',
+    deleteTitle: (noun: string) => `Supprimer ${noun} ?`, statusTitle: 'État de la suppression du commentaire',
     deleteBody: (noun: string, platform: string) => `Cela retire ${noun}, ainsi que toutes les réponses associées, de ${platform} et de votre boîte de réception. Cette action est irréversible.`,
     statusBody: 'Vérifiez le résultat de la suppression en cours. Fermer cette fenêtre n’annule pas une demande de suppression existante.',
     close: 'Fermer', checkStatus: 'Vérifier l’état de la suppression', checking: 'Vérification…', finish: 'Terminer le retrait de la boîte de réception', finishing: 'Finalisation…', deleting: 'Suppression…',

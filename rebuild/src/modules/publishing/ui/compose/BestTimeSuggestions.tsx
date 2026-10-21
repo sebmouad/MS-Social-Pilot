@@ -1,5 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { IconClockHour4 } from '@tabler/icons-react';
+import styles from './best-times.module.css';
 import { Button } from '@/components/Button';
 import type { BestTimeSuggestions as Suggestions } from '@/modules/publishing/server/best-time';
 
@@ -30,8 +32,8 @@ export function BestTimeSuggestions({ targetIds, locale, disabled, onChoose, cop
     return () => { current = false; controller.abort(); clearTimeout(timer); };
   }, [key, refresh]);
   const active = state?.key === key ? state : null;
-  return <section aria-label={t.title} aria-live="polite">
-    <h3>{t.title}</h3>
+  return <section className={styles.times} aria-label={t.title} aria-live="polite">
+    <h3 className={styles.timesTitle}><span className={styles.timesChip} aria-hidden="true"><IconClockHour4 size={16} stroke={2} /></span>{t.title}</h3>
     {!targetIds.length ? <p>{t.choose}</p> : !active ? <p>{t.loading}</p> : active.status === 'error' ? <>
       <p>{t.error}</p><Button type="button" size="sm" disabled={disabled} onClick={() => { setState(null); setRefresh(value => value + 1); }}>{t.retry}</Button>
     </> : <>

@@ -3,7 +3,7 @@ import { configurationOwner } from '../src/lib/config/ownership';
 import { CONFIG_BY_KEY, safeConfigShape } from '../src/lib/config/registry';
 import { rootManifest } from '../src/modules/root/manifest';
 import { moduleManifests } from '../src/modules';
-import { PLATFORM_MODULES, PLATFORM_CONFIG } from '../src/platforms';
+import { PLATFORM_MODULES, PLATFORM_CONFIG, STAGED_PLATFORM_IDS } from '../src/platforms';
 
 describe('Root module organization', () => {
   it('groups shared controls, product modules and platform modules in the existing sidebar', () => {
@@ -14,7 +14,7 @@ describe('Root module organization', () => {
   it('assigns every registered platform setting to its platform before product prefixes', () => {
     for (const setting of PLATFORM_CONFIG) {
       expect(configurationOwner(setting.key)).toEqual(setting.owner);
-      expect(PLATFORM_MODULES.some(module => module.id === setting.owner.id)).toBe(true);
+      expect(PLATFORM_MODULES.some(module => module.id === setting.owner.id) || STAGED_PLATFORM_IDS.includes(setting.owner.id)).toBe(true);
     }
     // The provider-owned reply policy must never enter the shared Inbox module.
     expect(configurationOwner('inbox.messengerReplyWindowHours')).toEqual({ kind: 'platform', id: 'facebook' });

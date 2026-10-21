@@ -17,11 +17,13 @@ type TabsProps = {
 export function Tabs({ items, value, defaultValue, onChange, label, className = "" }: TabsProps) {
   const base = useId();
   const [inner, setInner] = useState(defaultValue ?? items.find(item => !item.disabled)?.id ?? "");
-  const current = value ?? inner;
+  const requested = value ?? inner;
+  const current = items.find(item => item.id === requested && !item.disabled)?.id ?? items.find(item => !item.disabled)?.id;
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const select = (id: string) => { if (value === undefined) setInner(id); onChange?.(id); };
   const onKey = (event: KeyboardEvent) => {
     const enabled = items.filter(item => !item.disabled);
+    if (!enabled.length) return;
     const index = enabled.findIndex(item => item.id === current);
     let next = -1;
     if (event.key === "ArrowRight") next = (index + 1) % enabled.length;
@@ -37,7 +39,7 @@ export function Tabs({ items, value, defaultValue, onChange, label, className = 
   const active = items.find(item => item.id === current);
   return <div className={`ui-tabs ${className}`.trim()}>
     <div role="tablist" aria-label={label} className="ui-tabs__list" onKeyDown={onKey}>
-      {items.map(item => <button key={item.id} ref={node => { refs.current[item.id] = node; }} type="button" role="tab" id={`${base}-tab-${item.id}`} aria-selected={item.id === current} aria-controls={`${base}-panel-${item.id}`}
+      {items.map(item => <button key={item.id} ref={node => { refs.current[item.id] = node; }} type="button" role="tab" id={`${base}-tab-${item.id}`} aria-selected={item.id === current} aria-controls={item.id === current && item.content !== undefined ? `${base}-panel-${item.id}` : undefined}
         tabIndex={item.id === current ? 0 : -1} disabled={item.disabled} className="ui-tabs__tab" onClick={() => select(item.id)}>
         {item.icon && <span className="ui-tabs__icon" aria-hidden="true">{item.icon}</span>}
         <span>{item.label}</span>

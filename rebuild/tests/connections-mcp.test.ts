@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const service = vi.hoisted(() => ({ list: vi.fn(), preview: vi.fn(), disconnect: vi.fn(), operation: vi.fn(), purge: vi.fn(), health: vi.fn(), select: vi.fn() }));
-vi.mock('../src/server/data', async importOriginal => ({ ...(await importOriginal<object>()), listConnections: service.list, prisma: { user: { findUnique: async () => ({ disabledAt: null }) }, membership: { findUnique: async () => ({ role: 'owner' }) } } }));
+const service = vi.hoisted(() => ({ list: vi.fn(), accounts: vi.fn(), count: vi.fn(), preview: vi.fn(), disconnect: vi.fn(), operation: vi.fn(), purge: vi.fn(), health: vi.fn(), select: vi.fn() }));
+vi.mock('../src/server/data', async importOriginal => ({ ...(await importOriginal<object>()), listConnections: service.list, prisma: { user: { findUnique: async () => ({ disabledAt: null }) }, membership: { findUnique: async () => ({ role: 'owner' }) }, socialAccount: { findMany: service.accounts, count: service.count } } }));
 vi.mock('../src/server/connection-mutations', async importOriginal => ({ ...(await importOriginal<object>()), previewSocialAccountDeletion: service.preview, disconnectSocialAccount: service.disconnect, setConnectionSelections: service.select }));
-vi.mock('../src/server/platforms/registry', async importOriginal => ({ ...(await importOriginal<object>()), platformGrantHealth: service.health }));
+vi.mock('../src/server/platforms/registry', async importOriginal => ({ ...(await importOriginal<object>()), platformGrantHealth: service.health, enabledSocialAccountWhere: async () => ({ provider: { in: ['synthetic'] } }) }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: service.purge, withWorkspaceOperation: service.operation }));
 vi.mock('../src/server/mcp/kit', async importOriginal => ({ ...(await importOriginal<object>()), auditedReceipt: async (_viewer: unknown, _tool: string, _detail: unknown, result: unknown) => result }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: async () => resolvePermissions({ role: 'owner', allPages: true, pageAccess: [], clientAccess: [], workspaceDisabledModules: [], memberDisabledModules: [] }) }));
@@ -29,7 +29,10 @@ beforeEach(() => {
   service.health.mockResolvedValue([]);
   const account = (id: string) => ({ id, provider: 'synthetic', name: `Source ${id}`, pictureUrl: null, invalidatedAt: null, tokenExpiresAt: null, scopes: ['secret-scope'], createdAt: new Date('2026-01-01T00:00:00Z'),
     targets: [{ id: `${id}-channel`, type: 'page', name: 'Channel', enabled: false }], adAccounts: [{ id: `${id}-ads`, actId: 'act_1', name: 'Ads', enabled: true }] });
-  service.list.mockResolvedValue([account('a'), account('b')]);
+  const accounts = [account('a'), account('b')];
+  service.list.mockResolvedValue(accounts);
+  service.accounts.mockImplementation(async ({ skip, take }: { skip: number; take: number }) => accounts.slice(skip, skip + take));
+  service.count.mockResolvedValue(2);
   service.preview.mockResolvedValue({ channels: 1 });
   service.disconnect.mockResolvedValue({ mode: 'retain', stillScheduled: 0, retained: { channels: 1, adAccounts: 1, instagramAccounts: 0 } });
 });
@@ -48,6 +51,9 @@ describe('connections MCP parity with the Connections screen and API', () => {
     const result = (await call(viewer(), 'list_connections')).result.structuredContent;
     expect(result).toMatchObject({ total: 2, hasMore: true });
     expect(result.connections).toHaveLength(1);
+    expect(service.accounts).toHaveBeenCalledTimes(1);
+    expect(service.accounts.mock.calls[0][0]).toMatchObject({ where: { workspaceId: 'workspace', provider: { in: ['synthetic'] } }, skip: 0, take: 1 });
+    expect(service.count).toHaveBeenCalledTimes(1);
     expect(result.connections[0].channels).toEqual([{ id: 'a-channel', type: 'page', name: 'Channel', selected: false }]);
     expect(JSON.stringify(result)).not.toContain('secret-scope');
   });

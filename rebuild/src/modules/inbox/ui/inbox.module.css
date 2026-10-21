@@ -145,3 +145,19 @@
   .unreadDot { background: Highlight; forced-color-adjust: none; }
   .item:focus-visible { outline-color: Highlight; }
 }
+
+/* Keep bulk controls outside the list's bounded viewport. The list and history
+   each own one scroll region; appending activity never moves the composer. */
+.listContent { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.listScroll { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
+.listScroll .list { overflow: visible; }
+.loadMore { display: grid; justify-items: center; gap: 10px; padding: 14px 16px; }
+.loadMore:empty { display: none; }
+.loadMore p { margin: 0; color: var(--danger); font-size: 13px; line-height: 1.45; }
+.loadMore a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink-soft); font-size: 13px; text-decoration: underline; }
+.loadMore a:hover { color: var(--ink); }
+.loadMore a:focus-visible, .listScroll:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; border-radius: var(--radius-sm); }
+@media (max-width: 900px) { .listScroll { max-height: 70dvh; } }
+/* Keep long, progressively loaded lists cheap to paint without removing rows
+   from keyboard navigation or changing their stored order. */
+.listScroll .list > li { content-visibility: auto; contain-intrinsic-size: auto 8rem; }

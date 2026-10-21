@@ -62,7 +62,7 @@ describe('response report parity additions', () => {
   it('localizes every new label and preserves unknown business-hours measures', () => {
     const out = renderReport(snapshot as never, { ...input, sections: ['responseTime'], responseTime: { ...responseTime, businessHours: null, businessSlowestMs: null, resolve: { ...responseTime.resolve, businessMedianMs: null } } }, bounds, reportDocumentCopyDefaults.fr, 'fr');
     expect(out.html).toContain('Réponse initiale la plus lente');
-    expect(out.text).toContain('Résolution en heures ouvrées : médiane Non disponible.');
+    expect(out.text).toContain('Résolution en heures ouvrées : médiane Non disponible.');
     expect(out.csv).toContain('Délai médian de résolution');
     expect(JSON.parse(out.json!).records.find((r: { metric_key: string }) => r.metric_key === 'median_resolve_business_minutes').value).toBeNull();
   });

@@ -169,3 +169,18 @@ button.settings-row-actions__link:disabled { cursor: progress; opacity: .6; }
   .settings-account-item { padding: 12px; }
   .connection-toolbar > div > button { min-height: 44px; }
 }
+
+/* Settings polish: readable table headers, permission presets, flatter panels and phone stacking. */
+.settings-table th { font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--ink-soft); }
+.settings-panel { box-shadow: none; }
+.settings-panel__heading h2 { font-size: 18px; }
+.mcp-key-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.mcp-key-summary { margin-inline-start: auto; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 650; }
+.mcp-key-module-all { display: flex; align-items: center; gap: 8px; min-height: 36px; margin-bottom: 4px; color: var(--ink-soft); font-size: 12px; }
+.mcp-key-hint { color: var(--ink-faint); font-size: 12px; font-weight: 400; }
+@media (max-width: 620px) {
+  .settings-panel { padding: 16px; }
+  .mcp-key-summary { margin-inline-start: 0; width: 100%; text-align: center; }
+  .mcp-key-presets > button { flex: 1 1 140px; min-height: 44px; }
+  .mcp-key-feature-group .mcp-key-feature { grid-template-columns: minmax(0, 1fr) auto auto; }
+}

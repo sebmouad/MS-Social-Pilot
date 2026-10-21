@@ -15,7 +15,7 @@ export const workspacePolicyCopy = {
     title: 'Politiques de l’espace', description: 'Définissez le fuseau horaire de publication et l’exigence de validation pour {workspace}.',
     unavailable: 'Les politiques de l’espace sont indisponibles. Actualisez la page ou réessayez plus tard.',
     zonePanel: 'Fuseau horaire de publication', zoneDetail: 'Utilisé pour afficher et planifier les heures de publication dans cet espace.',
-    approvalNote: 'Lorsque la validation est requise, les nouvelles publications planifiées par des contributeurs attendent une relecture. Les propriétaires, administrateurs et éditeurs conservent leur dérogation. Modifier une publication approuvée annule sa relecture précédente : les contributeurs doivent obtenir une nouvelle validation pour le contenu et les destinations modifiés.',
+    approvalNote: 'Lorsque la validation est requise, les nouvelles publications planifiées par des contributeurs attendent une relecture. Les propriétaires, administrateurs et éditeurs conservent leur dérogation. Modifier une publication approuvée annule sa relecture précédente : les contributeurs doivent obtenir une nouvelle validation pour le contenu et les destinations modifiés.',
     timezone: 'Fuseau horaire', timezoneHint: 'Saisissez un fuseau horaire IANA valide, comme Europe/Paris ou UTC.',
     requireApproval: 'Exiger une validation pour les nouvelles publications planifiées par les contributeurs', confirmation: 'Saisissez cette confirmation pour enregistrer',
     save: 'Enregistrer les politiques', saving: 'Enregistrement…', saved: 'Politiques de l’espace enregistrées.',

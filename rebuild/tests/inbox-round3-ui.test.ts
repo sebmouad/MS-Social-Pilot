@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': state.language }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh, replace: vi.fn() }) }));
 vi.mock('../src/modules/inbox/ui/bulk-action', () => ({ runBulkInboxAction: state.bulk }));
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'inbox.progressivePageLimit' ? 3 : 180 }));
 vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children }: { sidebar: import('react').ReactNode; children: import('react').ReactNode }) => h('main', null, h('aside', null, sidebar), children) }));

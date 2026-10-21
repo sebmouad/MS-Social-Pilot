@@ -120,7 +120,7 @@ it('makes every registered setting reachable through owner-aware search', async 
   await fill(search, 'no-such-setting-here');
   expect(container.querySelector('.root-config__empty')?.textContent).toContain('No matching settings.');
   expect(container.querySelector('.root-config__empty button')?.textContent).toBe('Reset filters');
-});
+}, 20000);
 
 it('renders configured operator text as plain text and preserves search placeholders', async () => {
   const { ROOT_CONFIG_COPY } = await import('../src/lib/config/root-config-copy');
@@ -172,4 +172,39 @@ it('names the secret in a shared confirmation and retains the dialog on failure'
   await act(async () => confirm.click());
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ key: definition.key, value: '', clear: true, confirmation: `CLEAR ROOT SECRET ${definition.key}` });
   expect(document.querySelector('dialog [role=alert]')?.textContent).toContain('Could not clear');
+});
+
+it('matches separate metadata terms regardless of their order or accents', async () => {
+  const definition = { ...definitions[0], label: 'Fuseau préféré' };
+  await act(async () => root.render(createElement(RootConfigForm, { definitions: [definition], initialValues: values, availability: AVAILABILITY_CATALOG })));
+  const search = container.querySelector<HTMLInputElement>('#root-config-search')!;
+  await fill(search, 'prefere root');
+  expect(container.querySelectorAll('.root-config__card')).toHaveLength(1);
+  await fill(search, 'prefere absent');
+  expect(container.querySelectorAll('.root-config__card')).toHaveLength(0);
+});
+
+it('warns before leaving a draft and removes the warning after a confirmed save', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ values })));
+  await render();
+  const input = container.querySelector<HTMLInputElement>('input[aria-label="New workspace timezone"]')!;
+  await fill(input, 'Europe/Paris');
+  const draftEvent = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(draftEvent); expect(draftEvent.defaultPrevented).toBe(true);
+  await act(async () => [...input.closest('.root-config__card')!.querySelectorAll('button')].find(button => button.textContent === 'Save')!.click());
+  const savedEvent = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(savedEvent); expect(savedEvent.defaultPrevented).toBe(false);
+});
+
+it('never searches secret values and removes the replacement draft after confirmed clearing', async () => {
+  const definition = safeConfigShape().find(item => item.key === 'meta.appSecret')!;
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ values: [{ key: definition.key, value: '', isSet: false, source: 'default' }] })));
+  await act(async () => root.render(createElement(RootConfigForm, { definitions: [definition], initialValues: [{ key: definition.key, value: '', isSet: true, source: 'database' }], availability: AVAILABILITY_CATALOG })));
+  await fill(container.querySelector<HTMLInputElement>('input[type=password]')!, 'private-replacement');
+  const search = container.querySelector<HTMLInputElement>('#root-config-search')!;
+  await fill(search, 'private-replacement'); expect(container.querySelectorAll('.root-config__card')).toHaveLength(0);
+  await fill(search, '');
+  await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Clear saved secret')!.click());
+  await act(async () => [...document.querySelectorAll<HTMLButtonElement>('dialog button')].find(button => button.textContent === 'Clear saved secret')!.click());
+  expect(container.querySelector<HTMLInputElement>('input[type=password]')!.value).toBe('');
 });

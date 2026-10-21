@@ -1,8 +1,8 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), form: vi.fn(), config: vi.fn() }));
-vi.mock('../src/app/root/modules/ModuleHealth', () => ({ ModuleHealth: async () => createElement('section', null, 'Stored module health') }));
+const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), form: vi.fn(), config: vi.fn(), health: vi.fn() }));
+vi.mock('../src/app/root/modules/ModuleHealth', () => ({ ModuleHealth: async (props: { scope?: string }) => { state.health(props); return createElement('section', null, 'Stored module health'); } }));
 vi.mock('../src/server/root/RootDiagnostics', () => ({ RootDiagnostics: async () => null }));
 vi.mock('../src/server/root/RootInboxDeletions', () => ({ RootInboxDeletions: async () => createElement('section', null, 'Inbox deletion recovery') }));
 vi.mock('../src/server/root/RootPostDeletions', () => ({ RootPostDeletions: async () => createElement('section', null, 'Post deletion recovery') }));
@@ -89,4 +89,11 @@ describe('Root module screens', () => {
     expect(inbox).not.toContain('Publication attempt recovery');
     expect(inbox).not.toContain('Post deletion recovery');
   });
+
+  it('groups scoped stored health with platform settings and diagnostics', async () => {
+  const page = await PlatformPage({ params: Promise.resolve({ id: 'facebook' }) });
+  expect(state.health).toHaveBeenCalledWith({ scope: 'platform:facebook' });
+  expect(renderToStaticMarkup(page.props.children[0])).toContain('Stored module health');
+});
+
 });

@@ -1,18 +1,23 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import styles from './inbox.module.css';
 
-/**
- * Scrollable, keyboard-focusable message history. It opens on the newest entry;
- * `resetKey` changes with the open conversation and history page so each one
- * starts at the newest message.
+/** Opens each history page at its newest entry. Live refreshes follow the end
+ * only while the reader is already there; reading older entries keeps position.
  */
 export function ThreadScroll({ label, resetKey, children }: { label: string; resetKey: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  const previousKey = useRef<string | null>(null);
+  const followEnd = useRef(true);
+  useLayoutEffect(() => {
     const node = ref.current;
-    if (node) node.scrollTop = node.scrollHeight;
-  }, [resetKey]);
-  return <div ref={ref} className={styles.threadScroll} role="region" aria-label={label} tabIndex={0}>{children}</div>;
+    if (node && (previousKey.current !== resetKey || followEnd.current)) {
+      node.scrollTop = node.scrollHeight;
+      followEnd.current = true;
+    }
+    previousKey.current = resetKey;
+  }, [resetKey, children]);
+  return <div ref={ref} className={styles.threadScroll} role="region" aria-label={label} tabIndex={0}
+    onScroll={event => { const node = event.currentTarget; followEnd.current = node.scrollTop + node.clientHeight >= node.scrollHeight; }}>{children}</div>;
 }

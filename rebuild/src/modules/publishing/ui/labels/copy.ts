@@ -22,7 +22,7 @@ export const labelCopyDefaults = {
   },
   "limited": {
     "en": "Your access is limited to some channels, so only members with access to all channels can rename or delete labels.",
-    "fr": "Votre accès est limité à certains canaux : seuls les membres ayant accès à tous les canaux peuvent renommer ou supprimer des étiquettes."
+    "fr": "Votre accès est limité à certains canaux : seuls les membres ayant accès à tous les canaux peuvent renommer ou supprimer des étiquettes."
   },
   "saveUnknown": {
     "en": "The save result is unknown. Refresh the list and check the label before trying again.",
@@ -42,7 +42,7 @@ export const labelCopyDefaults = {
   },
   "deleted": {
     "en": "Label deleted. Posts and templates remain; the label is detached from them.",
-    "fr": "Étiquette supprimée. Les publications et les modèles restent ; l’étiquette en est retirée."
+    "fr": "Étiquette supprimée. Les publications et les modèles restent ; l’étiquette en est retirée."
   },
   "search": {
     "en": "Search labels",
@@ -110,7 +110,7 @@ export const labelCopyDefaults = {
   },
   "limitedNote": {
     "en": "Your access is limited to some channels, so label counts are hidden and only members with access to all channels can rename or delete labels. You can still create labels.",
-    "fr": "Votre accès est limité à certains canaux : les compteurs sont masqués et seuls les membres ayant accès à tous les canaux peuvent renommer ou supprimer des étiquettes. Vous pouvez toujours en créer."
+    "fr": "Votre accès est limité à certains canaux : les compteurs sont masqués et seuls les membres ayant accès à tous les canaux peuvent renommer ou supprimer des étiquettes. Vous pouvez toujours en créer."
   },
   "pages": {
     "en": "Label pages",

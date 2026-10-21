@@ -36,3 +36,20 @@ export function createInstagramDiscovery(config: InstagramDiscoveryConfig, fetch
     return [...accounts.values()];
   };
 }
+
+/** Selected Pages are supplied by the authorized connection service, never enumerated here. */
+export function createSelectedInstagramDiscovery(policy: import('./config').InstagramPolicy, options: Parameters<typeof import('./transport').createInstagramGraph>[1] = {}) {
+  return async (pages: readonly LinkedPage[], signal?: AbortSignal): Promise<LinkedInstagramAccount[]> => {
+    const { createInstagramGraph, object } = await import('./transport');
+    const graph = createInstagramGraph(policy, options);
+    const accounts = new Map<string, LinkedInstagramAccount>();
+    for (const page of pages) {
+      if (!page.id || !page.accessToken) continue;
+      const result = await graph.request(page.id, page.accessToken, { fields: LINK_FIELD }, 'GET', signal);
+      const account = object(result.instagram_business_account);
+      if (typeof account.id !== 'string' || !account.id || accounts.has(account.id)) continue;
+      accounts.set(account.id, { igUserId: account.id, username: typeof account.username === 'string' && account.username ? account.username : account.id, pageId: page.id, pageAccessToken: page.accessToken });
+    }
+    return [...accounts.values()];
+  };
+}

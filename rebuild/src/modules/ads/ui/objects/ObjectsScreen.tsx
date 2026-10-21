@@ -22,6 +22,7 @@ import { adsDirectoryManagementPort } from '@/modules/ads/directory/management-p
 import { pageSearchRecord } from '@/modules/ads/analysis/query';
 import { AdsFiltersSidebar } from '@/modules/ads/ui/ads-filters';
 import { ObjectManager } from './ObjectManager';
+import { ObjectRowLabel } from './ObjectRowLabel';
 import { ChangeHistory } from './ChangeHistory';
 
 type Params = AdsSearchParams & { level?: string; q?: string; sort?: string; direction?: string; parentId?: string; offset?: string };
@@ -75,7 +76,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     <section className="panel">
       {directory.freshness.status === 'stale' ? <p className="small-note">{t('text073')}</p> : null}
       <DataTable caption={t('text074')} rows={directory.items} rowKey={row => `${row.accountId}:${row.objectId}`} emptyMessage={t('text075')} columns={[
-        { key: 'name', label: t('text066'), render: row => <><strong>{row.name}</strong><br /><span className="small-note">{accountName.get(row.accountId) ?? row.accountName}{row.parentId ? t('inParent', { parent: row.parentId }) : ''}</span></> },
+        { key: 'name', label: t('text066'), render: row => <ObjectRowLabel adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name}><span className="small-note">{accountName.get(row.accountId) ?? row.accountName}{row.parentId ? t('inParent', { parent: row.parentId }) : ''}</span></ObjectRowLabel> },
         { key: 'spend', label: t('text019'), align: 'end', render: row => `${row.currency ? `${row.currency} ` : ''}${show(row.spend)}` },
         { key: 'impressions', label: t('text020'), align: 'end', render: row => show(row.impressions) },
         { key: 'clicks', label: t('text022'), align: 'end', render: row => show(row.clicks) },

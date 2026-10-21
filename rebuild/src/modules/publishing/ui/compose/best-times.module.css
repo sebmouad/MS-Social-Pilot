@@ -1,0 +1,5 @@
+.times { display: grid; gap: 10px; padding: 14px; border-radius: var(--radius-md); background: var(--surface-muted); }
+.times p, .times small { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.times ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.timesTitle { display: flex; align-items: center; gap: 10px; margin: 0; font-size: var(--text-base, 15px); }
+.timesChip { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); }

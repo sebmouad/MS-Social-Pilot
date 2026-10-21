@@ -103,6 +103,15 @@ describe('rescheduling a scheduled post', () => {
     expect(db.post.updateMany).not.toHaveBeenCalled();
   });
 
+  it('denies a post outside the authorized workspace before any remote move or local write', async () => {
+    db.post.findFirst.mockResolvedValue(null);
+    await expect(reschedulePost({ ...actor, workspaceId: 'workspace-other' }, input)).rejects.toMatchObject({ code: 'conflict' });
+    expect(db.post.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: input.postId, workspaceId: 'workspace-other' } }));
+    expect(db.postTarget.findMany).not.toHaveBeenCalled();
+    expect(db.post.updateMany).not.toHaveBeenCalled();
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+  });
+
   it('only moves posts that are scheduled and not yet handed to the platform', async () => {
     db.post.findFirst.mockResolvedValue({ ...scheduled, status: 'draft' });
     await expect(reschedulePost(actor, input)).rejects.toThrow(/still waiting to publish/);

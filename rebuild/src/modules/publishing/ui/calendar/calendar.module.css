@@ -1,5 +1,8 @@
-.range { margin: 0; min-width: 11ch; font-size: 17px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.sidebarNav { display: grid; gap: 8px; min-width: 0; }
+.range { margin: 0; min-width: 11ch; font-size: 20px; font-weight: 760; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.rangeBar { display: flex; align-items: center; gap: 12px; }
+.rangeChip { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); }
+.weekdays span { color: var(--ink-soft); }
+.day:hover { background: color-mix(in srgb, var(--mod, var(--accent)) 5%, var(--surface)); }.sidebarNav { display: grid; gap: 8px; min-width: 0; }
 .sidebarNav a { justify-content: center; width: 100%; }
 
 .board { display: grid; gap: 12px; min-width: 0; }

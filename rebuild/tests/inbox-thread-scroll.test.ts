@@ -24,10 +24,29 @@ describe('inbox message history scrolling', () => {
     expect(region.tabIndex).toBe(0);
     expect(region.scrollTop).toBe(900);
     region.scrollTop = 10;
+    region.dispatchEvent(new Event('scroll', { bubbles: true }));
     await act(async () => root.render(view('message:1', 'hello again')));
     expect(region.scrollTop).toBe(10);
     await act(async () => root.render(view('message:2', 'other')));
     expect(region.scrollTop).toBe(900);
+  });
+
+  it('follows new entries only while the reader is at the end of the current history', async () => {
+    let height = 900;
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => height });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 100 });
+    await act(async () => root.render(view('message:1', 'latest')));
+    const region = container.querySelector<HTMLElement>('[role="region"]')!;
+    region.scrollTop = 800; region.dispatchEvent(new Event('scroll', { bubbles: true }));
+    height = 1100;
+    await act(async () => root.render(view('message:1', 'new arrival')));
+    expect(region.scrollTop).toBe(1100);
+    region.scrollTop = 40; region.dispatchEvent(new Event('scroll', { bubbles: true }));
+    height = 1300;
+    await act(async () => root.render(view('message:1', 'another arrival')));
+    expect(region.scrollTop).toBe(40);
+    await act(async () => root.render(view('message:1:earlier', 'earlier page')));
+    expect(region.scrollTop).toBe(1300);
   });
 
   it('bounds the desktop layout so the list and the history scroll inside their panes', () => {

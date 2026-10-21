@@ -30,6 +30,26 @@ describe('nestReplies', () => {
     expect(nestReplies([{ id: 'x', remoteId: 'rx', parentRemoteId: 'earlier-page' }], opening, make).map(e => [e.id, e.parentId, e.depth])).toEqual([['x', 'c0', 1]]);
   });
 
+  it('keeps nested reply windows complete across ten synthetic Page discussions', () => {
+    for (let page = 0; page < 10; page++) {
+      const root = { id: `page-${page}-root`, remoteId: `page-${page}-remote-root` };
+      const replies = Array.from({ length: 60 }, (_, index) => ({
+        id: `page-${page}-reply-${index}`, remoteId: `page-${page}-remote-${index}`,
+        parentRemoteId: index % 3 === 0 ? root.remoteId : `page-${page}-remote-${index - 1}`,
+      }));
+      const shown: string[] = [];
+      for (let offset = 0; offset < replies.length; offset += 20) {
+        const window = replies.slice(offset, offset + 20);
+        const entries = nestReplies(window, root, make);
+        expect(entries).toHaveLength(window.length);
+        const visibleParents = new Set([root.id, ...entries.map(entry => entry.id)]);
+        expect(entries.every(entry => visibleParents.has(entry.parentId!))).toBe(true);
+        shown.push(...entries.map(entry => entry.id));
+      }
+      expect(new Set(shown)).toEqual(new Set(replies.map(reply => reply.id)));
+    }
+  });
+
   it('survives a stored parent cycle and self parent without repeating or dropping into recursion', () => {
     const out = nestReplies([{ id: 'p', remoteId: 'rp', parentRemoteId: 'rq' }, { id: 'q', remoteId: 'rq', parentRemoteId: 'rp' }, { id: 's', remoteId: 'rs', parentRemoteId: 'rs' }], opening, make);
     expect(out.map(e => e.id)).toEqual(['s']);

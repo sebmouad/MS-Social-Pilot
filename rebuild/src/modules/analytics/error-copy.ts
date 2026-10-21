@@ -373,7 +373,7 @@ export const errorCopyDefaults = {
   },
   "The run was interrupted during delivery. Delivery was not retried; check with the recipients.": {
     "en": "The run was interrupted during delivery. Delivery was not retried; check with the recipients.",
-    "fr": "L’exécution a été interrompue pendant l’envoi. L’envoi n’a pas été relancé ; vérifiez auprès des destinataires."
+    "fr": "L’exécution a été interrompue pendant l’envoi. L’envoi n’a pas été relancé ; vérifiez auprès des destinataires."
   },
   "The report has more rows than this access allows.": {
     "en": "The report has more rows than this access allows.",
@@ -389,7 +389,7 @@ export const errorCopyDefaults = {
   },
   "The result could not be recorded. Delivery was not retried; check with the recipients.": {
     "en": "The result could not be recorded. Delivery was not retried; check with the recipients.",
-    "fr": "Le résultat n’a pas pu être enregistré. L’envoi n’a pas été relancé ; vérifiez auprès des destinataires."
+    "fr": "Le résultat n’a pas pu être enregistré. L’envoi n’a pas été relancé ; vérifiez auprès des destinataires."
   },
   "The run did not finish.": {
     "en": "The run did not finish.",

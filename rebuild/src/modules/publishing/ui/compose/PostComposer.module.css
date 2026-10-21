@@ -79,7 +79,8 @@
 .step:first-of-type { padding-top: 0; border-top: 0; }
 .stepHead { display: flex; align-items: center; gap: 10px; }
 .stepHead h2 { margin: 0; font-size: var(--text-lg); letter-spacing: -.01em; }
-.stepNumber { display: inline-grid; place-items: center; flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; background: var(--mod-soft, var(--accent-soft)); color: var(--mod-ink, var(--accent)); font-size: var(--text-sm); font-weight: 750; font-variant-numeric: tabular-nums; }
+.stepNumber { display: inline-grid; place-items: center; flex: 0 0 auto; width: 32px; height: 32px; border-radius: 10px; background: var(--mod, var(--accent)); color: var(--on-accent, #fff); box-shadow: 0 4px 10px -4px var(--mod, var(--accent)); }
+.stepCount { margin-inline-start: auto; padding: 2px 8px; border-radius: 999px; background: var(--surface-muted); color: var(--ink-soft); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .step > label { margin-top: 4px; color: var(--ink); font-size: var(--text-base); font-weight: 700; }
 .step > label span { font-weight: 400; color: var(--ink-soft); }
 .chosen { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }

@@ -63,6 +63,12 @@ describe('library listing', () => {
     expect(result.usage).toMatchObject({ usedBytes: 3000, quotaBytes: 5368709120 });
     expect(db.$queryRaw.mock.calls.every(c => (c[0] as TemplateStringsArray).join('?').includes('?') || true)).toBe(true);
   });
+  it.each([undefined, 'image', 'video'] as const)('scans stored images once for a %s listing and its quota', async kind => {
+    const s = store();
+    const result = await readLibrary(actor, kind ? { kind } : {}, { store: s as never });
+    expect(s.listImages).toHaveBeenCalledTimes(1);
+    expect(result.usage).toMatchObject({ usedBytes: 3000, assetCount: 2 });
+  });
   it('applies Root overrides to stored-image scan and usage excerpt bounds', async () => {
     state.overrides = { 'media.imageListLimit': 321, 'media.holderExcerptCharacters': 42 };
     const s = store();

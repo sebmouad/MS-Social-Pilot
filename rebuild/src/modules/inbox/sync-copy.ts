@@ -1,9 +1,9 @@
 import type { InboxCustomerCopy } from './customer-copy';
 export const inboxSyncCopy: InboxCustomerCopy = {
-  'sync.summary': { en: 'Checked {targets}: {conversations} ({messages}) and {comments} up to date.', fr: '{targets} {verified} : {conversations} ({messages}) et {comments} à jour.' },
+  'sync.summary': { en: 'Checked {targets}: {conversations} ({messages}) and {comments} up to date.', fr: '{targets} {verified} : {conversations} ({messages}) et {comments} à jour.' },
   'sync.reviews': { en: ' {reviews} up to date.', fr: ' {reviews} à jour.' },
   'sync.failure.one': { en: ' {failed} could not be read. Reconnect it in Connections, then sync again.', fr: ' {failed} n’a pas pu être lu. Reconnectez-le dans Connexions, puis synchronisez à nouveau.' },
-  'sync.failure.many': { en: ' {failed} could not be read. Reconnect it in Connections, then sync again.', fr: ' {failed} n’ont pas pu être lus. Reconnectez-le dans Connexions, puis synchronisez à nouveau.' },
+  'sync.failure.many': { en: ' {failed} could not be read. Reconnect it in Connections, then sync again.', fr: ' {failed} n’ont pas pu être lus. Reconnectez-les dans Connexions, puis synchronisez à nouveau.' },
   'sync.verified.one': { en: 'checked', fr: 'vérifié' }, 'sync.verified.many': { en: 'checked', fr: 'vérifiés' },
   'sync.targets.one': { en: 'channel', fr: 'canal' }, 'sync.targets.many': { en: 'channels', fr: 'canaux' },
   'sync.conversations.one': { en: 'conversation', fr: 'conversation' }, 'sync.conversations.many': { en: 'conversations', fr: 'conversations' },

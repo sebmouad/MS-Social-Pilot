@@ -11,6 +11,8 @@ import { runtimeConfig, runtimeConfigBatch, runtimeSecret } from '@/server/confi
 import { facebookMediaJournal } from './media-journal';
 import { FACEBOOK_NATIVE_CONFIG, FACEBOOK_NATIVE_TRANSPORT_CONFIG, facebookNativePolicyFrom, facebookNativeTransportPolicyFrom } from './native-config';
 import { createFacebookNativeTransport } from './formats/transport';
+import { createFacebookGroupOperations } from './groups';
+import { facebookGroupScopesSchema } from './config';
 
 async function configured<T>(key: string): Promise<T> {
   return await runtimeConfig(key) as T;
@@ -70,6 +72,22 @@ export async function configuredFacebookAdapter() {
   const feedSchedule = scheduleValues['facebook.schedule.providerHeldEnabled'] === true && Number.isSafeInteger(minLeadSeconds) && Number.isSafeInteger(maxLeadSeconds) && minLeadSeconds < maxLeadSeconds
     ? { minLeadSeconds, maxLeadSeconds } : undefined;
   return createFacebookAdapter(config, fetch, { feedFormatLabel, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal, ...(native ? { native } : {}), ...(feedSchedule ? { feedSchedule } : {}) });
+}
+
+/** Private dependency only. Not installed as customer publishing/discovery:
+ * neutral per-kind capabilities and a shared authorized selection/publish flow
+ * are still required. No retired Group scopes are added to normal OAuth.
+ */
+export async function configuredFacebookGroupOperations() {
+  const [config, discoveryScopes, publishScopes, readScopes] = await Promise.all([
+    configuredFacebookConfig(), runtimeConfig('meta.groupDiscoveryScopes'),
+    runtimeConfig('meta.groupPublishScopes'), runtimeConfig('meta.groupReadScopes'),
+  ]);
+  return createFacebookGroupOperations(config, {
+    discoveryScopes: facebookGroupScopesSchema.parse(discoveryScopes),
+    publishScopes: facebookGroupScopesSchema.parse(publishScopes),
+    readScopes: facebookGroupScopesSchema.parse(readScopes),
+  });
 }
 
 /** Private switch: native formats are declared only while it is on and the native policy is valid. */

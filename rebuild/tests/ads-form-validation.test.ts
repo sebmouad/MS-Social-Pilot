@@ -1,3 +1,4 @@
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => undefined, push: () => undefined, replace: () => undefined }) }));
 // @vitest-environment jsdom
 import { act, createElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';

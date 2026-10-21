@@ -3,6 +3,8 @@ import { useAdsMessage } from '@/modules/ads/ui/AdsCopyProvider';
 import { useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 
 import { useId, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { patchObjectRow } from './row-state';
 import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
@@ -48,6 +50,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
   const [operationBlocked, setOperationBlocked] = useState(false);
   const [loadError, setLoadError] = useState('');
   const toast = useToast();
+  const router = useRouter();
   const [outcome, storeOutcome] = useState<Outcome | null>(null);
   const setOutcome = (value: Outcome | null) => {
     storeOutcome(value);
@@ -117,6 +120,15 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
       const payload = await response.json().catch(() => null) as { outcome?: string; message?: string; warning?: string; error?: string; status?: string; terminal?: boolean; replay?: boolean } | null;
       if (response.ok && payload?.outcome === 'succeeded') {
         setOutcome({ tone: 'ok', key: String(Date.now()), text: payload.warning ?? t('text239') });
+        const done = pending.operation;
+        if (done.type === 'rename') {
+          patchObjectRow(adAccountId, level, objectId, { name: done.name });
+          setDetail(current => current ? { ...current, name: done.name } : current);
+        } else if (done.type === 'status.set') {
+          patchObjectRow(adAccountId, level, objectId, { status: done.status });
+          setDetail(current => current ? { ...current, live: { ...current.live, configuredStatus: done.status } } : current);
+        }
+        router.refresh();
         setPending(null);
         setPendingDialogOpen(false);
         setOperationBlocked(false);

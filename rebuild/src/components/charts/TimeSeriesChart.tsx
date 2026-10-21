@@ -3,7 +3,7 @@ import { ChartShell, type ChartBaseProps, type ChartModel } from "./ChartShell";
 import { dateFormatters, numberFormatter, toTime, type ChartTime, type Granularity, type NumberFormat } from "./format";
 import { getMessages } from "./messages";
 import { axisStyle, baseOption, legendStyle, tooltipStyle } from "./option-base";
-import { colorAt } from "./theme";
+import { colorAt, css } from "./theme";
 
 export type TimeSeriesPoint = { t: ChartTime; v: number | null };
 export type TimeSeries = {
@@ -67,11 +67,11 @@ export function buildTimeSeriesModel(props: TimeSeriesChartProps): ChartModel {
       const { theme } = env;
       const lines = series.flatMap((item, position) => {
         const color = colorAt(theme, item.color ?? position);
-        const filled = stacked || item.area;
+        const filled = stacked || (item.area ?? series.length === 1);
         const primary = {
           type: "line", id: item.id, name: item.name, data: aligned[position],
-          showSymbol: times.length <= 1, connectNulls: false, smooth: false,
-          lineStyle: { width: 2, color }, itemStyle: { color },
+          showSymbol: times.length <= 12, symbolSize: 7, connectNulls: false, smooth: false,
+          lineStyle: { width: 2.5, color, cap: "round" }, itemStyle: { color, borderColor: css(theme.surface), borderWidth: 2 },
           stack: stacked ? "total" : undefined,
           areaStyle: filled ? { color, opacity: 0.16 } : undefined,
           emphasis: { focus: "series" },

@@ -80,8 +80,8 @@ describe('source-specific response report workflows', () => {
     expect(out.csv).toContain('comment_member_first_response_business_minutes');
     expect(out.html).toContain('&lt;Team&gt;'); expect(out.html).not.toContain('<Team>');
     for (const content of [out.html, out.text]) {
-      expect(content).toContain(locale === 'fr' ? 'Commentaires : 1 cycles de résolution enregistrés' : 'Comments: 1 recorded resolution cycles');
-      expect(content).toContain(locale === 'fr' ? 'Conversations : 2 événements de résolution, 2 de réouverture' : 'Conversations: 2 resolution events, 2 reopening events');
+      expect(content).toContain(locale === 'fr' ? 'Commentaires : 1 cycles de résolution enregistrés' : 'Comments: 1 recorded resolution cycles');
+      expect(content).toContain(locale === 'fr' ? 'Conversations : 2 événements de résolution, 2 de réouverture' : 'Conversations: 2 resolution events, 2 reopening events');
       expect(content).toContain(locale === 'fr' ? 'premières réponses' : 'first replies');
     }
     const bounded = renderReport(snapshot as never, { channelName: 'Example', sections: ['responseTime'], generatedAt: at(24), responseTime }, { maxRows: 3, maxBytes: 1000 });
@@ -113,5 +113,5 @@ it('discloses each source member omission in all artifact formats', async () => 
   expect(records.find((r: { metric_key: string }) => r.metric_key === 'comment_members_omitted').value).toBe(1);
   expect(records.find((r: { metric_key: string }) => r.metric_key === 'conversation_members_omitted').value).toBe(0);
   expect(out.csv).toContain('comment_members_omitted');
-  for (const content of [out.html, out.text]) expect(content).toContain('Commentaires : 1 autres membres ayant répondu non affichés.');
+  for (const content of [out.html, out.text]) expect(content).toContain('Commentaires : 1 autres membres ayant répondu non affichés.');
 });

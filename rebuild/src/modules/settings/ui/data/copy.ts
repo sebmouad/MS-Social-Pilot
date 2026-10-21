@@ -28,7 +28,7 @@ export const dataCopy = {
     previewFailed: 'Impossible d’afficher l’aperçu de la suppression des données.', deleteFailed: 'Impossible de supprimer les données de l’espace.',
     deleted: 'Les enregistrements et fichiers de l’espace ont été supprimés. L’espace et l’accès des membres restent disponibles. Le contenu distant des plateformes n’a pas été modifié.',
     counting: 'Comptage en cours…', preview: 'Prévisualiser les données à supprimer', refresh: 'Actualiser l’aperçu',
-    found: 'Enregistrements trouvés dans cet espace, regroupés par contenu :',
+    found: 'Enregistrements trouvés dans cet espace, regroupés par contenu :',
     none: 'Aucun enregistrement de contenu trouvé. Des fichiers stockés et des réglages liés peuvent tout de même être supprimés.',
     confirmLabel: 'Saisissez DELETE pour confirmer', deleting: 'Suppression…', deleteButton: 'Supprimer les données de l’espace',
     permanent: 'La suppression est définitive une fois terminée. Si des fichiers n’ont pas pu être supprimés, vous pouvez réessayer pour terminer. {workspace} subsiste comme espace vide.',

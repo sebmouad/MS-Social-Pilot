@@ -729,7 +729,7 @@ h1, h2, h3 { text-wrap: balance; scroll-margin-top: 88px; }
 .shell-nav__glyph { display: grid; place-items: center; width: 24px; height: 24px; }
 .shell-nav__glyph svg { width: 23px; height: 23px; }
 .shell-rail-utility { margin-top: 20px; min-height: 54px; }
-.shell-rail-avatar { display: grid; place-items: center; flex: 0 0 auto; width: 32px; height: 32px; margin: 18px auto 0; border: 1px solid var(--rail-ink); border-radius: 50%; font-size: 12px; font-weight: 700; }
+.shell-rail-avatar { display: grid; place-items: center; flex: 0 0 auto; width: 36px; height: 36px; margin: 18px auto 0; border: 2px solid color-mix(in srgb, var(--rail-ink) 55%, transparent); border-radius: 50%; background: var(--rail-active-bg, color-mix(in srgb, var(--rail-ink) 18%, transparent)); color: var(--rail-active-ink, var(--rail-ink)); font-size: 13px; font-weight: 750; line-height: 1; user-select: none; }
 .shell-context-sidebar { position: sticky; top: 0; height: 100dvh; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 20px; padding: 25px 18px 16px; border-right: 1px solid var(--line); background: var(--surface-raised); }
 .shell-context-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .shell-wordmark { color: var(--ink); font-size: 21px; font-weight: 750; letter-spacing: -.7px; }

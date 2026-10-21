@@ -14,6 +14,13 @@ const viewer = { workspaceId: 'workspace-a', entitlements: {}, permissions: { pa
 beforeEach(() => { vi.clearAllMocks(); deps.selected.mockResolvedValue(['current', 'expired', 'revoked']); deps.credentials.mockResolvedValue(['current', 'expired', 'revoked'].map(id => ({ id, accessToken: 'encrypted-test-token', socialAccount: { scopes: 'configured_publish_grant', invalidatedAt: null, tokenExpiresAt: null } })));  deps.enabled.mockReturnValue(true); deps.product.mockReturnValue(true); deps.adapter.mockResolvedValue({ publish: vi.fn(), supportsTargetKind: () => true }); });
 
 describe('shared publishing destination choices', () => {
+  it('includes the selected channel picture without exposing its credentials', async () => {
+    deps.targets.mockResolvedValue([target('current', { pictureUrl: 'https://images.example.test/page.jpg' })]);
+    const [choice] = await publishingDestinationChoices(viewer, now);
+    expect(choice?.pictureUrl).toBe('https://images.example.test/page.jpg');
+    expect(choice).not.toHaveProperty('accessToken');
+    expect(choice).not.toHaveProperty('socialAccount');
+  });
   it('does not advertise publishing when the product feature is unavailable', async () => {
     deps.targets.mockResolvedValue([target('current')]);
     deps.product.mockReturnValue(false);

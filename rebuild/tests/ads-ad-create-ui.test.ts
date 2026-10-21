@@ -3,6 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 const state = vi.hoisted(() => ({ randomUUID: vi.fn(() => 'ad-request-1') }));
 import { AdCreateForm } from '../src/modules/ads/ui/AdCreateForm';
 import { ObjectManager } from '../src/modules/ads/ui/objects/ObjectManager';

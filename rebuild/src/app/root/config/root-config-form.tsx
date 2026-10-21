@@ -2,7 +2,7 @@
 import { ROOT_CONFIG_COPY, configCopyText, type RootConfigCopy } from '@/lib/config/root-config-copy';
 import { AutoTextarea } from '@/components/AutoTextarea';
 
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconSearch, IconSettings, IconDeviceFloppy, IconTrash } from '@tabler/icons-react';
 import { Field, TextInput, Switch, useFieldProps } from '@/components/Forms';
 import { Select } from '@/components/Select';
@@ -40,8 +40,24 @@ export function RootConfigForm({ definitions, initialValues, availability, group
   const sections = Array.from(new Set(ordered.map(categoryFor)));
   const [section, setSection] = useState(sections[0] ?? '');
   const [search, setSearch] = useState(initialSearch);
+  const hasDrafts = Object.keys(inputs).length > 0;
+  useEffect(() => {
+    if (!hasDrafts) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [hasDrafts]);
+  // Search metadata only: never include saved values or secret drafts.
+  const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const searchIndex = useMemo(() => new Map(definitions.map(item => [item.key,
+    normalize(`${item.label} ${item.key} ${item.description} ${item.group} ${item.owner.kind === 'shared' ? copy.shared : `${copy[item.owner.kind]} · ${item.owner.id}`}`),
+  ])), [definitions, copy]);
+  const terms = normalize(search).trim().split(/\s+/).filter(Boolean);
   const visible = definitions.filter((item) => {
-    if (search.trim()) return `${item.label} ${item.key} ${item.description} ${item.group} ${ownerName(item)}`.toLowerCase().includes(search.trim().toLowerCase());
+    if (terms.length) {
+      const metadata = searchIndex.get(item.key) ?? '';
+      return terms.every(term => metadata.includes(term));
+    }
     return categoryFor(item) === section;
   });
 
@@ -72,7 +88,7 @@ export function RootConfigForm({ definitions, initialValues, availability, group
       }
       if (response.redirected || !Array.isArray(result.values) || !result.values.every(item => item && typeof item === 'object' && typeof item.key === 'string' && typeof item.isSet === 'boolean' && typeof item.source === 'string') || !result.values.some(item => item.key === key)) throw new Error(copy.invalidResponse);
       setValues(result.values as Values);
-      if (operation === 'save') setInputs((current) => {
+      setInputs((current) => {
         const next = { ...current };
         delete next[key];
         return next;
@@ -96,7 +112,7 @@ export function RootConfigForm({ definitions, initialValues, availability, group
   return <div className="root-config__layout">
     <SidebarDock><aside className="root-config__sidebar" aria-label={copy.sectionsLabel}><FilterPanel title={copy.sectionsLabel} activeCount={search.trim() ? 1 : 0} onReset={() => setSearch('')} resetLabel={interfaceCopy.reset}>
       <label htmlFor="root-config-search">{copy.find}</label>
-      <TextInput leading={<IconSearch size={18} />} id="root-config-search" type="search" maxLength={searchMaxCharacters} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={copy.searchPlaceholder} />
+      <TextInput leading={<IconSearch size={18} />} id="root-config-search" name="settings-search" autoComplete="off" aria-controls="root-config-results" type="search" maxLength={searchMaxCharacters} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={copy.searchPlaceholder} />
       <nav aria-label={copy.categoriesLabel}>
         {sections.map((name) => <button key={name} type="button" className={!search && section === name ? 'is-active' : ''} aria-current={!search && section === name ? 'page' : undefined} onClick={() => { setSection(name); setSearch(''); }}>{name}</button>)}
       </nav>
@@ -104,7 +120,7 @@ export function RootConfigForm({ definitions, initialValues, availability, group
     <div className="root-config__content" ref={errorsRef}>
     <FilterChips filters={search.trim() ? [{ key: 'search', label: interfaceCopy.search, value: search }] : []} onRemove={() => setSearch('')} label={interfaceCopy.filters} removeLabel={interfaceCopy.removeFilter} />
     <ConfigHistory copy={interfaceCopy} />
-    <div className="root-config__content-head"><h2>{search ? configCopyText(copy.searchResults, { search }) : section}</h2><span>{configCopyText(copy.count, { count: visible.length })}</span></div>
+    <div className="root-config__content-head" id="root-config-results"><h2>{search ? configCopyText(copy.searchResults, { search }) : section}</h2><span aria-live="polite" aria-atomic="true">{configCopyText(copy.count, { count: visible.length })}</span></div>
     {message && <p className="root-config__status" role={message.error ? 'alert' : 'status'} aria-live={message.error ? 'assertive' : 'polite'}>{message.text}</p>}
     {visible.length === 0 && <div className="root-config__empty"><EmptyState title={copy.empty} icon={<IconSettings />} action={<Button onClick={() => setSearch('')}>{interfaceCopy.reset}</Button>} /></div>}
     {visible.map((definition) => {
@@ -130,7 +146,12 @@ export function RootConfigForm({ definitions, initialValues, availability, group
               try { value = JSON.parse(String(value)); }
               catch { error = configCopyText(copy.invalidJson, { label: definition.label }); }
             }
-            if (error) { setFieldErrors(old => ({ ...old, [definition.key]: error })); setMessage({ text: error, error: true }); return; }
+            if (error) {
+              setFieldErrors(old => ({ ...old, [definition.key]: error })); setMessage({ text: error, error: true });
+              const card = [...(errorsRef.current?.querySelectorAll<HTMLElement>('[data-setting]') ?? [])].find(item => item.dataset.setting === definition.key);
+              card?.querySelector<HTMLElement>('input,textarea')?.focus();
+              return;
+            }
             void write(definition.key, 'save', value);
           }}>{copy.save}</Button>}
           {definition.kind === 'secret' && <Button variant="danger" leading={<IconTrash size={16} />} disabled={isPending || !current?.isSet} onClick={() => setClearKey(definition.key)}>{copy.clearSecret}</Button>}

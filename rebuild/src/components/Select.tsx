@@ -102,7 +102,7 @@ export function Select({ options, value, onChange, id, name, placeholder = "Sele
   return <div className={`ui-select ${className}`.trim()} ref={rootRef} onKeyDown={onKey}>
     {name && <input type="hidden" name={name} value={value} />}
     <button ref={triggerRef} id={triggerId} type="button" role="combobox" className="ui-select__trigger" aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined}
-      aria-activedescendant={!searchable ? activeId : undefined} aria-label={rest["aria-label"]} aria-invalid={invalid || undefined} aria-describedby={describedBy} disabled={disabled}
+      aria-autocomplete="none" aria-activedescendant={!searchable ? activeId : undefined} aria-label={rest["aria-label"]} aria-invalid={invalid || undefined} aria-describedby={describedBy} disabled={disabled}
       onClick={() => open ? close(false) : openList()}>
       {selected?.icon && <span className="ui-select__icon" aria-hidden="true">{selected.icon}</span>}
       <span className={`ui-select__value${selected ? "" : " is-placeholder"}`}>{selected?.label ?? placeholder}</span>
@@ -113,7 +113,7 @@ export function Select({ options, value, onChange, id, name, placeholder = "Sele
         <input ref={searchRef} role="combobox" aria-expanded="true" aria-controls={listId} aria-activedescendant={activeId} aria-autocomplete="list" aria-label={searchLabel} value={query} autoComplete="off" spellCheck={false}
           onChange={event => { setQuery(event.target.value); setActive(0); }} /></div>}
       <ul id={listId} role="listbox" aria-label={rest["aria-label"] ?? placeholder} className="ui-select__list">
-        {visible.length === 0 && <li className="ui-select__empty" role="presentation">{noMatchLabel}</li>}
+        {visible.length === 0 && <li className="ui-select__empty" role="presentation"><span role="status" aria-live="polite" aria-atomic="true">{noMatchLabel}</span></li>}
         {visible.map((option, index) => <li key={option.value} id={`${listId}-${index}`} role="option" aria-selected={option.value === value} aria-disabled={option.disabled || undefined}
           className={`ui-select__option${index === active ? " is-active" : ""}${option.value === value ? " is-selected" : ""}`}
           onPointerEnter={() => !option.disabled && setActive(index)} onMouseDown={event => event.preventDefault()} onClick={() => pick(option)}>

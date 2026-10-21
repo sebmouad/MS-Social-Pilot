@@ -17,3 +17,17 @@ export function inboxHref(location: InboxLocation = {}) {
   for (const [key, value] of Object.entries(location)) if (value && !(key === 'channel' && value === 'all')) search.set(key, value);
   return search.size ? `${inboxManifest.href}?${search}` : inboxManifest.href;
 }
+
+/** Normalized, service-approved filters for all row and paging links. */
+export function inboxListLocation(page: import('./server/types').InboxListPage): InboxLocation {
+  const filters = page.filters;
+  return {
+    ...(filters.channelId ? { channel: filters.channelId } : {}),
+    ...(filters.kind !== 'all' ? { type: filters.kind } : {}),
+    ...(filters.state !== 'open' ? { status: filters.state } : {}),
+    ...(filters.hidden !== 'visible' ? { hidden: filters.hidden } : {}),
+    ...(filters.q ? { q: filters.q } : {}),
+    ...(page.quick?.length ? { quick: page.quick.join(',') } : {}),
+    limit: String(page.limit),
+  };
+}

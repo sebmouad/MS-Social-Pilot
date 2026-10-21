@@ -102,9 +102,10 @@ export function RadioCards({ options, value, onChange, legend, name }: ChoicePro
 /** Single-row choice (2 to 5 short options). Never wraps: options share the width and the label truncates. Arrow keys move. */
 export function SegmentedControl({ options, value, onChange, legend }: ChoiceProps) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const focusValue = options.find(option => option.value === value && !option.disabled)?.value ?? options.find(option => !option.disabled)?.value;
   const onKey = (event: KeyboardEvent) => {
     const enabled = options.map((option, index) => ({ option, index })).filter(entry => !entry.option.disabled);
-    const at = enabled.findIndex(entry => entry.option.value === value);
+    const at = enabled.findIndex(entry => entry.option.value === focusValue);
     const delta = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
     if (!delta || !enabled.length) return;
     event.preventDefault();
@@ -113,7 +114,7 @@ export function SegmentedControl({ options, value, onChange, legend }: ChoicePro
     refs.current[next.index]?.focus();
   };
   return <div role="radiogroup" aria-label={legend} className="ui-segmented" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }} onKeyDown={onKey}>
-    {options.map((option, index) => <button key={option.value} ref={node => { refs.current[index] = node; }} type="button" role="radio" aria-checked={option.value === value} tabIndex={option.value === value ? 0 : -1} disabled={option.disabled}
+    {options.map((option, index) => <button key={option.value} ref={node => { refs.current[index] = node; }} type="button" role="radio" aria-checked={option.value === value} tabIndex={option.value === focusValue ? 0 : -1} disabled={option.disabled}
       className="ui-segmented__option" title={option.label} onClick={() => onChange(option.value)}>
       {option.icon && <span aria-hidden="true" className="ui-segmented__icon">{option.icon}</span>}<span className="ui-segmented__label">{option.label}</span>
     </button>)}
@@ -148,7 +149,7 @@ export function FileDropzone({ onFiles, label, help, accept, multiple = false, d
       <IconCloudUpload size={28} stroke={1.5} aria-hidden="true" />
       <button type="button" className="ui-dropzone__button" id={id} disabled={disabled || busy} aria-busy={busy || undefined} aria-describedby={help ? `${id}-h` : undefined} onClick={() => input.current?.click()}>{label}</button>
       {help && <small id={`${id}-h`}>{help}</small>}
-      <input ref={input} type="file" tabIndex={-1} className="ui-visually-hidden" accept={accept} multiple={multiple} disabled={disabled} onChange={event => { take(event.target.files); event.target.value = ""; }} />
+      <input ref={input} type="file" aria-label={label} aria-describedby={help ? `${id}-h` : undefined} tabIndex={-1} className="ui-visually-hidden" accept={accept} multiple={multiple} disabled={disabled || busy} onChange={event => { take(event.target.files); event.target.value = ""; }} />
     </div>
     {files && files.length > 0 && <ul className="ui-dropzone__files">{files.map(file => <li key={file.id}><IconFile size={16} aria-hidden="true" /><span>{file.name}</span>
       {onRemove && <button type="button" className="ui-icon-button" aria-label={`${removeLabel} ${file.name}`} onClick={() => onRemove(file.id)}><IconX size={14} aria-hidden="true" /></button>}</li>)}</ul>}

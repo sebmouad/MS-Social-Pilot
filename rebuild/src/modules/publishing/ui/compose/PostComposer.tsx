@@ -1,4 +1,5 @@
 'use client';
+import { IconBroadcast, IconCalendarEvent, IconMessageCircle, IconPencil, IconPhoto } from '@tabler/icons-react';
 import { BestTimeSuggestions } from './BestTimeSuggestions';
 import { GroupShortcut } from '@/modules/settings/ui/profiles/GroupShortcut';
 import { profileChannelName, type ProfileDirectory } from '@/modules/settings/channel-profiles/contracts';
@@ -32,6 +33,7 @@ import { ComposerCopyProvider } from './CopyProvider';
 type LocalImageUpload = { maxBytes: number; mimeTypes: readonly string[] };
 type TargetChoice = {
   id: string; name: string; type: string; provider: string | null; canPublish: boolean;
+  pictureUrl?: string | null;
   /** The installed platform module's customer-facing name; null when unknown. */
   platformName?: string | null;
   publishingMedia?: PublishingMediaSupport;
@@ -56,11 +58,13 @@ async function saveWithTransportRecovery(failureMessage: string, previous: Compo
   }
 }
 
+const STEP_ICONS = [IconBroadcast, IconPencil, IconPhoto, IconMessageCircle, IconCalendarEvent];
+
 /** One numbered stage of the authoring flow: destinations, content, media, first comment, scheduling. */
 function Step({ n, title, help, children }: { n: number; title: string; help?: string; children: ReactNode }) {
   const id = useId();
   return <section className={styles.step} aria-labelledby={id}>
-    <header className={styles.stepHead}><span className={styles.stepNumber} aria-hidden="true">{n}</span><h2 id={id}>{title}</h2></header>
+    <header className={styles.stepHead}><span className={styles.stepNumber} aria-hidden="true">{(() => { const Glyph = STEP_ICONS[n - 1] ?? IconPencil; return <Glyph size={16} stroke={2} />; })()}</span><h2 id={id}>{title}</h2><span className={styles.stepCount} aria-hidden="true">{n}/{STEP_ICONS.length}</span></header>
     {help ? <p className={styles.fieldHelp}>{help}</p> : null}
     {children}
   </section>;
@@ -175,6 +179,8 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const [draftPostId, setDraftPostId] = useState(initial.draftPostId ?? '');
   const [autosave, setAutosave] = useState<{ status: 'idle' | 'saving' | 'saved' | 'error'; at?: string }>({ status: 'idle' });
   const autosaveInFlight = useRef<Promise<unknown> | null>(null);
+  const waitingForAutosave = useRef(false);
+  const lastAutosaveAttempt = useRef('');
   const lastAutosaved = useRef('');
   const draftIdRef = useRef(initial.draftPostId ?? '');
   const selected = useMemo(() => targets.filter(target => selectedTargets.includes(target.id) && target.canPublish), [targets, selectedTargets]);
@@ -230,11 +236,16 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const pendingFiles = attachments.items.some(item => item.source === 'upload' && item.file);
   const autosaveSignature = JSON.stringify([message, firstComment, firstCommentDelayMinutes, labelId, link, selectedTargets, formatChoices, attachments.media]);
   useEffect(() => {
-    if (!autosaveSeconds || saved || pending || uploading || pendingFiles || submitGuard.current !== 'ready') return;
+    if (!autosaveSeconds || saved || pending || uploading || pendingFiles || autosaveInFlight.current || waitingForAutosave.current || submitGuard.current !== 'ready') return;
     if (autosaveSignature === lastAutosaved.current || (!message.trim() && !link.trim() && !attachments.media.length)) return;
+    if (autosaveSignature === lastAutosaveAttempt.current) return;
     const delay = firstCommentDelayMinutes === '' ? 0 : Number(firstCommentDelayMinutes);
     if (!Number.isSafeInteger(delay) || delay < 0 || delay > maxFirstCommentDelayMinutes) return;
     const timer = setTimeout(() => {
+      // Typing while the request is pending must not create a second draft or
+      // allow an older update to overwrite a newer one.
+      if (autosaveInFlight.current || waitingForAutosave.current || submitGuard.current !== 'ready') return;
+      lastAutosaveAttempt.current = autosaveSignature;
       const data = new FormData();
       data.set('message', message); data.set('firstComment', firstComment); data.set('firstCommentDelayMinutes', firstCommentDelayMinutes);
       data.set('labelId', labelId); data.set('link', link); data.set('mediaJson', JSON.stringify(attachments.media)); data.set('destinationFormatsJson', destinationFormatsJson);
@@ -251,7 +262,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
       autosaveInFlight.current = run;
     }, autosaveSeconds * 1000);
     return () => clearTimeout(timer);
-  }, [autosaveSeconds, autosaveSignature, saved, pending, uploading, pendingFiles, message, firstComment, firstCommentDelayMinutes, labelId, link, attachments.media, destinationFormatsJson, selected, draftPostId, maxFirstCommentDelayMinutes, aiLocale, schedule.timeZone]);
+  }, [autosaveSeconds, autosaveSignature, autosave.status, saved, pending, uploading, pendingFiles, message, firstComment, firstCommentDelayMinutes, labelId, link, attachments.media, destinationFormatsJson, selected, draftPostId, maxFirstCommentDelayMinutes, aiLocale, schedule.timeZone]);
 
   // The chosen queue time is shown before saving. A save that placed (or failed to place) a post changes what is free, so it refreshes too.
   const selectedKey = JSON.stringify(selected.map(target => target.id));
@@ -288,7 +299,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     link: link || null,
     media: attachments.media,
     status: 'draft', scheduledAt: null, publishedAt: null, createdAt, displayTime: createdAtDisplay,
-    targets: selected.map(target => ({ status: 'pending', remotePostId: null, remoteUrl: null, target: { id: target.id, type: target.type, name: target.name, pictureUrl: null } })),
+    targets: selected.map(target => ({ status: 'pending', remotePostId: null, remoteUrl: null, target: { id: target.id, type: target.type, name: target.name, pictureUrl: target.pictureUrl ?? null } })),
   }), [message, firstComment, link, attachments.media, createdAt, createdAtDisplay, selected]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -297,7 +308,11 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     // A background save still in flight must finish first so the manual save reuses its draft instead of creating a second one.
     if (autosaveInFlight.current) {
       event.preventDefault();
-      await autosaveInFlight.current;
+      if (waitingForAutosave.current) return;
+      waitingForAutosave.current = true;
+      try { await autosaveInFlight.current; }
+      finally { waitingForAutosave.current = false; }
+      if (!form.isConnected) return;
       flushSync(() => setDraftPostId(draftIdRef.current));
       form.requestSubmit(submitter ?? undefined);
       return;
@@ -374,7 +389,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
           const channelName = profiles?.channels.find(channel => channel.id === target.id) ? profileChannelName(profiles.channels.find(channel => channel.id === target.id)!) : target.name;
           const format = heldFormat(target);
           return <li key={target.id}>
-            <Avatar name={channelName} size={26} />
+            <Avatar name={channelName} src={target.pictureUrl} size={26} />
             <span className={styles.chosenName}>{channelName}</span>
             {target.platformName ? <Badge tone="neutral">{target.platformName}</Badge> : null}
             {format && target.publishingFormats && target.publishingFormats.length > 1 ? <span className={styles.chosenMeta}>{text.formatLabel(format.label)}</span> : null}

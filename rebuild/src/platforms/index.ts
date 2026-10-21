@@ -1,3 +1,5 @@
+import { INSTAGRAM_CONFIG } from './instagram/config';
+export { instagramModule } from './instagram/module';
 import { FACEBOOK_ADS_CREATION_CONFIG } from './facebook/ads-ui-config';
 import { FACEBOOK_CONFIG, facebookModule } from './facebook/module';
 import type { PlatformModule } from './module';
@@ -10,10 +12,13 @@ import type { PlatformModule } from './module';
  * wiring to `src/server/platforms/index.ts`. Root then shows it on the Platforms
  * screen with its on/off switch, and customers see it once it is on and set up.
  */
+/** Platform modules whose settings are registered while host wiring is pending; not customer-visible (enabled defaults to false). */
+export const STAGED_PLATFORM_IDS: readonly string[] = ['instagram'];
+
 export const PLATFORM_MODULES = [facebookModule] as const satisfies readonly PlatformModule[];
 
 /** Every module's Root settings, merged into the configuration registry. */
-export const PLATFORM_CONFIG = [...FACEBOOK_CONFIG, ...FACEBOOK_ADS_CREATION_CONFIG.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }))] as const;
+export const PLATFORM_CONFIG = [...INSTAGRAM_CONFIG, ...FACEBOOK_CONFIG, ...FACEBOOK_ADS_CREATION_CONFIG.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }))] as const;
 
 export type PlatformId = (typeof PLATFORM_MODULES)[number]['id'];
 

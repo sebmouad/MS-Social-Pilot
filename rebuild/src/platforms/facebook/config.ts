@@ -55,6 +55,16 @@ export const FACEBOOK_DATA_CONFIG = [
   entry({ key: 'meta.contentInsightCollections', group: 'Facebook · Analytics collection', label: 'Content insight collections', kind: 'json', description: 'Version-verified posts, videos, Reels and Stories metrics and periods. Empty until verified against the configured Graph version. Uses existing insight read grants; does not grant permissions.', defaultValue: [], schema: facebookContentInsightsSchema, consumption: 'active' }),
 ] as const;
 
+/** Private protocol compatibility policy. These settings do not advertise Groups,
+ * restore Meta's retired API or add retired permissions to normal OAuth requests.
+ */
+export const facebookGroupScopesSchema = z.array(z.string().trim().min(1));
+export const FACEBOOK_GROUP_CONFIG = [
+  entry({ key: 'meta.groupDiscoveryScopes', group: 'Facebook · Groups compatibility', label: 'Group discovery grants', kind: 'json', description: 'Recorded grants required by the private Group discovery transport. Meta removed Groups API access across all versions in April 2024. This policy does not enable customer Group choices or restore access.', defaultValue: ['groups_access_member_info'], schema: facebookGroupScopesSchema, consumption: 'configured' }),
+  entry({ key: 'meta.groupPublishScopes', group: 'Facebook · Groups compatibility', label: 'Group publishing grants', kind: 'json', description: 'Recorded grants required in addition to positive Group discovery before private feed/link/single-photo dispatch. Configured scope names cannot grant Meta access. Empty refuses every write.', defaultValue: ['publish_to_groups'], schema: facebookGroupScopesSchema, consumption: 'configured' }),
+  entry({ key: 'meta.groupReadScopes', group: 'Facebook · Groups compatibility', label: 'Group status grants', kind: 'json', description: 'Recorded grants required before private Group post readback. Missing grants or provider denial leave status unknown; they never prove publication or deletion.', defaultValue: ['groups_access_member_info'], schema: facebookGroupScopesSchema, consumption: 'configured' }),
+] as const;
+
 /**
  * Legacy arrays cannot distinguish an old default snapshot from deliberate removal.
  * Migrate them as additions, never infer exclusions from absence. Operators record

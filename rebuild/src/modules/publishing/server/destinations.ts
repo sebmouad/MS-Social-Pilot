@@ -43,7 +43,7 @@ export async function publishingTargetChoices(workspaceId: string, entitlements:
       canPublish = false;
     }
     return {
-      id: target.id, name: target.name, type: target.type, provider,
+      id: target.id, name: target.name, pictureUrl: target.pictureUrl, type: target.type, provider,
       // Customer-facing platform name from the installed module registry; null when the module is gone.
       platformName: provider ? platformModule(provider)?.name ?? null : null,
       canPublish,

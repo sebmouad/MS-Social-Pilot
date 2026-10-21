@@ -16,6 +16,7 @@ import { pageLocale } from "../kit/locale";
 import workflow from "@/modules/publishing/ui/workflow.module.css";
 import { CancelScheduleForm } from "./CancelScheduleForm";
 import { canCancelQueuedPost } from "@/modules/publishing/ui/workflow-access";
+import { isWaitingToReschedule } from '../../schedule-state';
 import { cancelScheduledPostAction } from "@/modules/publishing/ui/posts/actions";
 
 import { RescheduleQueuedPost } from "./RescheduleQueuedPost";
@@ -53,7 +54,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       <ul className={workflow.items} aria-label={dayHeading(key)}>{posts.map(post => {
         const due = post.scheduledAt !== null && post.scheduledAt <= now;
         const mayCancel = canCancelQueuedPost({ canWritePosts: viewer.permissions.features["publishing/posts"].write, role: viewer.membership.role, userId: viewer.user.id, authorId: post.authorId });
-        const mayMove = mayCancel && post.scheduledAt && post.targets.every(target => target.status === "pending" && !target.remotePostId);
+        const mayMove = mayCancel && post.scheduledAt && post.targets.length > 0 && isWaitingToReschedule(post);
         const wall = post.scheduledAt ? instantToWall(post.scheduledAt, timeZone) : null;
         const actions = <div className={workflow.actions}>
           {mayCancel ? <><CancelScheduleForm postId={post.id} action={cancelScheduledPostAction} locale={locale} /><p className={workflow.help}>{copy.queueCancelHelp}</p></>

@@ -444,11 +444,11 @@ export const customerCopy = {
   },
   "Linking: {0}": {
     "en": "Linking: {0}",
-    "fr": "À lier : {0}"
+    "fr": "À lier : {0}"
   },
   "Linked: {0}": {
     "en": "Linked: {0}",
-    "fr": "Liée : {0}"
+    "fr": "Liée : {0}"
   },
   "A checklist can have at most {0} tasks. Remove {1} and try again.": {
     "en": "A checklist can have at most {0} tasks. Remove {1} and try again.",
@@ -520,7 +520,7 @@ export const customerCopy = {
   },
   "Enter a {0}.": {
     "en": "Enter a {0}.",
-    "fr": "Saisissez : {0}."
+    "fr": "Saisissez : {0}."
   },
   "The {0} is longer than {1} characters.": {
     "en": "The {0} is longer than {1} characters.",
@@ -528,7 +528,7 @@ export const customerCopy = {
   },
   "This key returns at most {0} results per call, so a checklist can create at most {1} tasks at once. Nothing was created.": {
     "en": "This key returns at most {0} results per call, so a checklist can create at most {1} tasks at once. Nothing was created.",
-    "fr": "Cette clé renvoie au maximum {0} résultats par appel ; une liste peut donc créer au maximum {1} tâches à la fois. Aucune tâche n’a été créée."
+    "fr": "Cette clé renvoie au maximum {0} résultats par appel ; une liste peut donc créer au maximum {1} tâches à la fois. Aucune tâche n’a été créée."
   },
   "A checklist can create at most {0} tasks at once.": {
     "en": "A checklist can create at most {0} tasks at once.",

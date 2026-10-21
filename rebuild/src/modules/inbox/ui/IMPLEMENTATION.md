@@ -104,3 +104,144 @@ Evidence: `tests/inbox-round3.test.ts` (quick-filter SQL, bulk service, trend, d
 Scope caveat: `orderInboxCommentBatch` is a synchronous helper called from provider-owned files outside this lane. It accepts an optional error string, but those callers still use the bilingual catalog's English default until they pass `await inboxServiceText('historyUnsafe')`. The parser's direct synchronous compatibility callers similarly default to the catalog; Inbox read services pass current Root cursor error copy. Provider-owned errors and shared shell/form component copy are outside Inbox ownership. No browser, database, live-provider or production verification was performed. Root registry schema-version and shared architecture/handoff documentation updates belong to the integrator.
 
 Automated evidence for this batch: targeted Inbox Vitest checks passed 230 unique tests across 24 files (combined run 220/23, then the new service-template case plus nine digest producer cases; final affected-control recheck 52/5). The catalog test checks both languages, strict missing/unknown-field rejection, Root overrides, and default template parity including exhaustive sync count combinations. `npx tsc --noEmit -p .` passed with zero errors; `git diff --check` passed. Existing isolated service/page tests explicitly mock the new request catalog with declared defaults. These counts exclude full-suite, browser and live-provider validation.
+
+## Inbox quality lane — 2026-10-21
+
+This batch changes `/inbox` only. Source and synthetic automated evidence are
+separate from PostgreSQL, real browser, Next/RSC transport, provider and production
+verification. No app server, deployment, push or production operation was run.
+
+### Changes and ownership
+
+- `ui/InboxList.tsx`, `ui/InboxListRows.tsx`, `ui/list-action.ts`,
+  `ui/InboxScreen.tsx`, `query.ts`: progressive activity loading appends older
+  cursor pages through the existing `readInboxList` service. Server-rendered row
+  slots retain the existing avatars, channel badges, unread counts, action grants
+  and locale/workspace-formatted times. No provider rules move into shared code.
+  Each continuation derives its actor and channel ceiling from the current
+  session; the shared service rechecks tenant, membership, entitlements and
+  resource scope. Cursor validation/order are unchanged. There is no new write,
+  confirmation, audit policy, REST operation or MCP operation.
+- `ui/inbox.module.css`: one bounded list viewport below the bulk controls fixes
+  the former implicit third grid row. The history/composer keep their own space.
+  The list also scrolls in a bounded phone surface. Long lists use
+  `content-visibility` with an intrinsic row estimate to reduce offscreen painting.
+- `ui/InboxList.tsx`: in-flight deduplication, duplicate-row suppression, focused
+  keyboard paging controls, live count feedback, retained rows after failure,
+  explicit manual retry and a real continuation link. Auto-loading stops after
+  a failed request; the Root page cap bounds accumulated rows. Sidebar cursor
+  controls remain available. Appended pages are not separately URL-persisted;
+  opening a row links to its containing cursor page. History keeps explicit
+  Earlier/Newer/Latest paging rather than automatic history loading.
+- `ui/InboxSelection.tsx`: selected rows are intersected with currently visible
+  rows and their latest permission metadata; removed selections cannot revive
+  when navigating back. The list revision includes actor, channel ceiling,
+  authorized channel choices, filters, initial cursor, item data, grants and
+  display policy, discarding appended rows and pending reads after changes.
+- `ui/ThreadTools.tsx`: thread/kind-keyed internal state prevents a reply draft,
+  assignment/note form state or pending replacement dialog carrying into a
+  different conversation. Same-thread refreshes preserve the draft.
+- `ui/ThreadScroll.tsx`, `ui/InboxScreen.tsx`: history opens on the newest entry;
+  a refresh follows the end only while the reader is there. Reading older
+  entries preserves scroll position. History counts no longer reset the scroller.
+- `server/threads.ts`, `ui/InboxScreen.tsx`, `ui/InboxListRows.tsx`: list/history
+  and displayed sync times use the selected English/French locale while retaining
+  the workspace timezone and absolute ISO timestamps.
+- `config.ts`, `ui/copy.ts`: registered Root controls and bilingual progressive
+  loading/retry/continuation copy; the existing strict `inbox.customerCopy`
+  catalog collects these strings. `CONFIG_SCHEMA_VERSION` is unchanged.
+
+New registered Root keys (in `INBOX_MODULE_CONFIG`, already aggregated):
+
+| Key | Default / validation | Consumer |
+| --- | --- | --- |
+| `inbox.progressivePageLimit` | 10; integer 1–100 | Initial screen → `InboxList`, including initial page. 1 retains explicit paging only. |
+| `inbox.listPreviewMaxCharacters` | 180; integer 1–10,000 | Initial and continued server row rendering. Full text stays in the authorized thread. |
+
+Changed/added test files: `inbox-state-isolation.test.ts`,
+`inbox-progressive-list.test.ts`, `inbox-progressive-action.test.ts`,
+`inbox-browsing-page.test.ts`, `inbox-thread-scroll.test.ts`,
+`inbox-threads.test.ts`, `inbox-nested-replies.test.ts`,
+`inbox-round2-ui.test.ts`, `inbox-round3-ui.test.ts`, and the manual file-based
+`inbox-visual-check.cjs` fixture. Existing screen tests now mock runtime settings
+and contact-details reads rather than accidentally attempting a real database.
+
+### Design rules applied to the changed screen
+
+| Screen | Applied skills and visible result |
+| --- | --- |
+| `/inbox` activity list | Taste/app-screen rules preserve the established module color, avatars, badges and two-pane work surface. Web Interface Guidelines supply a named keyboard-focusable scroll region, real button/link alternatives, focus rings, busy/live feedback, bounded overflow and safe long-list painting. Composition Patterns keep server row slots separate from client loading/selection state without new boolean modes. React Best Practices overlap independent grant/config reads, memoize selectable rows and deduplicate requests. Users can scroll through older activity while bulk controls remain accessible. |
+| `/inbox` history/composer | Taste rules preserve the existing message bubbles and composer hierarchy. Web Interface Guidelines keep the labelled keyboard scroller and locale-correct dates. Composition Patterns isolate draft/productivity state by explicit thread identity. React Best Practices use refs for transient scroll position and a layout effect for initial/follow-end scrolling, avoiding scroll-driven rerenders. Readers keep their place during refreshes and cannot carry a draft into another thread. |
+
+Scoped taste lint (`--app`, seven changed UI/CSS files) has **0 FAIL, 1 WARN**:
+the pre-existing list-pane shadow. A preliminary `--help` invocation was treated
+by that script as a whole-repository scan; its unrelated legacy findings are not
+a scoped Inbox result. No global design changes were made.
+
+### Evidence and limits
+
+Regression cases were observed failing before the state-isolation, follow-end,
+French-time and authorized-channel-invalidation fixes, then passing. Synthetic
+fixtures exercise 80 alternating comments/Messenger conversations across ten
+Facebook Page identities; separate reply-tree checks cover ten discussions with
+60 nested replies each, including missing-parent history windows. These are
+mocked read-entry/presentation and pure-tree tests; they do not prove database
+SQL order/performance or live-provider completeness. Existing Inbox tests cover
+service roles/channel scope, reply windows, writes, deletion recovery, moderation,
+assignment, notes, saved replies, filters, metadata and sync query behavior.
+
+`tests/inbox-visual-check.cjs` bundles the actual list/history components and
+server row renderer into a file-based synthetic fixture, with explicit router/
+action stubs and no server/database/provider calls. Its attempted Chromium run
+was blocked before rendering by macOS sandbox process registration:
+`bootstrap_check_in ... MachPortRendezvousServer ... Permission denied (1100)`.
+No screenshot, phone/theme, keyboard-browser or actual Next server-action
+transport pass is claimed. Run the fixture and the real route on an authorized
+synthetic preview environment before calling this visually or release verified.
+
+### Remaining gaps and exact integrator edits outside this lane
+
+1. `src/app/api/inbox/route.ts`: add `'quick'` to the GET query allowlist beside
+   `'limit'`. `inboxListInput` already translates the comma-separated string and
+   `readInboxList` already validates/applies it. Currently REST refuses a filter
+   supported by UI/MCP. Keep duplicate-argument validation and service authority.
+2. `docs/MCP_PARITY.md`: amend the existing `list_inbox` → `GET /api/inbox` row
+   (do not create a duplicate operation) to name `readInboxList` and the UI's
+   `loadMoreInboxRows` continuation. Record the quick-filter allowlist gap until
+   item 1 is integrated. New UI continuation is a read of the existing capability.
+3. `src/lib/config/registry.ts`: integrator owns the schema-version bump for the
+   two new keys and additions to `inbox.customerCopy`; this worker leaves it intact.
+4. `docs/ARCHITECTURE.md`, `docs/DELIVERY_PLAN.md`, `docs/AGENT_HANDOFF.md`,
+   `DESIGN.md`, `UX-CONTRACT.md`: record bounded progressive loading, state/scroll
+   fixes, new Root settings and the explicit browser/transport/database limits.
+5. Comment liking is absent from Inbox service/UI/MCP advertised operations;
+   Facebook currently stores `likeCount` but exposes no neutral like action here.
+   It needs an authorized provider-owned implementation/capability plus one
+   confirmed/audited shared service across UI/REST/MCP. Do not add a provider
+   branch or inert customer button. This lane makes no live-moderation claim.
+6. Sync freshness remains the newest stored refresh among selected channels,
+   not proof that all ten channels are fresh. No per-channel complete freshness
+   or exhaustive provider-history claim is made. Productivity's existing
+   write-then-refresh error handling and raw-error display still need review;
+   this batch isolates its thread state but does not rewrite its receipts.
+
+Git's linked worktree metadata is outside the writable roots and read-only.
+Verified source remains uncommitted for integration. Existing untracked
+`node_modules` links were not modified. No migrations or data-control rows added.
+
+Final validation from `rebuild/`:
+
+- `npx tsc --noEmit -p .`: **PASS**, exit 0, zero errors.
+- `npx vitest run --no-cache tests/inbox-*.test.ts tests/parity-guard.test.ts tests/config-validation.test.ts`:
+  **418 passed, 8 skipped; 48 files passed, 5 skipped**. The eight skipped
+  integration cases need a dedicated preview PostgreSQL environment; none was set.
+- `npx vitest run --no-cache --exclude '**/facebook-diagnostic-transport.test.ts'`:
+  **7,014 passed, 245 skipped, 5 failed; 618 files passed, 49 skipped, 1 failed**.
+  All five failures are `tests/facebook-native-http.test.ts`, whose loopback
+  listener is refused by this sandbox (`listen EPERM ... ::1`). The five cases
+  cover signed GET/POST/DELETE, binary uploads, oversized response refusal,
+  stalled-body cancellation and configured response timeout. No other failures
+  were reported. The suite is not claimed green.
+- Scoped taste lint: **0 failures, 1 existing shadow warning**. Chromium visual
+  fixture: **BLOCKED before render**, as described above.
+- `git diff --check`: **PASS**. No source outside the Inbox module or tests changed.

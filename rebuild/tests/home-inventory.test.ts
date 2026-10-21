@@ -129,7 +129,7 @@ describe('Home overview screen', () => {
     state.overview.mockResolvedValue(data);
     const html = renderToStaticMarkup(await HomePage());
     expect(html).toContain('USD');
-    expect(html).toContain(locale === 'en' ? 'Latest stored day: Oct 16, 2026' : 'Dernier jour enregistré : 16 oct. 2026');
+    expect(html).toContain(locale === 'en' ? 'Latest stored day: Oct 16, 2026' : 'Dernier jour enregistré : 16 oct. 2026');
     expect(html).toContain(locale === 'en' ? '2 of 28 days' : '2 jours sur 28');
     expect(html).toContain('UTC');
   });

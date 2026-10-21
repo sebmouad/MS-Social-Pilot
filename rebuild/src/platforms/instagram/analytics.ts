@@ -1,10 +1,7 @@
-const metricNames: Record<string, string> = {
-  views: 'Views', profile_views: 'Profile views', follower_count: 'New followers',
-  follows_and_unfollows: 'Follows and unfollows',
-};
+import { INSTAGRAM_POLICY_DEFAULTS, type InstagramPolicy } from './config';
 
-export function instagramMetricLabel(key: string): string | undefined {
-  return metricNames[key];
+export function instagramMetricLabel(key: string, locale: 'en' | 'fr' = 'en', labels: InstagramPolicy['labels'] = INSTAGRAM_POLICY_DEFAULTS.labels): string | undefined {
+  return labels[key]?.[locale];
 }
 
 export function instagramMetricKind(key: string): 'stock' | 'flow' | 'ratio' | 'breakdown' {

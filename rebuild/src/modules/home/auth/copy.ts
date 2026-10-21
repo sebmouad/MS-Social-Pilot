@@ -91,7 +91,7 @@ const fr: CatalogLocale = {
     emailEmpty: 'Saisissez votre adresse e-mail.', emailInvalid: 'Saisissez une adresse e-mail valide.', passwordEmpty: 'Saisissez votre mot de passe.',
     failed: 'Échec de la connexion. Vérifiez votre e-mail et votre mot de passe.', unavailable: 'La connexion est momentanément indisponible. Réessayez.',
     show: 'Afficher', hide: 'Masquer', showLabel: 'Afficher le mot de passe', hideLabel: 'Masquer le mot de passe',
-    forgot: 'Mot de passe oublié ?', create: 'Créer un compte', signOut: 'Déconnecter ce navigateur', signingOut: 'Déconnexion…',
+    forgot: 'Mot de passe oublié ?', create: 'Créer un compte', signOut: 'Déconnecter ce navigateur', signingOut: 'Déconnexion…',
     signedOut: 'Ce navigateur a été déconnecté.', signOutFailed: 'La déconnexion n’a pas pu être confirmée. Réessayez.',
   },
   twoStep: {
@@ -117,8 +117,8 @@ const fr: CatalogLocale = {
     send: 'Envoyer le lien', sending: 'Envoi…', requestFailed: 'Cette demande n’a pas pu aboutir.',
     sentTitle: 'Consultez votre boîte mail', sent: 'Si un compte actif correspond à cette adresse, un lien de réinitialisation sera envoyé.',
     password: 'Nouveau mot de passe', confirm: 'Confirmez le nouveau mot de passe', passwordEmpty: 'Saisissez un nouveau mot de passe.', confirmEmpty: 'Confirmez votre nouveau mot de passe.', mismatch: 'Les mots de passe ne correspondent pas.',
-    save: 'Définir le mot de passe', saving: 'Enregistrement…', resetFailed: 'Le mot de passe n’a pas pu être réinitialisé. Le lien a peut-être expiré ; demandez-en un nouveau.',
-    doneTitle: 'Mot de passe modifié', done: 'Votre mot de passe a été modifié et toutes les sessions ont été fermées. Reconnectez-vous ; la vérification en deux étapes reste requise.', continue: 'Continuer vers la connexion',
+    save: 'Définir le mot de passe', saving: 'Enregistrement…', resetFailed: 'Le mot de passe n’a pas pu être réinitialisé. Le lien a peut-être expiré ; demandez-en un nouveau.',
+    doneTitle: 'Mot de passe modifié', done: 'Votre mot de passe a été modifié et toutes les sessions ont été fermées. Reconnectez-vous ; la vérification en deux étapes reste requise.', continue: 'Continuer vers la connexion',
     loading: 'Préparation du formulaire…',
   },
   verifyEmail: {
@@ -148,7 +148,7 @@ const fr: CatalogLocale = {
     name: 'Votre nom', email: 'Adresse e-mail', password: 'Mot de passe', confirm: 'Confirmez le mot de passe', show: 'Afficher', hide: 'Masquer', showLabel: 'Afficher les mots de passe', hideLabel: 'Masquer les mots de passe',
     nameEmpty: 'Saisissez votre nom.', emailEmpty: 'Saisissez votre adresse e-mail.', emailInvalid: 'Saisissez une adresse e-mail valide.', passwordEmpty: 'Saisissez un mot de passe.', confirmEmpty: 'Confirmez votre mot de passe.', mismatch: 'Les mots de passe ne correspondent pas.',
     submit: 'Créer le compte', busy: 'Création…', failed: 'Votre compte n’a pas pu être créé. Réessayez.',
-    doneTitle: 'Consultez votre boîte mail', done: 'Nous avons envoyé un lien pour confirmer votre adresse et créer votre espace. Le lien ne fonctionne qu’une fois.', resend: 'Pas reçu ? Envoyer un nouveau lien', haveAccount: 'J’ai déjà un compte',
+    doneTitle: 'Consultez votre boîte mail', done: 'Nous avons envoyé un lien pour confirmer votre adresse et créer votre espace. Le lien ne fonctionne qu’une fois.', resend: 'Pas reçu ? Envoyer un nouveau lien', haveAccount: 'J’ai déjà un compte',
   },
   accessLimited: { title: 'Accès à l’espace indisponible', body: 'Cet espace ou cette fonctionnalité n’est pas disponible avec votre accès actuel.', help: 'Choisissez un autre espace dans le menu ou contactez le propriétaire de l’espace.' },
   noWorkspace: { title: 'Aucun espace pour le moment', body: 'Demandez à un propriétaire d’espace d’inviter votre compte. Vous pouvez vous déconnecter depuis le menu pour utiliser un autre compte.', label: 'Aucun espace' },

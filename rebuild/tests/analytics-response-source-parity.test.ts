@@ -53,8 +53,8 @@ describe('separate comment/conversation and member business response parity', ()
     expect(output.html).toContain('&lt;Team&gt;');
     expect(output.html).not.toContain('<Team>');
     for (const content of [output.html, output.text]) {
-      expect(content).toContain(locale === 'fr' ? 'Commentaires : 2 attentes, 2 traitées' : 'Comments: 2 waits, 2 answered');
-      expect(content).toContain(locale === 'fr' ? 'Conversations : 2 attentes, 1 traitées' : 'Conversations: 2 waits, 1 answered');
+      expect(content).toContain(locale === 'fr' ? 'Commentaires : 2 attentes, 2 traitées' : 'Comments: 2 waits, 2 answered');
+      expect(content).toContain(locale === 'fr' ? 'Conversations : 2 attentes, 1 traitées' : 'Conversations: 2 waits, 1 answered');
       expect(content).toContain(locale === 'fr' ? 'première réponse médiane en heures ouvrées 1 h' : 'median first response within business hours 1 h');
     }
   });

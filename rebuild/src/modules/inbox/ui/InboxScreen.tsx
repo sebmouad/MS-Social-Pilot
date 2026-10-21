@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { loadInboxCustomerCopy } from '@/modules/inbox/server/customer-copy';
 import { resolveInboxCatalog } from '@/modules/inbox/customer-copy';
 import { InboxCopyProvider } from '@/modules/inbox/ui/copy-context';
@@ -7,7 +8,7 @@ import { OperationError, operationFailure } from '@/lib/operation-error';
 import { channelBadgeInfo } from '@/lib/channel-badge';
 import { inboxHref, inboxListInput, type InboxLocation, type InboxSearchParams } from '@/modules/inbox/query';
 import type { ReactNode } from 'react';
-import type { InboxFilters, InboxListPage, InboxSentiment, InboxThreadPage, OpenThread, ThreadEntry } from '@/modules/inbox/server/types';
+import type { InboxFilters, InboxListPage, InboxThreadPage, OpenThread, ThreadEntry } from '@/modules/inbox/server/types';
 import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -21,13 +22,15 @@ import { reviewSummary, reviewText } from '@/modules/inbox/reviews-copy';
 import { ThreadTools } from './ThreadTools';
 import { NestedReply } from './NestedReply';
 import { InboxTag } from './InboxTags';
-import { InboxHeader, PersonAvatar, ShortcutHint } from './InboxChrome';
+import { InboxHeader, ShortcutHint } from './InboxChrome';
 import { InboxFilterPanel } from './InboxFilterPanel';
 import { InboxShortcuts } from './InboxShortcuts';
-import { BulkBar } from './BulkBar';
 import { ContactDetails } from './ContactDetails';
 import { ThreadScroll } from './ThreadScroll';
-import { InboxSelectionProvider, SelectBox, type SelectableItem } from './InboxSelection';
+import { InboxList } from './InboxList';
+import { inboxListAbilities, inboxListRows } from './InboxListRows';
+import { loadMoreInboxRows } from './list-action';
+import { runtimeConfig } from '@/server/config/store';
 import { SavedRepliesManager } from './SavedRepliesManager';
 import { readInboxContactDetails } from '@/modules/inbox/server/details';
 import type { InboxContactDetails } from '@/modules/inbox/details';
@@ -37,7 +40,6 @@ import r3 from './inbox-round3.module.css';
 
 const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'all', state: 'open', hidden: 'visible', q: '' };
 const singleValue = (value: string | string[] | undefined) => typeof value === 'string' ? value : undefined;
-const SENTIMENT_TONE = { positive: 'ok', neutral: 'neutral', negative: 'danger' } as const satisfies Record<InboxSentiment, 'ok' | 'neutral' | 'danger'>;
 
 function cursorError(field: string) {
   return new OperationError('invalid_request', `Choose one ${field} value, or reset to the latest Inbox items.`);
@@ -126,7 +128,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       const isReply = entry.parentId !== null;
       return <li key={entry.id} className={styles.entryNode}>
         <div className={styles.entry} data-from={entry.fromChannel ? 'channel' : 'person'} data-reply={isReply || undefined}>
-          <div className={styles.entryHead}><strong>{entry.author}</strong>{entry.sentBy ? <span>{copy.sentBy(entry.sentBy)}</span> : null}{entry.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}<time dateTime={entry.time.toISOString()}>{formatInboxTime(entry.time, timeZone, true)}</time></div>
+          <div className={styles.entryHead}><strong>{entry.author}</strong>{entry.sentBy ? <span>{copy.sentBy(entry.sentBy)}</span> : null}{entry.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}<time dateTime={entry.time.toISOString()}>{formatInboxTime(entry.time, timeZone, true, locale)}</time></div>
           <p>{entry.text || copy.noText}</p>
           {isReply && canWrite && (capabilities.hide || capabilities.remove) ? <ThreadToolbar reply id={entry.id} kind="comment" resolved={false} hidden={entry.hidden} canResolve={canWrite} canHide={capabilities.hide} canDelete={capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} locale={locale} /> : null}
           {isReply && !entry.fromChannel ? <NestedReply id={entry.id} author={entry.author} canReply={canWrite && capabilities.reply} allowed={rule.allowed} /> : null}
@@ -150,7 +152,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         </div>
       </header>
       <div className={r3.threadGrid}><div className={r3.threadMain}>
-      <ThreadScroll label={copy.historyLabel} resetKey={`${thread.kind}:${thread.id}:${requestedHistoryCursor ?? ''}:${history.shown}`}>
+      <ThreadScroll label={copy.historyLabel} resetKey={`${thread.kind}:${thread.id}:${requestedHistoryCursor ?? ''}`}>
       {thread.postText ?<p className={styles.postContext}><strong>{copy.onYourPost}</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}</p> : null}
       <p className={styles.contextNote}>{thread.kind === 'review' ? reviewLabel(locale, 'note') : copy.syncedNote}</p>
       <div className={styles.historyHead}>
@@ -176,26 +178,13 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const quickApplied = listPage?.quick ?? [];
   const filtered = Boolean(filters.channelId || filters.kind !== 'all' || filters.state !== 'open' || filters.hidden !== 'visible' || filters.q || quickApplied.length);
 
-  // What this person may do to each item on the page, decided once per channel and provider. The services re-check on every action.
-  const abilities = new Map<string, { write: boolean; resolve: boolean; hide: boolean; remove: boolean }>();
-  if (listPage) {
-    const targets = [...new Map(listPage.items.map(item => [item.target.id, item.target.provider])).entries()];
-    const providers = [...new Set(targets.flatMap(([, provider]) => provider ? [provider] : []))];
-    const providerCaps = new Map(await Promise.all(providers.map(async provider => [provider, await inboxCapabilities(provider)] as const)));
-    await Promise.all(targets.map(async ([targetId, provider]) => {
-      const [write, resolve] = await Promise.all([canManageInbox(actor, targetId), canManageInboxWorkflow(actor, targetId)]);
-      const caps = provider ? providerCaps.get(provider) : undefined;
-      abilities.set(targetId, { write, resolve, hide: write && Boolean(caps?.hide), remove: write && Boolean(caps?.remove) });
-    }));
-  }
-  const selectables = new Map<string, SelectableItem>();
-  for (const item of listPage?.items ?? []) {
-    const ability = abilities.get(item.target.id);
-    if (!ability) continue;
-    const can = { resolve: ability.resolve, hide: item.kind === 'comment' && ability.hide, remove: item.kind === 'comment' && ability.remove };
-    if (can.resolve || can.hide || can.remove) selectables.set(item.key, { key: item.key, kind: item.kind, id: item.id, label: item.author, platformName: channelBadgeInfo(item.target.provider).platformName, resolved: item.resolved, hidden: item.hidden, can });
-  }
+  const abilities = listPage ? await inboxListAbilities(actor, listPage) : new Map();
   const canWriteReplies = [...abilities.values()].some(ability => ability.write);
+  const [progressivePageLimit, previewMaxCharacters] = await Promise.all([runtimeConfig('inbox.progressivePageLimit'), runtimeConfig('inbox.listPreviewMaxCharacters')]);
+  const rows = listPage ? inboxListRows(listPage, abilities, baseLocation, requestedThread, locale, catalog, previewMaxCharacters) : [];
+  // A scope, data or grant change starts a new browsing surface, invalidating
+  // pending continuations and preventing older loaded rows surviving a refresh.
+  const listRevision = createHash('sha256').update(JSON.stringify({ actor, constraints, channels: listPage?.channels, locale, baseLocation, cursor: listPage?.cursor, thread: requestedThread, items: listPage?.items, abilities: [...abilities], total: listPage?.total, progressivePageLimit, previewMaxCharacters })).digest('hex');
   const syncTarget = channel === 'all' ? undefined : channel;
 
   const sidebar = <aside className={styles.filters} aria-label={copy.filtersLabel}>
@@ -241,7 +230,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const noChannels = listPage !== null && visibleChannels.length === 0;
 
   return <InboxCopyProvider catalog={catalog}><PageFrame module="inbox" scopedAccess sidebar={sidebar}><div className={styles.page}>
-    <InboxHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} actions={visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true) : null} timeZone={timeZone} locale={locale} /> : undefined} />
+    <InboxHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} actions={visibleChannels.length > 0 ? <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true, locale) : null} timeZone={timeZone} locale={locale} /> : undefined} />
     <div className={r3.tools}>
       {visibleChannels.length > 0 ? <SavedRepliesManager locale={locale} canWrite={canWriteReplies} /> : null}
       <InboxShortcuts locale={locale} />
@@ -252,31 +241,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     {threadOutcome.error ? <div role="alert" className={styles.alert}><p>{threadOutcome.error.error}</p><a href={clearThreadHref}>{copy.returnToList}</a></div> : null}
     {noChannels ? <section className="panel"><EmptyState icon={<IconPlugConnected size={26} />} title={copy.noChannelsTitle} action={<a className="ui-button ui-button--primary" href="/settings/connections">{copy.goConnections}</a>}>{copy.noChannelsBody}</EmptyState></section> : listPage ? <div className={styles.split} data-open={thread ? 'true' : 'false'}>
       <section className={styles.listPane} aria-label={copy.conversationsAndComments}>
-        <div className={styles.listHead}><h2>{filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open}</h2><span>{copy.items(listPage.items.length, listPage.total)}</span></div>
-        {listPage.items.length ? <InboxSelectionProvider pageItems={[...selectables.values()]}>
-        {selectables.size ? <BulkBar locale={locale} maxItems={listPage.limits.bulkMaxItems ?? listPage.limit} /> : null}
-        <ul className={styles.list}>{listPage.items.map(item => {
-          const badge = channelBadgeInfo(item.target.provider);
-          const selected = thread !== null && thread.kind === item.kind && thread.id === item.id;
-          const selectable = selectables.get(item.key);
-          return <li key={item.key} className={selectables.size ? r3.row : undefined}>{selectables.size ? <span className={r3.rowSelect}>{selectable ? <SelectBox item={selectable} label={extra.bulk.selectItem(item.author)} /> : null}</span> : null}<a className={styles.item} href={inboxHref({ ...baseLocation, ...(listPage.cursor ? { cursor: listPage.cursor } : {}), thread: item.key })} aria-current={selected ? 'true' : undefined} data-attention={item.needsReply || item.unread > 0 || undefined} data-inbox-item>
-            <PersonAvatar name={item.author} size={38} />
-            <div className={styles.itemBody}>
-            <div className={styles.itemTop}><span className={styles.author}>{item.unread > 0 || item.needsReply ? <span className={styles.unreadDot} role="img" aria-label={copy.unread} /> : null}{item.author}</span><time dateTime={item.time.toISOString()}>{formatInboxTime(item.time, timeZone)}</time></div>
-            <p className={styles.preview}>{item.kind === 'review' && !item.preview ? reviewLabel(locale, 'noText') : item.preview.length > 180 ? `${item.preview.slice(0, 180)}…` : item.preview}</p>
-            <div className={styles.itemMeta}>
-              <ChannelBadge name={item.target.name} platformName={badge.platformName} mark={badge.mark} compact />
-              <InboxTag icon={item.kind === 'message' ? 'message' : 'comment'}>{item.kind === 'message' ? copy.message : item.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
-              {item.kind === 'review' ? <InboxTag icon="comment">{reviewSummary(locale, item, reviews)}</InboxTag> : null}
-              {item.sentiment ? <InboxTag icon={item.sentiment} tone={SENTIMENT_TONE[item.sentiment]} title={copy.sentimentHint}>{copy.sentiment[item.sentiment]}</InboxTag> : null}
-              {item.unread > 0 ? <InboxTag icon="unread" tone="warn">{copy.nUnread(item.unread)}</InboxTag> : null}
-              {item.needsReply ? <InboxTag icon="needsReply" tone="warn">{copy.needsReply}</InboxTag> : null}
-              {item.resolved ? <InboxTag icon="resolved" tone="ok">{copy.resolvedTag}</InboxTag> : null}
-              {item.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}
-            </div>
-            </div>
-          </a></li>;
-        })}</ul></InboxSelectionProvider> : listPage.total > 0 && listPage.cursor
+        {!listPage.items.length ? <div className={styles.listHead}><h2>{filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open}</h2><span>{copy.items(0, listPage.total)}</span></div> : null}
+        {listPage.items.length ? <InboxList key={listRevision} rows={rows} total={listPage.total} olderCursor={listPage.olderCursor} location={{ ...baseLocation, ...(requestedThread ? { thread: requestedThread } : {}) }}
+          locale={locale} title={filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open}
+          maxItems={listPage.limits.bulkMaxItems ?? listPage.limit} pageLimit={progressivePageLimit} loadMoreAction={loadMoreInboxRows} /> : listPage.total > 0 && listPage.cursor
           ? <EmptyState icon={<IconInboxOff size={26} />} title={copy.emptyPageTitle} action={<a className="ui-button ui-button--secondary" href={inboxHref({ ...listPagingLocation, cursor: undefined })}>{copy.showLatest}</a>}>{copy.emptyPageBody}</EmptyState>
           : filtered
             ? quickApplied.length

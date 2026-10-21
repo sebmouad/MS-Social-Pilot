@@ -18,7 +18,7 @@ export const publishingCopyDefaults = {
 "summaryEmpty": {"en": "Post with no content", "fr": "Publication sans contenu"},
 "noChannelsChosen": {"en": "No channels chosen", "fr": "Aucun canal choisi"},
 "rescheduleAction": {"en": "Reschedule", "fr": "Reprogrammer"},
-"rescheduleTitle": {"en": "Reschedule this post?", "fr": "Reprogrammer cette publication ?"},
+"rescheduleTitle": {"en": "Reschedule this post?", "fr": "Reprogrammer cette publication ?"},
 "rescheduleCancel": {"en": "Cancel", "fr": "Annuler"},
 "rescheduleConfirm": {"en": "Move post", "fr": "Déplacer la publication"},
 "rescheduleDate": {"en": "Date", "fr": "Date"},
@@ -105,15 +105,15 @@ export const publishingCopyDefaults = {
 "invalidTime": {"en": "Not a valid time", "fr": "Heure non valide"},
 "moveFailed": {"en": "The post could not be moved. Check your connection and try again.", "fr": "La publication n’a pas pu être déplacée. Vérifiez votre connexion et réessayez."},
 "calendarNavigation": {"en": "Calendar {unit} navigation", "fr": "Navigation du calendrier par {unit}"},
-"viewPostLabel": {"en": "View post: {text}", "fr": "Voir la publication : {text}"},
-"movePostLabel": {"en": " post: {text}, scheduled {time}", "fr": " publication : {text}, programmée à {time}"},
+"viewPostLabel": {"en": "View post: {text}", "fr": "Voir la publication : {text}"},
+"movePostLabel": {"en": " post: {text}, scheduled {time}", "fr": " publication : {text}, programmée à {time}"},
 "newPostLabel": {"en": "New post on {day} at {time}", "fr": "Nouvelle publication le {day} à {time}"},
 "currentlyScheduled": {"en": "Currently scheduled for {time}.", "fr": "Actuellement programmée pour {time}."},
 "timesIn": {"en": "Times are in {zone}.", "fr": "Les heures utilisent le fuseau {zone}."},
 "atTime": {"en": "{date} at {time}", "fr": "{date} à {time}"},
 "movedTo": {"en": "Post moved to {time} ({zone}).", "fr": "Publication déplacée au {time} ({zone})."},
 "startNew": {"en": "Select a day or time to start a new post. ", "fr": "Sélectionnez un jour ou une heure pour créer une publication. "},
-"dragHint": {"en": "Drag a scheduled post to another {slot}, or use its Move button. Times are in {zone}.", "fr": "Glissez une publication programmée vers {slot}, ou utilisez Déplacer. Fuseau : {zone}."},
+"dragHint": {"en": "Drag a scheduled post to another {slot}, or use its Move button. Times are in {zone}.", "fr": "Glissez une publication programmée vers {slot}, ou utilisez Déplacer. Fuseau : {zone}."},
 "timeSlot": {"en": "time slot", "fr": "un autre créneau"},
 "daySlot": {"en": "day", "fr": "un autre jour"},
 "earlierHours": {"en": " Earlier hours appear when they hold a post.", "fr": " Les heures antérieures apparaissent lorsqu’une publication y est prévue."},
@@ -453,7 +453,7 @@ export const publishingCopyDefaults = {
   },
   "queueDue": {
     "en": "Due; publishes on the next run.",
-    "fr": "Échéance atteinte ; publiée lors du prochain passage."
+    "fr": "Échéance atteinte ; publiée lors du prochain passage."
   },
   "queueUnscheduled": {
     "en": "No time set",

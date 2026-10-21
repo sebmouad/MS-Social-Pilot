@@ -22,7 +22,7 @@ export const adsCustomerCopy = {
 "accountOffset": {"en": "accountOffset must be a non-negative integer.", "fr": "Le décalage des comptes doit être un entier positif ou nul."},
 "findingConcentrated": {"en": "{name} accounts for {share}% of spend.", "fr": "{name} représente {share} % des dépenses."},
 "findingBestCtr": {"en": "{name} has a click-through rate {ratio} times the account average.", "fr": "Le taux de clic de {name} est {ratio} fois la moyenne du compte."},
-"viewOnlyObject": {"en": "You can view this {kind}. Changes are not available for your access or this account.", "fr": "Vous pouvez consulter cet objet : {kind}. Les modifications ne sont pas disponibles pour vos droits ou ce compte."},
+"viewOnlyObject": {"en": "You can view this {kind}. Changes are not available for your access or this account.", "fr": "Vous pouvez consulter cet objet : {kind}. Les modifications ne sont pas disponibles pour vos droits ou ce compte."},
 "grantMissing": {"en": "Reconnect this advertising connection and allow advertising changes.", "fr": "Reconnectez cette connexion publicitaire et autorisez les modifications publicitaires."},
 "needsReconnectObject": {"en": "Changes are paused for this {kind} until the advertising connection is reconnected with permission to make changes.", "fr": "Les modifications sont suspendues pour cet objet ({kind}) tant que la connexion publicitaire n’est pas reconnectée avec l’autorisation de modifier."},
 "needsReconnectAction": {"en": "Reconnect in Settings", "fr": "Reconnecter dans les paramètres"},
@@ -39,11 +39,11 @@ export const adsCustomerCopy = {
 "adCreateNoCreatives": {"en": "This account has no creatives yet. Create one first, then add the ad.", "fr": "Ce compte n’a pas encore de visuel. Créez-en un, puis ajoutez la publicité."},
 "adCreateReview": {"en": "Review ad", "fr": "Vérifier la publicité"},
 "adCreateAction": {"en": "Create paused ad", "fr": "Créer la publicité en pause"},
-"adCreateConfirmTitle": {"en": "Create this paused ad?", "fr": "Créer cette publicité en pause ?"},
+"adCreateConfirmTitle": {"en": "Create this paused ad?", "fr": "Créer cette publicité en pause ?"},
 "adCreateHeldLabel": {"en": "Ad creation needs review", "fr": "La création de la publicité doit être vérifiée"},
 "adCreateSuccess": {"en": "Paused ad created.", "fr": "Publicité créée en pause."},
 "adCreateChooseCreative": {"en": "Choose a creative.", "fr": "Choisissez un visuel."},
-"hierarchyNote": {"en": "Campaigns contain ad sets, and ad sets contain ads. Figures at each level overlap, so do not add them together.", "fr": "Les campagnes contiennent des ensembles de publicités, qui contiennent des publicités. Les chiffres de chaque niveau se recoupent : ne les additionnez pas."},
+"hierarchyNote": {"en": "Campaigns contain ad sets, and ad sets contain ads. Figures at each level overlap, so do not add them together.", "fr": "Les campagnes contiennent des ensembles de publicités, qui contiennent des publicités. Les chiffres de chaque niveau se recoupent : ne les additionnez pas."},
 "hierarchyAdSetsOf": {"en": "Ad sets in {name}", "fr": "Ensembles de {name}"},
 "hierarchyAdsOf": {"en": "Ads in {name}", "fr": "Publicités de {name}"},
 "hierarchyUngrouped": {"en": "Not linked to a parent in stored data", "fr": "Non rattaché à un parent dans les données enregistrées"},
@@ -179,7 +179,7 @@ export const adsCustomerCopy = {
 "service057": {"en":"Current advertising access could not be verified. Review access and try again.","fr":"Vos droits publicitaires actuels n’ont pas pu être vérifiés. Vérifiez vos accès et réessayez."},
 "service058": {"en":"The advertising platform rejected this change. Nothing was changed. Review the details and try again.","fr":"La plateforme publicitaire a refusé cette modification. Aucun changement n’a eu lieu. Vérifiez les détails et réessayez."},
 "service059": {"en":"The result of this change is unknown. Do not repeat it. Check the object in the advertising platform, then record what you found in Ads change history.","fr":"Le résultat est inconnu. Ne répétez pas la modification. Vérifiez l’objet sur la plateforme publicitaire, puis enregistrez votre constat dans l’historique."},
-"service060": {"en":"The change was applied but its record could not be completed. Do not repeat it; the object stays on hold in Ads change history until the outcome is reviewed.","fr":"La modification a été appliquée mais son enregistrement n’a pas pu aboutir. Ne la répétez pas ; l’objet reste suspendu dans l’historique jusqu’à sa vérification."},
+"service060": {"en":"The change was applied but its record could not be completed. Do not repeat it; the object stays on hold in Ads change history until the outcome is reviewed.","fr":"La modification a été appliquée mais son enregistrement n’a pas pu aboutir. Ne la répétez pas ; l’objet reste suspendu dans l’historique jusqu’à sa vérification."},
 "service061": {"en":"Choose a valid status.","fr":"Choisissez un état valide."},
 "service062": {"en":"Choose a valid page.","fr":"Choisissez une page valide."},
 "service063": {"en":"Choose a valid change and outcome.","fr":"Choisissez une modification et un résultat valides."},
@@ -200,9 +200,9 @@ export const adsCustomerCopy = {
 "service078": {"en":"Choose campaigns, ad sets or ads.","fr":"Choisissez les campagnes, ensembles ou publicités."},
 "service079": {"en":"Choose a valid sort column.","fr":"Choisissez une colonne de tri valide."},
 "service080": {"en":"Choose ascending or descending order.","fr":"Choisissez un ordre croissant ou décroissant."},
-"service081": {"en":"Totals are recomputed from stored daily flows; ratios are not averaged.","fr":"Les totaux sont recalculés à partir des données quotidiennes ; les ratios ne sont pas moyennés."},
+"service081": {"en":"Totals are recomputed from stored daily flows; ratios are not averaged.","fr":"Les totaux sont recalculés à partir des données quotidiennes ; les ratios ne sont pas moyennés."},
 "service082": {"en":"Amounts in different currencies are never combined.","fr":"Les montants de devises différentes ne sont jamais combinés."},
-"service083": {"en":"Reach is not additive and is not totalled; object rows show the highest single day.","fr":"La portée n’est pas additive et n’est pas totalisée ; les lignes affichent la meilleure journée."},
+"service083": {"en":"Reach is not additive and is not totalled; object rows show the highest single day.","fr":"La portée n’est pas additive et n’est pas totalisée ; les lignes affichent la meilleure journée."},
 "service084": {"en":"Choose objects or findings.","fr":"Choisissez les objets ou les constats."},
 "service085": {"en":"Choose en or fr.","fr":"Choisissez en ou fr."},
 "service086": {"en":"Too many objects to export completely. Choose fewer accounts or a shorter date range.","fr":"Trop d’objets pour un export complet. Choisissez moins de comptes ou une période plus courte."},
@@ -210,7 +210,7 @@ export const adsCustomerCopy = {
 "service088": {"en":"Unknown Ads directory tool.","fr":"Outil de liste publicitaire inconnu."},
 "service089": {"en":"Choose valid Ads directory filters.","fr":"Choisissez des filtres de liste publicitaire valides."},
 "service090": {"en":"Choose a valid parent object.","fr":"Choisissez un objet parent valide."},
-"service091": {"en":"Figures come from stored daily reports. Levels overlap, so campaign, ad set and ad figures must not be added together.","fr":"Les chiffres proviennent des rapports quotidiens enregistrés. Les niveaux se chevauchent : les chiffres des campagnes, ensembles et publicités ne doivent pas être additionnés."},
+"service091": {"en":"Figures come from stored daily reports. Levels overlap, so campaign, ad set and ad figures must not be added together.","fr":"Les chiffres proviennent des rapports quotidiens enregistrés. Les niveaux se chevauchent : les chiffres des campagnes, ensembles et publicités ne doivent pas être additionnés."},
 "service092": {"en":"Choose a valid ad object.","fr":"Choisissez un objet publicitaire valide."},
 "service093": {"en":"Choose an account, a level and an object.","fr":"Choisissez un compte, un niveau et un objet."},
 "service094": {"en":"No stored report rows were found for this object in the selected range.","fr":"Aucune donnée enregistrée pour cet objet sur la période sélectionnée."},
@@ -218,7 +218,7 @@ export const adsCustomerCopy = {
 "refusedHeld": {"en":"This request was sent before and its result is not known, so it stays held until a recorded result is available.","fr":"Cette demande a déjà été envoyée et son résultat est inconnu. Elle reste suspendue jusqu’à l’enregistrement du résultat."},
 "attestedCreation": {"en":"This request was reviewed and recorded as applied. Check the advertising platform for the object identity and its current delivery status.","fr":"Cette demande a été vérifiée et enregistrée comme appliquée. Consultez la plateforme publicitaire pour identifier l’objet et son état de diffusion actuel."},
 "identityUnknown": {"en":"The created object identity was not confirmed. Check change history before making another request.","fr":"L’identité de l’objet créé n’a pas été confirmée. Consultez l’historique avant de créer une nouvelle demande."},
-"restoredHeld": {"en":"A creation request from before this page reloaded has no confirmed result. Check the same request again; it cannot create a second object.","fr":"Une demande de création antérieure au rechargement de cette page reste sans résultat confirmé. Vérifiez à nouveau cette même demande ; elle ne peut pas créer de second objet."},
+"restoredHeld": {"en":"A creation request from before this page reloaded has no confirmed result. Check the same request again; it cannot create a second object.","fr":"Une demande de création antérieure au rechargement de cette page reste sans résultat confirmé. Vérifiez à nouveau cette même demande ; elle ne peut pas créer de second objet."},
 "networkHeld": {"en":"The result could not be confirmed. Checking again uses the same request ID, so it cannot create a second object.","fr":"Le résultat n’a pas pu être confirmé. Une nouvelle vérification utilise le même identifiant et ne peut pas créer de second objet."},
 "networkChangeHeld": {"en":"The result could not be confirmed. Retry uses the same request ID, so it cannot create a second change.","fr":"Le résultat n’a pas pu être confirmé. Réessayer utilise le même identifiant et ne peut pas créer de seconde modification."},
 "dailyBudgetDetail": {"en":" with a daily budget of {amount}","fr":" avec un budget quotidien de {amount}"},
@@ -228,7 +228,7 @@ export const adsCustomerCopy = {
 "objects": {"en":"objects","fr":"objets"},
 "object": {"en":"Object","fr":"Objet"},
 "dailyRows": {"en":"daily rows","fr":"lignes quotidiennes"},
-"pagesLabel": {"en":"{kind} report pages","fr":"Pages du rapport : {kind}"},
+"pagesLabel": {"en":"{kind} report pages","fr":"Pages du rapport : {kind}"},
 "pending": {"en":"In progress (on hold)","fr":"En cours (suspendue)"},
 "succeeded": {"en":"Applied","fr":"Appliquée"},
 "rejected": {"en":"Not applied","fr":"Non appliquée"},
@@ -318,7 +318,7 @@ export const adsCustomerCopy = {
   },
   "text016": {
     "en": "· Platform status:",
-    "fr": "· État sur la plateforme :"
+    "fr": "· État sur la plateforme :"
   },
   "text017": {
     "en": "not provided",
@@ -650,7 +650,7 @@ export const adsCustomerCopy = {
   },
   "text099": {
     "en": "You can view this",
-    "fr": "Vous pouvez consulter cet objet :"
+    "fr": "Vous pouvez consulter cet objet :"
   },
   "text100": {
     "en": ". Changes are not available for your access or this account.",
@@ -690,7 +690,7 @@ export const adsCustomerCopy = {
   },
   "text109": {
     "en": "Maximum per change:",
-    "fr": "Maximum par modification :"
+    "fr": "Maximum par modification :"
   },
   "text110": {
     "en": "New name",
@@ -746,7 +746,7 @@ export const adsCustomerCopy = {
   },
   "text123": {
     "en": "The current change history could not be checked, so this action is paused. Check Ads change history before trying again.",
-    "fr": "L’historique actuel n’a pas pu être vérifié ; cette action est suspendue. Consultez l’historique avant de réessayer."
+    "fr": "L’historique actuel n’a pas pu être vérifié ; cette action est suspendue. Consultez l’historique avant de réessayer."
   },
   "text124": {
     "en": "If the result is uncertain, this same request ID is retained for retry and the change stays on hold until it is reviewed.",
@@ -782,11 +782,11 @@ export const adsCustomerCopy = {
   },
   "text132": {
     "en": "I checked: it was applied",
-    "fr": "J’ai vérifié : appliquée"
+    "fr": "J’ai vérifié : appliquée"
   },
   "text133": {
     "en": "I checked: it was not applied",
-    "fr": "J’ai vérifié : non appliquée"
+    "fr": "J’ai vérifié : non appliquée"
   },
   "text134": {
     "en": "A partial creation may leave an uploaded image. Review the objects in the platform before recording an outcome.",
@@ -794,7 +794,7 @@ export const adsCustomerCopy = {
   },
   "text135": {
     "en": "Review note:",
-    "fr": "Note de vérification :"
+    "fr": "Note de vérification :"
   },
   "text136": {
     "en": "Record your review",
@@ -1042,7 +1042,7 @@ export const adsCustomerCopy = {
   },
   "text197": {
     "en": "Export all matching daily rows across every page, up to {value0} rows and {value1} bytes. Action metrics and additional fields are included; sensitive connection fields are redacted.",
-    "fr": "Exporte toutes les lignes quotidiennes correspondantes sur toutes les pages, jusqu’à {value0} lignes et {value1} octets. Les mesures d’actions et champs supplémentaires sont inclus ; les informations sensibles de connexion sont masquées."
+    "fr": "Exporte toutes les lignes quotidiennes correspondantes sur toutes les pages, jusqu’à {value0} lignes et {value1} octets. Les mesures d’actions et champs supplémentaires sont inclus ; les informations sensibles de connexion sont masquées."
   },
   "text198": {
     "en": "Export all matching daily rows",
@@ -1058,11 +1058,11 @@ export const adsCustomerCopy = {
   },
   "text201": {
     "en": "This request had already succeeded earlier: the {value0}{value1} was created paused{value2}. Its delivery status may have changed since, so check its current status in the advertising platform.",
-    "fr": "Cette demande avait déjà abouti : {value0}{value1} a été créé en pause{value2}. Son état de diffusion peut avoir changé depuis ; vérifiez son état actuel sur la plateforme publicitaire."
+    "fr": "Cette demande avait déjà abouti : {value0}{value1} a été créé en pause{value2}. Son état de diffusion peut avoir changé depuis ; vérifiez son état actuel sur la plateforme publicitaire."
   },
   "text202": {
     "en": "Paused {value0} created{value1}{value2}. It will not run or spend until you activate it.",
-    "fr": "Création en pause : {value0}{value1}{value2}. Aucune diffusion ni dépense avant activation."
+    "fr": "Création en pause : {value0}{value1}{value2}. Aucune diffusion ni dépense avant activation."
   },
   "text203": {
     "en": "Enter a campaign name from 1 to {value0} characters.",
@@ -1154,7 +1154,7 @@ export const adsCustomerCopy = {
   },
   "text225": {
     "en": ":",
-    "fr": ":"
+    "fr": " :"
   },
   "text226": {
     "en": "This could not be saved. Check Ads change history and try again.",
@@ -1250,7 +1250,7 @@ export const adsCustomerCopy = {
   },
   "text249": {
     "en": "Current status: {value0} · delivery: {value1}",
-    "fr": "État actuel : {value0} · diffusion : {value1}"
+    "fr": "État actuel : {value0} · diffusion : {value1}"
   },
   "text250": {
     "en": "New budget{value0}",
