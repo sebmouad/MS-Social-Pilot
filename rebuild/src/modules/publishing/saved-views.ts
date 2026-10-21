@@ -20,6 +20,8 @@ const KEYS: Record<SavedViewScreen, Record<string, (value: string) => boolean>> 
     status: value => (POST_STATUSES as readonly string[]).includes(value),
     channel: value => /^[A-Za-z0-9_-]{1,80}$/.test(value),
     q: value => value.trim().length > 0 && value.length <= 500,
+    // Origin kinds are opaque, registered by installed features; Posts re-validates against its installed list when the view opens.
+    origin: value => /^[a-z][a-z0-9_-]{0,39}$/.test(value),
   },
   calendar: {
     view: value => value === 'month' || value === 'week',

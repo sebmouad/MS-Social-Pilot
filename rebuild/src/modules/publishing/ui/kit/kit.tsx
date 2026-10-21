@@ -1,7 +1,7 @@
 'use client';
 import { usePublishingCopy } from './CopyProvider';
-import type { ReactNode } from 'react';
-import { IconAlertTriangle, IconClockHour4, IconPlayerPlay, IconSend } from '@tabler/icons-react';
+import { useState, type ReactNode } from 'react';
+import { IconAlertTriangle, IconClockHour4, IconPhotoOff, IconPlayerPlay, IconSend } from '@tabler/icons-react';
 import { Badge, EmptyState, PageHeader } from '@/components';
 import { ModuleGlyph, PageGlyph } from '@/components/icons';
 import { type KitLocale } from './copy';
@@ -76,11 +76,26 @@ export function AttentionHint({ locale = 'en' }: { locale?: KitLocale }) {
   return <span className={styles.attention}><IconAlertTriangle size={12} stroke={1.9} aria-hidden="true" />{copy.needsAttention}</span>;
 }
 
-export function MediaThumb({ url, alt, count, video }: { url: string | null; alt: string; count: number; video?: boolean }) {
+/**
+ * Post image that degrades to a neutral placeholder when the file is gone (for example a 404 from
+ * the media route). The failure is recorded once per source, so there is no retry loop and no
+ * further requests; the placeholder carries the accessible text instead of a broken-image icon.
+ */
+export function PostImage({ src, alt, locale, className, linkClassName, href, iconSize = 20 }: { src: string; alt: string; locale?: KitLocale; className?: string; linkClassName?: string; href?: string; iconSize?: number }) {
+  const copy = usePublishingCopy(locale);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (failedSrc === src) {
+    return <span className={styles.mediaMissing} role="img" aria-label={copy.mediaUnavailable} data-media-missing><IconPhotoOff size={iconSize} stroke={1.7} aria-hidden="true" /></span>;
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  const image = <img className={className} src={src} alt={alt} loading="lazy" onError={() => setFailedSrc(src)} />;
+  return href ? <a className={linkClassName} href={href} target="_blank" rel="noopener noreferrer" aria-label="Open image attachment">{image}</a> : image;
+}
+
+export function MediaThumb({ url, alt, count, video, locale }: { url: string | null; alt: string; count: number; video?: boolean; locale?: KitLocale }) {
   return <span className={styles.thumb} data-empty={!url || undefined}>
     {url && !video
-      // eslint-disable-next-line @next/next/no-img-element
-      ? <img src={url} alt={alt} loading="lazy" />
+      ? <PostImage src={url} alt={alt} locale={locale} iconSize={18} />
       : video ? <IconPlayerPlay size={18} stroke={1.8} aria-hidden="true" /> : null}
     {count > 1 ? <span className={styles.thumbCount}>+{count - 1}</span> : null}
   </span>;

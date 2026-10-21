@@ -37,6 +37,18 @@ describe('saved view query normalization', () => {
     expect(normalizeSavedViewQuery('calendar', 'view=week&date=2026-10-01&status=scheduled')).toBe('status=scheduled&view=week');
     expect(normalizeSavedViewQuery('posts', '')).toBe('');
   });
+  it('persists the origin filter on Posts only', () => {
+    expect(normalizeSavedViewQuery('posts', 'status=failed&origin=recipe&page=2')).toBe('origin=recipe&status=failed');
+    expect(normalizeSavedViewQuery('posts', 'origin=recipe')).toBe('origin=recipe');
+    expect(normalizeSavedViewQuery('posts', 'origin=Re cipe')).toBeNull();
+    expect(normalizeSavedViewQuery('posts', 'origin=recipe&origin=other')).toBeNull();
+    expect(normalizeSavedViewQuery('calendar', 'origin=recipe')).toBe('');
+  });
+  it('restores a saved origin filter into the opened href', async () => {
+    db.$queryRaw.mockImplementation(async () => [{ id: 'v2', name: 'Recipes', screen: 'posts', query: 'origin=recipe&evil=1', createdAt: new Date('2026-10-19T00:00:00Z') }]);
+    const result = await listSavedViews(actor, { screen: 'posts' });
+    expect(result.views[0]).toMatchObject({ query: 'origin=recipe', href: '/publishing/posts?origin=recipe' });
+  });
   it('refuses invalid or repeated values', () => {
     expect(normalizeSavedViewQuery('posts', 'status=bogus')).toBeNull();
     expect(normalizeSavedViewQuery('posts', 'status=draft&status=failed')).toBeNull();

@@ -35,7 +35,7 @@ export function PostCell({ post, locale = 'en' }: { post: Row; locale?: KitLocal
   const first = media[0];
   const copy = usePublishingCopy(locale);
   return <div className={styles.cell}>
-    <MediaThumb url={thumbUrl(first)} alt={first?.altText?.trim() || ''} count={media.length} video={first?.kind === 'video'} />
+    <MediaThumb url={thumbUrl(first)} alt={first?.altText?.trim() || ''} count={media.length} video={first?.kind === 'video'} locale={locale} />
     <div className={styles.cellText}>
       <span className={styles.message}>{postContentSummary(post.message, post.media, post.link, copy) || copy.noText}</span>
       {media.length ? <span className={styles.sub}>{media.length} {copy.mediaCount}</span> : null}
