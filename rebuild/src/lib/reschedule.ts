@@ -1,3 +1,5 @@
+import { synchronousPolicy } from "./config/synchronous-policy";
+import type { ReschedulePolicy } from "./config/reschedule-policy";
 import { addDaysToKey, instantToWall, wallTimeToInstant } from "./calendar-dates";
 
 export type MoveCandidate = {
@@ -19,33 +21,29 @@ function candidate(id: string, label: string, date: string, time: string, timeZo
 
 /**
  * Keyboard- and touch-friendly alternatives to dragging: move a scheduled post
- * earlier or later by an hour, a day or a week. Day and week moves keep the
+ * by the Root-configured offsets. Day moves keep the
  * workspace-local clock time; hour moves shift the actual instant.
  */
-export function moveCandidates(whenIso: string, timeZone: string, nowMs: number): MoveCandidate[] {
+export function moveCandidates(whenIso: string, timeZone: string, nowMs: number, policy: ReschedulePolicy = synchronousPolicy("shared.reschedulePolicy")): MoveCandidate[] {
   const current = new Date(whenIso);
   const wall = instantToWall(current, timeZone);
-  const byHours = (hours: number) => instantToWall(new Date(current.getTime() + hours * HOUR), timeZone);
-  const earlierHour = byHours(-1);
-  const laterHour = byHours(1);
-  return [
-    candidate("hour-earlier", "1 hour earlier", earlierHour.date, earlierHour.time, timeZone, nowMs),
-    candidate("hour-later", "1 hour later", laterHour.date, laterHour.time, timeZone, nowMs),
-    candidate("day-earlier", "1 day earlier", addDaysToKey(wall.date, -1), wall.time, timeZone, nowMs),
-    candidate("day-later", "1 day later", addDaysToKey(wall.date, 1), wall.time, timeZone, nowMs),
-    candidate("week-earlier", "1 week earlier", addDaysToKey(wall.date, -7), wall.time, timeZone, nowMs),
-    candidate("week-later", "1 week later", addDaysToKey(wall.date, 7), wall.time, timeZone, nowMs),
-  ];
+  const language = policy.locale === 'fr-FR' ? 'fr' : 'en';
+  return policy.moves.map(move => {
+    const next = move.unit === 'hour'
+      ? instantToWall(new Date(current.getTime() + move.amount * HOUR), timeZone)
+      : { date: addDaysToKey(wall.date, move.amount), time: wall.time };
+    return candidate(move.id, move.label[language], next.date, next.time, timeZone, nowMs);
+  });
 }
 
-/** "Tue, Oct 20, 4:00 PM" in the workspace time zone. Fixed locale: the UI is English. */
-export function formatWhen(instant: Date | string, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(typeof instant === "string" ? new Date(instant) : instant);
+/** Workspace time with Root-selected language and clock format. */
+export function formatWhen(instant: Date | string, timeZone: string, policy: ReschedulePolicy = synchronousPolicy("shared.reschedulePolicy")): string {
+  return new Intl.DateTimeFormat(policy.locale, { timeZone, hour12: policy.hour12, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(typeof instant === "string" ? new Date(instant) : instant);
 }
 
-export function formatWallTime(date: string, time: string, timeZone: string): string | null {
+export function formatWallTime(date: string, time: string, timeZone: string, policy: ReschedulePolicy = synchronousPolicy("shared.reschedulePolicy")): string | null {
   const resolved = wallTimeToInstant(date, time, timeZone);
-  return resolved.ok ? formatWhen(resolved.instant, timeZone) : null;
+  return resolved.ok ? formatWhen(resolved.instant, timeZone, policy) : null;
 }
 
 const SAFE_FAILURES = [
@@ -54,7 +52,7 @@ const SAFE_FAILURES = [
 ];
 
 /** Customer-safe text for a failed reschedule; unknown errors stay generic. */
-export function rescheduleFailureMessage(error: unknown): string {
+export function rescheduleFailureMessage(error: unknown, policy: ReschedulePolicy = synchronousPolicy("shared.reschedulePolicy")): string {
   const message = error instanceof Error ? error.message : "";
-  return SAFE_FAILURES.some(phrase => message.includes(phrase)) ? message : "The post could not be moved. Reload the calendar and try again.";
+  return SAFE_FAILURES.some(phrase => message.includes(phrase)) ? message : policy.failure[policy.locale === 'fr-FR' ? 'fr' : 'en'];
 }

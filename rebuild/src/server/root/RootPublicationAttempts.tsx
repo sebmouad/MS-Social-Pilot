@@ -21,7 +21,7 @@ export async function RootPublicationAttempts() {
     { key: 'state', label: 'State', render: (row: typeof history.items[number]) => stateLabel[row.state] ?? 'Unknown state' },
     { key: 'reason', label: 'Safe reason', render: (row: typeof history.items[number]) => row.reason ?? '—' },
     { key: 'updated', label: 'Updated', render: (row: typeof history.items[number]) => formatRootTimestamp(row.updatedAt, history.timeZone) },
-    { key: 'recovery', label: 'Recovery', render: (row: typeof history.items[number]) => <RootPublicationControls row={row} /> },
+    { key: 'recovery', label: 'Recovery', render: (row: typeof history.items[number]) => <RootPublicationControls limits={history.limits} row={row} /> },
   ];
   return <section className="root-jobs" aria-labelledby="root-publication-attempts-title">
     <p className="root-jobs__eyebrow">Publishing operations</p><h2 id="root-publication-attempts-title">Publication attempt recovery</h2>
@@ -34,7 +34,7 @@ export async function RootPublicationAttempts() {
       { key: 'post', label: 'Local post', render: (row: typeof history.legacyProcessing[number]) => <><code>{row.postId}</code><small className="root-inbox-deletions__id">Destination record {row.postTargetId}</small></> },
       { key: 'destination', label: 'Destination', render: (row: typeof history.legacyProcessing[number]) => row.targetName || 'Destination removed' },
       { key: 'platform', label: 'Platform', render: (row: typeof history.legacyProcessing[number]) => row.provider },
-      { key: 'recovery', label: 'Recovery', render: (row: typeof history.legacyProcessing[number]) => <RootLegacyPublicationControl row={row} /> },
+      { key: 'recovery', label: 'Recovery', render: (row: typeof history.legacyProcessing[number]) => <RootLegacyPublicationControl limits={history.limits} row={row} /> },
     ]} rowKey={row => row.postTargetId} caption="Legacy processing destinations" emptyMessage="No older processing destinations need adoption." />
     {history.legacyTruncated ? <p role="status">More older processing destinations exist than this history limit. Increase the Publishing recovery history limit to inspect them.</p> : null}
   </section>;

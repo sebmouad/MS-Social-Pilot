@@ -1,6 +1,7 @@
+import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { oauthFailure, oauthJson } from '@/modules/integrations/oauth/http';
-import { authorizeParamsSchema, OAuthError, redirectRegistered, sameOrigin } from '@/modules/integrations/oauth/protocol';
+import { authorizeParamsSchemaForLimits, OAuthError, redirectRegistered, sameOrigin } from '@/modules/integrations/oauth/protocol';
 import { createAuthorizationCode, findClient, recordDenied, requireOAuth, type OAuthResourceScope } from '@/modules/integrations/oauth/server';
 import { requireViewer } from '@/server/context';
 import { prisma } from '@/server/data';
@@ -12,13 +13,36 @@ import { selectedResourceConnectionWhere } from '@/server/platforms/resource-vis
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MAX_FORM_BYTES = 65536;
 const NO_REFERRER = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' };
 
 function back(redirectUri: string, params: Record<string, string | undefined>) {
   const url = new URL(redirectUri);
   for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== '') url.searchParams.set(key, value);
   return new Response(null, { status: 303, headers: { ...NO_REFERRER, location: url.toString() } });
+}
+
+/** Enforce the actual byte ceiling even when Content-Length is missing or inaccurate. */
+async function boundedForm(request: Request, maxBytes: number) {
+  const tooLarge = () => new OAuthError('invalid_request', 'The request is too large.');
+  if (Number(request.headers.get('content-length') ?? 0) > maxBytes) throw tooLarge();
+  const reader = request.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  if (reader) {
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > maxBytes) { await reader.cancel(); throw tooLarge(); }
+        chunks.push(value);
+      }
+    } finally { reader.releaseLock(); }
+  }
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
+  return new Response(body, { headers: { 'content-type': request.headers.get('content-type') ?? '' } }).formData();
 }
 
 /**
@@ -38,13 +62,11 @@ export async function POST(request: Request) {
       throw error;
     }
     if (!['owner', 'admin'].includes(viewer.membership.role)) return oauthJson({ error: 'access_denied', error_description: 'Only workspace owners and admins can connect MCP clients.' }, 403);
-    const length = Number(request.headers.get('content-length') ?? 0);
-    if (length > MAX_FORM_BYTES) throw new OAuthError('invalid_request', 'The request is too large.');
-    const form = await request.formData();
+    const form = await boundedForm(request, await runtimeConfig('http.oauthAuthorizeMaxBodyBytes'));
     const one = (name: string) => { const all = form.getAll(name); return all.length === 1 && typeof all[0] === 'string' ? all[0] : ''; };
-    const many = (name: string) => form.getAll(name).filter((value): value is string => typeof value === 'string').slice(0, 2000);
+    const many = (name: string) => form.getAll(name).map(value => { if (typeof value !== 'string') throw new OAuthError('invalid_request', 'Choose valid access.'); return value; });
 
-    const params = authorizeParamsSchema.safeParse({
+    const params = authorizeParamsSchemaForLimits(rt).safeParse({
       client_id: one('client_id'), redirect_uri: one('redirect_uri'), response_type: one('response_type'), code_challenge: one('code_challenge'),
       code_challenge_method: one('code_challenge_method'), state: one('state') || undefined, scope: one('scope') || undefined,
     });
@@ -73,8 +95,9 @@ export async function POST(request: Request) {
       if (!viewer.permissions.pageScope.all) throw new OAuthError('invalid_request', 'Your own access is limited to selected channels, so choose them explicitly.');
       resourceScope = { version: 1, mode: 'all' };
     } else {
-      const ids = [...new Set(many('target'))];
-      const adAccountIds = [...new Set(many('adAccount'))];
+      const selectedIds = [many('target'), many('adAccount')];
+      if (selectedIds.some(ids => ids.length > rt.resourceIdsMaxItems || ids.some(id => !id || id.length > rt.resourceIdMaxCharacters))) throw new OAuthError('invalid_request', 'The selected resources exceed the current connector limits.');
+      const [ids, adAccountIds] = selectedIds.map(ids => [...new Set(ids)]) as [string[], string[]];
       if (!ids.length && !adAccountIds.length) throw new OAuthError('invalid_request', 'Choose at least one channel or ad account, or allow all.');
       const channelScope = viewer.permissions.pageScope;
       if (!channelScope.all && (ids.some(id => !channelScope.ids.includes(id)) || adAccountIds.length)) throw new OAuthError('invalid_request', 'Choose only channels you can access.');

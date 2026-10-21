@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { RESCHEDULE_POLICY, reschedulePolicySchema } from './reschedule-policy';
 
 /** Bootstrap defaults for synchronous guards. Root declarations use these same values. */
 export const SYNCHRONOUS_POLICY = {
+  'shared.reschedulePolicy': { defaultValue: RESCHEDULE_POLICY, schema: reschedulePolicySchema },
   'auth.passwordVerificationMaxBytes': { defaultValue: 800, schema: z.number().int().min(64).max(65536) },
   'root.registrationIdentifierMaxCharacters': { defaultValue: 255, schema: z.number().int().min(1).max(255) },
   'connections.expiryWarningDays': { defaultValue: 7, schema: z.number().int().min(0).max(365) },
@@ -32,14 +34,15 @@ export const SYNCHRONOUS_POLICY = {
 export type SynchronousPolicyKey = keyof typeof SYNCHRONOUS_POLICY;
 
 // Plain typed policy state; no server or database imports enter browser-safe schema helpers.
-type PolicySnapshot = Partial<Record<SynchronousPolicyKey, number>>;
+type PolicyValue<K extends SynchronousPolicyKey> = z.infer<(typeof SYNCHRONOUS_POLICY)[K]['schema']>;
+type PolicySnapshot = { [K in SynchronousPolicyKey]?: PolicyValue<K> };
 const state = ((globalThis as { __mspSynchronousPolicy?: PolicySnapshot }).__mspSynchronousPolicy ??= {});
-export function synchronousPolicy(key: SynchronousPolicyKey): number {
-  return state[key] ?? SYNCHRONOUS_POLICY[key].defaultValue;
+export function synchronousPolicy<K extends SynchronousPolicyKey>(key: K): PolicyValue<K> {
+  return (state[key] ?? SYNCHRONOUS_POLICY[key].defaultValue) as PolicyValue<K>;
 }
 export function applySynchronousPolicy(key: string, value: unknown): void {
   if (!Object.hasOwn(SYNCHRONOUS_POLICY, key)) return;
   const name = key as SynchronousPolicyKey;
-  state[name] = SYNCHRONOUS_POLICY[name].schema.parse(value);
+  (state as Record<string, unknown>)[name] = SYNCHRONOUS_POLICY[name].schema.parse(value);
 }
-export const withinSynchronousLimit = (key: SynchronousPolicyKey) => (value: string) => value.length <= synchronousPolicy(key);
+export const withinSynchronousLimit = (key: SynchronousPolicyKey) => (value: string) => { const limit = synchronousPolicy(key); return typeof limit === 'number' && value.length <= limit; };

@@ -1,3 +1,4 @@
+import { rootRecoveryFields } from '@/lib/config/root-recovery-policy';
 import { z } from 'zod';
 import type { Prisma } from '../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
@@ -8,7 +9,14 @@ import { requireActiveRoot } from './operations';
 import { withRootPublicationOperation } from './publication-operation';
 
 type Attempt = { id: string; workspaceId: string; postId: string; postTargetId: string; targetId: string; provider: string; state: string; reason: string | null; remotePostId: string | null; remoteUrl: string | null; createdAt: Date; updatedAt: Date; workspaceName: string | null; targetName: string | null };
-const inputSchema = z.object({ operationId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), outcome: z.enum(['PUBLISHED', 'ABSENT']), remotePostId: z.string().optional(), remoteUrl: z.string().optional(), verifiedExternally: z.literal(true), confirmation: z.string() }).strict();
+const inputSchema = (fields: ReturnType<typeof rootRecoveryFields>) => z.object({ ...fields, outcome: z.enum(['PUBLISHED', 'ABSENT']), remotePostId: z.string().optional(), remoteUrl: z.string().optional(), verifiedExternally: z.literal(true) }).strict();
+
+async function recoveryLimits() {
+  const [identifierMaxCharacters, confirmationMaxCharacters] = await Promise.all([
+    runtimeConfig('root.identifierMaxCharacters'), runtimeConfig('root.confirmationMaxCharacters'),
+  ]);
+  return { identifierMaxCharacters, confirmationMaxCharacters };
+}
 
 /** Bounded content-free Root view of durable publication attempts. */
 export async function listRootPublicationAttempts(userId: string, cap?: number) {
@@ -32,13 +40,13 @@ export async function listRootPublicationAttempts(userId: string, cap?: number) 
       AND NOT EXISTS (SELECT 1 FROM rebuild_publication_attempts a WHERE a."workspaceId"=p."workspaceId" AND a."postTargetId"=pt.id AND a.state NOT IN ('rejected','attested_absent'))
     ORDER BY pt."updatedAt" DESC, pt.id DESC LIMIT ${Math.min(limit, cap ?? limit) + 1}
   `;
-  return { timeZone, items: rows.map(row => ({ operationId: row.id, workspaceId: row.workspaceId, workspaceName: row.workspaceName ?? row.workspaceId, postId: row.postId, postTargetId: row.postTargetId, targetId: row.targetId, targetName: row.targetName, provider: row.provider, state: row.state, reason: row.reason, remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })), legacyProcessing: legacyProcessing.slice(0, Math.min(limit, cap ?? limit)).map(row => ({ ...row, workspaceName: row.workspaceName ?? row.workspaceId })), legacyTruncated: legacyProcessing.length > Math.min(limit, cap ?? limit) };
+  return { timeZone, limits: await recoveryLimits(), items: rows.map(row => ({ operationId: row.id, workspaceId: row.workspaceId, workspaceName: row.workspaceName ?? row.workspaceId, postId: row.postId, postTargetId: row.postTargetId, targetId: row.targetId, targetName: row.targetName, provider: row.provider, state: row.state, reason: row.reason, remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })), legacyProcessing: legacyProcessing.slice(0, Math.min(limit, cap ?? limit)).map(row => ({ ...row, workspaceName: row.workspaceName ?? row.workspaceId })), legacyTruncated: legacyProcessing.length > Math.min(limit, cap ?? limit) };
 }
 
 /** Root attestation records only a verified human outcome; no provider call is made. */
 export async function recordRootPublicationOutcome(userId: string, input: unknown) {
   await requireActiveRoot(userId);
-  const parsed = inputSchema.safeParse(input);
+  const parsed = inputSchema(rootRecoveryFields(await recoveryLimits())).safeParse(input);
   const expected = parsed.success ? `ROOT RECORD PUBLICATION ${parsed.data.operationId} ${parsed.data.outcome}` : '';
   if (!parsed.success || parsed.data.confirmation !== expected || parsed.data.outcome === 'ABSENT' && (parsed.data.remotePostId !== undefined || parsed.data.remoteUrl !== undefined)) throw new OperationError('invalid_request', 'Verify the current destination result and enter its exact confirmation.');
   if (parsed.data.remoteUrl !== undefined) {
@@ -59,7 +67,7 @@ async function rootWorkspaceOperation(userId: string, workspaceId: string, postI
 
 export async function finishRootPublicationProjection(userId: string, input: unknown) {
   await requireActiveRoot(userId);
-  const parsed = z.object({ operationId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), confirmation: z.string().max(300) }).strict().safeParse(input);
+  const parsed = z.object(rootRecoveryFields(await recoveryLimits())).strict().safeParse(input);
   if (!parsed.success || parsed.data.confirmation !== `ROOT FINISH PUBLICATION ${parsed.data.operationId}`) throw new OperationError('invalid_request', 'Confirm the exact publication to finish its local update.');
   const rows = await prisma.$queryRaw<Array<{ workspaceId: string; postId: string; targetId: string }>>`SELECT "workspaceId", "postId", "targetId" FROM rebuild_publication_attempts WHERE id=${parsed.data.operationId}`;
   const row = rows[0];
@@ -69,7 +77,8 @@ export async function finishRootPublicationProjection(userId: string, input: unk
 
 export async function adoptRootLegacyPublication(userId: string, input: unknown) {
   await requireActiveRoot(userId);
-  const parsed = z.object({ postTargetId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), confirmation: z.string().max(300) }).strict().safeParse(input);
+  const fields = rootRecoveryFields(await recoveryLimits());
+  const parsed = z.object({ postTargetId: fields.operationId, confirmation: fields.confirmation }).strict().safeParse(input);
   if (!parsed.success || parsed.data.confirmation !== `ROOT ADOPT PUBLICATION ${parsed.data.postTargetId}`) throw new OperationError('invalid_request', 'Check the destination and confirm this exact legacy record.');
   const row = await prisma.postTarget.findFirst({ where: { id: parsed.data.postTargetId }, select: { id: true, postId: true, targetId: true, status: true, remotePostId: true, post: { select: { workspaceId: true } }, target: { select: { workspaceId: true, socialAccount: { select: { provider: true } } } } } });
   if (!row || row.status !== 'processing' || row.remotePostId || row.post.workspaceId !== row.target.workspaceId || !row.target.socialAccount?.provider) throw new OperationError('conflict', 'This destination does not need legacy publication recovery.');

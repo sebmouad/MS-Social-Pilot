@@ -1,3 +1,4 @@
+import { rootRecoveryFields } from '@/lib/config/root-recovery-policy';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
@@ -23,13 +24,18 @@ type DeletionRow = {
   targetName?: string | null;
 };
 
-const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
-const inputSchema = z.object({
-  operationId: idSchema,
-  confirmation: z.string().max(300),
+const inputSchema = (fields: ReturnType<typeof rootRecoveryFields>) => z.object({
+  ...fields,
   verifiedOnPlatform: z.literal(true),
 }).strict();
 const forbidden = () => new OperationError('forbidden', 'Installation-owner access is required.');
+
+async function recoveryLimits() {
+  const [identifierMaxCharacters, confirmationMaxCharacters] = await Promise.all([
+    runtimeConfig('root.identifierMaxCharacters'), runtimeConfig('root.confirmationMaxCharacters'),
+  ]);
+  return { identifierMaxCharacters, confirmationMaxCharacters };
+}
 
 /** Bounded operator view. Remote identities, provider details, reasons and actors stay private. */
 export async function listRootInboxDeletions(userId: string, cap?: number) {
@@ -48,7 +54,7 @@ export async function listRootInboxDeletions(userId: string, cap?: number) {
     ORDER BY d."updatedAt" DESC, d.id DESC
     LIMIT ${Math.min(limit, cap ?? limit)}
   `;
-  return { timeZone, items: rows.map(row => ({
+  return { timeZone, limits: await recoveryLimits(), items: rows.map(row => ({
     operationId: row.id, workspaceId: row.workspaceId, workspaceName: row.workspaceName ?? row.workspaceId,
     targetId: row.targetId, targetName: row.targetName ?? null, provider: row.provider ?? 'unknown', remoteObjectId: row.remoteId ?? '', localItemId: row.localItemId, state: row.state,
     createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
@@ -59,7 +65,7 @@ export async function listRootInboxDeletions(userId: string, cap?: number) {
 /** Record an explicit operator attestation; this never calls a provider or removes local rows. */
 export async function confirmRootInboxDeletion(userId: string, input: unknown) {
   await requireActiveRoot(userId);
-  const parsed = inputSchema.safeParse(input);
+  const parsed = inputSchema(rootRecoveryFields(await recoveryLimits())).safeParse(input);
   if (!parsed.success || parsed.data.confirmation !== `CONFIRM REMOTE DELETION ${parsed.data.operationId}`) {
     throw new OperationError('invalid_request', 'Verify the remote deletion and enter its exact confirmation.');
   }

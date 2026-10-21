@@ -57,3 +57,10 @@ describe('Root publication recovery controls', () => {
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({ operationId: 'op-1', outcome: 'PUBLISHED', verifiedExternally: true, confirmation: 'ROOT RECORD PUBLICATION op-1 PUBLISHED', remotePostId: 'provider-final-1' });
   });
 });
+
+
+it('uses the service-supplied confirmation ceiling in the dialog', async () => {
+  await act(async () => root.render(createElement(RootPublicationControls, { row, limits: { identifierMaxCharacters: 80, confirmationMaxCharacters: 77 } })));
+  await act(async () => container.querySelector<HTMLButtonElement>('button')!.click());
+  expect(container.querySelector<HTMLInputElement>('input[name=confirmation]')!.maxLength).toBe(77);
+});

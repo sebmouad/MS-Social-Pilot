@@ -1,4 +1,5 @@
 'use client';
+import { ROOT_RECOVERY_LIMITS, type RootRecoveryLimits } from '@/lib/config/root-recovery-policy';
 import { useRootActionFeedback } from '@/server/root/RootActionFeedback';
 
 import { useRef, useState, type FormEvent } from 'react';
@@ -14,7 +15,7 @@ type DeletionRow = {
 };
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export function RootInboxDeletionControls({ row }: { row: DeletionRow }) {
+export function RootInboxDeletionControls({ row, limits = ROOT_RECOVERY_LIMITS }: { row: DeletionRow; limits?: RootRecoveryLimits }) {
   const router = useRouter();
   const validation = useFormValidation();
   const inFlight = useRef(false);
@@ -70,7 +71,7 @@ export function RootInboxDeletionControls({ row }: { row: DeletionRow }) {
           <p><strong>Remote comment ID:</strong> <code>{row.remoteObjectId}</code></p>
           <p><strong>Inbox item:</strong> {row.localItemId}</p>
           <label className="ui-field" htmlFor={confirmationField.id}><span>Type <strong>{phrase}</strong> to confirm</span>
-            <input {...confirmationField} className="ui-input" name="confirmation" value={confirmation} maxLength={300} autoComplete="off" disabled={busy} onChange={event => { setConfirmation(event.target.value); validation.clear('confirmation'); }} />
+            <input {...confirmationField} className="ui-input" name="confirmation" value={confirmation} maxLength={limits.confirmationMaxCharacters} autoComplete="off" disabled={busy} onChange={event => { setConfirmation(event.target.value); validation.clear('confirmation'); }} />
           </label>
           <FieldError {...validation.errorProps('confirmation')} />
           <label className="ui-field"><span><input {...validation.fieldProps('verifiedOnPlatform')} type="checkbox" name="verifiedOnPlatform" checked={verified} required disabled={busy} onChange={event => { setVerified(event.target.checked); validation.clear('verifiedOnPlatform'); }} /> I verified the deletion on the platform.</span></label>
