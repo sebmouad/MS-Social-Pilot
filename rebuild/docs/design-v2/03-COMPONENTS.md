@@ -7,14 +7,14 @@ A screen must use these components instead of route-local controls. Each compone
 
 | Component | Decision | Notes |
 |---|---|---|
-| `AppShell` | **Replace** with `AppFrame` = `AppSidebar` + `TopBar` + `BottomBar` + content | Keep focus trap, Escape, inert and scroll-lock logic from today's drawer |
+| `AppShell` | **Evolve in place** into the single sidebar + `TopBar` + `BottomBar` (same file; split into sub-components only if it grows too large) | Keep its focus trap, Escape, inert and scroll-lock logic |
 | `SidebarDock` | **Delete** after migration (27 users) | Its contents move to `PageHeader` actions, `FilterButton` or the composer action bar |
 | `FilterPanel`, `FilterChips`, `DatePresets` | **Refactor** into `FilterButton` + `FilterSheet` + `FilterChips` | |
 | `Filters.tsx` | **Delete** (no importers) | |
 | `Menu`, `Select` | **Change**: render the popup through `Popover` (portal + fixed positioning) | Fixes clipping inside tables, dialogs and sidebars |
 | `usePopupPlacement` | **Move** into `Popover` | |
 | `DataTable` | **Change**: density, `aria` fixes, built-in pagination footer, bulk bar, compact phone rows | See 2.6 |
-| `MetricCard` | **Replace** with `MetricTile` | Value, delta, ⓘ, optional sparkline |
+| `MetricCard` | **Evolve in place**: add delta, ⓘ and sparkline props ("MetricTile" in this document means the improved `MetricCard`) | Value, delta, ⓘ, optional sparkline |
 | `PageHeader` | **Change**: title, count, actions, tabs slot, filter row | See 2.4 |
 | `Tabs` | **Change**: link variant (URL) and panel variant; no mixing | |
 | `RouteNotice`, `Toast` | **Unify**: `Toast` for transient success; `Notice` (inline) for errors and warnings near the action | One feedback system |
@@ -23,7 +23,7 @@ A screen must use these components instead of route-local controls. Each compone
 | `Dialog`, `ModalDialog`, `ConfirmDialog`, `useConfirm`, `Drawer` | **Keep**; `Drawer` → `Sheet` (side or bottom) | |
 | `PostPreview` | **Change**: localize copy and dates (today `en-US`); stop importing from `modules/publishing` (move the needed helpers into a neutral `src/lib/post-preview`) | Shared → module dependency inversion |
 | `EmptyState`, `ErrorState`, `Skeleton`, `Badge`, `StatusChip`, `ChannelBadge`, `Avatar`, `PostThumb`, `AutoTextarea`, `FormValidation`, `Forms`, `InlineEdit`, `LocalTime`, `CsvExportButton`, `IndeterminateCheckbox`, `charts/*` | **Keep**, restyle with v2 tokens | |
-| New | `AppSidebar`, `ChannelScopeList`, `ScopeSheet`, `TopBar`, `BottomBar`, `Popover`, `InfoTip`, `FilterButton`, `FilterSheet`, `DateRangePicker`, `MetricTile`, `SplitButton`, `ActionBar`, `Sheet`, `SidePanel`, `ListRow`, `Notice`, `useCopy` | Specs below |
+| New (only where nothing similar exists) | `Popover`, `InfoTip`, `ChannelScopeList`/`ScopeSheet` (inside `AppShell`), `BottomBar`, `DateRangePicker`, `SplitButton`, `ActionBar`, `SidePanel`, `ListRow`, `useCopy`. `FilterButton`/`FilterSheet` evolve from `FilterPanel`; `Sheet` from `Drawer`; `Notice` from `RouteNotice`; `TopBar` from the existing top bar in `AppShell` | Specs below. Names in this document refer to these evolved components |
 
 ## 2. Specifications
 

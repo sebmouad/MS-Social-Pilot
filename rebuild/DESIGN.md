@@ -34,7 +34,7 @@ components:
 
 # MS Social Pilot Design System
 
-> **Design v2: final plan approved by the owner on 2026-10-21. Not built yet.**
+> **Design v2: improvement plan for this same app, approved by the owner on 2026-10-21. Not applied yet. It is not a rebuild.**
 > The full target is in [docs/design-v2/](docs/design-v2/README.md):
 > - one channel-first sidebar with the areas **Home · Content · Inbox · Insights**
 > - tabs inside each area, Table + side preview, and a full-screen composer

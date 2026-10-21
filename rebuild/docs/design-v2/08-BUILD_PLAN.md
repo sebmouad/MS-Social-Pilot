@@ -1,8 +1,8 @@
-# 08. Build plan (final, owner-approved 2026-10-21)
+# 08. Improvement plan (final, owner-approved 2026-10-21)
 
 ## Strategy
 
-- **Replace directly (owner decision).** There is no v1/v2 switch. Each batch replaces the old UI for everyone once its checks pass, and it ships through the normal release (`rebuild/scripts/prod-deploy.sh`). Rollback is that script's swap-back to the previous release. Every batch must therefore leave the whole app usable and coherent.
+- **Improve the same app (owner decision).** This is not a rebuild: each step changes the existing code in `rebuild/src` in place (see README "How v2 is delivered"). There is no v1/v2 switch. Each step improves the UI for everyone once its checks pass, and it ships through the normal release (`rebuild/scripts/prod-deploy.sh`). Rollback is that script's swap-back to the previous release. Every batch must therefore leave the whole app usable and coherent.
 - **Transitional adapter.** B1 replaces the frame for every page at once. Pages not yet migrated still render their `SidebarDock` content, now shown in a "Page tools" panel opened from a header button: a side `Sheet` on desktop and a bottom sheet on phone. Each area batch removes its pages from the adapter. B9 deletes the adapter and `SidebarDock`.
 - **Routes.** An area batch adds its new routes (`/content/*`, `/create`, `/insights/*`, `/settings/*` changes) and, **in the same batch**, adds 308 redirects from the old routes. The redirect table lives in a small middleware generated from manifest declarations, maps query parameters (01 §5) and keeps unknown parameters. A test asserts every old route lands on an existing page.
 - **Small, reviewable batches.** One PR per batch, with screenshots (06 §3) and the review checklist (06 §4) filled in.
@@ -49,10 +49,11 @@ Every batch that touches these flows must pass them at 390 px, one-handed, with 
   - at most 9 font sizes in shared CSS
 - Screenshots in Clean light/dark and Vivid show no regressions.
 
-### B1. Frame (sidebar, channel scope, header, popovers, phone bar)
+### B1. Shell improvement (single sidebar, channel scope, header, popovers, phone bar)
 
 **Owns:**
-- New `src/components/{AppFrame,AppSidebar,ChannelScopeList,ScopeSheet,TopBar,BottomBar,Popover,InfoTip,FilterButton,FilterSheet,PageHeader,Notice,Sheet,SidePanel,ListRow,MetricTile,SplitButton,ActionBar,DateRangePicker}.tsx`
+- Existing `src/components/AppShell.tsx` (evolves into the single sidebar, top bar and phone bar), `PageHeader.tsx`, `FilterPanel.tsx`, `Drawer.tsx`, `RouteNotice.tsx`, `MetricCard.tsx`, `DataTable.tsx`
+- New only where missing: `src/components/{Popover,InfoTip,ChannelScopeList,BottomBar,SidePanel,ListRow,SplitButton,ActionBar,DateRangePicker}.tsx`
 - `Menu.tsx`, `Select.tsx` (move onto Popover), `Tabs.tsx`
 - `src/server/PageFrame.tsx`
 - `src/server/context.ts` (`actorFromViewer`, `parseChannelScope`)
@@ -63,14 +64,14 @@ Every batch that touches these flows must pass them at 390 px, one-handed, with 
 - the "Page tools" adapter
 
 **Work:**
-- Build the components per 03.
+- Evolve the existing components per 03; add the missing ones.
 - Build the channel scope per 01 §5: cookie + URL + validation notice.
 - Tasks and Agency show only when used (01 §4).
 - Sign-in lands on Home.
 - Phone bottom bar.
 
 **Accept:**
-- Every existing page renders in the new frame with no lost function: dock content is reachable through Page tools.
+- Every existing page renders in the improved shell with no lost function: dock content is reachable through Page tools.
 - Keyboard walk passes, with focus trap and Escape working.
 - The scope chip and the sidebar stay in sync.
 - No popover is clipped, including the row menu on the last table row and inside a dialog.
@@ -84,7 +85,7 @@ Every batch that touches these flows must pass them at 390 px, one-handed, with 
 - `src/app/create/page.tsx`
 - redirect from `/publishing/compose`
 
-**Work:** S7. Reuse today's server actions; services do not change. Move destinations and time out of the dock.
+**Work:** S7, by refactoring the existing `PostComposer` and `ComposeScreen` (not a new composer). Reuse today's server actions; services do not change. Move destinations and time out of the dock.
 
 **Accept:**
 - Draft, schedule, queue and publish-now all work.

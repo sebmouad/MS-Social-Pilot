@@ -1,4 +1,4 @@
-# Design v2: simple, channel-first MS Social Pilot
+# Design v2: improvement plan for the current MS Social Pilot app
 
 Status: **final plan approved by the owner on 2026-10-21; not built yet.** Written at `99c4155`.
 Built from the owner's direction in this session:
@@ -25,6 +25,27 @@ page. Each area uses **tabs** instead of separate menu pages. There is
 one action bar. **Numbers come first**, and the caveats sit behind ⓘ.
 Phones get a bottom bar with a central Create button.
 
+## How v2 is delivered: improvements to the same app (owner, 2026-10-21)
+
+v2 is **not a rebuild and not a second app**. It improves the application that runs
+in production today. That application's source lives in `rebuild/`; the folder name is
+historical, and it is the live app. Rules for every step:
+
+- **Change existing files in place.** `AppShell.tsx` evolves into the new sidebar.
+  `PageHeader`, `DataTable`, `Menu`, `Select`, `MetricCard`, `FilterPanel`, `Drawer`
+  and `RouteNotice` gain the v2 behaviour. Existing screens are refactored, not
+  rewritten from scratch.
+- **Add a new component only when nothing similar exists**: `Popover`, `InfoTip`,
+  `SidePanel`, `SplitButton`, `ActionBar`, `ListRow`, `BottomBar`, `DateRangePicker`.
+- **Keep everything that works:** services, data, authorization, MCP/API, tests,
+  Root settings and user preferences.
+- **Small improvement PRs.** Each step ships to users through the normal release, keeps
+  the app fully usable, and keeps existing tests green (updated only where the UI
+  intentionally changed).
+- **Delete as you replace.** When a step supersedes old code (for example
+  `SidebarDock` or the Feed/Cards views), remove it in the same step or the
+  cleanup step. Do not keep two versions alive.
+
 ## Final plan at a glance
 
 | Item | Decision |
@@ -37,7 +58,7 @@ Phones get a bottom bar with a central Create button.
 | Phone | Bottom bar with a central Create button; first-class Inbox replies, Create, post status and Insights numbers. |
 | Theme | Clean is the default for new users. Vivid, Meta blue and Warm stay selectable. All fix the audit's contrast defects. |
 | Landing | Home after sign-in. |
-| Rollout | Replace directly, batch by batch through the normal release. Rollback is the release swap-back. |
+| Rollout | Improve the current app in place, step by step through the normal release; no rebuild, no parallel version. Rollback is the release swap-back. |
 | Order | B0 foundations → B1 frame → B2 Create → B3 Content → B4 Inbox → B5 Insights → B6 Settings → B7 Home/Tasks/Agency → B8 Root → B9 verification; parity lane P runs alongside |
 
 ## Read in this order

@@ -4,7 +4,8 @@ Paste the block below into the next session. Fill in the batch number.
 
 ```text
 You are continuing MS Social Pilot design v2 in the repository sebmouad/MS-Social-Pilot.
-Work only in rebuild/. Start by reading, in order:
+Work only in rebuild/ (the folder name is historical: it is the live production app).
+Start by reading, in order:
 
  1. AGENTS.md
  2. rebuild/docs/ARCHITECTURE_CONTRACT.md
@@ -15,7 +16,10 @@ Work only in rebuild/. Start by reading, in order:
 
 Open rebuild/docs/design-v2/prototype.html in a browser to see the target.
 
-Task: implement batch B<N> from rebuild/docs/design-v2/08-BUILD_PLAN.md.
+Task: apply improvement step B<N> from rebuild/docs/design-v2/08-BUILD_PLAN.md
+to the existing app. This is NOT a rebuild: change existing files and components
+in place, refactor existing screens, add a new component only where nothing
+similar exists, and delete code you supersede.
 Edit only the files that batch owns.
 
 Hard rules:
