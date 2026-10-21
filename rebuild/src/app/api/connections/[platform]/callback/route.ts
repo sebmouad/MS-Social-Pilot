@@ -11,9 +11,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ platform: string }> }) {
   const viewer = await requireViewer({ feature: 'settings/connections' });
   const failed = NextResponse.redirect(new URL('/settings/connections?notice=connect_failed', requestOrigin(request)), { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
-  if (viewer.membership.role !== 'owner' && viewer.membership.role !== 'admin') return failed;
+  if (viewer.membership.role !== 'owner' && viewer.membership.role !== 'admin') { console.warn('[connections] callback refused: role'); return failed; }
   const provider = (await params).platform;
   const flow = hasPlatformCapability(viewer.entitlements, provider) ? await connectionFlow(provider) : null;
-  if (!flow) return failed;
+  if (!flow) { console.warn('[connections] callback refused: no_flow'); return failed; }
   return flow.callback(request, viewer);
 }

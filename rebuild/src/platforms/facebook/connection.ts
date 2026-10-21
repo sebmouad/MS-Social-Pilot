@@ -59,14 +59,14 @@ export async function finishFacebookConnection(request: NextRequest, viewer: Con
   if (!pending) return finish(request, 'oauth_invalid_state');
   if (params.has('error')) return finish(request, 'oauth_cancelled');
   const code = params.get('code');
-  if (!code || code.length > 4096) return finish(request, 'connect_failed');
+  if (!code || code.length > 4096) { console.warn('[facebook-connect] callback refused: missing_code'); return finish(request, 'connect_failed'); }
 
   let stage = 'configuration';
   try {
     return await withWorkspaceOperation(viewer.workspaceId, async () => {
       const [oauth, engine] = await Promise.all([configuredFacebookOAuth(), configuredFacebookEngine()]);
       const expectedRedirect = new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, requestOrigin(request)).toString();
-      if (new URL(oauth.redirectUri).toString() !== expectedRedirect) return finish(request, 'connect_failed');
+      if (new URL(oauth.redirectUri).toString() !== expectedRedirect) { console.warn('[facebook-connect] callback refused: redirect_mismatch', { expectedOrigin: new URL(expectedRedirect).origin }); return finish(request, 'connect_failed'); }
 
       stage = 'exchange';
       const shortLived = await engine.exchangeCode({ appId: oauth.appId, appSecret: oauth.appSecret, redirectUri: oauth.redirectUri, code });
@@ -86,7 +86,8 @@ export async function finishFacebookConnection(request: NextRequest, viewer: Con
     });
   } catch (error) {
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
-    await recordFacebookConnectionFailure(actor, stage, error instanceof FacebookApiError ? 'provider_error' : 'internal_error');
+    console.warn('[facebook-connect] callback failed', { stage, category: error instanceof FacebookApiError ? 'provider_error' : 'internal_error', name: error instanceof Error ? error.name : 'unknown', code: error instanceof FacebookApiError ? (error as { code?: unknown }).code : undefined });
+    await recordFacebookConnectionFailure(actor, stage, error instanceof FacebookApiError ? 'provider_error' : 'internal_error').catch(() => undefined);
     // The audit stores only a stage/category. Provider messages and credentials stay server-side.
     return finish(request, 'connect_failed');
   }
