@@ -540,3 +540,70 @@ Tests: `npx vitest run tests/verify-legacy-migration*.test.ts tests/raw-sql-void
 The real PostgreSQL test requires `REBUILD_PREVIEW_DATABASE_URL`, applies the
 same URL guard, reads existing isolated fixtures and verifies count drift without
 mutating records. Without that variable it explicitly skips.
+
+## Post-cutover rollback and installed-release restore drill
+
+From `app/`, the release owner runs:
+
+```sh
+bash rebuild/scripts/prod-rollback-drill.sh
+```
+
+`PROD_HOST` and `PROD_KEY` use the same SSH bootstrap convention as
+`prod-deploy.sh`. This is an operator-run recovery smoke test, not a deployment.
+The script does not build, migrate, swap releases, start workers, change the proxy,
+or issue commands against the live database or live service units. It uses the
+retained `/srv/ms-social-pilot` legacy build and the **installed**
+`/srv/ms-social-pilot-rebuild/rebuild` build, never `origin/main`. Preserve both
+artifacts and avoid concurrent deployments while running it. Output identifies
+both Next BUILD_ID hashes and the backup path/SHA-256; these identify tested
+artifacts, not a verified Git revision. Correlate them with release evidence.
+
+The newest existing `/var/backups/socialpilot-deploy-*/social_pilot.dump` by file
+mtime is restored with `--exit-on-error --no-owner --no-acl` into
+`social_pilot_drill`. No older backup fallback or automatic schema repair is
+allowed. A pre-existing scratch database/role, occupied drill port, unsafe target,
+or concurrent drill causes refusal. The fixed safety targets, local PostgreSQL
+socket/port, host paths, readiness bounds and health paths are release bootstrap
+constraints; they are not new application settings or Root policy. No registry
+schema change is needed. PostgreSQL must be on the expected local cluster/socket
+and the releases must have their installed Next CLI and production `.next` build.
+
+Transient `socialpilot-rollback-{legacy,rebuild}-<pid>.service` units run as
+`socialpilot`, binding only `127.0.0.1:3120` and `127.0.0.1:3121`. A fresh
+non-inheriting read-only database role uses loopback TCP and the scratch database;
+release `.env` files are hidden and production credentials are not copied.
+Systemd makes release files read-only, blocks external IP traffic and prevents
+privilege escalation. The host must support systemd's IP filtering/cgroup BPF
+and filesystem isolation; verify enforcement on the host before accepting the
+result. Loopback is allowed for PostgreSQL and probes. Only public table/sequence
+reads are granted; encrypted-secret use and application writes are outside this
+smoke test. Both builds see the same restored schema/data without migrations.
+A dump predating schema requirements of the installed build can therefore fail:
+retain that failure and resolve the backup/release recovery mismatch separately.
+
+Legacy `/api/health` and rebuild `/sign-in` must each return HTTP 200 within the
+readiness bound, with a separately named scratch connection visible in
+`pg_stat_activity`; legacy is checked again after rebuild startup. Output records
+restore and per-release readiness seconds. Exit/signal cleanup stops only this
+invocation's transient units, drops only its newly created scratch database/role,
+and removes private temporary environment files. Cleanup errors produce FAIL.
+SIGKILL or host loss cannot run traps: inspect leftovers before retrying; the
+script deliberately refuses to adopt or delete pre-existing resources. Unit
+output is suppressed to avoid logging restored private records or credentials.
+
+Only `ROLLBACK DRILL PASS` with exit code zero **after cleanup** is a passing
+smoke result. Retain the timestamp, artifact/backup hashes, timings and verdict in
+private release evidence. Static tests and shell syntax checks do not execute
+this drill or close the production recovery gate. This test establishes limited
+HTTP/database readiness of these two artifacts against that backup; media byte
+recovery, authenticated workflows, provider writes, worker/queue ownership,
+proxy switching and actual rollback execution remain separate release evidence.
+
+Static checks (from `rebuild/`; the owned test lives in the repository-root
+`tests/` directory):
+
+```sh
+npx vitest run --root .. --cache=false tests/rollback-drill-script.test.ts
+npx tsc --noEmit -p .
+```
