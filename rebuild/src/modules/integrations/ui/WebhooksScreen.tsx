@@ -1,3 +1,4 @@
+import { configOrDefault } from '@/server/config/config-or-default';
 import { webhookCopySchema } from '../config';
 import { runtimeConfig } from '@/server/config/store';
 import { PageHeader } from '@/components/PageHeader';
@@ -15,7 +16,7 @@ export const metadata = { title: 'Webhooks' };
 
 export default async function WebhooksScreen() {
   const locale = integrationsLocale((await headers()).get('accept-language'));
-  const catalog = webhookCopySchema.parse(await runtimeConfig('integrations.webhookCopy'));
+  const catalog = (await configOrDefault('integrations.webhookCopy', webhookCopySchema));
   const copy = catalog[locale];
   const t = (key: IntegrationsCopyKey, vars?: Record<string, string | number>) => Object.entries(vars ?? {}).reduce((value: string, [name, item]) => value.split(`{${name}}`).join(String(item)), copy[key]);
   const viewer = await requireViewer({ feature: WEBHOOKS_FEATURE_ID, channelScoped: true });

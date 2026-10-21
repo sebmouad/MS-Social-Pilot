@@ -1,10 +1,11 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import { cache } from 'react';
 import { runtimeConfig } from '@/server/config/store';
 
 /** One catalog read per request, shared by server screens and serialized client controls. */
 export const analyticsCopy = cache(async () => {
   const [reports, goals, downloads, demographics, workspace, records, errors] = await Promise.all([
-    runtimeConfig('analytics.reportsCopy'), runtimeConfig('analytics.goalsCopy'), runtimeConfig('analytics.downloadCopy'), runtimeConfig('analytics.demographicsCopy'), runtimeConfig('analytics.workspaceCopy'), runtimeConfig('analytics.recordsCopy'), runtimeConfig('analytics.errorCopy'),
+    configValueOrDefault('analytics.reportsCopy'), configValueOrDefault('analytics.goalsCopy'), configValueOrDefault('analytics.downloadCopy'), configValueOrDefault('analytics.demographicsCopy'), configValueOrDefault('analytics.workspaceCopy'), configValueOrDefault('analytics.recordsCopy'), configValueOrDefault('analytics.errorCopy'),
   ]);
   return { reports, goals, downloads, demographics, workspace, records, errors };
 });

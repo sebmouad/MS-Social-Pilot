@@ -1,3 +1,4 @@
+import { configOrDefault } from '@/server/config/config-or-default';
 import { reschedulePolicySchema } from '@/lib/config/reschedule-policy';
 import { pageLocale } from '../kit/locale';
 import { loadPublishingCopy } from '../../server/customer-copy';
@@ -31,7 +32,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const { catalog, copy: localizedCopy } = await loadPublishingCopy();
   const copy = localizedCopy[locale];
   const formatUtc = (key: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { ...options, timeZone: "UTC" }).format(utcNoon(key));
-  const reschedulePolicy = reschedulePolicySchema.parse(await runtimeConfig('shared.reschedulePolicy'));
+  const reschedulePolicy = (await configOrDefault('shared.reschedulePolicy', reschedulePolicySchema));
   const movePolicy = { ...reschedulePolicy, locale: locale === "fr" ? "fr-FR" as const : "en-US" as const };
   const defaultScheduleTime = await runtimeConfig('publishing.defaultScheduleTime') as string;
   const timeZone = viewer.membership.workspace.timezone;

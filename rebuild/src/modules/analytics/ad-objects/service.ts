@@ -1,5 +1,6 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import { cache } from 'react';
-const recordsCopy = cache(() => runtimeConfig('analytics.recordsCopy'));
+const recordsCopy = cache(() => configValueOrDefault('analytics.recordsCopy'));
 import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
 import { errorCopyDefaults } from '@/modules/analytics/error-copy';
 import { analyticsError } from '@/modules/analytics/server/error-copy';

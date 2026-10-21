@@ -1,3 +1,4 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { cache } from 'react';
 import { runtimeConfig } from '@/server/config/store';
@@ -6,7 +7,7 @@ import { catalogLanguages, defaultAdsCatalogs, type AdsCatalogs } from '../copy'
 const snapshots = new AsyncLocalStorage<{ copy?: Promise<AdsCatalogs> }>();
 const readAdsCopy = cache(async (): Promise<AdsCatalogs> => {
   try {
-    const [customer, analysis, creative] = await Promise.all([runtimeConfig('ads.customerCopy'), runtimeConfig('ads.analysisCopy'), runtimeConfig('ads.creativeCopy')]);
+    const [customer, analysis, creative] = await Promise.all([configValueOrDefault('ads.customerCopy'), configValueOrDefault('ads.analysisCopy'), configValueOrDefault('ads.creativeCopy')]);
     return { customer, analysis: catalogLanguages(analysis), creative: catalogLanguages(creative) };
   } catch {
     // Copy availability cannot replace an intentional product error with a storage exception.

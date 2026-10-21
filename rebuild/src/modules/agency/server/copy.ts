@@ -1,3 +1,4 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
 import { uiCopy, type CustomerCopy } from '../ui/copy';
@@ -6,9 +7,9 @@ import { exportCopyByLocale } from '../export-copy';
 import { runtimeConfig } from '@/server/config/store';
 
 /** React cache shares one catalog read across a rendered request. */
-export const loadCustomerCopy = cache(() => runtimeConfig('agency.customerCopy'));
+export const loadCustomerCopy = cache(() => configValueOrDefault('agency.customerCopy'));
 
-export const loadExportCopy = cache(async () => exportCopyByLocale(await runtimeConfig('agency.exportCopy')));
+export const loadExportCopy = cache(async () => exportCopyByLocale(await configValueOrDefault('agency.exportCopy')));
 
 /** Service calls share one request-local snapshot, including nested authorization calls. */
 const requestCopy = new AsyncLocalStorage<CustomerCopy>();

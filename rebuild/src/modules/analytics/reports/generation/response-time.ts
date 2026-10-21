@@ -1,7 +1,8 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import { cache } from 'react';
 import { runtimeConfig } from '@/server/config/store';
 import { responseTimeCopyDefaults, responseText, type ResponseTimeCopy } from './response-copy';
-const responseCopy = cache(() => runtimeConfig('analytics.responseTimeCopy'));
+const responseCopy = cache(() => configValueOrDefault('analytics.responseTimeCopy'));
 import { prisma } from '@/server/data';
 import type { ReportPeriod } from '../contracts';
 import { businessHoursOrNull, businessMs, calendarMs, type BusinessHoursSetting } from './business-hours';

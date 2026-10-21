@@ -1,3 +1,4 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import type { Metadata } from 'next';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -15,7 +16,7 @@ export const metadata: Metadata = { title: 'Appearance' };
 export default async function AppearancePage() {
   const viewer = await requireViewer({ feature: 'settings/appearance', channelScoped: true });
   const locale = await settingsLocale();
-  const t = (await runtimeConfig('settings.appearanceCopy'))[locale] as AppearanceCopy;
+  const t = (await configValueOrDefault('settings.appearanceCopy'))[locale] as AppearanceCopy;
   const appearance = await appearanceSession(await accountSessionActor(viewer.user.id, viewer.workspaceId));
   return <PageFrame module="settings" scopedAccess><SettingsPage active="settings/appearance" title={t.title} description={t.description} locale={locale}>
     <SettingsPanel title={t.panel} detail={t.panelDetail}>

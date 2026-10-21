@@ -1,8 +1,9 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import { cache } from 'react';
 import { runtimeConfig } from '@/server/config/store';
 import { goalsText, type GoalsCatalog } from '../copy';
 import { analyticsLanguage } from '../../server/error-copy';
-const goalCopy = cache(() => runtimeConfig('analytics.goalsCopy'));
+const goalCopy = cache(() => configValueOrDefault('analytics.goalsCopy'));
 import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
 import { errorCopyDefaults } from '@/modules/analytics/error-copy';
 import { analyticsError } from '@/modules/analytics/server/error-copy';

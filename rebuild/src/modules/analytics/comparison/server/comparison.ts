@@ -1,3 +1,4 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import { workspaceCopyDefaults, workspaceText, type WorkspaceCopy } from '../../workspace-copy';
 import { analyticsLanguage } from '../../server/error-copy';
 import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
@@ -57,7 +58,7 @@ export async function readAnalyticsComparison(actor: Actor, rawInput: unknown) {
   const maxMetrics = Number(await runtimeConfig('analytics.comparison.maxMetrics'));
   if (!Number.isSafeInteger(maxMetrics) || maxMetrics < 10 || maxMetrics > 2000) throw await analyticsError('unavailable', "Comparisons are temporarily unavailable.");
   const input = parsed.data;
-  const [copy, locale] = await Promise.all([runtimeConfig('analytics.workspaceCopy'), analyticsLanguage()]);
+  const [copy, locale] = await Promise.all([configValueOrDefault('analytics.workspaceCopy'), analyticsLanguage()]);
   const constraints = { feature: 'analytics/compare' as const, allowedChannelIds: actor.allowedChannelIds };
   let snapA: AnalyticsSnapshot; let snapB: AnalyticsSnapshot;
   if (input.mode === 'period') {

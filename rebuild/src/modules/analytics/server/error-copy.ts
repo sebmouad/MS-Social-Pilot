@@ -1,9 +1,10 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import { cache } from 'react';
 import { headers } from 'next/headers';
 import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
 import { errorCopyDefaults, type AnalyticsErrorCopy } from '../error-copy';
-const catalog = cache(() => runtimeConfig('analytics.errorCopy'));
+const catalog = cache(() => configValueOrDefault('analytics.errorCopy'));
 export const analyticsLanguage = cache(async (): Promise<'en' | 'fr'> => {
   try { return /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en'; }
   catch { return 'en'; } // Background jobs have no HTTP language preference.

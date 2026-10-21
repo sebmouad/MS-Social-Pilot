@@ -1,3 +1,4 @@
+import { configOrDefault } from '@/server/config/config-or-default';
 import { AccountSettings } from './settings';
 import { readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
 import { canAccessFeature } from '@/server/permissions';
@@ -29,7 +30,7 @@ export default async function AccountPage() {
   const t = uiCopy.account[locale];
   const account = await readAccount(await accountSessionActor(viewer.user.id, viewer.workspaceId));
   const { passwordPolicy, nameMaxLength } = account;
-  const confirmationCopy = accountConfirmationCopySchema.parse(await runtimeConfig('settings.accountConfirmationCopy'))[locale];
+  const confirmationCopy = (await configOrDefault('settings.accountConfirmationCopy', accountConfirmationCopySchema))[locale];
   // Read on the server so an unavailable credential store shows an in-page retry instead of a failing browser request.
   const personKeys = await listPersonKeys({ userId: viewer.user.id })
     .then(result => ({ ...result, keys: result.keys.map(key => ({ ...key, expiresAt: key.expiresAt.toISOString(), createdAt: key.createdAt.toISOString() })) }))

@@ -1,3 +1,4 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import { authorizeInbox } from '@/modules/inbox/server/access';
 import { hasPlatformCapability } from '@/server/entitlements';
 import { ADDITIONAL_NOTIFICATION_PREFERENCES } from './catalog';
@@ -49,7 +50,7 @@ async function bounds(): Promise<NotificationBounds> {
 
 export async function notificationEventCopy(): Promise<NotificationEventCopy> {
   try {
-    const raw = await runtimeConfig('notifications.eventCopy');
+    const raw = await configValueOrDefault('notifications.eventCopy');
     const definition = NOTIFICATIONS_CONFIG.find(item => item.key === 'notifications.eventCopy')!;
     const checked = definition.schema.safeParse(raw);
     if (!checked.success) throw unavailable();

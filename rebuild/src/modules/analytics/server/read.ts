@@ -1,6 +1,7 @@
+import { configValueOrDefault } from '@/server/config/config-or-default';
 import { analyticsLanguage } from './error-copy';
 import { cache } from 'react';
-const metricCopy = cache(() => runtimeConfig('analytics.workspaceCopy'));
+const metricCopy = cache(() => configValueOrDefault('analytics.workspaceCopy'));
 import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
 import { errorCopyDefaults } from '@/modules/analytics/error-copy';
 import { analyticsError } from '@/modules/analytics/server/error-copy';

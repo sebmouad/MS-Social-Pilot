@@ -1,3 +1,4 @@
+import { configOrDefault } from '@/server/config/config-or-default';
 import { ComposerCopyProvider } from '@/modules/publishing/ui/compose/CopyProvider';
 import { headers } from 'next/headers';
 import { loadComposerCopy } from '../../server/composer-copy';
@@ -67,7 +68,7 @@ async function CollaborationPageContent({ searchParams }: { searchParams: Promis
     if (view === 'queue') {
       const [result, limit] = await Promise.all([readQueueSlots(actor), bounds()]);
       return <>{nav}<PageHeading title={copy.queue} description={copy.queueHelp} />
-        <QueueTimes initialSlot={queueDefaultSlotSchema.parse(await runtimeConfig('publishing.queue.defaultSlot'))} timeZone={viewer.membership.workspace.timezone} slots={result.slots} targets={result.targets.map(({ id, name }) => ({ id, name }))} canEditShared={result.canEditShared} canEditChannels={result.canEditChannels} limit={limit.queueSlotLimit} /></>;
+        <QueueTimes initialSlot={(await configOrDefault('publishing.queue.defaultSlot', queueDefaultSlotSchema))} timeZone={viewer.membership.workspace.timezone} slots={result.slots} targets={result.targets.map(({ id, name }) => ({ id, name }))} canEditShared={result.canEditShared} canEditChannels={result.canEditChannels} limit={limit.queueSlotLimit} /></>;
     }
     const mix = await readContentMix(actor);
     return <>{nav}<PageHeading title={copy.mix} description={copy.mixHelp} />

@@ -1,3 +1,4 @@
+import { configOrDefault } from '@/server/config/config-or-default';
 import { readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
 import { SESSION_ONLY_MCP_FEATURES } from '../../mcp-access/session-policy';
 import { listMcpKeys } from '../../mcp-access/server';
@@ -30,7 +31,7 @@ export default async function McpKeysPage(props: { searchParams: Promise<Record<
   if (!isManager) return <PageFrame module="settings"><SettingsPage copy={uiCopy} active="settings/mcp" title={t.title} description={t.description} locale={locale}><SettingsPanel title={t.restricted}><p className={styles['settings-note']}>{t.managersOnly}</p></SettingsPanel></SettingsPage></PageFrame>;
   const params = await searchParams;
   const keyOffset = params.keyOffset === undefined ? 0 : Number(params.keyOffset);
-  const copy = accountConfirmationCopySchema.parse(await runtimeConfig('settings.accountConfirmationCopy'))[locale];
+  const copy = (await configOrDefault('settings.accountConfirmationCopy', accountConfirmationCopySchema))[locale];
   const [keyPage, maxLifetimeDays] = await Promise.all([
     listMcpKeys({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { offset: keyOffset }),
     runtimeConfig('mcp.keys.maxLifetimeDays') as Promise<number>,
