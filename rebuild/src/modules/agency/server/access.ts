@@ -1,7 +1,7 @@
 import { runtimeConfig } from '@/server/config/store';
 import { prisma } from '@/server/data';
 import { canUseFeature, canUseModule, loadEntitlements, resolveEntitlements } from '@/server/entitlements';
-import { OperationError } from '@/lib/operation-error';
+import { copyError, withCustomerCopy } from './copy';
 import { canAccessFeature, type ScopedPermissions } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
@@ -28,7 +28,7 @@ export const likePattern = (text: string) => `%${text.replace(/[!%_]/g, match =>
  * The search matches the workspace name only. Client names and emails are never read here: this query runs before
  * the per-workspace team permission and entitlement checks, so matching them would leak who is a client.
  */
-export async function administeredWorkspaces(actor: AgencyActor, limit: number, search?: { text: string }): Promise<AdministeredWorkspace[]> {
+async function administeredWorkspacesImpl(actor: AgencyActor, limit: number, search?: { text: string }): Promise<AdministeredWorkspace[]> {
   const pattern = search?.text ? likePattern(search.text) : null;
   const rows = await prisma.$queryRaw<Array<{ id: string; name: string; role: string; suspendedAt: Date | null; timezone: string }>>`
     SELECT w.id, w.name, m.role::text AS role, w."suspendedAt", w.timezone
@@ -56,15 +56,15 @@ function groupAccess(entitlements: Parameters<typeof canUseFeature>[0], permissi
  * read. Mirrors the entitlement loader: a stored value that is not an unencrypted `true` is off, and an
  * unreadable policy fails closed. Root rights never bypass it.
  */
-export async function assertInstallationPolicy(featureId: string): Promise<void> {
+async function assertInstallationPolicyImpl(featureId: string): Promise<void> {
   let rows: Array<{ key: string; value: unknown; encrypted: boolean }>;
   try {
     rows = await prisma.appSetting.findMany({
       where: { key: { in: [`entitlements.modules.${AGENCY_MODULE_ID}`, `entitlements.features.${featureId}`] } },
       select: { key: true, value: true, encrypted: true },
     });
-  } catch { throw new OperationError('unavailable', 'Agency views are currently unavailable.'); }
-  if (rows.some(item => !(item.encrypted === false && item.value === true))) throw new OperationError('forbidden', 'Agency is not available for your workspaces.');
+  } catch { throw copyError('unavailable', 'Agency views are currently unavailable.'); }
+  if (rows.some(item => !(item.encrypted === false && item.value === true))) throw copyError('forbidden', 'Agency is not available for your workspaces.');
 }
 
 /**
@@ -100,7 +100,7 @@ const NONE: AgencyAccess = { channels: false, publishing: false, tasks: false, t
  * the Agency entitlement are dropped; a group without its own grant is withheld from that workspace.
  * Any failure to evaluate a workspace drops it (fail closed) instead of widening access.
  */
-export async function classifyWorkspaces(actor: AgencyActor, rows: readonly AdministeredWorkspace[], featureId: string, concurrency: number): Promise<Classified[]> {
+async function classifyWorkspacesImpl(actor: AgencyActor, rows: readonly AdministeredWorkspace[], featureId: string, concurrency: number): Promise<Classified[]> {
   const out: Classified[] = [];
   for (let start = 0; start < rows.length; start += concurrency) {
     const settled = await Promise.all(rows.slice(start, start + concurrency).map(async (row): Promise<Classified | null> => {
@@ -121,12 +121,17 @@ export async function classifyWorkspaces(actor: AgencyActor, rows: readonly Admi
 }
 
 /** Issuance needs at least one currently usable overview workspace; the key stores none of these grants. */
-export async function assertAgencyOverviewCredentialAccess(actor: AgencyActor): Promise<void> {
+async function assertAgencyOverviewCredentialAccessImpl(actor: AgencyActor): Promise<void> {
   await assertInstallationPolicy('agency/overview');
   const limit = await runtimeConfig('agency.workspaceLimit');
   const concurrency = await runtimeConfig('agency.accessConcurrency');
-  if (!Number.isInteger(limit) || limit < 1 || limit > 2000 || !Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) throw new OperationError('unavailable', 'Agency access policy is unavailable.');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 2000 || !Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) throw copyError('unavailable', 'Agency access policy is unavailable.');
   const rows = await administeredWorkspaces(actor, limit);
   const items = await classifyWorkspaces(actor, rows.slice(0, limit), 'agency/overview', concurrency);
-  if (!items.some(item => item.state === 'available')) throw new OperationError('forbidden', 'A currently available Agency overview workspace is required.');
+  if (!items.some(item => item.state === 'available')) throw copyError('forbidden', 'A currently available Agency overview workspace is required.');
 }
+
+export const administeredWorkspaces = (...args: Parameters<typeof administeredWorkspacesImpl>) => withCustomerCopy(() => administeredWorkspacesImpl(...args));
+export const assertInstallationPolicy = (...args: Parameters<typeof assertInstallationPolicyImpl>) => withCustomerCopy(() => assertInstallationPolicyImpl(...args));
+export const classifyWorkspaces = (...args: Parameters<typeof classifyWorkspacesImpl>) => withCustomerCopy(() => classifyWorkspacesImpl(...args));
+export const assertAgencyOverviewCredentialAccess = (...args: Parameters<typeof assertAgencyOverviewCredentialAccessImpl>) => withCustomerCopy(() => assertAgencyOverviewCredentialAccessImpl(...args));

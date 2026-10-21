@@ -1,3 +1,5 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import { assertAdsResultCeiling, validateAdsResultCeiling } from '../result-ceiling';
 import { OperationError } from '@/lib/operation-error';
 import { describeAdsManagement, readAdsCreativeImage, listAdsCreativeSources, listAdsCreatives, listAdsOperations, performAdsManagement, previewAdsManagement, resolveAdsOperation, type AdsManageActor } from './server';
@@ -16,16 +18,17 @@ export const adsManagementToolDefinitions = [
   { name: 'list_ads_creatives', description: 'Browse existing creatives that can be assigned to an ad, when the platform supports it.', inputSchema: { type: 'object', required: ['adAccountId'], properties: { adAccountId: { type: 'string' }, after: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
 ];
 export async function executeAdsManagementTool(actor: AdsManageActor, name: string, args: Record<string, unknown>, maxResultItems?: number) {
+  return withAdsCopySnapshot(async () => {
   const allowed: Record<string, string[]> = {
     get_ads_management_options: ['adAccountId'], get_ads_creative_image: ['adAccountId', 'mediaId'],
     list_ads_creative_sources: ['adAccountId', 'imageAfter', 'targetOffset', 'limit'], preview_ads_change: ['adAccountId', 'operation'], apply_ads_change: ['adAccountId', 'operation', 'confirmation', 'requestId'], list_ads_changes: ['adAccountId', 'status', 'offset', 'limit'],
     resolve_ads_change: ['operationId', 'resolution', 'note', 'confirmation'], list_ads_creatives: ['adAccountId', 'after', 'limit'],
   };
-  if (!allowed[name] || Object.keys(args).some(key => !allowed[name]!.includes(key))) throw new OperationError('invalid_request', 'Choose valid Ads management input.');
+  if (!allowed[name] || Object.keys(args).some(key => !allowed[name]!.includes(key))) throw new OperationError('invalid_request', await adsServiceText('service027'));
   validateAdsResultCeiling(maxResultItems);
   const input = { ...args };
   if (['list_ads_changes', 'list_ads_creatives', 'list_ads_creative_sources'].includes(name) && maxResultItems !== undefined) {
-    if (input.limit !== undefined && (typeof input.limit !== 'number' || !Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > maxResultItems)) throw new OperationError('invalid_request', 'Choose a page size within the current result limit.');
+    if (input.limit !== undefined && (typeof input.limit !== 'number' || !Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > maxResultItems)) throw new OperationError('invalid_request', await adsServiceText('service028'));
     if (input.limit === undefined) input.limit = maxResultItems;
   }
   const checked = async (result: Promise<unknown>) => {
@@ -36,16 +39,16 @@ export async function executeAdsManagementTool(actor: AdsManageActor, name: stri
   const a = input as never;
   switch (name) {
     case 'get_ads_management_options':
-      if (typeof input.adAccountId !== 'string' || !input.adAccountId) throw new OperationError('invalid_request', 'Choose an advertising account.');
+      if (typeof input.adAccountId !== 'string' || !input.adAccountId) throw new OperationError('invalid_request', await adsServiceText('service011'));
       return describeAdsManagement(actor, input.adAccountId);
     case 'get_ads_creative_image': {
-      if (typeof input.adAccountId !== 'string' || !input.adAccountId || typeof input.mediaId !== 'string' || !input.mediaId) throw new OperationError('invalid_request', 'Choose an advertising account and image.');
+      if (typeof input.adAccountId !== 'string' || !input.adAccountId || typeof input.mediaId !== 'string' || !input.mediaId) throw new OperationError('invalid_request', await adsServiceText('service029'));
       const image = await readAdsCreativeImage(actor, { adAccountId: input.adAccountId, mediaId: input.mediaId });
       return { mimeType: image.mimeType, byteLength: image.bytes.length, base64: Buffer.from(image.bytes).toString('base64') };
     }
     case 'list_ads_creative_sources': {
       const result = await listAdsCreativeSources(actor, a);
-      if (maxResultItems !== undefined && (result.targets.length > maxResultItems || result.images.length > maxResultItems)) throw new OperationError('invalid_request', 'The sources page exceeds the current result limit.');
+      if (maxResultItems !== undefined && (result.targets.length > maxResultItems || result.images.length > maxResultItems)) throw new OperationError('invalid_request', await adsServiceText('service030'));
       return result;
     }
     case 'preview_ads_change': return previewAdsManagement(actor, a);
@@ -54,4 +57,6 @@ export async function executeAdsManagementTool(actor: AdsManageActor, name: stri
     case 'resolve_ads_change': return resolveAdsOperation(actor, a);
     default: return checked(listAdsCreatives(actor, a));
   }
+
+  });
 }

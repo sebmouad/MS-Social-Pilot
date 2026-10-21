@@ -1,5 +1,6 @@
 'use client';
-import { uiCopy, type UiLocale } from './copy';
+import type { DownloadCatalog } from './download-copy';
+import { uiCopy, type ReportCopy, type UiLocale } from './copy';
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -39,13 +40,13 @@ const OUTCOME: Record<string, string> = { never: 'Not run yet', generated: 'Last
 const safeFilename = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/.test(value);
 /** Server-formatted label when given (avoids hydration mismatches from differing time-zone data), else format here. */
 
-export function ReportsManager({ templates, templateOptions, schedules, runs, canSchedule, canManage, channels, policy, limits, defaultPeriod, timeZone, hasMoreTemplates, hasMoreSchedules, page, runsPage = 1, runsHasMore = false, canGenerate = canSchedule, locale = 'en' }: {
-  templates: TemplateRow[]; templateOptions: Array<{ id: string; name: string }>; schedules: ScheduleRow[]; runs: RunRow[]; canSchedule: boolean; channels: Array<{ id: string; name: string }>; canManage: boolean;
+export function ReportsManager({ templates, templateOptions, schedules, runs, canSchedule, canManage, channels, policy, limits, defaultPeriod, timeZone, hasMoreTemplates, hasMoreSchedules, page, runsPage = 1, runsHasMore = false, canGenerate = canSchedule, locale = 'en', copy, downloadCopy }: {
+  copy?: ReportCopy; downloadCopy?: DownloadCatalog; templates: TemplateRow[]; templateOptions: Array<{ id: string; name: string }>; schedules: ScheduleRow[]; runs: RunRow[]; canSchedule: boolean; channels: Array<{ id: string; name: string }>; canManage: boolean;
   policy: ReportUiPolicy; limits: ReportUiLimits; defaultPeriod: DefaultPeriod | null; timeZone: string;
   hasMoreTemplates: boolean; hasMoreSchedules: boolean; page: number; runsPage?: number; runsHasMore?: boolean; canGenerate?: boolean; locale?: UiLocale;
 }) {
-  const t = uiCopy(locale);
-  const existingSchedules = (count: number) => locale === 'fr' ? `${count} planification${count === 1 ? '' : 's'} existante${count === 1 ? '' : 's'}` : `${count} existing schedule${count === 1 ? '' : 's'}`;
+  const t = uiCopy(locale, copy);
+  const existingSchedules = (count: number) => t(count === 1 ? '{0} existing schedule' : '{0} existing schedules', count);
   const FALLBACK_ERROR = t("The result could not be confirmed. Refresh the page and check the current state before trying again.");
   const safeError = (body: unknown) => body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string' ? (body as { error: string }).error : FALLBACK_ERROR;
   const router = useRouter();
@@ -240,11 +241,11 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
         { key: 'channel', label: t("Channel and frequency"), render: row => <><strong>{row.channelName ?? t("Unavailable channel")}</strong><span className={styles.secondaryLine}>{t(policy.frequencyOptions.find(option => option.id === row.frequency)?.label ?? t('Saved frequency ({0})', row.frequency))}</span></> },
         { key: 'report', label: t("Report"), render: row => row.templateName ?? (row.templateId ? t("Saved template unavailable") : t("All selected sections")) },
         { key: 'recipients', label: t("Recipients"), render: row => <>{row.recipientCount}{canManage && row.recipients.length > 0 && <span className={styles.secondaryLine}>{row.recipients.join(', ')}</span>}</> },
-        { key: 'next', label: t("Next run"), render: row => <>{row.nextRunLabel ?? formatInZone(row.nextRunAt, timeZone, locale)}<span className={styles.secondaryLine}>{timeZone}</span></> },
+        { key: 'next', label: t("Next run"), render: row => <>{row.nextRunLabel ?? formatInZone(row.nextRunAt, timeZone, locale, t('Time unavailable'))}<span className={styles.secondaryLine}>{timeZone}</span></> },
         { key: 'outcome', label: t("Last result"), render: row => t(OUTCOME[row.lastOutcome] ?? t("Status unavailable")) },
         ...(canManage ? [{ key: 'edit', label: t("Actions"), render: (row: ScheduleRow) => <div className={styles.actions}>{canGenerate && <Button size="sm" variant="secondary" disabled={busy} onClick={() => void prepare(row)}>{busy ? t("Preparing…") : t("Prepare now")}</Button>}<Button size="sm" variant="secondary" disabled={busy} onClick={() => openSchedule(row)}>{t("Edit")}</Button></div> }] : []),
       ]} rowActions={canManage ? row => [{ key: 'delete', label: t("Delete"), icon: <IconTrash />, danger: true, disabled: busy, onSelect: () => removeSchedule(row) }] : undefined} rowActionsLabel={row => t("Actions for {0}", row.channelName ?? t("Unavailable channel"))} /> : <div className={styles.emptyState}><h3>{page > 1 ? t("No schedules on this page") : t("No scheduled reports")}</h3><p>{page > 1 ? t("Use Previous page to return to saved schedules.") : canSchedule && canManage ? t("Create a schedule to send reports to people who need them.") : canSchedule ? t("No report schedules are set up for channels you can access.") : t("No report schedules are set up for channels you can access.")}</p></div>}
-      {prepared && <div className={styles.prepared} role="region" aria-labelledby="prepared-title"><div><h3 id="prepared-title">{t("Report prepared")}</h3><p>{prepared.rowCount} {t("rows ·")} {prepared.bytes.toLocaleString(locale)} {t("bytes")}{prepared.truncated ? t(" · Shortened to fit the configured limit") : ''}</p>{prepared.notIncluded.length > 0 && <p>{t("Not included yet:")} {prepared.notIncluded.map(section => t(sectionLabels.get(section) ?? t("Some sections"))).join(', ')}.</p>}</div><ReportDownloads locale={locale} prepared={prepared} /></div>}
+      {prepared && <div className={styles.prepared} role="region" aria-labelledby="prepared-title"><div><h3 id="prepared-title">{t("Report prepared")}</h3><p>{prepared.rowCount} {t("rows ·")} {prepared.bytes.toLocaleString(locale)} {t("bytes")}{prepared.truncated ? t(" · Shortened to fit the configured limit") : ''}</p>{prepared.notIncluded.length > 0 && <p>{t("Not included yet:")} {prepared.notIncluded.map(section => t(sectionLabels.get(section) ?? t("Some sections"))).join(', ')}.</p>}</div><ReportDownloads copy={downloadCopy} locale={locale} prepared={prepared} /></div>}
       <p className={styles.note}>{t("Reports use stored analytics. Missing data is shown as unavailable, not zero. “Prepare report” creates a download and does not email anyone; scheduled runs send to their saved recipients.")}</p>
     </section>
 
@@ -253,7 +254,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
       {runs.length ? <DataTable caption={t("Report history")} rows={runs} rowKey={run => run.id} columns={[
         { key: 'result', label: t("Result"), render: run => <><Badge tone={run.status === 'completed' ? 'success' : run.status === 'failed' ? 'danger' : ['partial', 'uncertain'].includes(run.status) ? 'warning' : 'neutral'}>{runStatus(run)}</Badge><span className={styles.secondaryLine}>{run.kind === 'manual' ? t("Prepared for download") : t("Scheduled email")}</span></> },
         { key: 'period', label: t("Channel and period"), render: run => <>{channels.find(channel => channel.id === run.channelId)?.name ?? t("Channel unavailable")}<span className={styles.secondaryLine}>{run.periodStart} {t("to")} {run.periodEnd}</span></> },
-        { key: 'started', label: t("Started"), render: run => <>{run.startedLabel ?? formatInZone(run.startedAt, timeZone, locale)}<span className={styles.secondaryLine}>{timeZone}</span></> },
+        { key: 'started', label: t("Started"), render: run => <>{run.startedLabel ?? formatInZone(run.startedAt, timeZone, locale, t('Time unavailable'))}<span className={styles.secondaryLine}>{timeZone}</span></> },
         { key: 'rows', label: t("Rows"), align: 'end', render: run => <>{run.rowCount === null ? '—' : run.rowCount}{run.truncated ? t(" · shortened") : ''}{run.note && <span className={styles.secondaryLine}>{run.note}</span>}</> },
         { key: 'delivery', label: t("Delivery"), render: run => run.deliveries.length ? run.deliveries.map((delivery, index) => <span className={styles.deliveryLine} key={`${delivery.mask}-${index}`}>{delivery.mask} · {t(DELIVERY[delivery.status] ?? t("status unavailable"))}</span>) : run.kind === 'manual' && run.status === 'completed' ? t("Download prepared") : t("No recipient details") },
       ]} /> : <div className={styles.emptyState}><h3>{runsPage > 1 ? t("No runs on this page") : t("No report runs yet")}</h3><p>{runsPage > 1 ? t("Use Previous history page to return to report history.") : t("Prepared downloads and scheduled deliveries will appear here after the first report runs.")}</p></div>}

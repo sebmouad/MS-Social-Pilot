@@ -1,3 +1,4 @@
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { analyticsDateRange } from '@/modules/analytics/server/comparison';
 import { OperationError } from '@/lib/operation-error';
 import { createReportGenerator } from '@/modules/analytics/reports/generation/document';
@@ -65,7 +66,7 @@ export async function reportDefaultPeriod(now=new Date()):Promise<{start:string;
     const [defaultDays,maxDays]=await Promise.all([runtimeConfig('analytics.defaultRangeDays'),runtimeConfig('analytics.maxRangeDays')]);
     const period=analyticsDateRange({}, {defaultDays,maxDays,now});
     return {start:period.start,end:period.end,maxDays};
-  }catch{throw new OperationError('unavailable','Report dates could not be loaded. Try again shortly.');}
+  }catch{throw await analyticsError('unavailable', "Report dates could not be loaded. Try again shortly.");}
 }
 
 /** Native selectors receive the complete authorized template set or a refusal,
@@ -80,5 +81,5 @@ export async function reportTemplateOptions(actor:ReportActor):Promise<Array<{id
     if(choices.length>limits.maxTemplates)break;
     if(!result.hasMore)return choices;
   }
-  throw new OperationError('unavailable','The report template choices could not be loaded completely. Try again shortly.');
+  throw await analyticsError('unavailable', "The report template choices could not be loaded completely. Try again shortly.");
 }

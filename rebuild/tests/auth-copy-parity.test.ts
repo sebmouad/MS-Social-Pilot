@@ -19,7 +19,7 @@ describe('signed-out and home copy', () => {
     const flat = (value: unknown, path = ''): Array<[string, string]> => typeof value === 'string' ? [[path, value]] : value && typeof value === 'object' ? Object.entries(value).flatMap(([key, inner]) => flat(inner, `${path}.${key}`)) : [];
     const en = new Map(flat(authCopy('en')));
     const same = flat(authCopy('fr')).filter(([path, text]) => en.get(path) === text && text.length > 3).map(([path]) => path);
-    expect(same).toEqual([]);
+    expect(same).toEqual(['.shell.brand']); // Product branding is shared between locales.
   });
 
   it('interpolates the invitation sentence in both languages', () => {

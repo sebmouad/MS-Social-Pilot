@@ -1,3 +1,4 @@
+import { analyticsCopy } from '../../server/copy';
 import { headers } from 'next/headers';
 import { uiCopy, uiLocale } from './copy';
 import { PageHeader } from '@/components/PageHeader';
@@ -24,7 +25,8 @@ const parsePage = (value: PageValue) => value === undefined ? 1 : typeof value =
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ page?: PageValue; runsPage?: PageValue }> }) {
   const viewer = await requireViewer({ feature: 'analytics/reports', channelScoped: true });
   const locale = uiLocale((await headers()).get('accept-language'));
-  const t = uiCopy(locale);
+  const copy = await analyticsCopy();
+  const t = uiCopy(locale, copy.reports);
   const params = await searchParams;
   const page = parsePage(params.page);
   const runsPage = parsePage(params.runsPage);
@@ -67,12 +69,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/reports" />}><div className={styles.root}>
     <PageHeader module="analytics" title={t("Saved reports and schedules")} description={<>{canSchedule ? t("Reuse report layouts and have them prepared and emailed weekly or monthly for the channels you manage.") : canGenerate ? t("Reuse report layouts and prepare downloadable reports for the channels you manage.") : t("Reuse report layouts across your channels.")}</>} />
     {failure && <section className={styles.panel} role="alert"><h2>{t("Reports could not be loaded")}</h2><p>{failure}</p><a href="/analytics/reports">{t("Return to the first page")}</a></section>}
-    {data && <ReportsManager locale={locale} page={page!} runsPage={runsPage!} runsHasMore={data.runs.hasMore} canManage={canManage} canSchedule={canSchedule} canGenerate={canGenerate}
+    {data && <ReportsManager copy={copy.reports} downloadCopy={copy.downloads} locale={locale} page={page!} runsPage={runsPage!} runsHasMore={data.runs.hasMore} canManage={canManage} canSchedule={canSchedule} canGenerate={canGenerate}
       policy={data.policy} limits={{ nameMax: data.limits.nameMax, maxRecipients: data.limits.maxRecipients, maxRows: data.limits.maxRows, maxBytes: data.limits.maxBytes }}
       defaultPeriod={data.defaultPeriod}
       timeZone={viewer.membership.workspace.timezone} channels={data.channels} templateOptions={data.templateOptions} hasMoreTemplates={data.templates.hasMore} hasMoreSchedules={data.schedules.hasMore}
       templates={data.templates.templates.map(t => ({ id: t.id, name: t.name, sections: t.sections, rangeKey: t.rangeKey, scheduleCount: t.scheduleCount }))}
-      schedules={data.schedules.schedules.map(s => ({ id: s.id, channelId: s.channelId, channelName: s.channelName, templateId: s.templateId, templateName: s.templateName, frequency: s.frequency, recipientCount: s.recipientCount, recipients: s.recipients, nextRunAt: s.nextRunAt.toISOString(), nextRunLabel: formatInZone(s.nextRunAt.toISOString(), viewer.membership.workspace.timezone, locale), lastOutcome: s.lastOutcome }))}
-      runs={data.runs.runs.map(r => ({ id: r.id, channelId: r.channelId, kind: r.kind, status: r.status, periodStart: r.periodStart, periodEnd: r.periodEnd, startedAt: r.startedAt.toISOString(), startedLabel: formatInZone(r.startedAt.toISOString(), viewer.membership.workspace.timezone, locale), rowCount: r.rowCount, truncated: r.truncated, note: reportFailureText(r.failureReason), deliveries: r.deliveries.map(d => ({ mask: d.mask, status: d.status })) }))} />}
+      schedules={data.schedules.schedules.map(s => ({ id: s.id, channelId: s.channelId, channelName: s.channelName, templateId: s.templateId, templateName: s.templateName, frequency: s.frequency, recipientCount: s.recipientCount, recipients: s.recipients, nextRunAt: s.nextRunAt.toISOString(), nextRunLabel: formatInZone(s.nextRunAt.toISOString(), viewer.membership.workspace.timezone, locale, t('Time unavailable')), lastOutcome: s.lastOutcome }))}
+      runs={data.runs.runs.map(r => ({ id: r.id, channelId: r.channelId, kind: r.kind, status: r.status, periodStart: r.periodStart, periodEnd: r.periodEnd, startedAt: r.startedAt.toISOString(), startedLabel: formatInZone(r.startedAt.toISOString(), viewer.membership.workspace.timezone, locale, t('Time unavailable')), rowCount: r.rowCount, truncated: r.truncated, note: reportFailureText(r.failureReason, copy.errors, locale), deliveries: r.deliveries.map(d => ({ mask: d.mask, status: d.status })) }))} />}
   </div></PageFrame>;
 }

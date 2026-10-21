@@ -1,3 +1,4 @@
+import { goalsCopyDefaults } from './copy';
 import { z } from 'zod';
 import { dayIn, zonedToUtc } from '../reports/schedule-time';
 
@@ -5,10 +6,10 @@ import { dayIn, zonedToUtc } from '../reports/schedule-time';
 export const GOAL_METRICS = ['followers', 'views', 'engagements', 'posts'] as const;
 export type GoalMetric = (typeof GOAL_METRICS)[number];
 /** English labels for API, MCP and report output; screens use goals/copy.ts. */
-export const GOAL_LABELS: Record<GoalMetric, string> = { followers: 'New followers', views: 'Views', engagements: 'Engagement', posts: 'Posts published' };
+export const GOAL_LABELS: Record<GoalMetric, string> = { followers: goalsCopyDefaults['metric.followers'].en, views: goalsCopyDefaults['metric.views'].en, engagements: goalsCopyDefaults['metric.engagements'].en, posts: goalsCopyDefaults['metric.posts'].en };
 export const GOAL_MAX = 100_000_000;
 export type GoalPace = 'met' | 'onTrack' | 'behind' | 'noData';
-export const PACE_LABELS: Record<GoalPace, string> = { met: 'Reached', onTrack: 'On track', behind: 'Behind', noData: 'No data yet' };
+export const PACE_LABELS: Record<GoalPace, string> = { met: goalsCopyDefaults['pace.met'].en, onTrack: goalsCopyDefaults['pace.onTrack'].en, behind: goalsCopyDefaults['pace.behind'].en, noData: goalsCopyDefaults['pace.noData'].en };
 
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
 const goalValue = z.union([z.number().int().min(1).max(GOAL_MAX), z.null()]);

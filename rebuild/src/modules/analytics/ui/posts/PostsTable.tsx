@@ -1,4 +1,5 @@
 'use client';
+import { recordsCopyDefaults, type RecordsCopy } from '../../records-copy';
 import { useMemo, useState } from 'react';
 import { IconChartBar, IconExternalLink } from '@tabler/icons-react';
 import { Avatar } from '@/components/Avatar';
@@ -21,12 +22,12 @@ const NONE = '__none__';
  * stored measures, and a bar under the first metric scaled to the largest known value on the page.
  * Per-post history is not stored, so no trend line is drawn.
  */
-export function PostsTable({ rows, measures, locale, emptyAction }: {
-  rows: PostsTableRow[]; measures: PostsTableMeasure[]; locale: 'en' | 'fr'; emptyAction?: React.ReactNode;
+export function PostsTable({ rows, measures, locale, emptyAction, copy = recordsCopyDefaults }: {
+  copy?: RecordsCopy; rows: PostsTableRow[]; measures: PostsTableMeasure[]; locale: 'en' | 'fr'; emptyAction?: React.ReactNode;
 }) {
   const fr = locale === 'fr';
-  const t = (en: string, french: string) => fr ? french : en;
-  const unavailable = t('Not available', 'Non disponible');
+  const t = (key: keyof RecordsCopy) => copy[key][locale];
+  const unavailable = t("Not available");
   const [first, setFirst] = useState(measures[0]?.key ?? NONE);
   const [second, setSecond] = useState(measures[1]?.key ?? NONE);
   const number = useMemo(() => new Intl.NumberFormat(locale), [locale]);
@@ -38,24 +39,24 @@ export function PostsTable({ rows, measures, locale, emptyAction }: {
 
   return <div className="analytics-posts">
     {measures.length > 0 && <div className="analytics-posts__controls">
-      <label className="ui-field">{t('First metric', 'Première mesure')}
-        <Select aria-label={t('First metric', 'Première mesure')} value={first} onChange={setFirst} options={options} searchable={options.length > 8} />
+      <label className="ui-field">{t("First metric")}
+        <Select aria-label={t("First metric")} value={first} onChange={setFirst} options={options} searchable={options.length > 8} />
       </label>
-      <label className="ui-field">{t('Second metric', 'Deuxième mesure')}
-        <Select aria-label={t('Second metric', 'Deuxième mesure')} value={second} onChange={setSecond} options={[{ value: NONE, label: t('None', 'Aucune') }, ...options]} searchable={options.length > 8} />
+      <label className="ui-field">{t("Second metric")}
+        <Select aria-label={t("Second metric")} value={second} onChange={setSecond} options={[{ value: NONE, label: t("None") }, ...options]} searchable={options.length > 8} />
       </label>
     </div>}
-    <DataTable caption={t('Published posts', 'Publications publiées')} rows={rows} rowKey={row => row.key} density="compact"
-      emptyIcon={<IconChartBar />} emptyMessage={t('No published posts for this selection and period.', 'Aucune publication pour cette sélection et cette période.')} emptyAction={emptyAction}
+    <DataTable caption={t("Published posts")} rows={rows} rowKey={row => row.key} density="compact"
+      emptyIcon={<IconChartBar />} emptyMessage={t("No published posts for this selection and period.")} emptyAction={emptyAction}
       columns={[
-        { key: 'post', label: t('Post', 'Publication'), hideCardLabel: true, render: row => <span className="analytics-posts__post">
+        { key: 'post', label: t("Post"), hideCardLabel: true, render: row => <span className="analytics-posts__post">
           <Avatar name={row.channelName} size="sm" decorative />
           <span className="analytics-posts__text">
             {row.url ? <a href={row.url} rel="noreferrer" target="_blank">{row.text || unavailable}<IconExternalLink size={14} aria-hidden="true" /></a> : <span>{row.text || unavailable}</span>}
             <small>{row.channelName}</small>
           </span>
         </span> },
-        { key: 'publishedAt', label: t('Published', 'Publié'), render: row => when(row.publishedAt) },
+        { key: 'publishedAt', label: t("Published"), render: row => when(row.publishedAt) },
         ...chosen.map((measure, index) => ({ key: `m:${measure.key}`, label: measure.label, align: 'end' as const, render: (row: PostsTableRow) => {
           const value = row.measures[measure.key];
           if (value === null || value === undefined) return <span title={unavailable}>—</span>;
@@ -64,7 +65,7 @@ export function PostsTable({ rows, measures, locale, emptyAction }: {
             {index === 0 && top > 0 && <span className="analytics-posts__bar" aria-hidden="true"><span style={{ width: `${Math.max(2, Math.round((Math.max(0, value) / top) * 100))}%` }} /></span>}
           </span>;
         } })),
-        { key: 'measuredAt', label: t('Measured', 'Mesuré'), render: row => when(row.measuredAt) },
+        { key: 'measuredAt', label: t("Measured"), render: row => when(row.measuredAt) },
       ]} />
   </div>;
 }

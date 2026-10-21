@@ -1,3 +1,5 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import { prisma } from "@/server/data";
 import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
 import type { AdsFilters } from '@/modules/ads/report-filters';
@@ -13,15 +15,16 @@ const ADS_INSIGHT_LEVELS: readonly AdsInsightLevel[] = ['account', 'campaign', '
 
 /** Read only the accounts and stored insight rows belonging to this workspace. */
 export async function getAdsDataset(workspaceId: string, filters: AdsFilters, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[], options: AdsDatasetOptions = {}) {
+  return withAdsCopySnapshot(async () => {
   const policy = await loadAdsReadPolicy();
   const levels: unknown = options.levels;
   if (levels !== undefined && (!Array.isArray(levels) || levels.length === 0 || new Set(levels).size !== levels.length || levels.some(level => typeof level !== 'string' || !ADS_INSIGHT_LEVELS.includes(level as AdsInsightLevel)))) {
-    throw new OperationError('invalid_request', 'Choose valid Ads report levels.');
+    throw new OperationError('invalid_request', await adsServiceText('service022'));
   }
   const selectedLevels = levels as readonly AdsInsightLevel[] | undefined;
   const objectId: unknown = options.objectId;
   if (objectId !== undefined && (typeof objectId !== 'string' || !objectId || /[\u0000-\u001f\u007f]/.test(objectId) || !selectedLevels || selectedLevels.length !== 1 || !filters.accountId)) {
-    throw new OperationError('invalid_request', 'Choose one account and report level for an Ads object filter.');
+    throw new OperationError('invalid_request', await adsServiceText('service023'));
   }
   const accounts = await getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders, options.allowedAdAccountIds);
   const visibleAccountIds = accounts.map(account => account.id);
@@ -44,10 +47,13 @@ export async function getAdsDataset(workspaceId: string, filters: AdsFilters, al
   });
   if (insights.length > policy.maxRows) throw new AdsReportLimitError();
   return { accounts, insights, pageSize: policy.pageSize, maxRows: policy.maxRows };
+
+  });
 }
 
 /** Query predicate for enabled, selected ad accounts from installed and enabled platform modules. */
 export async function getAdsAccountWhere(workspaceId: string, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[], allowedAdAccountIds?: readonly string[]) {
+  return withAdsCopySnapshot(async () => {
   const socialAccountIds = allowedTargetIds === undefined ? undefined : (await prisma.target.findMany({
     where: { workspaceId, id: { in: [...allowedTargetIds] } },
     select: { socialAccountId: true },
@@ -60,13 +66,18 @@ export async function getAdsAccountWhere(workspaceId: string, allowedTargetIds: 
     // Independent of channel authority: explicit account ids only narrow the intersection above.
     ...(allowedAdAccountIds !== undefined ? { id: { in: [...allowedAdAccountIds] } } : {}),
   };
+
+  });
 }
 
 export async function getAdsAccounts(workspaceId: string, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[], allowedAdAccountIds?: readonly string[]) {
+  return withAdsCopySnapshot(async () => {
   const where = await getAdsAccountWhere(workspaceId, allowedTargetIds, allowedProviders, allowedAdAccountIds);
   return prisma.adAccount.findMany({
     where,
     orderBy: { name: "asc" },
     select: { id: true, actId: true, name: true, currency: true, accountStatus: true, enabled: true, lastSyncedAt: true, socialAccount: { select: { provider: true } } },
+  });
+
   });
 }

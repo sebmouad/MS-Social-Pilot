@@ -1,3 +1,7 @@
+import { defaultAnalyticsError } from '@/modules/analytics/error-copy';
+import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
+import { errorCopyDefaults } from '@/modules/analytics/error-copy';
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -10,7 +14,8 @@ import { reportLimits, transact } from './limits';
 type Row = { id: string; targetId: string; targetName: string | null; templateId: string | null; templateName: string | null; frequency: string; recipients: string[]; nextRunAt: Date; lastRunAt: Date | null; lastError: string | null; createdAt: Date; usable: boolean | null };
 
 export async function listReportSchedules(actor: ReportActor, input: unknown = {}) {
-  const parsed = listSchema.safeParse(input ?? {}); if (!parsed.success) throw bad('Choose a valid result page.');
+  try {
+  const parsed = listSchema.safeParse(input ?? {}); if (!parsed.success) throw bad( errorCopyDefaults["Choose a valid result page."].en);
   const auth = await authorizeReport(actor, 'read');
   const limits = await reportLimits();
   const size = pageOf(limits.pageSize, auth.maxItems);
@@ -29,16 +34,19 @@ export async function listReportSchedules(actor: ReportActor, input: unknown = {
     lastOutcome: r.lastRunAt === null ? 'never' : r.lastError ? 'failed' : 'generated', createdAt: r.createdAt, channelAvailable: r.usable === true,
   }));
   return { ok: true as const, schedules, page: parsed.data.page, hasMore: rows.length > size, canManage: auth.canManage };
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }
 
 async function workspaceClock(tx: Tx, workspaceId: string) {
   const row = (await tx.$queryRaw<Array<{ timezone: string; weekStartsOn: number }>>`SELECT timezone, "weekStartsOn" FROM workspaces WHERE id = ${workspaceId}`)[0];
-  if (!row || !validTimeZone(row.timezone)) throw new OperationError('unavailable', 'The workspace time zone is unavailable. Review workspace settings.');
+  if (!row || !validTimeZone(row.timezone)) throw await analyticsError('unavailable', "The workspace time zone is unavailable. Review workspace settings.");
   return row;
 }
 const inScope = (scope: readonly string[] | null, id: string) => scope === null || scope.includes(id);
 
 export async function manageReportSchedule(actor: ReportActor, input: unknown, now = new Date()) {
+  try {
   const parsed = scheduleActionSchema.safeParse(input); if (!parsed.success) throw bad();
   const value = parsed.data;
   const frequencyOf = value.action === 'delete' ? '' : value.frequency;
@@ -47,20 +55,20 @@ export async function manageReportSchedule(actor: ReportActor, input: unknown, n
   const auth = await authorizeReport(actor, 'write', { manager: true });
   const wide = workspaceWide(actor);
   // Templates are workspace-wide; a selected-resource key can neither attach nor change one.
-  if (!wide && value.action !== 'delete' && value.templateId !== null) throw bad('Report templates are not available to access keys limited to selected channels.');
+  if (!wide && value.action !== 'delete' && value.templateId !== null) throw bad( errorCopyDefaults["Report templates are not available to access keys limited to selected channels."].en);
   // A schedule that nothing can generate or deliver would look active while doing nothing: refuse new ones.
-  if (value.action === 'create' && !(await reportCapabilities()).schedules) throw new OperationError('unavailable', 'Scheduled reports are not available right now.');
+  if (value.action === 'create' && !(await reportCapabilities()).schedules) throw await analyticsError('unavailable', "Scheduled reports are not available right now.");
   const limits = await reportLimits();
   const recipients = value.action === 'delete' ? [] : [...new Set(value.recipients)];
-  if (recipients.length > limits.maxRecipients) throw bad(`List at most ${limits.maxRecipients} recipients.`);
+  if (recipients.length > limits.maxRecipients) throw bad(defaultAnalyticsError('List at most {0} recipients.', limits.maxRecipients));
   return transact(actor.workspaceId, limits, async tx => {
     const fresh = await lockActor(tx, actor);
     if (value.action === 'create') {
       // New content must be a currently selected, connected channel of an enabled, entitled platform inside the person's scope.
-      if (!inScope(fresh.scope, value.channelId) || !(await usableChannelIds(tx, actor.workspaceId, auth.providers, [value.channelId], true)).length) throw bad('Choose a channel you can manage in this workspace.');
-      if (value.templateId && !(await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM report_templates WHERE id = ${value.templateId} AND "workspaceId" = ${actor.workspaceId}`).length) throw bad('Choose a report template from this workspace.');
+      if (!inScope(fresh.scope, value.channelId) || !(await usableChannelIds(tx, actor.workspaceId, auth.providers, [value.channelId], true)).length) throw bad( errorCopyDefaults["Choose a channel you can manage in this workspace."].en);
+      if (value.templateId && !(await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM report_templates WHERE id = ${value.templateId} AND "workspaceId" = ${actor.workspaceId}`).length) throw bad( errorCopyDefaults["Choose a report template from this workspace."].en);
       const count = Number((await tx.$queryRaw<Array<{ count: bigint | number }>>`SELECT COUNT(*) AS count FROM report_schedules WHERE "workspaceId" = ${actor.workspaceId}`)[0]?.count ?? 0);
-      if (count >= limits.maxSchedules) throw new OperationError('conflict', 'This workspace has reached its report schedule limit. Delete one first.');
+      if (count >= limits.maxSchedules) throw await analyticsError('conflict', "This workspace has reached its report schedule limit. Delete one first.");
       const clock = await workspaceClock(tx, actor.workspaceId);
       const next = nextReportRun(value.frequency, now, clock.timezone, clock.weekStartsOn, limits.sendTime);
       const id = randomUUID();
@@ -73,7 +81,7 @@ export async function manageReportSchedule(actor: ReportActor, input: unknown, n
     if (!current || !inScope(fresh.scope, current.targetId)) throw missing();
     if (value.action === 'update') {
       const templateId = wide ? value.templateId : current.templateId;
-      if (wide && templateId && !(await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM report_templates WHERE id = ${templateId} AND "workspaceId" = ${actor.workspaceId}`).length) throw bad('Choose a report template from this workspace.');
+      if (wide && templateId && !(await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM report_templates WHERE id = ${templateId} AND "workspaceId" = ${actor.workspaceId}`).length) throw bad( errorCopyDefaults["Choose a report template from this workspace."].en);
       const clock = await workspaceClock(tx, actor.workspaceId);
       const next = nextReportRun(value.frequency, now, clock.timezone, clock.weekStartsOn, limits.sendTime);
       const changed = await tx.$executeRaw`UPDATE report_schedules SET frequency = ${value.frequency}, recipients = ${recipients}::text[], "templateId" = ${templateId}, "nextRunAt" = ${next} WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
@@ -86,6 +94,8 @@ export async function manageReportSchedule(actor: ReportActor, input: unknown, n
     await audit(tx, actor, 'analytics.report_schedule_deleted', { scheduleId: value.id, channelId: current.targetId });
     return { ok: true as const, action: value.action, id: value.id };
   });
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }
 
 export { runDueReportSchedules, type DueRunDeps, type DueRunSummary } from '../generation/runs';

@@ -1,3 +1,4 @@
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { z } from 'zod';
 import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
@@ -31,7 +32,7 @@ export async function reportLimits(): Promise<ReportLimits> {
 export function transact<T>(workspaceId: string, limits: Pick<ReportLimits, 'timeout' | 'maxWait'>, fn: (tx: Tx) => Promise<T>): Promise<T> {
   return prisma.$transaction(async tx => {
     const locked = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM workspaces WHERE id = ${workspaceId} FOR SHARE`;
-    if (!locked.length) throw new OperationError('unavailable', 'This workspace is unavailable.');
+    if (!locked.length) throw await analyticsError('unavailable', "This workspace is unavailable.");
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${workspaceId}))::text`;
     return fn(tx);
   }, { timeout: limits.timeout, maxWait: limits.maxWait });

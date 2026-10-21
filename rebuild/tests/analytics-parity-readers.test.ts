@@ -5,11 +5,16 @@ const state = vi.hoisted(() => ({
   authFail: false, role: 'member', execs: [] as Array<{ sql: string; values: unknown[] }>, config: {} as Record<string, unknown>, updated: 1,
 }));
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
+vi.mock('@/modules/analytics/server/error-copy', async () => {
+  const { errorCopyDefaults } = await import('@/modules/analytics/error-copy');
+  const { OperationError } = await import('@/lib/operation-error');
+  return { analyticsError: async (code: import('@/lib/operation-error').OperationErrorCode, key: keyof typeof errorCopyDefaults) => new OperationError(code, errorCopyDefaults[key].en), analyticsLanguage: async () => 'en', localizeAnalyticsError: async (error: unknown) => error };
+});
 vi.mock('@/server/data', () => ({ prisma: db }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: async (k: string) => k in state.config ? state.config[k] : ({
+vi.mock('@/server/config/store', async () => { const { workspaceCopyDefaults } = await import('@/modules/analytics/workspace-copy'); return ({ runtimeConfig: async (k: string) => k === 'analytics.workspaceCopy' ? workspaceCopyDefaults : k in state.config ? state.config[k] : ({
   'analytics.demographics.dimensions': [{ id: 'country', label: 'Country', terms: ['country'] }, { id: 'age-gender', label: 'Age and gender', terms: ['age', 'gender'] }],
   'analytics.demographics.maxRowsPerMetric': 2, 'analytics.pins.maxPerUser': 2, 'analytics.comparison.maxMetrics': 10,
-} as Record<string, unknown>)[k] }));
+} as Record<string, unknown>)[k] }); });
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: (_w: string, fn: () => Promise<unknown>) => fn() }));
 vi.mock('@/modules/analytics/server/access', async () => {
   const actual = await vi.importActual<typeof import('../src/modules/analytics/server/access')>('../src/modules/analytics/server/access');

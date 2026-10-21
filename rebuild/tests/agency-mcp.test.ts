@@ -1,3 +1,5 @@
+import { CONFIG_BY_KEY } from '@/lib/config/registry';
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => CONFIG_BY_KEY.get(key)?.defaultValue }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ overview: vi.fn(), clients: vi.fn() }));

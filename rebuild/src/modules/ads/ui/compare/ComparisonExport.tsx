@@ -1,4 +1,5 @@
 'use client';
+import { useAdsCatalogs } from '../AdsCopyProvider';
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/Button';
@@ -7,6 +8,8 @@ import { adsText, type AdsLocale } from '../../analysis/copy';
 
 /** Keep filters and the report visible after a refused download. */
 export function ComparisonExport({ href, locale, maxBytes }: { href: string; locale: AdsLocale; maxBytes: number }) {
+  const { catalogs } = useAdsCatalogs();
+  const text = (key: Parameters<typeof adsText>[1]) => adsText(locale, key, {}, catalogs.analysis);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<'success' | 'error' | null>(null);
   const current = useRef<AbortController | null>(null);
@@ -46,10 +49,10 @@ export function ComparisonExport({ href, locale, maxBytes }: { href: string; loc
   }
   return <div>
     <div className="ui-actions">
-      <Button disabled={busy} onClick={() => void download('objects')}>{adsText(locale, busy ? 'exportPending' : 'exportCsv')}</Button>
-      <Button disabled={busy} onClick={() => void download('findings')}>{adsText(locale, 'exportFindings')}</Button>
+      <Button disabled={busy} onClick={() => void download('objects')}>{text(busy ? 'exportPending' : 'exportCsv')}</Button>
+      <Button disabled={busy} onClick={() => void download('findings')}>{text('exportFindings')}</Button>
     </div>
-    <p className="small-note">{adsText(locale, 'exportHint')}</p>
-    {feedback ? <RouteNotice error={feedback === 'error'} focusKey={feedback}>{adsText(locale, feedback === 'error' ? 'exportError' : 'exportSuccess')}</RouteNotice> : null}
+    <p className="small-note">{text('exportHint')}</p>
+    {feedback ? <RouteNotice error={feedback === 'error'} focusKey={feedback}>{text(feedback === 'error' ? 'exportError' : 'exportSuccess')}</RouteNotice> : null}
   </div>;
 }

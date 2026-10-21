@@ -1,3 +1,6 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { defaultAdsText } from '@/modules/ads/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import { OperationError } from '@/lib/operation-error';
 import { parseAdsPerformanceFilters } from '../performance-filters';
 import { loadAdsReportPolicy } from './report-policy';
@@ -14,23 +17,23 @@ const DAY = 86_400_000;
 const INPUT_KEYS = new Set(['period', 'start', 'end', 'accountId', 'level', 'objectId', 'offset', 'limit']);
 
 function recordInput(input: unknown): Record<string, unknown> {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', 'Choose valid Ads report filters.');
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OperationError('invalid_request', defaultAdsText('validation002'));
   const value = input as Record<string, unknown>;
-  if (Object.keys(value).some(key => !INPUT_KEYS.has(key))) throw new OperationError('invalid_request', 'Choose valid Ads report filters.');
+  if (Object.keys(value).some(key => !INPUT_KEYS.has(key))) throw new OperationError('invalid_request', defaultAdsText('validation002'));
   return value;
 }
 
 function optionalText(input: Record<string, unknown>, key: string, maximum: number): string | undefined {
   const value = input[key];
   if (value === undefined) return undefined;
-  if (typeof value !== 'string' || value.length > maximum) throw new OperationError('invalid_request', `Choose valid Ads report filters. ${key} must be text with at most ${maximum} characters.`);
+  if (typeof value !== 'string' || value.length > maximum) throw new OperationError('invalid_request', defaultAdsText('validation003', { value0: key, value1: maximum }));
   return value;
 }
 
 function safeInteger(value: unknown, minimum: number, maximum: number, fallback: number, name: string): number {
   if (value === undefined) return fallback;
   if (!Number.isSafeInteger(value) || (value as number) < minimum || (value as number) > maximum) {
-    throw new OperationError('invalid_request', `Choose a ${name} from ${minimum} to ${maximum}.`);
+    throw new OperationError('invalid_request', defaultAdsText('validation004', { value0: name, value1: minimum, value2: maximum }));
   }
   return value as number;
 }
@@ -39,20 +42,21 @@ function compare(a: string, b: string) { return a < b ? -1 : a > b ? 1 : 0; }
 
 /** Read one complete bounded Ads dataset, then return a deterministic byte-bounded daily page. */
 export async function readAdsDailyRows(actor: AdsReadActor, input: unknown = {}, constraints: AdsReadConstraints = {}) {
+  return withAdsCopySnapshot(async () => {
   const access = await authorizeAdsRead(actor);
   const values = recordInput(input);
   const reportPolicy = await loadAdsReportPolicy();
   const readPolicy = await loadAdsReadPolicy();
   const level = optionalText(values, 'level', reportPolicy.maxFilterCharacters);
-  if (level !== undefined && !LEVELS.includes(level as AdsInsightLevel)) throw new OperationError('invalid_request', 'Choose one valid Ads report level.');
+  if (level !== undefined && !LEVELS.includes(level as AdsInsightLevel)) throw new OperationError('invalid_request', await adsServiceText('service013'));
   const objectId = optionalText(values, 'objectId', reportPolicy.maxFilterCharacters);
-  if (objectId !== undefined && (!objectId || /[\u0000-\u001f\u007f]/.test(objectId))) throw new OperationError('invalid_request', 'Choose a valid Ads object id.');
+  if (objectId !== undefined && (!objectId || /[\u0000-\u001f\u007f]/.test(objectId))) throw new OperationError('invalid_request', await adsServiceText('service014'));
   if (objectId !== undefined && (typeof values.accountId !== 'string' || typeof level !== 'string')) {
-    throw new OperationError('invalid_request', 'An Ads object id requires one explicit account and report level.');
+    throw new OperationError('invalid_request', await adsServiceText('service015'));
   }
   if (!constraints || typeof constraints !== 'object' || Array.isArray(constraints) || Object.keys(constraints).some(key => key !== 'maxItems') ||
     (constraints.maxItems !== undefined && (!Number.isSafeInteger(constraints.maxItems) || constraints.maxItems < 1))) {
-    throw new OperationError('invalid_request', 'Choose valid Ads report filters.');
+    throw new OperationError('invalid_request', await adsServiceText('service025'));
   }
   const start = optionalText(values, 'start', reportPolicy.maxFilterCharacters);
   const end = optionalText(values, 'end', reportPolicy.maxFilterCharacters);
@@ -61,7 +65,7 @@ export async function readAdsDailyRows(actor: AdsReadActor, input: unknown = {},
   const filtersInput = { ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), ...(accountId === undefined ? {} : { accountId }) };
   const accounts = await getAdsAccounts(actor.workspaceId, access.allowedTargetIds, access.allowedProviders, access.allowedAdAccountIds);
   const filters = parseAdsPerformanceFilters(filtersInput, accounts.map(account => account.id), new Date(), reportPolicy);
-  if (objectId !== undefined && !filters.accountId) throw new OperationError('invalid_request', 'An Ads object id requires one explicit account and report level.');
+  if (objectId !== undefined && !filters.accountId) throw new OperationError('invalid_request', await adsServiceText('service015'));
 
   const requestedLimit = safeInteger(values.limit, 1, readPolicy.maxRows, readPolicy.pageSize, 'report limit');
   const offset = safeInteger(values.offset, 0, Number.MAX_SAFE_INTEGER, 0, 'report offset');
@@ -98,7 +102,9 @@ export async function readAdsDailyRows(actor: AdsReadActor, input: unknown = {},
   };
   const outputPolicy = await loadAdsOutputPolicy();
   if (Buffer.byteLength(JSON.stringify(result), 'utf8') > outputPolicy.detailMaxBytes) {
-    throw new OperationError('invalid_request', 'This Ads report is too large to return. Choose a shorter range, fewer results, or a lower result limit.');
+    throw new OperationError('invalid_request', await adsServiceText('service026'));
   }
   return result;
+
+  });
 }

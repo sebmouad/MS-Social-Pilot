@@ -5,7 +5,7 @@ vi.mock('@/server/entitlements', () => ({ loadEntitlements: m.ent, canUseFeature
 vi.mock('@/server/permissions/loader', () => ({ loadPermissions: m.perms }));
 vi.mock('@/server/permissions', () => ({ canAccessFeature: m.can }));
 vi.mock('@/server/data-control/guard', () => ({ assertWorkspaceNotPurging: m.guard }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: m.config }));
+vi.mock('@/server/config/store', async () => { const { recordsCopyDefaults } = await import('@/modules/analytics/records-copy'); const { errorCopyDefaults } = await import('@/modules/analytics/error-copy'); return { runtimeConfig: (key: string) => key === 'analytics.recordsCopy' ? Promise.resolve(recordsCopyDefaults) : key === 'analytics.errorCopy' ? Promise.resolve(errorCopyDefaults) : m.config(key) }; });
 vi.mock('@/modules/ads/server/queries', () => ({ getAdsAccounts: m.accounts, getAdsDataset: m.data }));
 vi.mock('@/server/platforms/registry', () => ({ platformAds: async () => ({ parentObjectId: m.parent }) }));
 import { readAdObjects } from './service';

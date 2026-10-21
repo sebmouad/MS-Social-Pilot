@@ -1,3 +1,4 @@
+import { defaultAdsText } from '@/modules/ads/copy';
 import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
 
 /** Why a creation transmission was refused before any advertising platform request was sent. */
@@ -24,7 +25,7 @@ export class AdsNoDispatchError extends OperationError {
 export function asNoDispatch(error: unknown): AdsNoDispatchError {
   if (error instanceof AdsNoDispatchError) return error;
   if (error instanceof OperationError) return new AdsNoDispatchError(error.code, error.message);
-  return new AdsNoDispatchError('unavailable', 'Advertising changes are temporarily unavailable. Try again later.');
+  return new AdsNoDispatchError('unavailable', defaultAdsText('validation005'));
 }
 
 export type AdsNoDispatchMetadata = { attempt?: 'not_dispatched'; reason?: AdsNoDispatchReason };

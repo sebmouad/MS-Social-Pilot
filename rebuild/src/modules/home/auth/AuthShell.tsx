@@ -1,13 +1,14 @@
 import type { InputHTMLAttributes, ReactNode, Ref } from 'react';
 import { Field, TextInput } from '@/components/Forms';
 import { ToastProvider } from '@/components/Toast';
-import type { AuthLocale } from './copy';
+import { authCopyDefaults, type AuthLocale } from './copy';
 import styles from './auth.module.css';
 
 /** Shared frame for every signed-out page: brand, one card, one heading, and the toast region. */
-export function AuthShell({ title, titleId = 'auth-title', lead, brand = 'Social Pilot', children, footer, locale = 'en' }: { title: string; titleId?: string; lead?: ReactNode; brand?: string; children?: ReactNode; footer?: ReactNode; locale?: AuthLocale }) {
-  return <ToastProvider dismissLabel={locale === 'fr' ? 'Fermer' : 'Dismiss'}><main className={styles.page}>
-    <a className={styles.brand} href="/sign-in"><span className={styles.brandMark} aria-hidden="true">SP</span>{brand}</a>
+export function AuthShell({ title, titleId = 'auth-title', lead, brand, children, footer, locale = 'en', shellCopy }: { shellCopy?: typeof authCopyDefaults.en.shell; title: string; titleId?: string; lead?: ReactNode; brand?: string; children?: ReactNode; footer?: ReactNode; locale?: AuthLocale }) {
+  const copy = shellCopy ?? authCopyDefaults[locale].shell;
+  return <ToastProvider dismissLabel={copy.dismiss}><main className={styles.page}>
+    <a className={styles.brand} href="/sign-in"><span className={styles.brandMark} aria-hidden="true">{copy.mark}</span>{brand ?? copy.brand}</a>
     <section className={styles.card} aria-labelledby={titleId}>
       <header className={styles.heading}><h1 id={titleId}>{title}</h1>{lead && <p className={styles.lead}>{lead}</p>}</header>
       <div className={styles.body}>{children}</div>

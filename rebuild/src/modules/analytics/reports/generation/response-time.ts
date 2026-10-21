@@ -1,3 +1,7 @@
+import { cache } from 'react';
+import { runtimeConfig } from '@/server/config/store';
+import { responseTimeCopyDefaults, responseText, type ResponseTimeCopy } from './response-copy';
+const responseCopy = cache(() => runtimeConfig('analytics.responseTimeCopy'));
 import { prisma } from '@/server/data';
 import type { ReportPeriod } from '../contracts';
 import { businessHoursOrNull, businessMs, calendarMs, type BusinessHoursSetting } from './business-hours';
@@ -28,8 +32,8 @@ export type ResponseTimeSummary = {
 export type MemberResponse = { memberId: string | null; name: string; answered: number; medianMs: number | null };
 export type ResolveSummary = { resolved: number; unresolved: number; medianMs: number | null };
 
-export const OUTSIDE_APP_LABEL = 'Outside the app';
-export const FORMER_MEMBER_LABEL = 'Former member';
+export const OUTSIDE_APP_LABEL = responseTimeCopyDefaults.outside.en;
+export const FORMER_MEMBER_LABEL = responseTimeCopyDefaults.former.en;
 /** Upper bound on member rows kept in one report. */
 export const MEMBER_ROWS_CAP = 25;
 
@@ -52,7 +56,7 @@ export function median(values: number[]): number | null {
 }
 
 /** Pure arithmetic over messages ordered by conversation then time. */
-export function summarizeResponseTimes(messages: ResponseMessage[], partial = false, business: { hours: BusinessHoursSetting; timeZone: string } | null = null, memberNames: ReadonlyMap<string, string> = new Map()): ResponseTimeSummary {
+export function summarizeResponseTimes(messages: ResponseMessage[], partial = false, business: { hours: BusinessHoursSetting; timeZone: string } | null = null, memberNames: ReadonlyMap<string, string> = new Map(), copy: ResponseTimeCopy = responseTimeCopyDefaults, locale: 'en' | 'fr' = 'en'): ResponseTimeSummary {
   const waits: number[] = [];
   const byReplier = new Map<string | null, number[]>();
   const resolveWaits: number[] = [];
@@ -91,7 +95,7 @@ export function summarizeResponseTimes(messages: ResponseMessage[], partial = fa
   if (waitingSince) unanswered += 1;
   const everyone: MemberResponse[] = [...byReplier].map(([memberId, list]) => ({
     memberId, answered: list.length, medianMs: median(list),
-    name: memberId === null ? OUTSIDE_APP_LABEL : memberNames.get(memberId) ?? FORMER_MEMBER_LABEL,
+    name: memberId === null ? copy.outside[locale] : memberNames.get(memberId) ?? copy.former[locale],
   })).sort((a, b) => b.answered - a.answered || a.name.localeCompare(b.name));
   return {
     members: everyone.slice(0, MEMBER_ROWS_CAP), membersOmitted: Math.max(0, everyone.length - MEMBER_ROWS_CAP),
@@ -115,7 +119,7 @@ async function readBusinessHours(workspaceId: string): Promise<{ hours: Business
 }
 
 /** Inclusive UTC dates → [start, end + 1 day). The caller has already authorized the channel. */
-export async function readResponseTime(workspaceId: string, channelId: string, period: ReportPeriod): Promise<ResponseTimeSummary> {
+export async function readResponseTime(workspaceId: string, channelId: string, period: ReportPeriod, locale: 'en' | 'fr' = 'en'): Promise<ResponseTimeSummary> {
   const target = await prisma.target.findFirst({ where: { id: channelId, workspaceId }, select: { providerId: true } });
   if (!target) return { answered: 0, unanswered: 0, medianMs: null, businessMedianMs: null, businessHours: null, partial: false, members: [], membersOmitted: 0, resolve: { resolved: 0, unresolved: 0, medianMs: null } };
   const business = await readBusinessHours(workspaceId);
@@ -135,21 +139,22 @@ export async function readResponseTime(workspaceId: string, channelId: string, p
   // Names only, and only for current members of this workspace; anyone else shows as a former member.
   const memberIds = [...new Set(messages.map(m => m.sentById).filter((id): id is string => Boolean(id)))];
   const users = memberIds.length ? await prisma.user.findMany({ where: { id: { in: memberIds }, memberships: { some: { workspaceId } } }, select: { id: true, name: true } }) : [];
-  return summarizeResponseTimes(messages, partial, business, new Map(users.map(u => [u.id, u.name])));
+  return summarizeResponseTimes(messages, partial, business, new Map(users.map(u => [u.id, u.name])), await responseCopy(), locale);
 }
 
-export function formatDuration(ms: number | null): string {
-  if (ms === null) return 'Not available';
+export function formatDuration(ms: number | null, copy: ResponseTimeCopy = responseTimeCopyDefaults, locale: 'en' | 'fr' = 'en'): string {
+  const t = (key: keyof ResponseTimeCopy, ...values: Array<string | number>) => responseText(copy, locale, key, ...values);
+  if (ms === null) return t('unavailable');
   const minutes = Math.round(ms / 60_000);
-  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 60) return t('minutes', minutes);
   const hours = Math.floor(minutes / 60); const rest = minutes % 60;
-  if (hours < 48) return rest ? `${hours} h ${rest} min` : `${hours} h`;
-  return `${Math.round(hours / 24)} days`;
+  if (hours < 48) return rest ? t('hoursMinutes', hours, rest) : t('hours', hours);
+  return t('days', Math.round(hours / 24));
 }
 
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
 /** e.g. "Mon, Tue, Wed 09:00-18:00 (Europe/Paris)". */
-export function describeBusinessHours(b: BusinessHoursSetting & { timeZone: string }): string {
-  return `${b.days.map(d => DAY_NAMES[d]).join(', ')} ${hh(b.start)}-${hh(b.end)} (${b.timeZone})`;
+export function describeBusinessHours(b: BusinessHoursSetting & { timeZone: string }, copy: ResponseTimeCopy = responseTimeCopyDefaults, locale: 'en' | 'fr' = 'en'): string {
+  return `${b.days.map(d => copy[DAY_KEYS[d]!][locale]).join(', ')} ${hh(b.start)}-${hh(b.end)} (${b.timeZone})`;
 }

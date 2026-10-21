@@ -1,3 +1,9 @@
+import { analyticsLanguage } from './error-copy';
+import { cache } from 'react';
+const metricCopy = cache(() => runtimeConfig('analytics.workspaceCopy'));
+import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
+import { errorCopyDefaults } from '@/modules/analytics/error-copy';
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
@@ -18,8 +24,8 @@ const pageSchema = z.union([
   z.number().int().positive().safe(),
   z.string().regex(/^[1-9]\d{0,15}$/).transform(Number).refine(Number.isSafeInteger),
 ]);
-const invalid = () => new OperationError('invalid_request', 'Choose valid Analytics filters, or reset the filters and try again.');
-const forbiddenResource = () => new OperationError('forbidden', 'A selected Analytics resource is unavailable. Choose an available resource or reset the filters.');
+const invalid = () => new OperationError('invalid_request', errorCopyDefaults["Choose valid Analytics filters, or reset the filters and try again."].en);
+const forbiddenResource = () => new OperationError('forbidden', errorCopyDefaults["A selected Analytics resource is unavailable. Choose an available resource or reset the filters."].en);
 const metricIdentity = (metric: MetricView) => JSON.stringify([metric.key, metric.sourceLabel, metric.resourceKind, metric.unit]);
 
 type ParsedInput = {
@@ -111,21 +117,21 @@ function searchMetrics(metrics: MetricView[], search?: string): MetricView[] {
 function assertUniqueMetricKeys(metrics: Array<{ key: string }>): void {
   const keys = new Set<string>();
   for (const metric of metrics) {
-    if (keys.has(metric.key)) throw new OperationError('unavailable', 'Analytics returned duplicate metric keys. Refresh the report or try again later.');
+    if (keys.has(metric.key)) throw new OperationError('unavailable', errorCopyDefaults["Analytics returned duplicate metric keys. Refresh the report or try again later."].en);
     keys.add(metric.key);
   }
 }
 
 async function authorizeAnalytics(actor: AnalyticsReadActor, constraints: AnalyticsReadConstraints) {
   const user = await prisma.user.findUnique({ where: { id: actor.userId }, select: { disabledAt: true } });
-  if (!user || user.disabledAt) throw new OperationError('unauthorized', 'Sign in with an active account to view Analytics.');
+  if (!user || user.disabledAt) throw await analyticsError('unauthorized', "Sign in with an active account to view Analytics.");
   const [entitlements, permissions] = await Promise.all([
     loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }),
     loadPermissions(actor.userId, actor.workspaceId),
   ]);
   const feature = constraints.feature ?? 'analytics/overview';
   if (!entitlements || !permissions || !canUseFeature(entitlements, feature) || !canAccessFeature(permissions, feature)) {
-    throw new OperationError('forbidden', 'Analytics access is unavailable in this workspace.');
+    throw await analyticsError('forbidden', "Analytics access is unavailable in this workspace.");
   }
   await assertWorkspaceNotPurging(actor.workspaceId);
   const granted = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
@@ -150,7 +156,7 @@ async function runtimeLimits() {
     runtimeConfig('analytics.reportMaxChannels'),
   ]);
   const values = [defaultDays, maxDays, metricPageSize, detailPageSize, chartPoints, searchMaxLength, reportMaxChannels].map(Number);
-  if (values.some(value => !Number.isSafeInteger(value) || value < 1)) throw new OperationError('unavailable', 'Analytics settings are unavailable. Contact your workspace administrator.');
+  if (values.some(value => !Number.isSafeInteger(value) || value < 1)) throw await analyticsError('unavailable', "Analytics settings are unavailable. Contact your workspace administrator.");
   return { defaultDays: Math.min(values[0]!, values[1]!), maxDays: values[1]!, metricPageSize: values[2]!, detailPageSize: values[3]!, chartPoints: values[4]!, searchMaxLength: values[5]!, reportMaxChannels: values[6]! };
 }
 
@@ -181,19 +187,20 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
   const selectedReturnedChannels = currentData.selectedTargets.map(item => item.id);
   if (!sameIds(selectedReturnedChannels, selectedChannelIds) || !sameIds(currentData.selectedAdIds, selectedAdIds)) throw forbiddenResource();
   assertUniqueMetricKeys(currentData.metrics);
-  const view = buildAnalytics(currentData.metrics, currentData.audienceEntries, currentData.audienceSelected);
+  const [copy, locale] = await Promise.all([metricCopy(), analyticsLanguage()]);
+  const view = buildAnalytics(currentData.metrics, currentData.audienceEntries, currentData.audienceSelected, copy, locale);
   const allMetrics = view.metrics;
   const comparisonData = period.comparison
     ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders, access.adScope)
     : null;
   if (comparisonData && (!sameIds(comparisonData.selectedTargets.map(item => item.id), selectedChannelIds) || !sameIds(comparisonData.selectedAdIds, selectedAdIds))) throw forbiddenResource();
   if (comparisonData) assertUniqueMetricKeys(comparisonData.metrics);
-  const comparisonMetrics = comparisonData ? buildAnalytics(comparisonData.metrics, comparisonData.audienceEntries, comparisonData.audienceSelected).metrics : [];
+  const comparisonMetrics = comparisonData ? buildAnalytics(comparisonData.metrics, comparisonData.audienceEntries, comparisonData.audienceSelected, copy, locale).metrics : [];
   let comparisonMap: ReturnType<typeof compareAnalytics> | null = null;
   try {
     if (period.comparison) comparisonMap = compareAnalytics(allMetrics, comparisonMetrics);
   } catch (error) {
-    if (error instanceof AnalyticsComparisonError) throw new OperationError('unavailable', 'Analytics comparison could not be completed. Refresh the report or try another range.');
+    if (error instanceof AnalyticsComparisonError) throw await analyticsError('unavailable', "Analytics comparison could not be completed. Refresh the report or try another range.");
     throw error;
   }
   const comparisons: AnalyticsSnapshot['comparisons'] = Object.create(null);
@@ -236,13 +243,17 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
 }
 
 export async function readAnalyticsSnapshot(actor: AnalyticsReadActor, input: unknown = {}, constraints: AnalyticsReadConstraints = {}): Promise<AnalyticsSnapshot> {
+  try {
   const { snapshot, input: parsed, catalogMetrics } = await loadSnapshot(actor, input, constraints);
   if (parsed.metric && !catalogMetrics.some(metric => metric.key === parsed.metric)) throw forbiddenResource();
   snapshot.query = canonicalQuery(parsed, snapshot.period, snapshot.selected.channelIds, snapshot.selected.adAccountIds, {});
   return snapshot;
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }
 
 export async function readAnalytics(actor: AnalyticsReadActor, input: unknown = {}, constraints: AnalyticsReadConstraints = {}): Promise<AnalyticsReadResult> {
+  try {
   const { snapshot, input: parsed, limits, catalogMetrics } = await loadSnapshot(actor, input, constraints);
   const metrics = pager(snapshot.allMetrics, parsed.page, limits.metricPageSize);
   if (parsed.metric && !catalogMetrics.some(metric => metric.key === parsed.metric)) throw forbiddenResource();
@@ -260,4 +271,6 @@ export async function readAnalytics(actor: AnalyticsReadActor, input: unknown = 
     metrics,
     detail,
   };
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }

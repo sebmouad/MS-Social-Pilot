@@ -1,3 +1,6 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { defaultAdsText } from '@/modules/ads/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import type { TargetType } from '../../../../generated/client';
 import { listWorkspaceImages, readWorkspaceImage } from '@/modules/publishing/server/media/storage';
 import { createHash, randomBytes } from 'node:crypto';
@@ -26,8 +29,11 @@ export const OPERATION_STATUSES = ['pending', 'succeeded', 'rejected', 'uncertai
 export type AdsOperationStatus = (typeof OPERATION_STATUSES)[number];
 
 export async function loadAdsManagementPolicy(readConfig: typeof runtimeConfig = runtimeConfig): Promise<AdsManagementPolicy> {
+  return withAdsCopySnapshot(async () => {
   try { return ADS_MANAGEMENT_POLICY_SCHEMA.parse(await readConfig('ads.managementPolicy')); }
-  catch { throw new OperationError('unavailable', 'Ads management is temporarily unavailable. Try again later.'); }
+  catch { throw new OperationError('unavailable', await adsServiceText('service032')); }
+
+  });
 }
 
 function scopes(value: string) { return value.split(',').map(scope => scope.trim()).filter(Boolean); }
@@ -44,59 +50,59 @@ function accountTargetScope(actor: AdsManageActor, pageScope: AdsPageScope) {
 
 /** Parse and bound an untrusted neutral operation. Shape checks only; the module validates semantics. */
 export function parseNeutralOperation(raw: unknown): AdsNeutralOperation {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new OperationError('invalid_request', 'Choose a valid ad change.');
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new OperationError('invalid_request', defaultAdsText('validation007'));
   const value = raw as Record<string, unknown>;
   const { type, objectType, objectId } = value;
-  if (typeof type !== 'string' || !AD_OPERATION_IDS.includes(type as never) || typeof objectType !== 'string' || ![...AD_OBJECT_TYPES, 'creative'].includes(objectType as never)) throw new OperationError('invalid_request', 'Choose a valid ad change.');
-  const keys = (allowed: string[]) => { if (Object.keys(value).some(key => !allowed.includes(key))) throw new OperationError('invalid_request', 'Choose a valid ad change.'); };
+  if (typeof type !== 'string' || !AD_OPERATION_IDS.includes(type as never) || typeof objectType !== 'string' || ![...AD_OBJECT_TYPES, 'creative'].includes(objectType as never)) throw new OperationError('invalid_request', defaultAdsText('validation007'));
+  const keys = (allowed: string[]) => { if (Object.keys(value).some(key => !allowed.includes(key))) throw new OperationError('invalid_request', defaultAdsText('validation007')); };
   const text = (field: unknown, pattern: RegExp, message: string) => { if (typeof field !== 'string' || !pattern.test(field)) throw new OperationError('invalid_request', message); return field; };
   // Creation has no objectId or delivery input. Delivery objects start paused; creatives stay unattached.
   if (type === 'campaign.create') {
     keys(['type', 'objectType', 'name', 'objective']);
-    if (objectType !== 'campaign' || typeof value.name !== 'string') throw new OperationError('invalid_request', 'Enter a campaign name and objective.');
-    return { type, objectType, name: value.name.trim(), objective: text(value.objective, CREATE_TOKEN, 'Choose a valid campaign objective.') };
+    if (objectType !== 'campaign' || typeof value.name !== 'string') throw new OperationError('invalid_request', defaultAdsText('validation008'));
+    return { type, objectType, name: value.name.trim(), objective: text(value.objective, CREATE_TOKEN, defaultAdsText('validation009')) };
   }
   if (type === 'adset.create') {
     keys(['type', 'objectType', 'parentId', 'name', 'dailyBudgetMinor', 'countryCode', 'optimizationGoal']);
-    if (objectType !== 'adset' || typeof value.name !== 'string') throw new OperationError('invalid_request', 'Enter an ad set name.');
-    if (typeof value.dailyBudgetMinor !== 'number' || !Number.isSafeInteger(value.dailyBudgetMinor) || value.dailyBudgetMinor < 1) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units.');
+    if (objectType !== 'adset' || typeof value.name !== 'string') throw new OperationError('invalid_request', defaultAdsText('validation010'));
+    if (typeof value.dailyBudgetMinor !== 'number' || !Number.isSafeInteger(value.dailyBudgetMinor) || value.dailyBudgetMinor < 1) throw new OperationError('invalid_request', defaultAdsText('validation011'));
     return {
-      type, objectType, parentId: text(value.parentId, SAFE_ID, 'Choose a valid campaign.'), name: value.name.trim(), dailyBudgetMinor: value.dailyBudgetMinor,
-      countryCode: text(value.countryCode, /^[A-Z]{2}$/, 'Enter a two-letter country code.'), optimizationGoal: text(value.optimizationGoal, CREATE_TOKEN, 'Choose a valid optimization goal.'),
+      type, objectType, parentId: text(value.parentId, SAFE_ID, defaultAdsText('validation012')), name: value.name.trim(), dailyBudgetMinor: value.dailyBudgetMinor,
+      countryCode: text(value.countryCode, /^[A-Z]{2}$/, defaultAdsText('validation013')), optimizationGoal: text(value.optimizationGoal, CREATE_TOKEN, defaultAdsText('validation014')),
     };
   }
   if (type === 'creative.create') {
     keys(['type', 'objectType', 'name', 'targetId', 'mediaId', 'format', 'message', 'title', 'linkUrl']);
-    if (objectType !== 'creative' || typeof value.name !== 'string' || !['image', 'link'].includes(String(value.format)) || typeof value.message !== 'string' || typeof value.title !== 'string' || value.message.length > 5000 || value.title.length > 200) throw new OperationError('invalid_request', 'Enter valid creative details.');
+    if (objectType !== 'creative' || typeof value.name !== 'string' || !['image', 'link'].includes(String(value.format)) || typeof value.message !== 'string' || typeof value.title !== 'string' || value.message.length > 5000 || value.title.length > 200) throw new OperationError('invalid_request', defaultAdsText('validation015'));
     let linkUrl: string | undefined;
     if (value.format === 'link') {
       try { const url = new URL(String(value.linkUrl)); if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 2048) throw new Error(); linkUrl = url.href; }
-      catch { throw new OperationError('invalid_request', 'Enter an HTTPS destination without credentials.'); }
-    } else if (value.linkUrl !== undefined) throw new OperationError('invalid_request', 'Image creatives do not have a destination.');
-    return { type, objectType, name: value.name.trim(), targetId: text(value.targetId, SAFE_ID, 'Choose a selected channel.'), mediaId: text(value.mediaId, /^[A-Za-z0-9_.-]{1,150}$/, 'Choose a stored image.'), format: value.format as 'image' | 'link', message: value.message.trim(), title: value.title.trim(), ...(linkUrl ? { linkUrl } : {}) };
+      catch { throw new OperationError('invalid_request', defaultAdsText('validation016')); }
+    } else if (value.linkUrl !== undefined) throw new OperationError('invalid_request', defaultAdsText('validation017'));
+    return { type, objectType, name: value.name.trim(), targetId: text(value.targetId, SAFE_ID, defaultAdsText('validation018')), mediaId: text(value.mediaId, /^[A-Za-z0-9_.-]{1,150}$/, defaultAdsText('validation019')), format: value.format as 'image' | 'link', message: value.message.trim(), title: value.title.trim(), ...(linkUrl ? { linkUrl } : {}) };
   }
-  if (objectType === 'creative') throw new OperationError('invalid_request', 'Choose a supported creative operation.');
-  if (typeof objectId !== 'string' || !SAFE_ID.test(objectId)) throw new OperationError('invalid_request', 'Invalid ad object.');
+  if (objectType === 'creative') throw new OperationError('invalid_request', defaultAdsText('validation020'));
+  if (typeof objectId !== 'string' || !SAFE_ID.test(objectId)) throw new OperationError('invalid_request', defaultAdsText('validation021'));
   const base = { objectType: objectType as AdsObjectType, objectId };
   switch (type) {
     case 'status.set':
       keys(['type', 'objectType', 'objectId', 'status']);
-      if (value.status !== 'active' && value.status !== 'paused') throw new OperationError('invalid_request', 'Invalid ad status.');
+      if (value.status !== 'active' && value.status !== 'paused') throw new OperationError('invalid_request', defaultAdsText('validation022'));
       return { type, ...base, status: value.status };
     case 'budget.set': {
       keys(['type', 'objectType', 'objectId', 'budget']);
       const budget = value.budget as Record<string, unknown> | undefined;
       if (!budget || typeof budget !== 'object' || Object.keys(budget).some(key => key !== 'kind' && key !== 'minor') || (budget.kind !== 'daily' && budget.kind !== 'lifetime') ||
-        typeof budget.minor !== 'number' || !Number.isSafeInteger(budget.minor) || budget.minor < 1 || (objectType !== 'campaign' && objectType !== 'adset')) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units on a campaign or ad set.');
+        typeof budget.minor !== 'number' || !Number.isSafeInteger(budget.minor) || budget.minor < 1 || (objectType !== 'campaign' && objectType !== 'adset')) throw new OperationError('invalid_request', defaultAdsText('validation023'));
       return { type, objectType, objectId, budget: { kind: budget.kind, minor: budget.minor } };
     }
     case 'rename':
       keys(['type', 'objectType', 'objectId', 'name']);
-      if (typeof value.name !== 'string') throw new OperationError('invalid_request', 'Enter a name.');
+      if (typeof value.name !== 'string') throw new OperationError('invalid_request', defaultAdsText('validation024'));
       return { type, ...base, name: value.name.trim() };
     case 'creative.assign':
       keys(['type', 'objectType', 'objectId', 'creativeId']);
-      if (objectType !== 'ad' || typeof value.creativeId !== 'string' || !SAFE_ID.test(value.creativeId)) throw new OperationError('invalid_request', 'Choose an ad and a creative.');
+      if (objectType !== 'ad' || typeof value.creativeId !== 'string' || !SAFE_ID.test(value.creativeId)) throw new OperationError('invalid_request', defaultAdsText('validation025'));
       return { type, objectType, objectId, creativeId: value.creativeId };
     default:
       keys(['type', 'objectType', 'objectId']);
@@ -106,20 +112,20 @@ export function parseNeutralOperation(raw: unknown): AdsNeutralOperation {
 
 async function authorizeManager(actor: AdsManageActor, level: 'read' | 'write') {
   const user = await prisma.user.findUnique({ where: { id: actor.userId }, select: { disabledAt: true } });
-  if (!user || user.disabledAt) throw new OperationError('unauthorized', 'Sign in with an active account to manage ads.');
+  if (!user || user.disabledAt) throw new OperationError('unauthorized', await adsServiceText('service033'));
   const membership = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
-  if (!membership) throw new OperationError('unauthorized', 'You are no longer a member of this workspace.');
-  if (level === 'write' && !MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage ads.');
+  if (!membership) throw new OperationError('unauthorized', await adsServiceText('service034'));
+  if (level === 'write' && !MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', await adsServiceText('service035'));
   const [entitlements, permissions] = await Promise.all([loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }), loadPermissions(actor.userId, actor.workspaceId)]);
   if (!entitlements || !permissions || entitlements.workspaceId !== actor.workspaceId || !canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', level)) {
-    throw new OperationError('forbidden', 'Ads management is not available for this workspace.');
+    throw new OperationError('forbidden', await adsServiceText('service036'));
   }
   await assertWorkspaceNotPurging(actor.workspaceId);
   return { role: membership.role, entitlements, permissions };
 }
 
 async function managedContext(actor: AdsManageActor, adAccountId: string, level: 'read' | 'write') {
-  if (typeof adAccountId !== 'string' || !SAFE_ID.test(adAccountId)) throw new OperationError('invalid_request', 'Choose an advertising account.');
+  if (typeof adAccountId !== 'string' || !SAFE_ID.test(adAccountId)) throw new OperationError('invalid_request', await adsServiceText('service011'));
   const access = await authorizeManager(actor, level);
   const pageScope = access.permissions.pageScope;
   const account = await prisma.adAccount.findFirst({
@@ -130,25 +136,25 @@ async function managedContext(actor: AdsManageActor, adAccountId: string, level:
     select: { id: true, actId: true, currency: true, socialAccount: { select: { provider: true, accessToken: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } },
   });
   const connection = account?.socialAccount;
-  if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new OperationError('reconnect_required', 'This advertising account or its connection is unavailable. Reconnect it before managing ads.');
-  if (!hasPlatformCapability(access.entitlements, connection.provider)) throw new OperationError('unavailable', 'This advertising account is unavailable.');
+  if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new OperationError('reconnect_required', await adsServiceText('service037'));
+  if (!hasPlatformCapability(access.entitlements, connection.provider)) throw new OperationError('unavailable', await adsServiceText('service006'));
   const ads = await platformAds(connection.provider);
   const ops = ads?.operations ?? adsOpsHostFor(connection.provider);
-  if (!ads || !ops) throw new OperationError('unavailable', 'Advertising changes are currently unavailable.');
-  if (ads.isReady && (await ads.isReady().catch(() => false)) !== true) throw new OperationError('unavailable', 'Advertising changes are currently unavailable.');
+  if (!ads || !ops) throw new OperationError('unavailable', await adsServiceText('service038'));
+  if (ads.isReady && (await ads.isReady().catch(() => false)) !== true) throw new OperationError('unavailable', await adsServiceText('service038'));
   const required = level === 'write' ? await ads.manageScopes() : await ads.readScopes();
   if (level === 'write') {
-    if ((await runtimeConfig('ads.managementEnabled')) !== true) throw new OperationError('unavailable', 'Ads management is currently unavailable.');
+    if ((await runtimeConfig('ads.managementEnabled')) !== true) throw new OperationError('unavailable', await adsServiceText('service039'));
     ads.validateManageScopes(required, scopes(connection.scopes));
-  } else if (!ads.hasReadScopes(required, scopes(connection.scopes))) throw new OperationError('reconnect_required', 'Reconnect this advertising connection to continue.');
+  } else if (!ads.hasReadScopes(required, scopes(connection.scopes))) throw new OperationError('reconnect_required', await adsServiceText('service040'));
   const accessToken = decryptSecret(connection.accessToken);
-  if (!accessToken) throw new OperationError('reconnect_required', 'This advertising connection is unavailable. Reconnect it before managing ads.');
+  if (!accessToken) throw new OperationError('reconnect_required', await adsServiceText('service041'));
   return { account, ops, credential: { accessToken }, provider: connection.provider, pageScope };
 }
 
 function supports(ops: AdsOpsHost, operation: AdsNeutralOperation) {
   const found = ops.operations.find(item => item.id === operation.type);
-  if (!found || !found.objectTypes.includes(operation.objectType)) throw new OperationError('unavailable', 'This change is not available for the selected advertising account.');
+  if (!found || !found.objectTypes.includes(operation.objectType)) throw new OperationError('unavailable', defaultAdsText('validation026'));
   return found;
 }
 
@@ -167,72 +173,79 @@ function ledgerObjectId(operation: AdsNeutralOperation) {
 
 /** Ad set creation needs unrestricted page scope (the parent can't be bounded to channel targets). */
 function assertCreationScope(operation: AdsNeutralOperation, pageScope: AdsPageScope, allowedTargetIds?: readonly string[]) {
-  if (operation.type === 'adset.create' && (!pageScope.all || allowedTargetIds !== undefined)) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
+  if (operation.type === 'adset.create' && (!pageScope.all || allowedTargetIds !== undefined)) throw new OperationError('forbidden', defaultAdsText('validation027'));
 }
 
 async function assertOwnedObject(accountDbId: string, operation: AdsNeutralOperation) {
   if (operation.type === 'campaign.create' || operation.type === 'creative.create') return;
   if (operation.type === 'adset.create') {
     const parent = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: 'campaign', objectId: operation.parentId }, select: { id: true } });
-    if (!parent) throw new OperationError('not_found', 'This campaign cannot be verified for the selected account.');
+    if (!parent) throw new OperationError('not_found', await adsServiceText('service042'));
     return;
   }
   const owned = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: objectLevel[operation.objectType], objectId: operation.objectId }, select: { id: true } });
-  if (!owned) throw new OperationError('not_found', 'This ad object cannot be verified for the selected account.');
+  if (!owned) throw new OperationError('not_found', await adsServiceText('service007'));
 }
 
 /** Resolve only a selected, currently scoped channel from the account's own connection. */
 async function creativeContext(actor: AdsManageActor, ctx: Awaited<ReturnType<typeof managedContext>>, operation: AdsNeutralOperation) {
   if (operation.type !== 'creative.create') return undefined;
   const ids = allowedTargets(actor, ctx.pageScope);
-  if (ids !== null && !ids.includes(operation.targetId)) throw new OperationError('forbidden', 'This channel is outside your current access.');
+  if (ids !== null && !ids.includes(operation.targetId)) throw new OperationError('forbidden', await adsServiceText('service043'));
   const target = await prisma.target.findFirst({
     where: { id: operation.targetId, workspaceId: actor.workspaceId, enabled: true, canPublish: true, socialAccount: { is: { adAccounts: { some: { id: ctx.account.id, workspaceId: actor.workspaceId, enabled: true } }, workspaceId: actor.workspaceId, provider: ctx.provider, invalidatedAt: null } } },
     select: { providerId: true, type: true },
   });
-  if (!target || !ctx.ops.creativeIdentityKinds?.includes(String(target.type))) throw new OperationError('not_found', 'Choose a selected channel connected to this advertising account.');
+  if (!target || !ctx.ops.creativeIdentityKinds?.includes(String(target.type))) throw new OperationError('not_found', await adsServiceText('service044'));
   try { return { identityId: target.providerId, identityKind: String(target.type), image: await readWorkspaceImage(actor.workspaceId, operation.mediaId) }; }
-  catch { throw new OperationError('not_found', 'This stored image is unavailable in this workspace. Choose another image.'); }
+  catch { throw new OperationError('not_found', await adsServiceText('service045')); }
 }
 
 /** Bounded, authorized choices shared by UI/HTTP/MCP; never exposes storage paths or holder records. */
 export async function listAdsCreativeSources(actor: AdsManageActor, input: { adAccountId: string; imageAfter?: string; targetOffset?: number; limit?: number }) {
+  return withAdsCopySnapshot(async () => {
   const ctx = await managedContext(actor, input.adAccountId, 'write');
-  if (!ctx.ops.operations.some(op => op.id === 'creative.create') || !ctx.ops.creativeIdentityKinds?.length) throw new OperationError('unavailable', 'Creative creation is unavailable for this account.');
+  if (!ctx.ops.operations.some(op => op.id === 'creative.create') || !ctx.ops.creativeIdentityKinds?.length) throw new OperationError('unavailable', await adsServiceText('service046'));
   const policy = await loadAdsManagementPolicy();
   const offset = input.targetOffset ?? 0;
   const limit = Math.min(input.limit ?? policy.creativePageLimit, policy.creativePageLimit);
-  if (!Number.isSafeInteger(limit) || limit < 1) throw new OperationError('invalid_request', 'Choose a valid sources page size.');
-  if (!Number.isSafeInteger(offset) || offset < 0 || input.imageAfter !== undefined && (typeof input.imageAfter !== 'string' || input.imageAfter.length > 2048)) throw new OperationError('invalid_request', 'Choose a valid sources page.');
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new OperationError('invalid_request', await adsServiceText('service047'));
+  if (!Number.isSafeInteger(offset) || offset < 0 || input.imageAfter !== undefined && (typeof input.imageAfter !== 'string' || input.imageAfter.length > 2048)) throw new OperationError('invalid_request', await adsServiceText('service048'));
   const ids = allowedTargets(actor, ctx.pageScope);
   const [targets, images] = await Promise.all([
     prisma.target.findMany({ where: { workspaceId: actor.workspaceId, enabled: true, canPublish: true, ...(ids === null ? {} : { id: { in: ids } }), type: { in: [...ctx.ops.creativeIdentityKinds] as TargetType[] }, socialAccount: { is: { workspaceId: actor.workspaceId, provider: ctx.provider, invalidatedAt: null, adAccounts: { some: { id: ctx.account.id, enabled: true } } } } }, select: { id: true, name: true }, orderBy: { id: 'asc' }, skip: offset, take: limit + 1 }),
     listWorkspaceImages(actor.workspaceId, { limit, ...(input.imageAfter ? { cursor: input.imageAfter } : {}) }),
   ]);
   return { targets: targets.slice(0, limit), nextTargetOffset: targets.length > limit ? offset + limit : null, images: images.items.map(item => ({ id: item.id, mimeType: item.mimeType })), nextImageAfter: images.nextCursor, nameMaxCharacters: policy.nameMaxCharacters };
+
+  });
 }
 
 /** Private UI preview uses the same active-account authorization and stored-image reader as creation. */
 export async function readAdsCreativeImage(actor: AdsManageActor, input: { adAccountId: string; mediaId: string }) {
+  return withAdsCopySnapshot(async () => {
   const ctx = await managedContext(actor, input.adAccountId, 'write');
-  if (!ctx.ops.operations.some(op => op.id === 'creative.create')) throw new OperationError('unavailable', 'Creative creation is unavailable for this account.');
+  if (!ctx.ops.operations.some(op => op.id === 'creative.create')) throw new OperationError('unavailable', await adsServiceText('service046'));
   try { return await readWorkspaceImage(actor.workspaceId, input.mediaId); }
-  catch { throw new OperationError('not_found', 'This stored image is unavailable in this workspace. Choose another image.'); }
+  catch { throw new OperationError('not_found', await adsServiceText('service045')); }
+
+  });
 }
 
 /** Root-managed bounds apply to every module before its own validation; the module may only be stricter. */
 async function validateWithPolicy(ops: AdsOpsHost, operation: AdsNeutralOperation) {
   const policy = await loadAdsManagementPolicy();
-  if (operation.type === 'rename' && (!operation.name || operation.name.length > policy.nameMaxCharacters)) throw new OperationError('invalid_request', `Names must contain 1 to ${policy.nameMaxCharacters} characters.`);
-  if (isCreationOperation(operation) && (!operation.name || operation.name.length > policy.nameMaxCharacters)) throw new OperationError('invalid_request', `Names must contain 1 to ${policy.nameMaxCharacters} characters.`);
-  if (operation.type === 'adset.create' && operation.dailyBudgetMinor > policy.maxBudgetMinor) throw new OperationError('invalid_request', 'This budget is above the limit allowed for a single change.');
-  if (operation.type === 'budget.set' && operation.budget.minor > policy.maxBudgetMinor) throw new OperationError('invalid_request', 'This budget is above the limit allowed for a single change.');
+  if (operation.type === 'rename' && (!operation.name || operation.name.length > policy.nameMaxCharacters)) throw new OperationError('invalid_request', defaultAdsText('validation028', { value0: policy.nameMaxCharacters }));
+  if (isCreationOperation(operation) && (!operation.name || operation.name.length > policy.nameMaxCharacters)) throw new OperationError('invalid_request', defaultAdsText('validation028', { value0: policy.nameMaxCharacters }));
+  if (operation.type === 'adset.create' && operation.dailyBudgetMinor > policy.maxBudgetMinor) throw new OperationError('invalid_request', await adsServiceText('service049'));
+  if (operation.type === 'budget.set' && operation.budget.minor > policy.maxBudgetMinor) throw new OperationError('invalid_request', await adsServiceText('service049'));
   ops.validate(operation, { nameMaxCharacters: policy.nameMaxCharacters, maxBudgetMinor: policy.maxBudgetMinor });
   await ops.validateCurrent?.(operation, { nameMaxCharacters: policy.nameMaxCharacters, maxBudgetMinor: policy.maxBudgetMinor });
 }
 
 /** What this actor may do on one account; the UI shows only advertised operations. */
 export async function describeAdsManagement(actor: AdsManageActor, adAccountId: string) {
+  return withAdsCopySnapshot(async () => {
   try {
     const ctx = await managedContext(actor, adAccountId, 'write');
     const policy = await loadAdsManagementPolicy();
@@ -241,10 +254,13 @@ export async function describeAdsManagement(actor: AdsManageActor, adAccountId: 
     if (error instanceof OperationError && ['forbidden', 'unauthorized', 'unavailable', 'reconnect_required', 'not_found'].includes(error.code)) return { canManage: false as const, operations: [], canListCreatives: false };
     throw error;
   }
+
+  });
 }
 
 /** Returns the exact confirmation a caller must repeat. No remote or ledger write. */
 export async function previewAdsManagement(actor: AdsManageActor, input: { adAccountId: string; operation: unknown }) {
+  return withAdsCopySnapshot(async () => {
   const operation = parseNeutralOperation(input.operation);
   const ctx = await managedContext(actor, input.adAccountId, 'write');
   const support = supports(ctx.ops, operation);
@@ -256,6 +272,8 @@ export async function previewAdsManagement(actor: AdsManageActor, input: { adAcc
   const held = await prisma.$queryRaw<{ id: string }[]>`SELECT id FROM ads_management_operations WHERE "workspaceId" = ${actor.workspaceId} AND "adAccountId" = ${ctx.account.id} AND "objectType" = ${operation.objectType} AND "objectId" = ${ledgerObjectId(operation)} AND status IN ('pending','uncertain') LIMIT 1`
     .then(rows => rows.length > 0, () => null);
   return { confirmation: ctx.ops.confirmation(operation, { adAccountId: ctx.account.id, currency: ctx.account.currency }), spendChanging: support.spendChanging, irreversible: support.irreversible === true, blockedByOpenChange: held, operation };
+
+  });
 }
 
 const newId = (prefix: string) => `${prefix}_${randomBytes(12).toString('hex')}`;
@@ -277,17 +295,17 @@ function createdFrom(ledger: { operationType?: string; objectType?: string }, re
   return { created: { objectType: ledger.operationType === 'campaign.create' ? 'campaign' : ledger.operationType === 'creative.create' ? 'creative' : 'adset', remoteId } };
 }
 class AdsIntentNoLongerPending extends Error {
-  constructor(readonly ledger: AdsLedgerStatus) { super('This Ads request has already moved past pending.'); }
+  constructor(readonly ledger: AdsLedgerStatus) { super(defaultAdsText('validation029')); }
 }
 
 function replayLedgerOutcome(operationId: string, ledger: AdsLedgerStatus): AdsManagementOutcome {
   if (ledger.status === 'succeeded') return { outcome: 'succeeded', operationId, remoteId: ledger.remoteId, recorded: true, replay: true, status: ledger.status, ...createdFrom(ledger, ledger.remoteId) };
   // A human attestation never proves a created object's identity, so no `created` is returned.
   if (ledger.status === 'resolved_applied') return { outcome: 'succeeded', operationId, remoteId: ledger.remoteId, recorded: true, replay: true, status: ledger.status };
-  if (ledger.status === 'resolved_not_applied') return { outcome: 'rejected', operationId, message: 'This request was reviewed and recorded as not applied. Create a new request only if you still want to make the change.', terminal: true, replay: true, status: 'resolved_not_applied' };
-  if (ledger.status === 'rejected') return { outcome: 'rejected', operationId, message: 'The advertising platform rejected this change. Nothing was changed. Review the details before submitting a new request.' };
-  if (ledger.status === 'uncertain') return { outcome: 'uncertain', operationId, message: 'The result of this change is unknown. Do not repeat it. Check the object in the advertising platform, then record what you found in Ads change history.' };
-  throw new OperationError('conflict', 'This advertising request is still in progress or has not been resolved. Do not submit it again.');
+  if (ledger.status === 'resolved_not_applied') return { outcome: 'rejected', operationId, message: defaultAdsText('validation030'), terminal: true, replay: true, status: 'resolved_not_applied' };
+  if (ledger.status === 'rejected') return { outcome: 'rejected', operationId, message: defaultAdsText('validation031') };
+  if (ledger.status === 'uncertain') return { outcome: 'uncertain', operationId, message: defaultAdsText('validation032') };
+  throw new OperationError('conflict', defaultAdsText('validation033'));
 }
 
 const REQUEST_ID = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -301,7 +319,7 @@ async function replayRequest(actor: AdsManageActor, requestId: string, requestHa
     WHERE "workspaceId" = ${actor.workspaceId} AND "actorId" = ${actor.userId} AND "requestId" = ${requestId} LIMIT 1`;
   const row = rows[0];
   if (!row) return null;
-  if (row.requestHash !== requestHash) throw new OperationError('conflict', 'This request key was already used for a different advertising change.');
+  if (row.requestHash !== requestHash) throw new OperationError('conflict', await adsServiceText('service050'));
   return replayLedgerOutcome(row.id, row);
 }
 
@@ -311,7 +329,8 @@ async function replayRequest(actor: AdsManageActor, requestId: string, requestHa
  * changes to the same object until a manager resolves it.
  */
 export async function performAdsManagement(actor: AdsManageActor, input: { adAccountId: string; operation: unknown; confirmation: unknown; requestId: unknown }): Promise<AdsManagementOutcome> {
-  if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) throw new OperationError('invalid_request', 'Provide a request ID containing 8 to 128 letters, numbers, dots, underscores, colons or hyphens.');
+  return withAdsCopySnapshot(async () => {
+  if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) throw new OperationError('invalid_request', await adsServiceText('service051'));
   const operation = parseNeutralOperation(input.operation);
   // Creation only: a preflight failure of THIS send happened before its intent and any provider request. It says nothing about an earlier send of the same request id.
   const beforeJournal = isCreationOperation(operation) ? asNoDispatch : (error: unknown) => error;
@@ -325,7 +344,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
     if (input.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${expected}`);
     if (operation.type === 'creative.create') {
       const ids = allowedTargets(actor, ctx.pageScope);
-      if (ids !== null && !ids.includes(operation.targetId)) throw new OperationError('forbidden', 'This channel is outside your current access.');
+      if (ids !== null && !ids.includes(operation.targetId)) throw new OperationError('forbidden', await adsServiceText('service043'));
       const replay = await replayRequest(actor, input.requestId, requestPayloadHash(ctx.account.id, operation));
       if (replay) return replay;
     }
@@ -339,7 +358,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
     await prisma.$transaction(async tx => {
       await lockSelectedResources(tx, actor.workspaceId, [{ kind: 'adAccount', id: ctx.account.id }]);
       const active = await tx.adAccount.findFirst({ where: { id: ctx.account.id, workspaceId: actor.workspaceId, enabled: true }, select: { id: true } });
-      if (!active) throw new OperationError('reconnect_required', 'This advertising account is no longer selected. Select it again before managing ads.');
+      if (!active) throw new OperationError('reconnect_required', await adsServiceText('service052'));
       await tx.$executeRaw`INSERT INTO ads_management_operations (id, "workspaceId", "adAccountId", "actorId", "requestId", "requestHash", "operationType", "objectType", "objectId", params, status, "createdAt", "updatedAt")
         VALUES (${id}, ${actor.workspaceId}, ${ctx.account.id}, ${actor.userId}, ${input.requestId}, ${requestHash}, ${operation.type}, ${operation.objectType}, ${ledgerObjectId(operation)}, ${JSON.stringify(operation)}::jsonb, 'pending', NOW(), NOW())`;
     });
@@ -353,7 +372,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
       } catch (replayError) {
         if (replayError instanceof OperationError) throw replayError;
       }
-      const message = 'An earlier change to this object has no confirmed outcome. Check it in Ads change history and resolve it before making another change.';
+      const message = await adsServiceText('service053');
       // A successful lookup finding no row for this request id means THIS send was not recorded; an earlier send could still be in flight, so clients must not release a request they already sent unresolved.
       if (lookedUp && isCreationOperation(operation)) throw new AdsNoDispatchError('conflict', message, 'blocked_by_other_request');
       throw new OperationError('conflict', message);
@@ -361,7 +380,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
     // An OperationError here is one of our own checks raised before the INSERT, so this send recorded nothing.
     if (error instanceof OperationError) throw beforeJournal(error);
     // Any other failure (including a lost commit acknowledgement) may have committed the intent: never claim it was not recorded.
-    throw new OperationError('unavailable', 'Ads management is temporarily unavailable. Check Ads change history before submitting a new request.');
+    throw new OperationError('unavailable', await adsServiceText('service054'));
   }
 
   let current: Awaited<ReturnType<typeof managedContext>> | undefined;
@@ -376,19 +395,19 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
       if (!ledger || ledger.status !== 'pending') throw new AdsIntentNoLongerPending(ledger ?? { status: 'missing', remoteId: null });
       try {
         current = await managedContext(actor, input.adAccountId, 'write');
-        if (current.account.id !== ctx.account.id || current.provider !== ctx.provider || current.ops.provider !== ctx.ops.provider) throw new OperationError('conflict', 'The advertising account changed while preparing this request. Review it and try again.');
+        if (current.account.id !== ctx.account.id || current.provider !== ctx.provider || current.ops.provider !== ctx.ops.provider) throw new OperationError('conflict', await adsServiceText('service055'));
         supports(current.ops, operation);
         assertCreationScope(operation, current.pageScope, actor.allowedTargetIds);
         await validateWithPolicy(current.ops, operation);
         creative = await creativeContext(actor, current, operation);
         if (operation.type === 'adset.create') await assertOwnedObject(current.account.id, operation);
-        if (current.ops.confirmation(operation, { adAccountId: current.account.id, currency: current.account.currency }) !== expected) throw new OperationError('conflict', 'The advertising change confirmation is no longer current. Review it and try again.');
+        if (current.ops.confirmation(operation, { adAccountId: current.account.id, currency: current.account.currency }) !== expected) throw new OperationError('conflict', await adsServiceText('service056'));
         signal.throwIfAborted();
       } catch (error) {
         const changed = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = 'rejected', "failureCode" = 'authority_changed', "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
         if (changed !== 1) throw error;
         await audit(actor, 'ads.change_rejected', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation), reason: 'authority_changed' }, _tx);
-        const message = error instanceof OperationError ? error.message : 'Current advertising access could not be verified. Review access and try again.';
+        const message = error instanceof OperationError ? error.message : await adsServiceText('service057');
         return { outcome: 'rejected' as const, status: 'rejected' as const, operationId: id, message: `No advertising change was sent. ${message}` };
       }
 
@@ -408,8 +427,8 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
         if (changed !== 1) throw new AdsIntentNoLongerPending({ status: 'uncertain', remoteId: null });
         await audit(actor, `ads.change_${status}`, { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation) }, _tx);
         return kind === 'rejected'
-          ? { outcome: 'rejected' as const, status: 'rejected' as const, operationId: id, message: 'The advertising platform rejected this change. Nothing was changed. Review the details and try again.' }
-          : { outcome: 'uncertain' as const, operationId: id, message: 'The result of this change is unknown. Do not repeat it. Check the object in the advertising platform, then record what you found in Ads change history.' };
+          ? { outcome: 'rejected' as const, status: 'rejected' as const, operationId: id, message: await adsServiceText('service058') }
+          : { outcome: 'uncertain' as const, operationId: id, message: await adsServiceText('service059') };
       }
 
       const resultRemoteId = result.remoteId ?? null;
@@ -418,11 +437,11 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
         const held = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = 'uncertain', "failureCode" = 'missing_remote_id', "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
         if (held !== 1) throw new AdsIntentNoLongerPending({ status: 'uncertain', remoteId: null });
         await audit(actor, 'ads.change_uncertain', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation) }, _tx);
-        return { outcome: 'uncertain' as const, operationId: id, message: 'The result of this change is unknown. Do not repeat it. Check the object in the advertising platform, then record what you found in Ads change history.' };
+        return { outcome: 'uncertain' as const, operationId: id, message: await adsServiceText('service059') };
       }
       const created = isCreationOperation(operation) ? { created: { objectType: operation.objectType, remoteId: resultRemoteId! } } : {};
       const changed = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = 'succeeded', "remoteId" = ${resultRemoteId}, "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
-      if (changed !== 1) return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: false, warning: 'The change was applied but its record could not be completed. Do not repeat it; the object stays on hold in Ads change history until the outcome is reviewed.', ...created };
+      if (changed !== 1) return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: false, warning: await adsServiceText('service060'), ...created };
       await audit(actor, 'ads.change_applied', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation), spendChanging: support.spendChanging, ...(isCreationOperation(operation) ? { remoteId: resultRemoteId, createdPaused: operation.type !== 'creative.create', ...(operation.type === 'creative.create' ? { delivery: 'unattached' } : {}) } : {}) }, _tx);
       return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: true, ...created };
     });
@@ -430,12 +449,14 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
     if (error instanceof AdsIntentNoLongerPending) return replayLedgerOutcome(id, error.ledger);
     if (!providerDispatched) {
       // Lock/config failure before provider dispatch proves no provider write was sent; retain pending for explicit recovery.
-      const message = error instanceof OperationError ? error.message : 'Current advertising access could not be verified. Review access and try again.';
+      const message = error instanceof OperationError ? error.message : await adsServiceText('service057');
       return { outcome: 'rejected', operationId: id, message: `No advertising change was sent. ${message}` };
     }
     // Any failure after dispatch may have applied remotely. Leave the committed pending intent held for explicit review.
-    return { outcome: 'uncertain', operationId: id, message: 'The result of this change is unknown. Do not repeat it. Check the object in the advertising platform, then record what you found in Ads change history.' };
+    return { outcome: 'uncertain', operationId: id, message: await adsServiceText('service059') };
   }
+
+  });
 }
 
 type OperationRow = { id: string; adAccountId: string; actorId: string; operationType: string; objectType: string; objectId: string; params: unknown; status: string; remoteId: string | null; failureCode: string | null; createdAt: Date; completedAt: Date | null; resolvedBy: string | null; resolvedAt: Date | null; resolutionNote: string | null; receipts?: unknown };
@@ -450,13 +471,14 @@ const present = (row: OperationRow) => ({
 });
 
 export async function listAdsOperations(actor: AdsManageActor, input: { adAccountId?: string; status?: string; offset?: number; limit?: number } = {}) {
+  return withAdsCopySnapshot(async () => {
   const access = await authorizeManager(actor, 'write');
   const policy = await loadAdsManagementPolicy();
   const status = input.status;
-  if (status !== undefined && !OPERATION_STATUSES.includes(status as AdsOperationStatus)) throw new OperationError('invalid_request', 'Choose a valid status.');
-  if (input.adAccountId !== undefined && !SAFE_ID.test(input.adAccountId)) throw new OperationError('invalid_request', 'Choose an advertising account.');
+  if (status !== undefined && !OPERATION_STATUSES.includes(status as AdsOperationStatus)) throw new OperationError('invalid_request', await adsServiceText('service061'));
+  if (input.adAccountId !== undefined && !SAFE_ID.test(input.adAccountId)) throw new OperationError('invalid_request', await adsServiceText('service011'));
   const offset = input.offset ?? 0, limit = Math.min(input.limit ?? policy.historyPageLimit, policy.historyPageLimit);
-  if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1) throw new OperationError('invalid_request', 'Choose a valid page.');
+  if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1) throw new OperationError('invalid_request', await adsServiceText('service062'));
   // Visible accounts follow the caller's channel scope; history never crosses workspaces.
   const pageScope = access.permissions.pageScope;
   const visible = await prisma.adAccount.findMany({
@@ -472,6 +494,8 @@ export async function listAdsOperations(actor: AdsManageActor, input: { adAccoun
     ORDER BY "createdAt" DESC, id ASC OFFSET ${offset} LIMIT ${limit + 1}`;
   const page = rows.slice(0, limit);
   return { items: page.map(present), offset, limit, nextOffset: rows.length > limit ? offset + limit : null };
+
+  });
 }
 
 export type AdsResolution = 'applied' | 'not_applied';
@@ -480,16 +504,17 @@ export const pendingRecoveryConfirmation = (operationId: string, resolution: Ads
 
 /** Human attestation for an unknown outcome. Never contacts the provider and never repeats the write. */
 export async function resolveAdsOperation(actor: AdsManageActor, input: { operationId: string; resolution: AdsResolution; note?: string; confirmation: string }) {
-  if (typeof input.operationId !== 'string' || !SAFE_ID.test(input.operationId) || (input.resolution !== 'applied' && input.resolution !== 'not_applied')) throw new OperationError('invalid_request', 'Choose a valid change and outcome.');
-  if (input.note !== undefined && (typeof input.note !== 'string' || input.note.length > 500 || /[\u0000-\u001f\u007f]/.test(input.note))) throw new OperationError('invalid_request', 'Keep the note to 500 printable characters.');
+  return withAdsCopySnapshot(async () => {
+  if (typeof input.operationId !== 'string' || !SAFE_ID.test(input.operationId) || (input.resolution !== 'applied' && input.resolution !== 'not_applied')) throw new OperationError('invalid_request', await adsServiceText('service063'));
+  if (input.note !== undefined && (typeof input.note !== 'string' || input.note.length > 500 || /[\u0000-\u001f\u007f]/.test(input.note))) throw new OperationError('invalid_request', await adsServiceText('service064'));
   const access = await authorizeManager(actor, 'write');
   const rows = await prisma.$queryRaw<OperationRow[]>`SELECT (SELECT jsonb_agg(r.detail->'receipt') FROM (SELECT detail FROM root_activities WHERE action = 'ads.creation_receipt' AND detail->>'operationId' = ads_management_operations.id AND detail->>'workspaceId' = ${actor.workspaceId} ORDER BY "createdAt" DESC LIMIT 2) r) AS receipts, id, "adAccountId", "actorId", "operationType", "objectType", "objectId", params, status, "remoteId", "failureCode", "createdAt", "completedAt", "resolvedBy", "resolvedAt", "resolutionNote"
     FROM ads_management_operations WHERE id = ${input.operationId} AND "workspaceId" = ${actor.workspaceId}`;
   const row = rows[0];
-  if (!row) throw new OperationError('not_found', 'This change was not found.');
+  if (!row) throw new OperationError('not_found', await adsServiceText('service065'));
   const targetIds = allowedTargets(actor, access.permissions.pageScope);
-  if (row.operationType === 'creative.create' && targetIds !== null && !targetIds.includes((row.params as { targetId: string })?.targetId)) throw new OperationError('not_found', 'This change was not found.');
-  if (row.status !== 'pending' && row.status !== 'uncertain') throw new OperationError('conflict', 'This change does not need resolving.');
+  if (row.operationType === 'creative.create' && targetIds !== null && !targetIds.includes((row.params as { targetId: string })?.targetId)) throw new OperationError('not_found', await adsServiceText('service065'));
+  if (row.status !== 'pending' && row.status !== 'uncertain') throw new OperationError('conflict', await adsServiceText('service066'));
   const expected = row.status === 'pending' ? pendingRecoveryConfirmation(input.operationId, input.resolution) : resolutionConfirmation(input.operationId, input.resolution);
   if (input.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${expected}`);
   // Current workspace, module, role and key ceilings apply; retained disabled accounts remain visible for history recovery.
@@ -498,7 +523,7 @@ export async function resolveAdsOperation(actor: AdsManageActor, input: { operat
     where: { id: row.adAccountId, ...accountIdCeiling(actor), workspaceId: actor.workspaceId, socialAccount: { is: { workspaceId: actor.workspaceId, ...accountTargetScope(actor, pageScope) } } },
     select: { id: true },
   });
-  if (!visible) throw new OperationError('not_found', 'This change was not found.');
+  if (!visible) throw new OperationError('not_found', await adsServiceText('service065'));
   const next = input.resolution === 'applied' ? 'resolved_applied' : 'resolved_not_applied';
   let settled: boolean;
   try {
@@ -514,19 +539,24 @@ export async function resolveAdsOperation(actor: AdsManageActor, input: { operat
     });
   } catch (error) {
     if (error instanceof OperationError) throw error;
-    throw new OperationError('unavailable', 'This resolution could not be saved. Try again.');
+    throw new OperationError('unavailable', await adsServiceText('service067'));
   }
-  if (!settled) throw new OperationError('conflict', 'This change was already resolved.');
+  if (!settled) throw new OperationError('conflict', await adsServiceText('service068'));
   return { operationId: row.id, status: next, recoveredPending: row.status === 'pending', receipt: { affectedRows: 1, resolvedBy: actor.userId } };
+
+  });
 }
 
 /** Browse the module's existing creatives for assigning to an ad (read-only). */
 export async function listAdsCreatives(actor: AdsManageActor, input: { adAccountId: string; after?: string; limit?: number }) {
+  return withAdsCopySnapshot(async () => {
   const ctx = await managedContext(actor, input.adAccountId, 'write');
-  if (!ctx.ops.listCreatives) throw new OperationError('unavailable', 'Creative browsing is not available for the selected advertising account.');
+  if (!ctx.ops.listCreatives) throw new OperationError('unavailable', await adsServiceText('service069'));
   const policy = await loadAdsManagementPolicy();
   const limit = Math.min(input.limit ?? policy.creativePageLimit, policy.creativePageLimit);
-  if (!Number.isSafeInteger(limit) || limit < 1 || (input.after !== undefined && (typeof input.after !== 'string' || input.after.length > 500))) throw new OperationError('invalid_request', 'Choose a valid page.');
+  if (!Number.isSafeInteger(limit) || limit < 1 || (input.after !== undefined && (typeof input.after !== 'string' || input.after.length > 500))) throw new OperationError('invalid_request', await adsServiceText('service062'));
   try { return await ctx.ops.listCreatives({ credential: ctx.credential, accountId: ctx.account.actId }, { limit, ...(input.after ? { after: input.after } : {}) }); }
-  catch { throw new OperationError('upstream_failure', 'Creatives could not be loaded right now. Try again later.'); }
+  catch { throw new OperationError('upstream_failure', await adsServiceText('service070')); }
+
+  });
 }

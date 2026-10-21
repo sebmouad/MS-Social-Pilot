@@ -11,12 +11,13 @@ import { getTargets } from '@/server/data';
 import { canUseFeature, entitledPlatformIds } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { authLocale } from '@/modules/home/auth/locale';
-import { fill, homeCopy } from '@/modules/home/copy';
+import { fill, type HomeCopy } from '@/modules/home/copy';
+import { loadHomeCopy } from '@/modules/home/server/copy';
 import { readHomeOverview, type HomeOverview, type Section } from '@/modules/home/server/overview';
 import type { ScheduleMode } from '@/modules/home/server/overview-pure';
 import styles from './home.module.css';
 
-type Copy = ReturnType<typeof homeCopy>;
+type Copy = HomeCopy;
 type Module = 'analytics' | 'publishing' | 'inbox' | 'ads';
 const HREF: Record<Module, string> = { analytics: '/analytics', publishing: '/publishing/posts', inbox: '/inbox', ads: '/ads' };
 
@@ -75,7 +76,7 @@ const MODE_COPY: Record<ScheduleMode, 'modeApp' | 'modePlatform' | 'modeMixed'> 
 export default async function HomePage() {
   const viewer = await requireViewer({ feature: 'home/overview' });
   const locale = await authLocale();
-  const t = homeCopy(locale);
+  const t = await loadHomeCopy(locale);
   const showConnections = canUseFeature(viewer.entitlements, 'settings/connections') && canAccessFeature(viewer.permissions, 'settings/connections', 'read');
   const scope = viewer.permissions.pageScope;
   const visibleTargets = await getTargets(viewer.workspaceId, scope.all ? undefined : scope.ids, entitledPlatformIds(viewer.entitlements));

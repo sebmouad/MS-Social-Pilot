@@ -1,4 +1,6 @@
+import { useAdsMessage } from '@/modules/ads/ui/AdsCopyProvider';
 'use client';
+import { useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ModalDialog } from '@/components/ModalDialog';
@@ -12,6 +14,8 @@ type Config = NonNullable<AdsUiSchema['adSet']>;
 type Review = { name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string; confirmation: string; requestId: string };
 
 export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currency, config, ownerScope }: { adAccountId: string; campaignId: string; campaignName: string; currency: string | null; config: Config; ownerScope: CreationOwnerScope }) {
+  const localize = useAdsMessage();
+  const t = useAdsText();
   const { userId, workspaceId } = ownerScope;
   const owner = useMemo(() => ({ userId, workspaceId }), [userId, workspaceId]);
   const transmissions = useRef(0);
@@ -37,7 +41,7 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
     const { request } = stored;
     transmissions.current = stored.transmissions;
     const digits = budgetFractionDigits(currency);
-    setPendingRequest(request); setName(request.name); setBudget((request.dailyBudgetMinor / 10 ** digits).toFixed(digits)); setCountryCode(request.countryCode); setOptimizationGoal(request.optimizationGoal); setHeld(RESTORED_HELD_MESSAGE);
+    setPendingRequest(request); setName(request.name); setBudget((request.dailyBudgetMinor / 10 ** digits).toFixed(digits)); setCountryCode(request.countryCode); setOptimizationGoal(request.optimizationGoal); setHeld(t('restoredHeld'));
   }, [owner, scope, currency]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -47,10 +51,10 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
     const minorBudget = parseBudgetAmount(budget, currency);
     const country = countryCode.trim().toUpperCase();
     const customErrors: Record<string, string> = {};
-    if (!cleanName || cleanName.length > config.nameMaxLength) customErrors.name = `Enter an ad set name from 1 to ${config.nameMaxLength} characters.`;
-    if (minorBudget === null) customErrors.budget = `Enter a valid daily budget${currency ? ` in ${currency}` : ''} with up to ${budgetFractionDigits(currency)} decimal places.`;
-    if (!/^[A-Z]{2}$/.test(country)) customErrors.countryCode = 'Enter a two-letter country code, such as MA.';
-    if (!validation.validate(event.currentTarget, customErrors)) { setMessage('Correct the highlighted fields to continue.'); return; }
+    if (!cleanName || cleanName.length > config.nameMaxLength) customErrors.name = t('text216', { value0: config.nameMaxLength });
+    if (minorBudget === null) customErrors.budget = t('text217', { value0: currency ? t('currencyDetail', { currency }) : '', value1: budgetFractionDigits(currency) });
+    if (!/^[A-Z]{2}$/.test(country)) customErrors.countryCode = t('text218');
+    if (!validation.validate(event.currentTarget, customErrors)) { setMessage(t('text219')); return; }
     if (minorBudget === null) return;
     const confirmation = fill(config.confirmationTemplate, { nameJson: JSON.stringify(cleanName), campaignId, adAccountId, dailyBudgetMinor: String(minorBudget), currencySuffix: currency ? ` ${currency}` : '', countryCode: country, optimizationGoal });
     // The same reviewed payload keeps its request id; any change mints a new one.
@@ -71,14 +75,14 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
     if (!saveCreation('adset', owner, scope, request.requestId, request, sent)) {
       transmissions.current--;
       setBusy(false);
-      setDialogError('Your browser could not save this pending request. Allow tab storage and try again. Nothing was sent.');
+      setDialogError(t('text205'));
       return;
     }
     try {
       const response = await fetch('/api/ads/adsets', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ adAccountId, campaignId, ...request }) });
-      const result = await classifyCreationResponse(response, 'The ad set could not be created.');
+      const result = await classifyCreationResponse(response, t('text220'), t);
       if (result.kind === 'success') {
-        setMessage(creationSuccessMessage('ad set', result, ` with a daily budget of ${formatBudgetMinor(request.dailyBudgetMinor, currency)}`));
+        setMessage(creationSuccessMessage('ad set', result, t('dailyBudgetDetail', { amount: formatBudgetMinor(request.dailyBudgetMinor, currency) }), t));
         clearCreation('adset', owner, scope); transmissions.current = 0; setName(''); setBudget(''); setConfirmationOpen(false); setPendingRequest(null); setHeld('');
       } else if (result.kind === 'attested' || result.kind === 'rejected') {
         clearCreation('adset', owner, scope); transmissions.current = 0; setMessage(result.message); setConfirmationOpen(false); setPendingRequest(null); setHeld('');
@@ -88,33 +92,33 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
         // Only an identity sent exactly once, and refused before dispatch, has no unknown earlier send to protect.
         clearCreation('adset', owner, scope); transmissions.current = 0; setRefusalReason(result.reason); setDialogError(result.message);
       } else {
-        setHeld(`${result.message} ${REFUSED_HELD_NOTE}`); setConfirmationOpen(false);
+        setHeld(`${result.message} ${t('refusedHeld')}`); setConfirmationOpen(false);
       }
     } catch {
-      setHeld(NETWORK_HELD_MESSAGE); setConfirmationOpen(false);
+      setHeld(t('networkHeld')); setConfirmationOpen(false);
     } finally { setBusy(false); }
   }
 
-  return <form method="post" noValidate className="ads-campaign-create" onSubmit={handleSubmit} aria-label={`Create ad set under ${campaignName}`}>
+  return <form method="post" noValidate className="ads-campaign-create" onSubmit={handleSubmit} aria-label={t('text221', { value0: campaignName })}>
     <h4>{fill(config.title, { campaignName })}</h4>
-    <p className="small-note">{fill(config.description, { currency: currency ? ` in ${currency}` : '' })}</p>
+    <p className="small-note">{fill(config.description, { currency: currency ? t('currencyDetail', { currency }) : '' })}</p>
     <div className="ads-campaign-create__fields">
       <label>{config.nameLabel}<input name="name" value={name} onChange={event => setName(event.target.value)} maxLength={config.nameMaxLength} required disabled={locked} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /></label>
       <label>{config.budgetLabel}{currency ? ` (${currency})` : ''}<input name="budget" type="number" min={10 ** -budgetFractionDigits(currency)} step={10 ** -budgetFractionDigits(currency)} value={budget} onChange={event => setBudget(event.target.value)} inputMode="decimal" required disabled={locked} {...validation.fieldProps('budget')} /><FieldError {...validation.errorProps('budget')} /></label>
-      <label>{config.countryLabel}<input name="countryCode" value={countryCode} onChange={event => setCountryCode(event.target.value.toUpperCase())} maxLength={2} pattern="[A-Za-z]{2}" placeholder="MA" required disabled={locked} {...validation.fieldProps('countryCode')} /><FieldError {...validation.errorProps('countryCode')} /></label>
+      <label>{config.countryLabel}<input name="countryCode" value={countryCode} onChange={event => setCountryCode(event.target.value.toUpperCase())} maxLength={2} pattern="[A-Za-z]{2}" placeholder={t('text222')} required disabled={locked} {...validation.fieldProps('countryCode')} /><FieldError {...validation.errorProps('countryCode')} /></label>
       <label>{config.goalLabel}<select value={optimizationGoal} onChange={event => setOptimizationGoal(event.target.value)} disabled={locked}>{config.options.map(({value, label}) => <option key={value} value={value}>{label}</option>)}</select></label>
-      <button className="ui-button ui-button--primary" type="submit" disabled={locked}>{busy ? 'Creating…' : config.actionLabel}</button>
+      <button className="ui-button ui-button--primary" type="submit" disabled={locked}>{busy ? t('text208') : config.actionLabel}</button>
     </div>
-    {message ? <p role="status" className="small-note">{message}</p> : null}
-    {held && pendingRequest ? <div role="region" aria-label="Ad set creation needs review" className="ads-object-manager__pending">
-      <p role="alert" className="ui-error">{held}</p>
-      <p className="small-note">Do not start another creation. Checking again reuses the same request ID. Review the advertising platform and <a href="/ads/objects#changes">Ads change history</a> before trying again.</p>
-      <button className="ui-button ui-button--primary" type="button" onClick={() => void confirmCreate()} disabled={busy}>{busy ? 'Checking…' : 'Check the same request again'}</button>
+    {message ? <p role="status" className="small-note">{localize(message)}</p> : null}
+    {held && pendingRequest ? <div role="region" aria-label={t('text223')} className="ads-object-manager__pending">
+      <p role="alert" className="ui-error">{localize(held)}</p>
+      <p className="small-note">{t('text210')}<a href="/ads/objects#changes">{t('text211')}</a> {t('text212')}</p>
+      <button className="ui-button ui-button--primary" type="button" onClick={() => void confirmCreate()} disabled={busy}>{busy ? t('text118') : t('text213')}</button>
     </div> : null}
     {confirmationOpen && pendingRequest ? <ModalDialog className="ui-dialog" labelledBy={`adset-confirm-title-${adAccountId}-${campaignId}`} onDismiss={() => { if (!busy) setConfirmationOpen(false); }} busy={busy}>
       <div className="ui-dialog__header"><div><h2 id={`adset-confirm-title-${adAccountId}-${campaignId}`}>{config.confirmTitle}</h2><p>{config.confirmDescription}</p></div></div>
-      <div className="ui-dialog__body"><p><strong>{pendingRequest.name}</strong> under {campaignName}</p><p>{config.budgetLabel}: {formatBudgetMinor(pendingRequest.dailyBudgetMinor, currency)} · {pendingRequest.countryCode} · {config.options.find(option => option.value === pendingRequest.optimizationGoal)?.label ?? pendingRequest.optimizationGoal}</p>{dialogError ? <p role="alert" className="ui-error">{dialogError}{refusalReason === 'blocked_by_other_request' ? <> <a href="/ads/objects#changes">Open Ads change history</a> to resolve the earlier change.</> : null}</p> : null}</div>
-      <div className="ui-dialog__actions"><button className="ui-button ui-button--secondary" type="button" data-dialog-cancel onClick={() => setConfirmationOpen(false)} disabled={busy}>Cancel</button><button className="ui-button ui-button--primary" type="button" onClick={() => void confirmCreate()} disabled={busy}>{busy ? 'Creating…' : config.actionLabel}</button></div>
+      <div className="ui-dialog__body"><p><strong>{pendingRequest.name}</strong> {t('text224')}{campaignName}</p><p>{config.budgetLabel}{t('text225')}{formatBudgetMinor(pendingRequest.dailyBudgetMinor, currency)} {t('text166')}{pendingRequest.countryCode} {t('text166')}{config.options.find(option => option.value === pendingRequest.optimizationGoal)?.label ?? pendingRequest.optimizationGoal}</p>{dialogError ? <p role="alert" className="ui-error">{localize(dialogError)}{refusalReason === 'blocked_by_other_request' ? <> <a href="/ads/objects#changes">{t('text214')}</a> {t('text215')}</> : null}</p> : null}</div>
+      <div className="ui-dialog__actions"><button className="ui-button ui-button--secondary" type="button" data-dialog-cancel onClick={() => setConfirmationOpen(false)} disabled={busy}>{t('text125')}</button><button className="ui-button ui-button--primary" type="button" onClick={() => void confirmCreate()} disabled={busy}>{busy ? t('text208') : config.actionLabel}</button></div>
     </ModalDialog> : null}
   </form>;
 }

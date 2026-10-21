@@ -1,3 +1,4 @@
+import { defaultAdsText } from '@/modules/ads/copy';
 import { OperationError } from '@/lib/operation-error';
 import { ADS_REPORT_DEFAULT_POLICY, type AdsReportPolicy } from './report-policy';
 
@@ -29,32 +30,32 @@ export function parseAdsFilters(params: AdsSearchParams, accountIds: readonly st
     const value = params[key];
     const values = Array.isArray(value) ? value : value === undefined ? [] : [value];
     if (values.some(item => item.length > policy.maxFilterCharacters)) {
-      errors[key] = `Keep this filter to ${policy.maxFilterCharacters} characters or fewer.`;
+      errors[key] = defaultAdsText('validation061', { value0: policy.maxFilterCharacters });
       if (key === 'account') accountFilterTooLong = true;
     }
     if (Array.isArray(value)) {
-      if (value.length !== 1) errors[key] = 'Choose one value for this filter.';
+      if (value.length !== 1) errors[key] = defaultAdsText('validation062');
       return value[0];
     }
     return value;
   };
   const requestedPeriod = single('period') ?? policy.defaultPreset;
   const preset = policy.presets.find(item => item.id === requestedPeriod);
-  if (!preset && requestedPeriod !== 'custom') errors.period = 'Choose an available date range.';
+  if (!preset && requestedPeriod !== 'custom') errors.period = defaultAdsText('validation063');
   const requestedAccount = single('account');
   const accountId = requestedAccount && requestedAccount !== 'all' ? requestedAccount : null;
   const unavailableAccount = Boolean(accountId && !accountIds.includes(accountId));
-  if (unavailableAccount && !accountFilterTooLong) errors.account = 'This account is unavailable. Choose an available account or All accounts.';
-  if (requestedAccount === '') errors.account = 'Choose an available account or All accounts.';
+  if (unavailableAccount && !accountFilterTooLong) errors.account = defaultAdsText('validation064');
+  if (requestedAccount === '') errors.account = defaultAdsText('validation065');
   const since = single('since'), until = single('until');
   let customStart: Date | null = null, customEnd: Date | null = null;
   if (requestedPeriod === 'custom') {
-    if (!isAdsReportDay(since)) errors.since = 'Enter a valid start date.';
+    if (!isAdsReportDay(since)) errors.since = defaultAdsText('validation066');
     else customStart = new Date(`${since}T00:00:00.000Z`);
-    if (!isAdsReportDay(until)) errors.until = 'Enter a valid end date.';
+    if (!isAdsReportDay(until)) errors.until = defaultAdsText('validation067');
     else customEnd = new Date(`${until}T00:00:00.000Z`);
-    if (customStart && customEnd && customStart > customEnd) errors.until = 'End date must be on or after start date.';
-    if (customStart && customEnd && Math.floor((customEnd.getTime() - customStart.getTime()) / DAY) + 1 > policy.maxRangeDays) errors.until = `Choose a date range of ${policy.maxRangeDays} days or fewer.`;
+    if (customStart && customEnd && customStart > customEnd) errors.until = defaultAdsText('validation068');
+    if (customStart && customEnd && Math.floor((customEnd.getTime() - customStart.getTime()) / DAY) + 1 > policy.maxRangeDays) errors.until = defaultAdsText('validation069', { value0: policy.maxRangeDays });
   }
   if (Object.keys(errors).length) throw new AdsFilterError(errors, unavailableAccount && !accountFilterTooLong && Object.keys(errors).length === 1 && !Array.isArray(params.account) ? 'unavailable' : 'invalid_request');
   if (customStart && customEnd) return { period: 'custom', since: customStart, until: new Date(customEnd.getTime() + DAY), accountId };

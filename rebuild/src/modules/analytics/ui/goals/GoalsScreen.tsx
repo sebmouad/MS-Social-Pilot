@@ -1,3 +1,4 @@
+import { analyticsCopy } from '../../server/copy';
 import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { PageFrame } from '@/server/PageFrame';
@@ -12,7 +13,8 @@ import { GoalEditor } from './GoalEditor';
 export default async function GoalsPage() {
   const viewer = await requireViewer({ feature: 'analytics/goals', channelScoped: true });
   const locale = goalsLocale((await headers()).get('accept-language'));
-  const t = (key: GoalsCopyKey, values?: Record<string, string | number>) => goalsText(locale, key, values);
+  const { goals: copy } = await analyticsCopy();
+  const t = (key: GoalsCopyKey, values?: Record<string, string | number>) => goalsText(locale, key, values, copy);
   const number = new Intl.NumberFormat(locale);
   let failure = ''; let data: Awaited<ReturnType<typeof readGoals>> | null = null;
   try { data = await readGoals({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); }
@@ -24,10 +26,10 @@ export default async function GoalsPage() {
     {data?.channels.map(channel => <section key={channel.channelId} className={styles.panel} aria-labelledby={`goal-${channel.channelId}`}>
       <h2 id={`goal-${channel.channelId}`}>{channel.channelName}</h2>
       {channel.goals.length ? <div className={styles.tableWrap}><table><thead><tr><th scope="col">{t('goal')}</th><th scope="col">{t('target')}</th><th scope="col">{t('thisMonth')}</th><th scope="col">{t('progress')}</th><th scope="col">{t('pace')}</th></tr></thead><tbody>
-        {channel.goals.map(g => <tr key={g.metric}><td>{goalMetricText(locale, g.metric)}</td><td>{number.format(g.target)}</td><td>{g.actual === null ? t('noData') : number.format(g.actual)}</td><td><progress max={100} value={g.percent} aria-label={`${goalMetricText(locale, g.metric)} ${g.percent}%`} /> {g.percent}%</td><td>{goalPaceText(locale, g.pace)}</td></tr>)}
+        {channel.goals.map(g => <tr key={g.metric}><td>{goalMetricText(locale, g.metric, copy)}</td><td>{number.format(g.target)}</td><td>{g.actual === null ? t('noData') : number.format(g.actual)}</td><td><progress max={100} value={g.percent} aria-label={`${goalMetricText(locale, g.metric, copy)} ${g.percent}%`} /> {g.percent}%</td><td>{goalPaceText(locale, g.pace, copy)}</td></tr>)}
       </tbody></table></div> : <p>{data.canManage ? t('none') : t('noneReadOnly')}</p>}
-      {data.canManage && <GoalEditor locale={locale} channelId={channel.channelId} channelName={channel.channelName}
-        metrics={channel.trackable.map(metric => ({ metric, label: goalMetricText(locale, metric), value: channel.goals.find(g => g.metric === metric)?.target ?? null }))} />}
+      {data.canManage && <GoalEditor copy={copy} locale={locale} channelId={channel.channelId} channelName={channel.channelName}
+        metrics={channel.trackable.map(metric => ({ metric, label: goalMetricText(locale, metric, copy), value: channel.goals.find(g => g.metric === metric)?.target ?? null }))} />}
     </section>)}
   </div></PageFrame>;
 }

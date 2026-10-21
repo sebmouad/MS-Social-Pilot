@@ -1,3 +1,5 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import { loadAdsReadPolicy } from '../server/read-policy';
 import { assertAdsResultCeiling, validateAdsResultCeiling } from '../result-ceiling';
 import { OperationError } from '@/lib/operation-error';
@@ -15,11 +17,12 @@ export const adsDirectoryToolDefinitions = [
     inputSchema: { type: 'object', required: ['accountId', 'level', 'objectId'], properties: { ...range, level: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, objectId: { type: 'string' } }, additionalProperties: false } },
 ];
 export async function executeAdsDirectoryTool(actor: AdsReadActor, name: string, args: Record<string, unknown>, maxResultItems?: number) {
+  return withAdsCopySnapshot(async () => {
   validateAdsResultCeiling(maxResultItems);
   if (name === 'list_ads_objects') {
     const input = { ...args };
     if (maxResultItems !== undefined) {
-      if (typeof input.limit === 'number' && input.limit > maxResultItems) throw new OperationError('invalid_request', 'The page size exceeds the current result limit.');
+      if (typeof input.limit === 'number' && input.limit > maxResultItems) throw new OperationError('invalid_request', await adsServiceText('service087'));
       if (input.limit === undefined) input.limit = Math.min(maxResultItems, (await loadAdsReadPolicy()).pageSize);
     }
     const result = await readAdsDirectory(actor, input);
@@ -31,5 +34,7 @@ export async function executeAdsDirectoryTool(actor: AdsReadActor, name: string,
     assertAdsResultCeiling(result, maxResultItems);
     return result;
   }
-  throw new OperationError('invalid_request', 'Unknown Ads directory tool.');
+  throw new OperationError('invalid_request', await adsServiceText('service088'));
+
+  });
 }

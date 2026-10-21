@@ -1,8 +1,10 @@
 import { z } from 'zod';
+import { customerCopy, customerCopySchema } from './ui/copy';
 import { entry } from '@/lib/config/entry';
 
 /** Root-owned Tasks settings (prefix `tasks.`). Registered by the installed module host. */
 export const TASKS_CONFIG = [
+  entry({ key: 'tasks.customerCopy', group: 'Tasks', label: 'Customer copy', kind: 'json', description: 'English and French customer screen labels, feedback and empty states.', defaultValue: customerCopy, schema: customerCopySchema, consumption: 'active' }),
   entry({ key: 'tasks.titleMaxCharacters', group: 'Tasks', label: 'Task title limit', kind: 'number', description: 'Maximum characters in a task title.', defaultValue: 200, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'tasks.notesMaxCharacters', group: 'Tasks', label: 'Task notes limit', kind: 'number', description: 'Maximum characters in task notes.', defaultValue: 2000, schema: z.number().int().min(1).max(20000), consumption: 'active' }),
   entry({ key: 'tasks.commentMaxCharacters', group: 'Tasks', label: 'Task comment limit', kind: 'number', description: 'Maximum characters in one task comment. The database accepts at most 20,000.', defaultValue: 2000, schema: z.number().int().min(1).max(20000), consumption: 'active' }),

@@ -1,13 +1,13 @@
 'use client';
-import { uiCopy, type UiLocale } from './copy';
+import { uiCopy, type CustomerCopy, type UiLocale } from './copy';
 import { useState } from 'react';
 import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import styles from './agency.module.css';
 
 /** Switches the signed-in session to one administered workspace, then opens the destination there. */
-export function WorkspaceAction({ workspaceId, workspaceName, href, label, variant = 'secondary', locale = 'en' }: { workspaceId: string; workspaceName: string; href: string; label: string; locale?: UiLocale; variant?: 'primary' | 'secondary' | 'quiet' }) {
-  const t = uiCopy(locale);
+export function WorkspaceAction({ workspaceId, workspaceName, href, label, variant = 'secondary', locale = 'en', copy }: { workspaceId: string; workspaceName: string; href: string; label: string; copy?: CustomerCopy; locale?: UiLocale; variant?: 'primary' | 'secondary' | 'quiet' }) {
+  const t = uiCopy(locale, copy);
   const toast = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');

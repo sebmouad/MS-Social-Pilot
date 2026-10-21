@@ -1,4 +1,5 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => CONFIG_BY_KEY.get(key)?.defaultValue }));
 import { CONFIG_BY_KEY, safeConfigShape } from '@/lib/config/registry';
 import { PERSON_KEYS_CONFIG } from '@/modules/settings/person-keys/config';
 import { BEARER_SHAPE } from '@/server/mcp/bearer';

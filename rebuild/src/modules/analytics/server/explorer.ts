@@ -1,3 +1,5 @@
+import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { ANALYTICS_EXPLORER_CONFIG } from '../explorer-config';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
@@ -26,14 +28,15 @@ function metricView(metric: Awaited<ReturnType<typeof readAnalyticsSnapshot>>['a
 }
 
 export async function readAnalyticsExplorer(actor: Actor, rawInput: unknown = {}, constraints: AnalyticsReadConstraints = {}, responseCap?: number): Promise<AnalyticsExplorerResult> {
+  try {
   for (const definition of ANALYTICS_EXPLORER_CONFIG) {
-    if (!definition.schema.safeParse(await runtimeConfig(definition.key)).success) throw new OperationError('unavailable', 'Analytics Explorer settings are unavailable.');
+    if (!definition.schema.safeParse(await runtimeConfig(definition.key)).success) throw await analyticsError('unavailable', "Analytics Explorer settings are unavailable.");
   }
   const [explorerSearchLimit, readerSearchLimit, pageSize, detailSize] = await Promise.all([
     runtimeConfig('analytics.explorerSearchMaxCharacters'), runtimeConfig('analytics.searchMaxLength'), runtimeConfig('analytics.explorerPageSize'), runtimeConfig('analytics.detailPageSize'),
   ]).then(values => values.map(Number));
-  if ([explorerSearchLimit, readerSearchLimit, pageSize, detailSize].some(value => !Number.isSafeInteger(value) || value < 1)) throw new OperationError('unavailable', 'Analytics Explorer settings are unavailable.');
-  if (responseCap !== undefined && (!Number.isSafeInteger(responseCap) || responseCap < 1)) throw new OperationError('invalid_request', 'Choose a valid Analytics result limit.');
+  if ([explorerSearchLimit, readerSearchLimit, pageSize, detailSize].some(value => !Number.isSafeInteger(value) || value < 1)) throw await analyticsError('unavailable', "Analytics Explorer settings are unavailable.");
+  if (responseCap !== undefined && (!Number.isSafeInteger(responseCap) || responseCap < 1)) throw await analyticsError('invalid_request', "Choose a valid Analytics result limit.");
   const searchLimit = Math.min(explorerSearchLimit, readerSearchLimit);
   const boundedPageSize = responseCap === undefined ? pageSize : Math.min(pageSize, Math.max(1, Math.trunc(responseCap)));
   const boundedDetailSize = responseCap === undefined ? detailSize : Math.min(detailSize, Math.max(1, Math.trunc(responseCap)));
@@ -64,4 +67,6 @@ export async function readAnalyticsExplorer(actor: Actor, rawInput: unknown = {}
     detail,
     query: canonical(snapshot.query, input, { page: page.page, pointPage: detail?.points.page, rowPage: detail?.rows.page }),
   };
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }

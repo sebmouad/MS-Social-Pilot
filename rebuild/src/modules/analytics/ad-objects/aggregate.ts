@@ -1,3 +1,4 @@
+import { recordsCopyDefaults, type RecordsCopy } from '../records-copy';
 import type { AdsDailyRow } from '@/modules/ads/report-data';
 export type Observation = Omit<AdsDailyRow, 'spend' | 'impressions' | 'clicks' | 'reach'> & { parentId: string | null; spend: number | null; impressions: number | null; clicks: number | null; reach: number | null };
 const finite = (v: number | null) => v !== null && Number.isFinite(v);
@@ -41,12 +42,11 @@ export function sortAdObjects(items: readonly AdObject[], sort: AdObjectSort, di
     return sign * (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) || tie();
   });
 }
-export function adObjectsCsv(items: readonly AdObject[], start: string, end: string, locale: 'en' | 'fr') {
-  const missing = locale === 'fr' ? 'Non disponible' : 'Not available';
+export function adObjectsCsv(items: readonly AdObject[], start: string, end: string, locale: 'en' | 'fr', copy: RecordsCopy = recordsCopyDefaults) {
+  const missing = copy['Not available'][locale];
   const cell = (v: unknown) => { const s = v === null || v === undefined ? missing : typeof v === 'object' ? JSON.stringify(v) : String(v); return `"${(/^[=+\-@\t\r\n]/.test(s) ? "'" : '') + s.replaceAll('"', '""')}"`; };
-  const en = ['Kind', 'Start UTC inclusive', 'End UTC inclusive', 'Account', 'Account ID', 'Currency (account metadata)', 'Level', 'Object', 'Object ID', 'Parent ID', 'Covered days', 'Requested days', 'Date UTC', 'Fetched UTC', 'Spend', 'Impressions', 'Clicks', 'Reach snapshot', 'Reach date UTC', 'Cost per click', 'Cost per 1000 impressions', 'Click rate %', 'Frequency snapshot', 'Cost per person snapshot', 'Actions (unaggregated)', 'Additional fields (unaggregated)', 'Redacted paths'];
-  const fr = ['Type', 'Début UTC inclus', 'Fin UTC incluse', 'Compte', 'ID du compte', 'Devise (métadonnées du compte)', 'Niveau', 'Objet', 'ID de l’objet', 'ID parent', 'Jours couverts', 'Jours demandés', 'Date UTC', 'Collecté UTC', 'Dépenses', 'Impressions', 'Clics', 'Portée instantanée', 'Date de portée UTC', 'Coût par clic', 'Coût pour 1000 impressions', 'Taux de clic %', 'Fréquence instantanée', 'Coût par personne instantané', 'Actions (non agrégées)', 'Champs supplémentaires (non agrégés)', 'Chemins masqués'];
-  const rows: unknown[][] = [locale === 'fr' ? fr : en];
+  const keys = ["Kind", "Start UTC inclusive", "End UTC inclusive", "Account", "Account ID", "Currency (account metadata)", "Level", "Object", "Object ID", "Parent ID", "Covered days", "Requested days", "Date UTC", "Fetched UTC", "Spend", "Impressions", "Clicks", "Reach snapshot", "Reach date UTC", "Cost per click", "Cost per 1000 impressions", "Click rate %", "Frequency snapshot", "Cost per person snapshot", "Actions (unaggregated)", "Additional fields (unaggregated)", "Redacted paths"] as const;
+  const rows: unknown[][] = [keys.map(key => copy[key][locale])];
   for (const item of items) {
     const base = (parentId: string | null) => [start, end, item.accountName, item.accountId, item.currency, item.level, item.name, item.objectId, parentId, item.coveredDays, item.requestedDays];
     rows.push(['summary', ...base(item.parentConsistent ? item.parentId : null), null, item.lastFetchedAt, item.spend, item.impressions, item.clicks, item.reach, item.reachDate, item.cpc, item.cpm, item.ctr, item.frequency, item.cpp, null, null, null]);

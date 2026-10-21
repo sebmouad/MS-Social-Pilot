@@ -1,3 +1,7 @@
+import { defaultAnalyticsError } from '@/modules/analytics/error-copy';
+import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
+import { errorCopyDefaults } from '@/modules/analytics/error-copy';
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
@@ -12,7 +16,8 @@ export const cleanSections = (value: unknown): ReportSectionId[] => (Array.isArr
 const supportedIn = (section: string) => (REPORT_SUPPORTED_SECTIONS as readonly string[]).includes(section);
 
 export async function listReportTemplates(actor: ReportActor, input: unknown = {}) {
-  const parsed = listSchema.safeParse(input ?? {}); if (!parsed.success) throw bad('Choose a valid result page.');
+  try {
+  const parsed = listSchema.safeParse(input ?? {}); if (!parsed.success) throw bad( errorCopyDefaults["Choose a valid result page."].en);
   const auth = await authorizeReport(actor, 'read');
   requireWorkspaceWide(actor);
   const limits = await reportLimits();
@@ -24,9 +29,12 @@ export async function listReportTemplates(actor: ReportActor, input: unknown = {
   const templates: ReportTemplateView[] = rows.slice(0, size).map(r => ({ id: r.id, name: r.name, sections: cleanSections(r.sections), rangeKey: r.rangeKey as ReportTemplateView['rangeKey'], createdAt: r.createdAt, scheduleCount: Number(r.scheduleCount) }));
   // `sections` is every stored identifier (unchanged); `selectableSections` is what a new choice may include today.
   return { ok: true as const, templates, page: parsed.data.page, hasMore: rows.length > size, sections: REPORT_SECTION_IDS, selectableSections: (await recapOffered(actor)) ? REPORT_SUPPORTED_SECTIONS : REPORT_SUPPORTED_SECTIONS.filter(s => s !== 'aiRecap'), canManage: auth.canManage };
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }
 
 export async function manageReportTemplate(actor: ReportActor, input: unknown) {
+  try {
   const parsed = templateActionSchema.safeParse(input); if (!parsed.success) throw bad();
   const value = parsed.data;
   const expected = value.action === 'create' ? reportConfirmation.createTemplate(value.name) : value.action === 'update' ? reportConfirmation.updateTemplate(value.id) : reportConfirmation.deleteTemplate(value.id);
@@ -34,17 +42,17 @@ export async function manageReportTemplate(actor: ReportActor, input: unknown) {
   await authorizeReport(actor, 'write', { manager: true });
   requireWorkspaceWide(actor);
   const limits = await reportLimits();
-  if (value.action !== 'delete' && [...value.name].length > limits.nameMax) throw bad(`Use a name of ${limits.nameMax} characters or fewer.`);
+  if (value.action !== 'delete' && [...value.name].length > limits.nameMax) throw bad(defaultAnalyticsError('Use a name of {0} characters or fewer.', limits.nameMax));
   const aiOk = value.action !== 'delete' && value.sections.includes('aiRecap') ? await recapOffered(actor) : true;
   const supported = (section: string) => supportedIn(section) && (section !== 'aiRecap' || aiOk);
   const unsupportedNew = (list: readonly ReportSectionId[], stored: readonly string[] = []) => list.filter(s => !supported(s) && !stored.includes(s));
-  if (value.action === 'create' && unsupportedNew(value.sections).length) throw bad('Choose only report sections that are available.');
+  if (value.action === 'create' && unsupportedNew(value.sections).length) throw bad( errorCopyDefaults["Choose only report sections that are available."].en);
   try {
     return await transact(actor.workspaceId, limits, async tx => {
       await lockActor(tx, actor);
       if (value.action === 'create') {
         const count = Number((await tx.$queryRaw<Array<{ count: bigint | number }>>`SELECT COUNT(*) AS count FROM report_templates WHERE "workspaceId" = ${actor.workspaceId}`)[0]?.count ?? 0);
-        if (count >= limits.maxTemplates) throw new OperationError('conflict', 'This workspace has reached its report template limit. Delete one first.');
+        if (count >= limits.maxTemplates) throw await analyticsError('conflict', "This workspace has reached its report template limit. Delete one first.");
         const id = randomUUID();
         await tx.$executeRaw`INSERT INTO report_templates (id, "workspaceId", name, sections, "rangeKey", "createdAt") VALUES (${id}, ${actor.workspaceId}, ${value.name}, ${JSON.stringify(value.sections)}::jsonb, ${value.rangeKey}, NOW())`;
         await audit(tx, actor, 'analytics.report_template_created', { templateId: id, sections: value.sections.length, rangeKey: value.rangeKey });
@@ -54,7 +62,7 @@ export async function manageReportTemplate(actor: ReportActor, input: unknown) {
       if (!found.length) throw missing();
       if (value.action === 'update') {
         // A legacy template keeps the choices it already stores; nothing new unsupported can be added.
-        if (unsupportedNew(value.sections, cleanSections(found[0]!.sections)).length) throw bad('Choose only report sections that are available.');
+        if (unsupportedNew(value.sections, cleanSections(found[0]!.sections)).length) throw bad( errorCopyDefaults["Choose only report sections that are available."].en);
         const changed = await tx.$executeRaw`UPDATE report_templates SET name = ${value.name}, sections = ${JSON.stringify(value.sections)}::jsonb, "rangeKey" = ${value.rangeKey} WHERE id = ${value.id} AND "workspaceId" = ${actor.workspaceId}`;
         if (!changed) throw missing();
         await audit(tx, actor, 'analytics.report_template_updated', { templateId: value.id, sections: value.sections.length, rangeKey: value.rangeKey });
@@ -67,7 +75,9 @@ export async function manageReportTemplate(actor: ReportActor, input: unknown) {
       return { ok: true as const, action: value.action, id: value.id, detachedSchedules: Number(detached) };
     });
   } catch (error) {
-    if (isUnique(error)) throw new OperationError('conflict', 'A report template with this name already exists.');
+    if (isUnique(error)) throw await analyticsError('conflict', "A report template with this name already exists.");
     throw error;
   }
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }

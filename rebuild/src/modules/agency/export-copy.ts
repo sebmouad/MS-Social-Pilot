@@ -1,3 +1,4 @@
+import { z } from 'zod';
 /** Copy belongs to Agency; JSON field names remain stable in both locales. */
 export const agencyExportCopy = {
   en: {
@@ -31,3 +32,12 @@ export const agencyExportCopy = {
 } as const;
 export type AgencyExportLocale = keyof typeof agencyExportCopy;
 export const agencyExportLocale = (language: string | null): AgencyExportLocale => language?.trim().toLowerCase().startsWith('fr') ? 'fr' : 'en';
+
+export type AgencyExportCatalog = { [L in keyof typeof agencyExportCopy]: { [K in keyof typeof agencyExportCopy[L]]: string } };
+/** Root uses the same per-key English/French shape as the screen catalogs. */
+export const agencyExportCatalog = Object.fromEntries(Object.keys(agencyExportCopy.en).map(key => [key, { en: agencyExportCopy.en[key as keyof typeof agencyExportCopy.en], fr: agencyExportCopy.fr[key as keyof typeof agencyExportCopy.fr] }])) as { [K in keyof typeof agencyExportCopy.en]: { en: string; fr: string } };
+export const agencyExportCopySchema = z.object(Object.fromEntries(Object.keys(agencyExportCatalog).map(key => [key, z.object({ en: z.string().min(1).max(4000), fr: z.string().min(1).max(4000) }).strict()])) as { [K in keyof typeof agencyExportCatalog]: z.ZodObject<{ en: z.ZodString; fr: z.ZodString }> }).strict();
+export function exportCopyByLocale(catalog: typeof agencyExportCatalog): AgencyExportCatalog {
+  const locale = (language: 'en' | 'fr') => Object.fromEntries(Object.entries(catalog).map(([key, value]) => [key, value[language]]));
+  return { en: locale('en'), fr: locale('fr') } as AgencyExportCatalog;
+}

@@ -1,3 +1,4 @@
+import { defaultAdsText } from '@/modules/ads/copy';
 /**
  * Provider-neutral Ads analysis. Pure functions over stored daily rows:
  * totals are recomputed from additive flows (spend, impressions, clicks), never
@@ -93,14 +94,14 @@ export function buildFindings(input: { current: AdsTotals; previous: AdsTotals |
 }
 
 const FINDING_TEXT: Record<AdsFindingKey, (p: Record<string, string | number>) => string> = {
-  noSpend: () => 'No spend was recorded in this period.',
-  cpcDown: p => `Cost per click fell ${p.percent}% compared with the previous period.`,
-  cpcUp: p => `Cost per click rose ${p.percent}% compared with the previous period.`,
-  ctrUp: p => `Click-through rate rose ${p.percent}% compared with the previous period.`,
-  ctrDown: p => `Click-through rate fell ${p.percent}% compared with the previous period.`,
-  concentrated: p => `${p.name} accounts for ${p.share}% of spend.`,
-  bestCtr: p => `${p.name} has a click-through rate ${p.ratio} times the account average.`,
-  costlyClicks: p => `Clicks on ${p.name} cost ${p.ratio} times the account average.`,
+  noSpend: () => defaultAdsText('validation038'),
+  cpcDown: p => defaultAdsText('validation039', { value0: p.percent }),
+  cpcUp: p => defaultAdsText('validation040', { value0: p.percent }),
+  ctrUp: p => defaultAdsText('validation041', { value0: p.percent }),
+  ctrDown: p => defaultAdsText('validation042', { value0: p.percent }),
+  concentrated: p => defaultAdsText('findingConcentrated', { name: p.name, share: p.share }),
+  bestCtr: p => defaultAdsText('findingBestCtr', { name: p.name, ratio: p.ratio }),
+  costlyClicks: p => defaultAdsText('validation043', { value0: p.name, value1: p.ratio }),
 };
 export const findingMessage = (finding: AdsFinding) => FINDING_TEXT[finding.key](finding.params);
 

@@ -1,4 +1,4 @@
-import { OperationError } from '@/lib/operation-error';
+import { copyError, withCustomerCopy } from './copy';
 import { prisma } from '@/server/data';
 import { canUseFeature, canUseModule, loadEntitlements, type Entitlements } from '@/server/entitlements';
 import { canAccessFeature, type ScopedPermissions } from '@/server/permissions';
@@ -25,7 +25,7 @@ export function featureAllowed(access: Pick<TasksAccess, 'permissions' | 'ceilin
   return canAccessFeature(access.permissions, feature, mode) && (!access.ceiling || canAccessFeature(access.ceiling, feature, mode));
 }
 
-const denied = () => new OperationError('forbidden', 'Tasks are unavailable for your role in this workspace.');
+const denied = () => copyError('forbidden', 'Tasks are unavailable for your role in this workspace.');
 
 /** Current grants narrowed by an MCP key ceiling. A ceiling can never widen what the member holds now. */
 export function effectiveTargetIds(grants: ScopedPermissions['pageScope'], ceiling: readonly string[] | undefined): readonly string[] | undefined {
@@ -39,11 +39,11 @@ export function effectiveTargetIds(grants: ScopedPermissions['pageScope'], ceili
  * and feature entitlement, the feature's read/write permission, role, workspace state and channel scope.
  * Entry points (pages, HTTP, MCP) call the services, which call this; hiding a control is never the check.
  */
-export async function authorizeTasks(actor: TasksActor, mode: 'read' | 'write'): Promise<TasksAccess> {
+async function authorizeTasksImpl(actor: TasksActor, mode: 'read' | 'write'): Promise<TasksAccess> {
   const rows = await prisma.$queryRaw<Array<{ role: string; timezone: string; suspendedAt: Date | null }>>`SELECT m.role::text AS role, w.timezone, w."suspendedAt" FROM memberships m JOIN users u ON u.id = m."userId" JOIN workspaces w ON w.id = m."workspaceId" WHERE m."workspaceId" = ${actor.workspaceId} AND m."userId" = ${actor.userId} AND u."disabledAt" IS NULL`;
   const row = rows[0];
   if (!row || !(mode === 'write' ? TASK_WRITE_ROLES : TASK_READ_ROLES).includes(row.role)) throw denied();
-  if (row.suspendedAt && mode === 'write') throw new OperationError('forbidden', 'This workspace is suspended.');
+  if (row.suspendedAt && mode === 'write') throw copyError('forbidden', 'This workspace is suspended.');
   const [entitlements, permissions] = await Promise.all([
     loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }),
     loadPermissions(actor.userId, actor.workspaceId),
@@ -55,3 +55,5 @@ export async function authorizeTasks(actor: TasksActor, mode: 'read' | 'write'):
   const canWrite = TASK_WRITE_ROLES.includes(row.role) && !row.suspendedAt && featureAllowed({ permissions, ceiling: actor.permissionCeiling }, TASKS_FEATURE_ID, 'write');
   return { role: row.role, timeZone: row.timezone, entitlements, permissions, targetIds: effectiveTargetIds(permissions.pageScope, actor.allowedTargetIds), ceiling: actor.permissionCeiling, canWrite };
 }
+
+export const authorizeTasks = (...args: Parameters<typeof authorizeTasksImpl>) => withCustomerCopy(() => authorizeTasksImpl(...args));

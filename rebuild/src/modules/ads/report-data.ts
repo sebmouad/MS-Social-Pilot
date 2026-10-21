@@ -1,3 +1,4 @@
+import { defaultAdsText } from '@/modules/ads/copy';
 import { OperationError } from '@/lib/operation-error';
 import type { InsightRow } from '@/modules/ads/server/summary';
 
@@ -25,7 +26,7 @@ export type AdsDailyRow = {
   redactedPaths: string[];
 };
 
-const SAFE_UNAVAILABLE = 'Advertising report data is temporarily unavailable.';
+const SAFE_UNAVAILABLE = defaultAdsText('validation059');
 const REDACTED = '[REDACTED]';
 const CREDENTIAL_KEYS = new Set([
   'authorization', 'clientsecret', 'appsecret', 'password', 'passwd', 'cookie', 'setcookie', 'secret', 'token',

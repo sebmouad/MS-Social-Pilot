@@ -26,7 +26,7 @@ describe('Tasks manifest', () => {
   it('keeps every Root key in the manifest namespace and consumes every setting', () => {
     const keys = TASKS_CONFIG.map(item => item.key);
     expect(new Set(keys).size).toBe(keys.length);
-    const service = read('src/modules/tasks/server/tasks.ts');
+    const service = read('src/modules/tasks/server/tasks.ts') + read('src/modules/tasks/server/copy.ts');
     for (const entry of TASKS_CONFIG) {
       expect(tasksManifest.rootSettingsPrefixes.some(prefix => entry.key.startsWith(prefix))).toBe(true);
       expect(entry.schema.safeParse(entry.defaultValue).success).toBe(true);
@@ -110,7 +110,7 @@ describe('Tasks comments migration', () => {
     expect(readFileSync(join(migrations, '20261024100000_workspace_data_purges', 'migration.sql'), 'utf8')).toContain('CREATE FUNCTION rebuild_reject_purging_workspace_write()');
   });
   it('matches the columns the service reads and writes', () => {
-    const service = read('src/modules/tasks/server/tasks.ts');
+    const service = read('src/modules/tasks/server/tasks.ts') + read('src/modules/tasks/server/copy.ts');
     for (const column of ['"id"', '"taskId"', '"workspaceId"', '"authorId"', '"body"', '"createdAt"']) expect(sql).toContain(`${column} `);
     expect(service).toContain('INSERT INTO task_comments (id, "taskId", "workspaceId", "authorId", body, "createdAt")');
   });

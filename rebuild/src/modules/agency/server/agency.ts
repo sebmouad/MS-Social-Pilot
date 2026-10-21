@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
-import { OperationError } from '@/lib/operation-error';
+import { copyError, copyText, withCustomerCopy } from './copy';
 import { listTeamInvitations } from '@/modules/settings/server/invitations';
 import {
   AGENCY_CLIENTS_FEATURE_ID, AGENCY_GROUPS, AGENCY_OVERVIEW_FEATURE_ID, AGENCY_SORTS,
@@ -17,7 +17,7 @@ const OVERVIEW_FILTERS = z.object({
 }).strict();
 const CLIENT_FILTERS = z.object({ q: z.string().trim().optional() }).strict();
 
-const unavailable = () => new OperationError('unavailable', 'Agency views are currently unavailable.');
+const unavailable = () => copyError('unavailable', 'Agency views are currently unavailable.');
 const count = (max: number, min = 1) => z.number().int().min(min).max(max);
 const CONFIG_KEYS = [
   'agency.workspaceLimit', 'agency.failureWindowDays', 'agency.clientListLimit', 'agency.searchMaxLength', 'agency.accessConcurrency',
@@ -36,11 +36,11 @@ async function bounds() {
 }
 
 /** The longest search text Agency accepts, for form inputs. */
-export async function agencySearchLimit(): Promise<number> { return (await bounds()).searchMaxLength; }
+async function agencySearchLimitImpl(): Promise<number> { return (await bounds()).searchMaxLength; }
 
 function searchText(raw: string | undefined, max: number): string | undefined {
   if (!raw) return undefined;
-  if (raw.length > max) throw new OperationError('invalid_request', `Search text can be at most ${max} characters.`);
+  if (raw.length > max) throw copyError('invalid_request', copyText("Search text can be at most {0} characters.", max));
   return raw;
 }
 
@@ -54,7 +54,7 @@ async function scope(actor: AgencyActor, featureId: string, config: Awaited<Retu
   const rows = await administeredWorkspaces(actor, config.workspaceLimit, search);
   const truncated = rows.length > config.workspaceLimit;
   const items = await classifyWorkspaces(actor, rows.slice(0, config.workspaceLimit), featureId, config.concurrency);
-  if (rows.length > 0 && items.length === 0) throw new OperationError('forbidden', 'Agency is not available for your workspaces.');
+  if (rows.length > 0 && items.length === 0) throw copyError('forbidden', 'Agency is not available for your workspaces.');
   return { items, truncated };
 }
 
@@ -135,9 +135,9 @@ function compare(a: AgencyWorkspace, b: AgencyWorkspace, key: Exclude<(typeof AG
  * the workspaces that matched the name search (all of them without one), up to the Root workspace limit, and
  * ignore the attention filter, which only narrows the table. `filtered` tells the reader which of those applies.
  */
-export async function agencyOverview(actor: AgencyActor, rawFilters: unknown = {}, now: Date = new Date()): Promise<AgencyOverview> {
+async function agencyOverviewImpl(actor: AgencyActor, rawFilters: unknown = {}, now: Date = new Date()): Promise<AgencyOverview> {
   const parsed = OVERVIEW_FILTERS.safeParse(rawFilters);
-  if (!parsed.success) throw new OperationError('invalid_request', 'Choose valid agency filters.');
+  if (!parsed.success) throw copyError('invalid_request', 'Choose valid agency filters.');
   const filters = parsed.data;
   const config = await bounds();
   const text = searchText(filters.q, config.searchMaxLength);
@@ -168,9 +168,9 @@ type ClientRow = { workspaceId: string; userId: string; name: string; email: str
  * invitation of a selected, team-readable workspace is listed.
  * Client accounts are shown only where the person may read the workspace team.
  */
-export async function listAgencyClients(actor: AgencyActor, rawFilters: unknown = {}): Promise<AgencyClients> {
+async function listAgencyClientsImpl(actor: AgencyActor, rawFilters: unknown = {}): Promise<AgencyClients> {
   const parsed = CLIENT_FILTERS.safeParse(rawFilters);
-  if (!parsed.success) throw new OperationError('invalid_request', 'Choose valid agency filters.');
+  if (!parsed.success) throw copyError('invalid_request', 'Choose valid agency filters.');
   const config = await bounds();
   const text = searchText(parsed.data.q, config.searchMaxLength);
   const { items, truncated } = await scope(actor, AGENCY_CLIENTS_FEATURE_ID, config, text ? { text } : undefined);
@@ -204,3 +204,7 @@ export async function listAgencyClients(actor: AgencyActor, rawFilters: unknown 
   }
   return { ok: true, limit: config.workspaceLimit, truncated, filtered: Boolean(text), workspaces };
 }
+
+export const agencySearchLimit = (...args: Parameters<typeof agencySearchLimitImpl>) => withCustomerCopy(() => agencySearchLimitImpl(...args));
+export const agencyOverview = (...args: Parameters<typeof agencyOverviewImpl>) => withCustomerCopy(() => agencyOverviewImpl(...args));
+export const listAgencyClients = (...args: Parameters<typeof listAgencyClientsImpl>) => withCustomerCopy(() => listAgencyClientsImpl(...args));

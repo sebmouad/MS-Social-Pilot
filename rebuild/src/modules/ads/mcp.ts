@@ -1,3 +1,4 @@
+import { defaultAdsText } from '@/modules/ads/copy';
 import { readAdsCreationOptions } from './server/creation-options';
 import { listAdsAccounts, readAdsPerformance } from './server/performance';
 import { OperationError } from '@/lib/operation-error';
@@ -44,7 +45,7 @@ export const ADS_MCP: readonly McpToolGroup[] = [
     },
     writeTools: ['create_ad_campaign', 'create_ad_set', 'update_ad'],
     scope: { resourceTools: ['get_ads_report_rows', 'export_ads_report', 'list_ad_accounts', 'get_ad_creation_options', 'get_ads_performance', 'get_live_ad_status', 'create_ad_campaign', 'create_ad_set', 'update_ad'], resources: ['msp://ads/performance', 'msp://ads/daily'] },
-    managers: [{ tools: ADS_MANAGER_TOOLS, message: 'Only workspace owners and admins can manage ads.', hideFromList: true, inExecutor: true }],
+    managers: [{ tools: ADS_MANAGER_TOOLS, message: defaultAdsText('validation051'), hideFromList: true, inExecutor: true }],
     errorBoundary: adsErrorBoundary,
     lockedReads: ['get_live_ad_status'],
     resources: [
@@ -67,7 +68,7 @@ export const ADS_MCP: readonly McpToolGroup[] = [
         const adAccountId = requiredString(args, 'adAccountId');
         const objectId = requiredString(args, 'objectId');
         const objectType = requiredString(args, 'objectType') as 'campaign' | 'adset' | 'ad';
-        if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(objectId) || !['campaign', 'adset', 'ad'].includes(objectType)) throw new OperationError('invalid_request', 'Invalid ad object request.');
+        if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(objectId) || !['campaign', 'adset', 'ad'].includes(objectType)) throw new OperationError('invalid_request', defaultAdsText('validation052'));
         return readWorkspaceAdObject(adsActorFor(viewer), { adAccountId, objectId, objectType }, adsTargetIdsFor(viewer));
       }
       case 'get_ad_creation_options': return readAdsCreationOptions({ ...adsActorFor(viewer), allowedPlatformIds: entitledPlatformIds(viewer.entitlements) }, args);
@@ -89,8 +90,8 @@ export const ADS_MCP: readonly McpToolGroup[] = [
         const countryCode = requiredString(args, 'countryCode');
         const optimizationGoal = requiredString(args, 'optimizationGoal');
         const confirmation = requiredString(args, 'confirmation');
-        if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(campaignId) || typeof dailyBudgetMinor !== 'number' || !Number.isSafeInteger(dailyBudgetMinor) || dailyBudgetMinor < 1 || !/^[A-Z]{2}$/.test(countryCode)) throw new OperationError('invalid_request', 'Invalid ad set request.');
-        if (adsTargetIdsFor(viewer) !== undefined) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
+        if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(campaignId) || typeof dailyBudgetMinor !== 'number' || !Number.isSafeInteger(dailyBudgetMinor) || dailyBudgetMinor < 1 || !/^[A-Z]{2}$/.test(countryCode)) throw new OperationError('invalid_request', defaultAdsText('validation053'));
+        if (adsTargetIdsFor(viewer) !== undefined) throw new OperationError('forbidden', defaultAdsText('validation027'));
         const requestId = requiredString(args, 'requestId');
         const unrestricted = adsTargetIdsFor(viewer) === undefined;
         const result = await createWorkspaceAdSet(adsActorFor(viewer), { adAccountId, campaignId, name: nameValue, dailyBudgetMinor, countryCode, optimizationGoal, confirmation, requestId }, unrestricted);
@@ -104,7 +105,7 @@ export const ADS_MCP: readonly McpToolGroup[] = [
         const status = args.status === undefined ? undefined : requiredString(args, 'status') as AdMutationRequest['status'];
         const dailyBudgetMinor = args.dailyBudgetMinor;
         const lifetimeBudgetMinor = args.lifetimeBudgetMinor;
-        if ((dailyBudgetMinor !== undefined && typeof dailyBudgetMinor !== 'number') || (lifetimeBudgetMinor !== undefined && typeof lifetimeBudgetMinor !== 'number')) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units.');
+        if ((dailyBudgetMinor !== undefined && typeof dailyBudgetMinor !== 'number') || (lifetimeBudgetMinor !== undefined && typeof lifetimeBudgetMinor !== 'number')) throw new OperationError('invalid_request', defaultAdsText('validation011'));
         const confirmation = requiredString(args, 'confirmation');
         const requestId = requiredString(args, 'requestId');
         const result = await updateWorkspaceAd(adsActorFor(viewer), { adAccountId, objectId, objectType, status, dailyBudgetMinor, lifetimeBudgetMinor, confirmation, requestId });

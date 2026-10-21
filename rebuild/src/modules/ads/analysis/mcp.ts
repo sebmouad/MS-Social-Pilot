@@ -1,3 +1,5 @@
+import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
+import { adsServiceText } from '@/modules/ads/server/copy';
 import { assertAdsResultCeiling, validateAdsResultCeiling } from '../result-ceiling';
 import { OperationError } from '@/lib/operation-error';
 import type { AdsReadActor } from '../server/access';
@@ -20,18 +22,21 @@ export const adsAnalysisToolDefinitions = [{
   inputSchema: { type: 'object', properties: filters, additionalProperties: false },
 }];
 export async function executeAdsAnalysisTool(actor: AdsReadActor, name: string, args: Record<string, unknown>, maxResultItems?: number) {
-  if (name !== 'compare_ads_performance') throw new OperationError('invalid_request', 'Unknown Ads analysis tool.');
+  return withAdsCopySnapshot(async () => {
+  if (name !== 'compare_ads_performance') throw new OperationError('invalid_request', await adsServiceText('service071'));
   validateAdsResultCeiling(maxResultItems);
   const { format, exportKind, locale, ...filterArgs } = args;
-  if (format !== undefined && format !== 'json' && format !== 'csv') throw new OperationError('invalid_request', 'Choose json or csv.');
+  if (format !== undefined && format !== 'json' && format !== 'csv') throw new OperationError('invalid_request', await adsServiceText('service072'));
   if (format === 'csv') {
     const exported = await exportAdsComparison(actor, filterArgs, new Date(), { kind: exportKind, locale, resultLimit: maxResultItems });
     // A capped credential must never receive an export larger than its item ceiling.
-    if (maxResultItems !== undefined && exported.rowCount > maxResultItems) throw new OperationError('invalid_request', 'This export exceeds the result limit of this credential.');
+    if (maxResultItems !== undefined && exported.rowCount > maxResultItems) throw new OperationError('invalid_request', await adsServiceText('service073'));
     return exported;
   }
-  if (exportKind !== undefined || locale !== undefined) throw new OperationError('invalid_request', 'Export options require csv format.');
+  if (exportKind !== undefined || locale !== undefined) throw new OperationError('invalid_request', await adsServiceText('service074'));
   const result = await readAdsComparison(actor, filterArgs);
   assertAdsResultCeiling(result, maxResultItems);
   return result;
+
+  });
 }

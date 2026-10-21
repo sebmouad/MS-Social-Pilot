@@ -1,13 +1,13 @@
 "use client";
-import { uiCopy, type UiLocale } from './copy';
+import { uiCopy, type CustomerCopy, type UiLocale } from './copy';
 import { useState } from 'react';
 import { SidebarDock } from '@/components/SidebarDock';
 import { Button, Select, FilterPanel, FilterChips, TextInput } from '@/components';
 import { TASK_STATUSES, TASK_STATUS_LABELS } from '@/modules/tasks/tasks';
 import styles from './tasks.module.css';
 
-export function TaskFilters({ values, assignees, assigneesHasMore, locale = 'en' }: { values: { status: string; assignee: string; overdue: boolean; q: string; view: string }; assignees: Array<{ id: string; name: string }>; assigneesHasMore: boolean; locale?: UiLocale }) {
-  const t = uiCopy(locale);
+export function TaskFilters({ values, assignees, assigneesHasMore, locale = 'en', copy }: { values: { status: string; assignee: string; overdue: boolean; q: string; view: string }; assignees: Array<{ id: string; name: string }>; assigneesHasMore: boolean; copy?: CustomerCopy; locale?: UiLocale }) {
+  const t = uiCopy(locale, copy);
   const [draft, setDraft] = useState(values);
   const known = new Set(['', 'me', 'none', ...assignees.map(person => person.id)]);
   const filters = [

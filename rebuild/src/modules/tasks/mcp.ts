@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OperationError } from '@/lib/operation-error';
+import { copyError, withCustomerCopy } from './server/copy';
 import { TASK_STATUSES, type TasksActor } from './tasks';
 import { TASKS_TOOL_ACCESS, TASKS_FEATURE_ID } from './semantics';
 import { pageIdsFor, type McpToolGroup } from '@/server/mcp/kit';
@@ -30,16 +30,16 @@ export const tasksToolDefinitions = [
  * Run one Tasks tool. `actor.allowedTargetIds` is the key's channel ceiling and `ceiling` its result-size limit;
  * both reach the services, which intersect them with the member's current access on every call.
  */
-export async function executeTasksTool(actor: TasksActor, name: string, args: Record<string, unknown>, ceiling: number = TASKS_DEFAULT_RESULT_CEILING) {
+async function executeTasksToolImpl(actor: TasksActor, name: string, args: Record<string, unknown>, ceiling: number = TASKS_DEFAULT_RESULT_CEILING) {
   const options = { maxItems: ceiling };
   if (name === 'list_tasks') {
     const checked = z.object({ status: z.enum(TASK_STATUSES).optional(), assignee: z.string().max(200).optional(), overdue: z.boolean().optional(), q: z.string().max(200).optional(), offset: z.number().int().min(0).optional(), limit: z.number().int().min(1).max(1000).optional() }).strict().safeParse(args);
-    if (!checked.success) throw new OperationError('invalid_request', 'Choose valid task filters.');
+    if (!checked.success) throw copyError('invalid_request', 'Choose valid task filters.');
     return listTasks(actor, checked.data, options);
   }
   if (name === 'get_task') {
     const checked = z.object({ id: z.string().max(200), commentOffset: z.number().int().min(0).optional() }).strict().safeParse(args);
-    if (!checked.success) throw new OperationError('invalid_request', 'Choose a valid task.');
+    if (!checked.success) throw copyError('invalid_request', 'Choose a valid task.');
     return getTask(actor, checked.data.id, { ...options, ...(checked.data.commentOffset === undefined ? {} : { commentOffset: checked.data.commentOffset }) });
   }
   if (name === 'list_task_post_choices') return listTaskPostChoices(actor, args, options);
@@ -53,7 +53,7 @@ export async function executeTasksTool(actor: TasksActor, name: string, args: Re
     case 'delete_task': return performTaskAction(actor, { ...args, action: 'task.delete' });
     case 'add_task_comment': return performTaskAction(actor, { ...args, action: 'comment.add' });
     case 'delete_task_comment': return performTaskAction(actor, { ...args, action: 'comment.delete' });
-    default: throw new OperationError('invalid_request', 'Unknown task action.');
+    default: throw copyError('invalid_request', 'Unknown task action.');
   }
 }
 
@@ -83,3 +83,5 @@ export const TASKS_MCP: readonly McpToolGroup[] = [
     execute: (viewer, name, args, cap) => executeTasksTool({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer), ...(viewer.permissions ? { permissionCeiling: viewer.permissions } : {}) }, name, args, cap),
   },
 ];
+
+export const executeTasksTool = (...args: Parameters<typeof executeTasksToolImpl>) => withCustomerCopy(() => executeTasksToolImpl(...args));

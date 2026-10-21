@@ -1,3 +1,4 @@
+import { homeErrorCopy } from './copy';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfigBatch } from '@/server/config/store';
@@ -54,7 +55,7 @@ async function settled<T>(read: () => Promise<Section<T>>): Promise<Section<T>> 
  */
 export async function readHomeOverview(actor: HomeActor, now = new Date()): Promise<HomeOverview> {
   const [entitlements, permissions] = await Promise.all([loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }), loadPermissions(actor.userId, actor.workspaceId)]);
-  if (!entitlements || !permissions) throw new OperationError('forbidden', 'Home is unavailable in this workspace.');
+  if (!entitlements || !permissions) throw new OperationError('forbidden', (await homeErrorCopy()).homeUnavailable);
   const allowed = (feature: string) => canUseFeature(entitlements, feature) && canAccessFeature(permissions, feature, 'read');
   const config = await runtimeConfigBatch(KEYS) as Record<(typeof KEYS)[number], unknown>;
   const lookbackDays = Number(config['home.lookbackDays']), maxChannels = Number(config['home.maxChannels']);

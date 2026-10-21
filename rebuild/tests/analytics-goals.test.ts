@@ -7,6 +7,12 @@ const state = vi.hoisted(() => ({
   measureCalls: [] as Array<{ targetId: string; from: Date; to: Date }>, execs: [] as Array<{ sql: string; values: unknown[] }>, usable: ['c1', 'c2'],
 }));
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
+vi.mock('@/server/config/store', async () => { const { goalsCopyDefaults } = await import('@/modules/analytics/goals/copy'); return { runtimeConfig: async () => goalsCopyDefaults }; });
+vi.mock('@/modules/analytics/server/error-copy', async () => {
+  const { errorCopyDefaults } = await import('@/modules/analytics/error-copy');
+  const { OperationError } = await import('@/lib/operation-error');
+  return { analyticsError: async (code: import('@/lib/operation-error').OperationErrorCode, key: keyof typeof errorCopyDefaults) => new OperationError(code, errorCopyDefaults[key].en), analyticsLanguage: async () => 'en', localizeAnalyticsError: async (error: unknown) => error };
+});
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: (_w: string, fn: () => Promise<unknown>) => fn(), assertWorkspaceNotPurging: async () => undefined }));
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: async (_u: string, w: string) => ({ workspaceId: w }), entitledPlatformIds: () => ['facebook', 'other'] }));

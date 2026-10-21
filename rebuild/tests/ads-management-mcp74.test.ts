@@ -1,3 +1,4 @@
+vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
 import { beforeEach, expect, it, vi } from 'vitest';
 const service = vi.hoisted(() => ({ describeAdsManagement: vi.fn(), readAdsCreativeImage: vi.fn(), listAdsCreatives: vi.fn(), listAdsOperations: vi.fn(), performAdsManagement: vi.fn(), previewAdsManagement: vi.fn(), resolveAdsOperation: vi.fn() }));
 vi.mock('@/modules/ads/management/server', () => service);

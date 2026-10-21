@@ -1,9 +1,10 @@
+import { defaultAdsText } from '@/modules/ads/copy';
 import { OperationError } from '@/lib/operation-error';
 
 /** Safe public validation failure for an Ads report page number. */
 export class AdsPageError extends OperationError {
   constructor() {
-    super('invalid_request', 'Choose a valid report page.');
+    super('invalid_request', defaultAdsText('validation070'));
     this.name = 'AdsPageError';
   }
 }

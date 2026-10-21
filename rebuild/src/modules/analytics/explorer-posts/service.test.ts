@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({ user: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), catalog: vi.fn(), hook: vi.fn(), config: vi.fn(), use: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: { user: { findUnique: mocks.user } } }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: mocks.config }));
+vi.mock('@/server/config/store', async () => { const { recordsCopyDefaults } = await import('@/modules/analytics/records-copy'); const { errorCopyDefaults } = await import('@/modules/analytics/error-copy'); return { runtimeConfig: (key: string) => key === 'analytics.recordsCopy' ? Promise.resolve(recordsCopyDefaults) : key === 'analytics.errorCopy' ? Promise.resolve(errorCopyDefaults) : mocks.config(key) }; });
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, entitledPlatformIds: () => ['example'], canUseFeature: mocks.use }));
 vi.mock('@/server/permissions', () => ({ canAccessFeature: () => true }));
 vi.mock('@/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));

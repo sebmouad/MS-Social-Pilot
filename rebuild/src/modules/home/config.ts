@@ -1,8 +1,12 @@
 import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
+import { authCopyCatalogDefaults, authCopySchema } from './auth/copy';
+import { homeCopyCatalogDefaults, homeCopySchema } from './copy';
 
 /** Root-owned Home dashboard settings (prefix `home.`). Registered by the installed module host. */
 export const HOME_CONFIG = [
+  entry({ key: 'home.authCopy', group: 'Home · Sign in', label: 'Account access copy', kind: 'json', description: 'English and French signed-out account forms and messages. Route owners must pass this catalog to forms; currently retained as configurable defaults pending that integration.', defaultValue: authCopyCatalogDefaults, schema: authCopySchema, consumption: 'configured' }),
+  entry({ key: 'home.uiCopy', group: 'Home', label: 'Home copy', kind: 'json', description: 'English and French Home headings, figures, links and empty states. Keep named placeholders when editing templates.', defaultValue: homeCopyCatalogDefaults, schema: homeCopySchema, consumption: 'active' }),
   entry({ key: 'home.lookbackDays', group: 'Home', label: 'Overview period (days)', kind: 'number', description: 'Days shown on the Home overview and compared with the same number of days before.', defaultValue: 28, schema: z.number().int().min(7).max(90), consumption: 'active' }),
   entry({ key: 'home.maxChannels', group: 'Home', label: 'Channels read per overview', kind: 'number', description: 'Maximum selected channels whose stored figures feed the overview cards. Further channels are left out and the card says so.', defaultValue: 50, schema: z.number().int().min(1).max(500), consumption: 'active' }),
   entry({ key: 'home.topChannelsLimit', group: 'Home', label: 'Top channels shown', kind: 'number', description: 'Channels listed in the top channels chart.', defaultValue: 6, schema: z.number().int().min(1).max(20), consumption: 'active' }),

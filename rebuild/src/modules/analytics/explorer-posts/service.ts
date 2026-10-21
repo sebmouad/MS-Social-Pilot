@@ -1,3 +1,8 @@
+import { recordsCopyDefaults, type RecordsCopy } from '../records-copy';
+import { cache } from 'react';
+const recordsCopy = cache(() => runtimeConfig('analytics.recordsCopy'));
+import { localizeAnalyticsError } from '@/modules/analytics/server/error-copy';
+import { analyticsError } from '@/modules/analytics/server/error-copy';
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
@@ -22,26 +27,27 @@ export function comparePosts(sort: string, direction: 'asc' | 'desc') {
   };
 }
 export async function readPosts(actor: Actor, raw: unknown, cap?: number, exportMode = false) {
+  try {
   const parsed = inputSchema.safeParse(raw);
-  if (!parsed.success) throw new OperationError('invalid_request', 'Choose valid post filters.');
+  if (!parsed.success) throw await analyticsError('invalid_request', "Choose valid post filters.");
   const input = parsed.data;
   const [user, entitlements, permissions] = await Promise.all([prisma.user.findUnique({ where: { id: actor.userId }, select: { disabledAt: true } }), loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }), loadPermissions(actor.userId, actor.workspaceId)]);
-  if (!user || user.disabledAt || !entitlements || !permissions || !canUseFeature(entitlements, 'analytics/posts') || !canAccessFeature(permissions, 'analytics/posts')) throw new OperationError('forbidden', 'Post analytics access is unavailable.');
+  if (!user || user.disabledAt || !entitlements || !permissions || !canUseFeature(entitlements, 'analytics/posts') || !canAccessFeature(permissions, 'analytics/posts')) throw await analyticsError('forbidden', "Post analytics access is unavailable.");
   await assertWorkspaceNotPurging(actor.workspaceId);
   const scope = permissions.pageScope.all ? actor.allowedChannelIds : permissions.pageScope.ids.filter(id => actor.allowedChannelIds === undefined || actor.allowedChannelIds.includes(id));
   const [size, days, maxDays, maxChannels] = await Promise.all([exportMode ? 'analytics.reportExportRows' : 'analytics.postsPageSize', 'analytics.defaultRangeDays', 'analytics.maxRangeDays', 'analytics.reportMaxChannels'].map(runtimeConfig));
   const pageSize = Math.min(Number(size), cap ?? Number(size));
-  if (![pageSize, Number(days), Number(maxDays), Number(maxChannels)].every(n => Number.isSafeInteger(n) && n > 0)) throw new OperationError('unavailable', 'Analytics settings are unavailable.');
+  if (![pageSize, Number(days), Number(maxDays), Number(maxChannels)].every(n => Number.isSafeInteger(n) && n > 0)) throw await analyticsError('unavailable', "Analytics settings are unavailable.");
   let period;
-  try { period = analyticsDateRange(input, { defaultDays: Number(days), maxDays: Number(maxDays) }); } catch { throw new OperationError('invalid_request', 'Choose a valid date range.'); }
+  try { period = analyticsDateRange(input, { defaultDays: Number(days), maxDays: Number(maxDays) }); } catch { throw await analyticsError('invalid_request', "Choose a valid date range."); }
   const catalog = await loadAnalytics(actor.workspaceId, [], period.range, scope, [], entitledPlatformIds(entitlements), { accountIds: [] });
   const options: typeof catalog.targets = [];
   for (const channel of catalog.targets) if (channel.providerId && (await platformAnalytics(channel.providerId))?.postPerformance) options.push(channel);
   const ids = input.channel === undefined ? [] : Array.isArray(input.channel) ? input.channel : [input.channel];
-  if (ids.length && !input.filter) throw new OperationError('invalid_request', 'Choose channel filters.');
-  if (ids.some(id => !options.some(c => c.id === id))) throw new OperationError('forbidden', 'A selected channel is unavailable.');
+  if (ids.length && !input.filter) throw await analyticsError('invalid_request', "Choose channel filters.");
+  if (ids.some(id => !options.some(c => c.id === id))) throw await analyticsError('forbidden', "A selected channel is unavailable.");
   const selected = input.filter ? options.filter(c => ids.includes(c.id)) : options;
-  if (selected.length > Number(maxChannels)) throw new OperationError('invalid_request', 'Choose fewer channels.');
+  if (selected.length > Number(maxChannels)) throw await analyticsError('invalid_request', "Choose fewer channels.");
   const offset = (input.page - 1) * pageSize;
   const rows: PostRow[] = [];
   // Each channel contributes its first offset + pageSize + 1 rows to the global merge.
@@ -54,18 +60,23 @@ export async function readPosts(actor: Actor, raw: unknown, cap?: number, export
   const measures = [...new Map(rows.flatMap(row => row.measures.map(m => [m.key, { key: m.key, label: m.label, labelFr: m.labelFr }] as const))).values()];
   const items = rows.slice(offset, offset + pageSize);
   return { input, period, options, selectedIds: selected.map(c => c.id), measures, items, pageSize, nextPage: rows.length > offset + pageSize ? input.page + 1 : null };
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }
-export function postsCsv(rows: PostRow[], measures: Array<{ key: string; label: string; labelFr?: string }>, locale: 'en' | 'fr' = 'en') {
-  const missing = locale === 'fr' ? 'Non disponible' : 'Not available';
+export function postsCsv(rows: PostRow[], measures: Array<{ key: string; label: string; labelFr?: string }>, locale: 'en' | 'fr' = 'en', copy: RecordsCopy = recordsCopyDefaults) {
+  const missing = copy['Not available'][locale];
   const cell = (value: unknown) => { const s = String(value ?? missing); return `"${(/^[=+\-@\t\r]/.test(s) ? "'" : '') + s.replaceAll('"', '""')}"`; };
-  return [[...(locale === 'fr' ? ['Publication', 'Canal', 'Publié UTC', 'URL', 'Mesuré UTC'] : ['Post', 'Channel', 'Published UTC', 'URL', 'Measured UTC']), ...measures.map(m => locale === 'fr' ? m.labelFr ?? m.label : m.label)], ...rows.map(p => [p.text, p.channelName, p.publishedAt?.toISOString(), p.url, p.measuredAt?.toISOString(), ...measures.map(m => p.measures.find(v => v.key === m.key)?.value)])].map(row => row.map(cell).join(',')).join('\r\n');
+  return [[...(['Post', 'Channel', 'Published UTC', 'URL', 'Measured UTC'] as const).map(key => copy[key][locale]), ...measures.map(m => locale === 'fr' ? m.labelFr ?? m.label : m.label)], ...rows.map(p => [p.text, p.channelName, p.publishedAt?.toISOString(), p.url, p.measuredAt?.toISOString(), ...measures.map(m => p.measures.find(v => v.key === m.key)?.value)])].map(row => row.map(cell).join(',')).join('\r\n');
 }
 
 /** Complete bounded export: refuse oversized periods rather than silently truncate. */
 export async function exportPosts(actor: Actor, raw: unknown, locale: 'en' | 'fr' = 'en') {
+  try {
   const input = inputSchema.safeParse(raw);
-  if (!input.success) throw new OperationError('invalid_request', 'Choose valid post filters. / Choisissez des filtres valides.');
+  if (!input.success) throw await analyticsError('invalid_request', "Choose valid post filters. / Choisissez des filtres valides.");
   const data = await readPosts(actor, { ...input.data, page: 1 }, undefined, true);
-  if (data.nextPage !== null) throw new OperationError('invalid_request', 'Choose fewer channels or a shorter period to export all posts. / Choisissez moins de canaux ou une période plus courte pour tout exporter.');
-  return postsCsv(data.items, data.measures, locale);
+  if (data.nextPage !== null) throw await analyticsError('invalid_request', "Choose fewer channels or a shorter period to export all posts. / Choisissez moins de canaux ou une période plus courte pour tout exporter.");
+  return postsCsv(data.items, data.measures, locale, await recordsCopy());
+
+  } catch (error) { throw await localizeAnalyticsError(error); }
 }

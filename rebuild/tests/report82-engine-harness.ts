@@ -1,3 +1,7 @@
+import { workspaceCopyDefaults } from '@/modules/analytics/workspace-copy';
+import { goalsCopyDefaults } from '@/modules/analytics/goals/copy';
+import { responseTimeCopyDefaults } from '@/modules/analytics/reports/generation/response-copy';
+import { errorCopyDefaults } from '@/modules/analytics/error-copy';
 /** Shared in-memory stand-in for the database and shared services used by the report engine tests. Pure: no network, no real database. */
 import { vi } from 'vitest';
 
@@ -29,7 +33,7 @@ const CONFIG: Record<string, unknown> = {
   'analytics.reports.runHistoryPageSize': 5, 'analytics.reports.staleSweepBatchSize': 10, 'analytics.reports.finishRetries': 1, 'analytics.reports.outputRetentionHours': 24, 'analytics.reports.maxStoredArtifactBytes': 2200000,
   'analytics.defaultRangeDays': 30, 'analytics.maxRangeDays': 90,
 };
-export const configValue = (key: string) => (key in state.config ? state.config[key] : CONFIG[key]);
+export const configValue = (key: string) => (key === 'analytics.workspaceCopy' ? workspaceCopyDefaults : key === 'analytics.goalsCopy' ? goalsCopyDefaults : key === 'analytics.responseTimeCopy' ? responseTimeCopyDefaults : key === 'analytics.errorCopy' ? errorCopyDefaults : key in state.config ? state.config[key] : CONFIG[key]);
 
 export const db = {
   $queryRaw: vi.fn(async (s: TemplateStringsArray, ...v: unknown[]) => {

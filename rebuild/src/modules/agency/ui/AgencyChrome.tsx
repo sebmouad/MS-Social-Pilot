@@ -1,10 +1,10 @@
-import { uiCopy, type UiLocale } from './copy';
+import { uiCopy, type CustomerCopy, type UiLocale } from './copy';
 import type { ReactNode } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import styles from './agency.module.css';
 
-export function AgencyHeading({ description, locale = 'en' }: { description: string; locale?: UiLocale }) {
-  return <PageHeader module="agency" title={uiCopy(locale)('Client workspaces')} description={description} />;
+export function AgencyHeading({ description, locale = 'en', copy }: { description: string; copy?: CustomerCopy; locale?: UiLocale }) {
+  return <PageHeader module="agency" title={uiCopy(locale, copy)('Client workspaces')} description={description} />;
 }
 
 export function AgencyShell({ children }: { children: ReactNode }) {

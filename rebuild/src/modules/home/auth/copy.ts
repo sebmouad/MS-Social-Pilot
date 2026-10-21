@@ -1,9 +1,14 @@
+import { bilingualCatalog } from '../catalog';
+import { z } from 'zod';
+import { copySchema } from '@/lib/config/copy-schema';
+
 export type AuthLocale = 'en' | 'fr';
 
 const en = {
   tooMany: 'Too many attempts. Try again later.',
   offline: 'The request could not be confirmed. Check your connection and try again.',
   backToSignIn: 'Back to sign in',
+  shell: { brand: 'Social Pilot', mark: 'SP', dismiss: 'Dismiss' },
   signIn: {
     title: 'Sign in to your workspace', lead: 'Use your Social Pilot account.',
     email: 'Email', password: 'Password', submit: 'Sign in', busy: 'Signing in…',
@@ -53,12 +58,12 @@ const en = {
     unconfirmedAction: 'The operation could not be confirmed. Check your account before trying again.',
     switchFailed: 'Sign-out could not be confirmed. Try again before switching accounts.',
     createdBody: 'Your account and workspace membership were created. Sign in to complete any required verification.', signIn: 'Sign in',
-    inviteAs: (workspace: string, role: string) => ({ before: 'You’re invited to ', workspace, middle: ' as ', role }),
-    forEmail: (email: string) => `For ${email}.`, allChannels: 'This role includes every channel.', noChannels: 'You’ll start without channel access. A workspace manager can assign channels after you join.',
-    signedInAs: (email: string) => `Signed in as ${email}.`, switchLead: 'Switch to the invited account to accept this invitation.', switchAccount: 'Switch account', switching: 'Switching…',
+    inviteBefore: 'You’re invited to ', inviteMiddle: ' as ',
+    forEmail: 'For {email}.', allChannels: 'This role includes every channel.', noChannels: 'You’ll start without channel access. A workspace manager can assign channels after you join.',
+    signedInAs: 'Signed in as {email}.', switchLead: 'Switch to the invited account to accept this invitation.', switchAccount: 'Switch account', switching: 'Switching…',
     accept: 'Accept invitation', accepting: 'Joining…', enroll: 'Set up verification to join', continuing: 'Continuing…',
     existing: 'Sign in with your existing account, including verification. You’ll return here to accept the invitation.', signInToAccept: 'Sign in to accept',
-    name: 'Your name', nameEmpty: 'Enter your name.', password: 'Create a password', passwordShort: (n: number) => `Use at least ${n} characters.`, passwordHint: (n: number) => `At least ${n} characters. Creating an account accepts this invitation.`,
+    name: 'Your name', nameEmpty: 'Enter your name.', password: 'Create a password', passwordShort: 'Use at least {n} characters.', passwordHint: 'At least {n} characters. Creating an account accepts this invitation.',
     show: 'Show', hide: 'Hide', showLabel: 'Show password', hideLabel: 'Hide password', create: 'Create account and join', creating: 'Creating account…', goSignIn: 'Go to sign in',
   },
   signUp: {
@@ -72,12 +77,13 @@ const en = {
   noWorkspace: { title: 'No workspace yet', body: 'Ask a workspace owner to invite your account. You can sign out from the menu to use another account.', label: 'No workspace' },
 };
 
-type Copy = typeof en;
+type CatalogLocale = typeof en;
 
-const fr: Copy = {
+const fr: CatalogLocale = {
   tooMany: 'Trop de tentatives. Réessayez plus tard.',
   offline: 'La demande n’a pas pu être confirmée. Vérifiez votre connexion et réessayez.',
   backToSignIn: 'Retour à la connexion',
+  shell: { brand: 'Social Pilot', mark: 'SP', dismiss: 'Fermer' },
   signIn: {
     title: 'Connectez-vous à votre espace', lead: 'Utilisez votre compte Social Pilot.',
     email: 'E-mail', password: 'Mot de passe', submit: 'Se connecter', busy: 'Connexion…',
@@ -127,12 +133,12 @@ const fr: Copy = {
     unconfirmedAction: 'L’opération n’a pas pu être confirmée. Vérifiez votre compte avant de réessayer.',
     switchFailed: 'La déconnexion n’a pas pu être confirmée. Réessayez avant de changer de compte.',
     createdBody: 'Votre compte et votre appartenance à l’espace ont été créés. Connectez-vous pour terminer la vérification éventuellement requise.', signIn: 'Se connecter',
-    inviteAs: (workspace: string, role: string) => ({ before: 'Vous êtes invité à rejoindre ', workspace, middle: ' en tant que ', role }),
-    forEmail: (email: string) => `Pour ${email}.`, allChannels: 'Ce rôle inclut tous les canaux.', noChannels: 'Vous démarrerez sans accès aux canaux. Un gestionnaire de l’espace pourra vous en attribuer après votre arrivée.',
-    signedInAs: (email: string) => `Connecté en tant que ${email}.`, switchLead: 'Passez au compte invité pour accepter cette invitation.', switchAccount: 'Changer de compte', switching: 'Changement…',
+    inviteBefore: 'Vous êtes invité à rejoindre ', inviteMiddle: ' en tant que ',
+    forEmail: 'Pour {email}.', allChannels: 'Ce rôle inclut tous les canaux.', noChannels: 'Vous démarrerez sans accès aux canaux. Un gestionnaire de l’espace pourra vous en attribuer après votre arrivée.',
+    signedInAs: 'Connecté en tant que {email}.', switchLead: 'Passez au compte invité pour accepter cette invitation.', switchAccount: 'Changer de compte', switching: 'Changement…',
     accept: 'Accepter l’invitation', accepting: 'Arrivée…', enroll: 'Configurer la vérification pour rejoindre', continuing: 'Poursuite…',
     existing: 'Connectez-vous avec votre compte existant, vérification comprise. Vous reviendrez ici pour accepter l’invitation.', signInToAccept: 'Se connecter pour accepter',
-    name: 'Votre nom', nameEmpty: 'Saisissez votre nom.', password: 'Créez un mot de passe', passwordShort: (n: number) => `Utilisez au moins ${n} caractères.`, passwordHint: (n: number) => `Au moins ${n} caractères. La création du compte accepte cette invitation.`,
+    name: 'Votre nom', nameEmpty: 'Saisissez votre nom.', password: 'Créez un mot de passe', passwordShort: 'Utilisez au moins {n} caractères.', passwordHint: 'Au moins {n} caractères. La création du compte accepte cette invitation.',
     show: 'Afficher', hide: 'Masquer', showLabel: 'Afficher le mot de passe', hideLabel: 'Masquer le mot de passe', create: 'Créer le compte et rejoindre', creating: 'Création du compte…', goSignIn: 'Aller à la connexion',
   },
   signUp: {
@@ -146,4 +152,23 @@ const fr: Copy = {
   noWorkspace: { title: 'Aucun espace pour le moment', body: 'Demandez à un propriétaire d’espace d’inviter votre compte. Vous pouvez vous déconnecter depuis le menu pour utiliser un autre compte.', label: 'Aucun espace' },
 };
 
-export function authCopy(locale: AuthLocale): Copy { return locale === 'fr' ? fr : en; }
+
+export const authCopyDefaults = { en, fr };
+export type AuthCopyCatalog = typeof authCopyDefaults;
+const fill = (template: string, values: Record<string, string | number>) => template.replace(/\{(\w+)\}/g, (match, key: string) => key in values ? String(values[key]) : match);
+/** Browser-safe formatter. Signed-out server routes must serialize the current Root catalog to their forms. */
+export function authCopy(locale: AuthLocale, catalog: AuthCopyCatalog = authCopyDefaults) {
+  const copy = catalog[locale];
+  return { ...copy, join: { ...copy.join,
+    inviteAs: (workspace: string, role: string) => ({ before: copy.join.inviteBefore, workspace, middle: copy.join.inviteMiddle, role }),
+    forEmail: (email: string) => fill(copy.join.forEmail, { email }),
+    signedInAs: (email: string) => fill(copy.join.signedInAs, { email }),
+    passwordShort: (n: number) => fill(copy.join.passwordShort, { n }),
+    passwordHint: (n: number) => fill(copy.join.passwordHint, { n }),
+  } };
+}
+
+const authCatalog = bilingualCatalog(authCopyDefaults);
+export const authCopyCatalogDefaults = authCatalog.catalog;
+export const authCopySchema = authCatalog.schema;
+export const authLocaleCopy = authCatalog.view;
