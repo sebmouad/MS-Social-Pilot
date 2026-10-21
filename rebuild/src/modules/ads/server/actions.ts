@@ -1,3 +1,4 @@
+import { findStoredAdObject } from './object-store';
 import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
 import { adsServiceText } from '@/modules/ads/server/copy';
 import type { AdMutationRequest } from '@/platforms/types';
@@ -125,7 +126,9 @@ export async function readWorkspaceAdObject(actor: AdsActionActor, input: AdsObj
   });
   const connection = account?.socialAccount;
   if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new OperationError('unavailable', await adsServiceText('service006'));
-  const owned = await prisma.adInsight.findFirst({ where: { adAccountId: account.id, level: input.objectType, objectId: input.objectId }, select: { id: true } });
+  // Ownership: stored delivery rows or the delivery-independent object inventory for this account.
+  const owned = await prisma.adInsight.findFirst({ where: { adAccountId: account.id, level: input.objectType, objectId: input.objectId }, select: { id: true } })
+    ?? await findStoredAdObject(account.id, input.objectType, input.objectId);
   if (!owned) throw new OperationError('not_found', await adsServiceText('service007'));
   const accessToken = decryptSecret(connection.accessToken);
   if (!accessToken) throw new OperationError('unavailable', await adsServiceText('service006'));

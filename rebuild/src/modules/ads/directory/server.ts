@@ -1,3 +1,5 @@
+import { listStoredAdObjects, findStoredAdObject } from '../server/object-store';
+import { AdsReportLimitError } from '../read-policy';
 import { loadAdsManagementPolicy } from '../management/server';
 import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
 import { defaultAdsText } from '@/modules/ads/copy';
@@ -92,6 +94,20 @@ export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {},
       lastDeliveryDate: delivered ? adsIsoDay(delivered.date) : null, lastFetchedAt: fetched.newestFetchAt,
     };
   }));
+  const inventory = await listStoredAdObjects(accounts.filter(account => !filters.accountId || account.id === filters.accountId).map(account => account.id), [level], readPolicy.maxRows + 1);
+  if (inventory.length > readPolicy.maxRows) throw new AdsReportLimitError();
+  const known = new Map(items.map(item => [`${item.accountId}:${item.objectId}`, item]));
+  for (const object of inventory) {
+    const account = accounts.find(account => account.id === object.adAccountId);
+    if (!account) continue;
+    const key = `${object.adAccountId}:${object.objectId}`;
+    const existing = known.get(key);
+    if (existing) { existing.name = object.name ?? existing.name; existing.parentId = object.parentId; continue; }
+    const item: Item = { objectId: object.objectId, name: object.name ?? object.objectId, accountId: account.id, accountName: account.name, currency: account.currency, level, parentId: object.parentId,
+      spend: 0, impressions: 0, clicks: 0, ctr: null, cpc: null, cpm: null, lastDeliveryDate: null, lastFetchedAt: object.fetchedAt.toISOString() };
+    items.push(item); known.set(key, item);
+  }
+  if (items.length > readPolicy.maxRows) throw new AdsReportLimitError();
   if (parentId !== undefined) items = items.filter(item => item.parentId === parentId);
   if (q) items = items.filter(item => item.name.toLowerCase().includes(q) || item.objectId.toLowerCase().includes(q));
   const total = items.length;
@@ -124,7 +140,8 @@ export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, n
   const filters = parseAdsPerformanceFilters({ ...(period === undefined ? {} : { period }), ...(start === undefined ? {} : { start }), ...(end === undefined ? {} : { end }), accountId }, accounts.map(account => account.id), now, reportPolicy);
   const dataset = await getAdsDataset(actor.workspaceId, filters, access.allowedTargetIds, access.allowedProviders, { levels: [level as AdsInsightLevel], objectId, allowedAdAccountIds: access.allowedAdAccountIds });
   const rows = dataset.insights as unknown as Row[];
-  if (!rows.length) throw new OperationError('not_found', await adsServiceText('service094'));
+  const storedObject = accounts.some(account => account.id === accountId) ? await findStoredAdObject(accountId, level as DirectoryLevel, objectId) : null;
+  if (!rows.length && !storedObject) throw new OperationError('not_found', await adsServiceText('service094'));
   const totals = totalsFromRows(rows.map(flow));
   let live: { available: true; configuredStatus: string | null; effectiveStatus: string | null } | { available: false } = { available: false };
   try {
@@ -137,7 +154,7 @@ export async function readAdsObjectDetail(actor: AdsReadActor, input: unknown, n
   try { management = await adsDirectoryManagementPort()?.describe(actor, accountId) ?? null; }
   catch { /* keep scoped stored reporting available if management is unavailable */ }
   return {
-    accountId, level, objectId, name: rows[0]!.objectName || objectId, currency: rows[0]!.adAccount.currency, totals,
+    accountId, level, objectId, name: storedObject?.name || rows[0]?.objectName || objectId, currency: rows[0]?.adAccount.currency ?? accounts.find(account => account.id === accountId)?.currency ?? null, totals,
     range: { from: adsIsoDay(filters.since), to: adsIsoDay(filters.until), endExclusive: true as const },
     daily: [...rows].sort((a, b) => a.date.getTime() - b.date.getTime()).map(flow), live,
     management: management

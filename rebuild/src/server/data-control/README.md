@@ -25,6 +25,7 @@ migration names already in source. No migration was applied by this lane.
 | `rebuild_facebook_sync_cursors` | Workspace FK: catalog export/counts/dependency-ordered erasure before targets |
 | `wordpress_recipe_sources` | Workspace FK: catalog export/counts/dependency-ordered erasure after plans |
 | `wordpress_recipe_plans` | Workspace FK: catalog export/counts/dependency-ordered erasure before sources/targets |
+| `ads_objects` | Ad account FK with ON DELETE CASCADE: erased with its ad account; provider object identity only, no customer content |
 
 Account appearance is not a new table: `users.theme` and the exact
 `app_settings` key `settings.appearance.user.<userId>.mode` belong to the account.

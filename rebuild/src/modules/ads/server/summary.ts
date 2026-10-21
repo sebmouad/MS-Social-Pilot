@@ -41,6 +41,7 @@ export type AdsSummary = {
   frequency: number | null;
   actions: Array<{ name: string; value: number }>;
   fields: unknown;
+  parentId?: string | null;
   fieldsDate: Date;
   dailyMetrics: Array<{ date: Date; fetchedAt: Date | null; spend: number; impressions: number; clicks: number; reach: number; cpc: number | null; cpm: number | null; cpp: number | null; ctr: number | null; frequency: number | null; actions: unknown; fields: unknown }>;
   rows: number;

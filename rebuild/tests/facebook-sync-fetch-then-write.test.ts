@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   depth: 0, events: [] as string[], providerDepths: [] as number[],
   targets: vi.fn(), accounts: vi.fn(), freshTarget: vi.fn(), freshAccount: vi.fn(), postTargets: vi.fn(), freshPostTarget: vi.fn(),
-  insights: vi.fn(), history: vi.fn(), ads: vi.fn(), status: vi.fn(), cursorRows: vi.fn(), insightUpsert: vi.fn(), adUpsert: vi.fn(), executeRaw: vi.fn(), updateMany: vi.fn(),
+  discoverAds: vi.fn(), insights: vi.fn(), history: vi.fn(), ads: vi.fn(), status: vi.fn(), cursorRows: vi.fn(), insightUpsert: vi.fn(), adUpsert: vi.fn(), executeRaw: vi.fn(), updateMany: vi.fn(),
 }));
 
 const grants = { workspaceId: 'w', accessToken: 'token', scopes: 'read_insights,ads_read,pages_read_engagement', tokenExpiresAt: null, invalidatedAt: null };
@@ -39,6 +39,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
   return [];
 } }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
+vi.mock('../src/platforms/facebook/ads-discovery', () => ({ configuredDiscoverFacebookAdObjects: async () => { record('objects'); return state.discoverAds(); } }));
 vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({
   getPageInsightObservations: async () => { record('insights'); return state.insights(); },
   getPostHistory: async () => { record('history'); return state.history(); },
@@ -67,6 +68,7 @@ beforeEach(() => {
   state.cursorRows.mockResolvedValue([]);
   state.insights.mockResolvedValue([observation]);
   state.history.mockResolvedValue({ posts: [{ remoteId: 'p1', message: 'm', permalink: null, statusType: null, pictureUrl: null, createdTime: new Date(), insights: {} }], failures: [], progress });
+  state.discoverAds.mockResolvedValue([{ adAccountId: 'acct-a', level: 'campaign', objectId: 'c1', name: 'Autumn launch', parentId: null, status: 'paused', fetchedAt: new Date('2026-10-21T12:00:00Z') }]);
   state.ads.mockResolvedValue([{ date_start: '2026-10-16', spend: '1.5', impressions: '10' }]);
   state.insightUpsert.mockResolvedValue({}); state.adUpsert.mockResolvedValue({}); state.executeRaw.mockResolvedValue(1);
   state.postTargets.mockResolvedValue([{ id: 'pt1', postId: 'post1', remotePostId: 'remote1', post: { workspaceId: 'w', media: [] }, target: { id: 'target-a', workspaceId: 'w', providerId: 'pa' } }]);
@@ -119,11 +121,19 @@ describe('Page analytics fetch-then-write', () => {
 });
 
 describe('Ads analytics fetch-then-write', () => {
+  it('persists discovered paused objects even when there are no insight rows', async () => {
+    state.ads.mockResolvedValue([]);
+    expect(await syncAdsAnalytics()).toMatchObject({ updated: 1, failed: 0 });
+    expect(state.adUpsert).not.toHaveBeenCalled();
+    expect(state.executeRaw).toHaveBeenCalledTimes(1);
+  });
+
   it('calls the Ads API outside any transaction and re-checks the account before writing', async () => {
     const result = await syncAdsAnalytics();
 
-    expect(result).toMatchObject({ examined: 1, updated: 1, failed: 0 });
-    expect(state.providerDepths).toEqual([0]);
+    expect(result).toMatchObject({ examined: 1, updated: 2, failed: 0 });
+    expect(state.providerDepths).toEqual([0, 0]);
+    expect(state.executeRaw).toHaveBeenCalledTimes(1);
     const events = state.events;
     expect(events.indexOf('provider:ads')).toBeLessThan(events.indexOf('lock:begin'));
     expect(events.slice(events.indexOf('lock:begin'), events.indexOf('lock:end')).filter(event => event === 'recheck')).toHaveLength(2);
@@ -135,6 +145,7 @@ describe('Ads analytics fetch-then-write', () => {
 
     expect(await syncAdsAnalytics()).toMatchObject({ updated: 0, skipped: 1, failed: 0 });
     expect(state.adUpsert).not.toHaveBeenCalled();
+    expect(state.executeRaw).not.toHaveBeenCalled();
   });
 });
 

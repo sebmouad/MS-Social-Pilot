@@ -1,3 +1,4 @@
+vi.mock('../src/modules/ads/server/object-store', () => ({ listStoredAdObjects: vi.fn(async () => []), findStoredAdObject: vi.fn(async () => null) }));
 import { ADS_MANAGEMENT_DEFAULT_POLICY } from '../src/modules/ads/management/config';
 vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +13,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
 vi.mock('../src/modules/ads/directory/management-port', () => ({ adsDirectoryManagementPort: () => ({ describe: state.describe, listChanges: vi.fn() }) }));
 vi.mock('../src/server/platforms/registry', () => ({ platformAds: state.platformAds }));
 
+import { listStoredAdObjects, findStoredAdObject } from '../src/modules/ads/server/object-store';
 import { ADS_ANALYSIS_DEFAULT_POLICY } from '../src/modules/ads/analysis/metrics';
 import { readAdsDirectory, readAdsObjectDetail } from '../src/modules/ads/directory/server';
 import { executeAdsDirectoryTool } from '../src/modules/ads/directory/mcp';
@@ -27,6 +29,8 @@ const now = new Date('2026-10-17T12:00:00Z');
 describe('Ads object directory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(listStoredAdObjects).mockResolvedValue([]);
+    vi.mocked(findStoredAdObject).mockResolvedValue(null);
     state.access.mockResolvedValue({ actor, allowedTargetIds: ['t1'], allowedProviders: ['facebook'] });
     state.accounts.mockResolvedValue([{ id: 'a1', name: 'Account a1', currency: 'USD', socialAccount: { provider: 'test-platform' } }]);
     state.platformAds.mockResolvedValue({ parentObjectId: ({ level, fields }: { level: string; fields: unknown }) => level === 'adset' && fields && typeof fields === 'object' ? ((fields as Record<string, unknown>).parentRef as string | undefined) ?? null : null });
@@ -116,6 +120,18 @@ it('enforces the same non-default parent identifier bound for directory and MCP 
   state.config.mockImplementation(async (key: string) => key === 'ads.managementPolicy' ? { ...ADS_MANAGEMENT_DEFAULT_POLICY, parentIdMaxCharacters: 2 } : ADS_ANALYSIS_DEFAULT_POLICY);
   await expect(readAdsDirectory(actor, { parentId: 'abc' }, now)).rejects.toMatchObject({ code: 'invalid_request' });
   await expect(executeAdsDirectoryTool(actor, 'list_ads_objects', { parentId: 'abc' })).rejects.toMatchObject({ code: 'invalid_request' });
+});
+
+it('lists a newly created campaign and opens its manager detail without delivery rows', async () => {
+  state.dataset.mockResolvedValue({ insights: [], accounts: [] });
+  const object = { adAccountId: 'a1', level: 'campaign' as const, objectId: 'new1', name: 'Autumn launch', parentId: null, status: 'paused', fetchedAt: now };
+  vi.mocked(listStoredAdObjects).mockResolvedValue([object]);
+  vi.mocked(findStoredAdObject).mockResolvedValue(object);
+  const directory = await readAdsDirectory(actor, { level: 'campaign' }, now);
+  expect(directory.items).toEqual([expect.objectContaining({ objectId: 'new1', name: 'Autumn launch', lastDeliveryDate: null, spend: 0 })]);
+  expect(listStoredAdObjects).toHaveBeenLastCalledWith(['a1'], ['campaign'], 101);
+  const detail = await readAdsObjectDetail(actor, { accountId: 'a1', level: 'campaign', objectId: 'new1' }, now);
+  expect(detail).toMatchObject({ name: 'Autumn launch', daily: [], totals: { spend: 0 } });
 });
 
 });

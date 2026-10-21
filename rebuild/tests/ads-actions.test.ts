@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     adAccount: { findFirst: vi.fn() },
     adInsight: { findFirst: vi.fn() },
     $executeRaw: vi.fn(),
+    $queryRaw: vi.fn(async () => []),
   },
   config: vi.fn(),
   secret: vi.fn(),

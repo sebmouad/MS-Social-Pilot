@@ -1,3 +1,5 @@
+import { configuredDiscoverFacebookAdObjects } from './ads-discovery';
+import { saveAdObject } from '@/modules/ads/server/object-store';
 import { storeInboxMetadata } from '@/modules/inbox/server/metadata';
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
 import { redact } from '@/server/root/legacy/authz';
@@ -313,14 +315,23 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
         const engine = await configuredFacebookEngine({ signal });
         const lookbackDays = await readLookbackDays('meta.adsAnalyticsLookbackDays');
         const since = new Date(until.getTime() - (lookbackDays - 1) * DAY_MS);
-        return engine.getAdInsights(binding.token, account.actId, since, until);
+        const [insights, objects] = await Promise.all([
+          engine.getAdInsights(binding.token, account.actId, since, until),
+          configuredDiscoverFacebookAdObjects(binding.token, account.actId, account.id, now, signal),
+        ]);
+        return { insights, objects };
       }, retryLimit, retryBackoff));
       await withWorkspaceOperation(account.workspaceId, async () => {
         const outcome = await withSelectedResourceOperation(account.workspaceId, { kind: 'adAccount', id: account.id }, async (tx, signal) => {
           let persistedCount = 0;
           await assertFacebookJobAccess(account.workspaceId, jobFeatures.ads);
           if (!await currentAdsBinding(account, now)) return { updated: 0, skipped: 1 };
-          for (const row of rows) {
+          for (const item of rows.objects) {
+            signal.throwIfAborted();
+            await saveAdObject(tx, item);
+            persistedCount++;
+          }
+          for (const row of rows.insights) {
             signal.throwIfAborted();
             const date = validDate(row.date_start);
             if (!date) continue;

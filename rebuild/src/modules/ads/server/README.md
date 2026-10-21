@@ -10,8 +10,8 @@ UI, REST and MCP creation and management use `modules/ads/management/server.ts`.
 The service checks current membership, entitlements, write permission, selected
 account, resource scope, provider availability/grants and exact provider-owned
 consent before committing an intent. Campaigns, ad sets and ads start paused;
-creatives remain unattached. Parent campaigns/ad sets must exist in the selected
-account's stored history. Ad-set/ad creation refuses limited channel scope because
+creatives remain unattached. Parent campaigns/ad sets are verified against the
+selected account's inventory, stored delivery history or account-verified provider read. Ad-set/ad creation refuses limited channel scope because
 the parent cannot be bounded to a selected channel.
 
 `PlatformAdsHost.configuredOperations(locale)` resolves the module-owned factory
@@ -69,3 +69,45 @@ provider writes, browser and production evidence. No migration was applied here.
   pending migration rehearsal/application and locale entry-point integration.
 
 No new Root keys; existing `meta.adsCopy` and Ads customer catalogs are consumed.
+
+## Objects without delivery (2026-10-21 worker lane)
+
+`object-store.ts` owns a neutral `ads_objects` inventory, separate from daily
+insights. Confirmed campaign/ad-set/ad creation persists identity, account, name,
+parent and paused status in the same transaction as success/audit. Rename/status
+updates refresh inventory; delete records a hidden tombstone. Sync upserts reject
+older snapshots so an earlier fetch cannot overwrite a later management change.
+UI/REST/MCP still use the same directory/detail and management services. Existing
+insights remain a valid ownership source; absent local identity can be verified
+by the selected account's provider host read, with authority rechecked under lock.
+
+Facebook Ads sync discovers campaigns/ad sets/ads on account edges independently
+of delivery and keeps neutral parent ids. It reuses Root `meta.pageSize`,
+`meta.maxPages` and the existing configured signed transport/timeouts. Invalid
+identities, cross-account objects and incomplete pagination fail the account sync
+rather than silently claiming a complete inventory. Discovery persists only after
+current workspace/resource access is rechecked under the existing account lock.
+No discovery reconciliation of externally removed objects is implemented yet.
+
+Objects includes inventory with no period rows; detail returns an empty daily
+series and the same management controls. Campaigns merges inventory into summaries
+without inventing daily metric samples. Both screens reuse existing tables,
+responsive row cards, semantic actions, neutral no-delivery text and configurable
+English/French copy (`ads.customerCopy.text171`). No new Root keys.
+
+Additive migration `20261101120000_ads_object_inventory` SHA-256:
+`a6ea92c28d7697c4d229c6c90e068cc6da6b1d5575864b43e1d0976a31b50861`.
+The source checksum is pinned by `tests/ads-object-inventory.test.ts`; **the
+cutover rehearsal pin is pending integration outside lane ownership**. Add the
+migration to `scripts/cutover-rehearsal.sh` approved/history-refusal lists, checksum
+verification, ordered application and post-apply account-FK/level/primary-key
+probes; update `tests/cutover-rehearsal.test.ts` together before applying/releasing.
+No migration, live-provider or browser run occurred here. A database rehearsal
+must verify transaction rollback, cascade erasure and stale-sync tombstones.
+
+Integration also needs architecture/parity/handoff updates and explicit inventory
+coverage in account/workspace exports and retain-account erasure paths; those
+files are outside this lane. Historical creation receipts are not backfilled;
+current discovery populates their objects, and provider ownership fallback permits
+management before the next discovery sync. The configuration schema version is
+unchanged for the integrator to manage.

@@ -937,8 +937,8 @@ export const adsCustomerCopy = {
     "fr": "jours"
   },
   "text171": {
-    "en": "No delivery",
-    "fr": "Aucune diffusion"
+    "en": "No delivery yet",
+    "fr": "Aucune diffusion pour le moment"
   },
   "text172": {
     "en": "Daily spend for {value0}",

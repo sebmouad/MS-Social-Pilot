@@ -79,7 +79,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
         { key: 'spend', label: t('text019'), align: 'end', render: row => `${row.currency ? `${row.currency} ` : ''}${show(row.spend)}` },
         { key: 'impressions', label: t('text020'), align: 'end', render: row => show(row.impressions) },
         { key: 'clicks', label: t('text022'), align: 'end', render: row => show(row.clicks) },
-        { key: 'last', label: t('text262'), render: row => row.lastDeliveryDate ?? t('text263') },
+        { key: 'last', label: t('text262'), render: row => row.lastDeliveryDate ?? t('text171') },
         { key: 'manage', label: t('text264'), render: row => <ObjectManager adAccountId={row.accountId} level={directory.level} objectId={row.objectId} name={row.name} /> },
       ]} />
       <nav aria-label={t('text076')}>{directory.offset > 0 ? <a href={pageLink(Math.max(0, directory.offset - directory.limit))}>{t('text077')}</a> : null}{' '}{directory.nextOffset !== null ? <a href={pageLink(directory.nextOffset)}>{t('text078')}</a> : null}</nav>

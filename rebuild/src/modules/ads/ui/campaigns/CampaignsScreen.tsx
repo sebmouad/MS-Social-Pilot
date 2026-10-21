@@ -1,3 +1,6 @@
+import { listStoredAdObjects } from '../../server/object-store';
+import { mergeAdObjectSummaries } from '../../server/object-summaries';
+import { AdsReportLimitError } from '../../read-policy';
 import { loadAdsCopy } from '@/modules/ads/server/copy';
 import { customerText } from '@/modules/ads/copy';
 import { AdsCopyProvider } from '@/modules/ads/ui/AdsCopyProvider';
@@ -50,10 +53,15 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   try { requestedPage = parseAdsResultPage(params.page); }
   catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
   let dataset;
-  try { dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders, { levels: ['campaign', 'adset', 'ad'] }); }
-  catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
-  const summaries = summarizeInsights(dataset.insights).filter(row => ['campaign', 'adset', 'ad'].includes(row.level))
-    .sort((left, right) => left.accountName.localeCompare(right.accountName) || left.level.localeCompare(right.level) || left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+  let summaries;
+  try {
+    dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders, { levels: ['campaign', 'adset', 'ad'] });
+    const inventory = await listStoredAdObjects(accounts.filter(account => !filters.accountId || account.id === filters.accountId).map(account => account.id), ['campaign', 'adset', 'ad'], dataset.maxRows + 1);
+    if (inventory.length > dataset.maxRows) throw new AdsReportLimitError();
+    summaries = mergeAdObjectSummaries(summarizeInsights(dataset.insights), inventory, accounts).filter(row => ['campaign', 'adset', 'ad'].includes(row.level))
+      .sort((left, right) => left.accountName.localeCompare(right.accountName) || left.level.localeCompare(right.level) || left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+    if (summaries.length > dataset.maxRows) throw new AdsReportLimitError();
+  } catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
   const objectPage = pageAdsRows(summaries, requestedPage, dataset.pageSize);
   const byAccount = groupSummariesByAccount(objectPage.items);
   const actionAvailability = new Map(await Promise.all([...byAccount.keys()].map(async accountId => [
@@ -99,7 +107,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
           const known = summaries.filter(row => row.accountId === accountId);
           const named = new Map(known.map(row => [`${row.level}:${row.id}`, row] as const));
           const parentOf = (row: typeof known[number]) => {
-            const parentId = resolveParent && (row.level === 'adset' || row.level === 'ad') ? resolveParent({ level: row.level, fields: row.fields }) : null;
+            const parentId = row.parentId ?? (resolveParent && (row.level === 'adset' || row.level === 'ad') ? resolveParent({ level: row.level, fields: row.fields }) : null);
             return parentId ? named.get(`${row.level === 'ad' ? 'adset' : 'campaign'}:${parentId}`) : undefined;
           };
           // Campaign > ad set > ad: a row's path lists its ancestors that are present in stored data.

@@ -1,3 +1,4 @@
+import { recordAdObjectChange, findStoredAdObject } from '../server/object-store';
 import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
 import { defaultAdsText } from '@/modules/ads/copy';
 import { adsServiceText } from '@/modules/ads/server/copy';
@@ -184,20 +185,19 @@ function assertCreationScope(operation: AdsNeutralOperation, pageScope: AdsPageS
   if ((operation.type === 'adset.create' || operation.type === 'ad.create') && (!pageScope.all || allowedTargetIds !== undefined)) throw new OperationError('forbidden', defaultAdsText('validation027'));
 }
 
-async function assertOwnedObject(accountDbId: string, operation: AdsNeutralOperation) {
+async function assertOwnedObject(ctx: Awaited<ReturnType<typeof managedContext>>, operation: AdsNeutralOperation) {
   if (operation.type === 'campaign.create' || operation.type === 'creative.create') return;
-  if (operation.type === 'adset.create') {
-    const parent = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: 'campaign', objectId: operation.parentId }, select: { id: true } });
-    if (!parent) throw new OperationError('not_found', await adsServiceText('service042'));
-    return;
-  }
-  if (operation.type === 'ad.create') {
-    const parent = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: 'adset', objectId: operation.parentId }, select: { id: true } });
-    if (!parent) throw new OperationError('not_found', await adsServiceText('adCreateParentMissing'));
-    return;
-  }
-  const owned = await prisma.adInsight.findFirst({ where: { adAccountId: accountDbId, level: objectLevel[operation.objectType], objectId: operation.objectId }, select: { id: true } });
-  if (!owned) throw new OperationError('not_found', await adsServiceText('service007'));
+  const objectType = operation.type === 'adset.create' ? 'campaign' : operation.type === 'ad.create' ? 'adset' : operation.objectType;
+  const objectId = 'parentId' in operation ? operation.parentId : 'objectId' in operation ? operation.objectId : '';
+  const owned = await prisma.adInsight.findFirst({ where: { adAccountId: ctx.account.id, level: objectLevel[objectType], objectId }, select: { id: true } });
+  if (owned) return;
+  if (await findStoredAdObject(ctx.account.id, objectType, objectId)) return;
+  // The provider host verifies both remote identity and account ownership before returning.
+  const host = await platformAds(ctx.provider, platformAdsLocale());
+  if (!host || typeof host.read !== 'function') throw new OperationError('not_found', await adsServiceText('service007'));
+  const snapshot = await host.read({ credential: ctx.credential, accountId: ctx.account.actId, objectId, objectType });
+  if (!snapshot || typeof snapshot !== 'object' || !('id' in snapshot) || snapshot.id !== objectId) throw new OperationError('not_found', await adsServiceText('service007'));
+
 }
 
 /** Resolve only a selected, currently scoped channel from the account's own connection. */
@@ -279,7 +279,7 @@ export async function previewAdsManagement(actor: AdsManageActor, input: { adAcc
   const support = supports(ctx.ops, operation);
   assertCreationScope(operation, ctx.pageScope, actor.allowedTargetIds);
   await validateWithPolicy(ctx.ops, operation);
-  await assertOwnedObject(ctx.account.id, operation);
+  await assertOwnedObject(ctx, operation);
   await creativeContext(actor, ctx, operation);
   // Best effort: tells the caller an earlier unresolved change will refuse this one. Null when the ledger cannot be read.
   const held = await prisma.$queryRaw<{ id: string }[]>`SELECT id FROM ads_management_operations WHERE "workspaceId" = ${actor.workspaceId} AND "adAccountId" = ${ctx.account.id} AND "objectType" = ${operation.objectType} AND "objectId" = ${ledgerObjectId(operation)} AND status IN ('pending','uncertain') LIMIT 1`
@@ -361,7 +361,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
       const replay = await replayRequest(actor, input.requestId, requestPayloadHash(ctx.account.id, operation));
       if (replay) return replay;
     }
-    await assertOwnedObject(ctx.account.id, operation);
+    await assertOwnedObject(ctx, operation);
     await creativeContext(actor, ctx, operation);
   } catch (error) { throw beforeJournal(error); }
 
@@ -413,7 +413,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
         assertCreationScope(operation, current.pageScope, actor.allowedTargetIds);
         await validateWithPolicy(current.ops, operation);
         creative = await creativeContext(actor, current, operation);
-        if (operation.type === 'adset.create' || operation.type === 'ad.create') await assertOwnedObject(current.account.id, operation);
+        await assertOwnedObject(current, operation);
         if (current.ops.confirmation(operation, { adAccountId: current.account.id, currency: current.account.currency }) !== expected) throw new OperationError('conflict', await adsServiceText('service056'));
         signal.throwIfAborted();
       } catch (error) {
@@ -456,6 +456,7 @@ export async function performAdsManagement(actor: AdsManageActor, input: { adAcc
       const created = isCreationOperation(operation) ? { created: { objectType: operation.objectType, remoteId: resultRemoteId! } } : {};
       const changed = Number(await _tx.$executeRaw`UPDATE ads_management_operations SET status = 'succeeded', "remoteId" = ${resultRemoteId}, "updatedAt" = NOW(), "completedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${actor.workspaceId} AND status = 'pending'`);
       if (changed !== 1) return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: false, warning: await adsServiceText('service060'), ...created };
+      await recordAdObjectChange(_tx, ctx.account.id, operation, resultRemoteId);
       await audit(actor, 'ads.change_applied', { operationId: id, adAccountId: ctx.account.id, operation: operation.type, objectType: operation.objectType, objectId: ledgerObjectId(operation), spendChanging: support.spendChanging, ...(isCreationOperation(operation) ? { remoteId: resultRemoteId, createdPaused: operation.type !== 'creative.create', ...(operation.type === 'creative.create' ? { delivery: 'unattached' } : {}) } : {}) }, _tx);
       return { outcome: 'succeeded' as const, operationId: id, remoteId: resultRemoteId, recorded: true, ...created };
     });

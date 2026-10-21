@@ -201,6 +201,19 @@ and composer. Profile labels are text beside channel names, independent of post
 labels. English/French strings follow request language. Browser/theme/viewport
 verification remains open; DOM interaction evidence is in CHANNEL_PROFILES.md.
 
+## Design pass, round 4 — 2026-10-21 (owner: "the design is ugly")
+
+Decisions, implemented as one layer at the end of `src/styles/components.css` (tokens only; four themes, light and dark unchanged):
+
+- **Card system.** One surface recipe: hairline border, 16px radius and a soft two-part lift (`--card-lift`, `--card-lift-hover`; dark mode swaps to an inset highlight). Panels, home cards, metric tiles and tables share it. A tile inside a panel sits flat on a tinted surface so cards never stack lifted cards.
+- **Color by module.** The page-header chip is a solid module color with a white icon (tinted-soft in Clean). The top bar shows a module-colored dot and name. The sidebar page icons get a faint module wash.
+- **Typography.** 14px body, 29px page title at weight 780 with −0.028em tracking, 34px metric figures, 16px card titles; table headers are sentence case 12px instead of tiny uppercase. Sidebar section labels are 11px, quieter.
+- **Chrome.** The top bar no longer repeats the page title (the page `h1` owns it), the content gutter is 36px on desktop, and the primary action in the sidebar carries a colored lift.
+- **Empty states.** A filled calm surface with a module-tinted icon replaces the dashed wireframe border.
+- **Defect fixed.** In Inbox the bulk "Select all" bar was taking the list's 1fr grid row and left a large blank gap; the list pane is now a flex column and only the list scrolls.
+
+Evidence: local production build, synthetic data, Chromium screenshots (home, publishing queue/calendar/compose, inbox, analytics, ads, settings, root) at 1440 and 390 wide in light and dark across Vivid, Meta blue, Warm and Clean. This is visual review, not a full browser matrix rerun.
+
 ## Current language and theme evidence — 2026-10-21
 
 Source checked at `6fb0e57f`: Publishing, Inbox, Analytics, Ads, Home, Tasks and

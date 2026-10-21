@@ -239,7 +239,7 @@ export function createFacebookAdsOps(loadTransport: () => Promise<FacebookAdsTra
   };
 }
 
-async function configuredTransport(fetchImpl?: FacebookAdsFetch, text: FacebookAdsText = defaultFacebookAdsText) {
+export async function configuredFacebookAdsTransport(fetchImpl?: FacebookAdsFetch, text: FacebookAdsText = defaultFacebookAdsText) {
   const [graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes, appSecretProofEnabled, appSecret] = await Promise.all([
     runtimeConfig('meta.graphBaseUrl'), runtimeConfig('meta.oauthBaseUrl'), runtimeConfig('meta.graphVersion'), runtimeConfig('meta.requestTimeoutMs'),
     runtimeConfig('meta.maxPages'), runtimeConfig('meta.pageSize'), runtimeConfig('meta.pageInsightMetrics'), runtimeConfig('meta.adInsightFields'),
@@ -249,10 +249,10 @@ async function configuredTransport(fetchImpl?: FacebookAdsFetch, text: FacebookA
 }
 
 /** Runtime host for explicit installation by the host assembly (see docs/ADS_PARITY.md). */
-export const facebookAdsOps: AdsOpsHost = createFacebookAdsOps(() => configuredTransport());
+export const facebookAdsOps: AdsOpsHost = createFacebookAdsOps(() => configuredFacebookAdsTransport());
 
 /** Resolve once per shared service request, then use the same copy for preview and exact consent checks. */
 export async function configuredFacebookAdsOps(locale: 'en' | 'fr' = 'en'): Promise<AdsOpsHost> {
   const text = facebookAdsText(await configOrDefault('meta.adsCopy', FACEBOOK_ADS_COPY_SCHEMA), locale);
-  return createFacebookAdsOps(() => configuredTransport(undefined, text), configuredCreationUi, text);
+  return createFacebookAdsOps(() => configuredFacebookAdsTransport(undefined, text), configuredCreationUi, text);
 }

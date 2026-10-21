@@ -82,7 +82,8 @@ describe('Ads management service', () => {
     expect(calls[0]).toMatch(/^INSERT INTO ads_management_operations/);
     expect(calls.indexOf('REMOTE')).toBe(1);
     expect(calls[2]).toMatch(/^UPDATE ads_management_operations/);
-    expect(calls[3]).toMatch(/^INSERT INTO root_activities/);
+    expect(calls[3]).toMatch(/^UPDATE ads_objects/);
+    expect(calls[4]).toMatch(/^INSERT INTO root_activities/);
     expect(state.prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(state.selectedOperation).toHaveBeenCalledWith('w1', { kind: 'adAccount', id: 'acc1' }, expect.any(Function));
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ credential: { accessToken: 'token' }, accountId: 'act_1', signal: expect.anything() }), pause);
@@ -727,6 +728,7 @@ describe.each(['service', 'UI/REST', 'MCP'] as const)('Ads authorization via %s'
   }
   beforeEach(() => {
     clearAdsOpsHosts();
+    clearAdsOpsHosts();
     registerAdsOpsHost({ ...host, operations: [...host.operations, { id: 'delete', objectTypes: ['campaign'], spendChanging: false, irreversible: true, label: 'Delete' }] });
   });
   const noWrites = () => {
@@ -846,5 +848,51 @@ describe('contract audit runtime policy and locale', () => {
     state.platformAds.mockClear();
     await withPlatformAdsLocale('fr', () => executeAdsManagementTool(actor, 'get_ads_management_options', { adAccountId: 'acc1' }));
     expect(state.platformAds).toHaveBeenCalledWith('testnet', 'fr');
+  });
+});
+
+describe('objects without delivery', () => {
+  it('creates, renames and deletes a paused campaign through the shared service without any insight rows', async () => {
+    clearAdsOpsHosts();
+    registerAdsOpsHost({ ...host, operations: [...host.operations, { id: 'delete', objectTypes: ['campaign'], spendChanging: false, irreversible: true, label: 'Delete' }] });
+    state.prisma.adInsight.findFirst.mockResolvedValue(null);
+    let object: { objectId: string; name: string } | null = null;
+    state.prisma.$executeRaw.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = sqlOf(strings);
+      if (sql.includes('INSERT INTO ads_objects')) object = values[5] === 'deleted' ? null : { objectId: values[2] as string, name: values[3] as string };
+      if (sql.includes('UPDATE ads_objects SET name')) object = { ...object!, name: values[0] as string };
+      if (sql.includes('DELETE FROM ads_objects')) object = null;
+      return 1;
+    });
+    state.prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+      const sql = sqlOf(strings);
+      if (sql.includes('FROM ads_objects')) return object ? [object] : [];
+      if (sql.includes('FOR UPDATE')) return [{ status: 'pending', remoteId: null }];
+      return [];
+    });
+    const create = { type: 'campaign.create', objectType: 'campaign', name: 'Autumn launch', objective: 'traffic' } as const;
+    const preview = await previewAdsManagement(actor, { adAccountId: 'acc1', operation: create });
+    expect(await performAdsManagement(actor, { adAccountId: 'acc1', operation: create, confirmation: preview.confirmation })).toMatchObject({ outcome: 'succeeded' });
+    expect(object).toEqual({ objectId: 'c1', name: 'Autumn launch' });
+    const rename = { type: 'rename', objectType: 'campaign', objectId: 'c1', name: 'Winter launch' } as const;
+    const renamePreview = await previewAdsManagement(actor, { adAccountId: 'acc1', operation: rename });
+    expect(await performAdsManagement(actor, { adAccountId: 'acc1', operation: rename, confirmation: renamePreview.confirmation })).toMatchObject({ outcome: 'succeeded' });
+    expect(object).toEqual({ objectId: 'c1', name: 'Winter launch' });
+    const remove = { type: 'delete', objectType: 'campaign', objectId: 'c1' } as const;
+    const deletePreview = await previewAdsManagement(actor, { adAccountId: 'acc1', operation: remove });
+    expect(await performAdsManagement(actor, { adAccountId: 'acc1', operation: remove, confirmation: deletePreview.confirmation })).toMatchObject({ outcome: 'succeeded' });
+    expect(object).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses the account-verified provider read for an object absent locally', async () => {
+    state.prisma.adInsight.findFirst.mockResolvedValue(null);
+    const read = vi.fn(async () => ({ id: 'c1', accountId: '1' }));
+    state.platformAds.mockResolvedValue({ operations: host, manageScopes: async () => ['ads_management'], validateManageScopes: vi.fn(), read });
+    await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation: pause })).resolves.toHaveProperty('confirmation');
+    expect(read).toHaveBeenCalledWith({ credential: { accessToken: 'token' }, accountId: 'act_1', objectId: 'c1', objectType: 'campaign' });
+    read.mockRejectedValueOnce(new Error('outside selected account'));
+    await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation: pause })).rejects.toThrow();
+    expect(execute).not.toHaveBeenCalled();
   });
 });
