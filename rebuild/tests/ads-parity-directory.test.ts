@@ -1,3 +1,4 @@
+import { ADS_MANAGEMENT_DEFAULT_POLICY } from '../src/modules/ads/management/config';
 vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -31,7 +32,7 @@ describe('Ads object directory', () => {
     state.platformAds.mockResolvedValue({ parentObjectId: ({ level, fields }: { level: string; fields: unknown }) => level === 'adset' && fields && typeof fields === 'object' ? ((fields as Record<string, unknown>).parentRef as string | undefined) ?? null : null });
     state.reportPolicy.mockResolvedValue({ presets: [{ id: '7d', days: 7, label: 'Last 7 days' }], defaultPreset: '7d', maxRangeDays: 30, maxFilterCharacters: 80 });
     state.readPolicy.mockResolvedValue({ pageSize: 2, maxRows: 100 });
-    state.config.mockResolvedValue(ADS_ANALYSIS_DEFAULT_POLICY);
+    state.config.mockImplementation(async (key: string) => key === 'ads.managementPolicy' ? ADS_MANAGEMENT_DEFAULT_POLICY : ADS_ANALYSIS_DEFAULT_POLICY);
     state.dataset.mockResolvedValue({ accounts: [], pageSize: 2, maxRows: 100, insights: [
       row('s1', 'Spring', '2026-10-12', 10, 5, { campaign_id: 'ignored', parentRef: 'c1' }), row('s1', 'Spring', '2026-10-13', 5, 5, { campaign_id: 'ignored', parentRef: 'c1' }),
       row('s2', 'Summer', '2026-10-12', 50, 1, { campaign_id: 'ignored', parentRef: 'c2' }), row('s3', 'Autumn', '2026-10-12', 0, 0),
@@ -111,4 +112,10 @@ describe('Ads object directory', () => {
     await expect(executeAdsDirectoryTool(actor, 'list_ads_objects', { level: 'adset' })).resolves.toMatchObject({ level: 'adset' });
     await expect(executeAdsDirectoryTool(actor, 'x', {})).rejects.toMatchObject({ code: 'invalid_request' });
   });
+it('enforces the same non-default parent identifier bound for directory and MCP reads', async () => {
+  state.config.mockImplementation(async (key: string) => key === 'ads.managementPolicy' ? { ...ADS_MANAGEMENT_DEFAULT_POLICY, parentIdMaxCharacters: 2 } : ADS_ANALYSIS_DEFAULT_POLICY);
+  await expect(readAdsDirectory(actor, { parentId: 'abc' }, now)).rejects.toMatchObject({ code: 'invalid_request' });
+  await expect(executeAdsDirectoryTool(actor, 'list_ads_objects', { parentId: 'abc' })).rejects.toMatchObject({ code: 'invalid_request' });
+});
+
 });

@@ -1,3 +1,4 @@
+import { ROOT_ERROR_CONFIG } from '@/app/root/errors/config';
 import { ROOT_INTERFACE_COPY } from './root-interface-copy';
 import { ROOT_EVIDENCE_COPY } from './root-evidence-copy';
 import { ROOT_EVIDENCE_POLICY } from './root-evidence-policy';
@@ -76,6 +77,8 @@ export const SHARED_CONFIG = [
   entry({ key: 'root.errorReleaseMaxCharacters', group: 'Root · Errors', label: 'Error release character limit', kind: 'number', description: 'Maximum printable release identifier characters returned to operators.', defaultValue: 64, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'root.configCopy', group: 'Root · Configuration', label: 'Configuration operator copy', kind: 'json', description: 'Plain-text labels and feedback for the configuration index and forms. Keep {search}, {count} and {label} placeholders where needed.', defaultValue: ROOT_CONFIG_COPY, schema: z.object(Object.fromEntries(Object.keys(ROOT_CONFIG_COPY).map(key => [key, z.string().trim().min(1).max(4000)])) as { [K in keyof typeof ROOT_CONFIG_COPY]: z.ZodString }).strict(), consumption: 'active' }),
   ...MAIL_CONFIG,
+  ...ROOT_ERROR_CONFIG,
+  entry({ key: 'ui.loadingCopy', group: 'Interface · Copy', label: 'Global loading message (English and French)', kind: 'json', description: 'Plain-text status shown while a workspace page loads.', defaultValue: { en: 'Loading your workspace…', fr: 'Chargement de votre espace de travail…' }, schema: z.object({ en: z.string().trim().min(1).max(4000), fr: z.string().trim().min(1).max(4000) }).strict(), consumption: 'active' }),
   ...ROOT_LEGACY_CONFIG,
   ...ROOT_AUDIT_CONFIG,
   entry({ key: 'jobs.workspaceOwnerPolicy', group: 'Jobs · Authorization', label: 'Workspace sync owner access', kind: 'select', description: 'Automatic provider reads require qualifying feature and platform access from the same active workspace owner. Any owner is the default; All owners is stricter. Root inspection never bypasses customer suspension.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerPolicy, schema: WORKSPACE_JOB_OWNER_POLICY_SCHEMA, consumption: 'active', options: [{ value: 'any_active_owner', label: 'Any active owner qualifies' }, { value: 'all_active_owners', label: 'All active owners qualify' }] }),

@@ -3,6 +3,14 @@ import { adsCopy } from './analysis/copy';
 import { creativeCopy } from './ui/creative-copy';
 
 export const adsCustomerCopy = {
+"resultsCaption": {"en": "{level} results for {account}", "fr": "Résultats {level} pour {account}"},
+"accountFallback": {"en": "ad account", "fr": "compte publicitaire"},
+"managementInvalidView": {"en": "Choose a valid Ads management view.", "fr": "Choisissez une vue de gestion publicitaire valide."},
+"managementLoadFailure": {"en": "Ads management could not be loaded. Please try again.", "fr": "Impossible de charger la gestion publicitaire. Réessayez."},
+"managementInvalidRequest": {"en": "Invalid Ads management request.", "fr": "Demande de gestion publicitaire invalide."},
+"managementOriginDenied": {"en": "Cross-origin request denied.", "fr": "Demande provenant d’un autre site refusée."},
+"managementOutcomeUnknown": {"en": "The change outcome is unconfirmed. Check Ads change history before repeating it.", "fr": "Le résultat de la modification n’est pas confirmé. Consultez l’historique publicitaire avant de la répéter."},
+
 "facebookNamePrintable": {"en": "Names must contain 1 to {max} printable characters.", "fr": "Les noms doivent contenir de 1 à {max} caractères imprimables."},
 "facebookCampaignNamePrintable": {"en": "Campaign names must contain 1 to {max} printable characters.", "fr": "Les noms de campagne doivent contenir de 1 à {max} caractères imprimables."},
 "facebookAdSetNamePrintable": {"en": "Ad set names must contain 1 to {max} printable characters.", "fr": "Les noms d’ensemble doivent contenir de 1 à {max} caractères imprimables."},
@@ -175,7 +183,7 @@ export const adsCustomerCopy = {
 "service061": {"en":"Choose a valid status.","fr":"Choisissez un état valide."},
 "service062": {"en":"Choose a valid page.","fr":"Choisissez une page valide."},
 "service063": {"en":"Choose a valid change and outcome.","fr":"Choisissez une modification et un résultat valides."},
-"service064": {"en":"Keep the note to 500 printable characters.","fr":"Limitez la note à 500 caractères imprimables."},
+"service064": {"en":"Keep the note to {max} printable characters.","fr":"Limitez la note à {max} caractères imprimables."},
 "service065": {"en":"This change was not found.","fr":"Cette modification est introuvable."},
 "service066": {"en":"This change does not need resolving.","fr":"Cette modification ne nécessite pas de résolution."},
 "service067": {"en":"This resolution could not be saved. Try again.","fr":"Cette résolution n’a pas pu être enregistrée. Réessayez."},

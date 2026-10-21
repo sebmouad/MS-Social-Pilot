@@ -15,11 +15,12 @@ const FAILED = defaultAdsText('validation001');
  */
 export async function withAdsErrorBoundary<T>(operation: () => Promise<T>, locale: 'en' | 'fr' = platformAdsLocale()): Promise<T> {
   return withPlatformAdsLocale(locale, () => withAdsCopySnapshot(async () => {
+  const effectiveLocale = platformAdsLocale();
   try { return await operation(); }
   catch (error) {
-    if (error instanceof AdsNoDispatchError) { error.message = localizeAdsMessage(await loadAdsCopy(), locale, error.message); throw error; }
+    if (error instanceof AdsNoDispatchError) { error.message = localizeAdsMessage(await loadAdsCopy(), effectiveLocale, error.message); throw error; }
     const failure = operationFailure(error, FAILED);
-    throw new OperationError(failure.code, localizeAdsMessage(await loadAdsCopy(), locale, failure.error));
+    throw new OperationError(failure.code, localizeAdsMessage(await loadAdsCopy(), effectiveLocale, failure.error));
   }
 
   }));

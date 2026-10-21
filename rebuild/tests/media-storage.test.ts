@@ -3,8 +3,8 @@ import { mkdtemp, mkdir, rm, symlink, utimes, writeFile } from 'node:fs/promises
 import os from 'node:os';
 import path from 'node:path';
 
-const config = vi.hoisted(() => ({ root: '', maxBytes: 1024, allowed: ['image/jpeg', 'image/png'] as string[] }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'storage.mediaRoot' ? config.root : key === 'publishing.maxImageUploadBytes' ? config.maxBytes : key === 'publishing.allowedImageMimeTypes' ? config.allowed : undefined) }));
+const config = vi.hoisted(() => ({ root: '', maxBytes: 1024, allowed: ['image/jpeg', 'image/png'] as string[], presentation: { holdersPerImage: 5, fileNameMaxCharacters: 180, usagePreviewMaxCharacters: 80, fallbackFileName: 'image' } }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'storage.mediaPresentationPolicy' ? config.presentation : key === 'storage.mediaRoot' ? config.root : key === 'publishing.maxImageUploadBytes' ? config.maxBytes : key === 'publishing.allowedImageMimeTypes' ? config.allowed : undefined) }));
 const db = vi.hoisted(() => ({ post: { findMany: vi.fn(async (): Promise<Array<{ media: unknown }>> => []) } }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
 
@@ -92,6 +92,23 @@ describe('workspace image storage', () => {
     expect(blind.items.find(entry => entry.id === used.id)).toMatchObject({ usedBy: 3, heldBy: [] });
     db.post.findMany.mockReset();
     db.post.findMany.mockResolvedValue([]);
+  });
+
+  it('applies non-default Root bounds after holder visibility while preserving total counts', async () => {
+    tempRoot = await mkdtemp(path.join(os.tmpdir(), 'media-store-test-'));
+    config.root = path.join(tempRoot, 'root'); await mkdir(config.root);
+    const previous = config.presentation;
+    config.presentation = { holdersPerImage: 1, fileNameMaxCharacters: 4, usagePreviewMaxCharacters: 5, fallbackFileName: 'photo' };
+    try {
+      const image = await uploadWorkspaceImage({ userId: 'u1', workspaceId: 'workspace-a' }, new File([Buffer.from([0xff, 0xd8, 0xff])], '../abcdef.jpg', { type: 'image/jpeg' }));
+      expect(image.fileName).toBe('abcd');
+      db.post.findMany.mockImplementation((async (args: { where: { AND?: unknown } }) => args.where.AND
+        ? [{ id: 'visible-a' }, { id: 'visible-b' }]
+        : ['hidden', 'visible-a', 'visible-b'].map(id => ({ id, status: 'draft', message: 'Long preview text', media: [{ url: `media:${image.id}` }] }))) as never);
+      const result = await listWorkspaceImages('workspace-a', { limit: 10, holderVisibility: { workspaceId: 'workspace-a' } });
+      expect(result.items[0]).toMatchObject({ usedBy: 3, heldBy: [{ id: 'visible-a', excerpt: 'Long…' }] });
+      expect(result.items[0]!.heldBy).toHaveLength(1);
+    } finally { config.presentation = previous; db.post.findMany.mockReset(); db.post.findMany.mockResolvedValue([]); }
   });
 
   it('rejects mismatched content, over-limit input, and workspace symlinks', async () => {

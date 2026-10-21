@@ -57,8 +57,6 @@ export const AGENCY_SESSION_MCP: McpToolGroup = {
     await assertAgencySession(actor);
     if (name === 'list_agency_clients') return listAgencyClients({ userId: actor.userId }, args);
     if (name === 'select_workspace') {
-      // The service enforces a supplied confirmation; tools also require its presence.
-      if (typeof args.confirmation !== 'string') throw copyError('invalid_request', 'Confirm the workspace selection.');
       return selectWorkspace(actor, args);
     }
     throw copyError('invalid_request', 'Unknown agency session tool.');

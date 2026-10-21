@@ -1,3 +1,4 @@
+import { loadAdsManagementPolicy } from '../management/server';
 import { withAdsCopySnapshot } from '@/modules/ads/server/copy';
 import { defaultAdsText } from '@/modules/ads/copy';
 import { adsServiceText } from '@/modules/ads/server/copy';
@@ -43,7 +44,7 @@ export async function readAdsDirectory(actor: AdsReadActor, input: unknown = {},
   const max = reportPolicy.maxFilterCharacters;
   const level = (text(values.level, 'level', max) ?? 'campaign') as DirectoryLevel;
   if (!LEVELS.includes(level)) throw new OperationError('invalid_request', await adsServiceText('service078'));
-  const parentId = text(values.parentId, 'parent object', max);
+  const parentId = text(values.parentId, 'parent object', Math.min(max, (await loadAdsManagementPolicy()).parentIdMaxCharacters));
   if (parentId !== undefined && !SAFE_ID.test(parentId)) throw new OperationError('invalid_request', await adsServiceText('service090'));
   const q = text(values.q, 'search', max)?.trim().toLowerCase();
   const sort = (text(values.sort, 'sort', max) ?? 'spend') as AdsObjectSortKey;

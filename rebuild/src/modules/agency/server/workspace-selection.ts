@@ -16,16 +16,12 @@ async function assertAgencySessionImpl(actor: AccountActor): Promise<void> {
   if (!isUsableLegacySession(await getSessionByTokenHash(actor.sessionTokenHash), actor.userId)) throw copyError('unauthorized', 'Sign in to continue.');
 }
 
-/**
- * Shared browser/MCP selection. Selecting a preference has no destructive consequence, so the
- * existing browser's explicit workspace selection is sufficient consent. If a confirmation is
- * supplied it must match exactly; MCP advertises it as required. This never grants membership.
- */
+/** Every entry point requires the same exact selection consent before membership lookup. */
 async function selectWorkspaceImpl(actor: AccountActor, input: unknown) {
   await assertAgencySession(actor);
   const maxLength = await runtimeConfig('agency.workspaceIdMaxLength');
-  const parsed = z.object({ workspaceId: z.string().min(1).max(maxLength), confirmation: z.string().optional() }).strict().safeParse(input);
-  if (!parsed.success || (parsed.data.confirmation !== undefined && parsed.data.confirmation !== workspaceSelectionConfirmation(parsed.data.workspaceId))) throw copyError('invalid_request', 'Choose a valid workspace and matching confirmation.');
+  const parsed = z.object({ workspaceId: z.string().min(1).max(maxLength), confirmation: z.string() }).strict().safeParse(input);
+  if (!parsed.success || parsed.data.confirmation !== workspaceSelectionConfirmation(parsed.data.workspaceId)) throw copyError('invalid_request', 'Choose a valid workspace and matching confirmation.');
   const { workspaceId } = parsed.data;
   // Check membership before the workspace guard, so unrelated workspace status stays private.
   const membership = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId } }, select: { id: true } });

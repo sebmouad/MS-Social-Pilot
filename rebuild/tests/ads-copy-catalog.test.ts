@@ -1,3 +1,4 @@
+import { platformAdsLocale } from '../src/server/platforms/host';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -6,7 +7,8 @@ import { adsCustomerCopy, adsCustomerCopySchema, bilingualCatalog, defaultAdsCat
 import { AdsCopyProvider } from '../src/modules/ads/ui/AdsCopyProvider';
 import { AdsFilterForm } from '../src/modules/ads/ui/AdsFilterForm';
 import { ADS_REPORT_DEFAULT_POLICY } from '../src/modules/ads/report-policy';
-const config = vi.hoisted(() => ({ read: vi.fn() }));
+const config = vi.hoisted(() => ({ read: vi.fn(), language: vi.fn(() => 'en') }));
+vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': config.language() }) }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: config.read }));
 import { loadAdsCopy, adsServiceText, withAdsCopySnapshot } from '../src/modules/ads/server/copy';
 
@@ -55,4 +57,14 @@ describe('Root Ads bilingual catalogs', () => {
     expect(localizeAdsMessage(catalogs, 'fr', 'Pick your account.')).toBe('Choisissez votre compte.');
     expect(localizeAdsMessage(catalogs, 'fr', 'Unknown safe provider explanation')).toBe('Unknown safe provider explanation');
   });
+});
+
+it('establishes the French customer locale for nested shared services and restores it afterwards', async () => {
+  config.language.mockReturnValue('fr');
+  await withAdsCopySnapshot(async () => {
+    expect(platformAdsLocale()).toBe('fr');
+    await withAdsCopySnapshot(async () => expect(platformAdsLocale()).toBe('fr'));
+  });
+  expect(platformAdsLocale()).toBe('en');
+  config.language.mockReturnValue('en');
 });

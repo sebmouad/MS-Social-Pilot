@@ -22,7 +22,7 @@ describe('Agency browser session parity', () => {
     state.guard.mockImplementation(async (_id, run) => run()); state.audit.mockResolvedValue(undefined); state.actor.mockResolvedValue(actor); state.clients.mockResolvedValue({ ok: true, workspaces: [] });
   });
   it('shares selection, audit and cookie without exposing credentials', async () => {
-    expect(await selectWorkspace(actor, { workspaceId: 'next' })).toEqual({ ok: true });
+    expect(await selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).toEqual({ ok: true });
     expect(state.guard).toHaveBeenCalledWith('next', expect.any(Function));
     expect(state.audit).toHaveBeenCalledWith(expect.anything(), 'user', 'account.workspace_selected', { workspaceId: 'next' });
     expect(state.set).toHaveBeenCalledWith('sp_workspace', 'next', expect.objectContaining({ httpOnly: true, sameSite: 'lax' }));
@@ -34,30 +34,30 @@ describe('Agency browser session parity', () => {
   });
   it('requires current membership before inspecting target status', async () => {
     state.membership.mockResolvedValue(null);
-    await expect(selectWorkspace(actor, { workspaceId: 'other' })).rejects.toMatchObject({ code: 'not_found' });
+    await expect(selectWorkspace(actor, { workspaceId: 'other', confirmation: 'SELECT WORKSPACE other' })).rejects.toMatchObject({ code: 'not_found' });
     expect(state.guard).not.toHaveBeenCalled(); expect(state.set).not.toHaveBeenCalled();
   });
   it.each(['suspended', 'purging'])('refuses %s targets through workspace guard', async status => {
     state.guard.mockRejectedValue(new OperationError('forbidden', status));
-    await expect(selectWorkspace(actor, { workspaceId: 'next' })).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).rejects.toMatchObject({ code: 'forbidden' });
     expect(state.audit).not.toHaveBeenCalled(); expect(state.set).not.toHaveBeenCalled();
   });
   it('refuses membership removed before locked authorization', async () => {
     state.lockedMembership.mockResolvedValue([]);
-    await expect(selectWorkspace(actor, { workspaceId: 'next' })).rejects.toMatchObject({ code: 'not_found' });
+    await expect(selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).rejects.toMatchObject({ code: 'not_found' });
     expect(state.audit).not.toHaveBeenCalled(); expect(state.set).not.toHaveBeenCalled();
   });
   it('refuses preference mutation when durable audit fails', async () => {
     state.audit.mockRejectedValue(new Error('audit unavailable'));
-    await expect(selectWorkspace(actor, { workspaceId: 'next' })).rejects.toThrow('audit unavailable'); expect(state.set).not.toHaveBeenCalled();
+    await expect(selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).rejects.toThrow('audit unavailable'); expect(state.set).not.toHaveBeenCalled();
   });
   it.each([{ pending: 'totp' }, { expiresAt: new Date(0) }, { userId: 'other' }, { user: { id: 'user', disabledAt: new Date() } }])('refuses unusable session %j', async override => {
     state.session.mockResolvedValue({ ...session(), ...override });
-    await expect(selectWorkspace(actor, { workspaceId: 'next' })).rejects.toMatchObject({ code: 'unauthorized' }); expect(state.set).not.toHaveBeenCalled();
+    await expect(selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).rejects.toMatchObject({ code: 'unauthorized' }); expect(state.set).not.toHaveBeenCalled();
   });
   it('rechecks session after acquiring the workspace guard', async () => {
     state.session.mockResolvedValueOnce(session()).mockResolvedValueOnce(null);
-    await expect(selectWorkspace(actor, { workspaceId: 'next' })).rejects.toMatchObject({ code: 'unauthorized' }); expect(state.audit).not.toHaveBeenCalled();
+    await expect(selectWorkspace(actor, { workspaceId: 'next', confirmation: 'SELECT WORKSPACE next' })).rejects.toMatchObject({ code: 'unauthorized' }); expect(state.audit).not.toHaveBeenCalled();
   });
   it('excludes bearer keys before session cookie access', async () => {
     const keyed = { ...viewer, apiKeyId: 'key' };
@@ -71,6 +71,12 @@ describe('Agency browser session parity', () => {
     await expect(AGENCY_SESSION_MCP.execute(viewer, 'list_agency_clients', { q: 'Studio' }, 100)).resolves.toEqual({ ok: true, workspaces: [] });
     expect(state.actor).toHaveBeenCalledWith('user', 'old'); expect(state.clients).toHaveBeenCalledWith({ userId: 'user' }, { q: 'Studio' });
     expect(AGENCY_SESSION_MCP.features.list_agency_clients).toBe('agency/clients');
+  });
+  it.each([undefined, '', 'SELECT WORKSPACE other', 'SELECT WORKSPACE next '])('refuses the same invalid consent in the service and MCP: %s', async confirmation => {
+    const input = { workspaceId: 'next', ...(confirmation === undefined ? {} : { confirmation }) };
+    await expect(selectWorkspace(actor, input)).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(AGENCY_SESSION_MCP.execute(viewer, 'select_workspace', input, 100)).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.membership).not.toHaveBeenCalled(); expect(state.audit).not.toHaveBeenCalled(); expect(state.set).not.toHaveBeenCalled();
   });
   it('requires MCP confirmation and shares the same selection service', async () => {
     await expect(AGENCY_SESSION_MCP.execute(viewer, 'select_workspace', { workspaceId: 'next' }, 100)).rejects.toMatchObject({ code: 'invalid_request' });

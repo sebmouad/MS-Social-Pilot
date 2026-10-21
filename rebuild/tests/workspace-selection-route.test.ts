@@ -68,7 +68,7 @@ describe('workspace selection route', () => {
       id: 'session', userId: 'user', tokenHash: 'hash', expiresAt: new Date(Date.now() + 60_000), pending: 'totp',
       user: { id: 'user', disabledAt: null },
     });
-    const response = await POST(request({ workspaceId: 'workspace-b' }));
+    const response = await POST(request({ workspaceId: 'workspace-b', confirmation: 'SELECT WORKSPACE workspace-b' }));
     expect(response.status).toBe(401);
     expect(state.listWorkspaces).not.toHaveBeenCalled();
     expect(state.cookieSet).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe('workspace selection route', () => {
       id: 'session', userId: 'user', tokenHash: 'hash', expiresAt: new Date(Date.now() + 60_000), pending: null,
       user: { id: 'user', disabledAt: new Date() },
     });
-    const response = await POST(request({ workspaceId: 'workspace-b' }));
+    const response = await POST(request({ workspaceId: 'workspace-b', confirmation: 'SELECT WORKSPACE workspace-b' }));
     expect(response.status).toBe(401);
     expect(state.listWorkspaces).not.toHaveBeenCalled();
     expect(state.cookieSet).not.toHaveBeenCalled();
@@ -93,13 +93,13 @@ describe('workspace selection route', () => {
   });
 
   it('rejects a workspace without a current membership', async () => {
-    const response = await POST(request({ workspaceId: 'foreign-workspace' }));
+    const response = await POST(request({ workspaceId: 'foreign-workspace', confirmation: 'SELECT WORKSPACE foreign-workspace' }));
     expect(response.status).toBe(404);
     expect(state.cookieSet).not.toHaveBeenCalled();
   });
 
   it('sets only the authorized workspace cookie after validating the completed session', async () => {
-    const response = await POST(request({ workspaceId: 'workspace-b' }));
+    const response = await POST(request({ workspaceId: 'workspace-b', confirmation: 'SELECT WORKSPACE workspace-b' }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
     expect(state.getSessionByTokenHash).toHaveBeenCalledTimes(3);
@@ -111,8 +111,14 @@ describe('workspace selection route', () => {
     });
   });
 
+  it.each([undefined, '', 'SELECT WORKSPACE workspace-a', 'SELECT WORKSPACE workspace-b '])('refuses missing or inexact consent over REST: %s', async confirmation => {
+    const response = await POST(request({ workspaceId: 'workspace-b', ...(confirmation === undefined ? {} : { confirmation }) }));
+    expect(response.status).toBe(400);
+    expect(state.membership).not.toHaveBeenCalled(); expect(state.audit).not.toHaveBeenCalled(); expect(state.cookieSet).not.toHaveBeenCalled();
+  });
+
   it('rejects mixed bearer credentials before reading cookies', async () => {
-    const input = request({ workspaceId: 'workspace-b' });
+    const input = request({ workspaceId: 'workspace-b', confirmation: 'SELECT WORKSPACE workspace-b' });
     input.headers.set('authorization', 'Bearer workspace-key');
     expect((await POST(input)).status).toBe(403);
     expect(state.cookieGet).not.toHaveBeenCalled();

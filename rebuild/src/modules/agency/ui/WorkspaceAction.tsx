@@ -15,7 +15,7 @@ export function WorkspaceAction({ workspaceId, workspaceName, href, label, varia
     if (pending) return;
     setPending(true); setError('');
     try {
-      const response = await fetch('/api/workspaces/select', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workspaceId }) });
+      const response = await fetch('/api/workspaces/select', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workspaceId, confirmation: `SELECT WORKSPACE ${workspaceId}` }) });
       if (!response.ok) throw new Error('select');
       toast.notify({ title: `${label}: ${workspaceName}` });
       window.location.assign(href);

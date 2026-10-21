@@ -13,8 +13,9 @@ import { loadPermissions } from '@/server/permissions/loader';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import { lockSelectedResources, withSelectedResourceOperation } from '@/server/platforms/resource-lock';
 import { runtimeConfig } from '@/server/config/store';
+import { platformAdsLocale } from '@/server/platforms/host';
 import { platformAds } from '@/server/platforms/registry';
-import { ADS_MANAGEMENT_POLICY_SCHEMA, type AdsManagementPolicy } from './config';
+import { ADS_MANAGEMENT_DEFAULT_POLICY, ADS_MANAGEMENT_POLICY_SCHEMA, type AdsManagementPolicy } from './config';
 import { adsOpsHostFor } from './registry';
 import { AdsNoDispatchError, asNoDispatch } from './errors';
 import { AD_OBJECT_TYPES, AD_OPERATION_IDS, isCreationOperation, type AdsNeutralOperation, type AdsObjectType, type AdsOpsHost } from './types';
@@ -49,9 +50,10 @@ function accountTargetScope(actor: AdsManageActor, pageScope: AdsPageScope) {
 }
 
 /** Parse and bound an untrusted neutral operation. Shape checks only; the module validates semantics. */
-export function parseNeutralOperation(raw: unknown): AdsNeutralOperation {
+export function parseNeutralOperation(raw: unknown, policy: AdsManagementPolicy = ADS_MANAGEMENT_DEFAULT_POLICY): AdsNeutralOperation {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new OperationError('invalid_request', defaultAdsText('validation007'));
   const value = raw as Record<string, unknown>;
+  if (typeof value.parentId === 'string' && value.parentId.length > policy.parentIdMaxCharacters) throw new OperationError('invalid_request', defaultAdsText('validation012'));
   const { type, objectType, objectId } = value;
   if (typeof type !== 'string' || !AD_OPERATION_IDS.includes(type as never) || typeof objectType !== 'string' || ![...AD_OBJECT_TYPES, 'creative'].includes(objectType as never)) throw new OperationError('invalid_request', defaultAdsText('validation007'));
   const keys = (allowed: string[]) => { if (Object.keys(value).some(key => !allowed.includes(key))) throw new OperationError('invalid_request', defaultAdsText('validation007')); };
@@ -78,10 +80,10 @@ export function parseNeutralOperation(raw: unknown): AdsNeutralOperation {
   }
   if (type === 'creative.create') {
     keys(['type', 'objectType', 'name', 'targetId', 'mediaId', 'format', 'message', 'title', 'linkUrl']);
-    if (objectType !== 'creative' || typeof value.name !== 'string' || !['image', 'link'].includes(String(value.format)) || typeof value.message !== 'string' || typeof value.title !== 'string' || value.message.length > 5000 || value.title.length > 200) throw new OperationError('invalid_request', defaultAdsText('validation015'));
+    if (objectType !== 'creative' || typeof value.name !== 'string' || !['image', 'link'].includes(String(value.format)) || typeof value.message !== 'string' || typeof value.title !== 'string' || value.message.length > policy.creativeMessageMaxCharacters || value.title.length > policy.creativeTitleMaxCharacters) throw new OperationError('invalid_request', defaultAdsText('validation015'));
     let linkUrl: string | undefined;
     if (value.format === 'link') {
-      try { const url = new URL(String(value.linkUrl)); if (url.protocol !== 'https:' || url.username || url.password || url.href.length > 2048) throw new Error(); linkUrl = url.href; }
+      try { const url = new URL(String(value.linkUrl)); if (url.protocol !== 'https:' || url.username || url.password || url.href.length > policy.creativeUrlMaxCharacters) throw new Error(); linkUrl = url.href; }
       catch { throw new OperationError('invalid_request', defaultAdsText('validation016')); }
     } else if (value.linkUrl !== undefined) throw new OperationError('invalid_request', defaultAdsText('validation017'));
     return { type, objectType, name: value.name.trim(), targetId: text(value.targetId, SAFE_ID, defaultAdsText('validation018')), mediaId: text(value.mediaId, /^[A-Za-z0-9_.-]{1,150}$/, defaultAdsText('validation019')), format: value.format as 'image' | 'link', message: value.message.trim(), title: value.title.trim(), ...(linkUrl ? { linkUrl } : {}) };
@@ -143,7 +145,7 @@ async function managedContext(actor: AdsManageActor, adAccountId: string, level:
   const connection = account?.socialAccount;
   if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new OperationError('reconnect_required', await adsServiceText('service037'));
   if (!hasPlatformCapability(access.entitlements, connection.provider)) throw new OperationError('unavailable', await adsServiceText('service006'));
-  const ads = await platformAds(connection.provider);
+  const ads = await platformAds(connection.provider, platformAdsLocale());
   const ops = ads?.operations ?? adsOpsHostFor(connection.provider);
   if (!ads || !ops) throw new OperationError('unavailable', await adsServiceText('service038'));
   if (ads.isReady && (await ads.isReady().catch(() => false)) !== true) throw new OperationError('unavailable', await adsServiceText('service038'));
@@ -227,7 +229,7 @@ export async function listAdsCreativeSources(actor: AdsManageActor, input: { adA
     prisma.target.findMany({ where: { workspaceId: actor.workspaceId, enabled: true, canPublish: true, ...(ids === null ? {} : { id: { in: ids } }), type: { in: [...ctx.ops.creativeIdentityKinds] as TargetType[] }, socialAccount: { is: { workspaceId: actor.workspaceId, provider: ctx.provider, invalidatedAt: null, adAccounts: { some: { id: ctx.account.id, enabled: true } } } } }, select: { id: true, name: true }, orderBy: { id: 'asc' }, skip: offset, take: limit + 1 }),
     listWorkspaceImages(actor.workspaceId, { limit, ...(input.imageAfter ? { cursor: input.imageAfter } : {}) }),
   ]);
-  return { targets: targets.slice(0, limit), nextTargetOffset: targets.length > limit ? offset + limit : null, images: images.items.map(item => ({ id: item.id, mimeType: item.mimeType })), nextImageAfter: images.nextCursor, nameMaxCharacters: policy.nameMaxCharacters };
+  return { targets: targets.slice(0, limit), nextTargetOffset: targets.length > limit ? offset + limit : null, images: images.items.map(item => ({ id: item.id, mimeType: item.mimeType })), nextImageAfter: images.nextCursor, nameMaxCharacters: policy.nameMaxCharacters, creativeMessageMaxCharacters: policy.creativeMessageMaxCharacters, creativeTitleMaxCharacters: policy.creativeTitleMaxCharacters, creativeUrlMaxCharacters: policy.creativeUrlMaxCharacters };
 
   });
 }
@@ -260,7 +262,7 @@ export async function describeAdsManagement(actor: AdsManageActor, adAccountId: 
   try {
     const ctx = await managedContext(actor, adAccountId, 'write');
     const policy = await loadAdsManagementPolicy();
-    return { canManage: true as const, operations: ctx.ops.operations.map(item => ({ ...item })), canListCreatives: Boolean(ctx.ops.listCreatives), limits: { nameMaxCharacters: policy.nameMaxCharacters, maxBudgetMinor: policy.maxBudgetMinor } };
+    return { canManage: true as const, operations: ctx.ops.operations.map(item => ({ ...item })), canListCreatives: Boolean(ctx.ops.listCreatives), limits: { ...policy } };
   } catch (error) {
     if (error instanceof OperationError && ['forbidden', 'unauthorized', 'unavailable', 'reconnect_required', 'not_found'].includes(error.code)) return { canManage: false as const, needsReconnect: error.code === 'reconnect_required', operations: [], canListCreatives: false };
     throw error;
@@ -272,7 +274,7 @@ export async function describeAdsManagement(actor: AdsManageActor, adAccountId: 
 /** Returns the exact confirmation a caller must repeat. No remote or ledger write. */
 export async function previewAdsManagement(actor: AdsManageActor, input: { adAccountId: string; operation: unknown }) {
   return withAdsCopySnapshot(async () => {
-  const operation = parseNeutralOperation(input.operation);
+  const operation = parseNeutralOperation(input.operation, await loadAdsManagementPolicy());
   const ctx = await managedContext(actor, input.adAccountId, 'write');
   const support = supports(ctx.ops, operation);
   assertCreationScope(operation, ctx.pageScope, actor.allowedTargetIds);
@@ -342,7 +344,7 @@ async function replayRequest(actor: AdsManageActor, requestId: string, requestHa
 export async function performAdsManagement(actor: AdsManageActor, input: { adAccountId: string; operation: unknown; confirmation: unknown; requestId: unknown }): Promise<AdsManagementOutcome> {
   return withAdsCopySnapshot(async () => {
   if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) throw new OperationError('invalid_request', await adsServiceText('service051'));
-  const operation = parseNeutralOperation(input.operation);
+  const operation = parseNeutralOperation(input.operation, await loadAdsManagementPolicy());
   // Creation only: a preflight failure of THIS send happened before its intent and any provider request. It says nothing about an earlier send of the same request id.
   const beforeJournal = isCreationOperation(operation) ? asNoDispatch : (error: unknown) => error;
   let ctx: Awaited<ReturnType<typeof managedContext>>, support: ReturnType<typeof supports>, expected: string;
@@ -518,7 +520,8 @@ export const pendingRecoveryConfirmation = (operationId: string, resolution: Ads
 export async function resolveAdsOperation(actor: AdsManageActor, input: { operationId: string; resolution: AdsResolution; note?: string; confirmation: string }) {
   return withAdsCopySnapshot(async () => {
   if (typeof input.operationId !== 'string' || !SAFE_ID.test(input.operationId) || (input.resolution !== 'applied' && input.resolution !== 'not_applied')) throw new OperationError('invalid_request', await adsServiceText('service063'));
-  if (input.note !== undefined && (typeof input.note !== 'string' || input.note.length > 500 || /[\u0000-\u001f\u007f]/.test(input.note))) throw new OperationError('invalid_request', await adsServiceText('service064'));
+  const policy = await loadAdsManagementPolicy();
+  if (input.note !== undefined && (typeof input.note !== 'string' || input.note.length > policy.recoveryNoteMaxCharacters || /[\u0000-\u001f\u007f]/.test(input.note))) throw new OperationError('invalid_request', await adsServiceText('service064', { max: policy.recoveryNoteMaxCharacters }));
   const access = await authorizeManager(actor, 'write');
   const rows = await prisma.$queryRaw<OperationRow[]>`SELECT (SELECT jsonb_agg(r.detail->'receipt') FROM (SELECT detail FROM root_activities WHERE action = 'ads.creation_receipt' AND detail->>'operationId' = ads_management_operations.id AND detail->>'workspaceId' = ${actor.workspaceId} ORDER BY "createdAt" DESC LIMIT 2) r) AS receipts, id, "adAccountId", "actorId", "operationType", "objectType", "objectId", params, status, "remoteId", "failureCode", "createdAt", "completedAt", "resolvedBy", "resolvedAt", "resolutionNote"
     FROM ads_management_operations WHERE id = ${input.operationId} AND "workspaceId" = ${actor.workspaceId}`;

@@ -32,7 +32,7 @@ describe('Agency workspace action', () => {
     const [url, init] = vi.mocked(fetch).mock.calls[0]!;
     expect(url).toBe('/api/workspaces/select');
     expect(init?.method).toBe('POST');
-    expect(JSON.parse(String(init?.body))).toEqual({ workspaceId: 'w2' });
+    expect(JSON.parse(String(init?.body))).toEqual({ workspaceId: 'w2', confirmation: 'SELECT WORKSPACE w2' });
     expect(assign).toHaveBeenCalledWith('/settings/connections');
   });
 
@@ -101,6 +101,6 @@ it('quick-switches only to an explicitly selected workspace from the scoped list
   const choice = [...dock.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent === 'Acme')!;
   await click(choice);
   await click(dock.querySelector<HTMLElement>('button[aria-label="Ouvrir l’espace: Acme"]')!);
-  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ workspaceId: 'w2' });
+  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ workspaceId: 'w2', confirmation: 'SELECT WORKSPACE w2' });
   expect(assign).toHaveBeenCalledWith('/home');
 });

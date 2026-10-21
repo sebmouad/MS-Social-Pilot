@@ -1,3 +1,4 @@
+import { withPlatformAdsLocale } from '../src/server/platforms/host';
 vi.mock('@/modules/ads/server/copy', async () => { const { defaultAdsCatalogs, customerText } = await import('../src/modules/ads/copy'); return { withAdsCopySnapshot: (operation: () => Promise<unknown>) => operation(), loadAdsCopy: async () => defaultAdsCatalogs, adsServiceText: async (key: Parameters<typeof customerText>[2]) => customerText(defaultAdsCatalogs.customer, 'en', key) }; });
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
@@ -815,5 +816,35 @@ describe('Ads recovery independent credential ceilings', () => {
     state.prisma.adAccount.findFirst.mockResolvedValue(null);
     await expect(resolveAdsOperation(actor, { operationId: 'op1', resolution: 'not_applied', confirmation: 'wrong' })).rejects.toMatchObject({ code: 'not_found' });
     expect(state.prisma.$executeRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe('contract audit runtime policy and locale', () => {
+  it('enforces a non-default recovery note limit through service, REST and MCP', async () => {
+    state.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : { ...ADS_MANAGEMENT_DEFAULT_POLICY, recoveryNoteMaxCharacters: 3 });
+    const input = { operationId: 'op1', resolution: 'applied' as const, note: 'long', confirmation: resolutionConfirmation('op1', 'applied') };
+    await expect(resolveAdsOperation(actor, input)).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(executeAdsManagementTool(actor, 'resolve_ads_change', input)).rejects.toMatchObject({ code: 'invalid_request' });
+    const response = await managementPost(new Request('https://example.test/api/ads/management', { method: 'POST', headers: { origin: 'https://example.test', 'content-type': 'application/json' }, body: JSON.stringify({ action: 'resolve', ...input }) }));
+    expect(response.status).toBe(400);
+    expect(state.prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+  it('enforces non-default creative field and parent limits before dispatch', async () => {
+    const policy = { ...ADS_MANAGEMENT_DEFAULT_POLICY, creativeMessageMaxCharacters: 3, creativeTitleMaxCharacters: 2, creativeUrlMaxCharacters: 20, parentIdMaxCharacters: 2 };
+    state.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : policy);
+    const creative = { type: 'creative.create', objectType: 'creative', name: 'Creative', targetId: 't1', mediaId: 'image', format: 'link', message: 'ok', title: 'ok', linkUrl: 'https://ex.test' };
+    for (const operation of [{ ...creative, message: 'long' }, { ...creative, title: 'long' }, { ...creative, linkUrl: 'https://example.test/long' }, { type: 'ad.create', objectType: 'ad', parentId: 'abc', name: 'Ad', creativeId: 'c1' }]) {
+      await expect(previewAdsManagement(actor, { adAccountId: 'acc1', operation })).rejects.toMatchObject({ code: 'invalid_request' });
+      await expect(executeAdsManagementTool(actor, 'preview_ads_change', { adAccountId: 'acc1', operation })).rejects.toMatchObject({ code: 'invalid_request' });
+    }
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it('passes French locale from REST and MCP scope to the platform host', async () => {
+    const response = await managementPost(new Request('https://example.test/api/ads/management', { method: 'POST', headers: { origin: 'https://example.test', 'content-type': 'application/json', 'accept-language': 'fr' }, body: JSON.stringify({ action: 'preview', adAccountId: 'acc1', operation: pause }) }));
+    expect(response.status).toBe(200);
+    expect(state.platformAds).toHaveBeenCalledWith('testnet', 'fr');
+    state.platformAds.mockClear();
+    await withPlatformAdsLocale('fr', () => executeAdsManagementTool(actor, 'get_ads_management_options', { adAccountId: 'acc1' }));
+    expect(state.platformAds).toHaveBeenCalledWith('testnet', 'fr');
   });
 });

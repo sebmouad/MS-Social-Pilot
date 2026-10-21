@@ -73,7 +73,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   const nameMaxByAccount = new Map([...managementByAccount].map(([id, management]) => [id, 'limits' in management && management.limits ? management.limits.nameMaxCharacters : 100] as const));
   const parentResolvers = new Map<string, ((input: { level: 'campaign' | 'adset' | 'ad'; fields: unknown }) => string | null) | undefined>();
   const adsUi = new Map(await Promise.all(accounts.map(async account => {
-    const host = account.socialAccount ? await platformAds(account.socialAccount.provider) : null;
+    const host = account.socialAccount ? await platformAds(account.socialAccount.provider, locale) : null;
     parentResolvers.set(account.id, host?.parentObjectId);
     const ui = host?.creationUi ? await host.creationUi().catch(() => null) : host?.ui ?? null;
     return [account.id, ui] as const;
@@ -112,7 +112,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
           const slot = (row: typeof levelRows[number]) => readAvailability.get(accountId) || actionAvailability.get(accountId)
             ? <AdsObjectActions adAccountId={accountId} objectId={row.id} name={row.name} objectType={row.level as 'campaign' | 'adset' | 'ad'} currency={row.currency} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null;
           return <div className="ads-result-level" key={level.value}><h3>{level.label}</h3>
-            <HierarchyTable locale={locale} caption={`${level.label} results for ${account?.name ?? rows[0]?.accountName ?? 'ad account'}`} objectsHref="/ads/objects"
+            <HierarchyTable locale={locale} caption={t('resultsCaption', { level: level.label, account: account?.name ?? rows[0]?.accountName ?? t('accountFallback') })} objectsHref="/ads/objects"
               rows={levelRows.map(row => ({ key: row.key, id: row.id, name: row.name, level: row.level as 'campaign' | 'adset' | 'ad', currency: row.currency, spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, days: row.rows, path: pathOf(row),
                 spendSeries: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => entry.spend) }))}
               actions={Object.fromEntries(levelRows.map(row => [row.key, slot(row)]))}

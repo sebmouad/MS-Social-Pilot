@@ -74,3 +74,16 @@ describe('app-published posts read insights from the matching external post', ()
     expect(rows[0]!.measuredAt).toEqual(new Date('2026-10-06'));
   });
 });
+
+it('localizes every Ads presentation branch and respects Root copy and metric overrides', () => {
+  const base = { locale: 'fr' as const, pageRows: [], audienceRows: [], selectedTargets: [], selectedAdAccounts: [account], adRows: [adRow({ estimated_ad_recallers: 2, cost_per_custom: 3, custom_categories: { first: 2 }, delivery_breakdowns: [{ dimensions: ['age'], rows: [{ age: '18-24', impressions: 10 }] }] })] };
+  const { metrics } = normalizeFacebookAnalytics(base);
+  expect(metrics.every(metric => metric.sourceLabel === 'Publicité')).toBe(true);
+  expect(metrics.find(metric => metric.key === 'reach')?.label).toContain('Dernière valeur par compte');
+  const presentation = metrics.flatMap(metric => [metric.label, metric.sourceLabel, metric.aggregationLabel, metric.aggregationNote, metric.displayTotal]).filter(Boolean).join(' ');
+  expect(presentation).not.toMatch(/Advertising|Latest per ad account|Calculated using|Per-account values|Stored values|Categories/);
+  const overridden = normalizeFacebookAnalytics({ ...base, metricLabels: { reach: { en: 'Custom reach', fr: 'Portée choisie' }, 'ads.source': { en: 'Custom ads', fr: 'Source choisie' }, 'ads.latest': { en: 'Custom latest', fr: 'Valeur choisie' }, 'ads.latestDayNote': { en: 'Custom note', fr: 'Note choisie' } } }).metrics;
+  expect(overridden.every(metric => metric.sourceLabel === 'Source choisie')).toBe(true);
+  expect(overridden.find(metric => metric.key === 'reach')?.label).toBe('Portée choisie · Valeur choisie');
+  expect(overridden.find(metric => metric.key === 'frequency')?.aggregationNote).toBe('Note choisie');
+});

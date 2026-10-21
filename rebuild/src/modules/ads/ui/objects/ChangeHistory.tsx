@@ -11,7 +11,7 @@ type Change = { receipts?: unknown; id: string; operationType: string; objectTyp
 type Resolution = 'applied' | 'not_applied';
 const isCreation = (type: string) => type === 'campaign.create' || type === 'adset.create' || type === 'creative.create';
 
-export function ChangeHistory({ items, locale = 'en' }: { items: Change[]; locale?: 'en' | 'fr' }) {
+export function ChangeHistory({ items, noteMaxCharacters, locale = 'en' }: { items: Change[]; noteMaxCharacters: number; locale?: 'en' | 'fr' }) {
   const localize = useAdsMessage();
   const t = useAdsText();
   const STATUS_TEXT: Record<string, string> = { pending: t('pending'), succeeded: t('succeeded'), rejected: t('rejected'), uncertain: t('uncertain'), resolved_applied: t('resolved_applied'), resolved_not_applied: t('resolved_not_applied') };
@@ -80,7 +80,7 @@ export function ChangeHistory({ items, locale = 'en' }: { items: Change[]; local
       <div className="ui-dialog__body">
         <p><strong>{t('text139')}</strong></p>
         <p>{t('text140')}</p>
-        <label>{t('text141')}<textarea className="ui-input" value={note} maxLength={500} onChange={event => setNote(event.target.value)} disabled={busy} /></label>
+        <label>{t('text141')}<textarea className="ui-input" value={note} maxLength={noteMaxCharacters} onChange={event => setNote(event.target.value)} disabled={busy} /></label>
         {message ? <RouteNotice error className="ui-error" focusKey={message.key}>{localize(message.text)}</RouteNotice> : null}
       </div>
       <div className="ui-dialog__actions">

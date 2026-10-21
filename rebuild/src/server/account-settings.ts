@@ -1,28 +1,8 @@
-import { synchronousPolicy } from './synchronous-policy';
 import { randomBytes } from 'node:crypto';
 import type { Prisma } from '../../generated/client';
-import { runtimeConfig } from '@/server/config/store';
 
-export type AccountPasswordPolicy = { minLength: number; maxBytes: number };
-
-export async function accountPasswordPolicy(): Promise<AccountPasswordPolicy> {
-  const [minLength, maxBytes] = await Promise.all([
-    runtimeConfig('auth.passwordMinLength'),
-    runtimeConfig('auth.passwordMaxBytes'),
-  ]);
-  return { minLength, maxBytes };
-}
-
-export function validateProfileName(value: unknown) {
-  if (typeof value !== 'string') return null;
-  const name = value.trim();
-  return name.length >= 1 && name.length <= synchronousPolicy('settings.accountNameMaxLength') ? name : null;
-}
-
-export function validateNewPassword(value: unknown, policy: AccountPasswordPolicy) {
-  if (typeof value !== 'string' || value.length < policy.minLength || Buffer.byteLength(value, 'utf8') > policy.maxBytes) return false;
-  return true;
-}
+/** Compatibility exports; account validation belongs to Settings. */
+export { accountPasswordPolicy, validateProfileName, validateNewPassword, type AccountPasswordPolicy } from '@/modules/settings/server/account-policy';
 
 export function accountAuditId() {
   return `account_${randomBytes(12).toString('hex')}`;

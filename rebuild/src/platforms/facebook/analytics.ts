@@ -73,7 +73,41 @@ type AdRow = { date: Date; spend: number; impressions: number; clicks: number; r
 type FacebookTarget = AnalyticsTarget & { socialAccountId: string | null };
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const dayKey = (date: Date) => date.toISOString().slice(0, 10);
-const overlappingPeopleNote = 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.';
+/** Root can override these presentation entries in the existing extensible meta.metricLabels catalog. */
+export const FACEBOOK_AD_ANALYTICS_COPY_DEFAULTS = {
+  "ads.source": {
+    "en": "Advertising",
+    "fr": "Publicité"
+  },
+  "ads.latest": {
+    "en": "Latest per ad account",
+    "fr": "Dernière valeur par compte publicitaire"
+  },
+  "ads.latestDay": {
+    "en": "Calculated for the latest stored day",
+    "fr": "Calculé pour le dernier jour enregistré"
+  },
+  "ads.latestDayNote": {
+    "en": "Calculated using summed account reach for the latest stored day. People may overlap across accounts; this is not a deduplicated rate for the whole period.",
+    "fr": "Calculé avec la somme des portées des comptes pour le dernier jour enregistré. Une personne peut figurer dans plusieurs comptes ; ce taux ne représente pas des personnes distinctes sur toute la période."
+  },
+  "ads.selectedAccounts": {
+    "en": "Selected ad accounts",
+    "fr": "Comptes publicitaires sélectionnés"
+  },
+  "ads.perAccount": {
+    "en": "Per-account values",
+    "fr": "Valeurs par compte"
+  },
+  "ads.stored": {
+    "en": "Stored values",
+    "fr": "Valeurs enregistrées"
+  },
+  "ads.unknownCurrency": {
+    "en": "Unknown currency",
+    "fr": "Devise inconnue"
+  }
+};
 
 type PagePresentation = { locale?: 'en' | 'fr'; metricLabels?: Record<string, { en: string; fr: string }>; pageCopy?: Record<'en' | 'fr', Omit<(typeof FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS)['en'], 'postSeries' | 'postSeriesNote'> & { postSeries?: string; postSeriesNote?: string }> };
 
@@ -157,7 +191,10 @@ type SelectedAdAccount = AnalyticsAdAccount;
 type ExtraValue = { observation: AnalyticsObservation; sourcePriority: number };
 
 function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presentation: PagePresentation = {}): AnalyticsMetricInput[] {
-  const adCatalog = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...presentation.metricLabels } as LabelCatalog;
+  const locale = presentation.locale ?? 'en';
+  const adCatalog = { ...FACEBOOK_METRIC_LABEL_DEFAULTS, ...FACEBOOK_AD_ANALYTICS_COPY_DEFAULTS, ...presentation.metricLabels } as LabelCatalog;
+  const text = (key: keyof typeof FACEBOOK_AD_ANALYTICS_COPY_DEFAULTS) => adCatalog[key]![locale];
+  const pageCopy = { ...FACEBOOK_PAGE_ANALYTICS_COPY_DEFAULTS[locale], ...presentation.pageCopy?.[locale] };
   const facebookLabel = (key: string) => facebookAdLabel(key, adCatalog, presentation.locale ?? 'en');
   const facebookMetricLabel = facebookLabel;
   const metrics: AnalyticsMetricInput[] = [];
@@ -165,7 +202,7 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presen
   for (const row of rows) { const currency = row.adAccount.currency ?? ''; const group = byCurrency.get(currency) ?? []; group.push(row); byCurrency.set(currency, group); }
   const availableForCurrency = (currency: string) => selectedAdAccounts.filter(account => (account.currency ?? '') === currency).length;
   const currencyKey = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => unit === 'currency' ? `${key}::${currency || 'unknown-currency'}` : key;
-  const currencyLabel = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => `${facebookLabel(key)}${unit === 'currency' ? ` · ${currency || 'Unknown currency'}` : ''}`;
+  const currencyLabel = (key: string, currency: string, unit: AnalyticsMetricInput['unit']) => `${facebookLabel(key)}${unit === 'currency' ? ` · ${currency || text('ads.unknownCurrency')}` : ''}`;
   const latestSync = (source: AdRow[]) => source.length ? new Date(Math.max(...source.map(row => row.fetchedAt.getTime()))) : null;
   const extraUnit = (key: string, currency: string): AnalyticsMetricInput['unit'] => {
     const known = facebookAdMetricUnit(key, currency || null);
@@ -175,14 +212,14 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presen
   // Delivery counts can be combined across ad accounts; monetary spend is split into currency series.
   for (const key of ['impressions', 'clicks', 'reach'] as const) {
     const observations = rows.map(row => ({ date: row.date, channelId: row.adAccount.id, channelLabel: row.adAccount.name, value: row[key] }));
-    if (observations.length) metrics.push({ key, label: key === 'reach' ? 'Reach · Latest per ad account' : facebookMetricLabel(key)!, sourceLabel: 'Advertising', kind: key === 'reach' ? 'stock' : 'flow', unit: 'count', observations, ...(key === 'reach' ? { aggregationNote: overlappingPeopleNote } : {}), coveredResourceIds: [...new Set(observations.map(row => row.channelId))].sort(), available: selectedAdAccounts.length, updatedAt: latestSync(rows) });
+    if (observations.length) metrics.push({ key, label: key === 'reach' ? `${facebookMetricLabel(key)} · ${text('ads.latest')}` : facebookMetricLabel(key)!, sourceLabel: text('ads.source'), kind: key === 'reach' ? 'stock' : 'flow', unit: 'count', observations, ...(key === 'reach' ? { aggregationNote: pageCopy.overlap } : {}), coveredResourceIds: [...new Set(observations.map(row => row.channelId))].sort(), available: selectedAdAccounts.length, updatedAt: latestSync(rows) });
   }
   for (const [currency, currencyRows] of byCurrency) {
     const available = availableForCurrency(currency);
     if (!currencyRows.length) continue;
     const unit = 'currency';
     const observations = currencyRows.map(row => ({ date: row.date, channelId: row.adAccount.id, channelLabel: row.adAccount.name, value: row.spend }));
-    metrics.push({ key: currencyKey('spend', currency, unit), label: currencyLabel('spend', currency, unit), sourceLabel: 'Advertising', kind: 'flow', unit, observations, coveredResourceIds: [...new Set(observations.map(row => row.channelId))].sort(), available, updatedAt: latestSync(currencyRows) });
+    metrics.push({ key: currencyKey('spend', currency, unit), label: currencyLabel('spend', currency, unit), sourceLabel: text('ads.source'), kind: 'flow', unit, observations, coveredResourceIds: [...new Set(observations.map(row => row.channelId))].sort(), available, updatedAt: latestSync(currencyRows) });
   }
 
   const byDay = (source: AdRow[]) => {
@@ -221,7 +258,7 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presen
       const unit = facebookAdMetricUnit(key, currency || null);
       const latestDayOnly = ['cpp', 'frequency'].includes(key);
       const coveredResourceIds = latestDayOnly ? [...new Set(totalRows.filter(row => row.reach > 0).map(row => row.adAccount.id))].sort() : detailsByAccount.map(item => item.id).sort();
-      metrics.push({ key: currencyKey(key, currency, unit), label: currencyLabel(key, currency, unit), ...(latestDayOnly ? { aggregationLabel: 'Calculated for the latest stored day', aggregationNote: 'Calculated using summed account reach for the latest stored day. People may overlap across accounts; this is not a deduplicated rate for the whole period.' } : {}), sourceLabel: 'Advertising', kind: 'ratio', unit, observations: daily.map(item => ({ ...item, channelId: 'total', channelLabel: 'Selected ad accounts' })), totalObservations, rows: details, coveredResourceIds, available, covered: coveredResourceIds.length, updatedAt: latestSync(currencyRows) });
+      metrics.push({ key: currencyKey(key, currency, unit), label: currencyLabel(key, currency, unit), ...(latestDayOnly ? { aggregationLabel: text('ads.latestDay'), aggregationNote: text('ads.latestDayNote') } : {}), sourceLabel: text('ads.source'), kind: 'ratio', unit, observations: daily.map(item => ({ ...item, channelId: 'total', channelLabel: text('ads.selectedAccounts') })), totalObservations, rows: details, coveredResourceIds, available, covered: coveredResourceIds.length, updatedAt: latestSync(currencyRows) });
     }
   }
 
@@ -298,20 +335,20 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[], presen
       const kind: AnalyticsKind = actionValue || (knownActions.has(key) && !costRatio) ? 'flow' : costRatio ? 'ratio' : 'stock';
       const available = monetary ? availableForCurrency(currency) : selectedAdAccounts.length;
       const accountRows = kind === 'flow' ? undefined : currencyObservations.map(item => ({ label: `${item.channelLabel}${currency ? ` · ${currency}` : ''} · ${dayKey(item.date)}`, value: item.value, asOf: item.date }));
-      metrics.push({ key: currencyKey(key, currency, unit), label: kind === 'stock' ? `${currencyLabel(key, currency, unit)} · Latest per ad account` : currencyLabel(key, currency, unit), sourceLabel: 'Advertising', kind, unit, observations: currencyObservations, ...(accountRows ? { rows: accountRows, covered: new Set(currencyObservations.map(item => item.channelId)).size, totalOverride: null, displayTotal: costRatio ? 'Per-account values' : 'Stored values' } : {}), ...(kind === 'stock' ? { rollup: 'latest-per-channel' as const } : {}), coveredResourceIds: [...new Set(currencyObservations.map(item => item.channelId))].sort(), available, updatedAt: latestSync(rows.filter(row => currencyObservations.some(item => item.channelId === row.adAccount.id))) });
+      metrics.push({ key: currencyKey(key, currency, unit), label: kind === 'stock' ? `${currencyLabel(key, currency, unit)} · ${text('ads.latest')}` : currencyLabel(key, currency, unit), sourceLabel: text('ads.source'), kind, unit, observations: currencyObservations, ...(accountRows ? { rows: accountRows, covered: new Set(currencyObservations.map(item => item.channelId)).size, totalOverride: null, displayTotal: costRatio ? text('ads.perAccount') : text('ads.stored') } : {}), ...(kind === 'stock' ? { rollup: 'latest-per-channel' as const } : {}), coveredResourceIds: [...new Set(currencyObservations.map(item => item.channelId))].sort(), available, updatedAt: latestSync(rows.filter(row => currencyObservations.some(item => item.channelId === row.adAccount.id))) });
     }
   }
   for (const [key, accounts] of breakdowns) {
     const values = new Map<string, number>();
     for (const account of accounts.values()) for (const [label, value] of account.values) values.set(label, (values.get(label) ?? 0) + value);
     const latest = [...accounts.values()];
-    if (values.size) metrics.push({ key: extras.has(key) ? `${key}::breakdown` : key, label: `${facebookLabel(key)} · Categories`, sourceLabel: 'Advertising', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...accounts.keys()].sort(), available: selectedAdAccounts.length, covered: accounts.size, latestAt: new Date(Math.max(...latest.map(item => item.date.getTime()))), updatedAt: new Date(Math.max(...latest.map(item => item.fetchedAt.getTime()))) });
+    if (values.size) metrics.push({ key: extras.has(key) ? `${key}::breakdown` : key, label: `${facebookLabel(key)} · ${pageCopy.categories}`, sourceLabel: text('ads.source'), kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...accounts.keys()].sort(), available: selectedAdAccounts.length, covered: accounts.size, latestAt: new Date(Math.max(...latest.map(item => item.date.getTime()))), updatedAt: new Date(Math.max(...latest.map(item => item.fetchedAt.getTime()))) });
   }
-  return [...metrics, ...deliveryBreakdownInputs(rows, selectedAdAccounts, facebookLabel)].map(metric => ({ ...metric, resourceKind: 'ad-account' }));
+  return [...metrics, ...deliveryBreakdownInputs(rows, selectedAdAccounts, facebookLabel, text('ads.source'), pageCopy.overlap)].map(metric => ({ ...metric, resourceKind: 'ad-account' }));
 }
 
 /** Delivery dimensions retain daily/account/currency identity and never enter account totals. */
-function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[], facebookLabel: (key: string) => string): AnalyticsMetricInput[] {
+function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[], facebookLabel: (key: string) => string, sourceLabel: string, overlap: string): AnalyticsMetricInput[] {
   const groups = new Map<string, { field: string; currency: string; history: NonNullable<AnalyticsMetricInput['breakdownHistory']> }>();
   for (const row of rows) {
     const payload = object(row.fields).delivery_breakdowns;
@@ -354,9 +391,9 @@ function deliveryBreakdownInputs(rows: AdRow[], selected: SelectedAdAccount[], f
       const previous = latest.get(snapshot.resourceId);
       if (!previous || snapshot.asOf > previous.asOf || (snapshot.asOf.getTime() === previous.asOf.getTime() && snapshot.fetchedAt > previous.fetchedAt)) latest.set(snapshot.resourceId, snapshot);
     }
-    return { key: `delivery:${key}`, label: `${facebookLabel(group.field)}${group.currency ? ` · ${group.currency}` : ''}`, sourceLabel: 'Advertising', kind: 'breakdown', unit: facebookAdMetricUnit(group.field), observations: [],
+    return { key: `delivery:${key}`, label: `${facebookLabel(group.field)}${group.currency ? ` · ${group.currency}` : ''}`, sourceLabel, kind: 'breakdown', unit: facebookAdMetricUnit(group.field), observations: [],
       breakdownHistory: group.history, rows: [...latest.values()].flatMap(snapshot => snapshot.rows.flatMap(value => value.value === null ? [] : [{ label: `${snapshot.resourceLabel} · ${value.label}`, value: value.value, asOf: snapshot.asOf }])),
-      available: selected.length, coveredResourceIds: [...latest.keys()], covered: latest.size, totalOverride: null, aggregationNote: overlappingPeopleNote,
+      available: selected.length, coveredResourceIds: [...latest.keys()], covered: latest.size, totalOverride: null, aggregationNote: overlap,
       updatedAt: new Date(Math.max(...group.history.map(snapshot => snapshot.fetchedAt.getTime()))), latestAt: new Date(Math.max(...group.history.map(snapshot => snapshot.asOf.getTime()))) };
   });
 }

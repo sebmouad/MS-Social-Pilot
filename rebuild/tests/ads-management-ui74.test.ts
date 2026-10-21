@@ -157,11 +157,12 @@ describe('Ads management UI', () => {
 
   it('offers only service-approved pending recovery and keeps the review note after a save failure', async () => {
     const item = { id: 'change-9', operationType: 'status.set', objectType: 'campaign', objectId: 'campaign-1', status: 'pending', createdAt: '2026-10-18T12:00:00.000Z', needsResolution: true, resolutionKind: 'pending_recovery' as const, onHold: true, resolutionNote: null };
-    await act(async () => root.render(createElement(ChangeHistory, { items: [item] })));
+    await act(async () => root.render(createElement(ChangeHistory, { noteMaxCharacters: 37, items: [item] })));
     expect(container.textContent).toContain('service checks for an active dispatch before it records your finding');
     await click('I checked: it was applied');
     await settle();
     const note = container.querySelector<HTMLTextAreaElement>('textarea')!;
+    expect(note.maxLength).toBe(37);
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
     await act(async () => { setter.call(note, 'checked in the platform'); note.dispatchEvent(new Event('input', { bubbles: true })); note.dispatchEvent(new Event('change', { bubbles: true })); });
     fetchMock.mockResolvedValueOnce(response({ error: 'The record could not be saved.' }, false));

@@ -217,7 +217,7 @@ describe('no-dispatch refusals versus held outcomes', () => {
 describe('creation history labels', () => {
   it('shows New campaign and New ad set instead of placeholder identifiers', async () => {
     const base = { status: 'succeeded', createdAt: '2026-10-18T12:00:00.000Z', needsResolution: false, resolutionNote: null };
-    await render(createElement(ChangeHistory, { items: [
+    await render(createElement(ChangeHistory, { noteMaxCharacters: 37, items: [
       { ...base, id: 'a', operationType: 'campaign.create', objectType: 'campaign', objectId: '@create-campaign' },
       { ...base, id: 'b', operationType: 'adset.create', objectType: 'adset', objectId: '@create-adset:c1' },
     ] }));

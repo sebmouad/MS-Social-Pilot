@@ -120,7 +120,9 @@ async function executeCreation(transport: FacebookAdsTransport, token: string, c
   const name = operation.name.trim();
   let body: Record<string, string>;
   if (operation.type === 'campaign.create') {
-    body = { name, objective: operation.objective, status: FACEBOOK_CREATE_STATUS, special_ad_categories: '[]' };
+    body = { name, objective: operation.objective, status: FACEBOOK_CREATE_STATUS, special_ad_categories: '[]',
+      // Graph v26 requires an explicit choice when no campaign budget is set (error 100/4834011); ad sets keep their own budgets.
+      is_adset_budget_sharing_enabled: 'false' };
   } else {
     // A campaign has an objective; an ad set or ad does not, so this also rejects wrong-level ids.
     const parent = await transport.get(encodeURIComponent(operation.parentId), token, { fields: 'id,account_id,objective' }, context.signal);

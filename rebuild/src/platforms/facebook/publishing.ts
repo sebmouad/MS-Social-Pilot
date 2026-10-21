@@ -666,7 +666,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const objectives = new Set(['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION']);
       if (!objectives.has(input.objective)) throw new FacebookApiError('Choose a supported campaign objective.', 0);
       const payload = object(await request(`${encodeURIComponent(input.accountId)}/campaigns`, { method: 'POST', token: input.credential.accessToken,
-        body: { name, objective: input.objective, status: 'PAUSED', special_ad_categories: '[]' } }));
+        body: { name, objective: input.objective, status: 'PAUSED', special_ad_categories: '[]', is_adset_budget_sharing_enabled: 'false' } }));
       if (typeof payload.id !== 'string' || !payload.id) throw new FacebookApiError('Facebook did not return a campaign id.', 200);
       return { remoteId: payload.id };
     },

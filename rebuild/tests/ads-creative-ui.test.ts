@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CreativeCreateForm } from '@/modules/ads/ui/CreativeCreateForm';
-const sources = { targets: [{ id: 'channel', name: 'Example shop' }], images: [{ id: 'stored-image', mimeType: 'image/png' }], nextTargetOffset: null, nextImageAfter: null, nameMaxCharacters: 100 };
+const sources = { targets: [{ id: 'channel', name: 'Example shop' }], images: [{ id: 'stored-image', mimeType: 'image/png' }], nextTargetOffset: null, nextImageAfter: null, nameMaxCharacters: 100, creativeMessageMaxCharacters: 41, creativeTitleMaxCharacters: 23, creativeUrlMaxCharacters: 99 };
 const reply = (data: unknown) => new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json' } });
 let root: ReturnType<typeof createRoot>; let container: HTMLDivElement;
 const key = 'ads-creation-pending:v2:creative:user:workspace:account';
@@ -72,4 +72,12 @@ it('shows French copy and keeps entered values when review fails', async () => {
   expect(container.textContent).toContain('Cette demande n’a pas pu aboutir');
   expect(container.querySelector<HTMLInputElement>('input[name="name"]')!.value).toBe('Summer');
   expect(window.sessionStorage.getItem(key)).toBeNull();
+});
+
+it('uses service-supplied creative field limits', async () => {
+  await render();
+  expect(container.querySelector<HTMLTextAreaElement>('[name="message"]')!.maxLength).toBe(41);
+  await act(async () => value(container.querySelector('select[name="format"]')!, 'link'));
+  expect(container.querySelector<HTMLInputElement>('[name="title"]')!.maxLength).toBe(23);
+  expect(container.querySelector<HTMLInputElement>('[name="linkUrl"]')!.maxLength).toBe(99);
 });
