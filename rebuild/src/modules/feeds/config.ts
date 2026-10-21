@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { cron, entry } from '@/lib/config/entry';
+import { WORDPRESS_CONFIG } from './wordpress/config';
 
 export const FEEDS_DEFAULTS = {
   pageSize: 25, maxPerWorkspace: 25, fetchTimeoutMs: 15000, fetchMaxBytes: 2097152, fetchMaxRedirects: 3, allowHttp: false, hostAllowlist: [] as string[],
@@ -62,4 +63,5 @@ export const FEEDS_CONFIG = [
   entry({ key: 'feeds.queueLookaheadDays', group: G, label: 'Queue look-ahead for feed posts (days)', kind: 'number', description: 'How far ahead a scheduled feed post searches the workspace queue for a free time.', defaultValue: FEEDS_DEFAULTS.queueLookaheadDays, schema: int(FEEDS_BOUNDS.queueLookaheadDays), consumption: 'active' }),
   entry({ key: 'feeds.fallbackDelayMinutes', group: G, label: 'Delay when the queue has no free time (minutes)', kind: 'number', description: 'A scheduled feed post that finds no queue time goes out this long after it was read, so a person can still intervene.', defaultValue: FEEDS_DEFAULTS.fallbackDelayMinutes, schema: int(FEEDS_BOUNDS.fallbackDelayMinutes), consumption: 'active' }),
   entry({ key: 'feeds.fallbackSpacingMinutes', group: G, label: 'Spacing between fallback times (minutes)', kind: 'number', description: 'Minimum gap kept between feed posts placed without a queue time.', defaultValue: FEEDS_DEFAULTS.fallbackSpacingMinutes, schema: int(FEEDS_BOUNDS.fallbackSpacingMinutes), consumption: 'active' }),
+  ...WORDPRESS_CONFIG,
 ] as const;

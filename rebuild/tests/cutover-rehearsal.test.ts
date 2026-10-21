@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const script = 'scripts/cutover-rehearsal.sh';
-const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs,20261019050000_rebuild_publication_submissions,20261019060000_rebuild_template_comment_delay,20261026100000_rebuild_oauth_connectors,20261027100000_rebuild_workspace_exports,20261028100000_rebuild_alert_delivery,20261029100000_rebuild_channel_profiles,20261030100000_rebuild_facebook_native_story_proofs,20261030100000_rebuild_review_resolution,20261030110000_rebuild_ads_creative_creation,20261030120000_rebuild_workspace_watermark,20261030130000_rebuild_comment_sentiment,20261030130000_rebuild_person_mcp_keys,20261030140000_rebuild_facebook_native_schedule_changes,20261031100000_rebuild_destination_schedule_mode,20261031120000_rebuild_facebook_sync_cursors';
+const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs,20261019050000_rebuild_publication_submissions,20261019060000_rebuild_template_comment_delay,20261026100000_rebuild_oauth_connectors,20261027100000_rebuild_workspace_exports,20261028100000_rebuild_alert_delivery,20261029100000_rebuild_channel_profiles,20261030100000_rebuild_facebook_native_story_proofs,20261030100000_rebuild_review_resolution,20261030110000_rebuild_ads_creative_creation,20261030120000_rebuild_workspace_watermark,20261030130000_rebuild_comment_sentiment,20261030130000_rebuild_person_mcp_keys,20261030140000_rebuild_facebook_native_schedule_changes,20261031100000_rebuild_destination_schedule_mode,20261031120000_rebuild_facebook_sync_cursors,20261031140000_rebuild_wordpress_sources';
 
 describe('cutover rehearsal safety gates', () => {
   it('pins report run migrations, refuses already migrated objects/history, and proves the purge gate', () => {
@@ -307,5 +307,20 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain('ROLLBACK;');
     expect(migration).toContain('DEFAULT 0');
     expect(migration).toContain('CHECK ("firstCommentDelayMinutes" >= 0)');
+  });
+
+  it('pins the WordPress recipe source and plan ledger migration', () => {
+    const source = readFileSync(script, 'utf8');
+    const migration = readFileSync('../prisma/migrations/20261031140000_rebuild_wordpress_sources/migration.sql', 'utf8');
+    const hash = createHash('sha256').update(migration).digest('hex');
+
+    expect(hash).toBe('cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642');
+    expect(source).toContain(`verify_migration 20261031140000_rebuild_wordpress_sources ${hash}`);
+    expect(source).toContain(approvedMigrationSet);
+    expect(source.indexOf('migration_dir/20261031140000_rebuild_wordpress_sources/migration.sql')).toBeGreaterThan(source.indexOf('migration_dir/20261018193000_rebuild_purge_write_gates/migration.sql'));
+    expect(source).toContain("to_regclass('public.wordpress_recipe_plans') IS NOT NULL");
+    expect(source).toContain("ARRAY['wordpress_recipe_plans','slotAt']");
+    expect(migration).toContain('CREATE UNIQUE INDEX "wordpress_recipe_plans_slot_key" ON "wordpress_recipe_plans" ("sourceId", "targetId", "slotAt")');
+    expect(migration).toContain('rebuild_reject_purging_workspace_write()');
   });
 });

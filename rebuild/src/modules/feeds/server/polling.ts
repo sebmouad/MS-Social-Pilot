@@ -46,8 +46,10 @@ export async function automaticCheckingStatus(): Promise<{ available: boolean; i
 }
 
 export type FeedPollOutcome = 'created' | 'checked' | 'not_modified' | 'lost_claim' | 'no_destinations' | 'no_qualifying_owner' | 'not_permitted' | 'failed';
-export type FeedPollSummary = { reason?: 'disabled' | 'misconfigured'; examined: number; claimed: number; postsCreated: number; held: number; skipped: number; failed: number; outcomes: Array<{ feedId: string; outcome: FeedPollOutcome }> };
+export type FeedPollSummary = { reason?: 'disabled' | 'misconfigured'; examined: number; claimed: number; postsCreated: number; held: number; skipped: number; failed: number; outcomes: Array<{ feedId: string; outcome: FeedPollOutcome }>; recipes?: import('./wordpress-planner').RecipePlanSummary };
 export type PollDeps = {
+  /** Replaces the recipe planner's ports (tests). */
+  recipes?: Partial<import('./wordpress-planner').PlannerPorts>;
   net?: FetchDeps; validateTargets?: FeedPorts['validate']; resolveFormats?: FeedPorts['formats']; shouldStop?: () => boolean; now?: () => Date;
   /** Replaces owner qualification (tests); the default is the workspace-owner worker policy. */
   qualify?: (workspaceId: string, validate: (actor: FeedAuthorization['actor']) => Promise<void>) => Promise<FeedAuthorization | null>;
@@ -56,7 +58,22 @@ export type PollDeps = {
 /** Due predicate shared by the candidate scan and the claim: $1 interval s, $2 backoff ceiling. */
 const DUE = `("lastPolledAt" IS NULL OR "lastPolledAt" + (LEAST(power(2, LEAST("pollErrorCount", 30)), $2::double precision) * $1::double precision) * interval '1 second' <= NOW())`;
 
+/**
+ * The `feedsPoll` job: RSS/Atom/WordPress-REST reading, then the WordPress recipe planner. The planner has its own
+ * Root master switch (`feeds.wordpress.enabled`) and its own source switches, independent of automatic feed reading,
+ * so one job schedule drives both and a failure in one never stops the other.
+ */
 export async function runFeedPolling(deps: PollDeps = {}): Promise<FeedPollSummary> {
+  const summary = await pollRssFeeds(deps);
+  try {
+    const { runRecipePlanning } = await import('./wordpress-planner');
+    const recipes = await runRecipePlanning(deps.recipes);
+    if (recipes.reason !== 'disabled' && recipes.reason !== 'misconfigured') summary.recipes = recipes;
+  } catch { /* planner problems are recorded per source; they never fail the feed job */ }
+  return summary;
+}
+
+async function pollRssFeeds(deps: PollDeps = {}): Promise<FeedPollSummary> {
   const empty = (reason?: FeedPollSummary['reason']): FeedPollSummary => ({ ...(reason ? { reason } : {}), examined: 0, claimed: 0, postsCreated: 0, held: 0, skipped: 0, failed: 0, outcomes: [] });
   const settings = await pollSettings();
   if (!settings) return empty('misconfigured');

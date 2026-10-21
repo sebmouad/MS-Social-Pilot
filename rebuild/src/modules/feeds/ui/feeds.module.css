@@ -33,3 +33,15 @@
 .entries li { padding: .6rem .75rem; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
 .inline { display: flex !important; align-items: center; gap: .5rem; }
 .inline input { width: auto; }
+.sectionTitle { margin: .4rem 0 0; font-size: 1rem; font-weight: 700; color: var(--ink); }
+.badge { display: inline-block; padding: .1rem .55rem; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink); font-size: .75rem; font-weight: 700; }
+.recipes { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.recipe { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: .9rem; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.recipe a { color: var(--accent); text-decoration: underline; text-underline-offset: .18em; font-size: .85rem; }
+.thumb { width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-muted); }
+.slotRow { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.slotRow input { width: auto; }
+@media (max-width: 38rem) {
+  .recipe { grid-template-columns: minmax(0, 1fr); }
+  .thumb { max-width: 12rem; }
+}

@@ -10,6 +10,8 @@ import { automaticCheckingStatus } from '../server/polling';
 import { FEEDS_FEATURE_ID } from '../manifest';
 import { feedsLocale, feedsText, type FeedsCopyKey } from '../copy';
 import { FeedManager } from './FeedManager';
+import { RecipeSource, type RecipeView } from './RecipeSource';
+import { readRecipeSource } from '../server/wordpress';
 import styles from './feeds.module.css';
 
 export default async function FeedsScreen({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
@@ -22,6 +24,7 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const canWrite = canAccessFeature(viewer.permissions, FEEDS_FEATURE_ID, 'write');
   const scope = viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids;
+  const recipes = await readRecipeSource(actor).catch(() => null);
   try {
     const [result, channels, automatic] = await Promise.all([
       readFeeds(actor, params.page ? { page: Number(params.page) } : {}),
@@ -32,6 +35,7 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
       <PageHeading title={t('title')} description={t('description')} summary={t('pageSize', { count: result.pageSize })} />
       <FeedManager initialFeeds={result.feeds.map(f => ({ ...f, lastPolledAt: f.lastPolledAt?.toISOString() ?? null, createdAt: f.createdAt.toISOString(), updatedAt: f.updatedAt.toISOString() }))}
         channels={channels.map(c => ({ id: c.id, name: c.name }))} page={result.page} hasMore={result.hasMore} canWrite={canWrite} limits={result.limits} locale={locale} automaticMinutes={automatic.intervalMinutes} />
+      {recipes && (recipes.source || canWrite) && <RecipeSource initial={recipes as unknown as RecipeView} locale={locale} canWrite={canWrite} />}
       <p className={styles.privacy}>{t('footnote')}</p>
     </>;
   } catch (error) {
