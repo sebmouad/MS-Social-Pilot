@@ -32,7 +32,10 @@ export async function handleInvitationHttp(request: Request, action: InvitationH
     if (!checked.success) throw new OperationError('invalid_request', 'Check the invitation details and try again.');
     const supplied = action === 'preview' ? (checked.data as { token?: string }).token : undefined;
     const token = supplied ?? await readInvitationToken();
-    if (!token) throw new OperationError('not_found', 'Open the invitation link from your email to continue.');
+    if (!token) {
+      if (action === 'preview') return reply({ invitation: null });
+      throw new OperationError('not_found', 'Open the invitation link from your email to continue.');
+    }
     if (!hit(`rebuild-invitation-token:${action}:${createHash('sha256').update(token).digest('hex')}`, limits).allowed) return reply({ error: 'Too many attempts. Try again later.', code: 'rate_limited' }, 429);
     const invitation = await previewTeamInvitation(token);
     if (action === 'register') {
@@ -61,6 +64,7 @@ export async function handleInvitationHttp(request: Request, action: InvitationH
     return reply({ ok: true, ...result, next: '/home' });
   } catch (error) {
     const safe = operationFailure(error, 'The invitation operation could not be confirmed. Check your account before trying again.');
+    if (action === 'preview' && safe.code === 'not_found') return reply({ invitation: null });
     return reply({ error: safe.error, code: safe.code }, safe.status);
   }
 }

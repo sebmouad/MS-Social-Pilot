@@ -1,6 +1,6 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-21 against local HEAD `1240a9ce`; reviewed `git log 8852d367..HEAD --stat`.
+Updated 2026-10-21 against local HEAD `46c6bdae`; reviewed `git log 1240a9ce..HEAD`.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains the binding target,
 unchanged. This document describes implementation and gaps; deployment, source,
 automated tests, browser checks and live-provider evidence are separate claims.
@@ -19,8 +19,14 @@ These are recorded production outcomes in [RELEASE_GATES_PLAN.md](RELEASE_GATES_
 not fresh probes by this documentation worker. That log records 34 applied
 migrations, backup, health checks, ownership repair, owner sign-in confirmation,
 legacy configuration import and later AI/browser checks. Cutover happened; full
-contract completion is still unproven. The exact deployed revision and application
-of migrations added after cutover must be checked before claiming newer source live.
+contract completion is still unproven. The deployed release is recorded by the
+integrator as `46c6bdae`; this review did not observe it, and application of the
+newest migrations must still be checked before claiming source live. The log also
+records the 2026-10-21 post-cutover rollback drill (**PASS**: backup restored to a
+scratch database, legacy and the installed rebuild started on spare ports; live
+services unchanged) and the first full recipe day (40/40 publications with 40/40
+first comments). The drill proves a restorable backup and startable rollback
+artifacts, not a proxy cutback or media restoration.
 See [CUTOVER.md](CUTOVER.md) for current status and historical migration procedures.
 
 ## Source and service boundaries
@@ -53,7 +59,7 @@ moves. Registration of a module does not prove its workflows or health.
 ## Configuration and public origin
 
 `src/lib/config/registry.ts` aggregates module/platform declarations and
-`src/lib/config/shared-config.ts`. Local HEAD has schema version **111**. Runtime
+`src/lib/config/shared-config.ts`. Local HEAD has schema version **114**. Runtime
 consumers use `runtimeConfig`; Root validates and transactionally audits saves,
 encrypts secrets and groups controls under Shared, Product and Platform owners.
 Database access and encryption trust material remain bootstrap dependencies.
@@ -120,11 +126,11 @@ not every cross-device persistence/security scenario.
 | Publishing | Drafts/composer, CSV, previews, list/calendar/queue, approvals, templates/labels/fields/notes/versions, bulk actions, first comments, recovery, best times, mix/recycle and short links | Shared UI/REST/MCP coverage documented in PARITY_PUBLISHING_INBOX; native/live and new scheduling runtime checks remain partial |
 | Inbox | Scoped threads/nested replies/reviews, sync, moderation/deletion recovery, assignment/notes/replies, quick filters, contact details, bulk actions and shortcuts | Contact-details REST and bulk UI/REST/MCP (`f5c21c96`) exist; provider history/metadata and live moderation remain partial |
 | Analytics | Catalog/series, previous-period points, comparison, posts, audience history, ad objects, pins, goals, reports/exports and charts | Stored-data surfaces share services; complete readable-provider collection, labels and provider history remain partial; response-report rounds 1–3 add comments, historical cycles, source/member breakdowns with disclosed stored-history limits |
-| Ads | Account/performance/directory/compare/export, hierarchy charts, creation options, durable confirmed management and creative creation | Session REST/MCP plus key REST v1; live permissions, creative/management outcomes and exhaustive metrics unproven |
-| Settings | Connections/selection, profiles/watermark, team/invitations, account/security/sessions, appearance, notifications, exports/erasure and keys | Broad service parity; single-selection/disconnect caller consistency and live mail/security/data coverage remain gaps; shell appearance now shares persistence |
+| Ads | Account/performance/directory/compare/export, hierarchy charts, creation options, durable confirmed management: campaign, ad set, paused ad and stored-image creative creation, status/budget/rename/assign/delete, missing-grant reconnect notice | Session REST/MCP plus key REST v1; management is off by default and awaits a live `ads_management` grant. `ad.create` needs a ledger CHECK migration that is absent at HEAD (writes fail closed). Mocked/fixture evidence only; see ADS_PARITY.md |
+| Settings | Connections/selection, profiles/watermark, team/invitations, account/security/sessions, appearance, notifications, exports/erasure and keys | Broad service parity; selection and disconnect callers (UI, REST, MCP) share the confirmed services; partial account export is exposed (session route, MCP tool, bilingual download). Live mail/security/data coverage remain gaps; shell appearance shares persistence |
 | Media / Feeds / AI | Media images/videos/import/quota; RSS/Atom/WordPress feeds; recipe planner; AI writing/recap/sentiment | Shared UI/REST/MCP slices; real storage/source/automation and current browser/live evidence vary by feature |
 | Tasks / Agency / Sharing / Integrations | Task workflows, Agency overview/clients/export/switching, review/bio links, webhooks, scoped REST/OAuth connectors | Shared services exist; credential-specific capabilities and remaining confirmation differences must remain explicit |
-| Root | Owned settings, diagnostics/stored health, users/workspaces/plans/audit/errors, registration, installation transfer, connection refresh/disconnect and recovery | Private UI/HTTP/installation MCP includes workspace create/rename and directory GET; declaration exceptions closed, service-boundary gaps remain (MCP_PARITY). Backups page is read-only; production-scale proof incomplete |
+| Root | Owned settings, diagnostics/stored health, users/workspaces/plans/audit/errors, registration, installation transfer, connection refresh/disconnect and recovery | Private UI/HTTP/installation MCP includes workspace create/rename and directory GET; declaration exceptions closed. Workspace create/rename, directory, configuration save and error resolution are services in `src/modules/root/server/` that recheck the actor and own confirmations (mocked evidence). Backups page is read-only; production-scale proof incomplete |
 
 ## Scheduling and durable remote effects
 
@@ -163,7 +169,8 @@ is active. RELEASE_GATES_PLAN records read-only MariaDB checks, image/JPEG stora
 80 planned posts across 10 Pages and the first 07:00 Europe/Paris batch: 10/10
 publications and 10/10 first comments, with one Page checked in the owner's browser.
 The owner's current task report additionally records the first day's 11:00 batch
-as 10/10 with comments; this worker did not probe production. The owner removed
+as 10/10 with comments and the full day (07:00, 11:00, 15:00, 17:00) as 40/40
+publications with 40/40 first comments; this worker did not probe production. The owner removed
 the article link from comments; `2e23223a` records a backed-up/audited update of
 80 scheduled comments and preserves links on truncation only if the template
 contains `{link}`. The original link-preview observation is historical.
@@ -223,9 +230,11 @@ Data-control rounds (`4b13204b`, `83b26ba9`) inventory every recent migration ta
 tenant catalog rows plus explicit legacy OAuth-code/channel-profile ownership,
 account appearance/safe credential metadata, and retained installation/outbox/
 purge recovery state. Root user deletion and unverified-registration deletion
-now call supplementary cleanup transactionally. `exportAccountData` and HTTP/MCP
-adapters exist with explicit partial profile/appearance/safe-metadata coverage;
-**public route, installed MCP registration and customer download UI are absent**.
+now call supplementary cleanup transactionally. `exportAccountData` is exposed
+(`46c6bdae`) through session-only `GET /api/settings/account/export`, installed MCP
+tool `export_account_data` and a bilingual Account download, with explicit partial
+profile/appearance/safe-metadata coverage and refusal of bearer credentials. It is
+not the owner ZIP and is covered by mocked/DOM tests only.
 `20261031150000_rebuild_supplementary_purge_gates` adds OAuthCode/profile INSERT/
 UPDATE guards, but rehearsal pinning and real PostgreSQL concurrency proof remain
 open. See `src/server/data-control/README.md`; optional database tests skipped in
@@ -259,8 +268,24 @@ soft/unbranded English-only 404/error pages, misleading two-step failures, raw
 server errors, lost input on queue/Root activity failure, calendar contrast and
 join/share-media 404s. `36946d9e` subsequently adds missing-image fallback and
 saved-view expired-session feedback with unit tests, without a browser rerun.
-Feeds database paths, Firefox/Safari, screen readers, long content, server 500s
-and confirmed provider writes remain outside that browser evidence.
+
+Round 3 adds Firefox and WebKit (the Safari engine, not Safari) extended matrices
+on vivid and warm (496 cells each; no overflow, accessible-name or theme failures;
+WebKit shows 16 hydration warnings from `root-time.ts` and Sharing `LinksManager`
+date formatting), Chromium system mode on every page (992 cells, no mismatch) and a
+database-outage check: the root layout threw and every page answered Next's
+unthemed English 500, which the shared `ErrorState` fixed. Round 4 migrated the
+preview database (so Feeds renders), verified a page-level throw boundary (16 cells
+per engine, 0 findings; retry recovery in Firefox only) and ran the dynamic,
+empty, not-found and failure parts in Firefox and WebKit, reproducing the module
+findings. `error.tsx` (retry re-requests the server) and `global-error.tsx` (layout
+failure; bilingual bootstrap catalog) are committed; **`not-found.tsx` is not**, so
+unknown routes still show Next's default page, and unknown detail ids still answer
+HTTP 200. `46c6bdae` fixes queue cancel, Root activity, two-step wording, tokenless
+join, verify-email/recovery text and calendar contrast at source (unit tests, no
+rerun). Remaining: raw server text on several module forms, boundary above the
+shell, keyboard/system-mode in Firefox/WebKit, all four themes there, real Safari,
+screen readers, long content, client-render throws and confirmed provider writes.
 
 Historical 328/328 synthetic checks and the production Chrome sweep remain dated
 evidence. No browser round covers every later merge, and no declaration guard

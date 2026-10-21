@@ -1304,6 +1304,94 @@ export async function runBoundaryRecovery(env: Readonly<Record<string, string | 
   return { version: 1, startedAt, finishedAt: new Date().toISOString(), browser: engineName(env.MATRIX_BROWSER), routes: [route], expectedCells: 1, cells: [cell], fatal, failures, passed: failures === 0 };
 }
 
+/** Round 5 fixes check pages that show uploaded media. A stored file that is gone must show the "Image unavailable" placeholder, never the browser's broken-image icon. */
+export const MEDIA_ROUTES = ['/publishing/posts', '/publishing/queue', '/publishing/approvals', '/publishing/calendar'] as const;
+export const SAVED_VIEW_ROUTE = '/publishing/posts';
+
+export type MediaObservation = { images: number; broken: number; placeholders: number };
+/** Pure classification: a broken image is a defect; placeholders are the expected state for missing files. */
+export function classifyMedia(observed: MediaObservation): Finding[] {
+  return observed.broken > 0 ? [{ code: 'BROKEN_IMAGE_VISIBLE', count: observed.broken }] : [];
+}
+/** An expired session is a sign-in problem, not a naming or generic save failure: the alert must offer a way to sign in again or say the session ended. */
+export function classifySavedViewFeedback(text: string | null): Finding[] {
+  if (text === null) return [{ code: 'SAVED_VIEW_NO_FEEDBACK' }];
+  return /session|sign.?in|log.?in|connexion/i.test(text) ? [] : [{ code: 'SAVED_VIEW_SESSION_NOT_EXPLAINED' }];
+}
+
+export async function runRound5Fixes(env: Readonly<Record<string, string | undefined>>): Promise<MatrixReport> {
+  const startedAt = new Date().toISOString();
+  const cells: Cell[] = [], fatal: Finding[] = [];
+  const themes = selectThemes(env.MATRIX_THEMES);
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  let phase = 'CONFIGURATION_FAILED';
+  const routes = [...MEDIA_ROUTES];
+  try {
+    const base = guardBaseUrl(env.BASE_URL);
+    if (!env.QA_EMAIL || !env.QA_PASSWORD) throw new Error('QA_CREDENTIALS_REQUIRED');
+    browser = await launchBrowser(env);
+    phase = 'SIGN_IN_FAILED';
+    const storage = await signIn(browser, base, env.QA_EMAIL, env.QA_PASSWORD);
+    phase = 'MATRIX_INTERRUPTED';
+    for (const theme of themes) for (const mode of ['light', 'dark'] as const) for (const viewport of VIEWPORTS) {
+      const context = await browser.newContext({ viewport, serviceWorkers: 'block', colorScheme: mode, storageState: storage });
+      try {
+        // Reads only. The saved-view POST is allowed through because the session cookie has been removed first, so the server must refuse it.
+        await context.route('**/*', route => {
+          const request = route.request();
+          const savedViewPost = request.method() === 'POST' && new URL(request.url()).pathname === '/api/publishing/saved-views';
+          return savedViewPost || allowRequest(request.url(), base, request.method(), false) ? route.continue() : route.abort('blockedbyclient');
+        });
+        await context.addInitScript('window.__name = window.__name || (f => f);');
+        await context.addCookies([{ name: THEME_COOKIE, value: theme.id, url: base, sameSite: 'Lax' }, { name: MODE_COOKIE, value: mode, url: base, sameSite: 'Lax' }]);
+        for (const route of routes) {
+          const cell: Cell = { route, theme: theme.id, viewport, findings: [], keyboard: { mainAction: 'Not available', dialog: 'Not available' } };
+          cells.push(cell);
+          const page = await context.newPage();
+          page.setDefaultTimeout(10000);
+          try {
+            await page.goto(`${base}${route}`, { waitUntil: 'load', timeout: 60000 });
+            await page.waitForTimeout(1500); // images settle and onError handlers swap in the placeholder
+            const observed = await page.evaluate(() => {
+              const images = [...document.querySelectorAll('img')].filter(img => img.getClientRects().length > 0);
+              return { images: images.length, broken: images.filter(img => img.complete && img.naturalWidth === 0).length, placeholders: document.querySelectorAll('[data-media-missing]').length };
+            });
+            cell.findings.push(...classifyMedia(observed));
+            if (route === '/publishing/calendar') {
+              const contrast = await contrastAudit(page);
+              if (contrast.failures.length) cell.findings.push({ code: 'CONTRAST_LOW', count: contrast.failures.length });
+            }
+          } catch { cell.findings.push({ code: 'ROUTE_CHECK_FAILED' }); }
+          finally { await page.close(); }
+        }
+        // Saved views: expire the session, then save. Filters live in the sidebar on desktop; phones are verified with the drawer closed (not applicable).
+        if (viewport.width >= 1024) {
+          const cell: Cell = { route: SAVED_VIEW_ROUTE, theme: theme.id, viewport, findings: [], keyboard: { mainAction: 'Not available', dialog: 'Not available' } };
+          cells.push(cell);
+          const page = await context.newPage();
+          page.setDefaultTimeout(10000);
+          try {
+            await page.goto(`${base}${SAVED_VIEW_ROUTE}?status=published`, { waitUntil: 'load', timeout: 60000 });
+            const name = page.locator('input[id$="-name"]').first();
+            await name.waitFor({ state: 'visible' });
+            await name.fill('Round five check');
+            await context.clearCookies({ name: SESSION_COOKIE });
+            await name.locator('xpath=ancestor::form').locator('button[type=submit]').click();
+            const alert = page.locator('section[aria-labelledby$="-heading"] [role=alert]').first();
+            const text = await alert.waitFor({ state: 'visible', timeout: 8000 }).then(() => alert.innerText(), () => null);
+            cell.findings.push(...classifySavedViewFeedback(text));
+          } catch { cell.findings.push({ code: 'ROUTE_CHECK_FAILED' }); }
+          finally { await page.close(); }
+        }
+      } finally { await context.close(); }
+    }
+  } catch { fatal.push({ code: phase }); }
+  finally { if (browser) await browser.close().catch(() => { fatal.push({ code: 'BROWSER_CLOSE_FAILED' }); }); }
+  const failures = fatal.length + cells.reduce((n, cell) => n + cell.findings.length, 0);
+  const expectedCells = themes.length * 2 * (routes.length * 2 + 1);
+  return { version: 1, startedAt, finishedAt: new Date().toISOString(), browser: engineName(env.MATRIX_BROWSER), routes: [...routes, SAVED_VIEW_ROUTE], excludedDynamicRoutes: [], expectedCells, cells, fatal, failures, passed: failures === 0 && cells.length === expectedCells };
+}
+
 /** Optional: QA_CREDENTIALS_FILE points at a local JSON {email,password}, keeping secrets out of shell history. */
 function loadCredentialsFile() {
   const file = process.env.QA_CREDENTIALS_FILE;
@@ -1387,6 +1475,13 @@ async function main() {
   loadCredentialsFile();
   const output = resolve(process.env.BROWSER_MATRIX_REPORT || '/tmp/msp-browser-matrix.json');
   await mkdir(dirname(output), { recursive: true });
+  if (process.env.BROWSER_MATRIX_SCOPE === 'round5:fixes') {
+    const report = await runRound5Fixes(process.env);
+    await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+    console.log(`Round 5 fixes: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
+    process.exitCode = report.passed ? 0 : 1;
+    return;
+  }
   const round4 = /^round4:(boundary|recovery)$/.exec(process.env.BROWSER_MATRIX_SCOPE || '');
   if (round4) {
     const only = process.env.MATRIX_ONLY?.split(',').filter(Boolean);

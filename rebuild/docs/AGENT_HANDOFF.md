@@ -1,10 +1,11 @@
 # Shared agent handoff
 
-Updated 2026-10-21 against local HEAD `1240a9ce`, reviewing
-`git log 8852d367..HEAD --stat`, lane reports and selected current service/transport
-source. This supersedes the previous `8852d367` continuation. The binding contract
-is unchanged; the full goal remains active. No fresh database, browser, provider
-or production observation was made by this documentation worker.
+Updated 2026-10-21 against local HEAD `46c6bdae`, reviewing
+`git log 1240a9ce..HEAD`, the changed-file list of `46c6bdae`, dated release and
+browser records and selected current source. This supersedes the previous `1240a9ce`
+continuation. The binding contract is unchanged; the full goal remains active. No
+fresh database, browser, provider or production observation was made by this
+documentation worker; production facts below are owner/integrator records.
 
 ## Required context
 
@@ -16,7 +17,7 @@ release work; source and historical receipts do not identify current deployment.
 
 ## Production record
 
-Owner cutover: 2026-10-20 22:09 CEST, release `5f1e52d7`, via
+Deployed release (integrator statement): `46c6bdae`. Owner cutover: 2026-10-20 22:09 CEST, release `5f1e52d7`, via
 `rebuild/scripts/prod-cutover.sh`, origin https://social.newsgeet.com. Rebuild
 web/worker recorded active/enabled; legacy inactive/disabled, retained for rollback
 at `/srv/ms-social-pilot`. Releases use `rebuild/scripts/prod-deploy.sh`; legacy
@@ -26,9 +27,18 @@ proxy-facing same-origin source; do not substitute internal listener addresses.
 The dated release log records backup/migrations/ownership repair, owner sign-in,
 AI checks and Chrome sweep, then MariaDB read-only access, image/JPEG storage and
 80 planned recipe posts across 10 Pages. First live 07:00 Europe/Paris batch:
-10/10 published, 10/10 comments, one Page inspected in owner browser. The current
-owner task report also records first-day 11:00: 10/10 with comments. The original
+10/10 published, 10/10 comments, one Page inspected in owner browser. The first full
+recipe day (07:00, 11:00, 15:00, 17:00) published 40/40 posts with 40/40 first
+comments and no errors; 70 plans remain pending on the rolling horizon. The original
 comment included an article preview; the owner subsequently removed the link.
+
+Post-cutover rollback drill (2026-10-21, `prod-rollback-drill.sh`): a backup
+restored into scratch database `social_pilot_drill`; legacy (`/srv/ms-social-pilot`)
+and the installed rebuild started on spare ports against it. **ROLLBACK DRILL PASS**
+(restore 2 s, legacy 3 s, rebuild 2 s, total 7 s); scratch database/role removed;
+live rebuild web/worker stayed active and legacy inactive. This proves a restorable
+backup and startable rollback artifacts. It does not prove a proxy cutback, media
+restoration, a restore of the newest migrations, or worker/systemd shutdown timing.
 `2e23223a` records backed-up/audited updates to 80 scheduled comments and changes
 truncation to preserve a link only when the template contains `{link}`. Do not
 restore that link based on old prose or equate planning with delivery.
@@ -40,7 +50,7 @@ Live Graph v26.0 post-insights probe accepts `post_media_view`,
 no failures, views/unique 3, one like; summary edge 0 versus insight 1 remains
 unexplained (lag is a hypothesis). This is limited eligibility evidence, not full
 history/metric coverage. OpenAI/Gemini have earlier limited live success;
-Anthropic was blocked by account credit. Mail/rollback/live recovery remain open.
+Anthropic was blocked by account credit. Mail and live recovery remain open.
 
 ## Integrated source and automated scope
 
@@ -49,7 +59,7 @@ Anthropic was blocked by account credit. Mail/rollback/live recovery remain open
   Sharing; last three include service/public error localization. `configOrDefault`
   validates runtime or registry default; `configValueOrDefault` checks outer shape
   only. Residual literals/prompts/dynamic labels and stale OAuth metadata remain
-  in CONFIG_LITERAL_AUDIT. Schema version is now **111**, not 104–110.
+  in CONFIG_LITERAL_AUDIT. Schema version is now **114**, not 104–113.
 - Appearance (`2b42470b`): global shell and Settings save through confirmed
   appearance service; theme in users, mode under exact account key, transaction
   audit, Root-lifetime cookie cache and validated-session fallback in layout.
@@ -72,12 +82,32 @@ Anthropic was blocked by account credit. Mail/rollback/live recovery remain open
   persistence. Signals stop claims, request safe stops, drain with Root grace/
   poll settings, then abort/release abandoned leases. Unit evidence supersedes
   missing-source reports; production stop duration/systemd/DB contention unproven.
-- Data (`4b13204b`, `83b26ba9`): recent-table ownership catalog and explicit OAuth/
-  profile/account hooks, exact appearance cleanup, Root/unverified deletion hooks.
-  Partial account export service/HTTP/MCP adapters exist but are **unregistered**:
-  no public GET, installed group or customer control. Supplementary purge migration
-  `20261031150000_rebuild_supplementary_purge_gates` needs rehearsal pins and
-  PostgreSQL proof. Optional database tests skipped in lane; no complete export.
+- Data (`4b13204b`, `83b26ba9`, `46c6bdae`): recent-table ownership catalog and
+  explicit OAuth/profile/account hooks, exact appearance cleanup, Root/unverified
+  deletion hooks. Partial account export is now exposed: session-only
+  `GET /api/settings/account/export`, installed MCP tool `export_account_data`
+  and a bilingual Account download with explicit included/excluded coverage;
+  bearer credentials are refused. Coverage stays **partial** (not the owner ZIP).
+  Supplementary purge migration `20261031150000_rebuild_supplementary_purge_gates`
+  still needs rehearsal pins and PostgreSQL proof; no complete export/erasure claim.
+- Settings/Root boundaries (`46c6bdae`): single and batch connection selection and
+  disconnect callers (browser, REST, MCP) call `changeConnectionSelections` /
+  `changeConnectionDisconnect`; the browser sends the named retain/delete consent.
+  Root workspace create/rename, directory (actor-checked), configuration save
+  (exact confirmation, in-transaction actor recheck, availability inventory for
+  every caller) and error resolution moved to `src/modules/root/server/`
+  (`workspace-controls`, `directory`, `configuration`, `errors`); `src/server/root/*`
+  re-export them. Mocked/unit evidence (`tests/root-config-authority.test.ts`,
+  `root-workspace-controls.test.ts`, `root-directory.test.ts`); no PostgreSQL
+  transaction, real MCP client or browser evidence.
+- Ads (`46c6bdae`): neutral paused `ad.create` through the shared management
+  service for UI (`AdCreateForm`), session REST and MCP, with a Facebook-owned
+  implementation; reconnect notice when the `ads_management` grant is absent;
+  Campaigns hierarchy path. Mocked/fixture tests only. **No migration at HEAD
+  extends the ledger operation-kind CHECK to `ad.create`** (searched
+  `prisma/migrations`), so ad creation fails closed before any provider call until
+  one is authored and applied. Management is off by default; the live
+  `ads_management` grant is pending; no live Ads write has been made.
 - Performance (`245683ce`): migration `20261031160000_rebuild_read_path_indexes`
   under root prisma/migrations adds three Posts and one Page-insights indexes;
   Analytics exact-scope read reuse/request limits, Publishing adapter reuse and
@@ -92,72 +122,90 @@ Anthropic was blocked by account credit. Mail/rollback/live recovery remain open
 - Responsive/CSS (`78493189`, `eff49d35`, `4cccd55f`): shared phone layout, border-
   box, sidebar contrast, hidden-table overflow and Home/calendar contrast fixes.
   `6fb0e57f` fixes Ads client directive and guards top-level directives.
-  `36946d9e` adds missing-image fallback and saved-view expired-session feedback;
-  those latest fixes have unit evidence without a browser rerun.
+  `36946d9e` adds missing-image fallback and saved-view expired-session feedback.
+- Error pages and browser fixes (`497fda18`, `46c6bdae`): shared bilingual themed
+  `ErrorState`; `error.tsx` (retry re-requests the server, way home) and
+  `global-error.tsx` (layout/database failure, documented bootstrap catalog);
+  queue cancel, Root activity, two-step wording, tokenless join, verify-email/
+  password-recovery text and calendar badge contrast fixes
+  (`tests/browser-findings-fixes.test.ts`, `tests/ui-copy-coverage.test.ts`).
+  These have unit/render evidence without a browser rerun.
 
 ## Browser evidence, not an all-green gate
 
-BROWSER_MATRIX_2026-10-21 records Chromium/local production build/synthetic preview
-PostgreSQL. Round 1: 992/992 cells across four themes × light/dark × desktop/phone,
-41 customer/16 Root/five public pages. Final run has no overflow/name/theme/status
-failures but 176 findings. Round 2 adds dynamic (160), states (176), not-found
-(128), empty (656), system (768), keyboard (656 + 672) and failure (640) cells.
-Scoped system-mode comparisons/live changes and keyboard walks passed; 121
-injected-failure probes preserved input/dialogs. Calendar contrast still fails
-in some combinations after the earlier fix. No recipe table in preview: Feeds
-paths not exercised. Read the report for exact routes/checks rather than summing
-cells into a completion percentage.
+BROWSER_MATRIX_2026-10-21 records local production builds against a synthetic
+preview PostgreSQL database; none of it is production or provider evidence.
 
-Unresolved findings: soft/default unthemed English-only 404/error pages, misleading
-two-step failure, raw server errors, lost queue/Root activity input, calendar
-contrast, tokenless join and synthetic share-media 404s. Saved-view/session and
-missing-image fixes need rerun. Firefox/Safari, screen readers, long content,
-server-rendered 500s, confirmed provider forms and every later merge stay outside
-this evidence. Historical production Chrome and WAVE1 checks retain their dates.
+- Chromium round 1: 992/992 cells (four themes × light/dark × desktop/phone; 41
+  customer, 16 Root, five public pages); no overflow/name/theme/status failures,
+  176 findings. Round 2: dynamic (160), states (176), not-found (128), empty (656),
+  system (768), keyboard (656 + 672) and failure (640) cells; scoped system-mode and
+  keyboard checks passed and 121 injected-failure probes preserved input/dialogs.
+- Round 3: Firefox and WebKit (Safari engine, not Safari) extended matrices, 496
+  cells each on vivid and warm: 43 and 99 findings, no overflow/name/theme findings,
+  16 WebKit hydration warnings (`root-time.ts` "at" separator; Sharing `LinksManager`
+  locale formatting, a pattern in 15 more files). Chromium system mode on every page
+  (992): no mismatch or non-live cases. Database-outage 500s rendered Next's unthemed
+  English page and were fixed; 0 findings in three engines using temporary app files.
+- Round 4 (preview database migrated through `20261031170000`, so Feeds paths
+  render): page-throw boundary 16/16 per engine with 0 findings; "Try again"
+  recovery verified in Firefox only; Firefox/WebKit dynamic, session, empty,
+  not-found and failure parts reproduce the module findings.
+
+Unresolved (per the report and the `46c6bdae` file list; not rerun): `not-found.tsx`
+is missing, so unknown routes show Next's default page; unknown bio/share/
+collaboration/Root ids answer HTTP 200 (soft 404); raw server text on Tasks, Labels,
+Templates, Analytics goals and Inbox moderation; saved-view 401 wording; the error
+boundary sits above the shell; WebKit hydration; `/join` preview 404/429 console
+errors on repeated loads; share-media 404s from seed data. `46c6bdae` fixes queue
+cancel, Root activity, two-step wording, tokenless join, verify-email/recovery text
+and calendar contrast at source only. Not covered: keyboard/system-mode runs in
+Firefox/WebKit, all four themes there, real Safari/iOS, screen readers, long content,
+client-render throws and every later merge. Read the report for exact routes/checks
+rather than summing cells into a completion percentage. Historical production Chrome
+and WAVE1 checks retain their dates.
 
 ## Next actions / edits outside this documentation lane
 
-1. Release owner verifies exact deployed SHA/migrations/ownership, restorable
-   backup/media and post-cutover rollback, plus worker/systemd shutdown timing.
-2. Settings callers: single-selection MCP must call `changeConnectionSelections`,
-   disconnect MCP `changeConnectionDisconnect`; browser manager must send exact
-   retain/delete-related-data phrase. Root workspace services must own current
-   identity/limits; directory must accept/check actor. Unify Root config consent/
-   availability and error-resolution policy; resolve Agency/Sharing differences.
-3. Expose partial account export: add GET `src/app/api/settings/account/export/route.ts`
-   calling `accountHttp(request, 'export')`; register `ACCOUNT_EXPORT_MCP` in
-   Settings mcp.ts; add Root EN/FR download/coverage/error UI and broaden archive
-   byte-setting description. Extend MCP_PARITY mappings/guard when installed.
-   Pin supplementary purge gates/checksum/functions in cutover rehearsal as
-   specified in `src/server/data-control/README.md`. Prove isolated PostgreSQL
-   triggers/deletion/export and concurrency; no secrets in artifacts.
-4. App/auth/module owners fix browser findings and rerun synthetic matrix on a
-   migrated preview DB, including Feeds and latest media/session fixes. Verify
-   cross-device appearance and report downloads separately.
-5. Integration owner tests mixed scheduling and recipe retry/pause/recovery,
+1. Release owner verifies the exact deployed SHA, migrations and ownership (purge-
+   gate, read-index, inbox-metadata and trigram migrations), media backup coverage
+   and a proxy-level cutback; extend the rollback drill to the exact release;
+   measure worker/systemd shutdown timing.
+2. Database owner authors and applies a root `prisma/migrations` migration adding
+   `ad.create` to `ads_operations_operation_kind` (`objectType` already allows `ad`).
+   Then obtain the live `ads_management` grant on a test account and exercise paused
+   ad creation, status/budget/creative changes, recovery and cleanup with exact
+   confirmations. Keep management off by default until then.
+3. Agency owner (workspace switching: REST versus MCP confirmation) and Sharing
+   owner (copy-only saves) reconcile with the service contract. Run a current
+   cross-module auth/scope/confirmation matrix and real MCP client checks. The Root
+   boundary gaps recorded in MCP_PARITY are closed at source; verify in PostgreSQL.
+4. Pin supplementary purge gates/checksum/functions in cutover rehearsal as in
+   `src/server/data-control/README.md`; prove isolated PostgreSQL triggers,
+   deletion, partial-export content and concurrency; verify the Account download in
+   a browser and `export_account_data` with a real client. No secrets in artifacts.
+5. App owner adds `src/app/not-found.tsx` (`'use client'`, `ErrorState kind="not-found"`
+   with `useErrorLocale`), real 404 statuses for unknown detail ids (fix the
+   `loading.tsx` streaming order) and a boundary inside the shell. Module owners
+   remove raw server text, fix hydration formatting and the `/join` preview. Rerun
+   the matrix in all three engines, including keyboard walks, all four themes and
+   the round-5 fixes.
+6. Integration owner tests mixed scheduling and recipe retry/pause/recovery,
    metrics/history, live REST/MCP scope, provider outcomes/cleanup and index plans/
    volume. Preserve unresolved photo-canary ledger/Page lock; failed Graph lookup
    is not absence proof. Unknown remote effects must not be blindly resent.
-6. Documentation outside ownership: FEEDS.md and RELEASE_GATES_PLAN.md need the
-   owner's 11:00 batch and link-removal outcome, plus recipe visibility/retry status;
-   retain original linked-comment observation as history. CONFIG_LITERAL_AUDIT
-   needs latest catalogs/error localization and residual review. Existing legacy
-   round narratives contain historical bump instructions; version 111 is current.
-   PARITY_PUBLISHING_INBOX needs confirmed draft/v1 update; operation docs should
-   add data gates/read-index migration status without claiming target application.
+7. Documentation outside ownership: FEEDS.md needs the 15:00/17:00 slots, the 40/40
+   day and the link-removal outcome; CONFIG_LITERAL_AUDIT needs latest catalogs/error
+   localization; operation docs should add data gates/read-index migration status
+   without claiming target application. Legacy round narratives retain historical
+   version-bump text; version 114 is current.
 
 ## Current lane validation
 
 Only the six assigned docs are owned; LEGACY_CAPABILITY_PARITY changes are limited
-to existing Rebuild state cells. No contract, registry, source/test, migration,
-server, deploy, push or production edits/calls. No new Root keys. Pre-existing
-untracked node_modules and rebuild/node_modules links are not task changes.
-Validation from rebuild/: `npx tsc --noEmit -p .` passed, zero errors;
-`npx vitest run tests/parity-guard.test.ts --no-cache` passed, 21 tests / one file.
-`git diff --check` passed. Local Markdown link targets resolve; a comparison to
-HEAD confirms all 21 legacy inventory rows and all non-status text are unchanged.
-Exactly the six owned documents changed; ARCHITECTURE_CONTRACT is unchanged.
-No tests were edited/added, no whole suite or runtime verification was performed.
-Linked Git metadata resolves outside writable roots to the primary checkout's
-.git/worktrees/msp-docs3; commits cannot be written in this sandbox. Changes remain
-uncommitted in this worktree for integration; nothing was pushed.
+to the header date and existing Rebuild state cells. No contract, registry,
+source/test, migration, server, deploy, push or production edits/calls. No new Root
+keys; `CONFIG_SCHEMA_VERSION` is read as 114 from `src/lib/config/registry.ts` and
+not edited. Pre-existing untracked node_modules links are not task changes.
+Validation results are in the lane report. Changes remain uncommitted in this
+worktree for integration; nothing was pushed.

@@ -128,6 +128,13 @@ describe('missing advertising-changes grant', () => {
     await expect(describeAdsManagement(actor, 'acc1')).resolves.toEqual({ canManage: false, needsReconnect: true, operations: [], canListCreatives: false });
   });
 
+  it('detects a missing grant by code even when Root changes the English copy', async () => {
+    state.validateManageScopes.mockImplementation(() => { throw new OperationError('reconnect_required', 'Autorisez les modifications depuis les paramètres.'); });
+    await expect(describeAdsManagement(actor, 'acc1')).resolves.toMatchObject({ canManage: false, needsReconnect: true });
+    state.validateManageScopes.mockImplementation(() => { throw new OperationError('unavailable', 'Reconnect this advertising connection and allow advertising changes.'); });
+    await expect(describeAdsManagement(actor, 'acc1')).resolves.toMatchObject({ canManage: false, needsReconnect: false });
+  });
+
   it('does not ask to reconnect when management is withheld for another reason', async () => {
     state.prisma.membership.findUnique.mockResolvedValue({ role: 'editor' });
     await expect(describeAdsManagement(actor, 'acc1')).resolves.toMatchObject({ canManage: false, needsReconnect: false });

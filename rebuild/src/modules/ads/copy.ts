@@ -3,6 +3,9 @@ import { adsCopy } from './analysis/copy';
 import { creativeCopy } from './ui/creative-copy';
 
 export const adsCustomerCopy = {
+"facebookNamePrintable": {"en": "Names must contain 1 to {max} printable characters.", "fr": "Les noms doivent contenir de 1 à {max} caractères imprimables."},
+"facebookCampaignNamePrintable": {"en": "Campaign names must contain 1 to {max} printable characters.", "fr": "Les noms de campagne doivent contenir de 1 à {max} caractères imprimables."},
+"facebookAdSetNamePrintable": {"en": "Ad set names must contain 1 to {max} printable characters.", "fr": "Les noms d’ensemble doivent contenir de 1 à {max} caractères imprimables."},
 "filterTextLimit": {"en": "{key} must be text with at most {max} characters.", "fr": "{key} doit être un texte de {max} caractères maximum."},
 "startDateFormat": {"en": "start must be a valid YYYY-MM-DD date.", "fr": "La date de début doit respecter le format AAAA-MM-JJ."},
 "endDateFormat": {"en": "end must be a valid YYYY-MM-DD date.", "fr": "La date de fin doit respecter le format AAAA-MM-JJ."},

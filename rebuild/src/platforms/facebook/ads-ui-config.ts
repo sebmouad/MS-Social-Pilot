@@ -1,3 +1,4 @@
+import { FACEBOOK_ADS_COPY, FACEBOOK_ADS_COPY_SCHEMA } from './ads-copy';
 import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
 import type { AdsUiSchema } from '@/platforms/ads-ui';
@@ -9,6 +10,7 @@ const copy = z.string().trim().min(1).max(1000);
 const common = { title: copy, description: copy, nameLabel: copy, nameMaxLength: z.number().int().min(1).max(100), actionLabel: copy, confirmTitle: copy, confirmDescription: copy, confirmationTemplate: copy };
 const choices = (values: readonly [string, ...string[]]) => z.array(z.object({ value: z.enum(values), label: copy }).strict()).min(1).max(values.length).refine(items => new Set(items.map(item => item.value)).size === items.length, 'Choices must be unique.');
 export const FACEBOOK_ADS_CREATION_UI_SCHEMA = z.object({
+  ad: z.object({ ...common, creativeLabel: copy, chooseCreativeLabel: copy, loadCreativesLabel: copy, noCreativesDescription: copy, reviewLabel: copy }).strict(),
   campaign: z.object({ ...common, optionLabel: copy, options: choices(objectives), defaultOption: z.enum(objectives) }).strict(),
   adSet: z.object({ ...common, budgetLabel: copy, countryLabel: copy, goalLabel: copy, options: choices(goals), defaultOption: z.enum(goals) }).strict(),
 }).strict().superRefine((value, context) => {
@@ -18,6 +20,13 @@ export const FACEBOOK_ADS_CREATION_UI_SCHEMA = z.object({
   }
 });
 export const FACEBOOK_ADS_UI_DEFAULTS = {
+    ad: {
+      nameLabel: 'Ad name', nameMaxLength: 100, creativeLabel: 'Creative', chooseCreativeLabel: 'Choose a creative',
+      loadCreativesLabel: 'Load creatives', noCreativesDescription: 'This account has no creatives yet. Create one first, then add the ad.', reviewLabel: 'Review ad',
+      title: 'Create paused ad under {adSetName}', description: 'The ad uses an existing creative and starts paused. Nothing is delivered or spent until you resume it separately.',
+      actionLabel: 'Create paused ad', confirmTitle: 'Create this paused ad?', confirmDescription: 'It will not deliver until activated separately.',
+      confirmationTemplate: 'CREATE PAUSED FACEBOOK AD {nameJson} UNDER AD SET {parentId} IN ACCOUNT {adAccountId} WITH CREATIVE {creativeId}',
+    },
     campaign: {
       nameLabel: 'Campaign name', nameMaxLength: 100, optionLabel: 'Objective', title: 'Create paused campaign',
       description: 'Creates a paused campaign. Complete its ad setup before activating delivery.',
@@ -37,5 +46,5 @@ export const FACEBOOK_ADS_UI_DEFAULTS = {
       defaultOption: 'LINK_CLICKS', options: [{ value: 'LINK_CLICKS', label: 'Link clicks' }, { value: 'IMPRESSIONS', label: 'Impressions' }],
       confirmationTemplate: 'CREATE PAUSED FACEBOOK AD SET {nameJson} UNDER CAMPAIGN {campaignId} IN ACCOUNT {adAccountId} WITH DAILY BUDGET {dailyBudgetMinor} MINOR UNITS{currencySuffix} TARGETING {countryCode} OPTIMIZED FOR {optimizationGoal}',
     },
-  } satisfies AdsUiSchema;
-export const FACEBOOK_ADS_CREATION_CONFIG = [entry({ key: 'meta.adsCreationUi', group: 'Facebook · Ads creation', label: 'Creation choices and copy', kind: 'json', description: 'Safe form labels, implemented objective/optimization choices, defaults and name ceilings. Confirmation templates are reviewed separately by the provider engine.', defaultValue: FACEBOOK_ADS_UI_DEFAULTS, schema: FACEBOOK_ADS_CREATION_UI_SCHEMA, consumption: 'active' })] as const;
+  } satisfies AdsUiSchema & { ad: Record<string, string | number> };
+export const FACEBOOK_ADS_CREATION_CONFIG = [entry({ key: 'meta.adsCopy', group: 'Facebook · Ads creation', label: 'Advertising action copy (English/French)', kind: 'json', description: 'Action labels, name validation and exact confirmation templates. Preserve every placeholder; all clients must echo the current reviewed phrase.', defaultValue: FACEBOOK_ADS_COPY, schema: FACEBOOK_ADS_COPY_SCHEMA, consumption: 'active' }), entry({ key: 'meta.adsCreationUi', group: 'Facebook · Ads creation', label: 'Creation choices and copy', kind: 'json', description: 'Safe form labels, implemented objective/optimization choices, defaults and name ceilings. Confirmation templates are reviewed separately by the provider engine.', defaultValue: FACEBOOK_ADS_UI_DEFAULTS, schema: FACEBOOK_ADS_CREATION_UI_SCHEMA, consumption: 'active' })] as const;

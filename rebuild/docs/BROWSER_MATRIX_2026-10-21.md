@@ -250,3 +250,49 @@ and Posts reporting a 401 as a naming problem. No overflow, accessible-name, the
 
 The global-error path (database unreachable) was not re-run; round 3 covers it with the same shared component. Client-side render throws (a component crashing on a malformed response) were not exercised, only a server-side page throw.
 Only vivid and warm, one boundary page, one recovery check in Firefox only, no Firefox/WebKit keyboard walks or system-mode runs, no real Safari/iOS, screen readers, long content, or anything live-provider or production.
+
+# Round 5 (2026-10-21): full Chromium rerun after rounds 4-5, Feeds recipes, missing-image and saved-view fixes
+
+Same environment as before: a **local production build** of `46c6bdae` (`next build` + `next start`, :3200) against the **synthetic** preview PostgreSQL database, Chromium only. Not production, not live-provider evidence.
+The app accepts only the `localhost` origin (`app.publicOrigin`), so `BASE_URL` must be `http://localhost:3200`; `127.0.0.1` makes browser sign-in fail with a generic message (403 from the origin check).
+The preview database was brought up to date first: `20261031170000_rebuild_inbox_metadata` was applied by hand (the database has no `_prisma_migrations` table). Synthetic Feeds rows were added for the QA workspace: one recipe
+source and four plans (two planned, one failed, one uncertain), so `/publishing/feeds` renders with recipe data. They stay in the synthetic database only.
+
+Harness additions: `BROWSER_MATRIX_SCOPE=round5:fixes` (`runRound5Fixes`): on Posts, Queue, Approvals and Calendar, no visible broken-image icon (`classifyMedia`); calendar contrast; and on Posts at desktop, a saved-view save after the
+session cookie is removed must explain the ended session (`classifySavedViewFeedback`). The only POST it lets through is the refused saved-view save. Unit tests: `tests/browser-matrix-round5.test.ts`.
+
+## Results
+
+| Run | Scope | Cells | Findings |
+| --- | --- | --- | --- |
+| Full matrix | 62 customer/Root/public routes × 4 themes × light/dark × 1440/390, includes `/ads`, `/ads/campaigns`, `/ads/objects`, `/ads/compare` and `/publishing/feeds` | 992 / 992 | 162 (round 1 had 176), all explained below. Ads pages and Feeds: **0 own findings** |
+| Fixes check | 4 themes × light/dark × 1440/390; media on 4 pages, calendar contrast, saved view at desktop | 72 / 72 | 10: 8 saved-view, 2 calendar contrast. **0 broken images** |
+| Not found | unknown route, signed in and out, 4 themes × light/dark × 2 viewports | 64 / 64 | **0**, HTTP 404 |
+
+Full-matrix findings, by cause:
+
+1. **80 (40 requests + 40 console errors): seeded media with no stored file** answers 404 on `/api/media/<id>` (`/publishing/posts`, `/queue`, `/approvals`). Data, not UI: the fallback works, the fix check found no broken-image icon in any cell.
+   The browser still logs the failed request, which the gate counts.
+2. **`/join` without a token: 16 `/api/auth/invitations/preview` 404s (+10 console errors) and 6 console 429s.** Known "tokenless join" finding, unchanged; the 429s come from the rate limit on that endpoint when sixteen cells hit it in a row.
+3. **Calendar "View post" button, 4.35:1 (needs 4.5), warm light, desktop and phone.** Computed colour `rgb(189,92,57)` on `rgb(255,253,249)` is the warm accent `#B4461F` at 88 % opacity: `calendar.module.css`
+   `.post[data-status="published"] { opacity: .88 }` dims the whole card. Module-owned (Publishing); the shared tokens are correct. No other theme or mode fails, so calendar contrast now holds in seven of eight theme/mode combinations.
+
+## Fixed in my owned paths
+
+None needed in `src/styles/**` or `src/components/**`: no shared-token defect was found this round. The harness gained the `round5:fixes` scope and its tests.
+
+## Findings for module/app owners (not fixed here)
+
+| Severity | Finding | Where | Owner |
+| --- | --- | --- | --- |
+| Medium | **Saved views still report an ended session as a naming problem.** After the session cookie is removed, saving shows "The view could not be saved. Check its name and try again." (8 / 8 desktop cells). `36946d9e` did not change `SavedViews.tsx`: a 401 falls into `saved_saveFailed`. Needs a session-ended message (EN/FR) and a link to sign in | `src/modules/publishing/ui/SavedViews.tsx`, `action-catalog.ts` `saved_saveFailed` | Publishing |
+| Low | Calendar published-post opacity drops the "View post" button below 4.5:1 in warm light. Apply the dimming to the card background/text that carries no small button text, or raise the button colour | `calendar.module.css:88` | Publishing |
+| Low | Tokenless `/join` calls an invitation-preview endpoint that answers 404 and is rate limited; show the "link needed" state without a request | join screen | Auth |
+| Info | Seeded media rows have no stored file (404 in console) | preview data | n/a |
+| Open | Module findings from rounds 2 and 4 that this run did not re-test (raw server text, lost input after failed writes, soft 404 for unknown ids, hydration warnings in WebKit) remain open | see rounds 2 and 4 | Tasks, Publishing, Analytics, Auth, Inbox, Root, Sharing |
+
+## Not proven (round 5)
+
+Firefox and WebKit were not rerun. The dynamic-id, empty-workspace, system-mode, keyboard and failure-injection parts were not rerun (they need round-2 fixtures that were removed); the full matrix's own keyboard gate passed
+without findings. Saved views were checked at desktop width only (on phones the filters sit in a drawer). The Feeds page rendered with no findings but its recipe card was not inspected visually, and Ads creation/edit
+flows were not driven (the gate is read-only; spend-changing confirmations are not exercised). The 404 pages and everything else carry the earlier limits: no real Safari/iOS, screen readers, live-provider or production evidence.

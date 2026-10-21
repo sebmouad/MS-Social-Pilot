@@ -281,7 +281,15 @@ export async function schedulePostAction(data: FormData) {
 }
 
 export async function cancelScheduledPostAction(data: FormData) {
-  await run(async viewer => { await cancelScheduledPost(actor(viewer), stringField(data, 'postId')); return 'cancelled'; });
+  const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
+  if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new Error('You cannot manage posts.');
+  // The queue form owns failure feedback. Reject without navigation so its
+  // filters, reschedule input and localized inline notice remain available.
+  await cancelScheduledPost(actor(viewer), stringField(data, 'postId'));
+  revalidatePath(PATH);
+  revalidatePath('/publishing/queue');
+  revalidatePath('/publishing/approvals');
+  redirect(`${PATH}?notice=cancelled`);
 }
 
 export async function reviewPostAction(data: FormData) {

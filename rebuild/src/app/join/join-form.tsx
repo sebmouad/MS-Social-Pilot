@@ -34,7 +34,16 @@ export function JoinForm({ passwordPolicy, locale = 'en' }: { passwordPolicy: Ac
     if (window.location.hash) window.history.replaceState(window.history.state, '', window.location.pathname);
     const token = fragment.current;
     void fetch('/api/auth/invitations/preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(token ? { token } : {}), signal: controller.signal })
-      .then(async response => { const body: unknown = await response.json().catch(() => null); if (!response.ok) throw new Error(!token ? t.missingLink : response.status < 500 && typeof (body as { error?: unknown })?.error === 'string' ? (body as {error:string}).error : t.openFailed); if (!validPreview(body)) throw new Error(t.unconfirmed); if (!controller.signal.aborted) { setInvitation(body); fragment.current = ''; } })
+      .then(async response => {
+        const body: unknown = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(t.openFailed);
+        if (body && typeof body === 'object' && 'invitation' in body && body.invitation === null) {
+          if (!controller.signal.aborted) { setInvitation(null); setMessage(t.missingLink); fragment.current = ''; }
+          return;
+        }
+        if (!validPreview(body)) throw new Error(t.unconfirmed);
+        if (!controller.signal.aborted) { setInvitation(body); fragment.current = ''; }
+      })
       .catch(error => { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : t.loadFailed); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => { controller.abort(); pending.current?.abort(); };

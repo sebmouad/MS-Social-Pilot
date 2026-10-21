@@ -25,8 +25,10 @@ export interface RecipeStore {
   recordRun(workspaceId: string, sourceId: string, run: RunRecord): Promise<void>;
   /** Failed and uncertain slots at or after `from`, soonest first. */
   unresolved(sourceId: string, from: Date, limit: number): Promise<LedgerRow[]>;
-  /** Scheduled slots after `from` that hold a post, soonest first. */
+  /** Scheduled slots after `from` that hold a post, least recently attempted first. */
   plannedUpcoming(sourceId: string, from: Date, limit: number): Promise<LedgerRow[]>;
+  /** Record a refused cancellation without changing its state, receipt or reason. */
+  deferCancellation?(workspaceId: string, id: string, postId: string): Promise<void>;
   /** Settle a slot only while it is still in `expected`; false when another actor already changed it. */
   settleIf(workspaceId: string, id: string, expected: PlanState, settlement: Settlement & { expectedPostId?: string | null }): Promise<boolean>;
 }
@@ -88,12 +90,16 @@ export const prismaRecipeStore: RecipeStore = {
     return rows.map(toLedger);
   },
   async plannedUpcoming(sourceId, from, limit) {
-    const rows = await prisma.$queryRawUnsafe<RawLedger[]>(`SELECT ${LEDGER_COLUMNS} FROM wordpress_recipe_plans WHERE "sourceId" = $1 AND "slotAt" > $2 AND state = 'planned' AND "postId" IS NOT NULL ORDER BY "slotAt" ASC, id ASC LIMIT $3`, sourceId, from, limit);
+    const rows = await prisma.$queryRawUnsafe<RawLedger[]>(`SELECT ${LEDGER_COLUMNS} FROM wordpress_recipe_plans WHERE "sourceId" = $1 AND "slotAt" > $2 AND state = 'planned' AND "postId" IS NOT NULL ORDER BY "updatedAt" ASC, "slotAt" ASC, id ASC LIMIT $3`, sourceId, from, limit);
     return rows.map(toLedger);
   },
   async settleIf(workspaceId, id, expected, s) {
     const changed = await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET state = ${s.state}, "postId" = ${s.postId ?? null}, reason = ${s.reason ?? null}, "updatedAt" = NOW() WHERE id = ${id} AND "workspaceId" = ${workspaceId} AND state = ${expected} AND ("postId" IS NOT DISTINCT FROM ${s.expectedPostId ?? null}::text)`;
     return changed === 1;
+  },
+  async deferCancellation(workspaceId, id, postId) {
+    await prisma.$executeRaw`UPDATE wordpress_recipe_plans SET "updatedAt" = NOW()
+      WHERE "workspaceId" = ${workspaceId} AND id = ${id} AND state = 'planned' AND "postId" = ${postId}`;
   },
   async recordRun(workspaceId, sourceId, run) {
     await prisma.$executeRaw`UPDATE wordpress_recipe_sources SET "lastRunAt" = ${run.at}, "lastError" = ${run.error}, "lastSummary" = ${JSON.stringify(run.summary)}::jsonb WHERE id = ${sourceId} AND "workspaceId" = ${workspaceId}`;

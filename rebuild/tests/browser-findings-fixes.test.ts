@@ -27,7 +27,11 @@ const submit = (form: HTMLFormElement) => act(async () => { form.requestSubmit()
 describe('queue cancel failure', () => {
   it('shows a catalog sentence beside the post and re-enables the button when the request fails', async () => {
     const action = vi.fn(async () => { throw new Error('500 Internal Server Error: stack trace'); });
-    await render(createElement(CancelScheduleForm, { postId: 'post-1', action, locale: 'en' }));
+    window.history.replaceState(null, '', '/publishing/queue?page=2&channel=selected');
+    await render(createElement('div', null,
+      createElement('input', { name: 'scheduleTime', defaultValue: '10:00', 'aria-label': 'Reschedule time' }),
+      createElement(CancelScheduleForm, { postId: 'post-1', action, locale: 'en' })));
+    await fill(container.querySelector<HTMLInputElement>('[name="scheduleTime"]')!, '14:30');
     await submit(container.querySelector('form')!);
     await flush();
     expect(action).toHaveBeenCalledOnce();
@@ -36,6 +40,8 @@ describe('queue cancel failure', () => {
     expect(alert.textContent).toContain('could not be cancelled');
     expect(alert.textContent).not.toContain('stack trace');
     expect(container.querySelector('button')!.disabled).toBe(false);
+    expect(window.location.pathname + window.location.search).toBe('/publishing/queue?page=2&channel=selected');
+    expect(container.querySelector<HTMLInputElement>('[name="scheduleTime"]')!.value).toBe('14:30');
   });
   it('answers in French', async () => {
     await render(createElement(CancelScheduleForm, { postId: 'post-1', action: async () => { throw new Error('x'); }, locale: 'fr' }));
@@ -90,7 +96,7 @@ describe('two-step failure messages', () => {
 
 describe('tokenless join page', () => {
   it('shows a clear themed message instead of a raw server error', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: 'Not found' }) })));
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ invitation: null }) })));
     await render(createElement(JoinForm, { passwordPolicy: { minLength: 8, maxBytes: 800 } }));
     await flush();
     expect(container.textContent).toContain('There is no invitation to open here');

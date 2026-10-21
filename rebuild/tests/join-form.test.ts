@@ -22,8 +22,8 @@ afterEach(async () => {
   window.history.replaceState(null, '', '/');
 });
 
-async function render() {
-  await act(async () => root.render(createElement(JoinForm, { passwordPolicy: { minLength: 8, maxBytes: 800 } })));
+async function render(locale: 'en' | 'fr' = 'en') {
+  await act(async () => root.render(createElement(JoinForm, { passwordPolicy: { minLength: 8, maxBytes: 800 }, locale })));
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
 }
 function button(text: string) {
@@ -37,6 +37,33 @@ async function fill(input: HTMLInputElement, value: string) {
 }
 
 describe('join invitation form', () => {
+  it.each(['en', 'fr'] as const)('shows a focused localized empty state for a tokenless %s visit', async locale => {
+    window.history.replaceState(null, '', '/join');
+    vi.stubGlobal('fetch', vi.fn(async () => respond({ invitation: null })));
+    await render(locale);
+    const notice = container.querySelector('[role="alert"]');
+    expect(notice?.textContent).toContain(locale === 'en' ? 'Use the link from your invitation email' : 'Utilisez le lien de votre e-mail');
+    expect(document.activeElement).toBe(notice);
+    expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({});
+    expect(container.querySelector('a[href="/sign-in"]')).not.toBeNull();
+    expect(container.querySelector('form')).toBeNull();
+  });
+
+  it('continues an invitation from the cookie when the URL has no fragment', async () => {
+    window.history.replaceState(null, '', '/join');
+    vi.stubGlobal('fetch', vi.fn(async () => respond(preview)));
+    await render();
+    expect(container.textContent).toContain(preview.workspaceName);
+    expect(container.querySelector('[name="name"]')).not.toBeNull();
+  });
+
+  it('does not mistake lookup failure for an empty invitation', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => respond({ error: 'private upstream detail' }, false, 500)));
+    await render('fr');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('ouverte');
+    expect(container.textContent).not.toContain('private upstream detail');
+  });
+
   it('removes the fragment before fetching and carries the token only in the preview request body', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => respond(preview)));
     await render();

@@ -25,9 +25,9 @@ export type RetryOutcome = {
 
 /**
  * Re-plan the upcoming slots whose post is definitively not created. A failed slot never produced a post. An uncertain
- * slot is first checked against Publishing: when a post exists for that channel and time it is recorded (never
- * duplicated); only when none exists, and the claim is older than its lease so nothing can still be in flight, is the slot
- * released. Slots that cannot be confirmed stay uncertain. The planner then fills only the released and failed slots.
+ * slot is first checked against Publishing using durable recipe identity, regardless of the post
+ * state or current time. Unknown identity or absence proof stays uncertain. Only definitive absence from the port,
+ * after the claim lease ends, permits release. Slots that cannot be confirmed stay uncertain. The planner then fills only the released and failed slots.
  */
 export async function retryRecipeSlots(ctx: { settings: WordpressSettings; ports: PlannerPorts; db: WpDb; now: Date }, source: SourceRow, auth: FeedAuthorization): Promise<RetryOutcome> {
   const { settings, ports, now } = ctx;
@@ -44,8 +44,8 @@ export async function retryRecipeSlots(ctx: { settings: WordpressSettings; ports
     let post: { id: string } | null;
     try { post = await ports.postForSlot(source.workspaceId, row.targetId, row.slotAt); } catch { out.unconfirmed += 1; continue; }
     if (post) {
-      if (await ports.store.settleIf(source.workspaceId, row.id, 'uncertain', { state: 'planned', postId: post.id, reason: RECONCILED })) out.reconciled += 1;
-    } else if (await ports.store.settleIf(source.workspaceId, row.id, 'uncertain', { state: 'failed', reason: NOT_CREATED })) {
+      if (await ports.store.settleIf(source.workspaceId, row.id, 'uncertain', { state: 'planned', postId: post.id, reason: RECONCILED, expectedPostId: row.postId })) out.reconciled += 1;
+    } else if (await ports.store.settleIf(source.workspaceId, row.id, 'uncertain', { state: 'failed', reason: NOT_CREATED, expectedPostId: row.postId })) {
       out.released += 1; retry.add(key);
     }
   }
@@ -73,11 +73,14 @@ export async function cancelPlannedPosts(ctx: { settings: WordpressSettings; por
   const rows = (await ports.store.plannedUpcoming(source.id, now, limit + 1)).filter(row => inScope(auth, row));
   const out: CancelOutcome = { cancelled: 0, notCancelled: 0, remaining: rows.length > limit };
   for (const row of rows.slice(0, limit)) {
-    try { await ports.cancelPost(auth.actor, row.postId!); } catch { out.notCancelled += 1; continue; }
+    try { await ports.cancelPost(auth.actor, row.postId!); } catch {
+      out.notCancelled += 1;
+      // Retain the held post and state, but rotate this attempted row behind untouched work.
+      await ports.store.deferCancellation?.(source.workspaceId, row.id, row.postId!);
+      continue;
+    }
     out.cancelled += 1;
     await ports.store.settleIf(source.workspaceId, row.id, 'planned', { state: 'failed', reason: CANCELLED, expectedPostId: row.postId }).catch(() => false);
   }
-  // Posts that were refused stay scheduled, so a further request would meet them again: more work only when new ones remain.
-  if (out.remaining && out.cancelled === 0) out.remaining = false;
   return out;
 }

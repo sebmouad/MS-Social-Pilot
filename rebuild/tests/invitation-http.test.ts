@@ -14,6 +14,7 @@ vi.mock('@/server/rate-limit', () => ({ hit: () => ({ allowed: true }) }));
 vi.mock('@/server/client-ip', () => ({ clientIp: () => '127.0.0.1' }));
 
 import { handleInvitationHttp } from '@/server/invitation-http';
+import { OperationError } from '@/lib/operation-error';
 
 const origin = 'https://social.example';
 const token = Buffer.alloc(32, 3).toString('base64url');
@@ -34,6 +35,43 @@ beforeEach(() => {
 });
 
 describe('invitation HTTP continuation', () => {
+  it('returns an empty no-store preview when neither a fragment nor continuation token exists', async () => {
+    state.readToken.mockResolvedValue(null);
+    const response = await handleInvitationHttp(request('preview', {}), 'preview');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ invitation: null });
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(state.preview).not.toHaveBeenCalled();
+    expect(state.account).not.toHaveBeenCalled();
+    expect(state.rememberToken).not.toHaveBeenCalled();
+  });
+
+  it('normalizes a missing preview without changing unavailable or forbidden invitation responses', async () => {
+    state.preview.mockRejectedValueOnce(new OperationError('not_found', 'Unavailable'));
+    const missing = await handleInvitationHttp(request('preview', { token }), 'preview');
+    expect(missing.status).toBe(200);
+    expect(await missing.json()).toEqual({ invitation: null });
+    for (const [code, status] of [['conflict', 409], ['forbidden', 403]] as const) {
+      state.preview.mockRejectedValueOnce(new OperationError(code, 'Unavailable'));
+      expect((await handleInvitationHttp(request('preview', { token }), 'preview')).status).toBe(status);
+    }
+    expect(state.rememberToken).not.toHaveBeenCalled();
+  });
+
+  it('keeps tokenless writes rejected and malformed previews invalid', async () => {
+    state.readToken.mockResolvedValue(null);
+    for (const action of ['accept', 'enroll', 'register'] as const) {
+      const body = action === 'register' ? { name: 'Member', password: 'long-password', confirmation: 'CREATE ACCOUNT AND JOIN invite-1' } : { confirmation: 'CONFIRM' };
+      expect((await handleInvitationHttp(request(action, body), action)).status).toBe(404);
+    }
+    expect((await handleInvitationHttp(request('preview', { token: 'bad-token' }), 'preview')).status).toBe(400);
+    expect(state.preview).not.toHaveBeenCalled();
+    expect(state.accept).not.toHaveBeenCalled();
+    expect(state.register).not.toHaveBeenCalled();
+    expect(state.beginEnrollment).not.toHaveBeenCalled();
+  });
+
   it('requires same-origin requests before preview or token work', async () => {
     const response = await handleInvitationHttp(request('preview', { token }, { origin: 'https://attacker.example' }), 'preview');
     expect(response.status).toBe(403);

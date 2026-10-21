@@ -19,7 +19,7 @@ export type PlannerPorts = {
   createPost(actor: FeedActor, input: PlannedPostInput): Promise<{ id: string }>;
   /** Publishing's own cancel of a queued post (back to draft); throws when the post can no longer be cancelled. */
   cancelPost(actor: FeedActor, postId: string): Promise<void>;
-  /** The post Publishing holds for this channel and time, whatever its state; null when none exists. */
+  /** Resolve durable recipe identity regardless of current post state/time; throw when identity is unknown. */
   postForSlot(workspaceId: string, targetId: string, slotAt: Date): Promise<{ id: string } | null>;
   image: ImagePorts;
   qualify(workspaceId: string): Promise<FeedAuthorization | null>;
@@ -44,7 +44,16 @@ export function defaultPlannerPorts(net: FetchDeps = defaultFetchDeps()): Planne
       const { cancelScheduledPost } = await import('@/modules/publishing/server/lifecycle');
       await cancelScheduledPost({ userId: actor.userId, workspaceId: actor.workspaceId, ...(actor.allowedTargetIds === undefined ? {} : { allowedTargetIds: actor.allowedTargetIds }) }, postId);
     },
-    postForSlot: (workspaceId, targetId, slotAt) => prisma.post.findFirst({ where: { workspaceId, scheduledAt: slotAt, targets: { some: { targetId } } }, select: { id: true }, orderBy: { createdAt: 'asc' } }),
+    async postForSlot(workspaceId, targetId, slotAt) {
+      const rows = await prisma.$queryRaw<Array<{ postId: string | null }>>`SELECT "postId" FROM wordpress_recipe_plans
+        WHERE "workspaceId" = ${workspaceId} AND "targetId" = ${targetId} AND "slotAt" = ${slotAt}`;
+      // A time/channel match is not provenance. In particular, cancellation clears scheduledAt.
+      // Old interrupted creates without a saved identity require reconciliation, never a blind resend.
+      if (rows.length !== 1 || !rows[0]!.postId) throw new Error('Recipe post identity is unconfirmed');
+      const post = await prisma.post.findFirst({ where: { id: rows[0]!.postId, workspaceId }, select: { id: true } });
+      if (!post) throw new Error('Recipe post identity is unconfirmed');
+      return post;
+    },
     image: defaultImagePorts(net),
     qualify: workspaceId => qualifyingOwner(workspaceId),
     store: prismaRecipeStore,

@@ -1,6 +1,6 @@
 # UI, REST and MCP parity inventory
 
-Updated 2026-10-21 against local HEAD `1240a9ce` (merges since `8852d367`). This is a **source-level**
+Updated 2026-10-21 against local HEAD `46c6bdae` (merges since `1240a9ce`). This is a **source-level**
 inventory using module MCP declarations, HTTP routes, shared services and the
 lane matrices. It is not a fresh tools/list dump, real MCP-client run, database,
 browser or provider verification. Full parity remains **partial**. The automated declaration guard and exact
@@ -19,7 +19,7 @@ selected-resource, person-key and installation authority remain distinct.
 | Publishing | Drafts, create/edit/import, lists/search/export, publish/retry/sync, schedule/reschedule/cancel/queue, approvals, deletion/recovery, first-comment send/retry/record, templates/labels/fields/notes/versions, saved views, mix/recycle/best times/media | Broad source coverage. Per-destination schedule modes flow through session REST, key REST v1 and MCP. Draft aliases and REST v1 create now use confirmed `api-writes` lifecycle boundaries (`acb56bd7`); real scheduling/provider and remaining write-boundary evidence stay partial |
 | Inbox | List/thread/sync/reply/resolve, nested replies/reviews, moderation/deletion/recovery, productivity, assignment/notes/saved replies and contact details | Broad source coverage; GET `/api/inbox/threads/[key]/details` calls `readInboxContactDetails` (added in `8852d367`). `bulkInboxAction` now has UI, `POST /api/inbox/bulk` and `bulk_inbox_action` (`f5c21c96`); mocked route tests only |
 | Analytics | Overview/details/explorer/previous points, comparisons, posts/ad objects, demographics/history CSV, pins/goals, report exports/templates/schedules/runs/generation | Present at source; session HTTP and MCP share cores, key REST v1 delegates declared tools to host. Completeness of collected metrics and real transport/provider results remain unproven |
-| Ads | Accounts/performance/directory/rows/exports/compare/status, creation choices, creative sources/image/create/assignment, change preview/apply/history/recovery | Present at source with session routes and key REST v1 through owning MCP groups. Live manager/grant/spend/creative outcomes remain partial |
+| Ads | Accounts/performance/directory/rows/exports/compare/status, creation choices, creative sources/image/create/assignment, change preview/apply/history/recovery | Present at source with session routes and key REST v1 through owning MCP groups. `ad.create` (paused) uses the same `previewAdsManagement`/`performAdsManagement` path from `AdCreateForm`, session REST and `preview_ads_change`/`apply_ads_change`; a missing `ads_management` grant yields a reconnect notice and localized error. The ledger CHECK migration for `ad.create` is absent at HEAD (fails closed). Live manager/grant/spend/creative outcomes remain partial |
 | Settings connections | Directory/health, OAuth start, single/batch selection, disconnect preview/retain/delete | OAuth start UI/REST/session MCP share service; compatibility route also delegates. Single/batch MCP and REST selections call changeConnectionSelections; MCP and REST disconnect call changeConnectionDisconnect. Browser sends named retain/delete consent after final review. Targeted mocked transport and DOM tests cover caller parity; live client/provider and actual browser evidence remain separate |
 | Settings account/security/keys | Profile/password/session reads and changes; authenticator begin/enable/disable, passkey removal; workspace/person key list/issue/revoke | Session-only tools now exist; old claim that account/key issuance has no MCP is superseded. Bearer credentials cannot manage credentials/security. General authentication/passkey ceremony remains interactive |
 | Settings appearance | `appearanceSession`, GET/PATCH `/api/settings/appearance`, `get_appearance`, `update_appearance` | Shell ThemeProvider/mode toggle and Settings now share confirmed persistence (`2b42470b`); theme and mode are account-stored, cookies use Root lifetime, layout falls back to validated-session preferences. Cross-device/live persistence proof remains separate |
@@ -31,7 +31,7 @@ selected-resource, person-key and installation authority remain distinct.
 | Agency | Overview/export via shared service, session Clients and workspace selection | Separate read-only person keys exist for overview; workspace keys cannot expand to person-wide reads. Session Clients/switching are present, not granted to person keys; REST switch versus MCP confirmation difference remains |
 | Sharing | Review/share link CRUD/rotate/revoke, feedback, eligible channels, bio controls | Shared UI/API/MCP source; copy-only edits remain version checked without confirmation, access changes confirmed. Browser/public provider/data coverage remains partial |
 | Integrations | Webhooks/secrets/test/history, REST v1 and OAuth connector services | Session MCP secret reveal/rotate exist; bearer tools stay secret-free. OAuth browser consent is interactive. Not all module APIs are key-authenticated v1 endpoints |
-| Root | Configuration, operations/diagnostics/health, users/workspaces/plans/audit/errors, registration, installation transfer, connection refresh/disconnect/recovery | Private UI/HTTP/installation-session MCP source coverage; workspace/person keys excluded. Backups UI is read-only; full operator inventory/configuration remains partial |
+| Root | Configuration, operations/diagnostics/health, users/workspaces/plans/audit/errors, registration, installation transfer, connection refresh/disconnect/recovery | Private UI/HTTP/installation-session MCP source coverage; workspace/person keys excluded. Workspace create/rename, directory, configuration save and error resolution are shared services in `src/modules/root/server/` (`46c6bdae`). Backups UI is read-only; full operator inventory/configuration remains partial |
 
 ## Key-authenticated REST v1
 
@@ -51,8 +51,12 @@ Mocked route/host tests are not a live key/client verification of every tool.
   and `deletePublishingPost`, as do session REST; REST v1 create forwards exact
   `CREATE POST` consent to that boundary (`acb56bd7`). The old no-confirmation
   claim is superseded. Preserve actual lifecycle/scope and live evidence limits.
-- Reconcile Agency workspace switching and Sharing copy-only save policy with
-  the binding service contract.
+- Reconcile Agency workspace switching (REST switch versus MCP confirmation) and
+  Sharing copy-only save policy with the binding service contract.
+- Root service-boundary gaps from the 2026-10-21 exception closure are closed at
+  source (`46c6bdae`; see the update below); verify in PostgreSQL and with a real
+  installation-session MCP client.
+- Ads `ad.create` needs a ledger operation-kind migration before it can write.
 - Partial account export is registered in HTTP/MCP and exposed in the bilingual
   Account UI with explicit coverage/exclusions. Mapping and targeted automated
   checks cover those surfaces; real browser/MCP/database verification remains open.
@@ -551,6 +555,23 @@ Pre-existing untracked dependency links are unchanged.
 
 ### Boundary gaps requiring other owned files
 
+**Update (`46c6bdae`, source and mocked tests):** the four Root gaps below were
+addressed by new shared services under `src/modules/root/server/`.
+`workspace-controls` owns the current Root identity check, Root name/identifier
+limits and timezone defaulting inside the transaction; `directory` accepts and checks
+the actor; `configuration` is one confirmed writer (exact confirmation, in-transaction
+actor recheck, value-free audit, clear-secret phrase) used by REST and MCP, and the
+availability inventory is returned to every caller; `errors` checks the
+exact resolve/reopen confirmation in the service (whether MCP still adds a separate
+transport confirmation was not re-inspected). `src/server/root/*` re-export these, and the
+REST routes and MCP tools call them (`tests/root-config-authority.test.ts`,
+`root-workspace-controls.test.ts`, `root-directory.test.ts`,
+`root-legacy-services.test.ts`; mocked database, no PostgreSQL rollback, real MCP
+client or browser evidence). Settings single-selection and disconnect callers
+(`connections-mcp.ts`, `/api/connections`, the browser manager) now use
+`changeConnectionSelections` / `changeConnectionDisconnect`. Agency switching and
+Sharing copy-only saves remain open. The original gap list is retained as history:
+
 Explicit mapping removes an inventory exemption; it does not certify every
 historical Root caller's behavioral parity. These existing gaps were inspected
 and remain open because service/UI files are outside this lane:
@@ -585,8 +606,8 @@ exact exceptions are authority/protocol boundaries, not accepted product omissio
 Copy catalogs and schema/default fallback (`38ab34f4`, `fb42b056`, `93944199`,
 `5e6841ee`) expand bilingual UI and service errors; they do not prove complete
 localization. Recipe origin/status visibility has unit/render evidence. Browser
-rounds 1–2 are Chromium/local production-build/synthetic-data evidence, with
-unresolved findings and no Feeds table in round 2; see
+rounds 1–2 (Chromium) and 3–4 (plus Firefox and WebKit) are local production-build/
+synthetic-data evidence with unresolved findings; see
 [BROWSER_MATRIX_2026-10-21.md](BROWSER_MATRIX_2026-10-21.md). Owner-recorded recipe
 publications/comments and post-insights probes in RELEASE_GATES_PLAN, plus the
 owner's 11:00 batch report, establish those limited remote outcomes, not every
