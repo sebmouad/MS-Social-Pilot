@@ -31,6 +31,24 @@ Hard rules:
 - There is no v1/v2 switch: each batch replaces the old UI for everyone, so every batch must leave the whole app usable (use the Page tools adapter from B1 for pages not yet migrated).
 - Clean is the default theme: check Clean light/dark first.
 
+Token budget (owner rule: do not waste tokens; a session runs in a 5-hour usage window):
+- One step per session. Start a fresh session for the next step instead of continuing a long one.
+- Read only what the step needs. Read the docs listed above once; after that, open only
+  the files your step owns, using Grep/Glob with offset/limit rather than whole modules.
+  Do not re-read a file you just edited.
+- Do not explore unrelated modules, history, legacy src/ or old reports.
+- Plan the edit first, then make it in few, complete edits. Avoid trial-and-error loops.
+- Tests: run targeted vitest files while working. Run the full suite and npm run build
+  once, at the end of the step. Never re-run an unchanged failing command; read the error.
+- Screenshots: only changed screens, desktop 1440 and phone 390, in Clean and one other
+  theme. Read an image only when you need to check it.
+- Keep command output short (tail, head, grep, --reporter=dot). Never print lockfiles,
+  generated files, large JSON or full logs.
+- Do not use subagents or parallel sessions unless the owner asks.
+- Keep replies and docs brief. Report results, not narration.
+- If the window is running low, stop at a working point and commit and push.
+  Write the next action in AGENT_HANDOFF.md so the next session resumes without re-discovery.
+
 Verify before committing:
 - From rebuild/: npx tsc --noEmit -p .
 - Targeted vitest files, then the full suite.

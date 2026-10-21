@@ -9,6 +9,20 @@
 - **File ownership** is listed per batch, so parallel agents never edit the same files (AGENTS.md). Shared files (`tokens.css`, `components.css`, `components/index.ts`, `src/lib/product.ts`, the middleware) belong to the batch that lists them. Other batches ask before touching them.
 - **Never touch in design batches:** service authorization, confirmations, audit, provider modules, migrations. The parity lane (P) changes services only where 07 says so.
 
+## Token budget (owner rule)
+
+Each step should fit one 5-hour usage window. The rules are in [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md) under "Token budget". In short:
+
+- one step per fresh session
+- read only the files the step owns
+- use targeted tests while working; run the full suite and build once at the end
+- take a few screenshots, only of changed screens
+- keep command output short
+- no subagents unless the owner asks
+- commit, push and update the handoff before the window ends
+
+Large steps (B1, B2+B3, B5, B8) may need two windows. Split them at a working commit, not mid-edit.
+
 ## Phone priorities (owner: all four)
 
 Every batch that touches these flows must pass them at 390 px, one-handed, with no horizontal scroll:
