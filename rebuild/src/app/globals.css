@@ -1,5 +1,6 @@
 @import '../styles/tokens.css';
 @import '../styles/components.css';
+@import '../styles/responsive.css';
 a { color: inherit; text-decoration: none; }
 textarea { font: inherit; }
 .eyebrow { color: var(--accent) !important; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
