@@ -1,3 +1,4 @@
+import { settingsUiCopy, settingsUiCopySchema } from './ui/copy-catalog';
 import { accountConfirmationCopy, accountConfirmationCopySchema } from './account-confirmation-copy';
 import { PERSON_KEYS_CONFIG } from './person-keys/config';
 import { CHANNEL_PROFILES_CONFIG } from './channel-profiles/config';
@@ -12,6 +13,9 @@ import { entry, cron } from '@/lib/config/entry';
 import { appearanceCopy, appearanceCopySchema } from './ui/appearance/copy';
 
 export const SETTINGS_CONFIG = [
+  entry({ key: 'settings.uiCopy', group: 'Settings · Copy', label: 'Settings screen copy', kind: 'json', description: 'English and French customer copy for Settings screens, forms, tables and security controls.', defaultValue: settingsUiCopy, schema: settingsUiCopySchema, consumption: 'active' }),
+  entry({ key: 'settings.accountPasskeyLimit', group: 'Settings · Account', label: 'Passkey list limit', kind: 'number', description: 'Refuse oversized passkey lists rather than silently omitting credentials.', defaultValue: 100, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
+  entry({ key: 'settings.accountAuthenticatorIssuer', group: 'Settings · Account', label: 'Authenticator issuer', kind: 'text', description: 'Account label shown in authenticator apps.', defaultValue: 'MS Social Pilot', schema: z.string().trim().min(1).max(100), consumption: 'active' }),
   entry({ key: 'settings.appearanceCookieMaxAgeSeconds', group: 'Settings · Appearance', label: 'Appearance cookie lifetime (seconds)', kind: 'number', description: 'Lifetime of theme and display-mode cookies saved by Settings REST and session MCP.', defaultValue: 31536000, schema: z.number().int().min(1).max(315360000), consumption: 'active' }),
   entry({ key: 'settings.appearanceCopy', group: 'Settings · Appearance', label: 'Appearance copy', kind: 'json', description: 'English and French theme labels, display modes, feedback and Settings appearance copy.', defaultValue: appearanceCopy, schema: appearanceCopySchema, consumption: 'active' }),
   entry({ key: 'settings.connectionDirectoryPageSize', group: 'Connections', label: 'Connection directory page size', kind: 'number', description: 'Maximum discovered connection sources returned per REST/MCP page.', defaultValue: 25, schema: z.number().int().min(1).max(1000), consumption: 'active' }),

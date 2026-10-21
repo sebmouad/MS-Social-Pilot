@@ -1,5 +1,6 @@
 export const workspacePolicyCopy = {
   en: {
+    confirmationConsequence: 'Apply these settings to this workspace. This affects future workspace activity.',
     title: 'Workspace policies', description: 'Set the publishing time zone and review requirement for {workspace}.',
     unavailable: 'Workspace policies are unavailable. Refresh the page or try again later.',
     zonePanel: 'Publishing time zone', zoneDetail: 'Used to display and schedule publishing times across this workspace.',
@@ -10,6 +11,7 @@ export const workspacePolicyCopy = {
     unconfirmed: 'The workspace policy outcome is unconfirmed. Refresh before trying again.', failed: 'Workspace policies could not be confirmed.',
   },
   fr: {
+    confirmationConsequence: 'Appliquer ces paramètres à cet espace. Cela affecte ses prochaines activités.',
     title: 'Politiques de l’espace', description: 'Définissez le fuseau horaire de publication et l’exigence de validation pour {workspace}.',
     unavailable: 'Les politiques de l’espace sont indisponibles. Actualisez la page ou réessayez plus tard.',
     zonePanel: 'Fuseau horaire de publication', zoneDetail: 'Utilisé pour afficher et planifier les heures de publication dans cet espace.',

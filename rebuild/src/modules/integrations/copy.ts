@@ -1,6 +1,7 @@
 /** Webhook screen customer copy in both shipped languages; chosen from `accept-language` like the media library. */
 export const integrationsCopy = {
   en: {
+    confirmChange: 'Confirm this change to the named webhook.', deleteNote: 'This removes the webhook and its delivery history. It cannot be undone.', rotateNote: 'The previous secret will stop signing new deliveries. Update your receiving tool with the replacement.', revealNote: 'Only show this credential where you can keep it private.', testNote: 'Send a test event to this webhook address now.', againNote: 'Send this event again. Your receiving tool may process it more than once.', secretNote: 'Copy this signing secret now and keep it private.',
     title: 'Webhooks',
     description: 'Send events from {workspace} to tools like Zapier, Make or your own server.',
     eyebrow: 'Workspace settings',
@@ -91,6 +92,7 @@ export const integrationsCopy = {
     notEmitted: 'Not sent by this installation yet',
   },
   fr: {
+    confirmChange: 'Confirmez cette modification du webhook indiqué.', deleteNote: 'Le webhook et son historique seront supprimés définitivement.', rotateNote: 'L’ancien secret ne signera plus les nouveaux envois. Configurez le nouveau secret dans votre outil.', revealNote: 'Affichez cet identifiant uniquement dans un endroit privé.', testNote: 'Envoyer un événement de test à cette adresse maintenant.', againNote: 'Renvoyer cet événement. Votre outil peut le traiter plusieurs fois.', secretNote: 'Copiez ce secret de signature et conservez-le en lieu sûr.',
     title: 'Webhooks',
     description: 'Envoyez les événements de {workspace} vers des outils comme Zapier, Make ou votre propre serveur.',
     eyebrow: 'Paramètres de l’espace de travail',

@@ -9,8 +9,7 @@ const CATEGORIES = [
 ] as const;
 
 /** Product-facing deletion preview. Every server count belongs to exactly one row. */
-export function summarizeDeletionCounts(counts: Record<string, number>, locale: 'en' | 'fr' = 'en') {
-  const labels = dataCopy[locale].categories;
+export function summarizeDeletionCounts(counts: Record<string, number>, locale: 'en' | 'fr' = 'en', labels: { [K in keyof typeof dataCopy.en.categories]: string } = dataCopy[locale].categories) {
   const known = new Set<string>(CATEGORIES.flatMap(category => category.keys));
   const rows: { label: string; count: number }[] = CATEGORIES.map(category => ({
     label: labels[category.id],

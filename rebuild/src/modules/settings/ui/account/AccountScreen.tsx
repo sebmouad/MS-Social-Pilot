@@ -1,3 +1,5 @@
+import { AccountSettings } from './settings';
+import { readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
 import { canAccessFeature } from '@/server/permissions';
 import { runtimeConfig } from '@/server/config/store';
 import { accountConfirmationCopySchema } from '../../account-confirmation-copy';
@@ -8,10 +10,9 @@ import type { Metadata } from 'next';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { SettingsPage, SettingsPanel, styles } from '@/modules/settings/ui/_components';
-import { AccountManager } from './manager';
 import { readAccount } from '../../server/account';
 import { accountSessionActor } from '../../server/account-session';
-import { accountCopy } from './copy';
+
 import { listPersonKeys } from '@/modules/settings/person-keys/service';
 
 export const metadata: Metadata = { title: 'Account' };
@@ -24,7 +25,8 @@ export default async function AccountPage() {
     if (!(error instanceof Error) || !error.message.includes('NEXT_REDIRECT')) throw error;
     return <PersonKeysAccountFallback locale={locale} />;
   }
-  const t = accountCopy[locale];
+  const uiCopy = await readSettingsUiCopy();
+  const t = uiCopy.account[locale];
   const account = await readAccount(await accountSessionActor(viewer.user.id, viewer.workspaceId));
   const { passwordPolicy, nameMaxLength } = account;
   const confirmationCopy = accountConfirmationCopySchema.parse(await runtimeConfig('settings.accountConfirmationCopy'))[locale];
@@ -34,13 +36,13 @@ export default async function AccountPage() {
     .catch(() => null);
   const values = [
     { label: t.workspace, value: viewer.membership.workspace.name },
-    { label: t.role, value: viewer.membership.role },
+    { label: t.role, value: (uiCopy.roles[locale] as Record<string, string>)[viewer.membership.role] ?? viewer.membership.role },
     { label: t.timezone, value: viewer.membership.workspace.timezone },
     { label: t.slug, value: viewer.membership.workspace.slug },
   ];
 
-  return <PageFrame module="settings" scopedAccess><SettingsPage active="settings/account" title={t.title} description={t.description} locale={locale}>
-    <AccountManager canWrite={canAccessFeature(viewer.permissions, 'settings/account', 'write')} nameMaxLength={nameMaxLength} confirmationCopy={confirmationCopy} locale={locale} initialName={account.name} email={account.email} passwordPolicy={passwordPolicy} />
+  return <PageFrame module="settings" scopedAccess><SettingsPage copy={uiCopy} active="settings/account" title={t.title} description={t.description} locale={locale}>
+    <AccountSettings canWrite={canAccessFeature(viewer.permissions, 'settings/account', 'write')} nameMaxLength={nameMaxLength} confirmationCopy={confirmationCopy} locale={locale} initialName={account.name} email={account.email} passwordPolicy={passwordPolicy} />
     <PersonKeysManager locale={locale} initial={personKeys} />
     <SettingsPanel title={t.contextTitle}>
       <dl className={styles['settings-account-grid']}>{values.map(item => <div className={styles['settings-account-item']} key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>

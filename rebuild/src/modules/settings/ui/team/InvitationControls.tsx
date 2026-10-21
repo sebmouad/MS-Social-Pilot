@@ -1,12 +1,14 @@
 'use client';
+import { useConfirmedAction } from '@/modules/settings/ui/use-confirmed-action';
+import { useSettingsCopy } from '@/modules/settings/ui/copy-context';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
-import { DataTable, Badge, Select, Drawer, ConfirmDialog, useToast } from '@/components';
+import { DataTable, Badge, Select, ConfirmDialog, useToast } from '@/components';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { fill } from '@/modules/settings/ui/shell-copy';
-import { invitationCopy, teamRoleLabel } from './copy';
+
 import styles from './invitations.module.css';
 
 type Invitation = { id: string; email: string; role: string; expiresAt: string; acceptedAt: string | null; createdAt: string; status: 'pending' | 'expired' | 'accepted' };
@@ -25,8 +27,10 @@ export function InvitationControls({ invitations, actorRole, available, locale =
   locale?: 'en' | 'fr';
 }) {
   const toast = useToast();
-  const t = invitationCopy[locale];
-  const roleLabel = (role: string) => teamRoleLabel(locale, role);
+  const confirmedAction = useConfirmedAction();
+  const t = useSettingsCopy('invitations', locale);
+  const roles = useSettingsCopy('roles', locale);
+  const roleLabel = (role: string) => (roles as Record<string, string>)[role] ?? role;
   const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
   const utcDate = (value: string) => {
     const date = new Date(value);
@@ -43,7 +47,6 @@ export function InvitationControls({ invitations, actorRole, available, locale =
   const [inviteReview, setInviteReview] = useState(false);
   const [reissuing, setReissuing] = useState<Invitation | null>(null);
   const [revoking, setRevoking] = useState<Invitation | null>(null);
-  const [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
@@ -71,7 +74,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
     setInviteReview(false);
     setReissuing(null);
     setRevoking(null);
-    setConfirmation('');
+
     setFeedback(null);
   }
 
@@ -81,7 +84,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
     if (!canonicalEmail) errors.email = t.emailRequired;
     if (!validation.validate(event.currentTarget, errors)) return;
     setFeedback(null);
-    setConfirmation('');
+
     setReissuing(pendingForEmail ?? null);
     setInviteReview(true);
   }
@@ -92,7 +95,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
     validation.clearAll();
     setReissuing(invitation);
     setInviteReview(true);
-    setConfirmation('');
+
     setFeedback(null);
   }
 
@@ -142,7 +145,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
 
   async function createInvitation() {
     const result = await request('POST', { email: canonicalEmail, role, confirmation: inviteConfirmation });
-    if (!result || !mounted.current) return;
+    if (!result || !mounted.current) return t.unconfirmed;
     const expiry = utcDate(result.expiresAt ?? '');
     const values = { email: canonicalEmail, expiry, extra: reissuing ? t.reissued : '' };
     const text = result.delivery === 'sent'
@@ -156,7 +159,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
     setFeedback({ text, error: result.delivery === 'failed' || result.delivery === 'uncertain' || result.delivery === 'unavailable' });
     setInviteReview(false);
     setReissuing(null);
-    setConfirmation('');
+
     validation.clearAll();
     router.refresh();
   }
@@ -169,7 +172,7 @@ export function InvitationControls({ invitations, actorRole, available, locale =
     const text = fill(t.revokedDone, { email: invitation.email });
     setFeedback({ text, error: false }); toast.notify({ title: text });
     setRevoking(null);
-    setConfirmation('');
+
     router.refresh();
   }
 
@@ -185,12 +188,12 @@ export function InvitationControls({ invitations, actorRole, available, locale =
             setEmail(next);
             validation.clear('email');
             if (reissuing && next.trim().toLowerCase() !== reissuing.email.trim().toLowerCase()) setReissuing(null);
-            setConfirmation('');
+
           }} />
           {validation.errors.email ? <FieldError id="team-invitation-email-error">{validation.errors.email}</FieldError> : <span id="team-invitation-email-help" className={styles.hint}>{t.emailHint}</span>}
         </label>
         <label className={styles.field}>{t.workspaceRole}
-          <Select aria-label={t.workspaceRole} value={role} disabled={busy} onChange={value => { setRole(value as (typeof ROLES)[number]); setConfirmation(''); }} options={ROLES.filter(option => !(actorRole === 'admin' && option === 'owner')).map(option => ({ value: option, label: roleLabel(option) }))} />
+          <Select aria-label={t.workspaceRole} value={role} disabled={busy} onChange={value => { setRole(value as (typeof ROLES)[number]); }} options={ROLES.filter(option => !(actorRole === 'admin' && option === 'owner')).map(option => ({ value: option, label: roleLabel(option) }))} />
         </label>
       </div>
       <p className={styles.scopeNote}>{t.scopeNote}</p>
@@ -207,19 +210,14 @@ export function InvitationControls({ invitations, actorRole, available, locale =
       { key: 'expires', label: t.expires, render: invitation => utcDate(invitation.expiresAt) },
       { key: 'actions', label: t.actions, render: invitation => <div className={styles.rowActions}>
         {canManage && invitation.status !== 'accepted' && (actorRole === 'owner' || invitation.role !== 'owner') && <Button size="sm" disabled={busy || !available} onClick={() => beginReissue(invitation)}>{t.reissue}</Button>}
-        {canManage && invitation.status === 'pending' && <Button size="sm" variant="quiet" disabled={busy} onClick={() => { setRevoking(invitation); setConfirmation(''); setFeedback(null); }}>{t.revoke}</Button>}
+        {canManage && invitation.status === 'pending' && <Button size="sm" variant="quiet" disabled={busy} onClick={() => { setRevoking(invitation); setFeedback(null); }}>{t.revoke}</Button>}
         {!canManage && <span className={styles.hint}>{t.viewOnly}</span>}
       </div> },
     ]} />
 
-    <Drawer closeLabel={t.back} open={inviteReview} title={reissuing ? t.reviewReissueTitle : t.reviewTitle} description={fill(t.reviewDetail, { email: canonicalEmail, role: roleLabel(role) })} onClose={closeDialogs} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={closeDialogs}>{t.back}</Button><Button variant="primary" disabled={busy || confirmation !== inviteConfirmation} onClick={() => void createInvitation()}>{busy ? t.creating : reissuing ? t.reissueInvitation : t.createInvitation}</Button></>}>
-      <div className={styles.review}><p><span>{t.email}</span><strong>{canonicalEmail}</strong></p><p><span>{t.workspaceRole}</span><strong>{roleLabel(role)}</strong></p><p><span>{t.channelAccess}</span><strong>{managerRole(role) ? t.allIncluded : t.noChannels}</strong></p></div>
-      {reissuing && <p className={styles.warning}>{t.reissueWarning}</p>}
-      <label className={styles.confirmField}><span>{t.confirmType.split('{code}')[0]}<code>{inviteConfirmation}</code>{t.confirmType.split('{code}')[1]}</span><input autoComplete="off" value={confirmation} disabled={busy} aria-label={t.inviteAria} onChange={event => setConfirmation(event.currentTarget.value)} /></label>
-      {feedback?.error && <p ref={dialogFeedbackRef} tabIndex={-1} className={styles.error} role="alert">{feedback.text}</p>}
-    </Drawer>
+    {inviteReview && <ConfirmDialog open title={reissuing ? t.reviewReissueTitle : t.reviewTitle} objectName={canonicalEmail} consequence={`${fill(t.reviewDetail, { email: canonicalEmail, role: roleLabel(role) })} ${managerRole(role) ? t.allIncluded : t.noChannels}. ${reissuing ? t.reissueWarning : ''}`} confirmLabel={reissuing ? t.reissueInvitation : t.createInvitation} cancelLabel={t.back} pendingLabel={t.creating} failureLabel={t.unconfirmed} danger={false} onClose={() => { setInviteReview(false); setReissuing(null); }} onConfirm={() => confirmedAction(async () => (await createInvitation()) ?? null)} />}
 
-    {revoking && <ConfirmDialog open title={t.revokeTitle} objectName={revoking.email} consequence={t.revokeCopy} confirmLabel={t.revokeInvitation} cancelLabel={t.keepInvitation} pendingLabel={t.revoking} failureLabel={t.revokeUnconfirmed} onClose={() => { if (!busy) { setRevoking(null); setConfirmation(''); } }} onConfirm={async () => (await revokeInvitation()) ?? null} />}
+    {revoking && <ConfirmDialog open title={t.revokeTitle} objectName={revoking.email} consequence={t.revokeCopy} confirmLabel={t.revokeInvitation} cancelLabel={t.keepInvitation} pendingLabel={t.revoking} failureLabel={t.revokeUnconfirmed} onClose={() => { if (!busy) { setRevoking(null); } }} onConfirm={() => confirmedAction(async () => (await revokeInvitation()) ?? null)} />}
 
   </section>;
 }

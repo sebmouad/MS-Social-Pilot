@@ -1,5 +1,9 @@
+import { integrationsCopy } from './copy';
+import { copySchema } from '@/lib/config/copy-schema';
 import { z } from 'zod';
 import { cron, entry } from '@/lib/config/entry';
+
+export const webhookCopySchema = z.object({ en: copySchema(integrationsCopy.en), fr: copySchema(integrationsCopy.fr) }).strict();
 
 const A = 'Integrations · REST API';
 const W = 'Integrations · Outbound webhooks';
@@ -53,6 +57,7 @@ export type IntegrationsLimits = {
  * Every key is consumed by `server/core.ts#runtime()` or by the delivery job.
  */
 export const INTEGRATIONS_CONFIG = [
+  entry({ key: 'integrations.webhookCopy', group: W, label: 'Webhook screen copy', kind: 'json', description: 'English and French webhook screen labels, confirmations and feedback.', defaultValue: integrationsCopy, schema: webhookCopySchema, consumption: 'active' }),
   entry({ key: 'integrations.api.enabled', group: A, label: 'REST API available', kind: 'boolean', description: 'When off, /api/v1 refuses every request. API keys themselves stay as they are.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
   num('apiRatePerMinute', 'integrations.api.ratePerMinute', A, 'REST requests per minute', 'Requests one API key may make to /api/v1 per minute.', 120, int(1, 100000)),
   num('apiFailedAuthPerMinute', 'integrations.api.failedAuthPerMinute', A, 'Rejected REST credentials per minute', 'Requests with a missing or wrong key one caller address may make per minute before it is throttled.', 30, int(1, 10000)),

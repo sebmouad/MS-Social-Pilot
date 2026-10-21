@@ -1,3 +1,4 @@
+import { readSettingsUiCopy } from '@/modules/settings/ui/copy-server';
 import type { Metadata } from 'next';
 import { OperationError } from '@/lib/operation-error';
 import { PageFrame } from '@/server/PageFrame';
@@ -9,14 +10,15 @@ import { fill } from '@/modules/settings/ui/shell-copy';
 import { TeamControls } from './TeamControls';
 import { listTeamInvitations } from '@/modules/settings/server/invitations';
 import { InvitationControls } from './InvitationControls';
-import { teamCopy } from './copy';
+
 
 export const metadata: Metadata = { title: 'Team' };
 
 export default async function TeamPage() {
   const viewer = await requireViewer({ feature: 'settings/team' });
   const locale = await settingsLocale();
-  const t = teamCopy[locale];
+  const uiCopy = await readSettingsUiCopy();
+  const t = uiCopy.team[locale];
   let directory: Awaited<ReturnType<typeof getTeamDirectory>> | null = null;
   let directoryError: string | null = null;
   let invitations: Awaited<ReturnType<typeof listTeamInvitations>> | null = null;
@@ -31,7 +33,7 @@ export default async function TeamPage() {
   try { invitations = await listTeamInvitations({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); }
   catch (error) { invitationError = error instanceof OperationError ? error.message : t.invitationsFailed; }
 
-  return <PageFrame module="settings"><SettingsPage active="settings/team" title={t.title} locale={locale} description={fill(t.description, { workspace: viewer.membership.workspace.name })}>
+  return <PageFrame module="settings"><SettingsPage copy={uiCopy} active="settings/team" title={t.title} locale={locale} description={fill(t.description, { workspace: viewer.membership.workspace.name })}>
     <SettingsPanel title={t.membersPanel} detail={directory ? directory.total === 1 ? t.memberOne : fill(t.memberMany, { count: directory.total }) : t.memberFallback}>
       {directoryError ? <div className={styles['settings-empty']} role="alert"><p>{directoryError}</p><a href="/settings/team">{t.refreshDirectory}</a></div> : directory && <TeamControls key={viewer.workspaceId} locale={locale} members={directory.members} targets={directory.targets} actorId={directory.actorId} actorRole={directory.actorRole} total={directory.total} hasMore={directory.hasMore} defaultRole={directory.defaults.role} defaultAllPages={directory.defaults.allPages} />}
     </SettingsPanel>

@@ -1,16 +1,19 @@
 'use client';
+import { useConfirmedAction } from '@/modules/settings/ui/use-confirmed-action';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/Button';
-import { useConfirm } from '@/components/useConfirm';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useSettingsCopy } from '../ui/copy-context';
 import styles from '@/modules/settings/ui/settings.module.css';
-import { personKeyCopy } from './copy';
+
 import { personKeyCreateConfirmation, personKeyRevokeConfirmation, type PersonKeySummary } from './types';
 
 const endpoint = '/api/settings/account/person-keys';
 type Directory = { keys: PersonKeySummary[]; truncated: boolean; policy: { nameMaxLength: number; maxLifetimeDays: number } };
 /** `initial` is the server-read directory; `null` means that read failed, so no failing request is made on mount. */
 export function PersonKeysManager({ locale = 'en', initial }: { locale?: 'en' | 'fr'; initial?: Directory | null }) {
-  const t = personKeyCopy[locale];
+  const t = useSettingsCopy('personKeys', locale);
+  const confirmedAction = useConfirmedAction();
   const preloaded = initial !== undefined;
   const [directory, setDirectory] = useState<Directory | null>(initial ?? null);
   const [name, setName] = useState('');
@@ -20,7 +23,7 @@ export function PersonKeysManager({ locale = 'en', initial }: { locale?: 'en' | 
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);
-  const [confirm, dialog] = useConfirm({ title: t.title, cancel: t.cancel, confirm: t.confirm });
+  const [review, setReview] = useState<{ method: 'POST' | 'DELETE'; name: string; input: unknown } | null>(null);
   const reload = useCallback(async (signal?: AbortSignal) => {
     setError('');
     try {
@@ -37,7 +40,7 @@ export function PersonKeysManager({ locale = 'en', initial }: { locale?: 'en' | 
       if (!response.ok) return t.failed;
       const result = await response.json();
       if (alive.current) {
-        if (method === 'POST') { setSecret(result.token); setNotice(t.created); } else setNotice(t.revoked);
+        if (method === 'POST') { if (typeof result.token !== 'string') return t.failed; setSecret(result.token); setNotice(t.created); } else setNotice(t.revoked);
         await reload();
       }
       return null;
@@ -48,15 +51,11 @@ export function PersonKeysManager({ locale = 'en', initial }: { locale?: 'en' | 
     const trimmedName = name.trim(); const lifetime = Number(days);
     if (!trimmedName || trimmedName.length > directory.policy.nameMaxLength || !Number.isInteger(lifetime) || lifetime < 1 || lifetime > directory.policy.maxLifetimeDays) { setError(t.failed); return; }
     const confirmation = personKeyCreateConfirmation(trimmedName, lifetime);
-    setBusy(true); setNotice('');
-    try { await confirm(t.createNotice, { exactConfirmation: confirmation, confirmationLabel: t.exact, pendingLabel: t.pending, failureLabel: t.failed, onConfirm: () => change('POST', { name: trimmedName, expiresInDays: lifetime, confirmation }) }); }
-    finally { if (alive.current) setBusy(false); }
+    setNotice(''); setReview({ method: 'POST', name: `${trimmedName} · ${lifetime} ${t.days}`, input: { name: trimmedName, expiresInDays: lifetime, confirmation } });
   }
-  async function revoke(key: PersonKeySummary) {
-    if (busy) return; setBusy(true); setNotice('');
-    const confirmation = personKeyRevokeConfirmation(key.id);
-    try { await confirm(`${t.revokeNotice} ${key.name} (${key.tokenPrefix})`, { exactConfirmation: confirmation, confirmationLabel: t.exact, pendingLabel: t.pending, failureLabel: t.failed, onConfirm: () => change('DELETE', { id: key.id, confirmation }) }); }
-    finally { if (alive.current) setBusy(false); }
+  function revoke(key: PersonKeySummary) {
+    if (busy) return;
+    setReview({ method: 'DELETE', name: key.name, input: { id: key.id, confirmation: personKeyRevokeConfirmation(key.id) } });
   }
   return <section className={styles['settings-panel']}>
     <div className={styles['settings-panel__heading']}><div><h2>{t.title}</h2><p>{t.help}</p></div></div>
@@ -75,6 +74,7 @@ export function PersonKeysManager({ locale = 'en', initial }: { locale?: 'en' | 
         {!directory.keys.length && <tr><td colSpan={4}>{t.empty}</td></tr>}
       </tbody></table></div>
     </>}
-    {notice && <p role="status">{notice}</p>}{dialog}
+    {notice && <p role="status">{notice}</p>}
+    {review && <ConfirmDialog open title={review.method === 'POST' ? t.create : t.revoke} objectName={review.name} consequence={review.method === 'POST' ? t.createNotice : t.revokeNotice} confirmLabel={review.method === 'POST' ? t.create : t.revoke} cancelLabel={t.cancel} pendingLabel={t.pending} failureLabel={t.failed} danger={review.method === 'DELETE'} onClose={() => setReview(null)} onConfirm={() => confirmedAction(async () => { setBusy(true); try { return await change(review.method, review.input); } finally { if (alive.current) setBusy(false); } })} />}
   </section>;
 }

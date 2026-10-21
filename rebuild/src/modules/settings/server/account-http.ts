@@ -4,13 +4,17 @@ import { requestOrigin } from '@/server/request-origin';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { readAccount, updateAccountProfile, changeAccountPassword, listAccountSessions, revokeAccountSession } from './account';
 
+import { readAccountSecurity, changeAccountSecurity } from './account-security';
+
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
-export async function accountHttp(request: Request, action: 'read' | 'profile' | 'password' | 'sessions' | 'revoke') {
+export async function accountHttp(request: Request, action: 'read' | 'profile' | 'password' | 'sessions' | 'revoke' | 'security' | 'begin' | 'enable' | 'disable' | 'remove') {
   try {
     if (request.headers.has('authorization') || request.headers.has('x-api-key')) throw new OperationError('forbidden', 'Use a browser session.');
-    if (['profile', 'password', 'revoke'].includes(action) && request.headers.get('origin') !== requestOrigin(request)) throw new OperationError('forbidden', 'Cross-origin request denied.');
+    if (['profile', 'password', 'revoke', 'begin', 'enable', 'disable', 'remove'].includes(action) && request.headers.get('origin') !== requestOrigin(request)) throw new OperationError('forbidden', 'Cross-origin request denied.');
     const viewer = await requireViewer({ feature: 'settings/account', channelScoped: true });
     const actor = await accountSessionActor(viewer.user.id, viewer.workspaceId);
+    if (action === 'security') return reply(await readAccountSecurity(actor));
+    if (['begin', 'enable', 'disable', 'remove'].includes(action)) return reply(await changeAccountSecurity(actor, action as 'begin' | 'enable' | 'disable' | 'remove', await request.json()));
     if (action === 'read') return reply(await readAccount(actor));
     if (action === 'sessions') {
       const params = new URL(request.url).searchParams;

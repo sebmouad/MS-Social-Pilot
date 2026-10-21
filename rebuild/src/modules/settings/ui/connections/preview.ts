@@ -10,8 +10,7 @@ const CATEGORIES = [
 ] as const;
 
 /** Provider-scheduled links are a subset of post targets, not another deletion count. */
-export function summarizeDisconnectCounts(counts: Record<string, number>, locale: 'en' | 'fr' = 'en') {
-  const labels = connectionsCopy[locale].categories;
+export function summarizeDisconnectCounts(counts: Record<string, number>, locale: 'en' | 'fr' = 'en', labels: { [K in keyof typeof connectionsCopy.en.categories]: string } = connectionsCopy[locale].categories) {
   const known = new Set<string>(['scheduledRemote', ...CATEGORIES.flatMap(category => category.keys)]);
   const rows: { label: string; count: number }[] = CATEGORIES.map(category => ({
     label: labels[category.id],

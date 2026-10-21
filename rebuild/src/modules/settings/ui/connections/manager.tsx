@@ -1,4 +1,5 @@
 'use client';
+import { useSettingsCopy } from '@/modules/settings/ui/copy-context';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -7,7 +8,7 @@ import { ModalDialog } from '@/components/ModalDialog';
 import styles from '@/modules/settings/ui/settings.module.css';
 import { connectionState, type ConnectionStatusLabels } from '@/lib/connection-status';
 import { fill } from '@/modules/settings/ui/shell-copy';
-import { connectionsCopy } from './copy';
+
 import { summarizeDisconnectCounts } from './preview';
 
 type Channel = { id: string; name: string; type: string; enabled: boolean };
@@ -22,7 +23,7 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
   const retrySelection = useRef<() => void>(() => {});
   const toast = useToast();
   const [reviewDisconnect, setReviewDisconnect] = useState(false);
-  const t = connectionsCopy[locale];
+  const t = useSettingsCopy('connections', locale);
   const initialSource = sources.find(source => source.id === initialSourceId);
   const [open, setOpen] = useState(initiallyOpen || Boolean(initialSource && initialAction === 'manage'));
   const [busy, setBusy] = useState(false);
@@ -30,11 +31,10 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
   const [notice, setNotice] = useState('');
   const [disconnect, setDisconnect] = useState<Source | null>(initialSource && initialAction === 'disconnect' ? initialSource : null);
   const [disconnectMode, setDisconnectMode] = useState<'retain' | 'delete'>('retain');
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deletePreview, setDeletePreview] = useState<Record<string, number> | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const deleteSummary = deletePreview ? summarizeDisconnectCounts(deletePreview, locale) : null;
+  const deleteSummary = deletePreview ? summarizeDisconnectCounts(deletePreview, locale, t.categories) : null;
   useEffect(() => {
     if (!initialSource || !initialAction) return;
     const url = new URL(window.location.href);
@@ -80,16 +80,16 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
     inFlight.current = true;
     setBusy(true); setNotice('');
     try {
-      const response = await fetch('/api/connections', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ socialAccountId: disconnect.id, mode: disconnectMode, ...(disconnectMode === 'delete' ? { confirmation: deleteConfirmation } : {}) }) });
+      const response = await fetch('/api/connections', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ socialAccountId: disconnect.id, mode: disconnectMode, ...(disconnectMode === 'delete' ? { confirmation: 'DELETE' } : {}) }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? t.disconnectFailed);
-      toast.notify({ title: disconnectMode === 'delete' ? t.disconnectDelete : t.disconnectRetain }); setDisconnect(null); setDeleteConfirmation(''); setDisconnectMode('retain'); router.refresh(); return null;
+      toast.notify({ title: disconnectMode === 'delete' ? t.disconnectDelete : t.disconnectRetain }); setDisconnect(null); setDisconnectMode('retain'); router.refresh(); return null;
     } catch (error) { const message = error instanceof Error ? error.message : t.disconnectFailed; setNotice(message); toast.failed(message, () => setReviewDisconnect(true), t.disconnect); return message; }
     finally { inFlight.current = false; setBusy(false); }
   }
 
   async function previewDisconnect(source: Source) {
-    setPreviewBusy(true); setDeletePreview(null); setDeleteConfirmation(''); setNotice('');
+    setPreviewBusy(true); setDeletePreview(null); setNotice('');
     try {
       const response = await fetch('/api/connections', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ socialAccountId: source.id }) });
       const result = await response.json().catch(() => ({}));
@@ -111,15 +111,15 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
         {source.targets.map(item => <label key={item.id}><input type="checkbox" checked={selected[`target:${item.id}`] ?? item.enabled} disabled={busy || (connectionState(source) !== 'connected' && !item.enabled)} onChange={event => toggle('target', item.id, event.currentTarget.checked)} /><span>{item.name || item.type}<small>{fill(t.channel, { type: item.type })}</small></span></label>)}
         {source.adAccounts.map(item => <label key={item.id}><input type="checkbox" checked={selected[`adAccount:${item.id}`] ?? item.enabled} disabled={busy || (connectionState(source) !== 'connected' && !item.enabled)} onChange={event => toggle('adAccount', item.id, event.currentTarget.checked)} /><span>{item.name}<small>{fill(t.adAccountLine, { id: item.actId })}</small></span></label>)}
         {!source.targets.length && !source.adAccounts.length && <p className={styles['settings-note']}>{t.nothingDiscovered}</p>}
-        <button type="button" className={styles['connection-danger-link']} onClick={() => { setOpen(false); setDisconnect(source); setDisconnectMode('retain'); setDeleteConfirmation(''); }}>{t.disconnectLocally}</button>
+        <button type="button" className={styles['connection-danger-link']} onClick={() => { setOpen(false); setDisconnect(source); setDisconnectMode('retain'); }}>{t.disconnectLocally}</button>
       </fieldset>) : <p>{t.noSources}</p>}
       {notice && <p role="alert" className={styles['connection-error']}>{notice}</p>}
       <footer><button type="button" data-dialog-cancel onClick={() => setOpen(false)} disabled={busy}>{t.cancel}</button><button type="button" className={styles['connection-primary-button']} onClick={saveSelection} disabled={busy}>{busy ? t.saving : t.saveSelections}</button></footer>
     </ModalDialog>}
     {disconnect && !reviewDisconnect && <ModalDialog className={styles['connection-dialog']} labelledBy="disconnect-title" onDismiss={() => setDisconnect(null)} busy={busy}><header><div><p className={styles['settings-eyebrow']}>{t.localDisconnect}</p><h2 id="disconnect-title">{fill(t.disconnectTitle, { name: disconnect.name })}</h2><p>{t.disconnectDetail}</p></div><button type="button" aria-label={t.close} disabled={busy} onClick={() => setDisconnect(null)}>×</button></header>
       <fieldset className={styles['connection-retention']}><legend>{t.relatedData}</legend>
-        <label><input type="radio" name="disconnect-data" checked={disconnectMode === 'retain'} onChange={() => { setDisconnectMode('retain'); setDeleteConfirmation(''); }} disabled={busy} /><span>{t.retain} <small>{t.retainDetail}</small></span></label>
-        <label><input type="radio" name="disconnect-data" checked={disconnectMode === 'delete'} onChange={() => { setDisconnectMode('delete'); setDeletePreview(null); setDeleteConfirmation(''); }} disabled={busy} /><span>{t.deleteData} <small>{t.deleteDataDetail}</small></span></label>
+        <label><input type="radio" name="disconnect-data" checked={disconnectMode === 'retain'} onChange={() => { setDisconnectMode('retain'); }} disabled={busy} /><span>{t.retain} <small>{t.retainDetail}</small></span></label>
+        <label><input type="radio" name="disconnect-data" checked={disconnectMode === 'delete'} onChange={() => { setDisconnectMode('delete'); setDeletePreview(null); }} disabled={busy} /><span>{t.deleteData} <small>{t.deleteDataDetail}</small></span></label>
       </fieldset>
       {disconnectMode === 'delete' && <>
         {!deletePreview ? <button type="button" onClick={() => previewDisconnect(disconnect)} disabled={busy || previewBusy}>{previewBusy ? t.counting : t.previewRows}</button> : <>
@@ -127,11 +127,10 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
           {deleteSummary?.rows.length ? <ul className={styles['data-preview-list']}>{deleteSummary.rows.map(row => <li key={row.label}><span>{row.label}</span><strong>{new Intl.NumberFormat(locale).format(row.count)}</strong></li>)}</ul> : <p className={styles['settings-note']}>{t.noRecords}</p>}
           {Boolean(deleteSummary?.scheduledRemote) && <p className={styles['connection-warning']} role="alert">{deleteSummary?.scheduledRemote === 1 ? t.scheduledOne : fill(t.scheduledMany, { count: deleteSummary?.scheduledRemote ?? 0 })}</p>}
           <button type="button" onClick={() => previewDisconnect(disconnect)} disabled={busy || previewBusy}>{previewBusy ? t.counting : t.refreshPreview}</button>
-          <label className={styles['disconnect-confirm']}>{t.confirmDelete}<input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.currentTarget.value)} autoComplete="off" disabled={busy} /></label>
         </>}
       </>}
       {notice && <p role="alert" className={styles['connection-error']}>{notice}</p>}
-      <footer><button type="button" data-dialog-cancel onClick={() => setDisconnect(null)} disabled={busy}>{t.cancel}</button><button type="button" className={styles['connection-danger-button']} onClick={() => setReviewDisconnect(true)} disabled={busy || (disconnectMode === 'delete' && (!deletePreview || deleteConfirmation !== 'DELETE' || Boolean(deleteSummary?.scheduledRemote)))}>{busy ? t.disconnecting : disconnectMode === 'delete' ? t.disconnectDelete : t.disconnectRetain}</button></footer>
+      <footer><button type="button" data-dialog-cancel onClick={() => setDisconnect(null)} disabled={busy}>{t.cancel}</button><button type="button" className={styles['connection-danger-button']} onClick={() => setReviewDisconnect(true)} disabled={busy || (disconnectMode === 'delete' && (!deletePreview || Boolean(deleteSummary?.scheduledRemote)))}>{busy ? t.disconnecting : disconnectMode === 'delete' ? t.disconnectDelete : t.disconnectRetain}</button></footer>
     </ModalDialog>}
     {disconnect && reviewDisconnect && <ConfirmDialog open title={fill(t.disconnectTitle, { name: disconnect.name })} objectName={disconnect.name} consequence={`${disconnectMode === 'delete' ? t.deleteDataDetail : t.retainDetail} ${t.disconnectDetail}`} confirmLabel={disconnectMode === 'delete' ? t.disconnectDelete : t.disconnectRetain} cancelLabel={t.cancel} pendingLabel={t.disconnecting} failureLabel={t.disconnectFailed} onClose={() => setReviewDisconnect(false)} onConfirm={async () => (await disconnectSource()) ?? null} />}
   </>;
