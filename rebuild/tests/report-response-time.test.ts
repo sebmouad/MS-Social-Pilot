@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), target: { findFirst: vi.fn() }, conversationMessage: { findMany: vi.fn() }, user: { findMany: vi.fn(async (_args: { where?: unknown; select?: unknown }): Promise<Array<{ id: string; name: string }>> => []) } }));
+const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), target: { findFirst: vi.fn() }, conversationMessage: { findMany: vi.fn() }, postComment: { findMany: vi.fn(async () => []) }, user: { findMany: vi.fn(async (_args: { where?: unknown; select?: unknown }): Promise<Array<{ id: string; name: string }>> => []) } }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', async () => {
   const { responseTimeCopyDefaults } = await import('../src/modules/analytics/reports/generation/response-copy');
-  return { runtimeConfig: async () => responseTimeCopyDefaults };
+  return { runtimeConfig: async (key: string) => key === 'analytics.reports.responseMessageLimit' ? 20000 : key === 'analytics.reports.responseMemberLimit' ? 25 : responseTimeCopyDefaults };
 });
 
 import { formatDuration, readResponseTime, summarizeResponseTimes, MEMBER_ROWS_CAP, RESPONSE_TIME_MESSAGE_CAP } from '../src/modules/analytics/reports/generation/response-time';

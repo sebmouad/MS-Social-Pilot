@@ -1,6 +1,7 @@
 /** Module-owned customer copy. Root catalog registration is coordinated by the host owner. */
 export type UiLocale = 'en' | 'fr';
 const french: Record<string, string> = {
+  "Response-time reports include stored comment replies, slowest first response and resolution within business hours. Missing history is excluded; unset business hours show no figure.": "Les rapports de réponse incluent les réponses aux commentaires enregistrés, la réponse initiale la plus lente et la résolution en heures ouvrées. Les historiques absents sont exclus ; sans horaires définis, aucun résultat en heures ouvrées n’est affiché.",
   "{0} existing schedule": "{0} planification existante",
   "{0} existing schedules": "{0} planifications existantes",
   "not confirmed": "non confirmé",
