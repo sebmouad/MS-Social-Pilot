@@ -34,6 +34,15 @@ components:
 
 # MS Social Pilot Design System
 
+> **Design v2: improvement plan for this same app, approved by the owner on 2026-10-21. Not applied yet. It is not a rebuild.**
+> The full target is in [docs/design-v2/](docs/design-v2/README.md):
+> - one channel-first sidebar with the areas **Home · Content · Inbox · Insights**
+> - tabs inside each area, Table + side preview, and a full-screen composer
+> - ⓘ caveats, **Clean** as the default theme, and direct replacement in batches B0–B9
+>
+> Batch B0 rewrites the sections below that conflict with v2, starting with the two sidebars and Feed/Cards.
+> Until B0 lands, this document describes the current (v1) UI.
+
 ## Overview
 
 ### Creative North Star
