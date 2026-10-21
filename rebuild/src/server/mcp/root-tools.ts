@@ -10,6 +10,7 @@ import { CONFIG_BY_KEY, CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/con
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { setRootWorkspaceAccess } from '../root/workspace-access';
 import { listRootWorkspaces } from '../root/directory';
+import { createRootWorkspace, renameRootWorkspace } from '../root/workspace-controls';
 import { listRootActivity } from '../root/activity';
 import { loadRootUsers } from '../root/users';
 import { resetRootUserTwoStep, revokeRootUserSessions, setRootUserDisabled } from '../root/user-controls';
@@ -38,6 +39,8 @@ export const rootToolDefinitions = [
   { name: 'list_root_users', description: 'Private installation user directory. Filter name/email and all, active, disabled or owners. Active sessions exclude expired and pending verification sessions. Credentials and factor material are excluded. Workspace API keys cannot use this tool.', inputSchema: { type: 'object', properties: { q: { type: 'string' }, status: { type: 'string', enum: ['all', 'active', 'disabled', 'owners'] }, page: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'manage_root_user', description: 'Private installation-owner account access and recovery. Confirmation must exactly match DISABLE <email>, ENABLE <email>, SIGN OUT <email> or RESET TWO-STEP <email>. Self-actions are denied; owner second-factor reset is denied. Disabling revokes sessions and blocks keys. Sign out revokes browser sessions only; API keys retain current access. Every change has a transactional domain audit.', inputSchema: { type: 'object', required: ['userId', 'action', 'confirmation'], properties: { userId: { type: 'string', minLength: 1, maxLength: 200 }, action: { type: 'string', enum: [...rootUserActions] }, confirmation: { type: 'string', minLength: 1, maxLength: 400 } }, additionalProperties: false } },
   { name: 'get_root_config', description: 'Read installation configuration definitions and safe values. Only available to the signed-in instance owner; secrets are masked.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'create_root_workspace', description: 'Create a workspace for an existing active account. Confirmation must exactly match CREATE <trimmed name> FOR <lowercase ownerEmail>. Optional timezone defaults to the Root workspace timezone. Uses the same transactional membership creation and domain audit as REST. Installation owner only; workspace keys cannot use this tool.', inputSchema: { type: 'object', required: ['name', 'ownerEmail', 'confirmation'], properties: { name: { type: 'string', minLength: 1 }, ownerEmail: { type: 'string', format: 'email' }, timezone: { type: 'string' }, confirmation: { type: 'string', minLength: 1 } }, additionalProperties: false } },
+  { name: 'rename_root_workspace', description: 'Rename a workspace. Confirmation must exactly match RENAME <current name> TO <trimmed new name>. Refuses deletion in progress and concurrent name changes, with the same transactional domain audit as REST. Installation owner only; workspace keys cannot use this tool.', inputSchema: { type: 'object', required: ['workspaceId', 'name', 'confirmation'], properties: { workspaceId: { type: 'string', minLength: 1 }, name: { type: 'string', minLength: 1 }, confirmation: { type: 'string', minLength: 1 } }, additionalProperties: false } },
   { name: 'list_root_workspaces', description: 'Private installation-owner workspace directory, including access state and record counts. Workspace API keys cannot use this tool.', inputSchema: { type: 'object', properties: { q: { type: 'string' }, page: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'list_root_activity', description: 'Private installation-owner audit history. Search actions or people; filter exact workspace ID and inclusive UTC dates. Raw audit detail is omitted. Follow olderCursor/newerCursor with the same filters. Workspace API keys cannot use this tool.', inputSchema: { type: 'object', properties: { q: { type: 'string' }, workspaceId: { type: 'string' }, from: { type: 'string', description: 'UTC date, YYYY-MM-DD.' }, to: { type: 'string', description: 'Inclusive UTC date, YYYY-MM-DD.' }, limit: { type: 'integer', minimum: 1 }, cursor: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_root_workspace_access', description: 'Suspend or restore workspace member access and new app operations. Only signed-in installation owners. Confirmation must exactly match SUSPEND WORKSPACE <workspaceId> or RESTORE WORKSPACE <workspaceId>. Data is retained; existing provider content is not deleted.', inputSchema: { type: 'object', required: ['workspaceId', 'suspended', 'confirmation'], properties: { workspaceId: { type: 'string' }, suspended: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -133,6 +136,20 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
         return { schemaVersion: CONFIG_SCHEMA_VERSION, definitions: safeConfigShape(), values: await readConfig() };
       case 'list_root_activity':
         return await listRootActivity(viewer.userId, args, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
+      case 'create_root_workspace': {
+        const parsed = z.object({ name: z.string().trim().min(1), ownerEmail: z.string().trim().email(), timezone: z.string().optional(), confirmation: z.string().min(1) }).strict().safeParse(args);
+        if (!parsed.success) throw new OperationError('invalid_request', 'Enter a workspace name, owner email and exact confirmation.');
+        const input = parsed.data;
+        if (input.name.length > await runtimeConfig('root.workspaceNameMaxCharacters')) throw new OperationError('invalid_request', 'Choose a shorter workspace name.');
+        return await createRootWorkspace(viewer.userId, { ...input, timezone: input.timezone ?? await runtimeConfig('root.defaultWorkspaceTimezone') });
+      }
+      case 'rename_root_workspace': {
+        const parsed = z.object({ workspaceId: z.string().min(1), name: z.string().trim().min(1), confirmation: z.string().min(1) }).strict().safeParse(args);
+        if (!parsed.success) throw new OperationError('invalid_request', 'Choose a workspace, a name and the exact confirmation.');
+        const input = parsed.data;
+        if (input.workspaceId.length > await runtimeConfig('root.identifierMaxCharacters') || input.name.length > await runtimeConfig('root.workspaceNameMaxCharacters')) throw new OperationError('invalid_request', 'Choose a valid workspace and a shorter name.');
+        return await renameRootWorkspace(viewer.userId, input.workspaceId, input.name, input.confirmation);
+      }
       case 'list_root_workspaces': {
         if (Object.keys(args).some(key => !['q', 'page'].includes(key)) || args.q !== undefined && typeof args.q !== 'string' || args.page !== undefined && (typeof args.page !== 'number' || !Number.isSafeInteger(args.page) || args.page < 1)) throw new OperationError('invalid_request', 'Choose a valid workspace query and page.');
         const cap = viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems'));

@@ -1,6 +1,6 @@
 # UI, REST and MCP parity inventory
 
-Updated 2026-10-21 against local HEAD `6fb0e57f`. This is a **source-level**
+Updated 2026-10-21 against the parity-guard exception worker tree. This is a **source-level**
 inventory using module MCP declarations, HTTP routes, shared services and the
 lane matrices. It is not a fresh tools/list dump, real MCP-client run, database,
 browser or provider verification. Full parity remains **partial**. The automated declaration guard and exact
@@ -91,11 +91,12 @@ this lane and must carry forward the caller and evidence gaps listed here.
 `tests/parity-guard.test.ts` reads the following reviewed tables as its policy.
 It imports **all** `installedMcpGroups()` tools (including unavailable-by-default
 and session-only tools), plus the separate Agency person overview catalog. It
-compares their exact names, feature ids and declared read/write classification,
-then scans every `src/app/api/**/route.ts` export with the TypeScript parser.
+also imports private `rootToolDefinitions`, keeping installation authority separate
+from customer manifest features. It compares exact names, feature ids and reviewed
+read/write classification, then scans every `src/app/api/**/route.ts` export with the TypeScript parser.
 Named re-exports and exported handler aliases count; Next's implicit HEAD/OPTIONS
-do not. Root and authentication routes are scanned too, with exact exclusions
-below. No prefix/wildcard exception is applied by the test.
+do not. Root tools and routes are mapped under their separate installation authority;
+authentication and protocol routes retain exact reasoned exclusions below. No prefix/wildcard exception is applied by the test.
 
 Every tool must name an existing explicit HTTP method/path counterpart; every
 exported method/path must be mapped back to tools or have an exact reasoned
@@ -388,57 +389,78 @@ being session-only alone does not exclude them. Root is outside the customer
 catalog and has a separate installation MCP inventory and tests. Adding any new
 Root/authentication method/path still fails until its own exception is reviewed.
 
+Private Root operations are mapped separately from customer feature declarations.
+They require a current installation-owner session; this table grants no workspace
+or person credential access. Root resources read through these same tools.
+
+<!-- parity-root-tools:start -->
+| MCP tool | Authority | Access | REST method/path | Mapping review note |
+| --- | --- | --- | --- | --- |
+| list_root_activity | installation/root | read | GET /api/root/activity | listRootActivity. |
+| export_root_activity | installation/root | read | GET /api/root/activity/export | exportRootActivity; complete redacted CSV and export audit. |
+| get_root_backup_status | installation/root | read | GET /api/root/backups | readRootBackupStatus; recorded runs only. |
+| get_root_diagnostics_summary | installation/root | read | GET /api/root/backups | readRootDiagnosticsSummary; the same combined HTTP backup response. |
+| get_root_config | installation/root | read | GET /api/root/config | readConfig and safeConfigShape; HTTP additionally returns the availability catalog. |
+| set_root_config | installation/root | write | PUT /api/root/config | saveConfig; MCP currently requires an extra transport confirmation, see boundary gaps below. |
+| refresh_root_connection | installation/root | write | POST /api/root/connections/[id]/refresh | refreshRootConnection; same exact confirmation and domain audit. |
+| preview_root_connection_deletion | installation/root | read | GET /api/root/connections/[id] | previewRootConnectionDeletion. |
+| disconnect_root_connection | installation/root | write | POST /api/root/connections/[id] | disconnectRootConnection; retain/delete mode confirmation and audit. |
+| list_root_connections | installation/root | read | GET /api/root/connections | listRootConnections. |
+| get_root_diagnostics | installation/root | read | GET /api/root/diagnostics | listRootDiagnostics. |
+| run_root_diagnostics | installation/root | write | POST /api/root/diagnostics | runRootDiagnostics; confirmed audited checks. |
+| get_root_error | installation/root | read | GET /api/root/errors/[id] | getRootError. |
+| set_root_error_resolved | installation/root | write | POST /api/root/errors/[id] | setRootErrorResolved; confirmation remains in each entry point. |
+| list_root_errors | installation/root | read | GET /api/root/errors | listRootErrors. |
+| list_root_inbox_deletions | installation/root | read | GET /api/root/inbox-deletions | listRootInboxDeletions. |
+| confirm_root_inbox_deletion | installation/root | write | POST /api/root/inbox-deletions | confirmRootInboxDeletion; exact remote-verification attestation and audit. |
+| transfer_root_installation | installation/root | write | POST /api/root/installation | transferInstallationOwnership; exact confirmation and audit. |
+| transfer_root_workspace_ownership | installation/root | write | POST /api/root/lifecycle/ownership | transferWorkspaceOwnership; exact confirmation and audit. |
+| get_root_lifecycle | installation/root | read | GET /api/root/lifecycle | loadRootLifecycle. |
+| delete_root_user | installation/root | write | DELETE /api/root/lifecycle/users/[id] | deleteRootUser; exact confirmation and audit. |
+| delete_root_workspace | installation/root | write | DELETE /api/root/lifecycle/workspaces/[id] | deleteRootWorkspace; exact confirmation and audit. |
+| get_root_operations | installation/root | read | GET /api/root/operations | loadRootOperations. |
+| update_root_plan | installation/root | write | PATCH /api/root/plans/[id] | updateRootPlan; exact confirmation and audit. |
+| assign_root_plan | installation/root | write | POST /api/root/plans/assign | assignRootPlan; exact confirmation and audit. |
+| list_root_plans | installation/root | read | GET /api/root/plans | listRootPlans; default view. |
+| list_root_plan_history | installation/root | read | GET /api/root/plans | listRootPlanHistory; view=history. |
+| list_root_subscribers | installation/root | read | GET /api/root/plans | listRootSubscribers; view=subscribers. |
+| get_root_platform_publication_evidence | installation/root | read | GET /api/root/platform-publication-evidence | readRootPlatformPublicationEvidence. |
+| run_root_platform_publication_action | installation/root | write | POST /api/root/platform-publication-evidence | runRootPlatformPublicationAction; module confirmation and audit. |
+| list_root_post_deletions | installation/root | read | GET /api/root/post-deletions | listRootPostDeletions. |
+| record_root_post_deletion_outcome | installation/root | write | POST /api/root/post-deletions | recordRootPostDeletionOutcome; exact attestation and audit. |
+| export_root_privileges | installation/root | read | GET /api/root/privileges/export | exportRootPrivileges; bounded complete-or-refused CSV. |
+| list_root_privileges | installation/root | read | GET /api/root/privileges | listRootPrivileges. |
+| change_root_member_role | installation/root | write | POST /api/root/privileges | changeRootMemberRole; exact confirmation and audit. |
+| list_root_publication_attempts | installation/root | read | GET /api/root/publication-attempts | listRootPublicationAttempts. |
+| record_root_publication_outcome | installation/root | write | POST /api/root/publication-attempts | recordRootPublicationOutcome; action=record. |
+| finish_root_publication_projection | installation/root | write | POST /api/root/publication-attempts | finishRootPublicationProjection; action=finish. |
+| adopt_root_legacy_publication | installation/root | write | POST /api/root/publication-attempts | adoptRootLegacyPublication; action=adopt. |
+| delete_root_unverified_registration | installation/root | write | DELETE /api/root/registration/accounts/[id] | controlRootRegistrationAccount; action=delete. |
+| resend_root_registration_verification | installation/root | write | POST /api/root/registration/accounts/[id] | controlRootRegistrationAccount; action=resend. |
+| revoke_root_invitation | installation/root | write | DELETE /api/root/registration/invitations/[id] | revokeRootRegistrationInvitation. |
+| list_root_registration | installation/root | read | GET /api/root/registration | listRootRegistration. |
+| sign_out_root_session | installation/root | write | DELETE /api/root/sessions/[id] | signOutRootSession. |
+| list_root_sessions | installation/root | read | GET /api/root/sessions | listRootSessions. |
+| manage_root_user | installation/root | write | PATCH /api/root/users/[id]; POST /api/root/users/[id]; PATCH /api/root/lifecycle/users/[id] | setRootUserDisabled / revokeRootUserSessions / resetRootUserTwoStep; lifecycle wrapper delegates to the same core. |
+| list_root_users | installation/root | read | GET /api/root/users | loadRootUsers. |
+| set_root_workspace_access | installation/root | write | PATCH /api/root/workspaces/[id]/access; PATCH /api/root/lifecycle/workspaces/[id] | setRootWorkspaceAccess; lifecycle wrapper delegates to the same core. |
+| rename_root_workspace | installation/root | write | PATCH /api/root/workspaces/[id] | renameRootWorkspace; same exact confirmation, concurrency check and transactional audit. |
+| create_root_workspace | installation/root | write | POST /api/root/workspaces | createRootWorkspace; same exact confirmation, active owner membership and transactional audit. |
+| list_root_workspaces | installation/root | read | GET /api/root/workspaces | listRootWorkspaces; separately authenticated private dispatcher. |
+<!-- parity-root-tools:end -->
+
+The remaining 24 exceptions are authentication bootstrap/ceremonies, transport or
+credential-protocol handling, and public-token authority. `/api/v1/me` describes
+only the presented workspace key's grants, not another credential or customer
+operation; it remains a credential-protocol exception. MCP HTTP itself cannot be
+mapped to one of its own tools. Public review decisions stay bound to the share
+token rather than granting authenticated workspace agents external reviewer
+identity. Each exact reason follows; no private Root product read/write remains
+excepted.
+
 <!-- parity-rest-exceptions:start -->
 | REST method/path | Reason |
 | --- | --- |
-| GET /api/root/activity/export | Private installation activity/audit inspection; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/activity | Private installation activity/audit inspection; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/backups | Private backup inventory read; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/config | Private installation configuration read/save; separate Root authority, outside customer installedMcpGroups. |
-| PUT /api/root/config | Private installation configuration read/save; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/connections/[id]/refresh | Private cross-workspace connection inspection/recovery; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/connections/[id] | Private cross-workspace connection inspection/recovery; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/connections/[id] | Private cross-workspace connection inspection/recovery; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/connections | Private cross-workspace connection inspection/recovery; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/diagnostics | Private installation diagnostic execution/history; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/diagnostics | Private installation diagnostic execution/history; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/errors/[id] | Private installation error inspection/management; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/errors/[id] | Private installation error inspection/management; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/errors | Private installation error inspection/management; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/inbox-deletions | Private Inbox deletion recovery; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/inbox-deletions | Private Inbox deletion recovery; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/installation | Private installation transfer; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/lifecycle/ownership | Private user/workspace/ownership lifecycle; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/lifecycle | Private user/workspace/ownership lifecycle; separate Root authority, outside customer installedMcpGroups. |
-| PATCH /api/root/lifecycle/users/[id] | Private user/workspace/ownership lifecycle; separate Root authority, outside customer installedMcpGroups. |
-| DELETE /api/root/lifecycle/users/[id] | Private user/workspace/ownership lifecycle; separate Root authority, outside customer installedMcpGroups. |
-| PATCH /api/root/lifecycle/workspaces/[id] | Private user/workspace/ownership lifecycle; separate Root authority, outside customer installedMcpGroups. |
-| DELETE /api/root/lifecycle/workspaces/[id] | Private user/workspace/ownership lifecycle; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/operations | Private installation operations inspection; separate Root authority, outside customer installedMcpGroups. |
-| PATCH /api/root/plans/[id] | Private access-plan administration; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/plans/assign | Private access-plan administration; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/plans | Private access-plan administration; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/platform-publication-evidence | Private provider publication-evidence controls; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/platform-publication-evidence | Private provider publication-evidence controls; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/post-deletions | Private publication deletion recovery; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/post-deletions | Private publication deletion recovery; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/privileges/export | Private privilege inspection/export/control; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/privileges | Private privilege inspection/export/control; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/privileges | Private privilege inspection/export/control; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/publication-attempts | Private publication attempt inspection/recovery; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/publication-attempts | Private publication attempt inspection/recovery; separate Root authority, outside customer installedMcpGroups. |
-| DELETE /api/root/registration/accounts/[id] | Private registration/invitation/account control; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/registration/accounts/[id] | Private registration/invitation/account control; separate Root authority, outside customer installedMcpGroups. |
-| DELETE /api/root/registration/invitations/[id] | Private registration/invitation/account control; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/registration | Private registration/invitation/account control; separate Root authority, outside customer installedMcpGroups. |
-| DELETE /api/root/sessions/[id] | Private installation session inspection/revocation; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/sessions | Private installation session inspection/revocation; separate Root authority, outside customer installedMcpGroups. |
-| PATCH /api/root/users/[id] | Private installation user administration; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/users/[id] | Private installation user administration; separate Root authority, outside customer installedMcpGroups. |
-| GET /api/root/users | Private installation user administration; separate Root authority, outside customer installedMcpGroups. |
-| PATCH /api/root/workspaces/[id]/access | Private installation workspace/access administration; separate Root authority, outside customer installedMcpGroups. |
-| PATCH /api/root/workspaces/[id] | Private installation workspace/access administration; separate Root authority, outside customer installedMcpGroups. |
-| POST /api/root/workspaces | Private installation workspace/access administration; separate Root authority, outside customer installedMcpGroups. |
 | GET /api/auth/register | Public registration availability for account bootstrap; not authenticated customer workspace data. |
 | GET /api/connections/[platform]/callback | Provider consent callback validates browser OAuth state; autonomous tools initiate consent through mapped start_connection. |
 | GET /api/mcp | MCP HTTP transport negotiation/unsupported-stream response, not a product capability. |
@@ -492,33 +514,65 @@ service action unions. These selectors explain many-tools-to-one-route mapping;
 the guard checks exports, not the internals of those unions.
 
 
-## Automated guard evidence — 2026-10-21
+## Exception closure evidence — 2026-10-21
 
-Added `tests/parity-guard.test.ts` and the policy tables in this document only.
-Inventory: **237 installed tools + 1 separate Agency person tool**, **266 exported
-REST method/path pairs**: 194 mapped customer pairs and 72 exact protocol/private
-Root exceptions. Two manifest view aliases reuse covered feature capabilities.
-No product declaration fields, Root keys or schema-version changes were needed.
+Removed all **48 private Root REST exceptions** and added an explicit reviewed
+Root table covering **51 private tools**. Existing counterparts already shared
+the named services except two missing MCP writes: `create_root_workspace` and
+`rename_root_workspace` now call `createRootWorkspace` / `renameRootWorkspace`.
+Both preserve service-owned exact confirmations and transactional domain audits;
+the private dispatcher rechecks current installation-owner identity and refuses
+workspace keys. Current Root name/identifier limits and default timezone are read
+with `runtimeConfig`; no new Root keys or schema version change.
 
-From `rebuild/`, `npx vitest run tests/parity-guard.test.ts --no-cache` passed
-**10 tests / 1 file**, and `npx tsc --noEmit -p .` passed with **zero errors**.
-Regression fixtures exercise new tools, new methods/routes (including Root),
-removed counterparts, changed feature/write declarations, stale/unexplained/
-overlapping exceptions, missing alias targets, exported-handler parsing and
-malformed policy tables. No whole suite, server, browser, database, live MCP,
-provider, deploy, push or production operation was run.
+Mapping Root also exposed an existing reverse gap: `list_root_workspaces` had no
+REST read. Added `GET /api/root/workspaces` through `listRootWorkspaces`, using the
+Root directory page size, private session authorization, strict filters and
+no-store responses. Source changes are limited to
+`src/server/mcp/root-tools.ts` and `src/app/api/root/workspaces/route.ts`; test and
+inventory changes are `tests/parity-guard.test.ts` and this document.
 
-The first inventory probe passed assertions but could not write Vitest's results
-cache through the pre-existing external node_modules link (EPERM); the final
-successful run used `--no-cache`. This was a cache-path restriction, not runtime
-product evidence. Completed changes remain in the worktree for integration;
-linked Git metadata is outside this worker's writable roots.
+The guard now checks 238 customer/person tools plus 51 private Root tools, Root
+resource read mappings, exact exported routes and 24 remaining authority/protocol
+exceptions. It forbids reintroducing Root route exceptions. The original guard
+had 10 tests; the expanded targeted file passes **21 tests / 1 file** with
+`npx vitest run tests/parity-guard.test.ts --no-cache`. Tests exercise real
+workspace service logic over mocked database calls, confirmation rejection,
+current identity/key refusal, current Root limits, default/explicit timezone,
+audit invocation/failure, inactive owners, purge holds, rename concurrency, and
+the new directory route's authentication, filters and shared-service dispatch.
+This is source and mocked automated evidence, not PostgreSQL transaction rollback,
+a real MCP client, browser, provider or production evidence.
 
-Additional source finding: `create_draft`, `update_draft`, `delete_draft` still use
-legacy `createLocalDraft`/`updateLocalDraft`/`deleteLocalDraft` helpers while HTTP
-post CRUD uses lifecycle services. Their rows record customer capability aliases,
-not same-service proof. Publishing owners must unify those paths and confirmations
-or deliberately retire duplicate tools. Existing Settings selection/disconnect,
-appearance and other confirmation gaps above remain outside this lane. Architecture,
-delivery-plan and handoff owners should record this guard and its limited evidence;
-those files are outside the worker's assigned paths.
+`npx tsc --noEmit -p .` passes with zero errors; `git diff --check` passes. No whole
+suite, server, deploy, push or production operation was run. Changes are left in
+the worktree for integration; linked Git metadata is outside writable roots.
+Pre-existing untracked dependency links are unchanged.
+
+### Boundary gaps requiring other owned files
+
+Explicit mapping removes an inventory exemption; it does not certify every
+historical Root caller's behavioral parity. These existing gaps were inspected
+and remain open because service/UI files are outside this lane:
+
+- `src/server/root/workspace-controls.ts`: move current Root identity checks and
+  `root.workspaceNameMaxCharacters`, `root.identifierMaxCharacters` and timezone
+  validation/defaulting into both workspace services. They currently own exact
+  confirmations, persistence and domain audit, while identity/current Root limits
+  are checked by the REST/MCP entry points. Recheck authority transactionally.
+- `src/server/root/directory.ts`: accept an actor and enforce current Root authority
+  inside `listRootWorkspaces`; update its UI and transport callers. Today the
+  private dispatchers perform this check before the shared directory query.
+- `src/server/config/store.ts` and Root config UI/callers: provide a shared confirmed
+  Root configuration operation. REST `saveConfig` does not require the exact text
+  demanded by MCP's `set_root_config`; do not claim confirmation parity from the
+  mapping. MCP config read also omits HTTP's availability catalog.
+- `src/server/root/legacy/errors.ts` and error UI/callers: reconcile the documented
+  reversible no-confirmation service/REST action with MCP's extra transport
+  confirmation. Service-owned audit exists; confirmation policy is inconsistent.
+- Architecture, delivery plan and handoff owners must record the new Root mapping,
+  two MCP writes, directory GET and these remaining boundary gaps.
+
+Earlier customer findings remain: Publishing draft aliases still use legacy
+local helpers rather than HTTP lifecycle services; Settings caller/appearance
+and other confirmation gaps above are not closed by this private inventory work.
