@@ -4,8 +4,33 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, type BrowserContext, type Locator, type Page } from 'playwright';
+import { chromium, firefox, webkit, type BrowserContext, type Locator, type Page, type Route } from 'playwright';
 import { MODE_COOKIE, THEME_COOKIE, THEMES } from '../src/lib/themes';
+
+/** Round 3: the same checks run in Chromium, Firefox or WebKit (`MATRIX_BROWSER`), over all themes or a chosen subset (`MATRIX_THEMES=vivid,warm`). */
+export const ENGINES = { chromium, firefox, webkit } as const;
+export type EngineName = keyof typeof ENGINES;
+export function engineName(raw: string | undefined): EngineName {
+  if (!raw) return 'chromium';
+  if (raw in ENGINES) return raw as EngineName;
+  throw new Error('UNKNOWN_BROWSER');
+}
+export type ThemeList = readonly (typeof THEMES)[number][];
+export function selectThemes(raw: string | undefined): ThemeList {
+  if (!raw) return THEMES;
+  const ids = raw.split(',').map(id => id.trim()).filter(Boolean);
+  const chosen = THEMES.filter(theme => ids.includes(theme.id));
+  if (!chosen.length || chosen.length !== new Set(ids).size) throw new Error('UNKNOWN_THEME');
+  return chosen;
+}
+/** WebKit refuses to store a `Secure` cookie from plain-http loopback (Chromium and Firefox treat loopback as secure). */
+let relaxSecureCookie = false;
+async function launchBrowser(env: Readonly<Record<string, string | undefined>>) {
+  const name = engineName(env.MATRIX_BROWSER);
+  relaxSecureCookie = name === 'webkit';
+  return ENGINES[name].launch({ headless: true });
+}
+const passRoute = (route: Route) => route.continue();
 
 export const VIEWPORTS = [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const;
 export const FAMILIES = ['/home', '/publishing', '/inbox', '/analytics', '/ads', '/settings', '/tasks', '/agency'];
@@ -20,7 +45,7 @@ export type Cell = {
   keyboard: { mainAction: 'passed' | 'failed' | 'Not available'; mainActionTarget?: string; dialog: 'passed' | 'failed' | 'Not available' };
 };
 export type MatrixReport = {
-  version: 1; startedAt: string; finishedAt: string; browser: 'chromium';
+  version: 1; startedAt: string; finishedAt: string; browser: string;
   routes: string[]; excludedDynamicRoutes: string[]; expectedCells: number;
   cells: Cell[]; fatal: Finding[]; failures: number; passed: boolean;
 };
@@ -209,11 +234,11 @@ export async function runMatrix(env: Readonly<Record<string, string | undefined>
     const base = guardBaseUrl(env.BASE_URL);
     if (!env.QA_EMAIL || !env.QA_PASSWORD) throw new Error('QA_CREDENTIALS_REQUIRED');
     phase = 'BROWSER_LAUNCH_FAILED';
-    browser = await chromium.launch({ headless: true });
-    const auth = await browser.newContext({ serviceWorkers: 'block' });
+    browser = await launchBrowser(env);
+    const auth =await browser.newContext({ serviceWorkers: 'block' });
     let signingIn = true;
     const fence = async (context: typeof auth, authPhase: () => boolean) => {
-      await context.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), authPhase()) ? route.continue() : route.abort('blockedbyclient'));
+      await context.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), authPhase()) ? passRoute(route) : route.abort('blockedbyclient'));
     };
     await fence(auth, () => signingIn);
     // No WebSocket endpoint is required for a built QA preview.
@@ -286,7 +311,7 @@ export type ExtendedCell = {
   signature?: string; liveSignature?: string;
 };
 export type ExtendedReport = {
-  version: 1; startedAt: string; finishedAt: string; browser: 'chromium';
+  version: 1; startedAt: string; finishedAt: string; browser: string;
   groups: Record<string, string[]>; modes?: readonly string[]; excludedDynamicRoutes: string[]; expectedCells: number;
   cells: ExtendedCell[]; fatal: Finding[]; failures: number; passed: boolean;
 };
@@ -365,11 +390,11 @@ async function contrastAudit(page: Page): Promise<{ sampled: number; failures: A
   }, { normal: CONTRAST_NORMAL, large: CONTRAST_LARGE, limit: CONTRAST_SAMPLE_LIMIT });
 }
 
-export function finishExtended(input: Pick<ExtendedReport, 'startedAt' | 'groups' | 'excludedDynamicRoutes' | 'cells' | 'fatal'> & { modes?: readonly string[] }): ExtendedReport {
+export function finishExtended(input: Pick<ExtendedReport, 'startedAt' | 'groups' | 'excludedDynamicRoutes' | 'cells' | 'fatal'> & { modes?: readonly string[]; themes?: ThemeList; browser?: string }): ExtendedReport {
   const fatal = [...input.fatal];
   const expected = new Set<string>();
   for (const group of Object.keys(input.groups)) for (const route of input.groups[group])
-    for (const theme of THEMES) for (const mode of input.modes ?? EXTENDED_MODES) for (const v of VIEWPORTS)
+    for (const theme of input.themes ?? THEMES) for (const mode of input.modes ?? EXTENDED_MODES) for (const v of VIEWPORTS)
       expected.add(`${group}|${route}|${theme.id}|${mode}|${v.width}x${v.height}`);
   const seen = new Set<string>();
   for (const cell of input.cells) {
@@ -379,7 +404,7 @@ export function finishExtended(input: Pick<ExtendedReport, 'startedAt' | 'groups
   }
   if (seen.size !== expected.size) fatal.push({ code: 'INCOMPLETE_MATRIX' });
   const failures = fatal.length + input.cells.reduce((n, cell) => n + cell.findings.length, 0);
-  return { ...input, fatal, version: 1, browser: 'chromium', finishedAt: new Date().toISOString(), expectedCells: expected.size, failures, passed: failures === 0 };
+  return { ...input, fatal, version: 1, browser: input.browser ?? 'chromium', finishedAt: new Date().toISOString(), expectedCells: expected.size, failures, passed: failures === 0 };
 }
 
 /** How a route group is visited: the signed-in QA user, nobody, or a fixture session cookie (pending/no-workspace/empty users). */
@@ -413,35 +438,23 @@ export async function runPlan(env: Readonly<Record<string, string | undefined>>,
   const cells: ExtendedCell[] = [], fatal: Finding[] = [];
   const shotsDir = resolve(env.BROWSER_MATRIX_SHOTS || join(dirname(resolve(env.BROWSER_MATRIX_REPORT || '/tmp/msp-browser-matrix.json')), 'shots'));
   let shots = 0;
+  const themes = selectThemes(env.MATRIX_THEMES);
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   let phase = 'CONFIGURATION_FAILED';
   try {
     const base = guardBaseUrl(env.BASE_URL);
-    browser = await chromium.launch({ headless: true });
+    browser = await launchBrowser(env);
     const fence = async (context: BrowserContext, authPhase: () => boolean) => {
-      await context.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), authPhase()) ? route.continue() : route.abort('blockedbyclient'));
+      await context.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), authPhase()) ? passRoute(route) : route.abort('blockedbyclient'));
     };
     let storage: Awaited<ReturnType<BrowserContext['storageState']>> | undefined;
     if (Object.values(plan.groups).some(group => group.auth === 'qa' && group.routes.length)) {
       if (!env.QA_EMAIL || !env.QA_PASSWORD) throw new Error('QA_CREDENTIALS_REQUIRED');
-      const auth = await browser.newContext({ serviceWorkers: 'block' });
-      let signingIn = true;
-      await fence(auth, () => signingIn);
-      await auth.routeWebSocket('**/*', socket => socket.close());
       phase = 'SIGN_IN_FAILED';
-      const login = await auth.newPage();
-      await login.goto(`${base}/sign-in`, { waitUntil: 'load', timeout: 60000 });
-      await login.locator('input[name=email]').fill(env.QA_EMAIL);
-      await login.locator('input[name=password]').fill(env.QA_PASSWORD);
-      await login.getByRole('button', { name: 'Sign in', exact: true }).click();
-      await login.waitForURL(`${base}/home`, { timeout: 60000 });
-      await login.locator('main#main-content').waitFor();
-      signingIn = false;
-      storage = await auth.storageState();
-      await auth.close();
+      storage = await signIn(browser, base, env.QA_EMAIL, env.QA_PASSWORD);
     }
     phase = 'MATRIX_INTERRUPTED';
-    for (const theme of THEMES) for (const mode of plan.modes) for (const viewport of VIEWPORTS) {
+    for (const theme of themes) for (const mode of plan.modes) for (const viewport of VIEWPORTS) {
       const { cookie: modeCookie, scheme } = modeSpec(mode);
       for (const [group, spec] of Object.entries(plan.groups)) {
         if (!spec.routes.length) continue;
@@ -464,7 +477,12 @@ export async function runPlan(env: Readonly<Record<string, string | undefined>>,
             const page = await context.newPage();
             page.setDefaultTimeout(8000);
             const add = (finding: Finding, detail?: string) => { cell.findings.push(finding); if (detail && cell.details.length < 12) cell.details.push(detail); };
-            page.on('console', message => { const f = browserFinding('console', message.type(), message.text()); if (f) add(f, `${f.code}: ${message.text().replace(/\s+/g, ' ').slice(0, 160)}`); });
+            page.on('console', message => {
+              // The browser logs the document's own expected status (a deliberate 404) as a console error.
+              const expected = spec.expectStatus?.[route];
+              if (expected && message.text() === `Failed to load resource: the server responded with a status of ${expected} (${expected === 404 ? 'Not Found' : ''})`) return;
+              const f = browserFinding('console', message.type(), message.text()); if (f) add(f, `${f.code}: ${message.text().replace(/\s+/g, ' ').slice(0, 160)}`);
+            });
             page.on('pageerror', error => { const f = browserFinding('pageerror', 'error', error.message); if (f) add(f, `${f.code}: ${error.message.replace(/\s+/g, ' ').slice(0, 160)}`); });
             page.on('response', response => {
               const url = new URL(response.url());
@@ -528,7 +546,7 @@ export async function runPlan(env: Readonly<Record<string, string | undefined>>,
   } catch { fatal.push({ code: phase }); }
   finally { if (browser) await browser.close().catch(() => { fatal.push({ code: 'BROWSER_CLOSE_FAILED' }); }); }
   compareSystemModes(cells);
-  return finishExtended({ startedAt, groups, modes: plan.modes, excludedDynamicRoutes, cells, fatal });
+  return finishExtended({ startedAt, groups, modes: plan.modes, themes, browser: engineName(env.MATRIX_BROWSER), excludedDynamicRoutes, cells, fatal });
 }
 
 /** Computed colours of body, main and the first navigation landmark: enough to tell light, dark and system apart. */
@@ -636,16 +654,16 @@ export type KeyboardCell = {
   group: string; route: string; theme: string; mode: string; viewport: { width: number; height: number };
   findings: Finding[]; details: string[]; stops: number; checks: Record<string, 'passed' | 'failed' | 'Not available'>;
 };
-export type KeyboardReport = { version: 1; startedAt: string; finishedAt: string; browser: 'chromium'; groups: Record<string, string[]>; modes: readonly string[]; expectedCells: number; cells: KeyboardCell[]; fatal: Finding[]; failures: number; passed: boolean };
+export type KeyboardReport = { version: 1; startedAt: string; finishedAt: string; browser: string; groups: Record<string, string[]>; modes: readonly string[]; expectedCells: number; cells: KeyboardCell[]; fatal: Finding[]; failures: number; passed: boolean };
 export const KEYBOARD_CHECKS = ['skipLink', 'focusRing', 'noTrap', 'menu', 'select', 'tabs', 'dialog', 'formSubmit', 'mainAction'] as const;
 export const TAB_WALK_LIMIT = 220;
 /** Date and time inputs spend one Tab per segment (a datetime-local has five), so focus staying put that many times is not a trap. */
 export const SEGMENT_TABS = 8;
 
-export function finishKeyboard(input: Pick<KeyboardReport, 'startedAt' | 'groups' | 'modes' | 'cells' | 'fatal'>): KeyboardReport {
+export function finishKeyboard(input: Pick<KeyboardReport, 'startedAt' | 'groups' | 'modes' | 'cells' | 'fatal'> & { themes?: ThemeList; browser?: string }): KeyboardReport {
   const fatal = [...input.fatal];
   const expected = new Set<string>();
-  for (const group of Object.keys(input.groups)) for (const route of input.groups[group]) for (const theme of THEMES) for (const mode of input.modes) for (const v of VIEWPORTS) expected.add(`${group}|${route}|${theme.id}|${mode}|${v.width}x${v.height}`);
+  for (const group of Object.keys(input.groups)) for (const route of input.groups[group]) for (const theme of input.themes ?? THEMES) for (const mode of input.modes) for (const v of VIEWPORTS) expected.add(`${group}|${route}|${theme.id}|${mode}|${v.width}x${v.height}`);
   const seen = new Set<string>();
   for (const cell of input.cells) {
     const key = `${cell.group}|${cell.route}|${cell.theme}|${cell.mode}|${cell.viewport.width}x${cell.viewport.height}`;
@@ -658,7 +676,7 @@ export function finishKeyboard(input: Pick<KeyboardReport, 'startedAt' | 'groups
     if (input.cells.length && !input.cells.some(cell => cell.checks[check] === 'passed')) fatal.push({ code: 'KEYBOARD_COVERAGE_MISSING', route: check });
   }
   const failures = fatal.length + input.cells.reduce((n, cell) => n + cell.findings.length, 0);
-  return { ...input, fatal, version: 1, browser: 'chromium', finishedAt: new Date().toISOString(), expectedCells: expected.size, failures, passed: failures === 0 };
+  return { ...input, fatal, version: 1, browser: input.browser ?? 'chromium', finishedAt: new Date().toISOString(), expectedCells: expected.size, failures, passed: failures === 0 };
 }
 
 type Stop = { index: number; tag: string; role: string; label: string; popup: string; expanded: string; ring: boolean; inViewport: boolean; inMain: boolean; inShell: boolean; inFilters: boolean; isSubmit: boolean; selectedTab: boolean; skip: boolean };
@@ -767,12 +785,13 @@ export async function runKeyboardRound2(env: Readonly<Record<string, string | un
   const groups: Record<string, string[]> = Object.fromEntries(Object.entries(groupsIn).map(([name, group]) => [name, group.routes]));
   const shotsDir = resolve(env.BROWSER_MATRIX_SHOTS || join(dirname(resolve(env.BROWSER_MATRIX_REPORT || '/tmp/msp-browser-matrix.json')), 'shots'));
   let shotCount = 0;
+  const themes = selectThemes(env.MATRIX_THEMES);
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   let phase = 'CONFIGURATION_FAILED';
   try {
     const base = guardBaseUrl(env.BASE_URL);
     phase = 'BROWSER_LAUNCH_FAILED';
-    browser = await chromium.launch({ headless: true });
+    browser = await launchBrowser(env);
     const fence = async (context: BrowserContext) => { await context.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), false) ? route.continue() : route.abort('blockedbyclient')); };
     let storage: Awaited<ReturnType<BrowserContext['storageState']>> | undefined;
     if (Object.values(groupsIn).some(group => group.auth === 'qa' && group.routes.length)) {
@@ -781,7 +800,7 @@ export async function runKeyboardRound2(env: Readonly<Record<string, string | un
       storage = await signIn(browser, base, env.QA_EMAIL, env.QA_PASSWORD);
     }
     phase = 'MATRIX_INTERRUPTED';
-    for (const theme of THEMES) for (const mode of modes) for (const viewport of VIEWPORTS) {
+    for (const theme of themes) for (const mode of modes) for (const viewport of VIEWPORTS) {
       const { cookie: modeCookie, scheme } = modeSpec(mode);
       for (const [group, spec] of Object.entries(groupsIn)) {
         if (!spec.routes.length) continue;
@@ -877,13 +896,23 @@ export async function runKeyboardRound2(env: Readonly<Record<string, string | un
     }
   } catch { fatal.push({ code: phase }); }
   finally { if (browser) await browser.close().catch(() => { fatal.push({ code: 'BROWSER_CLOSE_FAILED' }); }); }
-  return finishKeyboard({ startedAt, groups, modes, cells, fatal });
+  return finishKeyboard({ startedAt, groups, modes, themes, browser: engineName(env.MATRIX_BROWSER), cells, fatal });
 }
 
 async function signIn(browser: NonNullable<Awaited<ReturnType<typeof chromium.launch>>>, base: string, email: string, password: string) {
   const auth = await browser.newContext({ serviceWorkers: 'block' });
+  if (relaxSecureCookie) {
+    // The sign-in form itself is covered by the public-page cells; here the session is obtained over HTTP and installed without `Secure`.
+    const response = await fetch(`${base}/api/auth/sign-in`, { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify({ email, password }) });
+    const value = /msp_session=([^;]+)/.exec(response.headers.get('set-cookie') || '')?.[1];
+    if (!response.ok || !value) throw new Error('SIGN_IN_FAILED');
+    await auth.addCookies([{ name: SESSION_COOKIE, value, url: base, httpOnly: true, sameSite: 'Lax' }]);
+    const state = await auth.storageState();
+    await auth.close();
+    return state;
+  }
   let signingIn = true;
-  await auth.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), signingIn) ? route.continue() : route.abort('blockedbyclient'));
+  await auth.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), signingIn) ? passRoute(route) : route.abort('blockedbyclient'));
   await auth.routeWebSocket('**/*', socket => socket.close());
   const login = await auth.newPage();
   await login.goto(`${base}/sign-in`, { waitUntil: 'load', timeout: 60000 });
@@ -924,8 +953,8 @@ export function classifyFailure(o: FailureObservation, scenario: FailureScenario
 }
 
 export type FailureCell = { route: string; theme: string; mode: string; viewport: { width: number; height: number }; scenario: FailureScenario; probes: string[]; findings: Finding[]; details: string[]; intercepted: number };
-export type FailureReport = { version: 1; startedAt: string; finishedAt: string; browser: 'chromium'; routes: string[]; combos: string[]; scenarios: readonly string[]; expectedCells: number; cells: FailureCell[]; fatal: Finding[]; failures: number; passed: boolean };
-export function finishFailure(input: Pick<FailureReport, 'startedAt' | 'routes' | 'combos' | 'cells' | 'fatal'>): FailureReport {
+export type FailureReport = { version: 1; startedAt: string; finishedAt: string; browser: string; routes: string[]; combos: string[]; scenarios: readonly string[]; expectedCells: number; cells: FailureCell[]; fatal: Finding[]; failures: number; passed: boolean };
+export function finishFailure(input: Pick<FailureReport, 'startedAt' | 'routes' | 'combos' | 'cells' | 'fatal'> & { browser?: string }): FailureReport {
   const fatal = [...input.fatal];
   const expected = new Set(input.routes.flatMap(route => input.combos.flatMap(combo => FAILURE_SCENARIOS.map(scenario => `${route}|${combo}|${scenario}`))));
   const seen = new Set<string>();
@@ -936,7 +965,7 @@ export function finishFailure(input: Pick<FailureReport, 'startedAt' | 'routes' 
   }
   if (seen.size !== expected.size) fatal.push({ code: 'INCOMPLETE_MATRIX' });
   const failures = fatal.length + input.cells.reduce((n, cell) => n + cell.findings.length, 0);
-  return { ...input, fatal, version: 1, browser: 'chromium', scenarios: FAILURE_SCENARIOS, finishedAt: new Date().toISOString(), expectedCells: expected.size, failures, passed: failures === 0 };
+  return { ...input, fatal, version: 1, browser: input.browser ?? 'chromium', scenarios: FAILURE_SCENARIOS, finishedAt: new Date().toISOString(), expectedCells: expected.size, failures, passed: failures === 0 };
 }
 
 const FILL: Record<string, string> = { email: 'qa-probe@example.test', password: 'QaProbe-Passw0rd!', number: '3', url: 'https://example.test/qa', tel: '5550100', search: 'qa probe' };
@@ -973,7 +1002,7 @@ export async function runFailureProbe(env: Readonly<Record<string, string | unde
   try {
     const base = guardBaseUrl(env.BASE_URL);
     phase = 'BROWSER_LAUNCH_FAILED';
-    browser = await chromium.launch({ headless: true });
+    browser = await launchBrowser(env);
     let storage: Awaited<ReturnType<BrowserContext['storageState']>> | undefined;
     if (routes.some(item => item.auth === 'qa')) {
       if (!env.QA_EMAIL || !env.QA_PASSWORD) throw new Error('QA_CREDENTIALS_REQUIRED');
@@ -1100,7 +1129,106 @@ export async function runFailureProbe(env: Readonly<Record<string, string | unde
     }
   } catch { fatal.push({ code: phase }); }
   finally { if (browser) await browser.close().catch(() => { fatal.push({ code: 'BROWSER_CLOSE_FAILED' }); }); }
-  return finishFailure({ startedAt, routes: routes.map(r => r.route), combos, cells, fatal });
+  return finishFailure({ startedAt, routes: routes.map(r => r.route), combos, browser: engineName(env.MATRIX_BROWSER), cells, fatal });
+}
+
+/* ----- round 3: server-rendered failure (the database is unreachable) -------------------------- */
+export const SERVER_ERROR_LOCALES = ['en', 'fr'] as const;
+export const SERVER_ERROR_ROUTES = ['/home', '/publishing/posts', '/inbox', '/analytics', '/ads', '/settings/team', '/root', '/sign-in'] as const;
+export type ServerErrorObservation = {
+  status: number; theme: string | null; mode: string | null; wantTheme: string; wantMode: 'light' | 'dark'; locale: 'en' | 'fr';
+  text: string; retryButtons: number; retryKeepsPage: boolean; backgroundLuminance: number; homeLink: boolean;
+};
+const SERVER_ERROR_WORDS = { en: /try again|couldn.t load|something went wrong/i, fr: /réessayer|impossible|charger|un problème/i } as const;
+const SERVER_ERROR_LEAK = /digest|exception|prisma|econn|node_modules|stack|postgres|server logs|\b127\.0\.0\.1\b/i;
+/** Pure so the rules are unit-tested without a browser. */
+export function classifyServerError(o: ServerErrorObservation): Finding[] {
+  const out: Finding[] = [];
+  if (o.status < 500) out.push({ code: 'SERVER_ERROR_NOT_SIMULATED', count: o.status });
+  if (o.text.replace(/\s+/g, '').length < 20) out.push({ code: 'SERVER_ERROR_BLANK_PAGE' });
+  if (o.theme !== o.wantTheme || o.mode !== o.wantMode || (o.wantMode === 'dark' ? o.backgroundLuminance > 0.35 : o.backgroundLuminance < 0.6)) out.push({ code: 'SERVER_ERROR_NOT_THEMED' });
+  if (!SERVER_ERROR_WORDS[o.locale].test(o.text) || (o.locale === 'fr' && SERVER_ERROR_WORDS.en.test(o.text) && !SERVER_ERROR_WORDS.fr.test(o.text))) out.push({ code: 'SERVER_ERROR_NOT_TRANSLATED' });
+  if (SERVER_ERROR_LEAK.test(o.text)) out.push({ code: 'SERVER_ERROR_LEAKS_DETAIL' });
+  if (o.retryButtons < 1) out.push({ code: 'SERVER_ERROR_NO_RETRY' });
+  else if (!o.retryKeepsPage) out.push({ code: 'SERVER_ERROR_RETRY_BROKEN' });
+  if (!o.homeLink) out.push({ code: 'SERVER_ERROR_NO_WAY_BACK' });
+  return out;
+}
+
+export type ServerErrorCell = { route: string; theme: string; mode: 'light' | 'dark'; locale: 'en' | 'fr'; viewport: { width: number; height: number }; findings: Finding[]; details: string[] };
+export type ServerErrorReport = { version: 1; startedAt: string; finishedAt: string; browser: string; routes: string[]; expectedCells: number; cells: ServerErrorCell[]; fatal: Finding[]; failures: number; passed: boolean };
+export function finishServerError(input: Pick<ServerErrorReport, 'startedAt' | 'routes' | 'cells' | 'fatal'> & { themes?: ThemeList; browser?: string }): ServerErrorReport {
+  const fatal = [...input.fatal];
+  const expectedCells = input.routes.length * (input.themes ?? THEMES).length * 2 * SERVER_ERROR_LOCALES.length * VIEWPORTS.length;
+  if (input.cells.length !== expectedCells) fatal.push({ code: 'INCOMPLETE_MATRIX' });
+  const failures = fatal.length + input.cells.reduce((n, cell) => n + cell.findings.length, 0);
+  return { version: 1, startedAt: input.startedAt, routes: input.routes, cells: input.cells, fatal, browser: input.browser ?? 'chromium', finishedAt: new Date().toISOString(), expectedCells, failures, passed: failures === 0 };
+}
+
+/** BASE_URL must be a build started with an unreachable DATABASE_URL: every render then fails, which exercises the server-side error path. */
+export async function runServerError(env: Readonly<Record<string, string | undefined>>, routes: string[]): Promise<ServerErrorReport> {
+  const startedAt = new Date().toISOString();
+  const cells: ServerErrorCell[] = [], fatal: Finding[] = [];
+  const themes = selectThemes(env.MATRIX_THEMES);
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  let phase = 'CONFIGURATION_FAILED';
+  try {
+    const base = guardBaseUrl(env.BASE_URL);
+    phase = 'BROWSER_LAUNCH_FAILED';
+    browser = await launchBrowser(env);
+    phase = 'MATRIX_INTERRUPTED';
+    for (const theme of themes) for (const mode of ['light', 'dark'] as const) for (const locale of SERVER_ERROR_LOCALES) for (const viewport of VIEWPORTS) {
+      const context = await browser.newContext({ viewport, serviceWorkers: 'block', colorScheme: mode, locale: locale === 'fr' ? 'fr-FR' : 'en-US' });
+      try {
+        await context.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), false) ? route.continue() : route.abort('blockedbyclient'));
+        await context.addInitScript('window.__name = window.__name || (f => f);');
+        await context.addCookies([{ name: THEME_COOKIE, value: theme.id, url: base, sameSite: 'Lax' }, { name: MODE_COOKIE, value: mode, url: base, sameSite: 'Lax' }]);
+        for (const route of routes) {
+          const cell: ServerErrorCell = { route, theme: theme.id, mode, locale, viewport, findings: [], details: [] };
+          cells.push(cell);
+          const page = await context.newPage();
+          page.setDefaultTimeout(8000);
+          try {
+            const response = await page.goto(`${base}${route}`, { waitUntil: 'load', timeout: 60000 });
+            await page.waitForTimeout(1500); // the client renders the boundary after hydration
+            const read = () => page.evaluate(() => {
+              const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+              const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+              const resolve = (el: Element) => { for (let n: Element | null = el; n; n = n.parentElement) { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = getComputedStyle(n).backgroundColor; ctx.fillRect(0, 0, 1, 1); const d = ctx.getImageData(0, 0, 1, 1).data; if (d[3] > 200) return [d[0], d[1], d[2]]; } return [255, 255, 255]; };
+              const f = (v: number) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+              const [r, g, b] = resolve(document.body);
+              const root = document.documentElement;
+              return {
+                theme: root.getAttribute('data-theme'), mode: root.getAttribute('data-mode'), text: document.body.innerText || '',
+                retryButtons: [...document.querySelectorAll('button, a')].filter(e => /try again|réessayer|retry/i.test(e.textContent || '')).length,
+                homeLink: [...document.querySelectorAll('a[href]')].some(a => ['/', '/home', '/sign-in'].includes(new URL((a as HTMLAnchorElement).href).pathname)),
+                backgroundLuminance: 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b),
+              };
+            });
+            const before = await read();
+            const retry = page.getByRole('button', { name: /try again|réessayer|retry/i }).first();
+            let retryKeepsPage = false;
+            if (await retry.count()) {
+              await retry.click().catch(() => undefined);
+              await page.waitForTimeout(1500);
+              const after = await read();
+              retryKeepsPage = after.text.replace(/\s+/g, '').length >= 20 && after.retryButtons >= 1;
+            }
+            const found = classifyServerError({ status: response?.status() ?? 0, theme: before.theme, mode: before.mode, wantTheme: theme.id, wantMode: mode, locale, text: before.text, retryButtons: before.retryButtons, retryKeepsPage, backgroundLuminance: before.backgroundLuminance, homeLink: before.homeLink });
+            for (const f of found) { cell.findings.push(f); }
+            if (found.length) cell.details.push(`status ${response?.status()} theme=${before.theme} mode=${before.mode} lum=${before.backgroundLuminance.toFixed(2)} text="${before.text.replace(/\s+/g, ' ').slice(0, 120)}"`);
+            const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
+            if (overflow > 1) cell.findings.push({ code: 'HORIZONTAL_OVERFLOW', count: overflow });
+            const contrast = await contrastAudit(page);
+            if (contrast.failures.length) { cell.findings.push({ code: 'CONTRAST_LOW', count: contrast.failures.length }); cell.details.push(...contrast.failures.slice(0, 2).map(f => `CONTRAST ${f.ratio}:1 "${f.text}"`)); }
+          } catch (error) { cell.findings.push({ code: 'ROUTE_CHECK_FAILED' }); cell.details.push((error as Error).message.split('\n')[0].slice(0, 140)); }
+          finally { await page.close(); }
+        }
+      } finally { await context.close(); }
+    }
+  } catch { fatal.push({ code: phase }); }
+  finally { if (browser) await browser.close().catch(() => { fatal.push({ code: 'BROWSER_CLOSE_FAILED' }); }); }
+  return finishServerError({ startedAt, routes, cells, fatal, themes, browser: engineName(env.MATRIX_BROWSER) });
 }
 
 /** Optional: QA_CREDENTIALS_FILE points at a local JSON {email,password}, keeping secrets out of shell history. */
@@ -1158,11 +1286,64 @@ function loadConfigArgument() {
   for (const [key, value] of Object.entries(parsed)) if (typeof value === 'string' && /^[A-Z][A-Z0-9_]*$/.test(key)) process.env[key] ||= value;
 }
 
+/** `tsx scripts/verify-browser-matrix.ts summary report.json`: findings grouped by code, then by route + first detail line. */
+export function summarizeReport(report: { cells: Array<{ route: string; findings: Finding[]; details?: string[]; theme?: string; mode?: string; viewport: { width: number } }>; fatal?: Finding[] }): string[] {
+  const byCode = new Map<string, number>(), byKey = new Map<string, { count: number; cells: Set<string>; detail: string }>();
+  for (const cell of report.cells) {
+    for (const f of cell.findings) byCode.set(f.code, (byCode.get(f.code) ?? 0) + 1);
+    for (const detail of cell.details ?? []) {
+      const code = /^[A-Z_]+/.exec(detail)?.[0] ?? 'DETAIL';
+      const key = `${code} ${cell.route} ${detail.replace(/^[A-Z_]+:? ?/, '').replace(/\d+(\.\d+)?/g, '#').slice(0, 90)}`;
+      const entry = byKey.get(key) ?? { count: 0, cells: new Set<string>(), detail: `${cell.route} ${detail}` };
+      entry.count++; entry.cells.add(`${cell.theme ?? ''}/${cell.mode ?? ''}/${cell.viewport.width}`);
+      byKey.set(key, entry);
+    }
+  }
+  return [`fatal: ${(report.fatal ?? []).map(f => f.code).join(',') || 'none'}`, ...[...byCode].map(([code, n]) => `${code}: ${n}`), '--',
+    ...[...byKey.values()].sort((a, b) => b.count - a.count).slice(0, 40).map(e => `${e.count}x [${[...e.cells].slice(0, 4).join(' ')}${e.cells.size > 4 ? ' …' : ''}] ${e.detail.slice(0, 200)}`)];
+}
+
 async function main() {
+  if (process.argv[2] === 'summary' && process.argv[3]) {
+    console.log(summarizeReport(JSON.parse(readFileSync(process.argv[3], 'utf8'))).join('\n'));
+    return;
+  }
   loadConfigArgument();
   loadCredentialsFile();
   const output = resolve(process.env.BROWSER_MATRIX_REPORT || '/tmp/msp-browser-matrix.json');
   await mkdir(dirname(output), { recursive: true });
+  const round3 = /^round3:(system|servererror|notfound)$/.exec(process.env.BROWSER_MATRIX_SCOPE || '');
+  if (round3) {
+    const appDir = fileURLToPath(new URL('../src/app', import.meta.url));
+    const only = process.env.MATRIX_ONLY?.split(',').filter(Boolean);
+    const pick = (routes: readonly string[]) => (only ? routes.filter(route => only.some(prefix => route.startsWith(prefix))) : [...routes]);
+    if (round3[1] === 'servererror') {
+      const report = await runServerError(process.env, pick(SERVER_ERROR_ROUTES));
+      await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+      console.log(`Round 3 server error: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
+      process.exitCode = report.passed ? 0 : 1;
+      return;
+    }
+    if (round3[1] === 'notfound') {
+      // Unknown routes need no fixture ids: signed in and signed out, status 404 required.
+      const plan: Plan = { groups: { 'notfound-signed-in': { auth: 'qa', routes: ['/does-not-exist'], expectStatus: { '/does-not-exist': 404 } }, 'notfound-signed-out': { auth: 'none', routes: ['/does-not-exist'], expectStatus: { '/does-not-exist': 404 } } }, modes: ROUND2_MODES, excludedDynamicRoutes: [] };
+      const report = await runPlan(process.env, plan);
+      await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+      console.log(`Round 3 not found: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
+      process.exitCode = report.passed ? 0 : 1;
+      return;
+    }
+    // System mode on every customer, Root and public page (round 2 compared a 22-page sample).
+    const plan: Plan = {
+      groups: { customer: { auth: 'qa', routes: pick(discoverRoutes(appDir).routes) }, root: { auth: 'qa', routes: pick(discoverRootRoutes(appDir).routes) }, public: { auth: 'none', routes: pick(PUBLIC_ROUTES) } },
+      modes: ROUND2_MODES, excludedDynamicRoutes: [],
+    };
+    const report = await runPlan(process.env, plan);
+    await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+    console.log(`Round 3 system: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
+    process.exitCode = report.passed ? 0 : 1;
+    return;
+  }
   const round2 = /^round2:(dynamic|states|system|empty|notfound|keyboard|failure)$/.exec(process.env.BROWSER_MATRIX_SCOPE || '');
   if (round2) return mainRound2(round2[1] as Round2Part, output);
   if (process.env.BROWSER_MATRIX_SCOPE === 'customer') {

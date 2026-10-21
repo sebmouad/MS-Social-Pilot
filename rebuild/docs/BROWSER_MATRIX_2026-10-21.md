@@ -142,3 +142,51 @@ Server-rendered 500 pages (no safe way to make the production build throw; `erro
 screen readers, long/non-synthetic content, hover states, Feeds/WordPress pages against a migrated database, forms behind confirmations that need real
 provider state, and any live-provider or production behaviour. Keyboard checks cover the first Menu, Select, Tabs and dialog opener found on each page;
 menu items are never activated. System mode was compared on 22 representative pages, not every route.
+
+# Round 3 (2026-10-21): Firefox, WebKit, system mode on every page, server-rendered failure
+
+Same environment: a **local production build** (`next build` + `next start`, :3200) against the **synthetic** preview PostgreSQL database; Playwright Firefox and WebKit 27.2
+(the Safari engine; not Safari itself). Not production, not live-provider evidence. Harness additions: `MATRIX_BROWSER=chromium|firefox|webkit`, `MATRIX_THEMES=vivid,warm`
+(subset of themes), `BROWSER_MATRIX_SCOPE=round3:system|round3:servererror|round3:notfound`, and `tsx scripts/verify-browser-matrix.ts summary report.json` (findings grouped by code/route).
+The app's session cookie is `Secure`, which WebKit refuses to store from plain-http loopback, so under WebKit the session is obtained with one HTTP sign-in request and installed as a
+non-secure cookie (the sign-in *form* is still covered by the public-page cells). The sign-in origin check needs `BASE_URL=http://localhost:3200` (not `127.0.0.1`).
+Two themes were run (vivid, warm; the lightest and the most different palette), each light/dark × 1440/390.
+
+| Run | Scope | Cells | Findings |
+| --- | --- | --- | --- |
+| Firefox extended matrix | 41 customer + 16 Root + 5 public pages × 2 themes × light/dark × 2 viewports | 496 / 496 | 43 (below); **0** overflow, accessible-name, theme/mode, redirect, hydration |
+| WebKit extended matrix | same | 496 / 496 | 99 (below); **0** overflow, accessible-name, theme/mode, redirect; **16 hydration warnings** |
+| Chromium system mode, every page | same pages × 2 themes × light, dark, system-light, system-dark (colour scheme emulated, flipped live) × 2 viewports | 992 / 992 | 166, all known data/module causes; **0** `SYSTEM_MODE_MISMATCH`, **0** `SYSTEM_MODE_NOT_LIVE` |
+| Not found (`/does-not-exist`, signed in/out) | Chromium, 2 themes × 4 modes × 2 viewports | 32 / 32 | **0** with the shared fix below (status 404; themed) |
+| Server 500 (database unreachable), Chromium / Firefox / WebKit | 8 routes × 2 themes × light/dark × en/fr × 2 viewports | 128 / 128 each | **before** the fix 640 findings (Chromium); **after** the fix 0 in all three engines |
+
+Remaining Firefox/WebKit findings (identical causes in both engines unless noted):
+
+| Finding | Where | Engines | Cause / owner |
+| --- | --- | --- | --- |
+| HYDRATION_WARNING (React #418, text mismatch) | `/root/operations` | WebKit | `src/lib/root-time.ts` formats with `Intl.DateTimeFormat('en-GB', { dateStyle:'medium', timeStyle:'medium' })`. Node, Chromium and Firefox join the halves with ", "; WebKit writes "21 Oct 2026 **at** 10:53:20". Server and browser text differ. Owner: Root (`src/lib`). Fix: format date and time separately and join them (`formatStableDateTime` in `src/components/LocalTime.tsx` does this) |
+| HYDRATION_WARNING (React #418) | `/settings/sharing` | WebKit | `LinksManager.tsx` calls `new Date(v).toLocaleString()` / `toLocaleDateString()` in a client component that is server-rendered: the server prints the server locale/zone, the browser its own (WebKit here is `en-GB`, Firefox/Chromium `en-US`). **Any visitor whose locale or zone differs from the server's will hit this**, not just Safari. Owner: Sharing. Fix: `<LocalTime value=… />`. The same pattern exists in 15 other files (list below) |
+| 404 `/api/media/<id>` + console error | `/publishing/posts`, `/queue`, `/approvals` | all | Seeded posts reference media with no stored file (round 1 note). The page still renders |
+| 404/429 `/api/auth/invitations/preview` + console error | `/join` | all | The page requests a preview without a token. The 429 appears after many loads (rate limit), so a visitor who reloads sees a console error too. Owner: Auth |
+| CONTRAST_LOW 4.35:1 "View post" (warm light); 4.08:1 today badge "21"/"Today" (warm dark, desktop) | `/publishing/calendar` | all | `calendar.module.css` (Publishing), unchanged since round 1. White on `rgb(173,110,89)` and `rgb(189,92,57)` on `rgb(255,253,249)`; darken the coral by about 8 % |
+
+Layout parity: no horizontal overflow, no missing accessible names and no unthemed page in Firefox or WebKit at 1440 and 390 px, so the round-1 global `box-sizing` change and the
+`table.ui-visually-hidden` change hold in both engines. Not compared pixel by pixel; "no finding" is the harness's checks, not a visual review.
+
+## Server-rendered failure (found and fixed)
+
+With the database unreachable the **root layout itself** throws (`initialAppearance`, `settingsLocale` and `runtimeConfig` all read the database), so `src/app/error.tsx` (which sits
+inside the layout) never renders. There is no `global-error.tsx`, so every page answered **HTTP 500 with Next's default "Application error: a server-side exception has occurred … see the server
+logs" text**: white even in dark mode, English only, not themed, no retry, no way back, and it shows the word "Digest". Same for `/sign-in`.
+
+Fix (shared, in my paths): `src/components/ErrorState.tsx`, with a bilingual last-resort catalog (documented bootstrap exception, as Root configuration is unavailable in this state), reading
+the theme and mode cookies itself and the language from the page or the browser; `.route-state__actions` in `src/styles/tokens.css`. It needs three thin files in `src/app/`, which are
+outside this lane's owned paths and are therefore **not committed**; they were created temporarily for the runs above and removed (exact contents in the lane report). Result with them:
+themed in both modes and both palettes, English/French, "Try again" re-attempts and keeps the page, a link home, no internal text, contrast and overflow clean, in all three engines.
+The not-found page needs the same component (the unknown-route page was the unbranded Next default, round 2 finding) and also returned 404 correctly.
+
+## Not proven (round 3)
+
+Keyboard/dialog behaviour in Firefox and WebKit (the keyboard gate was not run there; Safari also needs Option+Tab for links by default), all four palettes in the two new engines (only vivid and warm),
+real Safari/iOS, the empty/dynamic/failure-injection parts in the new engines, screen readers, hover states, and anything live-provider or production. The injected server failure is a database outage only
+(not a thrown error inside one page, which `error.tsx` handles).
