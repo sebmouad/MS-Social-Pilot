@@ -50,4 +50,11 @@
 @media (max-width: 38rem) { .heading { align-items: flex-start; } }
 
 .assignee { display: inline-flex; align-items: center; gap: var(--space-2, 8px); }
-.avatar { display: inline-grid; place-items: center; inline-size: 28px; block-size: 28px; border-radius: 50%; background: var(--mod-soft); color: var(--mod-ink); font-weight: 700; flex-shrink: 0; }
+
+.column[data-drop-active] { outline: 3px solid var(--focus); background: var(--mod-soft); }
+.dragHandle { cursor: grab; justify-self: end; padding: .4rem .7rem; color: var(--ink-soft); border: 1px solid var(--line); border-radius: var(--radius-sm); user-select: none; }
+.dragHandle:active { cursor: grabbing; }
+.postPreview { min-width: 0; padding: .5rem; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--ink-soft); font-size: .85rem; }
+.postPreview summary { cursor: pointer; color: var(--ink); }
+.postPreview summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.postPreview p { white-space: pre-wrap; overflow-wrap: anywhere; margin: .6rem 0; }

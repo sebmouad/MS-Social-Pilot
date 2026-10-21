@@ -1,11 +1,13 @@
 'use client';
+import { uiCopy, type UiLocale } from './copy';
 import { useState } from 'react';
 import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import styles from './agency.module.css';
 
 /** Switches the signed-in session to one administered workspace, then opens the destination there. */
-export function WorkspaceAction({ workspaceId, workspaceName, href, label, variant = 'secondary' }: { workspaceId: string; workspaceName: string; href: string; label: string; variant?: 'primary' | 'secondary' | 'quiet' }) {
+export function WorkspaceAction({ workspaceId, workspaceName, href, label, variant = 'secondary', locale = 'en' }: { workspaceId: string; workspaceName: string; href: string; label: string; locale?: UiLocale; variant?: 'primary' | 'secondary' | 'quiet' }) {
+  const t = uiCopy(locale);
   const toast = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -18,13 +20,13 @@ export function WorkspaceAction({ workspaceId, workspaceName, href, label, varia
       toast.notify({ title: `${label}: ${workspaceName}` });
       window.location.assign(href);
     } catch {
-      const message = `Could not switch to ${workspaceName}. Check your connection and try again.`;
+      const message = t("Could not switch to {0}. Check your connection and try again.", workspaceName);
       setError(message); toast.failed(message, () => void open(), label);
       setPending(false);
     }
   }
   return <span className={styles.action}>
-    <Button size="sm" variant={variant} busy={pending} disabled={pending} aria-label={`${label}: ${workspaceName}`} onClick={() => void open()}>{pending ? 'Opening…' : label}</Button>
+    <Button size="sm" variant={variant} busy={pending} disabled={pending} aria-label={`${label}: ${workspaceName}`} onClick={() => void open()}>{pending ? t("Opening…") : label}</Button>
     {error && <span role="alert" className={styles.actionError}>{error}</span>}
   </span>;
 }

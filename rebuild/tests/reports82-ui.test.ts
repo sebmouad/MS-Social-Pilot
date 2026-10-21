@@ -210,3 +210,29 @@ describe('Reports workflow UI', () => {
     expect(Array.from(dock.querySelectorAll('button')).some(item => /^(New template|New schedule)$/.test(item.textContent?.trim() ?? ''))).toBe(false);
   });
 });
+
+it('selects schedule frequency with keyboard arrows and sends the shared service value', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ ok: true }) })));
+  await render(base({ schedules: [schedule] })); await click(button('Edit'));
+  const group = container.querySelector('[role="radiogroup"][aria-label="Frequency"]')!;
+  const weekly = group.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')!;
+  await act(async () => { weekly.focus(); weekly.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
+  expect(document.activeElement?.textContent).toBe('Every month');
+  expect(container.querySelector<HTMLInputElement>('input[name="frequency"]')?.value).toBe('monthly');
+  await click(button('Save changes'));
+  const review = [...container.querySelectorAll('dialog')].at(-1)!;
+  await click(review.querySelector<HTMLInputElement>('input[type="checkbox"]')!);
+  await click(button('Save changes', review));
+  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toMatchObject({ action: 'update', id: schedule.id, frequency: 'monthly', confirmation: 'UPDATE REPORT SCHEDULE sch-1' });
+});
+
+it('uses the responsive history DataTable with meaningful status Badges and French copy', async () => {
+  await render(base({ locale: 'fr', runs: [{ id: 'run', channelId: 'ch-1', kind: 'manual', status: 'completed', periodStart: '2026-10-01', periodEnd: '2026-10-20', startedAt: '2026-10-20T10:00:00Z', rowCount: null, truncated: false, note: null, deliveries: [] }] }));
+  const table = container.querySelector('table')!;
+  expect(table.closest('.ui-table--stack')).toBeTruthy();
+  expect(table.querySelector('caption')?.textContent).toBe('Historique des rapports');
+  expect(table.querySelector('.ui-badge--success')?.textContent).toBe('Préparé');
+  expect(table.textContent).toContain('Téléchargement préparé'); expect(table.textContent).toContain('—');
+  await click(button('Nouveau modèle', dock));
+  expect(container.querySelector('input[name="sections"]')?.closest('label')?.querySelector('svg')).toBeTruthy();
+});
