@@ -11,7 +11,8 @@ const aliases: Record<string, string> = { post_impressions: 'impressions', post_
 /** Cursor-only continuation: never persist or follow a provider URL containing credentials. */
 export function createFacebookPostHistory(config: FacebookConfig, policyInput: z.input<typeof facebookHistoryPolicySchema>, fetcher: typeof fetch = fetch, signal?: AbortSignal) {
   const policy = facebookHistoryPolicySchema.parse(policyInput);
-  async function page(path: string, token: string, params: Record<string, string>) {
+  /** `timeWindow`: insights page by time windows (previous/next links without cursors); there is nothing to continue for lifetime values. */
+  async function page(path: string, token: string, params: Record<string, string>, options: { timeWindow?: boolean } = {}) {
     signal?.throwIfAborted();
     const url = graphObjectUrl(config, path);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
@@ -31,6 +32,7 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
     }
     signal?.throwIfAborted();
     const paging = obj(data.paging); const after = obj(paging.cursors).after;
+    if (options.timeWindow) return { rows: data.data as unknown[], after: null };
     if (paging.next && (typeof after !== 'string' || !after)) throw new Error('History continuation missing.');
     return { rows: data.data as unknown[], after: paging.next ? after as string : null };
   }
@@ -56,7 +58,7 @@ export function createFacebookPostHistory(config: FacebookConfig, policyInput: z
         for (const [key, value] of [['shares', obj(post.shares).count], ['comments', obj(obj(post.comments).summary).total_count]] as const) { const n = number(value); if (n !== null) insights[key] = n; }
         for (const metric of new Set(policy.metrics)) {
           try {
-            const data = await page(`${encodeURIComponent(post.id)}/insights`, token, { metric, period: 'lifetime', limit: String(config.pageSize) });
+            const data = await page(`${encodeURIComponent(post.id)}/insights`, token, { metric, period: 'lifetime', limit: String(config.pageSize) }, { timeWindow: true });
             // Insights always return time-window paging links (previous/next) even for one lifetime value; they are not a continuation of this metric.
             for (const rawMetric of data.rows) { const item = obj(rawMetric); if (item.name !== metric) continue; const values = Array.isArray(item.values) ? item.values : []; const value = obj(values.at(-1)).value ?? obj(item.total_value).value; if (value !== undefined) insights[aliases[metric] ?? metric] = number(value) ?? value; }
           } catch { signal?.throwIfAborted(); failures.push(metric); postFailures.push(metric); }
