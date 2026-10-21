@@ -63,3 +63,101 @@ Lets an MCP client (such as Claude) connect without a pasted key. Code: `modules
 **Audit.** `root_activities`: `oauth.client_registered`. Workspace `activity_logs`: `oauth.consent_granted`, `oauth.consent_denied`, `oauth.token_issued`, `oauth.code_reuse_revoked`; key creation and manual revocation keep their existing `mcp.key_created` / `mcp.key_revoked` Root activities.
 
 **Limitations.** Mocked-database tests only (no PostgreSQL, browser or real MCP client run). `/api/mcp` does not yet answer 401 with a `WWW-Authenticate: Bearer resource_metadata=...` header (not owned by this work); clients that probe `/.well-known/oauth-protected-resource` find it. A reuse racing in between key issuance and the `keyId` link cannot revoke (the key exists for milliseconds without the link). Rate limits are per process. Registered clients are anonymous (any caller may register); the consent screen shows the client name and the redirect host and users must recognise them. Key listing shows OAuth keys by name only (no separate origin column). The pinned cutover-rehearsal migration list was not extended.
+
+
+## Analytics and Ads REST v1 parity (2026-10-21)
+
+The module-owned MCP operations are also reachable at
+`/api/v1/analytics/<operation>` and `/api/v1/ads/<operation>`.
+Operation names and argument objects are identical to MCP. The table below lists
+all current endpoints; `GET / POST` means either verb may invoke the read.
+Writes accept POST only. POST reads support filters too large for a practical URL.
+
+Authentication is `Authorization: Bearer mcp_…`, with the existing API enablement,
+credential validation, current owner authority, rate limits and purge refusal.
+The transport delegates to the **same MCP host and product services**: feature
+read/write grants, independent channel/ad-account ceilings, manager checks,
+workspace-wide scope refusals, availability, operation locks, exact confirmations,
+idempotency and audit receipts are unchanged. No new key issuer or service rules.
+Module declarations form the route allowlist; Root and other modules cannot be
+invoked through either route family.
+
+For GET, pass an optional URL-encoded JSON object in the single `input` query
+parameter. For POST, send that object as the JSON body, without query parameters.
+Unknown/repeated query parameters, malformed JSON and non-object inputs are
+refused. For example:
+
+```text
+GET /api/v1/analytics/get_analytics_overview?input=%7B%22compare%22%3A%22previous%22%7D
+POST /api/v1/ads/preview_ads_change
+{"adAccountId":"example-account","operation":{"type":"status.set","objectType":"campaign","objectId":"example-campaign","status":"paused"}}
+```
+
+Repeat the returned exact confirmation with the same reviewed operation and a
+stable `requestId` at `POST /api/v1/ads/apply_ads_change`. Preserve that request ID
+after a lost response, inspect changes, and never automatically resend an unknown
+outcome. Successful bodies are the MCP structured result directly (including
+`previousPoints`, series/breakdown pagination, CSV/JSON/HTML export strings and
+audit receipts where that operation returns them). Service failures use their
+HTTP operation status and retain safe metadata such as `attempt: not_dispatched`.
+All responses use `Cache-Control: no-store`.
+
+| Endpoint suffix | Method | Required feature |
+| --- | --- | --- |
+| `/api/v1/analytics/get_analytics_posts` | GET / POST | `analytics/posts` |
+| `/api/v1/analytics/get_analytics_ad_objects` | GET / POST | `analytics/ads` |
+| `/api/v1/analytics/export_analytics_report` | GET / POST | `analytics/reports` |
+| `/api/v1/analytics/list_report_templates` | GET / POST | `analytics/reports` |
+| `/api/v1/analytics/manage_report_template` | POST | `analytics/reports` |
+| `/api/v1/analytics/list_report_schedules` | GET / POST | `analytics/reports` |
+| `/api/v1/analytics/manage_report_schedule` | POST | `analytics/reports` |
+| `/api/v1/analytics/list_report_runs` | GET / POST | `analytics/reports` |
+| `/api/v1/analytics/generate_report` | POST | `analytics/reports` |
+| `/api/v1/analytics/get_analytics_pins` | GET / POST | `analytics/pins` |
+| `/api/v1/analytics/pin_analytics_metric` | POST | `analytics/pins` |
+| `/api/v1/analytics/unpin_analytics_metric` | POST | `analytics/pins` |
+| `/api/v1/analytics/reorder_analytics_pins` | POST | `analytics/pins` |
+| `/api/v1/analytics/get_analytics_goals` | GET / POST | `analytics/goals` |
+| `/api/v1/analytics/set_analytics_goals` | POST | `analytics/goals` |
+| `/api/v1/analytics/get_analytics_demographics` | GET / POST | `analytics/demographics` |
+| `/api/v1/analytics/compare_analytics` | GET / POST | `analytics/compare` |
+| `/api/v1/analytics/get_analytics_explorer` | GET / POST | `analytics/explorer` |
+| `/api/v1/analytics/get_analytics_overview` | GET / POST | `analytics/overview` |
+| `/api/v1/analytics/get_analytics_metric_details` | GET / POST | `analytics/overview` |
+| `/api/v1/ads/get_ads_report_rows` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/export_ads_report` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/list_ad_accounts` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/get_ad_creation_options` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/get_ads_performance` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/get_live_ad_status` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/create_ad_campaign` | POST | `ads/campaigns` |
+| `/api/v1/ads/create_ad_set` | POST | `ads/campaigns` |
+| `/api/v1/ads/update_ad` | POST | `ads/campaigns` |
+| `/api/v1/ads/compare_ads_performance` | GET / POST | `ads/compare` |
+| `/api/v1/ads/list_ads_objects` | GET / POST | `ads/objects` |
+| `/api/v1/ads/get_ads_object` | GET / POST | `ads/objects` |
+| `/api/v1/ads/get_ads_management_options` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/get_ads_creative_image` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/preview_ads_change` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/apply_ads_change` | POST | `ads/campaigns` |
+| `/api/v1/ads/list_ads_changes` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/resolve_ads_change` | POST | `ads/campaigns` |
+| `/api/v1/ads/list_ads_creatives` | GET / POST | `ads/campaigns` |
+| `/api/v1/ads/list_ads_creative_sources` | GET / POST | `ads/campaigns` |
+
+All result/range/export/management ceilings continue to come from the existing
+Root settings and the key result cap. No new Root keys. Input bytes reuse
+`integrations.api.postsBodyMaxBytes` for both GET JSON input and POST bodies;
+its current Root label/help mention Posts only. The integrator should generalize
+that label/help in `modules/integrations/config.ts` (outside this lane) to cover
+all REST v1 JSON input. No configuration schema version change is needed here.
+
+Verification: `integrations-v1-analytics-ads.test.ts` covers every declared endpoint
+with transport/auth/grant/input/error/receipt tests (MCP dispatch mocked), plus
+actual-host checks for restricted report scope, Ads manager access, Analytics
+validation, snapshot previousPoints and missing Ads confirmation. Related account-scope/Ads management
+unit tests cover the existing shared service paths. This is synthetic unit
+verification, without server, PostgreSQL, browser, live provider or MCP transport
+execution. The existing `mcp-security.test.ts` independently fails five Analytics
+cases because its snapshot fixture omits the current `previousPoints` field;
+that file is outside this lane. Update the fixture and re-run it during integration.
