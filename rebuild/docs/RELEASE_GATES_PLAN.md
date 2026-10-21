@@ -529,3 +529,7 @@ records 80 scheduled posts, not 80 confirmed Facebook publications or comments.
 ### 2026-10-21 post-cutover rollback drill
 
 `rebuild/scripts/prod-rollback-drill.sh` restored `/var/backups/socialpilot-deploy-20261021-154321/social_pilot.dump` into scratch DB `social_pilot_drill` and started legacy (`/srv/ms-social-pilot`) and the installed rebuild on spare ports against it. Result: **ROLLBACK DRILL PASS** (restore 2s, legacy HTTP/DB 3s, rebuild HTTP/DB 2s, total 7s). Scratch DB/role removed; live rebuild web/worker stayed active, legacy stayed inactive. Proves a restorable backup and a startable rollback artifact, not a full proxy cutback.
+
+### 2026-10-21 first full recipe day
+
+All four Europe/Paris slots (07:00, 11:00, 15:00, 17:00) published 10/10 posts with 10/10 first comments and no errors (40/40). 70 further plans pending on the rolling horizon.
