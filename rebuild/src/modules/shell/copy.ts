@@ -147,6 +147,39 @@ const textMap = (keys: readonly string[]) => z.object(Object.fromEntries(keys.ma
 const locale = z.object(Object.fromEntries(Object.entries(en).map(([key, value]) => [key, typeof value === 'string' ? text : textMap(Object.keys(value))]))).strict();
 export const shellCopySchema = z.object({ en: locale, fr: locale }).strict();
 
+const savedText = (value: unknown): string | undefined => typeof value === 'string' && value.length >= 1 && value.length <= 300 ? value : undefined;
+
+/**
+ * Stored `home.shellCopy` catalogs outlive schema changes: B9 removed the three `pageTools*`
+ * entries, so a catalog saved before then carries obsolete keys. Merge the saved entries over
+ * the shipped locale text instead of rejecting the whole catalog: unknown keys and invalid
+ * values are dropped, saved customizations are kept, and shipped text fills every gap
+ * (including keys added after the catalog was saved). Root saves stay strict; this is the
+ * read path only.
+ */
+export function resolveShellCopy(saved: unknown): { en: ShellCopy; fr: ShellCopy } {
+  const locales = saved && typeof saved === 'object' && !Array.isArray(saved) ? (saved as Record<string, unknown>) : {};
+  const resolve = (locale: 'en' | 'fr'): ShellCopy => {
+    const shipped = SHELL_COPY[locale] as unknown as Record<string, unknown>;
+    const group = locales[locale];
+    const stored = group && typeof group === 'object' && !Array.isArray(group) ? (group as Record<string, unknown>) : {};
+    const out: Record<string, unknown> = {};
+    for (const [key, fallback] of Object.entries(shipped)) {
+      if (typeof fallback === 'string') {
+        out[key] = savedText(stored[key]) ?? fallback;
+      } else {
+        const sub = stored[key];
+        const savedGroup = sub && typeof sub === 'object' && !Array.isArray(sub) ? (sub as Record<string, unknown>) : {};
+        const merged: Record<string, string> = {};
+        for (const [subKey, subFallback] of Object.entries(fallback as Record<string, string>)) merged[subKey] = savedText(savedGroup[subKey]) ?? subFallback;
+        out[key] = merged;
+      }
+    }
+    return out as unknown as ShellCopy;
+  };
+  return { en: resolve('en'), fr: resolve('fr') };
+}
+
 /** Replaces `{name}` placeholders; unknown placeholders are kept visible rather than silently dropped. */
 export function fill(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) => (key in values ? String(values[key]) : match));

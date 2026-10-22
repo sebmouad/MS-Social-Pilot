@@ -786,3 +786,61 @@ the full browser matrix on the new selectors, the assign dialog and
 saved-replies menu at desktop/phone widths in EN/FR with keyboard, a
 live-provider renewal run, and the `DESIGN.md` Layout section, which still
 describes the pre-v2 two-sidebar shell.
+
+## Session 2026-10-22: B9 live, shellCopy tolerance, v2 matrix scope (source/unit only)
+
+Production runs `13bb7d27` (B9 deployed 2026-10-22 from a normal terminal;
+owner-stated, see HANDOVER). No deploy ran in this session.
+
+- **`home.shellCopy` obsolete-key tolerance:** the read path no longer
+  rejects a saved catalog that still carries the three pre-B9 `pageTools*`
+  entries. `resolveShellCopy` (`src/modules/shell/copy.ts`) merges valid
+  saved entries over the shipped locale text, drops unknown keys and
+  invalid values, and fills gaps (including keys added later) from the
+  shipped catalog; `shellChrome` reads via `configValueOrDefault` plus
+  that resolver, so every page (customer, Root, access-limited,
+  no-workspace, Inbox, Library) keeps its saved customizations. Root
+  saves stay strict (`shellCopySchema` unchanged). Tests in
+  `tests/shell-v2.test.ts`: a pre-B9 catalog with operator edits loads
+  the edits and validates strictly; garbage/partial values fall back
+  per-key or wholesale.
+- **`DESIGN.md` Layout rewritten** for the v2 shell: one collapsible
+  sidebar (areas + channel scope), tabs in areas, one Filter button per
+  page header, geometry tokens (248px/64px rail, breakpoints
+  1024/760px), Content table + side preview, full-screen Create with
+  action bar, Clean default for new users (the stale "Vivid (default)"
+  line in Overview fixed with it). Dated batch notes elsewhere in the
+  file are untouched.
+- **v2 area matrix scope** (`BROWSER_MATRIX_SCOPE=v2` in
+  `scripts/verify-browser-matrix.ts`, documented in
+  `BROWSER_MATRIX.md`): the required matrix now exists as a runnable
+  gate — 67 static routes across Home, Create, Content, Inbox, Insights,
+  Settings and Root × Clean (override via `MATRIX_THEMES`) ×
+  light/dark × 1440×900/390×844 × EN/FR (Accept-Language) × keyboard
+  walk (Tab-to-action every cell, phone drawer dialog probe), plus
+  console/page errors, HTTP/redirect/theme/mode/locale checks, overflow,
+  accessible names, contrast and failure screenshots: 536 cells on the
+  default theme. Eight unit tests pin routing, inventory, report rules
+  and the no-browser-on-bad-config guard; a tsx smoke run reports the
+  67-route/536-cell inventory and fails fast without credentials.
+- **Live matrix run: blocked in this sandbox** (first-hand probes, not a
+  claim): TCP `bind` to 127.0.0.1 and ::1 fails with `EPERM`, loopback
+  `connect` fails with `EPERM`, Docker.app cannot open
+  (`kLSNoExecutableErr`), a conda PostgreSQL cannot `initdb`
+  (`getpwuid(501)` fails: the sandbox hides passwd entries),
+  DYLD interposition is stripped, a source-built PostgreSQL 16.15 with
+  the lookup patched then fails on `shmget` (`EPERM`), and
+  `require_escalated` is denied (approval prompts disabled). No server,
+  database or browser run was possible here. Outside the sandbox, run
+  the documented scope against the PREVIEW.md seeded database; until
+  then there is no v2 browser evidence and no defect list from it.
+
+Verification in this session (from `rebuild/`): `npm run typecheck`
+0 errors; full suite `npx vitest run --exclude
+"**/facebook-diagnostic-transport.test.ts" --testTimeout 30000`:
+724 files / 11,736 tests pass (10 new: 2 shellCopy, 8 v2 scope),
+49 skipped, 5 fail — the known sandbox `facebook-native-http`
+loopback `listen EPERM ::1` probes; `npx next build` passes;
+`tests/browser-matrix.test.ts` + `tests/raw-sql-void-guard.test.ts`
+41/41 pass. Nothing here is browser, PostgreSQL, provider or
+production evidence beyond the stated production SHA.

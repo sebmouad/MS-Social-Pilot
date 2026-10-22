@@ -85,6 +85,36 @@ npx vitest run tests/browser-matrix.test.ts tests/raw-sql-void-guard.test.ts
 npx tsc --noEmit -p .
 ```
 
+## Design v2 area matrix (`BROWSER_MATRIX_SCOPE=v2`)
+
+Every v2 area — Home, Create, Content, Inbox, Insights, Settings, Root —
+in light and dark, at desktop (1440×900) and phone (390×844) widths, with
+keyboard navigation, in EN and FR. The theme defaults to Clean
+(`MATRIX_THEMES` may narrow or widen it); `MATRIX_ONLY` narrows routes by
+prefix. Sign-in happens once in English; every locale/mode/viewport cell
+reuses that session. Each cell checks console/page errors, HTTP status,
+redirects, applied theme/mode/locale, horizontal overflow, accessible
+control names, contrast and the keyboard walk (Tab to the page action on
+every cell; the phone navigation drawer is the shared dialog probe).
+Current inventory: 67 static routes, 536 cells on the default theme.
+
+```sh
+BROWSER_MATRIX_SCOPE=v2 \
+BASE_URL=http://127.0.0.1:3200 \
+BROWSER_MATRIX_REPORT=/tmp/msp-v2-matrix.json \
+node --import tsx scripts/verify-browser-matrix.ts
+```
+
+`QA_EMAIL` and `QA_PASSWORD` must already be exported (or point
+`QA_CREDENTIALS_FILE` at a local JSON `{email,password}`). Serve an
+already-running loopback rebuild on `BASE_URL` with the dedicated
+synthetic preview database from [PREVIEW.md](PREVIEW.md) (baseline
+migration applied, `seed-preview.ts` run); the QA account must be the
+instance owner so Root routes render. Dynamic record routes
+(`/content/post/[postId]`, `/root/errors/[id]`, `/root/modules/[id]`,
+`/root/platforms/[id]`) are reported as exclusions; test those separately
+with fixture-specific workflows.
+
 Unit tests verify completeness, guards and private error classification without
 launching browsers. No actual matrix run is claimed in this batch: no server or
 QA credentials were started/provided. A passing matrix is baseline evidence;

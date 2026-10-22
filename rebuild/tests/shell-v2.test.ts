@@ -3,7 +3,7 @@ import { act, createElement as h, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextChannelScope, parseChannelScope, withChannelScope } from '../src/lib/channel-scope';
-import { SHELL_COPY, SHELL_POLICY, fill, shellCopySchema, shellPolicySchema } from '../src/modules/shell/copy';
+import { SHELL_COPY, SHELL_POLICY, fill, resolveShellCopy, shellCopySchema, shellPolicySchema } from '../src/modules/shell/copy';
 import { PAGES, areaForPath, areaPages, pageForPath } from '../src/lib/product';
 import { ChannelScopeList, DateRangePicker, FilterButton, InfoTip, LinkTabs, ListRow, BottomBar, ActionBar, SplitButton, SidePanel } from '../src/components';
 
@@ -47,6 +47,42 @@ describe('shell catalog and areas', () => {
       expect((SHELL_COPY.en.pageTitles as Record<string, string>)[page.id], `${page.id} en`).toBeTruthy();
       expect((SHELL_COPY.fr.pageTitles as Record<string, string>)[page.id], `${page.id} fr`).toBeTruthy();
     }
+  });
+  it('loads saved catalogs with obsolete pageTools keys instead of falling back to defaults', () => {
+    // A catalog saved in Root before B9: the three removed pageTools entries plus operator edits.
+    const saved = structuredClone(SHELL_COPY) as unknown as Record<string, Record<string, unknown>>;
+    for (const locale of ['en', 'fr'] as const) {
+      saved[locale]!.pageTools = 'Page tools';
+      saved[locale]!.pageToolsTitle = 'Page tools';
+      saved[locale]!.pageToolsHint = 'Filters and options for this page.';
+    }
+    saved.en!.filter = 'Narrow down';
+    saved.fr!.filter = 'Affiner';
+    (saved.en!.areas as Record<string, string>).inbox = 'Messages inbox';
+    // The strict schema still rejects the obsolete keys on save; the read path must not.
+    expect(shellCopySchema.safeParse(saved).success).toBe(false);
+    const resolved = resolveShellCopy(saved);
+    expect(resolved.en.filter).toBe('Narrow down');
+    expect(resolved.fr.filter).toBe('Affiner');
+    expect(resolved.en.areas.inbox).toBe('Messages inbox');
+    expect('pageTools' in resolved.en).toBe(false);
+    expect('pageTools' in resolved.fr).toBe(false);
+    // Untouched keys keep the shipped text, and the merged catalog validates strictly.
+    expect(resolved.en.skipLink).toBe(SHELL_COPY.en.skipLink);
+    expect(shellCopySchema.safeParse(resolved).success).toBe(true);
+  });
+  it('fills gaps and invalid values from the shipped text, and rejects garbage wholesale', () => {
+    expect(resolveShellCopy(undefined)).toEqual({ en: SHELL_COPY.en, fr: SHELL_COPY.fr });
+    expect(resolveShellCopy('nope')).toEqual({ en: SHELL_COPY.en, fr: SHELL_COPY.fr });
+    const partial = { en: { filter: '', channels: 'My channels', areas: { home: 'Start', bogus: 'x' }, channelStatus: 'broken' }, fr: null };
+    const resolved = resolveShellCopy(partial);
+    expect(resolved.en.filter).toBe(SHELL_COPY.en.filter);
+    expect(resolved.en.channels).toBe('My channels');
+    expect(resolved.en.areas.home).toBe('Start');
+    expect('bogus' in resolved.en.areas).toBe(false);
+    expect(resolved.en.channelStatus).toEqual(SHELL_COPY.en.channelStatus);
+    expect(resolved.fr).toEqual(SHELL_COPY.fr);
+    expect(shellCopySchema.safeParse(resolved).success).toBe(true);
   });
   it('places every page in an area, Ads and Analytics in Insights, Publishing in Content', () => {
     expect(areaForPath('/insights/ads/campaigns')).toBe('insights');

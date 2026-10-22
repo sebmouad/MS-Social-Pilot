@@ -9,47 +9,66 @@ Everything needed to continue is in Git. Start a new session in a fresh clone of
 
 | Area | State |
 | --- | --- |
-| Repository | Only `rebuild/` plus agent files. `main` is `2fde8abd` (design v2 B9), pushed and verified on `origin/main`. Working tree clean. |
-| Production | https://social.newsgeet.com still runs `bf84cb8f` (B9 **not** deployed — deploy blocked, see below). When unblocked, deploy with `bash rebuild/scripts/prod-deploy.sh` (host from `rebuild/docs/OPERATIONS.md`, key `~/.ssh/SebMouadSSH`). |
+| Repository | Only `rebuild/` plus agent files. `main` is `13bb7d27` (handover commit on top of design v2 B9 `2fde8abd`), pushed and verified on `origin/main`. Working tree clean. |
+| Production | https://social.newsgeet.com runs `13bb7d27` (B9 deployed 2026-10-22 from a normal terminal). Future releases go through `bash rebuild/scripts/prod-deploy.sh` (host from `rebuild/docs/OPERATIONS.md`, key `~/.ssh/SebMouadSSH`). |
 | Server | Legacy units, `/srv/ms-social-pilot{,.prev}`, legacy deploy guard and 5 unmapped tables removed after backup `/var/backups/legacy-cleanup-20261022110559` (also `/var/backups/legacy-removal-202610221216`, verified restore). Media root `/var/lib/ms-social-pilot/media`. |
 | Legacy parity | Sweep `LEGACY_SWEEP_2026-10-21.md`: 0 missing. Dropped by owner: Facebook Groups, old API tokens, Facebook colored text backgrounds. Nine non-Facebook connectors installed, off by default, no live-provider evidence. |
 | Design v2 | B1–B9 merged. B9 (`2fde8abd`): SidebarDock/ModeToggle/Page-tools adapter deleted, 8 `scripts/verify-*` selectors rewritten, data-deletion sentences in Root `public.content` (EN/FR), atomic Root token refresh, Inbox reply-box saved-replies menu + bulk Assign (UI/REST/MCP, confirmation, audit). Schema **136**. |
 | Tests | Typecheck 0 errors; full suite 724 files / 11,726 tests pass, 5 fail (known sandbox-only `facebook-native-http` loopback `listen EPERM ::1`; rerun where sockets are permitted); `npx next build` passes. Full suite: `npx vitest run --exclude "**/facebook-diagnostic-transport.test.ts" --testTimeout 30000` from `rebuild/`. |
 
-## Deploy blocked (exact reason)
+## B9 deployed (2026-10-22)
 
-`bash rebuild/scripts/prod-deploy.sh` was **not** run to completion. In this
-session the sandbox blocks it twice over, proven by independent probes:
+Production now runs `13bb7d27`. The deploy ran from a normal terminal (the
+earlier sandboxed session could not ship: `ssh` failed with `No user exists
+for uid 501` and raw TCP to the host failed with `EPERM`, with
+`require_escalated` unavailable under `--approval-mode never`).
 
-- `ssh` cannot start: even `ssh -G` (no network) fails with `No user exists
-  for uid 501` (exit 255); the sandbox hides user-name resolution, which
-  OpenSSH requires.
-- Raw TCP to `213.246.45.75:22` fails with `EPERM`.
-
-`require_escalated` is unavailable because approval prompts are disabled
-(`--approval-mode never`). Nothing on the server was touched: no backup, no
-build, no migration, no swap. To ship B9, run this from a normal terminal
-(not this sandboxed session), after `git pull`:
-
-```sh
-bash rebuild/scripts/prod-deploy.sh
-```
-
-Then verify the B9 screens live in the owner's Chrome with real data, and
-update the Production row above with the new SHA.
+Still to do after the deploy: verify the B9 screens live in the owner's
+Chrome with real data (assign dialog + saved-replies menu at desktop/phone
+widths in EN/FR with keyboard; live-provider token renewal run).
 
 ## Known open items
 
-- B9 follow-ups: full v2 browser matrix on the rewritten selectors; assign
-  dialog + saved-replies menu at desktop/phone widths in EN/FR with
-  keyboard; live-provider token renewal run; `DESIGN.md` Layout section
-  still describes the pre-v2 two-sidebar shell.
-- Saved `home.shellCopy` catalogs carrying `pageTools` keys read as the
-  shipped default until re-saved in Root (strict-schema read + default).
+- B9 follow-ups: run the v2 area matrix live (`BROWSER_MATRIX_SCOPE=v2`,
+  536 cells; scope committed and unit-tested, live run sandbox-blocked —
+  see below); assign dialog + saved-replies menu at desktop/phone widths
+  in EN/FR with keyboard; live-provider token renewal run. Done this
+  session: `DESIGN.md` Layout rewritten for the v2 shell; saved
+  `home.shellCopy` catalogs with `pageTools` keys now load their
+  remaining entries (`resolveShellCopy`, tested).
 - Owner action: repoint Meta dashboard deauthorize/data-deletion URLs to
   `/api/platforms/facebook/deauthorize` and `/data-deletion`.
 - Live-provider, MCP-client and release gates in
   `ARCHITECTURE_CONTRACT.md` §10 remain open.
+
+## Session 2026-10-22 (no deploy)
+
+Changed: `DESIGN.md` (Layout + Clean-default fix), `src/modules/shell/
+{copy.ts,server/chrome.ts}` + `tests/shell-v2.test.ts` (catalog
+tolerance), `scripts/verify-browser-matrix.ts` +
+`tests/browser-matrix.test.ts` + `docs/BROWSER_MATRIX.md` (v2 scope),
+this file + `docs/ARCHITECTURE.md` (records).
+
+Ran from `rebuild/`: `npm run typecheck` (0 errors); full suite `npx
+vitest run --exclude "**/facebook-diagnostic-transport.test.ts"
+--testTimeout 30000` (724 files / 11,736 tests pass, 49 skipped, 5
+known sandbox `listen EPERM ::1` loopback failures); `npx next build`
+(passes); v2 scope tsx smoke run (67 routes / 536 cells inventoried,
+fails fast without credentials).
+
+Live v2 matrix blocked here: sandbox denies TCP bind/connect
+(`EPERM`), Docker, passwd lookup, SysV shm and escalation (probes in
+`ARCHITECTURE.md`). From a normal terminal with the PREVIEW.md seeded
+database and a loopback server on 3200, run:
+
+```sh
+BROWSER_MATRIX_SCOPE=v2 BASE_URL=http://127.0.0.1:3200 \
+BROWSER_MATRIX_REPORT=/tmp/msp-v2-matrix.json \
+node --import tsx scripts/verify-browser-matrix.ts
+```
+
+with `QA_EMAIL`/`QA_PASSWORD` (instance-owner QA) exported. Fix every
+finding, then re-run narrowed scopes with `MATRIX_ONLY=<prefix>`.
 
 ## Working method (owner rules)
 

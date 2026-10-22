@@ -1445,6 +1445,161 @@ async function mainRound2(part: Round2Part, output: string) {
   process.exitCode = report.passed ? 0 : 1;
 }
 
+/* ---------------------------------------------------------------------------------------------
+ * Design v2 area matrix (`BROWSER_MATRIX_SCOPE=v2`): every v2 area (Home, Create, Content,
+ * Inbox, Insights, Settings, Root) in light and dark, phone and desktop widths, with keyboard
+ * navigation, in EN and FR. Read-only like the other gates. The theme defaults to Clean
+ * (`MATRIX_THEMES` may narrow or widen it); `MATRIX_ONLY` narrows routes by prefix. Sign-in
+ * happens once in English; every locale/mode/viewport cell reuses that session.
+ * ------------------------------------------------------------------------------------------- */
+export const V2_FAMILIES = ['/home', '/create', '/content', '/inbox', '/insights', '/settings'] as const;
+export const V2_MODES = ['light', 'dark'] as const;
+export const V2_LOCALES = ['en', 'fr'] as const;
+export type V2Locale = (typeof V2_LOCALES)[number];
+/** Playwright locale names: they decide the Accept-Language header the app renders from. */
+export const V2_PLAYWRIGHT_LOCALE: Record<V2Locale, string> = { en: 'en-US', fr: 'fr-FR' };
+
+export function v2Area(route: string): string {
+  const area = (family: string, label: string) => route === family || route.startsWith(`${family}/`) ? label : null;
+  return area('/home', 'Home') ?? area('/create', 'Create') ?? area('/content', 'Content')
+    ?? area('/inbox', 'Inbox') ?? area('/insights', 'Insights') ?? area('/settings', 'Settings')
+    ?? area('/root', 'Root') ?? 'other';
+}
+
+export function v2Route(route: string): boolean {
+  return (V2_FAMILIES as readonly string[]).some(family => route === family || route.startsWith(`${family}/`))
+    || route === '/root' || route.startsWith('/root/');
+}
+
+export type V2Cell = {
+  route: string; area: string; theme: string; mode: 'light' | 'dark'; locale: V2Locale;
+  viewport: { width: number; height: number }; findings: Finding[]; details: string[];
+  keyboard: { mainAction: 'passed' | 'failed' | 'Not available'; mainActionTarget?: string; dialog: 'passed' | 'failed' | 'Not available' };
+  contrastSampled: number; screenshot?: string;
+};
+export type V2Report = {
+  version: 1; startedAt: string; finishedAt: string; browser: string;
+  routes: string[]; excludedDynamicRoutes: string[]; expectedCells: number;
+  cells: V2Cell[]; fatal: Finding[]; failures: number; passed: boolean;
+};
+
+export function finishV2(input: Pick<V2Report, 'startedAt' | 'routes' | 'excludedDynamicRoutes' | 'cells' | 'fatal'> & { themes?: ThemeList; browser?: string }): V2Report {
+  const fatal = [...input.fatal];
+  const themes = input.themes ?? THEMES;
+  for (const family of [...V2_FAMILIES, '/root']) if (!input.routes.some(route => route === family || route.startsWith(`${family}/`))) fatal.push({ code: 'MISSING_ROUTE_FAMILY', route: family });
+  const key = (route: string, theme: string, mode: string, locale: string, v: { width: number; height: number }) => `${route}|${theme}|${mode}|${locale}|${v.width}x${v.height}`;
+  const expected = new Set(input.routes.flatMap(route => themes.flatMap(theme => V2_MODES.flatMap(mode => V2_LOCALES.flatMap(locale => VIEWPORTS.map(v => key(route, theme.id, mode, locale, v)))))));
+  const seen = new Set<string>();
+  const cells = input.cells.map(cell => {
+    const findings = [...cell.findings];
+    const k = key(cell.route, cell.theme, cell.mode, cell.locale, cell.viewport);
+    if (!expected.has(k) || seen.has(k)) fatal.push({ code: 'UNEXPECTED_OR_DUPLICATE_CELL' });
+    seen.add(k);
+    if (cell.keyboard.mainAction !== 'passed') findings.push({ code: 'MAIN_ACTION_UNVERIFIED' });
+    if (cell.keyboard.dialog === 'failed') findings.push({ code: 'DIALOG_KEYBOARD_FAILED' });
+    return { ...cell, findings };
+  });
+  if (cells.length !== expected.size || seen.size !== expected.size || [...expected].some(k => !seen.has(k))) fatal.push({ code: 'INCOMPLETE_MATRIX' });
+  // The phone navigation drawer is the shared dialog probe; desktop has no equivalent in scope, so desktop keyboard evidence is the Tab-to-action walk on every cell.
+  const phone = VIEWPORTS.find(v => v.width < 1024)!;
+  for (const theme of themes) for (const mode of V2_MODES) for (const locale of V2_LOCALES) {
+    if (!cells.some(c => c.theme === theme.id && c.mode === mode && c.locale === locale && c.viewport.width === phone.width && c.keyboard.dialog === 'passed')) fatal.push({ code: 'DIALOG_COVERAGE_MISSING', theme: theme.id, viewport: phone });
+  }
+  const failures = fatal.length + cells.reduce((n, cell) => n + cell.findings.length, 0);
+  return { ...input, cells, fatal, version: 1, browser: input.browser ?? 'chromium', finishedAt: new Date().toISOString(), expectedCells: expected.size, failures, passed: failures === 0 };
+}
+
+export async function runV2Matrix(env: Readonly<Record<string, string | undefined>> = process.env): Promise<V2Report> {
+  const startedAt = new Date().toISOString();
+  const appDir = fileURLToPath(new URL('../src/app', import.meta.url));
+  const customer = discoverRoutes(appDir), root = discoverRootRoutes(appDir);
+  const only = env.MATRIX_ONLY?.split(',').filter(Boolean);
+  const routes = [...customer.routes.filter(v2Route), ...root.routes].filter(route => !only || only.some(prefix => route.startsWith(prefix))).sort();
+  const excludedDynamicRoutes = [...customer.excludedDynamicRoutes.filter(v2Route), ...root.excludedDynamicRoutes].sort();
+  const cells: V2Cell[] = [], fatal: Finding[] = [];
+  const shotsDir = resolve(env.BROWSER_MATRIX_SHOTS || join(dirname(resolve(env.BROWSER_MATRIX_REPORT || '/tmp/msp-browser-matrix.json')), 'shots'));
+  let shots = 0;
+  const themes = env.MATRIX_THEMES ? selectThemes(env.MATRIX_THEMES) : THEMES.filter(theme => theme.id === 'clean');
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  let phase = 'CONFIGURATION_FAILED';
+  try {
+    const base = guardBaseUrl(env.BASE_URL);
+    if (!env.QA_EMAIL || !env.QA_PASSWORD) throw new Error('QA_CREDENTIALS_REQUIRED');
+    phase = 'BROWSER_LAUNCH_FAILED';
+    browser = await launchBrowser(env);
+    phase = 'SIGN_IN_FAILED';
+    const storage = await signIn(browser, base, env.QA_EMAIL, env.QA_PASSWORD);
+    phase = 'MATRIX_INTERRUPTED';
+    for (const theme of themes) for (const mode of V2_MODES) for (const locale of V2_LOCALES) for (const viewport of VIEWPORTS) {
+      const context = await browser.newContext({ viewport, serviceWorkers: 'block', colorScheme: mode, locale: V2_PLAYWRIGHT_LOCALE[locale], storageState: storage });
+      try {
+        await context.route('**/*', route => allowRequest(route.request().url(), base, route.request().method(), false) ? passRoute(route) : route.abort('blockedbyclient'));
+        await context.routeWebSocket('**/*', socket => socket.close());
+        await context.addInitScript('window.__name = window.__name || (f => f);');
+        await context.addCookies([
+          { name: THEME_COOKIE, value: theme.id, url: base, sameSite: 'Lax' },
+          { name: MODE_COOKIE, value: mode, url: base, sameSite: 'Lax' },
+        ]);
+        for (const route of routes) {
+          const cell: V2Cell = { route, area: v2Area(route), theme: theme.id, mode, locale, viewport, findings: [], details: [], keyboard: { mainAction: 'Not available', dialog: 'Not available' }, contrastSampled: 0 };
+          cells.push(cell);
+          const page = await context.newPage();
+          page.setDefaultTimeout(8000);
+          const add = (finding: Finding, detail?: string) => { cell.findings.push(finding); if (detail && cell.details.length < 12) cell.details.push(detail); };
+          page.on('console', message => { const f = browserFinding('console', message.type(), message.text()); if (f) add(f, `${f.code}: ${message.text().replace(/\s+/g, ' ').slice(0, 160)}`); });
+          page.on('pageerror', error => { const f = browserFinding('pageerror', 'error', error.message); if (f) add(f, `${f.code}: ${error.message.replace(/\s+/g, ' ').slice(0, 160)}`); });
+          page.on('response', response => {
+            const url = new URL(response.url());
+            if (url.origin === base && response.status() >= 400 && response.request().resourceType() !== 'document') add({ code: 'REQUEST_FAILED', count: response.status() }, `REQUEST_FAILED ${response.status()} ${url.pathname}`);
+          });
+          page.on('requestfailed', request => {
+            const failure = request.failure()?.errorText || '';
+            if (/blockedbyclient/i.test(failure)) return;
+            if (/ERR_ABORTED/i.test(failure)) return; // navigation/prefetch cancelled by the page itself
+            add({ code: 'REQUEST_FAILED' }, `REQUEST_FAILED ${failure} ${new URL(request.url()).pathname}`);
+          });
+          try {
+            const response = await page.goto(`${base}${route}`, { waitUntil: 'load', timeout: 60000 });
+            if (!response || response.status() >= 400) add({ code: 'HTTP_FAILURE', count: response?.status() }, `HTTP_FAILURE ${response?.status()}`);
+            await page.locator('body').waitFor();
+            await page.evaluate(() => document.fonts.ready.then(() => undefined));
+            await page.waitForTimeout(400);
+            if (new URL(page.url()).origin !== base || new URL(page.url()).pathname !== route) add({ code: 'UNEXPECTED_REDIRECT' }, `UNEXPECTED_REDIRECT -> ${new URL(page.url()).pathname}`);
+            if (await page.locator('html').getAttribute('data-theme') !== theme.id) add({ code: 'THEME_NOT_APPLIED' });
+            if (await page.locator('html').getAttribute('data-mode') !== mode) add({ code: 'MODE_NOT_APPLIED' });
+            if (await page.locator('html').getAttribute('lang') !== locale) add({ code: 'LOCALE_NOT_APPLIED' }, `LOCALE_NOT_APPLIED want ${locale}`);
+            const overflow = await page.evaluate(() => {
+              const doc = document.documentElement, width = doc.clientWidth;
+              const wide = [...document.querySelectorAll('body *')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > width + 1 && !e.closest('[hidden], [inert], .sr-only') && getComputedStyle(e).position !== 'fixed'; });
+              const label = (e: Element) => `${e.tagName.toLowerCase()}${typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`;
+              return { amount: Math.max(doc.scrollWidth, document.body.scrollWidth) - width, culprits: wide.slice(0, 3).map(label) };
+            });
+            if (overflow.amount > 1) add({ code: 'HORIZONTAL_OVERFLOW', count: overflow.amount }, `HORIZONTAL_OVERFLOW ${overflow.amount}px: ${overflow.culprits.join(' | ')}`);
+            const named: Cell = { route, theme: theme.id, viewport, findings: [], keyboard: { mainAction: 'Not available', dialog: 'Not available' } };
+            await auditControls(page, named);
+            for (const f of named.findings.filter(f => f.code !== 'HORIZONTAL_OVERFLOW')) add(f, `${f.code} control #${f.control}`);
+            const contrast = await contrastAudit(page);
+            cell.contrastSampled = contrast.sampled;
+            if (contrast.failures.length) {
+              add({ code: 'CONTRAST_LOW', count: contrast.failures.length });
+              for (const f of contrast.failures.sort((a, b) => a.ratio - b.ratio).slice(0, 4)) if (cell.details.length < 12) cell.details.push(`CONTRAST ${f.ratio}:1 <${f.label}> "${f.text}" ${f.fg} on ${f.bg}`);
+            }
+            await checkKeyboard(page, cell);
+            if (cell.findings.length && shots < SCREENSHOT_LIMIT) {
+              const file = `v2${route.replace(/[^A-Za-z0-9-]/g, '_')}__${theme.id}-${mode}-${locale}-${viewport.width}.png`;
+              await mkdir(shotsDir, { recursive: true });
+              await page.screenshot({ path: join(shotsDir, file), fullPage: false }).then(() => { cell.screenshot = file; shots++; }).catch(() => undefined);
+            }
+          } catch (error) { add({ code: 'ROUTE_CHECK_FAILED' }, `ROUTE_CHECK_FAILED ${(error as Error).message.split('\n')[0].slice(0, 140)}`); }
+          finally { await page.close(); }
+        }
+      } finally { await context.close(); }
+    }
+  } catch { fatal.push({ code: phase }); }
+  finally { if (browser) await browser.close().catch(() => { fatal.push({ code: 'BROWSER_CLOSE_FAILED' }); }); }
+  return finishV2({ startedAt, routes, excludedDynamicRoutes, cells, fatal, themes, browser: engineName(env.MATRIX_BROWSER) });
+}
+
 /** `tsx scripts/verify-browser-matrix.ts run.json`: a local JSON object of environment settings (BASE_URL, MATRIX_FIXTURES, ...); real environment wins. */
 function loadConfigArgument() {
   const file = process.argv[2];
@@ -1536,6 +1691,13 @@ async function main() {
     const report = await runMatrix();
     await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
     console.log(`Browser matrix: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
+    process.exitCode = report.passed ? 0 : 1;
+    return;
+  }
+  if (process.env.BROWSER_MATRIX_SCOPE === 'v2') {
+    const report = await runV2Matrix();
+    await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+    console.log(`Design v2 area matrix: ${report.passed ? 'PASS' : 'FAIL'}; ${report.cells.length}/${report.expectedCells} cells; ${report.failures} findings. Report written.`);
     process.exitCode = report.passed ? 0 : 1;
     return;
   }
