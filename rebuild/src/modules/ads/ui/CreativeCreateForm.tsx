@@ -127,7 +127,7 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
       </div>
       {selectedImage && imageFailed ? <p>{t.unavailable}</p> : selectedImage ? <img onError={() => setImageFailed(true)} className="ads-creative-image" width="160" height="120" src={`/api/ads/management?${new URLSearchParams({ view: "creative-image", adAccountId, mediaId: selectedImage })}`} alt={t.image} /> : null}
       {sources.nextTargetOffset !== null || sources.nextImageAfter ? <Button onClick={() => void moreSources()} disabled={loading || locked}>{t.more}</Button> : null}
-      {!sources.targets.length || !sources.images.length ? <p>{t.empty} <a href="/publishing/media">{t.mediaLibrary}</a></p> : null}
+      {!sources.targets.length || !sources.images.length ? <p>{t.empty} <a href="/content/library">{t.mediaLibrary}</a></p> : null}
       <Button type="submit" variant="primary" disabled={locked || loading || !sources.targets.length || !sources.images.length}>{busy ? t.pending : t.review}</Button>
     </form> : null}
     {dialog}

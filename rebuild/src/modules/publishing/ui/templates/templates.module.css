@@ -1,5 +1,6 @@
 .root { display: grid; gap: 1rem; min-width: 0; }
-.search { display: grid; gap: .55rem; min-width: 0; }
+.search { display: flex; flex-wrap: wrap; align-items: end; gap: .55rem; min-width: 0; margin-bottom: 12px; }
+.search label { flex: 1 1 260px; max-width: 420px; }
 .search label { display: grid; gap: .3rem; min-width: 0; color: var(--ink-soft); font-size: .82rem; font-weight: 650; }
 .search input, .form input, .form textarea, .form select { width: 100%; min-width: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: .65rem .75rem; color: var(--ink); background: var(--surface); font: inherit; }
 .search input:focus-visible, .form input:focus-visible, .form textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 32%, transparent); outline-offset: 1px; }

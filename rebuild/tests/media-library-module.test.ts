@@ -23,7 +23,7 @@ describe('media library module declarations', () => {
   it('keeps the library on the existing publishing/media feature and navigation entry', () => {
     expect(MEDIA_PAGES[0].id).toBe(MEDIA_FEATURE_ID);
     expect(publishingManifest.pages.filter(page => page.id === MEDIA_FEATURE_ID)).toHaveLength(1);
-    expect(PAGES.find(page => page.id === MEDIA_FEATURE_ID)).toMatchObject({ title: 'Media library', href: '/publishing/media', module: 'publishing' });
+    expect(PAGES.find(page => page.id === MEDIA_FEATURE_ID)).toMatchObject({ title: 'Media library', href: '/content/library', module: 'publishing' });
   });
 
   it('bounds stored sizes inside the 32-bit media.size column', () => {

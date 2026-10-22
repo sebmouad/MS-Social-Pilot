@@ -21,7 +21,7 @@ export const policyDefaults: z.infer<typeof policySchema> = {
  maxShiftMinutes: 720, maxExtraTimes: 12, enabledRules: [...RULES], colors: ['blue', 'green', 'amber', 'red', 'purple'],
  maxKeywords: 30, maxKeywordLength: 80, trendMaxAgeHours: 36, feedPastDays: 30, feedAheadDays: 180, feedMaxEvents: 1000,
  feedEventMinutes: 15, feedSummaryLength: 80, tokenBytes: 32, feedStatuses: ['scheduled', 'pending_approval', 'published', 'publishing', 'partially_failed', 'failed'],
- feedPath: '/api/calendar-feed/', postsPath: '/publishing/posts', transactionTimeoutMs: 15000, transactionMaxWaitMs: 5000, requestMaxBytes: 65536,
+ feedPath: '/api/calendar-feed/', postsPath: '/content', transactionTimeoutMs: 15000, transactionMaxWaitMs: 5000, requestMaxBytes: 65536,
 };
 export type Policy = z.infer<typeof policySchema>;
 

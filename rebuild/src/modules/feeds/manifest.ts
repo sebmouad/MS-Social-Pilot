@@ -8,7 +8,7 @@ import { FEEDS_CONFIG } from './config';
 export const FEEDS_FEATURE_ID = 'publishing/feeds' as const;
 
 export const FEEDS_PAGES = [
-  { id: FEEDS_FEATURE_ID, title: 'Content feeds', href: '/publishing/feeds', description: 'Turn new articles from a website feed into posts for your channels.' },
+  { id: FEEDS_FEATURE_ID, title: 'Content feeds', href: '/content/library/feeds', navigation: false, description: 'Turn new articles from a website feed into posts for your channels.' },
 ] as const;
 
 /** Every Root key of this feature (checked against FEEDS_CONFIG by tests/feeds-module.test.ts). */

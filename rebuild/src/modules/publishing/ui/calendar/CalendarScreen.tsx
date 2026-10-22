@@ -1,13 +1,24 @@
 import { configOrDefault } from '@/server/config/config-or-default';
 import { reschedulePolicySchema } from '@/lib/config/reschedule-policy';
-import { IconCalendarMonth } from '@tabler/icons-react';
+import { InfoTip, PageHeader } from '@/components';
 import { pageLocale } from '../kit/locale';
+import { loadContent } from '../../server/content-copy';
+import { ContentProvider } from '../ContentProvider';
+import { CalendarToolbar } from './CalendarToolbar';
+import { CalendarMore } from './CalendarMore';
+import { calendarExtrasLinks } from '@/modules/calendar-extras/server/links';
+import { pageChannelScope } from '@/modules/shell/server/scope';
+import { readQueueSlots } from '../../collaboration/server/queue-slots';
+import { freeQueueSlots } from './free-slots';
+import { canUseFeature } from '@/server/entitlements';
+import { originFilterOptions } from '../origins/load';
+import { originCopy } from '../origins/copy';
+import { statusLabel } from '@/components';
 import { loadPublishingCopy } from '../../server/customer-copy';
 import { PublishingCopyProvider } from '../kit/CopyProvider';
 import { requireViewer } from "@/server/context";
 import { readPublishingCalendar } from "@/modules/publishing/server/read";
 import { canAccessFeature } from "@/server/permissions";
-import { PageHeading } from "@/modules/publishing/ui/publishing-ui";
 import { adjacentCalendarMonth, addDaysToKey, calendarMonth, instantToWall, isDateKey, postCalendarDate, wallTimeToInstant, weekOffsetOfKey, weekStartKey, workspaceDateKey } from "@/lib/calendar-dates";
 import { loadWorkspaceOperations } from "@/modules/settings/server/workspace-operations";
 import { channelBadgeInfo } from "@/lib/channel-badge";
@@ -47,7 +58,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const month = params.month && /^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : undefined;
   const anchor = isDateKey(params.date) ? params.date : month ? (month === today.slice(0, 7) ? today : `${month}-01`) : today;
 
-  const channelId = params.channel || undefined;
+  // The sidebar's channel scope: one channel is read by the service; several are narrowed to "any of them" after the authorized read.
+  const scope = await pageChannelScope(viewer, params as Record<string, string | undefined>).catch(() => null);
+  const scopeIds = scope?.ids ?? [];
+  const channelId = scopeIds.length === 1 ? scopeIds[0] : undefined;
+  const content = await loadContent();
   const originKind = parseOriginFilter(params.origin);
   const status = (STATUSES as readonly string[]).includes(params.status ?? "") ? params.status as (typeof STATUSES)[number] : undefined;
 
@@ -65,8 +80,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const { posts: visiblePosts, channels, channelUnavailable } = await readPublishingCalendar({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { from, to, channelId, status });
 
   const origins = await loadPostOrigins(viewer.workspaceId, visiblePosts.map(post => post.id), locale);
-  // The origin filter narrows the already authorized read; it never widens it.
-  const posts = originKind ? visiblePosts.filter(post => origins.get(post.id)?.kind === originKind) : visiblePosts;
+  // The origin and multi-channel filters narrow the already authorized read; they never widen it.
+  const inScope = scopeIds.length > 1 ? visiblePosts.filter(post => post.targets.some(({ target }) => scopeIds.includes(target.id))) : visiblePosts;
+  const posts = originKind ? inScope.filter(post => origins.get(post.id)?.kind === originKind) : inScope;
   const canEditCalendar = canAccessFeature(viewer.permissions, "publishing/calendar", "write");
   const canCreate = canAccessFeature(viewer.permissions, "publishing/posts", "write");
   const byDay = new Map<string, BoardPost[]>();
@@ -94,9 +110,18 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     }]);
   }
   const milestones = await loadBoardMilestones({ userId: viewer.user.id, workspaceId: viewer.workspaceId, locale }, keys, channelId);
+  // Free queue times: the weekly queue times of the channels in view that no post already uses, from today on. A lookup failure only hides the pills.
+  let freeSlots = new Map<string, string[]>();
+  try {
+    if (canCreate && content.policy.freeSlotsPerDay > 0 && canUseFeature(viewer.entitlements, 'publishing/queue') && canAccessFeature(viewer.permissions, 'publishing/queue', 'read')) {
+      const weekly = (await readQueueSlots({ userId: viewer.user.id, workspaceId: viewer.workspaceId })).slots.filter(slot => slot.targetId === null || scopeIds.length === 0 || scopeIds.includes(slot.targetId));
+      freeSlots = freeQueueSlots({ keys, today, nowTime: instantToWall(now, timeZone).time, weekly, taken: key => new Set((byDay.get(key) ?? []).map(post => post.wallTime?.time)), limit: content.policy.freeSlotsPerDay });
+    }
+  } catch { /* the pills are a convenience: without queue times the calendar simply shows none */ }
   const days: BoardDay[] = keys.map(key => ({
     key,
     milestones: milestones[key],
+    freeSlots: freeSlots.get(key),
     label: formatUtc(key, { weekday: "short", day: "numeric" }),
     longLabel: formatUtc(key, { weekday: "long", month: "long", day: "numeric" }),
     inMonth: key.startsWith(selected.key),
@@ -110,8 +135,15 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     posts: (byDay.get(key) ?? []).sort((a, b) => a.whenIso.localeCompare(b.whenIso)),
   }));
 
-  const filterQuery = `${channelId ? `&channel=${encodeURIComponent(channelId)}` : ""}${status ? `&status=${status}` : ""}${originKind ? `&origin=${encodeURIComponent(originKind)}` : ""}`;
-  const href = (nextView: string, date: string) => `/publishing/calendar?view=${nextView}&date=${date}${filterQuery}`;
+  const filterQuery = `${params.channel ? `&channel=${encodeURIComponent(params.channel)}` : ""}${status ? `&status=${status}` : ""}${originKind ? `&origin=${encodeURIComponent(originKind)}` : ""}`;
+  const href = (nextView: string, date: string) => `/content/calendar?view=${nextView}&date=${date}${filterQuery}`;
+  const originOptions = await originFilterOptions(viewer.workspaceId, locale).catch(() => []);
+  const extraCalendars = await calendarExtrasLinks(locale, ['dates', 'seasons', 'trends', 'feeds']).catch(() => []);
+  const without = (omit: "status" | "origin") => `/content/calendar?view=${view}&date=${anchor}${params.channel ? `&channel=${encodeURIComponent(params.channel)}` : ""}${status && omit !== "status" ? `&status=${status}` : ""}${originKind && omit !== "origin" ? `&origin=${encodeURIComponent(originKind)}` : ""}`;
+  const chips = [
+    ...(status ? [{ key: "status", label: copy.status, value: statusLabel(status), removeHref: without("status") }] : []),
+    ...(originKind ? [{ key: "origin", label: originCopy[locale].createdBy, value: originOptions.find(option => option.kind === originKind)?.label ?? originKind, removeHref: without("origin") }] : []),
+  ];
   const previous = view === "week" ? addDaysToKey(gridStart, -7) : `${adjacentCalendarMonth(selected.year, selected.month, -1)}-01`;
   const next = view === "week" ? addDaysToKey(gridStart, 7) : `${adjacentCalendarMonth(selected.year, selected.month, 1)}-01`;
   const rangeLabel = view === "month" ? formatUtc(firstOfMonth, { month: "long", year: "numeric" }) : (() => {
@@ -121,11 +153,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   })();
   const unit = view === "week" ? "week" : "month";
 
-  return <PublishingCopyProvider catalog={catalog} locale={locale}>
-    <PageHeading title={copy.calendarTitle} description={copy.calendarDescription} />
+  return <ContentProvider {...content}><PublishingCopyProvider catalog={catalog} locale={locale}>
+    <PageHeader module="publishing" title={copy.calendarTitle} info={<InfoTip name={copy.calendarTitle}>{content.copy.calendarInfo}</InfoTip>}
+      actions={<><CalendarMore links={extraCalendars} />{canCreate ? <a className="ui-button ui-button--primary" href="/create">{copy.newPost}</a> : undefined}</>} />
     {channelUnavailable ? <p role="status">{copy.unavailableChannel}</p> : null}
-    <div className={styles.rangeBar}><span className={styles.rangeChip} aria-hidden="true"><IconCalendarMonth size={18} stroke={2} /></span><h2 className={styles.range} aria-live="polite">{rangeLabel}</h2></div>
-    <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime}
-      navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} />
-  </PublishingCopyProvider>;
+    <CalendarToolbar navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} rangeLabel={rangeLabel} view={view}
+      viewHrefs={{ month: href("month", anchor), week: href("week", anchor) }} statuses={STATUSES.map(value => ({ value, label: value === "pending_approval" || value === "partially_failed" ? copy[`calendarStatus_${value}`] : copy[`status_${value}`] }))}
+      origins={originOptions} chips={chips} resetHref={`/content/calendar?view=${view}&date=${anchor}${params.channel ? `&channel=${encodeURIComponent(params.channel)}` : ""}`} />
+    <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime} />
+  </PublishingCopyProvider></ContentProvider>;
 }

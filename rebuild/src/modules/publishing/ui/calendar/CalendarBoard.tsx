@@ -11,7 +11,7 @@ import { OriginBadge } from "../origins/OriginBadge";
 import { PostPreview } from "@/components/PostPreview";
 import { PostThumb } from "@/components/PostThumb";
 import { postThumbnail } from "@/components/post-thumbnail";
-import { SidebarDock } from "@/components/SidebarDock";
+import { useContent } from "../ContentProvider";
 import { instantToWall, wallTimeToInstant } from "@/lib/calendar-dates";
 import { moveCandidates } from "@/lib/reschedule";
 import { reschedulePostAction } from "./actions";
@@ -24,9 +24,10 @@ type Notice = { kind: "ok" | "error"; text: string } | null;
 const hourLabel = (hour: number, locale: string = "en-US") => new Intl.DateTimeFormat(locale, { hour: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(2000, 0, 1, hour)));
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQuery, defaultScheduleTime, navigation }: { view: "month" | "week"; days: BoardDay[]; timeZone: string; nowIso: string; canCreate: boolean; filterQuery: string; defaultScheduleTime: string; navigation: { previous: string; today: string; next: string; unit: "week" | "month" } }) {
+export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQuery, defaultScheduleTime }: { view: "month" | "week"; days: BoardDay[]; timeZone: string; nowIso: string; canCreate: boolean; filterQuery: string; defaultScheduleTime: string }) {
   const copy = usePublishingCopy();
   const locale = usePublishingLocale();
+  const { copy: content, policy } = useContent();
   const router = useRouter();
   const nowMs = Date.parse(nowIso);
   const [move, setMove] = useState<Move | null>(null);
@@ -66,7 +67,9 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
 
   const milestoneList = (day: BoardDay) => day.milestones?.length
     ? <ul className={styles.milestones} aria-label={day.longLabel}>{day.milestones.map(item => <li key={item.id} title={item.title}>{item.title}</li>)}</ul> : null;
-  const newPostHref = (date: string, time: string) => `/publishing/compose?date=${date}&time=${time}`;
+  const newPostHref = (date: string, time: string) => `/create?date=${date}&time=${time}`;
+  /** Free queue times appear as dashed pills; one opens Create already set to that time. */
+  const freePill = (day: BoardDay, time: string) => <a key={`free-${day.key}-${time}`} className={styles.freeSlot} href={newPostHref(day.key, time)} aria-label={fillCopy(content.calendarFreeSlotLabel, { day: day.longLabel, time })}>{fillCopy(content.calendarFreeSlot, { time })}</a>;
   const rangeIsEmpty = days.every(day => day.posts.length === 0);
   // Week view shows 6 AM to 11 PM, widened to include any hour that holds a post.
   const postHours = days.flatMap(day => day.posts.map(post => Number((post.wallTime ?? instantToWall(new Date(post.whenIso), timeZone)).time.slice(0, 2))));
@@ -86,11 +89,6 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
   }
 
   return <div className={styles.board}>
-    <SidebarDock><nav className={styles.sidebarNav} aria-label={fillCopy(copy.calendarNavigation, {unit: navigation.unit === "week" ? copy.calendarUnitWeek : copy.calendarUnitMonth})}>
-      <a className="ui-button ui-button--secondary ui-button--md" href={navigation.previous}>{copy.previous}<span className="ui-visually-hidden"> {navigation.unit === "week" ? copy.calendarUnitWeek : copy.calendarUnitMonth}</span></a>
-      <a className="ui-button ui-button--secondary ui-button--md" href={navigation.today}>{copy.today}</a>
-      <a className="ui-button ui-button--secondary ui-button--md" href={navigation.next}>{copy.next}<span className="ui-visually-hidden"> {navigation.unit === "week" ? copy.calendarUnitWeek : copy.calendarUnitMonth}</span></a>
-    </nav></SidebarDock>
     <div className={styles.live} role="status" aria-live="polite">{notice?.kind === "ok" ? <p className={styles.noticeOk}>{notice.text}</p> : null}</div>
     {notice?.kind === "error" ? <p className={styles.noticeError} role="alert">{notice.text}</p> : null}
     <p className={styles.hint}>{canCreate ? copy.startNew : ""}{fillCopy(copy.dragHint, {slot:view === "week" ? copy.timeSlot : copy.daySlot,zone:timeZone.replaceAll("_", " ")})}{view === "week" && firstHour > 0 ? copy.earlierHours : ""}</p>
@@ -102,8 +100,9 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
         return <li key={day.key} className={styles.day} data-outside={!day.inMonth || undefined} data-past={day.isPast || undefined} data-today={day.isToday || undefined} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, undefined, day.isPast)}>
           <div className={styles.dayHead}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? copy.todaySuffix : "")}>{Number(day.key.slice(8))}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</div>
           {milestoneList(day)}
-          {day.posts.slice(0, 3).map(postCard)}
-          {day.posts.length > 3 && <a className={styles.more} href={`/publishing/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length - 3}{copy.more}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
+          {day.posts.slice(0, policy.monthPostsShown).map(postCard)}
+          {day.posts.length > policy.monthPostsShown && <a className={styles.more} href={`/content/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length - policy.monthPostsShown}{copy.more}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
+          {canCreate && !day.isPast && day.freeSlots?.map(time => freePill(day, time))}
           {canCreate && !day.isPast && <a className={styles.add} href={newPostHref(day.key, defaultScheduleTime)}>{copy.addPost}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
         </li>;
       })}</ol>
@@ -120,6 +119,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
           const dropKey = `s:${day.key}:${hour}`;
           return <div key={dropKey} role="group" aria-label={`${day.longLabel}, ${hourLabel(hour, locale)}`} className={styles.slot} data-past={slotEnded || undefined} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, time, day.isPast || slotEnded)}>
             {slotPosts.map(postCard)}
+            {canCreate && !slotEnded && day.freeSlots?.filter(free => Number(free.slice(0, 2)) === hour).map(free => freePill(day, free))}
             {canCreate && !slotEnded && <a className={styles.slotAdd} href={newPostHref(day.key, time)} aria-label={fillCopy(copy.newPostLabel, {day:day.longLabel,time:hourLabel(hour, locale)})}><span aria-hidden="true">+</span></a>}
           </div>;
         }),

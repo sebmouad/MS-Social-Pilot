@@ -40,7 +40,7 @@ async function main(){
     page.on('requestfailed',request=>{if(tracked(request))networkEvents.push({event:'failed',method:request.method(),path:new URL(request.url()).pathname,error:request.failure()?.errorText});});
     page.on('framenavigated',frame=>{if(frame===page.mainFrame())networkEvents.push({event:'navigation',path:new URL(frame.url()).pathname});});
     page.on('pageerror',error=>networkEvents.push({event:'page-error',message:error.message.slice(0,150)}));
-    console.log(JSON.stringify({view:{width,theme}}));await page.goto(`${origin}/publishing/compose`,{waitUntil:'networkidle'});
+    console.log(JSON.stringify({view:{width,theme}}));await page.goto(`${origin}/create`,{waitUntil:'networkidle'});
     await page.locator('#composer-message').waitFor();await page.evaluate(()=>{(window as any).__formatResetProbe=[];document.addEventListener('reset',event=>{queueMicrotask(()=>{(window as any).__formatResetProbe.push({prevented:event.defaultPrevented,checked:[...document.querySelectorAll<HTMLInputElement>('input[name=targetIds]')].map(input=>({value:input.value,checked:input.checked,defaultChecked:input.defaultChecked}))});});});});await page.evaluate(t=>{document.documentElement.dataset.theme=t;},theme);
     const message=`${tag}_${width}_${theme}`;await page.locator('#composer-message').fill(message);await page.locator('#composer-first-comment').fill('Synthetic first comment');
     if(width<600)await page.getByRole('button',{name:'Menu & filters',exact:true}).click();
@@ -53,7 +53,7 @@ async function main(){
     check(await page.getByRole('button',{name:'Save draft',exact:true}).isEnabled(),'A fresh valid composer must allow saving in every theme');
     await page.screenshot({path:`/private/tmp/formats85-${width}-${theme}.png`,fullPage:true,animations:'disabled'});views++;
     if(width===1440&&theme==='grove'){
-     await page.route('**/publishing/compose',route=>route.request().method()==='POST'?route.abort():route.continue(),{times:1});
+     await page.route('**/create',route=>route.request().method()==='POST'?route.abort():route.continue(),{times:1});
      await page.getByRole('button',{name:'Save draft',exact:true}).click();
      await page.locator('[data-composer-error]').filter({hasText:'We could not confirm whether this post was saved.'}).waitFor();
      check(await page.locator('#composer-message').inputValue()===message&&JSON.parse(await page.locator('input[name="destinationFormatsJson"]').inputValue())[channel]==='post','Transport failure must retain text and format');
@@ -63,7 +63,7 @@ async function main(){
     }
     if(theme==='grove'){
      await page.getByRole('button',{name:'Save draft',exact:true}).click();
-     try{await page.waitForURL('**/publishing/posts?notice=created',{timeout:30000});}
+     try{await page.waitForURL('**/content?notice=created',{timeout:30000});}
      catch(error){
       const alertText=(await page.locator('[role="alert"]').allTextContents().catch(()=>[])).join(' ').slice(0,500);
       console.error(JSON.stringify({saveFailure:{url:page.url(),alertText,networkEvents:networkEvents.slice(-30)}}));

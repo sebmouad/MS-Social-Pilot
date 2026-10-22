@@ -41,7 +41,7 @@ Content feeds are a feature of the Publishing product module (feature id `publis
 | `server/http.ts` | thin-route helpers |
 | `mcp.ts`, `copy.ts`, `ui/` | `FEEDS_MCP` group, en+fr copy, `FeedsScreen` + `FeedManager` |
 
-`src/app/publishing/feeds/page.tsx` re-exports `ui/FeedsScreen`. API: `GET/POST /api/feeds`, `PUT/DELETE /api/feeds/[id]`, `POST /api/feeds/[id]/check`. Reused rather than duplicated: the SSRF-guarded pinned fetch (`modules/publishing/server/media/network/net-guard`), Publishing's `validateTargets` (scope, enabled, provider capability, link support) and `resolveAuthorizedDestinationFormats`, `allocateQueueTime` (weekly queue), `recordPostVersion`, `withWorkspaceOperation`. The earlier WIP's duplicate network guard and its reliance on `modules/media` internals were dropped.
+`src/app/content/library/feeds/page.tsx` (Content › Library › Feeds; the old `/publishing/feeds` address redirects) re-exports `ui/FeedsScreen`. API: `GET/POST /api/feeds`, `PUT/DELETE /api/feeds/[id]`, `POST /api/feeds/[id]/check`. Reused rather than duplicated: the SSRF-guarded pinned fetch (`modules/publishing/server/media/network/net-guard`), Publishing's `validateTargets` (scope, enabled, provider capability, link support) and `resolveAuthorizedDestinationFormats`, `allocateQueueTime` (weekly queue), `recordPostVersion`, `withWorkspaceOperation`. The earlier WIP's duplicate network guard and its reliance on `modules/media` internals were dropped.
 
 ## Capability against legacy (`src/lib/rss/poll.ts`)
 

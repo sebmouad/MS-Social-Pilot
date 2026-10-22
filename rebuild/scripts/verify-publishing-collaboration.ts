@@ -121,7 +121,7 @@ async function main() {
     const notesFirstResponse = await http(`/api/publishing/notes?postId=${postA}&page=1`), notesSecondResponse = await http(`/api/publishing/notes?postId=${postA}&page=2`);
     const notesFirst = await json(notesFirstResponse), notesSecond = await json(notesSecondResponse);
     check(notesFirstResponse.ok && notesSecondResponse.ok && notesFirst.notes?.length === 5 && notesFirst.hasMore === true && notesSecond.notes?.length === 1 && notesSecond.hasMore === false, 'Notes pagination did not expose all records within the current Root page size.');
-    const postPage = await http(`/publishing/collaboration/post/${postA}`);
+    const postPage = await http(`/content/post/${postA}`);
     check(postPage.ok && (await postPage.text()).includes('Older notes'), 'Post organization page did not expose older-note navigation.');
     check((await http('/api/publishing/custom-fields?unknown=1')).status === 400, 'Unknown field filters were ignored.');
     const corruptId = `${prefix}_foreign_field_value`;

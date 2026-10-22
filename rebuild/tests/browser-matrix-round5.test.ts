@@ -5,7 +5,7 @@ describe('round 5 media fallback classification', () => {
   it('accepts placeholders for files that are gone', () => expect(classifyMedia({ images: 0, broken: 0, placeholders: 3 })).toEqual([]));
   it('accepts pages with healthy images', () => expect(classifyMedia({ images: 4, broken: 0, placeholders: 0 })).toEqual([]));
   it('reports a visible broken image with its count', () => expect(classifyMedia({ images: 4, broken: 2, placeholders: 1 })).toEqual([{ code: 'BROKEN_IMAGE_VISIBLE', count: 2 }]));
-  it('covers every page that lists posts with media', () => expect(MEDIA_ROUTES).toEqual(['/publishing/posts', '/publishing/queue', '/publishing/approvals', '/publishing/calendar']));
+  it('covers every page that lists posts with media', () => expect(MEDIA_ROUTES).toEqual(['/content', '/content/queue', '/content/approvals', '/content/calendar']));
 });
 
 describe('round 5 saved-view expired-session classification', () => {
@@ -17,5 +17,5 @@ describe('round 5 saved-view expired-session classification', () => {
     expect(classifySavedViewFeedback('Your session has ended. Sign in again to save this view.')).toEqual([]);
     expect(classifySavedViewFeedback('Votre session a expiré. Reconnectez-vous pour enregistrer cette vue.')).toEqual([]);
   });
-  it('targets the Posts screen', () => expect(SAVED_VIEW_ROUTE).toBe('/publishing/posts'));
+  it('targets the Posts screen', () => expect(SAVED_VIEW_ROUTE).toBe('/content'));
 });

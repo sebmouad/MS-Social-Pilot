@@ -1,22 +1,24 @@
 'use client';
-import { IconBroadcast, IconCalendarEvent, IconMessageCircle, IconPencil, IconPhoto } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCalendarEvent, IconCheck, IconChevronDown, IconInfoCircle, IconPlus, IconTemplate, IconX } from '@tabler/icons-react';
 import { BestTimeSuggestions } from './BestTimeSuggestions';
 import { GroupShortcut } from '@/modules/settings/ui/profiles/GroupShortcut';
 import { profileChannelName, type ProfileDirectory } from '@/modules/settings/channel-profiles/contracts';
 
 import { usePreserveFormState } from '@/components/usePreserveFormState';
 import { AutoTextarea } from '@/components/AutoTextarea';
-import { Badge, Button, Field, RadioCards, Select, TextInput } from '@/components';
+import { ActionBar, Button, Field, InfoTip, Popover, RadioCards, Select, SplitButton, TextInput } from '@/components';
 import { Dialog } from '@/components/Dialog';
 import { Avatar } from '@/modules/publishing/ui/kit/kit';
 import { catalogGroup, composerCatalogDefaults, composerText, fillComposerCopy, type ComposerCatalog } from '../../composer-catalog';
 import { PostPreview } from '@/components/PostPreview';
-import { SidebarDock } from '@/components/SidebarDock';
+import { useContent } from '../ContentProvider';
+import { fillContent } from '../content-copy';
+import { LibraryPicker } from './LibraryPicker';
 import { AuthoringMediaPreview, PostAttachments, usePostAttachments, type PostMediaItem } from '@/modules/publishing/components/PostAttachments';
 import { publishingMediaIssue, publishingMediaFormatter, type PublishingMediaIssueFormatter } from '@/modules/publishing/media-support';
 import { DestinationFormats, effectiveDestinationFormat } from '@/modules/publishing/components/DestinationFormats';
 import type { PublishingFormatDescriptor, PublishingMediaSupport } from '@/platforms/types';
-import { useActionState, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useActionState, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { createPostWithRecoveryAction } from '@/modules/publishing/ui/posts/actions';
@@ -56,18 +58,6 @@ async function saveWithTransportRecovery(failureMessage: string, previous: Compo
     if (error && typeof error === 'object' && 'digest' in error && typeof error.digest === 'string' && error.digest.startsWith('NEXT_REDIRECT')) throw error;
     return { status: 'error', saveUnconfirmed: true, message: failureMessage, values: previous.values };
   }
-}
-
-const STEP_ICONS = [IconBroadcast, IconPencil, IconPhoto, IconMessageCircle, IconCalendarEvent];
-
-/** One numbered stage of the authoring flow: destinations, content, media, first comment, scheduling. */
-function Step({ n, title, help, children }: { n: number; title: string; help?: string; children: ReactNode }) {
-  const id = useId();
-  return <section className={styles.step} aria-labelledby={id}>
-    <header className={styles.stepHead}><span className={styles.stepNumber} aria-hidden="true">{(() => { const Glyph = STEP_ICONS[n - 1] ?? IconPencil; return <Glyph size={16} stroke={2} />; })()}</span><h2 id={id}>{title}</h2><span className={styles.stepCount} aria-hidden="true">{n}/{STEP_ICONS.length}</span></header>
-    {help ? <p className={styles.fieldHelp}>{help}</p> : null}
-    {children}
-  </section>;
 }
 
 function initialMedia(value: unknown): PostMediaItem[] {
@@ -140,7 +130,7 @@ function selectedMediaIssue(targets: TargetChoice[], formats: Record<string, str
   return localUploadIssue(targets, items, ui);
 }
 
-function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling, autosaveSeconds = 0 }: { copyCatalog?: ComposerCatalog; autosaveSeconds?: number; remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
+function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, targets, templates = [], imageRules, schedule, authorName, createdAt, createdAtDisplay, maxFirstCommentDelayMinutes, spacingGapMinutes = 0, aiStatus, aiLocale = 'en', queueAvailable = false, remoteScheduling, autosaveSeconds = 0, initialTargetIds = [], closeHref = '/content' }: { initialTargetIds?: string[]; closeHref?: string; copyCatalog?: ComposerCatalog; autosaveSeconds?: number; remoteScheduling?: { offered: boolean; defaultMode: 'application' | 'remote' }; profiles?: ProfileDirectory; queueAvailable?: boolean; aiStatus?: AiStatus; aiLocale?: 'en' | 'fr'; targets: TargetChoice[]; templates?: ComposerTemplate[]; imageRules: ImageRules; schedule: Schedule; authorName: string; createdAt: Date; createdAtDisplay: string; maxFirstCommentDelayMinutes: number; spacingGapMinutes?: number }) {
   const router = useRouter();
   const navigated = useRef<ComposerActionState | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -154,7 +144,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const [firstCommentDelayError, setFirstCommentDelayError] = useState('');
   const [labelId, setLabelId] = useState(initial.labelId ?? '');
   const [link, setLink] = useState(initial.link ?? '');
-  const [selectedTargets, setSelectedTargets] = useState<string[]>(initial.targetIds ?? []);
+  const [selectedTargets, setSelectedTargets] = useState<string[]>(initial.targetIds ?? initialTargetIds);
   const [formatChoices, setFormatChoices] = useState<Record<string, string>>(() => parseFormats(initial.destinationFormatsJson));
   const [scheduleDate, setScheduleDate] = useState(initial.scheduleDate ?? schedule.date);
   const [scheduleTime, setScheduleTime] = useState(initial.scheduleTime ?? schedule.time);
@@ -175,6 +165,26 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const submitGuard = useRef<'ready' | 'uploading' | 'submitting'>('ready');
   const feedbackRef = useRef<HTMLParagraphElement>(null);
   const text = composerText(copyCatalog, aiLocale);
+  const { copy: cc, policy } = useContent();
+  // The action bar buttons live outside the form. They pick an intent first, then submit the form, so every path (draft, schedule, queue, publish now) uses the same validation and server actions.
+  const intentRef = useRef<'draft' | 'schedule' | 'queue'>((initial.intent as 'draft' | 'schedule' | 'queue') ?? 'draft');
+  const [intent, setIntent] = useState<'draft' | 'schedule' | 'queue'>(intentRef.current);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const scheduleAnchor = useRef<HTMLDivElement>(null);
+  const [publishConfirm, setPublishConfirm] = useState(false);
+  const [leaveConfirm, setLeaveConfirm] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [pane, setPane] = useState<'edit' | 'preview'>('edit');
+  const [commentOpen, setCommentOpen] = useState(Boolean(initial.firstComment));
+  const [previewChannelId, setPreviewChannelId] = useState('');
+  const titleId = useId();
+  // The sheet covers the page: the page behind stays still while it is open.
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = 'hidden';
+    return () => { root.style.overflow = previous; };
+  }, []);
   // Background draft saving: the first save creates the draft, later saves update it, and a manual save reuses its id.
   const [draftPostId, setDraftPostId] = useState(initial.draftPostId ?? '');
   const [autosave, setAutosave] = useState<{ status: 'idle' | 'saving' | 'saved' | 'error'; at?: string }>({ status: 'idle' });
@@ -304,7 +314,6 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     // A background save still in flight must finish first so the manual save reuses its draft instead of creating a second one.
     if (autosaveInFlight.current) {
       event.preventDefault();
@@ -314,10 +323,10 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
       finally { waitingForAutosave.current = false; }
       if (!form.isConnected) return;
       flushSync(() => setDraftPostId(draftIdRef.current));
-      form.requestSubmit(submitter ?? undefined);
+      form.requestSubmit();
       return;
     }
-    const intent = submitter?.value === 'schedule' ? 'schedule' : submitter?.value === 'queue' && queueAvailable ? 'queue' : 'draft';
+    const intent = intentRef.current === 'schedule' ? 'schedule' : intentRef.current === 'queue' && queueAvailable ? 'queue' : 'draft';
     setMode(intent);
     setLocalError('');
     setUploadMessage('');
@@ -365,7 +374,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
         }
         submitGuard.current = 'ready';
         flushSync(() => { setUploadMessage(''); setUploading(false); });
-        form.requestSubmit(submitter ?? undefined);
+        form.requestSubmit();
       } catch {
         setUploadMessage(ui.uploadFailure);
       } finally {
@@ -378,63 +387,137 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     submitGuard.current = 'submitting';
   }
 
-  return <div className={styles.composerLayout}>
-    <form id={FORM_ID} ref={formRef} action={formAction} onSubmit={onSubmit} className={styles.form} noValidate>
-      {saved && <p ref={feedbackRef} tabIndex={-1} className={styles.uploadNotice} role="status">{state.queued ? fill(state.queued.status === 'pending_approval' ? copy.addedApproval : copy.added, { time: formatDate(new Date(state.queued.scheduledAt), schedule.timeZone) }) : ui.saved} {copy.opening} {state.destination && <a href={state.destination}>{copy.viewSaved}</a>}</p>}
-      {localError && <p ref={feedbackRef} className={styles.error} role="alert" tabIndex={-1}>{localError}</p>}
-      {state.status === 'error' && <p ref={feedbackRef} className={styles.error} role="alert" data-composer-error tabIndex={-1}>{state.message} {copy.retained}{state.saveUnconfirmed ? <> <a href="/publishing/posts" target="_blank" rel="noopener noreferrer">{copy.checkPosts}</a>.</> : ` ${copy.retry}`}</p>}
-      {uploadMessage && <p className={styles.uploadNotice} role="status">{uploadMessage}</p>}
-      <Step n={1} title={text.destinations} help={text.destinationsHelp}>
-        {selected.length ? <ul className={styles.chosen} aria-label={text.destinations}>{selected.map(target => {
-          const channelName = profiles?.channels.find(channel => channel.id === target.id) ? profileChannelName(profiles.channels.find(channel => channel.id === target.id)!) : target.name;
-          const format = heldFormat(target);
-          return <li key={target.id}>
-            <Avatar name={channelName} src={target.pictureUrl} size={26} />
-            <span className={styles.chosenName}>{channelName}</span>
-            {target.platformName ? <Badge tone="neutral">{target.platformName}</Badge> : null}
-            {format && target.publishingFormats && target.publishingFormats.length > 1 ? <span className={styles.chosenMeta}>{text.formatLabel(format.label)}</span> : null}
-          </li>;
-        })}</ul> : <p className={styles.fieldHelp}>{text.noDestination}</p>}
-      </Step>
-      <Step n={2} title={text.content}>
-      <label htmlFor="composer-message">{ui.postText}<span>{ui.optionalContent}</span></label>
-      <AutoTextarea id="composer-message" name="message" disabled={saved} value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={7} placeholder={ui.messagePlaceholder} aria-describedby="composer-message-count" />
-      <div className={styles.fieldMeta} id="composer-message-count">{message.length.toLocaleString()} / {imageRules.maxMessageCharacters.toLocaleString()}</div>
-      <AiAssist status={aiStatus} locale={aiLocale} text={message} disabled={pending || saved} onUse={(suggestion, kind) => setMessage(current => (kind === 'hashtags' ? `${current.trimEnd()}${current.trim() ? '\n\n' : ''}${suggestion}` : suggestion).slice(0, imageRules.maxMessageCharacters))} />
-      </Step>
-      <Step n={3} title={text.media}>
-      <fieldset className={styles.attachments} disabled={uploading || pending || saved}>
-        <legend>{ui.attachments}<span>{ui.optional}</span></legend>
-        <label htmlFor="composer-link">{ui.link}<span>{ui.optional}</span></label>
-        <input id="composer-link" name="link" type="url" value={link} onChange={event => setLink(event.currentTarget.value)} placeholder={ui.linkPlaceholder} />
-        <PostAttachments controller={attachments} disabled={uploading || pending || saved} {...(aiStatus?.available && aiStatus.altText ? { altTextAssist: { locale: aiLocale } } : {})} />
-        <small>{ui.attachmentSupport}</small>
-      </fieldset>
-      </Step>
-      <Step n={4} title={text.firstComment}>
-      <label htmlFor="composer-first-comment">{ui.firstComment}<span>{ui.optional}</span></label>
-      <AutoTextarea id="composer-first-comment" name="firstComment" disabled={saved} value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder={ui.commentPlaceholder} />
-      {!showCommentDelay && <input type="hidden" name="firstCommentDelayMinutes" value={firstCommentDelayMinutes} />}
-      {showCommentDelay && <>
-      <label htmlFor="composer-first-comment-delay">{ui.commentDelay}<span>{ui.delayHint}</span></label>
-      <input id="composer-first-comment-delay" name="firstCommentDelayMinutes" type="number" inputMode="numeric" min={0} max={maxFirstCommentDelayMinutes} step={1} value={firstCommentDelayMinutes} disabled={saved} aria-invalid={Boolean(firstCommentDelayError)} aria-describedby={`composer-first-comment-delay-help${firstCommentDelayError ? ' composer-first-comment-delay-error' : ''}`} onChange={event => { setFirstCommentDelayMinutes(event.currentTarget.value); setFirstCommentDelayError(''); }} />
-      <p id="composer-first-comment-delay-help" className={styles.fieldHelp}>{fillComposerCopy(ui.delayRange, { max: maxFirstCommentDelayMinutes.toLocaleString() })} {ui.delayApplies}</p>
-      {firstCommentDelayError && <p id="composer-first-comment-delay-error" className={styles.error} role="alert">{firstCommentDelayError}</p>}
-      </>}
-      <input type="hidden" name="labelId" value={labelId} />
-      <input type="hidden" name="queueLocale" value={aiLocale} />
-      <input type="hidden" name="destinationFormatsJson" value={destinationFormatsJson} />
-      <input type="hidden" name="draftPostId" value={draftPostId} />
-      </Step>
+  const postable = targets.filter(target => target.canPublish);
+  const blocked = targets.filter(target => !target.canPublish);
+  const channelName = (target: TargetChoice) => profiles?.channels.find(channel => channel.id === target.id) ? profileChannelName(profiles.channels.find(channel => channel.id === target.id)!) : target.name;
+  const busy = pending || uploading || saved;
+  const hasTime = Boolean(scheduleDate && scheduleTime);
+  const hasContent = Boolean(message.trim() || link.trim() || attachments.items.length);
+  const queueReady = Boolean(queuePreview && typeof queuePreview === 'object' && queuePreview.status === 'ready' && previewSelection === selectedKey);
+  const dateLabel = (date: string, time: string) => new Intl.DateTimeFormat(aiLocale, { timeZone: 'UTC', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(`${date}T${time}:00Z`));
+  const previewTargets = previewChannelId && selected.some(target => target.id === previewChannelId) ? previewPost.targets.filter(row => row.target.id === previewChannelId) : previewPost.targets;
+  const toggleTarget = (id: string) => setSelectedTargets(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
 
-      <Step n={5} title={text.scheduling} help={text.schedulingHelp(schedule.timeZone.replaceAll('_', ' '))}>
-        <fieldset className={styles.scheduleFields} disabled={pending || uploading || saved}>
+  /** Pick the intent, then submit through the form so validation, uploads and the server action are the same for every button. */
+  function submitWith(next: 'draft' | 'schedule' | 'queue', when?: { date: string; time: string }) {
+    flushSync(() => { setPane('edit'); setIntent(next); if (when) { setScheduleDate(when.date); setScheduleTime(when.time); } });
+    intentRef.current = next;
+    formRef.current?.requestSubmit();
+  }
+  /** "Publish now" is a schedule a short, configurable moment ahead; the delivery worker then sends it like any scheduled post. */
+  function publishNow() {
+    setPublishConfirm(false);
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: schedule.timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(Date.now() + policy.publishNowLeadMinutes * 60_000));
+    const part = (type: string) => parts.find(item => item.type === type)?.value ?? '';
+    submitWith('schedule', { date: `${part('year')}-${part('month')}-${part('day')}`, time: `${part('hour')}:${part('minute')}` });
+  }
+  function leave() {
+    let sameSite = false;
+    try { sameSite = Boolean(document.referrer) && new URL(document.referrer).origin === window.location.origin; } catch { /* use the fallback address */ }
+    if (sameSite && window.history.length > 1) router.back(); else router.push(closeHref);
+  }
+  function requestClose() {
+    if (hasContent && !saved && autosaveSignature !== lastAutosaved.current) setLeaveConfirm(true); else leave();
+  }
+  function onSheetKey(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('dialog[open]') || scheduleOpen) return;
+    event.preventDefault();
+    requestClose();
+  }
+
+  const status = localError ? <p ref={feedbackRef} className={styles.alert} role="alert" tabIndex={-1}><IconAlertTriangle size={16} aria-hidden="true" /><span>{localError}</span></p>
+    : state.status === 'error' ? <p ref={feedbackRef} className={styles.alert} role="alert" data-composer-error tabIndex={-1}><IconAlertTriangle size={16} aria-hidden="true" /><span>{state.message} {copy.retained}{state.saveUnconfirmed ? <> <a href="/content" target="_blank" rel="noopener noreferrer">{cc.createOpenContent}</a>.</> : ` ${copy.retry}`}</span></p>
+    : saved ? <p ref={feedbackRef} tabIndex={-1} className={styles.ok} role="status"><IconCheck size={16} aria-hidden="true" /><span>{state.queued ? fill(state.queued.status === 'pending_approval' ? copy.addedApproval : copy.added, { time: formatDate(new Date(state.queued.scheduledAt), schedule.timeZone) }) : ui.saved} {copy.opening} {state.destination && <a href={state.destination}>{copy.viewSaved}</a>}</span></p>
+    : uploadMessage ? <span>{uploadMessage}</span>
+    : autosave.status === 'saving' ? <span>{cc.createStatusSaving}</span>
+    : autosave.status === 'error' ? <span>{cc.createStatusAutosaveFailed}</span>
+    : autosave.status === 'saved' && autosave.at ? <span>{fillContent(cc.createStatusSaved, { time: autosave.at })}</span>
+    : <span>{hasContent ? cc.createStatusReady : cc.createStatusNeedContent}</span>;
+
+  const mainLabel = uploading ? cc.createUploading : pending ? cc.createWorking : hasTime ? fillContent(cc.createScheduleFor, { when: dateLabel(scheduleDate, scheduleTime) }) : cc.createSchedule;
+  const queueErrored = typeof queuePreview === 'object' && queuePreview?.status === 'error' && previewSelection === selectedKey;
+  const queueLabel = !selected.length ? cc.createQueueNeedChannel : queuePreview === 'loading' || queuePreview === null || previewSelection !== selectedKey ? cc.createQueueLoading
+    : queueErrored ? cc.createQueueRetry
+    : typeof queuePreview === 'object' && queuePreview.status === 'ready' ? fillContent(cc.createQueueAt, { when: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) }) : cc.createQueueFull;
+
+  return <div className={styles.sheet} role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={onSheetKey}>
+    <header className={styles.top}>
+      <h1 id={titleId}>{cc.createTitle}</h1>
+      <div className={styles.topEnd}>
+        {templates.length > 0 && <Button type="button" variant="quiet" size="sm" leading={<IconTemplate size={16} aria-hidden="true" />} disabled={busy} onClick={() => setTemplateChooserOpen(true)}>{cc.createTemplates}</Button>}
+        <Button type="button" variant="quiet" size="sm" aria-label={cc.createClose} onClick={requestClose} leading={<IconX size={18} aria-hidden="true" />} />
+      </div>
+    </header>
+    <div className={styles.paneSwitch} role="group" aria-label={cc.createTitle}>
+      <button type="button" aria-pressed={pane === 'edit'} onClick={() => setPane('edit')}>{cc.createTabEdit}</button>
+      <button type="button" aria-pressed={pane === 'preview'} onClick={() => setPane('preview')}>{cc.createTabPreview}</button>
+    </div>
+    <div className={styles.main} data-pane={pane}>
+    <form id={FORM_ID} ref={formRef} action={formAction} onSubmit={onSubmit} className={styles.editor} noValidate onKeyDown={event => { const target = event.target as HTMLInputElement; if (event.key === 'Enter' && target.tagName === 'INPUT' && target.type !== 'submit') event.preventDefault(); }}>
+      <input type="hidden" name="intent" value={intent} />
+      <input type="hidden" name="scheduleDate" value={scheduleDate} />
+      <input type="hidden" name="scheduleTime" value={scheduleTime} />
+      {selected.map(target => <input key={target.id} type="hidden" name="targetIds" value={target.id} />)}
+      <section className={styles.section} aria-labelledby={`${titleId}-channels`}>
+        <div className={styles.sectionHead}><h2 id={`${titleId}-channels`}>{cc.createChannels}</h2><InfoTip name={cc.createChannels}>{cc.createChannelsInfo}</InfoTip><span className={styles.sectionMeta}>{fillContent(cc.createChannelsSelected, { count: selected.length })}</span></div>
+        {profiles && postable.length > 1 && <GroupShortcut groups={profiles.groups} allowedIds={postable.map(target => target.id)} onSelect={setSelectedTargets} locale={aiLocale} disabled={busy} />}
+        {postable.length || blocked.length ? <div className={styles.chips} role="group" aria-labelledby={`${titleId}-channels`}>
+          {postable.map(target => { const on = selectedTargets.includes(target.id); return <button key={target.id} type="button" className={styles.chip} aria-pressed={on} disabled={busy} onClick={() => toggleTarget(target.id)}>
+            <Avatar name={channelName(target)} src={target.pictureUrl} size={24} /><span className={styles.chipName}>{channelName(target)}</span>{on && <IconCheck size={15} stroke={2.4} aria-hidden="true" />}
+          </button>; })}
+          {blocked.map(target => <span key={target.id} className={styles.chipBlocked} title={fillContent(cc.createChannelBlocked, { name: channelName(target) })}>
+            <Avatar name={channelName(target)} src={target.pictureUrl} size={24} /><span className={styles.chipName}>{channelName(target)}</span><a href={policy.reconnectHref}>{cc.createReconnect}</a>
+          </span>)}
+        </div> : <p className={styles.help}>{cc.createChannelsNone}</p>}
+        {crowded && <p className={styles.help} role="status">{fillComposerCopy(ui.spacingWarning, { minutes: spacingGapMinutes })}</p>}
+      </section>
+      <section className={styles.section} aria-labelledby={`${titleId}-text`}>
+        <div className={styles.sectionHead}><h2 id={`${titleId}-text`}>{cc.createText}</h2></div>
+        <AutoTextarea id="composer-message" name="message" disabled={saved} value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={6} placeholder={cc.createTextPlaceholder} aria-labelledby={`${titleId}-text`} aria-describedby="composer-message-count" />
+        <div className={styles.textTools}>
+          <AiAssist status={aiStatus} locale={aiLocale} text={message} disabled={pending || saved} onUse={(suggestion, kind) => setMessage(current => (kind === 'hashtags' ? `${current.trimEnd()}${current.trim() ? '\n\n' : ''}${suggestion}` : suggestion).slice(0, imageRules.maxMessageCharacters))} />
+          <span className={styles.counter} id="composer-message-count">{fillContent(cc.createCounter, { used: message.length.toLocaleString(), max: imageRules.maxMessageCharacters.toLocaleString() })}</span>
+        </div>
+      </section>
+      <section className={styles.section} aria-labelledby={`${titleId}-media`}>
+        <div className={styles.sectionHead}><h2 id={`${titleId}-media`}>{cc.createMedia}</h2></div>
+        <PostAttachments controller={attachments} disabled={busy} onPickLibrary={() => setLibraryOpen(true)} {...(aiStatus?.available && aiStatus.altText ? { altTextAssist: { locale: aiLocale } } : {})} />
+        <label className={styles.linkField} htmlFor="composer-link"><span>{ui.link}</span>
+          <input id="composer-link" name="link" type="url" disabled={busy} value={link} onChange={event => setLink(event.currentTarget.value)} placeholder={ui.linkPlaceholder} />
+        </label>
+        <small className={styles.help}>{ui.attachmentSupport}</small>
+      </section>
+      <section className={styles.section} aria-labelledby={`${titleId}-comment`}>
+        {commentOpen || firstComment.trim() || firstCommentDelayError ? <>
+          <div className={styles.sectionHead}><h2 id={`${titleId}-comment`}><label htmlFor="composer-first-comment">{ui.firstComment}</label></h2>
+            <Button type="button" variant="quiet" size="sm" disabled={saved} onClick={() => { setFirstComment(''); setCommentOpen(false); setFirstCommentDelayError(''); }}>{cc.createFirstCommentHide}</Button></div>
+          <AutoTextarea id="composer-first-comment" name="firstComment" disabled={saved} value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder={ui.commentPlaceholder} />
+        </> : <>
+          <input type="hidden" name="firstComment" value="" />
+          <button type="button" className={styles.addRow} disabled={saved} onClick={() => setCommentOpen(true)}><IconPlus size={16} aria-hidden="true" />{cc.createFirstCommentAdd}</button>
+        </>}
+        {!showCommentDelay && <input type="hidden" name="firstCommentDelayMinutes" value={firstCommentDelayMinutes} />}
+        {showCommentDelay && <>
+          <label className={styles.linkField} htmlFor="composer-first-comment-delay"><span>{ui.commentDelay} <em>{ui.delayHint}</em></span>
+            <input id="composer-first-comment-delay" name="firstCommentDelayMinutes" type="number" inputMode="numeric" min={0} max={maxFirstCommentDelayMinutes} step={1} value={firstCommentDelayMinutes} disabled={saved} aria-invalid={Boolean(firstCommentDelayError)} aria-describedby={`composer-first-comment-delay-help${firstCommentDelayError ? ' composer-first-comment-delay-error' : ''}`} onChange={event => { setFirstCommentDelayMinutes(event.currentTarget.value); setFirstCommentDelayError(''); }} /></label>
+          <p id="composer-first-comment-delay-help" className={styles.help}>{fillComposerCopy(ui.delayRange, { max: maxFirstCommentDelayMinutes.toLocaleString() })} {ui.delayApplies}</p>
+          {firstCommentDelayError && <p id="composer-first-comment-delay-error" className={styles.alert} role="alert">{firstCommentDelayError}</p>}
+        </>}
+        <input type="hidden" name="labelId" value={labelId} />
+        <input type="hidden" name="queueLocale" value={aiLocale} />
+        <input type="hidden" name="destinationFormatsJson" value={destinationFormatsJson} />
+        <input type="hidden" name="draftPostId" value={draftPostId} />
+      </section>
+
+      <details className={styles.advanced}>
+        <summary><IconChevronDown size={16} aria-hidden="true" />{cc.createAdvanced}</summary>
+        <div className={styles.advancedBody}>
+        {selected.some(target => target.publishingFormats?.length) && <fieldset className={styles.group} disabled={busy}>
+          <legend>{cc.createAdvancedFormats}</legend>
+          <DestinationFormats copyCatalog={copyCatalog} locale={aiLocale} targets={targets} selectedIds={selected.map(target => target.id)} values={formatChoices} formId={FORM_ID} disabled={busy} onChange={(id, value) => setFormatChoices(current => ({ ...current, [id]: value }))} />
+        </fieldset>}
+        <fieldset className={styles.group} disabled={busy}>
           <legend className="ui-visually-hidden">{text.scheduling}</legend>
-          <div className={styles.dateTime}>
-            <Field label={text.date}><TextInput type="date" name="scheduleDate" value={scheduleDate} onChange={event => setScheduleDate(event.currentTarget.value)} /></Field>
-            <Field label={text.time}><TextInput type="time" name="scheduleTime" value={scheduleTime} onChange={event => setScheduleTime(event.currentTarget.value)} /></Field>
-          </div>
-          <BestTimeSuggestions copyCatalog={copyCatalog} targetIds={selectedTargets} locale={aiLocale} disabled={pending || uploading || saved} onChoose={({ date, time }) => { setScheduleDate(date); setScheduleTime(time); setMode('schedule'); }} />
           {remoteScheduling?.offered && holdable.length > 0 && <div className={styles.holdChoice}>
             <strong id="composer-hold-legend">{text.whoSends}</strong>
             <RadioCards legend={holdCopy.legend} name="scheduleMode" value={scheduleMode} onChange={value => setScheduleMode(value === 'remote' ? 'remote' : 'application')} options={[
@@ -461,55 +544,57 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
           </ul>}
           {remoteScheduling?.offered && scheduleMode === 'remote' && appOnly.length > 0 && <small role="status">{holdCopy.appOnly.replace('{names}', appOnly.map(target => target.name).join(', '))}</small>}
         </fieldset>
-        {autosaveSeconds > 0 && <p className={styles.autosave} aria-live="polite">{autosave.status === 'saving' ? text.autosaveSaving : autosave.status === 'saved' && autosave.at ? text.autosaveSaved(autosave.at) : autosave.status === 'error' ? text.autosaveFailed : text.autosaveOn}</p>}
-      </Step>
+        </div>
+      </details>
     </form>
 
-    <section className={styles.previewPanel} aria-labelledby="composer-preview-title">
-      <div className={styles.previewHeading}><h2 id="composer-preview-title">{ui.preview}</h2><span>{ui.neutralPreview}</span></div>
-      <div className={styles.unsavedLabel}>{saved ? ui.savedPreview : ui.unsavedPreview} · {ui.noResponse}</div>
-      <PostPreview post={previewPost} authorName={authorName || ui.yourTeam} timeZone={schedule.timeZone} variant="card" mediaOverride={<AuthoringMediaPreview controller={attachments} />} />
-      {mode === 'schedule' && scheduleDate && scheduleTime && <p className={styles.schedulePreview}>{fillComposerCopy(ui.schedulePreview, { date: scheduleDate, time: scheduleTime, zone: schedule.timeZone.replaceAll('_', ' ') })}</p>}
-      {mode === 'queue' && typeof queuePreview === 'object' && queuePreview?.status === 'ready' && previewSelection === selectedKey && <p className={styles.schedulePreview}>{fill(copy.next, { time: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) })}</p>}
-    </section>
+    <aside className={styles.preview} aria-labelledby={`${titleId}-preview`}>
+      <div className={styles.sectionHead}><h2 id={`${titleId}-preview`}>{cc.createPreviewTitle}</h2><InfoTip name={cc.createPreviewTitle}>{cc.createPreviewInfo}</InfoTip><span className={styles.sectionMeta}>{saved ? ui.savedPreview : ui.unsavedPreview}</span></div>
+      {selected.length > 1 && <div className={styles.previewChannels} role="group" aria-label={cc.createPreviewTitle}>
+        <button type="button" aria-pressed={!previewChannelId} onClick={() => setPreviewChannelId('')}>{cc.createChannels}</button>
+        {selected.map(target => <button key={target.id} type="button" aria-pressed={previewChannelId === target.id} aria-label={fillContent(cc.createPreviewChannel, { name: channelName(target) })} title={channelName(target)} onClick={() => setPreviewChannelId(target.id)}><Avatar name={channelName(target)} src={target.pictureUrl} size={22} /></button>)}
+      </div>}
+      <PostPreview post={{ ...previewPost, targets: previewTargets }} authorName={authorName || ui.yourTeam} timeZone={schedule.timeZone} variant="card" mediaOverride={<AuthoringMediaPreview controller={attachments} />} />
+      {mode === 'schedule' && hasTime && <p className={styles.timeNote}><IconCalendarEvent size={15} aria-hidden="true" />{fillComposerCopy(ui.schedulePreview, { date: scheduleDate, time: scheduleTime, zone: schedule.timeZone.replaceAll('_', ' ') })}</p>}
+      {mode === 'queue' && queueReady && typeof queuePreview === 'object' && queuePreview?.status === 'ready' && <p className={styles.timeNote}><IconCalendarEvent size={15} aria-hidden="true" />{fill(copy.next, { time: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) })} <small>{copy.estimate}</small></p>}
+    </aside>
+    </div>
 
-    <SidebarDock>
-      <aside className={styles.sidebarControls} aria-label={ui.sidebarLabel}>
-        {templates.length > 0 && <Button type="button" variant="secondary" disabled={pending || uploading || saved} onClick={() => setTemplateChooserOpen(true)}>{ui.chooseTemplate}</Button>}
-        <div className={styles.actions}>
-          <Button form={FORM_ID} type="submit" name="intent" value="draft" disabled={pending || uploading || saved} onClick={() => setMode('draft')}>{uploading ? ui.uploading : saved ? ui.opening : pending ? ui.saving : ui.saveDraft}</Button>
-          <Button form={FORM_ID} type="submit" name="intent" value="schedule" variant="primary" disabled={pending || uploading || saved} onClick={() => setMode('schedule')}>{uploading ? ui.uploading : saved ? ui.opening : pending ? ui.saving : ui.schedulePost}</Button>
-          {queueAvailable && <Button form={FORM_ID} type="submit" name="intent" value="queue" disabled={pending || uploading || saved || !(queuePreview && typeof queuePreview === 'object' && queuePreview.status === 'ready' && previewSelection === selectedKey)} onClick={() => setMode('queue')}>{uploading ? ui.uploading : saved ? ui.opening : pending ? ui.saving : copy.button}</Button>}
-        </div>
-        {queueAvailable && <section className={styles.queueSlot} aria-label={copy.legend} aria-live="polite">
-          <h3>{copy.legend}</h3>
-          {!selected.length ? <p>{copy.chooseDestination}</p>
-            : queuePreview === 'loading' || queuePreview === null || previewSelection !== selectedKey ? <p>{copy.loading}</p>
-            : queuePreview.status === 'error' ? <><p>{copy.unavailable}</p><Button type="button" size="sm" disabled={pending || uploading || saved} onClick={() => setPreviewRefresh(value => value + 1)}>{copy.retryPreview}</Button></>
-            : queuePreview.status === 'full' ? <p>{copy.full}</p>
-            : <>
-              <p><strong>{fill(copy.next, { time: formatDate(new Date(queuePreview.scheduledAt), schedule.timeZone) })}</strong></p>
-              {selected.length > 1 && <ul>{queuePreview.channels.map(channel => { const name = selected.find(target => target.id === channel.targetId)?.name ?? ''; return <li key={channel.targetId}>{channel.nextAt ? fill(copy.channelLine, { name, time: formatDate(new Date(channel.nextAt), schedule.timeZone) }) : fill(copy.channelFull, { name })}</li>; })}</ul>}
-              <small>{copy.estimate}</small>
-            </>}
-          <small>{copy.hint}</small>
-        </section>}
-        <fieldset className={styles.destinationList} disabled={pending || uploading || saved}>
-          <legend>{ui.destinations}</legend>
-          {profiles && <GroupShortcut groups={profiles.groups} allowedIds={targets.filter(target => target.canPublish).map(target => target.id)} onSelect={setSelectedTargets} locale={aiLocale} disabled={pending || uploading || saved} />}
-          {targets.filter(target => target.canPublish).length ? targets.filter(target => target.canPublish).map(target => <label key={target.id}>
-            <input form={FORM_ID} type="checkbox" name="targetIds" value={target.id} checked={selectedTargets.includes(target.id)} onChange={event => { const checked = event.currentTarget.checked; setSelectedTargets(current => checked ? [...current, target.id] : current.filter(id => id !== target.id)); }} />
-            <span>{profiles?.channels.find(channel => channel.id === target.id) ? profileChannelName(profiles.channels.find(channel => channel.id === target.id)!) : target.name}</span>
-          </label>) : <p>{ui.noDestinations}</p>}
-          <small>{ui.draftHint}</small>
-          {crowded && <p className={styles.spacingWarning} role="status">{fillComposerCopy(ui.spacingWarning, { minutes: spacingGapMinutes })}</p>}
-        </fieldset>
-        {selected.some(target => target.publishingFormats?.length) && <fieldset className={styles.destinationList} disabled={pending || uploading || saved}>
-          <legend>{ui.formats}</legend>
-          <DestinationFormats copyCatalog={copyCatalog} locale={aiLocale} targets={targets} selectedIds={selected.map(target => target.id)} values={formatChoices} formId={FORM_ID} disabled={pending || uploading || saved} onChange={(id, value) => setFormatChoices(current => ({ ...current, [id]: value }))} />
-        </fieldset>}
-      </aside>
-    </SidebarDock>
+    <ActionBar label={cc.createActionBar} status={status}>
+      <Button type="button" variant="secondary" disabled={busy} onClick={() => submitWith('draft')}>{cc.createSaveDraft}</Button>
+      <div ref={scheduleAnchor} className={styles.splitAnchor}>
+        <SplitButton label={mainLabel} variant="primary" disabled={busy} busy={pending || uploading} menuLabel={cc.createMoreWays}
+          onClick={() => { if (hasTime) submitWith('schedule'); else setScheduleOpen(true); }}
+          items={[
+            { key: 'now', label: cc.createPublishNow, disabled: !selected.length, disabledReason: cc.createPublishNeedChannel, onSelect: () => setPublishConfirm(true) },
+            ...(queueAvailable ? [{ key: 'queue', label: queueLabel, disabled: !queueReady && !queueErrored, onSelect: () => { if (queueErrored) setPreviewRefresh(value => value + 1); else submitWith('queue'); } }] : []),
+            { key: 'schedule', label: cc.createScheduleEllipsis, onSelect: () => setScheduleOpen(true) },
+          ]} />
+        <Popover open={scheduleOpen} anchorRef={scheduleAnchor} onClose={() => setScheduleOpen(false)} sheetOnPhone align="end" role="dialog" label={cc.createPickTime} className={styles.schedulePop}>
+          <div className={styles.popHead}><h2>{cc.createPickTime}</h2><button type="button" className={styles.popClose} aria-label={cc.createClose} onClick={() => setScheduleOpen(false)}><IconX size={18} aria-hidden="true" /></button></div>
+          <div className={styles.dateTime}>
+            <Field label={cc.createDate}><TextInput type="date" value={scheduleDate} onChange={event => setScheduleDate(event.currentTarget.value)} /></Field>
+            <Field label={cc.createTime}><TextInput type="time" value={scheduleTime} onChange={event => setScheduleTime(event.currentTarget.value)} /></Field>
+          </div>
+          <BestTimeSuggestions copyCatalog={copyCatalog} targetIds={selectedTargets} locale={aiLocale} disabled={busy} onChoose={({ date, time }) => { setScheduleDate(date); setScheduleTime(time); setMode('schedule'); }} />
+          <p className={styles.help}><IconInfoCircle size={14} aria-hidden="true" /> {fillContent(cc.createZone, { zone: schedule.timeZone.replaceAll('_', ' ') })}</p>
+          <div className={styles.popActions}>
+            <Button type="button" variant="quiet" size="sm" disabled={!hasTime} onClick={() => { setScheduleDate(''); setScheduleTime(''); }}>{cc.createClearTime}</Button>
+            <Button type="button" variant="primary" size="sm" disabled={!hasTime} onClick={() => { setScheduleOpen(false); setMode('schedule'); }}>{cc.createSetTime}</Button>
+          </div>
+        </Popover>
+      </div>
+    </ActionBar>
+
+    <LibraryPicker open={libraryOpen} onClose={() => setLibraryOpen(false)} onAdd={ids => attachments.addLibraryImages(ids)} maxSelect={policy.libraryPickerMaxSelect} />
+    <Dialog open={publishConfirm} title={cc.createPublishTitle} description={fillContent(cc.createPublishBody, { count: selected.length })} onClose={() => setPublishConfirm(false)}
+      actions={<><Button data-dialog-cancel variant="secondary" onClick={() => setPublishConfirm(false)}>{cc.createPublishCancel}</Button><Button variant="primary" onClick={publishNow}>{cc.createPublishGo}</Button></>}>
+      <ul className={styles.confirmList}>{selected.map(target => <li key={target.id}><Avatar name={channelName(target)} src={target.pictureUrl} size={22} />{channelName(target)}</li>)}</ul>
+    </Dialog>
+    <Dialog open={leaveConfirm} title={cc.createCloseTitle} description={cc.createCloseBody} onClose={() => setLeaveConfirm(false)}
+      actions={<><Button data-dialog-cancel variant="secondary" onClick={() => setLeaveConfirm(false)}>{cc.createCloseStay}</Button><Button variant="quiet" onClick={() => { setLeaveConfirm(false); leave(); }}>{cc.createCloseDiscard}</Button><Button variant="primary" onClick={() => { setLeaveConfirm(false); submitWith('draft'); }}>{cc.createCloseSave}</Button></>}>
+      {null}
+    </Dialog>
     <Dialog open={templateChooserOpen} title={ui.templateTitle} description={ui.templateDescription} onClose={() => setTemplateChooserOpen(false)} actions={<Button data-dialog-cancel onClick={() => setTemplateChooserOpen(false)}>{ui.close}</Button>}>
       <label className={styles.templateSearch}>{ui.searchTemplates}<input type="search" value={templateSearch} onChange={event => setTemplateSearch(event.target.value)} maxLength={120} /></label>
       {visibleTemplates.length ? <ul className={styles.templateList}>{visibleTemplates.map(template => <li key={template.id}><div><strong>{template.name}</strong><span>{template.category || ui.uncategorized}</span><p>{template.body}{template.hashtags ? `\n${template.hashtags}` : ''}</p>{template.labelId && <small>{ui.templateLabel}</small>}</div><Button type="button" size="sm" onClick={() => chooseTemplate(template)}>{ui.useTemplate}</Button></li>)}</ul> : <p>{ui.noTemplates}</p>}

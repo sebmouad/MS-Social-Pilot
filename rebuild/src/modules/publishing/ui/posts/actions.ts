@@ -18,7 +18,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { parseScheduleMode } from '@/modules/publishing/remote-scheduling';
 import { parseDestinationScheduleModesJson } from '@/modules/publishing/server/schedule-modes';
 
-const PATH = '/publishing/posts';
+const PATH = '/content';
 type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published' | 'publish-review' | 'synced' | 'failed';
 
 export type FirstCommentActionState = { status: 'idle' | 'error' | 'success'; message?: string; postId: string; postTargetId: string; state?: 'sent' | 'needs_review' | 'ready' | 'scheduled'; outcome?: 'sent' | 'not_sent'; remoteId?: string };
@@ -114,7 +114,7 @@ function deletionReceiptMessage(receipt: PostDeletionReceipt, errorText: Publish
 }
 
 function refreshPublishing() {
-  for (const path of [PATH, '/publishing/calendar', '/publishing/queue', '/publishing/approvals']) revalidatePath(path);
+  for (const path of [PATH, '/content/calendar', '/content/queue', '/content/approvals']) revalidatePath(path);
 }
 
 /** Stateful creation path for the dedicated composer. The legacy redirecting action remains available to existing callers. */
@@ -287,8 +287,8 @@ export async function cancelScheduledPostAction(data: FormData) {
   // filters, reschedule input and localized inline notice remain available.
   await cancelScheduledPost(actor(viewer), stringField(data, 'postId'));
   revalidatePath(PATH);
-  revalidatePath('/publishing/queue');
-  revalidatePath('/publishing/approvals');
+  revalidatePath('/content/queue');
+  revalidatePath('/content/approvals');
   redirect(`${PATH}?notice=cancelled`);
 }
 
@@ -299,7 +299,7 @@ export async function reviewPostAction(data: FormData) {
     if (decision !== 'approve' && decision !== 'reject') throw new Error('Choose an approval decision.');
     await reviewPost(actor(viewer), stringField(data, 'postId'), decision);
     return decision === 'approve' ? 'approved' : 'rejected';
-  }, 'publishing/approvals', '/publishing/approvals');
+  }, 'publishing/approvals', '/content/approvals');
 }
 
 async function run(operation: (viewer: Awaited<ReturnType<typeof requireViewer>>) => Promise<string>, feature: 'publishing/posts' | 'publishing/approvals' = 'publishing/posts', path = PATH) {
@@ -309,8 +309,8 @@ async function run(operation: (viewer: Awaited<ReturnType<typeof requireViewer>>
     if (!canAccessFeature(viewer.permissions, feature, 'write')) throw new Error(feature.endsWith('approvals') ? 'You cannot review posts.' : 'You cannot manage posts.');
     notice = await operation(viewer);
     revalidatePath(PATH);
-    revalidatePath('/publishing/queue');
-    revalidatePath('/publishing/approvals');
+    revalidatePath('/content/queue');
+    revalidatePath('/content/approvals');
   } catch (error) {
     if (isRedirect(error)) throw error;
     notice = failureNotice(error);

@@ -19,9 +19,9 @@ export async function reschedulePostAction(input: { postId: string; date: string
     if (!canAccessFeature(viewer.permissions, "publishing/calendar", "write")) throw new PublishingOperationError('forbidden', 'youCannotReschedulePosts', {}, errorText);
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedTargetIds: viewer.permissions.pageScope.ids }) };
     const { scheduledAt } = await reschedulePost(actor, { postId: input.postId, date: input.date, time: input.time, timeZone: viewer.membership.workspace.timezone });
-    revalidatePath("/publishing/calendar");
-    revalidatePath("/publishing/queue");
-    revalidatePath("/publishing/posts");
+    revalidatePath("/content/calendar");
+    revalidatePath("/content/queue");
+    revalidatePath("/content");
     return { ok: true, scheduledAt: scheduledAt.toISOString(), displayTime: formatWhen(scheduledAt, viewer.membership.workspace.timezone) };
   } catch (error) {
     if (typeof error === "object" && error !== null && "digest" in error && typeof error.digest === "string" && error.digest.startsWith("NEXT_REDIRECT")) throw error;

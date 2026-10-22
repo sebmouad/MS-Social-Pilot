@@ -7,7 +7,11 @@ import { PublishingActionCopyProvider } from '@/modules/publishing/ui/WorkflowSu
 import { loadPublishingActionCopy } from '@/modules/publishing/server/action-copy';
 import { loadComposerCopy } from '../../../../server/composer-copy';
 import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
-import { SidebarDock } from '@/components/SidebarDock';
+import { InfoTip, PageHeader, StatusChip } from '@/components';
+import { PostPreview, type PostPreviewPost } from '@/components/PostPreview';
+import { readPublishingPostPage } from '@/modules/publishing/server/read';
+import { loadContent } from '@/modules/publishing/server/content-copy';
+import styles from './post-detail.module.css';
 import { parsePostCollaborationSearch } from '@/modules/publishing/collaboration/search';
 import { notFound } from 'next/navigation';
 import { OperationError } from '@/lib/operation-error';
@@ -21,7 +25,6 @@ import { readPostNotes } from '@/modules/publishing/collaboration/server/notes';
 import { readRecycle } from '@/modules/publishing/collaboration/server/recycle';
 import { readPostVersions } from '@/modules/publishing/collaboration/server/versions';
 import { readCollaborationLabels } from '@/modules/publishing/collaboration/server/label-choices';
-import { PageHeading } from '@/modules/publishing/ui/publishing-ui';
 import { PostPanel } from '@/modules/publishing/ui/collaboration/PostPanel';
 
 async function PostCollaborationPageContent({ params, searchParams }: { params: Promise<{ postId: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -32,24 +35,34 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
   const copyCatalog = await loadComposerCopy();
   const locale = /^\s*fr\b/i.test((await headers()).get('accept-language') ?? '') ? 'fr' : 'en';
   const copy = catalogGroup(copyCatalog, 'collab', locale);
+  const content = await loadContent();
+  const memberName = (await loadPublishingCopy()).copy[locale].approvalsMember;
   const canWrite = canAccessFeature(viewer.permissions, 'publishing/collaboration', 'write');
   const caps = collaborationCapabilities();
   try {
     const paging = parsePostCollaborationSearch(await searchParams ?? {});
-    const pageUrl = (notesPage: number, versionsPage: number) => `/publishing/collaboration/post/${encodeURIComponent(postId)}?${new URLSearchParams({ notesPage: String(notesPage), versionsPage: String(versionsPage) })}`;
-    const [assigned, labels, fields, notes, versions, recycle] = await Promise.all([
+    const pageUrl = (notesPage: number, versionsPage: number) => `/content/post/${encodeURIComponent(postId)}?${new URLSearchParams({ notesPage: String(notesPage), versionsPage: String(versionsPage) })}`;
+    const [assigned, labels, fields, notes, versions, recycle, listing] = await Promise.all([
       readPostLabels(actor, postId), readCollaborationLabels(actor), readPostFieldValues(actor, postId), readPostNotes(actor, { postId, page: paging.notesPage }), readPostVersions(actor, { postId, page: paging.versionsPage }),
       caps.recycle ? readRecycle(actor, { postId }) : Promise.resolve(null),
+      // The post itself, through the same visibility rules as the Posts list; a failure only hides the summary.
+      readPublishingPostPage(actor, { postId }).catch(() => null),
     ]);
+    const post = listing?.posts[0];
+    const timeZone = viewer.membership.workspace.timezone;
     return <>
-      <PageHeading title={copy.postTitle} description={copy.postHelp} />
-      <SidebarDock><nav aria-label={copy.postNav}>
-        <p><a href="/publishing/collaboration?view=assign">{copy.back}</a></p>
-        <p>{fillComposerCopy(copy.notesPage, { page: notes.page })}</p>
-        {notes.page > 1 && <p><a href={pageUrl(notes.page - 1, versions.page)}>{copy.newerNotes}</a></p>}
-        {notes.hasMore && <p><a href={pageUrl(notes.page + 1, versions.page)}>{copy.olderNotes}</a></p>}
-        {(versions.versions.length > 0 || versions.page > 1) && <><p>{fillComposerCopy(copy.historyPage, { page: versions.page })}</p>{versions.page > 1 && <p><a href={pageUrl(notes.page, versions.page - 1)}>{copy.newerVersions}</a></p>}{versions.hasMore && <p><a href={pageUrl(notes.page, versions.page + 1)}>{copy.olderVersions}</a></p>}</>}
-      </nav></SidebarDock>
+      <PageHeader module="publishing" title={copy.postTitle} info={<InfoTip name={copy.postTitle}>{content.copy.postDetailInfo}</InfoTip>}
+        breadcrumbs={<a href="/content">{content.copy.postDetailBack}</a>} />
+      {post ? <section aria-label={copy.postTitle} className={styles.summary}>
+        <PostPreview post={post as PostPreviewPost} authorName={post.authorId === viewer.user.id ? viewer.user.name : memberName} timeZone={timeZone} locale={locale} variant="card" />
+        <ul className={styles.destinations}>{post.targets.map(row => <li key={row.id}><strong>{row.target.name}</strong><StatusChip status={row.status} compact />{row.remoteUrl ? <a href={row.remoteUrl} target="_blank" rel="noopener noreferrer">{content.copy.postsPanelDetails}</a> : null}</li>)}</ul>
+      </section> : null}
+      <nav aria-label={copy.postNav} className={styles.paging}>
+        <span>{fillComposerCopy(copy.notesPage, { page: notes.page })}</span>
+        {notes.page > 1 && <a href={pageUrl(notes.page - 1, versions.page)}>{copy.newerNotes}</a>}
+        {notes.hasMore && <a href={pageUrl(notes.page + 1, versions.page)}>{copy.olderNotes}</a>}
+        {(versions.versions.length > 0 || versions.page > 1) && <><span>{fillComposerCopy(copy.historyPage, { page: versions.page })}</span>{versions.page > 1 && <a href={pageUrl(notes.page, versions.page - 1)}>{copy.newerVersions}</a>}{versions.hasMore && <a href={pageUrl(notes.page, versions.page + 1)}>{copy.olderVersions}</a>}</>}
+      </nav>
       <PostPanel copyCatalog={copyCatalog} timeZone={viewer.membership.workspace.timezone} key={`${postId}:${notes.page}:${versions.page}`} notesCanAdd={notes.page === 1} postId={postId} canWrite={canWrite} labels={labels.labels.map(({ id, name }) => ({ id, name }))} assigned={assigned.labels.map(l => l.id)}
         fields={fields.fields.map(f => ({ id: f.id, name: f.name, kind: f.kind, options: f.options, value: f.value }))}
         fieldValueMax={fields.maxCharacters}
@@ -61,7 +74,7 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
     </>;
   } catch (error) {
     if (error instanceof OperationError && error.code === 'not_found') notFound();
-    return <><PageHeading title={copy.postTitle} description={copy.postHelp} /><RouteNotice error focusKey="collab-post-error">{error instanceof OperationError ? error.message : copy.postFailure}</RouteNotice></>;
+    return <><PageHeader module="publishing" title={copy.postTitle} breadcrumbs={<a href="/content">{content.copy.postDetailBack}</a>} /><RouteNotice error focusKey="collab-post-error">{error instanceof OperationError ? error.message : copy.postFailure}</RouteNotice></>;
   }
 }
 

@@ -165,7 +165,7 @@ async function main() {
       try {
         await context.addCookies([{ name: 'msp_session', value: sessionToken, url: rawOrigin, httpOnly: true, sameSite: 'Lax' }, { name: 'sp_workspace', value: workspaceId, url: rawOrigin, sameSite: 'Lax' }]);
         const page = await context.newPage();
-        await page.goto(`${rawOrigin}/publishing/compose`, { waitUntil: 'networkidle' });
+        await page.goto(`${rawOrigin}/create`, { waitUntil: 'networkidle' });
         await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
         const delay = page.getByLabel(/Wait before the first comment/);
         await delay.waitFor({ state: 'visible' });
@@ -191,7 +191,7 @@ async function main() {
         await page.screenshot({ path: `/private/tmp/first-comments94-${theme}-${width}.png`, animations: 'disabled', fullPage: true });
         views++;
         if (theme === 'grove' && width === 1440) {
-          await page.goto(`${rawOrigin}/publishing/posts?view=table`, { waitUntil: 'networkidle' });
+          await page.goto(`${rawOrigin}/content`, { waitUntil: 'networkidle' });
           const row = page.getByRole('row').filter({ hasText: 'Public post for future' });
           await row.getByText('Manage post', { exact: true }).click();
           const status = row.getByRole('group', { name: 'First comment delivery for Synthetic Facebook Page', exact: true });

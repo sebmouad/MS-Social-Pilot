@@ -2,23 +2,22 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SidebarDockContext } from '../src/components/SidebarDock';
 import { QueueTimes } from '../src/modules/publishing/ui/collaboration/QueueTimes';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
-let dock: HTMLDivElement;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
-  container = document.createElement('div'); dock = document.createElement('div'); document.body.append(container, dock); root = createRoot(container);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); dock.remove(); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 const props = { slots: [], targets: [{ id: 'channel-1', name: 'North' }, { id: 'channel-2', name: 'South' }], canEditShared: true, canEditChannels: true, limit: 20, initialSlot: { dayOfWeek: 1, hour: 9, minute: 0 }, timeZone: 'America/Los_Angeles' };
-async function render() { await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: dock }, createElement(QueueTimes, props)))); }
+async function render() { await act(async () => root.render(createElement(QueueTimes, props))); }
 function button(label: string, parent: ParentNode = container) { const result = Array.from(parent.querySelectorAll('button')).find(item => item.textContent?.trim() === label); if (!result) throw new Error(`Missing button ${label}`); return result as HTMLButtonElement; }
-function selector(parent: ParentNode = dock) { return parent.querySelector<HTMLSelectElement>('select')!; }
+/** The timetable (scope) selector is the first select of the panel; the day picker is the second. */
+function selector(parent: ParentNode = container) { return parent.querySelector<HTMLSelectElement>('select')!; }
 function timeInput(parent: ParentNode = container) { return parent.querySelector<HTMLInputElement>('input[type="time"]')!; }
 async function click(element: HTMLElement) { await act(async () => element.click()); }
 async function setValue(element: HTMLInputElement | HTMLSelectElement, value: string) {
@@ -28,10 +27,9 @@ async function setValue(element: HTMLInputElement | HTMLSelectElement, value: st
 }
 
 describe('queue timetable controls', () => {
-  it('keeps the scope selector in the sidebar and invalid cleared time never adds the initial slot', async () => {
+  it('keeps the scope selector in the queue panel and invalid cleared time never adds the initial slot', async () => {
     await render();
-    expect(dock.textContent).toContain('Shared by all channels');
-    expect(container.textContent).not.toContain('Timetable');
+    expect(container.textContent).toContain('Shared by all channels');
     expect(container.textContent).toContain('America/Los Angeles');
     expect(timeInput().value).toBe('09:00');
     await setValue(timeInput(), '');
@@ -48,17 +46,17 @@ describe('queue timetable controls', () => {
     expect(container.textContent).toContain('Monday'); expect(container.textContent).toContain('10:15');
     await setValue(selector(), 'channel-1');
     expect(timeInput().value).toBe('09:00');
-    const day = container.querySelector<HTMLSelectElement>('select')!;
+    const day = container.querySelectorAll<HTMLSelectElement>('select')[1]!;
     await setValue(day, '4');
     await setValue(timeInput(), '08:30');
     await click(button('Add time'));
     expect(container.textContent).toContain('Thursday'); expect(container.textContent).toContain('08:30');
     await setValue(selector(), '');
     expect(container.textContent).toContain('10:15');
-    expect(dock.textContent).toContain('Shared by all channels · Unsaved changes');
+    expect(container.textContent).toContain('Shared by all channels · Unsaved changes');
     await setValue(selector(), 'channel-1');
     expect(container.textContent).toContain('Thursday'); expect(container.textContent).toContain('08:30');
-    expect(dock.textContent).toContain('North · Unsaved changes');
+    expect(container.textContent).toContain('North · Unsaved changes');
   });
 
   it('disables scope and editor controls while a save is pending', async () => {

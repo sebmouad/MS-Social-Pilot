@@ -93,6 +93,8 @@ Every batch that touches these flows must pass them at 390 px, one-handed, with 
 
 ### B2. Create (full-screen composer)
 
+**Status (2026-10-22): built in the working tree, uncommitted; source/unit/jsdom evidence only.** Details and gaps: AGENT_HANDOFF "Design v2 B2 and B3".
+
 **Owns:**
 - `src/modules/publishing/ui/compose/**`
 - `src/modules/publishing/components/PostAttachments*`
@@ -109,6 +111,8 @@ Every batch that touches these flows must pass them at 390 px, one-handed, with 
 - EN/FR covered.
 
 ### B3. Content
+
+**Status (2026-10-22): built in the working tree, uncommitted; source/unit/jsdom evidence only.** Details and gaps: AGENT_HANDOFF "Design v2 B2 and B3".
 
 **Owns:**
 - `src/modules/publishing/ui/{posts,calendar,queue,approvals,labels,templates,media,collaboration}/**`

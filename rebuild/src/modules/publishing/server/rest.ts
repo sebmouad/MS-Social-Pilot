@@ -9,7 +9,7 @@ import type { PublishingActor } from './types';
 
 export const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 
-const REFRESH = ['/publishing/posts', '/publishing/calendar', '/publishing/queue', '/publishing/approvals'];
+const REFRESH = ['/content', '/content/calendar', '/content/queue', '/content/approvals'];
 
 function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');

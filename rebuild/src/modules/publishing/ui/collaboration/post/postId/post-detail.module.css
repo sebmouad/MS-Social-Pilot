@@ -1,0 +1,5 @@
+/* Post page summary: how the post looks, then where it went. */
+.summary { max-width: var(--form-max); margin-bottom: var(--space-6); }
+.destinations { display: grid; gap: var(--space-2); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.destinations li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.paging { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-4); color: var(--ink-soft); font-size: var(--text-sm); }

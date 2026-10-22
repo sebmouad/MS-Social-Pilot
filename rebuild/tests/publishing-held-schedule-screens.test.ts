@@ -29,7 +29,12 @@ vi.mock('@/modules/publishing/ui/posts/actions', () => ({ cancelScheduledPostAct
 vi.mock('@/modules/publishing/ui/queue/RescheduleQueuedPost', () => ({ RescheduleQueuedPost: () => createElement('span', { 'data-reschedule': true }, 'Reschedule') }));
 vi.mock('@/components/PostPreview', () => ({ PostPreview: ({ actions }: { actions?: ReactNode }) => actions, formatPostPreviewTime: () => '07:00' }));
 vi.mock('@/modules/publishing/ui/calendar/CalendarBoard', () => ({ CalendarBoard: (props: unknown) => { state.board(props); return null; } }));
-vi.mock('@/modules/publishing/ui/origins/load', () => ({ loadPostOrigins: async () => new Map(), parseOriginFilter: () => undefined }));
+vi.mock('@/modules/publishing/ui/origins/load', () => ({ loadPostOrigins: async () => new Map(), parseOriginFilter: () => undefined, originFilterOptions: async () => [] }));
+// Router-bound client controls cannot render without the app router; the board and the schedule controls are what these screens are tested for.
+vi.mock('@/modules/publishing/ui/calendar/CalendarToolbar', () => ({ CalendarToolbar: () => null }));
+vi.mock('@/modules/publishing/ui/calendar/CalendarMore', () => ({ CalendarMore: () => null }));
+// The queue panel is an async server component that reads queue times; the screens under test only need its place in the layout.
+vi.mock('@/modules/publishing/ui/queue/QueueSidePanel', () => ({ QueueSidePanel: () => null }));
 vi.mock('@/modules/settings/server/workspace-operations', () => ({ loadWorkspaceOperations: async () => ({ weekStartsOn: 1 }) }));
 
 import QueueScreen from '@/modules/publishing/ui/queue/QueueScreen';

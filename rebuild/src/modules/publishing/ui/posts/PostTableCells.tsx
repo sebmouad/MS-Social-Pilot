@@ -29,6 +29,9 @@ function thumbUrl(item: Media | undefined) {
   return isSafeImageUrl(item.url) ? item.url : null;
 }
 
+/** Safe thumbnail address of a post's first media item, or null. */
+export function postThumbUrl(media: unknown) { return thumbUrl(mediaList(media)[0]); }
+
 /** Thumbnail, text summary and attachment count for one post row. */
 export function PostCell({ post, locale = 'en' }: { post: Row; locale?: KitLocale }) {
   const media = mediaList(post.media);

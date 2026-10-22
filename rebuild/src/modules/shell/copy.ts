@@ -9,7 +9,7 @@ const en = {
   areas: { home: 'Home', content: 'Content', inbox: 'Inbox', insights: 'Insights', tasks: 'Tasks', agency: 'Agency', settings: 'Settings' },
   pageTitles: {
     'home/overview': 'Overview', 'publishing/posts': 'Posts', 'publishing/calendar': 'Calendar', 'publishing/queue': 'Queue', 'publishing/approvals': 'Approvals',
-    'publishing/media': 'Media library', 'publishing/feeds': 'Content feeds', 'publishing/collaboration': 'Organize', 'publishing/labels': 'Labels', 'publishing/templates': 'Templates',
+    'publishing/media': 'Library', 'publishing/feeds': 'Content feeds', 'publishing/collaboration': 'Organize', 'publishing/labels': 'Labels', 'publishing/templates': 'Templates',
     'agents/library': 'Writing agents', 'inbox/conversations': 'Messages', 'analytics/overview': 'Overview', 'analytics/explorer': 'Explorer', 'analytics/demographics': 'Audience',
     'analytics/compare': 'Compare', 'analytics/ads': 'Ads reporting', 'analytics/posts': 'Posts', 'analytics/goals': 'Goals', 'analytics/pins': 'Pinned metrics', 'analytics/reports': 'Reports',
     'ads/overview': 'Ad accounts', 'ads/compare': 'Compare ads', 'ads/objects': 'Ad objects', 'ads/campaigns': 'Campaigns', 'tasks/board': 'Tasks',
@@ -81,7 +81,7 @@ const fr = {
   areas: { home: 'Accueil', content: 'Contenu', inbox: 'Messages', insights: 'Statistiques', tasks: 'Tâches', agency: 'Agence', settings: 'Réglages' },
   pageTitles: {
     'home/overview': 'Aperçu', 'publishing/posts': 'Publications', 'publishing/calendar': 'Calendrier', 'publishing/queue': 'File d’attente', 'publishing/approvals': 'Approbations',
-    'publishing/media': 'Médiathèque', 'publishing/feeds': 'Flux de contenu', 'publishing/collaboration': 'Organisation', 'publishing/labels': 'Étiquettes', 'publishing/templates': 'Modèles',
+    'publishing/media': 'Bibliothèque', 'publishing/feeds': 'Flux de contenu', 'publishing/collaboration': 'Organisation', 'publishing/labels': 'Étiquettes', 'publishing/templates': 'Modèles',
     'agents/library': 'Agents de rédaction', 'inbox/conversations': 'Messages', 'analytics/overview': 'Vue d’ensemble', 'analytics/explorer': 'Explorateur', 'analytics/demographics': 'Audience',
     'analytics/compare': 'Comparer', 'analytics/ads': 'Rapports publicitaires', 'analytics/posts': 'Publications', 'analytics/goals': 'Objectifs', 'analytics/pins': 'Indicateurs épinglés', 'analytics/reports': 'Rapports',
     'ads/overview': 'Comptes publicitaires', 'ads/compare': 'Comparer les pubs', 'ads/objects': 'Objets publicitaires', 'ads/campaigns': 'Campagnes', 'tasks/board': 'Tâches',

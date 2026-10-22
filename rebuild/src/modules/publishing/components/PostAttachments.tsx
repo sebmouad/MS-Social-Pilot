@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { IconLink, IconPhoto, IconUpload } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
+import { useContent } from '../ui/ContentProvider';
 import { FieldError } from '@/components/FormValidation';
 import styles from './PostAttachments.module.css';
 import { useAttachmentCopy } from '../ui/compose/CopyProvider';
@@ -49,6 +51,8 @@ export type PostAttachmentsController = {
   addLink(): void;
   addLocalImage(file: File): void;
   addLocalImages(files: readonly File[]): void;
+  /** Adds images that already live in the workspace library (by id), skipping duplicates and anything over the limit. */
+  addLibraryImages(ids: readonly string[]): void;
   updateItem(clientId: string, change: Partial<PostAttachmentDraftItem>): void;
   removeItem(clientId: string): void;
   reorder(from: number, to: number): void;
@@ -132,6 +136,20 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
     };
     setItems(previous => [...previous, item]);
     itemsRef.current = [...current, item];
+    setError('');
+  }, [options.allowedKinds, options.allowMixedKinds, options.maxMedia, c]);
+
+  const addLibraryImages = useCallback((ids: readonly string[]) => {
+    const current = itemsRef.current;
+    if (!options.allowedKinds.includes('image')) { setError(fillComposerCopy(c.kindDenied, { kind: c.images })); return; }
+    if (!options.allowMixedKinds && current.some(item => item.kind !== 'image')) { setError(c.oneType); return; }
+    const room = Math.max(0, options.maxMedia - current.length);
+    if (!room) { setError(fillComposerCopy(c.limit, { max: options.maxMedia })); return; }
+    const added: PostAttachmentDraftItem[] = [...new Set(ids)].filter(id => MEDIA_ID.test(id) && !current.some(item => item.url === `media:${id}`)).slice(0, room)
+      .map(id => ({ clientId: newId(), kind: 'image' as const, source: 'upload' as const, url: `media:${id}`, altText: '' }));
+    if (!added.length) return;
+    itemsRef.current = [...current, ...added];
+    setItems(previous => [...previous, ...added]);
     setError('');
   }, [options.allowedKinds, options.allowMixedKinds, options.maxMedia, c]);
 
@@ -309,14 +327,16 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
     maxAltCharacters: options.maxAltCharacters, maxMedia: options.maxMedia, setError,
     addRemote: kind => add(kind, 'url'),
     addLink,
-    addLocalImage, addLocalImages,
+    addLocalImage, addLocalImages, addLibraryImages,
     updateItem: update, removeItem, reorder, validate, prepareUploads,
   };
 }
 
-export function PostAttachments({ controller, disabled = false, altTextAssist }: { controller: PostAttachmentsController; disabled?: boolean; /** Offer AI image descriptions for stored images (set only when the server reports it available). */ altTextAssist?: { locale: 'en' | 'fr' } }) {
+export function PostAttachments({ controller, disabled = false, onPickLibrary, altTextAssist }: { controller: PostAttachmentsController; disabled?: boolean; /** Offer AI image descriptions for stored images (set only when the server reports it available). */ altTextAssist?: { locale: 'en' | 'fr' }; /** Opens the caller's library picker; the "From library" button shows only when given. */ onPickLibrary?: () => void }) {
   const c = useAttachmentCopy();
+  const content = useContent().copy;
   const fileInput = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
   // A link is only tried once it is pasted or the field is left, not on every keystroke.
   const [committed, setCommitted] = useState<Record<string, string>>({});
   const commit = (clientId: string, value: string) => setCommitted(current => current[clientId] === value.trim() ? current : { ...current, [clientId]: value.trim() });
@@ -330,8 +350,13 @@ export function PostAttachments({ controller, disabled = false, altTextAssist }:
     controller.reorder(index, destination);
   };
 
-  return <section className={styles.attachments} aria-labelledby={`${controller.idPrefix}-title`}>
-    <h3 id={`${controller.idPrefix}-title`}>{c.heading}<span>{c.optional}</span></h3>
+  const canDrop = canUploadLocalImages && !disabled && !controller.uploading && !atLimit;
+  return <section className={`${styles.attachments}${dragging ? ` ${styles.dragging}` : ''}`} aria-labelledby={`${controller.idPrefix}-title`}
+    onDragOver={event => { if (canDrop && event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true); } }}
+    onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
+    onDrop={event => { setDragging(false); if (!canDrop) return; event.preventDefault(); const files = Array.from(event.dataTransfer.files); if (files.length) controller.addLocalImages(files); }}>
+    <h3 id={`${controller.idPrefix}-title`} className="ui-visually-hidden">{c.heading}</h3>
+    {controller.maxMedia > 0 && (canAddImages || canAddVideos) && <div className={styles.dropHint} aria-hidden="true"><IconPhoto size={22} stroke={1.6} /><span>{dragging ? content.createDropActive : content.createDrop}</span></div>}
     {canUploadLocalImages && <input
       ref={fileInput}
       className={styles.filePicker}
@@ -349,8 +374,9 @@ export function PostAttachments({ controller, disabled = false, altTextAssist }:
       }}
     />}
     {controller.maxMedia > 0 && (canAddImages || canAddVideos) && <div className={styles.addControls}>
-      <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => controller.addLink()}>{c.addLink}</Button>
-      {canUploadLocalImages && <Button size="sm" disabled={disabled || controller.uploading || atLimit} onClick={() => fileInput.current?.click()}>{c.addLocal}</Button>}
+      {canUploadLocalImages && <Button size="sm" leading={<IconUpload size={15} aria-hidden="true" />} disabled={disabled || controller.uploading || atLimit} onClick={() => fileInput.current?.click()}>{content.createUpload}</Button>}
+      {canAddImages && onPickLibrary && <Button size="sm" leading={<IconPhoto size={15} aria-hidden="true" />} disabled={disabled || controller.uploading || atLimit} onClick={onPickLibrary}>{content.createFromLibrary}</Button>}
+      <Button size="sm" leading={<IconLink size={15} aria-hidden="true" />} disabled={disabled || controller.uploading || atLimit} onClick={() => controller.addLink()}>{c.addLink}</Button>
     </div>}
     {controller.maxMedia === 0 ? <p className={styles.empty}>{c.unavailable}</p>
       : atLimit ? <p className={styles.empty}>{fillComposerCopy(c.used, { used: controller.items.length, max: controller.maxMedia })}</p>

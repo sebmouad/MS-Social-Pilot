@@ -34,11 +34,16 @@ describe('Publishing styles', () => {
   const page = css(`${publishing}publishing.module.css`);
   const work = css(`${publishing}worklist.module.css`);
   it('gives composer fields the shared themed focus ring and an invalid ring', () => {
-    expect(composer).toMatch(/\.form textarea:focus-visible[^{]*\{[^}]*var\(--ui-ring\)/);
-    expect(composer).toMatch(/\.form \[aria-invalid="true"\]:focus-visible[^{]*\{[^}]*var\(--danger\)/);
+    expect(composer).toMatch(/\.editor textarea:focus-visible[^{]*\{[^}]*var\(--ui-ring\)/);
+    expect(composer).toMatch(/\.editor \[aria-invalid="true"\][^{]*\{[^}]*var\(--danger\)/);
   });
-  it('stacks date, time and destination controls on phones', () => {
-    expect(composer).toMatch(/max-width: 540px\)[^]*\.dateTime \{ grid-template-columns: minmax\(0, 1fr\)/);
+  it('stacks date and time on phones and shows one pane at a time', () => {
+    expect(composer).toMatch(/max-width: 760px\)[^]*\.dateTime \{ grid-template-columns: minmax\(0, 1fr\)/);
+    expect(composer).toMatch(/\.main\[data-pane="edit"\] \.preview \{ display: none/);
+  });
+  it('writes the Create sheet with theme tokens only', () => {
+    expect(composer).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(composer).not.toMatch(/rgba?\(/);
   });
   it('gives filters, tabs and rows keyboard focus and 44px targets', () => {
     expect(page).toMatch(/\.postFilters select:focus-visible/);
@@ -47,7 +52,7 @@ describe('Publishing styles', () => {
     expect(work).toMatch(/\.reviewButtons > \* \{ flex: 1 1 120px; min-height: 44px/);
   });
   it('respects reduced motion for the added transitions', () => {
-    expect(composer).toMatch(/prefers-reduced-motion: reduce\) \{ \.chosen li \{ transition: none/);
+    expect(composer).toMatch(/prefers-reduced-motion: reduce\) \{ \.chip, \.advanced > summary svg \{ transition: none/);
     expect(work).toMatch(/prefers-reduced-motion: reduce\) \{ \.row \{ transition: none/);
   });
   it('uses theme tokens only in the polish blocks', () => {

@@ -11,13 +11,13 @@ const options: PostAttachmentOptions = {
   allowedMimeTypes: ['image/jpeg', 'image/png'], maxUploadBytes: 1000, allowMixedKinds: true,
 };
 
-function Harness({ initialMedia = [], allowedKinds = options.allowedKinds, allowedMimeTypes = options.allowedMimeTypes, maxMedia = options.maxMedia, disabled = false, onController }: { initialMedia?: PostAttachmentOptions['initialMedia']; allowedKinds?: PostAttachmentOptions['allowedKinds']; allowedMimeTypes?: PostAttachmentOptions['allowedMimeTypes']; maxMedia?: number; disabled?: boolean; onController?: (controller: PostAttachmentsController) => void }) {
+function Harness({ initialMedia = [], allowedKinds = options.allowedKinds, allowedMimeTypes = options.allowedMimeTypes, maxMedia = options.maxMedia, disabled = false, onController, onPickLibrary }: { onPickLibrary?: () => void; initialMedia?: PostAttachmentOptions['initialMedia']; allowedKinds?: PostAttachmentOptions['allowedKinds']; allowedMimeTypes?: PostAttachmentOptions['allowedMimeTypes']; maxMedia?: number; disabled?: boolean; onController?: (controller: PostAttachmentsController) => void }) {
   const last = useRef<PostAttachmentsController | null>(null);
   const controller = usePostAttachments({ ...options, initialMedia, allowedKinds, allowedMimeTypes, maxMedia });
   last.current = controller;
   onController?.(controller);
   return createElement('div', null,
-    createElement(PostAttachments, { controller, disabled }),
+    createElement(PostAttachments, { controller, disabled, onPickLibrary }),
     createElement(AuthoringMediaPreview, { controller }),
     createElement('output', { 'data-testid': 'serialized' }, controller.mediaJson),
     createElement('output', { 'data-testid': 'items' }, JSON.stringify(controller.items)),
@@ -217,7 +217,7 @@ describe('shared post attachment editor', () => {
 
     expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Add media link')).toBe(true);
     expect(Array.from(container.querySelectorAll('button')).some(button => /Add (image|video) URL/.test(button.textContent ?? ''))).toBe(false);
-    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Add local images')).toBe(false);
+    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Upload')).toBe(false);
     expect(container.querySelector('input[data-testid="local-image-input"]')).toBeNull();
   });
 
@@ -287,7 +287,7 @@ describe('shared post attachment editor', () => {
   it('adds one multi-file selection in FileList order and keeps each image description with its preview', async () => {
     await render();
     const picker = container.querySelector<HTMLInputElement>('input[data-testid="local-image-input"]')!;
-    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Add local images')).toBe(true);
+    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Upload')).toBe(true);
     const first = new File(['first'], 'first.png', { type: 'image/png' });
     const second = new File(['second'], 'second.png', { type: 'image/png' });
     expect(picker.multiple).toBe(true);
@@ -327,6 +327,49 @@ describe('shared post attachment editor', () => {
     expect(JSON.parse(output('serialized'))).toEqual([{ kind: 'image', url: 'https://images.example/existing.jpg', altText: 'Existing' }]);
     expect(JSON.parse(output('items'))).toHaveLength(1);
     expect(container.textContent).toMatch(/choose up to 2 media attachments/i);
+  });
+});
+
+describe('library images and drop zone', () => {
+  const id1 = '123e4567-e89b-42d3-a456-426614174001';
+  const id2 = '123e4567-e89b-42d3-a456-426614174002';
+  const id3 = '123e4567-e89b-42d3-a456-426614174003';
+  let controller!: PostAttachmentsController;
+  const capture = (value: PostAttachmentsController) => { controller = value; };
+
+  it('adds library images by id, skips duplicates and stops at the media limit', async () => {
+    await render({ onController: capture, maxMedia: 2 });
+    await act(async () => controller.addLibraryImages([id1, id1, 'not-an-id', id2, id3]));
+    expect(JSON.parse(output('serialized'))).toEqual([{ kind: 'image', url: `media:${id1}` }, { kind: 'image', url: `media:${id2}` }]);
+    await act(async () => controller.addLibraryImages([id3]));
+    expect(output('error')).toMatch(/choose up to 2 media attachments/i);
+    expect(JSON.parse(output('serialized'))).toHaveLength(2);
+  });
+
+  it('refuses library images when the chosen channels take no images', async () => {
+    await render({ onController: capture, allowedKinds: ['video'] });
+    await act(async () => controller.addLibraryImages([id1]));
+    expect(JSON.parse(output('serialized'))).toEqual([]);
+    expect(output('error')).not.toBe('');
+  });
+
+  it('shows the From library button only when the screen offers a picker', async () => {
+    await render();
+    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'From library')).toBe(false);
+    const onPickLibrary = vi.fn();
+    await act(async () => root.render(createElement(Harness, { onPickLibrary })));
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'From library')!.click());
+    expect(onPickLibrary).toHaveBeenCalledOnce();
+  });
+
+  it('adds files dropped on the media area', async () => {
+    await render({ onController: capture });
+    const area = container.querySelector('section')!;
+    const file = new File(['x'], 'dropped.png', { type: 'image/png' });
+    const event = new Event('drop', { bubbles: true, cancelable: true }) as Event & { dataTransfer?: unknown };
+    event.dataTransfer = { files: [file], types: ['Files'] };
+    await act(async () => { area.dispatchEvent(event); });
+    expect(JSON.parse(output('file-names'))).toEqual(['dropped.png']);
   });
 });
 

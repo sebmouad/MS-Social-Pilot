@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/Button';
-import { SidebarDock } from '@/components/SidebarDock';
 import { mixAutoFillConfirmation, saveMixConfirmation } from '@/modules/publishing/collaboration/schemas';
 import { ConfirmDialog, send, useAction } from './collab-client';
 import styles from './collaboration.module.css';
@@ -64,7 +63,7 @@ export function ContentMix({ targets, groups, labels, rules, status, windowDays,
   }
 
   return <div className={styles.root}>
-    <SidebarDock>
+    <>
       <section className={styles.section} aria-label={c.content_mix_controls}>
         <h2>{c.content_mix}</h2>
         <label className={styles.form}><span className={styles.meta}>{c.edit_a_channel_or_group}</span><select value={scopeKey} onChange={e => setScopeKey(e.target.value)} disabled={action.busy}><option value="">{c.choose}</option>
@@ -79,7 +78,7 @@ export function ContentMix({ targets, groups, labels, rules, status, windowDays,
           {autoFillDesired !== autoFillEnabled && <div className={styles.actions}><Button variant="primary" disabled={action.busy} onClick={() => setAutoFillReview(true)}>{c.review_setting}</Button><Button disabled={action.busy} onClick={() => setAutoFillDesired(autoFillEnabled)}>{c.discard}</Button></div>}
         </> : <p className={styles.help}>{c.only_workspace_owners_and_admins_with_access_to_all_channels_can_change_2}</p>}
       </section>
-    </SidebarDock>
+    </>
     {action.banner}
     <section className={styles.section}><h2>{c.planned_posts}</h2>
       <p className={styles.help}>{c.counts_include_only_posts_whose_full_destination_set_is_visible_to_you}</p>

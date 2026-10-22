@@ -33,7 +33,9 @@ beforeEach(() => {
 
 describe('saved view query normalization', () => {
   it('keeps only whitelisted, valid filters in stable order', () => {
-    expect(normalizeSavedViewQuery('posts', '?status=failed&page=3&view=cards&channel=ch_1&q=promo')).toBe('channel=ch_1&q=promo&status=failed&view=cards');
+    expect(normalizeSavedViewQuery('posts', '?status=failed&page=3&view=cards&channel=ch_1&q=promo')).toBe('channel=ch_1&q=promo&status=failed');
+    // Feed and Cards were removed in design v2: a stored view value is dropped and the table opens.
+    expect(normalizeSavedViewQuery('posts', 'view=feed&status=failed')).toBe('status=failed');
     expect(normalizeSavedViewQuery('calendar', 'view=week&date=2026-10-01&status=scheduled')).toBe('status=scheduled&view=week');
     expect(normalizeSavedViewQuery('posts', '')).toBe('');
   });
@@ -47,7 +49,7 @@ describe('saved view query normalization', () => {
   it('restores a saved origin filter into the opened href', async () => {
     db.$queryRaw.mockImplementation(async () => [{ id: 'v2', name: 'Recipes', screen: 'posts', query: 'origin=recipe&evil=1', createdAt: new Date('2026-10-19T00:00:00Z') }]);
     const result = await listSavedViews(actor, { screen: 'posts' });
-    expect(result.views[0]).toMatchObject({ query: 'origin=recipe', href: '/publishing/posts?origin=recipe' });
+    expect(result.views[0]).toMatchObject({ query: 'origin=recipe', href: '/content?origin=recipe' });
   });
   it('refuses invalid or repeated values', () => {
     expect(normalizeSavedViewQuery('posts', 'status=bogus')).toBeNull();
@@ -67,7 +69,7 @@ describe('saved view service', () => {
     const result = await listSavedViews(actor, { screen: 'posts' });
     expect(h.authorize).toHaveBeenCalledWith(actor, 'publishing/posts', 'read');
     expect(h.queries[0].values).toEqual(expect.arrayContaining(['w1', 'u1', 'posts']));
-    expect(result.views[0]).toMatchObject({ query: 'status=failed', href: '/publishing/posts?status=failed' });
+    expect(result.views[0]).toMatchObject({ query: 'status=failed', href: '/content?status=failed' });
   });
   it('uses the Calendar feature for calendar views', async () => {
     await listSavedViews(actor, { screen: 'calendar' });
@@ -75,7 +77,7 @@ describe('saved view service', () => {
   });
   it('creates a normalized view scoped to workspace and user', async () => {
     const { view } = await createSavedView(actor, { screen: 'posts', name: ' Failed ', query: 'status=failed&page=2' });
-    expect(view).toMatchObject({ name: 'Failed', query: 'status=failed', href: '/publishing/posts?status=failed' });
+    expect(view).toMatchObject({ name: 'Failed', query: 'status=failed', href: '/content?status=failed' });
     const insert = h.queries.find(q => q.sql.startsWith('INSERT'))!;
     expect(insert.values.slice(1)).toEqual(['w1', 'u1', 'Failed', 'posts', 'status=failed']);
   });

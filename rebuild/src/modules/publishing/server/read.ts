@@ -38,10 +38,10 @@ function integer(value: unknown, fallback: number, max?: number, errorText: Publ
 }
 
 /** Current authorization and selected resource visibility are shared by every Publishing read surface. */
-export async function readPublishingPostPage(actor: PublishingActor, input: { page?: number; status?: string; channelId?: string; q?: string; origin?: string; order?: 'scheduled_asc' | 'created_asc' } = {}, feature: PublishingFeature = 'publishing/posts') {
+export async function readPublishingPostPage(actor: PublishingActor, input: { page?: number; status?: string; channelId?: string; q?: string; origin?: string; postId?: string; order?: 'scheduled_asc' | 'created_asc' } = {}, feature: PublishingFeature = 'publishing/posts') {
   const errorText = await loadPublishingErrorText();
   if (input.order !== undefined && !['scheduled_asc', 'created_asc'].includes(input.order)) invalid(errorText('read_7'), errorText);
-  const query = await publishingPostReadQuery(actor, { status: input.status, channelId: input.channelId, q: input.q, origin: input.origin }, feature);
+  const query = await publishingPostReadQuery(actor, { status: input.status, channelId: input.channelId, q: input.q, origin: input.origin, ...(input.postId === undefined ? {} : { postId: input.postId }) }, feature);
   const size = await runtimeConfig('publishing.postPageSize');
   const listing = await listPostPage(actor.workspaceId, integer(input.page, 1, undefined, errorText), size, query.scope.targetIds, query.scope.authorId, { where: query.where, order: input.order });
   return { ...listing, posts: await withPlatformNames(actor.workspaceId, listing.posts), channelUnavailable: query.channelUnavailable, filters: query.filters };
@@ -86,14 +86,14 @@ export async function readPublishingPostList(actor: PublishingActor, input: unkn
   const errorText = await loadPublishingErrorText();
   if (!input || typeof input !== 'object' || Array.isArray(input)) invalid(undefined, errorText);
   const values = input as Record<string, unknown>;
-  if (Object.keys(values).some(key => !['status', 'from', 'to', 'limit', 'channelId', 'q', 'origin'].includes(key))) invalid(undefined, errorText);
+  if (Object.keys(values).some(key => !['status', 'from', 'to', 'limit', 'channelId', 'q', 'origin', 'postId'].includes(key))) invalid(undefined, errorText);
   const statuses = values.status === undefined ? [] : typeof values.status === 'string' ? values.status.split(',').map(value => value.trim()).filter(Boolean).map(value => status(value, errorText)!) : invalid(errorText('read_10'), errorText);
   const from = date(values.from, errorText); const to = date(values.to, errorText);
   if (from && to && from > to) invalid(errorText('read_11'), errorText);
   const maximum = await runtimeConfig('publishing.readMaxItems');
   const cap = constraints.maxItems === undefined ? maximum : Math.min(integer(constraints.maxItems, maximum, undefined, errorText), maximum);
   const limit = Math.min(integer(values.limit, cap, undefined, errorText), cap);
-  const query = await publishingPostReadQuery(actor, { channelId: values.channelId as string | undefined, q: values.q as string | undefined, origin: values.origin as string | undefined });
+  const query = await publishingPostReadQuery(actor, { channelId: values.channelId as string | undefined, q: values.q as string | undefined, origin: values.origin as string | undefined, ...(values.postId === undefined ? {} : { postId: values.postId as string }) });
   const where: Prisma.PostWhereInput = { AND: [query.where,
     ...(statuses.length ? [{ status: { in: statuses } }] : []),
     ...(from || to ? [{ scheduledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }] : [])] };

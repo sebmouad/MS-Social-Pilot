@@ -38,7 +38,7 @@ async function launchBrowser(env: Readonly<Record<string, string | undefined>>) 
 const passRoute = (route: Route) => route.continue();
 
 export const VIEWPORTS = [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const;
-export const FAMILIES = ['/home', '/publishing', '/inbox', '/analytics', '/ads', '/settings', '/tasks', '/agency'];
+export const FAMILIES = ['/home', '/content', '/create', '/inbox', '/analytics', '/ads', '/settings', '/tasks', '/agency'];
 /** Main-area candidates, tried in order; on desktop the sidebar's primary (filter apply) button is the page's main action. */
 export const MAIN_ACTION_SELECTORS = ['main .ui-button--primary:not(:disabled)', '#shell-filters .ui-button--primary', 'main button:not(:disabled)', 'main a[href]'] as const;
 /** On phones the sidebar is a closed drawer, so its primary action is verified after opening the drawer by keyboard. */
@@ -583,7 +583,7 @@ export function compareSystemModes(cells: ExtendedCell[]) {
  * ------------------------------------------------------------------------------------------- */
 export const ROUND2_MODES = ['light', 'dark', 'system-light', 'system-dark'] as const;
 /** Representative pages for the system-mode comparison (explicit light/dark are rendered beside system in the same run). */
-export const SYSTEM_SAMPLE = ['/home', '/publishing/compose', '/publishing/calendar', '/inbox', '/analytics', '/analytics/explorer', '/ads', '/ads/campaigns', '/settings/appearance', '/settings/team', '/tasks', '/agency', '/root', '/root/config', '/root/modules', '/sign-in', '/join'] as const;
+export const SYSTEM_SAMPLE = ['/home', '/create', '/content/calendar', '/inbox', '/analytics', '/analytics/explorer', '/ads', '/ads/campaigns', '/settings/appearance', '/settings/team', '/tasks', '/agency', '/root', '/root/config', '/root/modules', '/sign-in', '/join'] as const;
 export type Fixtures = {
   dynamic: { customer: string[]; root: string[]; public: string[] };
   sessions: { noWorkspace: string; empty: string; verify: string; enroll: string };
@@ -626,7 +626,7 @@ export function statePlan(f: Fixtures): Record<string, PlanGroup> {
 
 /** Not-found and invalid-token states. The status each one must return is part of the contract. */
 export function notFoundPlan(): Record<string, PlanGroup> {
-  const signedIn = ['/does-not-exist', '/root/modules/missing', '/root/platforms/missing', '/root/errors/missing', '/publishing/collaboration/post/missing'];
+  const signedIn = ['/does-not-exist', '/root/modules/missing', '/root/platforms/missing', '/root/errors/missing', '/content/post/missing'];
   const anon = ['/does-not-exist', '/bio/missing-slug/view', '/share/qamatrixmissingtoken0000/view'];
   return {
     'notfound-signed-in': { auth: 'qa', routes: signedIn, expectStatus: Object.fromEntries(signedIn.map(route => [route, 404])) },
@@ -1168,8 +1168,8 @@ export async function runFailureProbe(env: Readonly<Record<string, string | unde
 /* ----- round 3: server-rendered failure (the database is unreachable) -------------------------- */
 export const SERVER_ERROR_LOCALES = ['en', 'fr'] as const;
 /** Pages that throw while the layout still renders once the operator breaks their one dependency (the `labels` table; see the matrix doc). */
-export const BOUNDARY_ROUTES = ['/publishing/labels'] as const;
-export const SERVER_ERROR_ROUTES = ['/home', '/publishing/posts', '/inbox', '/analytics', '/ads', '/settings/team', '/root', '/sign-in'] as const;
+export const BOUNDARY_ROUTES = ['/content/library/labels'] as const;
+export const SERVER_ERROR_ROUTES = ['/home', '/content', '/inbox', '/analytics', '/ads', '/settings/team', '/root', '/sign-in'] as const;
 export type ServerErrorObservation = {
   status: number; theme: string | null; mode: string | null; wantTheme: string; wantMode: 'light' | 'dark'; locale: 'en' | 'fr';
   text: string; retryButtons: number; retryKeepsPage: boolean; backgroundLuminance: number; homeLink: boolean;
@@ -1338,8 +1338,8 @@ export async function runBoundaryRecovery(env: Readonly<Record<string, string | 
 }
 
 /** Round 5 fixes check pages that show uploaded media. A stored file that is gone must show the "Image unavailable" placeholder, never the browser's broken-image icon. */
-export const MEDIA_ROUTES = ['/publishing/posts', '/publishing/queue', '/publishing/approvals', '/publishing/calendar'] as const;
-export const SAVED_VIEW_ROUTE = '/publishing/posts';
+export const MEDIA_ROUTES = ['/content', '/content/queue', '/content/approvals', '/content/calendar'] as const;
+export const SAVED_VIEW_ROUTE = '/content';
 
 export type MediaObservation = { images: number; broken: number; placeholders: number };
 /** Pure classification: a broken image is a defect; placeholders are the expected state for missing files. */
@@ -1390,7 +1390,7 @@ export async function runRound5Fixes(env: Readonly<Record<string, string | undef
               return { images: images.length, broken: images.filter(img => img.complete && img.naturalWidth === 0).length, placeholders: document.querySelectorAll('[data-media-missing]').length };
             });
             cell.findings.push(...classifyMedia(observed));
-            if (route === '/publishing/calendar') {
+            if (route === '/content/calendar') {
               const contrast = await contrastAudit(page);
               if (contrast.failures.length) cell.findings.push({ code: 'CONTRAST_LOW', count: contrast.failures.length });
             }

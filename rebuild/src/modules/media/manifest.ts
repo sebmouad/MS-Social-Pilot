@@ -6,7 +6,7 @@
 export const MEDIA_FEATURE_ID = 'publishing/media' as const;
 
 export const MEDIA_PAGES = [
-  { id: MEDIA_FEATURE_ID, title: 'Media library', href: '/publishing/media', description: 'Browse, search, import and clean up the images and videos your posts use.' },
+  { id: MEDIA_FEATURE_ID, title: 'Media library', href: '/content/library', description: 'Browse, search, import and clean up the images and videos your posts use.' },
 ] as const;
 
 /** Worker jobs of the media library; Publishing's manifest spreads them (no separate module id). */

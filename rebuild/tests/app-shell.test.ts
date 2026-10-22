@@ -2,7 +2,7 @@
 import { act, createElement, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const nav = vi.hoisted(() => ({ path: '/publishing/posts', search: '' }));
+const nav = vi.hoisted(() => ({ path: '/content', search: '' }));
 vi.mock('next/navigation', () => ({ usePathname: () => nav.path, useSearchParams: () => new URLSearchParams(nav.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 import { AppShell } from '../src/components/AppShell';
 import { SidebarDock } from '../src/components/SidebarDock';
@@ -19,7 +19,7 @@ let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  nav.path = '/publishing/posts'; nav.search = '';
+  nav.path = '/content'; nav.search = '';
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ width: 1, height: 1 }] as unknown as DOMRectList);
@@ -48,7 +48,7 @@ describe('single-sidebar app shell', () => {
     expect(labels).toEqual(['Home', 'Content', 'Inbox', 'Insights']);
     expect(container.querySelector('.shell-areas [data-area="content"]')?.getAttribute('aria-current')).toBe('page');
     expect(container.querySelector('.shell-areas [data-area="insights"]')?.getAttribute('aria-current')).toBeNull();
-    expect(container.querySelector('a.shell-create')?.getAttribute('href')).toBe('/publishing/compose');
+    expect(container.querySelector('a.shell-create')?.getAttribute('href')).toBe('/create');
   });
 
   it('shows Tasks and Agency only when the workspace uses them', async () => {
@@ -64,10 +64,25 @@ describe('single-sidebar app shell', () => {
     await render();
     const tabs = container.querySelector('nav.ui-tabs--links')!;
     expect(tabs.getAttribute('aria-label')).toBe('Content sections');
-    expect([...tabs.querySelectorAll('a')].map(link => link.getAttribute('href'))).toEqual(['/publishing/posts', '/publishing/calendar']);
-    expect(tabs.querySelector('[aria-current="page"]')?.getAttribute('href')).toBe('/publishing/posts');
+    expect([...tabs.querySelectorAll('a')].map(link => link.getAttribute('href'))).toEqual(['/content', '/content/calendar']);
+    expect(tabs.querySelector('[aria-current="page"]')?.getAttribute('href')).toBe('/content');
     await render({}, ['publishing/posts']);
     expect(container.querySelector('nav.ui-tabs--links')).toBeNull();
+  });
+
+  it('badges the Approvals tab with the pending count and keeps the parent tab current inside Library sections and post pages', async () => {
+    const features = [...FEATURES, 'publishing/approvals', 'publishing/media', 'publishing/queue'];
+    await render({ tabCounts: { 'publishing/approvals': 3 } }, features);
+    const tabs = container.querySelector('nav.ui-tabs--links')!;
+    expect([...tabs.querySelectorAll('a')].map(link => link.getAttribute('href'))).toEqual(['/content', '/content/calendar', '/content/queue', '/content/approvals', '/content/library']);
+    expect(tabs.querySelector('a[href="/content/approvals"] .ui-tabs__count')?.textContent).toBe('3');
+    expect(tabs.querySelector('a[href="/content/queue"] .ui-tabs__count')).toBeNull();
+    nav.path = '/content/library/templates';
+    await render({}, [...features, 'publishing/templates']);
+    expect(container.querySelector('nav.ui-tabs--links [aria-current="page"]')?.getAttribute('href')).toBe('/content/library');
+    nav.path = '/content/post/abc';
+    await render({}, features);
+    expect(container.querySelector('nav.ui-tabs--links [aria-current="page"]')?.getAttribute('href')).toBe('/content');
   });
 
   it('lists scoped channels with status, and sidebar and scope chip stay in sync with the URL', async () => {

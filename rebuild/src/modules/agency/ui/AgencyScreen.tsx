@@ -39,7 +39,7 @@ function Actions({ item, locale = 'en', copy }: { item: AgencyWorkspace; copy?: 
   return <div className={styles.actions}>
     <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/home" label={t("Open")} variant={item.needsAttention ? 'secondary' : 'primary'} />
     {(metrics.disconnected ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/settings/connections" label={t("Fix connections")} variant="primary" />}
-    {(metrics.failed ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/publishing/posts" label={t("Review posts")} variant="primary" />}
+    {(metrics.failed ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/content" label={t("Review posts")} variant="primary" />}
     {(metrics.overdueTasks ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/tasks?overdue=true" label={t("Overdue tasks")} variant="primary" />}
   </div>;
 }

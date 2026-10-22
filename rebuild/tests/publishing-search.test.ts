@@ -79,4 +79,22 @@ describe('Publishing literal search query', () => {
     ]) }));
     expect(result.where.AND).toContainEqual({ targets: { some: { targetId: 'unselected' } } });
   });
+
+  it('reads several channels of the sidebar scope as "any of them" and still marks channels the viewer cannot see', async () => {
+    const result = await publishingPostReadQuery(allowedActor, { channelId: 'selected-a,selected-b' });
+    expect(result.where.AND).toContainEqual({ targets: { some: { targetId: { in: ['selected-a', 'selected-b'] } } } });
+    expect(result.channelUnavailable).toBe(false);
+    const unseen = await publishingPostReadQuery(allowedActor, { channelId: 'other-a,other-b,other-a' });
+    expect(unseen.where.AND).toContainEqual({ targets: { some: { targetId: { in: ['other-a', 'other-b'] } } } });
+    expect(unseen.channelUnavailable).toBe(true);
+    // The visibility rule is untouched: a wider channel list never widens what the viewer may read.
+    expect((unseen.where.AND as Prisma.PostWhereInput[])[0]).toEqual(expect.objectContaining({ workspaceId: 'workspace' }));
+  });
+
+  it('opens one post by id inside the same visibility rule, and rejects malformed ids', async () => {
+    const result = await publishingPostReadQuery(allowedActor, { postId: 'post_123-abc' });
+    expect(result.where.AND).toContainEqual({ id: 'post_123-abc' });
+    expect((result.where.AND as Prisma.PostWhereInput[])[0]).toEqual(expect.objectContaining({ workspaceId: 'workspace', OR: expect.any(Array) }));
+    for (const postId of ['', 'has space', 'a/b', 'x'.repeat(201), 4]) await expect(publishingPostReadQuery(allowedActor, { postId } as never)).rejects.toMatchObject({ code: 'invalid_request' });
+  });
 });

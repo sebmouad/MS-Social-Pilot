@@ -39,5 +39,7 @@ export type BoardDay = {
   slotEndedByHour?: Record<string, boolean>;
   /** Key dates saved for this day (launches, sales, yearly milestones). */
   milestones?: Array<{ id: string; title: string }>;
+  /** Free queue times (HH:MM) in the workspace time zone, shown as pills that open Create at that time. */
+  freeSlots?: string[];
   posts: BoardPost[];
 };

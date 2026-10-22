@@ -64,7 +64,7 @@ export async function saveQueueComposerAction(previous: QueueComposerState, data
       }
     } else throw new Error('intent');
     refresh();
-    return { status: 'success', destination: '/publishing/posts?notice=' + (field('intent') === 'draft' ? 'created' : 'scheduled'), values, ...(receipt ? { queued: { scheduledAt: receipt.scheduledAt.toISOString(), status: receipt.status === 'pending_approval' ? 'pending_approval' as const : 'scheduled' as const } } : {}) };
+    return { status: 'success', destination: '/content?notice=' + (field('intent') === 'draft' ? 'created' : 'scheduled'), values, ...(receipt ? { queued: { scheduledAt: receipt.scheduledAt.toISOString(), status: receipt.status === 'pending_approval' ? 'pending_approval' as const : 'scheduled' as const } } : {}) };
   } catch (error) {
     if (error instanceof QueueAfterSaveError) {
       refresh();
@@ -110,6 +110,6 @@ function actor(viewer: Awaited<ReturnType<typeof requireViewer>>) {
   return { userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedTargetIds: viewer.permissions.pageScope.ids }) };
 }
 function refresh() {
-  try { for (const path of ['/publishing/posts', '/publishing/calendar', '/publishing/queue', '/publishing/approvals']) revalidatePath(path); }
+  try { for (const path of ['/content', '/content/calendar', '/content/queue', '/content/approvals']) revalidatePath(path); }
   catch { /* A confirmed write remains successful even if cache refresh fails. */ }
 }

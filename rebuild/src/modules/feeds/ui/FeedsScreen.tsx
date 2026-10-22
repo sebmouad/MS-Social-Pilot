@@ -5,7 +5,7 @@ import { requireViewer } from '@/server/context';
 import { runtimeConfig } from '@/server/config/store';
 import { prisma } from '@/server/data';
 import { canAccessFeature } from '@/server/permissions';
-import { PageHeading } from '@/modules/publishing/ui/publishing-ui';
+import { LibraryHeader } from '@/modules/publishing/ui/library/LibraryHeader';
 import { readFeeds } from '../server/feeds';
 import { automaticCheckingStatus } from '../server/polling';
 import { FEEDS_FEATURE_ID } from '../manifest';
@@ -23,7 +23,7 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
   const t = (key: FeedsCopyKey, values: Record<string, string | number> = {}) => feedsText(locale, key, values, copy);
   const viewer = await requireViewer({ feature: FEEDS_FEATURE_ID, channelScoped: true });
   const params = await searchParams;
-  const heading = <PageHeading title={t('title')} description={t('description')} />;
+  const heading = <LibraryHeader active="feeds" viewer={viewer} />;
   if (Object.entries(params).some(([key, value]) => key !== 'page' || typeof value !== 'string') || (params.page && !/^[1-9]\d{0,5}$/.test(params.page))) return <>{heading}<RouteNotice error focusKey="feed-load-error">{t('invalidPage')}</RouteNotice></>;
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const canWrite = canAccessFeature(viewer.permissions, FEEDS_FEATURE_ID, 'write');
@@ -41,7 +41,7 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
       automaticCheckingStatus(),
     ]);
     return <>
-      <PageHeading title={t('title')} description={t('description')} summary={t('pageSize', { count: result.pageSize })} />
+      {heading}
       {recipeStatus ? <RecipeStatusCard status={recipeStatus} locale={locale} copy={copy} /> : null}
       <FeedManager initialFeeds={result.feeds.map(f => ({ ...f, lastPolledAt: f.lastPolledAt?.toISOString() ?? null, createdAt: f.createdAt.toISOString(), updatedAt: f.updatedAt.toISOString() }))}
         channels={channels.map(c => ({ id: c.id, name: c.name }))} page={result.page} hasMore={result.hasMore} canWrite={canWrite} limits={result.limits} locale={locale} automaticMinutes={automatic.intervalMinutes} copy={copy} />

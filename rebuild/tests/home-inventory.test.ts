@@ -67,7 +67,7 @@ describe('Home overview screen', () => {
     expect(html).toContain('Sent by the app');
     expect(html).toContain('EUR');
     expect(html).toContain('250.00');
-    for (const href of ['/analytics', '/publishing/posts', '/inbox', '/ads']) expect(html).toContain(`href="${href}"`);
+    for (const href of ['/analytics', '/content', '/inbox', '/ads']) expect(html).toContain(`href="${href}"`);
     expect(html).toContain('Welcome back, Example workspace');
     expect(html).toContain('Last 28 days');
   });
@@ -86,7 +86,7 @@ describe('Home overview screen', () => {
     const html = renderToStaticMarkup(await HomePage());
     expect(html).toContain('No audience counts yet');
     expect(html).toContain('Nothing scheduled');
-    expect(html).toContain('href="/publishing/compose"');
+    expect(html).toContain('href="/create"');
     expect(html).toContain('Not enough history yet');
     expect(html).toContain('No ad spend yet');
   });

@@ -2,7 +2,6 @@
 import { useComposerCatalog } from '../compose/CopyProvider';
 import { usePublishingActionText } from '@/modules/publishing/ui/WorkflowSubmitButtons';
 import { actionBulkCopy, defaultPublishingActionText, type PublishingActionText } from '@/modules/publishing/action-catalog';
-import { SidebarDock } from '@/components/SidebarDock';
 import { DestinationFormats, effectiveDestinationFormat } from '@/modules/publishing/components/DestinationFormats';
 import { usePreserveFormState } from '@/components/usePreserveFormState';
 import { AutoTextarea } from '@/components/AutoTextarea';
@@ -132,7 +131,7 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules,
   const isQueueEligible = canEdit && ['draft', 'rejected'].includes(post.status) && queueDestinations.length > 0;
   const isQueued = post.status === 'scheduled';
   return <div className={styles.rowActions}>
-    {canOrganize && <a className="ui-button ui-button--secondary ui-button--sm" href={`/publishing/collaboration/post/${encodeURIComponent(post.id)}`}>{t('organizePost')}</a>}
+    {canOrganize && <a className="ui-button ui-button--secondary ui-button--sm" href={`/content/post/${encodeURIComponent(post.id)}`}>{t('organizePost')}</a>}
     {canDuplicate ? <DuplicatePost postId={post.id} disabled={rowPending} onPendingChange={setDuplicatePending} /> : null}
     {canQueue ? <QueuePostButton postId={post.id} postMessage={post.message} destinations={queueDestinations.map(target => target.target.name ?? t('destination'))} timeZone={timeZone} eligible={isQueueEligible} /> : null}
     {canEdit && isDraft ? <details className={styles.editDetails}>
@@ -358,7 +357,7 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
   }}>
     <input type="hidden" name="postId" value={post.id} />
     <input type="hidden" name="destinationFormatsJson" value={serializedFormats} />
-    <SidebarDock><fieldset className="ui-field"><legend>{t('postFormats')}</legend><DestinationFormats copyCatalog={catalog} locale={locale} targets={targets} selectedIds={selectedTargets.map(target=>target.id)} values={formatChoices} onChange={(id,value) => setValues(current => ({...current,destinationFormatsJson:JSON.stringify({...readFormatValues(current.destinationFormatsJson),[id]:value})}))} formId={`post-edit-${post.id}`} disabled={disabled || pending || uploading} /></fieldset></SidebarDock>
+    <fieldset className="ui-field"><legend>{t('postFormats')}</legend><DestinationFormats copyCatalog={catalog} locale={locale} targets={targets} selectedIds={selectedTargets.map(target=>target.id)} values={formatChoices} onChange={(id,value) => setValues(current => ({...current,destinationFormatsJson:JSON.stringify({...readFormatValues(current.destinationFormatsJson),[id]:value})}))} formId={`post-edit-${post.id}`} disabled={disabled || pending || uploading} /></fieldset>
     <fieldset className={styles.formFields}>
       <label htmlFor={`message-${post.id}`}>{t('postText')} <span>{t('optionalWithALinkOrMedia')}</span></label>
       <AutoTextarea id={`message-${post.id}`} name="message" value={values.message ?? post.message} onChange={event => setValue('message', event.currentTarget.value)} rows={4} disabled={disabled || pending || uploading} aria-invalid={Boolean(validation.errors.message)} aria-describedby={validation.errors.message ? `message-error-${post.id}` : undefined} />

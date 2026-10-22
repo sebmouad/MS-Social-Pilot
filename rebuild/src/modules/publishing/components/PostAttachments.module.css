@@ -1,4 +1,7 @@
 .attachments { position: relative; display: grid; gap: 12px; min-width: 0; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.attachments { border-style: dashed; border-color: var(--line-strong); background: var(--surface-raised); transition: border-color var(--ease-fast), background var(--ease-fast); }
+.attachments.dragging { border-color: var(--accent); background: var(--accent-soft); }
+.dropHint { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; color: var(--ink-soft); font-size: var(--text-sm); pointer-events: none; }
 .attachments h3 { margin: 0; color: var(--ink); font-size: 13px; }
 .attachments h3 span { color: var(--ink-soft); font-weight: 400; }
 .addControls, .itemActions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

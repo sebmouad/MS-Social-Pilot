@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const scope = viewer.permissions.pageScope;
     const result = await retryFirstComment({ userId: viewer.user.id, workspaceId: viewer.workspaceId,
       ...(scope.all ? {} : { allowedTargetIds: scope.ids }) }, await request.json());
-    for (const path of ['/publishing/posts', '/publishing/calendar', '/publishing/queue', '/publishing/approvals']) {
+    for (const path of ['/content', '/content/calendar', '/content/queue', '/content/approvals']) {
       try { revalidatePath(path); } catch { /* Preserve the committed receipt. */ }
     }
     return reply(result);

@@ -56,6 +56,8 @@ type AppShellProps = {
   initialScopeDropped?: number;
   /** Optional areas the workspace uses (Tasks once a task exists; Agency with more than one workspace). */
   optionalAreas?: readonly AreaId[];
+  /** Pending counts shown on area tabs, keyed by page id (for example Approvals). Zero or missing shows no badge. */
+  tabCounts?: Readonly<Record<string, number>>;
   initialCollapsed?: boolean;
 };
 
@@ -63,7 +65,7 @@ function writeCookie(name: string, value: string, days: number) {
   try { document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${Math.round(days * 86400)}; samesite=lax`; } catch { /* a blocked cookie only loses the remembered choice */ }
 }
 
-export function AppShell({ children, activeModule, enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], sidebar, sidebarWhen, installationMode = false, paletteCopy, copy, policy, channels = [], initialScope = [], initialScopeDropped = 0, optionalAreas = [], initialCollapsed = false }: AppShellProps) {
+export function AppShell({ children, activeModule, enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], sidebar, sidebarWhen, installationMode = false, paletteCopy, copy, policy, channels = [], initialScope = [], initialScopeDropped = 0, optionalAreas = [], tabCounts = {}, initialCollapsed = false }: AppShellProps) {
   const pathname = usePathname();
   const search = useSearchParams();
   const theme = useOptionalTheme();
@@ -95,7 +97,10 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const areaHref = (area: AreaId) => areaPages(area, enabledFeatures)[0]?.href ?? "/home";
   const pageLabel = (page: { id: string; title: string }) => (copy.pageTitles as Record<string, string>)[page.id] ?? page.title;
   const primaryAction = installationMode ? undefined : MODULES.map(module => module.primaryAction).find(action => action && enabledFeatures.includes(action.featureId) && writableFeatures.includes(action.featureId));
-  const tabs = activeArea ? areaPages(activeArea, enabledFeatures).map(page => ({ id: page.id, href: page.href, label: pageLabel(page) })) : [];
+  const tabs = activeArea ? areaPages(activeArea, enabledFeatures).map(page => ({ id: page.id, href: page.href, label: pageLabel(page), ...(tabCounts[page.id] ? { count: tabCounts[page.id] } : {}) })) : [];
+  // Sections that are not tabs themselves (Library sections, post details) keep their parent tab current: the longest tab route that prefixes the path.
+  const activeTabId = tabs.find(tab => tab.id === activePage?.id)?.id
+    ?? [...tabs].filter(tab => pathname === tab.href || pathname.startsWith(`${tab.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]?.id;
 
   // ---- channel scope: the URL wins, then the remembered cookie (01 §5) ----
   const channelIds = useMemo(() => channels.map(channel => channel.id), [channels]);
@@ -307,7 +312,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
           </div>
         </header>
         <main id="main-content" className="shell-content" tabIndex={-1}>
-          {tabs.length > 1 && <LinkTabs items={tabs} activeId={activePage?.id} label={fill(copy.areaTabsLabel, { area: activeArea ? copy.areas[activeArea] : "" })} maxVisible={policy.maxVisibleTabs} moreLabel={copy.moreTabs} className="shell-tabs"/>}
+          {tabs.length > 1 && <LinkTabs items={tabs} activeId={activeTabId} label={fill(copy.areaTabsLabel, { area: activeArea ? copy.areas[activeArea] : "" })} maxVisible={policy.maxVisibleTabs} moreLabel={copy.moreTabs} className="shell-tabs"/>}
           {!installationMode && dropped > 0 && <p className="shell-notice" role="status">{dropped === 1 ? copy.scopeDroppedOne : fill(copy.scopeDroppedMany, { count: dropped })}</p>}
           {children}
         </main>

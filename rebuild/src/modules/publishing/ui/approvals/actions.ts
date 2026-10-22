@@ -7,7 +7,7 @@ import { requireViewer } from "@/server/context";
 import { canAccessFeature } from "@/server/permissions";
 import { reviewPost } from "@/modules/publishing/server/lifecycle";
 
-const PATH = "/publishing/approvals";
+const PATH = "/content/approvals";
 
 /** Approve or reject a post, optionally recording a short note with the decision. */
 export async function reviewWithNoteAction(data: FormData) {
@@ -23,8 +23,8 @@ export async function reviewWithNoteAction(data: FormData) {
     await reviewPost(actor, postId, decision, typeof note === "string" ? note : undefined);
     notice = decision === "approve" ? "approved" : "rejected";
     revalidatePath(PATH);
-    revalidatePath("/publishing/posts");
-    revalidatePath("/publishing/queue");
+    revalidatePath("/content");
+    revalidatePath("/content/queue");
   } catch (error) {
     if (typeof error === "object" && error !== null && "digest" in error && typeof error.digest === "string" && error.digest.startsWith("NEXT_REDIRECT")) throw error;
     const message = publishingErrorClassificationMessage(error);

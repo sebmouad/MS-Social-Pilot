@@ -1,11 +1,45 @@
-.cell { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 520px; }
+.cell { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 520px; text-align: start; }
 .cellText { display: grid; gap: 3px; min-width: 0; }
 .message { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--ink); font-size: var(--text-md); line-height: 1.4; overflow-wrap: anywhere; }
 .sub { color: var(--ink-faint); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .statusCell { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.viewSwitch { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-muted); }
-.viewSwitch a { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 6px; color: var(--ink-soft); font-size: var(--text-base); font-weight: 650; text-decoration: none; }
-.viewSwitch a:hover { color: var(--ink); }
-.viewSwitch a[aria-current="true"] { background: var(--surface); color: var(--mod-ink, var(--accent)); box-shadow: 0 0 0 1px var(--line-strong); }
-.toolbarRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-@media (max-width: 560px) { .viewSwitch a span { display: none; } }
+
+/* Table + side preview. The preview panel sits beside the list on wide screens and covers it on tablets. */
+.split { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.split[data-open="true"] { grid-template-columns: minmax(0, 1fr) 440px; }
+.listPane { min-width: 0; }
+.phoneList { display: none; margin: 0; padding: 0; list-style: none; }
+.rowOpen { display: block; width: 100%; padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.rowOpen:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.split .panel { width: 100%; max-height: calc(100dvh - var(--topbar-h) - 32px); }
+.panelBody { display: grid; gap: var(--space-5); }
+.panelBody h3 { margin: 0 0 var(--space-2); color: var(--ink-soft); font-size: var(--text-sm); font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+.panelBody p { margin: 0; color: var(--ink-soft); font-size: var(--text-md); }
+.destinations { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.destinations li { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.destName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-md); font-weight: 600; }
+.destinations a { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-xs); color: var(--ink-soft); }
+.destinations a:hover { background: var(--surface-muted); color: var(--ink); }
+
+/* Header filter row: Filter button, chips, search, export. */
+.filterRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.search { display: flex; flex: 1 1 260px; max-width: 420px; min-width: 0; }
+.search input { width: 100%; min-width: 0; min-height: var(--control-h); padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-md); }
+.search input:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
+.filterBody { display: grid; gap: var(--space-4); }
+.filterBody label { display: grid; gap: 6px; color: var(--ink-soft); font-size: var(--text-sm); font-weight: 650; }
+.filterBody select { width: 100%; min-height: var(--control-h); padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-md); }
+.filterBody select:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
+.exportBody { display: grid; gap: var(--space-3); }
+
+@media (max-width: 1279px) {
+  .split[data-open="true"] { grid-template-columns: minmax(0, 1fr); }
+  .split[data-open="true"] .listPane { display: none; }
+}
+/* Phone: compact 72px rows; the post opens on its own page. */
+@media (max-width: 760px) {
+  .desktopList { display: none; }
+  .phoneList { display: block; border-top: 1px solid var(--line); }
+  .phoneList :global(.ui-list-row) { min-height: 72px; }
+  .search { max-width: none; }
+}

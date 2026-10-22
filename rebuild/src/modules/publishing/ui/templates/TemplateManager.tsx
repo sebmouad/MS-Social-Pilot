@@ -7,7 +7,6 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DataTable } from '@/components/DataTable';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
-import { SidebarDock } from '@/components/SidebarDock';
 import { templateCopyDefaults, resolveTemplateCopy, type TemplateCopyCatalog } from './copy';
 import styles from './templates.module.css';
 
@@ -65,14 +64,14 @@ export function TemplateManager({ catalog = templateCopyDefaults, initialTemplat
     } catch { return t.deleteUnknown; }
     finally { inFlight.current = false; }
   }
-  const pageHref = (target: number) => `/publishing/templates?page=${target}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
+  const pageHref = (target: number) => `/content/library/templates?page=${target}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
   return <div className={styles.root}>
     {notice && !dialog && <RouteNotice error={notice.error} focusKey={`template-notice:${notice.key}`}>{notice.text}</RouteNotice>}
-    <SidebarDock><form action="/publishing/templates" method="get" className={styles.search} role="search">
+    <form action="/content/library/templates" method="get" className={styles.search} role="search">
       <label htmlFor="template-search">{t.search}</label><input id="template-search" name="q" defaultValue={query} maxLength={limits.maxSearchCharacters} placeholder={t.searchPlaceholder} />
-      <Button type="submit" variant="secondary">{t.searchButton}</Button>{query && <a href="/publishing/templates">{t.clear}</a>}
+      <Button type="submit" variant="secondary">{t.searchButton}</Button>{query && <a href="/content/library/templates">{t.clear}</a>}
       {canWrite && <Button type="button" variant="primary" onClick={() => begin()}>{t.newTemplate}</Button>}
-    </form></SidebarDock>
+    </form>
     <DataTable caption={t.caption} rows={templates} rowKey={template => template.id}
       columns={[
         { key: 'name', label: t.template, render: template => <><span className={styles.name}>{template.name}</span><span className={styles.meta}>{template.hashtags || t.noHashtags}{template.firstComment ? t.includesComment : ''}</span></> },
@@ -86,7 +85,7 @@ export function TemplateManager({ catalog = templateCopyDefaults, initialTemplat
       ] : undefined}
       rowActionsLabel={template => t.actionsFor(template.name)}
       emptyIcon={<IconTemplate />} emptyMessage={query ? t.noMatch : t.empty}
-      emptyAction={query ? <a className="ui-button ui-button--secondary" href="/publishing/templates">{t.clearSearch}</a> : canWrite ? <Button variant="primary" onClick={() => begin()}>{t.newTemplate}</Button> : undefined} />
+      emptyAction={query ? <a className="ui-button ui-button--secondary" href="/content/library/templates">{t.clearSearch}</a> : canWrite ? <Button variant="primary" onClick={() => begin()}>{t.newTemplate}</Button> : undefined} />
     <nav className={styles.pagination} aria-label={t.pages}>{page > 1 && <a href={pageHref(page - 1)}>{t.previous}</a>}<span>{t.page(page)}</span>{hasMore && <a href={pageHref(page + 1)}>{t.next}</a>}</nav>
     <p className={styles.help}>{t.help}</p>
     <Dialog open={dialog} title={editing ? t.editTitle : t.newTitle} description={t.dialogDescription} onClose={close} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={close}>{t.cancel}</Button><Button type="submit" form="template-form" variant="primary" disabled={busy}>{busy ? t.saving : editing ? t.saveChanges : t.createTemplate}</Button></>}>

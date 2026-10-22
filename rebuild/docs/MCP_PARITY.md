@@ -349,7 +349,7 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | get_workspace_image | publishing/media | read | GET /api/media/[id] | Shared customer operation; transport arguments may differ. |
 | delete_workspace_image | publishing/media | write | DELETE /api/media/[id] | Shared customer operation; transport arguments may differ. |
 | upload_workspace_image | publishing/media | write | POST /api/media | Shared customer operation; transport arguments may differ. |
-| list_posts | publishing/posts | read | GET /api/publishing/posts | Shared customer operation; transport arguments may differ. |
+| list_posts | publishing/posts | read | GET /api/publishing/posts | Shared customer operation; transport arguments may differ. Design v2 B3: `channelId` (REST `channel`) accepts several channel IDs separated by commas (any-of, same visibility rule) for the sidebar channel scope, and `postId` (REST `post`) returns one visible post for the post page and the `?post=` link. Both go through `publishingPostReadQuery`. |
 | export_posts | publishing/posts | read | GET /api/publishing/posts/export | Shared customer operation; transport arguments may differ. |
 | create_draft | publishing/posts | write | POST /api/publishing/posts | Capability alias: create_post without scheduledAt. Closed in `acb56bd7`: same confirmed api-writes boundary as REST and canonical tool; mocked parity tests, no live-client proof. |
 | update_draft | publishing/posts | write | PATCH /api/publishing/posts/[id] | Capability alias: update_post for a draft. Closed in `acb56bd7`: same confirmed api-writes boundary as REST and canonical tool; mocked parity tests, no live-client proof. |

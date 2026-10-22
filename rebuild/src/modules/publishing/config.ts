@@ -5,6 +5,7 @@ import { labelCopyDefaults, labelCopySchema } from './ui/labels/copy';
 import { templateCopyDefaults, templateCopySchema } from './ui/templates/copy';
 import { publishingCopyDefaults, publishingCopySchema } from './ui/kit/copy';
 import { COMPOSER_COPY_CONFIG } from './composer-catalog';
+import { CONTENT_CONFIG } from './ui/content-copy';
 import { ACTION_COPY_CONFIG } from './action-catalog';
 import { z } from 'zod';
 import { entry, cron } from '@/lib/config/entry';
@@ -24,6 +25,7 @@ export const PUBLISHING_MODULE_CONFIG = [
   entry({ key: 'publishing.templateCopy', group: 'Publishing · Copy', label: 'Template customer copy', kind: 'json', description: 'English and French template management labels, dialogs and feedback.', defaultValue: templateCopyDefaults, schema: templateCopySchema, consumption: 'active' }),
   entry({ key: 'publishing.labelCopy', group: 'Publishing · Copy', label: 'Label customer copy', kind: 'json', description: 'English and French label management labels, dialogs and feedback.', defaultValue: labelCopyDefaults, schema: labelCopySchema, consumption: 'active' }),
   ...COMPOSER_COPY_CONFIG,
+  ...CONTENT_CONFIG,
   ...ACTION_COPY_CONFIG,
   ...ERROR_COPY_CONFIG,
   entry({ key: 'publishing.uiCopy', group: 'Publishing · Copy', label: 'Publishing customer copy', kind: 'json', description: 'English and French Publishing headings, navigation, empty states and list labels.', defaultValue: publishingCopyDefaults, schema: publishingCopySchema, consumption: 'active' }),

@@ -42,6 +42,6 @@ it('retains authentication redirects', async () => {
 
 it('retains the successful cancellation destination and invalidates the existing views', async () => {
   state.cancel.mockResolvedValue(undefined);
-  await expect(cancelScheduledPostAction(form())).rejects.toMatchObject({ digest: 'NEXT_REDIRECT;/publishing/posts?notice=cancelled' });
-  expect(state.refresh.mock.calls).toEqual([['/publishing/posts'], ['/publishing/queue'], ['/publishing/approvals']]);
+  await expect(cancelScheduledPostAction(form())).rejects.toMatchObject({ digest: 'NEXT_REDIRECT;/content?notice=cancelled' });
+  expect(state.refresh.mock.calls).toEqual([['/content'], ['/content/queue'], ['/content/approvals']]);
 });

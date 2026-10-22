@@ -346,6 +346,10 @@ Source-level; mocked service/route/MCP tests only, no browser, PostgreSQL or pro
 - `GET /api/health` (`server/health.ts`): the database decides the verdict, worker state is information.
 - `src/server/errors/`: self-hosted recorder feeding `error_events` (Next `onRequestError`, error boundary, `window` listeners via `/api/errors`), scrubbed and grouped, bounded by Root keys `errors.*`. Operator follow-up below adds worker-side recording, `system_alerts` and uptime writers; runtime evidence and residual delivery parity remain open.
 
+## Design v2 B2/B3: Create and Content (2026-10-22, source only)
+
+Publishing's customer routes are now `/create` and `/content/*` (see AGENT_HANDOFF "Design v2 B2 and B3" for the route table, files, new Root keys `publishing.contentCopy` and `publishing.contentPolicy`, and open items). Ownership is unchanged: the screens live in `src/modules/publishing/ui/**` (plus media and feeds screens in their own modules) and call the same services, server actions, REST routes and MCP tools. Two read changes are shared by UI, REST and MCP through `publishingPostReadQuery`: comma-separated channel lists and a single `postId`. `src/app/content/**` and `src/app/create/**` are thin re-exports; the 308 redirects are declared in the publishing manifest. Nothing here is browser- or provider-verified.
+
 ## Calendar extras install (2026-10-22)
 
 Key dates, seasons, personal calendar subscriptions, chart notes and holidays/trends are a Publishing feature in `src/modules/calendar-extras/` (`INTEGRATION.md` there lists the owned files). Installed at source: its two config entries plus `calendarExtras.refresh`, `calendarExtras.holidaysSchedule` and `calendarExtras.trendsSchedule` (spread in `installed-config.ts`; schema version not bumped here), fifteen MCP tools (`installed-mcp.ts`; MCP_PARITY rows), thin pages `/publishing/calendar/{dates,seasons,feeds,trends}` and `/analytics/notes`, API routes `/api/key-dates`, `/api/seasons`, `/api/calendar-feeds`, `/api/chart-notes`, `/api/calendar/trends` (+ `[id]`) and the bearer ICS read `/api/calendar-feed/[token]`.

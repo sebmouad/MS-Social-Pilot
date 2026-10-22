@@ -54,7 +54,7 @@ describe('DuplicatePost', () => {
     await submit();
     await act(async () => finishes[0]({ ok: false, json: async () => ({ error: 'unsafe server detail' }) }));
     expect(container.querySelector('[role=alert]')?.textContent).toContain('The copy result could not be confirmed. Check Drafts before trying again.');
-    expect(container.querySelector('[role=alert] a')?.getAttribute('href')).toBe('/publishing/posts?status=draft');
+    expect(container.querySelector('[role=alert] a')?.getAttribute('href')).toBe('/content?status=draft');
     expect(container.querySelector('[role=alert] a')?.getAttribute('target')).toBe('_blank');
     expect(container.contains(document.activeElement)).toBe(true);
     await submit();
@@ -121,7 +121,7 @@ describe('DuplicatePost', () => {
     expect(url).toBe('/api/publishing/duplicate');
     expect(JSON.parse(String(init?.body))).toEqual({ postId: 'source-1', requestId: 'request-copy-1', confirmation: 'DUPLICATE POST source-1' });
     await act(async () => finishes[0]({ ok: true, json: async () => receipt() }));
-    expect(deps.router.push).toHaveBeenCalledWith('/publishing/posts?status=draft&notice=duplicated');
+    expect(deps.router.push).toHaveBeenCalledWith('/content?status=draft&notice=duplicated');
     expect(deps.router.refresh).toHaveBeenCalledTimes(1);
   });
 

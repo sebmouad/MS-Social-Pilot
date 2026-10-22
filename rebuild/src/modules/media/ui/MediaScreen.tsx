@@ -4,7 +4,7 @@ import { RouteNotice } from '@/components/RouteNotice';
 import { requireViewer } from '@/server/context';
 import { runtimeConfig } from '@/server/config/store';
 import { canAccessFeature } from '@/server/permissions';
-import { PageHeading } from '@/modules/publishing/ui/publishing-ui';
+import { LibraryHeader } from '@/modules/publishing/ui/library/LibraryHeader';
 import { readLibrary } from '../server/library';
 import { MEDIA_FEATURE_ID } from '../manifest';
 import { mediaLocale, mediaText } from '../copy';
@@ -19,7 +19,7 @@ export default async function MediaScreen({ searchParams }: { searchParams: Prom
   const t = (key: Parameters<typeof mediaText>[1]) => mediaText(LOCALE, key, {}, copy);
   const viewer = await requireViewer({ feature: MEDIA_FEATURE_ID, channelScoped: true });
   const params = await searchParams;
-  const heading = <PageHeading title={t('title')} description={t('description')} />;
+  const heading = <LibraryHeader active="media" viewer={viewer} />;
   const kind = params.kind; const usage = params.usage; const page = params.page; const q = params.q;
   if (Object.entries(params).some(([key, value]) => !ALLOWED.includes(key) || typeof value !== 'string') || (kind !== undefined && kind !== 'image' && kind !== 'video') || (usage !== undefined && usage !== 'used' && usage !== 'unused') || (typeof page === 'string' && !/^[1-9]\d{0,3}$/.test(page))) {
     return <>{heading}<RouteNotice error focusKey="media-load-error">{t('invalidFilters')}</RouteNotice></>;

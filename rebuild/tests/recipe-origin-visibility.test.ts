@@ -16,7 +16,6 @@ import { loadRecipeStatus } from '../src/modules/feeds/ui/recipe-status';
 import { feedsCopy, feedsText } from '../src/modules/feeds/copy';
 import { FEEDS_CONFIG } from '../src/modules/feeds/config';
 import { WORDPRESS_BOUNDS, WORDPRESS_DEFAULTS } from '../src/modules/feeds/wordpress/config';
-import { CalendarFilters } from '../src/modules/publishing/ui/calendar/CalendarFilters';
 import type { RecipeStatus } from '../src/modules/feeds/ui/recipe-status';
 
 const provider = (overrides: Partial<PostOriginProvider> = {}): PostOriginProvider => ({
@@ -164,15 +163,5 @@ describe('recipe status', () => {
     expect(keys).toContain('feeds.wordpress.statusFailureWindowDays');
     expect(WORDPRESS_DEFAULTS.statusUpcomingCount).toBeGreaterThanOrEqual(WORDPRESS_BOUNDS.statusUpcomingCount.min);
     expect(WORDPRESS_DEFAULTS.statusFailureWindowDays).toBeLessThanOrEqual(WORDPRESS_BOUNDS.statusFailureWindowDays.max);
-  });
-});
-
-describe('calendar origin filter', () => {
-  it('offers the Created by choice only when origins exist and keeps the selection', () => {
-    expect(renderToStaticMarkup(h(CalendarFilters, { channels: [], today: '2026-10-21' }))).not.toContain('name="origin"');
-    const html = renderToStaticMarkup(h(CalendarFilters, { channels: [], today: '2026-10-21', locale: 'fr', origins: [{ kind: 'recipe', label: 'Automatisation des recettes' }] }));
-    expect(html).toContain('name="origin"');
-    expect(html).toContain('Créé par');
-    expect(html).toContain('value="recipe"');
   });
 });

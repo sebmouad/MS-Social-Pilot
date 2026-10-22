@@ -69,14 +69,14 @@ describe('Publishing post duplication HTTP', () => {
   });
 
   it('returns the committed receipt even when one or more cache revalidations fail', async () => {
-    state.revalidate.mockImplementation(path => { if (path === '/publishing/calendar') throw new Error('cache unavailable'); });
+    state.revalidate.mockImplementation(path => { if (path === '/content/calendar') throw new Error('cache unavailable'); });
     const response = await POST(request(JSON.stringify(validInput)));
     expect(response.status).toBe(201);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toEqual({ sourcePostId: 'source-post', postId: 'new-post', draftCreated: true, replayed: false });
-    expect(state.revalidate).toHaveBeenCalledWith('/publishing/posts');
-    expect(state.revalidate).toHaveBeenCalledWith('/publishing/calendar');
-    expect(state.revalidate).toHaveBeenCalledWith('/publishing/queue');
-    expect(state.revalidate).toHaveBeenCalledWith('/publishing/approvals');
+    expect(state.revalidate).toHaveBeenCalledWith('/content');
+    expect(state.revalidate).toHaveBeenCalledWith('/content/calendar');
+    expect(state.revalidate).toHaveBeenCalledWith('/content/queue');
+    expect(state.revalidate).toHaveBeenCalledWith('/content/approvals');
   });
 });

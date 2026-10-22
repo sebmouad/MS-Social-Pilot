@@ -1,22 +1,30 @@
 'use client';
 import { usePublishingCopy } from '../kit/CopyProvider';
 
-import { useState, type ComponentProps, type ReactNode } from 'react';
+import { useCallback, useState, type ComponentProps, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconExternalLink, IconPencil } from '@tabler/icons-react';
-import { DataTable, Drawer, type TableColumn } from '@/components';
+import { IconExternalLink, IconEye } from '@tabler/icons-react';
+import { DataTable, ListRow, SidePanel, StatusChip, type TableColumn } from '@/components';
+import { PostPreview, type PostPreviewPost } from '@/components/PostPreview';
+import { postContentSummary } from '@/modules/publishing/content-summary';
+import { AttentionHint, Avatar, AvatarStack, MediaThumb } from '../kit/kit';
 import { type KitLocale } from '../kit/copy';
+import { useContent } from '../ContentProvider';
+import { fillContent } from '../content-copy';
 import { BulkPostActions } from './BulkPostActions';
 import { PostRowActions } from './PostActions';
 import type { PostOriginView } from '../origins/post-origin';
-import { ChannelsCell, PostCell, StatusCell } from './PostTableCells';
+import { ChannelsCell, PostCell, StatusCell, postThumbUrl } from './PostTableCells';
+import styles from './posts-table.module.css';
 
 type ManageProps = ComponentProps<typeof PostRowActions>;
-export type PostsTableRow = ManageProps['post'] & {
+export type PostsTableRow = Omit<ManageProps['post'], 'targets'> & {
   id: string; authorId: string; createdAt: Date; scheduledAt: Date | null;
-  targets: Array<ManageProps['post']['targets'][number] & { remoteUrl: string | null; target: { id: string; type: string; name: string; pictureUrl: string | null; platformName?: string | null } }>;
+  targets: Array<Omit<ManageProps['post']['targets'][number], 'target'> & { remoteUrl: string | null; target: { id: string; type: string; name: string; pictureUrl: string | null; platformName?: string | null } }>;
   /** Publish time already formatted in the workspace time zone on the server, so hydration cannot disagree. */
   whenLabel: string;
+  /** Who wrote it, resolved on the server for the preview. */
+  authorName: string;
   /** Set when an installed automation created the post. */
   origin?: PostOriginView | null;
   /** Per-row authority decided by the server; the actions re-check on submit. */
@@ -25,19 +33,28 @@ export type PostsTableRow = ManageProps['post'] & {
 export type PostsTableManage = Pick<ManageProps, 'targets' | 'canPublish' | 'canOrganize' | 'canQueue' | 'imageRules' | 'timeZone' | 'undoSendSeconds'>;
 
 /**
- * The posts list on the shared DataTable: row selection with a bulk toolbar, a row menu, and a side drawer
- * that keeps the list visible while one post is managed. Empty and no-match states come from the caller.
+ * Content › Posts (design v2 S2): the shared table with a side preview. Selecting a row opens the post beside the list
+ * (`?post=<id>` keeps it shareable); the list stays usable. Phones get compact rows that open the post page.
  */
-export function PostsTable({ rows, caption, locale = 'en', selectable, canRetry, manage, empty }: { rows: PostsTableRow[]; caption: string; locale?: KitLocale; selectable: boolean; canRetry: boolean; manage: PostsTableManage | null; empty: ReactNode }) {
+export function PostsTable({ rows, caption, locale = 'en', timeZone = 'UTC', selectable, canRetry, manage, empty, initialPostId }: { rows: PostsTableRow[]; caption: string; timeZone?: string; locale?: KitLocale; selectable: boolean; canRetry: boolean; manage: PostsTableManage | null; empty: ReactNode; initialPostId?: string }) {
   const copy = usePublishingCopy(locale);
+  const { copy: content } = useContent();
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
-  const [managing, setManaging] = useState<string | null>(null);
-  const current = rows.find(row => row.id === managing) ?? null;
-  const label = (row: PostsTableRow) => row.message.slice(0, 60) || row.id;
+  const [openId, setOpenId] = useState<string | null>(initialPostId ?? null);
+  const current = rows.find(row => row.id === openId) ?? null;
+  const label = (row: PostsTableRow) => postContentSummary(row.message, row.media, row.link, copy) || row.id;
+
+  // The address follows the panel without a server round trip; every other parameter stays.
+  const show = useCallback((id: string | null) => {
+    setOpenId(id);
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set('post', id); else url.searchParams.delete('post');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
   const columns: TableColumn<PostsTableRow>[] = [
-    { key: 'post', label: copy.columnPost, render: row => <PostCell post={row} locale={locale} /> },
+    { key: 'post', label: copy.columnPost, render: row => <button type="button" className={styles.rowOpen} aria-haspopup="true" aria-expanded={openId === row.id} aria-label={fillContent(content.postsOpenRow, { text: label(row).slice(0, 80) })} onClick={event => { event.stopPropagation(); show(openId === row.id ? null : row.id); }}><PostCell post={row} locale={locale} /></button> },
     { key: 'channels', label: copy.columnChannels, render: row => <ChannelsCell post={row} locale={locale} /> },
     { key: 'status', label: copy.columnStatus, render: row => <StatusCell post={row} locale={locale} /> },
     { key: 'scheduled', label: copy.columnWhen, render: row => row.whenLabel },
@@ -45,15 +62,48 @@ export function PostsTable({ rows, caption, locale = 'en', selectable, canRetry,
   if (!rows.length) return <>{empty}</>;
   return <>
     {selectable ? <BulkPostActions selected={selected} onClear={() => setSelected([])} canRetry={canRetry} locale={locale} /> : null}
-    <DataTable columns={columns} rows={rows} rowKey={row => row.id} caption={caption}
-      selection={selectable ? { selected, onChange: setSelected, rowLabel: row => copy.selectPost(label(row)), selectAllLabel: copy.selectAll } : undefined}
-      rowActionsLabel={row => copy.actionsFor(label(row))}
-      rowActions={row => [
-        ...(manage && row.canEdit ? [{ key: 'manage', label: copy.manage, icon: <IconPencil size={16} />, onSelect: () => setManaging(row.id) }] : []),
-        { key: 'details', label: copy.openDetails, icon: <IconExternalLink size={16} />, onSelect: () => router.push(`/publishing/collaboration/post/${encodeURIComponent(row.id)}`) },
-      ]} />
-    <Drawer open={Boolean(current && manage)} title={copy.manage} description={current ? label(current) : undefined} closeLabel={copy.close} onClose={() => setManaging(null)}>
-      {current && manage ? <PostRowActions post={current} canEdit={current.canEdit} canDuplicate={current.canDuplicate} {...manage} /> : null}
-    </Drawer>
+    <div className={styles.split} data-open={current ? 'true' : undefined}>
+      <div className={styles.listPane}>
+        <div className={styles.desktopList}>
+          <DataTable columns={columns} rows={rows} rowKey={row => row.id} caption={caption} stackOnPhone={false}
+            onRowClick={row => show(openId === row.id ? null : row.id)}
+            selection={selectable ? { selected, onChange: setSelected, rowLabel: row => copy.selectPost(label(row).slice(0, 60)), selectAllLabel: copy.selectAll } : undefined}
+            rowActionsLabel={row => copy.actionsFor(label(row).slice(0, 60))}
+            rowActions={row => [
+              { key: 'preview', label: content.postsPanelTitle, icon: <IconEye size={16} />, onSelect: () => show(row.id) },
+              { key: 'details', label: copy.openDetails, icon: <IconExternalLink size={16} />, onSelect: () => router.push(`/content/post/${encodeURIComponent(row.id)}`) },
+            ]} />
+        </div>
+        <ul className={styles.phoneList} aria-label={caption}>
+          {rows.map(row => {
+            const failed = row.targets.some(target => target.status === 'failed');
+            const channels = [...new Map(row.targets.map(({ target }) => [target.id, target])).values()];
+            return <li key={row.id}><ListRow href={`/content/post/${encodeURIComponent(row.id)}`}
+              leading={<MediaThumb url={postThumbUrl(row.media)} alt="" count={Array.isArray(row.media) ? row.media.length : 0} video={false} locale={locale} />}
+              title={label(row)}
+              meta={<><AvatarStack channels={channels} max={3} locale={locale} /><StatusChip status={row.status} compact />{failed ? <AttentionHint locale={locale} /> : null}<span>{row.whenLabel}</span></>} /></li>;
+          })}
+        </ul>
+      </div>
+      <SidePanel open={Boolean(current)} title={content.postsPanelTitle} closeLabel={content.postsPanelClose} onClose={() => show(null)} className={styles.panel}
+        actions={current ? <a className="ui-button ui-button--secondary" href={`/content/post/${encodeURIComponent(current.id)}`}>{content.postsPanelDetails}</a> : undefined}>
+        {current ? <div className={styles.panelBody}>
+          <PostPreview post={current as PostPreviewPost} authorName={current.authorName} timeZone={timeZone} locale={locale} variant="card" />
+          <section aria-labelledby="post-panel-destinations">
+            <h3 id="post-panel-destinations">{content.postsPanelDestinations}</h3>
+            {current.targets.length ? <ul className={styles.destinations}>{current.targets.map(({ id, status, remoteUrl, target }) => <li key={id ?? target.id}>
+              <Avatar name={target.name} src={target.pictureUrl} size={24} />
+              <span className={styles.destName}>{target.name}</span>
+              <StatusChip status={status} compact />
+              {remoteUrl ? <a href={remoteUrl} target="_blank" rel="noopener noreferrer" aria-label={`${copy.openDetails}: ${target.name}`}><IconExternalLink size={15} aria-hidden="true" /></a> : null}
+            </li>)}</ul> : <p>{content.postsPanelNoDestinations}</p>}
+          </section>
+          {manage ? <section aria-labelledby="post-panel-actions">
+            <h3 id="post-panel-actions">{content.postsPanelActions}</h3>
+            {current.canEdit ? <PostRowActions post={current} canEdit={current.canEdit} canDuplicate={current.canDuplicate} {...manage} /> : <p>{copy.actionsLimited}</p>}
+          </section> : null}
+        </div> : null}
+      </SidePanel>
+    </div>
   </>;
 }

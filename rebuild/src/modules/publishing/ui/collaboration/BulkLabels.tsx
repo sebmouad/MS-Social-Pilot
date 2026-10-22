@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/Button';
-import { SidebarDock } from '@/components/SidebarDock';
 import { assignConfirmation } from '@/modules/publishing/collaboration/schemas';
 import { ConfirmDialog, send, useAction } from './collab-client';
 import styles from './collaboration.module.css';
@@ -30,7 +29,7 @@ const MODES: Array<{ id: Mode; title: string; hint: string }> = [
   const toggle = (set: Set<string>, id: string) => { const next = new Set(set); if (!next.delete(id)) next.add(id); return next; };
   const confirmation = assignConfirmation(mode, selected.size);
   const invalid = selected.size === 0 || selected.size > bulkLimit || (mode !== 'set' && chosen.size === 0) || chosen.size > labelsPerPost;
-  const href = (p: number) => `/publishing/collaboration?view=assign&page=${p}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
+  const href = (p: number) => `/content/library/fields?view=assign&page=${p}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
 
   async function apply() {
     const ok = await action.run(async () => {
@@ -46,11 +45,11 @@ const MODES: Array<{ id: Mode; title: string; hint: string }> = [
 
   return <div className={styles.root}>
     {action.banner}
-    <SidebarDock><form action="/publishing/collaboration" method="get" className={styles.search} role="search">
+    <form action="/content/library/fields" method="get" className={styles.search} role="search">
       <input type="hidden" name="view" value="assign" />
       <label htmlFor="bulk-search">{c.search_posts}<input id="bulk-search" name="q" defaultValue={query} maxLength={searchMaxCharacters} placeholder={c.words_in_the_post} /></label>
-      <Button type="submit" variant="secondary">{c.search}</Button>{query && <a href="/publishing/collaboration?view=assign">{c.clear}</a>}
-    </form></SidebarDock>
+      <Button type="submit" variant="secondary">{c.search}</Button>{query && <a href="/content/library/fields?view=assign">{c.clear}</a>}
+    </form>
     {canWrite && <section className={styles.section} aria-labelledby="bulk-controls"><h2 id="bulk-controls">{c.change_labels_on_selected_posts}</h2>
       <fieldset className={styles.form}><legend className={styles.meta}>{c.action}</legend>
         <div className={styles.actions}>{MODES.map(m => <label key={m.id} className={styles.check}><input type="radio" name="mode" checked={mode === m.id} onChange={() => setMode(m.id)} />{m.title}</label>)}</div>
@@ -63,7 +62,7 @@ const MODES: Array<{ id: Mode; title: string; hint: string }> = [
     {posts.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{c.posts_and_their_labels}</caption>
       <thead><tr>{canWrite && <th scope="col">{c.select}</th>}<th scope="col">{c.post}</th><th scope="col">{c.status}</th><th scope="col">{c.labels}</th></tr></thead>
       <tbody>{posts.map(p => <tr key={p.id}>{canWrite && <td><input type="checkbox" aria-label={fillComposerCopy(c.selectPost, { title: p.message.slice(0, 40) || c.untitled })} checked={selected.has(p.id)} onChange={() => setSelected(s => toggle(s, p.id))} /></td>}
-        <th scope="row"><a className={styles.msg} href={`/publishing/collaboration/post/${encodeURIComponent(p.id)}`}>{p.message || c.untitled_post}</a></th>
+        <th scope="row"><a className={styles.msg} href={`/content/post/${encodeURIComponent(p.id)}`}>{p.message || c.untitled_post}</a></th>
         <td>{({ draft: c.status_draft, scheduled: c.status_scheduled, pending_approval: c.status_pending_approval, published: c.status_published, failed: c.status_failed, publishing: c.status_publishing, rejected: c.status_rejected } as Record<string, string>)[p.status] ?? p.status.replaceAll('_', ' ')}</td>
         <td>{p.labels.length ? <span className={styles.chips}>{p.labels.map(l => <span key={l.id} className={styles.chip}>{l.name}</span>)}</span> : <span className={styles.meta}>{c.no_labels}</span>}</td></tr>)}</tbody></table></div>
       : <p className={styles.empty}>{query ? c.no_posts_match_this_search : c.no_posts_yet_create_a_post_in_the_composer_to_organize_it}</p>}

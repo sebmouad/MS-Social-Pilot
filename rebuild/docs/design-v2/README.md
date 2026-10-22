@@ -1,6 +1,6 @@
 # Design v2: improvement plan for the current MS Social Pilot app
 
-Status: **final plan approved by the owner on 2026-10-21. B0 (tokens, Clean default) and B1 (shell) are built in the working tree (2026-10-22, uncommitted); B2 to B9 are not started.** Written at `99c4155`. B1 evidence: source, unit and jsdom tests only; no browser run, screenshots or review checklist yet. See [AGENT_HANDOFF.md](../AGENT_HANDOFF.md) "Design v2 B1".
+Status: **final plan approved by the owner on 2026-10-21. B0 (tokens, Clean default), B1 (shell), B2 (Create) and B3 (Content) are built in the working tree (2026-10-22, uncommitted); B4 to B9 are not started.** B2/B3 evidence: source, unit and jsdom tests only (typecheck 0 errors; full suite 706 files, 11,438 tests passed, 0 failed); no browser run, screenshots or review checklist yet. See [AGENT_HANDOFF.md](../AGENT_HANDOFF.md) "Design v2 B2 and B3". Written at `99c4155`. B1 evidence: source, unit and jsdom tests only; no browser run, screenshots or review checklist yet. See [AGENT_HANDOFF.md](../AGENT_HANDOFF.md) "Design v2 B1".
 Built from the owner's direction in this session:
 "the UI is very complex, I need it to be simple and efficient for a human user",
 then "suggest a better idea (check Meta, GitHub, Vercel, social scheduling

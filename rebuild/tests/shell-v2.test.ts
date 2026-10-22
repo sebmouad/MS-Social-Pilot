@@ -51,8 +51,11 @@ describe('shell catalog and areas', () => {
   it('places every page in an area, Ads and Analytics in Insights, Publishing in Content', () => {
     expect(areaForPath('/ads/campaigns')).toBe('insights');
     expect(areaForPath('/analytics/posts')).toBe('insights');
-    expect(areaForPath('/publishing/compose', 'publishing')).toBe('content');
-    expect(pageForPath('/publishing/collaboration/post/abc')?.id).toBe('publishing/collaboration');
+    expect(areaForPath('/create', 'publishing')).toBe('content');
+    expect(areaForPath('/content/library/templates')).toBe('content');
+    // Post details and Library sections belong to Content; their own tab, when they have none, is the parent route.
+    expect(pageForPath('/content/post/abc')?.id).toBe('publishing/posts');
+    expect(pageForPath('/content/library/labels')?.id).toBe('publishing/labels');
     expect(areaPages('insights', PAGES.map(page => page.id)).map(page => page.module)).toEqual(expect.arrayContaining(['analytics', 'ads']));
     expect(areaPages('home', [])).toEqual([]);
   });

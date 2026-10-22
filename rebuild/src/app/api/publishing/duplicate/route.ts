@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const result = await duplicatePost(actor, await request.json());
     // The service has committed the durable receipt before returning. Cache
     // failures must not turn that confirmed draft into an apparent failure.
-    for (const path of ['/publishing/posts', '/publishing/calendar', '/publishing/queue', '/publishing/approvals']) {
+    for (const path of ['/content', '/content/calendar', '/content/queue', '/content/approvals']) {
       try { revalidatePath(path); } catch { /* Keep the committed receipt as the response. */ }
     }
     return reply(result, result.replayed ? 200 : 201);

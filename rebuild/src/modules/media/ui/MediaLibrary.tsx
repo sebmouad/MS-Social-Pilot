@@ -5,12 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
-import { SidebarDock } from '@/components/SidebarDock';
 import { mediaText, type MediaCopyCatalog, type MediaCopyKey, type MediaLocale } from '../copy';
 import styles from './media.module.css';
 import { renameMediaAction } from './rename-action';
 
-const PATH = '/publishing/media';
+const PATH = '/content/library';
 type Holder = { postId: string; status: string; scheduledAt: string | null; excerpt: string };
 export type Asset = { id: string; kind: 'image' | 'video'; mimeType: string; name: string; size: number; createdAt: string; width: number | null; height: number | null; source: 'stored-image' | 'library'; inUse: boolean; holderCount: number; holders: Holder[] | null };
 type Usage = { usedBytes: number; quotaBytes: number; assetCount: number; approximate: boolean };
@@ -84,30 +83,33 @@ export function MediaLibrary({ items, usage, page, hasMore, filters, canWrite, w
 
   return <div className={styles.root}>
     {notice && !importing && !removing && !renaming && <RouteNotice error={notice.error} focusKey={`media-notice:${notice.key}`}>{notice.text}</RouteNotice>}
-    <SidebarDock><form action={PATH} method="get" className={styles.filters} role="search">
-      <label htmlFor="media-q">{t('search')}</label><input id="media-q" name="q" defaultValue={filters.q} maxLength={maxSearch} placeholder={t('searchPlaceholder')} />
-      <label htmlFor="media-kind">{t('type')}</label><select id="media-kind" name="kind" defaultValue={filters.kind}><option value="">{t('typeAll')}</option><option value="image">{t('typeImage')}</option><option value="video">{t('typeVideo')}</option></select>
-      <label htmlFor="media-usage">{t('use')}</label><select id="media-usage" name="usage" defaultValue={filters.usage}><option value="">{t('useAll')}</option><option value="used">{t('useUsed')}</option><option value="unused">{t('useUnused')}</option></select>
+    <form action={PATH} method="get" className={styles.filters} role="search">
+      <div className={styles.field}><label htmlFor="media-q">{t('search')}</label><input id="media-q" name="q" defaultValue={filters.q} maxLength={maxSearch} placeholder={t('searchPlaceholder')} /></div>
+      <div className={styles.field}><label htmlFor="media-kind">{t('type')}</label><select id="media-kind" name="kind" defaultValue={filters.kind}><option value="">{t('typeAll')}</option><option value="image">{t('typeImage')}</option><option value="video">{t('typeVideo')}</option></select></div>
+      <div className={styles.field}><label htmlFor="media-usage">{t('use')}</label><select id="media-usage" name="usage" defaultValue={filters.usage}><option value="">{t('useAll')}</option><option value="used">{t('useUsed')}</option><option value="unused">{t('useUnused')}</option></select></div>
       <Button type="submit" variant="secondary">{t('apply')}</Button>{filtered && <a href={PATH}>{t('clear')}</a>}
       {canWrite && <>
         <Button type="button" variant="primary" disabled={busy} onClick={() => fileInput.current?.click()}>{busy ? t('uploading') : t('upload')}</Button>
         <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden aria-label={t('upload')} onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void performUpload(file); }} />
         <Button type="button" variant="secondary" onClick={() => { setNotice(null); setConfirmation(''); setImporting(true); }}>{t('import')}</Button>
       </>}
-    </form></SidebarDock>
+    </form>
     <section className={styles.usage} aria-label={t('storage')}><strong>{t('storageUsed', { used: size(usage.usedBytes), quota: size(usage.quotaBytes) })}{usage.approximate ? t('approximate') : ''}</strong>
       <div className={styles.meter} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label={t('storageBar')}><span style={{ width: `${percent}%` }} /></div>
       <span className={styles.meta}>{usage.assetCount === 1 ? t('fileCountOne') : t('fileCount', { count: usage.assetCount })}</span></section>
     {usageMayBeIncomplete && <p className={styles.help}>{t('usageIncomplete')}</p>}
-    {assets.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{t('tableCaption')}</caption><thead><tr><th scope="col">{t('colPreview')}</th><th scope="col">{t('colFile')}</th><th scope="col">{t('colSize')}</th><th scope="col">{t('colUse')}</th>{canWrite && workspaceWide && <th scope="col">{t('colActions')}</th>}</tr></thead><tbody>
-      {assets.map(a => <tr key={a.id}>
-        <td>{a.kind === 'image' && a.source === 'stored-image' ? <img className={styles.thumb} src={`/api/media/${encodeURIComponent(a.id)}`} alt="" loading="lazy" /> : <span className={styles.meta}>{a.kind === 'video' ? t('video') : t('image')}</span>}</td>
-        <th scope="row"><span className={styles.name}>{a.name}</span><span className={styles.meta}>{a.mimeType} · {t('added', { date: day(a.createdAt) })}</span></th>
-        <td>{size(a.size)}</td>
-        <td>{a.inUse ? usedLabel(a.holderCount) : t('unused')}{a.holders && a.holders.length > 0 && <ul className={styles.holders}>{a.holders.map(h => <li key={h.postId}>{h.excerpt || t('untitled')} ({h.status.replace(/_/g, ' ')})</li>)}</ul>}</td>
-        {canWrite && workspaceWide && <td><Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button><Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></td>}
-      </tr>)}
-    </tbody></table></div> : <p className={styles.empty}>{filtered ? t('noMatch') : t('empty')}</p>}
+    {assets.length ? <ul className={styles.grid} aria-label={t('tableCaption')}>
+      {assets.map(a => <li key={a.id} className={styles.tile}>
+        <div className={styles.preview}>{a.kind === 'image' && a.source === 'stored-image' ? <img className={styles.tileImage} src={`/api/media/${encodeURIComponent(a.id)}`} alt="" loading="lazy" /> : <span className={styles.tileKind}>{a.kind === 'video' ? t('video') : t('image')}</span>}
+          <span className={`${styles.badge}${a.inUse ? ` ${styles.badgeUsed}` : ''}`}>{a.inUse ? usedLabel(a.holderCount) : t('unused')}</span></div>
+        <div className={styles.tileBody}>
+          <span className={styles.name}>{a.name}</span>
+          <span className={styles.meta}>{a.mimeType} · {size(a.size)} · {t('added', { date: day(a.createdAt) })}</span>
+          {a.holders && a.holders.length > 0 && <ul className={styles.holders}>{a.holders.map(h => <li key={h.postId}>{h.excerpt || t('untitled')} ({h.status.replace(/_/g, ' ')})</li>)}</ul>}
+        </div>
+        {canWrite && workspaceWide && <div className={styles.tileActions}><Button size="sm" disabled={busy} onClick={() => { setNotice(null); setConfirmation(''); setRenameName(a.name); setRenaming(a); }}>{t('rename')}</Button><Button size="sm" variant="danger" disabled={busy} aria-label={`${t('delete')} ${a.name}`} onClick={() => { setNotice(null); setConfirmation(''); setForce(false); setRemoving(a); }}>{t('delete')}</Button></div>}
+      </li>)}
+    </ul> : <p className={styles.empty}>{filtered ? t('noMatch') : t('empty')}</p>}
     <nav className={styles.pagination} aria-label={t('pages')}>{page > 1 && <a href={query(page - 1)}>{t('previous')}</a>}<span>{t('page', { page })}</span>{hasMore && <a href={query(page + 1)}>{t('next')}</a>}</nav>
     {canWrite && !workspaceWide && <p className={styles.help}>{t('deleteNeedsAll')}</p>}
 

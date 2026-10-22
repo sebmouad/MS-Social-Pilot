@@ -58,6 +58,21 @@
 .slotAdd { position: absolute; inset: 0; display: grid; place-items: center; color: transparent; font-size: 16px; font-weight: 700; }
 .slotAdd:hover, .slotAdd:focus-visible { color: var(--accent); background: var(--accent-soft); }
 .slot > .post { position: relative; z-index: 1; }
+/* Free queue time: a dashed pill that opens Create at that time. */
+.freeSlot { position: relative; z-index: 2; display: inline-flex; align-items: center; min-height: 28px; padding: 0 8px; border: 1px dashed var(--accent); border-radius: 7px; background: transparent; color: var(--accent); font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.freeSlot:hover { background: var(--accent-soft); }
+.freeSlot:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.toolbarNav { display: inline-flex; align-items: center; gap: 4px; }
+.toolbarRange { margin: 0 var(--space-2); font-size: var(--text-xl); font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.toolbarEnd { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-inline-start: auto; }
+.viewSwitch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-muted); }
+.viewSwitch a { display: inline-flex; align-items: center; min-height: 30px; padding: 0 12px; border-radius: 6px; color: var(--ink-soft); font-size: var(--text-md); font-weight: 650; }
+.viewSwitch a[aria-current="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line-strong); }
+.viewSwitch a:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.filterBody { display: grid; gap: var(--space-4); }
+.filterBody label { display: grid; gap: 6px; color: var(--ink-soft); font-size: var(--text-sm); font-weight: 650; }
+.filterBody select { width: 100%; min-height: var(--control-h); padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-md); }
 
 .agenda { display: none; gap: 14px; }
 .agendaDay { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }

@@ -8,7 +8,6 @@ import { DataTable } from '@/components/DataTable';
 import { Dialog } from '@/components/Dialog';
 import { Select } from '@/components/Select';
 import { RouteNotice } from '@/components/RouteNotice';
-import { SidebarDock } from '@/components/SidebarDock';
 import { labelCopyDefaults, resolveLabelCopy, type LabelCopyCatalog } from './copy';
 import styles from './labels.module.css';
 
@@ -76,14 +75,14 @@ export function LabelManager({ catalog = labelCopyDefaults, initialLabels, color
     } catch { return t.deleteUnknown; }
     finally { inFlight.current = false; }
   }
-  const href = (target: number) => `/publishing/labels?page=${target}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
+  const href = (target: number) => `/content/library/labels?page=${target}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
   return <div className={styles.root}>
     {notice && !dialog && <RouteNotice error={notice.error} focusKey={`label-notice:${notice.key}`}>{notice.text}</RouteNotice>}
-    <SidebarDock><form action="/publishing/labels" method="get" className={styles.search} role="search">
+    <form action="/content/library/labels" method="get" className={styles.search} role="search">
       <label htmlFor="label-search">{t.search}</label><input id="label-search" name="q" defaultValue={query} maxLength={maxSearchCharacters} placeholder={t.name} />
-      <Button type="submit" variant="secondary">{t.searchButton}</Button>{query && <a href="/publishing/labels">{t.clear}</a>}
+      <Button type="submit" variant="secondary">{t.searchButton}</Button>{query && <a href="/content/library/labels">{t.clear}</a>}
       {canWrite && <Button type="button" variant="primary" onClick={() => begin()}>{t.newLabel}</Button>}
-    </form></SidebarDock>
+    </form>
     <DataTable caption={t.caption} rows={labels} rowKey={label => label.id}
       columns={[
         { key: 'label', label: t.label, render: label => <span className={styles.chip}><span className={styles.swatch} data-color={label.color} aria-hidden="true" />{label.name}</span> },
@@ -97,7 +96,7 @@ export function LabelManager({ catalog = labelCopyDefaults, initialLabels, color
       ] : undefined}
       rowActionsLabel={label => t.actionsFor(label.name)}
       emptyIcon={<IconTag />} emptyMessage={query ? t.noMatch : t.empty}
-      emptyAction={query ? <a className="ui-button ui-button--secondary" href="/publishing/labels">{t.clearSearch}</a> : canWrite ? <Button variant="primary" onClick={() => begin()}>{t.newLabel}</Button> : undefined} />
+      emptyAction={query ? <a className="ui-button ui-button--secondary" href="/content/library/labels">{t.clearSearch}</a> : canWrite ? <Button variant="primary" onClick={() => begin()}>{t.newLabel}</Button> : undefined} />
     {canWrite && !canChange && <p className={styles.note}>{t.limitedNote}</p>}
     <nav className={styles.pagination} aria-label={t.pages}>{page > 1 && <a href={href(page - 1)}>{t.previous}</a>}<span>{t.page(page)}</span>{hasMore && <a href={href(page + 1)}>{t.next}</a>}</nav>
     <Dialog open={dialog} title={editing ? t.editTitle : t.newTitle} description={t.dialogDescription} onClose={close} busy={busy} actions={<><Button data-dialog-cancel disabled={busy} onClick={close}>{t.cancel}</Button><Button type="submit" form="label-form" variant="primary" disabled={busy}>{busy ? t.saving : editing ? t.saveChanges : t.createLabel}</Button></>}>

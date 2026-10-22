@@ -16,9 +16,9 @@ export const MODULE_ICONS: Record<string, TablerIcon> = {
 /** Page icons keyed by route; unknown routes fall back to a neutral dot. */
 export const PAGE_ICONS: Record<string, TablerIcon> = {
   '/home': IconLayoutDashboard,
-  '/publishing/posts': IconListDetails, '/publishing/calendar': IconCalendarEvent, '/publishing/queue': IconStack2,
-  '/publishing/approvals': IconClipboardCheck, '/publishing/media': IconPhoto, '/publishing/feeds': IconRss,
-  '/publishing/collaboration': IconColumns3, '/publishing/labels': IconTag, '/publishing/templates': IconTemplate,
+  '/content': IconListDetails, '/content/calendar': IconCalendarEvent, '/content/queue': IconStack2,
+  '/content/approvals': IconClipboardCheck, '/content/library': IconPhoto, '/content/library/feeds': IconRss,
+  '/content/library/fields': IconColumns3, '/content/library/labels': IconTag, '/content/library/templates': IconTemplate,
   '/inbox': IconMessageCircle,
   '/analytics': IconChartBar, '/analytics/demographics': IconUsersGroup, '/analytics/compare': IconScale,
   '/analytics/ads': IconChartPie, '/analytics/posts': IconChartDots3, '/analytics/goals': IconTarget,

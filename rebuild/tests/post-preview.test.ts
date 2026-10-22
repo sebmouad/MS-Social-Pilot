@@ -9,7 +9,6 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { PostPreview } from '@/components/PostPreview';
-import { PostFilters } from '@/modules/publishing/ui/posts/PostFilters';
 import { postContentSummary } from '@/modules/publishing/content-summary';
 import { PostMessage } from '@/modules/publishing/ui/publishing-ui';
 
@@ -111,38 +110,3 @@ describe('captionless post identity', () => {
   });
 });
 
-describe('PostFilters view selection', () => {
-  beforeEach(() => { routerState.pathname = '/publishing/posts'; routerState.query = ''; });
-
-  it('defaults to Table and makes Feed and Cards selectable', () => {
-    const markup = renderToStaticMarkup(createElement(PostFilters, { channels: [], currentMonth: '2026-10' }));
-
-    expect(markup).toContain('name="view"');
-    expect(markup).toMatch(/<option value="table" selected="">Table<\/option>/);
-    expect(markup).toContain('<option value="feed">Feed</option>');
-    expect(markup).toContain('<option value="cards">Cards</option>');
-  });
-
-  it('retains the selected view and existing filters in the sidebar form', () => {
-    routerState.query = 'view=feed&status=scheduled&channel=channel-1';
-    const markup = renderToStaticMarkup(createElement(PostFilters, { channels: [{ id: 'channel-1', name: 'Studio' }], currentMonth: '2026-10' }));
-
-    expect(markup).toMatch(/<option value="feed" selected="">Feed<\/option>/);
-    expect(markup).toMatch(/<option value="scheduled" selected="">Scheduled<\/option>/);
-    expect(markup).toMatch(/<option value="channel-1" selected="">Studio<\/option>/);
-  });
-
-  it('commits literal search with current filters and configured max length', () => {
-    routerState.query = 'view=feed&status=scheduled&channel=channel-1&q=summer';
-    const markup = renderToStaticMarkup(createElement(PostFilters, { channels: [{ id: 'channel-1', name: 'Studio' }], currentMonth: '2026-10', searchMaxCharacters: 150 }));
-
-    expect(markup).toContain('name="q"');
-    expect(markup).toMatch(/<input[^>]*maxLength="150"/);
-    expect(markup).toMatch(/<input[^>]*name="q"[^>]*value="summer"/);
-    expect(markup).toContain('Search posts');
-    expect(markup).toMatch(/<option value="feed" selected="">Feed<\/option>/);
-    expect(markup).toMatch(/<option value="scheduled" selected="">Scheduled<\/option>/);
-    expect(markup).toMatch(/<option value="channel-1" selected="">Studio<\/option>/);
-    expect(markup).toContain('first comments');
-  });
-});

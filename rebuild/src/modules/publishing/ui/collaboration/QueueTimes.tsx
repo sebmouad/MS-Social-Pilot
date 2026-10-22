@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/Button';
-import { SidebarDock } from '@/components/SidebarDock';
 import { replaceSlotsConfirmation, slotKey } from '@/modules/publishing/collaboration/schemas';
 import { ConfirmDialog, send, useAction } from './collab-client';
 import styles from './collaboration.module.css';
@@ -74,14 +73,14 @@ export function QueueTimes({ slots, targets, canEditShared, canEditChannels, lim
 
   const unsaved = (value: string) => Boolean(drafts[scopeKey(value)]);
   return <div className={styles.root}>
-    <SidebarDock><section className={styles.section} aria-label={c.queue_timetable_selection}>
+    <section className={styles.section} aria-label={c.queue_timetable_selection}>
       <h2>{c.timetable}</h2>
       <label className={styles.form}><span className={styles.meta}>{c.apply_times_for}</span><select value={scope} onChange={event => setScope(event.currentTarget.value)} disabled={action.busy}>
         <option value="">{c.sharedChannels}{unsaved('') ? c.unsaved_changes : ''}</option>
         {targets.map(target => <option key={target.id} value={target.id}>{target.name}{unsaved(target.id) ? c.unsaved_changes : ''}</option>)}
       </select></label>
       <p className={styles.help}>{fillComposerCopy(c.queueZoneHelp, { zone: timeZone.replaceAll('_', ' ') })}</p>
-    </section></SidebarDock>
+    </section>
     <div>{action.banner}</div>
     <section className={styles.section}><h2>{scope === '' ? c.shared_queue_times : fillComposerCopy(c.channelQueueTitle, { name: targets.find(target => target.id === scope)?.name ?? c.channel })}</h2>
       <p className={styles.help}>{c.queued_posts_take_the_next_available_saved_time_saving_changes_affects_future}</p>

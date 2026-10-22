@@ -6,7 +6,7 @@ import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
 import { requireViewer } from '@/server/context';
 import { readTemplateLabels, readTemplatePage } from '@/modules/publishing/server/templates';
-import { PageHeading } from '@/modules/publishing/ui/publishing-ui';
+import { LibraryHeader } from '../library/LibraryHeader';
 import { TemplateManager } from './TemplateManager';
 import { pageLocale } from '../kit/locale';
 import { canAccessFeature } from '@/server/permissions';
@@ -20,7 +20,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
   const managerCatalog = await loadPublishingTemplateCopy();
   const copy = localizedCopy[locale];
   const params = await searchParams;
-  if (Object.entries(params).some(([key, value]) => !['page', 'q'].includes(key) || typeof value !== 'string') || (params.page && !/^[1-9]\d*$/.test(params.page))) return <><PageHeading title={copy.templatesTitle} description={copy.templateFilters} /><RouteNotice error focusKey="template-load-error">{copy.templateInvalid}</RouteNotice></>;
+  if (Object.entries(params).some(([key, value]) => !['page', 'q'].includes(key) || typeof value !== 'string') || (params.page && !/^[1-9]\d*$/.test(params.page))) return <><LibraryHeader active="templates" viewer={viewer} /><RouteNotice error focusKey="template-load-error">{copy.templateInvalid}</RouteNotice></>;
   const page = params.page ? Number(params.page) : 1;
   const query = params.q ?? '';
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
@@ -29,9 +29,9 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
   try { [result, labels] = await Promise.all([
     readTemplatePage(actor, { page, ...(query ? { q: query } : {}) }),
     readTemplateLabels(actor),
-  ]); } catch (error) { return <><PageHeading title={copy.templatesTitle} description={copy.templatesDescription} /><RouteNotice error focusKey="template-load-error">{error instanceof OperationError ? error.message : copy.templateLoadError}</RouteNotice></>; }
+  ]); } catch (error) { return <><LibraryHeader active="templates" viewer={viewer} /><RouteNotice error focusKey="template-load-error">{error instanceof OperationError ? error.message : copy.templateLoadError}</RouteNotice></>; }
   return <PublishingCopyProvider catalog={catalog} locale={locale}><PublishingActionCopyProvider catalog={actionCatalog} locale={locale}>
-    <PageHeading href="/publishing/templates" title={copy.templatesTitle} description={copy.templatesDescription} summary={copy.perPage(result.pageSize)} />
+    <LibraryHeader active="templates" viewer={viewer} />
     <TemplateManager catalog={managerCatalog} initialTemplates={result.templates.map(item => ({ ...item, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() }))} labels={labels} page={result.page} hasMore={result.hasMore} query={result.query} canWrite={canWrite} limits={result.limits} locale={locale} />
     <p className={styles.privacy}>{copy.templatesPrivate}</p>
   </PublishingActionCopyProvider></PublishingCopyProvider>;

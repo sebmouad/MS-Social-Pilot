@@ -53,14 +53,16 @@ export function publishingPostSearchWhere(q: string): Prisma.PostWhereInput {
 /** Current authorized scope and validated search/status/channel filters for Posts and export. */
 export async function publishingPostReadQuery(
   actor: PublishingActor,
-  input: { status?: string; channelId?: string; q?: string; origin?: string },
+  input: { status?: string; channelId?: string; q?: string; origin?: string; postId?: string },
   feature: PublishingFeature = 'publishing/posts',
   originSources?: readonly PostOriginSource[],
 ): Promise<{ where: Prisma.PostWhereInput; filters: { status?: PostStatus; channelId?: string; q: string; origin?: string }; channelUnavailable: boolean; scope: { targetIds: string[]; authorId?: string } }> {
   const errorText = await loadPublishingErrorText();
   if (!input || typeof input !== 'object' || Array.isArray(input)
     || ![Object.prototype, null].includes(Object.getPrototypeOf(input))
-    || Object.keys(input).some(key => !['status', 'channelId', 'q', 'origin'].includes(key))) invalid(undefined, errorText);
+    || Object.keys(input).some(key => !['status', 'channelId', 'q', 'origin', 'postId'].includes(key))) invalid(undefined, errorText);
+  // One post by id (the post page and the `?post=` link); it is still read through the same visibility rules as the list.
+  if (input.postId !== undefined && (typeof input.postId !== 'string' || !/^[A-Za-z0-9_-]{1,200}$/.test(input.postId))) invalid(errorText('read_2'), errorText);
   const [postStatus, channelId, q] = await Promise.all([parseStatus(input.status, errorText), parseChannel(input.channelId), publishingPostSearch(input.q)]);
   const origin = parsePostOrigin(input.origin, originSources, errorText);
   const access = await authorizePublishing(actor, feature, 'read');
@@ -71,10 +73,14 @@ export async function publishingPostReadQuery(
     const profiles = await readChannelProfiles({ userId: actor.userId, workspaceId: actor.workspaceId, allowedChannelIds: targetIds }, 'publishing/posts');
     filterIds = profiles.groups.find(group => group.id === channelId.slice('channel-group:'.length))?.channelIds ?? [];
   }
+  // The channel scope of the shell (design v2) sends several channels as `a,b`; a post matches when it has any of them.
+  const multiple = !channelId?.startsWith('channel-group:') && Boolean(channelId?.includes(','));
+  if (multiple && channelId) filterIds = [...new Set(channelId.split(',').map(id => id.trim()).filter(Boolean))];
   const where: Prisma.PostWhereInput = { AND: [
     publishingPostVisibilityWhere(actor.workspaceId, targetIds, authorId),
     ...(postStatus ? [{ status: postStatus } as Prisma.PostWhereInput] : []),
-    ...(filterIds ? [{ targets: { some: { targetId: channelId?.startsWith('channel-group:') ? { in: filterIds } : channelId } } } as Prisma.PostWhereInput] : []),
+    ...(input.postId ? [{ id: input.postId } as Prisma.PostWhereInput] : []),
+    ...(filterIds ? [{ targets: { some: { targetId: channelId?.startsWith('channel-group:') || multiple ? { in: filterIds } : channelId } } } as Prisma.PostWhereInput] : []),
     ...(q ? [publishingPostSearchWhere(q)] : []),
     ...(origin ? [await postOriginWhere(actor.workspaceId, origin, originSources, errorText)] : []),
   ] };

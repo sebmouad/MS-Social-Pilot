@@ -12,6 +12,7 @@ import { COMMAND_COPY, commandCopySchema } from '@/modules/home/command-copy';
 import { shellChrome } from '@/modules/shell/server/chrome';
 import { shellChannels } from '@/modules/shell/server/channels';
 import { workspaceUsesTasks } from '@/modules/tasks/server/usage';
+import { pendingApprovalCount } from '@/modules/publishing/server/approvals-badge';
 
 export async function PageFrame({ module, children, sidebar, sidebarWhen, scopedAccess = false }: { module: ModuleId; children: ReactNode; sidebar?: ReactNode; sidebarWhen?: readonly string[]; scopedAccess?: boolean }) {
   const viewer = await requireViewer({ module, channelScoped: scopedAccess });
@@ -30,6 +31,9 @@ export async function PageFrame({ module, children, sidebar, sidebarWhen, scoped
   const optionalAreas: AreaId[] = [];
   if (enabledFeatures.includes('tasks/board') && await workspaceUsesTasks(viewer.workspaceId).catch(() => false)) optionalAreas.push('tasks');
   if (viewer.workspaces.length > 1) optionalAreas.push('agency');
-  return <AppShell activeModule={module} enabledModules={enabledModules} enabledFeatures={enabledFeatures} writableFeatures={writableFeatures} rootAccess={viewer.user.isInstanceOwner} userName={viewer.user.name} workspaceName={viewer.membership.workspace.name} workspaceId={viewer.workspaceId} workspaces={viewer.workspaces.map(item => ({ id: item.workspace.id, name: item.workspace.name }))} sidebar={sidebar} sidebarWhen={sidebarWhen} paletteCopy={paletteCopy}
+  // Pending Approvals show as a badge on the Content tabs.
+  const tabCounts: Record<string, number> = {};
+  if (module === 'publishing' && enabledFeatures.includes('publishing/approvals')) tabCounts['publishing/approvals'] = await pendingApprovalCount({ userId: viewer.user.id, workspaceId: viewer.workspaceId });
+  return <AppShell tabCounts={tabCounts} activeModule={module} enabledModules={enabledModules} enabledFeatures={enabledFeatures} writableFeatures={writableFeatures} rootAccess={viewer.user.isInstanceOwner} userName={viewer.user.name} workspaceName={viewer.membership.workspace.name} workspaceId={viewer.workspaceId} workspaces={viewer.workspaces.map(item => ({ id: item.workspace.id, name: item.workspace.name }))} sidebar={sidebar} sidebarWhen={sidebarWhen} paletteCopy={paletteCopy}
     copy={copy} policy={policy} channels={channels.map(channel => ({ id: channel.id, name: channel.name, pictureUrl: channel.pictureUrl, health: channel.health }))} initialScope={remembered.ids} initialScopeDropped={remembered.dropped} optionalAreas={optionalAreas} initialCollapsed={jar.get(policy.sidebarCookie)?.value === '1'}>{children}</AppShell>;
 }

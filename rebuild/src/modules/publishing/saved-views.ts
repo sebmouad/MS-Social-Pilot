@@ -15,8 +15,8 @@ export const SAVED_VIEW_BOUNDS = { maxName: 60, maxQuery: 1500, maxPerScreen: 50
 
 const POST_STATUSES = ['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing', 'published', 'partially_failed', 'failed', 'cancelled'] as const;
 const KEYS: Record<SavedViewScreen, Record<string, (value: string) => boolean>> = {
+  // Feed and Cards views were removed in design v2; stored `view` values are dropped and the table opens.
   posts: {
-    view: value => value === 'table' || value === 'feed' || value === 'cards',
     status: value => (POST_STATUSES as readonly string[]).includes(value),
     channel: value => /^[A-Za-z0-9_-]{1,80}$/.test(value),
     q: value => value.trim().length > 0 && value.length <= 500,
@@ -29,7 +29,7 @@ const KEYS: Record<SavedViewScreen, Record<string, (value: string) => boolean>> 
     channel: value => /^[A-Za-z0-9_-]{1,80}$/.test(value),
   },
 };
-export const SAVED_VIEW_PATHS: Record<SavedViewScreen, string> = { posts: '/publishing/posts', calendar: '/publishing/calendar' };
+export const SAVED_VIEW_PATHS: Record<SavedViewScreen, string> = { posts: '/content', calendar: '/content/calendar' };
 
 /** Keeps only known, valid, single-valued filter parameters in a stable order. Returns null when anything is invalid. */
 export function normalizeSavedViewQuery(screen: SavedViewScreen, query: string): string | null {

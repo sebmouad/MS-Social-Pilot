@@ -7,7 +7,7 @@ import {
 
 const token = (seed: string) => (seed + '0'.repeat(42)).slice(0, 42) + 'A';
 const raw = () => ({
-  dynamic: { customer: ['/publishing/collaboration/post/p1'], root: ['/root/modules/publishing'], public: ['/bio/studio/view'] },
+  dynamic: { customer: ['/content/post/p1'], root: ['/root/modules/publishing'], public: ['/bio/studio/view'] },
   sessions: { noWorkspace: token('a'), empty: token('b'), verify: token('c'), enroll: token('d') },
   oauth: { clientId: 'client-1', redirectUri: 'https://client.example/callback' },
 });

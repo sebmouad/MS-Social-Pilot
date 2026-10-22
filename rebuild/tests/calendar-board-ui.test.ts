@@ -38,7 +38,6 @@ const close = vi.fn(function (this: HTMLDialogElement) { this.removeAttribute('o
 async function render(dayOverrides: Partial<BoardDay> = {}, locale: 'en' | 'fr' = 'en', catalog = publishingCopyDefaults) {
   await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: sidebar }, createElement(PublishingCopyProvider, { catalog, locale, children: createElement(CalendarBoard, {
     view: 'week', days: days.map(day => ({ ...day, ...dayOverrides })), timeZone: 'UTC', nowIso: '2026-10-14T09:00:00.000Z', canCreate: false, filterQuery: '&status=published', defaultScheduleTime: '09:00',
-    navigation: { previous: '/publishing/calendar?view=week&date=2026-10-08&status=published', today: '/publishing/calendar?view=week&date=2026-10-14&status=published', next: '/publishing/calendar?view=week&date=2026-10-22&status=published', unit: 'week' },
   }) }))));
 }
 
@@ -111,12 +110,16 @@ describe('calendar post preview and navigation', () => {
     expect(dialog.textContent).not.toContain('Your post text will appear here');
   });
 
-  it('places previous, today and next navigation in the contextual sidebar with filters retained', async () => {
-    await render();
-    const nav = sidebar.querySelector('nav[aria-label="Calendar week navigation"]')!;
-    expect(nav.querySelector('a')?.getAttribute('href')).toContain('status=published');
-    expect(nav.querySelectorAll('a')).toHaveLength(3);
-    expect([...nav.querySelectorAll('a')].map(link => link.textContent?.trim())).toEqual(['Previous week', 'Today', 'Next week']);
+  it('shows free queue times as dashed pills that open Create at that time, for people who can create', async () => {
+    await render({ freeSlots: ['09:00', '17:30'] });
+    expect(container.querySelector('a[href="/create?date=2026-10-15&time=09:00"]')).toBeNull();
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await act(async () => root.render(createElement(PublishingCopyProvider, { catalog: publishingCopyDefaults, locale: 'en', children: createElement(CalendarBoard, { view: 'month', days: days.map(day => ({ ...day, freeSlots: ['09:00', '17:30'], isPast: false })), timeZone: 'UTC', nowIso: '2026-10-14T09:00:00.000Z', canCreate: true, filterQuery: '', defaultScheduleTime: '09:00' }) })));
+    const pill = container.querySelector<HTMLAnchorElement>('a[href="/create?date=2026-10-15&time=09:00"]');
+    expect(pill?.textContent).toBe('Free slot 09:00');
+    expect(pill?.getAttribute('aria-label')).toBe('Create a post for Thursday, October 15 at 09:00');
+    expect(container.querySelector('a[href="/create?date=2026-10-15&time=17:30"]')).not.toBeNull();
   });
 
   it('uses the server wall time in the move dialog and the server success label after saving', async () => {
@@ -133,13 +136,10 @@ describe('calendar post preview and navigation', () => {
   });
 });
 
-it('keeps French calendar controls and custom Root copy in the sidebar and move dialog', async () => {
+it('keeps French calendar controls and custom Root copy in the move dialog', async () => {
   const catalog = structuredClone(publishingCopyDefaults);
   catalog.moveScheduled.fr = 'Changer l’horaire';
-  catalog.calendarNavigation.fr = 'Parcourir par {unit}';
   await render({}, 'fr', catalog);
-  expect(sidebar.querySelector('nav')?.getAttribute('aria-label')).toBe('Parcourir par semaine');
-  expect(sidebar.textContent).toContain('Aujourd’hui');
   const move = [...container.querySelectorAll('button')].find(button => button.textContent?.startsWith('Déplacer'))!;
   await act(async () => move.click());
   expect(container.querySelector('dialog')?.textContent).toContain('Changer l’horaire');

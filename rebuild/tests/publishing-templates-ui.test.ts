@@ -12,7 +12,8 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
-  container = document.createElement('div'); dock = document.createElement('div'); document.body.append(container, dock); root = createRoot(container);
+  // The search and New template controls render inside the page now (no sidebar dock), so both names point at the page container.
+  container = document.createElement('div'); dock = container; document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); dock.remove(); vi.unstubAllGlobals(); });
 const props = { initialTemplates: [], labels: [{ id: 'label-a', name: 'Campaign' }], page: 1, hasMore: false, query: '', limits: { maxSearchCharacters: 120, maxNameCharacters: 120, maxCategoryCharacters: 80, maxBodyCharacters: 5000, maxHashtagsCharacters: 1000, maxFirstCommentCharacters: 2000, maxFirstCommentDelayMinutes: 10080 } };

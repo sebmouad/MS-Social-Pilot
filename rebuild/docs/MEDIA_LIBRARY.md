@@ -18,7 +18,7 @@ The library is a feature of the Publishing product module (feature id `publishin
 | `mcp.ts` | `MEDIA_MCP` tool group |
 | `copy.ts`, `ui/` | en+fr copy, `MediaScreen` (route screen), `MediaLibrary` (client) |
 
-`src/app/publishing/media/page.tsx` re-exports `ui/MediaScreen`. API: `GET/POST /api/media-library`, `DELETE /api/media-library/[id]`. Image bytes, raw delivery and image upload stay in the existing `/api/media` routes (the screen's "Upload image" button posts there).
+`src/app/content/library/page.tsx` (Content › Library › Media; the old `/publishing/media` address redirects) re-exports `ui/MediaScreen`. API: `GET/POST /api/media-library`, `DELETE /api/media-library/[id]`. Image bytes, raw delivery and image upload stay in the existing `/api/media` routes (the screen's "Upload image" button posts there).
 
 Reused rather than duplicated: the SSRF guard and pinned fetch (`modules/publishing/server/media/network/*`, byte-identical to the WIP copies, so the WIP copies were dropped), image storage and errors (`modules/publishing/server/media/*`), workspace lock (`withWorkspaceOperation`).
 

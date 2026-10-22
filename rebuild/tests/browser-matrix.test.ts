@@ -5,7 +5,7 @@ import { THEMES } from '../src/lib/themes';
 import { allowRequest, browserFinding, customerRoute, DRAWER_MAIN_ACTION_SELECTOR, MAIN_ACTION_SELECTORS, discoverRoutes, FAMILIES, finishReport, guardBaseUrl, runMatrix, VIEWPORTS, type Cell } from '../scripts/verify-browser-matrix';
 
 function complete() {
-  const routes = FAMILIES.map(route => route === '/publishing' ? '/publishing/posts' : route);
+  const routes = [...FAMILIES];
   const cells: Cell[] = routes.flatMap(route => THEMES.flatMap(theme => VIEWPORTS.map(viewport => ({
     route, theme: theme.id, viewport, findings: [], keyboard: { mainAction: 'passed' as const, dialog: route === '/tasks' ? 'passed' as const : 'Not available' as const },
   }))));
@@ -46,8 +46,9 @@ describe('browser matrix report', () => {
   it('passes only a complete four-theme two-viewport matrix with keyboard evidence', () => {
     const report = finishReport(complete());
     expect(report.passed).toBe(true);
-    expect(report.expectedCells).toBe(64);
-    expect(report.cells).toHaveLength(64);
+    // Nine route families (Create is its own family since design v2) × four themes × two viewports.
+    expect(report.expectedCells).toBe(72);
+    expect(report.cells).toHaveLength(72);
     expect(report.failures).toBe(0);
     expect(report.finishedAt).toMatch(/^\d{4}-/);
   });
@@ -90,8 +91,8 @@ describe('browser matrix report', () => {
   });
   it('records dynamic exclusions and discovers current static pages', () => {
     const inventory = discoverRoutes(fileURLToPath(new URL('../src/app', import.meta.url)));
-    for (const route of ['/home', '/publishing/compose', '/inbox/moderation', '/analytics/reports', '/ads/campaigns', '/settings/appearance', '/tasks', '/agency/clients']) expect(inventory.routes).toContain(route);
-    expect(inventory.excludedDynamicRoutes).toContain('/publishing/collaboration/post/[postId]');
+    for (const route of ['/home', '/create', '/content/calendar', '/content/library/templates', '/inbox/moderation', '/analytics/reports', '/ads/campaigns', '/settings/appearance', '/tasks', '/agency/clients']) expect(inventory.routes).toContain(route);
+    expect(inventory.excludedDynamicRoutes).toContain('/content/post/[postId]');
     expect(inventory.routes.some(route => route.startsWith('/root') || route.includes('['))).toBe(false);
     expect(customerRoute('/settings-evil')).toBe(false);
     expect(customerRoute('/sign-in')).toBe(false);

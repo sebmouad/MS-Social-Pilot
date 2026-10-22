@@ -116,7 +116,7 @@ export function AiStudioScreen({ status, videos: initialVideos, channels, canChe
     <label className="ui-field"><span>{t.imagePrompt}</span><textarea className="ui-input" rows={4} required value={imagePrompt} maxLength={status.image.promptMaxCharacters ?? undefined} disabled={pending} onChange={event => setImagePrompt(event.target.value)} /></label>
     <SegmentedControl legend={t.imageSize} value={size} onChange={setSize} options={status.image.sizes.map(option => ({ value: option.id, label: label(option.label) }))} />
     <div className={styles.actions}><Button type="submit" variant="primary" busy={pending} disabled={!imagePrompt.trim()} leading={<IconSparkles size={16} />}>{pending ? t.busy : t.imageRun}</Button></div>
-    {image ? <figure className={styles.result}><img src={`/api/media/${encodeURIComponent(image.id)}`} alt={t.imageAlt} /><figcaption>{t.imageDone} <a href="/publishing/media">{t.imageOpenLibrary}</a></figcaption></figure> : null}
+    {image ? <figure className={styles.result}><img src={`/api/media/${encodeURIComponent(image.id)}`} alt={t.imageAlt} /><figcaption>{t.imageDone} <a href="/content/library">{t.imageOpenLibrary}</a></figcaption></figure> : null}
   </form>;
 
   const videoTab = !status.video.available ? unavailable : <div className={styles.stack}>

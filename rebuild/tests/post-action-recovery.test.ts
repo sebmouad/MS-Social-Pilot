@@ -26,7 +26,7 @@ it('redirects only after a confirmed delete and refreshes publishing views', asy
   const data = values(); data.set('intent', 'start'); data.set('confirmation', 'DELETE POST p LOCAL');
   await expect(deletePostWithRecoveryAction({ status: 'idle', deleteRemote: false }, data)).rejects.toMatchObject({ digest: expect.stringContaining('notice=deleted') });
   expect(state.remove).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w', allowedTargetIds: ['a'] }, 'p', false);
-  expect(state.refresh).toHaveBeenCalledWith('/publishing/posts');
+  expect(state.refresh).toHaveBeenCalledWith('/content');
 });
 
 it('does not report deletion for a missing receipt or malformed request', async () => {

@@ -164,7 +164,7 @@ async function main() {
     await saveSetting('publishing.collab.versionRetention', 20); await saveSetting('publishing.collab.queueSlotLimit', 100); await saveSetting('publishing.collab.queueLookaheadDays', 30);
     await saveSetting('publishing.queue.defaultSlot', { dayOfWeek: 4, hour: 13, minute: 45 });
     stage = 'verify Root queue default reaches rendered editor HTML';
-    const queuePage = await http('/publishing/collaboration?view=queue');
+    const queuePage = await http('/content/queue');
     const queuePageHtml = await queuePage.text();
     const renderedDefaultTime = /<input\b[^>]*\btype="time"[^>]*\bvalue="13:45"|<input\b[^>]*\bvalue="13:45"[^>]*\btype="time"/.test(queuePageHtml);
     const renderedWorkspaceTimezone = queuePageHtml.replace(/<!--[\s\S]*?-->/g, '').includes('The workspace timezone is UTC.');

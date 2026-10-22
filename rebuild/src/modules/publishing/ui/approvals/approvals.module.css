@@ -3,3 +3,19 @@
 .toggle:hover { background: var(--surface-muted); }
 .toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .preview { max-width: 560px; margin-top: 4px; }
+/* Design v2 S5: review cards at a readable measure. */
+.keys { margin: 0 0 var(--space-3); color: var(--ink-soft); font-size: var(--text-sm); }
+.list { display: grid; gap: var(--space-4); max-width: 640px; margin: 0; padding: 0; list-style: none; }
+.card { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-card); }
+.card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.cardHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.cardHead strong { display: block; font-size: var(--text-md); }
+.when { display: block; color: var(--ink-soft); font-size: var(--text-sm); }
+.cardPreview article { max-width: none; }
+.decision { display: grid; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.note { display: grid; gap: 6px; }
+.note label { color: var(--ink-soft); font-size: var(--text-sm); font-weight: 650; }
+.note textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-md); }
+.note textarea:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.help { margin: 0; color: var(--ink-soft); font-size: var(--text-sm); }

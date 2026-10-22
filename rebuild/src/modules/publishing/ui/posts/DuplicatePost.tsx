@@ -74,7 +74,7 @@ export function DuplicatePost({ postId: sourceId, disabled = false, onPendingCha
         throw new Error(t('theCopyResultCouldNotBeConfirmed'));
       }
       requestId.current = null;
-      router.push('/publishing/posts?status=draft&notice=duplicated');
+      router.push('/content?status=draft&notice=duplicated');
       router.refresh();
     } catch {
       setError(t('theCopyResultCouldNotBeConfirmed'));
@@ -90,6 +90,6 @@ export function DuplicatePost({ postId: sourceId, disabled = false, onPendingCha
       {pending ? t('copying') : t('duplicateAsDraft')}
     </Button>
     <p className={styles.help}>{t('createsANewUnscheduledDraftWithThe')}</p>
-    {error ? <p className={styles.formError} role="alert" tabIndex={-1} ref={errorRef}>{error} <a href="/publishing/posts?status=draft" target="_blank" rel="noopener noreferrer">{t('checkDrafts')}</a> {t('beforeTryingAgain')}</p> : null}
+    {error ? <p className={styles.formError} role="alert" tabIndex={-1} ref={errorRef}>{error} <a href="/content?status=draft" target="_blank" rel="noopener noreferrer">{t('checkDrafts')}</a> {t('beforeTryingAgain')}</p> : null}
   </div>;
 }

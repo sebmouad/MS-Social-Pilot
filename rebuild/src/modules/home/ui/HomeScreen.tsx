@@ -21,7 +21,7 @@ import styles from './home.module.css';
 
 type Copy = HomeCopy;
 type Module = 'analytics' | 'publishing' | 'inbox' | 'ads';
-const HREF: Record<Module, string> = { analytics: '/analytics', publishing: '/publishing/posts', inbox: '/inbox', ads: '/ads' };
+const HREF: Record<Module, string> = { analytics: '/analytics', publishing: '/content', inbox: '/inbox', ads: '/ads' };
 
 /** One card: icon chip tinted by its module color, a title and a link to the module. */
 function Card({ module, icon, title, t, span, children, id }: { module: Module; icon: ReactNode; title: string; t: Copy; span: 'span4' | 'span6' | 'span8' | 'span12'; children: ReactNode; id: string }) {
@@ -130,7 +130,7 @@ export default async function HomePage() {
       </>}
 
       {overview.bestTimes && <Card module="publishing" icon={<IconClockHour4 size={20} />} title={t.bestTimes} t={t} span="span8" id="home-times">
-        <Body section={overview.bestTimes} t={t} empty={<Empty title={t.bestTimesEmptyTitle} body={t.bestTimesEmptyBody} action={t.bestTimesEmptyAction} href="/publishing/compose" />}>
+        <Body section={overview.bestTimes} t={t} empty={<Empty title={t.bestTimesEmptyTitle} body={t.bestTimesEmptyBody} action={t.bestTimesEmptyAction} href="/create" />}>
           {times => <>
             <HeatmapChart label={t.bestTimesLabel} valueLabel={t.bestTimesValue} locale={locale} format={{ style: 'number', maximumFractionDigits: 2 }} cells={times.cells.map(cell => ({ day: cell.day, hour: cell.hour, value: cell.value }))} />
             <p className={styles.note}>{t.bestTimesNote}</p>
@@ -139,7 +139,7 @@ export default async function HomePage() {
       </Card>}
 
       {overview.upcoming && <Card module="publishing" icon={<IconCalendarEvent size={20} />} title={t.upcoming} t={t} span="span4" id="home-upcoming">
-        <Body section={overview.upcoming} t={t} empty={<Empty title={t.upcomingEmptyTitle} body={t.upcomingEmptyBody} action={t.upcomingEmptyAction} href="/publishing/compose" />}>
+        <Body section={overview.upcoming} t={t} empty={<Empty title={t.upcomingEmptyTitle} body={t.upcomingEmptyBody} action={t.upcomingEmptyAction} href="/create" />}>
           {upcoming => <>
             <ul className={styles.list}>{upcoming.items.map(item => <li className={styles.item} key={item.id} data-module="publishing">
               <PostThumb thumb={(item as typeof item & { thumbnail?: PostThumbnail | null }).thumbnail ?? null} size="md" />
@@ -150,7 +150,7 @@ export default async function HomePage() {
               </div>
             </li>)}</ul>
             {upcoming.total > upcoming.items.length && <p className={styles.note}>{fill(t.upcomingMore, { n: upcoming.total })}</p>}
-            <a className={styles.link} href="/publishing/queue">{t.viewQueue}</a>
+            <a className={styles.link} href="/content/queue">{t.viewQueue}</a>
           </>}
         </Body>
       </Card>}
