@@ -5,6 +5,7 @@ import { AGENTS_CONFIG, AGENT_COPY_CONFIG } from './agents/config';
 import { ASYNC_POST_EXPORT_CONFIG } from './publishing/server/export/config';
 import { ANALYTICS_MODULE_CONFIG } from './analytics/config';
 import { FEEDS_CONFIG } from './feeds/config';
+import { HISTORY_CONFIG } from './history/config';
 import { HOME_CONFIG } from './home/config';
 import { INBOX_MODULE_CONFIG } from './inbox/config';
 import { INTEGRATIONS_CONFIG } from './integrations/config';
@@ -35,4 +36,5 @@ export const INSTALLED_MODULE_CONFIG = [
   ...AGENT_COPY_CONFIG,
   ...ASYNC_POST_EXPORT_CONFIG,
   ...INTEGRATIONS_CONFIG,
+  ...HISTORY_CONFIG,
 ] as const;

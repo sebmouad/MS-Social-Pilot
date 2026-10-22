@@ -72,6 +72,7 @@ const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
   'settings/bio': 'settings/bio',
   'settings/mcp': 'settings/team',
   'settings/webhooks': 'settings/team',
+  'settings/history': null,
   'settings/account': null,
   'settings/notifications': null,
   'settings/data': null,

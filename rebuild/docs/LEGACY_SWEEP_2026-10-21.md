@@ -20,6 +20,8 @@ Inventory sizes: 95 legacy pages, 191 legacy `route.ts`, ~150 `src/lib` files, 9
 | 9 | `import-legacy-config.ts` imports only Facebook, AI-provider, auth-policy and APP_URL values. Operator, alerts, retention, scheduler, media and link-shortener legacy settings are not imported. | Silent config loss if the legacy `app_settings` table is later dropped. | Root owner |
 | 10 | Legacy `oauth_clients`/`oauth_codes` are not read; rebuild uses new `mcp_oauth_clients`/`mcp_oauth_codes`. Existing connector registrations must be re-created. | Connectors authorised under legacy stop working. | Integrations owner (document or migrate) |
 
+**Update 2026-10-22 (history/public/errors lane; source + mocked tests only, no browser, PostgreSQL or production run):** gap 2 (public pages), gap 6 (`/api/health`) and the Settings › History and Root › Changelog parts of gap 7 are implemented in `src/modules/history/`; gap 3 is closed for server, browser and error-boundary errors via `src/server/errors/`. Still open from gap 3: worker-side `recordError` calls, `system_alerts`/`uptime_days` writers and alert delivery. The legacy `changelog_entries`, `activity_logs`, `email_logs` and `error_events` tables are the same tables the rebuild reads and writes, so no data import script is needed.
+
 ## 2. Pages (`src/app/**/page.tsx`)
 
 Rebuild paths are relative to `rebuild/src/app/`.
@@ -59,7 +61,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `(app)/settings/bio` | `settings/bio` | done |
 | `(app)/settings/export` | `settings/data` | partial (owner ZIP partial per parity file) |
 | `(app)/settings/fields` | `publishing/collaboration` FieldsManager | done |
-| `(app)/settings/history` | none | missing (activity + email log reader) |
+| `(app)/settings/history` | `settings/history` | done (source + mocked service/route/MCP tests, 2026-10-22): `src/modules/history/ui/HistoryScreen.tsx`, `server/history.ts`, `GET /api/settings/history/{activity,email}`, MCP `list_workspace_activity`/`list_workspace_email_log`; owner/admin only |
 | `(app)/settings/media` | `publishing/media` | done |
 | `(app)/settings/notifications` | `settings/notifications` | done |
 | `(app)/settings/pages` | `settings/connections`, `settings/profiles` | done |
@@ -80,11 +82,11 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `root/agency` | `agency` module + `root/workspaces` | partial: client invitations (`client_invitations`) unread |
 | `root/alerts` | `root/operations` / `root/modules` diagnostics | partial: no `system_alerts` writer, no alert test button |
 | `root/backups` | `root/backups` | partial: read-only; writers are legacy host scripts |
-| `root/changelog` | none | missing |
+| `root/changelog` | `root/changelog` | done (source + mocked tests): `src/app/root/changelog/page.tsx`, `ui/ChangelogManager.tsx`, `server/changelog.ts`, `/api/root/changelog*`, Root MCP `list/add/remove_root_changelog_*` |
 | `root/config`, `config/[section]` | `root/config`, `root/modules/[id]`, `root/platforms/[id]` | done |
 | `root/connections` | `root/connections` | done |
 | `root/danger` | `root/lifecycle` | done |
-| `root/errors` | `root/errors`, `root/errors/[id]` | partial: no recorder (gap 3) |
+| `root/errors` | `root/errors`, `root/errors/[id]` | done for the recorder (2026-10-22): `src/server/errors/recorder.ts` (instrumentation `onRequestError`, browser reports, error boundary) now writes `error_events`; worker-side `recordError` calls and `system_alerts` writers remain open |
 | `root/meta`, `meta/connections` | `root/platforms/[id]` (Facebook), `root/connections` | partial: no app-check button |
 | `root/meta/usage` (Graph usage) | `api.meta.requestsPerMinute` key only | missing: `graph_usage` has no reader |
 | `root/plans` | `root/plans` | done |
@@ -96,7 +98,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `root/users` | `root/users` | done |
 | `root/workspaces`, `[id]` | `root/workspaces` (+ `api/root/workspaces/[id]/access`) | done |
 | `bio/[slug]` | `bio/[slug]/view` | done |
-| `changelog`, `help`, `pricing`, `privacy-policy`, `status`, `terms`, `data-deletion` | none | missing (gap 2) |
+| `changelog`, `help`, `pricing`, `privacy-policy`, `status`, `terms`, `data-deletion` | same paths | done (source + render/route tests, 2026-10-22): `src/modules/history/ui/public-pages.tsx`, Root keys `public.siteEnabled/operator/content`; EN/FR; help/pricing/status/changelog gated by `public.siteEnabled`, legal pages always public; data-deletion keeps the confirmation-code lookup |
 | `invite/[token]` | `join` | done |
 | `page.tsx` (landing) | `page.tsx` | done |
 | `settings/config` (owner config) | `root/config` | done |
@@ -132,12 +134,12 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/cron/tick` | worker `scripts/worker.ts` | obsolete: external cron trigger replaced by worker |
 | `api/custom-fields`, `[id]` | `api/publishing/custom-fields/*` | done |
 | `api/engagement/comments`, `messages`, `sync`; `api/inbox`, `assign`, `notes*` | `api/inbox/*` | done |
-| `api/errors` | none | missing (client error report) |
+| `api/errors` | `api/errors` | done (source + mocked tests): `src/app/api/errors/route.ts`, `src/server/errors/client-report.ts`; Root-bounded rate limit and size; parity exception recorded in MCP_PARITY.md |
 | `api/exports`, `[id]` | `api/settings/data/exports`, `snapshot` | partial |
 | `api/facebook/connect`, `callback` | `api/connections/[platform]/start`, `callback` (+ `api/oauth/connections/[platform]/start`) | done; Meta redirect URI must be updated to the new callback |
 | `api/facebook/data-deletion`, `deauthorize` | none | **missing (gap 1)** |
 | `api/feeds`, `[id]` | `api/feeds/*` (+ WordPress) | done |
-| `api/health` | none | missing |
+| `api/health` | `api/health` | done (source + mocked tests): `src/app/api/health/route.ts`, `modules/history/server/health.ts`; scripts still probe `/sign-in` and legacy health until the release owner rewires them |
 | `api/instagram` | `platforms/instagram` discovery only | partial |
 | `api/key-dates`, `seasons` (+ `[id]`) | none | missing |
 | `api/labels`, `[id]` | `api/publishing/labels/*` | done |
@@ -159,7 +161,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/report-schedules*`, `report-templates*`, `reports` | `api/analytics/report-workflows/*`, `api/reports/export` | done |
 | `api/root/alerts/test` | none | missing |
 | `api/root/app-check` | `api/root/diagnostics` | partial |
-| `api/root/changelog*` | none | missing |
+| `api/root/changelog*` | `api/root/changelog`, `api/root/changelog/[id]` | done (source + mocked tests): exact confirmations, Root actor recheck and transactional audit |
 | `api/root/client-invitations*` | none | missing |
 | `api/root/config*`, `adopt`, `ai-models`, `test-email` | `api/root/config`, `diagnostics` | done (adopt obsolete: `import-legacy-config.ts`) |
 | `api/root/connections/health` | `api/root/connections*` | done |
@@ -201,7 +203,7 @@ Rebuild evidence paths under `rebuild/src/`.
 | `media`, `image-format`, `image-variants`, `media-links`, `zip`, `workspace-export` | `modules/media/**`, `server/data-control/**`, `modules/settings/server/exports.ts` | done / partial |
 | `bio`, `share-links`, `agency*`, `tasks`, `task-workflow`, `team`, `role-access`, `scope-abilities`, `page-access`, `page-groups`, `page-filter`, `selection`, `custom-fields`, `feeds`, `rss/*`, `webhooks`, `api`, `public-api`, `api-tokens` | corresponding modules; `api-tokens` replaced by MCP/person keys | done; `api-tokens` partial |
 | `root*`, `operator`, `site`, `setup`, `meta-app`, `plans`, `settings/*`, `config-draft`, `modules`, `env` | `server/root/**`, `server/config/**`, `lib/config/**` | done / partial (`operator`, `site`, `setup` missing) |
-| `activity`, `history` | writers in many modules; no reader UI | partial |
+| `activity`, `history` | writers in many modules; reader `modules/history/server/history.ts` | done (reader added 2026-10-22; retention follows `root.auditRetentionDays` for activity only) |
 | `scheduler/*` | `server/jobs/**`, `scripts/worker.ts` | done |
 | `structured-data*`, `safe-fetch`, `holidays` data, `world-map.json`, `palette`, `themes`, `brand`, `languages`, `time`, `text`, `csv`, `json`, `paging`, `validation` | `lib/themes.ts`, per-module helpers; structured-data and world-map not carried | partial (structured data/world map missing) |
 

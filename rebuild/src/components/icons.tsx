@@ -3,7 +3,7 @@ import {
   IconChartBar, IconChartDots3, IconChartPie, IconCheckbox, IconCircleDot, IconClipboardCheck, IconColumns3, IconDatabase,
   IconFileAnalytics, IconHome, IconId, IconLayoutDashboard, IconLink, IconListDetails, IconMessageCircle, IconPalette, IconPhoto,
   IconPlugConnected, IconRss, IconSend, IconSettings, IconShare, IconShieldLock, IconSpeakerphone, IconStack2, IconTag,
-  IconTarget, IconTemplate, IconUserCircle, IconUsers, IconUsersGroup, IconVersions, IconWebhook, IconPin, IconScale,
+  IconTarget, IconTemplate, IconUserCircle, IconUsers, IconUsersGroup, IconVersions, IconWebhook, IconPin, IconScale, IconHistory,
   type Icon as TablerIcon,
 } from '@tabler/icons-react';
 
@@ -28,7 +28,7 @@ export const PAGE_ICONS: Record<string, TablerIcon> = {
   '/settings/connections': IconPlugConnected, '/settings/team': IconUsers, '/settings/workspace': IconId,
   '/settings/sharing': IconShare, '/settings/bio': IconLink, '/settings/mcp': IconApi, '/settings/webhooks': IconWebhook,
   '/settings/account': IconUserCircle, '/settings/notifications': IconBell, '/settings/data': IconDatabase,
-  '/settings/appearance': IconPalette, '/settings/profiles': IconVersions,
+  '/settings/appearance': IconPalette, '/settings/history': IconHistory, '/settings/profiles': IconVersions,
 };
 
 export function ModuleGlyph({ id, size = 19 }: { id: string; size?: number }) {

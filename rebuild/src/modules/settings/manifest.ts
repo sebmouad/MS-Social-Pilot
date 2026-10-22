@@ -1,5 +1,6 @@
 import type { ModuleManifest } from '../types';
 import { INTEGRATIONS_JOBS, INTEGRATIONS_PAGES, INTEGRATIONS_ROOT_PREFIX } from '../integrations/manifest';
+import { HISTORY_PAGES, HISTORY_ROOT_PREFIX } from '../history/manifest';
 
 export const settingsManifest = {
   id: 'settings',
@@ -10,7 +11,7 @@ export const settingsManifest = {
     { name: 'notifications', label: 'Notification delivery', configKey: 'notifications.deliverySchedule' },
     ...INTEGRATIONS_JOBS,
   ],
-  rootSettingsPrefixes: ['settings.', 'connections.', 'mcp.keys.', 'mcp.personKeys.', 'notifications.', 'sharing.', 'bio.', INTEGRATIONS_ROOT_PREFIX],
+  rootSettingsPrefixes: ['settings.', 'connections.', 'mcp.keys.', 'mcp.personKeys.', 'notifications.', 'sharing.', 'bio.', INTEGRATIONS_ROOT_PREFIX, HISTORY_ROOT_PREFIX],
   rootSettingKeys: ['data.exportMaxJobs', 'data.exportExpiryHours', 'data.exportWorkerBatch', 'data.exportLeaseSeconds', 'data.exportSchedule', 'data.purgeRecoverySchedule', 'data.deleteTransactionTimeoutMs', 'data.maxArchiveBytes'],
   title: 'Settings',
   href: '/settings/connections',
@@ -22,6 +23,7 @@ export const settingsManifest = {
     { id: 'settings/bio', title: 'Link in bio', href: '/settings/bio', description: 'Manage your public profile and links.' },
     { id: 'settings/mcp', title: 'MCP API keys', href: '/settings/mcp', description: 'Manage scoped workspace integration keys.' },
     ...INTEGRATIONS_PAGES,
+    ...HISTORY_PAGES,
     { id: 'settings/account', title: 'Account', href: '/settings/account', description: 'Your profile and preferences.' },
     { id: 'settings/notifications', title: 'Notifications', href: '/settings/notifications', description: 'Choose your alerts and review notifications.' },
     { id: 'settings/data', title: 'Data and privacy', href: '/settings/data', description: 'Export or delete workspace data.' },

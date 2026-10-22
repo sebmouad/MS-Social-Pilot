@@ -20,6 +20,7 @@ export const rootManifest = {
       { title: 'Backup records', href: '/root/backups' },
       { title: 'Operations', href: '/root/operations' },
       { title: 'Activity', href: '/root/activity' },
+      { title: 'Changelog', href: '/root/changelog' },
       { title: 'Shared configuration', href: '/root/config' },
     ] },
     { title: 'Product modules', pages: [

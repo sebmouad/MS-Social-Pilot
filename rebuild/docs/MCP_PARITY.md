@@ -395,6 +395,8 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | list_webhook_deliveries | settings/webhooks | read | GET /api/webhooks/[id]/deliveries | Shared customer operation; transport arguments may differ. |
 | redeliver_webhook_delivery | settings/webhooks | write | POST /api/webhooks/[id]/deliveries/[deliveryId] | Shared customer operation; transport arguments may differ. |
 | get_agency_overview | agency/overview | read | GET /api/agency | Person overview catalog only; REST uses browser identity, MCP uses person identity; neither accepts workspace keys. |
+| list_workspace_activity | settings/history | read | GET /api/settings/history/activity | listWorkspaceActivity; owners/admins only, same filters and paging as Settings › History. |
+| list_workspace_email_log | settings/history | read | GET /api/settings/history/email | listWorkspaceEmails; owners/admins only, same filters, paging and recent-problem count as Settings › History. |
 <!-- parity-tools:end -->
 
 The next table records additional REST entry points for the same named tools.
@@ -481,6 +483,9 @@ or person credential access. Root resources read through these same tools.
 | rename_root_workspace | installation/root | write | PATCH /api/root/workspaces/[id] | renameRootWorkspace; same exact confirmation, concurrency check and transactional audit. |
 | create_root_workspace | installation/root | write | POST /api/root/workspaces | createRootWorkspace; same exact confirmation, active owner membership and transactional audit. |
 | list_root_workspaces | installation/root | read | GET /api/root/workspaces | listRootWorkspaces; separately authenticated private dispatcher. |
+| list_root_changelog | installation/root | read | GET /api/root/changelog | listRootChangelog; separately authenticated private dispatcher. |
+| add_root_changelog_entry | installation/root | write | POST /api/root/changelog | addRootChangelogEntry; exact ADD CHANGELOG ENTRY confirmation, Root re-check and transactional audit. |
+| remove_root_changelog_entry | installation/root | write | DELETE /api/root/changelog/[id] | removeRootChangelogEntry; exact REMOVE CHANGELOG ENTRY confirmation, Root re-check and transactional audit. |
 <!-- parity-root-tools:end -->
 
 The remaining 24 exceptions are authentication bootstrap/ceremonies, transport or
@@ -497,6 +502,7 @@ excepted.
 | --- | --- |
 | GET /api/auth/register | Public registration availability for account bootstrap; not authenticated customer workspace data. |
 | GET /api/connections/[platform]/callback | Provider consent callback validates browser OAuth state; autonomous tools initiate consent through mapped start_connection. |
+| GET /api/health | Unauthenticated liveness/readiness probe for proxies and deploy scripts; returns only a status code and worker state, no workspace data. Operators read the same facts through get_root_operations. |
 | GET /api/mcp | MCP HTTP transport negotiation/unsupported-stream response, not a product capability. |
 | GET /api/v1/me | Credential introspection returns authenticated key grants/ceilings; protocol-specific identity metadata, not workspace product data. |
 | POST /api/auth/invitations/accept | Interactive invitation redemption binds the current browser identity; workspace MCP credentials cannot bootstrap membership. |
@@ -521,6 +527,7 @@ excepted.
 | POST /api/platforms/[platform]/deauthorize | Provider-signed server-to-server "app removed" callback (Meta); authenticated by the provider's signature, not a workspace identity. Connection removal stays mapped through disconnect_connection. |
 | POST /api/platforms/[platform]/data-deletion | Provider-signed server-to-server erasure request (Meta); authenticated by the provider's signature. Returns a public status URL and code; not a workspace operation. |
 | POST /api/sharing/public/[token]/decision | External reviewer share-token decision; separate public reviewer authority from workspace MCP. Advisory approvals/change requests atomically queue author-eligible notices with the answer; applied decisions use Publishing notices. Authenticated link management/feedback and notification reads stay mapped; comments do not queue notices. |
+| POST /api/errors | Browser telemetry sink for the app's own pages: a signed-in browser reports its uncaught errors to the self-hosted recorder (rate limited, scrubbed, Root-bounded). It exposes no product data and no write a person chooses; operators read and resolve the result through the mapped Root error tools. |
 <!-- parity-rest-exceptions:end -->
 
 Manifest-only view aliases explicitly reuse covered feature capabilities. Neither

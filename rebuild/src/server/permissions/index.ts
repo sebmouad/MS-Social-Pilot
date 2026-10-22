@@ -63,6 +63,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'settings/bio': 'settings/bio',
   'settings/mcp': 'settings/team',
   'settings/webhooks': 'settings/team',
+  'settings/history': null,
   'settings/account': null,
   'settings/notifications': null,
   'settings/data': null,
@@ -80,6 +81,8 @@ const MODULE_ROOT_SWITCH: Record<PermissionModule, string | null> = {
 };
 
 function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: ReadonlySet<string>): Permission {
+  // History names who did what and may hold the only record of removed items: managers read it, nobody writes it.
+  if (feature === 'settings/history') return { read: role === 'owner' || role === 'admin', write: false };
   if (feature === 'settings/sharing' || feature === 'settings/bio') return { read: role === 'owner' || role === 'admin', write: role === 'owner' || role === 'admin' };
   if (feature.startsWith('agency/')) return { read: role === 'owner' || role === 'admin', write: false };
   if (role === 'owner' || role === 'admin') return { read: true, write: true };

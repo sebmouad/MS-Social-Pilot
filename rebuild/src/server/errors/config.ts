@@ -1,0 +1,30 @@
+import { z } from 'zod';
+import { entry } from '@/lib/config/entry';
+
+/**
+ * Root settings for the self-hosted error recorder and the browser error report endpoint (shared
+ * infrastructure, no module prefix). Nothing here is read by provider or product code.
+ */
+export const ERRORS_CONFIG = [
+  entry({ key: 'errors.recordingEnabled', group: 'Errors', label: 'Record application errors', kind: 'boolean', description: 'Store server, worker and browser errors (grouped, scrubbed of tokens and addresses) for Root › Errors. Turning it off stops new records; existing ones stay until they expire.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
+  entry({ key: 'errors.nameMaxCharacters', group: 'Errors', label: 'Stored error name limit', kind: 'number', description: 'Maximum characters kept of an error name.', defaultValue: 100, schema: z.number().int().min(10).max(500), consumption: 'active' }),
+  entry({ key: 'errors.messageMaxCharacters', group: 'Errors', label: 'Stored error message limit', kind: 'number', description: 'Maximum characters kept of an error message after scrubbing.', defaultValue: 1000, schema: z.number().int().min(100).max(10000), consumption: 'active' }),
+  entry({ key: 'errors.stackMaxCharacters', group: 'Errors', label: 'Stored call-stack limit', kind: 'number', description: 'Maximum characters kept of an error’s call stack after scrubbing; 0 stores none.', defaultValue: 4000, schema: z.number().int().min(0).max(50000), consumption: 'active' }),
+  entry({ key: 'errors.locationMaxCharacters', group: 'Errors', label: 'Stored location limit', kind: 'number', description: 'Maximum characters kept of the route or job an error happened in (query strings are always dropped).', defaultValue: 300, schema: z.number().int().min(20).max(2000), consumption: 'active' }),
+  entry({ key: 'errors.retentionDays', group: 'Errors', label: 'Error retention (days)', kind: 'number', description: 'Error groups not seen for this many days are deleted.', defaultValue: 90, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
+  entry({ key: 'errors.pruneIntervalMinutes', group: 'Errors', label: 'Error cleanup interval (minutes)', kind: 'number', description: 'Minimum time between cleanups of expired error groups, run by the process that records errors.', defaultValue: 60, schema: z.number().int().min(1).max(10080), consumption: 'active' }),
+  entry({ key: 'errors.releaseFile', group: 'Errors', label: 'Release marker file', kind: 'text', description: 'File, relative to the application directory, that the deploy writes with the running commit. Errors are tagged with its first line.', defaultValue: 'RELEASE', schema: z.string().trim().min(1).max(200), consumption: 'active' }),
+  entry({ key: 'errors.fallbackRelease', group: 'Errors', label: 'Release label when unknown', kind: 'text', description: 'Label stored when the release marker file is missing.', defaultValue: 'dev', schema: z.string().trim().min(1).max(40), consumption: 'active' }),
+  entry({ key: 'errors.releaseMaxCharacters', group: 'Errors', label: 'Release label limit', kind: 'number', description: 'Maximum characters kept of the release label.', defaultValue: 40, schema: z.number().int().min(4).max(64), consumption: 'active' }),
+  entry({ key: 'errors.clientReportsEnabled', group: 'Errors', label: 'Accept browser error reports', kind: 'boolean', description: 'Let signed-in browsers report client-side errors to the recorder.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
+  entry({ key: 'errors.clientReportsPerWindow', group: 'Errors', label: 'Browser reports per person per window', kind: 'number', description: 'How many error reports one signed-in person may send within the window. More are ignored so the table cannot be filled.', defaultValue: 20, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'errors.clientReportsWindowSeconds', group: 'Errors', label: 'Browser report window (seconds)', kind: 'number', description: 'Length of the window used to limit browser error reports.', defaultValue: 600, schema: z.number().int().min(10).max(86400), consumption: 'active' }),
+  entry({ key: 'errors.clientMaxPerPageLoad', group: 'Errors', label: 'Browser reports per page load', kind: 'number', description: 'How many errors one open page reports before it stops, so a failing loop cannot flood the server.', defaultValue: 5, schema: z.number().int().min(1).max(100), consumption: 'active' }),
+  entry({ key: 'errors.clientTrackedPeopleMax', group: 'Errors', label: 'People tracked for report limits', kind: 'number', description: 'How many people the in-memory browser report limiter remembers at once; the oldest are forgotten first.', defaultValue: 5000, schema: z.number().int().min(10).max(1000000), consumption: 'active' }),
+  entry({ key: 'errors.clientReportMaxBytes', group: 'Errors', label: 'Browser report size limit (bytes)', kind: 'number', description: 'Largest accepted request body for a browser error report.', defaultValue: 16384, schema: z.number().int().min(1024).max(262144), consumption: 'active' }),
+  entry({ key: 'errors.clientMessageMaxCharacters', group: 'Errors', label: 'Browser report message limit', kind: 'number', description: 'Longest accepted message in a browser error report.', defaultValue: 2000, schema: z.number().int().min(100).max(20000), consumption: 'active' }),
+  entry({ key: 'errors.clientStackMaxCharacters', group: 'Errors', label: 'Browser report stack limit', kind: 'number', description: 'Longest accepted call stack in a browser error report.', defaultValue: 8000, schema: z.number().int().min(0).max(50000), consumption: 'active' }),
+  entry({ key: 'errors.clientPathMaxCharacters', group: 'Errors', label: 'Browser report path limit', kind: 'number', description: 'Longest accepted page path in a browser error report.', defaultValue: 500, schema: z.number().int().min(20).max(4000), consumption: 'active' }),
+] as const;
+
+export type ErrorsConfigKey = (typeof ERRORS_CONFIG)[number]['key'];

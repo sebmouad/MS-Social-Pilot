@@ -18,12 +18,14 @@ import { resetRootUserTwoStep, revokeRootUserSessions, setRootUserDisabled } fro
 import { readRootPlatformPublicationEvidence, runRootPlatformPublicationAction } from '../root/platform-publication-evidence';
 import { rootUserActions, rootUserConfirmationSchema, rootUserIdSchema } from '@/lib/root-user-controls';
 import { rootLegacyToolDefinitions, rootLegacyResources, rootLegacyTools, callRootLegacyTool } from '../root/legacy/mcp';
+import { executeRootChangelogTool, rootChangelogResources, rootChangelogToolDefinitions, rootChangelogTools } from '@/modules/history/root-mcp';
 import type { RootMcpActor } from './types';
 import { ROOT_EVIDENCE_POLICY } from '@/lib/config/root-evidence-policy';
 import { loadRootEvidencePolicy, loadRootEvidenceCopy } from '../root/platform-publication-evidence';
 
 export const rootToolDefinitions = [
   ...rootLegacyToolDefinitions,
+  ...rootChangelogToolDefinitions,
   { name: 'list_root_inbox_deletions', description: 'Private bounded Inbox deletion recovery history. Includes remote object identity for operator verification, never credentials or comment content. Workspace keys cannot use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'confirm_root_inbox_deletion', description: 'Record an operator attestation only after separately verifying actual remote deletion. This is not an automatic provider check; it never contacts the platform or removes local rows. Require verifiedOnPlatform:true and exact CONFIRM REMOTE DELETION <operationId>. Workspace keys cannot use this tool.', inputSchema: { type: 'object', required: ['operationId', 'verifiedOnPlatform', 'confirmation'], properties: { operationId: { type: 'string' }, verifiedOnPlatform: { const: true, type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'list_root_post_deletions', description: 'Private bounded recent Publishing post deletion history. Shows remote and local post identities to installation owners only; excludes post content, credentials and provider errors.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -52,6 +54,7 @@ export const rootTools = new Set(rootToolDefinitions.map(tool => tool.name));
 export const canUseRootTool = (viewer: RootMcpActor) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 const resourceDefinitions = [
   ...rootLegacyResources,
+  ...rootChangelogResources,
   { uri: 'msp://root/inbox-deletions', name: 'Inbox deletion recovery', description: 'Private bounded operator deletion history and remote identity; credentials excluded.', tool: 'list_root_inbox_deletions' },
   { uri: 'msp://root/post-deletions', name: 'Publishing post deletion recovery', description: 'Private bounded operator deletion history and remote identity; post content and credentials excluded.', tool: 'list_root_post_deletions' },
   { uri: 'msp://root/publication-attempts', name: 'Publication attempt recovery', description: 'Private bounded publication receipts and safe attempt state; post content and credentials excluded.', tool: 'list_root_publication_attempts' },
@@ -76,6 +79,7 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
     if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
     if (!args || typeof args !== 'object' || Array.isArray(args)) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
     if (rootLegacyTools.has(name)) return await callRootLegacyTool({ ...viewer, maxResultItems: viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')) }, name, args);
+    if (rootChangelogTools.has(name)) return await executeRootChangelogTool(viewer.userId, name, args, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
     switch (name) {
       case 'list_root_inbox_deletions':
         if (Object.keys(args).length) throw new OperationError('invalid_request', 'This read does not accept filters.');

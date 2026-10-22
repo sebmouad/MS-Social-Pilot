@@ -329,6 +329,16 @@ Authorization/resource checks and isolated card failures remain. Source/query
 shape tests are evidence; no target application receipt, query plan, timing or
 production speedup is recorded.
 
+## History, public site, health and error recorder (2026-10-22)
+
+Source-level; mocked service/route/MCP tests only, no browser, PostgreSQL or production run.
+
+- `src/modules/history/` is a Settings feature (`settings/history`, declared through the Settings manifest like Integrations): owner/admin read-only activity and email-log readers behind one service (`server/history.ts`), session REST (`/api/settings/history/{activity,email}`) and MCP (`list_workspace_activity`, `list_workspace_email_log`). Root keys `history.*`.
+- Public site (`ui/public-pages.tsx`, thin `src/app/{help,pricing,status,changelog,privacy-policy,terms,data-deletion}` routes): text is Root-editable (`public.content`, `public.operator`, `public.siteEnabled`), EN/FR, rendered only as paragraphs, lists and safe links. Help, pricing, status and changelog 404 until `public.siteEnabled`; the legal pages are always public.
+- Root changelog (`server/changelog.ts`, `/root/changelog`, `/api/root/changelog*`, Root MCP `*_root_changelog_*`): installation owner only, exact confirmations, transactional audit.
+- `GET /api/health` (`server/health.ts`): the database decides the verdict, worker state is information.
+- `src/server/errors/`: self-hosted recorder feeding `error_events` (Next `onRequestError`, error boundary, `window` listeners via `/api/errors`), scrubbed and grouped, bounded by Root keys `errors.*`. Open: worker-side recording, `system_alerts` and uptime writers.
+
 ## Verification and continuation
 
 [BROWSER_MATRIX_2026-10-21.md](BROWSER_MATRIX_2026-10-21.md) records real Chromium

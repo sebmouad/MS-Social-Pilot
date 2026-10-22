@@ -9,7 +9,7 @@ const loaders = import.meta.glob('../src/app/**/page.tsx') as Record<string, () 
 const routeOf = (file: string) => file.replace('../src/app', '').replace(/\/page\.tsx$/, '') || '/';
 const sampleParams = (route: string) => Object.fromEntries([...route.matchAll(/\[(?:\.\.\.)?(\w+)\]/g)].map(match => [match[1], 'smoke-id']));
 
-const PUBLIC = new Set(['/', '/sign-in', '/sign-up', '/join', '/password-recovery', '/verify-email', '/two-step', '/two-step/enroll', '/no-workspace', '/access-limited', '/data-deletion', '/oauth/authorize', '/share/[token]/view', '/bio/[slug]/view', '/reports']);
+const PUBLIC = new Set(['/', '/sign-in', '/sign-up', '/join', '/password-recovery', '/verify-email', '/two-step', '/two-step/enroll', '/no-workspace', '/access-limited', '/data-deletion', '/privacy-policy', '/terms', '/help', '/pricing', '/status', '/changelog', '/oauth/authorize', '/share/[token]/view', '/bio/[slug]/view', '/reports']);
 const ROLES: SmokeRole[] = ['anonymous', 'owner', 'member', 'viewer'];
 const LOCALES: SmokeLocale[] = ['en', 'fr'];
 
