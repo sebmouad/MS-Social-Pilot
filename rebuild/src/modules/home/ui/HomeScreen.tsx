@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react';
-import { IconArrowUpRight, IconCalendarEvent, IconChartBar, IconChartDonut, IconClockHour4, IconEye, IconHeart, IconInbox, IconPlugConnected, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
+import { IconArrowUpRight, IconCalendarEvent, IconClockHour4, IconEye, IconHeart, IconInbox, IconPlugConnected, IconSpeakerphone, IconUsers } from '@tabler/icons-react';
+import { InfoTip } from '@/components/InfoTip';
+import { ListRow } from '@/components/ListRow';
+import { HomeRetry } from './HomeRetry';
 import { Badge } from '@/components/Badge';
 import { EmptyState } from '@/components/EmptyState';
 import { MetricCard, type MetricDelta } from '@/components/MetricCard';
 import { PageHeader } from '@/components/PageHeader';
 import { PostThumb } from '@/components/PostThumb';
 import type { PostThumbnail } from '@/components/post-thumbnail';
-import { BarChart, DonutChart, HeatmapChart } from '@/components/charts';
+import { HeatmapChart } from '@/components/charts';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { getTargets } from '@/server/data';
@@ -42,7 +45,7 @@ function Empty({ title, body, action, href }: { title: string; body: string; act
 }
 
 function Unavailable({ t }: { t: Copy }) {
-  return <EmptyState tone="error" title={t.unavailableTitle}>{t.unavailableBody}</EmptyState>;
+  return <EmptyState tone="error" title={t.unavailableTitle} action={<HomeRetry label={t.unavailableBody} />}>{t.unavailableBody}</EmptyState>;
 }
 
 /** A card body for a section state; `ready` content is supplied by the caller. */
@@ -69,7 +72,7 @@ function Kpi({ title, icon, totals, overview, t, locale }: { title: string; icon
   const partial = totals.comparable > 0 && totals.comparable < totals.covered;
   return <Tile module="analytics" span="span4" href={HREF.analytics} linkLabel={fill(t.openModule, { name: t.moduleNames.analytics })}>
     <MetricCard module="analytics" icon={icon} label={title} value={totals.current === null ? null : number.format(totals.current)} unavailable={totals.current === null ? t.unknownFigure : undefined} delta={delta}
-      hint={<>{fill(t.channelsNote, { covered: totals.covered, channels: overview.channelCount })}<br />{!delta ? t.noComparison : partial ? fill(t.comparableNote, { comparable: totals.comparable, covered: totals.covered }) : undefined}</>} />
+      info={<InfoTip name={title} warning={totals.covered < overview.channelCount || partial || Boolean(overview.performance?.state === 'ready' && overview.performance.data.truncated)}><p>{fill(t.period, { n: overview.lookbackDays })}</p><p>{fill(t.channelsNote, { covered: totals.covered, channels: overview.channelCount })}</p><p>{!delta ? t.noComparison : partial ? fill(t.comparableNote, { comparable: totals.comparable, covered: totals.covered }) : undefined}</p></InfoTip>} />
   </Tile>;
 }
 
@@ -82,26 +85,30 @@ export default async function HomePage() {
   const showConnections = canUseFeature(viewer.entitlements, 'settings/connections') && canAccessFeature(viewer.permissions, 'settings/connections', 'read');
   const scope = viewer.permissions.pageScope;
   const visibleTargets = await getTargets(viewer.workspaceId, scope.all ? undefined : scope.ids, entitledPlatformIds(viewer.entitlements));
+  if (visibleTargets.length === 0) return <PageFrame module="home"><div className={styles.root}><PageHeader module="home" title={viewer.user.name ? `${t.greeting}, ${viewer.user.name}` : t.greeting} /><EmptyState icon={<IconPlugConnected size={22} />} title={t.startTitle} action={showConnections ? <a className={CTA} href="/settings/connections"><span>{t.startAction}</span></a> : undefined}>{t.startBody}</EmptyState></div></PageFrame>;
   const overview = await readHomeOverview({ userId: viewer.user.id, workspaceId: viewer.workspaceId });
   const number = new Intl.NumberFormat(locale);
   const dayFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
   const timeFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: overview.timeZone });
   const days = overview.lookbackDays;
+  const periodEnd = new Date(overview.generatedAt);
+  const periodStart = new Date(periodEnd);
+  periodStart.setUTCDate(periodStart.getUTCDate() - days + 1);
   const performance = overview.performance;
   const ready = performance?.state === 'ready' ? performance.data : null;
   const readyAds = overview.ads?.state === 'ready' ? overview.ads.data : null;
 
   return <PageFrame module="home"><div className={styles.root}>
-    <PageHeader module="home" title={`${t.greeting}, ${viewer.membership.workspace.name}`} description={t.lead}
-      actions={<Badge tone="module" module="home" icon={<IconCalendarEvent size={14} />}>{fill(t.period, { n: days })}</Badge>} />
-
-    {showConnections && visibleTargets.length === 0 && <EmptyState icon={<IconPlugConnected size={22} />} title={t.startTitle} action={<a className={CTA} href="/settings/connections"><span>{t.startAction}</span></a>}>{t.startBody}</EmptyState>}
-
+    <PageHeader module="home" title={viewer.user.name ? `${t.greeting}, ${viewer.user.name}` : t.greeting}
+      actions={<><Badge tone="neutral" icon={<IconCalendarEvent size={14} />}>{dayFormat.format(periodStart)} – {dayFormat.format(periodEnd)}</Badge><InfoTip name={t.metrics}><p>{fill(t.period, { n: days })}</p></InfoTip></>} />
+    {overview.inbox?.state === 'ready' && overview.inbox.data.open > 0 && <section className={styles.attention} aria-label={t.continueTitle}>
+      <h2>{t.continueTitle}</h2><ListRow leading={<IconInbox size={20} aria-hidden="true" />} title={`${number.format(overview.inbox.data.open)} ${t.inboxOpen}`} href="/inbox" trailing={<IconArrowUpRight size={16} aria-hidden="true" />} />
+    </section>}
     <div className={styles.grid}>
       {overview.audience && (overview.audience.state === 'ready'
         ? <Tile module="analytics" span="span4" href={HREF.analytics} linkLabel={fill(t.openModule, { name: t.moduleNames.analytics })}>
           <MetricCard module="analytics" icon={<IconUsers size={20} />} label={t.audience} value={number.format(overview.audience.data.total)}
-            hint={<>{fill(t.audienceOf, { covered: overview.audience.data.covered, selected: overview.audience.data.selected })}{overview.audience.data.asOf ? ` · ${fill(t.audienceAsOf, { date: dayFormat.format(new Date(overview.audience.data.asOf)) })}` : ''}<br />{t.audienceNote}</>}
+            info={<InfoTip name={t.audience} warning={overview.audience.data.covered < overview.audience.data.selected}><p>{fill(t.audienceOf, { covered: overview.audience.data.covered, selected: overview.audience.data.selected })}{overview.audience.data.asOf ? ` · ${fill(t.audienceAsOf, { date: dayFormat.format(new Date(overview.audience.data.asOf)) })}` : ''}</p><p>{t.audienceNote}</p></InfoTip>}
             sparkline={overview.audience.data.trend.length > 1 ? overview.audience.data.trend.map(point => point.v) : undefined} sparklineLabel={fill(t.audienceTrend, { n: days })} />
         </Tile>
         : <Card module="analytics" icon={<IconUsers size={20} />} title={t.audience} t={t} span="span4" id="home-audience">
@@ -115,58 +122,44 @@ export default async function HomePage() {
         <Body section={performance} t={t} empty={<Empty title={t.perfEmptyTitle} body={t.perfEmptyBody} action={t.perfEmptyAction} href={HREF.analytics} />}>{() => null}</Body>
       </Card>)}
 
-      {performance && ready && <>
-        <Card module="analytics" icon={<IconChartBar size={20} />} title={t.topChannels} t={t} span="span6" id="home-top">
-          {ready.topChannels.length ? <BarChart label={fill(t.topChannelsLabel, { n: days })} locale={locale} orientation="horizontal" height={Math.max(160, ready.topChannels.length * 44)}
-            categories={ready.topChannels.map(channel => channel.name)} series={[{ id: 'engagements', name: t.topChannelsSeries, values: ready.topChannels.map(channel => channel.engagements) }]} />
-            : <p className={styles.note}>{t.topEmpty}</p>}
-          <p className={styles.note}>{fill(t.channelsNote, { covered: ready.topChannels.length, channels: ready.channels })}{ready.truncated ? ` · ${fill(t.truncatedNote, { n: ready.channels })}` : ''}</p>
-        </Card>
-        <Card module="analytics" icon={<IconChartDonut size={20} />} title={t.interactions} t={t} span="span6" id="home-mix">
-          {ready.interactions.length ? <DonutChart label={fill(t.interactionsLabel, { n: days })} locale={locale} totalLabel={t.interactionsTotal} slices={ready.interactions.map(item => ({ name: item.label, value: item.value }))} />
-            : <p className={styles.note}>{t.interactionsEmpty}</p>}
-          {ready.truncated && <p className={styles.note}>{fill(t.truncatedNote, { n: ready.channels })}</p>}
-        </Card>
-      </>}
-
-      {overview.bestTimes && <Card module="publishing" icon={<IconClockHour4 size={20} />} title={t.bestTimes} t={t} span="span8" id="home-times">
-        <Body section={overview.bestTimes} t={t} empty={<Empty title={t.bestTimesEmptyTitle} body={t.bestTimesEmptyBody} action={t.bestTimesEmptyAction} href="/create" />}>
-          {times => <>
-            <HeatmapChart label={t.bestTimesLabel} valueLabel={t.bestTimesValue} locale={locale} format={{ style: 'number', maximumFractionDigits: 2 }} cells={times.cells.map(cell => ({ day: cell.day, hour: cell.hour, value: cell.value }))} />
-            <p className={styles.note}>{t.bestTimesNote}</p>
-          </>}
-        </Body>
-      </Card>}
-
-      {overview.upcoming && <Card module="publishing" icon={<IconCalendarEvent size={20} />} title={t.upcoming} t={t} span="span4" id="home-upcoming">
+      {overview.upcoming && <Card module="publishing" icon={<IconCalendarEvent size={20} />} title={t.upcoming} t={t} span="span8" id="home-upcoming">
         <Body section={overview.upcoming} t={t} empty={<Empty title={t.upcomingEmptyTitle} body={t.upcomingEmptyBody} action={t.upcomingEmptyAction} href="/create" />}>
           {upcoming => <>
-            <ul className={styles.list}>{upcoming.items.map(item => <li className={styles.item} key={item.id} data-module="publishing">
-              <PostThumb thumb={(item as typeof item & { thumbnail?: PostThumbnail | null }).thumbnail ?? null} size="md" />
-              <div className={styles.itemBody}>
-                <strong>{item.text || '—'}</strong>
-                <span className={styles.meta}><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time><Badge tone="module" module="publishing">{t[MODE_COPY[item.mode]]}</Badge></span>
-                <span className={styles.meta}>{item.channels.join(', ')}</span>
-              </div>
-            </li>)}</ul>
+            <div className={styles.list}>{upcoming.items.map(item => <ListRow key={item.id}
+              href={`/content?post=${encodeURIComponent(item.id)}`}
+              leading={<PostThumb thumb={(item as typeof item & { thumbnail?: PostThumbnail | null }).thumbnail ?? null} size="md" />}
+              title={item.text || '—'}
+              meta={<><time dateTime={item.scheduledAt}>{Number.isNaN(new Date(item.scheduledAt).getTime()) ? item.scheduledAt : timeFormat.format(new Date(item.scheduledAt))}</time> · {item.channels.join(', ')}</>}
+              trailing={<InfoTip name={t.upcoming}><p>{t[MODE_COPY[item.mode]]}</p><p>{overview.timeZone}</p></InfoTip>} />)}</div>
             {upcoming.total > upcoming.items.length && <p className={styles.note}>{fill(t.upcomingMore, { n: upcoming.total })}</p>}
-            <a className={styles.link} href="/content/queue">{t.viewQueue}</a>
+            <a className={styles.link} href="/content/calendar">{t.viewQueue}</a>
           </>}
         </Body>
       </Card>}
 
+      <div className={styles.rail}>
       {overview.inbox && (overview.inbox.state === 'ready'
         ? <Tile module="inbox" span="span4" href={HREF.inbox} linkLabel={t.inboxAction}>
-          <MetricCard module="inbox" icon={<IconInbox size={20} />} label={t.inbox} value={number.format(overview.inbox.data.open)} hint={overview.inbox.data.open > 0 ? t.inboxOpen : t.inboxZero} />
+          <MetricCard module="inbox" icon={<IconInbox size={20} />} label={t.inbox} value={number.format(overview.inbox.data.open)} info={<InfoTip name={t.inbox}><p>{overview.inbox.data.open > 0 ? t.inboxOpen : t.inboxZero}</p></InfoTip>} />
         </Tile>
         : overview.inbox.state === 'unavailable' ? <Card module="inbox" icon={<IconInbox size={20} />} title={t.inbox} t={t} span="span4" id="home-inbox"><Unavailable t={t} /></Card> : null)}
 
+      {overview.bestTimes && <Card module="publishing" icon={<IconClockHour4 size={20} />} title={t.bestTimes} t={t} span="span4" id="home-times">
+        <Body section={overview.bestTimes} t={t} empty={<Empty title={t.bestTimesEmptyTitle} body={t.bestTimesEmptyBody} action={t.bestTimesEmptyAction} href="/create" />}>
+          {times => <>
+            <HeatmapChart label={t.bestTimesLabel} valueLabel={t.bestTimesValue} locale={locale} format={{ style: 'number', maximumFractionDigits: 2 }} cells={times.cells.map(cell => ({ day: cell.day, hour: cell.hour, value: cell.value }))} />
+            <InfoTip name={t.bestTimes}><p>{t.bestTimesNote}</p></InfoTip>
+          </>}
+        </Body>
+      </Card>}
+
+      </div>
       {overview.ads && (readyAds
         ? readyAds.spend.map((group, _index, all) => <Tile key={group.currency ?? 'none'} module="ads" span="span4" href={HREF.ads} linkLabel={fill(t.openModule, { name: t.moduleNames.ads })}>
           <MetricCard module="ads" icon={<IconSpeakerphone size={20} />} label={t.adSpend}
             value={new Intl.NumberFormat(locale, group.currency ? { style: 'currency', currency: group.currency, currencyDisplay: 'code' } : undefined).format(group.total)}
-            hint={fill(t.adSpendNote, { n: days, from: dayFormat.format(new Date(readyAds.start)),
-              to: dayFormat.format(new Date(readyAds.end)), recorded: group.recordedDays, latest: dayFormat.format(new Date(group.lastDay)) })}
+            info={<InfoTip name={t.adSpend} warning={group.recordedDays < days}>{fill(t.adSpendNote, { n: days, from: dayFormat.format(new Date(readyAds.start)),
+              to: dayFormat.format(new Date(readyAds.end)), recorded: group.recordedDays, latest: dayFormat.format(new Date(group.lastDay)) })}</InfoTip>}
             sparkline={all.length === 1 && group.recordedDays === days && group.daily.length > 1 ? group.daily.map(day => day.v) : undefined} sparklineLabel={fill(t.adSpendTrend, { n: days })} />
         </Tile>)
         : <Card module="ads" icon={<IconSpeakerphone size={20} />} title={t.adSpend} t={t} span="span4" id="home-ads">

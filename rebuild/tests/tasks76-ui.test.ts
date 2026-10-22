@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
+import { writeB7Fixture } from './b7-visual-fixture';
+import fixtureStyles from '@/modules/tasks/ui/tasks.module.css';
 import { act, createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TaskBoard } from '../src/modules/tasks/ui/TaskBoard';
@@ -63,7 +66,7 @@ describe('Task board shared confirmations', () => {
   });
   it('confirms a comment for the currently viewed task', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ ok: true, comments: [], canComment: true }) } as Response);
-    await click(button('Details (1)')); const dialog = container.querySelector('dialog')!;
+    await click(button('Details (1)')); const dialog = container.querySelector('.ui-side-panel')!;
     await fill(dialog.querySelector<HTMLTextAreaElement>('textarea')!, 'Ready to review'); await click(button('Post comment', dialog));
     expect(sent()[0]).toEqual({ action: 'comment.add', taskId: 'task-a', body: 'Ready to review', confirmation: 'COMMENT ON TASK task-a' });
   });
@@ -144,4 +147,41 @@ describe('Task kanban polish', () => {
     expect(container.querySelector('.ui-badge--warning')).toBeTruthy();
     expect(container.querySelector('button[aria-label="Modifier Review campaign"]')).toBeTruthy();
   });
+});
+
+it('opens comments in the shared side panel, closes with Escape and restores the row action focus', async () => {
+  vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ comments: [], canComment: false }) } as Response);
+  const opener = button('Details (1)'); opener.focus(); await click(opener);
+  const panel = container.querySelector<HTMLElement>('.ui-side-panel')!;
+  expect(panel.getAttribute('aria-labelledby')).toBeTruthy();
+  expect(document.activeElement).toBe(panel);
+  expect(panel.textContent).toContain('Review campaign');
+  expect(panel.textContent).toContain('No comments yet.');
+  await act(async () => panel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(container.querySelector('.ui-side-panel')).toBeNull();
+  expect(document.activeElement).toBe(opener);
+});
+
+it('ignores a late comment response from the previously selected task', async () => {
+  let oldResponse!: (response: Response) => void;
+  vi.mocked(fetch).mockReturnValueOnce(new Promise<Response>(resolve => { oldResponse = resolve; }));
+  vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ comments: [{ id: 'b-comment', body: 'Current comment', createdAt: task.createdAt, author: null, canDelete: false }], canComment: false }) } as Response);
+  await renderBoard({ tasks: [task, { ...task, id: 'task-b', title: 'Second task' }], view: 'table' });
+  const detailButtons = [...container.querySelectorAll<HTMLButtonElement>('button')].filter(item => item.textContent === 'Details (1)');
+  await click(detailButtons[0]); await click(detailButtons[1]);
+  expect(container.querySelector('.ui-side-panel')?.textContent).toContain('Current comment');
+  await act(async () => oldResponse({ ok: true, json: async () => ({ comments: [{ id: 'old-comment', body: 'Obsolete comment', createdAt: task.createdAt, author: null, canDelete: false }], canComment: true }) } as Response));
+  const panel = container.querySelector('.ui-side-panel')!;
+  expect(panel.textContent).toContain('Second task');
+  expect(panel.textContent).toContain('Current comment');
+  expect(panel.textContent).not.toContain('Obsolete comment');
+  expect(panel.querySelector('textarea')).toBeNull();
+});
+
+
+it.runIf(Boolean(process.env.B7_FIXTURE_DIR))('exports the Tasks synthetic component fixture when requested', () => {
+  writeB7Fixture('tasks', renderToStaticMarkup(createElement(TaskBoard, {
+    tasks: [task, { ...task, id: 'task-b', title: 'Approve autumn launch', status: 'doing', dueOn: '2026-10-23' }, { ...task, id: 'task-c', title: 'Schedule the recap', status: 'done' }],
+    assignees: [], canCreate: true, limits: TASK_DEFAULT_LIMITS, today: '2026-10-22', summary: { todo: 1, doing: 1, done: 1, overdue: 0 }, view: 'board', filtered: false,
+  })), 'tasks', fixtureStyles);
 });

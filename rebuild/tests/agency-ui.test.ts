@@ -59,13 +59,15 @@ describe('Agency workspace action', () => {
   });
 });
 
-describe('Agency sidebar filters', () => {
+describe('Agency v2 header filters', () => {
   const inDock = (node: Parameters<typeof root.render>[0]) => createElement(SidebarDockContext.Provider, { value: dock }, node);
 
-  it('renders overview filters in the shell sidebar, not in the page content', async () => {
+  it('opens overview filters in the header popover and retains applied values', async () => {
     await render(inDock(createElement(AgencyFilters, { values: { q: 'acm', sort: 'failed', order: 'asc', attention: true }, searchLimit: 40 })));
     expect(container.querySelector('form')).toBeNull();
-    const form = dock.querySelector('form[aria-label="Workspace filters"]')!;
+    await click(container.querySelector<HTMLElement>('.ui-filter-button')!);
+    const form = container.querySelector('form[aria-label="Workspace filters"]')!;
+    expect(dock.innerHTML).toBe('');
     expect(form.getAttribute('method')).toBe('get');
     const search = form.querySelector<HTMLInputElement>('input[name="q"]')!;
     expect(search.value).toBe('acm'); expect(search.maxLength).toBe(40); expect(search.placeholder).toBe('Workspace name');
@@ -75,14 +77,22 @@ describe('Agency sidebar filters', () => {
     expect(form.querySelector('a[href="/agency"]')).not.toBeNull();
   });
 
-  it('renders nothing without a sidebar dock', async () => {
+  it('works without the transitional Page tools dock and returns focus on Escape', async () => {
     await render(createElement(AgencyFilters, { values: { q: '', sort: 'attention', order: 'desc', attention: false }, searchLimit: 40 }));
-    expect(container.innerHTML).toBe(''); expect(dock.innerHTML).toBe('');
+    const trigger = container.querySelector<HTMLButtonElement>('.ui-filter-button')!;
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    await click(trigger);
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(dock.innerHTML).toBe('');
   });
 
   it('client search only promises workspace names', async () => {
     await render(inDock(createElement(ClientFilters, { q: 'acm', searchLimit: 25 })));
-    const form = dock.querySelector('form[aria-label="Client filters"]')!;
+    await click(container.querySelector<HTMLElement>('.ui-filter-button')!);
+    const form = container.querySelector('form[aria-label="Client filters"]')!;
     expect(form.getAttribute('action')).toBe('/agency/clients');
     const search = form.querySelector<HTMLInputElement>('input[name="q"]')!;
     expect(search.placeholder).toBe('Workspace name'); expect(search.maxLength).toBe(25);
@@ -95,12 +105,12 @@ it('quick-switches only to an explicitly selected workspace from the scoped list
   const { WorkspaceQuickSwitch } = await import('../src/modules/agency/ui/WorkspaceQuickSwitch');
   vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
   await render(createElement(SidebarDockContext.Provider, { value: dock }, createElement(WorkspaceQuickSwitch, { locale: 'fr', workspaces: [{ id: 'w2', name: 'Acme' }] })));
-  expect(dock.textContent).toContain('Changer d’espace');
-  expect(dock.querySelector('.ui-button')).toBeNull();
-  await click(dock.querySelector<HTMLElement>('[role="combobox"]')!);
-  const choice = [...dock.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent === 'Acme')!;
+  expect(container.textContent).toContain('Changer d’espace');
+  expect(container.querySelector('.ui-button')).toBeNull();
+  await click(container.querySelector<HTMLElement>('[role="combobox"]')!);
+  const choice = [...container.querySelectorAll<HTMLElement>('[role="option"]')].find(item => item.textContent === 'Acme')!;
   await click(choice);
-  await click(dock.querySelector<HTMLElement>('button[aria-label="Ouvrir l’espace: Acme"]')!);
+  await click(container.querySelector<HTMLElement>('button[aria-label="Ouvrir l’espace: Acme"]')!);
   expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toEqual({ workspaceId: 'w2', confirmation: 'SELECT WORKSPACE w2' });
   expect(assign).toHaveBeenCalledWith('/home');
 });

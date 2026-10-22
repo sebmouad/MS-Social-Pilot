@@ -766,3 +766,18 @@ Existing Analytics snapshot and metric-detail UI/REST/MCP operations now retain 
 ## Root administration naming (2026-10-22)
 
 Root administration UI and REST routes retain their existing capabilities and MCP tool names. All moved administration services and MCP dispatch now live in `src/modules/root/server/admin/`; authorization, exact confirmations and audit remain in those shared services. Root configuration uses `root.admin.*` (schema 132), with a collision-preserving saved-key migration. No new operation or customer capability is introduced.
+
+
+## Design v2 B7 presentation mapping (2026-10-22)
+
+No capability or shared-service behavior added/removed. Existing confirmations,
+audit and authorization are unchanged; new S1/S14 data fields remain dependencies,
+not UI-only invented features. Source/DOM checks do not prove real client execution.
+
+| UI | Existing REST | Existing MCP | Shared service / presentation change |
+| --- | --- | --- | --- |
+| Home `/home` | GET `/api/home/overview` | `get_home_overview` | `readHomeOverview`; same data, caveats in disclosures and scheduled-post links. Refresh re-renders the same read. |
+| Tasks `/tasks` Board/List and detail | GET/POST `/api/tasks`, GET `/api/tasks/[id]`, GET `/api/tasks/posts` | `list_tasks`, `get_task`, task/checklist/comment tools | Existing Tasks services and exact confirmations; shared Filter/Tabs/SidePanel replace dock/dialog presentation only. |
+| Agency `/agency`, `/agency/clients` and switching | GET `/api/agency`, POST `/api/workspaces/select` | `get_agency_overview`, `list_agency_clients`, `select_workspace` (existing credential boundaries) | Existing Agency read/export/session-selection services; same scoped table data and exact `SELECT WORKSPACE <id>`. |
+
+B7 details and gaps: [design-v2/B7_IMPLEMENTATION.md](design-v2/B7_IMPLEMENTATION.md).

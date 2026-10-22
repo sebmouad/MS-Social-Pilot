@@ -589,3 +589,19 @@ Source: [docs/design-v2/README.md](docs/design-v2/README.md) decision record (ow
 - Number caveats sit behind ⓘ; partial results show ⚠ (built in Insights Overview, B5; source and DOM evidence only). Charts show a "Show data" toggle, fill missing days as gaps, align the previous period by date offset and group beyond eight series or slices as "Other".
 - Phone first-class flows: Inbox replies, Create, post status, Insights numbers.
 - Form fields and controls use `--control-border` (3:1); focus is a 2 px outline on every control.
+
+
+## Design v2 B7 — partial source behavior (2026-10-22)
+
+Home first-run shows the connection next step in place of its cards; otherwise
+its personal greeting leads to real waiting conversations, figures with InfoTip
+caveats, scheduled-post ListRows and Inbox/Best times. Partial count coverage
+uses the warning disclosure. A failed card offers refresh while other cards stay.
+Tasks uses Board/List tabs, one header Filter and the shared detail SidePanel;
+Escape/focus return and stale comment responses have jsdom tests. Pending writes
+block competing task actions and preserve recoverable input. Agency/Clients use
+header filters and the existing confirmed workspace selection; overview counts
+remain withheld where access is missing. Its table-order sparklines are removed.
+These are source/DOM behaviors, not browser or complete S1/S14 acceptance: see
+[docs/design-v2/B7_IMPLEMENTATION.md](docs/design-v2/B7_IMPLEMENTATION.md) for the
+missing shared-service/copy fields and actual verification limits.

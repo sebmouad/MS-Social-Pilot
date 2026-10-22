@@ -183,8 +183,8 @@ export const customerCopy = {
     "fr": "Impossible de charger les données de l’agence. Actualisez, puis réessayez."
   },
   "Client workspaces": {
-    "en": "Client workspaces",
-    "fr": "Espaces clients"
+    "en": "All workspaces",
+    "fr": "Tous les espaces"
   },
   "Workspace name": {
     "en": "Workspace name",

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { loadCustomerCopy } from '../server/copy';
 import { headers } from 'next/headers';
 import { uiCopy, uiLocale, type CustomerCopy, type UiLocale } from './copy';
@@ -8,11 +9,12 @@ import { listTasks } from '@/modules/tasks/server/tasks';
 import { TASKS_FEATURE_ID, TASKS_MODULE_ID } from '@/modules/tasks/semantics';
 import { TaskBoard } from './TaskBoard';
 import { TaskFilters } from './TaskFilters';
+import { InfoTip } from '@/components/InfoTip';
 import { PageHeader } from '@/components/PageHeader';
 import styles from './tasks.module.css';
 
 const KEYS = ['q', 'status', 'assignee', 'overdue', 'offset', 'view'];
-const Heading = ({ description, locale, copy }: { description: string; locale: UiLocale; copy?: CustomerCopy }) => <PageHeader module="tasks" title={uiCopy(locale, copy)('Tasks')} description={description} />;
+const Heading = ({ description, locale, copy, filters }: { description: string; locale: UiLocale; copy?: CustomerCopy; filters?: ReactNode }) => <PageHeader module="tasks" title={uiCopy(locale, copy)('Tasks')} info={<InfoTip name={uiCopy(locale, copy)('Tasks')}><p>{description}</p></InfoTip>} filters={filters} />;
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const viewer = await requireViewer({ module: TASKS_MODULE_ID, feature: TASKS_FEATURE_ID, channelScoped: true });
@@ -39,8 +41,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const pageHref = (offset: number) => { const next = new URLSearchParams(query); if (offset > 0) next.set('offset', String(offset)); return `/tasks${next.size ? `?${next}` : ''}`; };
   const filtered = Boolean(filters.q || filters.status || filters.assignee || filters.overdue);
   return <div className={styles.root} data-module="tasks">
-    <Heading locale={locale} copy={copy} description={t("Assign work, set due dates and follow progress for this workspace.")} />
-    <TaskFilters key={JSON.stringify(filters)} locale={locale} copy={copy} values={filters} assignees={result.assignees} assigneesHasMore={result.assigneesHasMore} />
+    <Heading locale={locale} copy={copy} description={t("Assign work, set due dates and follow progress for this workspace.")} filters={<TaskFilters key={JSON.stringify(filters)} locale={locale} copy={copy} values={filters} assignees={result.assignees} assigneesHasMore={result.assigneesHasMore} />} />
     <TaskBoard locale={locale} copy={copy} key={`${viewer.workspaceId}:${filters.offset}:${filters.view}`} tasks={result.tasks} assignees={result.assignees} canCreate={result.canCreate} limits={result.limits} today={result.today} summary={result.summary} view={filters.view as 'table' | 'board'} filtered={filtered} />
     {(filters.offset > 0 || result.hasMore) && <nav className={styles.pagination} aria-label={t("Task pages")}>
       {filters.offset > 0 ? <a href={pageHref(Math.max(0, filters.offset - result.pageSize))}>{t("Previous tasks")}</a> : <span />}

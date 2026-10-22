@@ -706,3 +706,26 @@ Built per [design-v2/08-BUILD_PLAN.md](design-v2/08-BUILD_PLAN.md) B6 / [04-SCRE
 ## Legacy server removal executed (2026-10-22)
 
 `scripts/server-legacy-cleanup.sh` ran once on production and was then deleted from the repository; references to it above are historical. Result: fresh backup `/var/backups/legacy-cleanup-20261022110559`, five unmapped tables dropped (workspace_exports had 1 row; others empty), legacy units, `/srv/ms-social-pilot{,.prev}` and `/usr/local/sbin/socialpilot-deploy` removed; rebuild units stayed active. Production then deployed `b9001ddf` with the baseline marked applied. `20261022200000_root_admin_settings` was never applied in production before the squash; production had no `root.legacy.*` keys, so no data changed.
+
+
+## Design v2 B7 — lane 55 (2026-10-22, partial, uncommitted)
+
+Read [design-v2/B7_IMPLEMENTATION.md](design-v2/B7_IMPLEMENTATION.md) before
+continuing. Owned Home/Tasks/Agency UI and tests are changed; no new Root keys,
+registry bump or service behavior. Home has first-run replacement, personal
+greeting, compact period, InfoTip caveats, scheduled-post ListRows, real nonzero
+Inbox attention and per-card refresh. Tasks/Agency filters no longer use the dock;
+Tasks uses tabs/SidePanel, guards stale comment reads and pending competing actions.
+Agency retains its scoped table/unknown values, confirmed switch and exports.
+Full S1/S14 is not complete; outside-owned data/copy/activation and build/browser
+blockers are enumerated in the report. Synthetic component fixtures are optional
+file-only exports, not screenshots or actual page verification. Leave uncommitted;
+no server, deploy, push or production work was authorized in this lane.
+
+Final lane-55 evidence: TypeScript exit 0 / zero errors; 16 focused files,
+223 tests passed (3 optional artifact-export tests skipped). Full suite with
+only diagnostic transport excluded: 718 files passed, 1 failed, 49 skipped;
+11,609 tests passed, 5 failed, 2,556 skipped. The failures are unchanged
+`facebook-native-http` sandbox `listen EPERM ::1`. Build fails on font DNS and
+an outside-owned Settings/Sharing client import of server-only code. Chrome
+launch was sandbox-blocked; no screenshots. `git diff --check` passes.

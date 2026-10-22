@@ -51,7 +51,7 @@ describe('Ads, Home and Root polish', () => {
   });
 
   it('uses the shared focus token on Home links and adapts cards for phones', () => {
-    expect(homeCss).toMatch(/\.open:focus-visible, \.link:focus-visible \{ outline: 3px solid var\(--focus\)/);
+    expect(homeCss).toMatch(/\.open:focus-visible, \.link:focus-visible \{ outline: 2px solid var\(--focus\)/);
     expect(homeCss).toContain('@media (max-width: 720px)');
     expect(homeCss).toContain('prefers-reduced-motion');
   });

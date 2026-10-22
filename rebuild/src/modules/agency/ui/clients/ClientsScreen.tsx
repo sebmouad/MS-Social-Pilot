@@ -19,15 +19,14 @@ export default async function AgencyClientsPage({ searchParams }: { searchParams
   const t = uiCopy(locale, copy);
   const params = await searchParams;
   if (Object.entries(params).some(([key, value]) => key !== 'q' || typeof value !== 'string')) {
-    return <AgencyShell><AgencyHeading locale={locale} copy={copy} description={t("Review your filters.")} /><RouteNotice error focusKey="agency-filter-error">{t("Choose valid filters and try again.")}</RouteNotice><a href="/agency/clients">{t("Reset filters")}</a></AgencyShell>;
+    return <AgencyShell><AgencyHeading title={t("Clients")} locale={locale} copy={copy} description={t("Review your filters.")} /><RouteNotice error focusKey="agency-filter-error">{t("Choose valid filters and try again.")}</RouteNotice><a href="/agency/clients">{t("Reset filters")}</a></AgencyShell>;
   }
   const q = String(params.q ?? '');
   try {
     const searchLimit = await agencySearchLimit();
     const result = await listAgencyClients({ userId: viewer.user.id }, q ? { q } : {});
     return <AgencyShell>
-      <AgencyHeading locale={locale} copy={copy} description={t("Client accounts and pending client invitations in workspaces you own or administer.")} />
-      <ClientFilters key={q} locale={locale} copy={copy} q={q} searchLimit={searchLimit} />
+      <AgencyHeading title={t("Clients")} locale={locale} copy={copy} description={t("Client accounts and pending client invitations in workspaces you own or administer.")} filters={<ClientFilters key={q} locale={locale} copy={copy} q={q} searchLimit={searchLimit} />} />
       {result.truncated && <RouteNotice focusKey="agency-truncated">
         {result.filtered ? t("More than {0} workspaces match this search; only the first {1} by name are shown. Search for more of the name to narrow them.", result.limit, result.limit)
           : t("You manage more than {0} workspaces; only the first {1} by name are shown. Search by workspace name to find another.", result.limit, result.limit)}
@@ -55,6 +54,6 @@ export default async function AgencyClientsPage({ searchParams }: { searchParams
         </section>)}
     </AgencyShell>;
   } catch (error) {
-    return <AgencyShell><AgencyHeading locale={locale} copy={copy} description={t("Client accounts across your workspaces.")} /><RouteNotice error focusKey="agency-load-error">{error instanceof OperationError ? t(error.message) : t("Client accounts could not be loaded. Refresh and try again.")}</RouteNotice></AgencyShell>;
+    return <AgencyShell><AgencyHeading title={t("Clients")} locale={locale} copy={copy} description={t("Client accounts across your workspaces.")} /><RouteNotice error focusKey="agency-load-error">{error instanceof OperationError ? t(error.message) : t("Client accounts could not be loaded. Refresh and try again.")}</RouteNotice></AgencyShell>;
   }
 }

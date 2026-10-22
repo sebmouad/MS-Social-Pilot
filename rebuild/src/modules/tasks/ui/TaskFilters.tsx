@@ -1,9 +1,9 @@
 "use client";
 import { uiCopy, type CustomerCopy, type UiLocale } from './copy';
 import { useState } from 'react';
-import { SidebarDock } from '@/components/SidebarDock';
-import { Button, Select, FilterPanel, FilterChips, TextInput } from '@/components';
+import { Button, Select, FilterChips, TextInput } from '@/components';
 import { TASK_STATUSES, TASK_STATUS_LABELS } from '@/modules/tasks/tasks';
+import { FilterButton } from '@/components/FilterPanel';
 import styles from './tasks.module.css';
 
 export function TaskFilters({ values, assignees, assigneesHasMore, locale = 'en', copy }: { values: { status: string; assignee: string; overdue: boolean; q: string; view: string }; assignees: Array<{ id: string; name: string }>; assigneesHasMore: boolean; copy?: CustomerCopy; locale?: UiLocale }) {
@@ -19,10 +19,9 @@ export function TaskFilters({ values, assignees, assigneesHasMore, locale = 'en'
   function remove(key: string) { const query = new URLSearchParams(window.location.search); query.delete(key); query.delete('offset'); window.location.assign(`/tasks${query.size ? `?${query}` : ''}`); }
   return <>
     <FilterChips removeLabel={t('Remove filter')} label={t('Active filters')} filters={filters} onRemove={remove} />
-    <SidebarDock><FilterPanel resetLabel={t('Reset filters')} title={t("Task filters")} activeCount={filters.length} onReset={() => window.location.assign('/tasks')}>
-      <FilterChips removeLabel={t('Remove filter')} label={t('Active filters')} filters={filters} onRemove={remove} />
+    <FilterButton title={t("Task filters")} activeCount={filters.length} onClear={() => window.location.assign('/tasks')}>
       <form noValidate onSubmit={event => { const input = event.currentTarget.elements.namedItem("view") as HTMLInputElement; input.value = new URLSearchParams(window.location.search).get("view") ?? draft.view; }} action="/tasks" method="get" className={styles.filters} aria-label={t("Task filters")}>
-        <label>{t("Search")}<TextInput type="search" name="q" maxLength={200} value={draft.q} placeholder={t("Title or notes")} onChange={event => setDraft({ ...draft, q: event.target.value })} trailing={draft.q ? <button type="button" className="ui-icon-button" aria-label={t("Clear search")} onClick={() => setDraft({ ...draft, q: '' })}>×</button> : undefined} /></label>
+        <label>{t("Search")}<TextInput type="search" name="q" value={draft.q} placeholder={t("Title or notes")} onChange={event => setDraft({ ...draft, q: event.target.value })} trailing={draft.q ? <button type="button" className="ui-icon-button" aria-label={t("Clear search")} onClick={() => setDraft({ ...draft, q: '' })}>×</button> : undefined} /></label>
         <label>{t("Status")}<Select aria-label={t("Status")} name="status" value={draft.status} onChange={status => setDraft({ ...draft, status })} options={[{ value: '', label: t("All statuses") }, ...TASK_STATUSES.map(status => ({ value: status, label: t(TASK_STATUS_LABELS[status]) }))]} /></label>
         <label>{t("Assigned to")}<Select aria-label={t("Assigned to")} name="assignee" value={draft.assignee} onChange={assignee => setDraft({ ...draft, assignee })} options={[{ value: '', label: t("Anyone") }, { value: 'me', label: t("Me") }, { value: 'none', label: t("Unassigned") }, ...(!known.has(values.assignee) ? [{ value: values.assignee, label: t("Selected member") }] : []), ...assignees.map(person => ({ value: person.id, label: person.name }))]} /></label>
         {assigneesHasMore && <p className={styles.help}>{t("Only part of the team is listed here. Use Me or Unassigned, or search by title.")}</p>}
@@ -31,6 +30,6 @@ export function TaskFilters({ values, assignees, assigneesHasMore, locale = 'en'
         <Button type="submit" variant="primary">{t("Apply filters")}</Button>
         <a href="/tasks">{t("Reset filters")}</a>
       </form>
-    </FilterPanel></SidebarDock>
+    </FilterButton>
   </>;
 }

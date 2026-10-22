@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/Toast';
+import { InfoTip } from '@/components/InfoTip';
 import { Button } from '@/components/Button';
 import { agencyExportCopy, type AgencyExportCatalog, type AgencyExportLocale } from '../export-copy';
 
@@ -38,7 +39,7 @@ export function AgencyExport({ query, locale, catalog = agencyExportCopy }: { qu
     finally { if (request.current === controller) { request.current = null; setBusy(false); } }
   }
   return <section aria-label={t.title}>
-    <p className="small-note">{t.help}</p>
+    <InfoTip name={t.title}><p>{t.help}</p></InfoTip>
     <Button disabled={busy} onClick={() => download('csv')}>{busy ? t.pending : t.csv}</Button>{' '}
     <Button disabled={busy} onClick={() => download('json')}>{busy ? t.pending : t.json}</Button>
     {feedback && <p ref={feedbackRef} tabIndex={-1} role={feedback === 'failed' ? 'alert' : 'status'} className={feedback === 'failed' ? 'ui-error' : 'small-note'}>{t[feedback]}</p>}

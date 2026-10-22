@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { DataTable, type TableColumn } from '@/components/DataTable';
 import { Dialog } from '@/components/Dialog';
-import { Status } from '@/modules/settings/ui/_components';
+import { Status } from '@/modules/settings/ui/Status';
 import { ownerText, resolveOwnerCopy } from '../owner-copy';
 import styles from './sharing.module.css';
 

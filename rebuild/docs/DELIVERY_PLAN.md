@@ -143,3 +143,15 @@ drops) in an authorized session; confirm the baseline receipt on production;
 integrator schema bump for the queued lanes' keys. See
 [ARCHITECTURE.md](ARCHITECTURE.md#lane-47-legacy-removal--2026-10-22) and
 [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the handoff.
+
+
+## Design v2 B7 next work (lane 55)
+
+UI changes are partial and uncommitted. Home still needs shared-service attention
+counts, link clicks, audience comparison, recent Inbox rows and global scope;
+Agency needs waiting-conversation metrics; Shell/Settings need optional-area
+activation. Settings’ client/server component boundary blocks the build, separately
+from font DNS. Loopback test/browser restrictions also block a green release
+gate in this sandbox. Exact paths, proposed edits and scoped test evidence:
+[design-v2/B7_IMPLEMENTATION.md](design-v2/B7_IMPLEMENTATION.md). No service,
+provider, migration, deploy or production change is part of B7.

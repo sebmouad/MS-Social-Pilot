@@ -704,3 +704,16 @@ Analytics and Ads customer routes are now the Insights area (`/insights/*`, 308 
 ## Legacy server removal executed (2026-10-22)
 
 `scripts/server-legacy-cleanup.sh` ran once on production and was then deleted from the repository; references to it above are historical. Result: fresh backup `/var/backups/legacy-cleanup-20261022110559`, five unmapped tables dropped (workspace_exports had 1 row; others empty), legacy units, `/srv/ms-social-pilot{,.prev}` and `/usr/local/sbin/socialpilot-deploy` removed; rebuild units stayed active. Production then deployed `b9001ddf` with the baseline marked applied. `20261022200000_root_admin_settings` was never applied in production before the squash; production had no `root.legacy.*` keys, so no data changed.
+
+
+## Design v2 B7 — 2026-10-22, partial UI source
+
+Home now prioritizes real waiting conversations and scheduled-post ListRows, with
+number caveats in InfoTip and a first-run replacement. Tasks uses header Filter,
+Board/List tabs and shared SidePanel; Agency/Clients move out of Page tools, keep
+the authorized overview table and confirmed switching, and remove table-order
+sparklines. Existing services, REST/MCP, authorization, audit and schema are unchanged.
+B7 remains partial: Home attention/click/audience-comparison/recent-Inbox data,
+Agency waiting counts, optional-area activation and actual browser proof are open.
+See [design-v2/B7_IMPLEMENTATION.md](design-v2/B7_IMPLEMENTATION.md) for scoped
+evidence, build/environment blockers and exact outside-owned edits.

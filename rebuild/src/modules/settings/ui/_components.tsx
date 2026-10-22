@@ -42,6 +42,4 @@ export function SettingsPanel({ title, detail, children }: { title: string; deta
   return <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{title}</h2>{detail && <p>{detail}</p>}</div></div>{children}</section>;
 }
 
-export function Status({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'good' | 'warning' | 'neutral' }) {
-  return <Badge tone={tone === "good" ? "success" : tone}>{children}</Badge>;
-}
+export { Status } from './Status';

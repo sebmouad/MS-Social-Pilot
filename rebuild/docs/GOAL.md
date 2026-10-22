@@ -85,3 +85,11 @@ databases); `OAuthCode` hooks and the old migration-expectation helper removed;
 removal and five table drops. No new Root keys; schema stays 135. See
 [ARCHITECTURE.md](ARCHITECTURE.md#lane-47-legacy-removal--2026-10-22) and the
 lane-47 report. Work remains uncommitted as requested for this lane.
+
+
+## Lane 55 / design v2 B7
+
+Partial UI source is implemented for Home, Tasks and Agency; no new Root keys or
+service changes. The goal remains incomplete. Finish the service/copy dependencies
+and verification gates listed in [design-v2/B7_IMPLEMENTATION.md](design-v2/B7_IMPLEMENTATION.md)
+before marking B7 complete. Changes are uncommitted under this lane’s instruction.

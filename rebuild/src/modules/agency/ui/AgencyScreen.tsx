@@ -11,8 +11,7 @@ import { agencyOverview, agencySearchLimit } from '@/modules/agency/server/agenc
 import { AgencyFilters } from './AgencyFilters';
 import { AgencyHeading, AgencyShell } from './AgencyChrome';
 import { WorkspaceAction } from './WorkspaceAction';
-import { Badge, DataTable, EmptyState, MetricCard } from '@/components';
-import { BarChart } from '@/components/charts';
+import { Badge, DataTable, EmptyState, MetricCard, InfoTip } from '@/components';
 import { IconAlertTriangle, IconCalendar, IconChecklist, IconPlugConnected, IconBuildingCommunity } from '@tabler/icons-react';
 import styles from './agency.module.css';
 
@@ -37,10 +36,10 @@ function Actions({ item, locale = 'en', copy }: { item: AgencyWorkspace; copy?: 
   if (item.state !== 'available' || !item.metrics) return <span className={styles.meta}>{t("Unavailable until the workspace is active")}</span>;
   const { metrics } = item;
   return <div className={styles.actions}>
-    <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/home" label={t("Open")} variant={item.needsAttention ? 'secondary' : 'primary'} />
-    {(metrics.disconnected ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/settings/connections" label={t("Fix connections")} variant="primary" />}
-    {(metrics.failed ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/content" label={t("Review posts")} variant="primary" />}
-    {(metrics.overdueTasks ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/tasks?overdue=true" label={t("Overdue tasks")} variant="primary" />}
+    <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/home" label={t("Open")} variant="secondary" />
+    {(metrics.disconnected ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/settings/connections" label={t("Fix connections")} variant="secondary" />}
+    {(metrics.failed ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/content" label={t("Review posts")} variant="secondary" />}
+    {(metrics.overdueTasks ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/tasks?overdue=true" label={t("Overdue tasks")} variant="secondary" />}
   </div>;
 }
 
@@ -72,14 +71,13 @@ export default async function AgencyPage({ searchParams }: { searchParams: Promi
     const result = await agencyOverview({ userId: viewer.user.id }, { ...(filters.q ? { q: filters.q } : {}), sort: filters.sort, order: filters.order, attentionOnly: filters.attention });
     const exportQuery = new URLSearchParams({ q: filters.q, sort: filters.sort, order: filters.order, attention: String(filters.attention) }).toString();
     const totals = result.totals;
-    const sparkline = (key: 'scheduled' | 'failed') => result.workspaces.some(item => item.metrics?.[key] != null) ? result.workspaces.map(item => item.metrics?.[key] ?? null) : undefined;
     const scope = result.filtered ? t('{0} matching workspaces', totals.workspaces) : t("your workspaces");
     const count = (value: number | null) => value === null ? '–' : value;
     return <AgencyShell>
-      <AgencyHeading locale={locale} copy={copy} description={t("Compare the workspaces you own or administer. Failed posts cover the last {0} days.", result.windowDays)} />
-      <AgencyFilters key={JSON.stringify(filters)} locale={locale} copy={copy} values={filters} searchLimit={searchLimit} />
+      <AgencyHeading locale={locale} copy={copy} description={t("Compare the workspaces you own or administer. Failed posts cover the last {0} days.", result.windowDays)}
+        filters={<AgencyFilters key={JSON.stringify(filters)} locale={locale} copy={copy} values={filters} searchLimit={searchLimit} />}
+        actions={<AgencyExport key={`${locale}:${exportQuery}`} query={exportQuery} locale={locale} catalog={exportCopy} />} />
       <WorkspaceQuickSwitch locale={locale} copy={copy} workspaces={result.workspaces.filter(item => item.state === 'available' && item.metrics).map(({ id, name }) => ({ id, name }))} />
-      <AgencyExport key={`${locale}:${exportQuery}`} query={exportQuery} locale={locale} catalog={exportCopy} />
       {result.truncated && <RouteNotice focusKey="agency-truncated">
         {(result.filtered ? t("More than {0} workspaces match this search; only the first {1} by name are shown. Search for more of the name to narrow them.", result.limit, result.limit)
           : t("You manage more than {0} workspaces; only the first {1} by name are shown. Search by name to find another workspace.", result.limit, result.limit))
@@ -88,15 +86,11 @@ export default async function AgencyPage({ searchParams }: { searchParams: Promi
       {totals.workspaces > 0 && <div className={styles.metrics} aria-label={t("Across {0}", scope)}>
         <MetricCard module="agency" icon={<IconBuildingCommunity size={20} />} label={result.filtered ? t("Matching workspaces") : t("Workspaces")} value={totals.workspaces} />
         <MetricCard module="agency" icon={<IconAlertTriangle size={20} />} label={t("Need attention")} value={totals.needingAttention} />
-        <MetricCard module="agency" icon={<IconPlugConnected size={20} />} label={t("Channels that cannot publish")} value={count(totals.disconnected)} unavailable={totals.disconnected === null ? t(WITHHELD) : undefined} hint={<>{totals.channels !== null && t("of {0}", totals.channels)}<Coverage locale={locale} copy={copy} totals={totals} group="channels" /></>} />
-        <MetricCard module="agency" icon={<IconAlertTriangle size={20} />} label={t("Failed posts")} sparkline={sparkline('failed')} sparklineLabel={`${t('Failed posts by listed workspace')}: ${result.workspaces.map(item => item.name).join(', ')}`} value={count(totals.failed)} unavailable={totals.failed === null ? t(WITHHELD) : undefined} hint={<><Coverage locale={locale} copy={copy} totals={totals} group="publishing" />{t('Each point shows a listed workspace’s current count, in table order.') }</>} />
-        <MetricCard module="agency" icon={<IconCalendar size={20} />} label={t("Scheduled posts")} sparkline={sparkline('scheduled')} sparklineLabel={`${t('Scheduled posts by listed workspace')}: ${result.workspaces.map(item => item.name).join(', ')}`} value={count(totals.scheduled)} unavailable={totals.scheduled === null ? t(WITHHELD) : undefined} hint={<><Coverage locale={locale} copy={copy} totals={totals} group="publishing" />{t('Each point shows a listed workspace’s current count, in table order.') }</>} />
-        <MetricCard module="agency" icon={<IconChecklist size={20} />} label={t("Overdue tasks")} value={count(totals.overdueTasks)} unavailable={totals.overdueTasks === null ? t(WITHHELD) : undefined} hint={<>{totals.openTasks !== null && t("of {0} open", totals.openTasks)}<Coverage locale={locale} copy={copy} totals={totals} group="tasks" /></>} />
+        <MetricCard module="agency" icon={<IconPlugConnected size={20} />} label={t("Channels that cannot publish")} value={count(totals.disconnected)} unavailable={totals.disconnected === null ? t(WITHHELD) : undefined} info={<InfoTip name={t("Channels that cannot publish")} warning={totals.coverage.channels.covered < totals.coverage.channels.of}><p>{totals.channels !== null && t("of {0}", totals.channels)}<Coverage locale={locale} copy={copy} totals={totals} group="channels" /></p></InfoTip>} />
+        <MetricCard module="agency" icon={<IconAlertTriangle size={20} />} label={t("Failed posts")} value={count(totals.failed)} unavailable={totals.failed === null ? t(WITHHELD) : undefined} info={<InfoTip name={t("Failed posts")} warning={totals.coverage.publishing.covered < totals.coverage.publishing.of}><p>{t("Compare the workspaces you own or administer. Failed posts cover the last {0} days.", result.windowDays)}<Coverage locale={locale} copy={copy} totals={totals} group="publishing" /></p></InfoTip>} />
+        <MetricCard module="agency" icon={<IconCalendar size={20} />} label={t("Scheduled posts")} value={count(totals.scheduled)} unavailable={totals.scheduled === null ? t(WITHHELD) : undefined} info={<InfoTip name={t("Scheduled posts")} warning={totals.coverage.publishing.covered < totals.coverage.publishing.of}><p>{t("Compare the workspaces you own or administer. Failed posts cover the last {0} days.", result.windowDays)}<Coverage locale={locale} copy={copy} totals={totals} group="publishing" /></p></InfoTip>} />
+        <MetricCard module="agency" icon={<IconChecklist size={20} />} label={t("Overdue tasks")} value={count(totals.overdueTasks)} unavailable={totals.overdueTasks === null ? t(WITHHELD) : undefined} info={<InfoTip name={t("Overdue tasks")} warning={totals.coverage.tasks.covered < totals.coverage.tasks.of}><p>{totals.openTasks !== null && t("of {0} open", totals.openTasks)}<Coverage locale={locale} copy={copy} totals={totals} group="tasks" /></p></InfoTip>} />
       </div>}
-      {result.workspaces.some(item => item.metrics?.scheduled != null || item.metrics?.failed != null) && <BarChart label={t("Scheduled posts · Failed posts")} locale={locale} categories={result.workspaces.map(item => item.name)} series={[
-        { id: 'scheduled', name: t("Scheduled posts"), values: result.workspaces.map(item => item.metrics?.scheduled ?? null) },
-        { id: 'failed', name: t("Failed posts"), values: result.workspaces.map(item => item.metrics?.failed ?? null) },
-      ]} orientation="horizontal" />}
       {result.workspaces.length === 0
         ? <EmptyState title={totals.workspaces === 0 && !result.filtered ? t("You do not own or administer any workspace with Agency access yet.") : totals.workspaces === 0 ? t("No workspaces match this search.") : t("No workspaces need attention.")} icon={<IconBuildingCommunity />} action={<a href={result.filtered || filters.attention ? '/agency' : '/settings/workspace'}>{result.filtered || filters.attention ? t("Reset filters") : t("View workspace")}</a>} />
         : <DataTable caption={t("Workspaces you manage")} rows={result.workspaces} rowKey={item => item.id} columns={[

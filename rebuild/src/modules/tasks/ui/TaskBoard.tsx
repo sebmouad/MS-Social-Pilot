@@ -1,13 +1,14 @@
 'use client';
 import { uiCopy, type CustomerCopy, type UiLocale } from './copy';
 
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AutoTextarea } from '@/components/AutoTextarea';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
-import { SidebarDock } from '@/components/SidebarDock';
-import { Badge, DataTable, SegmentedControl, InlineEdit, ConfirmDialog, EmptyState, Select, Avatar, useToast } from '@/components';
+import { SidePanel } from '@/components/SidePanel';
+import { Tabs } from '@/components/Tabs';
+import { Badge, DataTable, InlineEdit, ConfirmDialog, EmptyState, Select, Avatar, useToast } from '@/components';
 import { IconGripVertical, IconChecklist, IconLayoutKanban, IconList } from '@tabler/icons-react';
 import { RouteNotice } from '@/components/RouteNotice';
 import { TASK_STATUSES, TASK_STATUS_LABELS, TASK_TRANSITIONS, taskConfirmations, type TaskCommentView, type TaskLimits, type TaskPostChoice, type TaskStatus, type TaskSummary, type TaskView } from '@/modules/tasks/tasks';
@@ -45,6 +46,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
   const [notice, setNotice] = useState<{ error: boolean; text: string; key: number } | null>(null);
   const [formError, setFormError] = useState('');
   const inFlight = useRef(false);
+  const detailRequest = useRef(0);
   const say = (text: string, error = false) => { setNotice(current => ({ error, text, key: (current?.key ?? 0) + 1 })); if (error) toast.failed(text, () => router.refresh(), t("Refresh tasks")); else toast.notify({ title: text }); };
 
   async function send(body: Record<string, unknown>): Promise<boolean> {
@@ -60,6 +62,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
   }
 
   function openForm(task: TaskView | null) {
+    detailRequest.current++;
     setDraft({ title: task?.title ?? '', notes: task?.notes ?? '', assigneeId: task?.assignee?.id ?? '', dueOn: task?.dueOn ?? '' });
     setPostChange(undefined); setPostLabel(task?.post ? task.post.preview || t("Untitled post") : ''); setPostSearch(''); setPostChoices(null);
     setFormError(''); setNotice(null); setMode({ kind: 'form', task });
@@ -106,13 +109,15 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
     return UNKNOWN;
   }
   async function loadComments(task: TaskView, offset: number) {
+    const request = ++detailRequest.current;
     try {
       const response = await fetch(`/api/tasks/${encodeURIComponent(task.id)}${offset ? `?commentOffset=${offset}` : ''}`, { cache: 'no-store' });
       const body = await response.json().catch(() => null);
+      if (request !== detailRequest.current) return false;
       if (!response.ok || !body || !Array.isArray(body.comments)) { setFormError(message(body)); return false; }
       setComments(current => ({ items: offset && current ? [...current.items, ...body.comments] : body.comments, hasMore: Boolean(body.commentsHasMore), canComment: body.canComment === true }));
       return true;
-    } catch { setFormError(t("Comments could not be loaded. Close this window and try again.")); return false; }
+    } catch { if (request !== detailRequest.current) return false; setFormError(t("Comments could not be loaded. Close this window and try again.")); return false; }
   }
   function openDetail(task: TaskView) {
     setComments(null); setCommentDraft(''); setFormError(''); setNotice(null); setMode({ kind: 'detail', task });
@@ -129,7 +134,9 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
     return UNKNOWN;
   }
 
-  const close = () => { if (!busy) setMode(null); };
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const close = useCallback(() => { if (!busyRef.current) { detailRequest.current++; setMode(null); } }, []);
   const dueCell = (task: TaskView) => task.dueOn ? <Badge tone={task.status === 'done' ? 'neutral' : task.overdue ? 'danger' : task.dueOn === today ? 'warning' : 'neutral'}>{day(task.dueOn)}{task.overdue ? t(" (overdue)") : task.status !== 'done' && task.dueOn === today ? t(" (today)") : ''}</Badge> : <span className={styles.meta}>{t("No date")}</span>;
   const taskTitle = (task: TaskView) => <InlineEdit value={task.title} label={task.title} editLabel={t('Edit')} saveLabel={t('Save')} cancelLabel={t('Cancel')} failureLabel={UNKNOWN} disabled={busy || !task.canEdit} maxLength={limits.titleMaxCharacters} onSave={async title => {
     if (!title.trim()) return t("Enter a task title.");
@@ -140,20 +147,20 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
   const postNote = (task: TaskView) => task.post ? <details className={styles.postPreview}><summary>{t("Linked post")}</summary><p>{task.post.preview || t("Untitled post")}</p><Badge>{t(task.post.status.replaceAll('_', ' '))}</Badge></details> : task.postHidden ? <span className={styles.meta}>{t("Linked post is not available to you.")}</span> : null;
   const rowActions = (task: TaskView) => <div className={styles.actions}>
     {task.canEdit && TASK_TRANSITIONS[task.status].map(status => <Button key={status} size="sm" disabled={busy} onClick={() => move(task, status)}>{verb(status)}</Button>)}
-    <Button size="sm" variant="quiet" onClick={() => openDetail(task)}>{t("Details")}{task.commentCount ? ` (${task.commentCount})` : ''}</Button>
-    {task.canEdit && <Button size="sm" variant="quiet" onClick={() => openForm(task)}>{t("Edit")}</Button>}
-    {task.canDelete && <Button size="sm" variant="danger" onClick={() => { setFormError(''); setMode({ kind: 'delete', task }); }}>{t("Delete")}</Button>}
+    <Button size="sm" variant="quiet" disabled={busy} onClick={() => openDetail(task)}>{t("Details")}{task.commentCount ? ` (${task.commentCount})` : ''}</Button>
+    {task.canEdit && <Button size="sm" variant="quiet" disabled={busy} onClick={() => openForm(task)}>{t("Edit")}</Button>}
+    {task.canDelete && <Button size="sm" variant="danger" disabled={busy} onClick={() => { detailRequest.current++; setFormError(''); setMode({ kind: 'delete', task }); }}>{t("Delete")}</Button>}
   </div>;
 
   return <>
-    <SidebarDock><SegmentedControl legend={t('Task layout')} value={layout} options={[
-      { value: 'board', label: t('Board'), icon: <IconLayoutKanban size={18} /> },
-      { value: 'table', label: t('List'), icon: <IconList size={18} /> },
+    <Tabs label={t('Task layout')} value={layout} items={[
+      { id: 'board', label: t('Board'), icon: <IconLayoutKanban size={18} /> },
+      { id: 'table', label: t('List'), icon: <IconList size={18} /> },
     ]} onChange={value => {
       if (value !== 'board' && value !== 'table') return;
       setLayout(value); const url = new URL(window.location.href); url.searchParams.set('view', value);
       window.history.replaceState(window.history.state, '', url);
-    }} /></SidebarDock>
+    }} />
     {deletingComment && <ConfirmDialog open title={t("Delete comment")} objectName={deletingComment.comment.body} consequence={t("This comment is permanently removed from the task.")} confirmLabel={t("Delete comment")} cancelLabel={t("Cancel")} failureLabel={UNKNOWN} onClose={() => setDeletingComment(null)} onConfirm={() => removeComment(deletingComment.task, deletingComment.comment)} />}
     {notice && <RouteNotice error={notice.error} focusKey={`task-notice-${notice.key}`}>{notice.text}</RouteNotice>}
     <div className={styles.toolbar}>
@@ -161,7 +168,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
         {TASK_STATUSES.map(status => <li key={status}><strong>{summary[status]}</strong> {t(TASK_STATUS_LABELS[status])}</li>)}
         {summary.overdue > 0 && <li className={styles.overdue}><strong>{summary.overdue}</strong> {t('Overdue')}</li>}
       </ul>
-      {canCreate && <div className={styles.actions}><Button variant="primary" onClick={() => openForm(null)}>{t("New task")}</Button><Button onClick={() => { setChecklist({ lines: '', assigneeId: '', startOn: '', gapDays: '1' }); setFormError(''); setNotice(null); setMode({ kind: 'checklist' }); }}>{t("Add checklist")}</Button></div>}
+      {canCreate && <div className={styles.actions}><Button variant="primary" disabled={busy} onClick={() => openForm(null)}>{t("New task")}</Button><Button disabled={busy} onClick={() => { detailRequest.current++; setChecklist({ lines: '', assigneeId: '', startOn: '', gapDays: '1' }); setFormError(''); setNotice(null); setMode({ kind: 'checklist' }); }}>{t("Add checklist")}</Button></div>}
     </div>
     {tasks.length === 0 ? <EmptyState title={filtered ? t("No tasks match these filters.") : t("No tasks yet.")} icon={<IconChecklist />} action={filtered ? <a href="/tasks">{t("Reset filters")}</a> : canCreate ? <Button onClick={() => openForm(null)}>{t("New task")}</Button> : <a href="/settings/team">{t("View team")}</a>}>{canCreate ? t("Create a task or paste a checklist to start tracking work.") : t("Tasks created by your team appear here.")}</EmptyState>
       : layout === 'board' ? <><p className={styles.help}>{t("Drag a task to another column, or use its status buttons to move it.")}</p><div className={styles.columns}>{TASK_STATUSES.map(status => {
@@ -210,7 +217,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
           <legend>{t("Linked post")}</legend>
           <p className={styles.help} role="status">{postChange === null ? t("No post linked.") : postChange ? t("Linking: {0}", postLabel) : postLabel ? t("Linked: {0}", postLabel) : mode?.kind === 'form' && mode.task?.postHidden ? t("A post you cannot see is linked. It stays linked unless you remove it.") : t("No post linked.")}</p>
           <div className={styles.actions}>
-            <input type="search" aria-label={t("Search posts to link")} value={postSearch} maxLength={200} placeholder={t("Search post text")} onChange={event => setPostSearch(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void findPosts(0); } }} />
+            <input type="search" aria-label={t("Search posts to link")} value={postSearch} placeholder={t("Search post text")} onChange={event => setPostSearch(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void findPosts(0); } }} />
             <Button type="button" size="sm" disabled={searching} onClick={() => findPosts(0)}>{searching ? t("Searching...") : t("Find posts")}</Button>
             {(postChange || (postChange === undefined && (postLabel || (mode?.kind === 'form' && mode.task?.postHidden)))) && <Button type="button" size="sm" variant="quiet" onClick={() => { setPostChange(null); setPostLabel(''); }}>{t("Remove link")}</Button>}
           </div>
@@ -238,7 +245,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
 
     {mode?.kind === 'delete' && <ConfirmDialog open title={t("Delete task")} objectName={mode.task.title} consequence={t("The task and its comments are permanently removed for everyone in this workspace.")} confirmLabel={t("Delete task")} cancelLabel={t("Cancel")} pendingLabel={t("Deleting...")} failureLabel={UNKNOWN} onClose={close} onConfirm={() => remove(mode.task)} />}
 
-    <Dialog closeLabel={t('Close')} open={mode?.kind === 'detail' && !deletingComment} title={mode?.kind === 'detail' ? mode.task.title : t("Task")} onClose={close} busy={busy}
+    <SidePanel closeLabel={t('Close')} open={mode?.kind === 'detail' && !deletingComment} title={mode?.kind === 'detail' ? mode.task.title : t("Task")} onClose={close}
       actions={<Button onClick={close} disabled={busy}>{t("Close")}</Button>}>
       {mode?.kind === 'detail' && <div className={styles.form}>
         {formError && <RouteNotice error focusKey={`task-detail-${formError}`}>{formError}</RouteNotice>}
@@ -246,7 +253,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
         {postNote(mode.task)}
         <h3>{t("Comments")}</h3>
         {comments === null ? (formError ? null : <p className={styles.help} role="status">{t("Loading comments...")}</p>) : comments.items.length === 0 ? <p className={styles.help}>{t("No comments yet.")}</p> : <ul className={styles.comments}>{comments.items.map(comment => <li key={comment.id}>
-          <span className={styles.meta}>{comment.author?.name ?? t("Former member")} · {new Date(comment.createdAt).toLocaleString()}</span>{comment.body}
+          <span className={styles.meta}>{comment.author?.name ?? t("Former member")} · {new Date(comment.createdAt).toLocaleString(locale)}</span>{comment.body}
           {comment.canDelete && <div><Button size="sm" variant="quiet" disabled={busy} onClick={() => setDeletingComment({ task: mode.task, comment })}>{t("Delete comment")}</Button></div>}
         </li>)}</ul>}
         {comments?.hasMore && <div><Button size="sm" disabled={busy} onClick={() => loadComments(mode.task, comments.items.length)}>{t("Load more comments")}</Button></div>}
@@ -255,6 +262,6 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
           <div><Button variant="primary" disabled={busy || !commentDraft.trim()} onClick={() => addComment(mode.task)}>{busy ? t("Posting...") : t("Post comment")}</Button></div>
         </>}
       </div>}
-    </Dialog>
+    </SidePanel>
   </>;
 }

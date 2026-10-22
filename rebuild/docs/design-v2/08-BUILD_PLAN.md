@@ -177,6 +177,8 @@ Every batch that touches these flows must pass them at 390 px, one-handed, with 
 
 ### B7. Home, Tasks, Agency
 
+**Status (2026-10-22): partial UI implementation, uncommitted; service/copy and browser acceptance gaps remain.** See [B7_IMPLEMENTATION.md](B7_IMPLEMENTATION.md) for changes, verification and exact outside-owned dependencies. This is not a completed B7 acceptance claim.
+
 **Owns:** `src/modules/{home,tasks,agency}/ui/**`.
 
 **Work:** S1 and S14.
