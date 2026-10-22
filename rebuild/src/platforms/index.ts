@@ -1,3 +1,5 @@
+import { BLUESKY_CONFIG } from './bluesky/config';
+import { TELEGRAM_CONFIG } from './telegram/config';
 import { INSTAGRAM_CONFIG } from './instagram/config';
 import { instagramModule } from './instagram/module';
 export { instagramModule };
@@ -21,12 +23,12 @@ import { xModule } from './x/module';
  */
 /** Platform modules whose settings are registered while host wiring is pending; not customer-visible (enabled defaults to false). */
 export const STAGED_PLATFORM_MODULES = [mastodonModule, threadsModule, xModule] as const satisfies readonly PlatformModule[];
-export const STAGED_PLATFORM_IDS: readonly string[] = STAGED_PLATFORM_MODULES.map(module => module.id);
+export const STAGED_PLATFORM_IDS: readonly string[] = [...STAGED_PLATFORM_MODULES.map(module => module.id), 'bluesky', 'telegram'];
 
 export const PLATFORM_MODULES = [facebookModule, instagramModule] as const satisfies readonly PlatformModule[];
 
 /** Every module's Root settings, merged into the configuration registry. */
-export const PLATFORM_CONFIG = [...MASTODON_CONFIG, ...THREADS_CONFIG, ...X_CONFIG, ...INSTAGRAM_CONFIG, ...FACEBOOK_CONFIG, ...FACEBOOK_ADS_CREATION_CONFIG.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }))] as const;
+export const PLATFORM_CONFIG = [...BLUESKY_CONFIG, ...TELEGRAM_CONFIG, ...MASTODON_CONFIG, ...THREADS_CONFIG, ...X_CONFIG, ...INSTAGRAM_CONFIG, ...FACEBOOK_CONFIG, ...FACEBOOK_ADS_CREATION_CONFIG.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }))] as const;
 
 export type PlatformId = (typeof PLATFORM_MODULES)[number]['id'];
 

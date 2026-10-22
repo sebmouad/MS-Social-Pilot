@@ -1,3 +1,5 @@
+import { manifest as blueskyManifest } from '@/platforms/bluesky/manifest';
+import { manifest as telegramManifest } from '@/platforms/telegram/manifest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ runtimeConfig: vi.fn(), adapter: vi.fn(), oauth: vi.fn() }));
@@ -31,14 +33,14 @@ describe('platform modules', () => {
       for (const key of module.requiredSettings) expect(CONFIG_BY_KEY.has(key)).toBe(true);
     }
     for (const entry of PLATFORM_CONFIG) {
-      const owner = [...PLATFORM_MODULES, ...STAGED_PLATFORM_MODULES].find(module => module.id === entry.owner.id);
+      const owner = [...PLATFORM_MODULES, ...STAGED_PLATFORM_MODULES, blueskyManifest, telegramManifest].find(module => module.id === entry.owner.id);
       expect(owner).toBeDefined();
       expect(entry.group.startsWith(`${owner!.name} · `)).toBe(true);
     }
   });
 
   it('registers staged settings without exposing unfinished providers even if Root enables their switch', async () => {
-    expect(STAGED_PLATFORM_IDS).toEqual(['mastodon', 'threads', 'x']);
+    expect(STAGED_PLATFORM_IDS).toEqual(['mastodon', 'threads', 'x', 'bluesky', 'telegram']);
     for (const module of STAGED_PLATFORM_MODULES) {
       expect(CONFIG_BY_KEY.get(module.enabledKey)?.defaultValue).toBe(false);
       for (const key of module.requiredSettings) expect(CONFIG_BY_KEY.has(key)).toBe(true);
