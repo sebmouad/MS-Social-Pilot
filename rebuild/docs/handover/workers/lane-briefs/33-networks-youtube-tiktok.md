@@ -1,0 +1,4 @@
+LANE: networks YouTube, TikTok. Read legacy implementation under root src/lib/networks/<name>.ts and src/app/api/networks to preserve behavior. Each network is an independent platform module under rebuild/src/platforms/<name>/ per ARCHITECTURE_CONTRACT section 3 (manifest, config.ts Root keys for endpoints/credentials/scopes, connection/OAuth via requestOrigin, discovery, publishing, status, capabilities declared only for implemented ops), installed in src/platforms/index.ts, fixture tests, README per module. Update LEGACY_SWEEP rows to done with evidence. Do not bump CONFIG_SCHEMA_VERSION. Full suite + tsc must pass.
+
+
+OWNERSHIP (authoritative, do not ask): you own every path needed under rebuild/src, rebuild/tests, rebuild/docs, rebuild/scripts and prisma/ for this lane. Edit central registries/aggregators only by adding entries. Implement fully, run targeted tests + npm run typecheck, leave changes uncommitted. Never ask questions.

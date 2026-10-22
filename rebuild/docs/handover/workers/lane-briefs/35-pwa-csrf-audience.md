@@ -1,0 +1,4 @@
+LANE: legacy platform shell. Implement: installable web app (rebuild/public manifest, service worker, offline page, icons, all values from Root branding), shared cross-site write check middleware for all mutating routes, audience growth identity (likes vs followers series identity, platform-neutral). Each feature: shared service + UI (EN/FR, design skills) + REST + MCP with confirmations/audit + Root config, worker jobs via the shared job runner with leases/run history. Read legacy implementation under root src/. Update LEGACY_SWEEP rows to done with evidence. Do not bump CONFIG_SCHEMA_VERSION. Full suite + tsc must pass.
+
+
+OWNERSHIP (authoritative, do not ask): you own every path needed under rebuild/src, rebuild/tests, rebuild/docs, rebuild/scripts and prisma/ for this lane. Edit central registries/aggregators only by adding entries. Implement fully, run targeted tests + npm run typecheck, leave changes uncommitted. Never ask questions.

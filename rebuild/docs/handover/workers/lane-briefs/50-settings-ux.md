@@ -1,0 +1,1 @@
+LANE: Settings UX polish. OWNED: src/modules/settings/ui/** (not connections, another worker), catalogs, tests. Team, roles, account/security, notifications, webhooks, MCP keys, data and privacy pages: apply design skills, simplify forms (smart defaults from Root, inline validation, fewer steps), consistent tables, empty/loading/error states, phone layout. Render tests.

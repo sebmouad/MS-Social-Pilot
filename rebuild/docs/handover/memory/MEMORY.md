@@ -1,0 +1,3 @@
+- [Worker account budget](worker-account-budget.md) — spend sebhaoui Claude/Codex first; protect sebmouad's last 10%
+- [No hardcoded settings](no-hardcoded-settings.md) — every value must be a Root UI setting, never in code/scripts/env
+- [Auto-dispatch workers](auto-dispatch-workers.md) — always use the 3 Codex + 2 Claude worker accounts automatically; keep them busy

@@ -1,0 +1,3 @@
+# Lane 53: design v2 batch B5 Insights
+Implement batch B5 (Insights) exactly as specified in rebuild/docs/design-v2/08-BUILD_PLAN.md and the design-v2 docs, following DESIGN.md, UX-CONTRACT.md and the architecture contract. B1-B4 are merged; also make Inbox honour the sidebar channel scope (B4 left its own filter); reuse their shell, Filter button and patterns. Nothing hardcoded (Root config), EN/FR, UI/REST/MCP parity unchanged, tests updated, docs status lines updated. typecheck + full suite green. Leave uncommitted.
+OWNERSHIP (authoritative, do not ask): analytics+ads module UI, /insights routes, inbox scope wiring, related tests and docs. Never stage node_modules or *.patch. Never ask questions.
