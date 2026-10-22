@@ -98,6 +98,11 @@ describe('shell catalog and areas', () => {
     // Post details and Library sections belong to Content; their own tab, when they have none, is the parent route.
     expect(pageForPath('/content/post/abc')?.id).toBe('publishing/posts');
     expect(pageForPath('/content/library/labels')?.id).toBe('publishing/labels');
+    // 2026-10-22 organization: Feeds and AI studio are Content tabs, Caption tests is an Insights tab.
+    expect(areaForPath('/content/feeds')).toBe('content');
+    expect(areaForPath('/content/ai-studio')).toBe('content');
+    expect(areaForPath('/insights/tests')).toBe('insights');
+    expect(pageForPath('/insights/tests')?.id).toBe('analytics/tests');
     expect(areaPages('insights', PAGES.map(page => page.id)).map(page => page.module)).toEqual(expect.arrayContaining(['analytics']));
     expect(areaPages('insights', PAGES.map(page => page.id)).map(page => page.module)).not.toContain('ads');
     expect(areaPages('ads', PAGES.map(page => page.id)).map(page => page.module)).toEqual(expect.arrayContaining(['analytics', 'ads']));

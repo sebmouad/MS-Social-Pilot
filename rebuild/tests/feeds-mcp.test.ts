@@ -38,7 +38,8 @@ describe('content feeds module declarations', () => {
   it('is a Publishing feature slice with its own navigation entry and no new module', () => {
     expect(FEEDS_PAGES[0].id).toBe(FEEDS_FEATURE_ID);
     expect(publishingManifest.pages.filter(page => page.id === FEEDS_FEATURE_ID)).toHaveLength(1);
-    expect(PAGES.find(page => page.id === FEEDS_FEATURE_ID)).toMatchObject({ title: 'Content feeds', href: '/content/library/feeds', navigation: false, module: 'publishing' });
+    expect(PAGES.find(page => page.id === FEEDS_FEATURE_ID)).toMatchObject({ title: 'Content feeds', href: '/content/feeds', module: 'publishing' });
+    expect(PAGES.find(page => page.id === FEEDS_FEATURE_ID)?.navigation).not.toBe(false);
     expect(moduleManifests.map(m => m.id)).not.toContain('feeds');
   });
 

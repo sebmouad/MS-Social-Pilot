@@ -8,7 +8,7 @@ import type { InstantFormatter } from '@/server/instant-labels';
 import { CaptionTestsScreen, type CaptionAction, type CaptionActionResult } from './CaptionTestsScreen';
 
 export default async function CaptionTestsPage() {
-  const viewer = await requireViewer({ module: 'analytics', feature: 'analytics/posts', channelScoped: true });
+  const viewer = await requireViewer({ module: 'analytics', feature: 'analytics/tests', channelScoped: true });
   const locale: Locale = await requestLocale();
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const instants = await workspaceInstantFormatter(viewer.workspaceId, locale);
@@ -19,7 +19,7 @@ export default async function CaptionTestsPage() {
   /** One injected action boundary: the screen never reaches storage, only the shared service. It captures only serializable values (locale, copy). */
   async function execute(action: CaptionAction): Promise<CaptionActionResult> {
     'use server';
-    const current = await requireViewer({ module: 'analytics', feature: 'analytics/posts', channelScoped: true });
+    const current = await requireViewer({ module: 'analytics', feature: 'analytics/tests', channelScoped: true });
     const who = { userId: current.user.id, workspaceId: current.workspaceId };
     const formatter = await workspaceInstantFormatter(current.workspaceId, locale);
     try {

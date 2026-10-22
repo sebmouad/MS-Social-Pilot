@@ -633,3 +633,27 @@ Source/DOM evidence only; no browser, keyboard-in-browser or screen-reader run.
 - Root manual token refresh renews the token, its expiry, destination
   copies and the audit record together. The dialog, confirmation and
   renewed/not renewable/failed receipts are unchanged.
+
+## Desktop UX organization (2026-10-22)
+
+Source/DOM evidence only (typecheck + touched vitest files); no browser run.
+
+- Content tabs are Posts · Calendar · Queue · Approvals · Library · Content
+  feeds · AI studio · Writing agents. The 8th tab folds into the shell "More"
+  menu per `maxVisibleTabs: 7`. Insights tabs are Overview · Explore ·
+  Audience · Posts · Caption tests · Compare · Reports. Full click-depth
+  table: [docs/UX_NAVIGATION_AUDIT.md](docs/UX_NAVIGATION_AUDIT.md).
+- Feeds left the Library sections for its own Content tab at /content/feeds;
+  /content/library/feeds redirects with 308, as does /publishing/feeds.
+  Library sections are Media · Templates · Labels · Fields.
+- AI studio (/content/ai-studio) and Caption tests (/insights/tests) are
+  promoted from unlinked routes to area tabs with their own features
+  (`publishing/ai-studio`, `analytics/tests`); both inherit their siblings'
+  role access. Chart notes (/insights/notes) is linked from the Insights
+  Overview header with its Root-managed label.
+- The command palette reaches every promoted page (palette = navigable
+  manifest pages). Section tabs and linked sub-pages (goals, pins, rules,
+  bio, webhooks, keys, security, appearance, notifications) stay out of the
+  palette; they are reached from their parent screen.
+- AI studio's no-channel empty state links to Manage channels. Feeds and
+  caption tests keep their one next action beside their empty states.

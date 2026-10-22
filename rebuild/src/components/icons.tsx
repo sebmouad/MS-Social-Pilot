@@ -3,7 +3,7 @@ import {
   IconChartBar, IconChartDots3, IconChartPie, IconCheckbox, IconCircleDot, IconClipboardCheck, IconColumns3, IconDatabase,
   IconFileAnalytics, IconHome, IconId, IconLayoutDashboard, IconLink, IconListDetails, IconMessageCircle, IconPalette, IconPhoto,
   IconPlugConnected, IconRss, IconSend, IconSettings, IconShare, IconShieldLock, IconSpeakerphone, IconStack2, IconTag,
-  IconTarget, IconTemplate, IconUserCircle, IconUsers, IconUsersGroup, IconVersions, IconWebhook, IconPin, IconScale, IconHistory,
+  IconTarget, IconTemplate, IconUserCircle, IconUsers, IconUsersGroup, IconVersions, IconWebhook, IconPin, IconScale, IconHistory, IconSparkles, IconFlask,
   type Icon as TablerIcon,
 } from '@tabler/icons-react';
 
@@ -17,11 +17,11 @@ export const MODULE_ICONS: Record<string, TablerIcon> = {
 export const PAGE_ICONS: Record<string, TablerIcon> = {
   '/home': IconLayoutDashboard,
   '/content': IconListDetails, '/content/calendar': IconCalendarEvent, '/content/queue': IconStack2,
-  '/content/approvals': IconClipboardCheck, '/content/library': IconPhoto, '/content/library/feeds': IconRss,
+  '/content/approvals': IconClipboardCheck, '/content/library': IconPhoto, '/content/feeds': IconRss, '/content/ai-studio': IconSparkles,
   '/content/library/fields': IconColumns3, '/content/library/labels': IconTag, '/content/library/templates': IconTemplate,
   '/inbox': IconMessageCircle,
   '/insights': IconChartBar, '/insights/explore': IconChartPie, '/insights/audience': IconUsersGroup, '/insights/compare': IconScale,
-  '/ads/analysis': IconChartPie, '/insights/posts': IconChartDots3, '/insights/goals': IconTarget,
+  '/ads/analysis': IconChartPie, '/insights/posts': IconChartDots3, '/insights/tests': IconFlask, '/insights/goals': IconTarget,
   '/insights/pins': IconPin, '/insights/reports': IconFileAnalytics,
   '/ads': IconAd2, '/ads/compare': IconScale, '/ads/manage': IconAffiliate, '/ads/campaigns': IconBolt,
   '/tasks': IconCheckbox, '/agency': IconBuildingStore, '/agency/clients': IconAddressBook,

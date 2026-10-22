@@ -608,13 +608,15 @@ excepted.
 | POST /api/errors | Browser telemetry sink for the app's own pages: a signed-in browser reports its uncaught errors to the self-hosted recorder (rate limited, scrubbed, Root-bounded). It exposes no product data and no write a person chooses; operators read and resolve the result through the mapped Root error tools. |
 <!-- parity-rest-exceptions:end -->
 
-Manifest-only view aliases explicitly reuse covered feature capabilities. Neither
+Manifest-only view aliases explicitly reuse covered feature capabilities. No
 alias waives the target's service-owned authorization or UI verification.
 
 <!-- parity-feature-aliases:start -->
 | Manifest feature | Covered feature | Reason |
 | --- | --- | --- |
 | ads/overview | ads/campaigns | Account overview presents the same account/performance reads declared under ads/campaigns by MCP. |
+| publishing/ai-studio | publishing/posts | AI studio page gates on the same publishing/posts capability the AI media and check MCP tools declare; the 2026-10-22 UX organization added page-only gating with no new MCP surface. |
+| analytics/tests | analytics/posts | Caption tests page gates on the same analytics/posts read capability list_caption_tests declares; start and learn keep their publishing/posts and settings/workspace service gates. |
 <!-- parity-feature-aliases:end -->
 
 Selector review: `/api/tasks` POST uses the task action union; Sharing link POST

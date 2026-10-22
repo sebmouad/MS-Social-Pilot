@@ -142,7 +142,7 @@ export function AiStudioScreen({ status, videos: initialVideos, channels, canChe
     {audio ? <div className={styles.result}><audio controls src={audio} /><a className="ui-button ui-button--secondary ui-button--md" href={audio} download="ai-voice.mp3"><IconDownload size={16} aria-hidden="true" /> {t.voiceDownload}</a></div> : null}
   </form>;
 
-  const checkTab = !canCheck ? unavailable : channels.length === 0 ? <EmptyState icon={<IconTrendingUp size={22} />} title={t.noChannels} /> : <div className={styles.stack}>
+  const checkTab = !canCheck ? unavailable : channels.length === 0 ? <EmptyState icon={<IconTrendingUp size={22} />} title={t.noChannels} action={<a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{t.noChannelsAction}</a>} /> : <div className={styles.stack}>
     <form className={styles.panel} onSubmit={event => { event.preventDefault(); check(); }}>
       <h2><IconTrendingUp size={20} aria-hidden="true" /> {t.checkHeading}</h2>
       <p className={styles.hint}>{t.checkIntro}</p>

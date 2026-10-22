@@ -33,9 +33,9 @@ describe('customer module manifests', () => {
     expect(PAGES.some(({ href }) => href === '/root' || href.startsWith('/root/'))).toBe(false);
   });
 
-  it('shows the Insights tabs in order (Overview, Explore, Audience, Posts, Compare, Reports) and keeps goals and pins as sub-pages', () => {
+  it('shows the Insights tabs in order (Overview, Explore, Audience, Posts, Caption tests, Compare, Reports) and keeps goals and pins as sub-pages', () => {
     expect(areaPages('insights', PAGES.map(({ id }) => id)).map(({ href }) => href)).toEqual([
-      '/insights', '/insights/explore', '/insights/audience', '/insights/posts', '/insights/compare', '/insights/reports',
+      '/insights', '/insights/explore', '/insights/audience', '/insights/posts', '/insights/tests', '/insights/compare', '/insights/reports',
     ]);
     for (const id of ['analytics/goals', 'analytics/pins']) expect(PAGES.find(page => page.id === id)?.navigation, id).toBe(false);
     expect(PAGES.find(({ id }) => id === 'analytics/reports')?.href).toBe('/insights/reports');

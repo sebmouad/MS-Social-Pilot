@@ -12,6 +12,7 @@ import { readPinnedMetrics } from '@/modules/analytics/pins/server/pins';
 import { readGoals } from '@/modules/analytics/goals/server/goals';
 import { readPosts } from '@/modules/analytics/explorer-posts/service';
 import { loadChartAnnotations } from '@/modules/calendar-extras/server/chart-notes';
+import { calendarExtrasLinks } from '@/modules/calendar-extras/server/links';
 import { InsightsHeader } from './insights/InsightsHeader';
 import { InsightsTiles } from './insights/InsightsTiles';
 import { MainChartCard } from './insights/MainChartCard';
@@ -85,10 +86,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const canConnect = may('settings/connections');
   const retry = `/insights${Object.keys(params).length ? `?${withParams(params, {})}` : ''}`;
 
+  const notesLink = (await calendarExtrasLinks(locale, ['notes']).catch(() => []))[0];
   return <PageFrame module="analytics" scopedAccess><div className="insights">
     <InsightsHeader runtime={runtime} title={copy.overviewTitle} info={copy.overviewInfo} period={period}
-      actions={(canExport && reportQuery) || may('analytics/pins') ? <>
+      actions={(canExport && reportQuery) || may('analytics/pins') || notesLink ? <>
         {may('analytics/pins') && snapshot && channelIds.length > 0 && <a className="ui-button ui-button--quiet ui-button--md" href="/insights/pins"><IconPin size={16} stroke={1.9} aria-hidden="true" /> {copy.pinsManage}</a>}
+        {notesLink && <a className="ui-button ui-button--quiet ui-button--md" href={notesLink.href}>{notesLink.label}</a>}
         {canExport && reportQuery && <a className="ui-button ui-button--secondary ui-button--md" href={`/api/reports/export?${reportQuery}`}><IconDownload size={16} stroke={1.9} aria-hidden="true" /> {copy.downloadReport}</a>}
       </> : undefined} />
     {failure && <EmptyState tone="error" title={copy.loadFailedTitle} action={<a href={retry}>{copy.retry}</a>}>{failure}</EmptyState>}

@@ -65,7 +65,7 @@ describe('page channel scope', () => {
 
 describe('Library header', () => {
   const viewer = { entitlements: {}, permissions: {} } as never;
-  const html = async (active: 'media' | 'templates' | 'labels' | 'fields' | 'feeds') => renderToStaticMarkup(await LibraryHeader({ active, viewer }) as never);
+  const html = async (active: 'media' | 'templates' | 'labels' | 'fields') => renderToStaticMarkup(await LibraryHeader({ active, viewer }) as never);
   it('offers only the sections the viewer can use, always keeping the current one, and marks it', async () => {
     h.allowed = new Set(['publishing/media', 'publishing/templates']);
     const markup = await html('media');
@@ -73,7 +73,7 @@ describe('Library header', () => {
     expect(markup).toContain('href="/content/library"');
     expect(markup).toContain('href="/content/library/templates"');
     expect(markup).not.toContain('href="/content/library/labels"');
-    expect(markup).not.toContain('href="/content/library/feeds"');
+    expect(markup).not.toContain('href="/content/feeds"');
     expect(markup).toMatch(/href="\/content\/library"[^>]*aria-current="page"|aria-current="page"[^>]*href="\/content\/library"/);
   });
   it('keeps a section reachable when it is the one being viewed, and describes it', async () => {

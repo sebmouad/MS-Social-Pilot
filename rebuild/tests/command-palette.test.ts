@@ -42,6 +42,15 @@ describe('command palette commands', () => {
     }
   });
 
+  it('reaches every promoted page of the 2026-10-22 organization (Feeds, AI studio, Caption tests)', async () => {
+    const { items } = await listNavigationCommands(actor);
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'publishing/feeds', href: '/content/feeds' }),
+      expect.objectContaining({ id: 'publishing/ai-studio', href: '/content/ai-studio' }),
+      expect.objectContaining({ id: 'analytics/tests', href: '/insights/tests' }),
+    ]));
+  });
+
   it('leaves out modules and features the member cannot use', async () => {
     deniedModules.add('ads');
     deniedFeatures.add('settings/data');

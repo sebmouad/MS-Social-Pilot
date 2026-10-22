@@ -29,7 +29,8 @@ export const analyticsManifest = {
     { id: 'analytics/overview', title: 'Overview', href: '/insights', tabOrder: 10, description: 'Explore channel audience, performance and post metrics.' },
     { id: 'analytics/explorer', title: 'Explore', href: '/insights/explore', tabOrder: 20, description: 'Inspect every available stored metric, source and resource.' },
     { id: 'analytics/demographics', title: 'Audience', href: '/insights/audience', tabOrder: 30, description: 'Understand available audience breakdowns and coverage.' },
-    { id: 'analytics/posts', title: 'Posts', href: '/insights/posts', tabOrder: 40, tabRoutes: ['/insights/tests'], description: 'Explore and export stored per-post measures.' },
+    { id: 'analytics/posts', title: 'Posts', href: '/insights/posts', tabOrder: 40, description: 'Explore and export stored per-post measures.' },
+    { id: 'analytics/tests', title: 'Caption tests', href: '/insights/tests', tabOrder: 45, description: 'Test captions against each other and learn what works.' },
     { id: 'analytics/compare', title: 'Compare', href: '/insights/compare', tabOrder: 50, description: 'Compare periods and selected resource groups with honest metric semantics.' },
     // Ad-object analysis is the Analysis tab of the Ads area (Accounts · Campaigns · Manage · Analysis · Compare).
     { id: 'analytics/ads', title: 'Ads analysis', href: '/ads/analysis', area: 'ads', tabOrder: 40, description: 'Explore paid campaign, ad set and ad performance separately from channel analytics.' },

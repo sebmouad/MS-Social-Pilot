@@ -3,7 +3,7 @@
 .search label { display: grid; gap: .3rem; min-width: 0; color: var(--ink-soft); font-size: .82rem; font-weight: 650; }
 .search input, .form input, .form textarea, .form select { width: 100%; min-width: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: .65rem .75rem; color: var(--ink); background: var(--surface); font: inherit; }
 .search input:focus-visible, .form input:focus-visible, .form textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 32%, transparent); outline-offset: 1px; }
-.tableWrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.tableWrap { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
 .table { width: 100%; min-width: 46rem; border-collapse: collapse; text-align: left; }
 .table th, .table td { padding: .8rem .9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
 .table th { color: var(--ink-soft); font-size: .78rem; font-weight: 700; }
@@ -55,4 +55,13 @@
 @media (max-width: 38rem) {
   .recipe { grid-template-columns: minmax(0, 1fr); }
   .thumb { max-width: 12rem; }
+}
+/* Phones (≤760px): 16px text stops iOS zoom on focused fields; text controls,
+   option rows and pagination links keep 44px touch targets. The table keeps its
+   bounded local scroll (tableWrap) and never widens the document. */
+@media (max-width: 47.5rem) {
+  .search input, .form input:not([type="checkbox"]):not([type="radio"]), .form textarea, .form select, .confirmLabel input { font-size: 1rem; min-height: 2.75rem; }
+  .checks label, .inline { min-height: 2.75rem; }
+  .pagination { flex-wrap: wrap; }
+  .pagination a { display: inline-flex; align-items: center; min-height: 2.75rem; padding-inline: .25rem; }
 }

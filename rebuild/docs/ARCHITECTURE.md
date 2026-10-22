@@ -38,6 +38,16 @@ clean residues from the rebuild. Pre-removal production backup
 - No new Root keys; schema stays 135. `config-validation`, `parity-guard`
   and the full suite were re-run (see the lane-47 report).
 
+## Desktop UX organization — 2026-10-22 (source only)
+
+Audit: [UX_NAVIGATION_AUDIT.md](UX_NAVIGATION_AUDIT.md). Feeds is its own
+Content tab at `/content/feeds` (308 from `/content/library/feeds`); AI studio
+is a Content tab (`publishing/ai-studio`); caption tests is an Insights tab
+(`analytics/tests`); chart notes is linked from the Insights Overview header.
+Command palette reaches all promoted pages. Typecheck 0 errors; 15
+touched/adjacent vitest files pass. No browser, provider or production run;
+mobile pass not started.
+
 ## Current HEAD reconciliation — 2026-10-21
 
 Reviewed source: `99c41554`; registry schema **123**. This section supersedes

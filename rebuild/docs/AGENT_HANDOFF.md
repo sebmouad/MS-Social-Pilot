@@ -861,3 +861,35 @@ verifier owns the full suite. No commit, push, deploy or server run in this
 lane. Next: full-suite verification, browser-matrix v2 run (families now
 include `/ads`; cell counts updated), then release through
 `rebuild/scripts/prod-deploy.sh` per CUTOVER.
+
+## Desktop UX organization — 2026-10-22 (no commit/push/deploy)
+
+Owner directive DESKTOP FIRST (organization, not styling). Audit:
+`docs/UX_NAVIGATION_AUDIT.md` (new, dated) with the full click-depth table.
+Feeds was buried at /content/library/feeds (depth 3); AI studio, caption
+tests and chart notes were reachable only by URL.
+
+- Feeds → own Content tab at /content/feeds (308 from /content/library/feeds
+  and /publishing/feeds); own PageHeader; pagination updated; removed from
+  Library sections.
+- AI studio → own Content tab (new `publishing/ai-studio` feature); page
+  gating moved to it; no-channel empty state links to /settings/channels (new
+  `noChannelsAction` key in Root catalog `ai.toolsCopy`, schema derived, no
+  version bump).
+- Caption tests → own Insights tab (new `analytics/tests` feature, tabOrder 45;
+  `tabRoutes` on Posts removed); page gating moved to it; client role keeps
+  analytics parity.
+- Chart notes → linked from Insights Overview header via `calendarExtrasLinks`
+  (Root-managed label, no new copy).
+- Switch maps (`FEATURE_ROOT_SWITCH`, `FEATURE_MODULE_SWITCH`), shellCopy
+  pageTitles EN/FR, PAGE_ICONS, command palette (automatic) updated. No
+  CONFIG_SCHEMA_VERSION bump (config-validation passes; no new registry keys).
+- Mobile work explicitly NOT started (later child owns it).
+
+Evidence: `npm run typecheck` 0 errors; 15 touched/adjacent files pass
+(route-redirects, app-shell, shell-v2, content-v2, content-v2-server,
+module-manifests, feeds-mcp, command-palette, mcp-security,
+ai-content-tools-ui, ai-content-tools-http, config-validation,
+contract-audit-shell, smoke-guard-redirect, caption-tests-service).
+No browser run; full suite owned by the verifier. Next: mobile pass, then
+browser-matrix v2 run and release per CUTOVER.

@@ -41,8 +41,10 @@ export const publishingManifest = {
     { from: '/publishing/labels', to: '/content/library/labels' },
     { from: '/publishing/collaboration/post/*', to: '/content/post/*' },
     { from: '/publishing/collaboration', to: '/content/library/fields' },
-    { from: '/publishing/feeds', to: '/content/library/feeds' },
+    { from: '/publishing/feeds', to: '/content/feeds' },
     { from: '/publishing/ai-studio', to: '/content/ai-studio' },
+    /** 2026-10-22 UX organization: Feeds left the Library sections for its own Content tab. */
+    { from: '/content/library/feeds', to: '/content/feeds' },
   ],
   pages: [
     { id: 'publishing/posts', title: 'Posts', href: '/content', description: 'Create and manage content across your channels.' },
@@ -50,8 +52,9 @@ export const publishingManifest = {
     { id: 'publishing/queue', title: 'Queue', href: '/content/queue', description: 'Review work waiting to publish.' },
     { id: 'publishing/approvals', title: 'Approvals', href: '/content/approvals', description: 'Review posts before they go live.' },
     ...MEDIA_PAGES,
-    // Library sections: they are tabs inside Library, not tabs of the Content area.
+    // Feeds is its own Content-area tab (2026-10-22 UX organization); the rest are tabs inside Library, not tabs of the Content area.
     ...FEEDS_PAGES,
+    { id: 'publishing/ai-studio', title: 'AI studio', href: '/content/ai-studio', description: 'Generate images, video and voice, and check a post before publishing.' },
     { id: 'publishing/collaboration', title: 'Fields', href: '/content/library/fields', navigation: false, description: 'Label posts, manage custom fields and collaborate with your team.' },
     { id: 'publishing/labels', title: 'Labels', href: '/content/library/labels', navigation: false, description: 'Organize workspace content with shared labels.' },
     { id: 'publishing/templates', title: 'Templates', href: '/content/library/templates', navigation: false, description: 'Create and reuse workspace post templates.' },

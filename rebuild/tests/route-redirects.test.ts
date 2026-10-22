@@ -52,7 +52,7 @@ describe('route redirects', () => {
       ['/publishing/posts', '/content'], ['/publishing/compose', '/create'], ['/publishing/calendar', '/content/calendar'], ['/publishing/calendar/dates', '/content/calendar/dates'],
       ['/publishing/queue', '/content/queue'], ['/publishing/approvals', '/content/approvals'], ['/publishing/media', '/content/library'], ['/publishing/templates', '/content/library/templates'],
       ['/publishing/labels', '/content/library/labels'], ['/publishing/collaboration', '/content/library/fields'], ['/publishing/collaboration/post/p1', '/content/post/p1'],
-      ['/publishing/feeds', '/content/library/feeds'], ['/publishing/ai-studio', '/content/ai-studio'],
+      ['/publishing/feeds', '/content/feeds'], ['/publishing/ai-studio', '/content/ai-studio'], ['/content/library/feeds', '/content/feeds'],
     ];
     for (const [from, to] of cases) expect(resolveRedirect(from, '?channelId=a&keep=1'), from).toBe(`${to}?channel=a&keep=1`);
   });

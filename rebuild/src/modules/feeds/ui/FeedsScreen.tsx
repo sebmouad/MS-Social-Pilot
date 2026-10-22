@@ -1,11 +1,11 @@
 import { headers } from 'next/headers';
 import { OperationError } from '@/lib/operation-error';
+import { PageHeader } from '@/components/PageHeader';
 import { RouteNotice } from '@/components/RouteNotice';
 import { requireViewer } from '@/server/context';
 import { runtimeConfig } from '@/server/config/store';
 import { prisma } from '@/server/data';
 import { canAccessFeature } from '@/server/permissions';
-import { LibraryHeader } from '@/modules/publishing/ui/library/LibraryHeader';
 import { readFeeds } from '../server/feeds';
 import { automaticCheckingStatus } from '../server/polling';
 import { FEEDS_FEATURE_ID } from '../manifest';
@@ -24,7 +24,7 @@ export default async function FeedsScreen({ searchParams }: { searchParams: Prom
   const t = (key: FeedsCopyKey, values: Record<string, string | number> = {}) => feedsText(locale, key, values, copy);
   const viewer = await requireViewer({ feature: FEEDS_FEATURE_ID, channelScoped: true });
   const params = await searchParams;
-  const heading = <LibraryHeader active="feeds" viewer={viewer} />;
+  const heading = <PageHeader module="publishing" title={t('title')} description={t('description')} />;
   if (Object.entries(params).some(([key, value]) => key !== 'page' || typeof value !== 'string') || (params.page && !/^[1-9]\d{0,5}$/.test(params.page))) return <>{heading}<RouteNotice error focusKey="feed-load-error">{t('invalidPage')}</RouteNotice></>;
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const canWrite = canAccessFeature(viewer.permissions, FEEDS_FEATURE_ID, 'write');

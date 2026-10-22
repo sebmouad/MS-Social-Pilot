@@ -83,6 +83,20 @@ describe('single-sidebar app shell', () => {
     expect(container.querySelector('nav.ui-tabs--links [aria-current="page"]')?.getAttribute('href')).toBe('/content');
   });
 
+  it('shows the promoted Feeds and AI studio Content tabs and the Caption tests Insights tab', async () => {
+    await render({}, [...FEATURES, 'publishing/queue', 'publishing/approvals', 'publishing/media', 'publishing/feeds', 'publishing/ai-studio']);
+    expect([...container.querySelectorAll('nav.ui-tabs--links a')].map(link => link.getAttribute('href'))).toEqual([
+      '/content', '/content/calendar', '/content/queue', '/content/approvals', '/content/library', '/content/feeds', '/content/ai-studio',
+    ]);
+    nav.path = '/content/feeds';
+    await render({}, [...FEATURES, 'publishing/feeds']);
+    expect(container.querySelector('nav.ui-tabs--links [aria-current="page"]')?.getAttribute('href')).toBe('/content/feeds');
+    nav.path = '/insights/tests';
+    await render({ activeModule: 'analytics' }, [...FEATURES, 'analytics/posts', 'analytics/tests']);
+    expect([...container.querySelectorAll('nav.ui-tabs--links a')].map(link => link.getAttribute('href'))).toEqual(['/insights', '/insights/posts', '/insights/tests']);
+    expect(container.querySelector('nav.ui-tabs--links [aria-current="page"]')?.getAttribute('href')).toBe('/insights/tests');
+  });
+
   it('lists scoped channels with status, and sidebar and scope chip stay in sync with the URL', async () => {
     nav.search = 'channel=c2';
     await render();
