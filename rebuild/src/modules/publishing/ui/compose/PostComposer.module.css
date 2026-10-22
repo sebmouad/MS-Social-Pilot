@@ -130,3 +130,8 @@
   .templateList li { flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) { .chip, .advanced > summary svg { transition: none; } }
+.linkPreview { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); padding: 10px 12px; }
+.linkPreviewTitle { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink-soft); font-size: var(--text-sm); font-weight: 600; }
+.linkPreview article { display: grid; gap: 6px; margin: 0; }
+.linkPreview article img { display: block; width: 100%; max-height: 180px; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface); }
+.linkPreview p { margin: 0; overflow-wrap: anywhere; }

@@ -743,3 +743,31 @@ Source/unit evidence only; no browser, provider or production run in this batch.
 - The open thread states its audience under the title (private conversation vs public comment thread vs public review). The reply composer states who sees the reply (private vs public); comment threads state the hide consequence. Comment deletion keeps its existing platform-consequence dialog.
 - Empty states are per kind with one next action in the same list: kind-specific no-open (Show resolved keeps the kind), kind-specific never-synced (names Sync now), kind-specific no-match (Reset filters keeps the kind).
 - No URL or route changes; the command palette is unaffected. Kind tabs keep 40px targets on phones; rows keep their full-row targets and the same icon/label/edge distinctions.
+
+## Supervised autopilot, per-channel best times, variants, link previews — idea batch 2, 2026-10-22
+
+- Autopilot tier lives on the agents screen above scheduled runs. The current
+  tier is always visible; only owners/admins see the change form. Changing the
+  tier needs the exact `SET AUTOPILOT TIER <tier>` typed confirmation. Manual
+  writes nothing by itself; assisted writes drafts; supervised-auto schedules
+  within the shown guardrails (daily cap, quiet hours, channel scope,
+  drafts-only channels).
+- Automatic sends carry provenance everywhere: an Autopilot badge in queue,
+  Posts and Calendar (with the `autopilot` origin filter), and the tier plus
+  automatic-send count in each run-history row.
+- Suggested times explain themselves: every slot shows its post count,
+  multiple of the channel's typical post, and the measured basis over the
+  history window. A per-channel disclosure lists each channel's own slots or an
+  honest reason (too few measured posts with the count, no time above typical,
+  unavailable stored performance, no access) — never an invented time. The
+  same suggestions appear in the composer and in queue rescheduling; choosing
+  one only fills the schedule fields.
+- The composer Languages section manages per-language texts for a saved draft
+  (unsaved composers say to save first). It lists variants, shows what each
+  destination receives (variant language or default text), and adds/removes
+  languages through exact typed confirmations. Variants are text-only; media
+  stays shared.
+- A pasted or typed link shows a server-fetched card (title, description,
+  picture) under the link field: cached previews render from the cache only, a
+  missing preview says so while keeping the address publishable, and failures
+  offer retry without losing composer input.

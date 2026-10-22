@@ -27,6 +27,8 @@ import { cancelScheduledPostAction } from "@/modules/publishing/ui/posts/actions
 
 import { RescheduleQueuedPost } from "./RescheduleQueuedPost";
 import { QueueTimeline } from "./QueueTimeline";
+import { loadPostOrigins } from "../origins/load";
+import { OriginBadge } from "../origins/OriginBadge";
 import styles from "./queue.module.css";
 
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ page?: string; channel?: string }> }) {
@@ -49,6 +51,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   ]);
   // Published/failed context for the header and the Sent block, in the same channel scope. A failed count falls back to the scheduled-only total, which never mixes states.
   const counts = await readPublishingStatusCounts({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { ...(channelId === undefined ? {} : { channelId }) }, "publishing/queue").catch(() => null);
+  const origins = await loadPostOrigins(viewer.workspaceId, listing.posts.map(post => post.id), locale);
   const now = new Date();
   const slotFormat = new Intl.DateTimeFormat(locale, { timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const today = workspaceDateKey(now, timeZone);
@@ -71,9 +74,10 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         const mayMove = mayCancel && post.scheduledAt && post.targets.length > 0 && isWaitingToReschedule(post);
         const wall = post.scheduledAt ? instantToWall(post.scheduledAt, timeZone) : null;
         const actions = <div className={workflow.actions}>
+          {origins.get(post.id) ? <OriginBadge origin={origins.get(post.id)!} compact /> : null}
           {mayCancel ? <><CancelScheduleForm postId={post.id} action={cancelScheduledPostAction} locale={locale} /><p className={workflow.help}>{copy.queueCancelHelp}</p></>
             : <p className={workflow.help}>{viewer.permissions.features["publishing/posts"].write ? copy.queueCancelOnly : copy.queueViewOnly}</p>}
-          {mayMove && wall ? <RescheduleQueuedPost postId={post.id} date={wall.date} time={wall.time} timeZone={timeZone} text={post.message} /> : null}
+          {mayMove && wall ? <RescheduleQueuedPost postId={post.id} date={wall.date} time={wall.time} timeZone={timeZone} text={post.message} targetIds={post.targets.map(row => row.target.id)} /> : null}
           {due ? <p className={workflow.help} role="status">{copy.queueDue}</p> : null}
         </div>;
         return <li key={post.id} className={workflow.item}><PostPreview variant="compact" post={post} authorName={authorName(post.authorId)} timeZone={timeZone} locale={locale} actions={actions} /></li>;

@@ -1,9 +1,75 @@
 # Shared agent handoff
 
-Updated 2026-10-22 (AI Studio module; uncommitted working tree), schema **137**.
+Updated 2026-10-22 (idea batch 2: autopilot + planning; uncommitted working tree), schema **138**.
 Full goal remains active. No browser, provider, database or production call by
 this lane. Historical records below retain their dates; current source
 reconciliation wins.
+
+## Idea batch 2 (autopilot + planning) — 2026-10-22 (source/unit only, uncommitted)
+
+Owner-approved idea batch 2 of 4. Four features, all usable end-to-end at
+source/unit scope:
+
+- **Supervised autopilot tiers** (`studio/agents/server/autopilot.ts`,
+  `scheduled.ts`, `AgentsPage/ScheduledAgents`, `manage_autopilot_tier` MCP,
+  `POST /api/agents/scheduled` `action: tier`): per-workspace tier
+  (manual/assisted/supervised-auto) in `autopilot_policies`, guardrails
+  (daily cap, quiet hours, channel scope, drafts-only channels, new/uncertain
+  destinations, approval rule) narrowing Root `agents.autopilotPolicy`
+  ceilings. Worker executes; every auto send/refusal audited with
+  `actor: 'autopilot'` + tier (`actorId` NULL worker rows); queue/Posts/
+  Calendar show the Autopilot origin badge; run history shows tier + send
+  count. Tier changes are owners/admins-only with exact confirmations.
+- **Best-time engine, per-Page** (`publishing/server/best-time*.ts`,
+  composer + queue-reschedule UI): same stored-only reads (no live fan-out),
+  plus per-channel slots with measured basis and honest reasons
+  (`insufficient_history` with the count, `no_lift`, `unsupported`,
+  `no_access`), a why-line per slot, and the existing suggest/apply mode.
+  Combined suggestions still need every destination behind one cell. REST and
+  `get_best_times` share the extended shape.
+- **Per-language post variants** (`publishing/server/post-variants.ts`,
+  `post-variants-mcp.ts`, `/api/publishing/post-variants`, composer Languages
+  section): new `post_language_variants` table + nullable `targets.locale`;
+  deterministic exact→language→default fallback; publish-time selection per
+  destination in `publishPost`; text-only (pipeline sends one media set per
+  post — no media override). Destination locales are API/MCP-managed; the
+  editor shows the effective language per destination.
+- **Composer link preview** (fetch service in Studio content-tools with the
+  Publishing-owned net-guard; `link_preview_cache` with Root TTL; composer
+  card): fresh entries served without fetching or hourly claims; misses fetch
+  once and cache usable previews; "no preview" never cached; renders read the
+  cache only (`GET /api/publishing/link-preview`); honest unavailable/failure
+  states; EN/FR.
+- **Migration** `20261103030000_autopilot_variants_linkcache` is additive
+  only (3 tables + 1 nullable column + purge-gate triggers); all new readers
+  tolerate a missing table mid-deploy.
+- **Config:** `CONFIG_SCHEMA_VERSION` **137 → 138** (required: three new
+  registry keys — `agents.autopilotPolicy`, `ai.linkPreviewCache`,
+  `publishing.postVariantsMaxPerPost`; `src/lib/config/registry.ts` says bump
+  when a key changes, and `tests/config-validation.test.ts` pins the version
+  in two places — both updated). New copy keys follow the established
+  fallback conventions.
+- **Docs:** `OPERATIONS.md` autopilot runbook, `UX-CONTRACT.md` behavior
+  rules, `BEST_TIMES.md` + `MCP_PARITY.md` + `LEGACY_CAPABILITY_PARITY.md`
+  cells, this entry, `ARCHITECTURE.md` status note.
+
+Evidence: `npm run typecheck` 0 errors; new suites pass (autopilot-tiers,
+autopilot-tier-ui, autopilot-origin, autopilot-batch-migration,
+best-time-pertarget, post-variants, post-variants-surfaces, post-variants-ui,
+link-preview-cache, link-preview-card-ui) plus touched suites
+(scheduled-agents, scheduled-runs-transport, best-time-service,
+best-time-surfaces, best-time-ui, best-time-ranking, best-time-apply,
+best-time-queue, config-validation, ai-composer-checks, ai-content-tools-http,
+publishing-composer-catalog, publishing-error-copy, pubinbox-gap-ui,
+publishing-held-schedule-screens, agents-authorization, agents-service,
+mcp-scope-host-matrix, mcp-exec-host-services, post-composer-page,
+composer-queue-ui, composer-queue-actions, publishing-origin-filter,
+recipe-origin-visibility, publishing-lifecycle, publishing-native-schedule,
+jobs-due-publishing, publishing-scheduling-verification,
+workspace-operations-publish, publishing-rest-writes, publishing-bulk,
+mcp-security, publishing-remote-hold, request-locale,
+client-zoned-time-formatting, content-v2). No full suite (not run per batch
+instructions), no browser, no provider, no production verification.
 
 ## AI Studio module — 2026-10-22 (source only)
 

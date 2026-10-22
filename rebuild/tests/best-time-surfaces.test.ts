@@ -5,7 +5,7 @@ vi.mock('@/server/context', () => ({ requireViewer: h.viewer }));
 import { GET } from '@/app/api/publishing/best-times/route';
 import { PUBLISHING_MCP } from '@/modules/publishing/mcp';
 import type { McpViewer } from '@/server/mcp/types';
-const result = { mode: 'suggest', timeZone: 'UTC', suggestions: [] };
+const result = { mode: 'suggest', timeZone: 'UTC', windowDays: 90, suggestions: [], perTarget: [] };
 beforeEach(() => { vi.clearAllMocks(); h.viewer.mockResolvedValue({ user: { id: 'u' }, workspaceId: 'w' }); h.read.mockResolvedValue(result); });
 it('HTTP reads share the authorized service and are not cached', async () => {
   const response = await GET(new Request('https://example.test/api/publishing/best-times?targetId=a&targetId=b'));
@@ -30,7 +30,7 @@ it('MCP declares resource scope and passes the credential channel ceiling to the
 });
 
 it('HTTP adds server-formatted slot labels in the workspace zone so browsers never format them', async () => {
-  h.read.mockResolvedValue({ mode: 'suggest', timeZone: 'Africa/Casablanca', suggestions: [{ nextAt: '2026-10-22T14:30:00.000Z', date: '2026-10-22', time: '15:30' }] });
+  h.read.mockResolvedValue({ mode: 'suggest', timeZone: 'Africa/Casablanca', windowDays: 90, suggestions: [{ nextAt: '2026-10-22T14:30:00.000Z', date: '2026-10-22', time: '15:30' }], perTarget: [] });
   const body = await (await GET(new Request('https://example.test/api/publishing/best-times?targetId=a'))).json();
   expect(body.suggestions[0].label).toContain('15:30');
 });

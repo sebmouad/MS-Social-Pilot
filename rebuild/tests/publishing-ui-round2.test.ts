@@ -218,10 +218,10 @@ describe('composer steps, scheduling words and autosave', () => {
     field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true }));
   });
 
-  it('lays the editor out as Channels, Post text and Media, with the first comment and more options folded away', async () => {
+  it('lays the editor out as Channels, Post text, Languages and Media, with the first comment and more options folded away', async () => {
     await render();
     const headings = [...container.querySelectorAll('form section h2')].map(heading => heading.textContent);
-    expect(headings).toEqual(['Channels', 'Post text', 'Media']);
+    expect(headings).toEqual(['Channels', 'Post text', 'Languages', 'Media']);
     expect(container.querySelector('#composer-message')).not.toBeNull();
     // Channels are toggle chips inside the editor; the actions live in the sticky action bar, not in the sidebar.
     expect(chips().map(button => button.querySelector('[class*="chipName"]')?.textContent)).toEqual(['Studio', 'Shop']);
@@ -260,7 +260,7 @@ describe('composer steps, scheduling words and autosave', () => {
 
   it('is written in French when the page language is French', async () => {
     await render({ aiLocale: 'fr' });
-    expect([...container.querySelectorAll('form section h2')].map(heading => heading.textContent)).toEqual(['Canaux', 'Texte de la publication', 'Médias']);
+    expect([...container.querySelectorAll('form section h2')].map(heading => heading.textContent)).toEqual(['Canaux', 'Texte de la publication', 'Langues', 'Médias']);
     expect(saveButton('Enregistrer le brouillon')).toBeDefined();
   });
 

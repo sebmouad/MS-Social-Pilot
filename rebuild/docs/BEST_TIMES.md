@@ -50,3 +50,16 @@ to this branch batch. Those runtime/release gates remain open.
 Final branch check: 485 targeted tests passed / 12 opt-in database cases skipped
 (57 passing files / 3 skipped). `npx tsc --noEmit -p .` and `git diff --check`
 passed. This is not full-suite or runtime/release evidence.
+
+## Per-Page slots and explainability (idea batch 2, 2026-10-22)
+
+The response now carries `windowDays` plus `perTarget`: each selected channel's
+own slots (same pure ranking, same stored-only hook, no live fan-out) with its
+measured `basis` and an honest `reason` (`ok`, `insufficient_history`,
+`no_lift`, `unsupported`, `no_access`). Combined `suggestions` still require
+every selected destination behind the same cell; all existing suggestion
+assertions are preserved. The composer and queue-reschedule UIs render the
+shared component with a per-channel disclosure and a why-line per slot (posts
+at the time, multiple of typical, measured basis over the window). REST and
+`get_best_times` MCP return the same extended shape; queue allocation and the
+weekly apply worker are unchanged.

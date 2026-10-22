@@ -1,6 +1,8 @@
 'use client';
 
 import { usePublishingCopy } from '../kit/CopyProvider';
+import { useComposerCatalog } from '../compose/CopyProvider';
+import { BestTimeSuggestions } from '../compose/BestTimeSuggestions';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
@@ -12,12 +14,13 @@ import { wallTimeToInstant } from '@/lib/calendar-dates';
 
 
 /** Uses the same bounded reschedule service as HTTP and MCP bulk_post_action. */
-export function RescheduleQueuedPost({ postId, date: initialDate, time: initialTime, timeZone, text }: { postId: string; date: string; time: string; timeZone: string; text: string }) {
+export function RescheduleQueuedPost({ postId, date: initialDate, time: initialTime, timeZone, text, targetIds = [] }: { postId: string; date: string; time: string; timeZone: string; text: string; targetIds?: readonly string[] }) {
   const router = useRouter();
   const validation = useFormValidation();
   const [locale, setLocale] = useState<'en' | 'fr'>('en');
   useEffect(() => { setLocale(document.documentElement.lang.startsWith('fr') ? 'fr' : 'en'); }, []);
   const copy = usePublishingCopy(locale);
+  const { catalog } = useComposerCatalog();
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState(initialTime);
   const [notice, setNotice] = useState('');
@@ -47,6 +50,7 @@ export function RescheduleQueuedPost({ postId, date: initialDate, time: initialT
     }}>
       <label className="ui-field"><span>{copy.rescheduleDate}</span><input className="ui-input" type="date" name="date" required value={date} onChange={event => setDate(event.target.value)} {...validation.fieldProps('date')} /><FieldError {...validation.errorProps('date')} /></label>
       <label className="ui-field"><span>{copy.rescheduleTime}</span><input className="ui-input" type="time" name="time" required value={time} onChange={event => setTime(event.target.value)} {...validation.fieldProps('time')} /><FieldError {...validation.errorProps('time')} /></label>
+      <BestTimeSuggestions copyCatalog={catalog} targetIds={targetIds} locale={locale} disabled={false} onChoose={({ date: day, time: at }) => { setDate(day); setTime(at); }} />
       <Button type="submit" size="sm">{copy.rescheduleReview}</Button>
       {error && <p role="alert">{error}</p>}
     </form>

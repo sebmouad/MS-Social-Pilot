@@ -11,6 +11,7 @@ export const GET = (request: Request) => handle(request, {
     const result = await getBestTimeSuggestions(actor, { targetIds: query.getAll('targetId') });
     // Slot labels are formatted on the server so every browser shows the same workspace-zone time.
     const labels = await zonedTimeLabels(result.timeZone);
-    return { ...result, suggestions: result.suggestions.map(slot => ({ ...slot, label: labels.slot(slot.nextAt) })) };
+    const labeled = (slot: { nextAt: string }) => ({ ...slot, label: labels.slot(slot.nextAt) });
+    return { ...result, suggestions: result.suggestions.map(labeled), perTarget: result.perTarget.map(channel => ({ ...channel, slots: channel.slots.map(labeled) })) };
   },
 });

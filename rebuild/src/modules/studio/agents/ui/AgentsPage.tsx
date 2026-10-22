@@ -27,7 +27,7 @@ export default async function AgentsPage() {
  const scheduledList = 'agents' in scheduled ? scheduled : { agents: [], channels: [], maxDrafts: 5, briefMax: 2000, history: [] };
  return <>
   <AgentsScreen agents={'agents' in listing ? listing.agents ?? [] : []} runs={'runs' in history ? history.runs ?? [] : []} hasMore={'hasMore' in history && history.hasMore === true} pageSize={'pageSize' in history ? history.pageSize ?? 1 : 1} copy={copy} locale={locale} execute={execute} />
-  <ScheduledAgents agents={scheduledList.agents ?? []} channels={scheduledList.channels ?? []} maxDrafts={scheduledList.maxDrafts ?? 5} briefMax={scheduledList.briefMax ?? 2000} history={'history' in scheduledList && scheduledList.history ? scheduledList.history : []} copy={copy} locale={locale} execute={executeScheduled} />
+  <ScheduledAgents agents={scheduledList.agents ?? []} channels={scheduledList.channels ?? []} maxDrafts={scheduledList.maxDrafts ?? 5} briefMax={scheduledList.briefMax ?? 2000} history={'history' in scheduledList && scheduledList.history ? scheduledList.history : []} policy={'policy' in scheduledList ? scheduledList.policy ?? null : null} canManageTier={viewer.membership.role === 'owner' || viewer.membership.role === 'admin'} copy={copy} locale={locale} execute={executeScheduled} />
   <StudioLinks copy={links} />
  </>;
 }

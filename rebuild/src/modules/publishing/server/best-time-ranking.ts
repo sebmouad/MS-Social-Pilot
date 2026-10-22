@@ -8,18 +8,30 @@ const median = (values: number[]) => {
   return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
 };
 
+/** Distinct, dated, measured posts; duplicates and invalid measures or timestamps cannot count. */
+export function measuredPosts(history: readonly PostPerformance[]): PostPerformance[] {
+  const seen = new Set<string>();
+  return history.filter(post => {
+    if (seen.has(post.postId)) return false;
+    if (!post.publishedAt || !Number.isFinite(post.publishedAt.getTime()) || !post.measuredAt || !Number.isFinite(post.measuredAt.getTime()) ||
+      typeof post.rankValue !== 'number' || !Number.isFinite(post.rankValue) || post.rankValue < 0) return false;
+    seen.add(post.postId); return true;
+  });
+}
+
+export type ChannelBestTimes = { measured: number; slots: BestTimeSlot[] };
+/** One channel on its own: its measured basis plus the slots that beat its own median. */
+export function describeChannelHistory(history: readonly PostPerformance[], timeZone: string, policy: BestTimePolicy): ChannelBestTimes {
+  const measured = measuredPosts(history);
+  return { measured: measured.length, slots: suggestBestTimes([history], timeZone, policy) };
+}
+
 /** Provider ranking stays at the module boundary. Scores are compared only with that channel's own typical post. */
 export function suggestBestTimes(histories: readonly (readonly PostPerformance[])[], timeZone: string, policy: BestTimePolicy): BestTimeSlot[] {
   if (!histories.length) return [];
   const channels: Array<Map<string, { scores: number[] }>> = [];
   for (const history of histories) {
-    const seen = new Set<string>();
-    const measured = history.filter(post => {
-      if (seen.has(post.postId)) return false;
-      if (!post.publishedAt || !Number.isFinite(post.publishedAt.getTime()) || !post.measuredAt || !Number.isFinite(post.measuredAt.getTime()) ||
-        typeof post.rankValue !== 'number' || !Number.isFinite(post.rankValue) || post.rankValue < 0) return false;
-      seen.add(post.postId); return true;
-    });
+    const measured = measuredPosts(history);
     if (measured.length < policy.minHistory) return [];
     const typical = median(measured.map(post => post.rankValue!));
     if (!(typical > 0)) return [];

@@ -32,6 +32,19 @@ it('uses French copy, no fabricated time on unknown data, and offers retry after
   await render(['b'], 'fr'); await load();
   expect(container.textContent).toContain('Réessayer');
 });
+it('explains each slot and reports per-channel unknowns with their reason', async () => {
+  fetcher.mockResolvedValue({ ok: true, json: async () => ({ mode: 'suggest', timeZone: 'UTC', windowDays: 90, suggestions: [], perTarget: [
+    { targetId: 'a', name: 'Page A', basis: 12, reason: 'ok', slots: [{ ...suggestion, label: 'Tue 08:00' }] },
+    { targetId: 'b', name: 'Page B', basis: 4, reason: 'insufficient_history', slots: [] },
+  ] }) });
+  await render(['a', 'b']); await load();
+  expect(container.textContent).toContain('Not available');
+  expect(container.textContent).toContain('Page A');
+  expect(container.textContent).toContain('3 posts at this time');
+  expect(container.textContent).toContain('Unknown: too few measured posts (4 measured).');
+  await act(async () => container.querySelectorAll<HTMLButtonElement>('details button')[0]!.click());
+  expect(onChoose).toHaveBeenCalledWith({ date: '2026-10-27', time: '08:00' });
+});
 it('hides stale suggestions immediately when destinations change and ignores late responses', async () => {
   let resolve!: (value: unknown) => void;
   fetcher.mockImplementationOnce(() => new Promise(r => { resolve = r; }));

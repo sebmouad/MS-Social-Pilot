@@ -289,8 +289,8 @@ const baseline = readFileSync(`prisma/migrations/${BASELINE}/migration.sql`, 'ut
 describe('baseline migration', () => {
   it('holds only the baseline and reviewed follow-up migrations', () => {
     const entries = readdirSync('prisma/migrations').filter(e => e !== 'migration_lock.toml').sort();
-    expect(entries).toEqual([BASELINE, '20261103010000_task_checklist_items', '20261103020000_workspace_tasks_area']);
-    for (const name of entries.slice(1)) expect(readFileSync(`prisma/migrations/${name}/migration.sql`, 'utf8')).toContain('lane 56');
+    expect(entries).toEqual([BASELINE, '20261103010000_task_checklist_items', '20261103020000_workspace_tasks_area', '20261103030000_autopilot_variants_linkcache']);
+    for (const name of ['20261103010000_task_checklist_items', '20261103020000_workspace_tasks_area']) expect(readFileSync(`prisma/migrations/${name}/migration.sql`, 'utf8')).toContain('lane 56');
   });
 
   it('contains every reviewed source block verbatim, in deploy order', () => {

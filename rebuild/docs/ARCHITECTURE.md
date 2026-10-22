@@ -1007,3 +1007,26 @@ Evidence: `npm run typecheck` 0 errors; touched suites pass (agency-shared-scree
 
 Owner directive: message vs comment unmistakable. Three separate lists (`type=message|comment|review`, default Messages, legacy `all` folds to Messages), kind rows with icon + label + `data-group` edge (solid/dashed/dotted), kind switcher with per-kind totals and message unread, thread audience line, reply/hide consequence copy, per-kind empty states with kind-preserving actions. `readInboxList` adds optional `totals`/`unread`; API/MCP keep `kind: 'all'`. New EN/FR keys live in the existing `inbox.customerCopy` catalog. `CONFIG_SCHEMA_VERSION` stays **137** (no registry entries added; config-validation passes).
 Evidence: `npm run typecheck` 0 errors; touched suites pass (inbox-kind-separation (new), inbox-kind-consequences (new), inbox-browsing-page, inbox-round2-ui, inbox-round3-ui, inbox-customer-copy, inbox-scope-b5, inbox-write-receipts-ui, inbox-delete-ui, inbox-delete-recovery-ui, inbox-v2-b4, inbox-screens-redesign, inbox-mention-ui, inbox-reply-saved-menu, inbox-nested-replies, inbox-thread-scroll, inbox-progressive-list, inbox-state-isolation, inbox-reviews, inbox-reviews-read, inbox-round3, inbox-read-routes, inbox-actions-route, inbox-route-auth, inbox-key-scope80, ui-copy-coverage, config-validation). No full suite, browser, provider or production verification in this batch.
+
+## Idea batch 2: autopilot + planning — 2026-10-22 (source/unit only, uncommitted)
+
+Supervised autopilot tiers (manual/assisted/supervised-auto) over scheduled
+runs: `studio/agents/server/autopilot.ts` owns the per-workspace policy
+(`autopilot_policies`) and the pure guardrail check; the `scheduledAgents`
+worker job executes (manual skips without claiming the day, assisted writes
+drafts, supervised-auto schedules through the ordinary queue); every auto
+send/refusal is audited with `actor: 'autopilot'` + tier; an `autopilot` post
+origin marks auto-scheduled posts in queue/Posts/Calendar. Best times gain
+per-channel slots with basis + honest reasons and a why-line in the composer
+and queue-reschedule UIs (stored-only reads unchanged). Per-language post
+variants (`post_language_variants`, deterministic exact→language→default
+fallback, text-only) are authored in the composer, managed over REST/MCP and
+selected per destination at publish time. Composer link previews fetch
+server-side once per address into `link_preview_cache` (Root TTL) with
+cached-only renders. Migration `20261103030000_autopilot_variants_linkcache`
+is additive only. `CONFIG_SCHEMA_VERSION` **137 → 138** (three new registry
+keys: `agents.autopilotPolicy`, `ai.linkPreviewCache`,
+`publishing.postVariantsMaxPerPost`; both `config-validation` pins updated).
+Evidence: `npm run typecheck` 0 errors; new + touched suites pass (see
+AGENT_HANDOFF.md). No full suite, browser, provider or production verification
+in this batch.

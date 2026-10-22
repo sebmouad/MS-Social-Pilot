@@ -28,6 +28,7 @@ import { publishDestinationInOperation } from '@/modules/publishing/server/publi
 import { assertPublishingMediaSupport } from '@/modules/publishing/media-support';
 import { needsContributorApproval } from '@/modules/settings/workspace-policy';
 import { preparePublicationLinks } from './short-links';
+import { resolveVariantMessage, variantSelectionForPublish } from './post-variants';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import { recordPostVersion, loadVersionRetention } from '@/modules/publishing/collaboration/server/versions';
 import { cancelHeldDestinations, rescheduleHeldDestinations } from '@/modules/publishing/server/remote-hold';
@@ -552,7 +553,10 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
     if (!post.targets.length) throw new PublishingOperationError('invalid_request', 'selectAtLeastOneDestinationBeforePublishing', {}, errorText);
     if (!Array.isArray(post.media)) throw new PublishingOperationError('invalid_request', 'storedPostMediaNeedsReviewBeforePublishing', {}, errorText);
     const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as unknown as PublishMedia[] }, Number(await runtimeConfig('publishing.maxRemoteMediaPerPost')), Number(await runtimeConfig('publishing.maxImageAltCharacters')), errorText);
-    validatePostContent(post.message, Number(await runtimeConfig('publishing.maxMessageCharacters')), attachments, errorText);
+    const maxMessageChars = Number(await runtimeConfig('publishing.maxMessageCharacters'));
+    validatePostContent(post.message, maxMessageChars, attachments, errorText);
+    // Each destination receives the variant matching its effective language, else the default text.
+    const selection = await variantSelectionForPublish(actor.workspaceId, post.id, post.targets.map(item => item.target.id));
     const publishMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
     const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
     if (!entitlements) throw new PublishingOperationError('unavailable', 'thisWorkspaceIsUnavailable', {}, errorText);
@@ -606,8 +610,10 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       const eligible = Boolean(credential && provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && (!post.firstComment?.trim() || adapter.publishFirstComment) && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
       if (!eligible) { failed++; await markTarget(actor, post.id, item.id, 'failed', signal); continue; }
       linkSettings ??= await loadWorkspaceOperations(actor.workspaceId);
+      const resolved = resolveVariantMessage(post.message, selection.variants, selection.locales.get(item.target.id) ?? selection.workspaceLocale);
+      if (resolved.message !== post.message) validatePostContent(resolved.message, maxMessageChars, attachments, errorText);
       const preparedLinks = await preparePublicationLinks({ workspaceId: actor.workspaceId, postId: post.id, targetId: item.target.id,
-        message: post.message, link: attachments.link, settings: linkSettings, targetName: item.target.name, date: taggedAt });
+        message: resolved.message, link: attachments.link, settings: linkSettings, targetName: item.target.name, date: taggedAt });
       const outcome = await publishDestinationInOperation({ actor, signal }, {
         postId: post.id, postTargetId: item.id, targetId: item.target.id, provider: provider!, expectedStatus: item.status as 'pending' | 'failed',
         ...(nativeScheduledAt ? { nativeScheduledFor: nativeScheduledAt } : {}),

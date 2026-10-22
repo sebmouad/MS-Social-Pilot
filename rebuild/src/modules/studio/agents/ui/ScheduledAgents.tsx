@@ -2,19 +2,29 @@
 import { useRef, useState, useTransition } from 'react';
 import { IconCalendarWeek, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-react';
 import type { ScheduledAgent, ScheduledChannel, ScheduledRun } from '../server/scheduled';
+import type { AutopilotTier, ResolvedAutopilotPolicy } from '../server/autopilot';
 import { AutoTextarea } from '@/components/AutoTextarea';
 import { Button } from '@/components/Button';
 import { useConfirm } from '@/components/useConfirm';
 import type { AgentCopy } from '../copy';
 import styles from './agents.module.css';
 
-export type ScheduledResult = { agents?: ScheduledAgent[]; channels?: ScheduledChannel[]; history?: ScheduledRun[]; error?: string; ok?: boolean; id?: string; drafts?: number; maxDrafts?: number; briefMax?: number };
+export type ScheduledResult = { agents?: ScheduledAgent[]; channels?: ScheduledChannel[]; history?: ScheduledRun[]; policy?: ResolvedAutopilotPolicy; error?: string; ok?: boolean; id?: string; drafts?: number; maxDrafts?: number; briefMax?: number };
 const CREATE = 'CREATE SCHEDULED AGENT';
+const tierLabel = (t: AgentCopy, tier: AutopilotTier) => tier === 'manual' ? t.autopilotManual : tier === 'assisted' ? t.autopilotAssisted : t.autopilotSupervised;
 
-export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history: initialHistory, copy: t, locale, execute }: { agents: ScheduledAgent[]; channels: ScheduledChannel[]; maxDrafts: number; briefMax: number; history: ScheduledRun[]; copy: AgentCopy; locale: 'en' | 'fr'; execute: (input: unknown) => Promise<ScheduledResult> }) {
+export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history: initialHistory, policy: initialPolicy, canManageTier, copy: t, locale, execute }: { agents: ScheduledAgent[]; channels: ScheduledChannel[]; maxDrafts: number; briefMax: number; history: ScheduledRun[]; policy: ResolvedAutopilotPolicy | null; canManageTier: boolean; copy: AgentCopy; locale: 'en' | 'fr'; execute: (input: unknown) => Promise<ScheduledResult> }) {
  const [pending, start] = useTransition();
  const [items, setItems] = useState(agents);
  const [history, setHistory] = useState(initialHistory);
+ const [policy, setPolicy] = useState(initialPolicy);
+ const [tier, setTier] = useState<AutopilotTier>(initialPolicy?.tier ?? 'assisted');
+ const [maxSends, setMaxSends] = useState(String(initialPolicy?.maxSendsPerDay ?? 10));
+ const [quietStart, setQuietStart] = useState(String(initialPolicy?.quietStartHour ?? 22));
+ const [quietEnd, setQuietEnd] = useState(String(initialPolicy?.quietEndHour ?? 7));
+ const [scope, setScope] = useState<string[]>(initialPolicy?.targetIds ?? []);
+ const [draftsOnly, setDraftsOnly] = useState<string[]>(initialPolicy?.draftsOnlyTargetIds ?? []);
+ const toggle = (list: string[], id: string, set: (next: string[]) => void) => set(list.includes(id) ? list.filter(item => item !== id) : [...list, id]);
  const [editing, setEditing] = useState<string>();
  const [targetId, setTargetId] = useState(channels[0]?.id ?? '');
  const [brief, setBrief] = useState('');
@@ -55,12 +65,46 @@ export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history
      const list = await execute({ action: 'list' });
      if (list.agents) setItems(list.agents);
      if (list.history) setHistory(list.history);
+     if (list.policy) { setPolicy(list.policy); setTier(list.policy.tier); }
     } catch { setError(t.upstream_failure); }
     status.current?.focus();
    }
   });
  }
+ function changeTier() {
+  const phrase = `SET AUTOPILOT TIER ${tier}`;
+  // The confirmation dialog opens as an urgent update; only the refresh after it is a transition.
+  // (Awaiting the dialog inside the transition leaves it unflushed.)
+  setError(''); setFeedback('');
+  void confirm(t.autopilotReview, {
+   exactConfirmation: phrase, confirmationLabel: t.confirmation, pendingLabel: t.busy, failureLabel: t.failed,
+   onConfirm: async () => {
+    const result = await execute({ action: 'tier', tier, guardrails: { maxSendsPerDay: Number(maxSends), quietStartHour: Number(quietStart), quietEndHour: Number(quietEnd), ...(scope.length ? { targetIds: scope } : {}), ...(draftsOnly.length ? { draftsOnlyTargetIds: draftsOnly } : {}) }, confirmation: phrase });
+    if (result.error || result.ok !== true || !result.policy) return result.error ?? t.upstream_failure;
+    setPolicy(result.policy); setFeedback(t.autopilotChanged);
+    return null;
+   },
+  }).then(accepted => { if (accepted) status.current?.focus(); });
+ }
  return <section className={`ui-panel ${styles.panel}`} aria-busy={pending}>
+  {policy ? <>
+   <h2>{t.autopilotTitle}</h2>
+   <p>{t.autopilotIntro}</p>
+   <p role="status">{t.autopilotTier}: <strong>{tierLabel(t, policy.tier)}</strong></p>
+   {canManageTier ? <form className={styles.form} onSubmit={e => { e.preventDefault(); changeTier(); }}>
+    <fieldset><legend>{t.autopilotTier}</legend>
+     {(['manual', 'assisted', 'supervised_auto'] as const).map(option => <label key={option} className="ui-field"><input type="radio" name="tier" value={option} checked={tier === option} disabled={pending} onChange={() => setTier(option)} /> {tierLabel(t, option)} <small>{option === 'manual' ? t.autopilotManualHint : option === 'assisted' ? t.autopilotAssistedHint : t.autopilotSupervisedHint}</small></label>)}
+    </fieldset>
+    <fieldset><legend>{t.autopilotGuardrails}</legend>
+     <label className="ui-field">{t.autopilotMaxSends}<input name="maxSends" type="number" min={0} max={200} className="ui-input" value={maxSends} disabled={pending} onChange={e => setMaxSends(e.target.value)} required /></label>
+     <label className="ui-field">{t.autopilotQuietStart}<input name="quietStart" type="number" min={0} max={23} className="ui-input" value={quietStart} disabled={pending} onChange={e => setQuietStart(e.target.value)} required /></label>
+     <label className="ui-field">{t.autopilotQuietEnd}<input name="quietEnd" type="number" min={0} max={23} className="ui-input" value={quietEnd} disabled={pending} onChange={e => setQuietEnd(e.target.value)} required /></label>
+     <fieldset><legend>{t.autopilotScope}</legend>{channels.length ? channels.map(c => <label key={c.id} className="ui-field"><input type="checkbox" checked={scope.includes(c.id)} disabled={pending} onChange={() => toggle(scope, c.id, setScope)} /> {c.name}</label>) : <p>{t.autopilotScopeAll}</p>}</fieldset>
+     <fieldset><legend>{t.autopilotDraftsOnly}</legend>{channels.length ? channels.map(c => <label key={c.id} className="ui-field"><input type="checkbox" checked={draftsOnly.includes(c.id)} disabled={pending} onChange={() => toggle(draftsOnly, c.id, setDraftsOnly)} /> {c.name}</label>) : <p>{t.autopilotDraftsOnlyNone}</p>}</fieldset>
+    </fieldset>
+    <div className={styles.actions}><Button type="submit" disabled={pending}>{pending ? t.busy : t.autopilotChange}</Button></div>
+   </form> : null}
+  </> : null}
   <h2><IconCalendarWeek size={20} aria-hidden="true" /> {t.scheduledTitle}</h2>
   <p>{t.scheduledIntro}</p>
   <p ref={status} tabIndex={-1} role="status">{feedback}</p>{error ? <p role="alert">{error}</p> : null}
@@ -85,7 +129,8 @@ export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, history
   {history.length ? <ol className={styles.list}>{history.map((run, index) => {
     const agent = items.find(item => item.id === run.agentId);
     const ok = run.code === null;
-    return <li key={`${run.agentId}-${run.at}-${index}`}><div className={styles.identity}><strong>{agent?.targetName ?? agent?.targetId ?? t.unknownAgent}</strong><p>{ok ? `${t.completed} · ${t.historyDrafts.replace('{count}', String(run.drafts ?? 0))}` : t.failedRun}</p></div><time dateTime={run.at}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(run.at))} {t.timeZone}</time></li>;
+    const tierName = run.tier === 'manual' || run.tier === 'assisted' || run.tier === 'supervised_auto' ? tierLabel(t, run.tier) : null;
+    return <li key={`${run.agentId}-${run.at}-${index}`}><div className={styles.identity}><strong>{agent?.targetName ?? agent?.targetId ?? t.unknownAgent}</strong><p>{ok ? `${t.completed} · ${t.historyDrafts.replace('{count}', String(run.drafts ?? 0))}${tierName ? ` · ${tierName}` : ''}${typeof run.scheduled === 'number' && run.scheduled > 0 ? ` · ${t.autopilotSends.replace('{count}', String(run.scheduled))}` : ''}` : t.failedRun}</p></div><time dateTime={run.at}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(run.at))} {t.timeZone}</time></li>;
   })}</ol> : <p>{t.noHistory}</p>}
   {confirmation}{removal}
  </section>;

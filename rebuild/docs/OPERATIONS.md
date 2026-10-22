@@ -140,3 +140,36 @@ defaults to `false`). Full audit and live checklist:
   clones. There is no remote media delete: remove test posts in the Instagram
   app. Only public HTTPS media URLs publish; stored-library bytes are refused
   until the signed-URL pipeline exists.
+
+## Supervised autopilot runbook (idea batch 2, 2026-10-22)
+
+Module: `src/modules/studio/agents/` (policy surface + worker execution).
+Workspace tiers live in `autopilot_policies` (one row per workspace; missing
+row means `assisted`, today's behavior). Installation ceilings live in Root
+`agents.autopilotPolicy` (sends/day ceiling, default quiet hours, new-channel
+grace days, guardrail channel limit); a workspace policy can only narrow them.
+
+- **Tiers:** `manual` (worker never runs; humans press Run now for drafts
+  only), `assisted` (worker writes drafts; a person reviews, schedules and
+  sends), `supervised_auto` (worker writes drafts and schedules them through
+  the ordinary queue inside guardrails).
+- **Guardrails:** approval-required workspaces, channel scope, drafts-only
+  channels, new channels (within the grace window), uncertain channels (never
+  published), quiet hours (workspace time) and the daily automatic-send cap.
+  Every refusal keeps an honest draft and is audited; refusals never fail the
+  run.
+- **Audit:** automatic sends write `agents.scheduled.auto_scheduled` and
+  refusals `agents.scheduled.auto_refused` with `actorId` NULL (worker rows,
+  like `queue.bestTimesAdded`) and `actor: 'autopilot'` plus the tier in the
+  detail. Run completions carry `tier`, `scheduled` count and `postIds`.
+- **Provenance:** queue, Posts and Calendar show an Autopilot badge
+  (`origin=autopilot` filter) for auto-scheduled posts; the agents screen
+  history shows the tier and automatic-send count per run.
+- **Jobs:** the existing `scheduledAgents` worker job
+  (`agents.scheduledRunsSchedule`) executes tiers; its summary ends with
+  `autoScheduled=<n> autoRefused=<m>`.
+- **Incidents:** to stop all automation immediately, set the workspace tier to
+  `manual` (owners/admins, exact `SET AUTOPILOT TIER manual` confirmation) or
+  switch `agents.scheduledRunsEnabled` off. Already scheduled posts still send
+  through the normal publish path; cancel them in the queue. Never edit
+  `autopilot_policies` by hand: tier changes are audited service writes.

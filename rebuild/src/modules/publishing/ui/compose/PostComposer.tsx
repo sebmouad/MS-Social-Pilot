@@ -1,6 +1,8 @@
 'use client';
 import { IconAlertTriangle, IconCalendarEvent, IconCheck, IconChevronDown, IconInfoCircle, IconPlus, IconTemplate, IconX } from '@tabler/icons-react';
 import { BestTimeSuggestions } from './BestTimeSuggestions';
+import { LinkPreviewCard } from './LinkPreviewCard';
+import { PostVariantsEditor } from './PostVariantsEditor';
 import { GroupShortcut } from '@/modules/settings/ui/profiles/GroupShortcut';
 import { profileChannelName, type ProfileDirectory } from '@/modules/settings/channel-profiles/contracts';
 
@@ -159,6 +161,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
   const [previewSelection, setPreviewSelection] = useState('');
   const [queuePreview, setQueuePreview] = useState<QueuePreviewState | 'loading' | null>(null);
   const ui = catalogGroup(copyCatalog, 'ui', aiLocale);
+  const variantCopy = catalogGroup(copyCatalog, 'variant', aiLocale);
   const copy = catalogGroup(copyCatalog, 'queue', aiLocale);
   const [localError, setLocalError] = useState('');
   const [uploadMessage, setUploadMessage] = useState('');
@@ -484,12 +487,17 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
           <span className={styles.counter} id="composer-message-count">{fillContent(cc.createCounter, { used: message.length.toLocaleString(aiLocale), max: imageRules.maxMessageCharacters.toLocaleString(aiLocale) })}</span>
         </div>
       </section>
+      <section className={styles.section} aria-labelledby={`${titleId}-languages`}>
+        <div className={styles.sectionHead}><h2 id={`${titleId}-languages`}>{variantCopy.title}</h2></div>
+        {draftPostId ? <PostVariantsEditor postId={draftPostId} locale={aiLocale} copyCatalog={copyCatalog} /> : <p className={styles.help}>{variantCopy.needDraft}</p>}
+      </section>
       <section className={styles.section} aria-labelledby={`${titleId}-media`}>
         <div className={styles.sectionHead}><h2 id={`${titleId}-media`}>{cc.createMedia}</h2></div>
         <PostAttachments controller={attachments} disabled={busy} onPickLibrary={() => setLibraryOpen(true)} {...(aiStatus?.available && aiStatus.altText ? { altTextAssist: { locale: aiLocale } } : {})} />
         <label className={styles.linkField} htmlFor="composer-link"><span>{ui.link}</span>
           <input id="composer-link" name="link" type="url" disabled={busy} value={link} onChange={event => setLink(event.currentTarget.value)} placeholder={ui.linkPlaceholder} />
         </label>
+        <LinkPreviewCard link={link} locale={aiLocale} disabled={busy} copyCatalog={copyCatalog} />
         <small className={styles.help}>{ui.attachmentSupport}</small>
       </section>
       <section className={styles.section} aria-labelledby={`${titleId}-comment`}>

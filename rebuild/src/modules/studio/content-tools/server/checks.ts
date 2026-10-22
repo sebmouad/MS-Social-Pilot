@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { OperationError, type OperationErrorCode } from '@/lib/operation-error';
 import { instantToWall, isValidTimeZone, wallTimeToInstant, weekdayOfKey } from '@/lib/calendar-dates';
@@ -7,7 +7,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { platformAnalytics } from '@/server/platforms/registry';
 import { checkUrlShape, defaultFetchDeps, guardedFetch, NetGuardError, type FetchDeps } from '@/modules/publishing/server/media/network/net-guard';
 import { authorizeAi, type AiActor } from '../../server/access';
-import { linkPreviewPolicySchema, outlookPolicySchema, spamPolicySchema } from '../../config';
+import { linkPreviewCacheSchema, linkPreviewPolicySchema, outlookPolicySchema, spamPolicySchema } from '../../config';
 import { assessSpamRisk, formatOfAppPost, parseOpenGraphHtml, POST_FORMATS, predictEngagement, previewIsUsable, type LinkPreview, type Outlook, type PastPost, type SpamRisk } from '../pure';
 import { toolsCopy, type Locale } from './copy-loader';
 
@@ -26,7 +26,7 @@ async function failure(code: OperationErrorCode, locale: Locale, link = false) {
   return error;
 }
 const boundary = (error: unknown, locale: Locale) => error instanceof OperationError && localisedErrors.has(error) ? error : failure(error instanceof OperationError ? error.code : 'upstream_failure', locale);
-const policyOf = async <S extends z.ZodTypeAny>(key: 'ai.linkPreviewPolicy' | 'ai.outlookPolicy' | 'ai.spamGuardPolicy', schema: S): Promise<z.output<S>> => {
+const policyOf = async <S extends z.ZodTypeAny>(key: 'ai.linkPreviewPolicy' | 'ai.outlookPolicy' | 'ai.spamGuardPolicy' | 'ai.linkPreviewCache', schema: S): Promise<z.output<S>> => {
   const parsed = schema.safeParse(await runtimeConfig(key));
   if (!parsed.success || !(parsed.data as { enabled: boolean }).enabled) throw new OperationError('unavailable', 'unavailable');
   return parsed.data;
@@ -54,8 +54,35 @@ function scopedChannel(auth: { allowedTargetIds?: string[] | undefined }, ids: s
 
 // ------------------------------------------------------------------ link preview
 
-/** Title, description and picture of a public web address, fetched by the server under the Root network policy. */
-export async function linkPreview(actor: ChecksActor, raw: unknown, deps: ChecksDeps = {}): Promise<{ preview: LinkPreview | null }> {
+const cachedPreviewSchema = z.object({ url: z.string(), title: z.string().nullable(), description: z.string().nullable(), imageUrl: z.string().nullable(), siteName: z.string().nullable(), fetchedAt: z.string() }).strict();
+const cacheKeyOf = (url: string) => createHash('sha256').update(url).digest('hex');
+async function cachePolicy() {
+  const parsed = linkPreviewCacheSchema.safeParse(await runtimeConfig('ai.linkPreviewCache').catch(() => null));
+  return parsed.success ? parsed.data : { enabled: false, ttlMinutes: 1440 };
+}
+/** Fresh cached preview, or null on a miss, an expired entry, an unreadable row or a missing table. */
+async function readPreviewCache(url: string, now: Date): Promise<LinkPreview | null> {
+  try {
+    const [row] = await prisma.$queryRaw<Array<{ preview: unknown }>>`SELECT preview FROM link_preview_cache WHERE "urlHash" = ${cacheKeyOf(url)} AND "expiresAt" > ${now}`;
+    const parsed = cachedPreviewSchema.safeParse(row?.preview);
+    return parsed.success ? parsed.data : null;
+  } catch { return null; }
+}
+async function storePreviewCache(url: string, preview: LinkPreview, ttlMinutes: number, now: Date) {
+  try {
+    const expiresAt = new Date(now.getTime() + ttlMinutes * 60_000);
+    await prisma.$executeRaw`INSERT INTO link_preview_cache ("urlHash", url, preview, "fetchedAt", "expiresAt") VALUES (${cacheKeyOf(url)}, ${url}, ${JSON.stringify(preview)}::jsonb, ${now}, ${expiresAt})
+      ON CONFLICT ("urlHash") DO UPDATE SET url = ${url}, preview = ${JSON.stringify(preview)}::jsonb, "fetchedAt" = ${now}, "expiresAt" = ${expiresAt}`;
+    await prisma.$executeRaw`DELETE FROM link_preview_cache WHERE "urlHash" IN (SELECT "urlHash" FROM link_preview_cache WHERE "expiresAt" < ${now} LIMIT 100)`;
+  } catch { /* a cache write never fails the preview */ }
+}
+
+/**
+ * Title, description and picture of a public web address, fetched by the server under the Root network policy.
+ * A fresh cached entry is served without fetching (and without spending the hourly budget); misses fetch,
+ * then cache usable previews for the Root TTL. "No preview" answers are never cached.
+ */
+export async function linkPreview(actor: ChecksActor, raw: unknown, deps: ChecksDeps = {}): Promise<{ preview: LinkPreview | null; cached: boolean }> {
   const locale = deps.locale ?? 'en';
   try {
     await authorizeAi(actor, COMPOSER, 'write');
@@ -65,6 +92,11 @@ export async function linkPreview(actor: ChecksActor, raw: unknown, deps: Checks
     const fetchPolicy = { timeoutMs: policy.timeoutMs, maxBytes: policy.maxBytes, maxRedirects: policy.maxRedirects, allowHttp: policy.allowHttp, hostAllowlist: policy.hostAllowlist };
     try { checkUrlShape(parsed.data.url, fetchPolicy); } catch (error) { if (error instanceof NetGuardError) throw await failure('invalid_request', locale, true); throw error; }
     const now = (deps.now ?? (() => new Date()))();
+    const cache = await cachePolicy();
+    if (cache.enabled) {
+      const hit = await readPreviewCache(parsed.data.url, now);
+      if (hit) return { preview: hit, cached: true };
+    }
     // Hourly allowance per workspace, counted from the audit trail; the claim is the audit record (host only, never the full address).
     await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`linkpreview:${actor.workspaceId}`}))::text`;
@@ -77,14 +109,30 @@ export async function linkPreview(actor: ChecksActor, raw: unknown, deps: Checks
     let preview: LinkPreview;
     try {
       const result = await guardedFetch(parsed.data.url, fetchPolicy, deps.net ?? defaultFetchDeps(), { headers: { 'user-agent': policy.userAgent, accept: policy.accept } });
-      if (result.notModified || !result.contentType.includes('html')) return { preview: null };
+      if (result.notModified || !result.contentType.includes('html')) return { preview: null, cached: false };
       preview = parseOpenGraphHtml(result.bytes.toString('utf8'), result.finalUrl, policy, now);
     } catch (error) {
       // An address that cannot be read is "no preview", not a failure of the product.
-      if (error instanceof NetGuardError) return { preview: null };
+      if (error instanceof NetGuardError) return { preview: null, cached: false };
       throw error;
     }
-    return { preview: previewIsUsable(preview) ? preview : null };
+    const usable = previewIsUsable(preview) ? preview : null;
+    if (usable && cache.enabled) await storePreviewCache(parsed.data.url, usable, cache.ttlMinutes, now);
+    return { preview: usable, cached: false };
+  } catch (error) { throw await boundary(error, locale); }
+}
+
+/** Cached preview reads only: never fetches, never spends the hourly budget. Renders use this. */
+export async function linkPreviewCache(actor: ChecksActor, raw: unknown, deps: ChecksDeps = {}): Promise<{ preview: LinkPreview | null; cached: boolean }> {
+  const locale = deps.locale ?? 'en';
+  try {
+    await authorizeAi(actor, COMPOSER, 'write');
+    const parsed = z.object({ url: z.string().trim().min(1).max(4000).refine(v => !CONTROL.test(v)) }).strict().safeParse(raw);
+    if (!parsed.success) throw new OperationError('invalid_request', 'invalid_request');
+    try { new URL(parsed.data.url); } catch { throw await failure('invalid_request', locale, true); }
+    const now = (deps.now ?? (() => new Date()))();
+    const hit = await readPreviewCache(parsed.data.url, now);
+    return { preview: hit, cached: hit !== null };
   } catch (error) { throw await boundary(error, locale); }
 }
 

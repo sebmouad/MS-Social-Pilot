@@ -20,6 +20,7 @@ import { createPublishingPost, updatePublishingPost, deletePublishingPost } from
 import { templateToolDefinitions, executeTemplateTool } from './template-mcp';
 import { labelToolDefinitions, executeLabelTool } from './labels-mcp';
 import { savedViewToolDefinitions, executeSavedViewTool } from './saved-views-mcp';
+import { variantToolDefinitions, executeVariantTool } from './post-variants-mcp';
 import { bulkToolDefinitions, executeBulkTool } from './bulk-mcp';
 import { collaborationToolDefinitions, availableCollaborationTools, executeCollaborationTool } from './collaboration/mcp';
 
@@ -108,6 +109,20 @@ export const PUBLISHING_MCP: readonly McpToolGroup[] = [
     selfLockedWrites: ['create_saved_view', 'delete_saved_view'],
     scope: { workspaceTools: ['list_saved_views', 'create_saved_view', 'delete_saved_view'] },
     execute: (viewer, name, args) => executeSavedViewTool({ userId: viewer.userId, workspaceId: viewer.workspaceId }, name, args),
+  },
+  {
+    id: 'publishing-variants',
+    tools: variantToolDefinitions,
+    features: {
+      list_post_variants: 'publishing/posts',
+      save_post_variant: 'publishing/posts',
+      delete_post_variant: 'publishing/posts',
+      set_destination_locale: 'publishing/posts',
+    },
+    writeTools: ['save_post_variant', 'delete_post_variant', 'set_destination_locale'],
+    selfLockedWrites: ['save_post_variant', 'delete_post_variant', 'set_destination_locale'],
+    scope: { workspaceTools: ['list_post_variants', 'save_post_variant', 'delete_post_variant', 'set_destination_locale'] },
+    execute: (viewer, name, args) => executeVariantTool(publishingActor(viewer), name, args),
   },
   {
     id: 'publishing-bulk',

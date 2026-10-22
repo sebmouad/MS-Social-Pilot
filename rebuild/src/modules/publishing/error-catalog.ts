@@ -1075,7 +1075,23 @@ export const publishingErrorCopy = {
 "read_11": {"en":"The end date must follow the start date.","fr":"La date de fin doit suivre la date de début."},
 "read_12": {"en":"This export exceeds the synchronous limit. Narrow your filters and try again.","fr":"Cet export dépasse la limite de traitement immédiat. Affinez les filtres et réessayez."},
 "read_13": {"en":"Choose a valid Publishing export result limit.","fr":"Choisissez une limite de résultats d’export valide."},
-"read_14": {"en":"Choose a valid post origin.","fr":"Choisissez une origine de publication valide."}
+"read_14": {"en":"Choose a valid post origin.","fr":"Choisissez une origine de publication valide."},
+  "chooseValidVariantDetailsAndConfirmTheExactAction": {
+    "en": "Choose valid variant details and confirm the exact action.",
+    "fr": "Choisissez des détails de variante valides et confirmez l’action exacte."
+  },
+  "thisVariantIsUnavailableInTheCurrentWorkspace": {
+    "en": "This language variant is unavailable in the current workspace.",
+    "fr": "Cette variante de langue est indisponible dans cet espace."
+  },
+  "thisPostAlreadyHasTheMaximumLanguageVariants": {
+    "en": "This post already has the maximum number of language variants.",
+    "fr": "Cette publication a déjà le nombre maximal de variantes de langue."
+  },
+  "thisDestinationIsUnavailableInTheCurrentWorkspace": {
+    "en": "This destination is unavailable in the current workspace.",
+    "fr": "Cette destination est indisponible dans cet espace."
+  }
 };
 export type PublishingErrorCopy = typeof publishingErrorCopy;
 export type PublishingErrorKey = keyof PublishingErrorCopy;

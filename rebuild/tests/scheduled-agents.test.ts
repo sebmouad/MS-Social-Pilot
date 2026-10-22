@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  queryRaw: vi.fn(), executeRaw: vi.fn(), batch: vi.fn(), authorize: vi.fn(),
-  settings: vi.fn(), complete: vi.fn(), createPost: vi.fn(), transaction: vi.fn(),
+  queryRaw: vi.fn(), executeRaw: vi.fn(), batch: vi.fn(), config: vi.fn(), authorize: vi.fn(),
+  settings: vi.fn(), complete: vi.fn(), createPost: vi.fn(), queuePost: vi.fn(), transaction: vi.fn(),
 }));
 vi.mock('@/server/data', () => ({ prisma: { $queryRaw: mocks.queryRaw, $executeRaw: mocks.executeRaw, $transaction: mocks.transaction } }));
-vi.mock('@/server/config/store', () => ({ runtimeConfigBatch: mocks.batch }));
+vi.mock('@/server/config/store', () => ({ runtimeConfigBatch: mocks.batch, runtimeConfig: mocks.config }));
 vi.mock('@/modules/studio/agents/server/copy', () => ({ agentCopy: async () => new Proxy({}, { get: (_t, key) => String(key) }) }));
 vi.mock('@/modules/studio/server/access', () => ({ authorizeAi: mocks.authorize }));
 vi.mock('@/modules/studio/server/ai', () => ({ settings: mocks.settings, complete: mocks.complete }));
 vi.mock('@/modules/studio/ai', () => ({ cleanOutput: (text: string) => text.trim() }));
 vi.mock('@/modules/publishing/server/api-writes', () => ({ createPublishingPost: mocks.createPost }));
+vi.mock('@/modules/publishing/server/queue', () => ({ queuePost: mocks.queuePost }));
 
 import { runDueScheduledAgents, scheduledAgents } from '@/modules/studio/agents/server/scheduled';
 
@@ -25,6 +26,7 @@ const sqlOf = (call: unknown[]) => (call[0] as TemplateStringsArray).join('?');
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.batch.mockResolvedValue(policy);
+  mocks.config.mockResolvedValue({ sendsCeilingPerDay: 10, defaultQuietStartHour: 22, defaultQuietEndHour: 7, newTargetGraceDays: 14, maxScopedTargets: 50 });
   mocks.authorize.mockResolvedValue(undefined);
   mocks.settings.mockResolvedValue({ configured: true, provider: 'test', model: 'm', apiKey: 'k', baseUrl: null, maxInput: 4000, outputInputMultiplier: 2, hourly: 10, daily: 100, monthly: 1000 });
   mocks.complete.mockResolvedValue('Draft text here');
@@ -83,7 +85,7 @@ describe('scheduled writing agents', () => {
       return [];
     });
     const summary = await runDueScheduledAgents(new Date('2026-10-22T08:00:00Z'));
-    expect(summary).toBe('agents=1 drafts=2 skipped=0 failed=0');
+    expect(summary).toBe('agents=1 drafts=2 skipped=0 failed=0 autoScheduled=0 autoRefused=0');
     expect(mocks.createPost).toHaveBeenCalledTimes(2);
     for (const call of mocks.createPost.mock.calls) {
       expect(call[0]).toMatchObject({ userId: 'user-a', workspaceId: 'workspace-a' });
@@ -146,11 +148,12 @@ describe('scheduled writing agents', () => {
       if (sql.includes('FROM targets')) return [{ id: 'target-a', name: 'Page' }];
       return [];
     });
-    const result = await scheduledAgents(actor, { action: 'list' }) as { agents: unknown[]; history: Array<{ agentId: string; at: string; drafts: number | null; code: string | null }> };
+    const result = await scheduledAgents(actor, { action: 'list' }) as { agents: unknown[]; policy: { tier: string }; history: Array<{ agentId: string; at: string; drafts: number | null; code: string | null; tier: string | null; scheduled: number | null }> };
     expect(result.agents).toHaveLength(1);
+    expect(result.policy.tier).toBe('assisted');
     expect(result.history).toEqual([
-      { agentId: 'agent-a', at: '2026-10-22T08:00:00.000Z', drafts: 2, code: null },
-      { agentId: 'agent-a', at: '2026-10-15T08:00:00.000Z', drafts: null, code: 'upstream_failure' },
+      { agentId: 'agent-a', at: '2026-10-22T08:00:00.000Z', drafts: 2, code: null, tier: undefined, scheduled: undefined },
+      { agentId: 'agent-a', at: '2026-10-15T08:00:00.000Z', drafts: null, code: 'upstream_failure', tier: undefined, scheduled: null },
     ]);
     const historyQuery = mocks.queryRaw.mock.calls.map(sqlOf).find(sql => sql.includes('FROM activity_logs') && sql.includes('agents.scheduled.completed'))!;
     expect(historyQuery).toContain('ORDER BY "createdAt" DESC');

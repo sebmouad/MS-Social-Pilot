@@ -2,7 +2,7 @@ import { operationFailure } from '@/lib/operation-error';
 import { requireViewer } from '@/server/context';
 import { requestOrigin } from '@/server/request-origin';
 import { aiMediaStatus, generateImage, generateVoice, listVideos, startVideo, type MediaActor } from './media';
-import { engagementOutlook, linkPreview, spamCheck } from './checks';
+import { engagementOutlook, linkPreview, linkPreviewCache, spamCheck } from './checks';
 import { toolsCopy, localeOf, type Locale } from './copy-loader';
 
 /** Largest request body any of these entry points reads; field limits are enforced by the services from Root policy. */
@@ -47,5 +47,11 @@ export const aiVoiceHttp = (request: Request) => handle(request, true, async (ac
 });
 export const aiVideoHttp = (request: Request) => handle(request, request.method === 'POST', (actor, body, locale) => request.method === 'POST' ? startVideo(actor, body, { locale }) : listVideos(actor, { locale }));
 export const linkPreviewHttp = (request: Request) => handle(request, true, (actor, body, locale) => linkPreview(actor, body, { locale }));
+/** Cached reads only (no fetch, no hourly claim); renders and re-renders use this. */
+export const linkPreviewCacheHttp = (request: Request) => handle(request, false, (actor, _body, locale) => {
+  const params = new URL(request.url).searchParams;
+  if ([...params.keys()].some(key => key !== 'url') || params.getAll('url').length !== 1) return linkPreviewCache(actor, {}, { locale });
+  return linkPreviewCache(actor, { url: params.get('url') }, { locale });
+});
 export const outlookHttp = (request: Request) => handle(request, true, (actor, body, locale) => engagementOutlook(actor, body, { locale }));
 export const spamCheckHttp = (request: Request) => handle(request, true, (actor, body, locale) => spamCheck(actor, body, { locale }));

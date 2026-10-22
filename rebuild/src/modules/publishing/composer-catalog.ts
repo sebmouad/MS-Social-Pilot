@@ -611,6 +611,30 @@ export const composerCatalogDefaults = {
     "en": "Queue mode uses your timetable. Choose a suggestion to fill the schedule.",
     "fr": "La file utilise votre calendrier habituel. Choisissez une suggestion pour remplir la programmation."
   },
+  "bestTime_why": {
+    "en": "{posts} posts at this time, {lift}× this channel’s typical post. Basis: {basis} measured posts over {days} days.",
+    "fr": "{posts} publications à cet horaire, {lift}× la publication typique du canal. Base : {basis} publications mesurées sur {days} jours."
+  },
+  "bestTime_channels": {
+    "en": "Per channel",
+    "fr": "Par canal"
+  },
+  "bestTime_reasonInsufficient": {
+    "en": "Unknown: too few measured posts ({basis} measured).",
+    "fr": "Inconnu : trop peu de publications mesurées ({basis} mesurées)."
+  },
+  "bestTime_reasonNoLift": {
+    "en": "No time beats this channel’s typical post.",
+    "fr": "Aucun horaire ne dépasse la publication typique de ce canal."
+  },
+  "bestTime_reasonUnsupported": {
+    "en": "Stored performance is unavailable for this channel.",
+    "fr": "Les performances enregistrées sont indisponibles pour ce canal."
+  },
+  "bestTime_reasonNoAccess": {
+    "en": "You cannot see this channel’s performance.",
+    "fr": "Vous ne pouvez pas voir les performances de ce canal."
+  },
   "ui_formatFor": {
     "en": "Format for {name}",
     "fr": "Format pour {name}"
@@ -1906,12 +1930,128 @@ export const composerCatalogDefaults = {
   "media_invalidAttachments": {
     "en": "Choose valid media attachments.",
     "fr": "Choisissez des pièces jointes multimédias valides."
+  },
+  "variant_title": {
+    "en": "Languages",
+    "fr": "Langues"
+  },
+  "variant_intro": {
+    "en": "Write this post in several languages. Each destination receives the text matching its language, or the default text. Media stays shared.",
+    "fr": "Rédigez cette publication en plusieurs langues. Chaque destination reçoit le texte de sa langue, ou le texte par défaut. Les médias restent partagés."
+  },
+  "variant_needDraft": {
+    "en": "Save the post as a draft first, then add translations here.",
+    "fr": "Enregistrez d’abord la publication en brouillon, puis ajoutez des traductions ici."
+  },
+  "variant_locale": {
+    "en": "Language (en, fr, fr-CA)",
+    "fr": "Langue (en, fr, fr-CA)"
+  },
+  "variant_message": {
+    "en": "Text in this language",
+    "fr": "Texte dans cette langue"
+  },
+  "variant_add": {
+    "en": "Save language",
+    "fr": "Enregistrer la langue"
+  },
+  "variant_remove": {
+    "en": "Remove",
+    "fr": "Retirer"
+  },
+  "variant_empty": {
+    "en": "No other language yet. The default text goes to every destination.",
+    "fr": "Aucune autre langue pour le moment. Le texte par défaut va à toutes les destinations."
+  },
+  "variant_destinations": {
+    "en": "What each destination receives",
+    "fr": "Ce que chaque destination reçoit"
+  },
+  "variant_usesDefault": {
+    "en": "Default text",
+    "fr": "Texte par défaut"
+  },
+  "variant_uses": {
+    "en": "Uses {locale}",
+    "fr": "Utilise {locale}"
+  },
+  "variant_effective": {
+    "en": "Language: {locale}",
+    "fr": "Langue : {locale}"
+  },
+  "variant_added": {
+    "en": "Language saved.",
+    "fr": "Langue enregistrée."
+  },
+  "variant_removed": {
+    "en": "Language removed.",
+    "fr": "Langue retirée."
+  },
+  "variant_loading": {
+    "en": "Loading languages…",
+    "fr": "Chargement des langues…"
+  },
+  "variant_error": {
+    "en": "Languages are unavailable. Try again.",
+    "fr": "Les langues sont indisponibles. Réessayez."
+  },
+  "variant_confirmAdd": {
+    "en": "Save this language for the post?",
+    "fr": "Enregistrer cette langue pour la publication ?"
+  },
+  "variant_confirmRemove": {
+    "en": "Remove this language? Destinations fall back to the default text.",
+    "fr": "Retirer cette langue ? Les destinations reviennent au texte par défaut."
+  },
+  "variant_confirm": {
+    "en": "Confirm",
+    "fr": "Confirmer"
+  },
+  "variant_cancel": {
+    "en": "Cancel",
+    "fr": "Annuler"
+  },
+  "variant_typeConfirmation": {
+    "en": "Type the exact confirmation",
+    "fr": "Saisissez la confirmation exacte"
+  },
+  "variant_working": {
+    "en": "Saving…",
+    "fr": "Enregistrement…"
+  },
+  "variant_failed": {
+    "en": "The change was not saved.",
+    "fr": "La modification n’a pas été enregistrée."
+  },
+  "linkPreview_title": {
+    "en": "Link preview",
+    "fr": "Aperçu du lien"
+  },
+  "linkPreview_loading": {
+    "en": "Reading the link…",
+    "fr": "Lecture du lien…"
+  },
+  "linkPreview_unavailable": {
+    "en": "No preview for this link. The address is kept and still publishes.",
+    "fr": "Aucun aperçu pour ce lien. L’adresse est conservée et sera publiée."
+  },
+  "linkPreview_error": {
+    "en": "The preview could not be read. Try again.",
+    "fr": "L’aperçu n’a pas pu être lu. Réessayez."
+  },
+  "linkPreview_retry": {
+    "en": "Retry preview",
+    "fr": "Réessayer l’aperçu"
+  },
+  "linkPreview_cached": {
+    "en": "Saved preview",
+    "fr": "Aperçu enregistré"
   }
 };
 export type ComposerCatalog = typeof composerCatalogDefaults;
 export const composerCatalogSchema = bilingualCatalogSchema(composerCatalogDefaults);
 export const COMPOSER_COPY_CONFIG = [entry({ key: 'publishing.composerCopy', group: 'Publishing · Copy', label: 'Composer, collaboration and attachment copy', kind: 'json', description: 'English and French composer, queue, remote scheduling and version history text. Keep named placeholders in templates.', defaultValue: composerCatalogDefaults, schema: composerCatalogSchema, consumption: 'active' })] as const;
-export function catalogGroup<P extends 'composer' | 'queue' | 'remote' | 'version' | 'ui' | 'bestTime' | 'collab' | 'attachments' | 'media'>(catalog: ComposerCatalog, prefix: P, locale: 'en' | 'fr') {
+export function catalogGroup<P extends 'composer' | 'queue' | 'remote' | 'version' | 'ui' | 'bestTime' | 'collab' | 'attachments' | 'media' | 'variant' | 'linkPreview'>(catalog: ComposerCatalog, prefix: P, locale: 'en' | 'fr') {
   type Keys = keyof ComposerCatalog;
   type Group = { [K in Keys as K extends `${P}_${infer Name}` ? Name : never]: string };
   return Object.fromEntries(Object.entries(catalog).filter(([key]) => key.startsWith(prefix + '_')).map(([key, value]) => [key.slice(prefix.length + 1), value[locale]])) as Group;

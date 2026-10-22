@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.clearAllMocks(); h.access = true;
   h.auth.mockResolvedValue({ actor, entitlements: {}, permissions: {} });
   h.targets.mockResolvedValue([{ id: 'a', socialAccount: { provider: 'neutral' } }]);
-  h.raw.mockResolvedValue([{ timezone: 'Asia/Tokyo', bestTimeMode: 'apply' }]);
+  h.raw.mockImplementation(async (strings: TemplateStringsArray) => strings.join('?').includes('FROM targets') ? [{ id: 'a', name: 'Page A' }] : [{ timezone: 'Asia/Tokyo', bestTimeMode: 'apply' }]);
   h.platform.mockResolvedValue({ postPerformance: h.hook });
   h.config.mockImplementation(async (key: string) => config[key.split('.').at(-1)!]);
   h.hook.mockResolvedValue([
@@ -25,7 +25,7 @@ beforeEach(() => {
 });
 it('returns bounded stored-only suggestions with a next workspace-local occurrence', async () => {
   const result = await getBestTimeSuggestions(actor, { targetIds: ['a'] }, now);
-  expect(result).toEqual({ mode: 'apply', timeZone: 'Asia/Tokyo', suggestions: [{ dayOfWeek: 2, hour: 8, minute: 0, posts: 3, lift: 3, nextAt: '2026-10-26T23:00:00.000Z', date: '2026-10-27', time: '08:00' }] });
+  expect(result).toEqual({ mode: 'apply', timeZone: 'Asia/Tokyo', windowDays: 90, suggestions: [{ dayOfWeek: 2, hour: 8, minute: 0, posts: 3, lift: 3, nextAt: '2026-10-26T23:00:00.000Z', date: '2026-10-27', time: '08:00' }], perTarget: [{ targetId: 'a', name: 'Page A', basis: 10, reason: 'ok', slots: [{ dayOfWeek: 2, hour: 8, minute: 0, posts: 3, lift: 3, nextAt: '2026-10-26T23:00:00.000Z', date: '2026-10-27', time: '08:00' }] }] });
   expect(h.auth).toHaveBeenCalledWith(actor, 'publishing/posts', 'read');
   expect(h.targets).toHaveBeenCalledWith(actor, ['a'], 10);
   expect(h.hook).toHaveBeenCalledWith({ workspaceId: 'w', targetId: 'a', from: new Date(now.getTime() - 90 * 86400000), to: now, limit: 1000, sort: 'publishedAt', direction: 'desc' });

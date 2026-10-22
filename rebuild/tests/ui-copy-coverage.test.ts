@@ -124,6 +124,7 @@ const LITERAL_ALLOWLIST: Array<{ file: RegExp; text: string; reason: string }> =
   { file: /sharing\/ui\/bio-settings\/BioManager\.tsx$/, text: '/bio/', reason: 'Public URL path prefix shown in front of the editable address; a route, not translatable copy.' },
   { file: /publishing\/ui\/posts\/PostActions\.tsx$/, text: 'message,firstComment,channels', reason: 'CSV column names are the import file contract, not display text; shown in a code element.' },
   { file: /publishing\/ui\/posts\/PostActions\.tsx$/, text: 'firstCommentDelayMinutes', reason: 'Optional CSV column name from the import file contract; shown in a code element.' },
+  { file: /publishing\/ui\/compose\/PostVariantsEditor\.tsx$/, text: 'fr', reason: 'BCP 47 locale example in a language-tag input placeholder; identical in English and French.' },
 ];
 
 /** User-visible string literals in a screen: JSX text and text-bearing attributes. Copy must come from the module catalog. */
