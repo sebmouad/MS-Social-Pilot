@@ -10,6 +10,8 @@ import { authorizeInbox } from './access';
 import { assertInboxDeletionsSettled, lockInboxChannel } from './comment-guard';
 import type { InboxReadActor } from './types';
 import { confirmation, inboxItemSchema, productivityActionSchema } from '../productivity';
+import { mentionedIn } from '@/modules/publishing/collaboration/schemas';
+import { enqueueNotification, loadNotificationPolicy } from '@/modules/settings/notifications/server';
 
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
 const invalid = async () => new OperationError('invalid_request', await inboxServiceText('service35'));
@@ -25,14 +27,16 @@ async function item(actor: InboxReadActor, channels: string[], value: z.infer<ty
 async function limits() {
   const values = await Promise.all([
     runtimeConfig('inbox.noteMaxCharacters'), runtimeConfig('inbox.noteHistoryLimit'), runtimeConfig('inbox.savedReplyPageLimit'), runtimeConfig('inbox.savedReplyNameMaxCharacters'), runtimeConfig('inbox.savedReplyBodyMaxCharacters'), runtimeConfig('inbox.productivityAssigneeLimit'), runtimeConfig('inbox.savedReplyMaxCount'),
+    runtimeConfig('inbox.mentionMaxCount'), runtimeConfig('inbox.mentionSuggestionLimit'), runtimeConfig('inbox.mentionNotificationsEnabled'),
   ]);
   const checked = z.tuple([
     z.number().int().min(1).max(10000), z.number().int().min(1).max(1000), z.number().int().min(1).max(1000),
     z.number().int().min(1).max(500), z.number().int().min(1).max(10000), z.number().int().min(1).max(5000), z.number().int().min(1).max(5000),
+    z.number().int().min(1).max(100), z.number().int().min(1).max(100), z.boolean(),
   ]).safeParse(values);
   if (!checked.success) throw new OperationError('unavailable', await inboxServiceText('service36'));
-  const [noteMaxCharacters, noteHistoryLimit, savedReplyPageLimit, savedReplyNameMaxCharacters, savedReplyBodyMaxCharacters, productivityAssigneeLimit, savedReplyMaxCount] = checked.data;
-  return { noteMaxCharacters, noteHistoryLimit, savedReplyPageLimit, savedReplyNameMaxCharacters, savedReplyBodyMaxCharacters, productivityAssigneeLimit, savedReplyMaxCount };
+  const [noteMaxCharacters, noteHistoryLimit, savedReplyPageLimit, savedReplyNameMaxCharacters, savedReplyBodyMaxCharacters, productivityAssigneeLimit, savedReplyMaxCount, mentionMaxCount, mentionSuggestionLimit, mentionNotificationsEnabled] = checked.data;
+  return { noteMaxCharacters, noteHistoryLimit, savedReplyPageLimit, savedReplyNameMaxCharacters, savedReplyBodyMaxCharacters, productivityAssigneeLimit, savedReplyMaxCount, mentionMaxCount, mentionSuggestionLimit, mentionNotificationsEnabled };
 }
 async function timeout() {
   const values = await Promise.all([runtimeConfig('inbox.workflowTransactionTimeoutMs'), runtimeConfig('inbox.workflowTransactionMaxWaitMs')]);
@@ -62,6 +66,12 @@ const ceiling = (actor: InboxReadActor) => actor.allowedChannelIds === undefined
 async function requireAllChannels(actor: InboxReadActor) {
   if (actor.allowedChannelIds !== undefined) throw new OperationError('forbidden', await inboxServiceText('service38'));
 }
+/** Active, non-client members who can see the conversation's channel: the only people a note may mention. */
+async function mentionCandidates(db: Prisma.TransactionClient | typeof prisma, workspaceId: string, targetId: string, maximum: number) {
+  const rows = await db.$queryRaw<Array<{ id: string; name: string }>>`SELECT u.id, u.name FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."workspaceId" = ${workspaceId} AND u."disabledAt" IS NULL AND m.role::text <> 'client' AND (m."allPages" OR EXISTS (SELECT 1 FROM member_page_access a WHERE a."membershipId" = m.id AND a."targetId" = ${targetId})) ORDER BY u.name ASC, u.id ASC LIMIT ${maximum + 1}`;
+  if (rows.length > maximum) throw new OperationError('unavailable', await inboxServiceText('service39'));
+  return rows;
+}
 const safeDate =(value: unknown) => value instanceof Date ? value : new Date(String(value));
 
 export async function readInboxProductivity(actor: InboxReadActor, input: unknown) {
@@ -70,14 +80,15 @@ export async function readInboxProductivity(actor: InboxReadActor, input: unknow
   const row = await item(actor, access.channelIds, parsed.data);
   if (!row) throw new OperationError('not_found', await inboxServiceText('service7'));
   const cap = await limits();
-  const [noteRows, teamRows, membership] = await Promise.all([
-    prisma.$queryRaw<Array<{ id: string; authorId: string | null; authorName: string | null; body: string; createdAt: Date }>>(Prisma.sql`SELECT n.id, n."authorId", u.name AS "authorName", n.body, n."createdAt" FROM inbox_notes n LEFT JOIN users u ON u.id = n."authorId" WHERE n."workspaceId" = ${actor.workspaceId} AND n.kind = ${parsed.data.kind} AND n."itemId" = ${parsed.data.id} ORDER BY n."createdAt" DESC, n.id DESC LIMIT ${cap.noteHistoryLimit + 1}`),
+  const [noteRows, teamRows, mentionable, membership] = await Promise.all([
+    prisma.$queryRaw<Array<{ id: string; authorId: string | null; authorName: string | null; body: string; mentionIds: string[]; createdAt: Date }>>(Prisma.sql`SELECT n.id, n."authorId", u.name AS "authorName", n.body, n."mentionIds", n."createdAt" FROM inbox_notes n LEFT JOIN users u ON u.id = n."authorId" WHERE n."workspaceId" = ${actor.workspaceId} AND n.kind = ${parsed.data.kind} AND n."itemId" = ${parsed.data.id} ORDER BY n."createdAt" DESC, n.id DESC LIMIT ${cap.noteHistoryLimit + 1}`),
     prisma.$queryRaw<Array<{ id: string; name: string | null }>>(Prisma.sql`SELECT u.id, u.name FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."workspaceId" = ${actor.workspaceId} AND m.role::text <> 'client' AND u."disabledAt" IS NULL ORDER BY u.name, u.id LIMIT ${cap.productivityAssigneeLimit + 1}`),
+    mentionCandidates(prisma, actor.workspaceId, row.targetId, cap.mentionSuggestionLimit),
     prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } }),
   ]);
   if (noteRows.length > cap.noteHistoryLimit || teamRows.length > cap.productivityAssigneeLimit) throw new OperationError('unavailable', await inboxServiceText('service39'));
   if (!membership) throw new OperationError('forbidden', await inboxServiceText('service2'));
-  return { ok: true as const, kind: parsed.data.kind, id: parsed.data.id, assignment: { assigneeId: row.assigneeId, members: teamRows }, notes: noteRows.map(note => ({ id: note.id, authorId: note.authorId, authorName: note.authorName || 'Former teammate', body: note.body, createdAt: safeDate(note.createdAt), canDelete: note.authorId === actor.userId || membership.role === 'owner' || membership.role === 'admin' })), limits: cap };
+  return { ok: true as const, kind: parsed.data.kind, id: parsed.data.id, assignment: { assigneeId: row.assigneeId, members: teamRows }, notes: noteRows.map(note => ({ id: note.id, authorId: note.authorId, authorName: note.authorName || 'Former teammate', body: note.body, mentionIds: note.mentionIds ?? [], createdAt: safeDate(note.createdAt), canDelete: note.authorId === actor.userId || membership.role === 'owner' || membership.role === 'admin' })), mentionable, limits: cap };
 }
 
 export async function listSavedReplies(actor: InboxReadActor, input: unknown = {}) {
@@ -101,7 +112,7 @@ export async function performInboxProductivityAction(actor: InboxReadActor, inpu
   const parsed = productivityActionSchema.safeParse(input); if (!parsed.success) throw await invalid();
   const value = parsed.data; const cap = await limits();
   if (value.action === 'assign' && value.confirmation !== confirmation.assign(value.kind, value.id, value.assigneeId)) throw await invalid();
-  if (value.action === 'note.add' && (value.body.length > cap.noteMaxCharacters || value.confirmation !== confirmation.addNote(value.kind, value.id))) throw await invalid();
+  if (value.action === 'note.add' && (value.body.length > cap.noteMaxCharacters || (value.mentionIds ?? []).length > cap.mentionMaxCount || value.confirmation !== confirmation.addNote(value.kind, value.id))) throw await invalid();
   if (value.action === 'note.delete' && value.confirmation !== confirmation.deleteNote(value.id)) throw await invalid();
   if (value.action === 'reply.create' && (value.name.length > cap.savedReplyNameMaxCharacters || value.body.length > cap.savedReplyBodyMaxCharacters || value.confirmation !== confirmation.createReply(value.name))) throw await invalid();
   if (value.action === 'reply.update' && (value.name.length > cap.savedReplyNameMaxCharacters || value.body.length > cap.savedReplyBodyMaxCharacters || value.confirmation !== confirmation.updateReply(value.id))) throw await invalid();
@@ -130,11 +141,24 @@ export async function performInboxProductivityAction(actor: InboxReadActor, inpu
         }
         await lockActiveActor(tx, actor);
         await assertInboxDeletionsSettled(tx, actor.workspaceId, [current.targetId]);
+        // A mention counts only when the named teammate can see this channel and their @name is really in the note.
+        const requested = value.action === 'note.add' ? value.mentionIds ?? [] : [];
+        const members = requested.length ? await mentionCandidates(tx, actor.workspaceId, current.targetId, cap.mentionSuggestionLimit) : [];
+        const mentionIds = mentionedIn(value.body, members, requested).filter(id => id !== actor.userId);
         const noteId = randomUUID();
-        const inserted = await tx.$executeRaw`INSERT INTO inbox_notes (id, "workspaceId", kind, "itemId", "authorId", body, "createdAt") VALUES (${noteId}, ${actor.workspaceId}, ${value.kind}, ${value.id}, ${actor.userId}, ${value.body}, NOW())`;
+        const inserted = await tx.$executeRaw`INSERT INTO inbox_notes (id, "workspaceId", kind, "itemId", "authorId", body, "mentionIds", "createdAt") VALUES (${noteId}, ${actor.workspaceId}, ${value.kind}, ${value.id}, ${actor.userId}, ${value.body}, ${mentionIds}::text[], NOW())`;
         if (!inserted) throw new OperationError('unavailable', await inboxServiceText('service40'));
-        await audit(tx, actor, 'inbox.private_note_added', { kind: value.kind, itemId: value.id, targetId: current.targetId, noteId });
-        return { ok: true as const, action: value.action, id: noteId };
+        let notified: 'none' | 'queued' = 'none';
+        if (mentionIds.length && cap.mentionNotificationsEnabled) {
+          const policy = await loadNotificationPolicy();
+          if (mentionIds.length > policy.maxRecipientsPerEvent) throw new OperationError('invalid_request', await inboxServiceText('service35'));
+          for (const userId of mentionIds) {
+            const queued = await enqueueNotification(tx, { eventId: `inbox_note_${noteId}`, workspaceId: actor.workspaceId, userId, kind: 'inbox_note_mention', targetId: current.targetId, noteId });
+            if (queued.inserted) notified = 'queued';
+          }
+        }
+        await audit(tx, actor, 'inbox.private_note_added', { kind: value.kind, itemId: value.id, targetId: current.targetId, noteId, mentions: mentionIds.length, notified });
+        return { ok: true as const, action: value.action, id: noteId, mentionIds, notified };
       }, t);
     });
   }

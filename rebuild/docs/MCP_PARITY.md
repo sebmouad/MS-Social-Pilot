@@ -180,8 +180,11 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | MCP tool | Feature | Access | REST method/path | Mapping review note |
 | --- | --- | --- | --- | --- |
 | get_home_overview | home/overview | read | GET /api/home/overview | Shared customer operation; transport arguments may differ. |
+| list_navigation_commands | home/overview | read | GET /api/home/commands | Command palette, REST and MCP share listNavigationCommands: sidebar-ordered pages the member may use, same titles as the sidebar. |
 | list_writing_agents | agents/library | read | GET /api/agents | Agents screen, REST and MCP share writingAgents for tenant-scoped briefs and content-free history. |
 | writing_agents | agents/library | write | GET /api/agents; POST /api/agents | Agents screen, REST and MCP use writingAgents for saved briefs, history and metered suggestions. Service checks current membership, feature permission, exact write confirmation and audit; workspace-wide key scope only. |
+| list_scheduled_agents | agents/library | read | GET /api/agents/scheduled | Agents screen, REST and MCP share scheduledAgents for scheduled runs; tenant-scoped list with enabled channels. |
+| manage_scheduled_agent | agents/library | write | POST /api/agents/scheduled | Agents screen, REST and MCP share scheduledAgents for scheduled runs. Exact CREATE/UPDATE/DELETE/RUN confirmations; a run writes drafts as the creator with AI metering and audit, never scheduling or publishing. |
 | posts_export_job | publishing/posts | write | POST /api/publishing/posts/export/jobs | Posts UI, REST and MCP use postExportAction for queued CSV creation. Exact EXPORT POSTS consent, current tenant/resource scope, expiry and per-request access apply in the service. |
 | posts_export_status | publishing/posts | read | GET /api/publishing/posts/export/jobs | Posts UI, REST and MCP use postExportAction for export status, attempt history and private download; readers retain independent credential ceilings, current scope and expiry checks. CSV byte limits still apply to MCP output. |
 | get_ads_report_rows | ads/campaigns | read | GET /api/ads/report/rows | Shared customer operation; transport arguments may differ. |
@@ -306,7 +309,11 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | export_workspace_archive | settings/data | read | GET /api/settings/data | Shared customer operation; transport arguments may differ. |
 | export_workspace_data | settings/data | read | GET /api/settings/data/snapshot | Shared customer operation; transport arguments may differ. |
 | delete_workspace_data | settings/data | write | DELETE /api/settings/data | Shared customer operation; transport arguments may differ. |
+| get_retention_status | settings/data | read | GET /api/settings/data/retention | Data screen, REST and MCP share getRetentionStatus; owners/admins only, workspace-scoped pending counts plus last nightly run. |
+| prune_old_records | settings/data | write | POST /api/settings/data/retention | Data screen, REST and MCP share runRetentionNow. Exact PRUNE OLD RECORDS confirmation; prunes this workspace only and audits counts. Owners/admins only. |
 | get_best_times | publishing/posts | read | GET /api/publishing/best-times | Shared customer operation; transport arguments may differ. |
+| get_best_time_apply_status | publishing/queue | read | GET /api/publishing/best-times/apply | Workspace settings card, REST and MCP share getBestTimeApplyStatus; owners/admins only. |
+| apply_best_times | publishing/queue | write | POST /api/publishing/best-times/apply | Workspace settings card, REST and MCP share runBestTimeApplyNow. Exact APPLY BEST TIMES confirmation; automatic mode only, claims the week, audits each added time. Owners/admins only. |
 | list_post_templates | publishing/templates | read | GET /api/publishing/templates | Shared customer operation; transport arguments may differ. |
 | create_post_template | publishing/templates | write | POST /api/publishing/templates | Shared customer operation; transport arguments may differ. |
 | update_post_template | publishing/templates | write | PUT /api/publishing/templates/[id] | Shared customer operation; transport arguments may differ. |

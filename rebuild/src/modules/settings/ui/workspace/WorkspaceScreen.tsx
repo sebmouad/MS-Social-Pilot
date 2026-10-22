@@ -10,6 +10,7 @@ import { WorkspacePolicyForm } from './policy-form';
 import { readWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 
 import { WorkspaceOperationsForm } from './operations-form';
+import { BestTimeApplyCard } from './best-time-apply-card';
 
 
 export const metadata: Metadata = { title: 'Workspace policies' };
@@ -31,6 +32,7 @@ export default async function WorkspacePolicyPage() {
     <p className={styles['settings-note']}>{t.approvalNote}</p>
     <SettingsPanel title={copy.panelTitle} detail={copy.panelLiveDetail}>
       {operations ? <WorkspaceOperationsForm key={viewer.workspaceId} locale={locale} workspaceName={viewer.membership.workspace.name} workspaceId={viewer.workspaceId} initial={operations.settings} /> : <p className={styles['settings-note']} role="alert">{copy.unavailable}</p>}
+      {['owner', 'admin'].includes(viewer.membership.role) && operations ? <BestTimeApplyCard locale={locale} /> : null}
     </SettingsPanel>
   </SettingsPage></PageFrame>;
 }

@@ -18,7 +18,8 @@ const caps = {
   'inbox.noteMaxCharacters': 2000, 'inbox.noteHistoryLimit': 100, 'inbox.savedReplyPageLimit': 100,
   'inbox.savedReplyNameMaxCharacters': 100, 'inbox.savedReplyBodyMaxCharacters': 2000,
   'inbox.productivityAssigneeLimit': 500, 'inbox.savedReplyMaxCount': 200, 'inbox.workflowTransactionTimeoutMs': 5000,
-  'inbox.workflowTransactionMaxWaitMs': 500,
+  'inbox.workflowTransactionMaxWaitMs': 500, 'inbox.mentionMaxCount': 20, 'inbox.mentionSuggestionLimit': 20,
+  'inbox.mentionNotificationsEnabled': true,
 };
 const sqlText = (query: unknown) => typeof query === 'string' ? query : (query as { sql?: string })?.sql ?? (query as string[])?.join('') ?? '';
 let actorRole = 'contributor'; let noteRow: { id: string; kind: string; itemId: string; authorId: string | null } | null = null;

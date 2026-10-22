@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
 import { authCopyCatalogDefaults, authCopySchema } from './auth/copy';
 import { homeCopyCatalogDefaults, homeCopySchema } from './copy';
+import { COMMAND_COPY, commandCopySchema } from './command-copy';
 
 /** Root-owned Home dashboard settings (prefix `home.`). Registered by the installed module host. */
 export const HOME_CONFIG = [
@@ -17,4 +18,6 @@ export const HOME_CONFIG = [
   entry({ key: 'home.heatmapMaxPostsPerChannel', group: 'Home', label: 'Best-time posts per channel', kind: 'number', description: 'Most recent stored posts read per channel for the best-time heatmap.', defaultValue: 500, schema: z.number().int().min(10).max(5000), consumption: 'active' }),
   entry({ key: 'home.heatmapMinPosts', group: 'Home', label: 'Best-time minimum measured posts', kind: 'number', description: 'Measured posts, over all channels, needed before the heatmap is shown; fewer is reported as not enough history.', defaultValue: 10, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'home.adsMaxPages', group: 'Home', label: 'Ad spend pages read', kind: 'number', description: 'Maximum pages of stored ad rows read for the spend snapshot. When more exist the snapshot is withheld rather than shown incomplete.', defaultValue: 5, schema: z.number().int().min(1).max(50), consumption: 'active' }),
+  entry({ key: 'home.commandPaletteLimit', group: 'Home', label: 'Command palette results', kind: 'number', description: 'Maximum pages listed by the command palette for one search.', defaultValue: 25, schema: z.number().int().min(5).max(100), consumption: 'active' }),
+  entry({ key: 'home.commandPaletteCopy', group: 'Home', label: 'Command palette copy', kind: 'json', description: 'English and French labels for the command palette. Page titles always match the sidebar.', defaultValue: COMMAND_COPY, schema: commandCopySchema, consumption: 'active' }),
 ] as const;

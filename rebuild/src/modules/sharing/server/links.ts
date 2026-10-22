@@ -12,12 +12,12 @@ import { sharingPresentationPolicy, publicWorkspaceLogo } from './presentation';
 import { sharingLimits } from './limits';
 import { sharingChannels } from './channels';
 
-type Row = { id: string; kind: ShareKind; title: string; description: string | null; targetIds: unknown; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; revokedAt: Date | null; expiresAt: Date | null; createdAt: Date; createdById: string; decisions: bigint | number; tokenHash?: string };
-export type ShareLinkSummary = { id: string; kind: ShareKind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; status: LinkStatus; expiresAt: Date | null; createdAt: Date; createdById: string; feedbackCount: number; /** Pass back as expectedVersion when editing; changes whenever the link or its address changes. */ version: string };
+type Row = { id: string; kind: ShareKind; title: string; description: string | null; targetIds: unknown; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; publishAnywayHours: number | null; revokedAt: Date | null; expiresAt: Date | null; createdAt: Date; createdById: string; decisions: bigint | number; tokenHash?: string };
+export type ShareLinkSummary = { id: string; kind: ShareKind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; publishAnywayHours: number | null; status: LinkStatus; expiresAt: Date | null; createdAt: Date; createdById: string; feedbackCount: number; /** Pass back as expectedVersion when editing; changes whenever the link or its address changes. */ version: string };
 export type ShareFeedback = { id: string; postId: string; decision: 'approved' | 'rejected' | 'comment'; comment: string | null; authorName: string; createdAt: Date; postStatus: string | null; postPreview: string | null };
 
 export const ids = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
-const summary = (row: Row): ShareLinkSummary => ({ id: row.id, kind: row.kind, title: row.title, description: row.description, targetIds: ids(row.targetIds), daysBack: row.daysBack, daysAhead: row.daysAhead, allowComments: row.allowComments, decides: row.decides, status: linkStatus(row), expiresAt: row.expiresAt, createdAt: row.createdAt, createdById: row.createdById, feedbackCount: Number(row.decisions), version: linkVersion({ ...row, targetIds: ids(row.targetIds) }, row.tokenHash ?? '') });
+const summary = (row: Row): ShareLinkSummary => ({ id: row.id, kind: row.kind, title: row.title, description: row.description, targetIds: ids(row.targetIds), daysBack: row.daysBack, daysAhead: row.daysAhead, allowComments: row.allowComments, decides: row.decides, publishAnywayHours: row.publishAnywayHours, status: linkStatus(row), expiresAt: row.expiresAt, createdAt: row.createdAt, createdById: row.createdById, feedbackCount: Number(row.decisions), version: linkVersion({ ...row, targetIds: ids(row.targetIds) }, row.tokenHash ?? '') });
 /** Customer-readable reasons for the few input mistakes a person can fix; everything else stays generic. */
 const explain = (error: ZodError) => {
   if (error.issues.some(i => i.path[0] === 'targetIds' && i.code === 'invalid_type' && i.received === 'undefined')) return bad('Choose at least one channel for this link.');
@@ -33,8 +33,8 @@ export async function listShareLinks(actor: SharingActor, input: unknown = {}, o
   const auth = await authorizeSharing(actor, 'sharing', 'read'); const limits = await sharingLimits();
   const page = query.data.page ?? 1, size = pageSize(limits.pageSize!, options.maxItems), offset = (page - 1) * size;
   const rows = await protect(auth.scope === null
-    ? prisma.$queryRaw<Row[]>`SELECT l.id, l.kind, l.title, l.description, l."targetIds", l."daysBack", l."daysAhead", l."allowComments", l.decides, l."revokedAt", l."expiresAt", l."createdAt", l."createdById", l."tokenHash", (SELECT COUNT(*) FROM review_decisions d WHERE d."shareLinkId" = l.id) AS decisions FROM share_links l WHERE l."workspaceId" = ${actor.workspaceId} ORDER BY l."createdAt" DESC, l.id ASC LIMIT ${size + 1} OFFSET ${offset}`
-    : prisma.$queryRaw<Row[]>`SELECT l.id, l.kind, l.title, l.description, l."targetIds", l."daysBack", l."daysAhead", l."allowComments", l.decides, l."revokedAt", l."expiresAt", l."createdAt", l."createdById", l."tokenHash", (SELECT COUNT(*) FROM review_decisions d WHERE d."shareLinkId" = l.id) AS decisions FROM share_links l WHERE l."workspaceId" = ${actor.workspaceId} AND jsonb_array_length(l."targetIds") > 0 AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(l."targetIds") e WHERE e <> ALL(${[...auth.scope]}::text[])) ORDER BY l."createdAt" DESC, l.id ASC LIMIT ${size + 1} OFFSET ${offset}`);
+    ? prisma.$queryRaw<Row[]>`SELECT l.id, l.kind, l.title, l.description, l."targetIds", l."daysBack", l."daysAhead", l."allowComments", l.decides, l."publishAnywayHours", l."revokedAt", l."expiresAt", l."createdAt", l."createdById", l."tokenHash", (SELECT COUNT(*) FROM review_decisions d WHERE d."shareLinkId" = l.id) AS decisions FROM share_links l WHERE l."workspaceId" = ${actor.workspaceId} ORDER BY l."createdAt" DESC, l.id ASC LIMIT ${size + 1} OFFSET ${offset}`
+    : prisma.$queryRaw<Row[]>`SELECT l.id, l.kind, l.title, l.description, l."targetIds", l."daysBack", l."daysAhead", l."allowComments", l.decides, l."publishAnywayHours", l."revokedAt", l."expiresAt", l."createdAt", l."createdById", l."tokenHash", (SELECT COUNT(*) FROM review_decisions d WHERE d."shareLinkId" = l.id) AS decisions FROM share_links l WHERE l."workspaceId" = ${actor.workspaceId} AND jsonb_array_length(l."targetIds") > 0 AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(l."targetIds") e WHERE e <> ALL(${[...auth.scope]}::text[])) ORDER BY l."createdAt" DESC, l.id ASC LIMIT ${size + 1} OFFSET ${offset}`);
   const presentation = await sharingPresentationPolicy();
   const branding = await protect(prisma.$queryRaw<Array<{ name: string; logoUrl: string | null }>>`SELECT name, "logoUrl" FROM workspaces WHERE id = ${actor.workspaceId}`);
   return { presentation: { workspaceName: branding[0]?.name ?? null, workspaceLogoUrl: publicWorkspaceLogo(branding[0]?.logoUrl, presentation), advisoryDecisionNotificationsEnabled: presentation.advisoryDecisionNotificationsEnabled }, links: rows.slice(0, size).map(summary), page, pageSize: size, hasMore: rows.length > size };
@@ -75,6 +75,9 @@ export async function createShareLink(actor: SharingActor, input: unknown) {
   if (needed.some(feature => !auth.publishing.includes(feature))) throw await sharingError('forbidden', 'You need Publishing access to share posts.');
   if (data.decides && data.kind === 'calendar') throw await bad('Calendar links cannot approve posts.');
   if (data.decides && !auth.canApprove) throw await sharingError('forbidden', 'You need approval permission to create a link that lets clients decide.');
+  const anyway = data.publishAnywayHours ?? null;
+  if (!data.decides && anyway !== null) throw await bad('Only a link that lets clients decide can approve posts automatically.');
+  if (anyway !== null && anyway > limits.publishAnywayMaxHours!) throw await bad('Automatic approval can wait at most {0} hours.', limits.publishAnywayMaxHours!);
   const requested = [...new Set(data.targetIds)];
   const token = newToken();
   return protect(transact(actor.workspaceId, limits, async tx => {
@@ -86,9 +89,9 @@ export async function createShareLink(actor: SharingActor, input: unknown) {
     const count = await tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*)::bigint AS count FROM share_links WHERE "workspaceId" = ${actor.workspaceId}`;
     if (Number(count[0]?.count ?? 0) >= limits.maxLinksPerWorkspace!) throw await sharingError('conflict', 'This workspace has reached its share link limit. Delete old links first.');
     const id = `shl_${randomUUID()}`;
-    const inserted = await tx.$executeRaw`INSERT INTO share_links (id, "workspaceId", kind, "tokenHash", title, description, "targetIds", "daysBack", "daysAhead", "allowComments", decides, "expiresAt", "createdById", "createdAt") VALUES (${id}, ${actor.workspaceId}, ${data.kind}, ${hashToken(token)}, ${data.title}, ${data.description ?? null}, ${JSON.stringify(requested)}::jsonb, ${data.daysBack}, ${data.daysAhead}, ${data.allowComments}, ${data.decides}, NOW() + (${days} * INTERVAL '1 day'), ${actor.userId}, NOW())`;
+    const inserted = await tx.$executeRaw`INSERT INTO share_links (id, "workspaceId", kind, "tokenHash", title, description, "targetIds", "daysBack", "daysAhead", "allowComments", decides, "publishAnywayHours", "expiresAt", "createdById", "createdAt") VALUES (${id}, ${actor.workspaceId}, ${data.kind}, ${hashToken(token)}, ${data.title}, ${data.description ?? null}, ${JSON.stringify(requested)}::jsonb, ${data.daysBack}, ${data.daysAhead}, ${data.allowComments}, ${data.decides}, ${anyway}, NOW() + (${days} * INTERVAL '1 day'), ${actor.userId}, NOW())`;
     if (inserted !== 1) throw await sharingError('unavailable', 'The share link could not be created.');
-    await audit(tx, actor, 'sharing.link_created', { linkId: id, kind: data.kind, decides: data.decides, expiresInDays: days, channelCount: requested.length });
+    await audit(tx, actor, 'sharing.link_created', { linkId: id, kind: data.kind, decides: data.decides, publishAnywayHours: anyway, expiresInDays: days, channelCount: requested.length });
     // The path carries the only copy of the secret; it is shown once and never stored in plain text.
     return { id, path: sharePath(token), expiresInDays: days };
   }), 'A share link could not be created.');
@@ -100,7 +103,7 @@ async function lockLink(tx: Parameters<Parameters<typeof transact>[2]>[0], auth:
   return row;
 }
 
-type EditRow = Omit<Row, 'decisions' | 'createdAt' | 'createdById'> & { tokenHash: string };
+type EditRow = Omit<Row, 'decisions' | 'createdAt' | 'createdById' | 'tokenHash'> & { tokenHash: string };
 const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every(id => b.includes(id));
 
 /**
@@ -123,12 +126,12 @@ export async function updateShareLink(actor: SharingActor, input: unknown) {
   const token = newToken();
   return protect(transact(actor.workspaceId, limits, async tx => {
     await lockActor(tx, actor, 'sharing');
-    const rows = await tx.$queryRaw<EditRow[]>`SELECT id, kind, title, description, "targetIds", "daysBack", "daysAhead", "allowComments", decides, "revokedAt", "expiresAt", "tokenHash" FROM share_links WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
+    const rows = await tx.$queryRaw<EditRow[]>`SELECT id, kind, title, description, "targetIds", "daysBack", "daysAhead", "allowComments", decides, "publishAnywayHours", "revokedAt", "expiresAt", "tokenHash" FROM share_links WHERE id = ${data.id} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
     const row = rows[0]; if (!row || !inScope(auth, ids(row.targetIds))) throw await missing();
     const stored = ids(row.targetIds);
     if (linkVersion({ ...row, targetIds: stored }, row.tokenHash) !== data.expectedVersion) throw await sharingError('conflict', 'This link was changed by someone else. Reload it to see the latest settings, then make your change again.');
 
-    const next = { kind: row.kind, title: row.title, description: row.description, targetIds: stored, daysBack: row.daysBack, daysAhead: row.daysAhead, allowComments: row.allowComments, decides: row.decides };
+    const next = { kind: row.kind, title: row.title, description: row.description, targetIds: stored, daysBack: row.daysBack, daysAhead: row.daysAhead, allowComments: row.allowComments, decides: row.decides, publishAnywayHours: row.publishAnywayHours };
     const changed: string[] = [];
     const description = data.description === undefined ? undefined : data.description === '' ? null : data.description;
     if (data.title !== undefined && data.title !== row.title) { changed.push('title'); next.title = data.title; }
@@ -139,6 +142,12 @@ export async function updateShareLink(actor: SharingActor, input: unknown) {
     if (data.daysAhead !== undefined && data.daysAhead !== row.daysAhead) { changed.push('daysAhead'); next.daysAhead = data.daysAhead; }
     if (data.allowComments !== undefined && data.allowComments !== row.allowComments) { changed.push('allowComments'); next.allowComments = data.allowComments; }
     if (data.decides !== undefined && data.decides !== row.decides) { changed.push('decides'); next.decides = data.decides; }
+    // A deadline only exists on a deciding link; switching decides off clears it in the same edit.
+    const storedHours = row.publishAnywayHours ?? null;
+    const hours = next.decides ? (data.publishAnywayHours !== undefined ? data.publishAnywayHours : storedHours) : null;
+    if (data.publishAnywayHours !== undefined && data.publishAnywayHours !== null && !next.decides) throw await bad('Only a link that lets clients decide can approve posts automatically.');
+    if (hours !== null && hours > limits.publishAnywayMaxHours!) throw await bad('Automatic approval can wait at most {0} hours.', limits.publishAnywayMaxHours!);
+    if (hours !== storedHours) { changed.push('publishAnywayHours'); next.publishAnywayHours = hours; }
     if (data.expiresInDays !== undefined) changed.push('expiresInDays');
     if (!changed.length) throw await bad('Nothing was changed.');
     await exact(data.confirmation ?? '', updateLinkConfirmation(row.id));
@@ -164,7 +173,7 @@ export async function updateShareLink(actor: SharingActor, input: unknown) {
     const expiresAt = days !== undefined ? new Date(Date.now() + days * 86_400_000) : row.expiresAt;
     const tokenHash = rotates ? hashToken(token) : row.tokenHash;
     const updated = rotates
-      ? await tx.$executeRaw`UPDATE share_links SET kind = ${next.kind}, title = ${next.title}, description = ${next.description}, "targetIds" = ${JSON.stringify(next.targetIds)}::jsonb, "daysBack" = ${next.daysBack}, "daysAhead" = ${next.daysAhead}, "allowComments" = ${next.allowComments}, decides = ${next.decides}, "expiresAt" = ${expiresAt}, "tokenHash" = ${tokenHash} WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} AND "revokedAt" IS NULL`
+      ? await tx.$executeRaw`UPDATE share_links SET kind = ${next.kind}, title = ${next.title}, description = ${next.description}, "targetIds" = ${JSON.stringify(next.targetIds)}::jsonb, "daysBack" = ${next.daysBack}, "daysAhead" = ${next.daysAhead}, "allowComments" = ${next.allowComments}, decides = ${next.decides}, "publishAnywayHours" = ${next.publishAnywayHours}, "expiresAt" = ${expiresAt}, "tokenHash" = ${tokenHash} WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId} AND "revokedAt" IS NULL`
       : await tx.$executeRaw`UPDATE share_links SET title = ${next.title}, description = ${next.description} WHERE id = ${row.id} AND "workspaceId" = ${actor.workspaceId}`;
     if (updated !== 1) throw await sharingError('unavailable', 'The link could not be updated.');
     await audit(tx, actor, 'sharing.link_updated', { linkId: row.id, changed, rotated: rotates, ...(days !== undefined ? { renewedForDays: days } : {}) });

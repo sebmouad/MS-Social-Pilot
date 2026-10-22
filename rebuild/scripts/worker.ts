@@ -58,6 +58,22 @@ const dependencies: WorkerDependencies = {
       const result = await deliverDueWebhooks(undefined, now);
       return `events=${result.events} delivered=${result.delivered} retrying=${result.retrying} failed=${result.failed} purged=${result.purged}`;
     }
+    if (job === 'retention') {
+      const { runRetentionSweep } = await import('../src/modules/settings/server/retention');
+      return runRetentionSweep(now);
+    }
+    if (job === 'sharingDeadlines') {
+      const { runShareLinkDeadlines } = await import('../src/modules/sharing/server/deadlines');
+      return runShareLinkDeadlines(now);
+    }
+    if (job === 'scheduledAgents') {
+      const { runDueScheduledAgents } = await import('../src/modules/agents/server/scheduled');
+      return runDueScheduledAgents(now);
+    }
+    if (job === 'bestTimes') {
+      const { runBestTimeApplication } = await import('../src/modules/publishing/server/best-time-apply');
+      return runBestTimeApplication(now);
+    }
     if (job === 'mediaCleanup') {
       const { cleanupOrphanImages } = await import('@/modules/publishing/server/media/storage');
       const result = await cleanupOrphanImages(now);

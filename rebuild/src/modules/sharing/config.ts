@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { entry } from '@/lib/config/entry';
+import { cron, entry } from '@/lib/config/entry';
 import { ownerCopy, ownerCopySchema } from './ui/owner-copy';
 import { publicCopyDefaults, publicCopySchema } from './ui/copy';
 import { answerNoticeDefault, answerNoticeSchema, sharingMessages, sharingMessagesSchema } from './messages';
@@ -39,6 +39,8 @@ export const SHARING_LIMIT_CONFIG = [
   num('sharing.rateStoreCapacity', G, 'Public rate-limit store size', 'Most visitor windows the public sharing and bio limiter remembers at once (separate from sign-in limits). Oldest windows are dropped first.', 5000, n(100, 100000)),
   num('sharing.transactionTimeoutMs', G, 'Sharing transaction timeout', 'Maximum duration of one share or bio mutation transaction.', 5000, n(500, 30000)),
   num('sharing.transactionMaxWaitMs', G, 'Sharing transaction wait', 'Maximum wait for a share or bio mutation transaction slot.', 2000, n(100, 10000)),
+  num('sharing.publishAnywayMaxHours', G, 'Publish-anyway deadline limit (hours)', 'Longest a deciding link may wait for a client answer before approving unanswered posts itself.', 72, n(1, 168)),
+  num('sharing.deadlineBatchLinks', G, 'Deadline links per run', 'Maximum deciding links with a deadline examined in one deadline run.', 100, n(1, 1000)),
   num('bio.maxLinks', B, 'Bio links limit', 'Most links a public bio page may list.', 30, n(1, 100)),
   num('bio.titleMaxCharacters', B, 'Bio title limit', 'Maximum characters in a bio page title.', 80, n(10, 200)),
   num('bio.descriptionMaxCharacters', B, 'Bio description limit', 'Maximum characters in a bio page description.', 300, n(0, 1000)),
@@ -72,7 +74,9 @@ export const sharingPresentationSchema = z.object({
 }).strict();
 export const SHARING_PRESENTATION_CONFIG = [entry({ key: 'sharing.presentationPolicy', group: G, label: 'Workspace branding and advisory decision notices', kind: 'json', description: 'Show the workspace HTTPS logo on public client links and notify post authors about advisory approvals/change requests. Email follows notification preferences; applied decisions are already notified by Publishing.', defaultValue: { showWorkspaceLogo: true, logoUrlMaxCharacters: 2048, advisoryDecisionNotificationsEnabled: true }, schema: sharingPresentationSchema, consumption: 'active' })] as const;
 
-export const SHARING_CONFIG = [...SHARING_LIMIT_CONFIG, ...SHARING_COPY_CONFIG, ...SHARING_UI_COPY_CONFIG, ...SHARING_PRESENTATION_CONFIG] as const;
+export const SHARING_JOB_CONFIG = [entry({ key: 'sharing.deadlineSchedule', group: G, label: 'Client deadline schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone for approving posts whose client deadline passed.', defaultValue: '*/5 * * * *', schema: cron, consumption: 'active' })] as const;
+
+export const SHARING_CONFIG = [...SHARING_LIMIT_CONFIG, ...SHARING_COPY_CONFIG, ...SHARING_UI_COPY_CONFIG, ...SHARING_PRESENTATION_CONFIG, ...SHARING_JOB_CONFIG] as const;
 
 export type SharingLimits = Record<string, number>;
 export type SharingCopy = { intro: string; answerNotice: string; bioFooter: string };

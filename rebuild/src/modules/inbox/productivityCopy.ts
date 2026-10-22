@@ -2,6 +2,7 @@ export const productivityCopy = {
   en: {
     region: 'Inbox productivity', assignment: 'Assignment', assignTo: 'Assign to', unassigned: 'Unassigned', teammate: 'Teammate', assignedTo: (name: string) => `Assigned to ${name}`,
     notes: 'Private notes', note: 'Private note', notePlaceholder: 'Add a note for your team', addNote: 'Add note', notesHelp: 'Only your workspace team can see these notes.', deleteNote: 'Delete note',
+    mentionHint: 'Type @ to mention a teammate — they get a note.', mentionList: 'Teammates you can mention', mentionEmpty: 'Nobody matches.', mentionNotified: (name: string) => `Notified ${name}`,
     savedReplies: 'Saved replies', noReplies: 'No saved replies yet', noRepliesBody: 'Save the answers you give often and insert them into a reply with one click.',
     useReply: 'Use reply', replyActions: (name: string) => `Actions for ${name}`, edit: 'Edit', delete: 'Delete',
     replyName: 'Saved reply name', replyNamePlaceholder: 'Reply name', replyText: 'Saved reply text', replyTextPlaceholder: 'Reply text', createReply: 'Create saved reply', saveReply: 'Save reply', cancelEdit: 'Cancel edit',
@@ -12,6 +13,7 @@ export const productivityCopy = {
   fr: {
     region: 'Outils de la boîte de réception', assignment: 'Attribution', assignTo: 'Attribuer à', unassigned: 'Non attribuée', teammate: 'Collègue', assignedTo: (name: string) => `Attribuée à ${name}`,
     notes: 'Notes privées', note: 'Note privée', notePlaceholder: 'Ajoutez une note pour votre équipe', addNote: 'Ajouter la note', notesHelp: 'Seule l’équipe de votre espace de travail voit ces notes.', deleteNote: 'Supprimer la note',
+    mentionHint: 'Tapez @ pour mentionner un collègue — il reçoit une note.', mentionList: 'Collègues que vous pouvez mentionner', mentionEmpty: 'Aucun résultat.', mentionNotified: (name: string) => `${name} prévenu`,
     savedReplies: 'Réponses enregistrées', noReplies: 'Aucune réponse enregistrée', noRepliesBody: 'Enregistrez les réponses que vous donnez souvent et insérez-les en un clic.',
     useReply: 'Utiliser la réponse', replyActions: (name: string) => `Actions pour ${name}`, edit: 'Modifier', delete: 'Supprimer',
     replyName: 'Nom de la réponse enregistrée', replyNamePlaceholder: 'Nom de la réponse', replyText: 'Texte de la réponse enregistrée', replyTextPlaceholder: 'Texte de la réponse', createReply: 'Créer la réponse enregistrée', saveReply: 'Enregistrer la réponse', cancelEdit: 'Annuler la modification',

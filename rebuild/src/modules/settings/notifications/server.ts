@@ -276,6 +276,16 @@ export async function notificationRecipientEligible(tx: Tx, input: NotificationE
     const note = await tx.$queryRaw<Array<{ id: string }>>`SELECT n.id FROM post_notes n JOIN posts p ON p.id = n."postId" WHERE n.id = ${value.noteId!} AND n."postId" = ${value.postId!} AND p."workspaceId" = ${value.workspaceId} AND n."mentionIds" @> ARRAY[${value.userId}]::text[]`;
     return note.length === 1;
   }
+  if (value.kind === 'inbox_note_mention') {
+    let recipientAuth;
+    try { recipientAuth = await authorizeInbox(recipient); }
+    catch (error) { if (error instanceof OperationError && ['unauthorized', 'forbidden', 'not_found'].includes(error.code)) return false; throw error; }
+    if (!recipientAuth.channelIds.includes(value.targetId!)) return false;
+    const membership = await tx.$queryRaw<Array<{ role: string }>>`SELECT m.role::text AS role FROM memberships m JOIN users u ON u.id = m."userId" WHERE m."workspaceId" = ${value.workspaceId} AND m."userId" = ${value.userId} AND u."disabledAt" IS NULL`;
+    if (!membership[0] || membership[0].role === 'client') return false;
+    const note = await tx.$queryRaw<Array<{ id: string }>>`SELECT n.id FROM inbox_notes n WHERE n.id = ${value.noteId!} AND n."workspaceId" = ${value.workspaceId} AND n."mentionIds" @> ARRAY[${value.userId}]::text[]`;
+    return note.length === 1;
+  }
   let queueAuth;
   try { queueAuth = await authorizePublishing(recipient, 'publishing/queue', 'read'); }
   catch (error) { if (error instanceof OperationError && ['unauthorized', 'forbidden', 'not_found'].includes(error.code)) return false; throw error; }
@@ -299,7 +309,7 @@ export async function recipientAllowsNotification(tx: Tx, input: Pick<Notificati
   const row = rows[0];
   const key = notificationPreferenceKey(input.kind);
   const enabled = row?.preferences?.[key];
-  const fallback = input.kind === 'note_mention' ? limit.preferenceDefaults.onNoteMention : ['mix_dry', 'queue_empty'].includes(input.kind) ? limit.preferenceDefaults.onQueueEmpty : input.kind !== 'inbox_digest';
+  const fallback = ['note_mention', 'inbox_note_mention'].includes(input.kind) ? limit.preferenceDefaults.onNoteMention : ['mix_dry', 'queue_empty'].includes(input.kind) ? limit.preferenceDefaults.onQueueEmpty : input.kind !== 'inbox_digest';
   return !row?.muted && (typeof enabled === 'boolean' ? enabled : fallback);
 }
 
@@ -307,7 +317,7 @@ export async function recipientAllowsNotification(tx: Tx, input: Pick<Notificati
 export const notificationPreferenceDefaults = NOTIFICATIONS_DEFAULTS;
 
 export function notificationPreferenceKey(kind: import('./contracts').NotificationEvent): string {
-  return ({ note_mention: 'onNoteMention', mix_dry: 'onQueueEmpty', queue_empty: 'onQueueEmpty', publish_failure: 'onPublishFailure', connection_expired: 'onPublishFailure', token_expiring: 'onTokenExpiry', approval_request: 'onApprovalRequest', approval_decision: 'onApprovalDecision', draft_updated: 'onDraftUpdated', inbox_digest: 'onNewInbox', moderation_alert: 'onModerationAlert', negative_spike: 'onModerationAlert' })[kind];
+  return ({ note_mention: 'onNoteMention', inbox_note_mention: 'onNoteMention', mix_dry: 'onQueueEmpty', queue_empty: 'onQueueEmpty', publish_failure: 'onPublishFailure', connection_expired: 'onPublishFailure', token_expiring: 'onTokenExpiry', approval_request: 'onApprovalRequest', approval_decision: 'onApprovalDecision', draft_updated: 'onDraftUpdated', inbox_digest: 'onNewInbox', moderation_alert: 'onModerationAlert', negative_spike: 'onModerationAlert' })[kind];
 }
 export async function txLocale(tx: Tx, userId: string) {
   const rows = await tx.$queryRaw<Array<{ locale: string }>>`SELECT locale::text AS locale FROM users WHERE id = ${userId}`;

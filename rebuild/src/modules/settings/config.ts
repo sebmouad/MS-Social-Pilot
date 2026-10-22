@@ -11,6 +11,7 @@ import { REGISTRATION_CONFIG } from './registration-config';
 import { NOTIFICATIONS_CONFIG } from './notifications/config';
 import { entry, cron } from '@/lib/config/entry';
 import { appearanceCopy, appearanceCopySchema } from './ui/appearance/copy';
+import { RETENTION_COPY, retentionCopySchema } from './retention-copy';
 
 export const SETTINGS_CONFIG = [
   entry({ key: 'settings.uiCopy', group: 'Settings · Copy', label: 'Settings screen copy', kind: 'json', description: 'English and French customer copy for Settings screens, forms, tables and security controls.', defaultValue: settingsUiCopy, schema: settingsUiCopySchema, consumption: 'active' }),
@@ -50,6 +51,7 @@ export const SETTINGS_MODULE_CONFIG = [
   ...NOTIFICATIONS_CONFIG,
   entry({ key: 'connections.statusLabels', group: 'Connections', label: 'Connection status labels', kind: 'json', description: 'Customer-facing labels for connected, expired and revoked sources. Health and permission checks are independent of these labels.', defaultValue: { connected: 'Connected', expired: 'Reconnect needed', revoked: 'Reconnect needed' }, schema: z.object({ connected: z.string().trim().min(1).max(80), expired: z.string().trim().min(1).max(80), revoked: z.string().trim().min(1).max(80) }).strict(), consumption: 'active' }),
   entry({ key: 'data.purgeRecoverySchedule', group: 'Data controls', label: 'Workspace erasure recovery schedule', kind: 'text', description: 'Five-field cron schedule for resuming already-confirmed workspace deletions after interruption.', defaultValue: '*/7 * * * *', schema: cron, consumption: 'active' }),
+  entry({ key: 'settings.retentionCopy', group: 'Settings · Data', label: 'Old-records cleanup copy', kind: 'json', description: 'English and French labels and feedback for the old-records cleanup in Settings, REST and MCP.', defaultValue: RETENTION_COPY, schema: retentionCopySchema, consumption: 'active' }),
   entry({ key: 'data.deleteTransactionTimeoutMs', group: 'Data controls', label: 'Workspace deletion timeout (ms)', kind: 'number', description: 'Maximum time allowed for one transactional workspace database deletion.', defaultValue: 120000, schema: z.number().int().min(5000).max(3600000), consumption: 'active' }),
   entry({ key: 'data.maxArchiveBytes', group: 'Data controls', label: 'Maximum workspace archive bytes', kind: 'number', description: 'Safety ceiling for synchronous workspace archives and partial personal account JSON exports. Exceeding it refuses the download rather than truncating the declared coverage.', defaultValue: 268435456, schema: z.number().int().min(1048576).max(2147483648), consumption: 'active' }),
   entry({ key: 'mcp.keys.maxActivePerWorkspace', group: 'MCP · API keys', label: 'Active API keys per workspace', kind: 'number', description: 'Maximum non-expired, non-revoked MCP bearer keys in each workspace.', defaultValue: 10, schema: z.number().int().min(1).max(1000), consumption: 'active' }),

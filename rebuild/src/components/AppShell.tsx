@@ -5,6 +5,7 @@ import { MODULES, PAGES, type ModuleId } from "@/lib/product";
 import { SidebarDockContext } from "./SidebarDock";
 import { ModuleGlyph, PageGlyph } from "./icons";
 import { ModeToggle } from "./ModeToggle";
+import { CommandPalette } from "./CommandPalette";
 import { ToastProvider } from "./Toast";
 import { IconPlus } from "@tabler/icons-react";
 
@@ -12,7 +13,7 @@ function Mark() {
   return <svg className="shell-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg>;
 }
 
-export function AppShell({ children, activeModule, enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], sidebar, sidebarWhen, installationMode = false }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; writableFeatures?: readonly string[]; rootAccess: boolean; userName: string; workspaceName: string; workspaceId?: string; workspaces?: readonly { id: string; name: string }[]; sidebar?: ReactNode; sidebarWhen?: readonly string[]; installationMode?: boolean }) {
+export function AppShell({ children, activeModule, enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], sidebar, sidebarWhen, installationMode = false, paletteCopy }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; writableFeatures?: readonly string[]; rootAccess: boolean; userName: string; workspaceName: string; workspaceId?: string; workspaces?: readonly { id: string; name: string }[]; sidebar?: ReactNode; sidebarWhen?: readonly string[]; installationMode?: boolean; paletteCopy?: { trigger: string; placeholder: string; noResults: string; hint: string; close: string } }) {
   const pathname = usePathname();
   const visibleSidebar = sidebar && (!sidebarWhen || sidebarWhen.includes(pathname));
   const [filterOpen, setFilterOpen] = useState(false);
@@ -132,6 +133,6 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       </div>
       <footer className="shell-context-footer"><span className="shell-context-user">{userName}</span>{enabledFeatures.includes('settings/account') && <a href="/settings/account">Account</a>}{rootAccess && !installationMode && <a href="/root">Root</a>}<button className="shell-signout" type="button" disabled={signingOut} aria-busy={signingOut} onClick={() => void signOut()}>{signingOut ? 'Signing out…' : 'Sign out'}</button>{accountError && <p className="ui-error" role="alert">{accountError}</p>}</footer>
     </aside>
-    <div className="shell-main" inert={filterOpen || undefined}><header className="shell-topbar"><div className="shell-topbar__crumb"><button ref={filterToggleRef} className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => filterOpen ? closeFilters() : setFilterOpen(true)}>Menu &amp; filters</button><span>{installationMode ? 'Installation' : workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : active?.title}</strong></div><div className="shell-topbar__tools">{installationMode && <span className="shell-root-badge"><ModuleGlyph id="root" size={15}/>Root · private installation controls</span>}<ModeToggle/><span className="shell-topbar__user">{PAGES.find(page => page.href === pathname)?.title ?? (installationMode ? 'Private control center' : 'Workspace')}</span></div></header><main id="main-content" className="shell-content" tabIndex={-1}>{children}</main></div>
+    <div className="shell-main" inert={filterOpen || undefined}><header className="shell-topbar"><div className="shell-topbar__crumb"><button ref={filterToggleRef} className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => filterOpen ? closeFilters() : setFilterOpen(true)}>Menu &amp; filters</button><span>{installationMode ? 'Installation' : workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : active?.title}</strong></div><div className="shell-topbar__tools">{!installationMode && paletteCopy && <CommandPalette copy={paletteCopy}/>}{installationMode && <span className="shell-root-badge"><ModuleGlyph id="root" size={15}/>Root · private installation controls</span>}<ModeToggle/><span className="shell-topbar__user">{PAGES.find(page => page.href === pathname)?.title ?? (installationMode ? 'Private control center' : 'Workspace')}</span></div></header><main id="main-content" className="shell-content" tabIndex={-1}>{children}</main></div>
   </div></ToastProvider></SidebarDockContext.Provider>;
 }

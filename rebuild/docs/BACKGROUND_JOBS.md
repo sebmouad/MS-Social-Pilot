@@ -9,3 +9,12 @@ Each job has a database lease so multiple worker processes cannot run the same s
 Transient provider reads retry up to Root's configured retry limit with exponential delays capped at one minute. Work is bounded per connection by `meta.pageSize * meta.maxPages` and runs serially within a job, while the number of concurrent jobs follows Root's limit. A crashed worker's lease expires after the Root-configured duration. The additive migration `20261023100000_rebuild_worker_jobs` must be applied before starting the worker. Never run migrations against production without the deployment review and backup process described in the rebuild README.
 
 The job scheduler and cron matcher have local unit tests. These tests do not make live Graph API calls; verify provider permissions and stored writes against a non-production database before cutover.
+
+## Jobs/productivity lane jobs (2026-10-22)
+
+All four run through the same runner with leases and `rebuild_sync_runs` history above:
+
+- `retention` (`retention.schedule`, nightly): prunes workspace activity/email/click-detail/AI/report-run history plus installation error and worker-run history. Feeds, insight snapshots, link totals, running reports, identity/members/content are never touched. Each run writes one Root receipt with counts. Owners/admins can also prune their own workspace now from Settings › Data (exact confirmation, audited).
+- `sharingDeadlines` (`sharing.deadlineSchedule`, every 5 minutes): approves pending-review posts inside each live deciding link’s `publishAnywayHours` window through the Publishing review lifecycle as the link creator. Revoked, expired or rotated links, departed creators and moved posts are skipped, never forced.
+- `scheduledAgents` (`agents.scheduledRunsSchedule`, hourly): claims due scheduled agents (workspace-timezone weekday + `lastRunOn`) and writes their drafts as the creator with hourly AI metering; nothing is scheduled or published. AI failure frees the day so the next run retries.
+- `bestTimes` (`publishing.bestTimeApplySchedule`, weekly): adds the strongest evidence-backed new times to channel queues for workspaces in automatic best-time mode, claiming the week per workspace and auditing each addition.

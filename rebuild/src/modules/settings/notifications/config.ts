@@ -29,6 +29,7 @@ export const NOTIFICATIONS_DEFAULTS = {
     moderation_alert: { title: 'Moderation needs attention', body: 'Review a moderation match in your inbox.', frTitle: 'Modération à examiner', frBody: 'Consultez une correspondance de modération dans votre boîte de réception.' },
     negative_spike: { title: 'Negative comment activity', body: 'Review increased negative activity in your inbox.', frTitle: 'Hausse des commentaires négatifs', frBody: 'Consultez la hausse des activités négatives dans votre boîte de réception.' },
     note_mention: { title: 'You were mentioned in a post note', body: 'A teammate mentioned you in an internal post note.' },
+    inbox_note_mention: { title: 'You were mentioned in an inbox note', body: 'A teammate mentioned you in a private inbox note.', frTitle: 'On vous a mentionné dans une note', frBody: 'Un collègue vous a mentionné dans une note privée de la boîte de réception.' },
     mix_dry: { title: 'A content mix needs attention', body: 'A selected channel has no eligible posts for its content mix.' },
     unavailable: { title: 'Related item unavailable', body: 'This alert is still in your inbox, but its related item is no longer available.' },
   },
@@ -46,6 +47,7 @@ const eventCopySchema = z.object({
   moderation_alert: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.moderation_alert),
   negative_spike: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict().default(NOTIFICATIONS_DEFAULTS.eventCopy.negative_spike),
   note_mention: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500) }).strict(),
+  inbox_note_mention: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500), frTitle: z.string().trim().min(1).max(120), frBody: z.string().trim().min(1).max(500) }).strict(),
   mix_dry: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500) }).strict(),
   unavailable: z.object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(500) }).strict(),
 }).strict();

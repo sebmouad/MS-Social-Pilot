@@ -1,4 +1,5 @@
 import { getBestTimeSuggestions } from './server/best-time';
+import { getBestTimeApplyStatus, runBestTimeApplyNow } from './server/best-time-apply';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
 import { cancelScheduledPost, importPostsCsv, publishPost, reschedulePostToInstant, reviewPost, schedulePost, submitPostForApproval, syncPostStatus } from '@/modules/publishing/server/lifecycle';
@@ -42,10 +43,24 @@ function isoInstant(value: unknown, key: string): Date {
 export const PUBLISHING_MCP: readonly McpToolGroup[] = [
   {
     id: 'publishing-best-times',
-    tools: [{ name: 'get_best_times', description: 'Suggest weekday/hour times from stored performance on every selected channel in the workspace time zone. Unknown or insufficient evidence returns no suggestions. Current publishing and analytics read access required.', inputSchema: { type: 'object', required: ['targetIds'], properties: { targetIds: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string' } } }, additionalProperties: false } }],
-    features: { get_best_times: 'publishing/posts' },
-    scope: { resourceTools: ['get_best_times'] },
-    execute: (viewer, _name, args) => getBestTimeSuggestions(publishingActor(viewer), args),
+    tools: [
+      { name: 'get_best_times', description: 'Suggest weekday/hour times from stored performance on every selected channel in the workspace time zone. Unknown or insufficient evidence returns no suggestions. Current publishing and analytics read access required.', inputSchema: { type: 'object', required: ['targetIds'], properties: { targetIds: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string' } } }, additionalProperties: false } },
+      { name: 'get_best_time_apply_status', description: 'Show whether this workspace applies best times automatically, when they were last applied and when the next weekly run is eligible. Owners and admins only.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+      { name: 'apply_best_times', description: 'Add this workspace’s strongest new times to its channel queues now, exactly like the weekly automatic run. Only in automatic mode; claims the week so the worker does not repeat it. Confirmation must exactly match APPLY BEST TIMES. Owners and admins only.', inputSchema: { type: 'object', required: ['confirmation'], properties: { confirmation: { type: 'string' } }, additionalProperties: false } },
+    ],
+    features: { get_best_times: 'publishing/posts', get_best_time_apply_status: 'publishing/queue', apply_best_times: 'publishing/queue' },
+    writeTools: ['apply_best_times'],
+    selfLockedWrites: ['apply_best_times'],
+    scope: { resourceTools: ['get_best_times'], workspaceTools: ['get_best_time_apply_status', 'apply_best_times'] },
+    managers: [{ tools: new Set(['get_best_time_apply_status', 'apply_best_times']), message: 'Only workspace owners and admins can manage best-time application.', hideFromList: true, inExecutor: true }],
+    execute: (viewer, name, args) => {
+      if (name === 'get_best_time_apply_status') return getBestTimeApplyStatus(publishingActor(viewer));
+      if (name === 'apply_best_times') {
+        requireConfirmation(args, 'APPLY BEST TIMES');
+        return runBestTimeApplyNow(publishingActor(viewer), args);
+      }
+      return getBestTimeSuggestions(publishingActor(viewer), args);
+    },
   },
   {
     id: 'publishing-templates',

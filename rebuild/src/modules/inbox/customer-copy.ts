@@ -54,7 +54,7 @@ const templates: Record<string, TemplateSpec> = {
   'round3Copy.details.assignedTo': { parameters: ['name'] }, 'round3Copy.details.unreadLabel': { parameters: ['n'] },
   'round3Copy.replies.usage': { parameters: ['used', 'max'] }, 'round3Copy.replies.full': { parameters: ['max'] }, 'round3Copy.replies.counter': { parameters: ['n', 'max'] },
   'round3Copy.replies.editing': { parameters: ['name'] }, 'round3Copy.replies.actions': { parameters: ['name'] },
-  'productivityCopy.assignedTo': { parameters: ['name'] }, 'productivityCopy.replyActions': { parameters: ['name'] },
+  'productivityCopy.assignedTo': { parameters: ['name'] }, 'productivityCopy.replyActions': { parameters: ['name'] }, 'productivityCopy.mentionNotified': { parameters: ['name'] },
 };
 const numeric = new Set(['shown', 'total', 'n', 'max', 'ok', 'failed', 'positive', 'neutral', 'negative', 'unclassified', 'used']);
 const variants = (spec: TemplateSpec) => spec.boolean ? ['comment', 'reply'] : spec.plural !== undefined ? ['zero', 'one', 'many'] : ['text'];

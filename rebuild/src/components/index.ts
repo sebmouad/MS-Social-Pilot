@@ -28,6 +28,7 @@ export { ConfirmDialog } from "./ConfirmDialog";
 export { ToastProvider, useToast } from "./Toast";
 export type { ToastInput, ToastTone } from "./Toast";
 export { ShortcutHint, useShortcut, formatChord } from "./ShortcutHint";
+export { CommandPalette } from "./CommandPalette";
 export { InlineEdit } from "./InlineEdit";
 export { Field, FieldGroup, TextInput, Switch, RadioCards, SegmentedControl, FileDropzone, useFieldProps } from "./Forms";
 export type { ChoiceOption } from "./Forms";

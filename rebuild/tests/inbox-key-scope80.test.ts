@@ -24,7 +24,7 @@ vi.mock('../src/modules/inbox/server/comment-guard', () => ({ lockInboxChannel: 
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
 vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 vi.mock('../src/server/config/store', () => ({
-  runtimeConfig: async (key: string) => ({ 'inbox.noteMaxCharacters': 1000, 'inbox.noteHistoryLimit': 50, 'inbox.savedReplyPageLimit': 50, 'inbox.savedReplyNameMaxCharacters': 100, 'inbox.savedReplyBodyMaxCharacters': 2000, 'inbox.productivityAssigneeLimit': 100, 'inbox.savedReplyMaxCount': 200, 'inbox.workflowTransactionTimeoutMs': 5000, 'inbox.workflowTransactionMaxWaitMs': 2000 })[key],
+  runtimeConfig: async (key: string) => ({ 'inbox.noteMaxCharacters': 1000, 'inbox.noteHistoryLimit': 50, 'inbox.savedReplyPageLimit': 50, 'inbox.savedReplyNameMaxCharacters': 100, 'inbox.savedReplyBodyMaxCharacters': 2000, 'inbox.productivityAssigneeLimit': 100, 'inbox.savedReplyMaxCount': 200, 'inbox.workflowTransactionTimeoutMs': 5000, 'inbox.workflowTransactionMaxWaitMs': 2000, 'inbox.mentionMaxCount': 20, 'inbox.mentionSuggestionLimit': 20, 'inbox.mentionNotificationsEnabled': true })[key],
 }));
 
 import { moderateInboxComment, replyToInbox } from '@/modules/inbox/server/actions';

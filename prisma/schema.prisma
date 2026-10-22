@@ -686,6 +686,7 @@ model InboxNote {
   itemId      String
   authorId    String?
   body        String
+  mentionIds  String[] @default([])
   createdAt   DateTime @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

@@ -33,6 +33,8 @@ export const CREATE_LINK_SCHEMA = z.object({
   daysAhead: z.number().int().min(1).max(365).default(30),
   allowComments: z.boolean().default(true),
   decides: z.boolean().default(false),
+  /** With decides: posts still unanswered this many hours before their time are approved anyway. Null = never. */
+  publishAnywayHours: z.number().int().min(1).max(168).nullish(),
   expiresInDays: z.number().int().min(1).max(730).optional(),
   confirmation: z.string(),
 }).strict();
@@ -52,12 +54,13 @@ export const UPDATE_LINK_SCHEMA = z.object({
   daysAhead: z.number().int().min(1).max(365).optional(),
   allowComments: z.boolean().optional(),
   decides: z.boolean().optional(),
+  publishAnywayHours: z.number().int().min(1).max(168).nullable().optional(),
   expiresInDays: z.number().int().min(1).max(730).optional(),
   confirmation: z.string().optional(),
 }).strict();
 export type UpdateLinkInput = z.infer<typeof UPDATE_LINK_SCHEMA>;
 /** Changing any of these changes who can see or do what, so the secret address is replaced in the same transaction. */
-export const ACCESS_FIELDS = ['kind', 'targetIds', 'daysBack', 'daysAhead', 'allowComments', 'decides', 'expiresInDays'] as const;
+export const ACCESS_FIELDS = ['kind', 'targetIds', 'daysBack', 'daysAhead', 'allowComments', 'decides', 'publishAnywayHours', 'expiresInDays'] as const;
 export const METADATA_FIELDS = ['title', 'description'] as const;
 export const LINK_ACTION_SCHEMA = z.object({ id, confirmation: z.string() }).strict();
 export const LIST_QUERY_SCHEMA = z.object({ page: z.number().int().min(1).max(10000).optional() }).strict();
@@ -98,13 +101,13 @@ export function safeUrl(value: string, maxChars: number, httpsOnly = false): str
   return url.toString();
 }
 
-export type VersionedLink = { kind: string; title: string; description: string | null; targetIds: readonly string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; expiresAt: Date | null; revokedAt: Date | null };
+export type VersionedLink = { kind: string; title: string; description: string | null; targetIds: readonly string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; publishAnywayHours?: number | null; expiresAt: Date | null; revokedAt: Date | null };
 /**
  * Optimistic-concurrency token: a one-way fingerprint of every editable field plus the current secret hash, so an edit,
  * rotation, renewal or revocation by anyone else changes it. It reveals nothing about the secret.
  */
 export function linkVersion(row: VersionedLink, tokenHash: string): string {
-  const parts = [row.kind, row.title, row.description ?? null, [...row.targetIds].sort(), row.daysBack, row.daysAhead, row.allowComments, row.decides, row.expiresAt ? new Date(row.expiresAt).getTime() : null, row.revokedAt ? new Date(row.revokedAt).getTime() : null, tokenHash];
+  const parts = [row.kind, row.title, row.description ?? null, [...row.targetIds].sort(), row.daysBack, row.daysAhead, row.allowComments, row.decides, row.publishAnywayHours ?? null, row.expiresAt ? new Date(row.expiresAt).getTime() : null, row.revokedAt ? new Date(row.revokedAt).getTime() : null, tokenHash];
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 32);
 }
 

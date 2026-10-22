@@ -8,23 +8,23 @@ import { ownerText, resolveOwnerCopy } from '../owner-copy';
 import styles from './sharing.module.css';
 
 type Kind = 'review' | 'calendar' | 'portal';
-type Link = { id: string; kind: Kind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; status: 'active' | 'expired' | 'revoked'; expiresAt: string | null; createdAt: string; feedbackCount: number; version: string };
+type Link = { id: string; kind: Kind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; publishAnywayHours: number | null; status: 'active' | 'expired' | 'revoked'; expiresAt: string | null; createdAt: string; feedbackCount: number; version: string };
 type Feedback = { id: string; decision: 'approved' | 'rejected' | 'comment'; comment: string | null; authorName: string; createdAt: string; postStatus: string | null; postPreview: string | null };
 type Props = {
   initial: { presentation?: { workspaceName: string | null; workspaceLogoUrl: string | null; advisoryDecisionNotificationsEnabled: boolean }; links: Link[]; page: number; hasMore: boolean }; channels: Array<{ id: string; name: string }>; canApprove: boolean;
-  /** maxDaysBack, maxDaysAhead and maxTargets are optional host hints; the service enforces the real Root bounds either way. */
-  limits: { titleMax: number; descriptionMax: number; defaultExpiryDays: number; maxExpiryDays: number; maxDaysBack?: number; maxDaysAhead?: number; maxTargets?: number };
+  /** maxDaysBack, maxDaysAhead, maxTargets and publishAnywayMax are optional host hints; the service enforces the real Root bounds either way. */
+  limits: { titleMax: number; descriptionMax: number; defaultExpiryDays: number; maxExpiryDays: number; maxDaysBack?: number; maxDaysAhead?: number; maxTargets?: number; publishAnywayMax?: number };
   /** Phrase → text in the viewer's language (see `owner-copy.ts`); English when the host does not supply it. */
   copy?: Record<string, string>;
 };
-type Draft = { kind: Kind; title: string; description: string; selected: string[]; allowComments: boolean; decides: boolean; daysBack: string; daysAhead: string; lifetime: string };
+type Draft = { kind: Kind; title: string; description: string; selected: string[]; allowComments: boolean; decides: boolean; anyway: string; daysBack: string; daysAhead: string; lifetime: string };
 type Editor = { mode: 'create' } | { mode: 'edit'; link: Link };
 type Pending = { link: Link; action: 'revoke' | 'rotate' | 'delete' };
 
 const stamp = (value: string) => new Date(value).toLocaleString();
 const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every(id => b.includes(id));
 const DEFAULT_COPY = resolveOwnerCopy('en');
-const EMPTY: Draft = { kind: 'review', title: '', description: '', selected: [], allowComments: true, decides: false, daysBack: '7', daysAhead: '30', lifetime: '' };
+const EMPTY: Draft = { kind: 'review', title: '', description: '', selected: [], allowComments: true, decides: false, anyway: '', daysBack: '7', daysAhead: '30', lifetime: '' };
 
 class ApiError extends Error { constructor(message: string, readonly code: string) { super(message); } }
 async function call(url: string, init: RequestInit = {}, fallback = ''): Promise<Record<string, unknown>> {
@@ -67,7 +67,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
 
   const openCreate = () => { setDraft(EMPTY); setAcknowledged(false); setDialogError(''); setStale(false); setEditor({ mode: 'create' }); };
   const openEdit = (link: Link) => {
-    setDraft({ kind: link.kind, title: link.title, description: link.description ?? '', selected: link.targetIds.filter(id => channelIds.includes(id)), allowComments: link.allowComments, decides: link.decides, daysBack: String(link.daysBack), daysAhead: String(link.daysAhead), lifetime: '' });
+    setDraft({ kind: link.kind, title: link.title, description: link.description ?? '', selected: link.targetIds.filter(id => channelIds.includes(id)), allowComments: link.allowComments, decides: link.decides, anyway: link.publishAnywayHours == null ? '' : String(link.publishAnywayHours), daysBack: String(link.daysBack), daysAhead: String(link.daysAhead), lifetime: '' });
     setAcknowledged(false); setDialogError(''); setStale(false); setEditor({ mode: 'edit', link });
   };
 
@@ -89,6 +89,8 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
       if (draft.allowComments !== edited.allowComments) patch.allowComments = draft.allowComments;
       if (draft.kind !== 'calendar' && draft.decides !== edited.decides) patch.decides = draft.decides;
       if (draft.kind === 'calendar' && edited.decides) patch.decides = false;
+      const anywayHours = (draft.kind === 'calendar' || !draft.decides || draft.anyway === '') ? null : Number(draft.anyway);
+      if (anywayHours !== (edited.publishAnywayHours ?? null)) patch.publishAnywayHours = anywayHours;
       if (draft.lifetime !== '') patch.expiresInDays = Number(draft.lifetime);
     }
   }
@@ -97,7 +99,9 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
   const hasChange = Object.keys(patch).length > 0;
   // A new link needs an explicit tick; an edit may not untick everything, because nothing ticked must never read as "all".
   const needsChannel = editor?.mode === 'create' || (!revoked && baseline.length > 0);
-  const canSubmit = !busy && Boolean(draft.title.trim()) && !(needsChannel && draft.selected.length === 0) && (editor?.mode === 'create' ? acknowledged : hasChange && acknowledged);
+  const anywayMax = limits.publishAnywayMax ?? 168;
+  const anywayValid = draft.anyway === '' || (Number.isInteger(Number(draft.anyway)) && Number(draft.anyway) >= 1 && Number(draft.anyway) <= anywayMax);
+  const canSubmit = !busy && anywayValid && Boolean(draft.title.trim()) && !(needsChannel && draft.selected.length === 0) && (editor?.mode === 'create' ? acknowledged : hasChange && acknowledged);
 
   const submit = (event: React.FormEvent) => { event.preventDefault(); if (!editor || !canSubmit) return; void guarded(async () => {
     if (editor.mode === 'create') {
@@ -105,6 +109,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
       const result = await request('/api/sharing/links', { method: 'POST', body: JSON.stringify({
         kind: draft.kind, title, description: draft.description.trim() || null, targetIds: draft.selected, allowComments: draft.allowComments, decides: draft.kind !== 'calendar' && draft.decides,
         ...(draft.kind !== 'review' ? { daysBack: Number(draft.daysBack || 0), daysAhead: Number(draft.daysAhead || 1) } : {}), ...(draft.lifetime ? { expiresInDays: Number(draft.lifetime) } : {}),
+        ...(draft.kind !== 'calendar' && draft.decides && draft.anyway !== '' ? { publishAnywayHours: Number(draft.anyway) } : {}),
         confirmation: `CREATE SHARE LINK ${title}` }) });
       if (typeof result.url !== 'string') throw new Error(t('The link was created but its address could not be shown. Revoke it and create another.'));
       setSecret({ url: result.url, title, replaced: false }); setEditor(null);
@@ -151,7 +156,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
   const copyAddress = () => { if (secret) void navigator.clipboard?.writeText(secret.url).then(() => { setFailed(false); setMessage(t('Address copied.')); }, () => { setFailed(true); setMessage(t('Copy failed. Select the address and copy it manually.')); }); };
   const scope = (link: Link) => link.targetIds.length ? channelCount(link.targetIds.length) : t('all channels (older link)');
   const columns: TableColumn<Link>[] = [
-    { key: 'title', label: t('Link'), render: link => <><strong>{link.title}</strong><br /><small>{kindLabel(link.kind)}{link.decides ? t(' · client can decide') : ''} · {scope(link)}</small></> },
+    { key: 'title', label: t('Link'), render: link => <><strong>{link.title}</strong><br /><small>{kindLabel(link.kind)}{link.decides ? t(' · client can decide') : ''}{link.decides && link.publishAnywayHours != null ? ` · ${t('Auto-approves {0}h before publishing', link.publishAnywayHours)}` : ''} · {scope(link)}</small></> },
     { key: 'status', label: t('Status'), render: link => <Status tone={link.status === 'active' ? 'good' : 'neutral'}>{link.status === 'active' ? t('Active') : link.status === 'expired' ? t('Expired') : t('Revoked')}</Status> },
     { key: 'expires', label: t('Expires'), render: link => date(link.expiresAt) },
     { key: 'feedback', label: t('Feedback'), render: link => link.feedbackCount ? <Button size="sm" variant="quiet" onClick={() => { setFeedback([]); void openFeedback(link); }} aria-label={t('View {0} on {1}', answerCount(link.feedbackCount), link.title)}>{answerCount(link.feedbackCount)}</Button> : t('None yet') },
@@ -197,6 +202,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
           {unavailable > 0 && <small>{unavailable === 1 ? t('{0} on this link is no longer available and will be dropped if you change the ticked channels.', channelCount(unavailable)) : t('{0} on this link are no longer available and will be dropped if you change the ticked channels.', channelCount(unavailable))}</small>}</fieldset>
         <label className={styles.check}><input type="checkbox" disabled={busy || revoked} checked={draft.allowComments} onChange={event => set({ allowComments: event.target.checked })} /><span>{t('Let visitors leave comments')}</span></label>
         {draft.kind !== 'calendar' && <label className={styles.check}><input type="checkbox" disabled={busy || revoked || (!canApprove && !draft.decides)} checked={draft.decides} onChange={event => set({ decides: event.target.checked })} /><span>{canApprove ? t('Their approval or change request settles the post in your review queue') : t('Their approval or change request settles the post in your review queue (needs approval permission)')}</span></label>}
+        {draft.kind !== 'calendar' && draft.decides && <label className={styles.field}><span>{t('Approve anyway when the client does not answer')}</span><input type="number" min={1} max={limits.publishAnywayMax ?? 168} inputMode="numeric" disabled={busy || revoked} value={draft.anyway} onChange={event => set({ anyway: event.target.value })} placeholder={t('Never')} /><small>{t('Hours before publishing to approve unanswered posts (empty never approves automatically)')}</small></label>}
         {!creating && changesAccess && <p className={styles.warning} role="status">{t('These changes replace the link’s address. The old address and any page already open with it stop working immediately; you will get a new address to send.')}</p>}
         {(creating || hasChange) && <label className={styles.check}><input type="checkbox" disabled={busy} checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /><span>{creating ? t('I understand that anyone who has the address can open this link without signing in until it expires or I revoke it.') : changesAccess ? t('I understand the old address will stop working and I must send the new one.') : t('I confirm these changes. The address stays the same.')}</span></label>}
         {dialogError && <div className={styles.confirm}><p className={styles.error} role="alert">{dialogError}</p>{stale && <><small>{t('Your entries are kept above until you reload.')}</small><Button size="sm" disabled={busy} onClick={reloadLatest}>{t('Reload latest and discard my changes')}</Button></>}</div>}

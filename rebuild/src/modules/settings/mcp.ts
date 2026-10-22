@@ -14,6 +14,7 @@ import { canAccessFeature } from '@/server/permissions';
 import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
 import { publishingTargetChoices } from '@/modules/publishing/server/destinations';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '@/server/data-control';
+import { RUN_RETENTION_CONFIRMATION, getRetentionStatus, runRetentionNow } from './server/retention';
 import { auditedReceipt, canManageData, pageIdsFor, requireConfirmation, type McpToolGroup } from '@/server/mcp/kit';
 import { teamToolDefinitions, teamTools, executeTeamTool, invitationAvailability } from './team-mcp';
 import { workspacePolicyToolDefinitions, workspacePolicyTools, executeWorkspacePolicyTool } from './workspace-policy-mcp';
@@ -153,17 +154,21 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
     { name: 'export_workspace_archive', description: 'Download the same bounded workspace ZIP archive as Settings Data. Includes the archive service coverage and media; current workspace owner/admin access is rechecked. Returned as base64.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
     { name: 'export_workspace_data', description: 'Export the current workspace JSON snapshot, including directly workspace-owned legacy tables with credential fields redacted. Indirect records and media bytes are not included. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
     { name: 'delete_workspace_data', description: 'Delete workspace records and stored files while retaining workspace identity and members. A failed file cleanup can be retried. Confirmation must exactly match DELETE WORKSPACE DATA <workspaceId>. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', required: ['confirmation'], properties: { confirmation: { type: 'string' } }, additionalProperties: false } },
+    { name: 'get_retention_status', description: 'Show the old-records cleanup policy, rows of this workspace already past it, and the last nightly run. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+    { name: 'prune_old_records', description: 'Remove this workspace’s old records now (activity trail, email log, click details, AI history, finished report runs). Installation history stays for the nightly run. Confirmation must exactly match PRUNE OLD RECORDS. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', required: ['confirmation'], properties: { confirmation: { type: 'string' } }, additionalProperties: false } },
     ],
     features: {
       preview_workspace_data_deletion: 'settings/data',
       export_workspace_archive: 'settings/data',
       export_workspace_data: 'settings/data',
       delete_workspace_data: 'settings/data',
+      get_retention_status: 'settings/data',
+      prune_old_records: 'settings/data',
     },
-    writeTools: ['delete_workspace_data'],
-    selfLockedWrites: ['delete_workspace_data'],
-    scope: { workspaceTools: ['preview_workspace_data_deletion', 'export_workspace_data', 'export_workspace_archive', 'delete_workspace_data'] },
-    managers: [{ tools: new Set(['preview_workspace_data_deletion', 'export_workspace_data', 'export_workspace_archive', 'delete_workspace_data']), message: 'Only workspace owners and admins can manage workspace data.', hideFromList: true, inExecutor: true }],
+    writeTools: ['delete_workspace_data', 'prune_old_records'],
+    selfLockedWrites: ['delete_workspace_data', 'prune_old_records'],
+    scope: { workspaceTools: ['preview_workspace_data_deletion', 'export_workspace_data', 'export_workspace_archive', 'delete_workspace_data', 'get_retention_status', 'prune_old_records'] },
+    managers: [{ tools: new Set(['preview_workspace_data_deletion', 'export_workspace_data', 'export_workspace_archive', 'delete_workspace_data', 'get_retention_status', 'prune_old_records']), message: 'Only workspace owners and admins can manage workspace data.', hideFromList: true, inExecutor: true }],
     purgeCheckExempt: ['delete_workspace_data'],
     resources: [
       { uri: 'msp://data/deletion-preview', name: "Data deletion preview", description: "Current workspace record counts before deletion.", mimeType: 'application/json', feature: 'settings/data', readTool: 'preview_workspace_data_deletion', managerOnly: true, guardedRead: true },
@@ -182,6 +187,12 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
         requireConfirmation(args, `DELETE WORKSPACE DATA ${viewer.workspaceId}`);
         const counts = await deleteWorkspaceData({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}) }, 'DELETE');
         return { deleted: true, counts };
+      }
+      case 'get_retention_status':
+        return getRetentionStatus({ userId: viewer.userId, workspaceId: viewer.workspaceId });
+      case 'prune_old_records': {
+        requireConfirmation(args, RUN_RETENTION_CONFIRMATION);
+        return runRetentionNow({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args);
       }
         default: throw new OperationError('invalid_request', `Unknown tool: ${name}`);
       }

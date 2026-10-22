@@ -9,13 +9,14 @@ import { useToast } from '@/components/Toast';
 import { TextInput } from '@/components/Forms';
 import { useConfirm } from '@/components/useConfirm';
 import { EmptyState } from '@/components/EmptyState';
+import { MentionTextarea, MentionedBody } from './MentionTextarea';
 import styles from './ThreadProductivity.module.css';
 
 type Locale = 'en' | 'fr';
 type Props = { kind: 'message' | 'comment'; id: string; canWrite?: boolean; onUseSavedReply?: (body: string) => void; locale?: Locale };
-type Note = { id: string; authorId: string | null; authorName: string; body: string; createdAt: string; canDelete: boolean };
+type Note = { id: string; authorId: string | null; authorName: string; body: string; mentionIds?: string[]; createdAt: string; canDelete: boolean };
 type Reply = { id: string; name: string; body: string };
-type Data = { assignment: { assigneeId: string | null; members: { id: string; name: string | null }[] }; notes: Note[]; limits: { noteMaxCharacters: number; savedReplyNameMaxCharacters: number; savedReplyBodyMaxCharacters: number } };
+type Data = { assignment: { assigneeId: string | null; members: { id: string; name: string | null }[] }; notes: Note[]; mentionable?: { id: string; name: string }[]; limits: { noteMaxCharacters: number; savedReplyNameMaxCharacters: number; savedReplyBodyMaxCharacters: number } };
 
 
 
@@ -23,7 +24,7 @@ type Data = { assignment: { assigneeId: string | null; members: { id: string; na
 export function ThreadProductivity({ kind, id, canWrite = true, onUseSavedReply, locale = 'en' }: Props) {
   const copy = useInboxCatalog('productivityCopy')[locale];
   const toast = useToast();
-  const [data, setData] = useState<Data | null>(null); const [replies, setReplies] = useState<Reply[]>([]); const [note, setNote] = useState(''); const [replyName, setReplyName] = useState(''); const [replyBody, setReplyBody] = useState(''); const [editing, setEditing] = useState<string | null>(null); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const [data, setData] = useState<Data | null>(null); const [replies, setReplies] = useState<Reply[]>([]); const [note, setNote] = useState(''); const [mentionIds, setMentionIds] = useState<string[]>([]); const [replyName, setReplyName] = useState(''); const [replyBody, setReplyBody] = useState(''); const [editing, setEditing] = useState<string | null>(null); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     const [productivity, saved] = await Promise.all([fetch(`/api/inbox/productivity?kind=${kind}&id=${encodeURIComponent(id)}`, { cache: 'no-store' }), fetch('/api/inbox/productivity?view=saved-replies', { cache: 'no-store' })]);
     const p = await productivity.json(); const r = await saved.json();
@@ -59,8 +60,8 @@ export function ThreadProductivity({ kind, id, canWrite = true, onUseSavedReply,
             onChange={value => { const assigneeId = value || null; const confirmation = `ASSIGN INBOX ${kind} ${id} TO ${assigneeId ?? 'UNASSIGNED'}`; void act({ action: 'assign', kind, id, assigneeId, confirmation }, copy.done.assign); }} />
         : <span className={styles.status}>{copy.assignedTo(memberName(data.assignment.assigneeId))}</span>}</div>}
     </div>
-    <div className={styles.section}><div className={styles.heading}><h3>{copy.notes}</h3></div>{canWrite && <><textarea className={styles.textarea} aria-label={copy.note} maxLength={data?.limits.noteMaxCharacters} value={note} onChange={e => setNote(e.target.value)} placeholder={copy.notePlaceholder}/><div className={styles.row}><Button disabled={busy || !note.trim() || note.length > (data?.limits.noteMaxCharacters ?? 0)} onClick={async () => { const confirmation = `ADD PRIVATE NOTE ${kind} ${id}`; const ok = await act({ action: 'note.add', kind, id, body: note, confirmation }, copy.done.noteAdded); if (ok) setNote(''); }}>{copy.addNote}</Button><span className={styles.status}>{copy.notesHelp}</span></div></>}
-      {data?.notes.map(item => <article className={styles.note} key={item.id}><div className={styles.meta}>{item.authorName} · {new Date(item.createdAt).toLocaleString(locale)}</div><p>{item.body}</p>{canWrite && item.canDelete && <Button size="sm" variant="quiet" disabled={busy} onClick={() => { const confirmation = `DELETE PRIVATE NOTE ${item.id}`; void act({ action: 'note.delete', id: item.id, confirmation }, copy.done.noteDeleted, copy.deleteNoteAsk); }}>{copy.deleteNote}</Button>}</article>)}
+    <div className={styles.section}><div className={styles.heading}><h3>{copy.notes}</h3></div>{canWrite && <><MentionTextarea ariaLabel={copy.note} maxLength={data?.limits.noteMaxCharacters} value={note} mentionable={data?.mentionable ?? []} listLabel={copy.mentionList} emptyLabel={copy.mentionEmpty} placeholder={copy.notePlaceholder} onChange={(next, ids) => { setNote(next); setMentionIds(ids); }} /><div className={styles.row}><Button disabled={busy || !note.trim() || note.length > (data?.limits.noteMaxCharacters ?? 0)} onClick={async () => { const confirmation = `ADD PRIVATE NOTE ${kind} ${id}`; const ok = await act({ action: 'note.add', kind, id, body: note, ...(mentionIds.length ? { mentionIds } : {}), confirmation }, copy.done.noteAdded); if (ok) { setNote(''); setMentionIds([]); } }}>{copy.addNote}</Button><span className={styles.status}>{copy.mentionHint} {copy.notesHelp}</span></div></>}
+      {data?.notes.map(item => <article className={styles.note} key={item.id}><div className={styles.meta}>{item.authorName} · {new Date(item.createdAt).toLocaleString(locale)}</div><p><MentionedBody body={item.body} mentionIds={item.mentionIds ?? []} mentionable={data?.mentionable ?? []} /></p>{canWrite && item.canDelete && <Button size="sm" variant="quiet" disabled={busy} onClick={() => { const confirmation = `DELETE PRIVATE NOTE ${item.id}`; void act({ action: 'note.delete', id: item.id, confirmation }, copy.done.noteDeleted, copy.deleteNoteAsk); }}>{copy.deleteNote}</Button>}</article>)}
     </div>
     <div className={styles.section}><div className={styles.heading}><h3>{copy.savedReplies}</h3></div>
       {data && !replies.length ? <EmptyState title={copy.noReplies}>{copy.noRepliesBody}</EmptyState> : null}

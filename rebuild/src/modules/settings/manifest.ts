@@ -9,6 +9,8 @@ export const settingsManifest = {
     { name: 'workspaceExports', label: 'Workspace ZIP exports', configKey: 'data.exportSchedule' },
     { name: 'purges', label: 'Data deletion recovery', configKey: 'data.purgeRecoverySchedule' },
     { name: 'notifications', label: 'Notification delivery', configKey: 'notifications.deliverySchedule' },
+    { name: 'retention', label: 'Old-records pruning', configKey: 'retention.schedule' },
+    { name: 'sharingDeadlines', label: 'Share-link client deadlines', configKey: 'sharing.deadlineSchedule' },
     ...INTEGRATIONS_JOBS,
   ],
   rootSettingsPrefixes: ['settings.', 'connections.', 'mcp.keys.', 'mcp.personKeys.', 'notifications.', 'sharing.', 'bio.', INTEGRATIONS_ROOT_PREFIX, HISTORY_ROOT_PREFIX],

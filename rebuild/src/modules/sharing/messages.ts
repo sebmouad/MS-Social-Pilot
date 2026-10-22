@@ -47,6 +47,8 @@ export const sharingMessages = {
   'Choose at least one channel for this link.': row('Choose at least one channel for this link.', 'Choisissez au moins un canal pour ce lien.'),
   'Choose channels that are enabled in this workspace.': row('Choose channels that are enabled in this workspace.', 'Choisissez des canaux activés dans cet espace.'),
   'Calendar links cannot approve posts.': row('Calendar links cannot approve posts.', 'Les liens de calendrier ne peuvent pas approuver de publications.'),
+  'Only a link that lets clients decide can approve posts automatically.': row('Only a link that lets clients decide can approve posts automatically.', 'Seul un lien qui laisse le client décider peut approuver les publications automatiquement.'),
+  'Automatic approval can wait at most {0} hours.': row('Automatic approval can wait at most {0} hours.', 'L’approbation automatique peut attendre {0} heures au maximum.'),
   'The title or message is too long.': row('The title or message is too long.', 'Le titre ou le message est trop long.'),
   'Nothing was changed.': row('Nothing was changed.', 'Rien n’a été modifié.'),
   'Links can last at most {0} days.': row('Links can last at most {0} days.', 'Un lien peut durer {0} jours au maximum.'),

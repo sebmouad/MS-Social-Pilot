@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 
 export const ROOT_AUDIT_CONFIG = [
   entry({ key: 'root.auditExportMaxRows', group: 'Root · audit', label: 'Audit export row limit', kind: 'number', description: 'Refuse exports exceeding this many matching events.', defaultValue: 10000, schema: z.number().int().min(1).max(ROOT_AUDIT_BOUNDS.exportRows.max), consumption: 'active' }),
-  entry({ key: 'root.auditRetentionDays', group: 'Root · audit', label: 'Audit retention days', kind: 'number', description: 'Zero keeps audit history forever. Applies to Root and workspace activity.', defaultValue: 0, schema: z.number().int().min(0).max(ROOT_AUDIT_BOUNDS.retentionDays.max), consumption: 'active' }),
+  entry({ key: 'root.auditRetentionDays', group: 'Root · audit', label: 'Audit retention days', kind: 'number', description: 'Days Root and workspace audit records are kept by the purge job. Zero keeps Root audit forever and leaves workspace audit to the nightly retention job (retention.auditDays).', defaultValue: 0, schema: z.number().int().min(0).max(ROOT_AUDIT_BOUNDS.retentionDays.max), consumption: 'active' }),
   entry({ key: 'root.auditRetentionBatchSize', group: 'Root · audit', label: 'Audit retention batch size', kind: 'number', description: 'Maximum rows deleted per audit table in each purge run.', defaultValue: 1000, schema: z.number().int().min(1).max(ROOT_AUDIT_BOUNDS.batchSize.max), consumption: 'active' }),
 ] as const;
 

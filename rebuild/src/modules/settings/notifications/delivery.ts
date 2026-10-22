@@ -71,6 +71,10 @@ async function lockEventResources(tx: Tx, row: Candidate) {
     if (!note.length) return false;
     const context = await tx.$queryRaw<Array<{ targetId: string }>>`SELECT pt."targetId" FROM posts p JOIN post_targets pt ON pt."postId" = p.id WHERE p.id = ${row.postId!} AND p."workspaceId" = ${row.workspaceId} ORDER BY pt."targetId" FOR SHARE OF p, pt`;
     ids = context.map(item => item.targetId);
+  } else if (row.kind === 'inbox_note_mention') {
+    const note = await tx.$queryRaw<Array<{ id: string }>>`SELECT n.id FROM inbox_notes n WHERE n.id = ${row.noteId!} AND n."workspaceId" = ${row.workspaceId} AND n."mentionIds" @> ARRAY[${row.userId}]::text[] FOR SHARE OF n`;
+    if (!note.length) return false;
+    ids = [row.targetId!];
   } else if (row.kind === 'mix_dry') {
     const rules = await tx.$queryRaw<Array<{ id: string }>>`SELECT r.id FROM content_mix_rules r JOIN labels l ON l.id = r."labelId" AND l."workspaceId" = r."workspaceId" LEFT JOIN page_group_targets pgt ON pgt."groupId" = r."groupId" AND pgt."targetId" = ${row.targetId!} WHERE r."workspaceId" = ${row.workspaceId} AND (r."targetId" = ${row.targetId!} OR (r."targetId" IS NULL AND r."groupId" IS NOT NULL AND pgt."groupId" IS NOT NULL)) AND (${row.labelId ?? null}::text IS NULL OR r."labelId" = ${row.labelId ?? null}) AND r."dryNotifiedAt" IS NOT NULL FOR SHARE OF r, l`;
     if (!rules.length) return false;

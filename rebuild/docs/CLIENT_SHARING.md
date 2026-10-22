@@ -40,7 +40,7 @@ Limits: page sizes, link/target/expiry ceilings, text limits, rate limits and wi
 - Raw-query unique violations (`P2010` with database `23505`) map to a conflict (`isUnique`); media of revoked/unresolvable links and uploads not referenced by a currently shown post answer the same 404.
 
 ## Schema prerequisites
-Only `share_links."expiresAt"` (additive migration `20261018230000_rebuild_sharing_expiry`, reported applied locally by the handoff; not re-verified here) plus legacy `share_links`, `review_decisions`, `bio_pages`, `bio_links`, `activity_logs`, `workspace_data_purges`. No further DDL is required by this batch; expiry migration is immutable after local application. Legacy `publishAnywayHours` stays unused.
+Only `share_links."expiresAt"` (additive migration `20261018230000_rebuild_sharing_expiry`, reported applied locally by the handoff; not re-verified here) plus legacy `share_links`, `review_decisions`, `bio_pages`, `bio_links`, `activity_logs`, `workspace_data_purges`. No further DDL is required by this batch; expiry migration is immutable after local application. Legacy `publishAnywayHours` is now consumed by the jobs/productivity lane (`sharingDeadlines` worker + link create/update).
 
 ## Editing and customer confirmation UX
 The owner list returns an opaque version fingerprint covering editable fields and the secret hash. PATCH and update_share_link require expectedVersion; stale changes return conflict without overwriting. Metadata edits preserve the address. Access edits (kind, channels, window, comments, decision rights or lifetime renewal) atomically rotate it and return the new secret once. Rotating a deciding credential requires current approval write, even if decides was already true or is being switched off. Settings-only keys cannot mint any Publishing credential. Metadata rename, revoke and delete remain available without Publishing read because they mint no capability.
@@ -60,7 +60,9 @@ The actual local HTTP/MCP/PostgreSQL/Chromium probe passed creation/list/rotatio
 Batch80 added independent channel/ad-account key scopes, actual issuance, dispatch and runtime isolation proof; see MCP_RESOURCE_SCOPE.md. Batch81 aligns Sharing channel eligibility with current same-workspace connections and enabled/entitled platforms; see SHARING_ELIGIBILITY.md for exact evidence and remaining races. Per-process rate buckets and proxy behavior are also release limitations. Automated tests do not establish all-theme or arbitrary-restart behavior.
 
 ## Open (not implemented, not faked)
-Portal results tab, publish-anyway auto-approval (`publishAnywayHours`), workspace logo on public pages, emailing links, legacy external-post calendar items, automatic expiry backfill for legacy links (explicit renewal is required), cross-process rate limiting, previews for non-image uploads, person-wide (agency) sharing tools, failed-post visibility in client calendars (deliberately hidden).
+Portal results tab, workspace logo on public pages, emailing links, legacy external-post calendar items, automatic expiry backfill for legacy links (explicit renewal is required), cross-process rate limiting, previews for non-image uploads, person-wide (agency) sharing tools, failed-post visibility in client calendars (deliberately hidden).
+
+Publish-anyway auto-approval (`publishAnywayHours`) shipped with the jobs/productivity lane: `sharing/server/deadlines.ts` worker (`sharingDeadlines`, every 5 minutes), deciding-link deadline on create/update, LinksManager field + badge, `tests/sharing-deadlines.test.ts`.
 
 Final compiled desktop check: 1440px page with 992px table inside a 1040px
 panel; primary and danger variants retain shared styling. Editor controls stay
