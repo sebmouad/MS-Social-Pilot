@@ -567,3 +567,7 @@ passed a synthetic SQLite collision/idempotence/metadata check, but PostgreSQL
 rehearsal and real live-probe execution remain open. No servers, deploy or push.
 
 Root naming final continuation: module-owned probe configuration now clears bundled signing secrets when Root has none; three regression tests cover policy and credential fallback. The saved-key SQL collision/idempotence/metadata check is now an automated test (built-in SQLite, not PostgreSQL). Unused historical mapping exports and a residual plans comment are removed. Typecheck and explicit tsc pass; 10 focused files / 164 tests pass. Full cache-disabled suite excluding diagnostic transport: 701 files passed, one failed, 49 skipped; 11,374 tests passed, five failed, 2,525 skipped. All five failures are unchanged sandbox `listen EPERM ::1` in facebook-native-http. No server, live probe, database migration, deploy, push or staging was performed. Source changes remain uncommitted.
+
+## Lane 44 sweep closure (2026-10-22)
+
+`LEGACY_SWEEP_2026-10-21.md` section 0.4 reconciles every missing/partial row against source and lists the open items G1 to G7 (Graph usage reader, legacy `api_tokens`, seven staged connectors, text backgrounds, alt text, mail HTTP API provider, unused-media retention). New: Root key `ui.defaultLocale` (schema **133**), `scripts/install-debian.sh`, `scripts/admin/{set-root,reset-two-step}.ts` (not run on a host). Apply nothing to production from this note.

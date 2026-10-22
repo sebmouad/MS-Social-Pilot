@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { headers } from 'next/headers';
 import { AppShell } from '@/components';
 import type { ModuleId } from '@/lib/product';
 import { requireViewer } from './context';
+import { requestLocale } from './platforms/request-locale';
 import { canUseFeature, canUseModule } from './entitlements';
 import { canAccessFeature, canAccessModule } from './permissions';
 import { configValueOrDefault } from './config/config-or-default';
@@ -13,7 +13,7 @@ export async function PageFrame({ module, children, sidebar, sidebarWhen, scoped
   const enabledModules = (Object.keys(viewer.entitlements.modules) as ModuleId[]).filter(id => canUseModule(viewer.entitlements, id) && (id === 'home' || canAccessModule(viewer.permissions, id)));
   const enabledFeatures = Object.keys(viewer.entitlements.features).filter(id => canUseFeature(viewer.entitlements, id) && canAccessFeature(viewer.permissions, id));
   const writableFeatures = enabledFeatures.filter(id => canAccessFeature(viewer.permissions, id, 'write'));
-  const locale = (await headers()).get('accept-language')?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+  const locale = await requestLocale();
   const raw = await configValueOrDefault('home.commandPaletteCopy').catch(() => COMMAND_COPY);
   const parsed = commandCopySchema.safeParse(raw);
   const paletteCopy = (parsed.success ? parsed.data : COMMAND_COPY)[locale];

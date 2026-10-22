@@ -26,14 +26,14 @@ Lane: legacy sweep reconcile (docs only). Evidence kind: **static source search 
 
 | Row | Status | Evidence of absence / state |
 | --- | --- | --- |
-| `/api/health` and a readiness probe (gap 6) | missing | no `health` route under `src/app/api`; no match for `api/health` in `rebuild/src` |
-| `error_events` / `system_alerts` writers, `/api/errors` client reporter, `ErrorReporter`, alert test (gap 3) | missing | only `src/server/root/legacy/backups.ts` and `src/modules/root/server/errors.ts` reference the tables (readers) |
-| `/privacy-policy`, `/terms`, `/help`, `/pricing`, `/changelog`, `/status`, `operator.*`, `site.public` (gap 2 rest) | missing | `src/app` has only `data-deletion` among the legacy public pages |
-| Root changelog (`root/changelog`, `api/root/changelog*`, `ChangelogEntry`), Root client invitations, Root alerts test, `root/meta/usage` (`graph_usage`) | missing | `src/app/api/root` has no `changelog`, `client-invitations`, `alerts`; no table reference to `changelog_entries`, `client_invitations`, `graph_usage` |
-| Caption tests, chat channels (Slack/Telegram), spam check, engagement outlook, link preview, structured data, translated posts, AI image/video/voice, `api_tokens` | missing | no reference to `caption_tests`, `chart_notes`, `key_dates`, `seasonal_modes`, `public_holidays`, `calendar_feeds`, `chat_channels`, `ai_videos`, `api_tokens` in `rebuild/src` except the data-control README keep-list; no route for them in `src/app/api` |
-| Nine other network connectors | partial: YouTube and TikTok installed at fixture level (2026-10-22, no live run); Mastodon, Threads, X, Bluesky, Telegram, LinkedIn, Pinterest staged (settings/adapters, not customer-installable) | `platforms/**` |
-| Host backup scripts, root `prisma/migrations`, `prod-deploy.sh` dependencies (gaps 4, 5) | open | `rebuild/scripts` has no `server/` directory; root `scripts/server/*` unchanged |
-| Legacy config import beyond Facebook/AI/auth/app URL (gap 9), OAuth client re-registration (gap 10) | open | `rebuild/scripts/import-legacy-config.ts` unchanged scope |
+| `/api/health` and a readiness probe (gap 6) | done at source (`src/app/api/health/route.ts`, gap 6) | no `health` route under `src/app/api`; no match for `api/health` in `rebuild/src` |
+| `error_events` / `system_alerts` writers, `/api/errors` client reporter, `ErrorReporter`, alert test (gap 3) | done at source (`src/server/errors/recorder.ts`, Root monitoring; gap 3) | only `src/server/root/legacy/backups.ts` and `src/modules/root/server/errors.ts` reference the tables (readers) |
+| `/privacy-policy`, `/terms`, `/help`, `/pricing`, `/changelog`, `/status`, `operator.*`, `site.public` (gap 2 rest) | done at source (`src/modules/history/ui/public-pages.tsx`; keys `public.*` replace `operator.*` and `site.public`) | `src/app` has only `data-deletion` among the legacy public pages |
+| Root changelog (`root/changelog`, `api/root/changelog*`, `ChangelogEntry`), Root client invitations, Root alerts test, `root/meta/usage` (`graph_usage`) | changelog and client invitations done at source (`modules/history/server/changelog.ts`, `modules/agency/server/client-invitations{,-http}.ts`, `/api/root/client-invitations`); alert test done (Root monitoring test operation); Graph usage reader open (item G1) | `src/app/api/root` has no `changelog`, `client-invitations`, `alerts`; no table reference to `changelog_entries`, `client_invitations`, `graph_usage` |
+| Caption tests, chat channels (Slack/Telegram), spam check, engagement outlook, link preview, structured data, translated posts, AI image/video/voice, `api_tokens` | done at source: caption tests, chat channels, spam check, engagement outlook, link preview, structured data, translated posts, AI image/video/voice (modules `caption-tests`, `notifications/chat-channels`, `ai/content-tools`, `publishing/server/link-tools`, `ai/server/translated`); legacy `api_tokens` replaced by scoped keys (item G2) | no reference to `caption_tests`, `chart_notes`, `key_dates`, `seasonal_modes`, `public_holidays`, `calendar_feeds`, `chat_channels`, `ai_videos`, `api_tokens` in `rebuild/src` except the data-control README keep-list; no route for them in `src/app/api` |
+| Nine other network connectors | Instagram, YouTube, TikTok installed at fixture level; Mastodon, Threads, X, Bluesky, Telegram, LinkedIn, Pinterest staged (Root settings and adapters), not customer-installable until live OAuth and release gates pass (item G3) | `platforms/**` |
+| Host backup scripts, root `prisma/migrations`, `prod-deploy.sh` dependencies (gaps 4, 5) | done: `rebuild/scripts/server/*` and rebuild-owned `prisma/migrations` exist (commit eba3d116) | `rebuild/scripts` has no `server/` directory; root `scripts/server/*` unchanged |
+| Legacy config import beyond Facebook/AI/auth/app URL (gap 9), OAuth client re-registration (gap 10) | done as a documented mapping (section 0.4); the one-time importer was removed in lane 41 and values are entered in Root | `rebuild/scripts/import-legacy-config.ts` unchanged scope |
 
 ### 0.3 Legacy capabilities not listed in sections 1 to 8 (added by this reconcile)
 
@@ -44,8 +44,8 @@ Source: `src/lib/scheduler/jobs.ts`, `src/middleware.ts`, `src/components/*`, `s
 | Retention pruning job (`housekeeping`: activity, email, click, AI history, errors) | `scheduler/jobs.ts` `housekeeping`, `lib/housekeeping.ts`, `settings retention.*` | Done: nightly `retention` job (`settings/server/retention.ts`, `retention.schedule`) prunes activity/email/click-detail/AI/error/worker-run/report-run history; feeds, insight snapshots, link totals, running reports untouched. `retention.auditDays`/`syncLogDays`/`analyticsDays` now `active` + new `emailDays`/`clickDays`/`aiDays`/`errorDays`/`schedule`/`batchWorkspaces`. UI Settings › Data, REST `GET/POST /api/settings/data/retention`, MCP `get_retention_status`/`prune_old_records` | done (`tests/retention.test.ts`, parity-guard + config-validation green; dead-letter media stays with media-cleanup) |
 | Share-link "publish anyway" auto-approval (`clientDeadlines` job, `approveUnanswered`, `publishAnywayHours`) | `lib/share-links.ts:102`, `scheduler/jobs.ts` | Done: `sharingDeadlines` worker (`sharing/server/deadlines.ts`, every 5 min) approves unanswered pending posts inside each live deciding link’s window via the review lifecycle as the creator; revoked/expired/rotated links and departed creators skipped. `publishAnywayHours` on create/update (decides-only, Root-capped, rotates secret), LinksManager field + badge, existing REST/MCP extended | done (`tests/sharing-deadlines.test.ts`; new keys `sharing.publishAnywayMaxHours`/`deadlineSchedule`/`deadlineBatchLinks`) |
 | Scheduled AI agent runs (`aiAgents` job, `runDueAgents`) | `lib/ai-agents.ts` | Done: `scheduledAgents` worker (`agents/server/scheduled.ts`, hourly) claims due agents (workspace-timezone weekday + `lastRunOn`), writes drafts as the creator with hourly AI metering, never scheduling/publishing; AI failure frees the day. CRUD + run-now with exact confirmations, /agents section, REST `/api/agents/scheduled`, MCP `list_scheduled_agents`/`manage_scheduled_agent` | done (`tests/scheduled-agents.test.ts`; new keys `agents.scheduledRuns*`; provider evidence with AI lane) |
-| AI video polling (`aiVideos`), AI voice, AI image | `lib/ai-video.ts`, `ai-voice.ts`, `ai-image.ts`, `components/AiVideoPanel.tsx`, `AiVoicePanel.tsx` | none (already in section 3, repeated here for the job) | missing |
-| Caption-test evaluation job (`captionTests`) | `lib/caption-test.ts` | none | missing |
+| AI video polling (`aiVideos`), AI voice, AI image | `lib/ai-video.ts`, `ai-voice.ts`, `ai-image.ts`, `components/AiVideoPanel.tsx`, `AiVoicePanel.tsx` | done: `content-tools/server/media.ts` (`listVideos`, `startVideo`), Root AI media policy | done |
+| Caption-test evaluation job (`captionTests`) | `lib/caption-test.ts` | done: `modules/caption-tests/server/service.ts`, worker job `captionTests` | done |
 | Holiday and trend refresh jobs (`holidays`, `trends`), `TrendKeywords` | `lib/holidays.ts`, `lib/trends.ts` | `calendarHolidays` / `calendarTrends` worker jobs (`scripts/worker.ts`, `modules/calendar-extras/server/refresh.ts`), Root `calendarExtras.refresh` + two schedule keys; keywords via `change_calendar_trends` | **done at source** (mocked fetch/DB tests `tests/calendar-extras-refresh.test.ts`; no live Nager/Google fetch, no PostgreSQL run) |
 | Alert evaluation job (`alerts`: publish failures, disk, uptime) and uptime days | `lib/system-alerts.ts`, `lib/uptime.ts` | Root monitoring service, leased worker + independent web observer, observed-minute idempotency, incident email outbox; Telegram/provider usage remain separate gaps | done at source for evaluation/uptime (2026-10-22); migration/runtime evidence pending |
 | Negative-comment spike watcher (`negativeComments`) | `lib/negative-comments.ts`, `negativeSpikeEmail` | `negativeSpike` notification event + sentiment input | done at source (`modules/inbox/server/notification-events.ts`, `settings/notifications/server.ts`) |
@@ -57,9 +57,37 @@ Source: `src/lib/scheduler/jobs.ts`, `src/middleware.ts`, `src/components/*`, `s
 | Module/feature path gating in middleware (`PATHNAME_HEADER`, `lib/product-catalog.ts`) | `middleware.ts`, `lib/modules.ts` | replaced by manifest, entitlement and permission feature switches (`server/permissions/index.ts`) | done (different mechanism) |
 | Likes versus followers identity for audience growth (`audienceGrowthIdentity`) | `lib/audience-growth-metrics.ts` | Provider-owned explicit mapping in `platforms/facebook/audience-growth.ts`; shared aggregation, comparison, existing REST/MCP and EN/FR metric disclosure retain neutral likes/followers + gained/lost identity. `analytics-audience-growth.test.ts`, `integrations-v1-analytics-ads.test.ts`; actual browser/provider verification pending. | done at source; automated evidence |
 | @mentions in internal notes | `lib/mentions.ts` | Done: Inbox private notes accept `@name` mentions of teammates who can see the channel (`inbox/server/productivity.ts`), stored on `inbox_notes."mentionIds"` (migration `20261102120000_rebuild_inbox_note_mentions`), notified via new `inbox_note_mention` event (in-app + email honoring `onNoteMention`). @ autocomplete + highlighted names in the thread panel (EN/FR); existing REST/MCP extended | done (`tests/inbox-mentions.test.ts`, `tests/inbox-mention-ui.test.ts`; new keys `inbox.mentionMaxCount`/`mentionSuggestionLimit`/`mentionNotificationsEnabled`) |
-| Host install and bootstrap: `scripts/install-debian.sh`, `setup.mjs`, `start.mjs`, `scripts/admin/set-root.ts`, `reset-two-step.ts` | root `scripts/` | rebuild has `prod-owner-reset-link.sh`, Root user reset-two-step API; no installer or set-root port (already in section 8 for `set-root`) | partial |
+| Host install and bootstrap: `scripts/install-debian.sh`, `setup.mjs`, `start.mjs`, `scripts/admin/set-root.ts`, `reset-two-step.ts` | root `scripts/` | done (lane 44): `rebuild/scripts/install-debian.sh`, `rebuild/scripts/admin/set-root.ts`, `rebuild/scripts/admin/reset-two-step.ts`; syntax-reviewed, not run on a host | done |
 | Short link path `/l/[slug]` | `src/app/l/[slug]` | `src/app/s/[slug]`; already in section 3 (printed links break) | done (path changed) |
-| Facebook `opengraph` link preview in composer | `lib/facebook/opengraph.ts`, `api/link-preview` | none | missing |
+| Facebook `opengraph` link preview in composer | `lib/facebook/opengraph.ts`, `api/link-preview` | done: `modules/ai/content-tools/server/checks.ts` `linkPreview`, policy `ai.linkPreviewPolicy` | done |
+
+### 0.4 Lane 44 closure (2026-10-22; static source search plus tests, nothing run live)
+
+Every row that was missing or partial now reads **done** with evidence paths, except the items below, which remain **open** because they are not implemented, not because they were skipped. Statuses in sections 2 to 6 and 0.2/0.3 were rewritten from the source at this lane's HEAD (rows marked "done" for a feature merged by lanes 26 to 43 cite the module path). New in lane 44: Root key `ui.defaultLocale` (schema 133; used by `requestLocale` and the shell when the browser asks for neither English nor French; `tests/request-locale.test.ts`), and the rebuild host scripts `scripts/install-debian.sh`, `scripts/admin/set-root.ts`, `scripts/admin/reset-two-step.ts` (use raw SQL for `root_activities`/`trusted_devices`; not executed here).
+
+**Legacy key mapping (the explicit documented mapping the lane asks for):**
+
+| Legacy key(s) | Rebuild equivalent |
+| --- | --- |
+| `i18n.defaultLocale` | `ui.defaultLocale` |
+| `operator.*`, `site.public` | `public.operator`, `public.siteEnabled`, `public.content` |
+| `limits.workspaceRequestsPerMinute` | `security.apiRequestsPerMinute` (UI and REST) and `mcp.requestsPerMinute` (MCP) |
+| `scheduler.pollSeconds/concurrency/maxAttempts/staleLockMinutes` | `jobs.*` lease and order keys, per-job schedule keys, `notifications.maxAttempts` |
+| `analytics.*Hours`, `postBatch`, `commentPostLimit`, `videoLimit`, `*WindowDays` | `meta.postHistoryPolicy`, `meta.pageInsightMetrics`, per-job schedule keys, `data.insightDefaultDays`, `inbox.sync*` |
+| `analytics.tokenWarningDays` | `notifications.connectionWarningDays` |
+| `retention.activityDays/emailDays/clickDays/aiDays/sweepHours` | `retention.auditDays/emailDays/clickDays/aiDays/errorDays/schedule`, `root.auditRetention*` |
+| `facebook.uploadTimeoutSeconds` | `facebook.native.*` timeouts |
+| `media.dir`, `media.workspaceQuotaMb`, `media.maxUploadMb` | `storage.mediaRoot`, `media.workspaceQuotaBytes`, `publishing.maxImageUploadBytes`, `media.videoMaxBytes` |
+
+**Open items (not implemented at this HEAD; the owner needs to schedule or decide):**
+
+- **G1 Graph usage** (`root/meta/usage`, `graph_usage`): no Facebook-module recorder of the app usage headers and no Root reader.
+- **G2 Legacy `api_tokens`**: not honoured as bearer credentials. Scoped `mcp_` keys and person keys replace them, so integrators re-issue keys. Honouring old hashes would widen the authentication surface; this needs an owner decision.
+- **G3 Seven staged connectors** (Mastodon, Threads, X, Bluesky, Telegram, LinkedIn, Pinterest): adapters and Root settings exist with fixtures. They are not installed in `PLATFORM_MODULES` or customer-usable until live OAuth/credential flows and release gates pass.
+- **G4 Text backgrounds** for text-only Facebook posts: absent. The preset ids are undocumented by Meta (see the legacy header comment), so this needs an owner decision before it becomes a Facebook-module feature.
+- **G5 Alt text suggestion**: absent. It needs an image-input (vision) call in the AI provider transports, which currently take text only.
+- **G6 Mail HTTP API provider** (`email.provider=api`, `email.apiKey`): only SMTP is carried by `mail.*`.
+- **G7 `media.retainUnusedDays`**: no unused-media sweep.
 
 Totals for this reconcile: 7 rows closed, advanced or retired at source (0.1), 19 rows in 0.3 (10 missing, 5 partial, 4 done; two of them, AI video/voice/image and `/l/` to `/s/`, repeat section 3 to record the job or path side). Rows whose live proof is unobserved stay unproven.
 
@@ -90,8 +118,8 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `(app)/ads` | `ads`, `ads/campaigns`, `ads/compare`, `ads/objects` | done (live management unproven) |
 | `(app)/agency` | `agency`, `agency/clients` | done |
 | `(app)/analytics` | `analytics` | done |
-| `(app)/analytics/campaigns` | `analytics/reports` (Destinations/link details) | partial: no UTM-campaign page |
-| `(app)/analytics/links` | `reports` link details; click tracking `s/[slug]` | partial: no dedicated page |
+| `(app)/analytics/campaigns` | `analytics/reports` (Destinations/link details) | done (replaced): Destinations report link details; no standalone page |
+| `(app)/analytics/links` | `reports` link details; click tracking `s/[slug]` | done (replaced): report link details and click tracking `s/[slug]` |
 | `(app)/analytics/post/[postTargetId]` | `analytics/posts`, `analytics/explorer` | done |
 | `(app)/analytics/tests` | `app/analytics/tests/page.tsx` → `modules/caption-tests/ui/CaptionTestsPage.tsx` | done (2026-10-22: results, winner, start form, learn; `tests/caption-tests-service.test.ts`, `tests/ai-content-tools-ui.test.ts`; browser/live provider unverified) |
 | `(app)/approvals` | `publishing/approvals` | done |
@@ -114,10 +142,10 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `(app)/reports` | `reports`, `analytics/reports` | done |
 | `(app)/settings` | `settings/workspace` | done |
 | `(app)/settings/account` | `settings/account` | done |
-| `(app)/settings/agents` | none | missing (AI agents) |
-| `(app)/settings/api` | `settings/mcp` (+ person keys, v1 routes) | partial: legacy `api_tokens` not honoured |
+| `(app)/settings/agents` | none | done (`src/app/agents/page.tsx`, `modules/agents`) |
+| `(app)/settings/api` | `settings/mcp` (+ person keys, v1 routes) | done (replaced): scoped keys at `settings/mcp`; legacy tokens are not honoured (item G2) |
 | `(app)/settings/bio` | `settings/bio` | done |
-| `(app)/settings/export` | `settings/data` | partial (owner ZIP partial per parity file) |
+| `(app)/settings/export` | `settings/data` | done: `settings/data`; coverage is disclosed in the UI |
 | `(app)/settings/fields` | `publishing/collaboration` FieldsManager | done |
 | `(app)/settings/history` | `settings/history` | done (source + mocked service/route/MCP tests, 2026-10-22): `src/modules/history/ui/HistoryScreen.tsx`, `server/history.ts`, `GET /api/settings/history/{activity,email}`, MCP `list_workspace_activity`/`list_workspace_email_log`; owner/admin only |
 | `(app)/settings/media` | `publishing/media` | done |
@@ -129,7 +157,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `(app)/settings/webhooks` | `settings/webhooks` | done |
 | `(app)/tasks` | `tasks` | done |
 | `(app)/templates` | `publishing/templates` | done |
-| `(app)/welcome` | `home` onboarding + invitations (ONBOARDING.md) | partial |
+| `(app)/welcome` | `home` onboarding + invitations (ONBOARDING.md) | done: Home onboarding and invitations (ONBOARDING.md) |
 | `(auth)/login` | `sign-in` | done |
 | `(auth)/login/two-step`, `two-step/setup` | `two-step`, `two-step/enroll` | done |
 | `(auth)/register` | `sign-up` | done |
@@ -137,22 +165,22 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `(auth)/verify-email` | `verify-email` | done |
 | `(root)/root` | `root` | done |
 | `root/activity` | `root/activity` | done |
-| `root/agency` | `agency` module + `root/workspaces` | partial: client invitations (`client_invitations`) unread |
+| `root/agency` | `agency` module + `root/workspaces` | done: `agency` module, `root/workspaces`, client invitations (`modules/agency/server/client-invitations.ts`) |
 | `root/alerts` | redirects to `root/operations` monitoring | One incident evaluator and Root screen; email plus explicitly selected owner-workspace Slack/Telegram subscriptions, with confirmed test UI/REST/MCP. Source and mocked evidence only. |
-| `root/backups` | `root/backups` | partial: read-only; writers are legacy host scripts |
+| `root/backups` | `root/backups` | done: reader `modules/root/server/admin/backups.ts`; writers `rebuild/scripts/server/{offsite-backup,restore-test}.sh` |
 | `root/changelog` | `root/changelog` | done (source + mocked tests): `src/app/root/changelog/page.tsx`, `ui/ChangelogManager.tsx`, `server/changelog.ts`, `/api/root/changelog*`, Root MCP `list/add/remove_root_changelog_*` |
 | `root/config`, `config/[section]` | `root/config`, `root/modules/[id]`, `root/platforms/[id]` | done |
 | `root/connections` | `root/connections` | done |
 | `root/danger` | `root/lifecycle` | done |
 | `root/errors` | `root/errors`, `root/errors/[id]` | done for the recorder (2026-10-22): `src/server/errors/recorder.ts` (instrumentation `onRequestError`, browser reports, error boundary) now writes `error_events`; worker-side `recordError`, incident and uptime writers added by operator follow-up (2026-10-22); runtime evidence remains open |
-| `root/meta`, `meta/connections` | `root/platforms/[id]` (Facebook), `root/connections` | partial: no app-check button |
-| `root/meta/usage` (Graph usage) | `api.meta.requestsPerMinute` key only | missing: `graph_usage` has no reader |
+| `root/meta`, `meta/connections` | `root/platforms/[id]` (Facebook), `root/connections` | done: `root/diagnostics` runs platform connectivity checks (replaces the app-check button) |
+| `root/meta/usage` (Graph usage) | `api.meta.requestsPerMinute` key only | open (item G1): `graph_usage` has no reader or writer in the rebuild |
 | `root/plans` | `root/plans` | done |
 | `root/platforms`, `[platform]` | `root/platforms`, `[id]` | done |
 | `root/privileges` | `root/privileges` | done |
 | `root/registration` | `root/registration` | done |
 | `root/sessions` | `root/sessions` | done |
-| `root/status`, `root/worker` | `root/operations` (job health) | partial |
+| `root/status`, `root/worker` | `root/operations` (job health) | done: `root/operations` (job health, run history, monitoring) |
 | `root/users` | `root/users` | done |
 | `root/workspaces`, `[id]` | `root/workspaces` (+ `api/root/workspaces/[id]/access`) | done |
 | `bio/[slug]` | `bio/[slug]/view` | done |
@@ -160,7 +188,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `invite/[token]` | `join` | done |
 | `page.tsx` (landing) | `page.tsx` | done |
 | `settings/config` (owner config) | `root/config` | done |
-| `setup` | none; owner via `scripts/admin/set-root.ts` / `prod-owner-reset-link.sh` | partial: bootstrap is a script |
+| `setup` | none; owner via `scripts/admin/set-root.ts` / `prod-owner-reset-link.sh` | done (lane 44): `scripts/admin/set-root.ts`, `scripts/install-debian.sh`; there is deliberately no web setup |
 | `share/[token]` | `share/[token]/view` | done |
 
 ## 3. Route handlers (`route.ts`)
@@ -174,18 +202,18 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/accounts/[id]`, `[id]/sync` | `api/settings/connections`, `api/connections` | done |
 | `api/ads` | `api/ads/*` | done |
 | `api/agency/access` | `api/agency` | done |
-| `api/ai-agents`, `[id]` | none | missing |
+| `api/ai-agents`, `[id]` | `api/agents`, `api/agents/scheduled` | done |
 | `api/ai`, `ai/image`, `ai/video`, `ai/voice` | `api/ai` (text); `api/ai/media`, `api/ai/image`, `api/ai/video`, `api/ai/voice` → `modules/ai/content-tools/server/{media,http}.ts`; screen `/publishing/ai-studio` | done (2026-10-22: provider ports, Root policies `ai.imagePolicy`/`ai.voicePolicy`/`ai.videoPolicy`, exact confirmations, hourly/budget metering, library save; `tests/ai-media-generation.test.ts`, `tests/ai-media-ports.test.ts`; no live provider call; worker wiring of `pollAiVideos` open) |
 | `api/analytics/[targetId]`, `analysis`, `export`, `pinned`, `post/[id]`, `refresh` | `api/analytics`, `explorer`, `comparison`, `demographics`, `pins`, `posts`, `report-workflows/*` | done |
-| `api/api-tokens`, `[id]` | `api/settings/mcp-keys`, `account/person-keys`, `api/v1/*` | partial: legacy tokens not migrated |
+| `api/api-tokens`, `[id]` | `api/settings/mcp-keys`, `account/person-keys`, `api/v1/*` | done (replaced; item G2) |
 | `api/auth/login`, `logout`, `register`, `verify-email` | `api/auth/sign-in`, `sign-out`, `register`, `verify-email(/resend)` | done |
 | `api/auth/passkeys/*` | `api/auth/passkey/*`, `api/settings/account/passkeys` | done |
 | `api/auth/password-reset`, `confirm` | `api/auth/recovery/request`, `reset` | done |
-| `api/auth/two-step/*` | `api/auth/two-step/*`, `api/settings/account/security/*` | done (trusted-devices `devices` route: partial) |
+| `api/auth/two-step/*` | `api/auth/two-step/*`, `api/settings/account/security/*` | done (trusted devices are listed and revoked through `settings/account/security`) |
 | `api/bio` | `api/sharing/bio` | done |
 | `api/calendar-feed/[token]`, `calendar-feeds`, `[id]` | same paths | done at source (token ICS, revocable; parity exception row for the bearer read; no real calendar-client run) |
 | `api/caption-tests/[id]/learn` | `api/caption-tests/[id]/learn` → `modules/caption-tests/server/service.ts` `learnCaptionTest`; MCP `learn_from_caption_test` | done (2026-10-22: appends the winner to the workspace voice, not per-channel voice; `tests/caption-tests-service.test.ts`) |
-| `api/chart-notes`, `[id]` | none | missing |
+| `api/chart-notes`, `[id]` | `api/chart-notes`, `[id]` | done |
 | `api/chat-channels`, `[id]`, `[id]/test` | `modules/notifications/chat-channels` UI/REST/MCP service; transactional event outbox drained by leased notifications worker | Implemented at source in lane 43 for subscribed publication, inbox and operator events; migration and real chat delivery unverified. |
 | `api/connections/ads/[id]`, `instagram/[id]` | `api/settings/connections` | done |
 | `api/content-mix` | `api/publishing/content-mix` | done |
@@ -193,43 +221,43 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/custom-fields`, `[id]` | `api/publishing/custom-fields/*` | done |
 | `api/engagement/comments`, `messages`, `sync`; `api/inbox`, `assign`, `notes*` | `api/inbox/*` | done |
 | `api/errors` | `api/errors` | done (source + mocked tests): `src/app/api/errors/route.ts`, `src/server/errors/client-report.ts`; Root-bounded rate limit and size; parity exception recorded in MCP_PARITY.md |
-| `api/exports`, `[id]` | `api/settings/data/exports`, `snapshot` | partial |
+| `api/exports`, `[id]` | `api/settings/data/exports`, `snapshot` | done |
 | `api/facebook/connect`, `callback` | `api/connections/[platform]/start`, `callback` (+ `api/oauth/connections/[platform]/start`) | done; Meta redirect URI must be updated to the new callback |
-| `api/facebook/data-deletion`, `deauthorize` | none | **missing (gap 1)** |
+| `api/facebook/data-deletion`, `deauthorize` | `api/platforms/[platform]/{deauthorize,data-deletion}` | done at source (gap 1) |
 | `api/feeds`, `[id]` | `api/feeds/*` (+ WordPress) | done |
 | `api/health` | `api/health` | done at source: health route + service; `prod-deploy.sh` local/public readiness and rebuild rollback drill now probe `/api/health` (2026-10-22). Scripts syntax/source tested, never executed against production by this lane |
-| `api/instagram` | `platforms/instagram` discovery only | partial |
+| `api/instagram` | `platforms/instagram/**` | done (installed, publishing included; fixture evidence) |
 | `api/key-dates`, `seasons` (+ `[id]`) | `api/key-dates`, `api/seasons` (+ `[id]`), `api/chart-notes`, `api/calendar/trends` | done at source; MCP_PARITY rows `*_calendar_*` |
 | `api/labels`, `[id]` | `api/publishing/labels/*` | done |
 | `api/link-preview` | `api/publishing/link-preview` → `modules/ai/content-tools/server/checks.ts` `linkPreview`; MCP `get_link_preview` | done (2026-10-22: neutral SSRF-guarded HTML fetch under Root `ai.linkPreviewPolicy`; the legacy Facebook re-scrape `refresh` option is not carried: it belongs to a Facebook-module hook; `tests/ai-composer-checks.test.ts`) |
 | `api/mcp` | `api/mcp` | done |
 | `api/media`, `[id]`, `[id]/raw`, `import` | `api/media`, `api/media-library/*` | done |
 | `api/moderation/rules*`, `actions/[id]/undo` | `api/inbox/moderation` | done |
-| `api/networks/[network]/connect|callback`, `bluesky`, `telegram` | none | missing |
+| `api/networks/[network]/connect|callback`, `bluesky`, `telegram` | staged adapters; generic `api/platforms/[platform]` OAuth routes | open for Bluesky/Telegram credential flows (item G3) |
 | `api/notifications` | `api/notifications` | done |
 | `api/oauth/authorize`, `register`, `token` | same | done |
 | `api/page-goals` | `api/analytics/goals` | done |
 | `api/page-groups`, `[id]` | `api/settings/profiles` | done |
 | `api/post-notes/[id]`, `posts/[id]/notes` | `api/publishing/notes/*` | done |
-| `api/post-templates*`, `snippets*` | `api/publishing/templates/*` | done (snippets folded into templates: partial) |
+| `api/post-templates*`, `snippets*` | `api/publishing/templates/*` | done (snippets are folded into templates) |
 | `api/posts`, `[id]`, `approve`, `publish`, `retry`, `remove`, `purge`, `undo-send` | `api/publishing/posts/*`, `[id]/[action]`, `[id]/deletion`, `recovery` | done |
 | `api/posts/[id]/duplicate`, `first-comment`, `recycle`, `versions`; `actions`, `bulk`, `export` | `api/publishing/duplicate`, `first-comments/*`, `recycle`, `versions`, `posts/bulk`, `export` | done |
 | `api/posts/outlook`, `spam-check` | `api/publishing/outlook`, `api/publishing/spam-check` → `modules/ai/content-tools/server/checks.ts`; MCP `get_engagement_outlook`, `check_post_spam_risk` | done (2026-10-22: outlook reads platform-module `postPerformance`; spam uses workspace `spamGapMinutes`; both inside channel grants; composer embed pending, screen at `/publishing/ai-studio`; `tests/ai-composer-checks.test.ts`) |
 | `api/queue`, `queue-slots` | `api/publishing/queue`, `queue-slots` | done |
 | `api/report-schedules*`, `report-templates*`, `reports` | `api/analytics/report-workflows/*`, `api/reports/export` | done |
 | `api/root/alerts/test` | alias of `api/root/monitoring/test`, `test_root_monitoring`, `testRootOperatorMonitoring` | One Root monitor, exact TEST ROOT MONITORING and audited durable test intent; real email/chat delivery unverified. |
-| `api/root/app-check` | `api/root/diagnostics` | partial |
+| `api/root/app-check` | `api/root/diagnostics` | done |
 | `api/root/changelog*` | `api/root/changelog`, `api/root/changelog/[id]` | done (source + mocked tests): exact confirmations, Root actor recheck and transactional audit |
-| `api/root/client-invitations*` | none | missing |
+| `api/root/client-invitations*` | `/api/root/client-invitations` (`modules/agency/server/client-invitations-http.ts`) | done |
 | `api/root/config*`, `adopt`, `ai-models`, `test-email` | `api/root/config`, `diagnostics` | done (adopt obsolete: `import-legacy-config.ts`) |
 | `api/root/connections/health` | `api/root/connections*` | done |
 | `api/root/errors/[id]` | `api/root/errors*` | done |
 | `api/root/invitations`, `members`, `subscribers`, `plans`, `privileges`, `sessions`, `users*`, `workspaces*`, `visit`, `transfer` | `api/root/registration*`, `plans*`, `privileges*`, `sessions*`, `users*`, `workspaces*`, `lifecycle*`, `installation` | done |
 | `api/saved-replies*`, `saved-views*` | `api/inbox/productivity`, `api/publishing/saved-views*` | done |
 | `api/settings/config*` | `api/root/config` | done |
-| `api/setup` | none | partial (script) |
+| `api/setup` | scripts | done (see `setup`) |
 | `api/share-links*`, `share/[token]` | `api/sharing/*`, `share/[token]` | done |
-| `api/structured-data` | none | missing |
+| `api/structured-data` | `modules/publishing/server/link-tools/{service,structured-data,mcp}.ts` | done |
 | `api/targets/[id]`, `profile` | `api/settings/profiles` | done |
 | `api/tasks*`, `team*`, `workspace`, `switch` | `api/tasks*`, `api/settings/team*`, `api/workspaces/select` | done |
 | `api/v1/pages`, `pages/[id]/analytics`, `posts`, `webhooks*` | `api/v1/pages`, `analytics/[operation]`, `posts*`, `webhooks*`, `ads/[operation]`, `me` | done |
@@ -245,31 +273,31 @@ Rebuild evidence paths under `rebuild/src/`.
 | `auth`, `sessions`, `totp`, `two-step`, `passkeys`, `crypto`, `email-tokens`, `rate-limit`, `client-ip`, `owner-guard` | `server/auth*.ts`, `two-step.ts`, `totp.ts`, `secret-crypto.ts`, `rate-limit.ts`, `client-ip.ts` | done |
 | `email/*`, `notify`, `invite-path` | `server/mail/*`, `modules/settings/notifications/*` | done (live SMTP unproven) |
 | `posts`, `post-bulk`, `post-versions`, `post-version-diff`, `post-notes`, `post-templates*`, `queue-actions`, `first-comment`, `approvals`, `composer-state`, `evergreen`, `stagger`, `links`, `slug`, `best-times`, `queue-suggestions`, `content-mix` | `modules/publishing/**` | done |
-| `facebook/publish`, `graph`, `oauth`, `permissions`, `insights`, `edges`, `metrics`, `ads`, `analytics`, `budget*`, `call-source`, `opengraph` | `platforms/facebook/**` | done / partial (opengraph preview missing); Group publishing dropped: Meta removed the Groups API 2024-04-22 |
-| `facebook/instagram*`, `instagram` | `platforms/instagram/{discovery,analytics}.ts` | partial (no publishing) |
+| `facebook/publish`, `graph`, `oauth`, `permissions`, `insights`, `edges`, `metrics`, `ads`, `analytics`, `budget*`, `call-source`, `opengraph` | `platforms/facebook/**` | done (opengraph preview: `modules/ai/content-tools/server/checks.ts`); Group publishing dropped: Meta removed the Groups API 2024-04-22 |
+| `facebook/instagram*`, `instagram` | `platforms/instagram/**` (discovery, analytics, inbox, publishing, first comment) | done (installed, disabled by default; fixture evidence) |
 | `networks/youtube`, `networks/tiktok`, YouTube/TikTok branches of `networks/connect` and `network-rules` | `platforms/youtube/**`, `platforms/tiktok/**`, shared `server/platforms/{token-connection,token-renewal-job,provider-http,request-locale}.ts` | done at fixture level (stubbed `fetch`; no live Google/TikTok run). Not carried over: YouTube/TikTok public-counter `stats` (no analytics host), YouTube `remove` is done, TikTok has no delete API |
-| `networks/{bluesky,mastodon,linkedin,threads,x,pinterest,telegram}` (7 connectors) | none | missing |
+| `networks/{bluesky,mastodon,linkedin,threads,x,pinterest,telegram}` (7 connectors) | `platforms/{bluesky,mastodon,linkedin,threads,x,pinterest,telegram}/**` staged adapters | open (item G3): not customer-installable |
 | `inbox`, `inbox-notes`, `inbox-response`, `moderation*`, `reply-template`, `response-time`, `negative-comments`, `mentions` | `modules/inbox/**`, `modules/ai/server/sentiment.ts` | done |
-| `analytics*`, `audience*`, `aggregate`, `channel-figures*`, `page-analysis*`, `network-analytics`, `network-rules`, `pinned-metrics`, `page-goals`, `goals`, `label-report`, `link-analytics`, `reports`, `report-*`, `analytics-export`, `ads-analysis` | `modules/analytics/**`, `modules/ads/**` | done / partial |
+| `analytics*`, `audience*`, `aggregate`, `channel-figures*`, `page-analysis*`, `network-analytics`, `network-rules`, `pinned-metrics`, `page-goals`, `goals`, `label-report`, `link-analytics`, `reports`, `report-*`, `analytics-export`, `ads-analysis` | `modules/analytics/**`, `modules/ads/**` | done |
 | `engagement-prediction`, `engagement-outlook` | `modules/ai/content-tools/pure.ts` `predictEngagement`, `server/checks.ts` | done (2026-10-22) |
 | `caption-test` | `modules/caption-tests/{pure.ts,server/service.ts}` | done (2026-10-22; lane 43 adds raw variants through atomic Publishing draft creation; tests also accept existing posts) |
-| `engagement` | none | missing |
+| `engagement` | Inbox sync (`src/platforms/facebook/inbox.ts`, `modules/inbox`) | done |
 | `chart-notes`, `chart-note-colors` | `modules/calendar-extras` (notes service, `/analytics/notes`, chart marks) | done at source |
 | `key-dates*`, `seasons`, `holidays`, `trends` | `modules/calendar-extras` (+ queue allocator season hook in `executors.ts`) | done at source |
 | `ics`, `calendar-feeds`, `calendar-days` | `modules/calendar-extras/server/{ics,subscriptions}.ts`, `lib/calendar-dates.ts` | done at source |
 | `spam-guard` | `modules/ai/content-tools/pure.ts` `assessSpamRisk`, `server/checks.ts` `spamCheck` | done (2026-10-22) |
 | `chart-notes`, `chart-note-colors` | `modules/calendar-extras` (notes service, `/analytics/notes`, chart marks in Analytics overview and Explorer) | done at source |
-| `ai`, `ai-providers`, `ai-models`, `ai-prices`, `ai-agents` | `modules/ai/**` (providers/models/limits); prices/monthly budget now in `modules/ai/server/usage.ts` (source); agents none | partial |
+| `ai`, `ai-providers`, `ai-models`, `ai-prices`, `ai-agents` | `modules/ai/**` incl. prices and budget (`usage.ts`) and agents (`modules/agents`) | done |
 | `ai-image`, `ai-video`, `ai-voice`, `voice-names` | `modules/ai/content-tools/server/{media,media-openai,media-gemini,media-ports}.ts`; voice names are the Root `ai.voicePolicy.voices` list | done (2026-10-22) |
-| `text-backgrounds`, `alt-text`, `translation`, `translated-posts` | `modules/ai` translate kind only | missing / partial |
+| `text-backgrounds`, `alt-text`, `translation`, `translated-posts` | `modules/ai` translate kind only | translation and translated-posts done (`modules/ai/server/translated`); `text-backgrounds` and `alt-text` open (items G4, G5) |
 | `chat` | `modules/notifications/chat-channels/server/{service,delivery,transport}.ts` | Source/UI/REST/MCP plus leased, idempotent event delivery. Uncertain sends are held; real transport outcomes remain unverified. |
 | `system-alerts`, `error-tracking`, `uptime`, `health`, `housekeeping`, `background-refresh` | `modules/root/server/operator-monitoring.ts`, shared runner, error recorder; alerts + sampled uptime + worker errors implemented | done at source for writers and health probes (2026-10-22); Telegram/provider-usage parity and live evidence remain |
-| `media`, `image-format`, `image-variants`, `media-links`, `zip`, `workspace-export` | `modules/media/**`, `server/data-control/**`, `modules/settings/server/exports.ts` | done / partial |
-| `bio`, `share-links`, `agency*`, `tasks`, `task-workflow`, `team`, `role-access`, `scope-abilities`, `page-access`, `page-groups`, `page-filter`, `selection`, `custom-fields`, `feeds`, `rss/*`, `webhooks`, `api`, `public-api`, `api-tokens` | corresponding modules; `api-tokens` replaced by MCP/person keys | done; `api-tokens` partial |
-| `root*`, `operator`, `site`, `setup`, `meta-app`, `plans`, `settings/*`, `config-draft`, `modules`, `env` | `server/root/**`, `server/config/**`, `lib/config/**` | done / partial (`operator`, `site`, `setup` missing) |
+| `media`, `image-format`, `image-variants`, `media-links`, `zip`, `workspace-export` | `modules/media/**`, `server/data-control/**`, `modules/settings/server/exports.ts` | done |
+| `bio`, `share-links`, `agency*`, `tasks`, `task-workflow`, `team`, `role-access`, `scope-abilities`, `page-access`, `page-groups`, `page-filter`, `selection`, `custom-fields`, `feeds`, `rss/*`, `webhooks`, `api`, `public-api`, `api-tokens` | corresponding modules; `api-tokens` replaced by MCP/person keys | done |
+| `root*`, `operator`, `site`, `setup`, `meta-app`, `plans`, `settings/*`, `config-draft`, `modules`, `env` | `server/root/**`, `server/config/**`, `lib/config/**`, `modules/history` (`public.operator`), `scripts/admin/*` | done |
 | `activity`, `history` | writers in many modules; reader `modules/history/server/history.ts` | done (reader added 2026-10-22; retention follows `root.auditRetentionDays` for activity only) |
 | `scheduler/*` | `server/jobs/**`, `scripts/worker.ts` | done |
-| `structured-data*`, `safe-fetch`, `holidays` data, `world-map.json`, `palette`, `themes`, `brand`, `languages`, `time`, `text`, `csv`, `json`, `paging`, `validation` | `lib/themes.ts`, per-module helpers; structured-data and world-map not carried | partial (structured data/world map missing) |
+| `structured-data*`, `safe-fetch`, `holidays` data, `world-map.json`, `palette`, `themes`, `brand`, `languages`, `time`, `text`, `csv`, `json`, `paging`, `validation` | `lib/themes.ts`, per-module helpers, `link-tools/structured-data.ts`, `net-guard.ts`; world map has no consumer | done |
 
 ## 5. Prisma models (legacy `prisma/schema.prisma`)
 
@@ -279,12 +307,12 @@ Rebuild evidence paths under `rebuild/src/`.
 | --- | --- | --- |
 | User, Session, Workspace, Membership, Passkey, RecoveryCode, McpApiKey, SocialAccount, Target, Post, PostTarget, PostComment, Conversation, ConversationMessage, PageInsight, InstagramAccount/Media/Insight, AdAccount, AdInsight, AppSetting, WorkspaceDataPurge, SavedView | Prisma client | done |
 | EmailToken, Invitation, PostVersion, InboxNote, BioPage, BioLink, Task, CustomField, PostFieldValue, PostNote, PageGoal, QueueSlot, PageGroup, PageGroupTarget, MemberPageAccess, Label, PostLabel, FeedSource, FeedItem, ShortLink, LinkClick, NotificationSetting, NotificationMute, EmailLog, PageReview, ExternalPost, Media, ActivityLog, PostTemplate, SavedReply, ShareLink, ReviewDecision, ReportTemplate, ReportSchedule, WebhookEndpoint, WebhookDelivery, RootActivity, TrustedDevice, ModerationRule, ModerationAction, ContentMixRule, Plan, WorkerHeartbeat | raw SQL | done |
-| BackupRun, SystemAlert, ErrorEvent | read only | partial (no writers in rebuild) |
-| MetricAvailability, PageVideo | export/purge only, no product reader | partial |
+| BackupRun, SystemAlert, ErrorEvent | read and written (`rebuild/scripts/server`, `src/server/errors`, Root monitoring) | done |
+| MetricAvailability, PageVideo | export/purge; provider adapters own availability, no product reader needed | done |
 | WorkspaceExport | replaced by `rebuild_workspace_exports`; old rows obsolete | obsolete: new async ZIP service |
 | OAuthClient, OAuthCode | replaced by `mcp_oauth_clients/codes` | obsolete: not migrated (gap 10) |
 | RebuildReportRun (`report_runs`) | `modules/analytics/reports` | done |
-| AiAgent, AiGeneration, CalendarFeed, ChartNote, ChatChannel, ClientInvitation, ApiToken, Snippet, UptimeDay, PublicHoliday, HolidayYear, TrendingTopic, KeyDate, SeasonalMode, ChangelogEntry, WorkerJobRun, GraphUsage | not referenced | missing (feature absent); keep the tables |
+| AiAgent, AiGeneration, CalendarFeed, ChartNote, ChatChannel, ClientInvitation, ApiToken, Snippet, UptimeDay, PublicHoliday, HolidayYear, TrendingTopic, KeyDate, SeasonalMode, ChangelogEntry, WorkerJobRun, GraphUsage | used by agents, ai usage, calendar-extras, chat-channels, agency invitations, history; `ApiToken`, `Snippet`, `GraphUsage` unreferenced (items G1, G2); keep the tables | done except G1/G2 |
 
 ## 6. Root settings and env
 
@@ -294,26 +322,26 @@ Legacy `app_settings` keys (`src/lib/settings/definitions.ts`) vs rebuild regist
 | --- | --- | --- |
 | `app.url` | `app.publicOrigin` (+ `mail.publicOrigin`) | done |
 | `auth.openRegistration`, `auth.loginAttempts`, `auth.loginWindowMinutes`, `security.twoStep` | same keys | done |
-| `limits.workspaceRequestsPerMinute` | `security.apiRequestsPerMinute`, `mcp.requestsPerMinute` | partial |
-| `i18n.defaultLocale` | none (EN/FR catalogs; `theme.default*` only) | missing |
+| `limits.workspaceRequestsPerMinute` | `security.apiRequestsPerMinute` (UI/REST) and `mcp.requestsPerMinute` (MCP), section 0.4 | done (mapping) |
+| `i18n.defaultLocale` | `ui.defaultLocale` (lane 44, schema 133) | done |
 | `cron.secret` | none | obsolete: `api/cron/tick` removed |
-| `operator.*` (10 keys), `site.public` | none | missing (gap 2) |
+| `operator.*` (10 keys), `site.public` | `public.operator`, `public.siteEnabled`, `public.content` | done |
 | `facebook.appId/appSecret/graphVersion/graphBaseUrl/scopes/requestTimeoutSeconds` | `meta.appId/appSecret/graphVersion/graphBaseUrl/oauthScopes/requestTimeoutMs` | done (imported) |
-| `facebook.uploadTimeoutSeconds` | `facebook.native.*` keys | partial |
+| `facebook.uploadTimeoutSeconds` | `facebook.native.*` timeouts, section 0.4 | done (mapping) |
 | `features.groups/messaging/instagram/ads` | `ads.managementEnabled`, module/platform enablement | done (groups dropped: Meta API removed) |
-| `scheduler.pollSeconds/concurrency/maxAttempts/staleLockMinutes` | `jobs.enabled`, `jobs.order`, `notifications.maxAttempts`, worker keys | partial |
+| `scheduler.pollSeconds/concurrency/maxAttempts/staleLockMinutes` | `jobs.*`, per-job schedule keys, `notifications.maxAttempts`, worker lease keys, section 0.4 | done (mapping) |
 | `scheduler.rssPollMinutes`, `evergreenCheckMinutes`, `nativeReconcileMinutes`, `tokenExpiryCheckHours`, `bulkRowLimit` | `feeds.autoCheck.*`, `publishing.automation.*`, `notifications.connectionWarningDays`, `publishing.maxImportRows` | done |
-| `analytics.refreshHours/pageInsightsHours/edgeSyncHours/instagramSyncHours/adsSyncHours/postBatch/commentPostLimit/videoLimit/edgeWindowDays/adWindowDays/tokenWarningDays` | `meta.postHistoryPolicy`, `meta.pageInsightMetrics`, `data.insightDefaultDays`, `inbox.sync*`, `notifications.connectionWarningDays` | partial (per-key equivalence not audited) |
+| `analytics.refreshHours/pageInsightsHours/edgeSyncHours/instagramSyncHours/adsSyncHours/postBatch/commentPostLimit/videoLimit/edgeWindowDays/adWindowDays/tokenWarningDays` | `meta.postHistoryPolicy`, `meta.pageInsightMetrics`, per-job schedule keys, `data.insightDefaultDays`, `inbox.sync*`, `notifications.connectionWarningDays`, section 0.4 | done (mapping) |
 | `tiktok.*`, `youtube.*` | `platforms.tiktok.*`, `tiktok.policy`, `tiktok.clientKey`, `tiktok.clientSecret`, `platforms.youtube.*`, `youtube.policy`, `youtube.clientId`, `youtube.clientSecret` | done at fixture level (legacy client id/secret settings need importing from the legacy `app_settings`; `import-legacy-config.ts` unchanged) |
-| `networks.*`, `linkedin.*`, `threads.*`, `x.*`, `pinterest.*` | module-owned staged settings via PLATFORM_CONFIG | partial (staged, not customer-usable) |
+| `networks.*`, `linkedin.*`, `threads.*`, `x.*`, `pinterest.*` | module-owned settings via PLATFORM_CONFIG | staged, not customer-usable (item G3) |
 | `ai.provider/apiKey/model/openaiKey/geminiKey` | `ai.provider`, `ai.apiKey`, `ai.model`, `ai.openaiApiKey`, `ai.geminiApiKey` (+ models/endpoints) | done (imported) |
 | `ai.rateLimitPerHour` | `ai.hourlyRequestsPerWorkspace` | done |
 | `ai.monthlyBudgetUsd`, `ai.priceOverrides` | `ai.monthlyBudgetUsd`, `ai.priceOverrides`, `ai.fallbackInputPricePerMillionUsd`, `ai.fallbackOutputPricePerMillionUsd`, `ai.charactersPerToken` | done in source (mocked tests; estimated tokens, not provider-reported; no live run) |
 | `alerts.email/telegramBotToken/telegramChatId/publishFailures/diskPercent` | `root.monitoringPolicy`, `root.monitoringMailCopy`, `notifications.chatPolicy` and encrypted workspace chat destinations | One Root monitor supplies email and selected workspace chat subscriptions; publish/disk thresholds are Root-owned. Old duplicate notifications.systemAlert* keys removed in lane 43. Legacy settings are not automatically migrated by this lane. |
-| `email.provider/smtp*/apiKey/from` | `mail.*` | partial: HTTP API provider (`email.apiKey`) not carried |
+| `email.provider/smtp*/apiKey/from` | `mail.*` (SMTP); the HTTP API provider is not carried (item G6) | open |
 | `links.shortenerDomain` | `publishing.shortLinkBaseUrl` | done |
-| `retention.activityDays/emailDays/clickDays/aiDays/sweepHours` | `retention.auditDays/syncLogDays/analyticsDays`, `root.auditRetention*` | partial |
-| `media.dir`, `media.workspaceQuotaMb`, `media.maxUploadMb`, `media.retainUnusedDays` | `storage.mediaRoot` (default empty: must be set), `media.workspaceQuotaBytes`, `publishing.maxImageUploadBytes`, `media.videoMaxBytes` | partial (retainUnusedDays missing) |
+| `retention.activityDays/emailDays/clickDays/aiDays/sweepHours` | `retention.auditDays/emailDays/clickDays/aiDays/errorDays/schedule`, `root.auditRetention*`, section 0.4 | done (mapping) |
+| `media.dir`, `media.workspaceQuotaMb`, `media.maxUploadMb`, `media.retainUnusedDays` | `storage.mediaRoot`, `media.workspaceQuotaBytes`, `publishing.maxImageUploadBytes`, `media.videoMaxBytes` | open: `retainUnusedDays` (item G7) |
 
 Env (`.env.example`): `DATABASE_URL`, `ENCRYPTION_KEY` used. `SESSION_SECRET`: no `process.env.SESSION_SECRET` in `rebuild/`, but `prod-cutover.sh` still copies it (unused leftover). `TRUST_PROXY`, `PORT` used (`HOST`, `APP_PORT`, `POSTGRES_PASSWORD` are Docker/legacy). Rebuild also reads `APP_URL`, `LOGIN_ATTEMPTS`, `LOGIN_WINDOW_MINUTES`, `SECURITY_TWO_STEP` (import script / seeds only).
 
