@@ -1,5 +1,7 @@
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
 import { moduleManifests } from '@/modules';
+import { ROOT_JOBS } from '@/modules/root/jobs';
+import { recordError } from '@/server/errors/recorder';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -7,12 +9,12 @@ import { cronMatches } from './cron';
 import { runWithJobContext } from './job-context';
 import type { RetryBackoff } from './retry';
 
-export type JobName = (typeof moduleManifests)[number]['jobs'][number]['name'];
+export type JobName = (typeof moduleManifests)[number]['jobs'][number]['name'] | (typeof ROOT_JOBS)[number]['name'];
 export type WorkerLogger = (message: string, detail?: unknown) => void;
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1_000;
 type Job = { name: JobName; configKey: string };
-const jobs: Job[] = moduleManifests.flatMap(module => [...module.jobs]);
+const jobs: Job[] = [...moduleManifests.flatMap(module => [...module.jobs]), ...ROOT_JOBS];
 
 export type WorkerDependencies = {
   readConfig: (key: string) => Promise<unknown>;
@@ -23,10 +25,16 @@ export type WorkerDependencies = {
   writeRun: (input: { id: string; job: JobName; owner: string; startedAt: Date; finishedAt: Date; outcome: string; attempts: number; summary?: string; error?: string }) => Promise<void>;
   writeHeartbeat: (owner: string, jobs: JobName[], at: Date) => Promise<void>;
   alreadyRanThisMinute: (job: JobName, from: Date, until: Date) => Promise<boolean>;
+  recordError?: typeof recordError;
   logger: WorkerLogger;
 };
 
-export function createWorker(deps: WorkerDependencies, owner: string) {
+export function createWorker(deps: WorkerDependencies, owner: string, options: { jobs?: readonly JobName[]; heartbeat?: boolean } = {}) {
+  const selectedJobs = options.jobs ? jobs.filter(job => options.jobs!.includes(job.name)) : jobs;
+  const log: WorkerLogger = (message, detail) => {
+    if (detail !== undefined) void (deps.recordError ?? recordError)({ source: 'worker', error: detail, location: message });
+    deps.logger(message, detail);
+  };
   const startedMinute = new Map<JobName, number>();
   const running = new Set<JobName>();
   const leaseTokens = new Map<JobName, string>();
@@ -37,26 +45,26 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
   // Successful ticks replace it with the current stored value.
   let pollIntervalMs = Number(CONFIG_BY_KEY.get('sync.workerPollSeconds')!.defaultValue) * SECOND_MS;
 
-  async function launch(job: Job, now: Date, retryLimit: number, retryBackoff: RetryBackoff, leaseMs: number, renewalDivisor: number, errorLimit: number, summaryLimit: number): Promise<void> {
-    if (running.has(job.name)) return;
+  async function launch(job: Job, now: Date, retryLimit: number, retryBackoff: RetryBackoff, leaseMs: number, renewalDivisor: number, errorLimit: number, summaryLimit: number, manual = false): Promise<boolean> {
+    if (running.has(job.name) || stopping) return false;
     const minuteStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
     const minuteEnd = new Date(minuteStart.getTime() + 60_000);
-    if (startedMinute.get(job.name) === minuteStart.getTime()) return;
-    if (await deps.alreadyRanThisMinute(job.name, minuteStart, minuteEnd)) {
+    if (!manual && startedMinute.get(job.name) === minuteStart.getTime()) return false;
+    if (!manual && await deps.alreadyRanThisMinute(job.name, minuteStart, minuteEnd)) {
       startedMinute.set(job.name, minuteStart.getTime());
-      return;
+      return false;
     }
-    startedMinute.set(job.name, minuteStart.getTime());
+    if (!manual) startedMinute.set(job.name, minuteStart.getTime());
     running.add(job.name);
     const token = randomUUID();
     let acquired: boolean;
     try { acquired = await deps.tryLease(job.name, owner, token, new Date(Date.now() + leaseMs)); }
     catch (error) { running.delete(job.name); throw error; }
-    if (!acquired) { running.delete(job.name); return; }
+    if (!acquired) { running.delete(job.name); return false; }
     if (stopping) {
-      await deps.releaseLease(job.name, token).catch(error => deps.logger(`lease release failed for ${job.name}`, error));
+      await deps.releaseLease(job.name, token).catch(error => log(`lease release failed for ${job.name}`, error));
       running.delete(job.name);
-      return;
+      return false;
     }
     leaseTokens.set(job.name, token);
     const startedAt = new Date();
@@ -66,26 +74,40 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     let errorText: string | undefined;
     const renew = setInterval(() => {
       void deps.renewLease(job.name, token, new Date(Date.now() + leaseMs)).then(renewed => {
-        if (!renewed) deps.logger(`lease for ${job.name} is no longer owned by this worker`);
-      }).catch(error => deps.logger(`lease renewal failed for ${job.name}`, error));
+        if (!renewed) log(`lease for ${job.name} is no longer owned by this worker`);
+      }).catch(error => log(`lease renewal failed for ${job.name}`, error));
     }, Math.max(1, Math.floor(leaseMs / renewalDivisor)));
     try {
       attempts = 1;
       summary = await runWithJobContext({ signal: shutdownAbort.signal, stopRequested: () => stopping }, () => deps.execute(job.name, new Date(), retryLimit, retryBackoff));
-      if (/failed=[1-9]/.test(summary)) { outcome = 'failed'; errorText = `Some workspace sync items failed: ${summary}`; }
-      deps.logger(`[${job.name}] ${summary}`);
+      if (/failed=[1-9]/.test(summary)) {
+        outcome = 'failed'; errorText = `Some workspace sync items failed: ${summary}`;
+        await (deps.recordError ?? recordError)({ source: 'worker', error: new Error(errorText), location: job.name });
+      }
+      log(`[${job.name}] ${summary}`);
     } catch (error) {
       outcome = 'failed';
+      await (deps.recordError ?? recordError)({ source: 'worker', error, location: job.name });
       errorText = (error instanceof Error ? error.message : String(error)).slice(0, errorLimit);
-      deps.logger(`[${job.name}] failed: ${errorText}`);
+      log(`[${job.name}] failed: ${errorText}`);
     } finally {
       clearInterval(renew);
       const finishedAt = new Date();
-      await deps.writeRun({ id: randomUUID(), job: job.name, owner, startedAt, finishedAt, outcome, attempts, ...(summary ? { summary: summary.slice(0, summaryLimit) } : {}), ...(errorText ? { error: errorText.slice(0, errorLimit) } : {}) }).catch(error => deps.logger(`run audit write failed for ${job.name}`, error));
-      await deps.releaseLease(job.name, token).catch(error => deps.logger(`lease release failed for ${job.name}`, error));
+      await deps.writeRun({ id: randomUUID(), job: job.name, owner, startedAt, finishedAt, outcome, attempts, ...(summary ? { summary: summary.slice(0, summaryLimit) } : {}), ...(errorText ? { error: errorText.slice(0, errorLimit) } : {}) }).catch(error => log(`run audit write failed for ${job.name}`, error));
+      await deps.releaseLease(job.name, token).catch(error => log(`lease release failed for ${job.name}`, error));
       leaseTokens.delete(job.name);
       running.delete(job.name);
     }
+    return true;
+  }
+
+  /** On-demand execution bypasses the cron window, while retaining the same lease, history and error handling. */
+  async function runNow(name: JobName): Promise<boolean> {
+    const job = selectedJobs.find(item => item.name === name);
+    if (!job || stopping) return false;
+    const keys = ['sync.retryLimit', 'sync.retryBaseDelayMs', 'sync.retryMaxDelayMs', 'sync.workerLeaseMinutes', 'sync.workerLeaseRenewalDivisor', 'logging.workerErrorMaxCharacters', 'logging.workerSummaryMaxCharacters'] as const;
+    const [retryLimit, baseDelay, maxDelay, leaseMinutes, renewalDivisor, errorLimit, summaryLimit] = await Promise.all(keys.map(async key => Number(await deps.readConfig(key))));
+    return launch(job, new Date(), Math.max(0, Math.trunc(retryLimit)), { baseDelayMs: Math.max(1, Math.trunc(baseDelay)), maxDelayMs: Math.max(1, Math.trunc(maxDelay)) }, Math.max(1, Math.trunc(leaseMinutes)) * MINUTE_MS, renewalDivisor, errorLimit, summaryLimit, true);
   }
 
   /**
@@ -106,8 +128,8 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     const abandoned = [...running];
     for (const name of abandoned) {
       const token = leaseTokens.get(name);
-      if (token) await deps.releaseLease(name, token).catch(error => deps.logger(`lease release failed for ${name}`, error));
-      deps.logger(`[${name}] abandoned at shutdown after ${graceMs}ms grace`);
+      if (token) await deps.releaseLease(name, token).catch(error => log(`lease release failed for ${name}`, error));
+      log(`[${name}] abandoned at shutdown after ${graceMs}ms grace`);
     }
     return { abandoned };
   }
@@ -117,7 +139,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     const order = await deps.readConfig('jobs.order') as string[];
     if (!Array.isArray(order) || order.some(name => typeof name !== 'string')) throw new Error('Background job priority order is invalid.');
     const priority = (job: Job) => { const index = order.indexOf(job.name); return index < 0 ? order.length : index; };
-    const orderedJobs = [...jobs].sort((a, b) => priority(a) - priority(b));
+    const orderedJobs = [...selectedJobs].sort((a, b) => priority(a) - priority(b));
     const maxConcurrent = await deps.readConfig('sync.maxConcurrentJobs') as number;
     const retryLimit = await deps.readConfig('sync.retryLimit') as number;
     const retryBaseDelayMs = await deps.readConfig('sync.retryBaseDelayMs') as number;
@@ -138,18 +160,18 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
         const expression = await deps.readConfig(job.configKey) as string;
         if (!cronMatches(expression, now)) continue;
         if (running.has(job.name)) continue;
-        void launch(job, now, Math.max(0, Math.trunc(retryLimit)), retryBackoff, leaseMs, renewalDivisor, errorLimit, summaryLimit).catch(error => deps.logger(`could not start ${job.name}`, error));
+        void launch(job, now, Math.max(0, Math.trunc(retryLimit)), retryBackoff, leaseMs, renewalDivisor, errorLimit, summaryLimit).catch(error => log(`could not start ${job.name}`, error));
         // Lease acquisition is async; reserve a local slot before its result.
         available--;
       }
     }
-    if (Date.now() - lastHeartbeat >= Math.max(1, Math.trunc(heartbeatSeconds)) * SECOND_MS) {
+    if (options.heartbeat !== false && Date.now() - lastHeartbeat >= Math.max(1, Math.trunc(heartbeatSeconds)) * SECOND_MS) {
       lastHeartbeat = Date.now();
-      await deps.writeHeartbeat(owner, enabled ? jobs.map(job => job.name) : [], now).catch(error => deps.logger('worker heartbeat failed', error));
+      await deps.writeHeartbeat(owner, enabled ? selectedJobs.map(job => job.name) : [], now).catch(error => log('worker heartbeat failed', error));
     }
   }
 
-  return { tick, shutdown, get running() { return new Set(running); }, get pollIntervalMs() { return pollIntervalMs; } };
+  return { tick, runNow, shutdown, get running() { return new Set(running); }, get pollIntervalMs() { return pollIntervalMs; } };
 }
 
 export const workerConfigKeys = jobs.map(job => job.configKey);

@@ -1,9 +1,11 @@
 /** Next.js startup hook: load Root values that synchronous request guards need. */
 export async function register() {
   // Import inside the runtime check so the bundler drops Node-only modules from the edge build.
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
+  if (process.env.NEXT_RUNTIME === 'nodejs' && process.env.NEXT_PHASE !== 'phase-production-build') {
     const { startPublicOriginRefresh } = await import('./server/request-origin');
     await startPublicOriginRefresh();
+    const { startOperatorWatchdog } = await import('./modules/root/server/watchdog');
+    await startOperatorWatchdog();
   }
 }
 

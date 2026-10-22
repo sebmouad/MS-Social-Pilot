@@ -10,6 +10,8 @@ migration names already in source. No migration was applied by this lane.
 | `OAuthClient` | Installation client registration, retained; not personal/tenant content |
 | `OAuthCode` | No workspace/user FK: explicit tenant export/counts/delete; supplementary account export/delete hook |
 | `changelog_entries` | Installation release notes, retained |
+| `rebuild_monitoring_deliveries` | Installation incident delivery claims and safe outcomes only, no customer content; retained operational history |
+| `rebuild_uptime_samples` | Installation uptime minute idempotency; no customer identifiers; retained for the Root-configured monitoring history window |
 | `rebuild_job_leases` | Installation worker coordination, retained |
 | `rebuild_sync_runs` | Installation worker run history, retained |
 | `workspace_data_purges` | Retained erasure recovery state, deliberately excluded from content erasure |

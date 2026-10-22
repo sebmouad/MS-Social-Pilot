@@ -1,3 +1,4 @@
+import { rootMonitoringToolDefinitions, rootMonitoringTools, rootMonitoringResources, executeRootMonitoringTool } from '@/modules/root/mcp';
 import { readRootConfig, saveRootConfig } from '@/modules/root/server/configuration';
 import { listRootInboxDeletions, confirmRootInboxDeletion } from '../root/inbox-deletions';
 import { listRootPostDeletions, recordRootPostDeletionOutcome } from '../root/post-deletions';
@@ -25,6 +26,7 @@ import { loadRootEvidencePolicy, loadRootEvidenceCopy } from '../root/platform-p
 
 export const rootToolDefinitions = [
   ...rootLegacyToolDefinitions,
+  ...rootMonitoringToolDefinitions,
   ...rootChangelogToolDefinitions,
   { name: 'list_root_inbox_deletions', description: 'Private bounded Inbox deletion recovery history. Includes remote object identity for operator verification, never credentials or comment content. Workspace keys cannot use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'confirm_root_inbox_deletion', description: 'Record an operator attestation only after separately verifying actual remote deletion. This is not an automatic provider check; it never contacts the platform or removes local rows. Require verifiedOnPlatform:true and exact CONFIRM REMOTE DELETION <operationId>. Workspace keys cannot use this tool.', inputSchema: { type: 'object', required: ['operationId', 'verifiedOnPlatform', 'confirmation'], properties: { operationId: { type: 'string' }, verifiedOnPlatform: { const: true, type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -54,6 +56,7 @@ export const rootTools = new Set(rootToolDefinitions.map(tool => tool.name));
 export const canUseRootTool = (viewer: RootMcpActor) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 const resourceDefinitions = [
   ...rootLegacyResources,
+  ...rootMonitoringResources,
   ...rootChangelogResources,
   { uri: 'msp://root/inbox-deletions', name: 'Inbox deletion recovery', description: 'Private bounded operator deletion history and remote identity; credentials excluded.', tool: 'list_root_inbox_deletions' },
   { uri: 'msp://root/post-deletions', name: 'Publishing post deletion recovery', description: 'Private bounded operator deletion history and remote identity; post content and credentials excluded.', tool: 'list_root_post_deletions' },
@@ -78,6 +81,7 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
     const actor = await prisma.user.findUnique({ where: { id: viewer.userId }, select: { isInstanceOwner: true, disabledAt: true } });
     if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
     if (!args || typeof args !== 'object' || Array.isArray(args)) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
+    if (rootMonitoringTools.has(name)) return await executeRootMonitoringTool(viewer.userId, name, args, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
     if (rootLegacyTools.has(name)) return await callRootLegacyTool({ ...viewer, maxResultItems: viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')) }, name, args);
     if (rootChangelogTools.has(name)) return await executeRootChangelogTool(viewer.userId, name, args, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
     switch (name) {

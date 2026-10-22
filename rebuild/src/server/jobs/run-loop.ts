@@ -1,3 +1,4 @@
+import { recordError } from '@/server/errors/recorder';
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
 import type { createWorker, WorkerLogger } from './worker';
 
@@ -18,11 +19,14 @@ async function numberSetting(readConfig: (key: string) => Promise<unknown>, key:
 }
 
 /** Tick until `stop` aborts, then drain within the Root-configured grace period. */
-export async function runWorkerLoop(input: { worker: Worker; readConfig: (key: string) => Promise<unknown>; stop: AbortSignal; log: WorkerLogger }): Promise<{ abandoned: string[] }> {
+export async function runWorkerLoop(input: { worker: Worker; readConfig: (key: string) => Promise<unknown>; stop: AbortSignal; log: WorkerLogger; recordError?: typeof recordError }): Promise<{ abandoned: string[] }> {
   const { worker, readConfig, stop, log } = input;
   while (!stop.aborted) {
     try { await worker.tick(new Date()); }
-    catch (error) { log('worker tick failed', error); }
+    catch (error) {
+      await (input.recordError ?? recordError)({ source: 'worker', error, location: 'worker.tick' });
+      log('worker tick failed', error);
+    }
     await sleep(worker.pollIntervalMs, stop);
   }
   const [graceMs, pollMs] = await Promise.all([numberSetting(readConfig, 'sync.workerShutdownGraceMs'), numberSetting(readConfig, 'sync.workerDrainPollMs')]);

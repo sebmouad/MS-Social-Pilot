@@ -124,3 +124,15 @@ describe('worker run loop shutdown', () => {
     expect(grace).toBeLessThan(90_000);
   });
 });
+
+it('records tick failures through the worker error recorder before shutdown', async () => {
+  const stop = new AbortController();
+  const failure = new Error('configuration unavailable');
+  const recorder = vi.fn(async () => true);
+  const log = vi.fn();
+  const shutdown = vi.fn(async () => ({ abandoned: [] }));
+  const worker = { tick: async () => { stop.abort(); throw failure; }, shutdown, pollIntervalMs: 1 };
+  await runWorkerLoop({ worker, readConfig: async key => config[key], stop: stop.signal, log, recordError: recorder });
+  expect(recorder).toHaveBeenCalledWith({ source: 'worker', error: failure, location: 'worker.tick' });
+  expect(shutdown).toHaveBeenCalledTimes(1);
+});

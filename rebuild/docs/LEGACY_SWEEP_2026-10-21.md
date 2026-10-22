@@ -47,7 +47,7 @@ Source: `src/lib/scheduler/jobs.ts`, `src/middleware.ts`, `src/components/*`, `s
 | AI video polling (`aiVideos`), AI voice, AI image | `lib/ai-video.ts`, `ai-voice.ts`, `ai-image.ts`, `components/AiVideoPanel.tsx`, `AiVoicePanel.tsx` | none (already in section 3, repeated here for the job) | missing |
 | Caption-test evaluation job (`captionTests`) | `lib/caption-test.ts` | none | missing |
 | Holiday and trend refresh jobs (`holidays`, `trends`), `TrendKeywords` | `lib/holidays.ts`, `lib/trends.ts` | `calendarHolidays` / `calendarTrends` worker jobs (`scripts/worker.ts`, `modules/calendar-extras/server/refresh.ts`), Root `calendarExtras.refresh` + two schedule keys; keywords via `change_calendar_trends` | **done at source** (mocked fetch/DB tests `tests/calendar-extras-refresh.test.ts`; no live Nager/Google fetch, no PostgreSQL run) |
-| Alert evaluation job (`alerts`: publish failures, disk, uptime) and uptime days | `lib/system-alerts.ts`, `lib/uptime.ts` | no writer; Telegram/disk alerts absent (section 6) | missing |
+| Alert evaluation job (`alerts`: publish failures, disk, uptime) and uptime days | `lib/system-alerts.ts`, `lib/uptime.ts` | Root monitoring service, leased worker + independent web observer, observed-minute idempotency, incident email outbox; Telegram/provider usage remain separate gaps | done at source for evaluation/uptime (2026-10-22); migration/runtime evidence pending |
 | Negative-comment spike watcher (`negativeComments`) | `lib/negative-comments.ts`, `negativeSpikeEmail` | `negativeSpike` notification event + sentiment input | done at source (`modules/inbox/server/notification-events.ts`, `settings/notifications/server.ts`) |
 | Inbox digest, queue-empty and token-expiry notifications | `email/notify.ts` | notification catalog, `connection-alerts.ts`, queue-empty in `settings/notifications/server.ts` | done at source (mail delivery unproven) |
 | Automatic best-time application (`bestTimes` job, `applyBestTimes`) | `lib/best-times.ts` | Done: weekly `bestTimes` worker (`publishing/server/best-time-apply.ts`) adds strongest new evidence-backed times to channel queues for `apply`-mode workspaces (claims the week, per-channel room caps, skips covered times, audits each add). Settings workspace card with status + apply-now, REST `GET/POST /api/publishing/best-times/apply`, MCP `get_best_time_apply_status`/`apply_best_times` | done (`tests/best-time-apply.test.ts`; new keys `publishing.bestTimeApplySchedule`/`AddPerWeek`/`MaxOwnSlots`/`ApplyBatchWorkspaces`) |
@@ -69,16 +69,16 @@ Totals for this reconcile: 7 rows closed, advanced or retired at source (0.1), 1
 | --- | --- | --- | --- |
 | 1 | **No Meta data-deletion callback and no deauthorize callback** (`/api/facebook/data-deletion`, `/api/facebook/deauthorize` have no rebuild route; nothing under `rebuild/src` mentions them). | Meta platform policy requires them; the Meta app dashboard still points at the legacy URLs on `social.newsgeet.com`, which now 404. | Facebook platform owner (route belongs to `src/platforms/facebook/`, signed-request parsing + shared deletion service) |
 | 2 | **No public legal/info pages**: `/privacy-policy`, `/terms`, `/data-deletion`, `/help`, `/pricing`, `/changelog`, `/status`. Legacy `operator.*` and `site.public` settings have no rebuild key. | Meta app review needs a privacy URL; the data-deletion instruction page is the status URL in gap 1. | App owner + Root config |
-| 3 | **Nothing writes `error_events` or `system_alerts`.** Rebuild `src/instrumentation.ts` only starts public-origin refresh; legacy `onRequestError` -> `recordError` and `/api/errors` are gone. Root Errors/Backups pages only read legacy rows. | Root error console and alert list silently go stale. | Root owner |
+| 3 | **Done at source (2026-10-22): error, alert and uptime writers.** Server/browser/worker errors feed `error_events`; shared Root monitoring writes incidents and sampled uptime through leased worker/web/manual execution. Email transitions use a persisted claim outbox. | Runtime/migration/mail verification and Telegram/provider-usage parity remain open. | Root owner |
 | 4 | **Host backup scripts live only in the legacy tree** (`scripts/server/offsite-backup.sh`, `restore-test.sh`, `install-offsite.sh`, `hardening-20261009.sh`); they insert `backup_runs` rows that Root Backups reads. Installed to `/usr/local/sbin/ms-social-pilot-*` + `/etc/cron.d/ms-social-pilot-offsite`. | Deleting the root tree would orphan the source of the backup/restore-test record. | Release owner: move into `rebuild/scripts/server/` before cleanup |
 | 5 | **Root `prisma/migrations/` is the only migration history** (134 dirs, rebuild ones included) and `prod-deploy.sh` runs `npm ci` at the repo root and tars `prisma/migrations`. `rebuild/package.json` uses `../node_modules/.bin/vitest` and `../.env`. | The "legacy" root cannot simply be deleted. | Release owner |
-| 6 | No `/api/health`. `prod-deploy.sh` probes `/sign-in`; `prod-rollback-drill.sh` probes legacy `/api/health`. | No cheap unauthenticated readiness probe; drill breaks once legacy is removed. | App owner |
+| 6 | **Done at source (2026-10-22):** rebuild `/api/health` checks database readiness; release local/public probes and rebuild recovery probe now use it. Legacy recovery probe is retained for the explicitly isolated legacy release. | Scripts syntax/source checked; actual release/recovery execution remains a release gate. | App owner |
 | 7 | Missing customer features: workspace **Activity/Email history** (`settings/history`), **AI agents** (`settings/agents`), **caption tests**, **chart notes**, **key dates / seasons / holidays / trends**, **ICS calendar feeds**, **Slack/Telegram alert channels** (`chat_channels`), **spam check**, **engagement outlook**, **composer link-preview fetch**, **translated posts**, **AI image/video/voice**, **legacy REST `api_tokens`**. | Legacy capabilities not in LEGACY_CAPABILITY_PARITY.md (it has no rows for them). | Per module |
 | 8 | Nine non-Facebook connectors and Instagram publishing. **Update 2026-10-22:** Instagram, YouTube and TikTok installed (fixture evidence); Mastodon, Threads, X, Bluesky, Telegram, LinkedIn, Pinterest staged adapters with Root settings, not customer-installable. | Partial | Platform owners |
 | 9 | `import-legacy-config.ts` imports only Facebook, AI-provider, auth-policy and APP_URL values. Operator, alerts, retention, scheduler, media and link-shortener legacy settings are not imported. | Silent config loss if the legacy `app_settings` table is later dropped. | Root owner |
 | 10 | Legacy `oauth_clients`/`oauth_codes` are not read; rebuild uses new `mcp_oauth_clients`/`mcp_oauth_codes`. Existing connector registrations must be re-created. | Connectors authorised under legacy stop working. | Integrations owner (document or migrate) |
 
-**Update 2026-10-22 (history/public/errors lane; source + mocked tests only, no browser, PostgreSQL or production run):** gap 2 (public pages), gap 6 (`/api/health`) and the Settings › History and Root › Changelog parts of gap 7 are implemented in `src/modules/history/`; gap 3 is closed for server, browser and error-boundary errors via `src/server/errors/`. Still open from gap 3: worker-side `recordError` calls, `system_alerts`/`uptime_days` writers and alert delivery. The legacy `changelog_entries`, `activity_logs`, `email_logs` and `error_events` tables are the same tables the rebuild reads and writes, so no data import script is needed.
+**Update 2026-10-22 (history/public/errors lane; source + mocked tests only, no browser, PostgreSQL or production run):** gap 2 (public pages), gap 6 (`/api/health`) and the Settings › History and Root › Changelog parts of gap 7 are implemented in `src/modules/history/`; gap 3 is closed for server, browser and error-boundary errors via `src/server/errors/`. Operator follow-up below adds worker-side `recordError`, `system_alerts`/`uptime_days` writers and claimed email delivery. Telegram/provider usage parity remains open. The legacy `changelog_entries`, `activity_logs`, `email_logs` and `error_events` tables are the same tables the rebuild reads and writes, so no data import script is needed.
 
 ## 2. Pages (`src/app/**/page.tsx`)
 
@@ -138,13 +138,13 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `(root)/root` | `root` | done |
 | `root/activity` | `root/activity` | done |
 | `root/agency` | `agency` module + `root/workspaces` | partial: client invitations (`client_invitations`) unread |
-| `root/alerts` | `root/operations` / `root/modules` diagnostics | partial: no `system_alerts` writer, no alert test button |
+| `root/alerts` | `root/operations` monitoring | evaluation/incidents/uptime/email outcomes done at source (2026-10-22); legacy test-alert button and Telegram parity remain open |
 | `root/backups` | `root/backups` | partial: read-only; writers are legacy host scripts |
 | `root/changelog` | `root/changelog` | done (source + mocked tests): `src/app/root/changelog/page.tsx`, `ui/ChangelogManager.tsx`, `server/changelog.ts`, `/api/root/changelog*`, Root MCP `list/add/remove_root_changelog_*` |
 | `root/config`, `config/[section]` | `root/config`, `root/modules/[id]`, `root/platforms/[id]` | done |
 | `root/connections` | `root/connections` | done |
 | `root/danger` | `root/lifecycle` | done |
-| `root/errors` | `root/errors`, `root/errors/[id]` | done for the recorder (2026-10-22): `src/server/errors/recorder.ts` (instrumentation `onRequestError`, browser reports, error boundary) now writes `error_events`; worker-side `recordError` calls and `system_alerts` writers remain open |
+| `root/errors` | `root/errors`, `root/errors/[id]` | done for the recorder (2026-10-22): `src/server/errors/recorder.ts` (instrumentation `onRequestError`, browser reports, error boundary) now writes `error_events`; worker-side `recordError`, incident and uptime writers added by operator follow-up (2026-10-22); runtime evidence remains open |
 | `root/meta`, `meta/connections` | `root/platforms/[id]` (Facebook), `root/connections` | partial: no app-check button |
 | `root/meta/usage` (Graph usage) | `api.meta.requestsPerMinute` key only | missing: `graph_usage` has no reader |
 | `root/plans` | `root/plans` | done |
@@ -197,7 +197,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/facebook/connect`, `callback` | `api/connections/[platform]/start`, `callback` (+ `api/oauth/connections/[platform]/start`) | done; Meta redirect URI must be updated to the new callback |
 | `api/facebook/data-deletion`, `deauthorize` | none | **missing (gap 1)** |
 | `api/feeds`, `[id]` | `api/feeds/*` (+ WordPress) | done |
-| `api/health` | `api/health` | done (source + mocked tests): `src/app/api/health/route.ts`, `modules/history/server/health.ts`; scripts still probe `/sign-in` and legacy health until the release owner rewires them |
+| `api/health` | `api/health` | done at source: health route + service; `prod-deploy.sh` local/public readiness and rebuild rollback drill now probe `/api/health` (2026-10-22). Scripts syntax/source tested, never executed against production by this lane |
 | `api/instagram` | `platforms/instagram` discovery only | partial |
 | `api/key-dates`, `seasons` (+ `[id]`) | `api/key-dates`, `api/seasons` (+ `[id]`), `api/chart-notes`, `api/calendar/trends` | done at source; MCP_PARITY rows `*_calendar_*` |
 | `api/labels`, `[id]` | `api/publishing/labels/*` | done |
@@ -263,7 +263,7 @@ Rebuild evidence paths under `rebuild/src/`.
 | `ai-image`, `ai-video`, `ai-voice`, `voice-names` | `modules/ai/content-tools/server/{media,media-openai,media-gemini,media-ports}.ts`; voice names are the Root `ai.voicePolicy.voices` list | done (2026-10-22) |
 | `text-backgrounds`, `alt-text`, `translation`, `translated-posts` | `modules/ai` translate kind only | missing / partial |
 | `chat` | none | missing |
-| `system-alerts`, `error-tracking`, `uptime`, `health`, `housekeeping`, `background-refresh` | worker jobs + `server/root/*`; no alert/error/uptime writer | partial (gap 3) |
+| `system-alerts`, `error-tracking`, `uptime`, `health`, `housekeeping`, `background-refresh` | `modules/root/server/operator-monitoring.ts`, shared runner, error recorder; alerts + sampled uptime + worker errors implemented | done at source for writers and health probes (2026-10-22); Telegram/provider-usage parity and live evidence remain |
 | `media`, `image-format`, `image-variants`, `media-links`, `zip`, `workspace-export` | `modules/media/**`, `server/data-control/**`, `modules/settings/server/exports.ts` | done / partial |
 | `bio`, `share-links`, `agency*`, `tasks`, `task-workflow`, `team`, `role-access`, `scope-abilities`, `page-access`, `page-groups`, `page-filter`, `selection`, `custom-fields`, `feeds`, `rss/*`, `webhooks`, `api`, `public-api`, `api-tokens` | corresponding modules; `api-tokens` replaced by MCP/person keys | done; `api-tokens` partial |
 | `root*`, `operator`, `site`, `setup`, `meta-app`, `plans`, `settings/*`, `config-draft`, `modules`, `env` | `server/root/**`, `server/config/**`, `lib/config/**` | done / partial (`operator`, `site`, `setup` missing) |
@@ -375,3 +375,20 @@ Lane verification (rebuild directory; synthetic/mocked evidence only):
 - Vitest caching was disabled because linked `node_modules/.vite` is outside the
   writable sandbox; the initial cached runs passed assertions but exited on cache
   write EPERM. No sandbox policy or unrelated dependency path was changed.
+
+## Operator follow-up (2026-10-22; source and mocked tests)
+
+Alert evaluation and `uptime_days` writing are implemented through the private
+Root monitoring service; UI, REST and MCP delegate to the same Root-authorized,
+exactly confirmed evaluation. Dedicated worker and independent web observer use
+the same leased job runner and run history; web observers never write worker
+heartbeats or run publishing jobs. Minute claims prevent repeated observations
+from inflating daily totals. Incidents enqueue email only on state transitions;
+committed delivery claims preserve uncertain sends without automatic replay.
+Worker job/tick/startup errors use the existing scrubbed `recordError` service.
+Release and recovery scripts use the rebuild database-backed health probe.
+
+This closes the requested evaluation/writer/health-probe source gaps, not all
+legacy alert delivery parity: Telegram, provider-specific usage alerts and the
+standalone legacy test-alert endpoint remain open. No migrations, browser,
+mail delivery, production scripts or deployment were executed by this lane.

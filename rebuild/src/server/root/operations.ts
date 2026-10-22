@@ -1,5 +1,6 @@
 import { loadRootModuleHealth } from './module-health';
 import { moduleManifests } from '@/modules';
+import { ROOT_JOBS } from '@/modules/root/jobs';
 import { Prisma } from '../../../generated/client';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -10,7 +11,7 @@ export async function requireActiveRoot(actorId: string, db = prisma) {
   const actor = await db.user.findUnique({ where: { id: actorId }, select: { isInstanceOwner: true, disabledAt: true } });
   if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
 }
-export const operationJobs = moduleManifests.flatMap(module => module.jobs.map(job => ({ ...job, moduleId: module.id })));
+export const operationJobs = [...moduleManifests.flatMap(module => module.jobs.map(job => ({ ...job, moduleId: module.id }))), ...ROOT_JOBS.map(job => ({ ...job, moduleId: 'root' }))];
 
 /** Rebuild-only, value-free telemetry. Never returns raw stored provider errors or summaries. */
 export async function loadRootOperations(actorId: string, moduleId?: string, resultCap?: number) {

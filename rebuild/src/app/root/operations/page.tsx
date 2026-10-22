@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { requireRootPage } from '@/server/config/access';
 import { RootFrame } from '@/server/root/RootFrame';
 import { RootDiagnostics } from '@/server/root/RootDiagnostics';
+import { RootMonitoring } from '@/modules/root/ui/RootMonitoring';
 import { RootJobHealth } from '@/server/jobs/RootJobHealth';
 import { runtimeConfig } from '@/server/config/store';
 import { ROOT_OPERATIONS_COPY } from '@/lib/config/root-operations-copy';
@@ -19,5 +20,6 @@ export default async function RootOperationsPage() {
     <PageHeader module="root" title={copy.title} description={<>{copy.intro}</>} />
     {await RootDiagnostics({ scope: 'shared' })}
     {await RootJobHealth()}
+    {await RootMonitoring()}
   </RootFrame>;
 }

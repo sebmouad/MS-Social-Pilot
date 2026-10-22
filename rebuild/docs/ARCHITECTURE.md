@@ -344,7 +344,7 @@ Source-level; mocked service/route/MCP tests only, no browser, PostgreSQL or pro
 - Public site (`ui/public-pages.tsx`, thin `src/app/{help,pricing,status,changelog,privacy-policy,terms,data-deletion}` routes): text is Root-editable (`public.content`, `public.operator`, `public.siteEnabled`), EN/FR, rendered only as paragraphs, lists and safe links. Help, pricing, status and changelog 404 until `public.siteEnabled`; the legal pages are always public.
 - Root changelog (`server/changelog.ts`, `/root/changelog`, `/api/root/changelog*`, Root MCP `*_root_changelog_*`): installation owner only, exact confirmations, transactional audit.
 - `GET /api/health` (`server/health.ts`): the database decides the verdict, worker state is information.
-- `src/server/errors/`: self-hosted recorder feeding `error_events` (Next `onRequestError`, error boundary, `window` listeners via `/api/errors`), scrubbed and grouped, bounded by Root keys `errors.*`. Open: worker-side recording, `system_alerts` and uptime writers.
+- `src/server/errors/`: self-hosted recorder feeding `error_events` (Next `onRequestError`, error boundary, `window` listeners via `/api/errors`), scrubbed and grouped, bounded by Root keys `errors.*`. Operator follow-up below adds worker-side recording, `system_alerts` and uptime writers; runtime evidence and residual delivery parity remain open.
 
 ## Calendar extras install (2026-10-22)
 
@@ -577,3 +577,20 @@ independently re-observed by this documentation lane.
 ## Legacy shell lane q-35 — 2026-10-22
 
 Source update: installable app shell (dynamic public branding/manifest, offline-only service worker, icons and bilingual Appearance controls), global cross-site mutation middleware and neutral likes-versus-followers growth identity are implemented in the working tree. See [PLATFORM_SHELL_Q35.md](PLATFORM_SHELL_Q35.md) for exact evidence and remaining checks. New Root key: `settings.webApp`; integrator must bump CONFIG_SCHEMA_VERSION (unchanged here). Existing `meta.metricLabels` and `analytics.overviewCopy` gain copy entries with saved-catalog compatibility. No new database table, migration, background job or provider write. Browser service workers are local browser infrastructure; existing audience synchronization stays under shared worker leases/run history. No server, deploy, commit, push or production action was authorized in this lane. These source changes do not close real browser/provider/release gates or unrelated historical gaps. Facebook Groups are dropped by owner decision 2026-10-22; historical missing-feature statements above do not authorize Groups work.
+
+## Operator monitoring follow-up (2026-10-22)
+
+Source adds module-owned Root monitoring (UI/REST/MCP shared authorization,
+exact confirmation and audit), incident evaluation, observed-minute uptime,
+and a persisted email outbox that never automatically replays uncertain sends.
+The dedicated worker and independent web observer share leases/run history;
+web monitoring cannot publish or write worker heartbeats. Worker failures feed
+the existing scrubbed error console. Release/recovery readiness probes now use
+`/api/health`; scripts were not executed against any host.
+
+New migration `20261022180000_rebuild_uptime_samples` adds minute claims and
+monitoring delivery records; apply/rehearse it before enabling monitoring.
+New Root keys are listed in the operator lane verification note. Schema version
+is deliberately unchanged for the integrator. Telegram, provider usage alerts,
+test-alert parity and real database/browser/mail/release evidence remain open.
+See `OPERATOR_MONITORING_2026-10-22.md` for scope and current verification.

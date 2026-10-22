@@ -549,6 +549,8 @@ or person credential access. Root resources read through these same tools.
 | list_root_changelog | installation/root | read | GET /api/root/changelog | listRootChangelog; separately authenticated private dispatcher. |
 | add_root_changelog_entry | installation/root | write | POST /api/root/changelog | addRootChangelogEntry; exact ADD CHANGELOG ENTRY confirmation, Root re-check and transactional audit. |
 | remove_root_changelog_entry | installation/root | write | DELETE /api/root/changelog/[id] | removeRootChangelogEntry; exact REMOVE CHANGELOG ENTRY confirmation, Root re-check and transactional audit. |
+| get_root_monitoring | installation/root | read | GET /api/root/monitoring | readRootOperatorMonitoring; bounded alerts and availability observations. |
+| evaluate_root_monitoring | installation/root | write | POST /api/root/monitoring | runRootOperatorMonitoring; exact confirmation and shared leased runner. |
 <!-- parity-root-tools:end -->
 
 The remaining 24 exceptions are authentication bootstrap/ceremonies, transport or
@@ -750,3 +752,4 @@ proof remain open. No server, deployment or push was run in this lane.
 `get_web_app` and `prepare_web_app_installation` use the same Settings account service as Appearance UI and GET/POST `/api/settings/web-app`. Preparation requires exact `PREPARE WEB APP INSTALLATION` and an account audit. Session-only access preserves tenant/permission checks. A preparation receipt explicitly says `installed: false`; browser installation itself is a device-local interactive ceremony, not a remotely executable MCP action. Manifest, worker, offline document and icon routes expose public branding only.
 
 Existing Analytics snapshot and metric-detail UI/REST/MCP operations now retain provider-normalized `audienceGrowth: { kind, direction }`. Likes/followers and gained/lost identities are kept separate; incompatible identities refuse comparison. Existing snapshot service owns authorization; this stored-read normalization adds no write or job. Evidence: `analytics-audience-growth.test.ts`, the REST/MCP detail case in `integrations-v1-analytics-ads.test.ts`. The shared cross-site middleware adds transport security to all mutation routes without a new product action or tool.
+| Root operator monitoring | `/root/operations` alert/availability panel and exact-confirmation evaluation | `GET /api/root/monitoring`, `POST /api/root/monitoring` | `get_root_monitoring`, `evaluate_root_monitoring`; `msp://root/monitoring` | `modules/root/server/operator-monitoring.ts`: installation-owner authorization, bounded evidence, exact `EVALUATE ROOT MONITORING`, shared leased runner and evaluation audit. Observation minutes are not continuous-uptime proof. |

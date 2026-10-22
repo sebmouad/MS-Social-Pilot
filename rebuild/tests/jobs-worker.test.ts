@@ -13,6 +13,7 @@ function dependencies(overrides: Partial<WorkerDependencies> = {}) {
     writeRun: async run => { runs.push(run); },
     writeHeartbeat: async () => undefined,
     alreadyRanThisMinute: async () => false,
+    recordError: vi.fn(async () => true),
     logger: () => undefined,
     ...overrides,
   };
@@ -27,6 +28,38 @@ async function drain(worker: ReturnType<typeof createWorker>) {
 }
 
 describe('replacement worker scheduling', () => {
+  it('uses the same lease and run history for confirmed on-demand monitoring', async () => {
+    const state = dependencies({ alreadyRanThisMinute: async () => true });
+    const worker = createWorker(state.deps, 'monitoring-manual-test', { jobs: ['operatorMonitoring'], heartbeat: false });
+    expect(await worker.runNow('posts')).toBe(false);
+    expect(await worker.runNow('operatorMonitoring')).toBe(true);
+    expect(state.started).toEqual(['operatorMonitoring']);
+    expect(state.runs).toHaveLength(1);
+    const held = dependencies({ tryLease: async () => false });
+    const heldWorker = createWorker(held.deps, 'monitoring-held', { jobs: ['operatorMonitoring'], heartbeat: false });
+    expect(await heldWorker.runNow('operatorMonitoring')).toBe(false);
+    expect(held.started).toHaveLength(0);
+    expect(held.runs).toHaveLength(0);
+  });
+
+
+  it('restricts the web observer to monitoring and never writes a worker heartbeat', async () => {
+    const heartbeat = vi.fn(async () => undefined);
+    const tryLease = vi.fn(async () => true);
+    const state = dependencies({ writeHeartbeat: heartbeat, tryLease });
+    const read = state.deps.readConfig;
+    state.deps.readConfig = async key => key.endsWith('.schedule') ? '* * * * *' : read(key);
+    const worker = createWorker(state.deps, 'monitoring-web-test', { jobs: ['operatorMonitoring'], heartbeat: false });
+    await worker.tick(new Date(2026, 0, 1, 12, 5));
+    await drain(worker);
+    expect(state.started).toEqual(['operatorMonitoring']);
+    expect(tryLease.mock.calls).toHaveLength(1);
+    expect(heartbeat).not.toHaveBeenCalled();
+    expect(state.runs).toHaveLength(1);
+    await worker.shutdown(100, 1);
+  });
+
+
   it('obeys Root enabled switch and limits simultaneous jobs', async () => {
     let resolveGate!: (value: string) => void;
     const gate = new Promise<string>(resolve => { resolveGate = resolve; });
@@ -148,5 +181,29 @@ describe('Root worker telemetry limits', () => {
       finish('done'); await vi.advanceTimersByTimeAsync(0);
       expect(worker.running.size).toBe(0);
     } finally { vi.useRealTimers(); }
+  });
+});
+
+
+describe('worker error recording', () => {
+  it('records thrown failures once and preserves failed run history and lease release', async () => {
+    const error = new Error('job refused');
+    const recordError = vi.fn(async () => true);
+    const releaseLease = vi.fn(async () => undefined);
+    const state = dependencies({ recordError, releaseLease, execute: async () => { throw error; } });
+    const worker = createWorker(state.deps, 'test-worker');
+    await worker.tick(new Date(2026, 0, 1, 12, 5)); await drain(worker);
+    expect(recordError).toHaveBeenCalledWith({ source: 'worker', error, location: 'posts' });
+    expect(recordError).toHaveBeenCalledTimes(1);
+    expect(state.runs[0]).toMatchObject({ outcome: 'failed' });
+    expect(releaseLease).toHaveBeenCalledTimes(1);
+  });
+  it('records partial failures returned by module jobs', async () => {
+    const recordError = vi.fn(async () => true);
+    const state = dependencies({ recordError, execute: async () => 'updated=1 failed=2' });
+    const worker = createWorker(state.deps, 'test-worker');
+    await worker.tick(new Date(2026, 0, 1, 12, 5)); await drain(worker);
+    expect(recordError).toHaveBeenCalledWith({ source: 'worker', error: expect.any(Error), location: 'posts' });
+    expect(state.runs[0]).toMatchObject({ outcome: 'failed' });
   });
 });

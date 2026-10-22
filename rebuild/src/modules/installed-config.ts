@@ -1,3 +1,4 @@
+import { ROOT_MONITORING_CONFIG } from './root/config';
 import { ADS_MODULE_CONFIG } from './ads/config';
 import { AGENCY_CONFIG } from './agency/config';
 import { AI_CONFIG } from './ai/config';
@@ -22,6 +23,7 @@ import { CALENDAR_EXTRAS_CONFIG } from './calendar-extras/config';
  * changes settings in its own config.ts; this list changes only when a module is installed.
  */
 export const INSTALLED_MODULE_CONFIG = [
+  ...ROOT_MONITORING_CONFIG,
   ...HOME_CONFIG,
   ...CALENDAR_EXTRAS_CONFIG,
   ...ADS_MODULE_CONFIG,

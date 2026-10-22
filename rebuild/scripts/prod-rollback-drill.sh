@@ -145,7 +145,7 @@ run_release() {
 run_release legacy "$LEGACY" "$LEGACY_PORT" /api/health
 LEGACY_SECONDS=$elapsed
 # Both releases use precisely the same restored schema/data; incompatibility fails the gate.
-run_release rebuild "$REBUILD" "$REBUILD_PORT" /sign-in
+run_release rebuild "$REBUILD" "$REBUILD_PORT" /api/health
 REBUILD_SECONDS=$elapsed
 # Ensure the first release survived the second check as well.
 curl --noproxy '*' --fail --silent --max-time "$CURL_TIMEOUT" -o /dev/null "http://127.0.0.1:$LEGACY_PORT/api/health" || fail 'Legacy did not remain healthy'
