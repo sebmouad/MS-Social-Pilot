@@ -112,3 +112,31 @@ single-use reset link for an account while mail is unconfigured. Promoting
 another installation owner or resetting a Root second step has no web path;
 use the rebuild equivalents in `rebuild/scripts/admin/` (`set-root.ts`,
 `reset-two-step.ts`) from `rebuild/` with the production database URL.
+
+## Instagram connector runbook
+
+Module: `src/platforms/instagram/` (installed, `platforms.instagram.enabled`
+defaults to `false`). Full audit and live checklist:
+[INSTAGRAM_LIVE_RUN.md](INSTAGRAM_LIVE_RUN.md).
+
+- **Root prerequisites:** set `instagram.appSecret` (Graph signing secret),
+  review `instagram.policy` (endpoint/version, bounds, required grants,
+  metric requests, EN/FR copy), then switch `platforms.instagram.enabled` on.
+  Access follows `platforms.instagram.includedByDefault` /
+  `platforms.instagram.planFeatures`. No Facebook setting changes.
+- **Connect:** customers use Settings › Channels › Instagram › Connect
+  (`START CONNECTION instagram`); discovery reads only enabled, selected
+  Facebook Pages and persists unselected encrypted clones. Grant health rows
+  (publishing/comments/analytics) show missing scopes per connection.
+- **Jobs:** the shared `analytics` job (`sync.analytics.schedule`) runs
+  `syncInstagramAnalytics` (account metrics, profile snapshot, media window).
+  Inbox sync is manual per channel; there is no inbox background job.
+- **Evidence:** per-attempt container/publication intents live in
+  `root_activities` (`instagram.publication_step`); the recovery host keeps
+  unknown dispatches held and exposes content-free evidence to Root even while
+  the module is off. Sync receipts use `instagram.analytics_synced`.
+- **Incidents:** missing/expired grants fail closed with reconnect prompts —
+  reconnect the parent Facebook Page, then re-run Instagram Connect to rotate
+  clones. There is no remote media delete: remove test posts in the Instagram
+  app. Only public HTTPS media URLs publish; stored-library bytes are refused
+  until the signed-URL pipeline exists.

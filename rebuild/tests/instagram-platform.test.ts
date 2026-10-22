@@ -79,7 +79,7 @@ describe('Instagram platform fixtures', () => {
   });
   it('refuses invalid media, formats, schedules and overlong Unicode captions before I/O', async () => {
     const f = fixture([]); const adapter = createInstagramAdapter(policy, { fetch: f.fetcher });
-    const changes: Array<Partial<PublishRequest>> = [{ media: [] }, { formatId: 'story' }, { link: 'https://example.test' }, { scheduledAt: new Date() }, { text: '🙂'.repeat(policy.captionLength + 1) }, { media: [{ kind: 'image', url: 'http://example.test/photo.jpg' }] }, { media: [{ kind: 'image', url: 'https://example.test/photo.jpg', altText: 'Unsupported' }] }, { formatId: 'reel' }];
+    const changes: Array<Partial<PublishRequest>> = [{ media: [] }, { formatId: 'live' }, { link: 'https://example.test' }, { scheduledAt: new Date() }, { text: '🙂'.repeat(policy.captionLength + 1) }, { media: [{ kind: 'image', url: 'http://example.test/photo.jpg' }] }, { media: [{ kind: 'image', url: 'https://example.test/photo.jpg', altText: 'Unsupported' }] }, { formatId: 'reel' }];
     for (const change of changes) await expect(adapter.publish!({ ...request, ...change })).rejects.toMatchObject({ outcome: 'rejected' });
     expect(f.calls).toHaveLength(0);
   });
@@ -205,6 +205,92 @@ describe('Instagram platform fixtures', () => {
   it('does not dispatch an already cancelled request', async () => {
     const f = fixture([]); const controller = new AbortController(); controller.abort();
     await expect(createInstagramAdapter(policy, { fetch: f.fetcher }).publish!({ ...request, signal: controller.signal })).rejects.toMatchObject({ outcome: 'rejected' });
+    expect(f.calls).toHaveLength(0);
+  });
+  it('publishes feed video with the VIDEO type and keeps reels distinct', async () => {
+    const f = fixture([{ id: 'video' }, finished, { id: 'post' }, {}]);
+    await createInstagramAdapter(policy, { fetch: f.fetcher }).publish!({ ...request, formatId: 'video', media: [{ kind: 'video', url: 'https://media.example.test/clip.mp4' }] });
+    expect(f.calls[0]!.fields.get('media_type')).toBe('VIDEO');
+    expect(f.calls[0]!.fields.get('caption')).toBe(request.text);
+  });
+  it('publishes stories without a caption and refuses captioned stories before I/O', async () => {
+    const f = fixture([{ id: 'story' }, finished, { id: 'post' }, {}]);
+    const adapter = createInstagramAdapter(policy, { fetch: f.fetcher });
+    await adapter.publish!({ ...request, text: '', formatId: 'story' });
+    expect(f.calls[0]!.fields.get('media_type')).toBe('STORIES');
+    expect(f.calls[0]!.fields.has('caption')).toBe(false);
+    await expect(adapter.publish!({ ...request, formatId: 'story' })).rejects.toMatchObject({ outcome: 'rejected' });
+    await expect(adapter.publishFirstComment!({ credential, remotePostId: 'post', formatId: 'story', text: 'First' })).rejects.toMatchObject({ outcome: 'rejected' });
+    expect(f.calls).toHaveLength(4);
+  });
+  it('declares photo, video, carousel, reel and story formats with honest capability flags', () => {
+    const adapter = createInstagramAdapter(policy, { locale: 'fr' });
+    const formats = Object.fromEntries(adapter.publishingFormats!.map(format => [format.id, format]));
+    expect(Object.keys(formats)).toEqual(['image', 'video', 'carousel', 'reel', 'story']);
+    expect(formats.story).toMatchObject({ label: 'Story', firstComment: false, remoteStatus: false, remoteDelete: false });
+    expect(formats.video).toMatchObject({ label: 'Vidéo', firstComment: true, remoteStatus: true });
+    expect(formats.story!.media).toMatchObject({ maxImages: 1, maxVideos: 1, mixedKinds: false });
+    expect(formats.carousel!.media).toMatchObject({ mixedKinds: true });
+    expect(adapter.defaultPublishingFormatId).toBe('image');
+  });
+  it.each([
+    { status: 429, body: { error: { code: 80004, message: 'slow down' } }, outcome: 'uncertain', retryable: true },
+    { status: 500, body: { error: { message: 'oops' } }, outcome: 'uncertain', retryable: true },
+    { status: 400, body: { error: { code: 190, is_transient: true } }, outcome: 'uncertain', retryable: true },
+    { status: 400, body: { error: { code: 190, message: 'expired' } }, outcome: 'rejected', retryable: false },
+    { status: 403, body: { error: { code: 200, message: 'permission' } }, outcome: 'rejected', retryable: false },
+  ])('maps Graph failure $status/$body.error.code to $outcome (retryable $retryable)', async ({ status, body, outcome, retryable }) => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+    const error = await createInstagramGraph(policy, { fetch: fetcher }).request('post', 'token').catch(error => error);
+    expect(error).toBeInstanceOf(InstagramError);
+    expect(error.outcome).toBe(outcome); expect(error.retryable).toBe(retryable);
+  });
+  it('treats transport failures as retryable uncertain outcomes', async () => {
+    const fetcher = vi.fn(async () => { throw new TypeError('network down'); }) as unknown as typeof fetch;
+    const error = await createInstagramGraph(policy, { fetch: fetcher }).request('post', 'token').catch(error => error);
+    expect(error).toMatchObject({ outcome: 'uncertain', retryable: true });
+  });
+  it('collects the media window with per-media insights and skips out-of-window items', async () => {
+    const small = { ...policy, postMetrics: ['views', 'likes'] };
+    const f = fixture([
+      { data: [
+        { id: 'media-new', caption: 'New', media_type: 'IMAGE', media_product_type: 'FEED', permalink: 'https://www.instagram.com/p/new/', timestamp: '2026-10-20T12:00:00Z', like_count: 5, comments_count: 1 },
+        { id: 'media-old', timestamp: '2026-09-01T12:00:00Z' },
+        { id: '', timestamp: 'not-a-date' },
+      ] },
+      { data: [{ name: 'views', period: 'lifetime', values: [{ value: 40 }] }] },
+      { data: [{ name: 'likes', period: 'lifetime', values: [{ value: 5 }] }] },
+    ]);
+    const result = await createInstagramCollector(small, { fetch: f.fetcher }).media(credential, 'ig-one', new Date('2026-10-01'), new Date('2026-10-21'));
+    expect(result.failedMedia).toEqual([]);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({ remoteId: 'media-new', caption: 'New', mediaType: 'IMAGE', likeCount: 5, commentsCount: 1, insights: { views: 40, likes: 5 }, insightsSyncedAt: new Date('2026-10-21') });
+    expect(f.calls.filter(call => call.path === '/v26.0/media-new/insights')).toHaveLength(2);
+  });
+  it('isolates single-media insight failures without losing the window', async () => {
+    const small = { ...policy, postMetrics: ['views'] };
+    const f = fixture([
+      { data: [{ id: 'a', timestamp: '2026-10-20T12:00:00Z' }, { id: 'b', timestamp: '2026-10-20T13:00:00Z' }] },
+      new Error('media a insights gone'),
+      { data: [{ name: 'views', period: 'lifetime', values: [{ value: 3 }] }] },
+    ]);
+    const result = await createInstagramCollector(small, { fetch: f.fetcher }).media(credential, 'ig-one', new Date('2026-10-01'), new Date('2026-10-21'));
+    expect(result.failedMedia).toEqual(['a']);
+    expect(result.items).toMatchObject([{ remoteId: 'a', insights: { views: null }, insightsSyncedAt: null }, { remoteId: 'b', insights: { views: 3 } }]);
+    expect(result.items[1]!.insightsSyncedAt).toEqual(new Date('2026-10-21'));
+  });
+  it('refuses a clipped media window unless an older item proves the edge', async () => {
+    const small = { ...policy, maxPages: 1, postMetrics: ['views'] };
+    const page = (items: unknown[]) => ({ data: items, paging: { next: 'https://graph.example/next', cursors: { after: 'more' } } });
+    const clipped = fixture([page([{ id: 'a', timestamp: '2026-10-20T12:00:00Z' }])]);
+    await expect(createInstagramCollector(small, { fetch: clipped.fetcher }).media(credential, 'ig-one', new Date('2026-10-01'), new Date('2026-10-21'))).rejects.toMatchObject({ outcome: 'uncertain' });
+    const proven = fixture([page([{ id: 'a', timestamp: '2026-10-20T12:00:00Z' }, { id: 'old', timestamp: '2026-08-01T12:00:00Z' }]), { data: [{ name: 'views', period: 'lifetime', values: [{ value: 1 }] }] }]);
+    const result = await createInstagramCollector(small, { fetch: proven.fetcher }).media(credential, 'ig-one', new Date('2026-10-01'), new Date('2026-10-21'));
+    expect(result.items.map(item => item.remoteId)).toEqual(['a']);
+  });
+  it('fails closed when insight scopes are missing for media history', async () => {
+    const f = fixture([]);
+    await expect(createInstagramCollector(policy, { fetch: f.fetcher }).media({ accessToken: 'token' }, 'ig-one', new Date('2026-10-01'), new Date('2026-10-21'))).rejects.toMatchObject({ outcome: 'rejected' });
     expect(f.calls).toHaveLength(0);
   });
 

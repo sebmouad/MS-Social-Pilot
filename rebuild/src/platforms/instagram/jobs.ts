@@ -54,9 +54,10 @@ export async function syncInstagramAnalytics(now = new Date(), retryLimit = 0, r
       if (!initial) { result.skipped++; continue; }
       const signal = jobAbortSignal(); signal?.throwIfAborted();
       const collector = await configuredInstagramCollector(signal);
-      const [profile, insights] = await Promise.all([
+      const [profile, insights, history] = await Promise.all([
         withRetries(() => collector.profile(initial.credential, target.providerId), retryLimit, retryBackoff),
         withRetries(() => collector.account({ credential: initial.credential, targetId: target.providerId, since, until: now }), retryLimit, retryBackoff),
+        withRetries(() => collector.media(initial.credential, target.providerId, since, now), retryLimit, retryBackoff),
       ]);
       signal?.throwIfAborted();
       const persisted = await withWorkspaceOperation(target.workspaceId, () => withSelectedResourceOperation(target.workspaceId, { kind: 'target', id: target.id }, async (tx, lockSignal) => {
@@ -71,6 +72,11 @@ export async function syncInstagramAnalytics(now = new Date(), retryLimit = 0, r
           const numeric = typeof row.value === 'number' && Number.isFinite(row.value) ? row.value : null;
           await tx.instagramInsight.upsert({ where: { accountId_metric_period_endTime: { accountId: current.accountId, metric: row.metric, period, endTime: row.asOf } }, create: { id: randomUUID(), accountId: current.accountId, metric: row.metric, period, endTime: row.asOf, value, numeric, fetchedAt: now }, update: { value, numeric, fetchedAt: now } });
         }
+        for (const item of history.items) {
+          const media = { instagramHostVersion: 1, ...item.insights } as Prisma.InputJsonValue;
+          const fields = { caption: item.caption, mediaType: item.mediaType, mediaProductType: item.mediaProductType, mediaUrl: item.mediaUrl, permalink: item.permalink, thumbnailUrl: item.thumbnailUrl, timestamp: item.timestamp, likeCount: item.likeCount, commentsCount: item.commentsCount, insights: media, insightsSyncedAt: item.insightsSyncedAt, fetchedAt: now };
+          await tx.instagramMedia.upsert({ where: { accountId_remoteId: { accountId: current.accountId, remoteId: item.remoteId } }, create: { id: randomUUID(), accountId: current.accountId, remoteId: item.remoteId, ...fields }, update: fields });
+        }
         // A failed/missing profile value remains unknown; it never becomes zero.
         const raw = object(profile.raw);
         const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -79,10 +85,10 @@ export async function syncInstagramAnalytics(now = new Date(), retryLimit = 0, r
         await access(target.workspaceId);
         const final = await binding(target, now);
         if (!final || final.accountId !== current.accountId || final.token !== current.token) throw new OperationError('forbidden', policy.copy.permission.en);
-        await tx.$executeRaw`INSERT INTO root_activities (id, action, detail, "createdAt") VALUES (${randomUUID()}, 'instagram.analytics_synced', ${JSON.stringify({ workspaceId: target.workspaceId, targetId: target.id, observations: insights.rows.length, failedMetrics: insights.failedMetrics })}::jsonb, NOW())`;
+        await tx.$executeRaw`INSERT INTO root_activities (id, action, detail, "createdAt") VALUES (${randomUUID()}, 'instagram.analytics_synced', ${JSON.stringify({ workspaceId: target.workspaceId, targetId: target.id, observations: insights.rows.length, failedMetrics: insights.failedMetrics, media: history.items.length, failedMedia: history.failedMedia })}::jsonb, NOW())`;
         return true;
       }));
-      if (persisted) { result.updated++; result.failed += insights.failedMetrics.length; } else result.skipped++;
+      if (persisted) { result.updated++; result.failed += insights.failedMetrics.length + history.failedMedia.length; } else result.skipped++;
     } catch (error) {
       if (error instanceof OperationError && ['forbidden', 'not_found', 'conflict'].includes(error.code)) result.skipped++;
       else result.failed++;

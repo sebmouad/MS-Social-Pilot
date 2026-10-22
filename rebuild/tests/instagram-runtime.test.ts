@@ -14,6 +14,7 @@ describe('Instagram runtime integration boundary', () => {
     expect(settings.runtimeConfig).toHaveBeenCalledWith('instagram.policy');
     expect(settings.runtimeSecret).toHaveBeenCalledWith('instagram.appSecret');
     expect(await configuredInstagramCollector()).toHaveProperty('post');
+    expect(await configuredInstagramCollector()).toHaveProperty('media');
     expect(await configuredInstagramDiscovery()).toBeTypeOf('function');
   });
   it('installs the host catalog while keeping activation off by default', () => {

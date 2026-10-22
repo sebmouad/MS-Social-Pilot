@@ -2,11 +2,14 @@ import type { Prisma } from '../../../generated/client';
 import { platformModule } from '@/platforms';
 import { facebookModule } from '@/platforms/facebook/module';
 import { facebookPublicationRecovery } from '@/platforms/facebook/media-recovery-host';
+import { instagramModule } from '@/platforms/instagram/module';
+import { instagramPublicationRecovery } from '@/platforms/instagram/container-recovery';
 import type { PlatformPublicationRecovery } from './host';
 
 /** Explicit installed safety registration; importing it never constructs an API engine. */
 const RECOVERY_HOSTS: Readonly<Record<string, PlatformPublicationRecovery>> = {
   [facebookModule.id]: facebookPublicationRecovery,
+  [instagramModule.id]: instagramPublicationRecovery,
 };
 
 /** Installed safety evidence must not disappear when a module is disabled. */

@@ -181,3 +181,29 @@ Fresh local verification for this host batch (synthetic/mocked only):
   green**; rerun in an environment allowing its local test sockets.
 - `git diff --check`: pass. No servers, deployment, provider/production calls,
   commits or pushes. Changes remain in this worktree for integration.
+
+## Live-ready lane — 2026-10-22 (source only, still default-off)
+
+Capability audit and owner checklist: `docs/INSTAGRAM_LIVE_RUN.md` (§1 table,
+§2 owner-executed steps, §3 open gates). No live Graph call was made here.
+
+- Publishing matrix complete at fixture level: feed video (`VIDEO`) and
+  stories (`STORIES`, caption refused pre-dispatch, no first comment or status
+  readback) join image/carousel/reel (`publishing.ts`, `adapter.ts`,
+  `config.ts` copy). Post metric defaults gain likes/comments/shares.
+- Media history: `insights.ts` `media()` collects the bounded media window
+  with per-media insights (single-media failures isolated, clipped windows
+  refused unless an older item proves the edge); `jobs.ts` persists it to
+  `instagram_media` inside `syncInstagramAnalytics`, feeding the existing
+  `postPerformance` read path.
+- Recovery registry: `container-recovery.ts` is now registered in
+  `src/server/platforms/publication-recovery.ts` (installed even while the
+  customer switch is off). This closes the documented before-activation gap.
+- Still missing: Inbox background sync, DMs, Meta inbound webhooks, remote
+  media deletion, signed local-media delivery (shared-pipeline owner),
+  Graph usage-header accounting.
+
+No top-level Root keys added; `instagram.policy` nested additions only
+(`video`/`story` copy, wider `postMetrics`); existing grants and Facebook
+login untouched. Verification: typecheck 0 errors; 13 Instagram/config/registry
+suites pass (144 tests). No browser, provider or production run.

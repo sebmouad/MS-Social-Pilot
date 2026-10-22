@@ -5,6 +5,7 @@ vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => 2 }));
 vi.mock('@/platforms/instagram/locale', () => ({ instagramLocale: async () => 'fr' }));
 vi.mock('@/platforms/instagram/runtime', async () => ({ configuredInstagramPolicy: async () => (await import('@/platforms/instagram/config')).INSTAGRAM_POLICY_DEFAULTS }));
 import { instagramPublicationRecovery } from '@/platforms/instagram/container-recovery';
+import { installedPublicationRecovery } from '@/server/platforms/publication-recovery';
 beforeEach(() => { vi.clearAllMocks(); state.rows = []; state.query.mockImplementation(async () => state.rows); });
 const tx = { $queryRaw: state.query } as unknown as Parameters<typeof instagramPublicationRecovery.assertOutcome>[0];
 describe('Instagram child receipt recovery constraints', () => {
@@ -24,6 +25,11 @@ describe('Instagram child receipt recovery constraints', () => {
     await instagramPublicationRecovery.assertOutcome(tx, 'workspace', 'op', 'ABSENT');
     expect(state.query.mock.calls[0]!.slice(1)).toEqual(['workspace', 'op']);
     expect(state.query.mock.calls[0]![0].join('')).toContain("a.provider='instagram'");
+  });
+  it('is installed in the shared publication-recovery registry', () => {
+    expect(installedPublicationRecovery('instagram')).toBe(instagramPublicationRecovery);
+    expect(installedPublicationRecovery('facebook')).toBeDefined();
+    expect(installedPublicationRecovery('tiktok')).toBeUndefined();
   });
   it('caps content-free private evidence using runtime bounds and bilingual Root copy', async () => {
     state.rows = ['a', 'b', 'c'].map(id => ({ id, operationId: 'op', phase: 'container', state: 'recorded', remoteId: id, createdAt: new Date('2026-10-21') }));

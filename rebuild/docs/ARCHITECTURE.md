@@ -5,6 +5,22 @@ Updated 2026-10-22 (AI Studio module) against the local working tree, configurat
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
 
+## Instagram live-ready lane — 2026-10-22 (source only)
+
+Still installed but disabled by default; no live Graph call was made here.
+Audit, owner checklist and open gates: [INSTAGRAM_LIVE_RUN.md](INSTAGRAM_LIVE_RUN.md).
+Publishing matrix is complete at fixture level (photo, feed video, carousel,
+reel, story — stories carry no caption, first comment or status readback);
+post-metric defaults gain likes/comments/shares; media history now flows from
+a bounded `media()` collector through `syncInstagramAnalytics` into
+`instagram_media` and the existing `postPerformance` read path; the
+publication-recovery host is registered (closes the before-activation gap).
+Missing: inbox background sync, DMs, Meta inbound webhooks, remote media
+deletion, signed local-media delivery, usage-header accounting. No top-level
+Root keys, no Facebook login change; schema stays 137. Typecheck 0 errors;
+13 Instagram/config/registry suites (144 tests) pass. No browser, provider or
+production run.
+
 ## Insights excellence pass — 2026-10-22 (source only)
 
 Palette reaches every Insights page via a new `palette` page flag

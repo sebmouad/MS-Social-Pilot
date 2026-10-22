@@ -29,6 +29,7 @@ export async function configuredInstagramCollector(signal?: AbortSignal) {
     profile: async (...args: Parameters<typeof collector.profile>) => { await assertInstagramSource({ accessToken: args[0].accessToken, remoteTargetId: args[1], requiredScopes: policy.readScopes }); return collector.profile(...args); },
     account: async (...args: Parameters<typeof collector.account>) => { await assertInstagramSource({ accessToken: args[0].credential.accessToken, remoteTargetId: args[0].targetId, requiredScopes: policy.insightScopes }); return collector.account(...args); },
     post: async (...args: Parameters<typeof collector.post>) => { await assertInstagramSource({ accessToken: args[0].accessToken, requiredScopes: policy.insightScopes }); return collector.post(...args); },
+    media: async (...args: Parameters<typeof collector.media>) => { await assertInstagramSource({ accessToken: args[0].accessToken, remoteTargetId: args[1], requiredScopes: policy.insightScopes }); return collector.media(...args); },
   };
 }
 

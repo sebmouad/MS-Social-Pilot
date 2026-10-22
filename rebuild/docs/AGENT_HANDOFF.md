@@ -1021,3 +1021,42 @@ Owner directive: inbox message vs comment must be unmistakable. Surfacing/UX bat
 - Empty states per kind with kind-preserving next actions; list titles are kind + state ("Messages · Open").
 
 Evidence: `npm run typecheck` 0 errors; new suites pass (inbox-kind-separation 10, inbox-kind-consequences 2); touched/neighbor suites pass (inbox-browsing-page, inbox-round2-ui, inbox-round3-ui, inbox-customer-copy, inbox-scope-b5, inbox-write-receipts-ui, inbox-delete-ui, inbox-delete-recovery-ui, inbox-v2-b4, inbox-screens-redesign, inbox-mention-ui, inbox-reply-saved-menu, inbox-nested-replies, inbox-thread-scroll, inbox-progressive-list, inbox-state-isolation, inbox-reviews, inbox-reviews-read, inbox-round3, inbox-read-routes, inbox-actions-route, inbox-route-auth, inbox-key-scope80, ui-copy-coverage, config-validation). No full suite, browser, provider or production verification in this batch.
+
+## Instagram live-ready lane — 2026-10-22 (source/unit only, uncommitted)
+
+Owner directive: Instagram goes live first. No live Graph calls from this lane
+(sandbox has no loopback/tokens); live steps are owner-executed from the new
+checklist. The module stays installed but disabled by default.
+
+- **Audit:** `docs/INSTAGRAM_LIVE_RUN.md` §1 classifies every capability
+  (implemented/partial/missing with file paths); §2 is the exact
+  owner-executed checklist (connect, photo/video/reel/story, schedule, first
+  comment, inbox reply, insights compare, token drill, cleanup); §3 lists open
+  live gates.
+- **Implemented:** feed-video (`VIDEO`) and story (`STORIES`, caption refused,
+  no first comment/status) formats complete the publishing matrix
+  (`publishing.ts`, `adapter.ts`, `config.ts` copy); post-metric defaults gain
+  likes/comments/shares; new `insights.ts` `media()` collector (bounded
+  window, per-media isolation, clipped-window refusal) persisted to
+  `instagram_media` by `syncInstagramAnalytics`, feeding `postPerformance`;
+  `instagramPublicationRecovery` registered in the shared recovery registry
+  (the documented before-activation gap — installed even while off).
+- **Still missing (do not promise):** inbox background sync, DMs, Meta inbound
+  webhooks, remote media deletion, signed local-media delivery
+  (Publishing/media pipeline owner), Graph usage-header accounting.
+- **Safety:** no top-level Root keys (nested `instagram.policy` additions
+  only), no Facebook login/scope change, no grant regression; scopes checked
+  against stored Page grants, never added to the login dialog.
+- **Docs:** this entry, `ARCHITECTURE.md` status note, `OPERATIONS.md`
+  Instagram runbook section, `LEGACY_CAPABILITY_PARITY.md` Instagram cells,
+  `MCP_PARITY.md` shared-entry mapping note, `DELIVERY_PLAN.md` row 8 fix,
+  module `README.md` addendum. No `CONFIG_SCHEMA_VERSION` bump: no registry
+  entries added (config-validation passes at 137).
+
+Evidence: `npm run typecheck` 0 errors; 13 suites / 144 tests pass
+(instagram-platform, instagram-jobs, instagram-container-recovery,
+instagram-hosts, instagram-host-connection, instagram-runtime,
+instagram-selection, instagram-source-binding, instagram-discovery,
+instagram-container-journal, instagram-customer-filters-ui,
+config-validation, publication-remote-projection). No full suite (not run per
+batch instructions), no browser, no provider, no production verification.

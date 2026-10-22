@@ -71,6 +71,19 @@ The parity guard remains a structural check, not a substitute for those tests.
 
 No complete installed Instagram, Facebook Groups, AI-agent CRUD or async Posts
 CSV capability exists at this HEAD. Do not add fictional tool/route mappings.
+
+Note 2026-10-22 (Instagram live-ready lane, source only, still default-off):
+Instagram rides the *shared* connection/publishing/inbox/analytics UI, REST and
+MCP entries through neutral dispatch — no Instagram-specific tool or route
+exists or is needed. Mapping: `start_connection` (+ `START CONNECTION
+instagram`) → `instagramConnection.start`; selection/disconnect →
+`changeConnectionSelections`/`changeConnectionDisconnect` (+
+`alignInstagramSelection`); publishing/status/first-comment →
+`configuredInstagramAdapter`; comment sync/reply/moderation/delete →
+`instagramInboxHost`; stored analytics + `analytics` worker →
+`instagramAnalyticsHost`/`syncInstagramAnalytics`; unknown-dispatch safety →
+the registered `instagramPublicationRecovery`. Fixture evidence only; no
+real-client execution receipt.
 Caption repair remains a service-only export with no UI/REST/MCP entry points.
 The requested legacy sweep is absent; additional missing mapping rows cannot be
 inferred from it. Supply the report and implemented lane commits for reconciliation.

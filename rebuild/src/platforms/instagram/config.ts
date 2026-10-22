@@ -32,7 +32,9 @@ const copy = {
   processing: { en: 'Instagram could not prepare this media. Check the file before trying again.', fr: 'Instagram n’a pas pu préparer ce média. Vérifiez le fichier avant de réessayer.' },
   source: { en: 'Instagram performance', fr: 'Performances Instagram' },
   overlap: { en: 'Reach and lifetime snapshots are not additive. People may overlap across accounts.', fr: 'La portée et les instantanés cumulés ne s’additionnent pas. Les personnes peuvent figurer dans plusieurs comptes.' },
-  image: { en: 'Photo', fr: 'Photo' }, carousel: { en: 'Carousel', fr: 'Carrousel' }, reel: { en: 'Reel', fr: 'Reel' },
+  image: { en: 'Photo', fr: 'Photo' }, video: { en: 'Video', fr: 'Vidéo' },
+  carousel: { en: 'Carousel', fr: 'Carrousel' }, reel: { en: 'Reel', fr: 'Reel' },
+  story: { en: 'Story', fr: 'Story' },
 };
 export const instagramPolicySchema = z.object({
   graphBaseUrl: z.string().url().refine(value => { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password && !u.search && !u.hash; }),
@@ -57,7 +59,7 @@ export const INSTAGRAM_POLICY_DEFAULTS: InstagramPolicy = {
   readScopes: ['instagram_basic', 'pages_read_engagement'], publishScopes: ['instagram_basic', 'instagram_content_publish', 'pages_read_engagement'],
   commentScopes: ['instagram_basic', 'instagram_manage_comments', 'pages_read_engagement'], insightScopes: ['instagram_basic', 'instagram_manage_insights', 'pages_read_engagement'],
   accountMetrics: [{ name: 'views', period: 'day', metricType: 'total_value' }, { name: 'reach', period: 'day', metricType: 'time_series' }],
-  postMetrics: ['views', 'reach', 'saved', 'total_interactions'], labels: metricLabels, copy,
+  postMetrics: ['views', 'reach', 'likes', 'comments', 'shares', 'saved', 'total_interactions'], labels: metricLabels, copy,
 };
 export const INSTAGRAM_CONFIG = [
   entry({ key: 'platforms.instagram.enabled', group: 'Instagram · Engine', label: 'Instagram enabled', kind: 'boolean', description: 'Keep off until the connection, persistence and shared host integration are verified.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),

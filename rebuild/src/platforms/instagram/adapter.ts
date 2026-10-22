@@ -18,7 +18,13 @@ export function createInstagramAdapter(input: InstagramPolicy, options: { fetch?
     // Connection and stored-data hosts are assembled by the installed module.
     capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'unsupported', inbox: 'supported', analytics: 'supported', ads: 'unsupported' },
     publishingMedia: media, defaultPublishingFormatId: 'image',
-    publishingFormats: (['image', 'carousel', 'reel'] as const).map(id => ({ id, label: policy.copy[id][options.locale ?? 'en'], media: { ...media, kinds: id === 'image' ? ['image'] : id === 'reel' ? ['video'] : media.kinds, maxImages: id === 'image' ? 1 : id === 'reel' ? 0 : policy.carouselMax, maxVideos: id === 'image' ? 0 : id === 'reel' ? 1 : policy.carouselMax }, firstComment: true, remoteStatus: true, remoteDelete: false, scheduling: { application: true, native: false } })),
+    publishingFormats: (['image', 'video', 'carousel', 'reel', 'story'] as const).map(id => ({ id, label: policy.copy[id][options.locale ?? 'en'], media: { ...media,
+      kinds: id === 'image' ? ['image'] : id === 'video' || id === 'reel' ? ['video'] : id === 'story' ? ['image', 'video'] : media.kinds,
+      maxImages: id === 'image' || id === 'story' ? 1 : id === 'video' || id === 'reel' ? 0 : policy.carouselMax,
+      maxVideos: id === 'image' ? 0 : id === 'video' || id === 'reel' || id === 'story' ? 1 : policy.carouselMax,
+      mixedKinds: id === 'carousel' },
+      // Stories carry no caption or public comments; their media_publish receipt is the delivery proof.
+      firstComment: id !== 'story', remoteStatus: id !== 'story', remoteDelete: false, scheduling: { application: true, native: false } })),
     supportsTargetKind: kind => kind === 'professional' || kind === 'instagram',
     canUseCredential: (credential, capability) => capability === 'remoteDelete' || policy.appSecretProofEnabled && !options.appSecret ? false : hasScopes(credential, capability === 'publishing' ? policy.publishScopes : capability === 'firstComment' ? policy.commentScopes : policy.readScopes),
     classifyPublishingFailure: error => error instanceof InstagramError ? error.outcome : 'uncertain',

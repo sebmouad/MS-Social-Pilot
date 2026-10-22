@@ -30,7 +30,9 @@ export function createInstagramPublisher(policy: InstagramPolicy, graph: Instagr
     const media = request.media ?? [];
     const format = request.formatId ?? 'image';
     if (request.target.kind !== 'professional' || request.scheduledAt || request.link || [...request.text].length > policy.captionLength || !media.length || media.length > policy.carouselMax) invalid();
-    if (!['image', 'reel', 'carousel'].includes(format) || (format === 'image' && (media.length !== 1 || media[0]?.kind !== 'image')) || (format === 'reel' && (media.length !== 1 || media[0]?.kind !== 'video')) || (format === 'carousel' && media.length < 2)) invalid();
+    if (!['image', 'video', 'reel', 'carousel', 'story'].includes(format) || (format === 'image' && (media.length !== 1 || media[0]?.kind !== 'image')) || ((format === 'video' || format === 'reel') && (media.length !== 1 || media[0]?.kind !== 'video')) || (format === 'carousel' && media.length < 2)) invalid();
+    // Story containers accept no caption; refusing text before dispatch is honest because shared authoring always offers a caption field.
+    if (format === 'story' && (media.length !== 1 || request.text.trim())) invalid();
     for (const item of media) {
       let url: URL; try { url = new URL(item.url); } catch { invalid(); }
       if (url.protocol !== 'https:' || url.username || url.password || item.localFile || item.altText || !['image', 'video'].includes(item.kind)) invalid();
@@ -51,8 +53,11 @@ export function createInstagramPublisher(policy: InstagramPolicy, graph: Instagr
       const children: string[] = [];
       for (const item of media) children.push(await container({ ...(item.kind === 'image' ? { image_url: item.url } : { video_url: item.url, media_type: 'VIDEO' }), is_carousel_item: 'true' }));
       creationId = await container({ media_type: 'CAROUSEL', children: children.join(','), caption: request.text });
+    } else if (format === 'story') {
+      const item = media[0]!;
+      creationId = await container({ ...(item.kind === 'image' ? { image_url: item.url } : { video_url: item.url }), media_type: 'STORIES' });
     } else {
-      creationId = await container({ ...(format === 'image' ? { image_url: media[0]!.url } : { video_url: media[0]!.url, media_type: 'REELS' }), caption: request.text });
+      creationId = await container({ ...(format === 'image' ? { image_url: media[0]!.url } : { video_url: media[0]!.url, media_type: format === 'video' ? 'VIDEO' : 'REELS' }), caption: request.text });
     }
     await journal?.begin('publish', 0);
     let result: Record<string, unknown>;
@@ -71,7 +76,7 @@ export function createInstagramPublisher(policy: InstagramPolicy, graph: Instagr
   }
   async function publishFirstComment(request: FirstCommentRequest) {
     requireScopes(graph, request.credential, policy.commentScopes);
-    if (!request.text.trim() || (request.formatId && !['image', 'carousel', 'reel'].includes(request.formatId))) invalid();
+    if (!request.text.trim() || (request.formatId && !['image', 'video', 'carousel', 'reel'].includes(request.formatId))) invalid();
     const result = await graph.request(`${request.remotePostId}/comments`, request.credential.accessToken, { message: request.text }, 'POST', request.signal);
     if (typeof result.id !== 'string' || !result.id) throw new InstagramError(graph.text('uncertain'), 'uncertain');
     return { remoteId: result.id };
