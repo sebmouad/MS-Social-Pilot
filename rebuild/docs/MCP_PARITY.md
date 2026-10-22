@@ -431,6 +431,14 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | check_post_spam_risk | publishing/posts | read | POST /api/publishing/spam-check | spamCheck counts only channels inside the caller's grants; advice only, nothing is saved or blocked. |
 | list_caption_tests | analytics/posts | read | GET /api/caption-tests | listCaptionTests (and view=posts for testable posts) settle due tests first; limited members see only tests that ran entirely on their channels. |
 | start_caption_test | publishing/posts | write | POST /api/caption-tests | startCaptionTest groups two to four existing posts after START CAPTION TEST; every post channel must be inside the caller's grants. |
+| get_page_details | publishing/posts | read | POST /api/publishing/link-tools | linkTools reads the structured details of a public page (shared address-pinned fetch guard, hourly workspace budget) and returns editable captions; the service needs composer write access, so it is stricter than the tool's read classification. Saves nothing. |
+| suggest_post_translations | publishing/posts | write | POST /api/ai/translations | translatedPosts action suggest: metered AI translation for review only; nothing is saved. Classified write because it spends the workspace AI allowance, like ai_assist_write. |
+| create_translated_posts | publishing/posts | write | POST /api/ai/translations | translatedPosts action create after CREATE TRANSLATED POSTS; one post per language through createPublishingPost, so approvals, limits, channel scope and audit apply to each. |
+| list_chat_channels | settings/notifications | read | GET /api/chat-channels | listChatChannels without credentials; workspace owners and admins only. |
+| create_chat_channel | settings/notifications | write | POST /api/chat-channels | createChatChannel after CREATE CHAT CHANNEL <name>; credentials encrypted and never returned; sends nothing until tested. |
+| update_chat_channel | settings/notifications | write | PATCH /api/chat-channels/[id] | updateChatChannel after UPDATE CHAT CHANNEL <id>. |
+| delete_chat_channel | settings/notifications | write | DELETE /api/chat-channels/[id] | deleteChatChannel after DELETE CHAT CHANNEL <id>. |
+| test_chat_channel | settings/notifications | write | POST /api/chat-channels/[id]/test | testChatChannel after TEST CHAT CHANNEL <id>; one content-free message, no automatic retries. |
 | learn_from_caption_test | settings/workspace | write | POST /api/caption-tests/[id]/learn | learnCaptionTest appends the winning caption to the workspace voice after LEARN <id>; workspace-wide key scope only; owner/admin settings access. |
 | list_webhooks | settings/webhooks | read | GET /api/webhooks | Shared customer operation; transport arguments may differ. |
 | create_webhook | settings/webhooks | write | POST /api/webhooks | Shared customer operation; transport arguments may differ. |
@@ -548,6 +556,9 @@ or person credential access. Root resources read through these same tools.
 | list_root_workspaces | installation/root | read | GET /api/root/workspaces | listRootWorkspaces; separately authenticated private dispatcher. |
 | list_root_changelog | installation/root | read | GET /api/root/changelog | listRootChangelog; separately authenticated private dispatcher. |
 | add_root_changelog_entry | installation/root | write | POST /api/root/changelog | addRootChangelogEntry; exact ADD CHANGELOG ENTRY confirmation, Root re-check and transactional audit. |
+| list_root_system_alerts | installation/root | read | GET /api/root/alerts | listSystemAlerts; recorded incidents without raw detail. |
+| check_root_system_alerts | installation/root | write | POST /api/root/alerts/check | checkSystemAlerts after CHECK SYSTEM ALERTS; unknown checks never resolve an incident. |
+| test_root_system_alert | installation/root | write | POST /api/root/alerts/test | testSystemAlert after TEST SYSTEM ALERT; one email and optional Telegram test, no retries. |
 | remove_root_changelog_entry | installation/root | write | DELETE /api/root/changelog/[id] | removeRootChangelogEntry; exact REMOVE CHANGELOG ENTRY confirmation, Root re-check and transactional audit. |
 | get_root_monitoring | installation/root | read | GET /api/root/monitoring | readRootOperatorMonitoring; bounded alerts and availability observations. |
 | evaluate_root_monitoring | installation/root | write | POST /api/root/monitoring | runRootOperatorMonitoring; exact confirmation and shared leased runner. |

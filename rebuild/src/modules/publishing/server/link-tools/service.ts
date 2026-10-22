@@ -6,22 +6,13 @@ import { OperationError } from '@/lib/operation-error';
 import { authorizeAi } from '@/modules/ai/server/access';
 import { catalogFor, guarded, toolFailure, type Locale, type ToolViewerActor } from '@/modules/ai/server/tool-kit';
 import { toolErrorCopy } from '@/modules/ai/server/tool-config';
-import { importFromUrl } from '@/modules/media/server/library';
-import { importConfirmation } from '@/modules/media/library';
 import { guardedFetch, defaultFetchDeps, type FetchDeps, type FetchPolicy } from '@/modules/publishing/server/media/network/net-guard';
-import { linkPreviewHosts } from '@/server/platforms/registry';
 import { linkToolsCopySchema, linkToolsPolicySchema, type LinkToolsPolicy } from './config';
-import { emptyPreview, isUsablePreview, parseOpenGraphHtml, type LinkPreview } from './open-graph';
 import { buildCaption, parseStructuredData, templatesFor, type CaptionFormat, type CaptionTemplate, type FactKey, type Money, type StructuredItem } from './structured-data';
 
 export const LINK_FEATURE = 'publishing/posts';
-export const REFRESH_CONFIRMATION = 'REFRESH LINK PREVIEW';
-export const IMPORT_CONFIRMATION = 'IMPORT IMAGES';
-export const linkToolsRequest = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('preview'), url: z.string(), refresh: z.boolean().optional(), confirmation: z.string().optional() }).strict(),
-  z.object({ action: z.literal('structured'), url: z.string() }).strict(),
-  z.object({ action: z.literal('import_images'), urls: z.array(z.string()).min(1), confirmation: z.string() }).strict(),
-]);
+/** Link cards and picture import already ship with the AI content tools (link preview) and the media library; this reads page details only. */
+export const linkToolsRequest = z.object({ url: z.string() }).strict();
 export type LinkToolsDeps = { locale?: Locale; now?: () => Date; net?: FetchDeps };
 
 export const linkToolsPolicy = async (): Promise<LinkToolsPolicy> => linkToolsPolicySchema.parse(await runtimeConfig('publishing.linkTools.policy'));
@@ -77,10 +68,9 @@ export function describeItem(item: StructuredItem, format: CaptionFormat, copy: 
 }
 
 /**
- * Read a public web page for the composer: its link card, the details it describes for search engines, or
- * copy its pictures into the media library. Every address goes through the shared guard (HTTPS pinning,
- * private networks refused, redirects re-checked, bytes capped). Refreshing a platform's cached card and
- * copying pictures need explicit confirmation; each request counts against the workspace hourly budget.
+ * Read the details a public web page describes for search engines and offer captions built from them.
+ * The address goes through the shared guard (HTTPS pinning, private networks refused, redirects
+ * re-checked, bytes capped); each request counts against the workspace hourly budget. Nothing is saved.
  */
 export async function linkTools(actor: ToolViewerActor, raw: unknown, deps: LinkToolsDeps = {}) {
   const locale = deps.locale ?? 'en';
@@ -96,36 +86,11 @@ export async function linkTools(actor: ToolViewerActor, raw: unknown, deps: Link
       if (!trimmed || trimmed.length > policy.maxUrlCharacters) throw new OperationError('invalid_request', copy.invalidUrl!);
       try { const u = new URL(trimmed); if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error(); return trimmed; } catch { throw new OperationError('invalid_request', copy.invalidUrl!); }
     };
-    if (input.action === 'import_images') {
-      if (input.confirmation !== IMPORT_CONFIRMATION) throw new OperationError('invalid_request', copy.confirmation!);
-      const urls = [...new Set(input.urls.map(checkUrl))].slice(0, policy.maxImportImages);
-      await claim(actor, policy, 'import_images', new URL(urls[0]!).hostname, now, copy);
-      const results: Array<{ url: string; mediaId: string | null }> = [];
-      for (const url of urls) {
-        try { const imported = await importFromUrl(actor, { url, confirmation: importConfirmation(url) }) as { id: string }; results.push({ url, mediaId: imported.id }); }
-        catch { results.push({ url, mediaId: null }); }
-      }
-      return { results, complete: results.every(r => r.mediaId), message: results.every(r => r.mediaId) ? copy.imported : copy.importPartial };
-    }
     const url = checkUrl(input.url);
-    await claim(actor, policy, input.action, new URL(url).hostname, now, copy);
-    if (input.action === 'structured') {
-      const page = await fetchHtml(url, policy, policy.structuredMaxBytes, policy.structuredUserAgent, net);
-      const items = page ? parseStructuredData(page.html, page.finalUrl, policy.limits) : [];
-      const format = captionFormat(copy, locale, policy.captionTimeZone);
-      return { url, items: items.map(item => describeItem(item, format, copy, now)) };
-    }
-    // preview
-    if (input.refresh && input.confirmation !== REFRESH_CONFIRMATION) throw new OperationError('invalid_request', copy.confirmation!);
-    const page = await fetchHtml(url, policy, policy.previewMaxBytes, policy.previewUserAgent, net);
-    let preview: LinkPreview = page ? parseOpenGraphHtml(page.html, page.finalUrl, { title: policy.titleCharacters, description: policy.descriptionCharacters, headFallbackBytes: policy.previewMaxBytes }, now) : emptyPreview(url, now);
-    if (input.refresh) {
-      // Only an address the guard accepted is handed to a platform; the first usable card wins.
-      if (page) for (const { host } of await linkPreviewHosts()) {
-        const card = await host.refresh(page.finalUrl, AbortSignal.timeout(policy.timeoutMs)).catch(() => null);
-        if (card) { preview = { url: page.finalUrl, title: card.title, description: card.description, imageUrl: card.imageUrl, siteName: card.siteName, source: 'platform', fetchedAt: now.toISOString() }; break; }
-      }
-    }
-    return { preview, found: isUsablePreview(preview) };
+    await claim(actor, policy, 'structured', new URL(url).hostname, now, copy);
+    const page = await fetchHtml(url, policy, policy.structuredMaxBytes, policy.structuredUserAgent, net);
+    const items = page ? parseStructuredData(page.html, page.finalUrl, policy.limits) : [];
+    const format = captionFormat(copy, locale, policy.captionTimeZone);
+    return { url, items: items.map(item => describeItem(item, format, copy, now)) };
   });
 }

@@ -147,6 +147,7 @@ const rootWrites = new Set([
   'finish_root_publication_projection', 'adopt_root_legacy_publication', 'run_root_diagnostics', 'manage_root_user',
   'set_root_workspace_access', 'set_root_config', 'create_root_workspace', 'rename_root_workspace',
   'add_root_changelog_entry', 'remove_root_changelog_entry', 'evaluate_root_monitoring',
+  'check_root_system_alerts', 'test_root_system_alert',
 ]);
 const privateTools: Tool[] = rootToolDefinitions.map(tool => ({ name: tool.name, feature: 'installation/root', access: rootWrites.has(tool.name) ? 'write' : 'read' }));
 const routes = scanRoutes(join(root, 'src/app/api'));

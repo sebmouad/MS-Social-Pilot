@@ -17,6 +17,10 @@ import { SETTINGS_MODULE_CONFIG } from './settings/config';
 import { SHARING_CONFIG } from './sharing/config';
 import { TASKS_CONFIG } from './tasks/config';
 import { CALENDAR_EXTRAS_CONFIG } from './calendar-extras/config';
+import { TRANSLATED_POSTS_CONFIG } from './ai/server/translated/config';
+import { AI_TOOL_ERROR_CONFIG } from './ai/server/tool-config';
+import { LINK_TOOLS_CONFIG } from './publishing/server/link-tools/config';
+import { CHAT_CHANNELS_CONFIG } from './notifications/chat-channels/config';
 
 /**
  * Root settings of every installed product module, in installation order. A module adds or
@@ -43,4 +47,8 @@ export const INSTALLED_MODULE_CONFIG = [
   ...ASYNC_POST_EXPORT_CONFIG,
   ...INTEGRATIONS_CONFIG,
   ...HISTORY_CONFIG,
+  ...AI_TOOL_ERROR_CONFIG,
+  ...TRANSLATED_POSTS_CONFIG,
+  ...LINK_TOOLS_CONFIG,
+  ...CHAT_CHANNELS_CONFIG,
 ] as const;

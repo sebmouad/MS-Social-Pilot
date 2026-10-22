@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { entry } from '@/lib/config/entry';
+import { entry, cron } from '@/lib/config/entry';
 import { TOOLS_COPY } from './copy';
 
 const https = z.string().url().max(500).refine(v => v.startsWith('https://'), 'Use an HTTPS URL.');
@@ -82,7 +82,10 @@ export const AI_CONTENT_TOOLS_DEFAULTS = {
 } as const;
 
 const D = AI_CONTENT_TOOLS_DEFAULTS;
+export const AI_VIDEO_JOBS = [{ name: 'aiVideos', label: 'AI video progress', configKey: 'ai.videoSchedule' }] as const;
+
 export const AI_CONTENT_TOOLS_CONFIG = [
+  entry({ key: 'ai.videoSchedule', group, label: 'AI video progress schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone. The worker checks videos still being made with the provider and saves finished ones to the media library.', defaultValue: '*/2 * * * *', schema: cron, consumption: 'active' }),
   entry({ key: 'ai.imagePolicy', group, label: 'AI pictures', kind: 'json', description: 'Switch, provider, endpoints, model (empty uses the newest model the provider key lists that matches the pattern), sizes with English/French labels, prompt bounds, stored file name and estimated cost per picture (0 means unpriced: usage is counted but its cost is reported as unknown). Uses the OpenAI key from the AI settings. Generated pictures are saved to the workspace media library and count toward the hourly allowance and monthly budget.', defaultValue: D.image, schema: imagePolicySchema, consumption: 'active' }),
   entry({ key: 'ai.voicePolicy', group, label: 'AI voice', kind: 'json', description: 'Switch, provider, endpoints, speech model (empty uses the newest listed model matching the pattern), the voice names the provider documents, text bounds, audio format and size ceiling, and estimated cost per request. The audio is returned to the member and is not stored.', defaultValue: D.voice, schema: voicePolicySchema, consumption: 'active' }),
   entry({ key: 'ai.videoPolicy', group, label: 'AI video', kind: 'json', description: 'Switch, provider, base endpoint, model (empty uses the newest listed model matching the pattern and not the exclude pattern), formats with labels, prompt bounds, how long a video may take before it is given up, how many are checked per read and per worker pass, the download ceiling and estimated cost per video. Uses the Gemini key from the AI settings.', defaultValue: D.video, schema: videoPolicySchema, consumption: 'active' }),

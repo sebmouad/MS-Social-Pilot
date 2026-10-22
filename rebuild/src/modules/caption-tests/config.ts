@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { entry } from '@/lib/config/entry';
+import { entry, cron } from '@/lib/config/entry';
 import { CAPTION_TESTS_COPY } from './copy';
 
 const measureKeys = z.array(z.string().regex(/^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/)).min(1).max(20);
@@ -27,7 +27,10 @@ export const CAPTION_TESTS_DEFAULTS = {
   transactionTimeoutMs: 15_000, transactionMaxWaitMs: 5_000,
 } as const;
 
+export const CAPTION_TESTS_JOBS = [{ name: 'captionTests', label: 'Caption test results', configKey: 'publishing.captionTestsSchedule' }] as const;
+
 export const CAPTION_TESTS_CONFIG = [
+  entry({ key: 'publishing.captionTestsSchedule', group: 'Caption tests', label: 'Caption test evaluation schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone. The worker decides finished tests from figures the platform sync already stored; it makes no provider request of its own.', defaultValue: '*/15 * * * *', schema: cron, consumption: 'active' }),
   entry({ key: 'captionTests.policy', group: 'Caption tests', label: 'Caption tests', kind: 'json', description: 'Switch and rules: how many captions a test compares, the compare-after and minimum-views defaults and bounds, how long to wait for fresh figures before giving up, the worker batch, and which stored per-post measures count as a view (the first one a post has) and as engagements (summed). The measure names are those the channel’s platform module stores.', defaultValue: CAPTION_TESTS_DEFAULTS, schema: captionTestsPolicySchema, consumption: 'active' }),
   entry({ key: 'captionTests.copy', group: 'Caption tests', label: 'Caption tests English / French copy', kind: 'json', description: 'Customer labels, messages and the sentence added to the workspace voice when a result is learned.', defaultValue: CAPTION_TESTS_COPY, schema: captionTestsCopySchema, consumption: 'active' }),
 ] as const;

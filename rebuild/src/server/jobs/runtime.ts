@@ -35,6 +35,14 @@ return {
       const { formatRefreshSummary, refreshHolidays, refreshTrends } = await import('@/modules/calendar-extras/server/refresh');
       return formatRefreshSummary(await (job === 'calendarHolidays' ? refreshHolidays({ now }) : refreshTrends({ now })));
     }
+    if (job === 'captionTests') {
+      const { settleCaptionTests } = await import('@/modules/caption-tests/server/service');
+      return `settled=${await settleCaptionTests({ now: () => now })}`;
+    }
+    if (job === 'aiVideos') {
+      const { pollAiVideos } = await import('@/modules/ai/content-tools/server/media');
+      return `finished=${await pollAiVideos({ now: () => now })}`;
+    }
     if (job === 'workspaceExports') {
       const { runWorkspaceExports } = await import('@/modules/settings/server/exports');
       return runWorkspaceExports();

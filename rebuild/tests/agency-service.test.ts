@@ -369,7 +369,7 @@ describe('agency configuration and manifest', () => {
   it('exports valid unique configuration for every operational bound the services read', () => {
     const keys = AGENCY_CONFIG.map(entry => entry.key);
     expect(new Set(keys).size).toBe(keys.length);
-    expect([...keys].sort()).toEqual([...Object.keys(defaults), 'agency.customerCopy', 'agency.exportCopy'].sort());
+    expect([...keys].sort()).toEqual([...Object.keys(defaults), 'agency.customerCopy', 'agency.exportCopy', 'agency.clientInvitationCopy', 'agency.clientInvitationPolicy'].sort());
     for (const entry of AGENCY_CONFIG) { expect(entry.schema.safeParse(entry.defaultValue).success).toBe(true); expect(entry.consumption).toBe('active'); }
     expect(agencyManifest.pages.map(page => page.id)).toEqual(['agency/overview', 'agency/clients']);
     expect(agencyManifest.rootSettingsPrefixes).toEqual(['agency.']);
