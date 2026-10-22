@@ -6,7 +6,6 @@ import { Button } from '@/components/Button';
 import { DataTable } from '@/components/DataTable';
 import { PageHeader } from '@/components/PageHeader';
 import { InfoTip } from '@/components';
-import { adsTabsFor } from '@/modules/ads/ui/AdsTabsFor';
 import type React from 'react';
 import { readAdObjects } from './service';
 import type { AdObject } from './aggregate';
@@ -43,10 +42,8 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
     { text: t("Figures sum stored daily reports only. Missing days are unknown. Levels overlap; never add campaigns, ad sets and ads together. Each object and account stays separate.") },
     { text: t("Currency comes from current account metadata; no conversion or historical currency verification. Reach, frequency and cost per person are latest-day snapshots, not period totals. Additional measures remain unaggregated.") },
   ]} />;
-  // The ad sub-tabs need the member's entitlements; a screen without them still renders its filters and table.
-  const tabs = await adsTabsFor('analysis', viewer).catch(() => null);
   const field = (label: string, control: React.ReactNode) => <label className={local.field}><span>{label}</span>{control}</label>;
-  const sidebar = <form action="/insights/ads/analysis" className={local.filters} aria-label={t("Ad-object analysis")}>
+  const sidebar = <form action="/ads/analysis" className={local.filters} aria-label={t("Ad-object analysis")}>
     {field(t("Start (UTC, inclusive)"), <input type="text" name="start" size={10} placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.start ?? value('start')} />)}
     {field(t("End (UTC, inclusive)"), <input type="text" name="end" size={10} placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.end ?? value('end')} />)}
     {field(t("Ad account"), <select name="accountId" defaultValue={selectedAccount}>
@@ -61,9 +58,9 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
     {field(t("Order"), <select name="direction" defaultValue={current?.direction ?? (value('direction') || 'asc')}><option value="asc">{t("Ascending")}</option><option value="desc">{t("Descending")}</option></select>)}
     {field(t("Parent ID (optional; select one account)"), <input name="parentId" size={10} defaultValue={current?.parentId ?? value('parentId')} />)}
     {field(t("Object ID (optional; select one account)"), <input name="objectId" size={10} defaultValue={current?.objectId ?? value('objectId')} />)}
-    <div className={local.submit}><Button type="submit" variant="primary" size="sm">{t("Apply")}</Button><a href="/insights/ads/analysis">{t("Reset filters")}</a></div>
+    <div className={local.submit}><Button type="submit" variant="primary" size="sm">{t("Apply")}</Button><a href="/ads/analysis">{t("Reset filters")}</a></div>
   </form>;
-  const header = <PageHeader title={t("Ad-object analysis")} info={info} tabs={tabs ?? undefined} />;
+  const header = <PageHeader title={t("Ad-object analysis")} info={info} />;
   if (!data) return <PageFrame module="analytics" scopedAccess><div className={local.content}>{header}{sidebar}<section role="alert" className={local.alert}><h2>{t("Ad-object analysis unavailable")}</h2><p>{t("Check your access and filters, or choose a shorter period, then try again.")}</p></section></div></PageFrame>;
   const d = data;
   const details = (item: AdObject) => <details><summary>{t("Stored daily details")}<span className="ui-visually-hidden"> · {item.name}</span></summary>

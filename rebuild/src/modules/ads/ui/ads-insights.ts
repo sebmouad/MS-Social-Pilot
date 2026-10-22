@@ -18,7 +18,7 @@ function catalogSchema<T extends Record<string, Message>>(defaults: T) {
 }
 
 /**
- * Customer copy of Insights › Ads (design v2 S12): the sub-tabs and the one-table Accounts view. The long existing
+ * Customer copy of Ads › Accounts (design v2 S12): the one-table Accounts view. The long existing
  * Ads catalogs (`ads.customerCopy`) keep their own text; this catalog holds only what the v2 frame added.
  */
 export const adsInsightsCopyDefaults = {
@@ -66,5 +66,5 @@ export const fillAds = (text: string, values: Record<string, string | number>) =
 
 /** Rows per page, periods and limits of the Accounts table come from the existing Ads read and report policies. */
 export const ADS_INSIGHTS_CONFIG = [
-  entry({ key: 'ads.insightsCopy', group: 'Ads · Customer copy', label: 'Insights › Ads copy', kind: 'json', description: 'English and French text of the Ads tab inside Insights: its sub-tabs and the one-table Accounts view. Keep named placeholders such as {name}.', defaultValue: adsInsightsCopyDefaults, schema: adsInsightsCopySchema, consumption: 'active' }),
+  entry({ key: 'ads.insightsCopy', group: 'Ads · Customer copy', label: 'Ads › Accounts copy', kind: 'json', description: 'English and French text of the Ads area Accounts tab: the one-table Accounts view. Keep named placeholders such as {name}.', defaultValue: adsInsightsCopyDefaults, schema: adsInsightsCopySchema, consumption: 'active' }),
 ] as const;

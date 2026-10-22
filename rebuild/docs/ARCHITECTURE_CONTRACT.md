@@ -87,6 +87,8 @@ Use route families `/publishing/*`, `/inbox/*`, `/analytics/*`, `/ads/*`, `/sett
 
 User decision, 2026-10-21 (design v2 decision record, [design-v2/README.md](design-v2/README.md)): **route families become `/content/*`, `/create`, `/insights/*` beside `/inbox/*`, `/settings/*`, `/root/*`; old `/publishing/*`, `/analytics/*`, `/ads/*` redirect with 308.** Reason: customer navigation is by area (Home, Content, Inbox, Insights), not by module. Modules, services and authorization are unchanged. Routes move batch by batch (B2 to B5); until a batch lands its old routes stay canonical.
 
+Owner decision, 2026-10-22: **Ads becomes its own top-level area holding both insights and management as area tabs (Accounts, Campaigns, Manage, Analysis, Compare); routes move to `/ads/*` canonical; old `/insights/ads/*` and `/insights/compare/ads` URLs redirect with 308.** Reason: the owner asked to separate Ads insights and management into its own menu beside Insights. The analytics-owned Analysis page joins the Ads area through the per-page area override; modules, services and authorization are unchanged.
+
 Thin UI/API/MCP entry points call shared application services. Services own tenant checks, state transitions, persistence, auditing, and module dispatch. Do not fork the business rules across interfaces.
 
 ## 5. Customer resource and data control

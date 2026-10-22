@@ -584,7 +584,7 @@ production planning/provider results cannot substitute for that UI evidence.
 Source: [docs/design-v2/README.md](docs/design-v2/README.md) decision record (owner-approved). Behaviour changes ship batch by batch (B1 to B9); a row above stays current until its batch lands.
 
 - Clean is the default theme for new users; saved choices are kept.
-- Navigation target: one sidebar with areas Home · Content · Inbox · Insights and a channel list that scopes every page; a Filter button per page (B1). Supersedes filters in the contextual sidebar.
+- Navigation target: one sidebar with areas Home · Content · Inbox · Insights · Ads (Ads split into its own area 2026-10-22) and a channel list that scopes every page; a Filter button per page (B1). Supersedes filters in the contextual sidebar.
 - Content target: Table with side preview; Feed and Cards views removed, old `view=feed|cards` values open the table with a one-time notice (B3). Supersedes "Feed and Cards, alongside default Table".
 - Number caveats sit behind ⓘ; partial results show ⚠ (built in Insights Overview, B5; source and DOM evidence only). Charts show a "Show data" toggle, fill missing days as gaps, align the previous period by date offset and group beyond eight series or slices as "Other".
 - Phone first-class flows: Inbox replies, Create, post status, Insights numbers.

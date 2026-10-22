@@ -38,7 +38,7 @@ async function launchBrowser(env: Readonly<Record<string, string | undefined>>) 
 const passRoute = (route: Route) => route.continue();
 
 export const VIEWPORTS = [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const;
-export const FAMILIES = ['/home', '/content', '/create', '/inbox', '/insights', '/settings', '/tasks', '/agency'];
+export const FAMILIES = ['/home', '/content', '/create', '/inbox', '/insights', '/ads', '/settings', '/tasks', '/agency'];
 /** Main-area candidates, tried in order. Every page keeps its filters and actions in-page (the Page tools sheet was removed in B9). */
 export const MAIN_ACTION_SELECTORS = ['main .ui-button--primary:not(:disabled)', 'main button:not(:disabled)', 'main a[href]', 'main select:not(:disabled)', 'main input:not([type=hidden]):not(:disabled)', 'main textarea:not(:disabled)'] as const;
 /** The phone/tablet navigation drawer toggle. The drawer holds navigation only; page actions stay in main. */
@@ -557,7 +557,7 @@ export function compareSystemModes(cells: ExtendedCell[]) {
  * ------------------------------------------------------------------------------------------- */
 export const ROUND2_MODES = ['light', 'dark', 'system-light', 'system-dark'] as const;
 /** Representative pages for the system-mode comparison (explicit light/dark are rendered beside system in the same run). */
-export const SYSTEM_SAMPLE = ['/home', '/create', '/content/calendar', '/inbox', '/insights', '/insights/explore', '/insights/ads', '/insights/ads/campaigns', '/settings/appearance', '/settings/team', '/tasks', '/agency', '/root', '/root/config', '/root/modules', '/sign-in', '/join'] as const;
+export const SYSTEM_SAMPLE = ['/home', '/create', '/content/calendar', '/inbox', '/insights', '/insights/explore', '/ads', '/ads/campaigns', '/settings/appearance', '/settings/team', '/tasks', '/agency', '/root', '/root/config', '/root/modules', '/sign-in', '/join'] as const;
 export type Fixtures = {
   dynamic: { customer: string[]; root: string[]; public: string[] };
   sessions: { noWorkspace: string; empty: string; verify: string; enroll: string };
@@ -1143,7 +1143,7 @@ export async function runFailureProbe(env: Readonly<Record<string, string | unde
 export const SERVER_ERROR_LOCALES = ['en', 'fr'] as const;
 /** Pages that throw while the layout still renders once the operator breaks their one dependency (the `labels` table; see the matrix doc). */
 export const BOUNDARY_ROUTES = ['/content/library/labels'] as const;
-export const SERVER_ERROR_ROUTES = ['/home', '/content', '/inbox', '/insights', '/insights/ads', '/settings/team', '/root', '/sign-in'] as const;
+export const SERVER_ERROR_ROUTES = ['/home', '/content', '/inbox', '/insights', '/ads', '/settings/team', '/root', '/sign-in'] as const;
 export type ServerErrorObservation = {
   status: number; theme: string | null; mode: string | null; wantTheme: string; wantMode: 'light' | 'dark'; locale: 'en' | 'fr';
   text: string; retryButtons: number; retryKeepsPage: boolean; backgroundLuminance: number; homeLink: boolean;
@@ -1453,7 +1453,7 @@ async function mainRound2(part: Round2Part, output: string) {
  * (`MATRIX_THEMES` may narrow or widen it); `MATRIX_ONLY` narrows routes by prefix. Sign-in
  * happens once in English; every locale/mode/viewport cell reuses that session.
  * ------------------------------------------------------------------------------------------- */
-export const V2_FAMILIES = ['/home', '/create', '/content', '/inbox', '/insights', '/settings'] as const;
+export const V2_FAMILIES = ['/home', '/create', '/content', '/inbox', '/insights', '/ads', '/settings'] as const;
 export const V2_MODES = ['light', 'dark'] as const;
 export const V2_LOCALES = ['en', 'fr'] as const;
 export type V2Locale = (typeof V2_LOCALES)[number];
@@ -1466,7 +1466,7 @@ export const V2_REDIRECTS: Readonly<Record<string, string>> = { '/root/alerts': 
 export function v2Area(route: string): string {
   const area = (family: string, label: string) => route === family || route.startsWith(`${family}/`) ? label : null;
   return area('/home', 'Home') ?? area('/create', 'Create') ?? area('/content', 'Content')
-    ?? area('/inbox', 'Inbox') ?? area('/insights', 'Insights') ?? area('/settings', 'Settings')
+    ?? area('/inbox', 'Inbox') ?? area('/insights', 'Insights') ?? area('/ads', 'Ads') ?? area('/settings', 'Settings')
     ?? area('/root', 'Root') ?? 'other';
 }
 

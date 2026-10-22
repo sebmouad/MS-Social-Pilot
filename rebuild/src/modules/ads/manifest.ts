@@ -2,24 +2,26 @@ import type { ModuleManifest } from '../types';
 
 export const adsManifest = {
   id: 'ads',
-  area: 'insights',
+  area: 'ads',
   health: { configuration: true, jobHistory: true, pendingQueues: [] },
   jobs: [],
   rootSettingsPrefixes: ['ads.'],
   rootSettingKeys: [],
   title: 'Ads',
-  href: '/insights/ads',
-  /** Design v2 B5: Ads reporting and management live under Insights; Compare is one tool with a channels/ad accounts switch. */
+  href: '/ads',
+  /** Design v2: Ads insights and management live in their own Ads area; the old Insights addresses redirect permanently. */
   redirects: [
-    { from: '/ads', to: '/insights/ads' },
-    { from: '/ads/campaigns', to: '/insights/ads/campaigns' },
-    { from: '/ads/objects', to: '/insights/ads/manage' },
-    { from: '/ads/compare', to: '/insights/compare/ads' },
+    { from: '/insights/ads', to: '/ads' },
+    { from: '/insights/ads/campaigns', to: '/ads/campaigns' },
+    { from: '/insights/ads/manage', to: '/ads/manage' },
+    { from: '/insights/compare/ads', to: '/ads/compare' },
+    { from: '/ads/objects', to: '/ads/manage' },
   ],
+  /** `tabOrder` fixes the Ads area tabs: Accounts, Campaigns, Manage, Analysis (analytics-owned), Compare. */
   pages: [
-    { id: 'ads/overview', title: 'Ads', href: '/insights/ads', tabOrder: 60, description: 'See paid performance across accounts.' },
-    { id: 'ads/compare', title: 'Compare ad accounts', href: '/insights/compare/ads', navigation: false, description: 'Compare account and object results with honest coverage and currency totals.' },
-    { id: 'ads/objects', title: 'Manage', href: '/insights/ads/manage', navigation: false, description: 'Browse campaigns, ad sets and ads with stored results and freshness.' },
-    { id: 'ads/campaigns', title: 'Campaigns', href: '/insights/ads/campaigns', navigation: false, description: 'Manage campaign results.' },
+    { id: 'ads/overview', title: 'Accounts', href: '/ads', tabOrder: 10, description: 'See paid performance across accounts.' },
+    { id: 'ads/campaigns', title: 'Campaigns', href: '/ads/campaigns', tabOrder: 20, description: 'Manage campaign results.' },
+    { id: 'ads/objects', title: 'Manage', href: '/ads/manage', tabOrder: 30, description: 'Browse campaigns, ad sets and ads with stored results and freshness.' },
+    { id: 'ads/compare', title: 'Compare', href: '/ads/compare', tabOrder: 50, description: 'Compare account and object results with honest coverage and currency totals.' },
   ],
 } as const satisfies ModuleManifest;

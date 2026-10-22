@@ -24,8 +24,8 @@ function Mark() {
 }
 
 /** Glyph module id for each sidebar area; colours come from the `--area-*` tokens. */
-const AREA_GLYPH: Record<AreaId, string> = { home: "home", content: "publishing", inbox: "inbox", insights: "analytics", tasks: "tasks", agency: "agency", settings: "settings" };
-const FIXED_AREAS: readonly AreaId[] = ["home", "content", "inbox", "insights"];
+const AREA_GLYPH: Record<AreaId, string> = { home: "home", content: "publishing", inbox: "inbox", insights: "analytics", ads: "ads", tasks: "tasks", agency: "agency", settings: "settings" };
+const FIXED_AREAS: readonly AreaId[] = ["home", "content", "inbox", "insights", "ads"];
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 type PaletteCopy = { trigger: string; placeholder: string; noResults: string; hint: string; close: string };
@@ -84,7 +84,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const activeArea = installationMode ? undefined : areaForPath(pathname, activeModule);
   const activePage = pageForPath(pathname);
   const areaOn = (area: AreaId) => areaPages(area, enabledFeatures).length > 0 && (FIXED_AREAS.includes(area) || optionalAreas.includes(area));
-  const areas = (["home", "content", "inbox", "insights", "tasks", "agency"] as const).filter(areaOn);
+  const areas = (["home", "content", "inbox", "insights", "ads", "tasks", "agency"] as const).filter(areaOn);
   const settingsPages = areaPages("settings", enabledFeatures);
   const areaHref = (area: AreaId) => areaPages(area, enabledFeatures)[0]?.href ?? "/home";
   const pageLabel = (page: { id: string; title: string }) => (copy.pageTitles as Record<string, string>)[page.id] ?? page.title;

@@ -22,7 +22,7 @@
   /* Area identity (01 §2): aliases of the module colours; palettes override the ones that collided. */
   --area-home: var(--mod-home); --area-content: var(--mod-publishing); --area-inbox: var(--mod-inbox); --area-insights: var(--mod-analytics);
   --ui-good: var(--success); --ui-good-soft: var(--success-soft); /* deprecated aliases for module CSS not yet migrated */
-  --area-tasks: var(--mod-tasks); --area-agency: var(--mod-agency); --area-settings: var(--mod-settings); --area-root: var(--mod-root);
+  --area-tasks: var(--mod-tasks); --area-agency: var(--mod-agency); --area-settings: var(--mod-settings); --area-root: var(--mod-root); --area-ads: var(--mod-ads);
 }
 @media (max-width: 1023px) { :root { --gutter: 24px; } }
 @media (max-width: 760px) { :root { --gutter: 16px; --topbar-h: 52px; } }

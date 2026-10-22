@@ -20,13 +20,12 @@ import { AdsHeader } from './AdsHeader';
 import { AdsReportPager } from './AdsReportPager';
 import { AdsReportExport } from './AdsReportExport';
 import { loadAdsInsightsCopy } from './ads-insights-server';
-import type { AdsSection } from './AdsSubTabs';
 import './ads.css';
 
-const PATH = '/insights/ads';
+const PATH = '/ads';
 
 /**
- * Insights › Ads › Accounts (design v2 S12): one table with a row per ad account, the period and account switcher in
+ * Ads › Accounts (design v2 S12): one table with a row per ad account, the period and account switcher in
  * the header, and a side panel per row for the spend chart, funnel and actions. Reads the same scoped services as
  * REST and MCP; spend is never added across currencies.
  */
@@ -58,18 +57,15 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
     lastSyncedAt: account.lastSyncedAt?.toISOString() ?? null, summary: summaries.get(account.id) ?? null,
   }));
   const use = (feature: string) => canUseFeature(entitlements, feature) && canAccessFeature(permissions, feature, 'read');
-  const available: AdsSection[] = [
-    ...(use('ads/campaigns') ? ['campaigns' as const] : []), ...(use('ads/objects') ? ['manage' as const] : []), ...(use('analytics/ads') ? ['analysis' as const] : []),
-  ];
   const exportPolicy = use('ads/campaigns') ? await loadAdsOutputPolicy().catch(() => null) : null;
 
   return <PageFrame module="ads"><div className="insights">
-    <AdsHeader title={t('text001')} copy={ui} locale={locale} policy={policy} filters={filters} accounts={dataset.accounts} current="accounts" available={available} count={scoped.length}
+    <AdsHeader title={t('text001')} copy={ui} locale={locale} policy={policy} filters={filters} accounts={dataset.accounts} count={scoped.length}
       periodLabel={t('text081')} customLabel={t('text083')} />
     {!dataset.accounts.length
       ? <EmptyState title={ui.emptyTitle} icon={<IconAd />} action={<a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{ui.emptyAction}</a>}>{ui.emptyBody}</EmptyState>
       : <section className="insights-accounts" aria-label={ui.caption}>
-        <AccountsTable rows={rows} copy={ui} locale={locale} campaignsHref={adsQuery(filters, '/insights/ads/campaigns')} rowLabel={ui.colAccount} />
+        <AccountsTable rows={rows} copy={ui} locale={locale} campaignsHref={adsQuery(filters, '/ads/campaigns')} rowLabel={ui.colAccount} />
         <AdsReportPager filters={filters} path={PATH} kind="accounts" page={page} />
         {exportPolicy && dataset.maxRows ? <div className="ads-report-export"><AdsReportExport filters={filters} maxRows={dataset.maxRows} maxBytes={exportPolicy.exportMaxBytes} fileName={exportPolicy.exportFileName} /></div> : null}
       </section>}

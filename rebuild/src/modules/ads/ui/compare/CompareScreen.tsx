@@ -63,12 +63,12 @@ async function AdsComparePage({ searchParams }: { searchParams: Promise<Params> 
   const { copy: insightsCopy } = await loadAdsInsightsCopy();
   const at = adsTranslator(catalogs, locale);
   const header = () => headerFilters
-    ? <AdsHeader title={t('title')} copy={insightsCopy} locale={locale} policy={policy} filters={headerFilters} accounts={accounts} current="accounts" available={[]}
+    ? <AdsHeader title={t('title')} copy={insightsCopy} locale={locale} policy={policy} filters={headerFilters} accounts={accounts}
       actions={kindSwitch} periodLabel={at('text081')} customLabel={at('text083')} />
-    : <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/insights/compare/ads" policy={policy} /><PageHeader module="ads" title={t('title')} actions={kindSwitch} /></>;
+    : <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/ads/compare" policy={policy} /><PageHeader module="ads" title={t('title')} actions={kindSwitch} /></>;
   const hidden = (['period', 'since', 'until', 'account'] as const).map(key => first(params[key]) ? <input key={key} type="hidden" name={key} value={first(params[key])} /> : null);
   const sortLabels: Record<string, string> = { spend: t('col.spend'), impressions: t('col.impressions'), clicks: t('col.clicks'), ctr: t('col.ctr'), cpc: t('col.cpc'), cpm: t('col.cpm'), name: t('col.name') };
-  const sidebar = <><form noValidate method="get" action="/insights/compare/ads" className="ads-extra-filters" aria-label={t('optionsLabel')}>{hidden}
+  const sidebar = <><form noValidate method="get" action="/ads/compare" className="ads-extra-filters" aria-label={t('optionsLabel')}>{hidden}
     <label>{t('compareLabel')}<select name="compare" defaultValue={first(params.compare) ?? 'previous'}><option value="previous">{t('comparePrevious')}</option><option value="accounts">{t('compareAccounts')}</option></select></label>
     <label>{t('show')}<select name="level" defaultValue={first(params.level) ?? 'campaign'}>{(['campaign', 'adset', 'ad'] as const).map(level => <option key={level} value={level}>{t(`level.${level}`)}</option>)}</select></label>
     <label>{t('sortBy')}<select name="sort" defaultValue={first(params.sort) ?? 'spend'}>{Object.entries(sortLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>

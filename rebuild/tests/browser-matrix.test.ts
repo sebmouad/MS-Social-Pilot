@@ -46,9 +46,9 @@ describe('browser matrix report', () => {
   it('passes only a complete four-theme two-viewport matrix with keyboard evidence', () => {
     const report = finishReport(complete());
     expect(report.passed).toBe(true);
-    // Eight route families (Create is its own family and Analytics plus Ads are one Insights family since design v2) × four themes × two viewports.
-    expect(report.expectedCells).toBe(64);
-    expect(report.cells).toHaveLength(64);
+    // Nine route families (Create is its own family; Ads has its own area since design v2) × four themes × two viewports.
+    expect(report.expectedCells).toBe(72);
+    expect(report.cells).toHaveLength(72);
     expect(report.failures).toBe(0);
     expect(report.finishedAt).toMatch(/^\d{4}-/);
   });
@@ -91,7 +91,7 @@ describe('browser matrix report', () => {
   });
   it('records dynamic exclusions and discovers current static pages', () => {
     const inventory = discoverRoutes(fileURLToPath(new URL('../src/app', import.meta.url)));
-    for (const route of ['/home', '/create', '/content/calendar', '/content/library/templates', '/inbox/rules', '/insights/reports', '/insights/ads/campaigns', '/settings/account/appearance', '/tasks', '/agency/clients']) expect(inventory.routes).toContain(route);
+    for (const route of ['/home', '/create', '/content/calendar', '/content/library/templates', '/inbox/rules', '/insights/reports', '/ads/campaigns', '/settings/account/appearance', '/tasks', '/agency/clients']) expect(inventory.routes).toContain(route);
     expect(inventory.excludedDynamicRoutes).toContain('/content/post/[postId]');
     expect(inventory.routes.some(route => route.startsWith('/root') || route.includes('['))).toBe(false);
     expect(customerRoute('/settings-evil')).toBe(false);
@@ -120,19 +120,19 @@ describe('design v2 area matrix', () => {
     }))))));
     return { startedAt: '2026-10-22T00:00:00.000Z', routes: families, excludedDynamicRoutes: ['/content/post/[postId]'], cells, fatal: [] };
   }
-  it('covers the seven v2 areas, each in light/dark, phone/desktop and EN/FR, with keyboard evidence', () => {
+  it('covers the eight v2 areas, each in light/dark, phone/desktop and EN/FR, with keyboard evidence', () => {
     expect(V2_MODES).toEqual(['light', 'dark']);
     expect(V2_LOCALES).toEqual(['en', 'fr']);
     expect(V2_PLAYWRIGHT_LOCALE).toEqual({ en: 'en-US', fr: 'fr-FR' });
     const report = finishV2({ ...completeV2(), themes: clean });
     expect(report.passed).toBe(true);
-    // Seven areas × Clean × two modes × two locales × two viewports.
-    expect(report.expectedCells).toBe(56);
-    expect(report.cells).toHaveLength(56);
+    // Eight areas × Clean × two modes × two locales × two viewports.
+    expect(report.expectedCells).toBe(64);
+    expect(report.cells).toHaveLength(64);
     expect(report.failures).toBe(0);
   });
   it('classifies v2 routes and areas without matching evil prefixes', () => {
-    for (const [route, area] of [['/home', 'Home'], ['/create', 'Create'], ['/content/calendar', 'Content'], ['/inbox/rules', 'Inbox'], ['/insights/ads/campaigns', 'Insights'], ['/settings/team', 'Settings'], ['/root', 'Root'], ['/root/config', 'Root']] as const) {
+    for (const [route, area] of [['/home', 'Home'], ['/create', 'Create'], ['/content/calendar', 'Content'], ['/inbox/rules', 'Inbox'], ['/insights/compare', 'Insights'], ['/ads/campaigns', 'Ads'], ['/settings/team', 'Settings'], ['/root', 'Root'], ['/root/config', 'Root']] as const) {
       expect(v2Route(route)).toBe(true);
       expect(v2Area(route)).toBe(area);
     }
@@ -144,7 +144,7 @@ describe('design v2 area matrix', () => {
   it('discovers the current v2 inventory: customer areas plus Root, tasks and agency excluded', () => {
     const appDir = fileURLToPath(new URL('../src/app', import.meta.url));
     const routes = [...discoverRoutes(appDir).routes.filter(v2Route), ...discoverRootRoutes(appDir).routes];
-    for (const route of ['/home', '/create', '/content', '/inbox', '/insights', '/settings/account', '/root']) expect(routes).toContain(route);
+    for (const route of ['/home', '/create', '/content', '/inbox', '/insights', '/ads', '/settings/account', '/root']) expect(routes).toContain(route);
     expect(routes.some(route => route.startsWith('/tasks') || route.startsWith('/agency'))).toBe(false);
     expect(routes.length).toBeGreaterThan(60);
   });

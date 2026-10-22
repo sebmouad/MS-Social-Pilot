@@ -1,6 +1,6 @@
 /** Customer modules and routes generated from their per-module manifests. */
 import { moduleManifests } from '@/modules';
-import type { AreaId } from '@/modules/types';
+import type { AreaId, ModulePageManifest } from '@/modules/types';
 
 export type { AreaId };
 export type ModuleId = (typeof moduleManifests)[number]['id'];
@@ -35,13 +35,13 @@ export const MODULES: readonly ProductModule[] = moduleManifests.map((module) =>
 }));
 
 export const PAGES: readonly ProductPage[] = moduleManifests.flatMap((manifest) =>
-  manifest.pages.map((page) => ({ ...page, module: manifest.id, area: (manifest as { area?: AreaId }).area ?? 'home' })),
+  manifest.pages.map((page) => ({ ...page, module: manifest.id, area: (page as ModulePageManifest).area ?? (manifest as { area?: AreaId }).area ?? 'home' })),
 );
 
 export const pageFor = (pathname: string) => PAGES.find((page) => page.href === pathname);
 
 /** Fixed order of the sidebar areas. Optional areas (tasks, agency) appear only when used. */
-export const AREA_ORDER: readonly AreaId[] = ['home', 'content', 'inbox', 'insights', 'tasks', 'agency'];
+export const AREA_ORDER: readonly AreaId[] = ['home', 'content', 'inbox', 'insights', 'ads', 'tasks', 'agency'];
 export const OPTIONAL_AREAS: readonly AreaId[] = ['tasks', 'agency'];
 
 /** Pages the area shows as tabs, in manifest order; pages hidden from navigation and unavailable features are left out. */

@@ -192,7 +192,7 @@ describe('no-dispatch refusals versus held outcomes', () => {
     await act(async () => setValue(container.querySelector<HTMLInputElement>('input[name="name"]')!, 'Spring'));
     await submit(); await click(confirmButton());
     expect(container.querySelector('dialog [role="alert"]')?.textContent).toContain('earlier change');
-    expect(container.querySelector('dialog [role="alert"] a')?.getAttribute('href')).toBe('/insights/ads/manage#changes');
+    expect(container.querySelector('dialog [role="alert"] a')?.getAttribute('href')).toBe('/ads/manage#changes');
     expect(sameRequestButton()).toBeUndefined();
     expect(window.sessionStorage.getItem(CAMPAIGN_KEY)).toBeNull();
 

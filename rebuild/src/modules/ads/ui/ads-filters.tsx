@@ -18,7 +18,7 @@ import type { AdsOutputPolicy } from '@/modules/ads/output-policy';
 
 type AdsAccountOption = { id: string; name: string };
 
-export function AdsFiltersSidebar({ accounts, filters, input, errors, action = "/insights/ads", policy, catalogs = defaultAdsCatalogs, locale = 'en' }: { catalogs?: AdsCatalogs; locale?: 'en' | 'fr'; accounts: AdsAccountOption[]; filters?: AdsFilters; input?: AdsSearchParams; errors?: AdsFilterError['fields']; action?: string; policy: AdsReportPolicy }) {
+export function AdsFiltersSidebar({ accounts, filters, input, errors, action = "/ads", policy, catalogs = defaultAdsCatalogs, locale = 'en' }: { catalogs?: AdsCatalogs; locale?: 'en' | 'fr'; accounts: AdsAccountOption[]; filters?: AdsFilters; input?: AdsSearchParams; errors?: AdsFilterError['fields']; action?: string; policy: AdsReportPolicy }) {
   const t = adsTranslator(catalogs, locale);
   const value = (date: Date) => date.toISOString().slice(0, 10);
   const first = (raw: string | string[] | undefined, fallback: string) => (Array.isArray(raw) ? raw[0] : raw) ?? fallback;

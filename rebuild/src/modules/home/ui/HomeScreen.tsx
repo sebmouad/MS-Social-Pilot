@@ -25,7 +25,7 @@ import styles from './home.module.css';
 
 type Copy = HomeCopy;
 type Module = 'analytics' | 'publishing' | 'inbox' | 'ads';
-const HREF: Record<Module, string> = { analytics: '/insights', publishing: '/content', inbox: '/inbox', ads: '/insights/ads' };
+const HREF: Record<Module, string> = { analytics: '/insights', publishing: '/content', inbox: '/inbox', ads: '/ads' };
 
 /** One card: icon chip tinted by its module color, a title and a link to the module. */
 function Card({ module, icon, title, t, span, children, id, count }: { module: Module; icon: ReactNode; title: string; t: Copy; span: 'span4' | 'span6' | 'span8' | 'span12'; children: ReactNode; id: string; count?: ReactNode }) {

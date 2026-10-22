@@ -22,7 +22,7 @@ import { adsDirectoryManagementPort } from '@/modules/ads/directory/management-p
 import { pageSearchRecord } from '@/modules/ads/analysis/query';
 import { AdsFiltersSidebar } from '@/modules/ads/ui/ads-filters';
 import { ObjectManager } from './ObjectManager';
-import { adsHeaderFor, adsTabsFor } from '../AdsTabsFor';
+import { adsHeaderFor } from '../AdsTabsFor';
 import { Button } from '@/components/Button';
 import { ObjectRowLabel } from './ObjectRowLabel';
 import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
@@ -41,7 +41,6 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   const show = (value: number | null) => value === null ? t('text094') : number.format(value);
   const viewer = await requireViewer({ feature: 'ads/objects', channelScoped: true });
   const params = await searchParams;
-  const tabs = await adsTabsFor('manage', viewer);
   const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
   const policy = await loadAdsReportPolicy();
   const managementPolicy = await loadAdsManagementPolicy();
@@ -51,10 +50,10 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   let headerFilters: AdsFilters | null = null;
   try { headerFilters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); } catch { headerFilters = null; }
   const header = headerFilters
-    ? await adsHeaderFor('manage', viewer, { title: t('text261'), locale, policy, filters: headerFilters, accounts, periodLabel: t('text081'), customLabel: t('text083') })
-    : <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/insights/ads/manage" policy={policy} />{tabs}<PageHeader module="ads" title={t('text261')} /></>;
+    ? await adsHeaderFor({ title: t('text261'), locale, policy, filters: headerFilters, accounts, periodLabel: t('text081'), customLabel: t('text083') })
+    : <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/ads/manage" policy={policy} /><PageHeader module="ads" title={t('text261')} /></>;
   const sidebar = <>
-    <form noValidate method="get" action="/insights/ads/manage" className="ads-extra-filters" aria-label={t('text055')}>{hidden}
+    <form noValidate method="get" action="/ads/manage" className="ads-extra-filters" aria-label={t('text055')}>{hidden}
       <label>{t('text056')}<select name="level" defaultValue={first(params.level) ?? 'campaign'}><option value="campaign">{t('text057')}</option><option value="adset">{t('text058')}</option><option value="ad">{t('text059')}</option></select></label>
       <label>{t('text060')}<input name="q" defaultValue={first(params.q) ?? ''} maxLength={policy.maxFilterCharacters} /></label>
       <label>{t('text061')}<input name="parentId" defaultValue={first(params.parentId) ?? ''} maxLength={Math.min(policy.maxFilterCharacters, managementPolicy.parentIdMaxCharacters)} /></label>
@@ -80,7 +79,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   const instants = await workspaceInstantFormatter(actor.workspaceId, locale);
   const history = managementPort ? await managementPort.listChanges(actor).catch(() => null) : null;
   const query = new URLSearchParams(Object.entries(values).flatMap(([key, value]) => (value !== undefined && key !== 'offset' ? [[key, value]] : [])));
-  const pageLink = (offset: number) => `/insights/ads/manage?${new URLSearchParams([...query, ['offset', String(offset)]])}`;
+  const pageLink = (offset: number) => `/ads/manage?${new URLSearchParams([...query, ['offset', String(offset)]])}`;
   const accountName = new Map(accounts.map(account => [account.id, account.name]));
   return <PageFrame module="ads"><div className="insights">
     {header}

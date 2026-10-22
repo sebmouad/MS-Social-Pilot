@@ -83,17 +83,24 @@ describe('shell catalog and areas', () => {
     expect(resolved.en.channelStatus).toEqual(SHELL_COPY.en.channelStatus);
     expect(resolved.fr).toEqual(SHELL_COPY.fr);
     expect(shellCopySchema.safeParse(resolved).success).toBe(true);
+    // A catalog saved before the Ads area existed gains the new area label from the shipped text.
+    const legacy = { en: { ...SHELL_COPY.en, areas: { ...SHELL_COPY.en.areas, ads: undefined } }, fr: SHELL_COPY.fr };
+    delete (legacy.en.areas as Record<string, unknown>).ads;
+    expect(resolveShellCopy(legacy).en.areas.ads).toBe('Ads');
   });
-  it('places every page in an area, Ads and Analytics in Insights, Publishing in Content', () => {
-    expect(areaForPath('/insights/ads/campaigns')).toBe('insights');
+  it('places every page in an area, Ads in Ads, Analytics in Insights, Publishing in Content', () => {
+    expect(areaForPath('/ads/campaigns')).toBe('ads');
+    expect(areaForPath('/ads/analysis')).toBe('ads');
+    expect(areaForPath('/ads/compare')).toBe('ads');
     expect(areaForPath('/insights/posts')).toBe('insights');
-    expect(areaForPath('/insights/compare/ads')).toBe('insights');
     expect(areaForPath('/create', 'publishing')).toBe('content');
     expect(areaForPath('/content/library/templates')).toBe('content');
     // Post details and Library sections belong to Content; their own tab, when they have none, is the parent route.
     expect(pageForPath('/content/post/abc')?.id).toBe('publishing/posts');
     expect(pageForPath('/content/library/labels')?.id).toBe('publishing/labels');
-    expect(areaPages('insights', PAGES.map(page => page.id)).map(page => page.module)).toEqual(expect.arrayContaining(['analytics', 'ads']));
+    expect(areaPages('insights', PAGES.map(page => page.id)).map(page => page.module)).toEqual(expect.arrayContaining(['analytics']));
+    expect(areaPages('insights', PAGES.map(page => page.id)).map(page => page.module)).not.toContain('ads');
+    expect(areaPages('ads', PAGES.map(page => page.id)).map(page => page.module)).toEqual(expect.arrayContaining(['analytics', 'ads']));
     expect(areaPages('home', [])).toEqual([]);
   });
 });

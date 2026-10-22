@@ -28,10 +28,10 @@ beforeEach(() => {
   document.cookie = 'sp_scope_w1=; max-age=0; path=/';
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
-const FEATURES = ['home/overview', 'publishing/posts', 'publishing/calendar', 'inbox/conversations', 'analytics/overview', 'settings/account', 'settings/connections'];
+const FEATURES = ['home/overview', 'publishing/posts', 'publishing/calendar', 'inbox/conversations', 'analytics/overview', 'ads/overview', 'settings/account', 'settings/connections'];
 async function render(extra: Partial<ComponentProps<typeof AppShell>> = {}, enabledFeatures: string[] = FEATURES) {
   await act(async () => root.render(createElement(AppShell, {
-    activeModule: 'publishing', enabledModules: ['home', 'publishing', 'inbox', 'analytics', 'settings'], enabledFeatures, writableFeatures: ['publishing/posts'],
+    activeModule: 'publishing', enabledModules: ['home', 'publishing', 'inbox', 'analytics', 'ads', 'settings'], enabledFeatures, writableFeatures: ['publishing/posts'],
     rootAccess: false, userName: 'Preview', workspaceName: 'Example workspace', workspaceId: 'w1', copy, policy, channels,
     children: createElement('div', null, 'Example posts', createElement('input', { 'aria-label': 'Route setting' })),
     ...extra,
@@ -43,7 +43,7 @@ describe('single-sidebar app shell', () => {
   it('lists the work areas in fixed order with the current one marked', async () => {
     await render();
     const labels = [...container.querySelectorAll('.shell-areas .shell-area')].map(link => link.textContent);
-    expect(labels).toEqual(['Home', 'Content', 'Inbox', 'Insights']);
+    expect(labels).toEqual(['Home', 'Content', 'Inbox', 'Insights', 'Ads']);
     expect(container.querySelector('.shell-areas [data-area="content"]')?.getAttribute('aria-current')).toBe('page');
     expect(container.querySelector('.shell-areas [data-area="insights"]')?.getAttribute('aria-current')).toBeNull();
     expect(container.querySelector('a.shell-create')?.getAttribute('href')).toBe('/create');
@@ -125,7 +125,7 @@ describe('single-sidebar app shell', () => {
     await render();
     const bar = container.querySelector('nav.ui-bottombar')!;
     const order = [...bar.querySelectorAll('a')].map(link => link.getAttribute('aria-label') ?? link.textContent);
-    expect(order).toEqual(['Home', 'Content', 'Create post', 'Inbox', 'Insights']);
+    expect(order).toEqual(['Home', 'Content', 'Inbox', 'Create post', 'Insights', 'Ads']);
   });
 
   it('reports a failed sign-out through the account menu and keeps it retryable', async () => {

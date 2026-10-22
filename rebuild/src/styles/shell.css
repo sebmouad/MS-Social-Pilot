@@ -38,6 +38,7 @@
 .shell-area[data-area="content"], .ui-bottombar__item[data-area="content"] { --area-c: var(--area-content); }
 .shell-area[data-area="inbox"], .ui-bottombar__item[data-area="inbox"] { --area-c: var(--area-inbox); }
 .shell-area[data-area="insights"], .ui-bottombar__item[data-area="insights"] { --area-c: var(--area-insights); }
+.shell-area[data-area="ads"], .ui-bottombar__item[data-area="ads"] { --area-c: var(--area-ads); }
 .shell-area[data-area="tasks"] { --area-c: var(--area-tasks); }
 .shell-area[data-area="agency"] { --area-c: var(--area-agency); }
 .shell-area[data-area="settings"] { --area-c: var(--area-settings); }

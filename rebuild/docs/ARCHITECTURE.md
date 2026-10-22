@@ -1,7 +1,7 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-22 (design v2 B9) against the local working tree, configuration schema **136**.
-[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding and unchanged.
+Updated 2026-10-22 (design v2 Ads area) against the local working tree, configuration schema **137**.
+[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding; §4 gained the owner-approved 2026-10-22 Ads-area decision.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
 
@@ -905,3 +905,20 @@ any client component using `toLocaleDateString/TimeString`, `new Date(..).toLoca
 local-zone Date getters or `Intl.DateTimeFormat` without a `timeZone`. Remaining allowlist:
 `RootWorkspaceControls` (validates a zone name only) and `CalendarBoard` (fallback with the
 workspace zone prop; the server supplies `clockLabel`).
+
+## Ads area split — 2026-10-22 (source/unit only, uncommitted)
+
+Owner decision: Ads is its own top-level sidebar area (Accounts, Campaigns,
+Manage, Analysis, Compare) with canonical `/ads/*` routes; the old
+`/insights/ads/*` and `/insights/compare/ads` addresses redirect with 308.
+Insights keeps Overview, Explore, Audience, Posts, Compare and Reports. The
+analytics-owned Analysis page joins the Ads area through the new per-page
+area override (`page.area ?? manifest.area`); Ads sub-tabs were removed
+because the area tabs carry navigation. `CONFIG_SCHEMA_VERSION` 136 → **137**
+for the `home.shellCopy` catalog change (`areas.ads`, Ads page titles). Old
+saved catalogs load with shipped-text backfill. Evidence: `npm run
+typecheck` 0 errors; targeted suites pass (route-redirects, app-shell,
+shell-v2, ads-filter-ui, module-manifests, browser-matrix, config-validation,
+home-inventory, ads-management-ui74, ads-creation-recovery, ads-ad-create-ui
+plus neighboring ads UI files). No full suite, browser matrix run, provider
+or production verification in this batch.

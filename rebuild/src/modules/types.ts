@@ -5,6 +5,8 @@ export interface ModulePageManifest {
   readonly title: string;
   readonly href: string;
   readonly description: string;
+  /** Sidebar area override: lets one page join another area than its module's (for example the analytics-owned Analysis page joins the Ads area). */
+  readonly area?: AreaId;
   readonly navigation?: boolean;
   /** Position among the area's tabs when pages of several modules share an area (lower first); pages without one keep manifest order after them. */
   readonly tabOrder?: number;
@@ -12,8 +14,8 @@ export interface ModulePageManifest {
   readonly tabRoutes?: readonly string[];
 }
 
-/** Customer work areas of the single sidebar (design v2). Pages join an area through their module's `area`. */
-export type AreaId = 'home' | 'content' | 'inbox' | 'insights' | 'tasks' | 'agency' | 'settings';
+/** Customer work areas of the single sidebar (design v2). Pages join an area through their page-level `area`, else their module's `area`. */
+export type AreaId = 'home' | 'content' | 'inbox' | 'insights' | 'ads' | 'tasks' | 'agency' | 'settings';
 
 /** An old route that moves permanently (308). `from`/`to` may end in `/*` to move a whole prefix; `params` renames query parameters. */
 export interface RouteRedirect {

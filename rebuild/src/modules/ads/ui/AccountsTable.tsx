@@ -16,7 +16,7 @@ export type AccountRow = {
 };
 
 /**
- * Insights › Ads › Accounts: one row per ad account, never a wall of tiles. A row opens a side panel with the spend
+ * Ads › Accounts: one row per ad account, never a wall of tiles. A row opens a side panel with the spend
  * chart, the funnel and the reported actions; currencies stay per row and are never summed.
  */
 export function AccountsTable({ rows, copy, locale, campaignsHref, rowLabel }: { rows: AccountRow[]; copy: AdsInsightsCopy; locale: 'en' | 'fr'; campaignsHref: string; rowLabel: string }) {

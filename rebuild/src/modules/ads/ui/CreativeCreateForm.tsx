@@ -115,7 +115,7 @@ export function CreativeCreateForm({ adAccountId, accountName, ownerScope, local
     {loading ? <p role="status">{t.loading}</p> : null}
     {error ? <p role="alert" className="ui-error">{localize(error)} <Button onClick={() => setReload(value => value + 1)} disabled={busy || loading}>{t.refresh}</Button></p> : null}
     {notice ? <p role="status">{localize(notice)}</p> : null}
-    {held ? <div role="alert"><p>{t.held}</p><p><strong>{held.operation.name}</strong> · {held.operation.mediaId}</p><Button disabled={busy} onClick={() => void send(held)}>{busy ? t.pending : t.check}</Button> <a href="/insights/ads/manage#changes">{t.history}</a></div> : null}
+    {held ? <div role="alert"><p>{t.held}</p><p><strong>{held.operation.name}</strong> · {held.operation.mediaId}</p><Button disabled={busy} onClick={() => void send(held)}>{busy ? t.pending : t.check}</Button> <a href="/ads/manage#changes">{t.history}</a></div> : null}
     {sources ? <form noValidate onSubmit={submit} aria-label={t.title}>
       <div className="ads-campaign-create__fields">
         <label>{t.name}<input name="name" defaultValue={held?.operation.name} required maxLength={sources.nameMaxCharacters} disabled={locked} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /></label>

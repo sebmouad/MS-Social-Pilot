@@ -827,3 +827,37 @@ sandbox `listen EPERM ::1` (file untouched by B9; `node:net` `::1` bind
 probe fails identically). `npx next build` re-run at ship time. No browser
 matrix, keyboard walk, live-provider or production-behavior run in this
 batch beyond the deploy health checks; see HANDOVER for the ship record.
+
+## Ads area split — 2026-10-22 (source/unit only, uncommitted)
+
+Owner decision (authoritative): Ads insights and management move out of
+Insights into their own top-level **Ads** area with area tabs Accounts,
+Campaigns, Manage, Analysis, Compare. Canonical routes are `/ads`,
+`/ads/campaigns`, `/ads/manage`, `/ads/analysis`, `/ads/compare` (moved with
+`git mv` under `src/app/ads/`, new `src/app/ads/layout.tsx` owns the ads.css
+import); old `/insights/ads*` and `/insights/compare/ads` redirect with 308
+via manifest declarations, plus the `/ads/objects` → `/ads/manage` alias. No
+reverse `/ads` → `/insights/*` entries (they would loop).
+
+- Plumbing: `AreaId` gains `'ads'`; `ModulePageManifest` gains the optional
+  per-page `area` override (lets `analytics/ads` join the Ads area);
+  `AREA_ORDER` inserts `ads` after `insights`; `AppShell` gains the
+  `AREA_GLYPH` entry (existing `ads` registry id) and `FIXED_AREAS` entry;
+  phone bar order is Home, Content, Inbox, Create, Insights, Ads;
+  `--area-ads` token plus shell.css glyph rule added.
+- Chrome: `SHELL_COPY` areas gain `ads` (EN `Ads`, FR `Publicités`);
+  pageTitles become Accounts/Comptes, Campaigns/Campagnes (kept),
+  Manage/Gérer, Compare/Comparer. Old saved catalogs backfill from shipped
+  text (covered by a new shell-v2 assertion).
+- Headers: `AdsSubTabs` deleted (area tabs carry navigation);
+  `AdsHeader`/`adsHeaderFor` keep title, ⓘ, period and account controls;
+  `compareKindSwitch` (Channels | Ad accounts) kept with updated hrefs;
+  pager/export placement unchanged.
+- `CONFIG_SCHEMA_VERSION` 136 → **137** (`config-validation` pins updated).
+
+Evidence: `npm run typecheck` 0 errors; 11 touched test files plus 15
+neighboring ads UI files pass (see batch notes for the file list). The
+verifier owns the full suite. No commit, push, deploy or server run in this
+lane. Next: full-suite verification, browser-matrix v2 run (families now
+include `/ads`; cell counts updated), then release through
+`rebuild/scripts/prod-deploy.sh` per CUTOVER.

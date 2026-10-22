@@ -79,11 +79,6 @@
 .insights-more > summary { cursor: pointer; padding: var(--space-2) 0; color: var(--ink-soft); font-weight: 600; }
 .insights-more > summary:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; }
 
-.insights-subtabs { display: flex; gap: var(--space-1); margin: 0; padding: 0; overflow-x: auto; list-style: none; border-bottom: 1px solid var(--line); }
-.insights-subtabs a { display: block; padding: var(--space-2) var(--space-3); border-bottom: 2px solid transparent; color: var(--ink-soft); font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
-.insights-subtabs a[aria-current="page"] { border-bottom-color: var(--mod, var(--accent)); color: var(--ink); }
-.insights-subtabs a:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: -2px; }
-
 .insights-accounts { display: grid; gap: var(--space-4); }
 .insights-accounts__name { display: grid; gap: 2px; min-width: 0; }
 .insights-accounts__name button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 650; text-align: left; cursor: pointer; }

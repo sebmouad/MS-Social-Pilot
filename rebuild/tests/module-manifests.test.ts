@@ -23,9 +23,9 @@ describe('customer module manifests', () => {
 
   it('generates the shared catalog from the independent module manifests', () => {
     expect(MODULES.map(({ id }) => id)).toEqual(moduleManifests.map(({ id }) => id));
-    expect(PAGES).toEqual(moduleManifests.flatMap((manifest) => manifest.pages.map((page) => ({ ...page, module: manifest.id, area: (manifest as { area?: string }).area }))));
+    expect(PAGES).toEqual(moduleManifests.flatMap((manifest) => manifest.pages.map((page) => ({ ...page, module: manifest.id, area: (page as { area?: string }).area ?? (manifest as { area?: string }).area }))));
     // Every module places its pages in a sidebar area (design v2).
-    expect(PAGES.every(({ area }) => ['home', 'content', 'inbox', 'insights', 'tasks', 'agency', 'settings'].includes(area))).toBe(true);
+    expect(PAGES.every(({ area }) => ['home', 'content', 'inbox', 'insights', 'ads', 'tasks', 'agency', 'settings'].includes(area))).toBe(true);
   });
 
   it('does not expose internal Root routes as customer features', () => {
@@ -33,14 +33,22 @@ describe('customer module manifests', () => {
     expect(PAGES.some(({ href }) => href === '/root' || href.startsWith('/root/'))).toBe(false);
   });
 
-  it('shows the Insights tabs in order (Overview, Explore, Audience, Posts, Compare, Ads, Reports) and keeps goals, pins and ad analysis as sub-pages', () => {
+  it('shows the Insights tabs in order (Overview, Explore, Audience, Posts, Compare, Reports) and keeps goals and pins as sub-pages', () => {
     expect(areaPages('insights', PAGES.map(({ id }) => id)).map(({ href }) => href)).toEqual([
-      '/insights', '/insights/explore', '/insights/audience', '/insights/posts', '/insights/compare', '/insights/ads', '/insights/reports',
+      '/insights', '/insights/explore', '/insights/audience', '/insights/posts', '/insights/compare', '/insights/reports',
     ]);
-    for (const id of ['analytics/goals', 'analytics/pins', 'analytics/ads', 'ads/campaigns', 'ads/objects', 'ads/compare']) expect(PAGES.find(page => page.id === id)?.navigation, id).toBe(false);
+    for (const id of ['analytics/goals', 'analytics/pins']) expect(PAGES.find(page => page.id === id)?.navigation, id).toBe(false);
     expect(PAGES.find(({ id }) => id === 'analytics/reports')?.href).toBe('/insights/reports');
     expect(moduleManifests.find(({id})=>id==='analytics')?.jobs).toEqual(expect.arrayContaining([expect.objectContaining({name:'analyticsReports',configKey:'analytics.reports.schedule'})]));
     expect(PAGES.find(({ id }) => id === 'analytics/explorer')?.href).toBe('/insights/explore');
+  });
+
+  it('shows the Ads area tabs in order (Accounts, Campaigns, Manage, Analysis, Compare), with Analysis owned by Analytics', () => {
+    expect(areaPages('ads', PAGES.map(({ id }) => id)).map(({ href }) => href)).toEqual([
+      '/ads', '/ads/campaigns', '/ads/manage', '/ads/analysis', '/ads/compare',
+    ]);
+    expect(PAGES.find(({ id }) => id === 'analytics/ads')).toMatchObject({ module: 'analytics', area: 'ads', href: '/ads/analysis' });
+    expect(PAGES.find(({ id }) => id === 'ads/overview')).toMatchObject({ module: 'ads', area: 'ads', href: '/ads' });
   });
 
   it('uses a compact mobile title for Publishing', () => {

@@ -141,12 +141,12 @@ export function CampaignCreateForm({ adAccountId, accountName, config, ownerScop
     {message ? <p role="status" className="small-note">{localize(message)}</p> : null}
     {held && review ? <div role="region" aria-label={t('text209')} className="ads-object-manager__pending">
       <p role="alert" className="ui-error">{localize(held)}</p>
-      <p className="small-note">{t('text210')}<a href="/insights/ads/manage#changes">{t('text211')}</a> {t('text212')}</p>
+      <p className="small-note">{t('text210')}<a href="/ads/manage#changes">{t('text211')}</a> {t('text212')}</p>
       <button className="ui-button ui-button--primary" type="button" onClick={() => void confirmCreate()} disabled={busy}>{busy ? t('text118') : t('text213')}</button>
     </div> : null}
     {confirming && review ? <ModalDialog className="ui-dialog" labelledBy={`campaign-confirm-${adAccountId}`} onDismiss={() => { if (!busy) setConfirming(false); }} busy={busy}>
       <div className="ui-dialog__header"><div><h2 id={`campaign-confirm-${adAccountId}`}>{config.confirmTitle}</h2><p>{config.confirmDescription}</p></div></div>
-      <div className="ui-dialog__body"><p><strong>{review.name}</strong> {t('text166')}{config.options.find(option => option.value === review.objective)?.label ?? review.objective} {t('text166')}{accountName}</p>{dialogError && <p role="alert" className="ui-error">{localize(dialogError)}{refusalReason === 'blocked_by_other_request' ? <> <a href="/insights/ads/manage#changes">{t('text214')}</a> {t('text215')}</> : null}</p>}</div>
+      <div className="ui-dialog__body"><p><strong>{review.name}</strong> {t('text166')}{config.options.find(option => option.value === review.objective)?.label ?? review.objective} {t('text166')}{accountName}</p>{dialogError && <p role="alert" className="ui-error">{localize(dialogError)}{refusalReason === 'blocked_by_other_request' ? <> <a href="/ads/manage#changes">{t('text214')}</a> {t('text215')}</> : null}</p>}</div>
       <div className="ui-dialog__actions"><button className="ui-button ui-button--secondary" type="button" data-dialog-cancel onClick={() => setConfirming(false)} disabled={busy}>{t('text125')}</button><button className="ui-button ui-button--primary" type="button" onClick={() => void confirmCreate()} disabled={busy}>{busy ? t('text208') : config.actionLabel}</button></div>
     </ModalDialog> : null}
   </form>;

@@ -10,7 +10,7 @@ const customPolicy = {
 };
 const state = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn(), viewer: vi.fn(), readiness: vi.fn(), canRead: vi.fn(), policy: vi.fn(), output: vi.fn(), feature: vi.fn(), access: vi.fn() }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': 'en' }) }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {} }), usePathname: () => '/insights/ads', useSearchParams: () => new URLSearchParams() }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {} }), usePathname: () => '/ads', useSearchParams: () => new URLSearchParams() }));
 vi.mock('@/modules/ads/management/server', () => ({ describeAdsManagement: async () => ({ canManage: false, operations: [] }) }));
 vi.mock('@/modules/ads/server/object-store', () => ({ listStoredAdObjects: async () => [] }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
@@ -25,6 +25,7 @@ vi.mock('../src/modules/ads/server/output-policy', () => ({ loadAdsOutputPolicy:
 
 import AdsPage from '../src/modules/ads/ui/AdsScreen';
 import CampaignsPage from '../src/modules/ads/ui/campaigns/CampaignsScreen';
+import { PAGES, areaPages } from '../src/lib/product';
 import { AdsFiltersSidebar } from '../src/modules/ads/ui/ads-filters';
 import { parseAdsFilters } from '@/modules/ads/server/queries';
 import { ADS_REPORT_DEFAULT_POLICY } from '../src/modules/ads/report-policy';
@@ -63,12 +64,13 @@ describe('Ads report filter UX', () => {
     expect(node.querySelector('.metric-grid')).toBeNull();
   });
 
-  it('offers the Ads sub-tabs for the sections this member may use', async () => {
+  it('leaves Ads navigation to the area tabs and keeps the header to period and account controls', async () => {
+    expect(areaPages('ads', PAGES.map(page => page.id)).map(page => page.href)).toEqual(['/ads', '/ads/campaigns', '/ads/manage', '/ads/analysis', '/ads/compare']);
     const node = dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({}) })));
-    const tabs = [...node.querySelectorAll('.insights-subtabs a')].map(link => [link.textContent, link.getAttribute('aria-current')]);
-    expect(tabs).toEqual([['Accounts', 'page'], ['Campaigns', null], ['Manage', null], ['Analysis', null]]);
-    state.feature.mockImplementation((_entitlements, feature) => feature === 'ads/overview');
-    expect(dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({}) }))).querySelector('.insights-subtabs')).toBeNull();
+    expect(node.querySelector('.insights-subtabs')).toBeNull();
+    expect(node.querySelector('button.ui-daterange')).not.toBeNull();
+    const filtered = dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({ account: 'usd' }) })));
+    expect(filtered.querySelector('.ui-filter-button')?.getAttribute('aria-label')).toBe('Filter, 1 active');
   });
 
   it('paginates the Accounts table while keeping the total and the complete custom filter scope', async () => {
@@ -78,7 +80,7 @@ describe('Ads report filter UX', () => {
     expect(node.querySelector('tbody tr')?.textContent).toContain('US account');
     expect(node.querySelector('.ui-page-header__count')?.textContent).toBe('3');
     const next = node.querySelector<HTMLAnchorElement>('nav[aria-label="Account report pages"] a[rel="next"]')!;
-    expect(next.getAttribute('href')).toBe('/insights/ads?period=custom&since=2026-10-01&until=2026-10-03&page=3');
+    expect(next.getAttribute('href')).toBe('/ads?period=custom&since=2026-10-01&until=2026-10-03&page=3');
     expect(node.querySelector('.ads-report-pager__current [aria-current="page"]')?.textContent).toBe('Page 2 of 3');
   });
 
@@ -134,7 +136,7 @@ describe('Ads report filter UX', () => {
     expect(node.querySelector('[role="alert"]')?.textContent).toMatch(/too much report data/i);
     expect(node.querySelector<HTMLInputElement>('input[name="since"]')?.value).toBe('2026-10-01');
     expect(node.querySelector<HTMLSelectElement>('select[name="account"]')?.value).toBe('usd');
-    expect(node.querySelector('.ads-page-reset')?.getAttribute('href')).toBe('/insights/ads?period=custom&since=2026-10-01&until=2026-10-03&account=usd');
+    expect(node.querySelector('.ads-page-reset')?.getAttribute('href')).toBe('/ads?period=custom&since=2026-10-01&until=2026-10-03&account=usd');
     expect(node.querySelector('.ads-account-card')).toBeNull();
     expect(node.querySelector('[aria-label="Export Ads report"]')).toBeNull();
     expect(state.output).not.toHaveBeenCalled();

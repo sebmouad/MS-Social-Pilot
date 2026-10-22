@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 export type BottomBarItem = { id: string; href: string; label: string; icon: ReactNode; active?: boolean; badge?: number };
 
 /**
- * Phone navigation (< 760 px): Home, Content, a raised Create button, Inbox and Insights. Labels stay visible.
+ * Phone navigation (< 760 px): Home, Content, Inbox, a raised Create button, Insights and Ads. Labels stay visible.
  * The create control is omitted when the member cannot create (read-only roles), leaving the other items evenly spaced.
  */
 export function BottomBar({ label, items, create }: { label: string; items: BottomBarItem[]; create?: { href: string; label: string } }) {
