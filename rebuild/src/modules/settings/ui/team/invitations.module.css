@@ -16,7 +16,7 @@
 .tableWrap { position: relative; width: 100%; min-width: 0; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
 .table th, .table td { padding: 12px 13px; border-bottom: 1px solid var(--line-subtle); vertical-align: top; }
-.table thead th { background: var(--surface-raised); color: var(--ink-faint); font-size: 10px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; white-space: nowrap; }
+.table thead th { background: var(--surface-raised); color: var(--ink-faint); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .table tbody tr:last-child > * { border-bottom: 0; }
 .table tbody tr:hover { background: var(--surface-hover); }
 .table tbody th { min-width: 180px; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }

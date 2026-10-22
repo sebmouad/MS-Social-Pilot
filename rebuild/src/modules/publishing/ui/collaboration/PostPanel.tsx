@@ -49,7 +49,7 @@ function LabelsSection({ postId, canWrite, labels, assigned }: { postId: string;
   return <section className={styles.section} aria-labelledby="labels-title"><h2 id="labels-title">{c.labels}</h2>
     {action.banner}
     {labels.length ? <div className={styles.grid}>{labels.map(l => <label key={l.id} className={styles.check}><input type="checkbox" disabled={!canWrite || action.busy} checked={chosen.has(l.id)} onChange={() => setChosen(c => { const n = new Set(c); if (!n.delete(l.id)) n.add(l.id); return n; })} />{l.name}</label>)}</div> : <p className={styles.empty}>{c.no_labels_exist_yet_create_some_in_labels}</p>}
-    {canWrite && <div className={styles.actions}><Button variant="primary" disabled={!dirty || action.busy} onClick={() => setReview(true)}>{c.review_label_change}</Button></div>}
+    {canWrite && labels.length > 0 && dirty && <div className={styles.actions}><Button variant="primary" disabled={action.busy} onClick={() => setReview(true)}>{c.review_label_change}</Button></div>}
     <ConfirmDialog feedback={action.feedback} open={review} title={c.review_label_change} description={c.only_this_post_s_labels_change_nothing_is_published_or_rescheduled} confirmation={confirmation} actionLabel={c.save_labels} busy={action.busy} onCancel={() => setReview(false)} onConfirm={() => void apply()} />
   </section>;
 }
@@ -88,6 +88,8 @@ function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, 
   const [removing, setRemoving] = useState<Note | null>(null);
   const action = useAction();
   const confirmed = addNoteConfirmation(postId);
+  // You cannot mention yourself, so the picker appears only when someone else can be mentioned.
+  const others = mentionable.filter(m => m.id !== viewerId);
   async function add(event: React.FormEvent) {
     event.preventDefault();
     await action.run(async () => {
@@ -114,7 +116,7 @@ function NotesSection({ postId, canWrite, notes: initial, mentionable, noteMax, 
     {action.banner}
     {canWrite && canAdd && <form noValidate className={styles.form} onSubmit={event => void add(event)}>
       <label>{c.new_note}<AutoTextarea rows={3} maxLength={noteMax} required value={body} disabled={action.busy} onChange={e => setBody(e.target.value)} /></label>
-      {mentionable.length > 0 && <fieldset className={styles.form}><legend className={styles.meta}>{c.mention_also_type_name_in_the_note}</legend><div className={styles.grid}>{mentionable.filter(m => m.id !== viewerId).map(m => <label key={m.id} className={styles.check}><input type="checkbox" checked={mentions.has(m.id)} onChange={() => setMentions(s => { const n = new Set(s); if (!n.delete(m.id)) n.add(m.id); return n; })} />{m.name}</label>)}</div></fieldset>}
+      {others.length > 0 && <fieldset className={styles.form}><legend className={styles.meta}>{c.mention_also_type_name_in_the_note}</legend><div className={styles.grid}>{others.map(m => <label key={m.id} className={styles.check}><input type="checkbox" checked={mentions.has(m.id)} onChange={() => setMentions(s => { const n = new Set(s); if (!n.delete(m.id)) n.add(m.id); return n; })} />{m.name}</label>)}</div></fieldset>}
       <div className={styles.actions}><Button type="submit" variant="primary" disabled={action.busy || !body.trim()}>{action.busy ? c.saving : c.add_note}</Button><span className={styles.meta}>{body.length}/{noteMax}</span></div>
     </form>}
     {notes.length ? <ul className={styles.form}>{notes.map(n => <li key={n.id} className={styles.note}><div>{n.body}</div><div className={styles.meta}>{n.authorName ?? c.former_member} · {n.createdLabel || c.unknown}</div>

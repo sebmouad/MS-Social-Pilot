@@ -76,7 +76,7 @@ async function attribute(db: Pick<Tx, '$queryRaw'>, workspaceId: string, assets:
   const all = [...new Set([...refs.values()].flat())];
   if (!all.length) return { byAsset, truncated: false };
   const patterns = all.map(likeContains);
-  const rows = await db.$queryRaw<PostRow[]>`SELECT p.id, p.status::text AS status, p."scheduledAt", left(p.message, ${excerptCharacters}) AS excerpt, p.media::text AS media, p."mediaKeys" AS keys FROM posts p WHERE p."workspaceId" = ${workspaceId} AND (p."mediaKeys" && ${all}::text[] OR p.media::text LIKE ANY(${patterns}::text[])) ORDER BY p."createdAt" DESC, p.id ASC LIMIT ${scan + 1}`;
+  const rows = await db.$queryRaw<PostRow[]>`SELECT p.id, p.status::text AS status, p."scheduledAt", left(p.message, ${excerptCharacters}::int) AS excerpt, p.media::text AS media, p."mediaKeys" AS keys FROM posts p WHERE p."workspaceId" = ${workspaceId} AND (p."mediaKeys" && ${all}::text[] OR p.media::text LIKE ANY(${patterns}::text[])) ORDER BY p."createdAt" DESC, p.id ASC LIMIT ${scan + 1}`;
   for (const [id, list] of refs) {
     byAsset.set(id, rows.slice(0, scan).filter(r => list.some(ref => (r.keys ?? []).includes(ref) || r.media.includes(ref))).map(r => ({ postId: r.id, status: r.status, scheduledAt: r.scheduledAt, excerpt: r.excerpt })));
   }

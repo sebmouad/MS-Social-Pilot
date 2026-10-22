@@ -36,8 +36,8 @@ export type WebAppPolicy = z.infer<typeof webAppSchema>;
 export type WebAppCopy = WebAppPolicy['copy']['en'];
 export const WEB_APP_DEFAULTS: WebAppPolicy = {
   requestTimeoutMs: 15000,
-  enabled: true, startUrl: '/', scope: '/', display: 'standalone', themeColor: '#286b4b', backgroundColor: '#f5f7f4', inkColor: '#18231e',
-  darkBackgroundColor: '#18231e', darkInkColor: '#f5f7f4',
+  enabled: true, startUrl: '/', scope: '/', display: 'standalone', themeColor: '#111318', backgroundColor: '#ffffff', inkColor: '#111318',
+  darkBackgroundColor: '#0e0f12', darkInkColor: '#f2f3f5',
   iconText: 'SP', iconTextColor: '#ffffff', cacheRevision: 'v1', copy: { en: language, fr },
 };
 export const WEB_APP_CONFIG = [entry({ key: 'settings.webApp', group: 'Settings · Web app', label: 'Installable app branding and offline copy', kind: 'json', description: 'Public English/French app identity, icon mark, colors, start path, install availability and offline cache revision. Public branding only: never place private information here. Change the revision after offline-copy changes so installed browsers retire the old fallback.', defaultValue: WEB_APP_DEFAULTS, schema: webAppSchema, consumption: 'active' })] as const;

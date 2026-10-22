@@ -147,15 +147,15 @@ describe('Home overview screen', () => {
   it('renders the needs-attention strip with a link to each fix', async () => {
     const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain('Needs attention');
-    expect(html).toContain('2 posts failed — Review');
+    expect(html).toContain('Failed posts: 2');
     expect(html).toContain('href="/content?status=failed"');
-    expect(html).toContain('3 posts waiting for your approval');
+    expect(html).toContain('Waiting for your approval: 3');
     expect(html).toContain('href="/content/approvals"');
     expect(html).toContain('Reconnect Beta');
     expect(html).toContain('href="/settings/channels"');
-    expect(html).toContain('7 conversations waiting');
+    expect(html).toContain('Waiting conversations: 7');
     expect(html).toContain('href="/inbox"');
-    expect(html).not.toContain('partly failed');
+    expect(html).not.toContain('Partly failed');
   });
 
   it('hides the strip when nothing needs attention and warns when counts are partial', async () => {
@@ -163,7 +163,7 @@ describe('Home overview screen', () => {
     expect(await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }))).not.toContain('Needs attention');
     state.overview.mockResolvedValue({ ...full(), attention: { state: 'ready', data: { failedPosts: 1, partiallyFailedPosts: null, pendingApprovals: null, waitingConversations: null, reconnect: null, partial: true } } });
     const html = await disclosedMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
-    expect(html).toContain('1 posts failed');
+    expect(html).toContain('Failed posts: 1');
     expect(html).toContain('Some counts could not be loaded.');
   });
 

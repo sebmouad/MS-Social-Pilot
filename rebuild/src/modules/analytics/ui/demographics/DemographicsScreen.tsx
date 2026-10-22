@@ -4,7 +4,8 @@ import { PageHeader } from '@/components/PageHeader';
 import { headers } from 'next/headers';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
-import { IconUsers } from '@tabler/icons-react';
+import { IconDownload, IconUsers } from '@tabler/icons-react';
+import { InfoTip } from '@/components';
 import { AudienceChart } from './AudienceCharts';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -12,7 +13,6 @@ import { readDemographics } from '@/modules/analytics/demographics/server/demogr
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
 import { pageChannelScope } from '@/modules/shell/server/scope';
 import { insightsReadInput } from '@/modules/analytics/ui/insights/scope';
-import { WorkflowNav } from '@/modules/analytics/ui/reports/WorkflowNav';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 
 type Search = Record<string, string | string[] | undefined>;
@@ -48,21 +48,19 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
   const dateField = (name: 'start' | 'end', label: string) => {
     const value = params[name] !== undefined ? first(params[name]) : data?.period[name] ?? options?.period[name] ?? '';
     const valid = /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
-    return <label className="ui-field">{label}<input className="ui-input" type={!value || valid ? 'date' : 'text'} name={name} defaultValue={value} aria-describedby={failed ? 'demographics-error' : undefined} /></label>;
+    return <label className={styles.inlineField}><span>{label}</span><input className="ui-input" type={!value || valid ? 'date' : 'text'} name={name} defaultValue={value} aria-describedby={failed ? 'demographics-error' : undefined} /></label>;
   };
-  const filters = <form noValidate action="/insights/audience" className={styles.filters}>
-    <fieldset><legend>{t("Date range (UTC)")}</legend>{dateField('start', t("From"))}{dateField('end', t("To"))}</fieldset>
+  // One compact toolbar on the title row: the period, Apply and the CSV export. The sidebar scopes the channels.
+  const filters = <form noValidate action="/insights/audience" className={styles.toolbar} aria-label={t("Date range (UTC)")}>
+    {dateField('start', t("From"))}{dateField('end', t("To"))}
     {scope.ids.length ? <input type="hidden" name="channel" value={scope.ids.join(',')} /> : null}
-    {!channels.length && <p>{t("No channels available.")}</p>}
-    <Button type="submit" variant="primary">{t("Apply filters")}</Button>
-    <a href="/insights/audience">{t("Reset filters")}</a>
-    {data && <a href={`/api/analytics/demographics?${query}`} download>{t("Export full history (CSV)")}</a>}
+    <Button type="submit" variant="secondary" size="sm">{t("Apply filters")}</Button>
+    {data && <a className="ui-button ui-button--quiet ui-button--sm" href={`/api/analytics/demographics?${query}`} download><IconDownload size={16} aria-hidden="true" />{t("Export full history (CSV)")}</a>}
   </form>;
   const metrics = data ? [...data.groups.flatMap(group => group.metrics), ...data.other] : [];
   return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
-    <WorkflowNav current="/insights/audience">{filters}</WorkflowNav>
-    <PageHeader module="analytics" title={t("Audience history")} description={<>{t("Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.")}</>} />
-      {data && <p>{data.period.start} — {data.period.end} UTC</p>}
+    <PageHeader module="analytics" title={t("Audience history")} info={<InfoTip name={t("Audience history")} blocks={[{ text: t("Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.") }]} />} filters={filters} />
+    {!channels.length && <p className={styles.note}>{t("No channels available.")}</p>}
     {failed && <section id="demographics-error" className={styles.panel}><EmptyState tone="error" title={t("History could not be loaded")} action={<a href="/insights/audience">{t("Reset filters")}</a>}>{t("Review your dates and channels, narrow the period, or retry. Your filters have been retained.")}</EmptyState></section>}
     {data && <section className={styles.panel}><h2>{t("Audience size")}</h2><p>{data.audience.covered ? number.format(data.audience.total) : unknown} · {data.audience.covered} / {data.audience.selected} {t("selected channels")}</p><p>{t("Latest valid figure per covered channel. This is not a count of unique people across networks.")}</p></section>}
     {data?.empty && <section className={styles.panel}><EmptyState icon={<IconUsers />} title={t("No stored breakdowns")} action={<a href="/insights/audience">{t("Reset filters")}</a>}>{t("Not available for these channels and dates. Try another period or channel.")}</EmptyState></section>}

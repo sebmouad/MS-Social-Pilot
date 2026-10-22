@@ -35,7 +35,7 @@ export default async function NotificationsPage() {
         <NotificationCenter initialPreferences={preferences} initialPage={notifications && { ...notifications, items: notifications.items.map(item => labelInstants(item, { createdAt: 'dateTime' }, instants)) }} locale={locale} />
       </SettingsPanel>
       {chatCopy ? <SettingsPanel title={chatCopy.title} detail={chatCopy.description}>
-        <Link href="/settings/notifications/chat-channels">{chatCopy.title}</Link>
+        <Link href="/settings/account/notifications/chat-channels">{chatCopy.title}</Link>
       </SettingsPanel> : null}
     </SettingsPage>
   </PageFrame>;

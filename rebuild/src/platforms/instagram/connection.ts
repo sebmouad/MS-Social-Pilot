@@ -84,11 +84,11 @@ export const instagramConnection: PlatformHost['connection'] = {
   isReady: async () => Boolean(await runtimeSecret('instagram.appSecret')),
   async start(request, viewer) {
     await withWorkspaceOperation(viewer.workspaceId, () => discoverSelectedInstagramAccounts(viewer));
-    return NextResponse.json({ authorizationUrl: new URL('/settings/connections?notice=connected&select=1', requestOrigin(request)).toString() }, { headers: { 'cache-control': 'no-store' } });
+    return NextResponse.json({ authorizationUrl: new URL('/settings/channels?notice=connected&select=1', requestOrigin(request)).toString() }, { headers: { 'cache-control': 'no-store' } });
   },
   // This linked-Page flow has no OAuth callback and never accepts callback writes.
   async callback(request) {
-    return NextResponse.redirect(new URL('/settings/connections', requestOrigin(request)), { status: 303 });
+    return NextResponse.redirect(new URL('/settings/channels', requestOrigin(request)), { status: 303 });
   },
   async grantHealth({ scopes, locale = 'en' }) {
     const policy = await configuredInstagramPolicy();

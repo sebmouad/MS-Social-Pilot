@@ -155,9 +155,9 @@ describe('Insights › Overview', () => {
 
   it('explains an empty workspace with a way to manage channels, only for members who can', async () => {
     state.snapshot.mockResolvedValue(snapshot({ options: { channels: [], adAccounts: [], metrics: [] }, selected: { channelIds: [], adAccountIds: [] } }));
-    expect(await render()).toContain('href="/settings/connections"');
+    expect(await render()).toContain('href="/settings/channels"');
     state.use.mockImplementation((_entitlements: unknown, feature: string) => feature !== 'settings/connections');
-    expect(await render()).not.toContain('href="/settings/connections"');
+    expect(await render()).not.toContain('href="/settings/channels"');
   });
 });
 

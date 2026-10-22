@@ -44,7 +44,7 @@ describe('installed LinkedIn/Pinterest shared connection hosts', () => {
   });
   it.each([linkedinConnection, pinterestConnection])('redirects invalid callbacks to the configured public origin', async connection => {
     const response = await connection.callback!(new NextRequest('http://internal:3100/api/callback?code=synthetic&state=invalid'), viewer);
-    expect(response.headers.get('location')).toBe('https://app.example.test/settings/connections?notice=oauth_invalid_state');
+    expect(response.headers.get('location')).toBe('https://app.example.test/settings/channels?notice=oauth_invalid_state');
   });
   it.each([linkedinConnection, pinterestConnection])('refuses member, viewer, removed membership, foreign workspace and disabled module before OAuth', async connection => {
     const request = new NextRequest('https://app.example.test/api/start');

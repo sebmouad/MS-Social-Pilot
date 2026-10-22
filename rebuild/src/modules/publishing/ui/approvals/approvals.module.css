@@ -4,14 +4,17 @@
 .toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .preview { max-width: 560px; margin-top: 4px; }
 /* Design v2 S5: review cards at a readable measure. */
-.keys { margin: 0 0 var(--space-3); color: var(--ink-soft); font-size: var(--text-sm); }
-.list { display: grid; gap: var(--space-4); max-width: 640px; margin: 0; padding: 0; list-style: none; }
-.card { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-card); }
+.keys { margin: 0 0 var(--space-3); color: var(--ink-faint); font-size: var(--text-xs); }
+.list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); align-items: start; gap: var(--space-4); max-width: 1180px; margin: 0; padding: 0; list-style: none; }
+.card { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
 .card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .cardHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .cardHead strong { display: block; font-size: var(--text-md); }
 .when { display: block; color: var(--ink-soft); font-size: var(--text-sm); }
-.cardPreview article { max-width: none; }
+.cardPreview article { max-width: none; padding: 0; border: 0; background: transparent; }
+/* The decision is the focus: the post media stays a bounded preview. */
+.cardPreview article img, .cardPreview article video { max-height: 300px; object-fit: cover; }
+.cardPreview article a:has(> img) { max-height: 300px; }
 .decision { display: grid; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); }
 .note { display: grid; gap: 6px; }
 .note label { color: var(--ink-soft); font-size: var(--text-sm); font-weight: 650; }

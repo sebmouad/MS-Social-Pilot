@@ -17,6 +17,7 @@ import { Menu, type MenuItem } from "./Menu";
 import { Avatar } from "./Avatar";
 import { Drawer } from "./Drawer";
 import { useOptionalTheme, MODES } from "./ThemeProvider";
+import { LANGUAGE_COOKIE, type Language } from "@/lib/language";
 
 function Mark() {
   return <svg className="shell-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg>;
@@ -87,11 +88,30 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const settingsPages = areaPages("settings", enabledFeatures);
   const areaHref = (area: AreaId) => areaPages(area, enabledFeatures)[0]?.href ?? "/home";
   const pageLabel = (page: { id: string; title: string }) => (copy.pageTitles as Record<string, string>)[page.id] ?? page.title;
+  // Every signed-in page shares the root layout's title; name the tab after the current page so history and tabs stay readable.
+  const documentTitle = installationMode ? copy.root : activePage ? pageLabel(activePage) : undefined;
+  useEffect(() => {
+    if (!documentTitle) return;
+    const current = document.title;
+    const brand = current.includes(" · ") ? current.slice(current.lastIndexOf(" · ") + 3) : current;
+    document.title = brand && brand !== documentTitle ? `${documentTitle} · ${brand}` : documentTitle;
+  }, [documentTitle, pathname]);
+  // Phone tab strips scroll; bring the current tab into view instead of leaving it clipped past the edge.
+  useEffect(() => {
+    for (const strip of document.querySelectorAll<HTMLElement>(".shell-tabs .ui-tabs__list, .shell-settings__list")) {
+      const current = strip.querySelector<HTMLElement>('[aria-current="page"]');
+      if (!current || strip.scrollWidth <= strip.clientWidth) continue;
+      const box = strip.getBoundingClientRect(), tab = current.getBoundingClientRect();
+      if (tab.right > box.right - 32 || tab.left < box.left) strip.scrollLeft += tab.left - box.left - 16;
+    }
+  }, [pathname]);
   const primaryAction = installationMode ? undefined : MODULES.map(module => module.primaryAction).find(action => action && enabledFeatures.includes(action.featureId) && writableFeatures.includes(action.featureId));
   const tabs = activeArea ? areaPages(activeArea, enabledFeatures).map(page => ({ id: page.id, href: page.href, label: pageLabel(page), ...(tabCounts[page.id] ? { count: tabCounts[page.id] } : {}) })) : [];
   // Sections that are not tabs themselves (Library sections, post details) keep their parent tab current: the longest tab route that prefixes the path.
+  const underRoute = (route: string) => pathname === route || pathname.startsWith(`${route}/`);
   const activeTabId = tabs.find(tab => tab.id === activePage?.id)?.id
-    ?? [...tabs].filter(tab => pathname === tab.href || pathname.startsWith(`${tab.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]?.id;
+    ?? (activeArea ? areaPages(activeArea, enabledFeatures).find(page => page.tabRoutes?.some(underRoute))?.id : undefined)
+    ?? [...tabs].filter(tab => underRoute(tab.href)).sort((a, b) => b.href.length - a.href.length)[0]?.id;
 
   // ---- channel scope: the URL wins, then the remembered cookie (01 §5) ----
   const channelIds = useMemo(() => channels.map(channel => channel.id), [channels]);
@@ -196,9 +216,18 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   }
 
   const go = (href: string) => () => { window.location.assign(href); };
+  const [currentLanguage, setCurrentLanguage] = useState<string>("");
+  useEffect(() => { setCurrentLanguage(document.documentElement.lang); }, []);
+  // The cookie becomes the request's Accept-Language in middleware; a reload re-renders the whole document, including <html lang>.
+  const chooseLanguage = (language: Language) => {
+    if (language === currentLanguage) return;
+    document.cookie = `${LANGUAGE_COOKIE}=${language}; path=/; max-age=31536000; samesite=lax`;
+    window.location.reload();
+  };
   const userItems: MenuItem[] = [
     ...(enabledFeatures.includes("settings/account") ? [{ key: "account", label: copy.account, icon: <IconUserCircle size={17} stroke={1.75} />, onSelect: go("/settings/account") }] : []),
     ...(theme ? MODES.map(mode => ({ key: `mode-${mode.id}`, label: `${copy.theme} · ${theme.copy[mode.id]}`, icon: theme.mode === mode.id ? <IconCheck size={17} stroke={2} /> : <span style={{ width: 17 }} />, disabled: theme.busy, onSelect: () => { void theme.setMode(mode.id).catch(() => undefined); } })) : []),
+    ...([["en", copy.languageEnglish], ["fr", copy.languageFrench]] as [Language, string][]).map(([id, name]) => ({ key: `language-${id}`, label: `${copy.language} · ${name}`, icon: currentLanguage === id ? <IconCheck size={17} stroke={2} /> : <span style={{ width: 17 }} />, onSelect: () => chooseLanguage(id) })),
     { key: "help", label: copy.help, icon: <IconHelp size={17} stroke={1.75} />, onSelect: go("/help") },
     ...(rootAccess && !installationMode ? [{ key: "root", label: copy.root, icon: <IconShieldLock size={17} stroke={1.75} />, onSelect: go("/root") }] : []),
     { key: "signout", label: signingOut ? copy.signingOut : copy.signOut, icon: <IconLogout size={17} stroke={1.75} />, disabled: signingOut, onSelect: () => { void signOut(); } },

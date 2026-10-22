@@ -2,6 +2,7 @@ import { workspaceText, workspaceCopyDefaults, type WorkspaceCopy } from '../../
 import { analyticsCopy } from '../../server/copy';
 import { headers } from 'next/headers';
 import { PageHeader } from '@/components/PageHeader';
+import { InfoTip } from '@/components';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';
@@ -29,7 +30,7 @@ export default async function PinnedPage({ searchParams }: { searchParams: Promi
   }
   catch (error) { failure = operationFailure(error, t('Pinned metrics could not be loaded. Please try again.')).error; }
   return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
-    <PageHeader module="analytics" title={t('Pinned metrics')} description={<>{t("Keep the measures you watch most in one place. Pins are personal; values come from stored analytics for the resources you can access.")}</>} />
+    <PageHeader module="analytics" title={t('Pinned metrics')} info={<InfoTip name={t('Pinned metrics')} blocks={[{ text: t("Keep the measures you watch most in one place. Pins are personal; values come from stored analytics for the resources you can access.") }]} />} />
     {failure && <section className={styles.panel} role="alert"><h2>{t("Pinned metrics could not be loaded")}</h2><p>{failure}</p><a href="/insights/pins">{t("Try again")}</a></section>}
     {data && <PinManager copy={copy} locale={locale} max={data.max} pinnable={data.pinnable} pins={data.pins.map(p => ({
       key: p.key, label: p.label, sourceLabel: p.sourceLabel, state: p.state, value: formatValue(p.total, p.unit, p.displayTotal),

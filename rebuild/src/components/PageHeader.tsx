@@ -25,6 +25,8 @@ type PageHeaderProps = {
 /** Page title row: title, count, ⓘ and actions, then tabs and the filter row when the page has them. */
 export function PageHeader({ title, description, module, breadcrumbs, count, info, actions, tabs, filters, level = 1 }: PageHeaderProps) {
   const Heading = level === 1 ? "h1" : "h2";
+  // Without tabs or a description the filters fit on the title row, which keeps the page compact.
+  const inline = Boolean(filters) && !tabs && !description;
   return <header className="ui-page-header" data-module={module}>
     {breadcrumbs}
     <div className="ui-page-header__row">
@@ -32,9 +34,10 @@ export function PageHeader({ title, description, module, breadcrumbs, count, inf
         <div className="ui-page-header__titleline"><Heading>{title}</Heading>{count !== undefined && count !== null && <span className="ui-page-header__count">{count}</span>}{info}</div>
         {description && <p>{description}</p>}
       </div>
+      {inline && <div className="ui-page-header__filters is-inline">{filters}</div>}
       {actions && <div className="ui-page-header__actions">{actions}</div>}
     </div>
     {tabs}
-    {filters && <div className="ui-page-header__filters">{filters}</div>}
+    {filters && !inline && <div className="ui-page-header__filters">{filters}</div>}
   </header>;
 }

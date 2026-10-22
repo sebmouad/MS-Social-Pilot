@@ -72,7 +72,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
           {mayMove && wall ? <RescheduleQueuedPost postId={post.id} date={wall.date} time={wall.time} timeZone={timeZone} text={post.message} /> : null}
           {due ? <p className={workflow.help} role="status">{copy.queueDue}</p> : null}
         </div>;
-        return <li key={post.id} className={workflow.item}><PostPreview post={post} authorName={authorName(post.authorId)} timeZone={timeZone} locale={locale} actions={actions} /></li>;
+        return <li key={post.id} className={workflow.item}><PostPreview variant="compact" post={post} authorName={authorName(post.authorId)} timeZone={timeZone} locale={locale} actions={actions} /></li>;
       })}</ul>
     </section>)}
   </>;

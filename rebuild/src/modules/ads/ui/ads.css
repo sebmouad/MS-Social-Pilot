@@ -26,9 +26,9 @@
 .ads-report-pager__nav .ui-button { width: 100%; }
 .ads-report-pager__nav [aria-disabled="true"] { cursor: default; opacity: .7; }
 .ads-report-export { display: grid; gap: 8px; margin-top: 14px; }
-.ads-report-export section { display: grid; gap: 8px; }
+.ads-report-export section { display: grid; gap: 8px; justify-items: start; }
 .ads-filter-field { display: grid; gap: 8px; }
-.ads-filter-heading { margin: 0 0 2px; color: var(--ink-faint); font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.ads-filter-heading { margin: 0 0 2px; color: var(--ink-faint); font-size: 12px; font-weight: 750; }
 .ads-sidebar-filter .ui-button { margin-top: 8px; }
 .ads-filter-reset { display: inline-flex; min-height: 40px; align-items: center; justify-self: center; color: var(--ink-soft); font-size: 12px; }
 .ads-account-list { display: grid; gap: 12px; margin-top: 18px; }
@@ -145,3 +145,12 @@
 @media (pointer: coarse) { .ads-object-actions button, .ads-object-actions select, .ads-object-actions input { min-height: var(--control-height-touch); } }
 @media (max-width: 480px) { .ads-account-card, .ads-performance-card, .ads-campaign-charts__panel { padding: 12px; } .ads-metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .empty-state { padding: 28px 16px; } }
 @media (forced-colors: active) { .route-tabs a[aria-current="page"] { outline: 2px solid Highlight; } .ads-performance-card, .ads-account-card { border-color: CanvasText; } }
+
+/* Manage: the level, search, parent, sort and order filters sit on one compact row under the shared header. */
+.ads-extra-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.ads-extra-filters label { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--ink-soft); font-size: var(--text-xs); font-weight: 600; }
+.ads-extra-filters select, .ads-extra-filters input { min-height: var(--control-h-sm); padding: 0 var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-sm); min-width: 0; }
+.ads-extra-filters input { width: 160px; }
+@media (max-width: 620px) { .ads-extra-filters label { flex: 1 1 100%; justify-content: space-between; } .ads-extra-filters input { flex: 1; width: auto; } }
+.ads-compare-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.ads-compare-status p { margin: 0; }

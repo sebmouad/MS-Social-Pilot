@@ -13,8 +13,8 @@
   /* Shape (02 §4): five radii */
   --radius-xs: 6px; --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-full: 999px;
   /* Elevation and motion */
-  --shadow-card: 0 1px 2px rgb(20 24 40 / 5%), 0 10px 28px -14px rgb(20 24 40 / 16%);
-  --shadow-card-hover: 0 1px 2px rgb(20 24 40 / 6%), 0 16px 34px -14px rgb(20 24 40 / 24%);
+  --shadow-card: 0 1px 2px rgb(20 24 40 / 4%);
+  --shadow-card-hover: 0 1px 2px rgb(20 24 40 / 6%), 0 8px 20px -12px rgb(20 24 40 / 18%);
   --shadow-pop: 0 10px 30px rgb(0 0 0 / 14%), 0 1px 2px rgb(0 0 0 / 8%);
   --shadow-sheet: 0 24px 60px rgb(0 0 0 / 22%), 0 2px 6px rgb(0 0 0 / 10%);
   --card-lift: var(--shadow-card); --card-lift-hover: var(--shadow-card-hover);
@@ -28,8 +28,8 @@
 @media (max-width: 760px) { :root { --gutter: 16px; --topbar-h: 52px; } }
 @media (pointer: coarse) { :root { --control-h: var(--control-h-touch); --control-h-sm: var(--control-h-touch); } }
 /* Dark elevation uses an inset highlight instead of a long drop shadow. */
-:root[data-mode="dark"] { --shadow-card: 0 1px 0 rgb(255 255 255 / 4%) inset, 0 10px 28px -14px rgb(0 0 0 / 60%); --shadow-card-hover: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 34px -14px rgb(0 0 0 / 70%); --shadow-pop: 0 12px 34px rgb(0 0 0 / 45%), 0 1px 2px rgb(0 0 0 / 40%); --shadow-sheet: 0 28px 70px rgb(0 0 0 / 55%), 0 2px 6px rgb(0 0 0 / 40%); }
-@media (prefers-color-scheme: dark) { :root[data-mode="system"] { --shadow-card: 0 1px 0 rgb(255 255 255 / 4%) inset, 0 10px 28px -14px rgb(0 0 0 / 60%); --shadow-card-hover: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 34px -14px rgb(0 0 0 / 70%); --shadow-pop: 0 12px 34px rgb(0 0 0 / 45%), 0 1px 2px rgb(0 0 0 / 40%); --shadow-sheet: 0 28px 70px rgb(0 0 0 / 55%), 0 2px 6px rgb(0 0 0 / 40%); } }
+:root[data-mode="dark"] { --shadow-card: 0 1px 0 rgb(255 255 255 / 4%) inset; --shadow-card-hover: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 34px -14px rgb(0 0 0 / 70%); --shadow-pop: 0 12px 34px rgb(0 0 0 / 45%), 0 1px 2px rgb(0 0 0 / 40%); --shadow-sheet: 0 28px 70px rgb(0 0 0 / 55%), 0 2px 6px rgb(0 0 0 / 40%); }
+@media (prefers-color-scheme: dark) { :root[data-mode="system"] { --shadow-card: 0 1px 0 rgb(255 255 255 / 4%) inset; --shadow-card-hover: 0 1px 0 rgb(255 255 255 / 6%) inset, 0 16px 34px -14px rgb(0 0 0 / 70%); --shadow-pop: 0 12px 34px rgb(0 0 0 / 45%), 0 1px 2px rgb(0 0 0 / 40%); --shadow-sheet: 0 28px 70px rgb(0 0 0 / 55%), 0 2px 6px rgb(0 0 0 / 40%); } }
 
 /* Generated theme palettes: 4 themes x light/dark. Mode "system" follows prefers-color-scheme. */
 :root[data-theme="vivid"] {
@@ -802,8 +802,8 @@ table.ui-visually-hidden { display: block; }
 .ui-table-wrap.is-empty { border-radius: var(--radius-md) var(--radius-md) 0 0; }
 .ui-table-empty { margin: -1px 0 0; padding: 30px 18px; border: 1px solid var(--line); border-radius: 0 0 var(--radius-md) var(--radius-md); background: var(--surface); color: var(--ink-soft); font-size: var(--text-sm); line-height: 1.5; text-align: center; }
 .ui-table { width: 100%; border-collapse: collapse; text-align: left; font-size: var(--text-sm); }
-.ui-table th { height: 42px; padding: 0 16px; border-bottom: 1px solid var(--line); color: var(--ink-soft); background: color-mix(in srgb, var(--surface-muted) 70%, var(--surface)); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0; text-transform: none; white-space: nowrap; }
-.ui-table td { height: 54px; padding: 10px 16px; border-bottom: 1px solid var(--line-subtle); font-variant-numeric: tabular-nums; border-bottom-color: var(--line-subtle); }
+.ui-table th { height: 38px; padding: 0 14px; border-bottom: 1px solid var(--line); color: var(--ink-soft); background: color-mix(in srgb, var(--surface-muted) 70%, var(--surface)); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+.ui-table td { height: 48px; padding: 8px 14px; border-bottom: 1px solid var(--line-subtle); font-variant-numeric: tabular-nums; border-bottom-color: var(--line-subtle); }
 .ui-table tbody tr:last-child td { border-bottom: 0; }
 .ui-table tbody tr:hover { background: var(--surface-hover); }
 .ui-table .is-end { text-align: right; }
@@ -859,7 +859,7 @@ select.ui-input { appearance: none; padding-right: 36px; background-image: linea
 /* Shared states: loading skeletons, empty and error panels, dense tables. */
 .ui-skeleton { display: block; min-height: 14px; border-radius: var(--radius-xs); background: linear-gradient(90deg, var(--surface-muted) 25%, var(--line-subtle) 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: ui-shimmer 1.4s ease-in-out infinite; }
 @keyframes ui-shimmer { to { background-position: -200% 0; } }
-.ui-state { display: grid; justify-items: center; gap: 12px; padding: 36px 24px; border: 1px solid var(--line-subtle); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface-muted) 55%, var(--surface)); color: var(--ink-soft); font-size: var(--text-base); line-height: 1.5; text-align: center; }
+.ui-state { display: grid; justify-items: center; gap: 8px; padding: 24px 20px; border: 1px solid var(--line-subtle); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface-muted) 55%, var(--surface)); color: var(--ink-soft); font-size: var(--text-base); line-height: 1.5; text-align: center; }
 .ui-state > :is(h2, h3, p) { margin: 0; }
 .ui-state > :is(h2, h3) { color: var(--ink); font-size: var(--text-md); font-weight: 700; }
 .ui-state--error { border-style: solid; border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); background: var(--danger-soft); color: var(--danger); }

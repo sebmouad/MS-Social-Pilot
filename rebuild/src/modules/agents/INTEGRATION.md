@@ -28,7 +28,7 @@ The integrator must bump CONFIG_SCHEMA_VERSION; this lane did not change it.
 `src/server/permissions/index.ts` must include `agents` in PermissionModule and
 MODULES, add `agents: null` to MODULE_ROOT_SWITCH and `'agents/library': null`
 to FEATURE_MODULE_SWITCH. The missing feature entry currently causes TS2741;
-the absent module list entry denies the owner `/agents` screen. This lane asked
+the absent module list entry denies the owner `/content/agents` screen (moved from `/agents`, which redirects). This lane asked
 for a scope exception but did not edit the file without authorization. Decide
 explicitly whether editor/contributor writing permissions should include Agents;
 the current shared role policy permits reads but denies their writes.

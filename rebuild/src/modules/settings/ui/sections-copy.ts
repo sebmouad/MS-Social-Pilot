@@ -20,7 +20,7 @@ const en = {
   moderation: { title: 'Moderation alerts', detail: 'Get alerted when new comments look negative.', switchLabel: 'Alert me about negative comments' },
   areas: { title: 'Tasks area', detail: 'Show Tasks in the sidebar for everyone in this workspace, even before the first task exists.', switchLabel: 'Show the Tasks area' },
   channels: {
-    inUse: '{enabled} of {total} channels in use', noneInUse: 'No channels in use', manage: 'Manage channels', reconnect: 'Reconnect', more: 'More actions', disconnect: 'Disconnect…',
+    inUse: 'Channels in use: {enabled} of {total}', noneInUse: 'No channels in use', manage: 'Manage channels', reconnect: 'Reconnect', more: 'More actions', disconnect: 'Disconnect…',
     permissions: 'Permissions', permissionsOk: 'All permissions are granted.', permissionsMissing: 'Missing: {labels}', permissionsAll: 'Show all permissions', permissionsNone: 'This account does not report its permissions.',
     adTitle: 'Ad accounts', adDetail: 'Choose which ad accounts appear in reports and Ads.', adLinked: 'Linked account', inUseOn: 'In use', inUseOff: 'Not in use', adManage: 'Choose ad accounts',
     groupsTitle: 'Channel groups and labels', groupsDetail: 'Organise channels into groups for filters and reports.', groupsOpen: 'Open groups',
@@ -45,7 +45,7 @@ const fr: typeof en = {
   moderation: { title: 'Alertes de modération', detail: 'Soyez alerté quand de nouveaux commentaires semblent négatifs.', switchLabel: 'M’alerter pour les commentaires négatifs' },
   areas: { title: 'Espace Tâches', detail: 'Afficher Tâches dans la barre latérale pour tout l’espace, même avant la première tâche.', switchLabel: 'Afficher l’espace Tâches' },
   channels: {
-    inUse: '{enabled} canaux sur {total} utilisés', noneInUse: 'Aucun canal utilisé', manage: 'Gérer les canaux', reconnect: 'Reconnecter', more: 'Autres actions', disconnect: 'Déconnecter…',
+    inUse: 'Canaux utilisés : {enabled} sur {total}', noneInUse: 'Aucun canal utilisé', manage: 'Gérer les canaux', reconnect: 'Reconnecter', more: 'Autres actions', disconnect: 'Déconnecter…',
     permissions: 'Autorisations', permissionsOk: 'Toutes les autorisations sont accordées.', permissionsMissing: 'Manquantes : {labels}', permissionsAll: 'Afficher toutes les autorisations', permissionsNone: 'Ce compte ne communique pas ses autorisations.',
     adTitle: 'Comptes publicitaires', adDetail: 'Choisissez les comptes publicitaires affichés dans les rapports et la publicité.', adLinked: 'Compte lié', inUseOn: 'Utilisé', inUseOff: 'Non utilisé', adManage: 'Choisir les comptes publicitaires',
     groupsTitle: 'Groupes de canaux et étiquettes', groupsDetail: 'Organisez vos canaux en groupes pour les filtres et les rapports.', groupsOpen: 'Ouvrir les groupes',

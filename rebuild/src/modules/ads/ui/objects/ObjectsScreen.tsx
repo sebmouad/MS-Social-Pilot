@@ -15,14 +15,15 @@ import { OperationError } from '@/lib/operation-error';
 import { RouteNotice } from '@/components/RouteNotice';
 import { DataTable } from '@/components/DataTable';
 import { entitledPlatformIds } from '@/server/entitlements';
-import { getAdsAccounts, type AdsSearchParams } from '@/modules/ads/server/queries';
+import { getAdsAccounts, parseAdsFilters, type AdsFilters, type AdsSearchParams } from '@/modules/ads/server/queries';
 import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
 import { readAdsDirectory } from '@/modules/ads/directory/server';
 import { adsDirectoryManagementPort } from '@/modules/ads/directory/management-port';
 import { pageSearchRecord } from '@/modules/ads/analysis/query';
 import { AdsFiltersSidebar } from '@/modules/ads/ui/ads-filters';
 import { ObjectManager } from './ObjectManager';
-import { adsTabsFor } from '../AdsTabsFor';
+import { adsHeaderFor, adsTabsFor } from '../AdsTabsFor';
+import { Button } from '@/components/Button';
 import { ObjectRowLabel } from './ObjectRowLabel';
 import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { ChangeHistory } from './ChangeHistory';
@@ -46,14 +47,20 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   const managementPolicy = await loadAdsManagementPolicy();
   const accounts = await getAdsAccounts(viewer.workspaceId, viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, entitledPlatformIds(viewer.entitlements));
   const hidden = (['period', 'since', 'until', 'account'] as const).map(key => first(params[key]) ? <input key={key} type="hidden" name={key} value={first(params[key])} /> : null);
-  const sidebar = <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/insights/ads/manage" policy={policy} />
+  // The shared Ads header carries period and account; a period the header cannot parse falls back to the full filter form.
+  let headerFilters: AdsFilters | null = null;
+  try { headerFilters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); } catch { headerFilters = null; }
+  const header = headerFilters
+    ? await adsHeaderFor('manage', viewer, { title: t('text261'), locale, policy, filters: headerFilters, accounts, periodLabel: t('text081'), customLabel: t('text083') })
+    : <><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/insights/ads/manage" policy={policy} />{tabs}<PageHeader module="ads" title={t('text261')} /></>;
+  const sidebar = <>
     <form noValidate method="get" action="/insights/ads/manage" className="ads-extra-filters" aria-label={t('text055')}>{hidden}
       <label>{t('text056')}<select name="level" defaultValue={first(params.level) ?? 'campaign'}><option value="campaign">{t('text057')}</option><option value="adset">{t('text058')}</option><option value="ad">{t('text059')}</option></select></label>
       <label>{t('text060')}<input name="q" defaultValue={first(params.q) ?? ''} maxLength={policy.maxFilterCharacters} /></label>
       <label>{t('text061')}<input name="parentId" defaultValue={first(params.parentId) ?? ''} maxLength={Math.min(policy.maxFilterCharacters, managementPolicy.parentIdMaxCharacters)} /></label>
       <label>{t('text062')}<select name="sort" defaultValue={first(params.sort) ?? 'spend'}><option value="spend">{t('text019')}</option><option value="impressions">{t('text020')}</option><option value="clicks">{t('text022')}</option><option value="ctr">{t('text063')}</option><option value="cpc">{t('text064')}</option><option value="cpm">{t('text065')}</option><option value="name">{t('text066')}</option></select></label>
       <label>{t('text067')}<select name="direction" defaultValue={first(params.direction) ?? 'desc'}><option value="desc">{t('text068')}</option><option value="asc">{t('text069')}</option></select></label>
-      <button type="submit">{t('text070')}</button></form></>;
+      <Button type="submit" size="sm">{t('text070')}</Button></form></>;
   let values: Record<string, string | undefined>;
   let directory;
   try {
@@ -66,7 +73,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     });
   } catch (error) {
     if (!(error instanceof OperationError)) throw error;
-    return <PageFrame module="ads"><div className="page-stack">{sidebar}<PageHeader module="ads" title={t('text261')} />
+    return <PageFrame module="ads"><div className="insights">{header}{sidebar}
       <section className="panel"><RouteNotice error className="ui-error" focusKey={localizeAdsMessage(catalogs, locale, error.message)}>{localizeAdsMessage(catalogs, locale, error.message)}</RouteNotice></section></div></PageFrame>;
   }
   const managementPort = adsDirectoryManagementPort();
@@ -75,10 +82,10 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   const query = new URLSearchParams(Object.entries(values).flatMap(([key, value]) => (value !== undefined && key !== 'offset' ? [[key, value]] : [])));
   const pageLink = (offset: number) => `/insights/ads/manage?${new URLSearchParams([...query, ['offset', String(offset)]])}`;
   const accountName = new Map(accounts.map(account => [account.id, account.name]));
-  return <PageFrame module="ads"><div className="page-stack">
+  return <PageFrame module="ads"><div className="insights">
+    {header}
     {sidebar}
-    {tabs}
-    <PageHeader module="ads" title={t('text261')} description={<>{directory.total} {t('text071')}{directory.range.from} {t('text072')}{directory.range.to}</>} />
+    <p className="small-note">{directory.total} {t('text071')} {directory.range.from} {t('text072')} {directory.range.to}</p>
     <section className="panel">
       {directory.freshness.status === 'stale' ? <p className="small-note">{t('text073')}</p> : null}
       <DataTable caption={t('text074')} rows={directory.items} rowKey={row => `${row.accountId}:${row.objectId}`} emptyMessage={t('text075')} columns={[

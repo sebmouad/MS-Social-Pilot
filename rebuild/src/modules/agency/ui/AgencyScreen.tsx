@@ -38,7 +38,7 @@ function Actions({ item, locale = 'en', copy }: { item: AgencyWorkspace; copy?: 
   const { metrics } = item;
   return <div className={styles.actions}>
     <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/home" label={t("Open")} variant="secondary" />
-    {(metrics.disconnected ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/settings/connections" label={t("Fix connections")} variant="secondary" />}
+    {(metrics.disconnected ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/settings/channels" label={t("Fix connections")} variant="secondary" />}
     {(metrics.failed ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/content" label={t("Review posts")} variant="secondary" />}
     {(metrics.waitingConversations ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/inbox" label={t("Open inbox")} variant="secondary" />}
     {(metrics.overdueTasks ?? 0) > 0 && <WorkspaceAction locale={locale} copy={copy} workspaceId={item.id} workspaceName={item.name} href="/tasks?overdue=true" label={t("Overdue tasks")} variant="secondary" />}

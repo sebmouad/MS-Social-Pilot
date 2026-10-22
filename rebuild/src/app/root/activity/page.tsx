@@ -12,12 +12,14 @@ import { listRootActivity } from '@/server/root/activity';
 import { RootActivityFilters } from '@/modules/root/ui/RootActivityFilters';
 import { rootActivitySearchParams, type RootActivitySearch } from '@/lib/root-activity';
 import { OperationError } from '@/lib/operation-error';
+import { loadRootDates, loadRootInterfaceCopy, rootText } from '@/modules/root/ui/interface-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Activity · Root' };
 
 export default async function RootActivityPage({ searchParams }: { searchParams: Promise<RootActivitySearch> }) {
   const actor = await requireRootPage();
+  const t = await loadRootInterfaceCopy();
   const params = await searchParams;
   const [auditPolicy, auditCopy, downloadPolicy] = await Promise.all([readAuditConfig(), runtimeConfig('root.auditControlsCopy'), runtimeConfig('root.auditDownloadPolicy')]);
   async function saveRetention(_previous: string, data: FormData) {
@@ -46,10 +48,10 @@ export default async function RootActivityPage({ searchParams }: { searchParams:
     <AuditRetention days={auditPolicy.retentionDays} exportRows={auditPolicy.exportMaxRows} batchSize={auditPolicy.batchSize} save={saveRetention} copy={auditCopy} />
     {await RootActivityFilters({ values: params, page: activities, policy })}
     {activities === null ? <section className="root-control__notice" role="alert"><h2>{invalid ? 'Check activity filters' : 'Activity is unavailable'}</h2><p>{invalid ? 'A date, search or page link is invalid. Adjust the sidebar filters or reset to the latest activity.' : 'The audit store could not be read. Please retry, or check database availability.'}</p><a href="/root/activity">Reset to latest activity</a></section> : activities.items.length === 0 ? <RootEmptyState route="/root/activity" title={params.cursor ? 'No activity on this page' : filtered ? 'No activity matches these filters' : 'No activity recorded'}>{params.cursor ? 'Recorded events may have changed. Open the latest matching activity from the sidebar.' : filtered ? 'Try another action, person, workspace or date range.' : 'Installation and workspace actions will appear here when recorded.'}</RootEmptyState> : <><p className="root-activity__summary">Showing {activities.items.length} {filtered ? 'matching ' : ''}recorded {activities.items.length === 1 ? 'event' : 'events'}.</p><DataTable caption="Activity" rows={activities.items} rowKey={item => item.id} columns={[
-      { key: 'action', label: 'Action', render: item => <strong>{item.action.replaceAll('.', ' · ').replaceAll('_', ' ')}</strong> },
-      { key: 'time', label: 'Recorded (UTC)', render: item => <time dateTime={item.createdAt.toISOString()}>{item.createdAt.toISOString().replace('T', ' ').replace('.000Z', ' UTC').replace(/Z$/, ' UTC')}</time> },
-      { key: 'actor', label: 'Account', render: item => <>{item.actor ? `${item.actor.name} · ${item.actor.email}` : 'System or deleted account'}</> },
-      { key: 'details', label: 'Safe activity details', render: item => <ul>{item.metadata.map(value => <li key={value}>{value}</li>)}</ul> },
+      { key: 'action', label: t.colAction, render: item => <strong>{item.action.replaceAll('.', ' · ').replaceAll('_', ' ')}</strong> },
+      { key: 'time', label: t.colRecordedUtc, render: item => <time dateTime={item.createdAt.toISOString()}>{item.createdAt.toISOString().replace('T', ' ').replace('.000Z', ' UTC').replace(/Z$/, ' UTC')}</time> },
+      { key: 'actor', label: t.colAccount, render: item => <>{item.actor ? `${item.actor.name} · ${item.actor.email}` : t.valueSystemAccount}</> },
+      { key: 'details', label: t.colActivityDetails, render: item => <ul>{item.metadata.map(value => <li key={value}>{value}</li>)}</ul> },
     ]} /></>}
   </RootFrame>;
 }

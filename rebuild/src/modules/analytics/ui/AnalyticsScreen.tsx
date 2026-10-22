@@ -1,4 +1,4 @@
-import { IconChartBar, IconPlugConnected, IconDownload } from '@tabler/icons-react';
+import { IconChartBar, IconPlugConnected, IconDownload, IconPin } from '@tabler/icons-react';
 import { EmptyState } from '@/components/EmptyState';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -87,13 +87,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
   return <PageFrame module="analytics" scopedAccess><div className="insights">
     <InsightsHeader runtime={runtime} title={copy.overviewTitle} info={copy.overviewInfo} period={period}
-      actions={canExport && reportQuery ? <a className="ui-button ui-button--secondary ui-button--md" href={`/api/reports/export?${reportQuery}`}><IconDownload size={16} stroke={1.9} aria-hidden="true" /> {copy.downloadReport}</a> : undefined} />
+      actions={(canExport && reportQuery) || may('analytics/pins') ? <>
+        {may('analytics/pins') && snapshot && channelIds.length > 0 && <a className="ui-button ui-button--quiet ui-button--md" href="/insights/pins"><IconPin size={16} stroke={1.9} aria-hidden="true" /> {copy.pinsManage}</a>}
+        {canExport && reportQuery && <a className="ui-button ui-button--secondary ui-button--md" href={`/api/reports/export?${reportQuery}`}><IconDownload size={16} stroke={1.9} aria-hidden="true" /> {copy.downloadReport}</a>}
+      </> : undefined} />
     {failure && <EmptyState tone="error" title={copy.loadFailedTitle} action={<a href={retry}>{copy.retry}</a>}>{failure}</EmptyState>}
-    {snapshot && !snapshot.options.channels.length && <EmptyState icon={<IconPlugConnected />} title={copy.noChannelsTitle} action={canConnect ? <a className="ui-button ui-button--primary ui-button--md" href="/settings/connections">{copy.noChannelsAction}</a> : undefined}>{copy.noChannelsBody}</EmptyState>}
+    {snapshot && !snapshot.options.channels.length && <EmptyState icon={<IconPlugConnected />} title={copy.noChannelsTitle} action={canConnect ? <a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{copy.noChannelsAction}</a> : undefined}>{copy.noChannelsBody}</EmptyState>}
     {snapshot && snapshot.options.channels.length > 0 && !channelIds.length && <EmptyState icon={<IconChartBar />} title={copy.noDataTitle}>{copy.noDataBody}</EmptyState>}
     {snapshot && channelIds.length > 0 && <>
       {tiles.length > 0 && <InsightsTiles tiles={tiles} visible={policy.tilesVisible} labels={{ group: copy.tilesLabel, showAll: copy.tilesShowAll, showLess: copy.tilesShowLess }} />}
-      {may('analytics/pins') && <a className="insights-card__link" href="/insights/pins">{copy.pinsManage}</a>}
       <MainChartCard title={copy.overviewTitle} metrics={metrics} locale={locale} annotations={annotations}
         labels={{ switcher: copy.chartMetrics, chartLabel: copy.chartLabel, empty: copy.chartNoSeries, scrollHint: copy.chartScrollHint, previous: copy.chartPrevious, openExplore: copy.chartOpenExplore, info: copy.chartInfo }} />
       <div className="insights-grid">

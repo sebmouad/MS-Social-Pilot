@@ -28,12 +28,12 @@
 .tableWrap { position: relative; width: 100%; min-width: 0; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
 .table th, .table td { padding: 13px 14px; border-bottom: 1px solid var(--line-subtle); vertical-align: top; }
-.table thead th { color: var(--ink-faint); background: var(--surface-raised); font-size: 10px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; white-space: nowrap; }
+.table thead th { color: var(--ink-faint); background: var(--surface-raised); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .table tbody tr:last-child > * { border-bottom: 0; }
 .table tbody tr:hover { background: var(--surface-hover); }
 .table tbody th { min-width: 180px; font-weight: 500; }
 .person { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 12px; font-weight: 700; }
-.you { padding: 2px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 9px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+.you { padding: 2px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; }
 .email { display: block; margin-top: 4px; color: var(--ink-faint); font-size: 11px; overflow-wrap: anywhere; }
 .role { display: inline-flex; min-height: 24px; align-items: center; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink-soft); font-size: 10px; font-weight: 700; }
 .channelSummary { display: flex; flex-wrap: wrap; gap: 5px; min-width: 130px; max-width: 280px; }

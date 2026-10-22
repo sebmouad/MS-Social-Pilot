@@ -26,7 +26,7 @@ const ROOT_PAGE_ICONS: Record<string, Icon> = {
   '/root/platforms': IconWorld,
 };
 
-const PRODUCT_ICONS: Record<string, string> = { publishing: '/content', inbox: '/inbox', analytics: '/insights', ads: '/insights/ads', home: '/home', tasks: '/tasks', agency: '/agency', settings: '/settings/connections' };
+const PRODUCT_ICONS: Record<string, string> = { publishing: '/content', inbox: '/inbox', analytics: '/insights', ads: '/insights/ads', home: '/home', tasks: '/tasks', agency: '/agency', settings: '/settings/channels' };
 
 export function rootPageIcon(href: string): Icon {
   const direct = ROOT_PAGE_ICONS[href];

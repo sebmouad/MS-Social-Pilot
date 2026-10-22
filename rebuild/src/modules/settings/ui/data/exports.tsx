@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { ConfirmDialog, useToast } from '@/components';
 import { DataTable } from '@/components/DataTable';
+import styles from '../settings.module.css';
 
 
 type ExportStatus = 'requested' | 'running' | 'ready' | 'failed' | 'expired';
@@ -55,10 +56,12 @@ export function WorkspaceExports({ workspaceId, workspaceName = workspaceId, loc
     finally { busyRef.current = false; setBusy(false); }
   }
   return <div>
-    <Button variant="primary" onClick={() => { setOpen(true); setNotice(null); }}>{copy.request}</Button>{' '}
-    <Button onClick={() => { void refresh(); }}>{copy.refresh}</Button>
+    <div className={styles['data-actions']}>
+      <Button variant="primary" onClick={() => { setOpen(true); setNotice(null); }}>{copy.request}</Button>
+      <Button variant="secondary" onClick={() => { void refresh(); }}>{copy.refresh}</Button>
+    </div>
     {notice && !open && <p role={notice === 'failure' ? 'alert' : 'status'} tabIndex={-1} ref={node => node?.focus()}>{copy[notice]}</p>}
-    {loadError ? <p role="alert">{copy.loadError}</p> : jobs === null ? <p role="status">{copy.loading}</p> : <DataTable caption={copy.history} rows={jobs} rowKey={job => job.id} emptyMessage={copy.empty} emptyAction={<Button onClick={() => setOpen(true)}>{copy.request}</Button>} columns={[
+    {loadError ? <p role="alert">{copy.loadError}</p> : jobs === null ? <p role="status">{copy.loading}</p> : <DataTable caption={copy.history} rows={jobs} rowKey={job => job.id} emptyMessage={copy.empty} columns={[
       { key: 'created', label: copy.created, render: job => job.labels?.createdAt ?? '' },
       { key: 'status', label: copy.status, render: job => <>{copy.statuses[job.status]}{job.status === 'failed' && <p>{copy.failed}</p>}</> },
       { key: 'expiry', label: copy.expiry, render: job => job.expiresAt ? job.labels?.expiresAt ?? '' : copy.preparing },

@@ -144,7 +144,7 @@ describe('connection start and finish', () => {
     mocks.tx.target.findUnique.mockResolvedValue(null);
     const response = await finishTokenOAuth(flow({ complete }), callback(`code=abc&state=${started.state}`, started.cookieValue), viewer);
     expect(complete).toHaveBeenCalledWith(expect.objectContaining({ code: 'abc', redirectUri: 'https://app.example.test/api/connections/youtube/callback', verifier: started.verifier }));
-    expect(response.headers.get('location')).toBe('https://app.example.test/settings/connections?notice=connected&select=1');
+    expect(response.headers.get('location')).toBe('https://app.example.test/settings/channels?notice=connected&select=1');
     expect(response.headers.get('referrer-policy')).toBe('no-referrer');
   });
   it('reports a failed exchange without provider text and audits only the stage', async () => {

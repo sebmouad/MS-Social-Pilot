@@ -23,15 +23,15 @@ export async function readTopPostContent(workspaceId: string, channelId: string,
   const from = new Date(`${period.start}T00:00:00.000Z`);
   const to = new Date(`${period.end}T00:00:00.000Z`); to.setUTCDate(to.getUTCDate() + 1);
   const rows = await prisma.$queryRaw<Array<{ postId: string; text: string; media: unknown; link: string | null; articleTitle: string | null; articleDescription: string | null }>>`
-    SELECT pt."postId", left(COALESCE(pt."messageOverride", p.message), ${policy.textCharacters + 1}) AS text,
+    SELECT pt."postId", left(COALESCE(pt."messageOverride", p.message), ${policy.textCharacters + 1}::int) AS text,
       CASE WHEN pt."skipMedia" THEN '[]'::jsonb ELSE COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('kind', item->>'kind', 'url', left(item->>'url', ${policy.urlCharacters + 1})) ORDER BY ordinal)
+        SELECT jsonb_agg(jsonb_build_object('kind', item->>'kind', 'url', left(item->>'url', ${policy.urlCharacters + 1}::int)) ORDER BY ordinal)
         FROM (SELECT item, ordinal FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p.media) = 'array' THEN p.media ELSE '[]'::jsonb END)
           WITH ORDINALITY AS media(item, ordinal) ORDER BY ordinal LIMIT ${policy.mediaPerPost + 1}) bounded
       ), '[]'::jsonb) END AS media,
-      left(p.link, ${policy.urlCharacters + 1}) AS link,
-      left(p."linkPreview"->>'title', ${policy.previewCharacters + 1}) AS "articleTitle",
-      left(p."linkPreview"->>'description', ${policy.previewCharacters + 1}) AS "articleDescription"
+      left(p.link, ${policy.urlCharacters + 1}::int) AS link,
+      left(p."linkPreview"->>'title', ${policy.previewCharacters + 1}::int) AS "articleTitle",
+      left(p."linkPreview"->>'description', ${policy.previewCharacters + 1}::int) AS "articleDescription"
     FROM post_targets pt JOIN posts p ON p.id = pt."postId"
     JOIN targets t ON t.id = pt."targetId" AND t."workspaceId" = p."workspaceId"
     WHERE p."workspaceId" = ${workspaceId} AND pt."targetId" = ${channelId}

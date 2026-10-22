@@ -16,7 +16,7 @@
 
 .monthWrap, .weekWrap { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--line); background: var(--surface-raised); border-radius: var(--radius-md) var(--radius-md) 0 0; }
-.weekdays span { padding: 10px; color: var(--ink-faint); font-size: 10px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.weekdays span { padding: 10px; color: var(--ink-faint); font-size: 12px; font-weight: 750; }
 .month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
 .day { display: flex; flex-direction: column; gap: 5px; min-width: 0; min-height: 132px; padding: 8px; border-right: 1px solid var(--line-subtle); border-bottom: 1px solid var(--line-subtle); }
 .day:nth-child(7n) { border-right: 0; }
@@ -26,7 +26,6 @@
 .day[data-over], .slot[data-over] { background: var(--accent-soft); outline: 2px dashed var(--accent); outline-offset: -2px; }
 .dayHead { display: flex; align-items: center; gap: 6px; }
 .dayHead time { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.todayTag { padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent, #fff); font-size: 10px; font-weight: 750; letter-spacing: .02em; }
 .add, .more, .agendaAdd { display: inline-flex; align-items: center; min-height: 28px; color: var(--accent); font-size: 11.5px; font-weight: 650; }
 .add { margin-top: auto; color: var(--ink-soft); }
 .add:hover, .more:hover, .agendaAdd:hover { color: var(--accent); text-decoration: underline; }
@@ -92,7 +91,7 @@
 .pickForm input { min-height: 40px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 14px; }
 .times { display: grid; gap: 10px; margin: 0 0 10px; }
 .times div { display: grid; gap: 2px; }
-.times dt { color: var(--ink-faint); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.times dt { color: var(--ink-faint); font-size: 12px; font-weight: 700; }
 .times dd { margin: 0; font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .dialogError { margin: 10px 0 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--danger-soft); color: var(--danger); font-size: 13px; line-height: 1.45; }
 
@@ -108,11 +107,11 @@
 .post:hover { box-shadow: 0 3px 10px color-mix(in srgb, var(--ink) 14%, transparent); }
 /* Published posts are marked by a dashed edge and a quieter fill, never by opacity, so text keeps full contrast. */
 .post[data-status="published"] { border-left-style: dashed; background: color-mix(in srgb, var(--chip, var(--mod, var(--accent))) 4%, var(--surface)); }
-.day[data-today] { background: var(--mod-soft, var(--accent-soft)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
+.day[data-today] { background: color-mix(in srgb, var(--mod, var(--accent)) 6%, var(--surface)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
 .day[data-today] .dayHead time { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--mod, var(--accent)) 45%, black); color: #fff; }
-.weekHead[data-today] { background: var(--mod-soft, var(--accent-soft)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
+.weekHead[data-today] { background: color-mix(in srgb, var(--mod, var(--accent)) 6%, var(--surface)); box-shadow: inset 0 3px 0 var(--mod, var(--accent)); }
 /* Even a white accent mixed 45% with black is rgb(115 115 115): white text keeps at least 4.5:1 in every theme and mode. */
-.todayTag { background: color-mix(in srgb, var(--mod, var(--accent)) 45%, black); color: #fff; }
+.todayTag { padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--mod, var(--accent)) 45%, black); color: #fff; font-size: 10px; font-weight: 750; letter-spacing: .02em; }
 .day:hover .add { color: var(--mod-ink, var(--accent)); }
 .empty { border-color: var(--mod, var(--line-strong)); background: var(--mod-soft, transparent); }
 @media (prefers-reduced-motion: reduce) { .post { transition: none; } }

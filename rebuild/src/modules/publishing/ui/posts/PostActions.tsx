@@ -521,6 +521,12 @@ function TargetPicker({ targets, selected = new Set<string>(), onSelectionChange
   </fieldset>;
 }
 
+/** Retry for failed destinations outside the Posts table (the post page). */
+export function RetryFailedDestinations({ postId, count }: { postId: string; count: number }) {
+  const t = usePublishingActionText();
+  return count > 0 ? <RetryFailedButton postId={postId} count={count} copy={actionBulkCopy(t)} disabled={false} /> : null;
+}
+
 function RetryFailedButton({ postId, count, copy, disabled }: { postId: string; count: number; copy: { retryOne: string; retryOneHelp: (n: number) => string; cancel: string; confirm: string }; disabled: boolean }) {
   const [open, setOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);

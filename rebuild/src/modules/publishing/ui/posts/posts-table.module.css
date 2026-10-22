@@ -13,7 +13,7 @@
 .rowOpen:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .split .panel { width: 100%; max-height: calc(100dvh - var(--topbar-h) - 32px); }
 .panelBody { display: grid; gap: var(--space-5); }
-.panelBody h3 { margin: 0 0 var(--space-2); color: var(--ink-soft); font-size: var(--text-sm); font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+.panelBody h3 { margin: 0 0 var(--space-2); color: var(--ink-soft); font-size: var(--text-sm); font-weight: 700; }
 .panelBody p { margin: 0; color: var(--ink-soft); font-size: var(--text-md); }
 .destinations { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .destinations li { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
@@ -23,7 +23,8 @@
 
 /* Header filter row: Filter button, chips, search, export. */
 .filterRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.search { display: flex; flex: 1 1 260px; max-width: 420px; min-width: 0; }
+.search { display: flex; flex: 0 1 280px; min-width: 160px; }
+@media (min-width: 761px) { .filterRow { flex-wrap: nowrap; } }
 .search input { width: 100%; min-width: 0; min-height: var(--control-h); padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-md); }
 .search input:focus-visible { outline: none; border-color: var(--focus); box-shadow: var(--ui-ring); }
 .filterBody { display: grid; gap: var(--space-4); }
@@ -41,5 +42,6 @@
   .desktopList { display: none; }
   .phoneList { display: block; border-top: 1px solid var(--line); }
   .phoneList :global(.ui-list-row) { min-height: 72px; }
-  .search { max-width: none; }
+  /* Filter, search and Export share one line; active chips wrap below. */
+  .search { flex: 1 1 120px; min-width: 0; }
 }

@@ -39,7 +39,7 @@ export function CommandPalette({ copy: t }: { copy: CommandCopy }) {
   const matches = q ? items.filter(item => `${item.title} ${item.moduleTitle} ${item.id}`.toLowerCase().includes(q)) : items;
   const go = (item: CommandItem) => { setOpen(false); router.push(item.href); };
   return <>
-    <button type="button" className="shell-palette-trigger" onClick={() => setOpen(true)} aria-keyshortcuts="Control+k Meta+k" title={t.trigger}>
+    <button type="button" className="shell-palette-trigger" aria-label={t.trigger} onClick={() => setOpen(true)} aria-keyshortcuts="Control+k Meta+k" title={t.trigger}>
       <IconSearch size={15} aria-hidden="true" /><span>{t.trigger}</span><kbd aria-hidden="true"><IconCommand size={12} aria-hidden="true" />K</kbd>
     </button>
     <Dialog open={open} title={t.trigger} closeLabel={t.close} onClose={() => setOpen(false)}>

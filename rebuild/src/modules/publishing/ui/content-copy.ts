@@ -186,7 +186,7 @@ export const contentPolicyDefaults: ContentPolicy = {
   monthPostsShown: 3,
   freeSlotsPerDay: 3,
   libraryPickerMaxSelect: 10,
-  reconnectHref: '/settings/connections',
+  reconnectHref: '/settings/channels',
 };
 
 export const CONTENT_CONFIG = [

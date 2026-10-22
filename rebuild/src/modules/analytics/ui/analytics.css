@@ -10,7 +10,7 @@
 .report-row strong { color: var(--ink-soft); font-size: 13px; font-variant-numeric: tabular-nums; }
 .analytics-sidebar { display: grid; gap: 20px; }
 .analytics-sidebar-filter { display: grid; gap: 14px; }
-.analytics-filter-heading { margin: 0; color: var(--ink-faint); font-size: 11px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
+.analytics-filter-heading { margin: 0; color: var(--ink-faint); font-size: 12px; font-weight: 750; }
 .analytics-sidebar-filter label { display: flex; align-items: center; gap: 9px; color: var(--ink-soft); font-size: 13px; }
 .analytics-sidebar-filter .analytics-date-filter, .analytics-sidebar-filter .analytics-select-filter { display: grid; gap: 6px; }
 .analytics-sidebar-filter input[type="date"], .analytics-sidebar-filter input[type="search"], .analytics-sidebar-filter select { width: 100%; min-height: 44px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; }
@@ -77,7 +77,7 @@
 /* Post explorer table. */
 .analytics-posts__columns { margin-bottom: 12px; }
 .analytics-posts__columns summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
-.analytics-posts__columns summary:focus-visible { outline: 2px solid var(--focus-ring, currentColor); outline-offset: 2px; }
+.analytics-posts__columns summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .analytics-posts__columns fieldset { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 4px 12px; }
 .analytics-posts__column-option { display: flex; align-items: center; gap: 8px; min-height: 36px; }
 .analytics-posts__post { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -101,7 +101,7 @@
 .analytics-pager a { display: inline-flex; align-items: center; min-height: 36px; }
 .analytics-table-wrap { border: 1px solid var(--line); border-radius: var(--radius-md); }
 .analytics-table caption { padding: 10px 12px; font-weight: 600; }
-.analytics-table thead th { color: var(--ink-soft); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.analytics-table thead th { color: var(--ink-soft); font-size: 12px; font-weight: 700; }
 .analytics-table tbody tr:hover { background: var(--surface-hover); }
 .analytics-table tbody tr:last-child > * { border-bottom: 0; }
 .analytics-table th:not(:first-child), .analytics-table td:not(:first-child) { text-align: end; }

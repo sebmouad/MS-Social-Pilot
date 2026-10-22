@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { IconHistory, IconSparkles } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
 import { ConfirmDialog, useToast } from '@/components';
+import styles from '../settings.module.css';
 import type { RetentionCopy } from '@/modules/settings/retention-copy';
 import type { RetentionPolicy, RetentionCounts } from '@/modules/settings/server/retention';
 
@@ -49,15 +50,14 @@ export function RetentionPanel({ copy: t, locale }: { copy: RetentionCopy; local
     [t.reports, status.pending.reports, status.policy.analyticsDays],
   ];
   const total = rows.reduce((sum, [, count]) => sum + count, 0);
-  return <div>
-    <p>{t.intro}</p>
-    <dl>
+  return <div className={styles['retention-panel']}>
+    <dl className={styles['retention-list']}>
       {rows.map(([label, count, days]) => <div key={label}>
-        <dt>{label} · {fill(t.olderThan, { days })}</dt>
+        <dt>{label} <small>{fill(t.olderThan, { days })}</small></dt>
         <dd>{count > 0 ? fill(t.pendingNow, { count }) : t.noneNow}</dd>
       </div>)}
     </dl>
-    <p>{status.lastRun
+    <p className={styles['settings-note']}>{status.lastRun
       ? <span><IconHistory aria-hidden="true" /> {fill(t.lastRun, { summary: status.lastRun.summary ?? status.lastRun.outcome })}</span>
       : <span><IconSparkles aria-hidden="true" /> {t.neverRun}</span>}</p>
     <Button variant="secondary" onClick={() => setOpen(true)} disabled={total === 0}>{t.runNow}</Button>

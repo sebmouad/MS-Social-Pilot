@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { StatusChip } from '@/components/StatusChip';
 import styles from './PostPreview.module.css';
-import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
+import { firstCommentLabels, firstCommentState } from '@/modules/publishing/first-comment-state';
 import { PostImage, ScheduleBadge } from '@/modules/publishing/ui/kit/kit';
-import type { KitLocale } from '@/modules/publishing/ui/kit/copy';
+import { fillCopy, kitCopy, type KitLocale } from '@/modules/publishing/ui/kit/copy';
 
 export type PostPreviewPost = {
   id: string;
@@ -35,9 +35,9 @@ type Props = {
   post: PostPreviewPost;
   authorName: string;
   timeZone: string;
-  variant?: 'feed' | 'card';
+  variant?: 'feed' | 'card' | 'compact';
   actions?: ReactNode;
-  /** Language of the schedule badges; the surrounding labels are still English. */
+  /** Language of the preview labels and schedule badges. */
   locale?: KitLocale;
   /** Trusted composer-only media rendering (for example, temporary File previews). */
   mediaOverride?: ReactNode;
@@ -89,11 +89,14 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
     return url ? [{ ...item, url }] : [];
   });
   const time = post.publishedAt ?? post.scheduledAt ?? post.createdAt;
-  const timeLabel = post.publishedAt ? 'Published' : post.scheduledAt ? 'Scheduled' : 'Created';
+  const t = kitCopy[locale];
+  const commentLabels = firstCommentLabels(t);
+  const timeLabel = post.publishedAt ? t.previewPublished : post.scheduledAt ? t.previewScheduled : t.previewCreated;
   const safeLink = webUrl(post.link);
-  const hasFailure = post.status === 'failed' || post.status === 'partially_failed' || post.targets.some(item => item.status === 'failed');
+  // The header chip already says Failed; the notice is for a failed destination the post-level status does not show.
+  const hasFailure = post.status !== 'failed' && post.targets.some(item => item.status === 'failed');
 
-  return <article className={styles.preview} data-variant={variant} aria-label={`Post by ${authorName}`}>
+  return <article className={styles.preview} data-variant={variant} aria-label={fillCopy(t.previewBy, { name: authorName })}>
     <header className={styles.header}>
       <span className={styles.authorAvatar} aria-hidden="true">{initials(authorName)}</span>
       <div className={styles.headerText}>
@@ -103,7 +106,7 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
       <StatusChip status={post.status} />
     </header>
 
-    {post.targets.length > 0 ? <ul className={styles.destinations} aria-label="Destinations">
+    {post.targets.length > 0 ? <ul className={styles.destinations} aria-label={t.previewDestinations}>
       {post.targets.map(row => {
         const { status, remoteUrl, target } = row;
         const picture = webUrl(target.pictureUrl);
@@ -115,29 +118,29 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
           <StatusChip status={status} compact />
           {status === 'scheduled_remote' ? <ScheduleBadge mode="remote" locale={locale} platformName={target.platformName ?? undefined} />
             : post.scheduledAt && post.status === 'scheduled' && status === 'pending' ? <ScheduleBadge mode="application" locale={locale} /> : null}
-          {commentState !== 'not_requested' ? <span className={styles.noDestinations}>{FIRST_COMMENT_LABELS[commentState]}</span> : null}
-          {destinationUrl ? <a href={destinationUrl} target="_blank" rel="noopener noreferrer">View post</a> : null}
+          {commentState !== 'not_requested' ? <span className={styles.noDestinations}>{commentLabels[commentState]}</span> : null}
+          {destinationUrl ? <a href={destinationUrl} target="_blank" rel="noopener noreferrer">{t.viewPost}</a> : null}
         </li>;
       })}
-    </ul> : <p className={styles.noDestinations}>No destinations selected</p>}
+    </ul> : <p className={styles.noDestinations}>{t.previewNoDestinations}</p>}
 
-    {hasFailure ? <p className={styles.deliveryNotice} role="status">Delivery needs attention. Review the destination statuses above.</p> : null}
+    {hasFailure ? <p className={styles.deliveryNotice} role="status">{t.previewDeliveryNotice}</p> : null}
 
     {post.message.trim() ? <div className={styles.message}>{post.message}</div> : null}
 
     {mediaOverride !== undefined ? mediaOverride : media.length ? <div className={styles.media}>
       {media.map((item, index) => item.kind === 'image'
-        ? <PostImage key={`${item.url}-${index}`} src={item.url} href={item.url} alt={item.altText?.trim() || 'Post image'} locale={locale} linkClassName={styles.imageLink} />
+        ? <PostImage key={`${item.url}-${index}`} src={item.url} href={item.url} alt={item.altText?.trim() || t.previewImage} locale={locale} linkClassName={styles.imageLink} />
         : item.kind === 'video'
-          ? <video className={styles.video} controls preload="metadata" aria-label="Video attachment" key={`${item.url}-${index}`}>
+          ? <video className={styles.video} controls preload="metadata" aria-label={t.previewVideo} key={`${item.url}-${index}`}>
               <source src={item.url} />
-              <a href={item.url} target="_blank" rel="noopener noreferrer">Open video attachment</a>
+              <a href={item.url} target="_blank" rel="noopener noreferrer">{t.previewOpenVideo}</a>
             </video>
-          : <a className={styles.attachmentLink} href={item.url} target="_blank" rel="noopener noreferrer" key={`${item.url}-${index}`}>Open attachment</a>)}
+          : <a className={styles.attachmentLink} href={item.url} target="_blank" rel="noopener noreferrer" key={`${item.url}-${index}`}>{t.previewOpenAttachment}</a>)}
     </div> : null}
 
-    {safeLink ? <p className={styles.sharedLink}><a href={safeLink} target="_blank" rel="noopener noreferrer">Open shared link</a></p> : null}
-    {post.firstComment?.trim() ? <section className={styles.firstComment} aria-label="First comment"><strong>First comment</strong><p>{post.firstComment}</p></section> : null}
+    {safeLink ? <p className={styles.sharedLink}><a href={safeLink} target="_blank" rel="noopener noreferrer">{t.previewOpenLink}</a></p> : null}
+    {post.firstComment?.trim() ? <section className={styles.firstComment} aria-label={t.previewFirstComment}><strong>{t.previewFirstComment}</strong><p>{post.firstComment}</p></section> : null}
     {actions ? <div className={styles.actions}>{actions}</div> : null}
   </article>;
 }

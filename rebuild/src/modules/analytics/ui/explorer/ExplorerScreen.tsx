@@ -61,6 +61,15 @@ export default async function AnalyticsExplorerPage({ searchParams, locale = 'en
   delete input.period;
   try { data = await readAnalyticsExplorer({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input,{ allowedChannelIds: viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, feature: 'analytics/explorer' }); }
   catch (error) { failure = operationFailure(error, t('Analytics Explorer could not be loaded. Change the filters or retry.')).error; }
+  // Wide screens open on the first metric instead of an empty panel; phones still start on the list.
+  let autoSelected = false;
+  const firstMetric = data && !data.detail && !params.metric ? data.metrics.items[0]?.key : undefined;
+  if (firstMetric) {
+    try {
+      const withFirst = await readAnalyticsExplorer({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { ...input, metric: firstMetric }, { allowedChannelIds: viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, feature: 'analytics/explorer' });
+      if (withFirst.detail) { data = withFirst; autoSelected = true; }
+    } catch { /* keep the list with its "choose a metric" panel */ }
+  }
   const annotations = data?.detail && data.selected.channelIds.length ? await loadChartAnnotations({ userId: viewer.user.id, workspaceId: viewer.workspaceId, locale }, data.period.start, data.period.end, data.selected.channelIds) : null;
   const exportParams = data ? new URLSearchParams(data.query) : null;
   if (exportParams) for (const key of ['source', 'kind', 'metric', 'page', 'pointPage', 'rowPage']) exportParams.delete(key);
@@ -87,7 +96,7 @@ export default async function AnalyticsExplorerPage({ searchParams, locale = 'en
         <AddressSelect name="kind" label={t('Measurement type')} allLabel={t('All types')} options={kinds.map(([value, label]) => ({ value, label }))} />
       </>} />
     {failure && <section className={styles.panel} role="alert"><h2>{t("Explorer could not be loaded")}</h2><p>{failure}</p><a href="/insights/explore">{ui.resetFilters}</a></section>}
-    {data && <div className="insights-explore" data-detail={data.detail ? 'true' : 'false'}>
+    {data && <div className="insights-explore" data-detail={data.detail && !autoSelected ? 'true' : 'false'} data-auto={autoSelected ? 'true' : undefined}>
       <nav className="insights-explore__list" aria-label={ui.exploreList}>
         <h2>{ui.exploreList} <small>{data.metrics.total}</small></h2>
         {data.metrics.items.length
@@ -101,7 +110,7 @@ export default async function AnalyticsExplorerPage({ searchParams, locale = 'en
       </nav>
       <div className="insights-explore__detail">
         {data.detail ? <>
-          <a className="insights-card__link" href={`/insights/explore?${withParams(params, { metric: null, pointPage: null, rowPage: null })}`}>← {ui.exploreBack}</a>
+          {autoSelected ? null : <a className="insights-card__link insights-explore__back" href={`/insights/explore?${withParams(params, { metric: null, pointPage: null, rowPage: null })}`}>← {ui.exploreBack}</a>}
           <Detail annotations={annotations} copy={copy} data={data} locale={locale} />
         </> : <section className={styles.panel}><p>{ui.exploreChoose}</p></section>}
       </div>

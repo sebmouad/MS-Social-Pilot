@@ -54,7 +54,7 @@ describe('shared responsive CSS (phone 390px, tablet 768px)', () => {
     expect(components).toMatch(/\.ui-tabs__list \{[^}]*overflow-x: auto/);
     expect(components).toMatch(/\.ui-tabs__tab \{[^}]*white-space: nowrap/);
     expect(components).toMatch(/\.ui-page-header__actions \{[^}]*flex-wrap: wrap/);
-    expect(components).toContain('.ui-page-header__actions { flex: 1 0 100%');
+    expect(components).toContain('.ui-page-header__actions, .ui-page-header__filters.is-inline { flex: 1 0 100%');
   });
   it('collapses metric grids at tablet, phone and very narrow widths', () => {
     expect(globals).toContain('@media (max-width: 850px) { .metric-grid { grid-template-columns: repeat(2');

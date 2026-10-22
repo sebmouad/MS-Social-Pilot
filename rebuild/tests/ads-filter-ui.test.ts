@@ -118,7 +118,9 @@ describe('Ads report filter UX', () => {
     const row = (id: string, account: typeof accounts[number]) => ({ id, adAccountId: account.id, level: 'campaign', objectId: id, objectName: `Campaign ${id}`, date, spend: 2, impressions: 10, clicks: 1, reach: 5, cpc: 2, cpm: 200, cpp: null, ctr: 10, frequency: 1, actions: [], fields: {}, adAccount: { id: account.id, name: account.name, currency: account.currency } });
     state.dataset.mockResolvedValue({ accounts, insights: [row('a', accounts[0]), row('b', accounts[1])], pageSize: 1, maxRows: 2500 });
     const node = dom(renderToStaticMarkup(await CampaignsPage({ searchParams: Promise.resolve({ page: '2' }) })));
-    expect(node.querySelector('.ui-page-header')?.textContent).toContain('Showing 2–2 of 2 objects · Page 2 of 2');
+    expect(node.querySelector('.ui-page-header__count')?.textContent).toBe('2');
+    expect(node.querySelector('.ads-report-pager')?.textContent).toContain('Showing 2–2 of 2 objects');
+    expect(node.querySelector('.ads-report-pager__current [aria-current="page"]')?.textContent).toBe('Page 2 of 2');
     expect(node.querySelectorAll('.ads-results-panel')).toHaveLength(1);
     expect(node.querySelector('.ads-results-panel h2')?.textContent).toBe('US account');
     expect(state.dataset).toHaveBeenCalledWith('workspace', expect.anything(), undefined, ['test-platform'], { levels: ['campaign', 'adset', 'ad'] });
@@ -177,13 +179,8 @@ describe('Ads report filter UX', () => {
     const node = dom(renderToStaticMarkup(await page({ searchParams: Promise.resolve({}) })));
     expect(state.policy).toHaveBeenCalledTimes(1);
     expect(state.policy.mock.invocationCallOrder[0]).toBeGreaterThan(state.viewer.mock.invocationCallOrder[0]);
-    // Campaigns keeps the in-page filter form; Accounts shows the policy default preset in the header's period picker.
-    if (page === CampaignsPage) {
-      expect(node.querySelector('select[name=period] option[value="14d"]')?.textContent).toBe('Last two weeks');
-      expect(node.querySelector<HTMLSelectElement>('select[name=period]')?.value).toBe('14d');
-    } else {
-      expect(node.querySelector('button.ui-daterange')?.getAttribute('aria-label')).toContain('Last two weeks');
-    }
+    // Both report pages share the header's period picker showing the policy default preset.
+    expect(node.querySelector('button.ui-daterange')?.getAttribute('aria-label')).toContain('Last two weeks');
   });
 
   it('keeps custom range correction and explains the configured maximum', async () => {

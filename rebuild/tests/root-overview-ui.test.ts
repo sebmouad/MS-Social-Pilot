@@ -25,7 +25,7 @@ it('renders shared metrics, a Root icon header, truthful job failure and stored 
   expect(html).toContain('ui-page-header__titleline'); expect(html).toContain('data-module="root"');
   expect(html).toContain('ui-metric'); expect(html).toContain('Open errors · last 24 hours');
   expect(html).toContain('Needs attention'); expect(html).toContain('ui-badge--danger');
-  expect(html).toContain('2 posts are failed or partially failed');
+  expect(html).toContain('Failed or partly failed posts: 2');
   expect(html).toContain('Stored content and connection counts');
   expect(deps.health).toHaveBeenCalledWith('root', 'shared');
 });

@@ -52,7 +52,7 @@
 .detailsTitle { margin: 0; font-size: 14px; font-weight: 750; cursor: pointer; }
 .detailsTitle:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .detailsBody[open] > .detailsTitle { margin-bottom: 12px; }
-.details h4 { margin: 14px 0 6px; color: var(--ink-soft); font-size: 11.5px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.details h4 { margin: 14px 0 6px; color: var(--ink-soft); font-size: 12px; font-weight: 750; }
 .person { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .person strong { overflow-wrap: anywhere; }
 .facts { display: grid; gap: 8px; margin: 14px 0 0; }
@@ -87,7 +87,7 @@
 
 /* Shortcut guide. */
 .keys { display: grid; gap: 14px; margin: 0; }
-.keys h3 { margin: 0 0 6px; color: var(--ink-soft); font-size: 11.5px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.keys h3 { margin: 0 0 6px; color: var(--ink-soft); font-size: 12px; font-weight: 750; }
 .keys dl { display: grid; gap: 8px; margin: 0; }
 .keys dl > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
 .keys dd { margin: 0; flex: 0 0 auto; }

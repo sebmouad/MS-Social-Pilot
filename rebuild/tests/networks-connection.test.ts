@@ -103,7 +103,7 @@ for (const lane of lanes) describe(`${lane.id} connection service`, () => {
   });
   it('rejects a callback without bound state before exchanging credentials', async () => {
     const response = await lane.connection.callback(new NextRequest(`http://localhost:3200/api/connections/${lane.id}/callback?code=secret&state=wrong`), viewer);
-    expect(response.headers.get('location')).toBe('https://app.example.test/settings/connections?notice=oauth_invalid_state');
+    expect(response.headers.get('location')).toBe('https://app.example.test/settings/channels?notice=oauth_invalid_state');
     expect(m.exchange).not.toHaveBeenCalled();
   });
   it('finishes a bound callback through discovery, persistence and selection', async () => {
@@ -112,7 +112,7 @@ for (const lane of lanes) describe(`${lane.id} connection service`, () => {
     const state = m.authUrl.mock.calls[0]![0].state;
     m.discover.mockResolvedValue({ targets: input().targets });
     const response = await lane.connection.callback(new NextRequest(`http://localhost:3200/api/connections/${lane.id}/callback?code=synthetic&state=${encodeURIComponent(state)}`, { headers: { cookie: `${cookie.name}=${cookie.value}` } }), viewer);
-    expect(response.headers.get('location')).toBe('https://app.example.test/settings/connections?notice=connected&select=1');
+    expect(response.headers.get('location')).toBe('https://app.example.test/settings/channels?notice=connected&select=1');
     expect(m.create).toHaveBeenCalledTimes(1); expect(m.audit).toHaveBeenCalledTimes(1);
     expect(response.cookies.get(cookie.name)?.maxAge).toBe(0);
   });

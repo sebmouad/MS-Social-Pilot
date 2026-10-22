@@ -8,6 +8,8 @@ export interface ModulePageManifest {
   readonly navigation?: boolean;
   /** Position among the area's tabs when pages of several modules share an area (lower first); pages without one keep manifest order after them. */
   readonly tabOrder?: number;
+  /** Other routes (and their sub-paths) that keep this page's tab current, for related screens outside its own route. */
+  readonly tabRoutes?: readonly string[];
 }
 
 /** Customer work areas of the single sidebar (design v2). Pages join an area through their module's `area`. */

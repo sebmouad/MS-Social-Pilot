@@ -134,7 +134,7 @@ export async function finishTokenOAuth(flow: TokenOAuthFlow, request: NextReques
 }
 
 async function finish(flow: TokenOAuthFlow, request: NextRequest, notice: string, openSelection = false) {
-  const location = new URL(`/settings/connections?notice=${encodeURIComponent(notice)}${openSelection ? '&select=1' : ''}`, await publicOrigin());
+  const location = new URL(`/settings/channels?notice=${encodeURIComponent(notice)}${openSelection ? '&select=1' : ''}`, await publicOrigin());
   const response = NextResponse.redirect(location, { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
   response.cookies.set(tokenOAuthCookie(flow.provider), '', {
     httpOnly: true, secure: new URL(await publicOrigin()).protocol === 'https:', sameSite: 'lax', path: tokenCallbackPath(flow.provider), maxAge: 0,

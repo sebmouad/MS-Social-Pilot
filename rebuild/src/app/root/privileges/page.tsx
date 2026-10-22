@@ -12,6 +12,7 @@ import { ROOT_PRIVILEGE_CSV_FORMAT, ROOT_PRIVILEGE_CSV_NAME, WORKSPACE_ROLES } f
 import { StatusChip } from '@/components/StatusChip';
 import { RoleControl } from './RoleControl';
 import '../plans/root-ops.css';
+import { loadRootDates, loadRootInterfaceCopy, rootText } from '@/modules/root/ui/interface-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Privileges · Root' };
@@ -19,6 +20,7 @@ type Search = { q?: string; role?: string; workspaceId?: string; page?: string }
 
 export default async function RootPrivilegesPage({ searchParams }: { searchParams: Promise<Search> }) {
   const actor = await requireRootPage();
+  const t = await loadRootInterfaceCopy();
   const params = await searchParams;
   let input: Record<string, string> = {};
   let data: Awaited<ReturnType<typeof listRootPrivileges>> | null = null;
@@ -42,14 +44,14 @@ export default async function RootPrivilegesPage({ searchParams }: { searchParam
       : <>
         <p className="root-activity__summary">{data.total} {data.total === 1 ? 'membership' : 'memberships'}. The CSV export is limited by Root; oversized exports are refused rather than shortened.</p>
         <DataTable caption={'Members, roles and channel access'} rows={data.items} rowKey={item => item.membershipId} columns={[
-          { key: 'column0', label: 'Member', render: (item) => <><strong>{item.name}</strong><br />{item.email}{item.root ? ' · installation owner' : ''}</> },
-          { key: 'column1', label: 'Workspace', render: (item) => <>{item.workspace}{item.workspaceSuspended ? ' · suspended' : ''}</> },
-          { key: 'column2', label: 'Channels', render: (item) => <>{item.channels === 'all' ? 'All channels' : `${item.channels} selected`}</> },
-          { key: 'column3', label: 'Status', render: (item) => <><StatusChip status={item.disabled ? 'disabled' : 'active'} /></> },
-          { key: 'column4', label: 'Role', render: (item) => <><RoleControl membershipId={item.membershipId} email={item.email} workspaceId={item.workspaceId} workspace={item.workspace} role={item.role} /></> }
+          { key: 'column0', label: t.colMember, render: (item) => <><strong>{item.name}</strong><br />{item.email}{item.root ? ` · ${t.valueInstallationOwner}` : ''}</> },
+          { key: 'column1', label: t.colWorkspace, render: (item) => <>{item.workspace}{item.workspaceSuspended ? ` · ${t.valueSuspended}` : ''}</> },
+          { key: 'column2', label: t.colChannels, render: (item) => <>{item.channels === 'all' ? t.valueAllChannels : rootText(t.valueChannelsSelected, { count: item.channels })}</> },
+          { key: 'column3', label: t.colStatus, render: (item) => <><StatusChip status={item.disabled ? 'disabled' : 'active'} /></> },
+          { key: 'column4', label: t.colRole, render: (item) => <><RoleControl membershipId={item.membershipId} email={item.email} workspaceId={item.workspaceId} workspace={item.workspace} role={item.role} /></> }
         ]} />
-        <p className="root-directory__pager">Page {data.page} of {Math.max(1, Math.ceil(data.total / data.pageSize))}
-          {data.page > 1 && <> · <a href={pageUrl(data.page - 1)}>Previous</a></>}{data.page * data.pageSize < data.total && <> · <a href={pageUrl(data.page + 1)}>Next</a></>}</p>
+        <p className="root-directory__pager">{rootText(t.userPageOf, { page: data.page, total: Math.max(1, Math.ceil(data.total / data.pageSize)) })}
+          {data.page > 1 && <> · <a href={pageUrl(data.page - 1)}>{t.userPrevious}</a></>}{data.page * data.pageSize < data.total && <> · <a href={pageUrl(data.page + 1)}>{t.userNext}</a></>}</p>
       </>}
   </div></RootFrame>;
 }

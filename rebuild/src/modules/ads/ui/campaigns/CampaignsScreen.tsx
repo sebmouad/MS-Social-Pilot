@@ -4,10 +4,11 @@ import { AdsReportLimitError } from '../../read-policy';
 import { loadAdsCopy } from '@/modules/ads/server/copy';
 import { customerText } from '@/modules/ads/copy';
 import { AdsCopyProvider } from '@/modules/ads/ui/AdsCopyProvider';
-import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { IconAd, IconSpeakerphone } from '@tabler/icons-react';
-import { adsTabsFor } from '../AdsTabsFor';
+import { adsHeaderFor } from '../AdsTabsFor';
+import { AdsReportPager } from '../AdsReportPager';
+import { AdsReportExport } from '../AdsReportExport';
 import { CampaignCharts } from './CampaignCharts';
 import { HierarchyTable } from './HierarchyTable';
 import { headers } from 'next/headers';
@@ -17,7 +18,7 @@ import { CreativeCreateForm } from '@/modules/ads/ui/CreativeCreateForm';
 import { entitledPlatformIds } from '@/server/entitlements';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { AdsFilterErrorView, AdsReportFailureView, AdsReportSidebar, dateRangeLabel } from '@/modules/ads/ui/ads-filters';
+import { AdsFilterErrorView, AdsReportFailureView } from '@/modules/ads/ui/ads-filters';
 import { getAdsAccounts, getAdsDataset, parseAdsFilters, AdsFilterError, type AdsSearchParams } from '@/modules/ads/server/queries';
 import { groupSummariesByAccount, summarizeInsights } from '@/modules/ads/server/summary';
 import { DailyMetrics } from '@/modules/ads/ui/DailyMetrics';
@@ -89,13 +90,11 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   })));
   const canExport = canUseFeature(viewer.entitlements, 'ads/campaigns') && canAccessFeature(viewer.permissions, 'ads/campaigns', 'read');
   const exportPolicy = canExport ? await loadAdsOutputPolicy().catch(() => null) : null;
-  const tabs = await adsTabsFor('campaigns', viewer, filters);
-  const sidebar = <AdsReportSidebar catalogs={catalogs} locale={locale} accounts={accounts} filters={filters} action="/insights/ads/campaigns" kind="objects" policy={policy} page={objectPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
-  return <PageFrame module="ads"><div className="page-stack">
-    {accounts.length ? sidebar : null}
-    {tabs}
-    <PageHeader module="ads" title={t('text041')} description={<>{accounts.length ? t('text260', { value0: objectPage.from, value1: objectPage.to, value2: objectPage.resultCount, value3: objectPage.page, value4: objectPage.pageCount, value5: dateRangeLabel(filters) }) : t('text042')}</>} />
-    {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title={t('text003')} action={<a className="text-link" href="/settings/connections">{t('text004')}</a>}>{t('text043')}</EmptyState></section> : <>
+  const header = await adsHeaderFor('campaigns', viewer, { title: t('text041'), locale, policy, filters, accounts, periodLabel: t('text081'), customLabel: t('text083'), count: accounts.length ? objectPage.resultCount : undefined });
+  const pager = <AdsReportPager filters={filters} path="/insights/ads/campaigns" kind="objects" page={objectPage} />;
+  return <PageFrame module="ads"><div className="insights">
+    {header}
+    {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title={t('text003')} action={<a className="text-link" href="/settings/channels">{t('text004')}</a>}>{t('text043')}</EmptyState></section> : <>
     {objectPage.resultCount ? [...byAccount].map(([accountId, rows]) => {
       const account = accounts.find(item => item.id === accountId);
       const levels = [
@@ -104,7 +103,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
       return <section className="panel ads-results-panel" key={accountId}>
         <div className="analytics-panel-title"><div><h2>{rows[0]?.accountName ?? account?.name ?? t('text044')}</h2><p className="small-note">{account?.actId}{account?.currency ? ` · ${account.currency}` : ''}</p></div><span className="badge">{rows.length} {t('text045')}</span></div>
         <CampaignCharts accountName={rows[0]?.accountName ?? account?.name ?? t('text044')} rows={rows} locale={locale} />
-        {reconnectAccounts.has(accountId) ? <p className="small-note" role="note">{t('needsReconnectAccount', { account: rows[0]?.accountName ?? account?.name ?? t('text044') })} <a href="/settings/connections">{t('needsReconnectAction')}</a></p> : null}
+        {reconnectAccounts.has(accountId) ? <p className="small-note" role="note">{t('needsReconnectAccount', { account: rows[0]?.accountName ?? account?.name ?? t('text044') })} <a href="/settings/channels">{t('needsReconnectAction')}</a></p> : null}
         <p className="small-note">{t('hierarchyNote')}</p>
         {levels.map(level => {
           const resolveParent = parentResolvers.get(accountId);
@@ -143,6 +142,8 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
       {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={{ userId: viewer.user.id, workspaceId }} />)}
     </section> : null}
     {accounts.filter(account => (!filters.accountId || account.id === filters.accountId) && creativeAvailability.get(account.id)).map(account => <section className="panel" key={`creative:${account.id}`}><CreativeCreateForm adAccountId={account.id} accountName={account.name} ownerScope={{ userId: viewer.user.id, workspaceId }} locale={locale} /></section>)}
+    {objectPage.pageCount > 1 ? pager : null}
+    {canExport && exportPolicy && dataset.maxRows ? <div className="ads-report-export"><AdsReportExport filters={filters} maxRows={dataset.maxRows} maxBytes={exportPolicy.exportMaxBytes} fileName={exportPolicy.exportFileName} /></div> : null}
     <p className="ads-read-only-note">{t('text054')}</p>
     </>}
   </div></PageFrame>;

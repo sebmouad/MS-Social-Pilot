@@ -18,7 +18,7 @@ export function TopPostsCard({ copy, posts, infoText, allHref, unavailable }: { 
     </div>
     {posts.length
       ? <ol className="insights-posts">{posts.map(post => <li key={post.key} className="insights-post">
-        <PostThumb thumb={null} size="md" />
+        <PostThumb thumb={null} size="sm" />
         <div className="insights-post__text">
           <strong title={post.text}>{post.text || copy.topPostsNoText}</strong>
           <small>{post.channelName}{post.url ? <> · <a href={post.url} target="_blank" rel="noreferrer">{copy.postViewOnChannel}</a></> : null}</small>

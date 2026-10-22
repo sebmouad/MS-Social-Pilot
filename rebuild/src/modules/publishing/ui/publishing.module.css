@@ -18,14 +18,14 @@
 .heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; }
 .heading h1 { margin: 4px 0 7px; font-size: clamp(27px, 3vw, 36px); letter-spacing: -.045em; }
 .heading p { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.5; }
-.eyebrow { margin: 0; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.eyebrow { margin: 0; color: var(--accent); font-size: 12px; font-weight: 800; }
 .summary { color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
 .card { min-width: 0; padding: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
 .message { display: block; max-width: 560px; color: var(--ink); line-height: 1.45; }
 .targets { color: var(--ink-soft); font-size: 12px; }
 .date { white-space: nowrap; }
 .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.weekday { padding: 12px 10px; color: var(--ink-faint); background: var(--surface-raised); border-bottom: 1px solid var(--line); font-size: 10px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.weekday { padding: 12px 10px; color: var(--ink-faint); background: var(--surface-raised); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 750; }
 .day { min-height: 116px; padding: 10px; border-right: 1px solid var(--line-subtle); border-bottom: 1px solid var(--line-subtle); }
 .day:nth-child(7n) { border-right: 0; }
 .outside { background: var(--surface-raised); color: var(--ink-faint); }

@@ -7,12 +7,14 @@ import { listRootPlanHistory, listRootPlans, listRootSubscribers } from '@/modul
 import { PlanEditor } from './PlanEditor';
 import { AssignPlan } from './AssignPlan';
 import './root-ops.css';
+import { loadRootDates, loadRootInterfaceCopy, rootText } from '@/modules/root/ui/interface-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Plans · Root' };
 
 export default async function RootPlansPage() {
   const actor = await requireRootPage();
+  const [t, dates] = await Promise.all([loadRootInterfaceCopy(), loadRootDates()]);
   const loaded = await Promise.all([listRootPlans(actor.id), listRootPlanHistory(actor.id), listRootSubscribers(actor.id)]).catch(() => null);
   return <RootFrame active="/root/plans"><div className="root-ops">
     <PageHeader module="root" title="Plans" description={<>Plans set limits and the module features an account can use. Prices are displayed only; no payment is taken here. Every change needs an exact confirmation and is recorded in installation activity.</>} />
@@ -28,16 +30,16 @@ export default async function RootPlansPage() {
         <section className="root-ops__panel" aria-labelledby="subscribers"><h2 id="subscribers">Subscribers</h2>
           {subsCut && <p className="root-ops__muted" role="status">Showing the first {subLimit} accounts. Raise the subscriber limit in Root settings to assign plans to others.</p>}
           {subscribers.length === 0 ? <p className="root-ops__muted">No account owns a workspace yet.</p> : <DataTable caption={'Accounts that own workspaces and their plans'} rows={subscribers} rowKey={user => user.id} columns={[
-          { key: 'column0', label: 'Account', render: (user) => <><strong>{user.name}</strong><br />{user.email}{user.isInstanceOwner ? ' · installation owner' : ''}{user.disabled ? ' · disabled' : ''}</> },
-          { key: 'column1', label: 'Workspaces owned', render: (user) => <>{user.workspaces}</> },
-          { key: 'column2', label: 'Plan', render: (user) => <><AssignPlan userId={user.id} email={user.email} current={user.planKey} plans={plans} /></> }
+          { key: 'column0', label: t.colAccount, render: (user) => <><strong>{user.name}</strong><br />{user.email}{user.isInstanceOwner ? ` · ${t.valueInstallationOwner}` : ''}{user.disabled ? ` · ${t.valueDisabled}` : ''}</> },
+          { key: 'column1', label: t.colWorkspacesOwned, render: (user) => <>{user.workspaces}</> },
+          { key: 'column2', label: t.colPlan, render: (user) => <><AssignPlan userId={user.id} email={user.email} current={user.planKey} plans={plans} /></> }
         ]} />}
         </section>
         <section className="root-ops__panel" aria-labelledby="plan-history"><h2 id="plan-history">Plan history</h2>
           {history.items.length === 0 ? <p className="root-ops__muted">No plan changes recorded.</p> : <DataTable caption={'Recent plan edits and assignments'} rows={history.items} rowKey={item => item.id} columns={[
-          { key: 'column0', label: 'When', render: (item) => <><time dateTime={item.at}>{new Date(item.at).toLocaleString()}</time></> },
-          { key: 'column1', label: 'Change', render: (item) => <>{item.action === 'root.plan_assigned' ? `${item.subject ?? 'Account'}: ${item.fromPlan ?? 'no plan'} → ${item.toPlan ?? 'no plan'}` : `${item.plan ?? 'Plan'} edited${item.changes.length ? ` (${item.changes.join(', ')})` : ''}`}</> },
-          { key: 'column2', label: 'By', render: (item) => <>{item.actor ?? 'Unknown'}</> }
+          { key: 'column0', label: t.colWhen, render: (item) => <><time dateTime={item.at}>{dates.dateTime(item.at)}</time></> },
+          { key: 'column1', label: t.colChange, render: (item) => <>{item.action === 'root.plan_assigned' ? rootText(t.valuePlanAssigned, { account: item.subject ?? t.colAccount, from: item.fromPlan ?? t.valueNoPlan, to: item.toPlan ?? t.valueNoPlan }) : item.changes.length ? rootText(t.valuePlanEditedFields, { plan: item.plan ?? t.colPlan, fields: item.changes.join(', ') }) : rootText(t.valuePlanEdited, { plan: item.plan ?? t.colPlan })}</> },
+          { key: 'column2', label: t.colBy, render: (item) => <>{item.actor ?? t.unknown}</> }
         ]} />}
         </section>
       </>;

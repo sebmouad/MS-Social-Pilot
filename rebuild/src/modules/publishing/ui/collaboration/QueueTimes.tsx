@@ -84,7 +84,6 @@ export function QueueTimes({ slots, targets, canEditShared, canEditChannels, lim
     <div>{action.banner}</div>
     <section className={styles.section}><h2>{scope === '' ? c.shared_queue_times : fillComposerCopy(c.channelQueueTitle, { name: targets.find(target => target.id === scope)?.name ?? c.channel })}</h2>
       <p className={styles.help}>{c.queued_posts_take_the_next_available_saved_time_saving_changes_affects_future}</p>
-      <p className={styles.help}>{fillComposerCopy(c.workspaceZone, { zone: timeZone.replaceAll('_', ' ') })}</p>
       {rows.length ? <div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">{scope === '' ? c.shared_queue_times : c.channel_queue_times}</caption><thead><tr><th scope="col">{c.day}</th><th scope="col">{c.time}</th>{canEdit && <th scope="col">{c.actions}</th>}</tr></thead>
         <tbody>{rows.map(row => <tr key={slotKey(row)}><th scope="row">{DAYS[row.dayOfWeek]}</th><td>{pad(row.hour)}:{pad(row.minute)}</td>{canEdit && <td><Button size="sm" variant="danger" disabled={action.busy} onClick={() => setRowsDraft(rows.filter(item => slotKey(item) !== slotKey(row)))}>{c.remove}</Button></td>}</tr>)}</tbody></table></div>
         : <p className={styles.empty}>{scope === '' ? c.no_shared_queue_times_yet : c.this_channel_has_no_own_times_and_currently_uses_the_shared_times}</p>}

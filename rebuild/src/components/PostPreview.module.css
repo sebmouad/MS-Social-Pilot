@@ -1,5 +1,13 @@
 .preview { display: grid; gap: 15px; min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--ink); }
 .preview[data-variant="card"] { height: 100%; align-content: start; }
+/* Compact: lists such as the queue show media as small thumbnails so several posts fit on one screen. */
+.preview[data-variant="compact"] { gap: 10px; padding: 14px 16px; }
+.preview[data-variant="compact"] .authorAvatar { width: 32px; height: 32px; }
+.preview[data-variant="compact"] .message { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 3; -webkit-box-orient: vertical; line-height: 1.5; }
+.preview[data-variant="compact"] .media { grid-template-columns: repeat(auto-fill, 88px); gap: 8px; }
+.preview[data-variant="compact"] .imageLink, .preview[data-variant="compact"] .imageLink img { width: 88px; height: 88px; max-height: none; object-fit: cover; }
+.preview[data-variant="compact"] .video { grid-column: 1 / -1; max-height: 200px; }
+.preview[data-variant="compact"] .actions { padding-top: 10px; }
 .header { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .authorAvatar, .channelAvatar, .channelFallback { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 50%; }
 .authorAvatar, .channelFallback { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 750; }
@@ -23,7 +31,7 @@
 .video { display: block; width: 100%; max-height: 520px; border-radius: var(--radius-sm); background: var(--surface-muted); }
 .sharedLink { margin: 0; overflow-wrap: anywhere; font-size: 12px; }
 .firstComment { padding: 12px 14px; border-left: 3px solid var(--line-strong); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface-raised); }
-.firstComment strong { color: var(--ink-soft); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.firstComment strong { color: var(--ink-soft); font-size: 12px; }
 .firstComment p { margin: 5px 0 0; color: var(--ink); font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
 .actions { padding-top: 12px; border-top: 1px solid var(--line-subtle); }
 .feedList, .cardsGrid { display: grid; margin: 0; padding: 0; list-style: none; }

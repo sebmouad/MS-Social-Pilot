@@ -7,7 +7,9 @@ import { PublishingActionCopyProvider } from '@/modules/publishing/ui/WorkflowSu
 import { loadPublishingActionCopy } from '@/modules/publishing/server/action-copy';
 import { loadComposerCopy } from '../../../../server/composer-copy';
 import { ensurePublishingCollaboration } from '@/modules/publishing/server/collaboration';
-import { InfoTip, PageHeader, StatusChip } from '@/components';
+import { InfoTip, PageHeader } from '@/components';
+import { RetryFailedDestinations } from '@/modules/publishing/ui/posts/PostActions';
+import { retryableDestinationCount } from '@/modules/publishing/bulk';
 import { PostPreview, type PostPreviewPost } from '@/components/PostPreview';
 import { readPublishingPostPage } from '@/modules/publishing/server/read';
 import { loadContent } from '@/modules/publishing/server/content-copy';
@@ -38,6 +40,7 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
   const content = await loadContent();
   const memberName = (await loadPublishingCopy()).copy[locale].approvalsMember;
   const canWrite = canAccessFeature(viewer.permissions, 'publishing/collaboration', 'write');
+  const canPublish = canAccessFeature(viewer.permissions, 'publishing/posts', 'write');
   const caps = collaborationCapabilities();
   try {
     const paging = parsePostCollaborationSearch(await searchParams ?? {});
@@ -59,14 +62,15 @@ async function PostCollaborationPageContent({ params, searchParams }: { params: 
         breadcrumbs={<a href="/content">{content.copy.postDetailBack}</a>} />
       {post ? <section aria-label={copy.postTitle} className={styles.summary}>
         <PostPreview post={post as PostPreviewPost} authorName={post.authorId === viewer.user.id ? viewer.user.name : memberName} timeZone={timeZone} locale={locale} variant="card" />
-        <ul className={styles.destinations}>{post.targets.map(row => <li key={row.id}><strong>{row.target.name}</strong><StatusChip status={row.status} compact />{row.remoteUrl ? <a href={row.remoteUrl} target="_blank" rel="noopener noreferrer">{content.copy.postsPanelDetails}</a> : null}</li>)}</ul>
+        {/* The preview already lists each destination with its status; offer the recovery action instead of repeating them. */}
+        {canPublish ? <div className={styles.destinations}><RetryFailedDestinations postId={post.id} count={retryableDestinationCount(post)} /></div> : null}
       </section> : null}
-      <nav aria-label={copy.postNav} className={styles.paging}>
-        <span>{fillComposerCopy(copy.notesPage, { page: notes.page })}</span>
+      {(notes.page > 1 || notes.hasMore || versions.page > 1 || versions.hasMore) && <nav aria-label={copy.postNav} className={styles.paging}>
+        {(notes.page > 1 || notes.hasMore) && <span>{fillComposerCopy(copy.notesPage, { page: notes.page })}</span>}
         {notes.page > 1 && <a href={pageUrl(notes.page - 1, versions.page)}>{copy.newerNotes}</a>}
         {notes.hasMore && <a href={pageUrl(notes.page + 1, versions.page)}>{copy.olderNotes}</a>}
-        {(versions.versions.length > 0 || versions.page > 1) && <><span>{fillComposerCopy(copy.historyPage, { page: versions.page })}</span>{versions.page > 1 && <a href={pageUrl(notes.page, versions.page - 1)}>{copy.newerVersions}</a>}{versions.hasMore && <a href={pageUrl(notes.page, versions.page + 1)}>{copy.olderVersions}</a>}</>}
-      </nav>
+        {(versions.page > 1 || versions.hasMore) && <><span>{fillComposerCopy(copy.historyPage, { page: versions.page })}</span>{versions.page > 1 && <a href={pageUrl(notes.page, versions.page - 1)}>{copy.newerVersions}</a>}{versions.hasMore && <a href={pageUrl(notes.page, versions.page + 1)}>{copy.olderVersions}</a>}</>}
+      </nav>}
       <PostPanel copyCatalog={copyCatalog} timeZone={viewer.membership.workspace.timezone} key={`${postId}:${notes.page}:${versions.page}`} notesCanAdd={notes.page === 1} postId={postId} canWrite={canWrite} labels={labels.labels.map(({ id, name }) => ({ id, name }))} assigned={assigned.labels.map(l => l.id)}
         fields={fields.fields.map(f => ({ id: f.id, name: f.name, kind: f.kind, options: f.options, value: f.value }))}
         fieldValueMax={fields.maxCharacters}

@@ -664,8 +664,8 @@ export const composerCatalogDefaults = {
     "fr": "Cette page n’a pas pu être chargée. Actualisez puis réessayez."
   },
   "collab_postTitle": {
-    "en": "Organize post",
-    "fr": "Organiser la publication"
+    "en": "Post details",
+    "fr": "Détails de la publication"
   },
   "collab_postHelp": {
     "en": "Manage labels, custom fields and internal team notes.",

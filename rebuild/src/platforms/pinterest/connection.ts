@@ -85,7 +85,7 @@ export const pinterestConnection: PlatformHost['connection'] = {
     const publicOrigin = String(await runtimeConfig('app.publicOrigin'));
     const redirectUri = new URL(CALLBACK_PATH, publicOrigin).toString();
     const finish = (notice: string) => {
-      const response = NextResponse.redirect(new URL(`/settings/connections?notice=${notice}${notice === 'connected' || notice === 'connected_partial' ? '&select=1' : ''}`, publicOrigin), { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
+      const response = NextResponse.redirect(new URL(`/settings/channels?notice=${notice}${notice === 'connected' || notice === 'connected_partial' ? '&select=1' : ''}`, publicOrigin), { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
       response.cookies.set(STATE_COOKIE, '', { httpOnly: true, sameSite: 'lax', secure: new URL(redirectUri).protocol === 'https:', path: CALLBACK_PATH, maxAge: 0 });
       return response;
     };

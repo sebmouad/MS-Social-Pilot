@@ -6,7 +6,7 @@ import { installedMcpGroups } from '@/modules/installed-mcp';
 
 describe('installed writing agents and asynchronous Posts exports', () => {
  it('exposes the module and its real Root-managed policies', () => {
-  expect(moduleManifests.find(module => module.id === 'agents')).toMatchObject({ href: '/agents', pages: [expect.objectContaining({ id: 'agents/library', href: '/agents' })] });
+  expect(moduleManifests.find(module => module.id === 'agents')).toMatchObject({ href: '/content/agents', pages: [expect.objectContaining({ id: 'agents/library', href: '/content/agents' })] });
   for (const key of ['agents.policy', 'agents.copy']) {
    const definition = CONFIG_BY_KEY.get(key)!;
    expect(definition.schema.safeParse(definition.defaultValue).success).toBe(true);

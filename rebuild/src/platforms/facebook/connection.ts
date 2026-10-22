@@ -94,7 +94,7 @@ export async function finishFacebookConnection(request: NextRequest, viewer: Con
 }
 
 function finish(request: NextRequest, notice: string, openSelection = false) {
-  const location = new URL(`/settings/connections?notice=${encodeURIComponent(notice)}${openSelection ? '&select=1' : ''}`, requestOrigin(request));
+  const location = new URL(`/settings/channels?notice=${encodeURIComponent(notice)}${openSelection ? '&select=1' : ''}`, requestOrigin(request));
   const response = NextResponse.redirect(location, { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
   response.cookies.set(FACEBOOK_OAUTH_STATE_COOKIE, '', {
     httpOnly: true, secure: new URL(requestOrigin(request)).protocol === 'https:', sameSite: 'lax',

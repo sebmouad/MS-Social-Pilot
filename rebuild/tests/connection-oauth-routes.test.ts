@@ -131,7 +131,7 @@ describe('Meta OAuth callback route', () => {
     expect(mocks.persistFacebookDiscovery).toHaveBeenCalledWith({ userId: 'user-1', workspaceId: 'workspace-1' }, expect.objectContaining({
       accessToken: 'long-token', scopes: ['pages_show_list', 'ads_read'],
     }));
-    expect(response.headers.get('location')).toBe('https://social.example.test/settings/connections?notice=connected&select=1');
+    expect(response.headers.get('location')).toBe('https://social.example.test/settings/channels?notice=connected&select=1');
     expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
     expect(response.headers.get('location')).not.toContain('token');
   });
@@ -166,7 +166,7 @@ describe('Meta OAuth callback route', () => {
       headers: { cookie: `${FACEBOOK_OAUTH_STATE_COOKIE}=${pending.cookieValue}` },
     });
     const response = await GET(request);
-    expect(response.headers.get('location')).toBe('https://social.example.test/settings/connections?notice=connect_failed');
+    expect(response.headers.get('location')).toBe('https://social.example.test/settings/channels?notice=connect_failed');
     expect(response.headers.get('location')).not.toContain('private-provider-detail-with-token');
     expect(mocks.recordFacebookConnectionFailure).toHaveBeenCalledWith({ userId: 'user-1', workspaceId: 'workspace-1' }, 'exchange', 'internal_error');
     expect(mocks.persistFacebookDiscovery).not.toHaveBeenCalled();

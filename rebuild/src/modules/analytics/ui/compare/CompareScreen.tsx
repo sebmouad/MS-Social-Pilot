@@ -3,11 +3,11 @@ import { analyticsCopy } from '../../server/copy';
 import { headers } from 'next/headers';
 import { BarChart } from '@/components/charts';
 import { PageHeader } from '@/components/PageHeader';
+import { InfoTip } from '@/components';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';
 import { readAnalyticsComparison } from '@/modules/analytics/comparison/server/comparison';
-import { WorkflowNav } from '@/modules/analytics/ui/reports/WorkflowNav';
 import { formatValue as formatAnalyticsValue } from '@/modules/analytics/ui/reports/format';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 import { comparisonInputFromSearch, comparisonSearchSchema } from './search';
@@ -44,10 +44,9 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     start: first(params.start), end: first(params.end), channel: list(params.channel), groupA: list(params.groupA), groupB: list(params.groupB),
   }} />;
   return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
-    <WorkflowNav current="/insights/compare">{form}</WorkflowNav>
-    {kindSwitch}
-    <PageHeader module="analytics" title={t('Compare periods or channels')} description={<>{t("Differences are shown only where both sides measure the same thing with the same coverage. Reach and breakdowns are never subtracted, and missing data is unknown, not zero.")}</>} />
-    {!input && !failure && <section className={styles.panel}><h2>{t("Choose what to compare")}</h2><p>{t("Pick two periods for the same channels, or two separate groups of channels in one period, then select Compare.")}</p></section>}
+    <PageHeader module="analytics" title={t('Compare periods or channels')} info={<InfoTip name={t('Compare periods or channels')} blocks={[{ text: t("Differences are shown only where both sides measure the same thing with the same coverage. Reach and breakdowns are never subtracted, and missing data is unknown, not zero.") }]} />} actions={kindSwitch ?? undefined} />
+    {form}
+    {!input && !failure && <p className={styles.note}>{t("Pick two periods for the same channels, or two separate groups of channels in one period, then select Compare.")}</p>}
     {failure && <section className={styles.panel} role="alert"><h2>{t("Comparison unavailable")}</h2><p>{failure}</p></section>}
     {data && <>
       <section className={styles.panel}><h2>{t("Audience")}</h2><div className={styles.tiles}>

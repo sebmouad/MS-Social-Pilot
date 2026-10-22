@@ -14,7 +14,7 @@ const inter = Inter({ subsets: ['latin', 'latin-ext'], display: 'swap', variable
 export async function generateMetadata(): Promise<Metadata> {
   const [policy, locale] = await Promise.all([publicWebApp(), settingsLocale()]);
   const t = policy.copy[locale];
-  return { title: { default: t.name, template: `%s · ${t.shortName}` }, description: t.description, manifest: policy.enabled ? `${WEB_APP_ROUTES.manifest}?lang=${locale}` : undefined, icons: { icon: `${WEB_APP_ROUTES.icon}/192`, apple: `${WEB_APP_ROUTES.icon}/192` }, appleWebApp: { capable: policy.enabled, title: t.shortName } };
+  return { title: { default: t.shortName, template: `%s · ${t.shortName}` }, description: t.description, manifest: policy.enabled ? `${WEB_APP_ROUTES.manifest}?lang=${locale}` : undefined, icons: { icon: `${WEB_APP_ROUTES.icon}/192`, apple: `${WEB_APP_ROUTES.icon}/192` }, appleWebApp: { capable: policy.enabled, title: t.shortName } };
 }
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [{ theme: safeTheme, mode: safeMode }, locale, copy] = await Promise.all([initialAppearance(), settingsLocale(), runtimeConfig('settings.appearanceCopy')]);

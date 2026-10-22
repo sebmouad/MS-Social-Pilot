@@ -346,7 +346,7 @@ it('uses Instagram destination format descriptors without offering undeclared fo
   expect(container.textContent).toContain('Atelier Atlas');
   // A channel that cannot publish is never selectable; it points to reconnecting instead.
   expect(chip('Unavailable channel')).toBeUndefined();
-  expect(container.querySelector('a[href="/settings/connections"]')?.textContent).toBe('Reconnect');
+  expect(container.querySelector('a[href="/settings/channels"]')?.textContent).toBe('Reconnect');
   await act(async () => chip('Atelier Atlas').click());
   expect(container.textContent).toContain('Photo');
   expect(container.textContent).toContain('Reel');

@@ -5,7 +5,7 @@ import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import { RouteNotice } from '@/components/RouteNotice';
 import { goalsText, type GoalsCatalog, type GoalsCopyKey, type GoalsLocale } from '@/modules/analytics/goals/copy';
-import styles from '@/modules/analytics/ui/reports/workflows.module.css';
+import styles from './goals.module.css';
 
 type Metric = { metric: string; label: string; value: number | null };
 
@@ -44,12 +44,11 @@ export function GoalEditor({ locale, channelId, channelName, metrics, copy }: { 
   }
 
   return <form noValidate onSubmit={save} className={styles.form} aria-label={t('formLabel', { channel: channelName })}>
-    <p className={styles.note}>{t('editHint')}</p>
-    {metrics.map(m => <label key={m.metric}>{t('perMonth', { label: m.label })}
+    <div className={styles.fields}>{metrics.map(m => <label key={m.metric}>{t('perMonth', { label: m.label })}
       <input type="number" inputMode="numeric" min={1} max={100000000} step={1} value={values[m.metric] ?? ''} placeholder={t('noGoal')}
         onChange={e => setValues(v => ({ ...v, [m.metric]: e.target.value }))} disabled={busy} />
-    </label>)}
-    <Button type="submit" disabled={busy}>{busy ? t('saving') : t('save')}</Button>
+    </label>)}</div>
+    <div className={styles.foot}><Button type="submit" size="sm" disabled={busy}>{busy ? t('saving') : t('save')}</Button></div>
     {notice && <RouteNotice error={notice.error} focusKey={`goals:${channelId}:${notice.key}`}>{notice.text}</RouteNotice>}
   </form>;
 }

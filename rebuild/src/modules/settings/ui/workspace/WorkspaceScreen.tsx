@@ -22,7 +22,7 @@ export default async function WorkspacePolicyPage() {
   const timezones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
   return <PageFrame module="settings"><SettingsPage copy={uiCopy} active="settings/workspace" title={t.title} locale={locale} description={fill(t.description, { workspace: viewer.membership.workspace.name })}>
     {policy && operations
-      ? <WorkspaceCards key={viewer.workspaceId} locale={locale} copy={sections} workspaceId={viewer.workspaceId} workspaceName={viewer.membership.workspace.name} canManage={canManage} policy={policy} operations={operations.settings} timezones={timezones} bestTime={canManage ? <BestTimeApplyCard locale={locale} /> : null} />
+      ? <WorkspaceCards key={viewer.workspaceId} locale={locale} copy={sections} workspaceId={viewer.workspaceId} workspaceName={viewer.membership.workspace.name} canManage={canManage} policy={policy} operations={operations.settings} timezones={timezones} bestTime={canManage ? <BestTimeApplyCard key="best-time" locale={locale} /> : null} />
       : <p className={styles['settings-note']} role="alert">{sections.unavailable}</p>}
   </SettingsPage></PageFrame>;
 }

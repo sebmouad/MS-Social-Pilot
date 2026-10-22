@@ -67,7 +67,7 @@ async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams
     <AdsHeader title={t('text001')} copy={ui} locale={locale} policy={policy} filters={filters} accounts={dataset.accounts} current="accounts" available={available} count={scoped.length}
       periodLabel={t('text081')} customLabel={t('text083')} />
     {!dataset.accounts.length
-      ? <EmptyState title={ui.emptyTitle} icon={<IconAd />} action={<a className="ui-button ui-button--primary ui-button--md" href="/settings/connections">{ui.emptyAction}</a>}>{ui.emptyBody}</EmptyState>
+      ? <EmptyState title={ui.emptyTitle} icon={<IconAd />} action={<a className="ui-button ui-button--primary ui-button--md" href="/settings/channels">{ui.emptyAction}</a>}>{ui.emptyBody}</EmptyState>
       : <section className="insights-accounts" aria-label={ui.caption}>
         <AccountsTable rows={rows} copy={ui} locale={locale} campaignsHref={adsQuery(filters, '/insights/ads/campaigns')} rowLabel={ui.colAccount} />
         <AdsReportPager filters={filters} path={PATH} kind="accounts" page={page} />

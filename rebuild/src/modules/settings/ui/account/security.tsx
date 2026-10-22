@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Switch, DataTable, ConfirmDialog, useToast } from '@/components';
+import { Button, Switch, DataTable, ConfirmDialog, Field, TextInput, useToast } from '@/components';
 import { useSettingsCopy } from '../copy-context';
 import { SecretReveal } from '@/modules/integrations/ui/SecretReveal';
 import { securityConfirmations } from '../../server/account-security-contract';
@@ -50,9 +50,9 @@ export function AccountSecurity({ canWrite, accountName, locale, onChanged }: { 
     {error && <p role="alert">{error}<Button onClick={() => void reload()}>{t.retry}</Button></p>}
     {data && <>
       {data.required && <p>{t.required}</p>}
-      {canWrite && <div className={styles['mcp-key-form']}>
-        <label>{t.password}<input type="password" autoComplete="current-password" value={password} disabled={busy} onChange={e => setPassword(e.target.value)} /></label>
-        <label>{t.code}<input autoComplete="one-time-code" inputMode="numeric" value={code} disabled={busy} onChange={e => setCode(e.target.value)} /></label>
+      {canWrite && <div className={styles['security-form']}>
+        <Field label={t.password}><TextInput type="password" autoComplete="current-password" value={password} disabled={busy} onChange={e => setPassword(e.target.value)} /></Field>
+        <Field label={t.code}><TextInput autoComplete="one-time-code" inputMode="numeric" value={code} disabled={busy} onChange={e => setCode(e.target.value)} /></Field>
         <Switch label={t.authenticator} checked={data.twoStepEnabled} disabled={busy || !password || (data.twoStepEnabled && (!code || (data.required && data.passkeys.length === 0)))} onChange={() => setPending({ action: data.twoStepEnabled ? 'disable' : 'begin', name: accountName })} />
       </div>}
       {setup && <><SecretReveal key={setup} label={t.secret} value={setup} notice={t.setupNote} onDone={() => setSetup(null)} strings={revealStrings} /><Button disabled={busy || !password || !code} onClick={() => setPending({ action: 'enable', name: accountName })}>{t.enable}</Button></>}

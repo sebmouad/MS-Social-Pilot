@@ -4,6 +4,7 @@ import { IconClock } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
 import { ConfirmDialog, useToast } from '@/components';
 import { useSettingsCopy } from '@/modules/settings/ui/copy-context';
+import styles from './cards.module.css';
 import type { BestTimeApplyStatus } from '@/modules/publishing/server/best-time-apply';
 
 const fill = (template: string, ...values: Array<string | number>) => values.reduce<string>((text, value, index) => text.replace(`{${index}}`, String(value)), template);
@@ -40,11 +41,11 @@ export function BestTimeApplyCard({ locale }: { locale: 'en' | 'fr' }) {
     } catch { return t.bestTimeApplyFailed; }
   };
   if (!status) return null;
-  return <div>
-    <p><IconClock aria-hidden="true" /> <strong>{t.bestTimeAuto}</strong></p>
+  return <div className={styles.bestTime}>
+    <p className={styles.bestTimeTitle}><IconClock size={16} aria-hidden="true" /> <strong>{t.bestTimeAuto}</strong></p>
     <p>{status.mode === 'apply' ? t.bestTimeAutoOn : t.bestTimeAutoOff}</p>
     <p>{status.lastRunAt ? fill(t.bestTimeLastRun, status.labels?.lastRunAt ?? '') : t.bestTimeNeverRun}{status.mode === 'apply' && status.nextEligibleAt ? ` · ${fill(t.bestTimeNextRun, status.labels?.nextEligibleAt ?? '')}` : ''}</p>
-    {status.mode === 'apply' ? <Button variant="secondary" onClick={() => setOpen(true)}>{t.bestTimeApplyNow}</Button> : null}
+    {status.mode === 'apply' ? <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>{t.bestTimeApplyNow}</Button> : null}
     {open && <ConfirmDialog open title={t.bestTimeAuto} objectName={t.bestTimeAuto} consequence={t.bestTimeApplyReview} confirmLabel={t.bestTimeApplyNow} cancelLabel={cancel} pendingLabel={t.saving} failureLabel={t.bestTimeApplyFailed} danger={false} onClose={() => setOpen(false)} onConfirm={applyNow} />}
   </div>;
 }

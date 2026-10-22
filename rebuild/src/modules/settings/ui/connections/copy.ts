@@ -1,6 +1,6 @@
 export const connectionsCopy = {
   en: {
-    title: 'Connections', description: 'Choose which discovered channels and advertising accounts this workspace uses.',
+    title: 'Channels', description: 'Choose which discovered channels and advertising accounts this workspace uses.',
     connectedPartial: 'Connected. Newly discovered channels and ad accounts are ready for selection. Items already linked to another profile were left unchanged.',
     connected: 'Connected. Discovered channels and ad accounts are ready for your selection.',
     oauthCancelled: 'Authorization was cancelled.', connectFailed: 'Connection unavailable. Try again or contact support.',
@@ -39,7 +39,7 @@ export const connectionsCopy = {
     categories: { channels: 'Channels', adAccounts: 'Ad accounts', posts: 'Posts and comments', inbox: 'Inbox messages', metrics: 'Performance metrics', media: 'Media records', other: 'Other linked records' },
   },
   fr: {
-    title: 'Connexions', description: 'Choisissez les canaux et comptes publicitaires découverts que cet espace utilise.',
+    title: 'Canaux', description: 'Choisissez les canaux et comptes publicitaires découverts que cet espace utilise.',
     connectedPartial: 'Connecté. Les canaux et comptes publicitaires nouvellement découverts sont prêts à être sélectionnés. Les éléments déjà liés à un autre profil n’ont pas été modifiés.',
     connected: 'Connecté. Les canaux et comptes publicitaires découverts sont prêts à être sélectionnés.',
     oauthCancelled: 'L’autorisation a été annulée.', connectFailed: 'Connexion indisponible. Réessayez ou contactez le support.',

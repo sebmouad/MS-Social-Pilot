@@ -25,10 +25,10 @@ export const PAGE_ICONS: Record<string, TablerIcon> = {
   '/insights/pins': IconPin, '/insights/reports': IconFileAnalytics,
   '/insights/ads': IconAd2, '/insights/compare/ads': IconScale, '/insights/ads/manage': IconAffiliate, '/insights/ads/campaigns': IconBolt,
   '/tasks': IconCheckbox, '/agency': IconBuildingStore, '/agency/clients': IconAddressBook,
-  '/settings/connections': IconPlugConnected, '/settings/team': IconUsers, '/settings/workspace': IconId,
-  '/settings/sharing': IconShare, '/settings/bio': IconLink, '/settings/mcp': IconApi, '/settings/webhooks': IconWebhook,
-  '/settings/account': IconUserCircle, '/settings/notifications': IconBell, '/settings/data': IconDatabase,
-  '/settings/appearance': IconPalette, '/settings/history': IconHistory, '/settings/profiles': IconVersions,
+  '/settings/channels': IconPlugConnected, '/settings/team': IconUsers, '/settings/workspace': IconId,
+  '/settings/sharing': IconShare, '/settings/sharing/bio': IconLink, '/settings/integrations': IconApi, '/settings/integrations/webhooks': IconWebhook,
+  '/settings/account': IconUserCircle, '/settings/account/notifications': IconBell, '/settings/data': IconDatabase,
+  '/settings/account/appearance': IconPalette, '/settings/history': IconHistory, '/settings/profiles': IconVersions,
 };
 
 export function ModuleGlyph({ id, size = 19 }: { id: string; size?: number }) {

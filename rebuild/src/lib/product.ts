@@ -15,6 +15,7 @@ export interface ProductPage {
   area: AreaId;
   description: string;
   navigation?: boolean;
+  tabRoutes?: readonly string[];
 }
 
 export interface ProductModule {

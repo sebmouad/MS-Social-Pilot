@@ -9,7 +9,7 @@ import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { RouteNotice } from '@/components/RouteNotice';
-import styles from '@/modules/analytics/ui/reports/workflows.module.css';
+import styles from './pins.module.css';
 
 export type PinView = { key: string; label: string; sourceLabel: string; state: 'available' | 'unavailable'; value: string; coverage: string; asOf: string; basis: string; change: string };
 export type Pinnable = { key: string; label: string; sourceLabel: string; pinned: boolean };
@@ -53,15 +53,15 @@ export function PinManager({ pins: initial, pinnable, max, copy = workspaceCopyD
   };
   return <div className={styles.root}>
     {notice && <RouteNotice error={notice.error} focusKey={`pins:${notice.key}`}>{notice.text}</RouteNotice>}
-    <section className={styles.panel} aria-labelledby="pin-add"><h2 id="pin-add">{t("Add a pinned metric")}</h2>
+    <section className={styles.add} aria-labelledby="pin-add"><h2 id="pin-add">{t("Add a pinned metric")}</h2>
       {pins.length >= max ? <p className={styles.note}>{t("You have pinned the most metrics allowed (")}{max}{t("). Remove one to add another.")}</p>
-        : options.length ? <form noValidate className={styles.form} onSubmit={event => { event.preventDefault(); pin(); }}><label>{t("Metric")}<select value={choice} onChange={e => setChoice(e.target.value)}><option value="">{t("Choose a metric")}</option>{options.map(o => <option key={o.key} value={o.key}>{o.label} · {o.sourceLabel}</option>)}</select></label>
-          <div className={styles.actions}><Button type="submit" variant="primary" disabled={busy || !choice}>{busy ? t('Saving…') : t('Pin metric')}</Button></div></form>
-          : <p className={styles.empty}>{t("No more single-value metrics are available for your channels yet.")}</p>}</section>
-    <section className={styles.panel} aria-labelledby="pin-list"><h2 id="pin-list">{t("Your pinned metrics (")}{pins.length}{" "}{t("of")}{" "}{max})</h2>
-      {pins.length ? <ul className={styles.list}>{pins.map((p, i) => <li key={p.key}><div><MetricCard module="analytics" icon={<IconPin />} label={p.label} value={p.value} unavailable={p.state === 'unavailable' ? t('Not available for your current channels.') : undefined} />
-        <small>{p.state === 'available' ? <>{p.value} · {p.basis} · {p.coverage}{" "}{t("· as of")}{" "}{p.asOf}{p.change ? ` · ${p.change}` : ''}</> : t('Not available for your current channels, so its value is unknown. You can remove it.')}</small></div>
-        <div className={styles.actions}><Button size="sm" disabled={busy || i === 0} aria-label={t('Move {0} up', p.label)} onClick={() => move(i, -1)}>{t("Up")}</Button><Button size="sm" disabled={busy || i === pins.length - 1} aria-label={t('Move {0} down', p.label)} onClick={() => move(i, 1)}>{t("Down")}</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => setRemoving(p)}>{t("Unpin")}</Button></div></li>)}</ul>
+        : options.length ? <form noValidate onSubmit={event => { event.preventDefault(); pin(); }}><label className="ui-visually-hidden" htmlFor="pin-choice">{t("Metric")}</label><select id="pin-choice" value={choice} onChange={e => setChoice(e.target.value)}><option value="">{t("Choose a metric")}</option>{options.map(o => <option key={o.key} value={o.key}>{o.label} · {o.sourceLabel}</option>)}</select>
+          <Button type="submit" variant="primary" size="sm" leading={<IconPin size={16} />} disabled={busy || !choice}>{busy ? t('Saving…') : t('Pin metric')}</Button></form>
+          : <p className={styles.note}>{t("No more single-value metrics are available for your channels yet.")}</p>}</section>
+    <section aria-labelledby="pin-list" className={styles.root}><div className={styles.head}><h2 id="pin-list">{t("Your pinned metrics (")}{pins.length}{" "}{t("of")}{" "}{max})</h2></div>
+      {pins.length ? <ul className={styles.grid}>{pins.map((p, i) => <li key={p.key} className={styles.tile}><MetricCard module="analytics" icon={<IconPin />} label={p.label} value={p.value} unavailable={p.state === 'unavailable' ? t('Not available for your current channels.') : undefined} />
+        <small>{p.state === 'available' ? <>{p.basis} · {p.coverage}{" "}{t("· as of")}{" "}{p.asOf}{p.change ? ` · ${p.change}` : ''}</> : t('Not available for your current channels, so its value is unknown. You can remove it.')}</small>
+        <div className={styles.tools}><Button size="sm" variant="quiet" disabled={busy || i === 0} aria-label={t('Move {0} up', p.label)} onClick={() => move(i, -1)}>{t("Up")}</Button><Button size="sm" variant="quiet" disabled={busy || i === pins.length - 1} aria-label={t('Move {0} down', p.label)} onClick={() => move(i, 1)}>{t("Down")}</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => setRemoving(p)}>{t("Unpin")}</Button></div></li>)}</ul>
         : <p className={styles.empty}>{t("Nothing pinned yet. Pinned metrics are personal and only visible to you.")}</p>}</section>
       <Dialog open={Boolean(removing)} title={t("Unpin metric")} description={removing ? t('{0} will no longer appear in your pinned metrics. This does not change any data, and you can pin it again.', removing.label) : undefined} busy={busy} onClose={() => !busy && setRemoving(null)}
       actions={<><Button data-dialog-cancel disabled={busy} onClick={() => setRemoving(null)}>{t("Cancel")}</Button><Button variant="danger" disabled={busy || !removing} onClick={() => removing && void unpin(removing.key)}>{busy ? t('Removing…') : t('Unpin')}</Button></>}><p>{removing?.sourceLabel}</p></Dialog>

@@ -3,7 +3,8 @@
 .head h1 { margin: 5px 0 6px; font-size: clamp(27px, 3vw, 36px); line-height: 1.15; letter-spacing: -.04em; }
 .head p { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.5; }
 
-.sync { display: grid; justify-items: end; gap: 8px; max-width: 26rem; }
+.sync { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 8px; max-width: 26rem; }
+.sync > [role=alert] { flex-basis: 100%; text-align: right; }
 .syncTime { margin: 0; color: var(--ink-soft); font-size: 12.5px; }
 .syncTime strong { color: var(--ink); font-weight: 650; }
 .syncResult { color: var(--ink-soft); font-size: 12.5px; line-height: 1.45; text-align: right; }
@@ -12,7 +13,7 @@
 
 .filters form { display: grid; gap: 12px; }
 .filters form > label { min-width: 0; }
-.filterHeading { margin: 0 0 6px; color: var(--ink-faint); font-size: 10px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.filterHeading { margin: 0 0 6px; color: var(--ink-faint); font-size: 12px; font-weight: 750; }
 .filters label { display: grid; gap: 6px; color: var(--ink-soft); font-size: 12px; font-weight: 650; }
 .filters select, .filters input:not([type="hidden"]), .searchInput { width: 100%; min-width: 0; min-height: 44px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 16px; }
 .filters a { justify-self: center; display: inline-flex; align-items: center; min-height: 36px; padding: 0 8px; color: var(--ink-soft); font-size: 12px; text-decoration: underline; }
@@ -55,7 +56,7 @@
 .contextNote { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-muted); line-height: 1.45; }
 .threadTags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .postContext { margin: 0; padding: 10px 12px; border-left: 3px solid var(--line-strong); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface-muted); color: var(--ink-soft); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
-.postContext strong { display: block; margin-bottom: 2px; color: var(--ink-faint); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; }
+.postContext strong { display: block; margin-bottom: 2px; color: var(--ink-faint); font-size: 12px; }
 .entries { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .entryNode { display: grid; gap: 10px; min-width: 0; }
 .replies { display: grid; gap: 10px; margin: 0; padding: 0 0 0 16px; border-inline-start: 2px solid var(--line); list-style: none; }
@@ -101,7 +102,8 @@
   .list { overflow-y: visible; }
   .threadPane { overflow: visible; }
   .threadScroll { max-height: 60dvh; }
-  .sync { justify-items: start; }
+  .sync { justify-content: flex-start; }
+  .sync > [role=alert] { text-align: left; }
   .syncResult { text-align: left; }
 }
 /* Redesign: helpdesk list with avatars, unread dots, module-coloured selection and chat-style bubbles. */

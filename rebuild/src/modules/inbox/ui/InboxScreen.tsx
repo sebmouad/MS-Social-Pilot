@@ -250,7 +250,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       </>} />
     {listError ? <div role="alert" className={styles.alert}><p>{listError.error}</p><a href={resetHref}>{copy.resetAndReturn}</a></div> : null}
     {threadOutcome.error ? <div role="alert" className={styles.alert}><p>{threadOutcome.error.error}</p><a href={clearThreadHref}>{copy.returnToList}</a></div> : null}
-    {noChannels ? <section className="panel"><EmptyState icon={<IconPlugConnected size={26} />} title={copy.noChannelsTitle} action={<a className="ui-button ui-button--primary" href="/settings/connections">{copy.goConnections}</a>}>{copy.noChannelsBody}</EmptyState></section> : listPage ? <div className={styles.split} data-open={thread ? 'true' : 'false'}>
+    {noChannels ? <section className="panel"><EmptyState icon={<IconPlugConnected size={26} />} title={copy.noChannelsTitle} action={<a className="ui-button ui-button--primary" href="/settings/channels">{copy.goConnections}</a>}>{copy.noChannelsBody}</EmptyState></section> : listPage ? <div className={styles.split} data-open={thread ? 'true' : 'false'}>
       <section className={styles.listPane} aria-label={copy.conversationsAndComments}>
         {quickRow}
         {!listPage.items.length ? <div className={styles.listHead}><h2>{filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open}</h2><span>{copy.items(0, listPage.total)}</span></div> : null}

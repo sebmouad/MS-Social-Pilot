@@ -123,16 +123,16 @@ describe('missing advertising-changes grant in the object manager', () => {
   it('tells the customer to reconnect, in English and French, with a link to connections', async () => {
     await open('en', true);
     expect(container.textContent).toContain('until the advertising connection is reconnected');
-    expect(container.querySelector('a[href="/settings/connections"]')?.textContent).toBe('Reconnect in Settings');
+    expect(container.querySelector('a[href="/settings/channels"]')?.textContent).toBe('Reconnect in Settings');
     await act(async () => root.unmount()); root = createRoot(container);
     await open('fr', true);
     expect(container.textContent).toContain('reconnectée');
-    expect(container.querySelector('a[href="/settings/connections"]')?.textContent).toBe('Reconnecter dans les paramètres');
+    expect(container.querySelector('a[href="/settings/channels"]')?.textContent).toBe('Reconnecter dans les paramètres');
   });
 
   it('keeps the plain view-only message when reconnecting would not help', async () => {
     await open('en', false);
     expect(container.textContent).toContain('Changes are not available for your access');
-    expect(container.querySelector('a[href="/settings/connections"]')).toBeNull();
+    expect(container.querySelector('a[href="/settings/channels"]')).toBeNull();
   });
 });

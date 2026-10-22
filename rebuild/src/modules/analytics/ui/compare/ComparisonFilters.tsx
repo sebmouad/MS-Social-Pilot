@@ -4,7 +4,7 @@ import { workspaceText, workspaceCopyDefaults, type WorkspaceCopy } from '../../
 
 import { useState } from 'react';
 import { Button } from '@/components/Button';
-import styles from '@/modules/analytics/ui/reports/workflows.module.css';
+import styles from './compare.module.css';
 
 type Channel = { id: string; name: string };
 type Initial = {
@@ -24,19 +24,27 @@ export function ComparisonFilters({ mode: initialMode, channels, initial, copy =
     set(checked ? [...current, id] : current.filter(value => value !== id));
   };
   const channelChoices = (name: string, selected: string[], set: (next: string[]) => void) => channels.length
-    ? channels.map(channel => <label className={styles.check} key={`${name}:${channel.id}`}><input type="checkbox" name={name} value={channel.id} checked={selected.includes(channel.id)} onChange={event => toggle(selected, set, channel.id, event.currentTarget.checked)} /><span>{channel.name}</span></label>)
-    : <p className={styles.note}>{t("No channels available.")}</p>;
-  return <form noValidate action="/insights/compare" method="get" className={styles.filters}>
-    <label>{t("Compare")}<select name="mode" value={mode} onChange={event => setMode(event.currentTarget.value as typeof mode)}><option value="period">{t("The same channels across two periods")}</option><option value="channels">{t("Two groups of channels in one period")}</option></select></label>
+    ? <div className={styles.chips}>{channels.map(channel => { const on = selected.includes(channel.id); return <label className={styles.chip} data-on={on} key={`${name}:${channel.id}`}><input type="checkbox" name={name} value={channel.id} checked={on} onChange={event => toggle(selected, set, channel.id, event.currentTarget.checked)} /><span>{channel.name}</span></label>; })}</div>
+    : <p className={styles.hint}>{t("No channels available.")}</p>;
+  const range = (from: keyof typeof dates, fromName: string, to: keyof typeof dates, toName: string) => <div className={styles.dates}>
+    <label>{t("From")}<input type="date" name={fromName} value={dates[from]} onChange={event => updateDate(from, event.currentTarget.value)} /></label>
+    <label>{t("To")}<input type="date" name={toName} value={dates[to]} onChange={event => updateDate(to, event.currentTarget.value)} /></label>
+  </div>;
+  return <form noValidate action="/insights/compare" method="get" className={styles.card}>
+    <div className={styles.top}>
+      <label>{t("Compare")}<select name="mode" value={mode} onChange={event => setMode(event.currentTarget.value as typeof mode)}><option value="period">{t("The same channels across two periods")}</option><option value="channels">{t("Two groups of channels in one period")}</option></select></label>
+      {mode === 'channels' && <fieldset className={styles.inline}><legend className="ui-visually-hidden">{t("One period (UTC)")}</legend>{range('start', 'start', 'end', 'end')}</fieldset>}
+      <Button type="submit" variant="primary" size="sm" className={styles.submit}>{t("Compare")}</Button>
+    </div>
     {mode === 'period' ? <>
-      <fieldset><legend>{t("Period A (UTC)")}</legend><label>{t("From")}<input type="date" name="aStart" value={dates.aStart} onChange={event => updateDate('aStart', event.currentTarget.value)} /></label><label>{t("To")}<input type="date" name="aEnd" value={dates.aEnd} onChange={event => updateDate('aEnd', event.currentTarget.value)} /></label></fieldset>
-      <fieldset><legend>{t("Period B (UTC)")}</legend><label>{t("From")}<input type="date" name="bStart" value={dates.bStart} onChange={event => updateDate('bStart', event.currentTarget.value)} /></label><label>{t("To")}<input type="date" name="bEnd" value={dates.bEnd} onChange={event => updateDate('bEnd', event.currentTarget.value)} /></label></fieldset>
-      <fieldset><legend>{t("Channels (none selected means all)")}</legend>{channelChoices('channel', periodChannels, setPeriodChannels)}</fieldset>
-    </> : <>
-      <fieldset><legend>{t("One period (UTC)")}</legend><label>{t("From")}<input type="date" name="start" value={dates.start} onChange={event => updateDate('start', event.currentTarget.value)} /></label><label>{t("To")}<input type="date" name="end" value={dates.end} onChange={event => updateDate('end', event.currentTarget.value)} /></label></fieldset>
-      <fieldset><legend>{t("Group A")}</legend>{channelChoices('groupA', groupA, setGroupA)}</fieldset>
-      <fieldset><legend>{t("Group B")}</legend>{channelChoices('groupB', groupB, setGroupB)}</fieldset>
-    </>}
-    <Button type="submit" variant="primary">{t("Compare")}</Button>
+      <div className={styles.sides}>
+        <fieldset className={styles.side}><legend>{t("Period A (UTC)")}</legend>{range('aStart', 'aStart', 'aEnd', 'aEnd')}</fieldset>
+        <fieldset className={styles.side}><legend>{t("Period B (UTC)")}</legend>{range('bStart', 'bStart', 'bEnd', 'bEnd')}</fieldset>
+      </div>
+      <fieldset className={styles.side}><legend>{t("Channels (none selected means all)")}</legend>{channelChoices('channel', periodChannels, setPeriodChannels)}</fieldset>
+    </> : <div className={styles.sides}>
+      <fieldset className={styles.side}><legend>{t("Group A")}</legend>{channelChoices('groupA', groupA, setGroupA)}</fieldset>
+      <fieldset className={styles.side}><legend>{t("Group B")}</legend>{channelChoices('groupB', groupB, setGroupB)}</fieldset>
+    </div>}
   </form>;
 }

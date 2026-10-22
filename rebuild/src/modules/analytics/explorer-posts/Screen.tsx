@@ -3,6 +3,9 @@ import { headers } from 'next/headers';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { Button } from '@/components/Button';
+import { InfoTip } from '@/components';
+import { PageHeader } from '@/components/PageHeader';
+import { IconDownload } from '@tabler/icons-react';
 import { PostsTable } from '@/modules/analytics/ui/posts/PostsTable';
 import { postsTableMeasures, postsTableRows } from '@/modules/analytics/ui/posts/rows';
 import { pageChannelScope } from '@/modules/shell/server/scope';
@@ -31,18 +34,19 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
     Object.entries(patch).forEach(([k, v]) => q.set(k, v)); return q.toString();
   };
   const measureLabel = (m: { label: string; labelFr?: string }) => fr ? m.labelFr ?? m.label : m.label;
-  const sidebar = <form action="/insights/posts" className={styles.filters}>
-    <h2>{t("Post explorer")}</h2>
-    <label>{t("Start (UTC)")}<input type="date" name="start" defaultValue={d.period.start} required /></label>
-    <label>{t("End (UTC)")}<input type="date" name="end" defaultValue={d.period.end} required /></label>
+  // One toolbar on the title row (period, sort, Apply); export beside it and paging under the table.
+  const toolbar = <form action="/insights/posts" className={styles.toolbar} aria-label={t("Post explorer")}>
+    <label className={styles.inlineField}><span>{t("Start (UTC)")}</span><input type="date" name="start" defaultValue={d.period.start} required /></label>
+    <label className={styles.inlineField}><span>{t("End (UTC)")}</span><input type="date" name="end" defaultValue={d.period.end} required /></label>
     {scope.ids.length ? <input type="hidden" name="channel" value={scope.ids.join(',')} /> : null}
-    <label>{t("Sort by")}<select name="sort" defaultValue={d.input.sort}><option value="publishedAt">{t("Publication date")}</option>{d.populatedMeasures.concat(d.measures.filter(m => m.key === d.input.sort && !d.populatedMeasures.some(p => p.key === m.key))).map(m => <option key={m.key} value={m.key}>{measureLabel(m)}</option>)}</select></label>
-    <label>{t("Order")}<select name="direction" defaultValue={d.input.direction}><option value="desc">{t("Descending")}</option><option value="asc">{t("Ascending")}</option></select></label>
-    <Button type="submit" variant="primary">{t("Apply")}</Button>
-    <a href={`/api/analytics/posts?${query({ format: 'csv' }, true)}`}>{t("Export selection (CSV)")}</a>
-    <nav aria-label={t("Pages")} className={styles.actions}>{d.input.page > 1 && <a href={`?${query({ page: String(d.input.page - 1) })}`}>{t("Previous")}</a>}<span>{t("Page")} {d.input.page}</span>{d.nextPage && <a href={`?${query({ page: String(d.nextPage) })}`}>{t("Next")}</a>}</nav>
+    <label className={styles.inlineField}><span>{t("Sort by")}</span><select name="sort" defaultValue={d.input.sort}><option value="publishedAt">{t("Publication date")}</option>{d.populatedMeasures.concat(d.measures.filter(m => m.key === d.input.sort && !d.populatedMeasures.some(p => p.key === m.key))).map(m => <option key={m.key} value={m.key}>{measureLabel(m)}</option>)}</select></label>
+    <label className={styles.inlineField}><span className="ui-visually-hidden">{t("Order")}</span><select name="direction" defaultValue={d.input.direction}><option value="desc">{t("Descending")}</option><option value="asc">{t("Ascending")}</option></select></label>
+    <Button type="submit" variant="secondary" size="sm">{t("Apply")}</Button>
+    <a className="ui-button ui-button--quiet ui-button--sm" href={`/api/analytics/posts?${query({ format: 'csv' }, true)}`}><IconDownload size={16} aria-hidden="true" />{t("Export selection (CSV)")}</a>
   </form>;
-  return <PageFrame module="analytics" scopedAccess><div className={`${styles.root} ${local.content}`}>{sidebar}<header className={styles.heading}><h1>{t("Post explorer")}</h1><p>{t("Published posts with stored measures. Measures are snapshots, not period totals. Missing data is not available.")}</p></header>
+  return <PageFrame module="analytics" scopedAccess><div className={`${styles.root} ${local.content}`}>
+    <PageHeader module="analytics" title={t("Post explorer")} info={<InfoTip name={t("Post explorer")} blocks={[{ text: t("Published posts with stored measures. Measures are snapshots, not period totals. Missing data is not available.") }]} />} filters={toolbar} />
     <PostsTable copy={copy} rows={postsTableRows(d.items, await workspaceInstantFormatter(viewer.workspaceId, fr ? 'fr' : 'en'))} measures={postsTableMeasures(d.measures, fr ? 'fr' : 'en')} locale={fr ? 'fr' : 'en'} />
+    {d.input.page > 1 || d.nextPage ? <nav aria-label={t("Pages")} className={styles.pager}>{d.input.page > 1 && <a href={`?${query({ page: String(d.input.page - 1) })}`}>{t("Previous")}</a>}<span>{t("Page")} {d.input.page}</span>{d.nextPage && <a href={`?${query({ page: String(d.nextPage) })}`}>{t("Next")}</a>}</nav> : null}
   </div></PageFrame>;
 }

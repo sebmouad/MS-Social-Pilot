@@ -21,3 +21,8 @@
 .automation > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-xs); }
 .muted { margin: 0; color: var(--ink-soft); font-size: var(--text-md); }
 @media (max-width: 1023px) { .layout { grid-template-columns: minmax(0, 1fr); } .side { position: static; } }
+/* The queue-times editor sits flat inside the side panel: dividers instead of cards within a card. */
+.sidePanel section { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.sidePanel section + section, .sidePanel section + div + section { padding-top: var(--space-3); border-top: 1px solid var(--line-subtle); }
+.sidePanel section h2 { font-size: var(--text-sm); }
+.sidePanel section p { font-size: var(--text-xs); line-height: 1.5; }
