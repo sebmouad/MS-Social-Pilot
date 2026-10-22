@@ -9,7 +9,7 @@ vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomer
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/modules/inbox/ui/scope', () => ({ inboxScope: async (viewer: { permissions: { pageScope: { all: boolean; ids: string[] } } }) => ({ ids: [], constraints: viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids }, param: undefined }) }));
 vi.mock('../src/modules/inbox/server/read', () => ({ readInboxList: state.list, readInboxThread: state.thread }));
-vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children, scopedAccess }: { sidebar: import('react').ReactNode; children: import('react').ReactNode; scopedAccess?: boolean }) => createElement('main', { 'data-scoped-access': scopedAccess }, createElement('aside', null, sidebar), children) }));
+vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children, scopedAccess }: { children: import('react').ReactNode; scopedAccess?: boolean }) => createElement('main', { 'data-scoped-access': scopedAccess }, children) }));
 vi.mock('@/modules/inbox/server/actions', () => ({ canManageInbox: state.manage, canManageInboxWorkflow: state.workflow }));
 vi.mock('@/modules/inbox/server/providers', () => ({ inboxCapabilities: async () => ({ reply: false, hide: false, remove: false }) }));
 vi.mock('@/modules/inbox/server/policy', () => ({ inboxReplyPolicy: async () => ({ allowed: false, headline: 'Read only' }) }));
@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 const render = async (params = { thread: 'message:conversation', cursor: 'list-position', historyCursor: 'history-position' }) => renderToStaticMarkup(await InboxPage({ searchParams: Promise.resolve(params) }));
 describe('Inbox paging and recoverable route context', () => {
-  it('keeps both page positions while navigating and places controls in the existing sidebar', async () => {
+  it('keeps both page positions while navigating', async () => {
     const html = await render();
     expect(state.viewer).toHaveBeenCalledWith({ feature: 'inbox/conversations', channelScoped: true });
     expect(html).toContain('data-scoped-access="true"');

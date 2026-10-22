@@ -1,12 +1,11 @@
 "use client";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { IconChevronsLeft, IconChevronsRight, IconAdjustmentsHorizontal, IconCheck, IconChevronDown, IconHelp, IconLogout, IconMenu2, IconPlus, IconSettings, IconShieldLock, IconUserCircle, IconX } from "@tabler/icons-react";
+import { IconChevronsLeft, IconChevronsRight, IconCheck, IconChevronDown, IconHelp, IconLogout, IconMenu2, IconPlus, IconSettings, IconShieldLock, IconUserCircle, IconX } from "@tabler/icons-react";
 import { MODULES, areaForPath, areaPages, pageForPath, type AreaId, type ModuleId } from "@/lib/product";
 import { nextChannelScope, parseChannelScope, withChannelScope } from "@/lib/channel-scope";
 import { fill, type ShellCopy, type ShellPolicy } from "@/modules/shell/copy";
 import type { ConnectionState } from "@/lib/connection-status";
-import { SidebarDockContext } from "./SidebarDock";
 import { ModuleGlyph } from "./icons";
 import { CommandPalette } from "./CommandPalette";
 import { ToastProvider } from "./Toast";
@@ -42,10 +41,9 @@ type AppShellProps = {
   workspaceName: string;
   workspaceId?: string;
   workspaces?: readonly { id: string; name: string }[];
-  /** Transitional "Page tools": filters and options of pages that have not moved to the new header yet. */
-  sidebar?: ReactNode;
-  sidebarWhen?: readonly string[];
-  /** Root: the private installation shell. Its section navigation (`sidebar`) is shown inside the sidebar. */
+  /** Root: the private installation section navigation, shown inside the sidebar. Customer pages keep their filters in-page. */
+  rootNav?: ReactNode;
+  /** Root: the private installation shell. */
   installationMode?: boolean;
   paletteCopy?: PaletteCopy;
   copy: ShellCopy;
@@ -65,18 +63,13 @@ function writeCookie(name: string, value: string, days: number) {
   try { document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${Math.round(days * 86400)}; samesite=lax`; } catch { /* a blocked cookie only loses the remembered choice */ }
 }
 
-export function AppShell({ children, activeModule, enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], sidebar, sidebarWhen, installationMode = false, paletteCopy, copy, policy, channels = [], initialScope = [], initialScopeDropped = 0, optionalAreas = [], tabCounts = {}, initialCollapsed = false }: AppShellProps) {
+export function AppShell({ children, activeModule, enabledModules, enabledFeatures, writableFeatures = [], rootAccess, userName, workspaceName, workspaceId, workspaces = [], rootNav, installationMode = false, paletteCopy, copy, policy, channels = [], initialScope = [], initialScopeDropped = 0, optionalAreas = [], tabCounts = {}, initialCollapsed = false }: AppShellProps) {
   const pathname = usePathname();
   const search = useSearchParams();
   const theme = useOptionalTheme();
-  const toolsTitleId = useId();
-  const visibleTools = Boolean(sidebar) && (!sidebarWhen || sidebarWhen.includes(pathname));
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [scopeOpen, setScopeOpen] = useState(false);
-  const [toolsOpen, setToolsOpen] = useState(false);
-  const [toolsHost, setToolsHost] = useState<HTMLElement | null>(null);
-  const [dockUsed, setDockUsed] = useState(false);
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [compactViewport, setCompactViewport] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -86,8 +79,6 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const [navigating, setNavigating] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
-  const toolsRef = useRef<HTMLDialogElement>(null);
-  const toolsToggleRef = useRef<HTMLButtonElement>(null);
 
   const activeArea = installationMode ? undefined : areaForPath(pathname, activeModule);
   const activePage = pageForPath(pathname);
@@ -185,28 +176,6 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     return () => { window.removeEventListener("keydown", onKeyDown); desktop?.removeEventListener("change", onResize); document.body.style.overflow = oldOverflow; };
   }, [menuOpen, closeMenu]);
 
-  // ---- Page tools: a modal sheet that stays mounted so docked controls keep their form state ----
-  useEffect(() => {
-    const dialog = toolsRef.current;
-    if (!dialog) return;
-    if (toolsOpen && !dialog.open) dialog.showModal?.();
-    if (!toolsOpen && dialog.open) dialog.close?.();
-  }, [toolsOpen]);
-  useEffect(() => setToolsOpen(false), [pathname]);
-  useEffect(() => {
-    if (!toolsHost) return;
-    const update = () => setDockUsed(toolsHost.childElementCount > 0);
-    update();
-    const observer = new MutationObserver(update);
-    observer.observe(toolsHost, { childList: true });
-    return () => observer.disconnect();
-  }, [toolsHost]);
-  const closeTools = useCallback(() => {
-    setToolsOpen(false);
-    requestAnimationFrame(() => toolsToggleRef.current?.focus());
-  }, []);
-  const toolsAvailable = visibleTools || dockUsed;
-
   async function switchWorkspace(nextId: string) {
     if (switching || nextId === workspaceId) return;
     setSwitching(true); setWorkspaceError("");
@@ -258,14 +227,8 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} compact={rail} busy={navigating} />
   </section>;
 
-  return <ShellCopyProvider copy={copy}><SidebarDockContext.Provider value={toolsHost}><ToastProvider>
-    <div className="shell" data-area={activeArea} data-module={installationMode ? "root" : activeModule} data-rail={rail ? "true" : undefined} data-menu={menuOpen ? "open" : undefined} onSubmitCapture={event => {
-      // A Page tools button may submit an editor form outside the sheet. Reveal its progress and validation feedback instead of leaving it inert.
-      if (toolsOpen && event.target instanceof HTMLFormElement) {
-        setToolsOpen(false);
-        if (event.target.closest(".shell-main")) requestAnimationFrame(() => document.getElementById("main-content")?.focus());
-      }
-    }}>
+  return <ShellCopyProvider copy={copy}><ToastProvider>
+    <div className="shell" data-area={activeArea} data-module={installationMode ? "root" : activeModule} data-rail={rail ? "true" : undefined} data-menu={menuOpen ? "open" : undefined}>
       <a className="shell-skip-link" href="#main-content">{copy.skipLink}</a>
       <aside ref={sidebarRef} id="shell-sidebar" className="shell-sidebar" role={menuOpen ? "dialog" : undefined} aria-modal={menuOpen ? true : undefined} aria-label={copy.mainNavigation} tabIndex={menuOpen ? -1 : undefined}>
         <div className="shell-sidebar__head">
@@ -287,7 +250,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
               ? <><a href="/home" data-area="home" className="shell-area"><span className="shell-area__glyph"><ModuleGlyph id="home" size={18}/></span><span className="shell-area__label">{copy.backToApp}</span></a><a href="/root" data-area="root" className="shell-area is-active" aria-current="page"><span className="shell-area__glyph"><ModuleGlyph id="root" size={18}/></span><span className="shell-area__label">{copy.root}</span></a></>
               : areas.map(areaLink)}
           </nav>
-          {installationMode ? <div className="shell-root-nav">{sidebar}</div> : sidebarScope}
+          {installationMode ? <div className="shell-root-nav">{rootNav}</div> : sidebarScope}
         </div>
         <footer className="shell-sidebar__foot">
           {!installationMode && settingsPages.length > 0 && <a href={areaHref("settings")} data-area="settings" className={`shell-area${activeArea === "settings" ? " is-active" : ""}`} aria-current={activeArea === "settings" ? "page" : undefined} title={rail ? copy.areas.settings : undefined}><span className="shell-area__glyph"><IconSettings size={18} stroke={1.75} aria-hidden="true"/></span><span className="shell-area__label">{copy.areas.settings}</span></a>}
@@ -308,7 +271,6 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
           </div>
           <div className="shell-topbar__tools">
             {!installationMode && paletteCopy && <CommandPalette copy={paletteCopy}/>}
-            {!installationMode && toolsAvailable && <button ref={toolsToggleRef} type="button" className="shell-tools-toggle" aria-haspopup="dialog" aria-expanded={toolsOpen} onClick={() => setToolsOpen(true)}><IconAdjustmentsHorizontal size={17} stroke={1.9} aria-hidden="true"/><span>{copy.pageTools}</span></button>}
           </div>
         </header>
         <main id="main-content" className="shell-content" tabIndex={-1}>
@@ -329,16 +291,6 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       {scopeOpen && showScope && <Drawer open title={copy.scopeSheetTitle} variant="sheet" closeLabel={copy.close} onClose={() => setScopeOpen(false)}>
         <ChannelScopeList channels={channels as ScopeChannel[]} selectedIds={scope} onSelect={onSelectChannel} onReset={() => applyScope([])} collapsedCount={policy.channelsCollapsedCount} searchThreshold={policy.channelSearchThreshold} manageHref={enabledFeatures.includes("settings/connections") ? "/settings/channels" : undefined} busy={navigating}/>
       </Drawer>}
-      <dialog ref={toolsRef} className="ui-drawer ui-drawer--end ui-drawer--sheet shell-tools" aria-labelledby={toolsTitleId}
-        onCancel={event => { event.preventDefault(); closeTools(); }}
-        onClose={() => setToolsOpen(false)}
-        onMouseDown={event => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeTools(); } }}>
-        <div className="ui-drawer__header"><div><h2 id={toolsTitleId}>{copy.pageToolsTitle}</h2><p>{copy.pageToolsHint}</p></div><button type="button" className="shell-tools__close" data-dialog-cancel aria-label={copy.close} onClick={closeTools}><IconX size={18} stroke={1.75} aria-hidden="true"/></button></div>
-        <div className="ui-drawer__body shell-tools__body">
-          {!installationMode && visibleTools && <div className="shell-sidebar-filter">{sidebar}</div>}
-          <div ref={setToolsHost} className="shell-sidebar-tools"/>
-        </div>
-      </dialog>
     </div>
-  </ToastProvider></SidebarDockContext.Provider></ShellCopyProvider>;
+  </ToastProvider></ShellCopyProvider>;
 }

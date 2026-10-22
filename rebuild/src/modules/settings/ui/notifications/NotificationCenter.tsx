@@ -9,7 +9,6 @@ import { useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { ModalDialog } from '@/components/ModalDialog';
 import { RouteNotice } from '@/components/RouteNotice';
-import { SidebarDock } from '@/components/SidebarDock';
 import type { NotificationPage, NotificationPreferenceView, NotificationRow } from '@/modules/settings/notifications/server';
 import { fill } from '@/modules/settings/ui/shell-copy';
 
@@ -129,36 +128,34 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
 
   return <>
     {preferencesDialog}
-    <SidebarDock>
-      <aside className={styles.sidebar} aria-label={t.controls}>
-        <form noValidate className={styles.preferences} onSubmit={event => { event.preventDefault(); if (!ADDITIONAL_NOTIFICATION_PREFERENCES.some(key => prefsDraft[key] !== preferences?.preferences[key])) { setReviewPrefs(true); return; } void confirmPreferences(t.savePrompt).then(ok => { if (ok) void savePreferences(); }); }}>
-          <h2>{t.emailAlerts}</h2>
-          <p>{t.emailAlertsHint}</p>
-          <Switch label={t.onMention} checked={prefsDraft.onNoteMention} onChange={checked => { const next = { ...prefsDraft, onNoteMention: checked }; setPrefsDraft(next); setPrefsChanged(true); void savePreferences(next); }} disabled={!preferences || busy} />
-          <Switch label={t.onQueueEmpty} checked={prefsDraft.onQueueEmpty} onChange={checked => { const next = { ...prefsDraft, onQueueEmpty: checked }; setPrefsDraft(next); setPrefsChanged(true); void savePreferences(next); }} disabled={!preferences || busy} />
-          {preferences && preferences.channels.length > 0 && <fieldset className={styles.mutes}>
-            <legend>{t.muteLegend}</legend>
-            {preferences.channels.map(channel => <label key={channel.id} className={styles.check}><input type="checkbox" checked={muteDraft.includes(channel.id)} onChange={event => { const checked = event.currentTarget.checked; setMuteDraft(current => checked ? [...current, channel.id] : current.filter(id => id !== channel.id)); setPrefsChanged(true); }} disabled={busy} /><span>{channel.name}</span></label>)}
-            <small>{preferences.maxMutes === 1 ? t.muteLimitOne : fill(t.muteLimitMany, { max: preferences.maxMutes })}</small>
-          </fieldset>}
-          {preferences && preferences.channels.length === 0 && <p className={styles.hint}>{t.noMuteChannels}</p>}
-          <p>{labels.pending}</p>
-          {ADDITIONAL_NOTIFICATION_PREFERENCES.map(key => <Switch key={key} label={labels[key]} checked={prefsDraft[key] ?? (key !== 'onNewInbox')} onChange={checked => { const next = { ...prefsDraft, [key]: checked }; setPrefsDraft(next); setPrefsChanged(true); void savePreferences(next); }} disabled={!preferences || busy} />)}
-          <Button type="submit" variant="primary" disabled={!preferences || !prefsChanged || busy || tooManyMutes}>{t.review}</Button>
-          {tooManyMutes && <p className={styles.error}>{fill(t.tooManyMutes, { max: preferences?.maxMutes ?? 0 })}</p>}
-        </form>
-        <div className={styles.sidebarSection}>
-          <h2>{t.inboxView}</h2>
-          <label className={styles.check}><input type="checkbox" checked={unreadOnly} onChange={event => { const value = event.currentTarget.checked; void loadList(1, value); }} disabled={busy} /><span>{t.unreadOnly}</span></label>
-          <div className={styles.paging}>
-            <Button size="sm" disabled={busy || page <= 1} onClick={() => void loadList(page - 1)}>{t.previous}</Button>
-            <span>{fill(t.page, { page })}</span>
-            <Button size="sm" disabled={busy || !hasMore} onClick={() => void loadList(page + 1)}>{t.next}</Button>
-          </div>
-          <Button size="sm" onClick={() => void loadList(page)}>{t.refresh}</Button>
+    <aside className={styles.sidebar} aria-label={t.controls}>
+      <form noValidate className={styles.preferences} onSubmit={event => { event.preventDefault(); if (!ADDITIONAL_NOTIFICATION_PREFERENCES.some(key => prefsDraft[key] !== preferences?.preferences[key])) { setReviewPrefs(true); return; } void confirmPreferences(t.savePrompt).then(ok => { if (ok) void savePreferences(); }); }}>
+        <h2>{t.emailAlerts}</h2>
+        <p>{t.emailAlertsHint}</p>
+        <Switch label={t.onMention} checked={prefsDraft.onNoteMention} onChange={checked => { const next = { ...prefsDraft, onNoteMention: checked }; setPrefsDraft(next); setPrefsChanged(true); void savePreferences(next); }} disabled={!preferences || busy} />
+        <Switch label={t.onQueueEmpty} checked={prefsDraft.onQueueEmpty} onChange={checked => { const next = { ...prefsDraft, onQueueEmpty: checked }; setPrefsDraft(next); setPrefsChanged(true); void savePreferences(next); }} disabled={!preferences || busy} />
+        {preferences && preferences.channels.length > 0 && <fieldset className={styles.mutes}>
+          <legend>{t.muteLegend}</legend>
+          {preferences.channels.map(channel => <label key={channel.id} className={styles.check}><input type="checkbox" checked={muteDraft.includes(channel.id)} onChange={event => { const checked = event.currentTarget.checked; setMuteDraft(current => checked ? [...current, channel.id] : current.filter(id => id !== channel.id)); setPrefsChanged(true); }} disabled={busy} /><span>{channel.name}</span></label>)}
+          <small>{preferences.maxMutes === 1 ? t.muteLimitOne : fill(t.muteLimitMany, { max: preferences.maxMutes })}</small>
+        </fieldset>}
+        {preferences && preferences.channels.length === 0 && <p className={styles.hint}>{t.noMuteChannels}</p>}
+        <p>{labels.pending}</p>
+        {ADDITIONAL_NOTIFICATION_PREFERENCES.map(key => <Switch key={key} label={labels[key]} checked={prefsDraft[key] ?? (key !== 'onNewInbox')} onChange={checked => { const next = { ...prefsDraft, [key]: checked }; setPrefsDraft(next); setPrefsChanged(true); void savePreferences(next); }} disabled={!preferences || busy} />)}
+        <Button type="submit" variant="primary" disabled={!preferences || !prefsChanged || busy || tooManyMutes}>{t.review}</Button>
+        {tooManyMutes && <p className={styles.error}>{fill(t.tooManyMutes, { max: preferences?.maxMutes ?? 0 })}</p>}
+      </form>
+      <div className={styles.sidebarSection}>
+        <h2>{t.inboxView}</h2>
+        <label className={styles.check}><input type="checkbox" checked={unreadOnly} onChange={event => { const value = event.currentTarget.checked; void loadList(1, value); }} disabled={busy} /><span>{t.unreadOnly}</span></label>
+        <div className={styles.paging}>
+          <Button size="sm" disabled={busy || page <= 1} onClick={() => void loadList(page - 1)}>{t.previous}</Button>
+          <span>{fill(t.page, { page })}</span>
+          <Button size="sm" disabled={busy || !hasMore} onClick={() => void loadList(page + 1)}>{t.next}</Button>
         </div>
-      </aside>
-    </SidebarDock>
+        <Button size="sm" onClick={() => void loadList(page)}>{t.refresh}</Button>
+      </div>
+    </aside>
 
     <section className={styles.inbox} aria-label={t.alerts}>
       <header className={styles.inboxHeading}><div><h2>{t.alerts}</h2><p>{t.alertsHint}</p></div><span>{fill(t.unreadCount, { count: rows.filter(row => !row.readAt).length })}</span></header>

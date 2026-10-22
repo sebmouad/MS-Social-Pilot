@@ -3,8 +3,6 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/components/SidebarDock', () => ({ SidebarDock: ({ children }: { children: React.ReactNode }) => children }));
-
 import { RootConfigForm } from '../src/app/root/config/root-config-form';
 import { AVAILABILITY_CATALOG, safeConfigShape } from '../src/lib/config/registry';
 

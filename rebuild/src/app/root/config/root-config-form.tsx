@@ -14,7 +14,6 @@ import { EmptyState } from '@/components';
 import { useToast } from '@/components/Toast';
 import { ROOT_INTERFACE_COPY, type RootInterfaceCopy } from '@/lib/config/root-interface-copy';
 import { ConfigHistory } from './ConfigHistory';
-import { SidebarDock } from '@/components/SidebarDock';
 import type { AVAILABILITY_CATALOG, safeConfigShape } from '@/lib/config/registry';
 
 type Definition = ReturnType<typeof safeConfigShape>[number];
@@ -110,13 +109,13 @@ export function RootConfigForm({ definitions, initialValues, availability, group
   }
 
   return <div className="root-config__layout">
-    <SidebarDock><aside className="root-config__sidebar" aria-label={copy.sectionsLabel}><FilterPanel title={copy.sectionsLabel} activeCount={search.trim() ? 1 : 0} onReset={() => setSearch('')} resetLabel={interfaceCopy.reset}>
+    <aside className="root-config__sidebar" aria-label={copy.sectionsLabel}><FilterPanel title={copy.sectionsLabel} activeCount={search.trim() ? 1 : 0} onReset={() => setSearch('')} resetLabel={interfaceCopy.reset}>
       <label htmlFor="root-config-search">{copy.find}</label>
       <TextInput leading={<IconSearch size={18} />} id="root-config-search" name="settings-search" autoComplete="off" aria-controls="root-config-results" type="search" maxLength={searchMaxCharacters} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={copy.searchPlaceholder} />
       <nav aria-label={copy.categoriesLabel}>
         {sections.map((name) => <button key={name} type="button" className={!search && section === name ? 'is-active' : ''} aria-current={!search && section === name ? 'page' : undefined} onClick={() => { setSection(name); setSearch(''); }}>{name}</button>)}
       </nav>
-    </FilterPanel></aside></SidebarDock>
+    </FilterPanel></aside>
     <div className="root-config__content" ref={errorsRef}>
     <FilterChips filters={search.trim() ? [{ key: 'search', label: interfaceCopy.search, value: search }] : []} onRemove={() => setSearch('')} label={interfaceCopy.filters} removeLabel={interfaceCopy.removeFilter} />
     <ConfigHistory copy={interfaceCopy} />

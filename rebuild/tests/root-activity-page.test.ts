@@ -14,16 +14,15 @@ vi.mock('../src/server/root/audit-config', () => ({
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'root.auditControlsCopy' ? ROOT_AUDIT_CONTROLS_COPY : key === 'root.auditDownloadPolicy' ? ROOT_AUDIT_DOWNLOAD : key === 'root.activityPageSize' ? 50 : key === 'root.interfaceCopy' ? ROOT_INTERFACE_COPY : 200 }));
 vi.mock('../src/modules/root/ui/RootFrame', () => ({ RootFrame: 'main' }));
-vi.mock('../src/components/SidebarDock', () => ({ SidebarDock: 'aside' }));
 import Page from '../src/app/root/activity/page';
 import { OperationError } from '../src/lib/operation-error';
 const page = { items: [], filters: { q: '', workspaceId: '', from: '', to: '' }, limit: 50, configuredLimit: 50, searchCharacters: 200, olderCursor: null, newerCursor: null };
 beforeEach(() => { vi.clearAllMocks(); state.list.mockResolvedValue(page); });
 describe('Root activity work surface', () => {
-  it('keeps filters and pagination in the sidebar and renders explicit UTC records', async () => {
+  it('keeps filters and pagination in-page and renders explicit UTC records', async () => {
     state.list.mockResolvedValue({ ...page, olderCursor: 'older-value', newerCursor: 'newer-value', items: [{ id: 'event-a', action: 'config.changed', createdAt: new Date('2026-10-16T12:00:00Z'), actor: { name: 'Owner', email: 'owner@example.test' }, metadata: ['3 posts'] }] });
     const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ q: 'config', limit: '2' }) }));
-    expect(html).toMatch(/<aside>[\s\S]*name="q"[\s\S]*name="workspaceId"[\s\S]*name="from"[\s\S]*name="to"[\s\S]*Newer activity[\s\S]*Older activity[\s\S]*<\/aside>/);
+    expect(html).toMatch(/<section[^>]*root-audit-filters[^>]*>[\s\S]*name="q"[\s\S]*name="workspaceId"[\s\S]*name="from"[\s\S]*name="to"[\s\S]*Newer activity[\s\S]*Older activity[\s\S]*<\/section>/);
     expect(html).toContain('2026-10-16 12:00:00 UTC');
     expect(html).toContain('Showing 1 recorded event.');
     expect(html).toContain('Export CSV');

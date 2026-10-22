@@ -16,7 +16,7 @@ vi.mock('@/modules/ads/server/object-store', () => ({ listStoredAdObjects: async
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/entitlements', () => ({ entitledPlatformIds: () => ['test-platform'], canUseFeature: state.feature }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.access }));
-vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children, sidebar }: { children: ReactNode; sidebar?: ReactNode }) => createElement('div', null, createElement('aside', null, sidebar), children) }));
+vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children }: { children: ReactNode }) => createElement('div', null, children) }));
 vi.mock('@/modules/ads/server/queries', async original => ({ ...await original<typeof import('@/modules/ads/server/queries')>(), getAdsAccounts: state.accounts, getAdsDataset: state.dataset }));
 vi.mock('@/modules/ads/server/actions', () => ({ canManageWorkspaceAds: state.readiness, canReadWorkspaceAds: state.canRead }));
 vi.mock('../src/server/platforms/registry', () => ({ platformAds: async () => null }));
@@ -177,7 +177,7 @@ describe('Ads report filter UX', () => {
     const node = dom(renderToStaticMarkup(await page({ searchParams: Promise.resolve({}) })));
     expect(state.policy).toHaveBeenCalledTimes(1);
     expect(state.policy.mock.invocationCallOrder[0]).toBeGreaterThan(state.viewer.mock.invocationCallOrder[0]);
-    // Campaigns keeps the sidebar form; Accounts shows the policy default preset in the header's period picker.
+    // Campaigns keeps the in-page filter form; Accounts shows the policy default preset in the header's period picker.
     if (page === CampaignsPage) {
       expect(node.querySelector('select[name=period] option[value="14d"]')?.textContent).toBe('Last two weeks');
       expect(node.querySelector<HTMLSelectElement>('select[name=period]')?.value).toBe('14d');

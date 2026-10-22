@@ -4,7 +4,6 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ rename: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh }) }));
-vi.mock('@/components/SidebarDock', () => ({ SidebarDock: ({ children }: { children: import('react').ReactNode }) => children }));
 vi.mock('@/modules/media/ui/rename-action', () => ({ renameMediaAction: state.rename }));
 import { FeedManager, type Feed } from '@/modules/feeds/ui/FeedManager';
 import { MediaLibrary, type Asset } from '@/modules/media/ui/MediaLibrary';

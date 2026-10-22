@@ -73,7 +73,7 @@ async function AdsComparePage({ searchParams }: { searchParams: Promise<Params> 
     });
   } catch (error) {
     if (!(error instanceof OperationError)) throw error;
-    return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack"><PageHeader module="ads" title={t('title')} />
+    return <PageFrame module="ads"><div className="page-stack">{sidebar}<PageHeader module="ads" title={t('title')} />
       <section className="panel"><RouteNotice error className="ui-error" focusKey={localizeAdsMessage(catalogs, locale, error.message)}>{localizeAdsMessage(catalogs, locale, error.message)}</RouteNotice><p>{t('errorHint')}</p></section></div></PageFrame>;
   }
   const exportQuery = new URLSearchParams({ format: 'csv', locale });
@@ -94,7 +94,8 @@ async function AdsComparePage({ searchParams }: { searchParams: Promise<Params> 
     { key: 'cpm', label: t('col.cpm'), align: 'end', render: row => show(row.cpm) },
     { key: 'reach', label: t('col.reach'), align: 'end', render: row => show(row.reachPeakDay) },
   ];
-  return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
+  return <PageFrame module="ads"><div className="page-stack">
+    {sidebar}
     {kindSwitch}
     <PageHeader module="ads" title={t('title')} description={<>{t('rangeLine', { from: result.range.from, to: result.range.to })}{result.previousRange ? t('earlierLine', { from: result.previousRange.from, to: result.previousRange.to }) : ''}</>} />
       {result.groups.length ? <ComparisonExport href={`/api/ads/compare?${exportQuery.toString()}`} locale={locale} maxBytes={outputPolicy.exportMaxBytes} /> : null}

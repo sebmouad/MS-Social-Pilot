@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ prisma: { $queryRaw: vi.fn() }, batch: vi.fn() }));
+const mocks = vi.hoisted(() => ({ prisma: { $queryRaw: vi.fn() }, batch: vi.fn(), config: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
-vi.mock('../src/server/config/store', () => ({ runtimeConfigBatch: mocks.batch, runtimeConfig: vi.fn() }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfigBatch: mocks.batch, runtimeConfig: mocks.config }));
 
-import { OPERATOR_DEFAULTS, SITE_CONTENT_DEFAULTS, fillText, operatorSchema, parseBlocks, parseInline, resolveLegalValues, siteContentSchema, siteLocale } from '../src/modules/history/public/content';
+import { OPERATOR_DEFAULTS, SITE_CONTENT_DEFAULTS, fillText, frenchTypography, operatorSchema, parseBlocks, parseInline, resolveDataDeletionResults, resolveLegalValues, siteContentSchema, siteLocale } from '../src/modules/history/public/content';
 import { HISTORY_COPY, historyActionLabelsSchema, historyCopySchema, HISTORY_ACTION_LABELS, actionLabel, humanizeAction } from '../src/modules/history/copy';
 import { ROOT_CHANGELOG_COPY, rootChangelogCopySchema } from '../src/modules/history/root-copy';
 import { HISTORY_CONFIG } from '../src/modules/history/config';
 import { readSystemHealth } from '../src/modules/history/server/health';
+import { loadSiteContent } from '../src/modules/history/server/site';
 
 describe('Root-editable public content', () => {
   it('ships valid English and French defaults with matching structure', () => {
@@ -87,5 +88,62 @@ describe('health probe facts', () => {
     expect((await readSystemHealth()).database).toBe(false);
     mocks.prisma.$queryRaw.mockImplementation(() => new Promise(() => undefined));
     expect(await readSystemHealth()).toMatchObject({ database: false, worker: { status: 'unknown' } });
+  });
+});
+
+describe('data-deletion outcome sentences', () => {
+  const holes = (value: string) => (value.match(/\{\w+\}/g) ?? []).sort().join();
+  const keys = ['resultCompletedOne', 'resultCompletedMany', 'resultUnknown', 'resultInvalid'] as const;
+  it('ships English and French outcome sentences with the same placeholders', () => {
+    for (const key of keys) {
+      expect(SITE_CONTENT_DEFAULTS.en.dataDeletion[key]?.trim(), `en.${key}`).not.toBe('');
+      expect(SITE_CONTENT_DEFAULTS.fr.dataDeletion[key]?.trim(), `fr.${key}`).not.toBe('');
+      expect(holes(SITE_CONTENT_DEFAULTS.fr.dataDeletion[key]!), key).toBe(holes(SITE_CONTENT_DEFAULTS.en.dataDeletion[key]!));
+    }
+    expect(holes(SITE_CONTENT_DEFAULTS.en.dataDeletion.resultCompletedOne!)).toBe('{count},{when}');
+    expect(holes(SITE_CONTENT_DEFAULTS.en.dataDeletion.resultCompletedMany!)).toBe('{count},{when}');
+  });
+  it('keeps saved catalogs from before the outcome sentences valid, filling each gap from the shipped locale text', () => {
+    const legacy = structuredClone(SITE_CONTENT_DEFAULTS);
+    for (const locale of ['en', 'fr'] as const) for (const key of keys) delete legacy[locale].dataDeletion[key];
+    expect(siteContentSchema.safeParse(legacy).success).toBe(true);
+    const shipped = (locale: 'en' | 'fr') => {
+      const { resultCompletedOne, resultCompletedMany, resultUnknown, resultInvalid } = SITE_CONTENT_DEFAULTS[locale].dataDeletion;
+      return { resultCompletedOne: resultCompletedOne!, resultCompletedMany: resultCompletedMany!, resultUnknown: resultUnknown!, resultInvalid: resultInvalid! };
+    };
+    expect(resolveDataDeletionResults(legacy.en.dataDeletion, 'en')).toEqual(shipped('en'));
+    expect(resolveDataDeletionResults(legacy.fr.dataDeletion, 'fr')).toEqual(frenchTypography(shipped('fr')));
+  });
+  it('prefers Root-saved outcome sentences and rejects completed templates that drop a placeholder', () => {
+    const edited = { ...resolveDataDeletionResults(SITE_CONTENT_DEFAULTS.en.dataDeletion, 'en'), resultUnknown: 'Custom unknown.' };
+    expect(resolveDataDeletionResults(edited, 'en')).toMatchObject({ resultUnknown: 'Custom unknown.' });
+    const saved = (key: (typeof keys)[number], template: string) => siteContentSchema.safeParse({ ...SITE_CONTENT_DEFAULTS, en: { ...SITE_CONTENT_DEFAULTS.en, dataDeletion: { ...SITE_CONTENT_DEFAULTS.en.dataDeletion, [key]: template } } }).success;
+    expect(saved('resultCompletedOne', 'Done on {when}. No count here.')).toBe(false);
+    expect(saved('resultCompletedMany', '{count} removed, no date.')).toBe(false);
+    expect(saved('resultCompletedOne', '{count} connection removed on {when}.')).toBe(true);
+    expect(saved('resultUnknown', 'Custom unknown.')).toBe(true);
+  });
+});
+
+describe('deletion lookup content loading', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  it('serves Root-edited outcome sentences with French typography applied', async () => {
+    const edited = structuredClone(SITE_CONTENT_DEFAULTS);
+    edited.fr.dataDeletion.resultUnknown = 'Introuvable : réessayez.';
+    edited.en.dataDeletion.resultInvalid = 'Edited invalid.';
+    mocks.config.mockImplementation(async (key: string) => {
+      if (key === 'public.content') return edited;
+      throw new Error(`unexpected ${key}`);
+    });
+    // The space before ":" below is the narrow no-break space French typography inserts.
+    expect((await loadSiteContent('fr')).dataDeletion.resultUnknown).toBe('Introuvable : réessayez.');
+    expect((await loadSiteContent('en')).dataDeletion.resultInvalid).toBe('Edited invalid.');
+  });
+  it('falls back to the shipped catalog when the saved value is invalid', async () => {
+    mocks.config.mockResolvedValue({ nope: true });
+    const en = await loadSiteContent('en');
+    expect(en.dataDeletion.resultInvalid).toBe(SITE_CONTENT_DEFAULTS.en.dataDeletion.resultInvalid);
   });
 });

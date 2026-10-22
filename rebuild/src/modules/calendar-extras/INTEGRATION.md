@@ -76,8 +76,9 @@ preview fixtures. No new table is introduced.
    | `/analytics/notes` | `ChartNotesScreen` | `analytics/overview` |
 
    Use existing shell/loading/error boundaries. Add contextual sidebar links from
-   the main Publishing calendar and Analytics screen. The prepared screens use
-   `SidebarDock`; do not introduce another menu or a separate product module rail.
+   the main Publishing calendar and Analytics screen. The prepared screens render
+   their tools inline in-page (`SidebarDock` was removed in B9); do not introduce
+   another menu or a separate product module rail.
 4. Mount thin API routes using `calendarCollectionHttp(area)` and
    `calendarItemHttp(area)` from `@/modules/calendar-extras/server/http`:
 

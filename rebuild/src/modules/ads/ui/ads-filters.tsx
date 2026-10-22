@@ -29,7 +29,8 @@ export function AdsFiltersSidebar({ accounts, filters, input, errors, action = "
 
 export function AdsFilterErrorView({ accounts, input, error, action, title, policy, catalogs = defaultAdsCatalogs, locale = 'en' }: { catalogs?: AdsCatalogs; locale?: 'en' | 'fr'; accounts: AdsAccountOption[]; input: AdsSearchParams; error: AdsFilterError; action: string; title: string; policy: AdsReportPolicy }) {
   const t = adsTranslator(catalogs, locale);
-  return <PageFrame module="ads" sidebar={<AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={input} errors={error.fields} action={action} policy={policy} />}><div className="page-stack">
+  return <PageFrame module="ads"><div className="page-stack">
+    <AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={input} errors={error.fields} action={action} policy={policy} />
     <PageHeader module="ads" title={title} />
     <section className="panel"><h2>{t('text265')}</h2><RouteNotice error className="ui-error" focusKey={JSON.stringify(input)}>{Object.values(error.fields).filter(Boolean).map(message => localizeAdsMessage(catalogs, locale, message!)).join(' ')}</RouteNotice><p>{t('text266')}</p></section>
   </div></PageFrame>;
@@ -41,7 +42,9 @@ export function AdsReportFailureView({ accounts, input, filters, error, action, 
   if (!isPageError && !(error instanceof AdsReportLimitError) && !(error instanceof OperationError && error.code === 'unavailable')) throw error;
   const message = error.message;
   const href = adsQuery(filters, action);
-  return <PageFrame module="ads" sidebar={<><AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} filters={filters} action={action} policy={policy} /><a className="ads-page-reset" href={href}>{isPageError ? t('text267') : t('text268')}</a></>}><div className="page-stack">
+  return <PageFrame module="ads"><div className="page-stack">
+    <AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} filters={filters} action={action} policy={policy} />
+    <a className="ads-page-reset" href={href}>{isPageError ? t('text267') : t('text268')}</a>
     <PageHeader module="ads" title={title} />
     <section className="panel"><h2>{isPageError ? t('text269') : t('text270')}</h2><RouteNotice error className="ui-error" focusKey={`${action}:${String(input.page)}:${message}`}>{localizeAdsMessage(catalogs, locale, message)}</RouteNotice><p>{isPageError ? t('text271') : t('text272')}</p></section>
   </div></PageFrame>;

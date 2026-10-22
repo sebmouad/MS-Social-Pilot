@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
     conversationMessage: { findFirst: vi.fn() }, postComment: { findMany: vi.fn(), findFirst: vi.fn(), aggregate: vi.fn() },
     postTarget: { findFirst: vi.fn() }, membership: { findFirst: vi.fn() }, $queryRaw: vi.fn(),
   },
-  authorize: vi.fn(), config: vi.fn(), operation: vi.fn(), resolved: vi.fn(), moderate: vi.fn(), remove: vi.fn(),
+  authorize: vi.fn(), config: vi.fn(), operation: vi.fn(), resolved: vi.fn(), moderate: vi.fn(), remove: vi.fn(), assign: vi.fn(),
 }));
 
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
@@ -16,6 +16,7 @@ vi.mock('@/modules/inbox/server/access', () => ({ authorizeInbox: mocks.authoriz
 vi.mock('../src/modules/inbox/server/access', () => ({ authorizeInbox: mocks.authorize }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: mocks.operation }));
 vi.mock('../src/modules/inbox/server/actions', () => ({ setInboxResolved: mocks.resolved, moderateInboxComment: mocks.moderate, deleteInboxComment: mocks.remove }));
+vi.mock('../src/modules/inbox/server/productivity', () => ({ performInboxProductivityAction: mocks.assign }));
 
 import { readInboxList, quickConditions } from '@/modules/inbox/server/read';
 import { bulkInboxAction } from '@/modules/inbox/server/bulk';
@@ -42,6 +43,7 @@ beforeEach(() => {
   mocks.resolved.mockResolvedValue({ ok: true });
   mocks.moderate.mockResolvedValue({ ok: true });
   mocks.remove.mockResolvedValue({ ok: true, state: 'completed', remoteConfirmed: true, localConfirmed: true });
+  mocks.assign.mockResolvedValue({ ok: true, action: 'assign' });
   mocks.prisma.conversation.aggregate.mockResolvedValue({ _max: { fetchedAt: null } });
   mocks.prisma.postComment.aggregate.mockResolvedValue({ _max: { fetchedAt: null } });
   mocks.prisma.$queryRaw.mockResolvedValue([]);
@@ -172,6 +174,46 @@ describe('bulk moderation service', () => {
   it('counts duplicates once', async () => {
     const result = await bulkInboxAction(actor, { action: 'resolve', items: [...comments('a', 'a')], confirmation: bulkConfirmation('resolve', 1) });
     expect(result.requested).toBe(1); expect(mocks.resolved).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('bulk assign service', () => {
+  const items = (...ids: string[]) => ids.map(id => ({ kind: 'comment' as const, id }));
+
+  it('names the assignee in one exact confirmation per request', () => {
+    expect(bulkConfirmation('assign', 2, 'member-1')).toBe('BULK ASSIGN 2 INBOX ITEMS TO member-1');
+    expect(bulkConfirmation('assign', 1, null)).toBe('BULK ASSIGN 1 INBOX ITEMS TO UNASSIGNED');
+  });
+
+  it('refuses a missing assignee, a wrong confirmation, reviews and a stray assignee before touching anything', async () => {
+    await expect(bulkInboxAction(actor, { action: 'assign', items: items('a'), confirmation: 'BULK ASSIGN 1 INBOX ITEMS TO UNASSIGNED' })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(bulkInboxAction(actor, { action: 'assign', items: items('a'), assigneeId: null, confirmation: 'BULK ASSIGN 1 INBOX ITEMS TO member-1' })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(bulkInboxAction(actor, { action: 'assign', items: items('a'), assigneeId: 'member-1', confirmation: 'BULK ASSIGN 2 INBOX ITEMS TO member-1' })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(bulkInboxAction(actor, { action: 'assign', items: [{ kind: 'review', id: 'r1' }], assigneeId: null, confirmation: 'BULK ASSIGN 1 INBOX ITEMS TO UNASSIGNED' })).rejects.toThrow(/Only conversations and comments/);
+    await expect(bulkInboxAction(actor, { action: 'resolve', items: items('a'), assigneeId: null, confirmation: 'BULK RESOLVE 1 INBOX ITEMS' })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(mocks.assign).not.toHaveBeenCalled();
+  });
+
+  it('assigns every item through the single-item productivity action with its exact confirmation', async () => {
+    const result = await bulkInboxAction(actor, { action: 'assign', items: [{ kind: 'message', id: 'm1' }, { kind: 'comment', id: 'c1' }], assigneeId: 'member-1', confirmation: 'BULK ASSIGN 2 INBOX ITEMS TO member-1' });
+    expect(result).toMatchObject({ ok: true, action: 'assign', requested: 2, succeeded: 2, failed: 0 });
+    expect(result.results).toMatchObject([{ id: 'm1', ok: true, assigneeId: 'member-1' }, { id: 'c1', ok: true, assigneeId: 'member-1' }]);
+    expect(mocks.assign).toHaveBeenNthCalledWith(1, actor, { action: 'assign', kind: 'message', id: 'm1', assigneeId: 'member-1', confirmation: 'ASSIGN INBOX message m1 TO member-1' });
+    expect(mocks.assign).toHaveBeenNthCalledWith(2, actor, { action: 'assign', kind: 'comment', id: 'c1', assigneeId: 'member-1', confirmation: 'ASSIGN INBOX comment c1 TO member-1' });
+  });
+
+  it('unassigns with an explicit null and reports each item on its own', async () => {
+    const { OperationError } = await import('@/lib/operation-error');
+    mocks.assign.mockResolvedValueOnce({ ok: true, action: 'assign' }).mockRejectedValueOnce(new OperationError('not_found', 'This item is unavailable.'));
+    const result = await bulkInboxAction(actor, { action: 'assign', items: items('a', 'b'), assigneeId: null, confirmation: 'BULK ASSIGN 2 INBOX ITEMS TO UNASSIGNED' });
+    expect(result).toMatchObject({ requested: 2, succeeded: 1, failed: 1 });
+    expect(mocks.assign).toHaveBeenNthCalledWith(1, actor, expect.objectContaining({ id: 'a', assigneeId: null, confirmation: 'ASSIGN INBOX comment a TO UNASSIGNED' }));
+    expect(result.results[1]).toMatchObject({ id: 'b', ok: false, code: 'not_found' });
+  });
+
+  it('passes the credential ceiling to every item through the actor', async () => {
+    await bulkInboxAction(actor, { action: 'assign', items: items('a'), assigneeId: 'member-1', confirmation: 'BULK ASSIGN 1 INBOX ITEMS TO member-1' }, { allowedChannelIds: ['target-1'] });
+    expect(mocks.assign).toHaveBeenCalledWith({ ...actor, allowedChannelIds: ['target-1'] }, expect.objectContaining({ action: 'assign' }));
   });
 });
 

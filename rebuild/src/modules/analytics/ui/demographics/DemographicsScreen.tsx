@@ -59,7 +59,8 @@ export default async function DemographicsPage({ searchParams }: { searchParams:
     {data && <a href={`/api/analytics/demographics?${query}`} download>{t("Export full history (CSV)")}</a>}
   </form>;
   const metrics = data ? [...data.groups.flatMap(group => group.metrics), ...data.other] : [];
-  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/insights/audience">{filters}</WorkflowNav>}><div className={styles.root}>
+  return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
+    <WorkflowNav current="/insights/audience">{filters}</WorkflowNav>
     <PageHeader module="analytics" title={t("Audience history")} description={<>{t("Stored age, gender, country, city and language categories, as supplied by the provider. Each snapshot stands alone; counts are never added across dates or sources.")}</>} />
       {data && <p>{data.period.start} — {data.period.end} UTC</p>}
     {failed && <section id="demographics-error" className={styles.panel}><EmptyState tone="error" title={t("History could not be loaded")} action={<a href="/insights/audience">{t("Reset filters")}</a>}>{t("Review your dates and channels, narrow the period, or retry. Your filters have been retained.")}</EmptyState></section>}

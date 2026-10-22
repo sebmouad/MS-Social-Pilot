@@ -16,7 +16,6 @@ import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
 import { ensureReportWorkflows, reportDefaultPeriod, reportTemplateOptions } from '@/modules/analytics/server/report-workflows';
 import { loadReportUiPolicy } from '@/modules/analytics/server/report-ui-policy';
 import { ReportsManager } from './ReportsManager';
-import { WorkflowNav } from './WorkflowNav';
 import styles from './workflows.module.css';
 
 type PageValue = string | string[] | undefined;
@@ -66,7 +65,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     data = { templates, schedules, channels, templateOptions, runs, policy, limits, defaultPeriod };
   } catch (error) { failure = operationFailure(error, t("Reports could not be loaded. Please try again.")).error; }
 
-  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/insights/reports" />}><div className={styles.root}>
+  return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
     <PageHeader module="analytics" title={t("Saved reports and schedules")} description={<>{canSchedule ? t("Reuse report layouts and have them prepared and emailed weekly or monthly for the channels you manage.") : canGenerate ? t("Reuse report layouts and prepare downloadable reports for the channels you manage.") : t("Reuse report layouts across your channels.")}</>} />
     <p>{t("Member details include slowest replies, resolved answered waits and median resolution times. Resolution is credited to the first responder of the last visitor run, not the person who marked it resolved.")}</p>
     <p>{t("Response reports separate comments and conversations: answer shares, response and resolution times, member first replies, recorded resolution cycles and resolution/reopening counts. Business hours and saved-history limits remain explicit; events may concern waits missing from stored visitor history. Complete platform history is not guaranteed.")}</p>

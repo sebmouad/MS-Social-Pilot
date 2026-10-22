@@ -28,5 +28,5 @@ export const threadsConnection: PlatformHost['connection'] = {
   isReady: () => settings().then(() => true, () => false),
   start: (request, viewer) => startTokenOAuth(threadsOAuthFlow, request, viewer),
   callback: (request, viewer) => finishTokenOAuth(threadsOAuthFlow, request, viewer),
-  async renewToken({ accessToken }) { const next = await (await configuredThreadsAdapter()).refreshToken(accessToken); return { ...next, refreshToken: next.accessToken }; },
+  async renewToken({ accessToken }) { const next = await (await configuredThreadsAdapter()).refreshToken(accessToken); return { ...next, refreshToken: next.accessToken, rotateDestinationCopies: true }; },
 };

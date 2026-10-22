@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { IconCalendarEvent, IconSun, IconRss, IconNotes, IconTrendingUp, IconPlus } from '@tabler/icons-react';
 import { Button } from '@/components/Button';
 import { PageHeader } from '@/components/PageHeader';
-import { SidebarDock } from '@/components/SidebarDock';
 import { Dialog } from '@/components/Dialog';
 import { useConfirm } from '@/components/useConfirm';
 import { useFormValidation, FieldError } from '@/components/FormValidation';
@@ -24,7 +23,7 @@ export type WorkspaceProps = {
 };
 export function CalendarTools(props: Pick<WorkspaceProps, 'area' | 'copy' | 'from' | 'to' | 'targetId' | 'channels' | 'showAll'>) {
  const { area, copy: c } = props;
- return <SidebarDock><div className={styles.tools}>
+ return <div className={styles.tools}>
   <nav aria-label={c.dates}>{AREAS.map(a => { const Icon = icons[a]; return <a key={a} href={paths[a]} aria-current={a === area ? 'page' : undefined}><Icon size={18} aria-hidden="true" />{c[a]}</a>; })}</nav>
   <form className={styles.tools} action={paths[area]}>
    <label className="ui-field"><span>{c.from}</span><input className="ui-input" type="text" inputMode="numeric" name="from" defaultValue={props.from} autoComplete="off" /></label>
@@ -33,7 +32,7 @@ export function CalendarTools(props: Pick<WorkspaceProps, 'area' | 'copy' | 'fro
    {area === 'trends' && <label className={styles.choice}><input type="checkbox" name="showAll" value="true" defaultChecked={props.showAll} />{c.showAll}</label>}
    <Button type="submit">{c.apply}</Button>
   </form>
- </div></SidebarDock>;
+ </div>;
 }
 export function CalendarWorkspace(props: WorkspaceProps) {
  const { area, copy: c, policy, rows, channels, canWrite } = props;

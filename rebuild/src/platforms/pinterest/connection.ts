@@ -66,7 +66,8 @@ export const pinterestConnection: PlatformHost['connection'] = {
     if (!input.refreshToken) return null;
     const [credentials, engine] = await Promise.all([configuredCredentials(), configuredEngine()]);
     const renewed = await engine.renew(credentials.appId, credentials.appSecret, input.refreshToken, input.signal);
-    return { accessToken: renewed.accessToken, expiresAt: renewed.expiresAt, refreshToken: renewed.refreshToken ?? input.refreshToken };
+    // The grant has no separate reported end; Root keeps the stored grant expiry and rotates destination copies.
+    return { accessToken: renewed.accessToken, expiresAt: renewed.expiresAt, refreshToken: renewed.refreshToken ?? input.refreshToken, rotateDestinationCopies: true };
   },
   async isReady() { try { await Promise.all([configuredCredentials(), configuredPolicy()]); return true; } catch { return false; } },
   async start(request, viewer) {

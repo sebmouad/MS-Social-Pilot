@@ -6,7 +6,7 @@ import styles from './inbox-round3.module.css';
 /** What the bulk bar needs to know about one selectable item; all of it was decided on the server for the signed-in person. */
 export type SelectableItem = {
   key: string; kind: 'message' | 'comment' | 'review'; id: string; label: string; platformName: string;
-  resolved: boolean; hidden: boolean; can: { resolve: boolean; hide: boolean; remove: boolean };
+  resolved: boolean; hidden: boolean; can: { resolve: boolean; hide: boolean; remove: boolean; assign: boolean };
 };
 type Selection = {
   items: Map<string, SelectableItem>;

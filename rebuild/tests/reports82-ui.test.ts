@@ -4,7 +4,6 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const navigation = vi.hoisted(() => ({refresh:vi.fn()}));
 vi.mock('next/navigation',()=>({useRouter:()=>navigation}));
-import { SidebarDockContext } from '../src/components/SidebarDock';
 import { ReportsManager, type ReportUiLimits } from '../src/modules/analytics/ui/reports/ReportsManager';
 
 const policy = {
@@ -18,23 +17,23 @@ const limits: ReportUiLimits = { nameMax: 90, maxRecipients: 12, maxRows: 5000, 
 const template = { id: 'tpl-1', name: 'Weekly view', sections: ['analysis', 'goals'], rangeKey: '30d', scheduleCount: 1 };
 const schedule = { id: 'sch-1', channelId: 'ch-1', channelName: 'North', templateId: 'tpl-1', templateName: 'Weekly view', frequency: 'weekly', recipientCount: 1, recipients: ['person@example.test'], nextRunAt: '2026-10-20T10:00:00Z', lastOutcome: 'never' };
 
-let root: ReturnType<typeof createRoot>; let container: HTMLDivElement; let dock: HTMLDivElement;
+let root: ReturnType<typeof createRoot>; let container: HTMLDivElement;
 beforeEach(() => {
   navigation.refresh.mockClear();
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
-  container = document.createElement('div'); dock = document.createElement('div'); document.body.append(container, dock); root = createRoot(container);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   vi.stubGlobal('crypto', { randomUUID: () => '11111111-1111-4111-8111-111111111111' });
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); dock.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 const base = (overrides: Record<string, unknown> = {}) => ({
   templates: [], templateOptions: [], schedules: [], runs: [], canSchedule: true, canGenerate: true, canManage: true, channels: [{ id: 'ch-1', name: 'North' }],
   policy, limits, defaultPeriod: { start: '2026-10-01', end: '2026-10-30', maxDays: 90 }, timeZone: 'Africa/Casablanca', hasMoreTemplates: false, hasMoreSchedules: false, page: 1, runsPage: 1, runsHasMore: false,
   ...overrides,
 });
-async function render(props = base()) { await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: dock }, createElement(ReportsManager, props as never)))); }
+async function render(props = base()) { await act(async () => root.render(createElement(ReportsManager, props as never))); }
 function button(label: string, scope: ParentNode = document) { const item = Array.from(scope.querySelectorAll('button')).find(node => node.textContent?.trim() === label); if (!item) throw new Error(`Missing button: ${label}`); return item as HTMLButtonElement; }
 async function click(item: HTMLElement) { await act(async () => item.click()); }
 async function enter(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
@@ -69,7 +68,7 @@ describe('Reports workflow UI', () => {
 
   it('hides new email scheduling when mail is unavailable but leaves existing schedules manageable', async () => {
     await render(base({ canSchedule: false, schedules: [schedule] }));
-    expect(Array.from(dock.querySelectorAll('button')).some(item => item.textContent?.trim() === 'New schedule')).toBe(false);
+    expect(Array.from(container.querySelectorAll('button')).some(item => item.textContent?.trim() === 'New schedule')).toBe(false);
     expect(container.textContent).toContain('You can still review and edit saved schedules');
     expect(container.textContent).toContain('person@example.test');
     expect(button('Edit')).toBeTruthy();
@@ -120,7 +119,7 @@ describe('Reports workflow UI', () => {
     const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, filename: 'report-2026-10-01-2026-10-30', csv, html: '<!doctype html><p>Report</p>', rowCount: 1, bytes: new TextEncoder().encode(csv).byteLength, truncated: false, notIncluded: [] }) });
     vi.stubGlobal('fetch', fetcher);
     await render(base({ canSchedule: false, schedules: [], templates: [template], templateOptions: [{ id: template.id, name: template.name }] }));
-    await click(button('Prepare report', dock));
+    await click(button('Prepare report', container));
     const form = container.querySelector<HTMLDialogElement>('dialog')!;
     expect(form.textContent).toContain('From (UTC)');
     expect(form.textContent).toContain('Through (UTC)');
@@ -141,7 +140,7 @@ describe('Reports workflow UI', () => {
     const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { downloads.push(this.download); });
     vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, filename: 'report-2026-10-01-2026-10-30', csv, html: '<!doctype html><p>Printable</p>', rowCount: 1, bytes: new TextEncoder().encode(csv).byteLength, truncated: false, notIncluded: [] }) }));
-    await render(); await click(button('Prepare report', dock));
+    await render(); await click(button('Prepare report', container));
     const form = container.querySelector<HTMLDialogElement>('dialog')!;
     await click(button('Review report', form));
     const review = Array.from(container.querySelectorAll<HTMLDialogElement>('dialog')).find(item => item.textContent?.includes('Nothing will be emailed'))!;
@@ -163,7 +162,7 @@ describe('Reports workflow UI', () => {
     const csv = 'a,b\n1,2';
     const fetcher = vi.fn().mockRejectedValueOnce(new TypeError('offline')).mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, filename: 'report-2026-10-01-2026-10-30', csv, html: '<p>Report</p>', rowCount: 1, bytes: new TextEncoder().encode(csv).byteLength, truncated: false, notIncluded: [] }) });
     vi.stubGlobal('fetch', fetcher);
-    await render(); await click(button('Prepare report', dock));
+    await render(); await click(button('Prepare report', container));
     const form = container.querySelector<HTMLDialogElement>('dialog')!;
     await click(button('Review report', form));
     const review = Array.from(container.querySelectorAll<HTMLDialogElement>('dialog')).find(item => item.textContent?.includes('Nothing will be emailed'))!;
@@ -188,7 +187,7 @@ describe('Reports workflow UI', () => {
     expect(container.textContent).toContain('Quarterly archive');
   });
 
-  it('distinguishes an empty later page from an empty workspace',async()=>{await render(base({page:2,runsPage:2}));expect(container.textContent).toContain('No templates on this page');expect(container.textContent).toContain('No schedules on this page');expect(container.textContent).toContain('No runs on this page');expect(dock.textContent).toContain('Previous history page');});
+  it('distinguishes an empty later page from an empty workspace',async()=>{await render(base({page:2,runsPage:2}));expect(container.textContent).toContain('No templates on this page');expect(container.textContent).toContain('No schedules on this page');expect(container.textContent).toContain('No runs on this page');expect(container.textContent).toContain('Previous history page');});
 
   it('labels manual completion Prepared without claiming email delivery', async () => {
     await render(base({runs:[{id:'manual-1',channelId:'ch-1',kind:'manual',status:'completed',periodStart:'2026-10-01',periodEnd:'2026-10-30',startedAt:'2026-10-30T10:00:00Z',rowCount:2,truncated:false,note:null,deliveries:[]}]}));
@@ -207,7 +206,7 @@ describe('Reports workflow UI', () => {
     await render(base({ canManage: false, schedules: [schedule] }));
     expect(container.textContent).not.toContain('person@example.test');
     expect(Array.from(container.querySelectorAll('button')).some(item => /^(Edit|Delete|Prepare now)$/.test(item.textContent?.trim() ?? ''))).toBe(false);
-    expect(Array.from(dock.querySelectorAll('button')).some(item => /^(New template|New schedule)$/.test(item.textContent?.trim() ?? ''))).toBe(false);
+    expect(Array.from(container.querySelectorAll('button')).some(item => /^(New template|New schedule)$/.test(item.textContent?.trim() ?? ''))).toBe(false);
   });
 });
 
@@ -233,6 +232,6 @@ it('uses the responsive history DataTable with meaningful status Badges and Fren
   expect(table.querySelector('caption')?.textContent).toBe('Historique des rapports');
   expect(table.querySelector('.ui-badge--success')?.textContent).toBe('Préparé');
   expect(table.textContent).toContain('Téléchargement préparé'); expect(table.textContent).toContain('—');
-  await click(button('Nouveau modèle', dock));
+  await click(button('Nouveau modèle', container));
   expect(container.querySelector('input[name="sections"]')?.closest('label')?.querySelector('svg')).toBeTruthy();
 });

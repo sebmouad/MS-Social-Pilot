@@ -58,7 +58,7 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
       <nav aria-label={t("Drill-down")}><a href={`?${query({ level: 'campaign', parentId: null, objectId: null })}`}>{t("Back to campaigns")}</a></nav>
       <nav aria-label={t("Pages")} className={styles.actions}>{data.page > 1 && <a href={`?${query({ page: String(data.page - 1) })}`}>{t("Previous")}</a>}<span>{t("Page")} {data.page}</span>{data.nextPage && <a href={`?${query({ page: String(data.nextPage) })}`}>{t("Next")}</a>}</nav></>}
   </form>;
-  if (!data) return <PageFrame module="analytics" scopedAccess sidebar={sidebar}><section role="alert"><h1>{t("Ad-object analysis unavailable")}</h1><p>{t("Check your access and filters, or choose a shorter period, then try again.")}</p></section></PageFrame>;
+  if (!data) return <PageFrame module="analytics" scopedAccess><div className={local.content}>{sidebar}<section role="alert"><h1>{t("Ad-object analysis unavailable")}</h1><p>{t("Check your access and filters, or choose a shorter period, then try again.")}</p></section></div></PageFrame>;
   const d = data;
   const details = (item: AdObject) => <details><summary>{t("Stored daily details")} · {item.name}</summary>
     <DataTable caption={`${t("Daily measures")} · ${item.name}`} rows={item.daily} rowKey={row => row.id} columns={[
@@ -71,7 +71,7 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
       { key: 'extra', label: t("Stored ratios, actions and additional fields"), render: r => <pre className={local.raw}>{JSON.stringify({ cpc: r.cpc, cpm: r.cpm, cpp: r.cpp, ctr: r.ctr, frequency: r.frequency, actions: r.actions, fields: r.fields, redactedPaths: r.redactedPaths }, (_key, v: unknown) => v === null ? missing : v, 2)}</pre> },
     ]} />
   </details>;
-  return <PageFrame module="analytics" scopedAccess sidebar={sidebar}><div className={`${styles.root} ${local.content}`}><header className={styles.heading}><h1>{t("Ad-object analysis")} · {levelLabel}</h1>
+  return <PageFrame module="analytics" scopedAccess><div className={`${styles.root} ${local.content}`}>{sidebar}<header className={styles.heading}><h1>{t("Ad-object analysis")} · {levelLabel}</h1>
     <p>{d.period.start} – {d.period.end} · UTC</p>
     <p>{t("Figures sum stored daily reports only. Missing days are unknown. Levels overlap; never add campaigns, ad sets and ads together. Each object and account stays separate.")}</p>
     <p>{t("Currency comes from current account metadata; no conversion or historical currency verification. Reach, frequency and cost per person are latest-day snapshots, not period totals. Additional measures remain unaggregated.")}</p>

@@ -255,10 +255,12 @@ async function main() {
         await heading.waitFor();
         const section = page.locator('section.root-jobs').filter({ has: heading }).last();
         if (width === 390) {
-          await page.getByRole('button', { name: 'Menu & filters', exact: true }).click();
-          check(await page.getByLabel('Publication operation ID', { exact: true }).inputValue() === accepted.operationId,
-            'Phone evidence filter must remain in the sidebar drawer.');
-          await page.locator('.shell-context-close').click();
+          const filter = page.getByLabel('Publication operation ID', { exact: true });
+          await filter.scrollIntoViewIfNeeded();
+          check(await filter.inputValue() === accepted.operationId,
+            'Phone evidence filter must keep its value in-page.');
+          check(await filter.evaluate(element => Boolean(element.closest('main'))),
+            'Phone evidence filter must live in the page, not the menu drawer.');
         }
         const trigger = section.getByRole('button', { name: 'Check final publication status', exact: true });
         check((await trigger.getAttribute('class'))?.includes('ui-button--secondary'), 'Status inspection must use the neutral secondary button style.');

@@ -6,7 +6,6 @@ import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';
 import { readGoals } from '@/modules/analytics/goals/server/goals';
 import { goalMetricText, goalPaceText, goalsLocale, goalsText, type GoalsCopyKey } from '@/modules/analytics/goals/copy';
-import { WorkflowNav } from '@/modules/analytics/ui/reports/WorkflowNav';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 import { GoalEditor } from './GoalEditor';
 
@@ -19,7 +18,7 @@ export default async function GoalsPage() {
   let failure = ''; let data: Awaited<ReturnType<typeof readGoals>> | null = null;
   try { data = await readGoals({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); }
   catch (error) { failure = operationFailure(error, t('loadFailed')).error; }
-  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/insights/goals" />}><div className={styles.root}>
+  return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
     <PageHeader module="analytics" title={t('title')} />{data && <p>{t('subtitle', { from: data.month.start, to: data.month.end, zone: data.month.timeZone })}</p>}
     {failure && <section className={styles.panel} role="alert"><h2>{t('loadFailedTitle')}</h2><p>{failure}</p><a href="/insights/goals">{t('retry')}</a></section>}
     {data && !data.channels.length && <section className={styles.panel}><h2>{t('noChannelsTitle')}</h2><p>{t('noChannels')}</p><a href="/settings/connections">{t('manageConnections')}</a></section>}

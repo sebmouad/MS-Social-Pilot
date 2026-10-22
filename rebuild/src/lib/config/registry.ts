@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { configurationOwner } from './ownership';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 135;
+export const CONFIG_SCHEMA_VERSION = 136;
 
 import { entry, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';

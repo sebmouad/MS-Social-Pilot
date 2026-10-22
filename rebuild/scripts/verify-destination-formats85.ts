@@ -41,12 +41,12 @@ async function main(){
     page.on('framenavigated',frame=>{if(frame===page.mainFrame())networkEvents.push({event:'navigation',path:new URL(frame.url()).pathname});});
     page.on('pageerror',error=>networkEvents.push({event:'page-error',message:error.message.slice(0,150)}));
     console.log(JSON.stringify({view:{width,theme}}));await page.goto(`${origin}/create`,{waitUntil:'networkidle'});
-    await page.locator('#composer-message').waitFor();await page.evaluate(()=>{(window as any).__formatResetProbe=[];document.addEventListener('reset',event=>{queueMicrotask(()=>{(window as any).__formatResetProbe.push({prevented:event.defaultPrevented,checked:[...document.querySelectorAll<HTMLInputElement>('input[name=targetIds]')].map(input=>({value:input.value,checked:input.checked,defaultChecked:input.defaultChecked}))});});});});await page.evaluate(t=>{document.documentElement.dataset.theme=t;},theme);
+    await page.locator('#composer-message').waitFor();await page.evaluate(()=>{(window as any).__formatResetProbe=[];document.addEventListener('reset',event=>{queueMicrotask(()=>{(window as any).__formatResetProbe.push({prevented:event.defaultPrevented,selected:[...document.querySelectorAll<HTMLInputElement>('input[name=targetIds]')].map(input=>input.value)});});});});await page.evaluate(t=>{document.documentElement.dataset.theme=t;},theme);
     const message=`${tag}_${width}_${theme}`;await page.locator('#composer-message').fill(message);await page.locator('#composer-first-comment').fill('Synthetic first comment');
-    if(width<600)await page.getByRole('button',{name:'Menu & filters',exact:true}).click();
-    await page.getByRole('checkbox',{name:target.name,exact:true}).check();
-    const formats=page.locator('fieldset').filter({has:page.locator('legend').getByText('Formats',{exact:true})});
-    check(await formats.locator('strong').getByText(label,{exact:true}).count()===1,'Chosen module label must appear in sidebar');
+    const channelChip=page.getByRole('button',{name:target.name,exact:true});await channelChip.scrollIntoViewIfNeeded();
+    if(await channelChip.getAttribute('aria-pressed')!=='true')await channelChip.click();
+    const formats=page.locator('fieldset').filter({has:page.locator('legend').getByText('Format for each channel',{exact:true})});
+    check(await formats.locator('strong').getByText(label,{exact:true}).count()===1,'Chosen module label must appear in the composer');
     check(await formats.locator('select').count()===0,'Single-format choice must not create a redundant picker');
     const saved=JSON.parse(await page.locator('input[name="destinationFormatsJson"]').inputValue());check(saved[channel]==='post'&&Object.keys(saved).length===1,'Only selected destination intent must be serialized');
     check(!await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),'Layout must fit desktop and phone');
@@ -58,7 +58,7 @@ async function main(){
      await page.locator('[data-composer-error]').filter({hasText:'We could not confirm whether this post was saved.'}).waitFor();
      check(await page.locator('#composer-message').inputValue()===message&&JSON.parse(await page.locator('input[name="destinationFormatsJson"]').inputValue())[channel]==='post','Transport failure must retain text and format');
      check(await page.evaluate(()=>(window as any).__formatResetProbe.some((event:{prevented:boolean})=>event.prevented)),'Managed form must intercept the native reset');
-     check(await page.getByRole('checkbox',{name:target.name,exact:true}).isChecked(),'Failed save must retain the actual destination checkbox, not only preview state');
+     check(await page.getByRole('button',{name:target.name,exact:true}).getAttribute('aria-pressed')==='true','Failed save must retain the actual destination selection, not only preview state');
      check(await db.post.count({where:{message}})===0,'Aborted test save must have no draft');recovery=true;await page.unrouteAll({behavior:'wait'});
     }
     if(theme==='grove'){

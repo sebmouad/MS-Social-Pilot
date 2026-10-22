@@ -91,7 +91,8 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   const exportPolicy = canExport ? await loadAdsOutputPolicy().catch(() => null) : null;
   const tabs = await adsTabsFor('campaigns', viewer, filters);
   const sidebar = <AdsReportSidebar catalogs={catalogs} locale={locale} accounts={accounts} filters={filters} action="/insights/ads/campaigns" kind="objects" policy={policy} page={objectPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
-  return <PageFrame module="ads" sidebar={accounts.length ? sidebar : undefined}><div className="page-stack">
+  return <PageFrame module="ads"><div className="page-stack">
+    {accounts.length ? sidebar : null}
     {tabs}
     <PageHeader module="ads" title={t('text041')} description={<>{accounts.length ? t('text260', { value0: objectPage.from, value1: objectPage.to, value2: objectPage.resultCount, value3: objectPage.page, value4: objectPage.pageCount, value5: dateRangeLabel(filters) }) : t('text042')}</>} />
     {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title={t('text003')} action={<a className="text-link" href="/settings/connections">{t('text004')}</a>}>{t('text043')}</EmptyState></section> : <>

@@ -65,7 +65,7 @@ describe('design tokens v2', () => {
   });
 
   it('draws field and control borders with --control-border, never --line-strong', () => {
-    const fieldSelectors = ['.ui-input', '.ui-select__trigger', '.ui-menu__trigger', '.ui-segmented', '.ui-filter-chip', '.ui-filter select', '.shell-sidebar-filter select'];
+    const fieldSelectors = ['.ui-input', '.ui-select__trigger', '.ui-menu__trigger', '.ui-segmented', '.ui-filter-chip', '.ui-filter select'];
     const rules = [...(components + tokens).matchAll(/^([^{}\n@/][^{}]*)\{([^}]*)\}/gm)];
     for (const [, selector, body] of rules) {
       const names = selector.split(',').map(s => s.trim());

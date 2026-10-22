@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { deletionRequestStatus } from '@/server/platforms/deletion-status';
-import { fillText, parseBlocks, parseInline, resolveLegalValues, siteLocale, type SiteLocale, type SitePageContent } from '../public/content';
+import { fillText, parseBlocks, parseInline, resolveDataDeletionResults, resolveLegalValues, siteLocale, type SiteLocale, type SitePageContent } from '../public/content';
 import { listPublicPlans, loadOperator, loadPublicChangelog, loadPublicHealth, loadSiteContent, siteIsPublic } from '../server/site';
 import { runtimeConfig } from '@/server/config/store';
 import styles from './public.module.css';
@@ -144,7 +144,10 @@ export async function DataDeletionPage({ searchParams }: { searchParams: Promise
   const maxCode = Number(await runtimeConfig('public.dataDeletionCodeMaxCharacters').catch(() => 100));
   const status = code ? await deletionRequestStatus(code.slice(0, maxCode)) : null;
   const when = status?.state === 'completed' ? new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: 'UTC' }).format(status.completedAt) : '';
-  const result = !status ? null : status.state === 'completed' ? RESULT[locale].completed(status.connections, when) : status.state === 'unknown' ? RESULT[locale].unknown : RESULT[locale].invalid;
+  const results = resolveDataDeletionResults(t, locale);
+  const result = !status ? null
+    : status.state === 'completed' ? fillText(status.connections === 1 ? results.resultCompletedOne : results.resultCompletedMany, { count: status.connections, when })
+    : status.state === 'unknown' ? results.resultUnknown : results.resultInvalid;
   return <SiteFrame content={content} operator={operator} locale={locale} current="dataDeletion">
     <Intro title={t.title} lead={t.lead} />
     {result && <p className={styles.statusPanel} role="status" data-ok={status?.state === 'completed'}><span className={styles.dot} aria-hidden="true" />{result}</p>}
@@ -155,17 +158,3 @@ export async function DataDeletionPage({ searchParams }: { searchParams: Promise
     </form>
   </SiteFrame>;
 }
-
-/** Outcome sentences of the deletion lookup (the facts come from the platform's own record, not from Root text). */
-const RESULT = {
-  en: {
-    completed: (count: number, when: string) => `Done on ${when}. We removed the stored access for ${count} ${count === 1 ? 'connection' : 'connections'} and stopped its scheduled work.`,
-    unknown: 'We found no record for this code. If you used Facebook’s removal option, no access linked to your account was held here.',
-    invalid: 'This code is not valid. Open the link shown in your Facebook settings again.',
-  },
-  fr: {
-    completed: (count: number, when: string) => `Terminé le ${when}. Nous avons supprimé l’accès enregistré pour ${count} ${count === 1 ? 'connexion' : 'connexions'} et arrêté ses tâches planifiées.`,
-    unknown: 'Aucun enregistrement n’existe pour ce code. Si vous avez utilisé l’option de suppression de Facebook, aucun accès lié à votre compte n’était conservé ici.',
-    invalid: 'Ce code n’est pas valide. Ouvrez à nouveau le lien affiché dans vos paramètres Facebook.',
-  },
-} as const;

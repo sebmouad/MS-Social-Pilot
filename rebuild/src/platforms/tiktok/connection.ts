@@ -38,8 +38,9 @@ export const tiktokConnection: PlatformHost['connection'] = {
     const configured = await configuredTiktokApi('en', input.signal);
     if (!configured) return null;
     const renewed = await configured.api.refresh(input.refreshToken, input.signal);
-    // Root records the grant's end (the refresh token's life), not the access token's.
-    return { accessToken: renewed.accessToken, refreshToken: renewed.refreshToken, expiresAt: renewed.grantExpiresAt ?? null };
+    // Root stores the access end in meta and the grant's end (the refresh token's life) as the grant expiry.
+    // Destinations hold copies of the account token, so Root rotates them with the account.
+    return { accessToken: renewed.accessToken, refreshToken: renewed.refreshToken, expiresAt: renewed.accessExpiresAt, grantExpiresAt: renewed.grantExpiresAt ?? null, rotateDestinationCopies: true };
   },
   async grantHealth({ scopes, locale = 'en' }) {
     const policy = await configuredTiktokPolicy();

@@ -11,7 +11,7 @@ vi.mock('@/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('@/modules/shell/server/scope', () => ({ pageChannelScope: async (_viewer: unknown, params: { channel?: string }) => ({ ids: params.channel ? params.channel.split(',') : [], dropped: 0, source: params.channel ? 'url' : 'none', channels: [] }) }));
 vi.mock('@/modules/analytics/demographics/server/demographics', () => ({ readDemographics: state.read }));
 vi.mock('@/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: async () => ({ period: { start: '2026-10-01', end: '2026-10-02' }, options: { channels: [] } }) }));
-vi.mock('@/server/PageFrame', () => ({ PageFrame: ({ children, sidebar }: { children: ReactNode; sidebar: ReactNode }) => createElement('main', null, createElement('aside', null, sidebar), children) }));
+vi.mock('@/server/PageFrame', () => ({ PageFrame: ({ children }: { children: ReactNode }) => createElement('main', null, children) }));
 vi.mock('@/modules/analytics/ui/reports/WorkflowNav', () => ({ WorkflowNav: ({ children }: { children: ReactNode }) => children }));
 import Page from '../src/modules/analytics/ui/demographics/DemographicsScreen';
 import { GET } from '../src/app/api/analytics/demographics/route';
@@ -22,18 +22,18 @@ beforeEach(() => {
   state.viewer.mockResolvedValue({ user: { id: 'u' }, workspaceId: 'w' });
   state.read.mockResolvedValue({ csv: null, empty: false, period: { start: '2026-10-01', end: '2026-10-02' }, selected: { channelIds: ['a'] }, options: { channels: [{ id: 'a', name: 'Example channel' }] }, audience: { covered: 0, selected: 1, total: 0 }, other: [], groups: [{ metrics: [{ key: 'country', label: 'Country', sourceLabel: 'Stored audience', unit: 'count', historyCoverage: { covered: 1, selected: 1, oldestAsOf: asOf, newestAsOf: asOf }, history: [{ resourceId: 'a', resourceLabel: 'Example channel', asOf, fetchedAt: asOf, rows: [{ label: 'FR', value: null, share: null }] }] }] }] });
 });
-it('renders historical dates, unknowns and a scope-bound export in the sidebar', async () => {
+it('renders historical dates, unknowns and a scope-bound export in-page', async () => {
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
   expect(html).toContain('Audience history'); expect(html).toContain('2026-10-01 00:00:00 UTC');
   expect(html).toContain('Not available'); expect(html).not.toContain('>0<');
-  const aside = html.slice(html.indexOf('<aside'), html.indexOf('</aside>'));
-  expect(aside).toContain('format=csv'); expect(aside).toContain('channel=a'); expect(aside).toContain('filter=1');
+  expect(html).toContain('format=csv'); expect(html).toContain('channel=a'); expect(html).toContain('filter=1');
+  expect(html).not.toContain('<aside');
 });
 it('renders French copy and retains invalid filters after read failure without exposing details', async () => {
   state.language = 'fr-FR'; state.read.mockRejectedValue(new Error('private database'));
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ start: 'bad-date', filter: '1', channel: 'gone' }) }));
   expect(html).toContain('Historique de l’audience'); expect(html).toContain('Impossible de charger');
-  // The typed date stays for correction; the sidebar scope travels as a hidden field (the page has no channel boxes of its own).
+  // The typed date stays for correction; the channel scope travels as a hidden field (the page has no channel boxes of its own).
   expect(html).toContain('value="bad-date"'); expect(html).toContain('<input type="hidden" name="channel" value="gone"/>'); expect(html).not.toContain('type="checkbox"'); expect(html).not.toContain('private database');
 });
 it.each(['en-US,en;q=0.9,fr;q=0.8', 'en,fr-FR;q=0.5'])('keeps the English heading when French is a fallback: %s', async language => {

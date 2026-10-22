@@ -95,9 +95,8 @@
 .shell-topbar { position: sticky; z-index: 10; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--topbar-h); padding: 0 var(--gutter); border-bottom: 1px solid var(--line-subtle); background: var(--surface); }
 .shell-topbar__start, .shell-topbar__tools { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .shell-menu-toggle, .shell-scope-chip { display: none; }
-.shell-menu-toggle, .shell-tools-toggle { align-items: center; justify-content: center; gap: 8px; min-height: var(--control-h-sm); padding: 0 10px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-sm); font-weight: 650; cursor: pointer; }
-.shell-tools-toggle { display: inline-flex; }
-.shell-menu-toggle:hover, .shell-tools-toggle:hover, .shell-scope-chip:hover { background: var(--surface-muted); }
+.shell-menu-toggle { align-items: center; justify-content: center; gap: 8px; min-height: var(--control-h-sm); padding: 0 10px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-sm); font-weight: 650; cursor: pointer; }
+.shell-menu-toggle:hover, .shell-scope-chip:hover { background: var(--surface-muted); }
 .shell-scope-chip { align-items: center; gap: 6px; max-width: 48vw; min-height: var(--control-h-sm); padding: 0 12px; border: 1px solid var(--control-border); border-radius: var(--radius-full); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--text-sm); font-weight: 650; cursor: pointer; }
 .shell-scope-chip__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shell[data-module="root"] .shell-topbar { box-shadow: inset 0 3px 0 var(--mod-root); }
@@ -112,17 +111,6 @@
 .ui-tabs__link[aria-current="page"] .ui-tabs__icon { color: var(--accent); }
 .ui-tabs__more { display: inline-flex; align-items: center; margin-left: auto; }
 .ui-tabs__more .ui-menu__trigger { min-height: 44px; border-color: transparent; background: transparent; color: var(--ink-soft); }
-
-/* ---- Page tools (transitional sheet) ---- */
-.shell-tools .ui-drawer__header { align-items: center; }
-.shell-tools__close { display: inline-grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); cursor: pointer; }
-.shell-tools__close:hover { background: var(--surface-muted); color: var(--ink); }
-.shell-sidebar-filter select, .shell-sidebar-filter input:not([type=checkbox]), .shell-sidebar-tools select { max-width: 100%; }
-.shell-sidebar-filter form, .shell-sidebar-tools form { min-width: 0; }
-.shell-sidebar-tools:not(:empty) { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line-subtle); }
-.shell-sidebar-tools:empty { display: none; }
-.shell-sidebar-filter:first-child + .shell-sidebar-tools:not(:empty) { margin-top: 20px; }
-.shell-tools__body > .shell-sidebar-tools:first-child:not(:empty) { margin-top: 0; padding-top: 0; border-top: 0; }
 
 /* ---- Bottom bar (phone) ---- */
 .ui-bottombar { display: none; }
@@ -188,7 +176,7 @@
 .ui-action-bar__status { min-width: 0; color: var(--ink-soft); font-size: var(--text-sm); }
 .ui-action-bar__actions { display: flex; align-items: center; gap: 8px; }
 
-/* ---- Bottom sheet variant of the drawer (Page tools, channel scope on phones) ---- */
+/* ---- Bottom sheet variant of the drawer (channel scope on phones) ---- */
 @media (max-width: 760px) {
   .ui-drawer--sheet { inset: auto 0 0 0; width: 100%; max-width: none; height: auto; max-height: 85dvh; border: 0; border-top: 1px solid var(--line); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 }
@@ -218,8 +206,6 @@
   .shell[data-menu="open"] .shell-sidebar { display: flex; padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
   .shell-menu-toggle, .shell-scope-chip { display: inline-flex; }
   .shell-menu-toggle span { display: none; }
-  .shell-tools-toggle span { display: none; }
-  .shell-tools-toggle { width: var(--control-h-touch); padding: 0; }
   .shell-menu-toggle { width: var(--control-h-touch); padding: 0; }
   .shell-topbar { padding-top: env(safe-area-inset-top); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
   .shell-content { padding: 16px max(16px, env(safe-area-inset-left)) 32px; }

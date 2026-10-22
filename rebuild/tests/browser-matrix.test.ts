@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { THEMES } from '../src/lib/themes';
-import { allowRequest, browserFinding, customerRoute, DRAWER_MAIN_ACTION_SELECTOR, MAIN_ACTION_SELECTORS, discoverRoutes, FAMILIES, finishReport, guardBaseUrl, runMatrix, VIEWPORTS, type Cell } from '../scripts/verify-browser-matrix';
+import { allowRequest, browserFinding, customerRoute, MENU_DRAWER_TOGGLE_SELECTOR, MAIN_ACTION_SELECTORS, discoverRoutes, FAMILIES, finishReport, guardBaseUrl, runMatrix, VIEWPORTS, type Cell } from '../scripts/verify-browser-matrix';
 
 function complete() {
   const routes = [...FAMILIES];
@@ -100,9 +100,9 @@ describe('browser matrix report', () => {
 });
 
 describe('main action discovery', () => {
-  it('keeps the sidebar primary action as the page action and verifies it in the phone drawer', () => {
-    expect(MAIN_ACTION_SELECTORS).toEqual(['main .ui-button--primary:not(:disabled)', '#shell-filters .ui-button--primary', 'main button:not(:disabled)', 'main a[href]']);
-    expect(MAIN_ACTION_SELECTORS).toContain(DRAWER_MAIN_ACTION_SELECTOR);
+  it('finds the page action in-page and checks the phone navigation drawer separately', () => {
+    expect(MAIN_ACTION_SELECTORS).toEqual(['main .ui-button--primary:not(:disabled)', 'main button:not(:disabled)', 'main a[href]']);
+    expect(MENU_DRAWER_TOGGLE_SELECTOR).toBe('.shell-menu-toggle');
   });
   it('still reports a page with no verified main action', () => {
     const input = complete(); input.cells[1].keyboard.mainAction = 'Not available';

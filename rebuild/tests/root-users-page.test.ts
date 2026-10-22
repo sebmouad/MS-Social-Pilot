@@ -8,7 +8,6 @@ vi.mock('../src/server/config/access', () => ({ requireRootPage: async () => ({ 
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.runtime }));
 vi.mock('../src/server/root/users', () => ({ loadRootUsers: state.load }));
 vi.mock('../src/modules/root/ui/RootFrame', () => ({ RootFrame: 'main' }));
-vi.mock('../src/components/SidebarDock', () => ({ SidebarDock: 'aside' }));
 import Page from '../src/app/root/users/page';
 import { OperationError } from '../src/lib/operation-error';
 import { ROOT_INTERFACE_COPY } from '../src/lib/config/root-interface-copy';
@@ -27,10 +26,10 @@ beforeEach(() => {
 });
 
 describe('Root users directory page', () => {
-  it('puts search, status and pagination in the contextual sidebar and keeps counts distinct', async () => {
+  it('puts search, status and pagination in the in-page filters and keeps counts distinct', async () => {
     const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ q: 'casey', status: 'active' }) }));
-    const sidebar = html.slice(html.indexOf('<aside'), html.indexOf('</aside>'));
-    for (const value of ['name="q"', 'maxLength="180"', 'name="status"', 'aria-label="User directory pages"']) expect(sidebar).toContain(value);
+    expect(html).toContain('root-user-filters');
+    for (const value of ['name="q"', 'maxLength="180"', 'name="status"', 'aria-label="User directory pages"']) expect(html).toContain(value);
     expect(html).toContain('1 matching user · 14 in this installation');
     expect(html).toContain('Active sessions');
     expect(html).toContain('Authenticator: Enabled');
@@ -56,7 +55,7 @@ describe('Root users directory page', () => {
     expect(renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ q: 'absent' }) }))).toContain('No users match these filters');
   });
 
-  it('keeps the sidebar and reset path for invalid filters and masks unavailable details', async () => {
+  it('keeps the filters and reset path for invalid filters and masks unavailable details', async () => {
     state.load.mockRejectedValueOnce(new OperationError('invalid_request', 'Filter rejected'));
     const invalid = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ q: ['first', 'second'] }) }));
     expect(invalid).toContain('Check user filters');

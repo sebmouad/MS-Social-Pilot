@@ -38,8 +38,9 @@ export function inboxListRows(page: InboxListPage, abilities: Awaited<ReturnType
   for (const item of page.items) {
     const ability = abilities.get(item.target.id);
     if (!ability) continue;
-    const can = { resolve: ability.resolve, hide: item.kind === 'comment' && ability.hide, remove: item.kind === 'comment' && ability.remove };
-    if (can.resolve || can.hide || can.remove) selectables.set(item.key, { key: item.key, kind: item.kind, id: item.id, label: item.author, platformName: channelBadgeInfo(item.target.provider).platformName, resolved: item.resolved, hidden: item.hidden, can });
+    // Assignment needs the same local write grant as resolve, on an item kind that carries an assignee.
+    const can = { resolve: ability.resolve, hide: item.kind === 'comment' && ability.hide, remove: item.kind === 'comment' && ability.remove, assign: (item.kind === 'message' || item.kind === 'comment') && ability.resolve };
+    if (can.resolve || can.hide || can.remove || can.assign) selectables.set(item.key, { key: item.key, kind: item.kind, id: item.id, label: item.author, platformName: channelBadgeInfo(item.target.provider).platformName, resolved: item.resolved, hidden: item.hidden, can });
   }
   const hasSelection = selectables.size > 0;
   return page.items.map(item => {

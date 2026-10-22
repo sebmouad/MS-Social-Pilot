@@ -15,7 +15,6 @@ import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { RouteNotice } from '@/components/RouteNotice';
-import { SidebarDock } from '@/components/SidebarDock';
 import type { ReportUiPolicy } from '@/modules/analytics/report-ui-config';
 import styles from './workflows.module.css';
 
@@ -206,7 +205,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
   const runStatus = (run: RunRow) => run.status === 'completed' ? (run.kind === 'manual' ? t("Prepared") : t("Completed")) : ({ claimed: t("Starting"), generating: t("Preparing"), delivering: t("Sending"), partial: t("Partly sent"), failed: t("Failed"), uncertain: t("Delivery not confirmed"), skipped: t("Skipped") } as Record<string, string>)[run.status] ?? t("Status unavailable");
 
   return <div className={styles.root}>
-    <SidebarDock><div className={styles.sidebarActions}>
+    <div className={styles.sidebarActions}>
       {canManage && <Button variant="primary" onClick={() => openTemplate()}>{t("New template")}</Button>}
       {canManage && canGenerate && defaultPeriod && <Button variant="secondary" disabled={!channels.length} aria-disabled={!channels.length} onClick={() => channels.length && openManual()}>{t("Prepare report")}</Button>}
       {canManage && canGenerate && !defaultPeriod && <p className={styles.sidebarHint}>{t("A default UTC report period is unavailable. You can still prepare reports from existing schedules.")}</p>}
@@ -223,7 +222,7 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
         <span aria-current="page" aria-label={t("History page {0}", runsPage)}>{t("History page")} {runsPage}</span>
         {runsHasMore ? <a className="ui-button ui-button--secondary ui-button--sm" rel="next" href={runsHref(runsPage + 1)}>{t("Next history page")}</a> : <span className="ui-button ui-button--secondary ui-button--sm" aria-disabled="true">{t("Next history page")}</span>}
       </nav>}
-    </div></SidebarDock>
+    </div>
 
     {notice && <RouteNotice error={notice.error} focusKey={`reports:${notice.key}`}>{notice.text}</RouteNotice>}
     <section className={styles.panel} aria-labelledby="tpl-h"><div className={styles.panelHeading}><div><h2 id="tpl-h"><IconFileAnalytics aria-hidden="true" /> {t("Report templates")}</h2><p>{t("Save the sections and period your team reuses.")}</p></div></div>

@@ -1,6 +1,6 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-22 (lane 47) against the local working tree, configuration schema **135**.
+Updated 2026-10-22 (design v2 B9) against the local working tree, configuration schema **136**.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding and unchanged.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
@@ -743,3 +743,46 @@ MCP tools `add_task_checklist_item`, `set_task_checklist_item`,
 `delete_task_checklist_item`. Migrations live in `rebuild/prisma/migrations/`
 next to the baseline (the legacy root `prisma/` is gone since lane 47).
 Nothing here is browser- or provider-verified.
+
+## Design v2 B9 — 2026-10-22, verification and cleanup (source/unit/jsdom only)
+
+B9 deletes the transitional adapter: `src/components/SidebarDock.tsx` and the
+unmounted `ModeToggle.tsx` are removed, `AppShell` loses the Page tools
+sheet/toggle/context, and the eight `scripts/verify-*` browser scripts use the
+new Composer/Inbox/Settings/Root selectors (source-updated; no browser run).
+No `SidebarDock` imports or `pageTools` references remain in `src/`.
+
+Beyond the adapter, B9 closes three HANDOVER open items. The data-deletion
+lookup outcome sentences are Root catalog entries under `public.content`
+(`resultCompletedOne/Many` keep `{count}`/`{when}`, plus `resultUnknown` and
+`resultInvalid`, EN/FR; `resolveDataDeletionResults` fills gaps in catalogs
+saved before the keys existed). Root manual token refresh now renews the
+account token, access expiry, destination copies and audit inside one
+`prisma.$transaction`, with module-declared `grantExpiresAt` /
+`rotateDestinationCopies` (YouTube, TikTok, LinkedIn, Pinterest, Threads, X;
+Facebook/Mastodon keep page-specific grants). The Inbox reply box gains a
+Saved replies menu (insert into draft, never sends; loading/error/empty
+states) and bulk Assign through the shared `bulkInboxAction` service: UI
+dialog with member picker, `POST /api/inbox/bulk` and `bulk_inbox_action`
+(`assigneeId`, exact `BULK ASSIGN <n> INBOX ITEMS TO <member|UNASSIGNED>`
+confirmation, per-item outcomes, no Undo, audited receipt).
+
+Registry schema is **136** (this batch performs the queued B8 bump together
+with the B9 catalog changes): `home.shellCopy` loses the three `pageTools`
+entries, `public.content` gains the four outcome sentences,
+`inbox.customerCopy` gains the bulk-assign templates. Saved catalogs that
+still carry `pageTools` keys fall back to the shipped default until re-saved
+in Root (strict-schema read followed by default, per `configOrDefault`).
+`tsconfig.json` now excludes reference-only `docs/handover/archive` (a WIP
+backup whose stale tree broke typecheck and the build type gate); nothing in
+`src/`, `tests/` or `scripts/` imports it.
+
+Evidence: typecheck 0 errors; targeted B9 suites pass (config-validation,
+parity-guard, public-data-deletion, root-connection-refresh-atomicity,
+inbox-bulk-assign-mcp, inbox-reply-saved-menu); full suite 724 files /
+11,726 tests passed with only the 5 known sandbox `listen EPERM ::1`
+loopback failures; `next build` re-run at ship time (see HANDOVER). Open:
+the full browser matrix on the new selectors, the assign dialog and
+saved-replies menu at desktop/phone widths in EN/FR with keyboard, a
+live-provider renewal run, and the `DESIGN.md` Layout section, which still
+describes the pre-v2 two-sidebar shell.

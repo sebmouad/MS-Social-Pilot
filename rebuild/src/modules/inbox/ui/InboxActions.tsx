@@ -2,9 +2,9 @@
 import { useInboxCatalog } from './copy-context';
 import { AutoTextarea } from '@/components/AutoTextarea';
 
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Dialog, InfoTip } from '@/components';
+import { Button, Dialog, InfoTip, Menu } from '@/components';
 import { useToast } from '@/components/Toast';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { isOperationErrorCode } from '@/lib/operation-error';
@@ -220,8 +220,11 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   </div>;
 }
 
+type SavedReply = { id: string; name: string; body: string };
+const isSavedReply = (value: unknown): value is SavedReply => typeof value === 'object' && value !== null && typeof (value as SavedReply).id === 'string' && typeof (value as SavedReply).name === 'string' && typeof (value as SavedReply).body === 'string';
+
 /** Reply composer with a character count and the platform's reply rule in plain words. */
-export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000, value, onChange, locale = 'en' }: { locale?: 'en' | 'fr'; id: string; kind: Kind; allowed: boolean; headline: string; detail?: string; maxLength?: number; value?: string; onChange?: (value: string) => void }) {
+export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000, value, onChange, onInsertSavedReply, locale = 'en' }: { locale?: 'en' | 'fr'; id: string; kind: Kind; allowed: boolean; headline: string; detail?: string; maxLength?: number; value?: string; onChange?: (value: string) => void; onInsertSavedReply?: (body: string) => void }) {
   const validation = useFormValidation();
   const copy = useInboxCatalog('REPLY_COPY')[locale];
   const inFlight = useRef(false);
@@ -231,12 +234,36 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState('');
+  // Saved replies only fill the draft through the caller's insert handler; inserting never sends anything.
+  const [savedReplies, setSavedReplies] = useState<SavedReply[] | 'error' | null>(null);
+  // The fetch depends only on whether a handler exists, so typing in the draft never refetches the list.
+  const wantsSaved = Boolean(onInsertSavedReply);
+  useEffect(() => {
+    if (!wantsSaved) return;
+    let live = true;
+    setSavedReplies(null);
+    fetch('/api/inbox/productivity?view=saved-replies', { cache: 'no-store' })
+      .then(async response => {
+        const body: unknown = await response.json().catch(() => null);
+        if (!response.ok || !body || typeof body !== 'object') throw new Error('unavailable');
+        const replies = (body as { replies?: unknown }).replies;
+        if (!Array.isArray(replies) || !replies.every(isSavedReply)) throw new Error('unavailable');
+        if (live) setSavedReplies(replies);
+      })
+      .catch(() => { if (live) setSavedReplies('error'); });
+    return () => { live = false; };
+  }, [wantsSaved]);
   const router = useRouter();
   const fieldId = useId();
   const ruleId = `${fieldId}-rule`;
   const countId = `${fieldId}-count`;
   const remaining = maxLength - text.length;
   const empty = text.trim().length === 0;
+  const insert = onInsertSavedReply;
+  const savedItems = savedReplies === null ? [{ key: 'loading', label: copy.savedRepliesLoading, disabled: true, onSelect: () => {} }]
+    : savedReplies === 'error' ? [{ key: 'error', label: copy.savedRepliesError, disabled: true, onSelect: () => {} }]
+    : savedReplies.length ? savedReplies.map(reply => ({ key: reply.id, label: reply.name, onSelect: () => insert?.(reply.body) }))
+    : [{ key: 'empty', label: copy.savedRepliesEmpty, disabled: true, onSelect: () => {} }];
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -259,7 +286,10 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
     <FieldError {...validation.errorProps('reply')} />
     <div className={styles.replyFoot}>
       <span id={countId} className={remaining < 100 ? styles.countLow : styles.count}>{text.length.toLocaleString(locale)} / {maxLength.toLocaleString(locale)} {copy.characters}{remaining < 100 ? ` · ${remaining} ${copy.left}` : ''}</span>
-      <Button type="submit" variant="primary" disabled={!allowed || busy || empty} aria-busy={busy}>{busy ? copy.sending : copy.send}</Button>
+      <div className={styles.replyActions}>
+        {onInsertSavedReply ? <Menu label={copy.savedReplies} trigger={<>{copy.savedReplies}</>} items={savedItems} /> : null}
+        <Button type="submit" variant="primary" disabled={!allowed || busy || empty} aria-busy={busy}>{busy ? copy.sending : copy.send}</Button>
+      </div>
     </div>
     <div role="status" aria-live="polite" className={styles.replyStatus}>{sent}</div>
     {error && <p role="alert" className={styles.error}>{error}</p>}

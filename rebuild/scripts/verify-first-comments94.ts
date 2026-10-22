@@ -169,16 +169,9 @@ async function main() {
         await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
         const delay = page.getByLabel(/Wait before the first comment/);
         await delay.waitFor({ state: 'visible' });
-        const destination = page.getByLabel('Synthetic Facebook Page', { exact: true });
-        if (!(await destination.isVisible().catch(() => false))) {
-          const menu = page.getByRole('button', { name: 'Menu & filters', exact: true });
-          if (await menu.count()) await menu.click();
-        }
-        await destination.check();
-        if (await page.locator('#shell-filters[role="dialog"]').count()) {
-          await page.keyboard.press('Escape');
-          await page.locator('#shell-filters[role="dialog"]').waitFor({ state: 'detached' });
-        }
+        const destination = page.getByRole('button', { name: 'Synthetic Facebook Page', exact: true });
+        await destination.scrollIntoViewIfNeeded();
+        if (await destination.getAttribute('aria-pressed') !== 'true') await destination.click();
         check(await delay.getAttribute('type') === 'number' && await delay.getAttribute('min') === '0' &&
           Number(await delay.getAttribute('max')) === maxDelay && await delay.getAttribute('step') === '1', 'Composer delay input must expose the configured whole-minute bounds.');
         await delay.fill('-1'); check(await delay.evaluate(element => (element as HTMLInputElement).validity.rangeUnderflow), 'Negative first-comment delay must fail native validation.');

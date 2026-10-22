@@ -80,6 +80,7 @@
 .ruleClosed { background: var(--warning-soft); color: var(--warning); }
 .ruleDetail { font-weight: 450; }
 .replyFoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.replyActions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
 .count, .countLow { font-size: 12px; font-variant-numeric: tabular-nums; }
 .count { color: var(--ink-soft); }
 .countLow { color: var(--warning); font-weight: 700; }

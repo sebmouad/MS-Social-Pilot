@@ -7,7 +7,6 @@ import { requireViewer } from '@/server/context';
 import { operationFailure } from '@/lib/operation-error';
 import { readPinnedMetrics } from '@/modules/analytics/pins/server/pins';
 import { pinnedSearchSchema } from './search';
-import { WorkflowNav } from '@/modules/analytics/ui/reports/WorkflowNav';
 import { formatValue as formatAnalyticsValue, formatWhen } from '@/modules/analytics/ui/reports/format';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 import { PinManager } from './PinManager';
@@ -29,7 +28,7 @@ export default async function PinnedPage({ searchParams }: { searchParams: Promi
     data = await readPinnedMetrics({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { ...parsed.data, compare: 'previous' });
   }
   catch (error) { failure = operationFailure(error, t('Pinned metrics could not be loaded. Please try again.')).error; }
-  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/insights/pins" />}><div className={styles.root}>
+  return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
     <PageHeader module="analytics" title={t('Pinned metrics')} description={<>{t("Keep the measures you watch most in one place. Pins are personal; values come from stored analytics for the resources you can access.")}</>} />
     {failure && <section className={styles.panel} role="alert"><h2>{t("Pinned metrics could not be loaded")}</h2><p>{failure}</p><a href="/insights/pins">{t("Try again")}</a></section>}
     {data && <PinManager copy={copy} locale={locale} max={data.max} pinnable={data.pinnable} pins={data.pins.map(p => ({

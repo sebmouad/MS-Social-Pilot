@@ -27,7 +27,7 @@ function ThreadToolsState({ kind, id, canWrite, canReply, allowed, headline, det
     {confirmDialog}
     <ThreadProductivity kind={kind} id={id} canWrite={canWrite} locale={locale} onUseSavedReply={canWrite && canReply ? useSavedReply : undefined} />
     {canWrite && canReply
-      ? <ReplyBox key={id} id={id} kind={kind} allowed={allowed} headline={headline} detail={detail} value={draft} onChange={setDraft} locale={locale} />
+      ? <ReplyBox key={id} id={id} kind={kind} allowed={allowed} headline={headline} detail={detail} value={draft} onChange={setDraft} onInsertSavedReply={useSavedReply} locale={locale} />
       : <p>{copy.readOnly}</p>}
   </>;
 }

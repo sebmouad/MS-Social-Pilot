@@ -326,9 +326,9 @@ async function main() {
     expect(!desktop.overflow, 'Desktop Reports page must not overflow horizontally at 1440px.');
     expect(desktop.theme.length > 0, 'Grove theme tokens should resolve in the rendered UI.');
     const phone = await renderReports(390, 'nightfall', async page => {
-      await page.getByRole('button', { name: 'Menu & filters' }).click();
-      const navigation = page.getByRole('dialog', { name: 'Analytics navigation' });
-      await navigation.getByRole('button', { name: 'Prepare report' }).click();
+      const prepare = page.getByRole('button', { name: 'Prepare report' });
+      await prepare.scrollIntoViewIfNeeded();
+      await prepare.click();
       const dialog = page.getByRole('dialog', { name: 'Prepare report' });
       expect(await dialog.isVisible(), 'Manual report dialog should open at phone width.');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Phone report dialog must not cause page overflow.');

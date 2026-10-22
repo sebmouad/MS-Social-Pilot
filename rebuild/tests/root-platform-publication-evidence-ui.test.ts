@@ -6,7 +6,6 @@ vi.mock('../src/server/config/access', () => ({ requireRootPage: state.access })
 vi.mock('../src/server/root/platform-publication-evidence', () => ({ readRootPlatformPublicationEvidence: state.read, loadRootEvidencePolicy: state.policy, loadRootEvidenceCopy: state.copy }));
 vi.mock('../src/server/platforms/publication-recovery', () => ({ installedPublicationRecovery: () => state.noHook ? undefined : { readEvidence: vi.fn() } }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
-vi.mock('../src/components/SidebarDock', () => ({ SidebarDock: ({ children }: { children: import('react').ReactNode }) => children }));
 import { RootPlatformPublicationEvidence } from '../src/modules/root/ui/RootPlatformPublicationEvidence';
 import { OperationError } from '../src/lib/operation-error';
 import { ROOT_EVIDENCE_POLICY } from '../src/lib/config/root-evidence-policy';

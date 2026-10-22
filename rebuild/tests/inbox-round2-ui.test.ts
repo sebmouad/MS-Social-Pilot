@@ -16,7 +16,7 @@ vi.mock('@/modules/inbox/server/details', () => ({ readInboxContactDetails: asyn
 vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/modules/inbox/ui/scope', () => ({ inboxScope: async (viewer: { permissions: { pageScope: { all: boolean; ids: string[] } } }) => ({ ids: [], constraints: viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids }, param: undefined }) }));
-vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children }: { sidebar: import('react').ReactNode; children: import('react').ReactNode }) => createElement('main', null, createElement('aside', null, sidebar), children) }));
+vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children }: { children: import('react').ReactNode }) => createElement('main', null, children) }));
 vi.mock('@/modules/inbox/server/read', async importOriginal => ({ ...await importOriginal<typeof import('../src/modules/inbox/server/read')>(), readInboxList: state.list, readInboxThread: state.thread }));
 vi.mock('@/modules/inbox/server/actions', () => ({ canManageInbox: state.manage, canManageInboxWorkflow: state.workflow }));
 vi.mock('@/modules/inbox/server/providers', () => ({ inboxCapabilities: async () => ({ reply: true, hide: true, remove: false }) }));

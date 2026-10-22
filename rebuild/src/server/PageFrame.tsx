@@ -15,7 +15,7 @@ import { workspaceUsesTasks } from '@/modules/tasks/server/usage';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 import { pendingApprovalCount } from '@/modules/publishing/server/approvals-badge';
 
-export async function PageFrame({ module, children, sidebar, sidebarWhen, scopedAccess = false }: { module: ModuleId; children: ReactNode; sidebar?: ReactNode; sidebarWhen?: readonly string[]; scopedAccess?: boolean }) {
+export async function PageFrame({ module, children, scopedAccess = false }: { module: ModuleId; children: ReactNode; scopedAccess?: boolean }) {
   const viewer = await requireViewer({ module, channelScoped: scopedAccess });
   const enabledModules = (Object.keys(viewer.entitlements.modules) as ModuleId[]).filter(id => canUseModule(viewer.entitlements, id) && (id === 'home' || canAccessModule(viewer.permissions, id)));
   const enabledFeatures = Object.keys(viewer.entitlements.features).filter(id => canUseFeature(viewer.entitlements, id) && canAccessFeature(viewer.permissions, id));
@@ -41,6 +41,6 @@ export async function PageFrame({ module, children, sidebar, sidebarWhen, scoped
   // Pending Approvals show as a badge on the Content tabs.
   const tabCounts: Record<string, number> = {};
   if (module === 'publishing' && enabledFeatures.includes('publishing/approvals')) tabCounts['publishing/approvals'] = await pendingApprovalCount({ userId: viewer.user.id, workspaceId: viewer.workspaceId });
-  return <AppShell tabCounts={tabCounts} activeModule={module} enabledModules={enabledModules} enabledFeatures={enabledFeatures} writableFeatures={writableFeatures} rootAccess={viewer.user.isInstanceOwner} userName={viewer.user.name} workspaceName={viewer.membership.workspace.name} workspaceId={viewer.workspaceId} workspaces={viewer.workspaces.map(item => ({ id: item.workspace.id, name: item.workspace.name }))} sidebar={sidebar} sidebarWhen={sidebarWhen} paletteCopy={paletteCopy}
+  return <AppShell tabCounts={tabCounts} activeModule={module} enabledModules={enabledModules} enabledFeatures={enabledFeatures} writableFeatures={writableFeatures} rootAccess={viewer.user.isInstanceOwner} userName={viewer.user.name} workspaceName={viewer.membership.workspace.name} workspaceId={viewer.workspaceId} workspaces={viewer.workspaces.map(item => ({ id: item.workspace.id, name: item.workspace.name }))} paletteCopy={paletteCopy}
     copy={copy} policy={policy} channels={channels.map(channel => ({ id: channel.id, name: channel.name, pictureUrl: channel.pictureUrl, health: channel.health }))} initialScope={remembered.ids} initialScopeDropped={remembered.dropped} optionalAreas={optionalAreas} initialCollapsed={jar.get(policy.sidebarCookie)?.value === '1'}>{children}</AppShell>;
 }

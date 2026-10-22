@@ -76,7 +76,7 @@ async function main(){
     check(await summary.evaluate(element=>element.parentElement?.hasAttribute('open')),'Receipt details must open from keyboard');
     check(await section.getByText('native89_synthetic_upload',{exact:true}).isVisible(),'Expanded receipt details must show the retained upload ID');
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);check(!overflow,'Root evidence must not widen document');
-    if(width===390){await page.getByRole('button',{name:'Menu & filters',exact:true}).click();check(await page.getByLabel('Publication operation ID',{exact:true}).inputValue()===operationId,'Operation filter must stay in sidebar drawer');await page.locator('.shell-context-close').click();}
+    if(width===390){const filter=page.getByLabel('Publication operation ID',{exact:true});await filter.scrollIntoViewIfNeeded();check(await filter.inputValue()===operationId,'Operation filter must keep its value in-page');check(await filter.evaluate(element=>Boolean(element.closest('main'))),'Operation filter must live in the page, not the menu drawer');}
     await page.screenshot({path:`/private/tmp/native89-root-${theme}-${width}.png`,animations:'disabled'});views++;
    }finally{await context.close();}
   }

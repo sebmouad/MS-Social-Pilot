@@ -379,6 +379,6 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
 .panel h2, .panel h3 { letter-spacing: -.018em; }
 .panel h2 { font-size: var(--text-lg); font-weight: 650; }
 .panel .ui-metric { box-shadow: none; background: color-mix(in srgb, var(--surface-muted) 60%, var(--surface)); border-color: var(--line-subtle); }
-.ui-input, .ui-select__trigger, .ui-filter select, .shell-sidebar-filter select, .shell-sidebar-filter input:not([type=checkbox]) { border-radius: var(--radius-sm); border-color: var(--control-border); }
+.ui-input, .ui-select__trigger, .ui-filter select { border-radius: var(--radius-sm); border-color: var(--control-border); }
 .ui-chip, .ui-badge { font-weight: 650; }
 @media (max-width: 760px) { .panel { padding: 16px; } }

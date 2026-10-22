@@ -1,11 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { OperationError } from '@/lib/operation-error';
-const m = vi.hoisted(() => ({ viewer: vi.fn(), authorize: vi.fn(), resolved: vi.fn(), moderate: vi.fn(), remove: vi.fn(), config: vi.fn(), guard: vi.fn() }));
+const m = vi.hoisted(() => ({ viewer: vi.fn(), authorize: vi.fn(), resolved: vi.fn(), moderate: vi.fn(), remove: vi.fn(), assign: vi.fn(), config: vi.fn(), guard: vi.fn() }));
 vi.mock('@/server/context', () => ({ requireViewer: m.viewer }));
 vi.mock('@/server/request-origin', () => ({ requestOrigin: () => 'https://app.example' }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: m.config }));
 vi.mock('@/modules/inbox/server/access', () => ({ authorizeInbox: m.authorize }));
 vi.mock('@/modules/inbox/server/actions', () => ({ setInboxResolved: m.resolved, moderateInboxComment: m.moderate, deleteInboxComment: m.remove }));
+vi.mock('@/modules/inbox/server/productivity', () => ({ performInboxProductivityAction: m.assign }));
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: m.guard }));
 import { POST } from '@/app/api/inbox/bulk/route';
 const actor = { userId: 'user', workspaceId: 'workspace' };
@@ -14,7 +15,7 @@ const input = { action: 'resolve', items, confirmation: 'BULK RESOLVE 1 INBOX IT
 const request = (body: unknown = input, origin: string | null = 'https://app.example', query = '') => new Request(`https://app.example/api/inbox/bulk${query}`, { method: 'POST', headers: { ...(origin === null ? {} : { origin }), 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 beforeEach(() => {
   vi.resetAllMocks(); m.viewer.mockResolvedValue({ user: { id: actor.userId }, workspaceId: actor.workspaceId });
-  m.config.mockResolvedValue(2); m.resolved.mockResolvedValue({ ok: true }); m.authorize.mockResolvedValue({ channelIds: ['channel'] });
+  m.config.mockResolvedValue(2); m.resolved.mockResolvedValue({ ok: true }); m.assign.mockResolvedValue({ ok: true, action: 'assign' }); m.authorize.mockResolvedValue({ channelIds: ['channel'] });
   m.guard.mockImplementation((_id, run) => run());
 });
 it.each([null, 'https://attacker.example', 'invalid'])('rejects missing, foreign or malformed origin %s', async origin => {
@@ -59,4 +60,19 @@ it('preserves per-item resource scope failures without reporting a successful mu
 });
 it('hides unexpected authorization backend errors', async () => {
   m.authorize.mockRejectedValue(new Error('private database password')); const response = await POST(request()); expect(response.status).toBe(502); expect(JSON.stringify(await response.json())).not.toContain('password');
+});
+it('assigns through the same service as MCP, naming the assignee per item', async () => {
+  const body = { action: 'assign', items, assigneeId: 'member-1', confirmation: 'BULK ASSIGN 1 INBOX ITEMS TO member-1' };
+  const response = await POST(request(body));
+  expect(response.status).toBe(200);
+  expect(m.assign).toHaveBeenCalledWith(actor, { action: 'assign', kind: 'comment', id: 'one', assigneeId: 'member-1', confirmation: 'ASSIGN INBOX comment one TO member-1' });
+  expect(await response.json()).toMatchObject({ action: 'assign', requested: 1, succeeded: 1, failed: 0, results: [{ id: 'one', ok: true, assigneeId: 'member-1' }] });
+});
+it.each([
+  { action: 'assign', items, confirmation: 'BULK ASSIGN 1 INBOX ITEMS TO UNASSIGNED' },
+  { action: 'assign', items, assigneeId: null, confirmation: 'BULK ASSIGN 1 INBOX ITEMS TO member-1' },
+  { action: 'assign', items: [{ kind: 'review', id: 'one' }], assigneeId: null, confirmation: 'BULK ASSIGN 1 INBOX ITEMS TO UNASSIGNED' },
+  { ...input, assigneeId: 'member-1' },
+])('rejects invalid bulk assign payloads before any action: %j', async body => {
+  const response = await POST(request(body)); expect(response.status).toBe(400); expect(m.assign).not.toHaveBeenCalled();
 });

@@ -65,7 +65,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
     });
   } catch (error) {
     if (!(error instanceof OperationError)) throw error;
-    return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack"><PageHeader module="ads" title={t('text261')} />
+    return <PageFrame module="ads"><div className="page-stack">{sidebar}<PageHeader module="ads" title={t('text261')} />
       <section className="panel"><RouteNotice error className="ui-error" focusKey={localizeAdsMessage(catalogs, locale, error.message)}>{localizeAdsMessage(catalogs, locale, error.message)}</RouteNotice></section></div></PageFrame>;
   }
   const managementPort = adsDirectoryManagementPort();
@@ -73,7 +73,8 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
   const query = new URLSearchParams(Object.entries(values).flatMap(([key, value]) => (value !== undefined && key !== 'offset' ? [[key, value]] : [])));
   const pageLink = (offset: number) => `/insights/ads/manage?${new URLSearchParams([...query, ['offset', String(offset)]])}`;
   const accountName = new Map(accounts.map(account => [account.id, account.name]));
-  return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
+  return <PageFrame module="ads"><div className="page-stack">
+    {sidebar}
     {tabs}
     <PageHeader module="ads" title={t('text261')} description={<>{directory.total} {t('text071')}{directory.range.from} {t('text072')}{directory.range.to}</>} />
     <section className="panel">

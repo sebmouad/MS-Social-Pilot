@@ -1,9 +1,9 @@
 'use client';
 import { useInboxCatalog } from './copy-context';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, ConfirmDialog, ShortcutHint, useShortcut } from '@/components';
+import { Button, ConfirmDialog, Dialog, Field, Select, ShortcutHint, useShortcut } from '@/components';
 import { IndeterminateCheckbox } from '@/components/IndeterminateCheckbox';
 import { useToast } from '@/components/Toast';
 import { BULK_INVERSE, bulkConfirmation, type BulkAction } from '@/modules/inbox/bulk';
@@ -15,8 +15,11 @@ import styles from './inbox-round3.module.css';
 /** Hide, show again and delete reach the platform, so they ask first. Resolve and reopen are local and reversible, so they run now and offer Undo. */
 const ASKS_FIRST: readonly BulkAction[] = ['hide', 'unhide', 'delete'];
 
+type Member = { id: string; name: string | null };
+const isMember = (value: unknown): value is Member => typeof value === 'object' && value !== null && typeof (value as Member).id === 'string' && ((value as Member).name === null || typeof (value as Member).name === 'string');
+
 /**
- * Selection toolbar for the Inbox list: select the page, then resolve, hide or delete the chosen items.
+ * Selection toolbar for the Inbox list: select the page, then resolve, assign, hide or delete the chosen items.
  * Which actions appear is decided from what the signed-in person may do on each selected item; the shared bulk
  * service decides again on the server. Partly failed requests keep the failed items selected so none are lost.
  */
@@ -27,28 +30,52 @@ export function BulkBar({ locale, maxItems }: { locale: InboxLocale; maxItems: n
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState<{ action: BulkAction; items: SelectableItem[] } | null>(null);
+  const [assigning, setAssigning] = useState<{ items: SelectableItem[] } | null>(null);
+  const [members, setMembers] = useState<Member[] | null>(null);
+  const [membersFailed, setMembersFailed] = useState(false);
+  const [choice, setChoice] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState('');
   const chosen = [...selection.items.values()];
   const all = (test: (item: SelectableItem) => boolean) => chosen.length > 0 && chosen.every(test);
   const resolveAction: BulkAction | null = all(item => item.can.resolve) ? (all(item => !item.resolved) ? 'resolve' : all(item => item.resolved) ? 'reopen' : null) : null;
   const hideAction: BulkAction | null = all(item => item.kind === 'comment' && item.can.hide) ? (all(item => !item.hidden) ? 'hide' : all(item => item.hidden) ? 'unhide' : null) : null;
   const canDelete = all(item => item.kind === 'comment' && item.can.remove);
+  const canAssign = all(item => item.can.assign);
   const tooMany = chosen.length > maxItems;
   const platformNames = (items: SelectableItem[]) => [...new Set(items.map(item => item.platformName))].join(' / ');
   const pageCount = selection.pageItems.length;
   const allSelected = pageCount > 0 && selection.pageItems.every(item => selection.has(item.key));
 
-  useShortcut('escape', () => selection.clear(), chosen.length > 0 && !asking);
+  useShortcut('escape', () => selection.clear(), chosen.length > 0 && !asking && !assigning);
+
+  // The assignee directory is workspace-wide, so the first selected item lends its team list to the whole dialog.
+  useEffect(() => {
+    if (!assigning) return;
+    let live = true;
+    setMembers(null); setMembersFailed(false); setChoice(null); setAssignError('');
+    const first = assigning.items[0]!;
+    fetch(`/api/inbox/productivity?kind=${first.kind}&id=${encodeURIComponent(first.id)}`, { cache: 'no-store' })
+      .then(async response => {
+        const body: unknown = await response.json().catch(() => null);
+        if (!response.ok || !body || typeof body !== 'object') throw new Error('unavailable');
+        const list = (body as { assignment?: { members?: unknown } }).assignment?.members;
+        if (!Array.isArray(list) || !list.every(isMember)) throw new Error('unavailable');
+        if (live) setMembers(list);
+      })
+      .catch(() => { if (live) setMembersFailed(true); });
+    return () => { live = false; };
+  }, [assigning]);
 
   /** Runs one bulk request and reports truthfully. Returns an error message only when nothing was applied. */
-  async function execute(action: BulkAction, items: SelectableItem[], inline: boolean): Promise<string | null> {
+  async function execute(action: BulkAction, items: SelectableItem[], inline: boolean, assigneeId?: string | null): Promise<string | null> {
     setBusy(true);
-    const outcome = await runBulkInboxAction({ action, items: items.map(({ kind, id }) => ({ kind, id })), confirmation: bulkConfirmation(action, items.length) }).catch(() => null);
+    const outcome = await runBulkInboxAction({ action, items: items.map(({ kind, id }) => ({ kind, id })), ...(action === 'assign' ? { assigneeId: assigneeId ?? null } : {}), confirmation: bulkConfirmation(action, items.length, assigneeId) }).catch(() => null);
     setBusy(false);
-    if (!outcome) { if (!inline) toast.failed(copy.failedTitle, () => { void execute(action, items, false); }, copy.retry, copy.unconfirmed); return copy.unconfirmed; }
-    if (!outcome.ok) { if (!inline) toast.failed(copy.failedTitle, () => { void execute(action, items, false); }, copy.retry, outcome.error); return outcome.error; }
+    if (!outcome) { if (!inline) toast.failed(copy.failedTitle, () => { void execute(action, items, false, assigneeId); }, copy.retry, copy.unconfirmed); return copy.unconfirmed; }
+    if (!outcome.ok) { if (!inline) toast.failed(copy.failedTitle, () => { void execute(action, items, false, assigneeId); }, copy.retry, outcome.error); return outcome.error; }
     const done = outcome.results.filter(result => result.ok);
     const failedKeys = outcome.results.filter(result => !result.ok).map(result => `${result.kind}:${result.id}`);
-    if (!done.length) { const first = outcome.results.find(result => !result.ok); const message = first && !first.ok ? first.error : copy.unconfirmed; if (!inline) toast.failed(copy.failedTitle, () => { void execute(action, items, false); }, copy.retry, message); return message; }
+    if (!done.length) { const first = outcome.results.find(result => !result.ok); const message = first && !first.ok ? first.error : copy.unconfirmed; if (!inline) toast.failed(copy.failedTitle, () => { void execute(action, items, false, assigneeId); }, copy.retry, message); return message; }
     selection.replace(failedKeys);
     router.refresh();
     const inverse = BULK_INVERSE[action];
@@ -69,8 +96,17 @@ export function BulkBar({ locale, maxItems }: { locale: InboxLocale; maxItems: n
   }
 
   function start(action: BulkAction) {
+    if (action === 'assign') { setAssigning({ items: chosen }); return; }
     if (ASKS_FIRST.includes(action)) setAsking({ action, items: chosen });
     else void execute(action, chosen, false);
+  }
+
+  async function confirmAssign() {
+    if (!assigning || members === null) return;
+    setAssignError('');
+    const failure = await execute('assign', assigning.items, true, choice);
+    if (failure) setAssignError(failure);
+    else setAssigning(null);
   }
 
   const confirmCopy = copy.confirm;
@@ -78,6 +114,8 @@ export function BulkBar({ locale, maxItems }: { locale: InboxLocale; maxItems: n
     : asking.action === 'unhide' ? { title: confirmCopy.unhideTitle, sentence: confirmCopy.unhideSentence, label: confirmCopy.unhideConfirm, danger: false }
     : { title: confirmCopy.deleteTitle, sentence: confirmCopy.deleteSentence, label: confirmCopy.deleteConfirm, danger: true });
   const reason = tooMany ? copy.limit(maxItems) : undefined;
+  const assignName = choice === null ? null : members?.find(member => member.id === choice)?.name ?? copy.teammate;
+  const assignSentence = assigning ? (assignName === null ? copy.unassignSentence(assigning.items.length) : copy.assignSentence(assigning.items.length, assignName)) : '';
 
   return <div className={styles.bulk} role="region" aria-label={copy.region} data-active={chosen.length > 0 || undefined}>
     <label className={styles.selectAll}>
@@ -86,14 +124,24 @@ export function BulkBar({ locale, maxItems }: { locale: InboxLocale; maxItems: n
     </label>
     {chosen.length > 0 ? <div className={styles.bulkActions}>
       {resolveAction ? <Button size="sm" variant="secondary" disabled={busy || tooMany} title={reason} onClick={() => start(resolveAction)}>{copy[resolveAction]}</Button> : null}
+      {canAssign ? <Button size="sm" variant="secondary" disabled={busy || tooMany} title={reason} onClick={() => start('assign')}>{copy.assign}</Button> : null}
       {hideAction ? <Button size="sm" variant="secondary" disabled={busy || tooMany} title={reason} onClick={() => start(hideAction)}>{copy[hideAction]}</Button> : null}
       {canDelete ? <Button size="sm" variant="danger" disabled={busy || tooMany} title={reason} onClick={() => start('delete')}>{copy.delete}</Button> : null}
-      {!resolveAction && !hideAction && !canDelete ? <span className={styles.bulkNote}>{copy.mixed}</span> : null}
+      {!resolveAction && !canAssign && !hideAction && !canDelete ? <span className={styles.bulkNote}>{copy.mixed}</span> : null}
       <Button size="sm" variant="quiet" disabled={busy} onClick={() => selection.clear()} trailing={<ShortcutHint chord="escape" />}>{copy.clear}</Button>
       {tooMany ? <span className={styles.bulkNote} role="status">{copy.limit(maxItems)}</span> : null}
     </div> : null}
     {askText && asking ? <ConfirmDialog open title={askText.title} objectName={confirmCopy.object(asking.items.length)} consequence={askText.sentence(asking.items.length, platformNames(asking.items))}
       confirmLabel={askText.label} cancelLabel={confirmCopy.cancel} pendingLabel={confirmCopy.pending} failureLabel={confirmCopy.failure} danger={askText.danger}
       onConfirm={() => execute(asking.action, asking.items, true)} onClose={() => setAsking(null)} /> : null}
+    {assigning ? <Dialog open title={copy.assignTitle} description={members === null && !membersFailed ? copy.assignMembersLoading : assignSentence} closeLabel={confirmCopy.cancel}
+      busy={busy} onClose={() => { if (!busy) setAssigning(null); }}
+      actions={<><Button variant="secondary" data-dialog-cancel disabled={busy} onClick={() => setAssigning(null)}>{confirmCopy.cancel}</Button>
+        <Button variant="primary" disabled={busy || members === null} busy={busy} onClick={() => void confirmAssign()}>{busy ? confirmCopy.pending : copy.assign}</Button></>}>
+      {membersFailed ? <p role="alert" className={styles.error}>{copy.assignMembersError}</p> : members === null ? null : <Field label={copy.assignTo}>
+        <Select aria-label={copy.assignTo} value={choice ?? ''} disabled={busy} searchable={members.length >= 8} options={[{ value: '', label: copy.unassigned }, ...members.map(member => ({ value: member.id, label: member.name || copy.teammate }))]} onChange={value => setChoice(value || null)} />
+      </Field>}
+      {assignError ? <p role="alert" className={styles.error}>{assignError}</p> : null}
+    </Dialog> : null}
   </div>;
 }

@@ -32,6 +32,7 @@ export const xConnection: PlatformHost['connection'] = {
   async renewToken({ accessToken, refreshToken }) {
     if (!refreshToken) return null;
     const next = await (await configuredXAdapter()).refreshToken(refreshToken);
-    return { accessToken: next.accessToken, expiresAt: next.expiresAt, refreshToken: next.refreshToken ?? refreshToken };
+    // The grant has no separate reported end; Root keeps the stored grant expiry and rotates destination copies.
+    return { accessToken: next.accessToken, expiresAt: next.expiresAt, refreshToken: next.refreshToken ?? refreshToken, rotateDestinationCopies: true };
   },
 };

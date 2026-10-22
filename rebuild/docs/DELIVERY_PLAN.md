@@ -1,6 +1,6 @@
 # Shared delivery plan
 
-Updated 2026-10-22 (lane 47), registry schema **135**.
+Updated 2026-10-22 (design v2 B9), registry schema **136**.
 [GOAL.md](GOAL.md) remains active; [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md)
 is unchanged. [ARCHITECTURE.md](ARCHITECTURE.md) and
 [AGENT_HANDOFF.md](AGENT_HANDOFF.md) separate current source from historical
@@ -39,7 +39,7 @@ browser matrices retain unresolved findings and their original merge coverage.
 The latest smoke suite renders pages and invokes routes with synthetic mocks in
 EN/FR; it does not run a server, browser, real database or provider.
 
-Current schema is 135. Module-owned services retain auth, tenant/resource scope,
+Current schema is 136. Module-owned services retain auth, tenant/resource scope,
 confirmations and audit; Facebook logic remains platform-owned. Leave verified
 working-tree changes for integration; do not replay old release work.
 
@@ -155,3 +155,13 @@ from font DNS. Loopback test/browser restrictions also block a green release
 gate in this sandbox. Exact paths, proposed edits and scoped test evidence:
 [design-v2/B7_IMPLEMENTATION.md](design-v2/B7_IMPLEMENTATION.md). No service,
 provider, migration, deploy or production change is part of B7.
+
+## Design v2 B9 — 2026-10-22
+
+This batch ships B9 (see HANDOVER for the ship record):
+adapter/SidebarDock removal, rewritten verify selectors, data-deletion
+catalog entries, atomic Root token refresh, and the Inbox saved-replies
+menu plus bulk Assign. Next reviewable work after B9: run the v2 browser
+matrix on the rewritten selectors (batch 5 above), a live-provider token
+renewal run, and the `DESIGN.md` Layout rewrite for the single-sidebar
+shell. Schema is 136.

@@ -1,5 +1,4 @@
 import { RootFilters } from './RootFilters';
-import { SidebarDock } from '@/components/SidebarDock';
 import { Button } from '@/components/Button';
 import { rootActivityUrl, type RootActivitySearch } from '@/lib/root-activity';
 import type { listRootActivity } from '@/server/root/activity';
@@ -10,7 +9,7 @@ export async function RootActivityFilters({ values, page, policy }: { values: Ro
   const text = (key: string) => typeof values[key] === 'string' ? values[key] as string : '';
   const query = page ? { ...page.filters, limit: page.limit } : {};
   const copy = await loadRootInterfaceCopy();
-  return <SidebarDock><section className="root-audit-filters" aria-label={copy.activityFiltersTitle}>
+  return <section className="root-audit-filters" aria-label={copy.activityFiltersTitle}>
     <RootFilters title={copy.activityFiltersTitle} route="/root/activity" filters={['q', 'workspaceId', 'from', 'to'].map(key => ({ key, label: key, value: text(key) })).filter(item => item.value)}>
     {policy && <form key={JSON.stringify(values)} noValidate action="/root/activity">
       <label className="ui-field">{copy.activityActionPerson}<input className="ui-input" name="q" defaultValue={text('q')} maxLength={policy.searchCharacters} placeholder={copy.activityActionPlaceholder} /></label>
@@ -26,5 +25,5 @@ export async function RootActivityFilters({ values, page, policy }: { values: Ro
       {page?.newerCursor && <a href={rootActivityUrl(query, page.newerCursor)}>{copy.activityNewer}</a>}
       {page?.olderCursor && <a href={rootActivityUrl(query, page.olderCursor)}>{copy.activityOlder}</a>}
     </nav>
-  </RootFilters></section></SidebarDock>;
+  </RootFilters></section>;
 }

@@ -61,7 +61,7 @@ describe('installed LinkedIn/Pinterest shared connection hosts', () => {
     expect(await connection.renewToken!({ accessToken: 'old', refreshToken: null, signal: new AbortController().signal })).toBeNull();
     const expiresAt = new Date('2030-01-01');
     mocks.renewal.mockResolvedValue({ accessToken: 'fresh', refreshToken: null, expiresAt });
-    expect(await connection.renewToken!({ accessToken: 'old', refreshToken: 'refresh', signal: new AbortController().signal })).toEqual({ accessToken: 'fresh', refreshToken: 'refresh', expiresAt });
+    expect(await connection.renewToken!({ accessToken: 'old', refreshToken: 'refresh', signal: new AbortController().signal })).toEqual({ accessToken: 'fresh', refreshToken: 'refresh', expiresAt, rotateDestinationCopies: true });
   });
   it.each([[renewLinkedinTokens, 'linkedin', linkedin], [renewPinterestTokens, 'pinterest', pinterest]] as const)('wires automatic renewal through shared authorization and rotation', async (run, provider, policy) => {
     const result = { examined: 1, updated: 1, skipped: 0, failed: 0 };

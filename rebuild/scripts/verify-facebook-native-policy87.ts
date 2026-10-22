@@ -49,9 +49,7 @@ async function main(){
     await context.addCookies([{name:'msp_session',value:token,url:origin,httpOnly:true,sameSite:'Lax'}]);
     const page=await context.newPage();await page.goto(`${origin}/root/platforms/facebook`,{waitUntil:'networkidle'});
     await page.evaluate(t=>{document.documentElement.dataset.theme=t;},theme);
-    if(width<600)await page.getByRole('button',{name:'Menu & filters',exact:true}).click();
     await page.getByLabel('Find a setting',{exact:true}).fill(key);
-    if(width<600)await page.locator('.shell-context-close').click();
     const input=page.getByRole('spinbutton',{name:'Native response maximum (bytes)',exact:true});await input.waitFor();
     check(await input.inputValue()==='2048','Root UI must reflect the MCP-saved value');
     check(await page.getByText('Stored; runtime wiring pending',{exact:false}).count()>0,'Root must not advertise customer readiness');

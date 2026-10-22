@@ -5,7 +5,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ rename: vi.fn(), refresh: vi.fn() }));
 vi.mock('@/modules/media/ui/rename-action', () => ({ renameMediaAction: state.rename }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: state.refresh }) }));
-vi.mock('@/components/SidebarDock', () => ({ SidebarDock: ({ children }: { children: ReactNode }) => children }));
 import { MediaLibrary, type Asset } from '@/modules/media/ui/MediaLibrary';
 const asset: Asset = { id: '11111111-2222-4333-8444-555555555555', kind: 'image', mimeType: 'image/jpeg', name: 'Spring.jpg', size: 100, createdAt: '2026-10-21T00:00:00Z', source: 'stored-image', width: null, height: null, inUse: false, holderCount: 0, holders: [] };
 let root: ReturnType<typeof createRoot>, container: HTMLDivElement;

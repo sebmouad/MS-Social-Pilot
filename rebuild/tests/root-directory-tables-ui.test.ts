@@ -11,7 +11,6 @@ vi.mock('@/modules/root/server/admin/sessions', () => ({ listRootSessions: deps.
 vi.mock('@/modules/root/server/admin/errors', () => ({ listRootErrors: deps.errors }));
 vi.mock('@/server/root/directory', () => ({ listRootWorkspaces: deps.workspaces }));
 vi.mock('@/modules/root/ui/RootFrame', () => ({ RootFrame: ({ controls, children }: { controls: ReactNode; children: ReactNode }) => createElement('main', null, createElement('aside', null, controls), children) }));
-vi.mock('@/components/SidebarDock', () => ({ SidebarDock: 'aside' }));
 import { ROOT_INTERFACE_COPY } from '@/lib/config/root-interface-copy';
 import Connections from '../src/app/root/connections/page';
 import Sessions from '../src/app/root/sessions/page';

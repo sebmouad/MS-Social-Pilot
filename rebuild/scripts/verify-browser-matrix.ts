@@ -39,10 +39,10 @@ const passRoute = (route: Route) => route.continue();
 
 export const VIEWPORTS = [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const;
 export const FAMILIES = ['/home', '/content', '/create', '/inbox', '/insights', '/settings', '/tasks', '/agency'];
-/** Main-area candidates, tried in order; on desktop the sidebar's primary (filter apply) button is the page's main action. */
-export const MAIN_ACTION_SELECTORS = ['main .ui-button--primary:not(:disabled)', '#shell-filters .ui-button--primary', 'main button:not(:disabled)', 'main a[href]'] as const;
-/** On phones the sidebar is a closed drawer, so its primary action is verified after opening the drawer by keyboard. */
-export const DRAWER_MAIN_ACTION_SELECTOR = '#shell-filters .ui-button--primary';
+/** Main-area candidates, tried in order. Every page keeps its filters and actions in-page (the Page tools sheet was removed in B9). */
+export const MAIN_ACTION_SELECTORS = ['main .ui-button--primary:not(:disabled)', 'main button:not(:disabled)', 'main a[href]'] as const;
+/** The phone/tablet navigation drawer toggle. The drawer holds navigation only; page actions stay in main. */
+export const MENU_DRAWER_TOGGLE_SELECTOR = '.shell-menu-toggle';
 export type Finding = { code: string; count?: number; fingerprint?: string; control?: number; route?: string; theme?: string; viewport?: { width: number; height: number } };
 export type Cell = {
   route: string; theme: string; viewport: { width: number; height: number };
@@ -179,35 +179,9 @@ async function auditControls(page: Page, cell: Cell) {
   }
 }
 
-/** Phone: the closed drawer hides the sidebar action, so open it by keyboard, Tab to the action, then close it again. */
-async function checkDrawerMainAction(page: Page, drawer: Locator, cell: Cell) {
-  if (!await tabTo(page, drawer)) { cell.keyboard.mainAction = 'failed'; return; }
-  await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog');
-  await dialog.first().waitFor({ state: 'visible', timeout: 3000 });
-  await page.waitForTimeout(100);
-  const candidates = page.locator(DRAWER_MAIN_ACTION_SELECTOR);
-  let target: Locator | undefined;
-  for (let i = 0; i < await candidates.count(); i++) if (await candidates.nth(i).isVisible()) { target = candidates.nth(i); break; }
-  if (target) {
-    cell.keyboard.mainActionTarget = `drawer: ${DRAWER_MAIN_ACTION_SELECTOR}`;
-    // Only real Tab presses move focus, which starts inside the open drawer and must stay trapped there.
-    let reached = false;
-    for (let i = 0; i < 100 && !reached; i++) {
-      await page.keyboard.press(tabKey());
-      reached = await target.evaluate(element => element === document.activeElement);
-    }
-    cell.keyboard.mainAction = reached && await visibleFocus(target) ? 'passed' : 'failed';
-  }
-  await page.keyboard.press('Escape');
-  await dialog.first().waitFor({ state: 'hidden', timeout: 3000 });
-  await page.waitForTimeout(100);
-  if (!await drawer.evaluate(element => element === document.activeElement)) cell.findings.push({ code: 'DRAWER_FOCUS_NOT_RESTORED' });
-}
-
 async function checkKeyboard(page: Page, cell: Cell) {
-  // The phone drawer is a real shared dialog and holds the sidebar main action.
-  const drawer = page.locator('.shell-filter-toggle');
+  // The phone/tablet drawer is a real shared dialog holding the sidebar navigation.
+  const drawer = page.locator(MENU_DRAWER_TOGGLE_SELECTOR);
   if (await drawer.isVisible()) {
     cell.keyboard.dialog = await checkDialog(page, drawer, cell) ? 'passed' : 'failed';
   }
@@ -219,7 +193,6 @@ async function checkKeyboard(page: Page, cell: Cell) {
     if (target) break;
   }
   if (target) cell.keyboard.mainAction = await tabTo(page, target) ? 'passed' : 'failed';
-  else if (await drawer.isVisible()) await checkDrawerMainAction(page, drawer, cell);
   // Open only the known local task editor; never activate arbitrary customer writes.
   if (cell.route === '/tasks') {
     const opener = page.getByRole('button', { name: 'New task', exact: true });
@@ -699,7 +672,7 @@ export const NO_TABBABLE_AFTER_FOCUS = `(() => {
   });
 })()`;
 
-type Stop = { index: number; tag: string; role: string; label: string; popup: string; expanded: string; ring: boolean; inViewport: boolean; inMain: boolean; inShell: boolean; inFilters: boolean; isSubmit: boolean; selectedTab: boolean; skip: boolean };
+type Stop = { index: number; tag: string; role: string; label: string; popup: string; expanded: string; ring: boolean; inViewport: boolean; inMain: boolean; inShell: boolean; isSubmit: boolean; selectedTab: boolean; skip: boolean };
 
 /** Press Tab through the page once, tagging each stop so later checks can act on it without searching the tab order again. */
 async function tabWalk(page: Page, limit: number): Promise<{ stops: Stop[]; trapped: boolean; truncated: boolean }> {
@@ -723,7 +696,7 @@ async function tabWalk(page: Page, limit: number): Promise<{ stops: Stop[]; trap
       return {
         index, tag: e.tagName.toLowerCase(), role: e.getAttribute('role') || '', label: name, popup: e.getAttribute('aria-haspopup') || '', expanded: e.getAttribute('aria-expanded') || '',
         ring: (e.matches(':focus-visible') || (e.matches('input:is([type=date], [type=time], [type=datetime-local], [type=month], [type=week])') && e.matches(':focus'))) && (outline || s.boxShadow !== 'none'), inViewport: r.width > 0 && r.height > 0 && r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight,
-        inMain: !!e.closest('main'), inShell: !!e.closest('nav, aside, header'), inFilters: !!e.closest('#shell-filters'), isSubmit: e.matches('form button[type=submit], form input[type=submit], form button:not([type])'),
+        inMain: !!e.closest('main'), inShell: !!e.closest('nav, aside, header'), isSubmit: e.matches('form button[type=submit], form input[type=submit], form button:not([type])'),
         selectedTab: e.getAttribute('role') === 'tab' && e.getAttribute('aria-selected') === 'true', skip: e.classList.contains('shell-skip-link'),
       };
     }, stops.length);
@@ -887,9 +860,9 @@ export async function runKeyboardRound2(env: Readonly<Record<string, string | un
               if (menu) { cell.checks.menu = await checkMenu(page, menu) ? 'passed' : 'failed'; if (cell.checks.menu === 'failed') add({ code: 'MENU_KEYBOARD_FAILED' }, `menu "${menu.label}"`); }
               if (select) { cell.checks.select = await checkSelect(page, select) ? 'passed' : 'failed'; if (cell.checks.select === 'failed') add({ code: 'SELECT_KEYBOARD_FAILED' }, `select "${select.label}"`); }
               if (tab) { cell.checks.tabs = await checkTabs(page, tab) ? 'passed' : 'failed'; if (cell.checks.tabs === 'failed') add({ code: 'TABS_KEYBOARD_FAILED' }, `tab "${tab.label}"`); }
-              // Dialogs: calendar post dialogs, the phone drawer and the task editor are the safe openers (nothing is written by opening them).
+              // Dialogs: calendar post dialogs, the phone navigation drawer and the task editor are the safe openers (nothing is written by opening them).
               const dialogOpeners: Locator[] = [];
-              const drawer = page.locator('.shell-filter-toggle');
+              const drawer = page.locator(MENU_DRAWER_TOGGLE_SELECTOR);
               if (await drawer.isVisible()) dialogOpeners.push(drawer);
               const popupDialog = first(s => s.popup === 'dialog');
               if (popupDialog) dialogOpeners.push(kbdHandle(page, popupDialog));
@@ -911,9 +884,9 @@ export async function runKeyboardRound2(env: Readonly<Record<string, string | un
               const submit = first(s => s.isSubmit);
               if (submit) cell.checks.formSubmit = submit.ring ? 'passed' : 'failed';
               if (customerRoute(route) && !route.includes('?')) {
-                // The page's action may live in main or in the sidebar filter panel (empty pages keep their actions there).
-                cell.checks.mainAction = stops.some(s => s.inMain || s.inFilters) || await drawer.isVisible() ? 'passed' : 'failed';
-                if (cell.checks.mainAction === 'failed') add({ code: 'MAIN_ACTION_UNVERIFIED' }, 'no keyboard stop inside main or the sidebar filters, and no filter drawer');
+                // The page's action lives in main; the phone drawer holds navigation only.
+                cell.checks.mainAction = stops.some(s => s.inMain) ? 'passed' : 'failed';
+                if (cell.checks.mainAction === 'failed') add({ code: 'MAIN_ACTION_UNVERIFIED' }, 'no keyboard stop inside main');
               }
               await page.evaluate(() => document.querySelectorAll('[data-kbd-stop]').forEach(e => e.removeAttribute('data-kbd-stop')));
               if (cell.findings.length && shotCount < SCREENSHOT_LIMIT) {
@@ -1397,7 +1370,7 @@ export async function runRound5Fixes(env: Readonly<Record<string, string | undef
           } catch { cell.findings.push({ code: 'ROUTE_CHECK_FAILED' }); }
           finally { await page.close(); }
         }
-        // Saved views: expire the session, then save. Filters live in the sidebar on desktop; phones are verified with the drawer closed (not applicable).
+        // Saved views: expire the session, then save. The in-page form is the same on phones, so desktop covers it.
         if (viewport.width >= 1024) {
           const cell: Cell = { route: SAVED_VIEW_ROUTE, theme: theme.id, viewport, findings: [], keyboard: { mainAction: 'Not available', dialog: 'Not available' } };
           cells.push(cell);

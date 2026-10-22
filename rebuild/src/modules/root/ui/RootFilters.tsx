@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FilterPanel, FilterChips, type ActiveFilter } from '@/components/FilterPanel';
 import { useRootInterface } from './RootInterface';
 
-/** Applied filters stay in the sidebar; changing scope always resets pagination. */
+/** Applied filters stay in-page above the results; changing scope always resets pagination. */
 export function RootFilters({ title, route, filters, children }: { title: string; route: string; filters: ActiveFilter[]; children: ReactNode }) {
   const router = useRouter();
   const copy = useRootInterface();

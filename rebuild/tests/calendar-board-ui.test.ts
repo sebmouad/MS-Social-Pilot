@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('../src/modules/publishing/ui/calendar/actions', () => ({ reschedulePostAction: vi.fn() }));
 
-import { SidebarDockContext } from '../src/components/SidebarDock';
 import { PublishingCopyProvider } from '../src/modules/publishing/ui/kit/CopyProvider';
 import { publishingCopyDefaults } from '../src/modules/publishing/ui/kit/copy';
 import { CalendarBoard } from '../src/modules/publishing/ui/calendar/CalendarBoard';
@@ -15,7 +14,6 @@ import type { BoardDay, BoardPost } from '../src/modules/publishing/ui/calendar/
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
-let sidebar: HTMLDivElement;
 
 const samplePost: BoardPost = {
   id: 'post-1', text: 'A full calendar post with useful detail.', status: 'scheduled', whenIso: '2026-10-15T12:00:00.000Z', clockLabel: 'Server clock label', wallTime: { date: '2026-10-15', time: '23:30' }, movable: true,
@@ -36,9 +34,9 @@ const showModal = vi.fn(function (this: HTMLDialogElement) { this.setAttribute('
 const close = vi.fn(function (this: HTMLDialogElement) { this.removeAttribute('open'); });
 
 async function render(dayOverrides: Partial<BoardDay> = {}, locale: 'en' | 'fr' = 'en', catalog = publishingCopyDefaults) {
-  await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: sidebar }, createElement(PublishingCopyProvider, { catalog, locale, children: createElement(CalendarBoard, {
+  await act(async () => root.render(createElement(PublishingCopyProvider, { catalog, locale, children: createElement(CalendarBoard, {
     view: 'week', days: days.map(day => ({ ...day, ...dayOverrides })), timeZone: 'UTC', nowIso: '2026-10-14T09:00:00.000Z', canCreate: false, filterQuery: '&status=published', defaultScheduleTime: '09:00',
-  }) }))));
+  }) })));
 }
 
 beforeEach(() => {
@@ -46,10 +44,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   HTMLDialogElement.prototype.showModal = showModal;
   HTMLDialogElement.prototype.close = close;
-  container = document.createElement('div'); sidebar = document.createElement('div');
-  document.body.append(container, sidebar); root = createRoot(container);
+  container = document.createElement('div');
+  document.body.append(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); sidebar.remove(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
 describe('calendar post preview and navigation', () => {
   it('keeps invalid picked times in the move dialog with associated field errors', async () => {

@@ -250,10 +250,33 @@ Final validation from `rebuild/`:
 
 Supersedes the sidebar wording above. Filters, quick filters, shortcuts and the moderation page moved as follows; services, REST routes and MCP tools are unchanged.
 
-- **Header:** `InboxHeader` (no icon chip) shows the waiting count (open view only), an ⓘ with the page description, the Sync now button with "Last sync" inside an ⓘ, Saved replies, a keyboard-shortcuts icon button, the **Conversations | Rules** `LinkTabs` and the filter row: the page's single `FilterButton` (channel, type, status, hidden comments, page size; `InboxFilterRow`, one GET form), the search box and the removable chips. `InboxScreen` passes no `sidebar`, so there is no Page tools sheet.
+- **Header:** `InboxHeader` (no icon chip) shows the waiting count (open view only), an ⓘ with the page description, the Sync now button with "Last sync" inside an ⓘ, Saved replies, a keyboard-shortcuts icon button, the **Conversations | Rules** `LinkTabs` and the filter row: the page's single `FilterButton` (channel, type, status, hidden comments, page size; `InboxFilterRow`, one GET form), the search box and the removable chips. `InboxScreen` keeps its filters in-page; the transitional Page tools sheet was removed in B9.
 - **List pane:** quick filters (Unread, Unanswered, Negative, Mentions) are links in a horizontally scrolling row above the rows (current one marked `aria-current`); Older/Latest/Newer sit under the list; history paging sits in the thread's history header.
 - **Thread pane:** the header row holds the title and tags, Resolve/Hide/Delete (`ThreadToolbar`, durable deletion flow unchanged) and a details toggle. `ThreadDetailsLayout` shows the 320 px details pane beside the thread from 1280 px (collapsible) and as a drawer below it (Escape or scrim closes). Below 1024 px list and thread are separate pages; the reply box (`replyDock`) is sticky at the bottom.
 - **Keyboard:** J/K, R, E, X, `/` and `?` are unchanged (`InboxShortcuts`); the always-visible legend is removed.
 - **Rules:** `/inbox/rules` (tab) replaces `/inbox/moderation`, which redirects with 308 (declared in `inbox/manifest.ts`).
 - **Copy:** new `round3Copy.screen.*` keys (EN/FR, Root catalog keys `round3Copy.screen.*`). No new Root setting names beyond those catalog entries.
 - **Not done:** per-message moderation menu (actions stay as buttons in the thread header); the sidebar channel scope is not applied to the Inbox (it keeps its own single-channel `channel` filter); no browser, screenshot, keyboard-in-browser or screen-reader run.
+
+## Design v2 B9: reply-box saved menu and bulk Assign (2026-10-22, source only)
+
+- **Saved replies menu:** `ReplyBox` (`InboxActions.tsx`) takes
+  `onInsertSavedReply`; `ThreadTools` passes the existing insert handler for
+  members who can write and reply. The `Menu` lists saved-reply names from
+  the productivity service; choosing one fills the draft and never sends.
+  Loading, read-error, empty and no-handler states render disabled items.
+  Tests: `tests/inbox-reply-saved-menu.test.ts`.
+- **Bulk Assign:** `BULK_ACTIONS` gains `assign` (`inbox/bulk.ts`,
+  `inbox/server/bulk.ts`): conversations and comments only,
+  `assigneeId` (member id or null to unassign), exact `BULK ASSIGN <n> INBOX
+  ITEMS TO <member|UNASSIGNED>` confirmation, per-item outcomes through the
+  shared per-item services, no Undo. `BulkBar` opens the assign dialog with
+  the member picker fed by the first selected item's team list.
+  `POST /api/inbox/bulk` and `bulk_inbox_action` accept the same input
+  (MCP audits `assigneeId` in the receipt); no new MCP tool. New
+  `round3Copy.bulk.done.assign`, `assignSentence` and `unassignSentence`
+  templates (EN/FR) in `inbox.customerCopy`. Tests:
+  `tests/inbox-bulk-assign-mcp.test.ts` plus extended `inbox-round3*`,
+  `inbox-bulk-route` and `inbox-state-isolation`.
+- **Not done:** browser run of the menu and dialog at desktop/phone widths
+  in EN/FR with keyboard; phone bottom-sheet reply path.

@@ -12,7 +12,7 @@ import { ThreadTools } from '../src/modules/inbox/ui/ThreadTools';
 let root: ReturnType<typeof createRoot>; let host: HTMLDivElement;
 beforeEach(() => { (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true; host = document.createElement('div'); document.body.append(host); root = createRoot(host); });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
-const item = (id: string, can = true): SelectableItem => ({ key: `comment:${id}`, id, kind: 'comment', label: id, platformName: 'Facebook', resolved: false, hidden: false, can: { resolve: can, hide: can, remove: can } });
+const item = (id: string, can = true): SelectableItem => ({ key: `comment:${id}`, id, kind: 'comment', label: id, platformName: 'Facebook', resolved: false, hidden: false, can: { resolve: can, hide: can, remove: can, assign: can } });
 function SelectionState() { const selection = useInboxSelection(); return h('output', null, [...selection.items.values()].map(item => `${item.key}:${item.can.hide}`).join(',')); }
 const selectionView = (items: SelectableItem[]) => h(InboxSelectionProvider, { pageItems: items, children: [...items.map(item => h(SelectBox, { key: item.key, item, label: item.id })), h(SelectionState, { key: 'state' })] });
 const render = (node: import('react').ReactNode) => act(async () => root.render(node));

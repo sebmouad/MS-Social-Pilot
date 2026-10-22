@@ -17,7 +17,7 @@ vi.mock('next/headers', () => ({ headers: state.headers }));
 vi.mock('../src/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: state.read }));
 vi.mock('../src/server/config/store', async () => { const { errorCopyDefaults } = await import('@/modules/analytics/error-copy'); const { workspaceCopyDefaults } = await import('@/modules/analytics/workspace-copy'); return { runtimeConfig: (key: string) => key === 'analytics.workspaceCopy' ? Promise.resolve(workspaceCopyDefaults) : key === 'analytics.errorCopy' ? Promise.resolve(errorCopyDefaults) : state.config(key) }; });
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
-vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children }: { sidebar: import('react').ReactNode; children: import('react').ReactNode }) => createElement('main', null, createElement('aside', null, sidebar), children) }));
+vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children }: { children: import('react').ReactNode }) => createElement('main', null, children) }));
 vi.mock('../src/server/entitlements', () => ({ canUseFeature: (_entitlements: unknown, feature: string) => feature === 'analytics/reports' }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: (_permissions: unknown, feature: string) => feature === 'analytics/reports' }));
 

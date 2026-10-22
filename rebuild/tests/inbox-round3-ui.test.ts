@@ -16,7 +16,7 @@ vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => 
 vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/modules/inbox/ui/scope', () => ({ inboxScope: async (viewer: { permissions: { pageScope: { all: boolean; ids: string[] } } }) => ({ ids: [], constraints: viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids }, param: undefined }) }));
-vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children }: { sidebar: import('react').ReactNode; children: import('react').ReactNode }) => h('main', null, h('aside', null, sidebar), children) }));
+vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children }: { children: import('react').ReactNode }) => h('main', null, children) }));
 vi.mock('@/modules/inbox/server/read', async importOriginal => ({ ...await importOriginal<typeof import('../src/modules/inbox/server/read')>(), readInboxList: state.list, readInboxThread: state.thread }));
 vi.mock('@/modules/inbox/server/details', () => ({ readInboxContactDetails: state.details }));
 vi.mock('@/modules/inbox/server/actions', () => ({ canManageInbox: state.manage, canManageInboxWorkflow: state.workflow }));
@@ -52,7 +52,7 @@ const button = (label: string) => {
   return all.find(item => item.textContent?.trim() === label || item.getAttribute('aria-label') === label) ?? all.find(item => item.textContent?.trim().startsWith(label)) ?? null;
 };
 
-const selectable = (id: string, over: Partial<SelectableItem> = {}): SelectableItem => ({ key: `comment:${id}`, kind: 'comment', id, label: `Person ${id}`, platformName: 'Facebook', resolved: false, hidden: false, can: { resolve: true, hide: true, remove: true }, ...over });
+const selectable = (id: string, over: Partial<SelectableItem> = {}): SelectableItem => ({ key: `comment:${id}`, kind: 'comment', id, label: `Person ${id}`, platformName: 'Facebook', resolved: false, hidden: false, can: { resolve: true, hide: true, remove: true, assign: true }, ...over });
 const bar = (items: SelectableItem[], max = 5) => h(InboxSelectionProvider, { pageItems: items, children: [...items.map(item => h(SelectBox, { key: item.key, item, label: `Select ${item.label}` })), h(BulkBar, { key: 'bar', locale: 'en', maxItems: max })] });
 
 beforeEach(() => {
@@ -126,8 +126,8 @@ describe('bulk bar', () => {
   });
 
   it('shows a mixed-selection note instead of actions that do not apply, and enforces the Root limit', async () => {
-    const message = selectable('m1', { key: 'message:m1', kind: 'message', can: { resolve: true, hide: false, remove: false } });
-    await mount(bar([selectable('c1', { can: { resolve: false, hide: true, remove: false } }), message], 1));
+    const message = selectable('m1', { key: 'message:m1', kind: 'message', can: { resolve: true, hide: false, remove: false, assign: true } });
+    await mount(bar([selectable('c1', { can: { resolve: false, hide: true, remove: false, assign: false } }), message], 1));
     await click(document.querySelector('input[aria-label="Select all on this page"]'));
     expect(text()).toContain('2 selected');
     expect(text()).toContain('You can act on up to 1 items at a time.');
@@ -147,9 +147,82 @@ describe('bulk bar', () => {
     expect(text()).toContain('1 selected');
   });
 
+  it('assigns the selection to a chosen teammate with one exact confirmation and no Undo', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ok: true, assignment: { assigneeId: null, members: [{ id: 'u1', name: 'Nadia' }, { id: 'u2', name: null }] } })));
+    await mount(bar([selectable('c1'), selectable('c2')]));
+    await click(document.querySelector('input[aria-label="Select all on this page"]'));
+    await click(button('Assign'));
+    expect(state.bulk).not.toHaveBeenCalled();
+    expect(text()).toContain('2 items will be unassigned.');
+    await click(document.querySelector('[role="combobox"]'));
+    await click([...document.querySelectorAll('[role="option"]')].find(item => item.textContent === 'Nadia') ?? null);
+    expect(text()).toContain('2 items will be assigned to Nadia.');
+    await click([...document.querySelectorAll('dialog button')].find(item => item.textContent === 'Assign') ?? null);
+    await flush();
+    expect(state.bulk).toHaveBeenCalledWith({ action: 'assign', items: [{ kind: 'comment', id: 'c1' }, { kind: 'comment', id: 'c2' }], assigneeId: 'u1', confirmation: 'BULK ASSIGN 2 INBOX ITEMS TO u1' });
+    expect(text()).toContain('Assigned 2 items.');
+    expect(button('Undo')).toBeNull();
+    expect(document.querySelector('dialog')).toBeNull();
+    expect(text()).not.toContain('selected');
+    vi.unstubAllGlobals();
+  });
+
+  it('hides Assign unless every selected item can be assigned', async () => {
+    const review = selectable('r1', { key: 'review:r1', kind: 'review', can: { resolve: true, hide: false, remove: false, assign: false } });
+    await mount(bar([selectable('c1'), review]));
+    await click(document.querySelector('input[aria-label="Select all on this page"]'));
+    expect(button('Assign')).toBeNull();
+    expect(button('Resolve')).not.toBeNull();
+  });
+
+  it('keeps failed assignments selected after a partial result', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ok: true, assignment: { assigneeId: null, members: [{ id: 'u1', name: 'Nadia' }] } })));
+    state.bulk.mockResolvedValue({ ok: true, action: 'assign', requested: 2, succeeded: 1, failed: 1, results: [{ kind: 'comment', id: 'c1', ok: true, assigneeId: 'u1' }, { kind: 'comment', id: 'c2', ok: false, code: 'not_found', error: 'Gone.' }] });
+    await mount(bar([selectable('c1'), selectable('c2')]));
+    await click(document.querySelector('input[aria-label="Select all on this page"]'));
+    await click(button('Assign'));
+    await flush();
+    await click([...document.querySelectorAll('dialog button')].find(item => item.textContent === 'Assign') ?? null);
+    await flush();
+    expect(state.bulk).toHaveBeenCalledWith(expect.objectContaining({ action: 'assign', assigneeId: null, confirmation: 'BULK ASSIGN 2 INBOX ITEMS TO UNASSIGNED' }));
+    expect(text()).toContain('1 done, 1 could not be updated.');
+    expect(text()).toContain('1 selected');
+    expect((document.querySelector('input[aria-label="Select Person c2"]') as HTMLInputElement).checked).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it('explains an unreachable team directory and refuses to confirm', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network'); }));
+    await mount(bar([selectable('c1')]));
+    await click(document.querySelector('input[aria-label="Select Person c1"]'));
+    await click(button('Assign'));
+    await flush();
+    expect(text()).toContain('Team members could not be loaded.');
+    expect(([...document.querySelectorAll('dialog button')].find(item => item.textContent === 'Assign') as HTMLButtonElement).disabled).toBe(true);
+    expect(state.bulk).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps the assign dialog open with the reason when nothing could be applied', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ok: true, assignment: { assigneeId: null, members: [] } })));
+    state.bulk.mockResolvedValue({ ok: true, action: 'assign', requested: 1, succeeded: 0, failed: 1, results: [{ kind: 'comment', id: 'c1', ok: false, code: 'forbidden', error: 'You cannot assign this channel.' }] });
+    await mount(bar([selectable('c1')]));
+    await click(document.querySelector('input[aria-label="Select Person c1"]'));
+    await click(button('Assign'));
+    await flush();
+    await click([...document.querySelectorAll('dialog button')].find(item => item.textContent === 'Assign') ?? null);
+    await flush();
+    expect(document.querySelector('dialog')?.textContent).toContain('You cannot assign this channel.');
+    expect(text()).toContain('1 selected');
+    vi.unstubAllGlobals();
+  });
+
   it('speaks French', async () => {
     expect(round3Copy.fr.bulk.count(2)).toBe('2 sélectionnés');
     expect(round3Copy.fr.bulk.confirm.deleteSentence(1, 'Facebook')).toContain('irréversible');
+    expect(round3Copy.fr.bulk.assignSentence(2, 'Nadia')).toBe('2 éléments seront attribués à Nadia.');
+    expect(round3Copy.fr.bulk.unassignSentence(1)).toBe('1 élément ne sera plus attribué.');
+    expect(round3Copy.fr.bulk.done.assign(1)).toBe('1 élément attribué.');
   });
 });
 

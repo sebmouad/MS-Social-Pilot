@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const nav = vi.hoisted(() => ({ path: '/content', search: '' }));
 vi.mock('next/navigation', () => ({ usePathname: () => nav.path, useSearchParams: () => new URLSearchParams(nav.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 import { AppShell } from '../src/components/AppShell';
-import { SidebarDock } from '../src/components/SidebarDock';
 import { SHELL_COPY, SHELL_POLICY, type ShellCopy, type ShellPolicy } from '../src/modules/shell/copy';
 
 const copy = SHELL_COPY.en as unknown as ShellCopy;
@@ -34,8 +33,7 @@ async function render(extra: Partial<ComponentProps<typeof AppShell>> = {}, enab
   await act(async () => root.render(createElement(AppShell, {
     activeModule: 'publishing', enabledModules: ['home', 'publishing', 'inbox', 'analytics', 'settings'], enabledFeatures, writableFeatures: ['publishing/posts'],
     rootAccess: false, userName: 'Preview', workspaceName: 'Example workspace', workspaceId: 'w1', copy, policy, channels,
-    sidebar: createElement('button', null, 'Apply filters'),
-    children: createElement('div', null, 'Example posts', createElement(SidebarDock, { children: createElement('input', { 'aria-label': 'Route setting' }) })),
+    children: createElement('div', null, 'Example posts', createElement('input', { 'aria-label': 'Route setting' })),
     ...extra,
   })));
 }
@@ -108,30 +106,11 @@ describe('single-sidebar app shell', () => {
     expect(document.cookie).toContain('sp_scope_w1=c1');
   });
 
-  it('docks route controls into Page tools, keeps them mounted and opens them as a dialog', async () => {
+  it('renders route controls in-page with no Page tools sheet or toggle', async () => {
     await render();
-    const dialog = container.querySelector<HTMLDialogElement>('dialog.shell-tools')!;
-    expect(dialog.open).toBe(false);
-    expect(dialog.querySelector('[aria-label="Route setting"]')).not.toBeNull();
-    expect(container.querySelector('main [aria-label="Route setting"]')).toBeNull();
-    const toggle = container.querySelector<HTMLButtonElement>('.shell-tools-toggle')!;
-    expect(toggle.textContent).toContain('Page tools');
-    await act(async () => toggle.click());
-    expect(dialog.hasAttribute('open')).toBe(true);
-    expect(dialog.textContent).toContain('Apply filters');
-  });
-
-  it('reveals the editor when a Page tools action submits a form in the main content', async () => {
-    await render({ children: createElement('form', { id: 'route-form', onSubmit: event => event.preventDefault() },
-      createElement('input', { 'aria-label': 'Post text' }),
-      createElement(SidebarDock, { children: createElement('button', { type: 'submit', form: 'route-form' }, 'Save draft') }),
-    ) });
-    await act(async () => container.querySelector<HTMLButtonElement>('.shell-tools-toggle')!.click());
-    const dialog = container.querySelector<HTMLDialogElement>('dialog.shell-tools')!;
-    expect(dialog.hasAttribute('open')).toBe(true);
-    await act(async () => container.querySelector<HTMLFormElement>('#route-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-    expect(dialog.hasAttribute('open')).toBe(false);
-    expect(document.activeElement).toBe(container.querySelector('main'));
+    expect(container.querySelector('main [aria-label="Route setting"]')).not.toBeNull();
+    expect(container.querySelector('.shell-tools-toggle')).toBeNull();
+    expect(container.querySelector('dialog.shell-tools')).toBeNull();
   });
 
   it('provides a phone exit from private Root to the customer app', async () => {

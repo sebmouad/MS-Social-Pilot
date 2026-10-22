@@ -226,8 +226,15 @@ export interface PlatformHost {
       form(locale: 'en' | 'fr'): Promise<PlatformCredentialForm>;
       connect(fields: Record<string, string>, signal?: AbortSignal): Promise<import('./token-connection').TokenConnectionResult>;
     };
-    /** Server-only renewal; null means this credential cannot be renewed. No persistence or UI data. */
-    renewToken?(input: { accessToken: string; refreshToken: string | null; signal: AbortSignal }): Promise<{ accessToken: string; expiresAt: Date | null; refreshToken?: string | null } | null>;
+    /**
+     * Server-only renewal; null means this credential cannot be renewed. No persistence or UI data.
+     * `expiresAt` is the renewed access token's end (also the grant end when the connection has no
+     * refresh token). `grantExpiresAt`, when present, is a separately reported grant end and is the
+     * only value Root stores as the grant expiry. `rotateDestinationCopies` is true when this module
+     * stores copies of the account token on its destinations; Root then rotates those copies in the
+     * same transaction. Modules with channel-specific destination credentials leave it unset.
+     */
+    renewToken?(input: { accessToken: string; refreshToken: string | null; signal: AbortSignal }): Promise<{ accessToken: string; expiresAt: Date | null; refreshToken?: string | null; grantExpiresAt?: Date | null; rotateDestinationCopies?: boolean } | null>;
     /** True when Root has filled in what a customer needs to connect. */
     isReady(): Promise<boolean>;
     start(request: Request, viewer: ConnectionViewer): Promise<NextResponse>;

@@ -11,6 +11,11 @@ export const siteLocale = (language: string | null | undefined): SiteLocale => (
 const short = z.string().trim().min(1).max(200);
 const long = z.string().trim().min(1).max(8000);
 const section = z.object({ title: short, body: long }).strict();
+/** Outcome sentence of a finished deletion lookup: Root may reword it but {count} and {when} must stay. */
+const resultTemplate = z.string().trim().min(1).max(2000).refine(
+  value => value.includes('{count}') && value.includes('{when}'),
+  'Keep the {count} and {when} placeholders.',
+);
 
 const pageContent = z.object({
   nav: z.object({ label: short, help: short, pricing: short, status: short, changelog: short, privacy: short, terms: short, dataDeletion: short, signIn: short, signUp: short, home: short }).strict(),
@@ -24,13 +29,44 @@ const pageContent = z.object({
   changelog: z.object({ title: short, lead: long, empty: long }).strict(),
   privacy: z.object({ title: short, updated: short, notUpdated: long, sections: z.array(section).min(1).max(40) }).strict(),
   terms: z.object({ title: short, updated: short, notUpdated: long, sections: z.array(section).min(1).max(40) }).strict(),
-  dataDeletion: z.object({ title: short, lead: long, sections: z.array(section).min(1).max(20), lookupLabel: short, lookupButton: short }).strict(),
+  dataDeletion: z.object({
+    title: short, lead: long, sections: z.array(section).min(1).max(20), lookupLabel: short, lookupButton: short,
+    // Outcome sentences added after catalogs were first saved in Root: optional so a saved catalog without them stays
+    // valid, with the shipped text filling in (see resolveDataDeletionResults).
+    resultCompletedOne: resultTemplate.optional(), resultCompletedMany: resultTemplate.optional(),
+    resultUnknown: long.optional(), resultInvalid: long.optional(),
+  }).strict(),
   fallbacks: z.object({ operatorName: short, operatorEmail: short, governingLaw: short, dataProtection: short, hosting: short }).strict(),
 }).strict();
 
 export const siteContentSchema = z.object({ en: pageContent, fr: pageContent }).strict();
 export type SiteContent = z.infer<typeof siteContentSchema>;
 export type SitePageContent = z.infer<typeof pageContent>;
+
+/** Outcome sentences of the deletion lookup: the facts ({count}, {when}) come from the platform's own record. */
+export type DataDeletionResults = { resultCompletedOne: string; resultCompletedMany: string; resultUnknown: string; resultInvalid: string };
+const enResults: DataDeletionResults = {
+  resultCompletedOne: 'Done on {when}. We removed the stored access for {count} connection and stopped its scheduled work.',
+  resultCompletedMany: 'Done on {when}. We removed the stored access for {count} connections and stopped its scheduled work.',
+  resultUnknown: 'We found no record for this code. If you used Facebook’s removal option, no access linked to your account was held here.',
+  resultInvalid: 'This code is not valid. Open the link shown in your Facebook settings again.',
+};
+const frResults: DataDeletionResults = {
+  resultCompletedOne: 'Terminé le {when}. Nous avons supprimé l’accès enregistré pour {count} connexion et arrêté ses tâches planifiées.',
+  resultCompletedMany: 'Terminé le {when}. Nous avons supprimé l’accès enregistré pour {count} connexions et arrêté ses tâches planifiées.',
+  resultUnknown: 'Aucun enregistrement n’existe pour ce code. Si vous avez utilisé l’option de suppression de Facebook, aucun accès lié à votre compte n’était conservé ici.',
+  resultInvalid: 'Ce code n’est pas valide. Ouvrez à nouveau le lien affiché dans vos paramètres Facebook.',
+};
+/** Stored catalogs saved before the outcome sentences existed omit them; the shipped locale text fills each gap. */
+export function resolveDataDeletionResults(saved: Pick<SitePageContent['dataDeletion'], keyof DataDeletionResults>, locale: SiteLocale): DataDeletionResults {
+  const shipped = locale === 'fr' ? frenchTypography(frResults) : enResults;
+  return {
+    resultCompletedOne: saved.resultCompletedOne ?? shipped.resultCompletedOne,
+    resultCompletedMany: saved.resultCompletedMany ?? shipped.resultCompletedMany,
+    resultUnknown: saved.resultUnknown ?? shipped.resultUnknown,
+    resultInvalid: saved.resultInvalid ?? shipped.resultInvalid,
+  };
+}
 
 const en: SitePageContent = {
   nav: { label: 'Site', help: 'Help', pricing: 'Pricing', status: 'Status', changelog: 'What’s new', privacy: 'Privacy', terms: 'Terms', dataDeletion: 'Data deletion', signIn: 'Sign in', signUp: 'Create an account', home: 'Home' },
@@ -101,7 +137,7 @@ const en: SitePageContent = {
       { title: 'Check the outcome', body: 'After removing the app you receive a confirmation code. Enter it below or open the link Facebook shows you to see the result.' },
       { title: 'Delete the rest', body: 'Posts already published belong to the workspace that managed the Page. Its owner can delete workspace data from Settings › Data and privacy. You can also write to {operatorEmail} and we will erase your account data on request.' },
     ],
-    lookupLabel: 'Confirmation code', lookupButton: 'Check status',
+    lookupLabel: 'Confirmation code', lookupButton: 'Check status', ...enResults,
   },
   fallbacks: { operatorName: 'the operator of this installation', operatorEmail: 'the operator of this installation', governingLaw: 'the law of the operator’s country', dataProtection: 'under the data-protection law that applies to you', hosting: 'our hosting providers store it on our behalf' },
 };
@@ -175,7 +211,7 @@ const fr: SitePageContent = {
       { title: 'Vérifier le résultat', body: 'Après avoir retiré l’application, vous recevez un code de confirmation. Saisissez-le ci-dessous ou ouvrez le lien affiché par Facebook pour voir le résultat.' },
       { title: 'Supprimer le reste', body: 'Les publications déjà parues appartiennent à l’espace de travail qui gérait la Page. Son propriétaire peut supprimer les données de l’espace depuis Paramètres › Données et confidentialité. Vous pouvez aussi écrire à {operatorEmail} pour demander l’effacement des données de votre compte.' },
     ],
-    lookupLabel: 'Code de confirmation', lookupButton: 'Vérifier le statut',
+    lookupLabel: 'Code de confirmation', lookupButton: 'Vérifier le statut', ...frResults,
   },
   fallbacks: { operatorName: 'l’opérateur de cette installation', operatorEmail: 'l’opérateur de cette installation', governingLaw: 'le droit du pays de l’opérateur', dataProtection: 'selon la loi de protection des données qui vous est applicable', hosting: 'nos hébergeurs les stockent pour notre compte' },
 };

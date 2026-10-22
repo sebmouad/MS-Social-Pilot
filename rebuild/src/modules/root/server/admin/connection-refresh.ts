@@ -58,6 +58,8 @@ export async function refreshRootConnection(actorId: string, input: unknown) {
         signal.throwIfAborted();
         if (renewed) {
           if (!renewed.accessToken || renewed.expiresAt !== null && (!Number.isFinite(renewed.expiresAt.getTime()) || renewed.expiresAt <= new Date())) throw new Error('Invalid renewal result');
+          const grant = renewed.grantExpiresAt;
+          if (grant !== undefined && grant !== null && (!Number.isFinite(grant.getTime()) || grant <= new Date())) throw new Error('Invalid renewal result');
           outcome = 'renewed';
         }
       } catch {
@@ -68,11 +70,23 @@ export async function refreshRootConnection(actorId: string, input: unknown) {
     }
     if (renewed) {
       expiresAt = renewed.expiresAt;
+      const encrypted = encryptSecret(renewed.accessToken);
+      // A renewable grant keeps its own stored end; only a connection without a refresh token
+      // treats the renewed token's end as the grant end. A separately reported grant end wins.
+      const renewable = renewed.refreshToken !== undefined ? renewed.refreshToken !== null : account.refreshToken !== null;
       const saved = await tx.socialAccount.updateMany({ where: { id: socialAccountId, workspaceId: owner.workspaceId, invalidatedAt: null }, data: {
-        accessToken: encryptSecret(renewed.accessToken), tokenExpiresAt: expiresAt,
+        accessToken: encrypted,
         ...(renewed.refreshToken !== undefined ? { refreshToken: renewed.refreshToken === null ? null : encryptSecret(renewed.refreshToken) } : {}),
+        ...(renewed.grantExpiresAt !== undefined ? { tokenExpiresAt: renewed.grantExpiresAt } : renewable ? {} : { tokenExpiresAt: expiresAt }),
       } });
       if (saved.count !== 1) throw new OperationError('conflict', 'The connection changed. Reload before repeating it.');
+      // Same consistency as automatic renewal: the access end lives in meta, and destination
+      // copies rotate with the account. Channel-specific destination credentials are untouched.
+      const expiryMetadata = JSON.stringify({ accessTokenExpiresAt: expiresAt?.toISOString() ?? null });
+      await tx.$executeRaw`UPDATE social_accounts SET meta = COALESCE(meta, '{}'::jsonb) || ${expiryMetadata}::jsonb WHERE id = ${socialAccountId} AND "workspaceId" = ${owner.workspaceId}`;
+      if (renewed.rotateDestinationCopies) {
+        await tx.target.updateMany({ where: { workspaceId: owner.workspaceId, socialAccountId }, data: { accessToken: encrypted } });
+      }
     }
     const receipt = { socialAccountId, workspaceId: owner.workspaceId, outcome, tokenExpiresAt: expiresAt?.toISOString() ?? null };
     await writeRootAudit(tx, actorId, `root.connection_refresh.${outcome}`, receipt);

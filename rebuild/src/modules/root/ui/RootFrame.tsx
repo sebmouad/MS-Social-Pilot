@@ -28,7 +28,7 @@ export async function RootFrame({ active, children, controls }: { active: string
     </details>; })}
   </nav>;
   const { copy: shellChromeCopy, policy } = await shellChrome();
-  return <RootInterfaceProvider copy={copy}><AppShell activeModule="settings" enabledModules={[]} enabledFeatures={[]} rootAccess installationMode copy={shellChromeCopy} policy={policy} userName={actor.name} workspaceName={shellChromeCopy.installation} sidebar={<>{sidebar}{controls}</>}>
+  return <RootInterfaceProvider copy={copy}><AppShell activeModule="settings" enabledModules={[]} enabledFeatures={[]} rootAccess installationMode copy={shellChromeCopy} policy={policy} userName={actor.name} workspaceName={shellChromeCopy.installation} rootNav={<>{sidebar}{controls}</>}>
     <div className="root-directory">{children}</div>
   </AppShell></RootInterfaceProvider>;
 }

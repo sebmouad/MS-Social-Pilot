@@ -250,5 +250,9 @@ export const inboxServiceCopy = {
   "selectionFailed": {
     "en": "The selection could not be updated. Check the items before trying again.",
     "fr": "La sélection n’a pas pu être mise à jour. Vérifiez les éléments avant de réessayer."
+  },
+  "assignKinds": {
+    "en": "Only conversations and comments can be assigned.",
+    "fr": "Seules les conversations et les commentaires peuvent être attribués."
   }
 } as const;

@@ -775,3 +775,55 @@ passed, 11683 tests passed, 5 failed — all 5 are the pre-existing
 as B7). Agency module suite: 183 passed; 7 failed, all verified pre-existing on
 the clean tree (`export-ui` ×3, `person-account` ×2, `person-ui` ×2). No browser
 run, screenshots, live-provider or production verification.
+
+## Design v2 B9 (2026-10-22, source/unit/jsdom only; see HANDOVER for the ship record)
+
+Built per [design-v2/08-BUILD_PLAN.md](design-v2/08-BUILD_PLAN.md) B9 plus the
+three HANDOVER open items it names (data-deletion catalog, atomic token
+refresh, Inbox saved-replies menu + bulk Assign). Closes the B4 open items
+(3) reply-box menu and (4) bulk Assign, and the B2/B3/B5/B6 open items on
+`scripts/verify-*` selectors.
+
+- **Adapter removal:** deleted `src/components/SidebarDock.tsx` and the
+  unmounted `ModeToggle.tsx`; `AppShell` loses the Page tools sheet, toggle
+  and context; `PageFrame`, shell copy/CSS, Root, Calendar, Reports, Ads and
+  Analytics screens drop dock mounts. `sidebar=` hits 0 and `pageTools` hits
+  0 in `src/`. Eight verify scripts rewritten for the new selectors
+  (browser-matrix, first-comments94, destination-formats85,
+  facebook-native-journal89/policy87/status91/publication-submissions92,
+  reports82); selectors are source-verified only, no browser run.
+- **Data deletion:** outcome sentences move from a code constant into
+  `public.content` (`resultCompletedOne/Many` with required `{count}`/
+  `{when}`, `resultUnknown`, `resultInvalid`; EN/FR defaults;
+  `resolveDataDeletionResults` backfills catalogs saved before the keys).
+  New `tests/public-data-deletion.test.ts`; `server/site.ts` untouched.
+- **Token refresh:** `root/server/admin/connection-refresh.ts` renews the
+  account token, `tokenExpiresAt`, destination copies and audit in one
+  `prisma.$transaction`. New host fields `grantExpiresAt` and
+  `rotateDestinationCopies`, declared per module (YouTube, TikTok, LinkedIn,
+  Pinterest, Threads, X); Facebook/Mastodon untouched (page-specific
+  grants). New `tests/root-connection-refresh-atomicity.test.ts`; mocked
+  transport only, no live-provider renewal run.
+- **Inbox:** `ReplyBox` gains an `onInsertSavedReply` menu (names from the
+  saved-replies service; insert fills the draft, never sends;
+  loading/error/empty/disabled states; writers only). `BULK_ACTIONS` gains
+  `assign` (conversations/comments only, `assigneeId` member or null,
+  `BULK_INVERSE` null — no Undo) through the shared service with UI dialog
+  (member picker from the first item's team list), REST and `bulk_inbox_action`
+  parity, exact `BULK ASSIGN <n> INBOX ITEMS TO <member|UNASSIGNED>`
+  confirmation and audited receipt. New `tests/inbox-bulk-assign-mcp.test.ts`
+  and `tests/inbox-reply-saved-menu.test.ts`. Closes B4 (3)(4).
+- **Integrator fixes:** `CONFIG_SCHEMA_VERSION` 135 → **136** (queued B8 keys
+  plus the three B9 catalog changes; `config-validation` pins updated).
+  `tsconfig.json` excludes reference-only `docs/handover/archive`, whose
+  73-file WIP backup broke typecheck (103 errors) and the `next build` type
+  gate at HEAD; nothing imports it. Saved `home.shellCopy` catalogs carrying
+  `pageTools` keys read as the shipped default until re-saved in Root.
+
+Evidence: `npm run typecheck` 0 errors; targeted B9 files pass; full suite
+(diagnostic transport excluded, 30 s timeout) 724 files / 11,726 tests
+passed, 5 failed — all pre-existing `tests/facebook-native-http.test.ts`
+sandbox `listen EPERM ::1` (file untouched by B9; `node:net` `::1` bind
+probe fails identically). `npx next build` re-run at ship time. No browser
+matrix, keyboard walk, live-provider or production-behavior run in this
+batch beyond the deploy health checks; see HANDOVER for the ship record.

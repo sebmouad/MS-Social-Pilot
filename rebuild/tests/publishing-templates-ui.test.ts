@@ -2,22 +2,19 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SidebarDockContext } from '../src/components/SidebarDock';
 import { TemplateManager } from '../src/modules/publishing/ui/templates/TemplateManager';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
-let dock: HTMLDivElement;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
-  // The search and New template controls render inside the page now (no sidebar dock), so both names point at the page container.
-  container = document.createElement('div'); dock = container; document.body.append(container); root = createRoot(container);
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); dock.remove(); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 const props = { initialTemplates: [], labels: [{ id: 'label-a', name: 'Campaign' }], page: 1, hasMore: false, query: '', limits: { maxSearchCharacters: 120, maxNameCharacters: 120, maxCategoryCharacters: 80, maxBodyCharacters: 5000, maxHashtagsCharacters: 1000, maxFirstCommentCharacters: 2000, maxFirstCommentDelayMinutes: 10080 } };
-async function render() { await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: dock }, createElement(TemplateManager, props)))); }
+async function render() { await act(async () => root.render(createElement(TemplateManager, props))); }
 function button(label: string, parent: ParentNode = document) { const result = Array.from(parent.querySelectorAll('button')).find(item => item.textContent?.trim() === label); if (!result) throw new Error(`Missing button ${label}`); return result as HTMLButtonElement; }
 async function click(element: HTMLElement) { await act(async () => element.click()); }
 async function enter(input: HTMLInputElement | HTMLTextAreaElement, value: string) { const setter = Object.getOwnPropertyDescriptor(input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value')!.set!; await act(async () => { setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); }); }
@@ -26,7 +23,7 @@ describe('template management UI', () => {
   it('requires exact review confirmation, sends the label, and accepts only a matching create receipt', async () => {
     const fetch = vi.fn(async (_url: string, init: RequestInit) => ({ ok: true, json: async () => ({ id: 'template-a', name: 'Welcome', category: '', body: 'Hello', hashtags: '', firstComment: '', firstCommentDelayMinutes: 37, labelId: 'label-a', createdAt: '2026-10-17T12:00:00Z', updatedAt: '2026-10-17T12:00:00Z' }) }));
     vi.stubGlobal('fetch', fetch); await render();
-    await click(button('New template', dock));
+    await click(button('New template', container));
     const edit = container.querySelector<HTMLDialogElement>('dialog')!;
     await enter(edit.querySelector<HTMLInputElement>('input')!, 'Welcome');
     await enter(edit.querySelector<HTMLTextAreaElement>('textarea')!, 'Hello');
@@ -43,7 +40,7 @@ describe('template management UI', () => {
   it('shows an offline error inside the active review dialog and retains the draft for retry', async () => {
     const fetch = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({ ok: true, json: async () => ({ id: 'retry-template', name: 'Retry test', category: '', body: 'Keep this draft', hashtags: '', firstComment: '', firstCommentDelayMinutes: 0, labelId: null, createdAt: '2026-10-17T12:00:00Z', updatedAt: '2026-10-17T12:00:00Z' }) });
     vi.stubGlobal('fetch', fetch); await render();
-    await click(button('New template', dock));
+    await click(button('New template', container));
     const edit = container.querySelector<HTMLDialogElement>('dialog')!;
     await enter(edit.querySelector<HTMLInputElement>('input')!, 'Retry test');
     await enter(edit.querySelector<HTMLTextAreaElement>('textarea')!, 'Keep this draft');
@@ -58,7 +55,7 @@ describe('template management UI', () => {
     const template = { id: 'template-z', name: 'Old promo', category: '', body: 'Sale', hashtags: '', firstComment: '', firstCommentDelayMinutes: 0, labelId: null, createdAt: '2026-10-17T12:00:00Z', updatedAt: '2026-10-17T12:00:00Z' };
     const fetch = vi.fn(async () => ({ ok: true, json: async () => ({ id: 'template-z', deleted: true }) }));
     vi.stubGlobal('fetch', fetch);
-    await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: dock }, createElement(TemplateManager, { ...props, initialTemplates: [template] }))));
+    await act(async () => root.render(createElement(TemplateManager, { ...props, initialTemplates: [template] })));
     await click(container.querySelector<HTMLButtonElement>('button[aria-label="Actions for Old promo"]')!);
     await click(Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(item => item.textContent === 'Delete')!);
     const confirm = container.querySelector<HTMLDialogElement>('dialog')!;
@@ -70,8 +67,8 @@ describe('template management UI', () => {
     expect(container.textContent).not.toContain('Old promo');
   });
   it('renders French copy', async () => {
-    await act(async () => root.render(createElement(SidebarDockContext.Provider, { value: dock }, createElement(TemplateManager, { ...props, locale: 'fr' }))));
-    expect(dock.textContent).toContain('Nouveau modèle');
+    await act(async () => root.render(createElement(TemplateManager, { ...props, locale: 'fr' })));
+    expect(container.textContent).toContain('Nouveau modèle');
     expect(container.textContent).toContain('Aucun modèle pour l’instant');
   });
 

@@ -1,6 +1,6 @@
 # Active delivery goal
 
-Updated 2026-10-22 (lane 47), registry schema **135**.
+Updated 2026-10-22 (design v2 B9), registry schema **136**.
 **Status: active; incomplete.** The owner recorded production cutover on
 2026-10-20; current deployed SHA/schema were not re-observed by this lane.
 The legacy tree was deleted from the repository on 2026-10-22; server-side
@@ -93,3 +93,17 @@ Partial UI source is implemented for Home, Tasks and Agency; no new Root keys or
 service changes. The goal remains incomplete. Finish the service/copy dependencies
 and verification gates listed in [design-v2/B7_IMPLEMENTATION.md](design-v2/B7_IMPLEMENTATION.md)
 before marking B7 complete. Changes are uncommitted under this lane’s instruction.
+
+## Design v2 B9 — 2026-10-22
+
+B9 removes `SidebarDock`/Page tools adapter (B1–B8 migrated every page off
+it), rewrites the eight `scripts/verify-*` selectors for the new screens,
+moves data-deletion outcome sentences into the Root `public.content`
+catalog (EN/FR), makes Root manual token refresh atomic
+(token + expiry + destination copies + audit in one transaction), and adds
+the Inbox reply-box saved-replies menu plus bulk Assign with UI/REST/MCP
+parity, exact confirmation and audit. Registry schema is **136**.
+Typecheck is clean; the full suite passes except the 5 known sandbox
+loopback binds. The goal remains incomplete: the v2 browser matrix,
+keyboard walks, live-provider renewal proof and the remaining parity
+batches above are still open. See HANDOVER for the ship record.

@@ -605,3 +605,31 @@ remain withheld where access is missing. Its table-order sparklines are removed.
 These are source/DOM behaviors, not browser or complete S1/S14 acceptance: see
 [docs/design-v2/B7_IMPLEMENTATION.md](docs/design-v2/B7_IMPLEMENTATION.md) for the
 missing shared-service/copy fields and actual verification limits.
+
+## Design v2 B9 — adapter removal, Inbox assign, data-deletion copy (2026-10-22)
+
+Source/DOM evidence only; no browser, keyboard-in-browser or screen-reader run.
+
+- The transitional Page tools sheet is gone with `SidebarDock`: every page
+  keeps its filters and actions in place (header Filter button, in-content
+  panels). There is no Page tools entry point anymore.
+- The Inbox reply box has a Saved replies menu for members who can write and
+  reply. Choosing a reply inserts its text into the draft; inserting never
+  sends. Loading, read failure, an empty list and readers without reply
+  rights each have their own state.
+- Bulk Assign works on selected conversations and comments (reviews have no
+  assignee). The dialog lists workspace members from the first selected
+  item's team, or Unassigned to clear. It asks first with the exact
+  sentence naming the count and the member, runs each item through the
+  shared service with its own outcome, and has no Undo. REST
+  (`POST /api/inbox/bulk`) and MCP (`bulk_inbox_action` with `assigneeId`)
+  take the same input, the same exact
+  `BULK ASSIGN <n> INBOX ITEMS TO <member|UNASSIGNED>` confirmation shape
+  and the same audit.
+- The data-deletion lookup outcome sentences are Root-editable catalog text
+  (`public.content`, English and French). Customer-visible wording is
+  unchanged unless Root rewords it; the `{count}` and `{when}` placeholders
+  must stay.
+- Root manual token refresh renews the token, its expiry, destination
+  copies and the audit record together. The dialog, confirmation and
+  renewed/not renewable/failed receipts are unchanged.

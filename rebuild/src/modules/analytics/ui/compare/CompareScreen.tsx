@@ -43,7 +43,8 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     aStart: first(params.aStart), aEnd: first(params.aEnd), bStart: first(params.bStart), bEnd: first(params.bEnd),
     start: first(params.start), end: first(params.end), channel: list(params.channel), groupA: list(params.groupA), groupB: list(params.groupB),
   }} />;
-  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/insights/compare">{form}</WorkflowNav>}><div className={styles.root}>
+  return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
+    <WorkflowNav current="/insights/compare">{form}</WorkflowNav>
     {kindSwitch}
     <PageHeader module="analytics" title={t('Compare periods or channels')} description={<>{t("Differences are shown only where both sides measure the same thing with the same coverage. Reach and breakdowns are never subtracted, and missing data is unknown, not zero.")}</>} />
     {!input && !failure && <section className={styles.panel}><h2>{t("Choose what to compare")}</h2><p>{t("Pick two periods for the same channels, or two separate groups of channels in one period, then select Compare.")}</p></section>}

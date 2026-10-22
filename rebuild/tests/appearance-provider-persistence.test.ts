@@ -1,13 +1,21 @@
 // @vitest-environment jsdom
-import { act, createElement } from 'react';
+import { act, createElement, Fragment, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ThemeProvider, useTheme } from '@/components/ThemeProvider';
-import { ModeToggle } from '@/components/ModeToggle';
+import { MODES, ThemeProvider, useTheme } from '@/components/ThemeProvider';
 import { appearanceCopy } from '@/modules/settings/ui/appearance/copy';
 let root: ReturnType<typeof createRoot>, container: HTMLDivElement;
 let theme: ReturnType<typeof useTheme>;
-function Probe() { theme = useTheme(); return createElement(ModeToggle); }
+/** ModeToggle was removed in B9; this probe keeps the same cycling-button contract for the persistence tests. */
+function Probe() {
+  theme = useTheme();
+  const [failed, setFailed] = useState(false);
+  const { mode, setMode, busy, copy: t } = theme;
+  const next = MODES[(MODES.findIndex(item => item.id === mode) + 1) % MODES.length]!;
+  return createElement(Fragment, null,
+    createElement('button', { type: 'button', disabled: busy, 'aria-busy': busy, 'aria-label': `${t.title}: ${t[mode]}. ${t.mode}: ${t[next.id]}`, onClick: () => { setFailed(false); void setMode(next.id).catch(() => setFailed(true)); } }),
+    failed ? createElement('span', { role: 'alert' }, t.failed) : null);
+}
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   document.documentElement.dataset.theme = 'warm'; document.documentElement.dataset.mode = 'light';
