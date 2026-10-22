@@ -34,6 +34,34 @@ selected-resource, person-key and installation authority remain distinct.
 
 ## Current execution and missing-capability boundaries
 
+### Networks lane q-31: Mastodon, Threads and X (2026-10-22)
+
+Provider-owned adapters and Root settings are staged in `src/platforms/{mastodon,threads,x}`.
+They are **not customer capabilities**: no shared connection persistence/host is
+installed, and enabling a staged Root switch cannot expose one. Fixture adapter
+tests are not UI/REST/MCP, tenant-authorization or live-provider evidence.
+
+| Capability | UI | REST | MCP | Shared-service integration status |
+| --- | --- | --- | --- | --- |
+| Connect and select Mastodon, Threads or X | Not available | Existing generic start/callback routes refuse staged providers | Existing `start_connection` refuses staged providers | Pending provider connection hosts, authenticated OAuth state, tenant-bound encrypted discovery persistence and selection rechecks |
+| Publish and inspect status on Mastodon, Threads or X | Not available | Existing Publishing routes cannot dispatch staged providers | Existing `publish_post` cannot dispatch staged providers | Pending host installation, credential lifecycle and cross-interface authorization/confirmation/audit verification |
+
+No new tool or route is declared for adapter-only work. Reuse the existing shared
+Settings and Publishing services when completing installation; never expose a
+parallel provider route or tool that bypasses their confirmations and audit.
+Per-provider READMEs list the remaining protocol and integration work. The legacy
+sweep remains partial rather than treating transport fixtures as completed parity.
+
+Local verification for this batch: `npx tsc --noEmit -p .` exits 0; targeted
+provider/staging/config/parity/Root-ownership tests pass 71/71 (seven files).
+`npx vitest run --cache=false --exclude "**/facebook-diagnostic-transport.test.ts"`
+finishes with 656 files passed, 49 skipped and one failed; 10,167 tests passed,
+2,153 skipped and five failed. All five failures are existing
+`facebook-native-http.test.ts` loopback probes refused by the sandbox
+(`listen EPERM ::1`). The full suite is therefore **not green**. Cache is disabled
+because node_modules links to a read-only dependency installation. No live-provider,
+browser, deployment or production checks were run; changes remain uncommitted.
+
 Ads inventory uses the existing directory/management mappings below; no new
 route/tool is needed. Common management services preserve ownership, exact
 confirmations, ledger/audit and held uncertain results. The owner-reported live

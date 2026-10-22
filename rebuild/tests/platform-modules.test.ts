@@ -8,7 +8,7 @@ vi.mock('../src/platforms/facebook/runtime', () => ({
   configuredFacebookEngine: vi.fn(),
 }));
 
-import { PLATFORM_CONFIG, PLATFORM_MODULES } from '../src/platforms';
+import { PLATFORM_CONFIG, PLATFORM_MODULES, STAGED_PLATFORM_MODULES, STAGED_PLATFORM_IDS } from '../src/platforms';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 import { PLATFORM_HOSTS } from '../src/server/platforms/index';
 import { analyticsPlatformIds, connectablePlatforms, connectionFlow, inboxPlatformIds, isPlatformEnabled, platformAnalytics, platformFor, platformInbox, platformStatuses } from '../src/server/platforms/registry';
@@ -30,7 +30,27 @@ describe('platform modules', () => {
       expect(CONFIG_BY_KEY.get(module.enabledKey)?.kind).toBe('boolean');
       for (const key of module.requiredSettings) expect(CONFIG_BY_KEY.has(key)).toBe(true);
     }
-    for (const entry of PLATFORM_CONFIG) expect(entry.group.startsWith('Facebook · ') || entry.group.startsWith('Instagram · ')).toBe(true);
+    for (const entry of PLATFORM_CONFIG) {
+      const owner = [...PLATFORM_MODULES, ...STAGED_PLATFORM_MODULES].find(module => module.id === entry.owner.id);
+      expect(owner).toBeDefined();
+      expect(entry.group.startsWith(`${owner!.name} · `)).toBe(true);
+    }
+  });
+
+  it('registers staged settings without exposing unfinished providers even if Root enables their switch', async () => {
+    expect(STAGED_PLATFORM_IDS).toEqual(['mastodon', 'threads', 'x']);
+    for (const module of STAGED_PLATFORM_MODULES) {
+      expect(CONFIG_BY_KEY.get(module.enabledKey)?.defaultValue).toBe(false);
+      for (const key of module.requiredSettings) expect(CONFIG_BY_KEY.has(key)).toBe(true);
+      const entries = PLATFORM_CONFIG.filter(entry => entry.owner.id === module.id);
+      expect(entries.length).toBeGreaterThan(0);
+      for (const entry of entries) expect(entry.schema.safeParse(entry.defaultValue).success).toBe(true);
+      enabled.set(module.enabledKey, true);
+      expect(await isPlatformEnabled(module.id)).toBe(false);
+      expect(await connectionFlow(module.id)).toBeNull();
+      expect(await platformFor(module.id, 'publishing')).toBeNull();
+    }
+    expect(await connectablePlatforms(STAGED_PLATFORM_IDS)).toEqual([]);
   });
 
   it('a switched-off module behaves as if it were not installed', async () => {

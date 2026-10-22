@@ -1,0 +1,1 @@
+export { xModule } from './manifest';
