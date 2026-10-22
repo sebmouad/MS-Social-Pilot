@@ -1,0 +1,19 @@
+import { z } from 'zod';
+import { entry } from '@/lib/config/entry';
+
+export const translatedPostsPolicySchema = z.object({
+  /** Most languages (translations) one request may add beside the original. */
+  maxTranslations: z.number().int().min(1).max(20),
+  /** Longest source text sent for suggestions, in characters. */
+  suggestMaxCharacters: z.number().int().min(100).max(20000),
+}).strict();
+const copy = z.record(z.string(), z.string().min(1));
+export const translatedPostsCopySchema = z.object({ en: copy, fr: copy });
+export const TRANSLATED_POSTS_COPY = {
+  en: { title: 'Translated posts', intro: 'Send the same post in several languages, each to its own channels. Review every suggestion before you create the posts.', language: 'Language', languageHint: 'For example French', channels: 'Channels for this language', original: 'Original text', translation: 'Translation', suggest: 'Suggest translations', suggesting: 'Translating…', create: 'Create translated posts', creating: 'Creating…', add: 'Add a language', remove: 'Remove', confirm: 'I reviewed the translations and want to create these posts', restNote: 'Channels not chosen for a language receive the original text.', created: 'Posts created.', partial: 'Some posts could not be created. Check the list and retry only those channels.', needText: 'Write the original post first.', needChannels: 'Choose at least one channel for each language.', overlap: 'A channel can only be in one language.', failedSuggest: 'We could not translate this. Your text is unchanged.', failedCreate: 'We could not create these posts. Your translations are still here.', confirmation: 'Confirm the translated posts.', tooMany: 'Too many languages in one request.', draft: 'Saved as a draft', scheduled: 'Scheduled' },
+  fr: { title: 'Publications traduites', intro: 'Envoyez la même publication en plusieurs langues, chacune vers ses propres canaux. Relisez chaque suggestion avant de créer les publications.', language: 'Langue', languageHint: 'Par exemple anglais', channels: 'Canaux pour cette langue', original: 'Texte original', translation: 'Traduction', suggest: 'Suggérer des traductions', suggesting: 'Traduction…', create: 'Créer les publications traduites', creating: 'Création…', add: 'Ajouter une langue', remove: 'Retirer', confirm: 'J’ai relu les traductions et je veux créer ces publications', restNote: 'Les canaux non choisis pour une langue reçoivent le texte original.', created: 'Publications créées.', partial: 'Certaines publications n’ont pas pu être créées. Vérifiez la liste et relancez uniquement ces canaux.', needText: 'Rédigez d’abord la publication originale.', needChannels: 'Choisissez au moins un canal pour chaque langue.', overlap: 'Un canal ne peut appartenir qu’à une seule langue.', failedSuggest: 'Impossible de traduire ce texte. Votre texte est inchangé.', failedCreate: 'Impossible de créer ces publications. Vos traductions sont conservées.', confirmation: 'Confirmez les publications traduites.', tooMany: 'Trop de langues dans une même demande.', draft: 'Enregistrée comme brouillon', scheduled: 'Planifiée' },
+} as const;
+export const TRANSLATED_POSTS_CONFIG = [
+  entry({ key: 'ai.translatedPosts.policy', group: 'AI · Translated posts', label: 'Translated posts policy', description: 'Languages allowed per request and the longest source text sent for translation suggestions. Suggestions use the same provider, hourly limit and budget as AI writing assist.', kind: 'json', defaultValue: { maxTranslations: 8, suggestMaxCharacters: 4000 }, schema: translatedPostsPolicySchema, consumption: 'active' }),
+  entry({ key: 'ai.translatedPosts.copy', group: 'AI · Translated posts', label: 'Translated posts English / French copy', description: 'Customer labels and feedback for the translated posts workflow.', kind: 'json', defaultValue: TRANSLATED_POSTS_COPY, schema: translatedPostsCopySchema, consumption: 'active' }),
+] as const;

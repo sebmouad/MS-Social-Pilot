@@ -29,7 +29,7 @@ const PROVIDER_KEYS: Record<AiProviderId, { secret: string; model: string; endpo
   gemini: { secret: 'ai.geminiApiKey', model: 'ai.geminiModel', endpoint: 'ai.geminiEndpoint', port: geminiPort },
 };
 
-type Settings = { port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; hashtagBodyMax: number; outputInputMultiplier: number; languageMax: number; txTimeout: number; txWait: number; metering: Metering };
+export type Settings = { port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; hashtagBodyMax: number; outputInputMultiplier: number; languageMax: number; txTimeout: number; txWait: number; metering: Metering };
 /** Resolve everything assist needs; null when anything is unconfigured, so customer surfaces stay hidden. */
 export async function settings(deps: AiDeps): Promise<Settings | null> {
   try {

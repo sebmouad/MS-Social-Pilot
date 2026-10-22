@@ -56,6 +56,15 @@ export async function platformAnalytics(provider: string): Promise<NonNullable<P
   return analytics;
 }
 
+/** Enabled modules that can refresh their cached link card for a page, in installation order. */
+export async function linkPreviewHosts(): Promise<Array<{ provider: string; host: NonNullable<PlatformHost['linkPreview']> }>> {
+  const found = await Promise.all((PLATFORM_MODULES as readonly PlatformModule[]).map(async module => {
+    const host = hostFor(module.id)?.linkPreview;
+    return host && await isPlatformEnabled(module.id) ? { provider: module.id, host } : null;
+  }));
+  return found.filter((item): item is { provider: string; host: NonNullable<PlatformHost['linkPreview']> } => item !== null);
+}
+
 /** Installed and enabled modules that implement analytics, not only declare it. */
 export async function analyticsPlatformIds(): Promise<string[]> {
   const ids = await Promise.all((PLATFORM_MODULES as readonly PlatformModule[]).map(async module =>

@@ -178,11 +178,16 @@ export type PlatformDataCallbackResult =
   | { ok: true; affected: number; confirmationCode?: string }
   | { ok: false; reason: 'invalid_signature' };
 
+export interface PlatformLinkCard { title: string | null; description: string | null; imageUrl: string | null; siteName: string | null }
+export interface PlatformLinkPreviewHost { refresh(url: string, signal: AbortSignal): Promise<PlatformLinkCard | null> }
+
 export interface PlatformHost {
   diagnostics?: import('@/server/diagnostics/types').PlatformDiagnostics;
   inbox?: PlatformInboxHost;
   ads?: PlatformAdsHost;
   analytics?: PlatformAnalyticsHost;
+  /** Optional: ask the provider to read a public page again so its cached link card is fresh. Null when it found nothing usable. */
+  linkPreview?: PlatformLinkPreviewHost;
   /** Build the engine from Root settings. */
   adapter(): Promise<PlatformAdapter>;
   jobs?: Partial<Record<PlatformJobName, (now: Date, retryLimit: number, retryBackoff: RetryBackoff) => Promise<JobSummary>>>;
