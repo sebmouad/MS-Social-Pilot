@@ -76,7 +76,7 @@ describe('thread details pane', () => {
 describe('filter row', () => {
   it('keeps filters in one GET form with the Filter button and the search box', () => {
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
-    act(() => root.render(createElement(InboxCopyProvider, { catalog: inboxCustomerCopy, children: createElement(InboxFilterRow, { action: '/inbox', resetHref: '/inbox', channels: [], locale: 'fr', disabledLimit: false, activeCount: 2, quick: ['unread'], filters: { channelId: null, kind: 'all', state: 'open', hidden: 'visible', q: 'bonjour' } }) })));
+    act(() => root.render(createElement(InboxCopyProvider, { catalog: inboxCustomerCopy, children: createElement(InboxFilterRow, { action: '/inbox', resetHref: '/inbox', locale: 'fr', disabledLimit: false, activeCount: 2, quick: ['unread'], filters: { channelId: null, kind: 'all', state: 'open', hidden: 'visible', q: 'bonjour' } }) })));
     const form = host.querySelector('form')!;
     expect(form.getAttribute('method')).toBe('get');
     expect(form.querySelector('button.ui-filter-button')?.textContent).toContain('2');

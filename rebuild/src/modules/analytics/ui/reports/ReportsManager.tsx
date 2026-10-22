@@ -199,8 +199,8 @@ export function ReportsManager({ templates, templateOptions, schedules, runs, ca
   }
 
   const toggleSection = (id: string) => setTpl(current => ({ ...current, sections: current.sections.includes(id) ? current.sections.filter(section => section !== id) : [...current.sections, id] }));
-  const templatesHref = (next: number) => `/analytics/reports?page=${next}${runsPage > 1 ? `&runsPage=${runsPage}` : ''}`;
-  const runsHref = (next: number) => `/analytics/reports?page=${page}${next > 1 ? `&runsPage=${next}` : ''}`;
+  const templatesHref = (next: number) => `/insights/reports?page=${next}${runsPage > 1 ? `&runsPage=${runsPage}` : ''}`;
+  const runsHref = (next: number) => `/insights/reports?page=${page}${next > 1 ? `&runsPage=${next}` : ''}`;
   const templatePager = page > 1 || hasMoreTemplates || hasMoreSchedules;
   const runPager = runsPage > 1 || runsHasMore;
   const runStatus = (run: RunRow) => run.status === 'completed' ? (run.kind === 'manual' ? t("Prepared") : t("Completed")) : ({ claimed: t("Starting"), generating: t("Preparing"), delivering: t("Sending"), partial: t("Partly sent"), failed: t("Failed"), uncertain: t("Delivery not confirmed"), skipped: t("Skipped") } as Record<string, string>)[run.status] ?? t("Status unavailable");

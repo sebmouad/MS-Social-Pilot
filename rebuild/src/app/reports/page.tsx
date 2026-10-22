@@ -7,5 +7,5 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     if (!['start', 'end', 'filter', 'channel'].includes(key)) continue;
     for (const item of Array.isArray(value) ? value : value ? [value] : []) params.append(key, item);
   }
-  redirect(`/analytics${params.size ? `?${params}` : ''}`);
+  redirect(`/insights${params.size ? `?${params}` : ''}`);
 }

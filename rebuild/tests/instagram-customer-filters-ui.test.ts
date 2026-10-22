@@ -17,21 +17,17 @@ describe('neutral customer channel choices', () => {
     host.innerHTML = renderToStaticMarkup(createElement(AnalyticsChannelChoices, { channels: [], selectedIds: ['ig-atlas'] }));
     expect(host.querySelectorAll('input')).toHaveLength(0);
   });
-  it.each(['en', 'fr'] as const)('offers Instagram in the searchable inbox channel filter in %s', async locale => {
+  it.each(['en', 'fr'] as const)('leaves the channel choice to the sidebar and carries its scope through the Inbox filter form in %s', async locale => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
     try {
-      await act(async () => root.render(createElement(InboxFilterRow, { action: '/inbox', resetHref: '/inbox', channels, locale, disabledLimit: false, activeCount: 1,
-        filters: { channelId: 'ig-atlas', kind: 'all', state: 'open', hidden: 'visible', q: '' } })));
-      // The channel list lives behind the page's single Filter button.
+      await act(async () => root.render(createElement(InboxFilterRow, { action: '/inbox', resetHref: '/inbox', scope: 'ig-atlas,other', locale, disabledLimit: false, activeCount: 0,
+        filters: { channelId: null, kind: 'all', state: 'open', hidden: 'visible', q: '' } })));
       await act(async () => host.querySelector<HTMLButtonElement>('button.ui-filter-button')!.click());
-      expect(host.querySelector<HTMLInputElement>('input[name=channel]')?.value).toBe('ig-atlas');
-      const picker = [...host.querySelectorAll<HTMLElement>('[role=combobox]')].find(el => el.textContent?.includes(channels[0]!.name))!;
-      expect(picker).toBeTruthy();
-      await act(async () => picker.click());
-      const option = [...document.querySelectorAll('[role=option]')].find(el => el.textContent?.includes(channels[0]!.name));
-      expect(option).toBeTruthy();
-      expect(option?.getAttribute('aria-selected')).toBe('true');
+      // The scope is a hidden field, so filtering keeps it; there is no channel picker of its own any more.
+      expect(host.querySelector<HTMLInputElement>('input[type=hidden][name=channel]')?.value).toBe('ig-atlas,other');
+      expect([...host.querySelectorAll<HTMLElement>('[role=combobox]')].some(el => el.textContent?.includes(channels[0]!.name))).toBe(false);
+      expect(host.querySelector('select[name=channel], input[type=text][name=channel]')).toBeNull();
     } finally { await act(async () => root.unmount()); host.remove(); }
   });
 });

@@ -10,6 +10,7 @@ const customPolicy = {
 };
 const state = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn(), viewer: vi.fn(), readiness: vi.fn(), canRead: vi.fn(), policy: vi.fn(), output: vi.fn(), feature: vi.fn(), access: vi.fn() }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': 'en' }) }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {} }), usePathname: () => '/insights/ads', useSearchParams: () => new URLSearchParams() }));
 vi.mock('@/modules/ads/management/server', () => ({ describeAdsManagement: async () => ({ canManage: false, operations: [] }) }));
 vi.mock('@/modules/ads/server/object-store', () => ({ listStoredAdObjects: async () => [] }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
@@ -50,33 +51,43 @@ beforeEach(() => {
 });
 
 describe('Ads report filter UX', () => {
-  it('uses the same selected account set for summary counts and account cards', async () => {
+  it('shows the selected account as one row of the Accounts table, with the count in the header', async () => {
     const node = dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({ account: 'usd' }) })));
-    const totals = Object.fromEntries([...node.querySelectorAll('.metric-card dl')].map(item => [item.querySelector('dt')!.textContent, item.querySelector('dd')!.textContent]));
-    expect(totals).toEqual({ 'Linked accounts': '1', 'Enabled accounts': '1', 'Accounts with sync time': '0', 'Campaigns with data': '0' });
-    expect(node.querySelectorAll('.ads-account-card')).toHaveLength(1);
-    expect(node.querySelector('.ads-account-card h3')?.textContent).toBe('US account');
+    const rows = node.querySelectorAll('tbody tr');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.textContent).toContain('US account');
+    expect(node.querySelector('.ui-page-header__count')?.textContent).toBe('1');
+    // One table, not a wall of per-account tiles, charts and funnels.
+    expect(node.querySelectorAll('table')).toHaveLength(1);
+    expect(node.querySelector('.ads-account-card')).toBeNull();
+    expect(node.querySelector('.metric-grid')).toBeNull();
   });
 
-  it('paginates account cards while preserving global counts and the complete custom filter scope', async () => {
+  it('offers the Ads sub-tabs for the sections this member may use', async () => {
+    const node = dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({}) })));
+    const tabs = [...node.querySelectorAll('.insights-subtabs a')].map(link => [link.textContent, link.getAttribute('aria-current')]);
+    expect(tabs).toEqual([['Accounts', 'page'], ['Campaigns', null], ['Manage', null], ['Analysis', null]]);
+    state.feature.mockImplementation((_entitlements, feature) => feature === 'ads/overview');
+    expect(dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({}) }))).querySelector('.insights-subtabs')).toBeNull();
+  });
+
+  it('paginates the Accounts table while keeping the total and the complete custom filter scope', async () => {
     state.dataset.mockResolvedValue({ accounts, insights: [], pageSize: 1, maxRows: 2500 });
     const node = dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({ period: 'custom', since: '2026-10-01', until: '2026-10-03', page: '2' }) })));
-    expect(node.querySelectorAll('.ads-account-card')).toHaveLength(1);
-    expect(node.querySelector('.ads-account-card h3')?.textContent).toBe('US account');
-    expect(node.querySelector('.ui-page-header')?.textContent).toContain('Showing 2–2 of 3 accounts · Page 2 of 3');
-    expect(node.querySelector('.metric-card dd')?.textContent).toBe('3');
+    expect(node.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(node.querySelector('tbody tr')?.textContent).toContain('US account');
+    expect(node.querySelector('.ui-page-header__count')?.textContent).toBe('3');
     const next = node.querySelector<HTMLAnchorElement>('nav[aria-label="Account report pages"] a[rel="next"]')!;
-    expect(next.getAttribute('href')).toBe('/ads?period=custom&since=2026-10-01&until=2026-10-03&page=3');
+    expect(next.getAttribute('href')).toBe('/insights/ads?period=custom&since=2026-10-01&until=2026-10-03&page=3');
     expect(node.querySelector('.ads-report-pager__current [aria-current="page"]')?.textContent).toBe('Page 2 of 3');
   });
 
   it('places a bounded export below paging using applied filters without the visible page', async () => {
     const node = dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({ period: 'custom', since: '2026-10-01', until: '2026-10-03', account: 'usd', page: '2' }) })));
-    const sidebar = node.querySelector('aside')!;
-    expect(sidebar.querySelector('section[aria-label="Export Ads report"]')).not.toBeNull();
-    expect(sidebar.querySelector('.ads-report-export button')?.textContent).toBe('Export all matching daily rows');
-    expect(sidebar.textContent).toContain('Action metrics and additional fields are included');
-    expect(sidebar.querySelector('.ads-report-pager')!.compareDocumentPosition(sidebar.querySelector('.ads-report-export')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(node.querySelector('section[aria-label="Export Ads report"]')).not.toBeNull();
+    expect(node.querySelector('.ads-report-export button')?.textContent).toBe('Export all matching daily rows');
+    expect(node.textContent).toContain('Action metrics and additional fields are included');
+    expect(node.querySelector('.ads-report-pager')!.compareDocumentPosition(node.querySelector('.ads-report-export')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(state.output).toHaveBeenCalledTimes(1);
   });
 
@@ -121,7 +132,7 @@ describe('Ads report filter UX', () => {
     expect(node.querySelector('[role="alert"]')?.textContent).toMatch(/too much report data/i);
     expect(node.querySelector<HTMLInputElement>('input[name="since"]')?.value).toBe('2026-10-01');
     expect(node.querySelector<HTMLSelectElement>('select[name="account"]')?.value).toBe('usd');
-    expect(node.querySelector('.ads-page-reset')?.getAttribute('href')).toBe('/ads?period=custom&since=2026-10-01&until=2026-10-03&account=usd');
+    expect(node.querySelector('.ads-page-reset')?.getAttribute('href')).toBe('/insights/ads?period=custom&since=2026-10-01&until=2026-10-03&account=usd');
     expect(node.querySelector('.ads-account-card')).toBeNull();
     expect(node.querySelector('[aria-label="Export Ads report"]')).toBeNull();
     expect(state.output).not.toHaveBeenCalled();
@@ -166,8 +177,13 @@ describe('Ads report filter UX', () => {
     const node = dom(renderToStaticMarkup(await page({ searchParams: Promise.resolve({}) })));
     expect(state.policy).toHaveBeenCalledTimes(1);
     expect(state.policy.mock.invocationCallOrder[0]).toBeGreaterThan(state.viewer.mock.invocationCallOrder[0]);
-    expect(node.querySelector('select[name=period] option[value="14d"]')?.textContent).toBe('Last two weeks');
-    expect(node.querySelector<HTMLSelectElement>('select[name=period]')?.value).toBe('14d');
+    // Campaigns keeps the sidebar form; Accounts shows the policy default preset in the header's period picker.
+    if (page === CampaignsPage) {
+      expect(node.querySelector('select[name=period] option[value="14d"]')?.textContent).toBe('Last two weeks');
+      expect(node.querySelector<HTMLSelectElement>('select[name=period]')?.value).toBe('14d');
+    } else {
+      expect(node.querySelector('button.ui-daterange')?.getAttribute('aria-label')).toContain('Last two weeks');
+    }
   });
 
   it('keeps custom range correction and explains the configured maximum', async () => {

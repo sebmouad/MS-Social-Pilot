@@ -19,9 +19,9 @@ export default async function GoalsPage() {
   let failure = ''; let data: Awaited<ReturnType<typeof readGoals>> | null = null;
   try { data = await readGoals({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); }
   catch (error) { failure = operationFailure(error, t('loadFailed')).error; }
-  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/goals" />}><div className={styles.root}>
+  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/insights/goals" />}><div className={styles.root}>
     <PageHeader module="analytics" title={t('title')} />{data && <p>{t('subtitle', { from: data.month.start, to: data.month.end, zone: data.month.timeZone })}</p>}
-    {failure && <section className={styles.panel} role="alert"><h2>{t('loadFailedTitle')}</h2><p>{failure}</p><a href="/analytics/goals">{t('retry')}</a></section>}
+    {failure && <section className={styles.panel} role="alert"><h2>{t('loadFailedTitle')}</h2><p>{failure}</p><a href="/insights/goals">{t('retry')}</a></section>}
     {data && !data.channels.length && <section className={styles.panel}><h2>{t('noChannelsTitle')}</h2><p>{t('noChannels')}</p><a href="/settings/connections">{t('manageConnections')}</a></section>}
     {data?.channels.map(channel => <section key={channel.channelId} className={styles.panel} aria-labelledby={`goal-${channel.channelId}`}>
       <h2 id={`goal-${channel.channelId}`}>{channel.channelName}</h2>

@@ -7,6 +7,7 @@ import { AdsCopyProvider } from '@/modules/ads/ui/AdsCopyProvider';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { IconAd, IconSpeakerphone } from '@tabler/icons-react';
+import { adsTabsFor } from '../AdsTabsFor';
 import { CampaignCharts } from './CampaignCharts';
 import { HierarchyTable } from './HierarchyTable';
 import { headers } from 'next/headers';
@@ -48,10 +49,10 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   const [params, accounts] = await Promise.all([searchParams, getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders)]);
   let filters;
   try { filters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); }
-  catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView catalogs={catalogs} locale={locale} accounts={accounts} input={params} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
+  catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView catalogs={catalogs} locale={locale} accounts={accounts} input={params} error={error} action="/insights/ads/campaigns" title={t('text041')} policy={policy} />; }
   let requestedPage: number;
   try { requestedPage = parseAdsResultPage(params.page); }
-  catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
+  catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/insights/ads/campaigns" title={t('text041')} policy={policy} />; }
   let dataset;
   let summaries;
   try {
@@ -61,7 +62,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
     summaries = mergeAdObjectSummaries(summarizeInsights(dataset.insights), inventory, accounts).filter(row => ['campaign', 'adset', 'ad'].includes(row.level))
       .sort((left, right) => left.accountName.localeCompare(right.accountName) || left.level.localeCompare(right.level) || left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
     if (summaries.length > dataset.maxRows) throw new AdsReportLimitError();
-  } catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title={t('text041')} policy={policy} />; }
+  } catch (error) { return <AdsReportFailureView catalogs={catalogs} locale={locale} accounts={accounts} input={params} filters={filters} error={error} action="/insights/ads/campaigns" title={t('text041')} policy={policy} />; }
   const objectPage = pageAdsRows(summaries, requestedPage, dataset.pageSize);
   const byAccount = groupSummariesByAccount(objectPage.items);
   const actionAvailability = new Map(await Promise.all([...byAccount.keys()].map(async accountId => [
@@ -88,8 +89,10 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
   })));
   const canExport = canUseFeature(viewer.entitlements, 'ads/campaigns') && canAccessFeature(viewer.permissions, 'ads/campaigns', 'read');
   const exportPolicy = canExport ? await loadAdsOutputPolicy().catch(() => null) : null;
-  const sidebar = <AdsReportSidebar catalogs={catalogs} locale={locale} accounts={accounts} filters={filters} action="/ads/campaigns" kind="objects" policy={policy} page={objectPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
+  const tabs = await adsTabsFor('campaigns', viewer, filters);
+  const sidebar = <AdsReportSidebar catalogs={catalogs} locale={locale} accounts={accounts} filters={filters} action="/insights/ads/campaigns" kind="objects" policy={policy} page={objectPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
   return <PageFrame module="ads" sidebar={accounts.length ? sidebar : undefined}><div className="page-stack">
+    {tabs}
     <PageHeader module="ads" title={t('text041')} description={<>{accounts.length ? t('text260', { value0: objectPage.from, value1: objectPage.to, value2: objectPage.resultCount, value3: objectPage.page, value4: objectPage.pageCount, value5: dateRangeLabel(filters) }) : t('text042')}</>} />
     {!accounts.length ? <section className="panel"><EmptyState icon={<IconAd />} title={t('text003')} action={<a className="text-link" href="/settings/connections">{t('text004')}</a>}>{t('text043')}</EmptyState></section> : <>
     {objectPage.resultCount ? [...byAccount].map(([accountId, rows]) => {
@@ -120,7 +123,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
           const slot = (row: typeof levelRows[number]) => readAvailability.get(accountId) || actionAvailability.get(accountId)
             ? <AdsObjectActions adAccountId={accountId} objectId={row.id} name={row.name} objectType={row.level as 'campaign' | 'adset' | 'ad'} currency={row.currency} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null;
           return <div className="ads-result-level" key={level.value}><h3>{level.label}</h3>
-            <HierarchyTable locale={locale} caption={t('resultsCaption', { level: level.label, account: account?.name ?? rows[0]?.accountName ?? t('accountFallback') })} objectsHref="/ads/objects"
+            <HierarchyTable locale={locale} caption={t('resultsCaption', { level: level.label, account: account?.name ?? rows[0]?.accountName ?? t('accountFallback') })} objectsHref="/insights/ads/manage"
               rows={levelRows.map(row => ({ key: row.key, id: row.id, name: row.name, level: row.level as 'campaign' | 'adset' | 'ad', currency: row.currency, spend: row.spend, impressions: row.impressions, clicks: row.clicks, ctr: row.ctr, cpc: row.cpc, days: row.rows, path: pathOf(row),
                 spendSeries: [...row.dailyMetrics].sort((a, b) => a.date.getTime() - b.date.getTime()).map(entry => entry.spend) }))}
               actions={Object.fromEntries(levelRows.map(row => [row.key, slot(row)]))}
@@ -134,7 +137,7 @@ async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearch
           {rows.filter(row => row.level === 'adset').map(row => <AdCreateForm key={row.id} adAccountId={accountId} adSetId={row.id} adSetName={row.name} nameMaxCharacters={nameMaxByAccount.get(accountId) ?? 100} />)}
         </div> : null}
       </section>;
-    }) : <section className="panel"><EmptyState icon={<IconSpeakerphone />} title={t('text049')} action={<a className="text-link" href="/ads">{t('text050')}</a>}>{t('text051')}</EmptyState></section>}
+    }) : <section className="panel"><EmptyState icon={<IconSpeakerphone />} title={t('text049')} action={<a className="text-link" href="/insights/ads">{t('text050')}</a>}>{t('text051')}</EmptyState></section>}
     {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>{t('text052')}</h2><p className="small-note">{t('text053')}</p>
       {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} ownerScope={{ userId: viewer.user.id, workspaceId }} />)}
     </section> : null}

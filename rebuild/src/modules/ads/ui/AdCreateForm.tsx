@@ -99,7 +99,7 @@ export function AdCreateForm({ adAccountId, adSetId, adSetName, nameMaxCharacter
     {message ? <RouteNotice error={message.tone === 'error'} className={message.tone === 'ok' ? 'small-note' : 'ui-error'} focusKey={message.text}>{localize(message.text)}</RouteNotice> : null}
     {held && review ? <div role="region" aria-label={t('adCreateHeldLabel')} className="ads-object-manager__pending">
       <p role="alert" className="ui-error">{localize(held)}</p>
-      <p className="small-note">{t('text210')}<a href="/ads/objects#changes">{t('text211')}</a> {t('text212')}</p>
+      <p className="small-note">{t('text210')}<a href="/insights/ads/manage#changes">{t('text211')}</a> {t('text212')}</p>
       <Button type="button" variant="primary" onClick={() => void apply()} disabled={busy}>{busy ? t('text118') : t('text213')}</Button>
     </div> : null}
     {review && dialogOpen ? <ModalDialog className="ui-dialog" labelledBy={`${id}-title`} onDismiss={() => { if (!busy) setDialogOpen(false); }} busy={busy}>
@@ -107,7 +107,7 @@ export function AdCreateForm({ adAccountId, adSetId, adSetName, nameMaxCharacter
       <div className="ui-dialog__body">
         {review.spendChanging ? <p role="note"><strong>{t('text120')}</strong></p> : null}
         <p><strong>{review.operation.name}</strong> {t('text224')}{adSetName}</p>
-        {review.blocked ? <p role="alert">{t('text122')}<a href="/ads/objects#changes">{t('text102')}</a>{t('text251')}</p> : null}
+        {review.blocked ? <p role="alert">{t('text122')}<a href="/insights/ads/manage#changes">{t('text102')}</a>{t('text251')}</p> : null}
       </div>
       <div className="ui-dialog__actions">
         <Button data-dialog-cancel onClick={() => setDialogOpen(false)} disabled={busy}>{t('text125')}</Button>

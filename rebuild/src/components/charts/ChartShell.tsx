@@ -1,8 +1,9 @@
 "use client";
 import type { EChartsCoreOption } from "echarts/core";
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { EmptyState } from "../EmptyState";
 import { Skeleton } from "../Skeleton";
+import "./charts.css";
 import { UNKNOWN } from "./format";
 import { getMessages } from "./messages";
 import type { ChartEnv } from "./theme";
@@ -124,8 +125,8 @@ function ChartCanvas({ option, signature, label, height, focusCount }: CanvasPro
   />;
 }
 
-function DataTable({ table, caption }: { table: ChartTable; caption: string }) {
-  return <table className="ui-visually-hidden">
+function DataTable({ table, caption, visible = false }: { table: ChartTable; caption: string; visible?: boolean }) {
+  return <table className={visible ? "ui-chart__table" : "ui-visually-hidden"}>
     <caption>{caption}</caption>
     <thead><tr>{table.columns.map((column, index) => <th key={index} scope="col">{column}</th>)}</tr></thead>
     <tbody>{table.rows.map((row, rowIndex) => <tr key={rowIndex}>
@@ -136,6 +137,7 @@ function DataTable({ table, caption }: { table: ChartTable; caption: string }) {
 
 export function ChartShell({ model, height = 280, ...props }: ChartBaseProps & { model: ChartModel }) {
   const env = useChartEnv();
+  const [dataShown, setDataShown] = useState(false);
   const messages = getMessages(props.locale ?? "en");
   const className = ["ui-chart", props.className].filter(Boolean).join(" ");
   const box = { minHeight: typeof height === "number" ? height : undefined };
@@ -151,6 +153,11 @@ export function ChartShell({ model, height = 280, ...props }: ChartBaseProps & {
   }
   return <div className={className} style={{ position: "relative", width: "100%" }}>
     <ChartCanvas option={env ? model.option(env) : null} signature={model.signature} label={props.label} height={height} focusCount={model.focusCount} />
-    {(props.table ?? true) && <DataTable table={model.table} caption={props.tableCaption ?? props.label} />}
+    {(props.table ?? true) && <>
+      <button type="button" className="ui-chart__toggle" aria-expanded={dataShown} onClick={() => setDataShown(value => !value)}>{dataShown ? messages.hideData : messages.showData}</button>
+      <div className={dataShown ? "ui-chart__data" : undefined} tabIndex={dataShown ? 0 : undefined} role={dataShown ? "region" : undefined} aria-label={dataShown ? props.tableCaption ?? props.label : undefined}>
+        <DataTable table={model.table} caption={props.tableCaption ?? props.label} visible={dataShown} />
+      </div>
+    </>}
   </div>;
 }

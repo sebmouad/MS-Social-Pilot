@@ -3,6 +3,7 @@ import { ChartShell, type ChartBaseProps, type ChartModel } from "./ChartShell";
 import { dateFormatters, numberFormatter, toTime, type ChartTime, type Granularity, type NumberFormat } from "./format";
 import { getMessages } from "./messages";
 import { axisStyle, baseOption, legendStyle, tooltipStyle } from "./option-base";
+import { fillTimes, SERIES_DASHES, SERIES_SYMBOLS } from "./series-fit";
 import { colorAt, css } from "./theme";
 
 export type TimeSeriesPoint = { t: ChartTime; v: number | null };
@@ -39,8 +40,10 @@ export function buildTimeSeriesModel(props: TimeSeriesChartProps): ChartModel {
   const axisFmt = numberFormatter(locale, { ...format, compact: true });
   const dates = dateFormatters(locale, granularity, timeZone);
 
-  // Category axis over the union of timestamps: ticks and labels stay in the display time zone.
-  const times = [...new Set(series.flatMap(item => item.points.map(point => toTime(point.t))).filter(Number.isFinite))].sort((a, b) => a - b);
+  // Every step of the granularity between the first and last point, so a gap in the data is drawn as a gap and
+  // never compressed. Ticks and labels stay in the display time zone.
+  const known = [...new Set(series.flatMap(item => item.points.map(point => toTime(point.t))).filter(Number.isFinite))].sort((a, b) => a - b);
+  const times = fillTimes(known, granularity);
   const index = new Map(times.map((time, position) => [time, position]));
   const align = (points: TimeSeriesPoint[]) => {
     const data: Array<number | null> = times.map(() => null);
@@ -50,7 +53,20 @@ export function buildTimeSeriesModel(props: TimeSeriesChartProps): ChartModel {
     }
     return data;
   };
-  const alignComparison = (points: TimeSeriesPoint[]) => times.map((_, position) => points[position]?.v ?? null);
+  // The comparison is aligned by date offset (t − period length), not by array position: a previous day without a
+  // value stays a gap. Dates that already fall in the primary range are used as they are.
+  const alignComparison = (points: TimeSeriesPoint[]) => {
+    const stamps = points.map(point => toTime(point.t));
+    const shift = stamps.some(stamp => index.has(stamp)) || !stamps.length || !times.length ? 0 : times[0]! - Math.min(...stamps);
+    const data: Array<number | null> = times.map(() => null);
+    points.forEach((point, position) => {
+      const slot = index.get(stamps[position]! + shift);
+      if (slot !== undefined) data[slot] = point.v;
+    });
+    return data;
+  };
+  // More than two series: marker shape and line pattern differ per series, so color is never the only cue.
+  const distinct = series.length > 2;
 
   const columns = [messages.date, ...series.map(item => item.name), ...series.filter(item => item.comparison).map(item => `${item.name} · ${comparisonLabel}`)];
   const aligned = series.map(item => align(item.points));
@@ -70,8 +86,8 @@ export function buildTimeSeriesModel(props: TimeSeriesChartProps): ChartModel {
         const filled = stacked || (item.area ?? series.length === 1);
         const primary = {
           type: "line", id: item.id, name: item.name, data: aligned[position],
-          showSymbol: times.length <= 12, symbolSize: 7, connectNulls: false, smooth: false,
-          lineStyle: { width: 2.5, color, cap: "round" }, itemStyle: { color, borderColor: css(theme.surface), borderWidth: 2 },
+          showSymbol: distinct || times.length <= 12, symbol: distinct ? SERIES_SYMBOLS[position % SERIES_SYMBOLS.length] : "circle", symbolSize: 7, connectNulls: false, smooth: false,
+          lineStyle: { width: 2.5, color, cap: "round", type: distinct ? SERIES_DASHES[position % SERIES_DASHES.length] : "solid" }, itemStyle: { color, borderColor: css(theme.surface), borderWidth: 2 },
           stack: stacked ? "total" : undefined,
           areaStyle: filled ? { color, opacity: 0.16 } : undefined,
           emphasis: { focus: "series" },

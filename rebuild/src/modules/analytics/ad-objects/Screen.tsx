@@ -35,7 +35,7 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
   const levelLabel = level === 'campaign' ? t("Campaigns") : level === 'adset' ? t("Ad sets") : t("Ads");
   const selectedAccount = current?.accountId ?? value('accountId');
   const options = data?.options ?? [];
-  const sidebar = <form action="/analytics/ads" className={local.filters}>
+  const sidebar = <form action="/insights/ads/analysis" className={local.filters}>
     <h2>{t("Ad-object analysis")}</h2>
     <label className="ui-field">{t("Start (UTC, inclusive)")}<input className="ui-input" type="text" name="start" placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.start ?? value('start')} /></label>
     <label className="ui-field">{t("End (UTC, inclusive)")}<input className="ui-input" type="text" name="end" placeholder={t("YYYY-MM-DD")} defaultValue={data?.period.end ?? value('end')} /></label>
@@ -53,7 +53,7 @@ export default async function AdObjectsScreen({ searchParams }: { searchParams: 
     <label className="ui-field">{t("Order")}<select className="ui-input" name="direction" defaultValue={current?.direction ?? (value('direction') || 'asc')}><option value="asc">{t("Ascending")}</option><option value="desc">{t("Descending")}</option></select></label>
     <p className="small-note">{t("Sorted within each account and currency. Missing values appear last.")}</p>
     <Button type="submit" variant="primary">{t("Apply")}</Button>
-    <a href="/analytics/ads">{t("Reset filters")}</a>
+    <a href="/insights/ads/analysis">{t("Reset filters")}</a>
     {data && <><a href={`/api/analytics/ad-objects?${query({ format: 'csv', locale: fr ? 'fr' : 'en' })}`}>{t("Export selection (CSV)")}</a>
       <nav aria-label={t("Drill-down")}><a href={`?${query({ level: 'campaign', parentId: null, objectId: null })}`}>{t("Back to campaigns")}</a></nav>
       <nav aria-label={t("Pages")} className={styles.actions}>{data.page > 1 && <a href={`?${query({ page: String(data.page - 1) })}`}>{t("Previous")}</a>}<span>{t("Page")} {data.page}</span>{data.nextPage && <a href={`?${query({ page: String(data.nextPage) })}`}>{t("Next")}</a>}</nav></>}

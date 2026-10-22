@@ -112,12 +112,12 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
     {message ? <p role="status" className="small-note">{localize(message)}</p> : null}
     {held && pendingRequest ? <div role="region" aria-label={t('text223')} className="ads-object-manager__pending">
       <p role="alert" className="ui-error">{localize(held)}</p>
-      <p className="small-note">{t('text210')}<a href="/ads/objects#changes">{t('text211')}</a> {t('text212')}</p>
+      <p className="small-note">{t('text210')}<a href="/insights/ads/manage#changes">{t('text211')}</a> {t('text212')}</p>
       <button className="ui-button ui-button--primary" type="button" onClick={() => void confirmCreate()} disabled={busy}>{busy ? t('text118') : t('text213')}</button>
     </div> : null}
     {confirmationOpen && pendingRequest ? <ModalDialog className="ui-dialog" labelledBy={`adset-confirm-title-${adAccountId}-${campaignId}`} onDismiss={() => { if (!busy) setConfirmationOpen(false); }} busy={busy}>
       <div className="ui-dialog__header"><div><h2 id={`adset-confirm-title-${adAccountId}-${campaignId}`}>{config.confirmTitle}</h2><p>{config.confirmDescription}</p></div></div>
-      <div className="ui-dialog__body"><p><strong>{pendingRequest.name}</strong> {t('text224')}{campaignName}</p><p>{config.budgetLabel}{t('text225')}{formatBudgetMinor(pendingRequest.dailyBudgetMinor, currency)} {t('text166')}{pendingRequest.countryCode} {t('text166')}{config.options.find(option => option.value === pendingRequest.optimizationGoal)?.label ?? pendingRequest.optimizationGoal}</p>{dialogError ? <p role="alert" className="ui-error">{localize(dialogError)}{refusalReason === 'blocked_by_other_request' ? <> <a href="/ads/objects#changes">{t('text214')}</a> {t('text215')}</> : null}</p> : null}</div>
+      <div className="ui-dialog__body"><p><strong>{pendingRequest.name}</strong> {t('text224')}{campaignName}</p><p>{config.budgetLabel}{t('text225')}{formatBudgetMinor(pendingRequest.dailyBudgetMinor, currency)} {t('text166')}{pendingRequest.countryCode} {t('text166')}{config.options.find(option => option.value === pendingRequest.optimizationGoal)?.label ?? pendingRequest.optimizationGoal}</p>{dialogError ? <p role="alert" className="ui-error">{localize(dialogError)}{refusalReason === 'blocked_by_other_request' ? <> <a href="/insights/ads/manage#changes">{t('text214')}</a> {t('text215')}</> : null}</p> : null}</div>
       <div className="ui-dialog__actions"><button className="ui-button ui-button--secondary" type="button" data-dialog-cancel onClick={() => setConfirmationOpen(false)} disabled={busy}>{t('text125')}</button><button className="ui-button ui-button--primary" type="button" onClick={() => void confirmCreate()} disabled={busy}>{busy ? t('text208') : config.actionLabel}</button></div>
     </ModalDialog> : null}
   </form>;

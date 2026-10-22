@@ -45,7 +45,10 @@ export const OPTIONAL_AREAS: readonly AreaId[] = ['tasks', 'agency'];
 
 /** Pages the area shows as tabs, in manifest order; pages hidden from navigation and unavailable features are left out. */
 export function areaPages(area: AreaId, enabledFeatures: readonly string[]): ProductPage[] {
-  return PAGES.filter((page) => page.area === area && page.navigation !== false && enabledFeatures.includes(page.id));
+  return PAGES.filter((page) => page.area === area && page.navigation !== false && enabledFeatures.includes(page.id))
+    .map((page, position) => ({ page, position }))
+    .sort((a, b) => ((a.page as { tabOrder?: number }).tabOrder ?? Number.MAX_SAFE_INTEGER) - ((b.page as { tabOrder?: number }).tabOrder ?? Number.MAX_SAFE_INTEGER) || a.position - b.position)
+    .map(({ page }) => page);
 }
 
 /** The page whose route is the longest prefix of the pathname (detail screens stay in their page's area). */

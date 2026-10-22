@@ -7,6 +7,7 @@ vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => 
 vi.mock('@/modules/inbox/server/details', () => ({ readInboxContactDetails: async () => null }));
 vi.mock('@/modules/inbox/server/customer-copy', async () => ({ loadInboxCustomerCopy: async () => (await import('../src/modules/inbox/customer-copy')).inboxCustomerCopy }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
+vi.mock('../src/modules/inbox/ui/scope', () => ({ inboxScope: async (viewer: { permissions: { pageScope: { all: boolean; ids: string[] } } }) => ({ ids: [], constraints: viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids }, param: undefined }) }));
 vi.mock('../src/modules/inbox/server/read', () => ({ readInboxList: state.list, readInboxThread: state.thread }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children, scopedAccess }: { sidebar: import('react').ReactNode; children: import('react').ReactNode; scopedAccess?: boolean }) => createElement('main', { 'data-scoped-access': scopedAccess }, createElement('aside', null, sidebar), children) }));
 vi.mock('@/modules/inbox/server/actions', () => ({ canManageInbox: state.manage, canManageInboxWorkflow: state.workflow }));

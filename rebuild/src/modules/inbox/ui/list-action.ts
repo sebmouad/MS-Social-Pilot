@@ -6,6 +6,7 @@ import { readInboxList } from '../server/read';
 import { loadInboxCustomerCopy } from '../server/customer-copy';
 import { inboxListInput, inboxListLocation, type InboxLocation } from '../query';
 import { inboxLocale } from './locale';
+import { inboxScope } from './scope';
 import { inboxListAbilities, inboxListRows } from './InboxListRows';
 import type { InboxListContinuation } from './InboxList';
 
@@ -17,10 +18,11 @@ export async function loadMoreInboxRows(location: InboxLocation): Promise<InboxL
   try {
     const viewer = await requireViewer({ feature: 'inbox/conversations', channelScoped: true });
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
-    const constraints = viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids };
-    const page = await readInboxList(actor, inboxListInput(location), constraints);
+    const scope = await inboxScope(viewer, location.channel);
+    const { channel: _scope, ...filters } = location;
+    const page = await readInboxList(actor, inboxListInput(filters), scope.constraints);
     const [abilities, catalog, locale, previewMaxCharacters] = await Promise.all([inboxListAbilities(actor, page), loadInboxCustomerCopy(), inboxLocale(), runtimeConfig('inbox.listPreviewMaxCharacters')]);
-    return { ok: true, rows: inboxListRows(page, abilities, inboxListLocation(page), location.thread, locale, catalog, previewMaxCharacters), olderCursor: page.olderCursor, total: page.total };
+    return { ok: true, rows: inboxListRows(page, abilities, { ...inboxListLocation(page), ...(scope.param ? { channel: scope.param } : {}) }, location.thread, locale, catalog, previewMaxCharacters), olderCursor: page.olderCursor, total: page.total };
   } catch {
     // Session loss, changed scope/cursors and infrastructure failures retain the
     // existing rows and use the Root-managed customer recovery copy in the client.

@@ -12,6 +12,7 @@ import { formatValue as formatAnalyticsValue } from '@/modules/analytics/ui/repo
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 import { comparisonInputFromSearch, comparisonSearchSchema } from './search';
 import { ComparisonFilters } from './ComparisonFilters';
+import { compareKindSwitch } from './compareKindSwitch';
 
 type Search = Record<string, string | string[] | undefined>;
 const list = (value: string | string[] | undefined) => value === undefined ? [] : Array.isArray(value) ? value : [value];
@@ -36,12 +37,14 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   // Channel choices come from a scoped read, so they never list channels the person cannot see.
   let channels: Array<{ id: string; name: string }> = data?.options.channels ?? [];
   if (!channels.length) { try { channels = (await (await import('@/modules/analytics/server/read')).readAnalyticsSnapshot(actor, {}, { feature: 'analytics/compare' })).options.channels; } catch { channels = []; } }
+  const kindSwitch = await compareKindSwitch('channels', viewer);
   const mode = first(params.mode) === 'channels' ? 'channels' : 'period';
   const form = <ComparisonFilters copy={copy} locale={locale} mode={mode} channels={channels} initial={{
     aStart: first(params.aStart), aEnd: first(params.aEnd), bStart: first(params.bStart), bEnd: first(params.bEnd),
     start: first(params.start), end: first(params.end), channel: list(params.channel), groupA: list(params.groupA), groupB: list(params.groupB),
   }} />;
-  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/analytics/compare">{form}</WorkflowNav>}><div className={styles.root}>
+  return <PageFrame module="analytics" scopedAccess sidebar={<WorkflowNav current="/insights/compare">{form}</WorkflowNav>}><div className={styles.root}>
+    {kindSwitch}
     <PageHeader module="analytics" title={t('Compare periods or channels')} description={<>{t("Differences are shown only where both sides measure the same thing with the same coverage. Reach and breakdowns are never subtracted, and missing data is unknown, not zero.")}</>} />
     {!input && !failure && <section className={styles.panel}><h2>{t("Choose what to compare")}</h2><p>{t("Pick two periods for the same channels, or two separate groups of channels in one period, then select Compare.")}</p></section>}
     {failure && <section className={styles.panel} role="alert"><h2>{t("Comparison unavailable")}</h2><p>{failure}</p></section>}

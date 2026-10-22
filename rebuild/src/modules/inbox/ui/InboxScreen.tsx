@@ -37,6 +37,7 @@ import { SavedRepliesManager } from './SavedRepliesManager';
 import { readInboxContactDetails } from '@/modules/inbox/server/details';
 import type { InboxContactDetails } from '@/modules/inbox/details';
 import { inboxLocale } from './locale';
+import { inboxScope } from './scope';
 import styles from './inbox.module.css';
 
 const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'all', state: 'open', hidden: 'visible', q: '' };
@@ -71,14 +72,17 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const extra = resolveInboxCatalog('round3Copy', catalog)[locale];
   const { copy: shell } = await shellChrome();
   const actor ={ userId: viewer.user.id, workspaceId: viewer.workspaceId };
-  const constraints = viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids };
+  // The channel list in the sidebar scopes the Inbox; the page has no channel filter of its own.
+  const scope = await inboxScope(viewer, params.channel);
+  const constraints = scope.constraints;
+  const { channel: _scopeParam, ...listParams } = params;
 
   const listOutcome = await (async () => {
-    try { return { page: await readInboxList(actor, inboxListInput(params), constraints), error: null }; }
+    try { return { page: await readInboxList(actor, inboxListInput(listParams), constraints), error: null }; }
     catch (error) { return { page: null, error: operationFailure(error, copy.listError) }; }
   })();
   const listPage = listOutcome.page;
-  const baseLocation = locationFrom(listPage, params);
+  const baseLocation: InboxLocation = { ...locationFrom(listPage, params), ...(scope.param ? { channel: scope.param } : {}) };
   const requestedThread = singleValue(params.thread);
   const requestedHistoryCursor = singleValue(params.historyCursor);
   let threadOutcome: { page: InboxThreadPage | null; error: { error: string; code: string; status: number } | null } = { page: null, error: null };
@@ -196,7 +200,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   // A scope, data or grant change starts a new browsing surface, invalidating
   // pending continuations and preventing older loaded rows surviving a refresh.
   const listRevision = createHash('sha256').update(JSON.stringify({ actor, constraints, channels: listPage?.channels, locale, baseLocation, cursor: listPage?.cursor, thread: requestedThread, items: listPage?.items, abilities: [...abilities], total: listPage?.total, progressivePageLimit, previewMaxCharacters })).digest('hex');
-  const syncTarget = channel === 'all' ? undefined : channel;
+  const syncTarget = scope.ids.length === 1 ? scope.ids[0] : undefined;
 
   const listNav = listPage ? <nav className={styles.listPaging} aria-label={catalog['navigation.listPages'][locale]}>
     {listPage.olderCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.olderCursor })}>{copy.older}</a> : <span aria-disabled="true">{copy.older}</span>}
@@ -232,7 +236,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const tabs = <LinkTabs label={extra.screen.tabsLabel} moreLabel={shell.moreTabs} activeId="conversations"
     items={[{ id: 'conversations', href: '/inbox', label: extra.screen.tabConversations }, { id: 'rules', href: '/inbox/rules', label: extra.screen.tabRules }]} />;
   const filterRow = <div className={styles.filterTools}>
-    <InboxFilterRow action={inboxHref()} filters={filters} channels={visibleChannels} locale={locale} thread={requestedThread} limit={listPage?.limit} maxLimit={listPage?.limits.listPageSize}
+    <InboxFilterRow action={inboxHref()} filters={filters} scope={scope.param} locale={locale} thread={requestedThread} limit={listPage?.limit} maxLimit={listPage?.limits.listPageSize}
       searchMaxCharacters={listPage?.limits.searchMaxCharacters} resetHref={resetHref} disabledLimit={!listPage} quick={quickApplied} activeCount={chips.length} />
     <UrlFilterChips chips={chips} resetHref={resetHref} labels={{ active: copy.activeFilters, remove: copy.removeFilter, reset: copy.resetFilters }} />
   </div>;

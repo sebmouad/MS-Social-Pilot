@@ -6,6 +6,8 @@ export interface ModulePageManifest {
   readonly href: string;
   readonly description: string;
   readonly navigation?: boolean;
+  /** Position among the area's tabs when pages of several modules share an area (lower first); pages without one keep manifest order after them. */
+  readonly tabOrder?: number;
 }
 
 /** Customer work areas of the single sidebar (design v2). Pages join an area through their module's `area`. */

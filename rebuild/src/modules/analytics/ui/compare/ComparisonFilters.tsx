@@ -26,7 +26,7 @@ export function ComparisonFilters({ mode: initialMode, channels, initial, copy =
   const channelChoices = (name: string, selected: string[], set: (next: string[]) => void) => channels.length
     ? channels.map(channel => <label className={styles.check} key={`${name}:${channel.id}`}><input type="checkbox" name={name} value={channel.id} checked={selected.includes(channel.id)} onChange={event => toggle(selected, set, channel.id, event.currentTarget.checked)} /><span>{channel.name}</span></label>)
     : <p className={styles.note}>{t("No channels available.")}</p>;
-  return <form noValidate action="/analytics/compare" method="get" className={styles.filters}>
+  return <form noValidate action="/insights/compare" method="get" className={styles.filters}>
     <label>{t("Compare")}<select name="mode" value={mode} onChange={event => setMode(event.currentTarget.value as typeof mode)}><option value="period">{t("The same channels across two periods")}</option><option value="channels">{t("Two groups of channels in one period")}</option></select></label>
     {mode === 'period' ? <>
       <fieldset><legend>{t("Period A (UTC)")}</legend><label>{t("From")}<input type="date" name="aStart" value={dates.aStart} onChange={event => updateDate('aStart', event.currentTarget.value)} /></label><label>{t("To")}<input type="date" name="aEnd" value={dates.aEnd} onChange={event => updateDate('aEnd', event.currentTarget.value)} /></label></fieldset>

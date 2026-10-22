@@ -71,7 +71,7 @@ describe('Ads management UI', () => {
     await settle();
     expect(container.textContent).toContain('same request ID');
     expect(container.querySelector('.ui-dialog')).toBeNull();
-    expect(container.querySelector('a[href="/ads/objects#changes"]')).toBeTruthy();
+    expect(container.querySelector('a[href="/insights/ads/manage#changes"]')).toBeTruthy();
     await click('Close');
     expect(container.querySelector('[aria-labelledby$="-pending-title"]')).toBeTruthy();
     await click('Try the same change again');

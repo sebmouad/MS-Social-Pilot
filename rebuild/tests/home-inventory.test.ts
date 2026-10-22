@@ -67,7 +67,7 @@ describe('Home overview screen', () => {
     expect(html).toContain('Sent by the app');
     expect(html).toContain('EUR');
     expect(html).toContain('250.00');
-    for (const href of ['/analytics', '/content', '/inbox', '/ads']) expect(html).toContain(`href="${href}"`);
+    for (const href of ['/insights', '/content', '/inbox', '/insights/ads']) expect(html).toContain(`href="${href}"`);
     expect(html).toContain('Welcome back, Example workspace');
     expect(html).toContain('Last 28 days');
   });
@@ -75,9 +75,9 @@ describe('Home overview screen', () => {
   it('only shows cards for modules the member can use', async () => {
     state.overview.mockResolvedValue({ ...full(), audience: null, performance: null, bestTimes: null, inbox: null, ads: null });
     const html = renderToStaticMarkup(await HomePage());
-    expect(html).not.toContain('href="/ads"');
+    expect(html).not.toContain('href="/insights/ads"');
     expect(html).not.toContain('href="/inbox"');
-    expect(html).not.toContain('href="/analytics"');
+    expect(html).not.toContain('href="/insights"');
     expect(html).toContain('Launch day');
   });
 

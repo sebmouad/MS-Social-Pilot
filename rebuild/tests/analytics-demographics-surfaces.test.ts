@@ -8,6 +8,7 @@ vi.mock('@/modules/analytics/server/copy', async () => {
 });
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'accept-language': state.language }) }));
 vi.mock('@/server/context', () => ({ requireViewer: state.viewer }));
+vi.mock('@/modules/shell/server/scope', () => ({ pageChannelScope: async (_viewer: unknown, params: { channel?: string }) => ({ ids: params.channel ? params.channel.split(',') : [], dropped: 0, source: params.channel ? 'url' : 'none', channels: [] }) }));
 vi.mock('@/modules/analytics/demographics/server/demographics', () => ({ readDemographics: state.read }));
 vi.mock('@/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: async () => ({ period: { start: '2026-10-01', end: '2026-10-02' }, options: { channels: [] } }) }));
 vi.mock('@/server/PageFrame', () => ({ PageFrame: ({ children, sidebar }: { children: ReactNode; sidebar: ReactNode }) => createElement('main', null, createElement('aside', null, sidebar), children) }));
@@ -32,7 +33,8 @@ it('renders French copy and retains invalid filters after read failure without e
   state.language = 'fr-FR'; state.read.mockRejectedValue(new Error('private database'));
   const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ start: 'bad-date', filter: '1', channel: 'gone' }) }));
   expect(html).toContain('Historique de l’audience'); expect(html).toContain('Impossible de charger');
-  expect(html).toContain('value="bad-date"'); expect(html).toContain('value="gone"'); expect(html).not.toContain('private database');
+  // The typed date stays for correction; the sidebar scope travels as a hidden field (the page has no channel boxes of its own).
+  expect(html).toContain('value="bad-date"'); expect(html).toContain('<input type="hidden" name="channel" value="gone"/>'); expect(html).not.toContain('type="checkbox"'); expect(html).not.toContain('private database');
 });
 it.each(['en-US,en;q=0.9,fr;q=0.8', 'en,fr-FR;q=0.5'])('keeps the English heading when French is a fallback: %s', async language => {
   state.language = language;

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ viewer: vi.fn(), read: vi.fn(), writer: true, previewLimit: 180 }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => state.previewLimit }));
 vi.mock('@/server/context', () => ({ requireViewer: state.viewer }));
+vi.mock('@/modules/inbox/ui/scope', () => ({ inboxScope: async (viewer: { permissions: { pageScope: { all: boolean; ids: string[] } } }) => ({ ids: [], constraints: viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids }, param: undefined }) }));
 vi.mock('@/modules/inbox/server/read', () => ({ readInboxList: state.read }));
 vi.mock('@/modules/inbox/server/actions', () => ({ canManageInbox: async () => state.writer, canManageInboxWorkflow: async () => state.writer }));
 vi.mock('@/modules/inbox/server/providers', () => ({ inboxCapabilities: async () => ({ reply: true, hide: true, remove: true }) }));
@@ -64,7 +65,8 @@ describe('Inbox progressive entry point on ten-Page fixtures', () => {
     state.viewer.mockResolvedValue({ user: { id: role }, workspaceId: 'workspace', permissions: { pageScope: { all: role === 'owner', ids: ['page-0', 'page-1'] } } });
     const result = await loadMoreInboxRows({ quick: 'unread,unanswered', channel: 'page-0', q: 'Saturday', cursor: 'position-20' });
     expect(result.ok).toBe(true); if (!result.ok) throw new Error('Expected a rendered page');
-    expect(state.read).toHaveBeenCalledWith({ userId: role, workspaceId: 'workspace' }, { channelId: 'page-0', q: 'Saturday', cursor: 'position-20', quick: ['unread', 'unanswered'] }, role === 'owner' ? undefined : { allowedChannelIds: ['page-0', 'page-1'] });
+    // The channel is the sidebar scope (a list, resolved by inboxScope), never a page filter of its own.
+    expect(state.read).toHaveBeenCalledWith({ userId: role, workspaceId: 'workspace' }, { q: 'Saturday', cursor: 'position-20', quick: ['unread', 'unanswered'] }, role === 'owner' ? undefined : { allowedChannelIds: ['page-0', 'page-1'] });
     expect(result.rows.every(row => Boolean(row.selectable) === state.writer)).toBe(true);
   });
   it('stops before reads on session loss and masks rejected cross-workspace/stale cursors', async () => {

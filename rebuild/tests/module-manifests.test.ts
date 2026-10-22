@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MODULES, PAGES } from '@/lib/product';
+import { MODULES, PAGES, areaPages } from '@/lib/product';
 import { moduleManifests } from '@/modules';
 import { CONFIG_BY_KEY } from '@/lib/config/registry';
 import { configurationOwner } from '@/lib/config/ownership';
@@ -33,13 +33,14 @@ describe('customer module manifests', () => {
     expect(PAGES.some(({ href }) => href === '/root' || href.startsWith('/root/'))).toBe(false);
   });
 
-  it('shows the Analytics overview, audience, comparison, goals and pins pages while retaining scoped CSV export as a capability', () => {
-    expect(PAGES.filter(({ module, navigation }) => module === 'analytics' && navigation !== false).map(({ href }) => href)).toEqual([
-      '/analytics', '/analytics/demographics', '/analytics/compare', '/analytics/ads', '/analytics/posts', '/analytics/goals', '/analytics/pins', '/analytics/reports',
+  it('shows the Insights tabs in order (Overview, Explore, Audience, Posts, Compare, Ads, Reports) and keeps goals, pins and ad analysis as sub-pages', () => {
+    expect(areaPages('insights', PAGES.map(({ id }) => id)).map(({ href }) => href)).toEqual([
+      '/insights', '/insights/explore', '/insights/audience', '/insights/posts', '/insights/compare', '/insights/ads', '/insights/reports',
     ]);
-    expect(PAGES.find(({ id }) => id === 'analytics/reports')?.href).toBe('/analytics/reports');
+    for (const id of ['analytics/goals', 'analytics/pins', 'analytics/ads', 'ads/campaigns', 'ads/objects', 'ads/compare']) expect(PAGES.find(page => page.id === id)?.navigation, id).toBe(false);
+    expect(PAGES.find(({ id }) => id === 'analytics/reports')?.href).toBe('/insights/reports');
     expect(moduleManifests.find(({id})=>id==='analytics')?.jobs).toEqual(expect.arrayContaining([expect.objectContaining({name:'analyticsReports',configKey:'analytics.reports.schedule'})]));
-    expect(PAGES.find(({ id }) => id === 'analytics/explorer')?.navigation).toBe(false);
+    expect(PAGES.find(({ id }) => id === 'analytics/explorer')?.href).toBe('/insights/explore');
   });
 
   it('uses a compact mobile title for Publishing', () => {

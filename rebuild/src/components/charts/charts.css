@@ -1,0 +1,24 @@
+/* Chart chrome shared by every chart: the "Show data" toggle and the visible data table (design v2 02 §6). */
+.ui-chart__toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ui-chart__toggle:hover { color: var(--ink); background: var(--surface-2, transparent); }
+.ui-chart__toggle:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; }
+.ui-chart__data { max-height: 320px; margin-top: 8px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-sm, 8px); }
+.ui-chart__data:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; }
+.ui-chart__table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ui-chart__table caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ui-chart__table th, .ui-chart__table td { padding: 6px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.ui-chart__table th:first-child, .ui-chart__table td:first-child { position: sticky; left: 0; background: var(--surface); text-align: left; }
+.ui-chart__table thead th { position: sticky; top: 0; background: var(--surface); color: var(--ink-soft); font-weight: 600; }

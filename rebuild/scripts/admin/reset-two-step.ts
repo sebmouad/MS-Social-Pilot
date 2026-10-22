@@ -7,7 +7,7 @@
  * Ends the account's sessions; two-step is set up again at the next sign-in if
  * it is required. The change is written to the Root activity log.
  */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../generated/client';
 
 async function main(): Promise<void> {
   const email = process.argv[2]?.trim().toLowerCase();

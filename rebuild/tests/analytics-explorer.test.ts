@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const state = vi.hoisted(() => ({ read: vi.fn(), config: vi.fn(), viewer: vi.fn(), headers: vi.fn() }));
+const state = vi.hoisted(() => ({ read: vi.fn(), config: vi.fn(), viewer: vi.fn(), headers: vi.fn(), scope: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {} }), usePathname: () => '/insights/explore', useSearchParams: () => new URLSearchParams() }));
+vi.mock('@/modules/shell/server/scope', () => ({ pageChannelScope: state.scope }));
 vi.mock('@/modules/analytics/server/overview-copy', async () => {
   const { overviewCopyDefaults } = await import('@/modules/analytics/overview-copy');
   return { loadOverviewCopy: async (locale: 'en' | 'fr') => overviewCopyDefaults[locale] };
@@ -23,7 +25,7 @@ import { readAnalyticsExplorer } from '../src/modules/analytics/server/explorer'
 import { executeAnalyticsExplorerTool, analyticsExplorerToolDefinitions } from '../src/modules/analytics/explorer-mcp';
 import { GET } from '../src/app/api/analytics/explorer/route';
 import AnalyticsExplorerPage from '../src/modules/analytics/ui/explorer/ExplorerScreen';
-import AnalyticsExplorerRoute from '../src/app/analytics/explorer/page';
+import AnalyticsExplorerRoute from '../src/app/insights/explore/page';
 import type { AnalyticsSnapshot } from '../src/modules/analytics/server/types';
 
 const metric = (key: string, label: string, sourceLabel: string, kind: 'flow' | 'stock' = 'flow') => ({
@@ -40,6 +42,7 @@ const snapshot = (): AnalyticsSnapshot => ({
 const actor = { userId: 'reader-a', workspaceId: 'workspace-a' };
 beforeEach(() => {
   vi.clearAllMocks(); state.read.mockResolvedValue(snapshot());
+  state.scope.mockResolvedValue({ ids: [], dropped: 0, source: 'none', channels: [] });
   state.headers.mockImplementation(() => { throw new Error('Request headers are unavailable in components'); });
   state.config.mockImplementation(async (key: string) => ({ 'analytics.explorerSearchMaxCharacters': 500, 'analytics.searchMaxLength': 200, 'analytics.explorerPageSize': 1, 'analytics.detailPageSize': 1 }[key]));
   state.viewer.mockResolvedValue({ user: { id: actor.userId }, workspaceId: actor.workspaceId, permissions: { pageScope: { all: false, ids: ['channel-a'] } } });
@@ -101,14 +104,31 @@ describe('Analytics Explorer', () => {
     expect(denied.status).toBe(401); expect(await denied.json()).toEqual({ error: 'Sign in to an authorized workspace.', code: 'unauthorized' });
   });
 
-  it('renders source/type/resource filters in the sidebar and emits a permission-gated export link', async () => {
+  it('lists the metrics in a column beside the detail, with one Filter button and a permission-gated export link', async () => {
     state.viewer.mockResolvedValueOnce({ user: { id: actor.userId }, workspaceId: actor.workspaceId, permissions: { pageScope: { all: false, ids: ['channel-a'] } }, entitlements: {} });
-    const tree = await AnalyticsExplorerPage({ searchParams: Promise.resolve({ source: 'Community', kind: 'flow', filter: '1', channel: 'channel-a' }) });
+    const tree = await AnalyticsExplorerPage({ searchParams: Promise.resolve({ source: 'Community', kind: 'flow', channel: 'channel-a' }) });
     const html = renderToStaticMarkup(tree);
-    const sidebar = html.slice(html.indexOf('<aside'), html.indexOf('</aside>'));
-    expect(sidebar).toContain('name="source"'); expect(sidebar).toContain('name="kind"'); expect(sidebar).toContain('name="channel"');
-    expect(sidebar).toContain('/api/reports/export');
-    expect(html).toContain('Explore stored metrics');
-    expect(html).toContain('Reach');
+    expect(html).toContain('class="insights-explore__list"');
+    expect(html).toContain('href="/insights/explore?');
+    expect(html).toContain('metric=reach');
+    expect(html).toContain('/api/reports/export');
+    expect(html.match(/<button[^>]*class="ui-filter-button/g)).toHaveLength(1);
+    // No page-owned channel checkboxes: the sidebar scopes the page.
+    expect(html).not.toContain('name="channel"');
+    // Active source and type show as removable chips.
+    expect(html).toContain('Community'); expect(html).toContain('Period totals');
+  });
+
+  it('reads only the channels chosen in the sidebar and drops the page-owned channel names', async () => {
+    state.scope.mockResolvedValueOnce({ ids: ['channel-a'], dropped: 0, source: 'url', channels: [] });
+    await AnalyticsExplorerPage({ searchParams: Promise.resolve({ channel: 'channel-a,channel-z', filter: '1', metric: 'reach' }) });
+    expect(state.read).toHaveBeenCalledWith(actor, expect.objectContaining({ filter: '1', channel: ['channel-a'], metric: 'reach' }), expect.objectContaining({ feature: 'analytics/explorer' }));
+    expect(state.read.mock.calls[0]![1]).toMatchObject({ start: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), end: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+  });
+
+  it('keeps the page address, not the service query, in metric links so the scope and period survive', async () => {
+    const tree = await AnalyticsExplorerPage({ searchParams: Promise.resolve({ period: '7', channel: 'channel-a' }) });
+    const html = renderToStaticMarkup(tree);
+    expect(html).toMatch(/href="\/insights\/explore\?period=7&amp;channel=channel-a&amp;metric=reach/);
   });
 });

@@ -1,5 +1,6 @@
 import { adsCustomerCopy, adsCustomerCopySchema, adsAnalysisCatalog, adsCreativeCatalog, bilingualCatalogSchema } from './copy';
 import { z } from 'zod';
+import { ADS_INSIGHTS_CONFIG } from './ui/ads-insights';
 import { entry } from '@/lib/config/entry';
 import { ADS_REPORT_DEFAULT_POLICY } from './report-policy';
 import { ADS_READ_DEFAULT_POLICY, ADS_READ_MAX_ROWS_SCHEMA, ADS_READ_PAGE_SIZE_SCHEMA } from './read-policy';
@@ -60,6 +61,7 @@ export const ADS_MODULE_CONFIG = [
   entry({ key: 'ads.customerCopy', group: 'Ads · Copy', label: 'Customer copy', kind: 'json', description: 'English and French account, campaign, object, filter and change review text.', defaultValue: adsCustomerCopy, schema: adsCustomerCopySchema, consumption: 'active' }),
   entry({ key: 'ads.analysisCopy', group: 'Ads · Copy', label: 'Performance comparison copy', kind: 'json', description: 'English and French comparison labels, findings and export feedback.', defaultValue: adsAnalysisCatalog, schema: bilingualCatalogSchema(adsAnalysisCatalog), consumption: 'active' }),
   entry({ key: 'ads.creativeCopy', group: 'Ads · Copy', label: 'Creative creation copy', kind: 'json', description: 'English and French creative form, confirmation and outcome text.', defaultValue: adsCreativeCatalog, schema: bilingualCatalogSchema(adsCreativeCatalog), consumption: 'active' }),
+  ...ADS_INSIGHTS_CONFIG,
   ...ADS_CONFIG,
   ...ADS_ANALYSIS_CONFIG,
   ...ADS_MANAGEMENT_CONFIG,

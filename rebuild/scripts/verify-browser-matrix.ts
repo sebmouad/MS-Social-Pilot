@@ -38,7 +38,7 @@ async function launchBrowser(env: Readonly<Record<string, string | undefined>>) 
 const passRoute = (route: Route) => route.continue();
 
 export const VIEWPORTS = [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const;
-export const FAMILIES = ['/home', '/content', '/create', '/inbox', '/analytics', '/ads', '/settings', '/tasks', '/agency'];
+export const FAMILIES = ['/home', '/content', '/create', '/inbox', '/insights', '/settings', '/tasks', '/agency'];
 /** Main-area candidates, tried in order; on desktop the sidebar's primary (filter apply) button is the page's main action. */
 export const MAIN_ACTION_SELECTORS = ['main .ui-button--primary:not(:disabled)', '#shell-filters .ui-button--primary', 'main button:not(:disabled)', 'main a[href]'] as const;
 /** On phones the sidebar is a closed drawer, so its primary action is verified after opening the drawer by keyboard. */
@@ -583,7 +583,7 @@ export function compareSystemModes(cells: ExtendedCell[]) {
  * ------------------------------------------------------------------------------------------- */
 export const ROUND2_MODES = ['light', 'dark', 'system-light', 'system-dark'] as const;
 /** Representative pages for the system-mode comparison (explicit light/dark are rendered beside system in the same run). */
-export const SYSTEM_SAMPLE = ['/home', '/create', '/content/calendar', '/inbox', '/analytics', '/analytics/explorer', '/ads', '/ads/campaigns', '/settings/appearance', '/settings/team', '/tasks', '/agency', '/root', '/root/config', '/root/modules', '/sign-in', '/join'] as const;
+export const SYSTEM_SAMPLE = ['/home', '/create', '/content/calendar', '/inbox', '/insights', '/insights/explore', '/insights/ads', '/insights/ads/campaigns', '/settings/appearance', '/settings/team', '/tasks', '/agency', '/root', '/root/config', '/root/modules', '/sign-in', '/join'] as const;
 export type Fixtures = {
   dynamic: { customer: string[]; root: string[]; public: string[] };
   sessions: { noWorkspace: string; empty: string; verify: string; enroll: string };
@@ -1169,7 +1169,7 @@ export async function runFailureProbe(env: Readonly<Record<string, string | unde
 export const SERVER_ERROR_LOCALES = ['en', 'fr'] as const;
 /** Pages that throw while the layout still renders once the operator breaks their one dependency (the `labels` table; see the matrix doc). */
 export const BOUNDARY_ROUTES = ['/content/library/labels'] as const;
-export const SERVER_ERROR_ROUTES = ['/home', '/content', '/inbox', '/analytics', '/ads', '/settings/team', '/root', '/sign-in'] as const;
+export const SERVER_ERROR_ROUTES = ['/home', '/content', '/inbox', '/insights', '/insights/ads', '/settings/team', '/root', '/sign-in'] as const;
 export type ServerErrorObservation = {
   status: number; theme: string | null; mode: string | null; wantTheme: string; wantMode: 'light' | 'dark'; locale: 'en' | 'fr';
   text: string; retryButtons: number; retryKeepsPage: boolean; backgroundLuminance: number; homeLink: boolean;

@@ -46,9 +46,9 @@ describe('browser matrix report', () => {
   it('passes only a complete four-theme two-viewport matrix with keyboard evidence', () => {
     const report = finishReport(complete());
     expect(report.passed).toBe(true);
-    // Nine route families (Create is its own family since design v2) × four themes × two viewports.
-    expect(report.expectedCells).toBe(72);
-    expect(report.cells).toHaveLength(72);
+    // Eight route families (Create is its own family and Analytics plus Ads are one Insights family since design v2) × four themes × two viewports.
+    expect(report.expectedCells).toBe(64);
+    expect(report.cells).toHaveLength(64);
     expect(report.failures).toBe(0);
     expect(report.finishedAt).toMatch(/^\d{4}-/);
   });
@@ -91,7 +91,7 @@ describe('browser matrix report', () => {
   });
   it('records dynamic exclusions and discovers current static pages', () => {
     const inventory = discoverRoutes(fileURLToPath(new URL('../src/app', import.meta.url)));
-    for (const route of ['/home', '/create', '/content/calendar', '/content/library/templates', '/inbox/rules', '/analytics/reports', '/ads/campaigns', '/settings/appearance', '/tasks', '/agency/clients']) expect(inventory.routes).toContain(route);
+    for (const route of ['/home', '/create', '/content/calendar', '/content/library/templates', '/inbox/rules', '/insights/reports', '/insights/ads/campaigns', '/settings/appearance', '/tasks', '/agency/clients']) expect(inventory.routes).toContain(route);
     expect(inventory.excludedDynamicRoutes).toContain('/content/post/[postId]');
     expect(inventory.routes.some(route => route.startsWith('/root') || route.includes('['))).toBe(false);
     expect(customerRoute('/settings-evil')).toBe(false);

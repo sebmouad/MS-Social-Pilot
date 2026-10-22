@@ -8,7 +8,7 @@
  * the target account is re-enabled, and the change is written to the Root
  * activity log (`root_activities`).
  */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../generated/client';
 
 async function main(): Promise<void> {
   const email = process.argv[2]?.trim().toLowerCase();

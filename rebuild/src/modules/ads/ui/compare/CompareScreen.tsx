@@ -22,6 +22,7 @@ import { readAdsComparison, type AdsComparisonResult } from '@/modules/ads/analy
 import { pageSearchRecord } from '@/modules/ads/analysis/query';
 import { adsFindingText, adsKpiLabel, adsLocale, adsText, type AdsCopyKey, type AdsLocale } from '@/modules/ads/analysis/copy';
 import { AdsFiltersSidebar } from '@/modules/ads/ui/ads-filters';
+import { compareKindSwitch } from '@/modules/analytics/ui/compare/compareKindSwitch';
 
 type Params = AdsSearchParams & { compare?: string; level?: string; sort?: string; direction?: string };
 type Group = AdsComparisonResult['groups'][number];
@@ -50,10 +51,11 @@ async function AdsComparePage({ searchParams }: { searchParams: Promise<Params> 
   const outputPolicy = await loadAdsOutputPolicy();
   const accounts = await getAdsAccounts(viewer.workspaceId, viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, entitledPlatformIds(viewer.entitlements));
   const allowedKeys = ['period', 'since', 'until', 'account', 'compare', 'level', 'sort', 'direction'];
-  const sidebarBase = <AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/ads/compare" policy={policy} />;
+  const kindSwitch = await compareKindSwitch('ads', viewer);
+  const sidebarBase = <AdsFiltersSidebar catalogs={catalogs} locale={locale} accounts={accounts} input={params} action="/insights/compare/ads" policy={policy} />;
   const hidden = (['period', 'since', 'until', 'account'] as const).map(key => first(params[key]) ? <input key={key} type="hidden" name={key} value={first(params[key])} /> : null);
   const sortLabels: Record<string, string> = { spend: t('col.spend'), impressions: t('col.impressions'), clicks: t('col.clicks'), ctr: t('col.ctr'), cpc: t('col.cpc'), cpm: t('col.cpm'), name: t('col.name') };
-  const sidebar = <>{sidebarBase}<form noValidate method="get" action="/ads/compare" className="ads-extra-filters" aria-label={t('optionsLabel')}>{hidden}
+  const sidebar = <>{sidebarBase}<form noValidate method="get" action="/insights/compare/ads" className="ads-extra-filters" aria-label={t('optionsLabel')}>{hidden}
     <label>{t('compareLabel')}<select name="compare" defaultValue={first(params.compare) ?? 'previous'}><option value="previous">{t('comparePrevious')}</option><option value="accounts">{t('compareAccounts')}</option></select></label>
     <label>{t('show')}<select name="level" defaultValue={first(params.level) ?? 'campaign'}>{(['campaign', 'adset', 'ad'] as const).map(level => <option key={level} value={level}>{t(`level.${level}`)}</option>)}</select></label>
     <label>{t('sortBy')}<select name="sort" defaultValue={first(params.sort) ?? 'spend'}>{Object.entries(sortLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -93,6 +95,7 @@ async function AdsComparePage({ searchParams }: { searchParams: Promise<Params> 
     { key: 'reach', label: t('col.reach'), align: 'end', render: row => show(row.reachPeakDay) },
   ];
   return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
+    {kindSwitch}
     <PageHeader module="ads" title={t('title')} description={<>{t('rangeLine', { from: result.range.from, to: result.range.to })}{result.previousRange ? t('earlierLine', { from: result.previousRange.from, to: result.previousRange.to }) : ''}</>} />
       {result.groups.length ? <ComparisonExport href={`/api/ads/compare?${exportQuery.toString()}`} locale={locale} maxBytes={outputPolicy.exportMaxBytes} /> : null}
     {!result.groups.length ? <section className="panel empty-state"><h2>{t('emptyTitle')}</h2><p>{t('emptyHint')}</p></section> : result.groups.map(group => <section key={group.key} className="panel" aria-labelledby={`g-${group.key}`}>

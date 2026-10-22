@@ -12,7 +12,13 @@ import { readAnalyticsExplorer } from '@/modules/analytics/server/explorer';
 import type { AnalyticsExplorerResult } from '@/modules/analytics/explorer';
 import { canUseFeature } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
-import { ExplorerSidebar } from './sidebar';
+import { pageChannelScope } from '@/modules/shell/server/scope';
+import { InsightsHeader } from '../insights/InsightsHeader';
+import { resolvePeriod } from '../insights/period';
+import { loadInsightsUi } from '../insights/runtime';
+import { insightsReadInput, withParams } from '../insights/scope';
+import { AddressSelect } from '../insights/AddressSelect';
+import { ExploreSearchField } from './ExploreSearchField';
 import styles from './explorer.module.css';
 
 type Search = Record<string, string | string[] | undefined>;
@@ -22,9 +28,9 @@ function value(amount: number, unit: string) {
   return unit === 'percent' ? `${formatted}%` : unit === 'multiple' ? `${formatted}×` : formatted;
 }
 function href(query: string, key: string, page: number) {
-  const params = new URLSearchParams(query); params.set(key, String(page)); return `/analytics/explorer?${params.toString()}`;
+  const params = new URLSearchParams(query); params.set(key, String(page)); return `/insights/explore?${params.toString()}`;
 }
-function metricHref(query: string, metric: string) { const params = new URLSearchParams(query); params.set('metric', metric); params.delete('page'); params.set('pointPage', '1'); params.set('rowPage', '1'); return `/analytics/explorer?${params.toString()}`; }
+function metricHref(query: string, metric: string) { const params = new URLSearchParams(query); params.set('metric', metric); params.delete('page'); params.set('pointPage', '1'); params.set('rowPage', '1'); return `/insights/explore?${params.toString()}`; }
 function Pager({ t, query, keyName, page, pages, label }: { t: ReturnType<typeof workspaceText>; query: string; keyName: string; page: number; pages: number; label: string }) {
   if (pages < 2) return null;
   return <nav className={styles.pager} aria-label={t('{0} pages', label)}><span>{t("Page")}{" "}{page}{" "}{t("of")}{" "}{pages}</span>{page > 1 && <a href={href(query, keyName, page - 1)}>{t("Previous")}{" "}{label.toLowerCase()}</a>}{page < pages && <a href={href(query, keyName, page + 1)}>{t("Next")}{" "}{label.toLowerCase()}</a>}</nav>;
@@ -48,19 +54,57 @@ export default async function AnalyticsExplorerPage({ searchParams, locale = 'en
   const overviewCopy = await loadOverviewCopy(locale);
   const t = workspaceText(copy, locale);
   const params = await searchParams; let data: AnalyticsExplorerResult | null = null; let failure = '';
-  try { data = await readAnalyticsExplorer({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, params as Record<string, unknown>, { allowedChannelIds: viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, feature: 'analytics/explorer' }); }
+  const runtime = await loadInsightsUi();
+  const scope = await pageChannelScope(viewer, params);
+  const period = resolvePeriod(params, runtime.policy);
+  const input = insightsReadInput(params, scope.ids, { start: period.start, end: period.end, compare: period.compare });
+  delete input.period;
+  try { data = await readAnalyticsExplorer({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input,{ allowedChannelIds: viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids, feature: 'analytics/explorer' }); }
   catch (error) { failure = operationFailure(error, t('Analytics Explorer could not be loaded. Change the filters or retry.')).error; }
   const annotations = data?.detail && data.selected.channelIds.length ? await loadChartAnnotations({ userId: viewer.user.id, workspaceId: viewer.workspaceId, locale }, data.period.start, data.period.end, data.selected.channelIds) : null;
   const exportParams = data ? new URLSearchParams(data.query) : null;
   if (exportParams) for (const key of ['source', 'kind', 'metric', 'page', 'pointPage', 'rowPage']) exportParams.delete(key);
   const exportHref = exportParams && canUseFeature(viewer.entitlements, 'analytics/reports') && canAccessFeature(viewer.permissions, 'analytics/reports') ? `/api/reports/export?${exportParams.toString()}` : undefined;
-  const sidebar = data ? <ExplorerSidebar overviewCopy={overviewCopy} copy={copy} locale={locale} data={data} exportHref={exportHref} summaryHref={canUseFeature(viewer.entitlements, 'analytics/overview') && canAccessFeature(viewer.permissions, 'analytics/overview') ? '/analytics' : undefined} /> : <div className={styles.sidebar}><h2>{t("Metric explorer")}</h2><a href="/analytics/explorer">{t("Reset filters")}</a></div>;
-  return <PageFrame module="analytics" scopedAccess sidebar={sidebar}><div className={styles.root}>
-    <PageHeader module="analytics" title={t('Metric explorer')} description={<>{t("Explore stored measurements by resource, source and data type. The inclusive date range is")}{" "}{data ? `${day(data.period.start)} to ${day(data.period.end)} UTC` : t('unavailable')}.</>} />{data?.period.comparison && <p>{t("Comparison range:")}{" "}{day(data.period.comparison.start)}{" "}{t("to")}{" "}{day(data.period.comparison.end)}.</p>}
-    {failure && <section className={styles.panel} role="alert"><h2>{t("Explorer could not be loaded")}</h2><p>{failure}</p><p>{t("Use the sidebar to adjust filters or reset them.")}</p></section>}
-    {data?.detail ? <Detail annotations={annotations} copy={copy} data={data} locale={locale} /> : data && <section className={styles.panel}><header className={styles.listHeader}><div><h2>{t("Available metrics")}</h2><p>{data.metrics.total}{" "}{t("metrics match the current filters. Choose a metric for its complete stored date series and resource values.")}</p></div><span>{data.selected.channelIds.length}{" "}{t("Channels")}</span></header>
-      {data.metrics.items.length ? <div className={styles.metricList}>{data.metrics.items.map(metric => <article key={metric.key}><div><h3><a href={metricHref(data.query, metric.key)}>{metric.label}</a></h3><p>{metric.sourceLabel} · {metric.kind} · {metric.coverage}/{metric.available}{" "}{t("resources")}</p><p>{metric.aggregationLabel}{metric.aggregationNote ? ` · ${metric.aggregationNote}` : ''}</p>{metric.latestAt && <small>{t("Latest observation")}{" "}{day(metric.latestAt.toISOString().slice(0, 10))}</small>}</div><strong>{metric.displayTotal ?? (metric.total === null ? t('Unknown') : value(metric.total, metric.unit))}</strong></article>)}</div> : <p className={styles.empty}>{t("No stored metrics match these filters. Try a wider date range, another source, or reset filters.")}</p>}
-      <Pager t={t} query={data.query} keyName="page" page={data.metrics.page} pages={data.metrics.pages} label={t("Metrics")} />
-    </section>}
+  // Every link below keeps the page's own address (channel scope, period, search), not the service's canonical form.
+  const query = withParams(params, {});
+  if (data) data = { ...data, query };
+  const { copy: ui } = runtime;
+  const search = data?.filters.search ?? '';
+  const source = data?.filters.source ?? '';
+  const kind = data?.filters.kind && data.filters.kind !== 'all' ? data.filters.kind : '';
+  const kinds = [['flow', t('Period totals')], ['stock', t('Latest resource values')], ['ratio', t('Ratios')], ['breakdown', t('Category breakdowns')]] as const;
+  const chips = [
+    ...(search ? [{ key: 'search', label: ui.searchMetrics, value: search }] : []),
+    ...(source ? [{ key: 'source', label: t('Source'), value: source }] : []),
+    ...(kind ? [{ key: 'kind', label: t('Measurement type'), value: kinds.find(([value]) => value === kind)?.[1] ?? kind }] : []),
+  ];
+  return <PageFrame module="analytics" scopedAccess><div className="insights">
+    <InsightsHeader runtime={runtime} title={ui.exploreTitle} info={ui.exploreInfo} period={period} chips={chips} activeCount={chips.length}
+      actions={exportHref ? <a className="ui-button ui-button--secondary ui-button--md" href={exportHref}>{ui.downloadReport}</a> : undefined}
+      filterBody={<>
+        <ExploreSearchField label={ui.searchMetrics} placeholder={ui.searchMetricsPlaceholder} maxLength={data?.searchMaxCharacters} />
+        <AddressSelect name="source" label={t('Source')} allLabel={t('All sources')} options={(data?.options.sources ?? []).map(item => ({ value: item, label: item }))} />
+        <AddressSelect name="kind" label={t('Measurement type')} allLabel={t('All types')} options={kinds.map(([value, label]) => ({ value, label }))} />
+      </>} />
+    {failure && <section className={styles.panel} role="alert"><h2>{t("Explorer could not be loaded")}</h2><p>{failure}</p><a href="/insights/explore">{ui.resetFilters}</a></section>}
+    {data && <div className="insights-explore" data-detail={data.detail ? 'true' : 'false'}>
+      <nav className="insights-explore__list" aria-label={ui.exploreList}>
+        <h2>{ui.exploreList} <small>{data.metrics.total}</small></h2>
+        {data.metrics.items.length
+          ? <ul>{data.metrics.items.map(metric => <li key={metric.key}>
+            <a href={metricHref(query, metric.key)} aria-current={data.detail?.metric.key === metric.key ? 'true' : undefined}>
+              <span className="insights-explore__dot" data-available={metric.coverage > 0} title={metric.coverage > 0 ? ui.exploreAvailable : ui.exploreUnavailable} />
+              <span>{metric.label}<span className="insights-explore__source">{metric.sourceLabel}</span></span>
+            </a></li>)}</ul>
+          : <p className="small-note">{ui.exploreListEmpty}</p>}
+        <Pager t={t} query={query} keyName="page" page={data.metrics.page} pages={data.metrics.pages} label={t("Metrics")} />
+      </nav>
+      <div className="insights-explore__detail">
+        {data.detail ? <>
+          <a className="insights-card__link" href={`/insights/explore?${withParams(params, { metric: null, pointPage: null, rowPage: null })}`}>← {ui.exploreBack}</a>
+          <Detail annotations={annotations} copy={copy} data={data} locale={locale} />
+        </> : <section className={styles.panel}><p>{ui.exploreChoose}</p></section>}
+      </div>
+    </div>}
   </div></PageFrame>;
 }

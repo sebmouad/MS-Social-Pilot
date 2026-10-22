@@ -36,6 +36,16 @@ describe('route redirects', () => {
       expect(hasPage(join(app, ...target.split('/').filter(Boolean))), entry.to).toBe(true);
     }
   });
+  it('sends every old Analytics and Ads route to its Insights address and maps channel parameters', () => {
+    const cases: Array<[string, string]> = [
+      ['/analytics', '/insights'], ['/analytics/explorer', '/insights/explore'], ['/analytics/demographics', '/insights/audience'], ['/analytics/posts', '/insights/posts'],
+      ['/analytics/compare', '/insights/compare'], ['/analytics/ads', '/insights/ads/analysis'], ['/analytics/goals', '/insights/goals'], ['/analytics/pins', '/insights/pins'],
+      ['/analytics/reports', '/insights/reports'], ['/analytics/notes', '/insights/notes'], ['/analytics/tests', '/insights/tests'],
+      ['/ads', '/insights/ads'], ['/ads/campaigns', '/insights/ads/campaigns'], ['/ads/objects', '/insights/ads/manage'], ['/ads/compare', '/insights/compare/ads'],
+    ];
+    for (const [from, to] of cases) expect(resolveRedirect(from, '?channelId=a&account=x&keep=1'), from).toBe(`${to}?channel=a&account=x&keep=1`);
+    expect(resolveRedirect('/ads/unknown', '')).toBeNull();
+  });
   it('sends every old Publishing route to its Content or Create address', () => {
     const cases: Array<[string, string]> = [
       ['/publishing/posts', '/content'], ['/publishing/compose', '/create'], ['/publishing/calendar', '/content/calendar'], ['/publishing/calendar/dates', '/content/calendar/dates'],

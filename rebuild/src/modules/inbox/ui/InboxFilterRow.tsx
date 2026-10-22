@@ -2,6 +2,7 @@
 import { useInboxCatalog } from './copy-context';
 
 import { useRef, useState } from 'react';
+
 import { FilterButton, FilterSection, Select, TextInput } from '@/components';
 import { reviewText } from '@/modules/inbox/reviews-copy';
 import type { InboxLocale } from './copy';
@@ -10,31 +11,29 @@ import styles from './inbox-round3.module.css';
 type Filters = { channelId: string | null; kind: string; state: string; hidden: string; q: string };
 
 /**
- * The Inbox filter row (design v2 S8): the page's single Filter button (channel, type, status, hidden comments, page size)
+ * The Inbox filter row (design v2 S8): the page's single Filter button (type, status, hidden comments, page size)
  * and a search box. Both are one ordinary GET form, so filters live in the URL and work without script; choosing a value
  * applies it straight away and Enter applies the search. Quick filters and the active chips sit with the list.
  */
-export function InboxFilterRow({ action, filters, channels, locale, thread, limit, maxLimit, searchMaxCharacters, resetHref, disabledLimit, quick = [], activeCount }: {
-  action: string; filters: Filters; channels: Array<{ id: string; name: string }>; locale: InboxLocale; thread?: string;
+export function InboxFilterRow({ action, filters, scope, locale, thread, limit, maxLimit, searchMaxCharacters, resetHref, disabledLimit, quick = [], activeCount }: {
+  /** The sidebar's channel scope (`channel=a,b`), carried through the form so filtering keeps it. The channel is chosen in the sidebar, not here. */
+  scope?: string;
+  action: string; filters: Filters; locale: InboxLocale; thread?: string;
   limit?: number; maxLimit?: number; searchMaxCharacters?: number; resetHref: string; disabledLimit: boolean; quick?: readonly string[]; activeCount: number;
 }) {
   const reviews = useInboxCatalog('reviewCopy');
   const copy = useInboxCatalog('inboxCopy')[locale];
   const screen = useInboxCatalog('round3Copy')[locale].screen;
   const form = useRef<HTMLFormElement>(null);
-  const [channel, setChannel] = useState(filters.channelId ?? 'all');
   const [kind, setKind] = useState(filters.kind);
   const [state, setState] = useState(filters.state);
   const [hidden, setHidden] = useState(filters.hidden);
   const apply = () => setTimeout(() => form.current?.requestSubmit(), 0);
   return <form ref={form} method="get" action={action} noValidate className={styles.filterRow}>
     {thread ? <input type="hidden" name="thread" value={thread} /> : null}
+    {scope ? <input type="hidden" name="channel" value={scope} /> : null}
     {quick.length ? <input type="hidden" name="quick" value={quick.join(',')} /> : null}
     <FilterButton activeCount={activeCount} title={screen.filterTitle} onClear={() => window.location.assign(resetHref)}>
-      <FilterSection label={copy.channel}>
-        <Select name="channel" aria-label={copy.channel} value={channel} searchable onChange={value => { setChannel(value); apply(); }}
-          options={[{ value: 'all', label: copy.allChannels }, ...channels.map(item => ({ value: item.id, label: item.name }))]} />
-      </FilterSection>
       <FilterSection label={copy.type}>
         <Select name="type" aria-label={copy.type} value={kind} onChange={value => { setKind(value); apply(); }}
           options={[{ value: 'all', label: copy.allTypes }, { value: 'message', label: copy.messages }, { value: 'comment', label: copy.comments }, { value: 'review', label: reviewText(locale, 'reviews', {}, reviews) }]} />

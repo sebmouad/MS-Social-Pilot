@@ -49,8 +49,9 @@ describe('shell catalog and areas', () => {
     }
   });
   it('places every page in an area, Ads and Analytics in Insights, Publishing in Content', () => {
-    expect(areaForPath('/ads/campaigns')).toBe('insights');
-    expect(areaForPath('/analytics/posts')).toBe('insights');
+    expect(areaForPath('/insights/ads/campaigns')).toBe('insights');
+    expect(areaForPath('/insights/posts')).toBe('insights');
+    expect(areaForPath('/insights/compare/ads')).toBe('insights');
     expect(areaForPath('/create', 'publishing')).toBe('content');
     expect(areaForPath('/content/library/templates')).toBe('content');
     // Post details and Library sections belong to Content; their own tab, when they have none, is the parent route.

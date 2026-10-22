@@ -56,7 +56,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
     storeOutcome(value);
     if (!value) return;
     if (value.tone === 'ok') toast.notify({ title: value.text, tone: 'success' });
-    else toast.failed(value.text, () => window.location.assign('/ads/objects#changes'), t('text236'));
+    else toast.failed(value.text, () => window.location.assign('/insights/ads/manage#changes'), t('text236'));
   };
   const [pending, setPending] = useState<Pending | null>(null);
   const [pendingDialogOpen, setPendingDialogOpen] = useState(false);
@@ -209,7 +209,7 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
         <details><summary>{t('text095')}</summary><ul>{detail.daily.map(day => <li key={day.date}>{t('objectDailyLine', { date: day.date, currency: detail.currency ? `${detail.currency} ` : '', spend: number.format(day.spend), impressions: number.format(day.impressions), clicks: number.format(day.clicks) })}</li>)}</ul></details>
         <p className="small-note">{detail.live.available ? t('text249', { value0: detail.live.configuredStatus ?? t('text094'), value1: detail.live.effectiveStatus ?? t('text094') }) : t('text098')}</p>
         {needsReconnect ? <p className="small-note" role="note">{t('needsReconnectObject', { kind: t(level) })} <a href="/settings/connections">{t('needsReconnectAction')}</a></p>
-          : !canManage || !supports.length ? <p className="small-note">{t('viewOnlyObject', { kind: t(level) })}</p> : operationBlocked ? <p className="small-note">{t('text101')}<a href="/ads/objects#changes">{t('text102')}</a>{t('text103')}</p> : <>
+          : !canManage || !supports.length ? <p className="small-note">{t('viewOnlyObject', { kind: t(level) })}</p> : operationBlocked ? <p className="small-note">{t('text101')}<a href="/insights/ads/manage#changes">{t('text102')}</a>{t('text103')}</p> : <>
           {statusSupport && statusInput?.kind === 'choice' ? <div className="ads-object-manager__row">{statusInput.options.map(option => {
             if (option.value !== 'paused' && option.value !== 'active') return null;
             const status = option.value as 'paused' | 'active';
@@ -237,14 +237,14 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
           {deleteSupport ? <div className="ads-object-manager__row"><Button variant="danger" disabled={busy} onClick={() => void preview({ type: 'delete', objectType: level, objectId }, deleteSupport, t('text252', { value0: t(level) }))}>{deleteSupport.label}{t('text253')}</Button></div> : null}
         </>}
       </> : null}
-      {outcome ? <><RouteNotice error={outcome.tone !== 'ok'} className={outcome.tone === 'ok' ? 'small-note' : 'ui-error'} focusKey={outcome.key}>{localize(outcome.text)}</RouteNotice>{outcome.tone === 'unknown' ? <a href="/ads/objects#changes">{t('text102')}</a> : null}</> : null}
+      {outcome ? <><RouteNotice error={outcome.tone !== 'ok'} className={outcome.tone === 'ok' ? 'small-note' : 'ui-error'} focusKey={outcome.key}>{localize(outcome.text)}</RouteNotice>{outcome.tone === 'unknown' ? <a href="/insights/ads/manage#changes">{t('text102')}</a> : null}</> : null}
     </div> : null}
     {pending && !pendingDialogOpen ? <div className="ads-object-manager__pending" role="region" aria-labelledby={`${id}-pending-title`}>
       <h3 id={`${id}-pending-title`}>{t('text115')}</h3>
       <RouteNotice error className="ui-error" focusKey={pending.feedback ?? 'unknown-ads-change'}>{pending.feedback ?? t('text116')}</RouteNotice>
       <p className="small-note">{t('text117')}</p>
       <Button onClick={() => void apply()} disabled={busy || pending.blockedByOpenChange !== false}>{busy ? t('text118') : t('text254')}</Button>{' '}
-      <a href="/ads/objects#changes">{t('text102')}</a>
+      <a href="/insights/ads/manage#changes">{t('text102')}</a>
     </div> : null}
     {pending && pendingDialogOpen ? <ModalDialog className="ui-dialog" labelledBy={`${id}-title`} onDismiss={() => { if (!busy) { setPending(null); setPendingDialogOpen(false); } }} busy={busy}>
       <div className="ui-dialog__header"><div><h2 id={`${id}-title`}>{t('text119')}</h2><p>{pending.summary}</p></div></div>
@@ -252,9 +252,9 @@ export function ObjectManager({ adAccountId, level, objectId, name }: { adAccoun
         {pending.spendChanging ? <p role="note"><strong>{t('text120')}</strong></p> : null}
         {pending.irreversible ? <p role="note"><strong>{t('text121')}</strong></p> : null}
         <p>{t(level)} {t('text166')}{name}</p>
-        {pending.blockedByOpenChange === true ? <p role="alert">{t('text122')}<a href="/ads/objects#changes">{t('text102')}</a>{t('text251')}</p> : null}
-        {pending.blockedByOpenChange === null ? <p role="alert">{t('text123')}<a href="/ads/objects#changes">{t('text102')}</a>{t('text251')}</p> : null}
-        {pending.feedback ? <p role="alert" className="ui-error">{localize(pending.feedback)} <a href="/ads/objects#changes">{t('text102')}</a>{t('text251')}</p> : null}
+        {pending.blockedByOpenChange === true ? <p role="alert">{t('text122')}<a href="/insights/ads/manage#changes">{t('text102')}</a>{t('text251')}</p> : null}
+        {pending.blockedByOpenChange === null ? <p role="alert">{t('text123')}<a href="/insights/ads/manage#changes">{t('text102')}</a>{t('text251')}</p> : null}
+        {pending.feedback ? <p role="alert" className="ui-error">{localize(pending.feedback)} <a href="/insights/ads/manage#changes">{t('text102')}</a>{t('text251')}</p> : null}
         {pending.blockedByOpenChange === false && !pending.feedback ? <p className="small-note">{t('text124')}</p> : null}
       </div>
       <div className="ui-dialog__actions">

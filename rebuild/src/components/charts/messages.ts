@@ -14,6 +14,9 @@ export type ChartMessages = {
   ofFirst: string;
   day: string;
   previousPeriod: string;
+  other: string;
+  showData: string;
+  hideData: string;
 };
 
 const en: ChartMessages = {
@@ -31,6 +34,9 @@ const en: ChartMessages = {
   ofFirst: "% of first stage",
   day: "Day",
   previousPeriod: "previous period",
+  other: "Other",
+  showData: "Show data",
+  hideData: "Hide data",
 };
 
 const fr: ChartMessages = {
@@ -48,6 +54,9 @@ const fr: ChartMessages = {
   ofFirst: "% de la première étape",
   day: "Jour",
   previousPeriod: "période précédente",
+  other: "Autres",
+  showData: "Afficher les données",
+  hideData: "Masquer les données",
 };
 
 export function getMessages(locale: string): ChartMessages {

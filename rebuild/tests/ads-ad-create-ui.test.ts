@@ -81,7 +81,7 @@ describe('paused ad creation form', () => {
     fetchMock.mockRejectedValueOnce(new TypeError('network interrupted'));
     await click('Create paused ad'); await settle();
     expect(container.querySelector('.ui-dialog')).toBeNull();
-    expect(container.querySelector('a[href="/ads/objects#changes"]')).toBeTruthy();
+    expect(container.querySelector('a[href="/insights/ads/manage#changes"]')).toBeTruthy();
     expect(bodies().filter(body => body.action === 'apply')).toHaveLength(1);
     expect(container.querySelector('[aria-label="Ad creation needs review"]')).toBeTruthy();
     await click('same request'); await settle();
