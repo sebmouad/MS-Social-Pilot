@@ -1,4 +1,5 @@
 import { approvalNotice } from '../posts/notices';
+import { formatPostPreviewTime } from '@/components/PostPreview';
 import { loadPublishingCopy, loadPublishingNoticeCopy } from '../../server/customer-copy';
 import { PublishingCopyProvider } from '../kit/CopyProvider';
 import { loadPublishingActionCopy } from '../../server/action-copy';
@@ -40,7 +41,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     {listing.total === 0
       ? <EmptyPanel icon={<IconChecklist size={26} aria-hidden="true" />} title={copy.approvalsEmptyTitle} action={<a className="ui-button ui-button--secondary" href="/content?status=draft">{copy.approvalsEmptyAction}</a>}>{copy.approvalsEmptyBody}</EmptyPanel>
       : <>
-        <ApprovalsList rows={listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }>, authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember, whenLabel: formatDate(post.createdAt, timeZone, true, locale, copy) }))}
+        <ApprovalsList rows={listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }>, authorName: post.authorId === viewer.user.id ? viewer.user.name : copy.approvalsMember, whenLabel: formatDate(post.createdAt, timeZone, true, locale, copy), displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone) }))}
           locale={locale} timeZone={timeZone} canReview={canReview} reviewAction={reviewWithNoteAction} />
         <PublishingPagination path="/content/approvals" page={listing.page} pages={listing.pages} locale={locale} copy={copy} />
       </>}

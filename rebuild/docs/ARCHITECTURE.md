@@ -823,7 +823,35 @@ owner-stated, see HANDOVER). No deploy ran in this session.
   default theme. Eight unit tests pin routing, inventory, report rules
   and the no-browser-on-bad-config guard; a tsx smoke run reports the
   67-route/536-cell inventory and fails fast without credentials.
-- **Live matrix run: blocked in this sandbox** (first-hand probes, not a
+- **Live v2 matrix run: PASS 536/536 cells, 0 findings (2026-10-22).**
+  Fresh `social_pilot_rebuild_preview` database in `msp-test-pg`
+  (baseline migration + `scripts/seed-preview.ts`, synthetic data only)
+  and a production build (`next start`, local-only env file outside Git)
+  at `http://localhost:3201` (port 3200 was held by an unrelated
+  process). First run: 0/536 (sign-in blocked by that other process);
+  second: 536 cells, 188 findings; after fixes: 536/536, 0 findings.
+  Defects fixed: shared page header and AI Studio root grids let wide
+  tab strips push the phone page 38-47px wide (`minmax(0, 1fr)`
+  tracks); Approvals `PostPreview` time and several client number
+  formats (`toLocaleString()` / `Intl.NumberFormat(undefined)` in the
+  composer counter, first-comment delay, ads export help, ads daily
+  metrics and stored fields) hydrated differently from SSR in FR;
+  `/insights/notes` and `/insights/tests` rendered without the shell;
+  `instrumentation.ts` `onRequestError` imported Node-only modules in
+  the edge/dev bundle (`next dev` returned 500s); an
+  `align-items: end` autoprefixer warning. Harness fixes: the phone
+  drawer dialog probe is pinned to `#shell-sidebar` (the `/create`
+  composer sheet is also a modal), form fields count as a main keyboard
+  stop, `/root/alerts` redirects to `/root/operations` by design.
+  Observed engine caveat: Playwright Chromium 156 formats
+  `Africa/Casablanca` (the fixture workspace zone) one hour behind
+  Node for dates in October 2026; the Approvals time is now rendered
+  once on the server and passed as `displayTime`, so it hydrates.
+  Other client components that format a zoned time themselves could
+  show the same engine difference. Typecheck 0 errors; full suite 725
+  files / 11,741 tests pass (49 files skipped); `npx next build` passes.
+  Synthetic example data only: not live-provider or production evidence.
+- **Earlier sandbox attempt (superseded by the run above): blocked** (first-hand probes, not a
   claim): TCP `bind` to 127.0.0.1 and ::1 fails with `EPERM`, loopback
   `connect` fails with `EPERM`, Docker.app cannot open
   (`kLSNoExecutableErr`), a conda PostgreSQL cannot `initdb`

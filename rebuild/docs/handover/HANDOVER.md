@@ -29,9 +29,10 @@ widths in EN/FR with keyboard; live-provider token renewal run).
 
 ## Known open items
 
-- B9 follow-ups: run the v2 area matrix live (`BROWSER_MATRIX_SCOPE=v2`,
-  536 cells; scope committed and unit-tested, live run sandbox-blocked —
-  see below); assign dialog + saved-replies menu at desktop/phone widths
+- B9 follow-ups: the v2 area matrix now passes live (2026-10-22, 536/536
+  cells, 0 findings, local synthetic preview, production build; see
+  `ARCHITECTURE.md`; defects fixed in the same commit, not yet deployed);
+  assign dialog + saved-replies menu at desktop/phone widths
   in EN/FR with keyboard; live-provider token renewal run. Done this
   session: `DESIGN.md` Layout rewritten for the v2 shell; saved
   `home.shellCopy` catalogs with `pageTools` keys now load their
@@ -56,7 +57,9 @@ known sandbox `listen EPERM ::1` loopback failures); `npx next build`
 (passes); v2 scope tsx smoke run (67 routes / 536 cells inventoried,
 fails fast without credentials).
 
-Live v2 matrix blocked here: sandbox denies TCP bind/connect
+Superseded: the live v2 matrix then passed (536/536, 2026-10-22) in a normal terminal. Blocked-sandbox notes follow for history:
+
+Live v2 matrix blocked there: sandbox denies TCP bind/connect
 (`EPERM`), Docker, passwd lookup, SysV shm and escalation (probes in
 `ARCHITECTURE.md`). From a normal terminal with the PREVIEW.md seeded
 database and a loopback server on 3200, run:

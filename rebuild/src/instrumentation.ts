@@ -11,7 +11,9 @@ export async function register() {
 
 /** Unhandled server render and route errors go to the self-hosted error recorder (Root › Errors). */
 export async function onRequestError(error: unknown, request: { path?: string; method?: string }, context: { routerKind?: string; routePath?: string; routeType?: string }) {
-  if (process.env.NEXT_RUNTIME !== 'nodejs') return;
-  const { reportRequestError } = await import('./server/errors/recorder');
-  await reportRequestError(error, request, context);
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // Import inside the runtime check so the bundler drops Node-only modules from the edge build (dev compiles it too).
+    const { reportRequestError } = await import('./server/errors/recorder');
+    await reportRequestError(error, request, context);
+  }
 }

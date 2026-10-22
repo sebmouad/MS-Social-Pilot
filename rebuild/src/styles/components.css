@@ -209,7 +209,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--ink); }
 .ui-breadcrumbs svg { flex: 0 0 auto; color: var(--ink-faint); }
 
 /* ---- Page header ---- */
-.ui-page-header { display: grid; gap: 10px; margin-bottom: 26px; }
+.ui-page-header { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-bottom: 26px; }
 .ui-page-header__row { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .ui-page-header__text { flex: 1; min-width: 0; }
 .ui-page-header__titleline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }

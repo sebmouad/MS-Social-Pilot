@@ -40,7 +40,7 @@ const passRoute = (route: Route) => route.continue();
 export const VIEWPORTS = [{ width: 1440, height: 900 }, { width: 390, height: 844 }] as const;
 export const FAMILIES = ['/home', '/content', '/create', '/inbox', '/insights', '/settings', '/tasks', '/agency'];
 /** Main-area candidates, tried in order. Every page keeps its filters and actions in-page (the Page tools sheet was removed in B9). */
-export const MAIN_ACTION_SELECTORS = ['main .ui-button--primary:not(:disabled)', 'main button:not(:disabled)', 'main a[href]'] as const;
+export const MAIN_ACTION_SELECTORS = ['main .ui-button--primary:not(:disabled)', 'main button:not(:disabled)', 'main a[href]', 'main select:not(:disabled)', 'main input:not([type=hidden]):not(:disabled)', 'main textarea:not(:disabled)'] as const;
 /** The phone/tablet navigation drawer toggle. The drawer holds navigation only; page actions stay in main. */
 export const MENU_DRAWER_TOGGLE_SELECTOR = '.shell-menu-toggle';
 export type Finding = { code: string; count?: number; fingerprint?: string; control?: number; route?: string; theme?: string; viewport?: { width: number; height: number } };
@@ -142,10 +142,11 @@ async function tabTo(page: Page, target: Locator): Promise<boolean> {
   return false;
 }
 
-async function checkDialog(page: Page, opener: Locator, cell: Cell): Promise<boolean> {
+/** `scope` pins the dialog under test when the page itself also holds a modal (the /create composer sheet). */
+async function checkDialog(page: Page, opener: Locator, cell: Cell, scope?: string): Promise<boolean> {
   if (!await tabTo(page, opener)) return false;
   await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog');
+  const dialog = scope ? page.locator(scope) : page.getByRole('dialog');
   await dialog.first().waitFor({ state: 'visible', timeout: 3000 });
   await page.waitForTimeout(100);
   await auditControls(page, cell);
@@ -183,7 +184,7 @@ async function checkKeyboard(page: Page, cell: Cell) {
   // The phone/tablet drawer is a real shared dialog holding the sidebar navigation.
   const drawer = page.locator(MENU_DRAWER_TOGGLE_SELECTOR);
   if (await drawer.isVisible()) {
-    cell.keyboard.dialog = await checkDialog(page, drawer, cell) ? 'passed' : 'failed';
+    cell.keyboard.dialog = await checkDialog(page, drawer, cell, '#shell-sidebar[role=dialog]') ? 'passed' : 'failed';
   }
   const selectors = MAIN_ACTION_SELECTORS;
   let target: Locator | undefined;
@@ -1459,6 +1460,9 @@ export type V2Locale = (typeof V2_LOCALES)[number];
 /** Playwright locale names: they decide the Accept-Language header the app renders from. */
 export const V2_PLAYWRIGHT_LOCALE: Record<V2Locale, string> = { en: 'en-US', fr: 'fr-FR' };
 
+/** Routes that redirect by design (the page itself is a server redirect to the canonical operations view). */
+export const V2_REDIRECTS: Readonly<Record<string, string>> = { '/root/alerts': '/root/operations' };
+
 export function v2Area(route: string): string {
   const area = (family: string, label: string) => route === family || route.startsWith(`${family}/`) ? label : null;
   return area('/home', 'Home') ?? area('/create', 'Create') ?? area('/content', 'Content')
@@ -1564,7 +1568,7 @@ export async function runV2Matrix(env: Readonly<Record<string, string | undefine
             await page.locator('body').waitFor();
             await page.evaluate(() => document.fonts.ready.then(() => undefined));
             await page.waitForTimeout(400);
-            if (new URL(page.url()).origin !== base || new URL(page.url()).pathname !== route) add({ code: 'UNEXPECTED_REDIRECT' }, `UNEXPECTED_REDIRECT -> ${new URL(page.url()).pathname}`);
+            if (new URL(page.url()).origin !== base || new URL(page.url()).pathname !== (V2_REDIRECTS[route] ?? route)) add({ code: 'UNEXPECTED_REDIRECT' }, `UNEXPECTED_REDIRECT -> ${new URL(page.url()).pathname}`);
             if (await page.locator('html').getAttribute('data-theme') !== theme.id) add({ code: 'THEME_NOT_APPLIED' });
             if (await page.locator('html').getAttribute('data-mode') !== mode) add({ code: 'MODE_NOT_APPLIED' });
             if (await page.locator('html').getAttribute('lang') !== locale) add({ code: 'LOCALE_NOT_APPLIED' }, `LOCALE_NOT_APPLIED want ${locale}`);

@@ -1,6 +1,6 @@
 "use client";
 import { useComposerCatalog } from '../compose/CopyProvider';
-import { usePublishingActionText } from '@/modules/publishing/ui/WorkflowSubmitButtons';
+import { usePublishingActionLocale, usePublishingActionText } from '@/modules/publishing/ui/WorkflowSubmitButtons';
 import { actionBulkCopy, defaultPublishingActionText, type PublishingActionText } from '@/modules/publishing/action-catalog';
 import { DestinationFormats, effectiveDestinationFormat } from '@/modules/publishing/components/DestinationFormats';
 import { usePreserveFormState } from '@/components/usePreserveFormState';
@@ -158,6 +158,7 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules,
 
 function FirstCommentControl({ postId, postComment, delayMinutes, timeZone, target }: { postId: string; postComment: string; delayMinutes: number; timeZone: string; target: PostRow['targets'][number] }) {
   const t = usePublishingActionText();
+  const numberLocale = usePublishingActionLocale();
   const [mode, setMode] = useState<'send' | 'record' | null>(null);
   const [localState, setLocalState] = useState<FirstCommentActionState['state'] | null>(null);
   const controlRef = useRef<HTMLDivElement>(null);
@@ -178,7 +179,7 @@ function FirstCommentControl({ postId, postComment, delayMinutes, timeZone, targ
   const isScheduled = !rejected && displayState === 'ready' && delayMinutes > 0;
   const stateText = displayState === 'scheduled' ? t('firstCommentIsScheduled')
     : isScheduled && dueAt ? t('firstCommentScheduled', { time: formatPostPreviewTime(dueAt, timeZone), zone: timeZone.replaceAll('_', ' ') })
-      : isScheduled ? t('firstCommentWait', { minutes: delayMinutes.toLocaleString() })
+      : isScheduled ? t('firstCommentWait', { minutes: delayMinutes.toLocaleString(numberLocale) })
         : t(`comment_${displayState}`);
   const open = (next: 'send' | 'record') => setMode(next);
 
@@ -366,7 +367,7 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
       <AutoTextarea id={`comment-${post.id}`} name="firstComment" value={values.firstComment ?? post.firstComment ?? ''} onChange={event => setValue('firstComment', event.currentTarget.value)} rows={2} disabled={disabled || pending || uploading} />
       <label htmlFor={delayField.id}>{t('waitBeforeTheFirstComment')} <span>{t('minutes0SendsItRightAfterPublication')}</span></label>
       <input name="firstCommentDelayMinutes" type="number" inputMode="numeric" min={0} max={imageRules.maxFirstCommentDelayMinutes} step={1} value={values.firstCommentDelayMinutes ?? String(post.firstCommentDelayMinutes ?? 0)} onChange={event => setValue('firstCommentDelayMinutes', event.currentTarget.value)} disabled={disabled || pending || uploading} {...delayField} />
-      <p id={`comment-delay-help-${post.id}`} className={styles.help}>{t('chooseAWholeNumberFrom0To')} {imageRules.maxFirstCommentDelayMinutes.toLocaleString()} {t('minutes')}</p>
+      <p id={`comment-delay-help-${post.id}`} className={styles.help}>{t('chooseAWholeNumberFrom0To')} {imageRules.maxFirstCommentDelayMinutes.toLocaleString(locale)} {t('minutes')}</p>
       <FieldError {...validation.errorProps('firstCommentDelayMinutes')} />
       <label htmlFor={`link-${post.id}`}>{t('link')} <span>{t('optional2')}</span></label><input id={`link-${post.id}`} name="link" type="url" value={values.link ?? post.link ?? ''} onChange={event => setValue('link', event.currentTarget.value)} disabled={disabled || pending || uploading} aria-invalid={Boolean(validation.errors.link)} aria-describedby={validation.errors.link ? `link-error-${post.id}` : undefined} />
       {validation.errors.link && <p id={`link-error-${post.id}`} className={styles.formError} role="alert">{validation.errors.link}</p>}

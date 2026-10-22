@@ -1,5 +1,5 @@
 'use client';
-import { useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
+import { useAdsCatalogs, useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 import type { AdsFilters } from '@/modules/ads/server/queries';
 import { CsvExportButton } from '@/components/CsvExportButton';
 
@@ -17,6 +17,7 @@ export function adsExportHref(filters: AdsFilters) {
 
 export function AdsReportExport({ filters, maxRows, maxBytes, fileName }: { filters: AdsFilters; maxRows: number; maxBytes: number; fileName: string }) {
   const t = useAdsText();
+  const { locale } = useAdsCatalogs();
   return <CsvExportButton
     href={adsExportHref(filters)}
     expectedFormat="ads-daily-v1"
@@ -27,7 +28,7 @@ export function AdsReportExport({ filters, maxRows, maxBytes, fileName }: { filt
     requireFileNameConfirmation
     copy={{
       heading: t('text196'),
-      help: t('text197', { value0: maxRows.toLocaleString(), value1: maxBytes.toLocaleString() }),
+      help: t('text197', { value0: maxRows.toLocaleString(locale), value1: maxBytes.toLocaleString(locale) }),
       action: t('text198'),
       pending: t('text199'),
       noun: { singular: t('text046'), plural: t('dailyRows') },

@@ -338,13 +338,13 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
     const delayValue = firstCommentDelayMinutes === '' ? 0 : Number(firstCommentDelayMinutes);
     if (!Number.isSafeInteger(delayValue) || delayValue < 0 || delayValue > maxFirstCommentDelayMinutes) {
       event.preventDefault();
-      setFirstCommentDelayError(fillComposerCopy(ui.delayRange, { max: maxFirstCommentDelayMinutes.toLocaleString() }));
+      setFirstCommentDelayError(fillComposerCopy(ui.delayRange, { max: maxFirstCommentDelayMinutes.toLocaleString(aiLocale) }));
       form.querySelector<HTMLInputElement>('#composer-first-comment-delay')?.focus();
       return;
     }
     setFirstCommentDelayError('');
     if (message.length > imageRules.maxMessageCharacters) {
-      event.preventDefault(); setLocalError(fillComposerCopy(ui.textMax, { max: imageRules.maxMessageCharacters.toLocaleString() })); return;
+      event.preventDefault(); setLocalError(fillComposerCopy(ui.textMax, { max: imageRules.maxMessageCharacters.toLocaleString(aiLocale) })); return;
     }
     if (link.trim()) {
       let valid = false;
@@ -476,7 +476,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
         <AutoTextarea id="composer-message" name="message" disabled={saved} value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={6} placeholder={cc.createTextPlaceholder} aria-labelledby={`${titleId}-text`} aria-describedby="composer-message-count" />
         <div className={styles.textTools}>
           <AiAssist status={aiStatus} locale={aiLocale} text={message} disabled={pending || saved} onUse={(suggestion, kind) => setMessage(current => (kind === 'hashtags' ? `${current.trimEnd()}${current.trim() ? '\n\n' : ''}${suggestion}` : suggestion).slice(0, imageRules.maxMessageCharacters))} />
-          <span className={styles.counter} id="composer-message-count">{fillContent(cc.createCounter, { used: message.length.toLocaleString(), max: imageRules.maxMessageCharacters.toLocaleString() })}</span>
+          <span className={styles.counter} id="composer-message-count">{fillContent(cc.createCounter, { used: message.length.toLocaleString(aiLocale), max: imageRules.maxMessageCharacters.toLocaleString(aiLocale) })}</span>
         </div>
       </section>
       <section className={styles.section} aria-labelledby={`${titleId}-media`}>
@@ -500,7 +500,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
         {showCommentDelay && <>
           <label className={styles.linkField} htmlFor="composer-first-comment-delay"><span>{ui.commentDelay} <em>{ui.delayHint}</em></span>
             <input id="composer-first-comment-delay" name="firstCommentDelayMinutes" type="number" inputMode="numeric" min={0} max={maxFirstCommentDelayMinutes} step={1} value={firstCommentDelayMinutes} disabled={saved} aria-invalid={Boolean(firstCommentDelayError)} aria-describedby={`composer-first-comment-delay-help${firstCommentDelayError ? ' composer-first-comment-delay-error' : ''}`} onChange={event => { setFirstCommentDelayMinutes(event.currentTarget.value); setFirstCommentDelayError(''); }} /></label>
-          <p id="composer-first-comment-delay-help" className={styles.help}>{fillComposerCopy(ui.delayRange, { max: maxFirstCommentDelayMinutes.toLocaleString() })} {ui.delayApplies}</p>
+          <p id="composer-first-comment-delay-help" className={styles.help}>{fillComposerCopy(ui.delayRange, { max: maxFirstCommentDelayMinutes.toLocaleString(aiLocale) })} {ui.delayApplies}</p>
           {firstCommentDelayError && <p id="composer-first-comment-delay-error" className={styles.alert} role="alert">{firstCommentDelayError}</p>}
         </>}
         <input type="hidden" name="labelId" value={labelId} />

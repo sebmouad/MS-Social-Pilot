@@ -101,7 +101,7 @@ describe('browser matrix report', () => {
 
 describe('main action discovery', () => {
   it('finds the page action in-page and checks the phone navigation drawer separately', () => {
-    expect(MAIN_ACTION_SELECTORS).toEqual(['main .ui-button--primary:not(:disabled)', 'main button:not(:disabled)', 'main a[href]']);
+    expect(MAIN_ACTION_SELECTORS).toEqual(['main .ui-button--primary:not(:disabled)', 'main button:not(:disabled)', 'main a[href]', 'main select:not(:disabled)', 'main input:not([type=hidden]):not(:disabled)', 'main textarea:not(:disabled)']);
     expect(MENU_DRAWER_TOGGLE_SELECTOR).toBe('.shell-menu-toggle');
   });
   it('still reports a page with no verified main action', () => {

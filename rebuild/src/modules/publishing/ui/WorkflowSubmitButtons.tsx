@@ -10,6 +10,8 @@ export function PublishingActionCopyProvider({ catalog, locale, children }: { ca
   const value = useMemo(() => ({ catalog, locale }), [catalog, locale]);
   return <ActionCopyContext.Provider value={value}>{children}</ActionCopyContext.Provider>;
 }
+/** The workspace locale the server rendered with; used for number formatting so SSR and hydration agree. */
+export function usePublishingActionLocale() { return useContext(ActionCopyContext).locale; }
 export function usePublishingActionText(locale?: string) {
   const context = useContext(ActionCopyContext);
   const [browserLocale, setBrowserLocale] = useState('en');

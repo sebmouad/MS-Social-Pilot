@@ -1,5 +1,5 @@
 'use client';
-import { useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
+import { useAdsCatalogs, useAdsText } from '@/modules/ads/ui/AdsCopyProvider';
 import type { AdsSummary } from '@/modules/ads/server/summary';
 import { StoredFields } from './stored-fields';
 
@@ -12,6 +12,7 @@ function validDate(value: unknown): Date | null {
 
 export function DailyMetrics({ rows, currency }: { rows: readonly DailyMetric[]; currency: string | null }) {
   const t = useAdsText();
+  const { locale } = useAdsCatalogs();
 function reportDay(value: unknown) {
   const date = validDate(value);
   if (!date) return { label: t('text175'), dateTime: undefined };
@@ -26,13 +27,13 @@ function fetchedAt(value: unknown) {
 
 function count(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value)
-    ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
+    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value)
     : t('text177');
 }
 
 function amount(value: unknown, currency: string | null) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return t('text177');
-  const formatted = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  const formatted = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
   return currency ? `${currency} ${formatted}` : t('currencyUnavailableAmount', { amount: formatted });
 }
 
