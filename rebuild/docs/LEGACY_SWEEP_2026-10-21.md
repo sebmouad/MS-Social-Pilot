@@ -93,7 +93,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `(app)/analytics/campaigns` | `analytics/reports` (Destinations/link details) | partial: no UTM-campaign page |
 | `(app)/analytics/links` | `reports` link details; click tracking `s/[slug]` | partial: no dedicated page |
 | `(app)/analytics/post/[postTargetId]` | `analytics/posts`, `analytics/explorer` | done |
-| `(app)/analytics/tests` | none | missing (caption tests) |
+| `(app)/analytics/tests` | `app/analytics/tests/page.tsx` → `modules/caption-tests/ui/CaptionTestsPage.tsx` | done (2026-10-22: results, winner, start form, learn; `tests/caption-tests-service.test.ts`, `tests/ai-content-tools-ui.test.ts`; browser/live provider unverified) |
 | `(app)/approvals` | `publishing/approvals` | done |
 | `(app)/calendar` | `publishing/calendar` | done |
 | `(app)/calendar/dates` | none | missing (key dates) |
@@ -175,7 +175,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/ads` | `api/ads/*` | done |
 | `api/agency/access` | `api/agency` | done |
 | `api/ai-agents`, `[id]` | none | missing |
-| `api/ai`, `ai/image`, `ai/video`, `ai/voice` | `api/ai` (caption/improve/translate/hashtags only) | partial: image/video/voice missing |
+| `api/ai`, `ai/image`, `ai/video`, `ai/voice` | `api/ai` (text); `api/ai/media`, `api/ai/image`, `api/ai/video`, `api/ai/voice` → `modules/ai/content-tools/server/{media,http}.ts`; screen `/publishing/ai-studio` | done (2026-10-22: provider ports, Root policies `ai.imagePolicy`/`ai.voicePolicy`/`ai.videoPolicy`, exact confirmations, hourly/budget metering, library save; `tests/ai-media-generation.test.ts`, `tests/ai-media-ports.test.ts`; no live provider call; worker wiring of `pollAiVideos` open) |
 | `api/analytics/[targetId]`, `analysis`, `export`, `pinned`, `post/[id]`, `refresh` | `api/analytics`, `explorer`, `comparison`, `demographics`, `pins`, `posts`, `report-workflows/*` | done |
 | `api/api-tokens`, `[id]` | `api/settings/mcp-keys`, `account/person-keys`, `api/v1/*` | partial: legacy tokens not migrated |
 | `api/auth/login`, `logout`, `register`, `verify-email` | `api/auth/sign-in`, `sign-out`, `register`, `verify-email(/resend)` | done |
@@ -184,7 +184,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/auth/two-step/*` | `api/auth/two-step/*`, `api/settings/account/security/*` | done (trusted-devices `devices` route: partial) |
 | `api/bio` | `api/sharing/bio` | done |
 | `api/calendar-feed/[token]`, `calendar-feeds`, `[id]` | none | missing (ICS) |
-| `api/caption-tests/[id]/learn` | none | missing |
+| `api/caption-tests/[id]/learn` | `api/caption-tests/[id]/learn` → `modules/caption-tests/server/service.ts` `learnCaptionTest`; MCP `learn_from_caption_test` | done (2026-10-22: appends the winner to the workspace voice, not per-channel voice; `tests/caption-tests-service.test.ts`) |
 | `api/chart-notes`, `[id]` | none | missing |
 | `api/chat-channels`, `[id]`, `[id]/test` | none | missing (Slack/Telegram) |
 | `api/connections/ads/[id]`, `instagram/[id]` | `api/settings/connections` | done |
@@ -201,7 +201,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/instagram` | `platforms/instagram` discovery only | partial |
 | `api/key-dates`, `seasons` (+ `[id]`) | none | missing |
 | `api/labels`, `[id]` | `api/publishing/labels/*` | done |
-| `api/link-preview` | none | missing |
+| `api/link-preview` | `api/publishing/link-preview` → `modules/ai/content-tools/server/checks.ts` `linkPreview`; MCP `get_link_preview` | done (2026-10-22: neutral SSRF-guarded HTML fetch under Root `ai.linkPreviewPolicy`; the legacy Facebook re-scrape `refresh` option is not carried: it belongs to a Facebook-module hook; `tests/ai-composer-checks.test.ts`) |
 | `api/mcp` | `api/mcp` | done |
 | `api/media`, `[id]`, `[id]/raw`, `import` | `api/media`, `api/media-library/*` | done |
 | `api/moderation/rules*`, `actions/[id]/undo` | `api/inbox/moderation` | done |
@@ -214,7 +214,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/post-templates*`, `snippets*` | `api/publishing/templates/*` | done (snippets folded into templates: partial) |
 | `api/posts`, `[id]`, `approve`, `publish`, `retry`, `remove`, `purge`, `undo-send` | `api/publishing/posts/*`, `[id]/[action]`, `[id]/deletion`, `recovery` | done |
 | `api/posts/[id]/duplicate`, `first-comment`, `recycle`, `versions`; `actions`, `bulk`, `export` | `api/publishing/duplicate`, `first-comments/*`, `recycle`, `versions`, `posts/bulk`, `export` | done |
-| `api/posts/outlook`, `spam-check` | none | missing |
+| `api/posts/outlook`, `spam-check` | `api/publishing/outlook`, `api/publishing/spam-check` → `modules/ai/content-tools/server/checks.ts`; MCP `get_engagement_outlook`, `check_post_spam_risk` | done (2026-10-22: outlook reads platform-module `postPerformance`; spam uses workspace `spamGapMinutes`; both inside channel grants; composer embed pending, screen at `/publishing/ai-studio`; `tests/ai-composer-checks.test.ts`) |
 | `api/queue`, `queue-slots` | `api/publishing/queue`, `queue-slots` | done |
 | `api/report-schedules*`, `report-templates*`, `reports` | `api/analytics/report-workflows/*`, `api/reports/export` | done |
 | `api/root/alerts/test` | none | missing |
@@ -250,12 +250,15 @@ Rebuild evidence paths under `rebuild/src/`.
 | `networks/*` (9 connectors) | none | missing |
 | `inbox`, `inbox-notes`, `inbox-response`, `moderation*`, `reply-template`, `response-time`, `negative-comments`, `mentions` | `modules/inbox/**`, `modules/ai/server/sentiment.ts` | done |
 | `analytics*`, `audience*`, `aggregate`, `channel-figures*`, `page-analysis*`, `network-analytics`, `network-rules`, `pinned-metrics`, `page-goals`, `goals`, `label-report`, `link-analytics`, `reports`, `report-*`, `analytics-export`, `ads-analysis` | `modules/analytics/**`, `modules/ads/**` | done / partial |
-| `engagement`, `engagement-prediction`, `engagement-outlook`, `caption-test`, `chart-notes`, `chart-note-colors` | none | missing |
+| `engagement-prediction`, `engagement-outlook` | `modules/ai/content-tools/pure.ts` `predictEngagement`, `server/checks.ts` | done (2026-10-22) |
+| `caption-test` | `modules/caption-tests/{pure.ts,server/service.ts}` | done (2026-10-22; composer A/B creation still belongs to Publishing, tests start from existing posts) |
+| `engagement`, `chart-notes`, `chart-note-colors` | none | missing |
 | `key-dates*`, `seasons`, `holidays`, `trends` | none | missing |
 | `ics`, `calendar-feeds`, `calendar-days` | `lib/calendar-dates.ts` only | missing (feeds); calendar days done |
-| `spam-guard` | none | missing |
+| `spam-guard` | `modules/ai/content-tools/pure.ts` `assessSpamRisk`, `server/checks.ts` `spamCheck` | done (2026-10-22) |
 | `ai`, `ai-providers`, `ai-models`, `ai-prices`, `ai-agents` | `modules/ai/**` (providers/models/limits); prices/monthly budget now in `modules/ai/server/usage.ts` (source); agents none | partial |
-| `ai-image`, `ai-video`, `ai-voice`, `voice-names`, `text-backgrounds`, `alt-text`, `translation`, `translated-posts` | `modules/ai` translate kind only | missing / partial |
+| `ai-image`, `ai-video`, `ai-voice`, `voice-names` | `modules/ai/content-tools/server/{media,media-openai,media-gemini,media-ports}.ts`; voice names are the Root `ai.voicePolicy.voices` list | done (2026-10-22) |
+| `text-backgrounds`, `alt-text`, `translation`, `translated-posts` | `modules/ai` translate kind only | missing / partial |
 | `chat` | none | missing |
 | `system-alerts`, `error-tracking`, `uptime`, `health`, `housekeeping`, `background-refresh` | worker jobs + `server/root/*`; no alert/error/uptime writer | partial (gap 3) |
 | `media`, `image-format`, `image-variants`, `media-links`, `zip`, `workspace-export` | `modules/media/**`, `server/data-control/**`, `modules/settings/server/exports.ts` | done / partial |
@@ -278,7 +281,7 @@ Rebuild evidence paths under `rebuild/src/`.
 | WorkspaceExport | replaced by `rebuild_workspace_exports`; old rows obsolete | obsolete: new async ZIP service |
 | OAuthClient, OAuthCode | replaced by `mcp_oauth_clients/codes` | obsolete: not migrated (gap 10) |
 | RebuildReportRun (`report_runs`) | `modules/analytics/reports` | done |
-| AiAgent, AiGeneration, AiVideo, CalendarFeed, ChartNote, CaptionTest, ChatChannel, ClientInvitation, ApiToken, Snippet, UptimeDay, PublicHoliday, HolidayYear, TrendingTopic, KeyDate, SeasonalMode, ChangelogEntry, WorkerJobRun, GraphUsage | not referenced | missing (feature absent); keep the tables |
+| AiAgent, AiGeneration, CalendarFeed, ChartNote, ChatChannel, ClientInvitation, ApiToken, Snippet, UptimeDay, PublicHoliday, HolidayYear, TrendingTopic, KeyDate, SeasonalMode, ChangelogEntry, WorkerJobRun, GraphUsage | not referenced | missing (feature absent); keep the tables |
 
 ## 6. Root settings and env
 

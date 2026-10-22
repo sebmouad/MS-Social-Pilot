@@ -58,7 +58,7 @@ export async function settings(deps: AiDeps): Promise<Settings | null> {
 }
 
 /** The workspace's own switch and writing preferences. A missing or unreadable row means assist is off. */
-async function workspaceContext(workspaceId: string): Promise<(AiContext & { enabled: boolean }) | null> {
+export async function workspaceContext(workspaceId: string): Promise<(AiContext & { enabled: boolean }) | null> {
   try {
     const rows = await prisma.$queryRaw<Array<{ aiEnabled: boolean; aiTone: string | null; aiBrandVoice: string | null; aiAvoidWords: string | null }>>`SELECT "aiEnabled", "aiTone", "aiBrandVoice", "aiAvoidWords" FROM workspaces WHERE id = ${workspaceId}`;
     const row = rows[0];
@@ -88,7 +88,8 @@ export async function summaryAvailable(actor: AiActor, deps: AiDeps = {}): Promi
  * when the provider then fails, so a failing provider cannot be used to bypass the limit. The claim
  * records the kind and input length only, never the text.
  */
-async function claim(actor: AiActor, s: Settings, kind: string, inputLength: number, now: Date) {
+export type ClaimLimits = Pick<Settings, 'hourly' | 'txTimeout' | 'txWait' | 'metering'>;
+export async function claim(actor: AiActor, s: ClaimLimits, kind: string, inputLength: number, now: Date) {
   await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`ai:${actor.workspaceId}`}))::text`;
     const rows = await tx.$queryRaw<Array<{ role: string; disabledAt: Date | null; suspendedAt: Date | null }>>`SELECT m.role::text AS role, u."disabledAt", w."suspendedAt" FROM memberships m JOIN users u ON u.id = m."userId" JOIN workspaces w ON w.id = m."workspaceId" WHERE m."userId" = ${actor.userId} AND m."workspaceId" = ${actor.workspaceId} FOR SHARE OF w FOR UPDATE OF m, u`;

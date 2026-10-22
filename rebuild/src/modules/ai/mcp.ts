@@ -1,8 +1,7 @@
 import { OperationError } from '@/lib/operation-error';
 import type { McpToolGroup } from '@/server/mcp/kit';
 import { AI_KINDS, TONES } from './ai';
-import { AI_BOUNDS } from './config';
-import { aiStatus, runAssist, COMPOSER_FEATURE, type AiDeps } from './server/ai';
+import { AI_BOUNDS } from './config';import { aiStatus, runAssist, COMPOSER_FEATURE, type AiDeps } from './server/ai';
 import type { AiActor } from './server/access';
 
 export const aiToolDefinitions = [

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
+import { AI_CONTENT_TOOLS_CONFIG } from './content-tools/config';
 
 export const AI_DEFAULTS = {
   enabled: false, provider: 'anthropic', model: 'claude-sonnet-5-5', endpoint: 'https://api.anthropic.com/v1/messages',
@@ -60,4 +61,5 @@ export const AI_CONFIG = [
   entry({ key: 'ai.summarySubjectMaxCharacters', group: G, label: 'AI recap subject length', kind: 'number', description: 'Maximum characters accepted for an AI recap subject.', defaultValue: AI_DEFAULTS.summarySubjectMaxCharacters, schema: int(AI_BOUNDS.summarySubjectMaxCharacters), consumption: 'active' }),
   entry({ key: 'ai.transactionTimeoutMs', group: G, label: 'AI usage transaction timeout (ms)', kind: 'number', description: 'Maximum duration of the usage-claim write.', defaultValue: AI_DEFAULTS.transactionTimeoutMs, schema: int(AI_BOUNDS.transactionTimeoutMs), consumption: 'active' }),
   entry({ key: 'ai.transactionMaxWaitMs', group: G, label: 'AI usage transaction wait (ms)', kind: 'number', description: 'Maximum wait for the usage-claim slot.', defaultValue: AI_DEFAULTS.transactionMaxWaitMs, schema: int(AI_BOUNDS.transactionMaxWaitMs), consumption: 'active' }),
+  ...AI_CONTENT_TOOLS_CONFIG,
 ] as const;

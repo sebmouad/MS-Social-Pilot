@@ -386,6 +386,17 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | retry_recipe_slots | publishing/feeds | write | POST /api/feeds/wordpress/retry | Shared customer operation; transport arguments may differ. |
 | get_ai_assist_status | publishing/posts | read | GET /api/ai | Shared customer operation; transport arguments may differ. |
 | ai_assist_write | publishing/posts | write | POST /api/ai | Shared customer operation; transport arguments may differ. |
+| get_ai_media_status | publishing/posts | read | GET /api/ai/media | aiMediaStatus: availability, formats, voices and exact confirmations for AI picture, video and voice; workspace-wide key scope only. |
+| generate_ai_image | publishing/posts | write | POST /api/ai/image | generateImage saves one picture to the media library after GENERATE IMAGE; shares the hourly allowance and monthly budget with AI assist; workspace-wide key scope only. |
+| generate_ai_voice | publishing/posts | write | POST /api/ai/voice | generateVoice returns audio (REST bytes, MCP base64) after GENERATE VOICE; nothing stored; workspace-wide key scope only. |
+| start_ai_video | publishing/posts | write | POST /api/ai/video | startVideo begins an asynchronous video after GENERATE VIDEO; the finished file is saved to the media library; workspace-wide key scope only. |
+| list_ai_videos | publishing/posts | read | GET /api/ai/video | listVideos shows recent videos and finishes working ones; workspace-wide key scope only. |
+| get_link_preview | publishing/posts | read | POST /api/publishing/link-preview | linkPreview fetches a public address under the Root network policy; the service requires composer write access, so it is stricter than the tool's read classification. |
+| get_engagement_outlook | publishing/posts | read | POST /api/publishing/outlook | engagementOutlook compares a draft with one channel's stored history; the requested channel must be inside the member's and key's grants. |
+| check_post_spam_risk | publishing/posts | read | POST /api/publishing/spam-check | spamCheck counts only channels inside the caller's grants; advice only, nothing is saved or blocked. |
+| list_caption_tests | analytics/posts | read | GET /api/caption-tests | listCaptionTests (and view=posts for testable posts) settle due tests first; limited members see only tests that ran entirely on their channels. |
+| start_caption_test | publishing/posts | write | POST /api/caption-tests | startCaptionTest groups two to four existing posts after START CAPTION TEST; every post channel must be inside the caller's grants. |
+| learn_from_caption_test | settings/workspace | write | POST /api/caption-tests/[id]/learn | learnCaptionTest appends the winning caption to the workspace voice after LEARN <id>; workspace-wide key scope only; owner/admin settings access. |
 | list_webhooks | settings/webhooks | read | GET /api/webhooks | Shared customer operation; transport arguments may differ. |
 | create_webhook | settings/webhooks | write | POST /api/webhooks | Shared customer operation; transport arguments may differ. |
 | update_webhook | settings/webhooks | write | PATCH /api/webhooks/[id] | Shared customer operation; transport arguments may differ. |

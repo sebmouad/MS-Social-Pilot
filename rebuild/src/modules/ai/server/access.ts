@@ -30,5 +30,9 @@ export async function authorizeAi(actor: AiActor, feature: string, access: 'read
   if (!entitlements || !permissions || entitlements.workspaceId !== actor.workspaceId || !canUseFeature(entitlements, feature)
     || !canAccessFeature(permissions, feature, access) || (actor.permissionCeiling && !canAccessFeature(actor.permissionCeiling, feature, access))) throw denied();
   await assertWorkspaceNotPurging(actor.workspaceId);
-  return { role: row.role };
+  // Channels this call may touch: the member's current grants narrowed by any key ceiling; undefined means every channel.
+  const grants = permissions.pageScope.all ? undefined : [...permissions.pageScope.ids];
+  const ceiling = actor.permissionCeiling && !actor.permissionCeiling.pageScope.all ? [...actor.permissionCeiling.pageScope.ids] : undefined;
+  const allowedTargetIds = grants === undefined ? ceiling : ceiling === undefined ? grants : grants.filter(id => ceiling.includes(id));
+  return { role: row.role, allowedTargetIds };
 }
