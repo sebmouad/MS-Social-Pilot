@@ -8,7 +8,8 @@ vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => 
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: (_id: string, cb: () => Promise<unknown>) => cb() }));
 
 import { COLLAB_CONFIG } from '../src/modules/publishing/collaboration/config';
-const DEFAULTS: Record<string, unknown> = Object.fromEntries(COLLAB_CONFIG.map(i => [i.key, i.defaultValue]));
+import { CALENDAR_EXTRAS_CONFIG } from '../src/modules/calendar-extras/config';
+const DEFAULTS: Record<string, unknown> = Object.fromEntries([...COLLAB_CONFIG, ...CALENDAR_EXTRAS_CONFIG].map(i => [i.key, i.defaultValue]));
 import { allocateQueueTime, nextAvailableSlot, runContentMix, runRecycleCycle, slotsForPages, variantForRun, wallToUtc, type AutomationLifecycle } from '../src/modules/publishing/collaboration/server/executors';
 import { availableCollaborationTools } from '../src/modules/publishing/collaboration/mcp';
 import { registerCollaborationPorts } from '../src/modules/publishing/collaboration/ports';

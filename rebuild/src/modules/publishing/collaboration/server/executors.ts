@@ -9,6 +9,7 @@ import type { CollabBounds } from '../config';
 import { ID, nextRecycleAt } from '../schemas';
 import type { RecycleExecutorPort, MixExecutorPort, QueueSchedulerPort } from '../ports';
 import { bounds, transact, type Tx } from './core';
+import { queueSeasons, seasonAdjuster } from '@/modules/calendar-extras/server/queue-seasons';
 
 /**
  * Module-owned executors for recycling, queue-time allocation and the content mix.
@@ -73,14 +74,15 @@ export function slotsForPages(rows: readonly SlotRow[], targetIds: readonly stri
 }
 
 /** First free queue time strictly after `now`, within `horizonDays`, in the workspace time zone. Null when none. */
-export function nextAvailableSlot(o: { slots: readonly Slot[]; timeZone: string; takenUtc: readonly Date[]; now: Date; horizonDays: number }): Date | null {
+export function nextAvailableSlot(o: { slots: readonly Slot[]; timeZone: string; takenUtc: readonly Date[]; now: Date; horizonDays: number; /** Shapes one local day's slots (seasonal rules); receives the day as yyyy-MM-dd. */ adjustDay?: (daySlots: readonly Slot[], day: string) => Slot[] }): Date | null {
   if (!o.slots.length) return null;
   const taken = new Set(o.takenUtc.map(d => Math.floor(d.getTime() / 60_000)));
   const today = parts(o.timeZone, o.now);
   for (let i = 0; i <= o.horizonDays + 1; i++) {
     const day = new Date(Date.UTC(today.year, today.month - 1, today.day + i));
     const dow = day.getUTCDay();
-    for (const s of o.slots.filter(x => x.dayOfWeek === dow)) {
+    const base = o.slots.filter(x => x.dayOfWeek === dow);
+    for (const s of o.adjustDay ? o.adjustDay(base, day.toISOString().slice(0, 10)) : base) {
       const at = wallToUtc(o.timeZone, day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(), s.hour, s.minute);
       if (!at || at.getTime() <= o.now.getTime() || at.getTime() > o.now.getTime() + o.horizonDays * 86_400_000) continue;
       if (!taken.has(Math.floor(at.getTime() / 60_000))) return at;
@@ -101,7 +103,9 @@ export async function allocateQueueTime(tx: Tx, workspaceId: string, timeZone: s
     tx.$queryRaw<SlotRow[]>`SELECT "targetId", "dayOfWeek", hour, minute FROM queue_slots WHERE "workspaceId" = ${workspaceId} AND ("targetId" IS NULL OR "targetId" = ANY(${[...targetIds]}::text[]))`,
     tx.$queryRaw<Array<{ scheduledAt: Date }>>`SELECT DISTINCT p."scheduledAt" FROM posts p JOIN post_targets pt ON pt."postId" = p.id WHERE p."workspaceId" = ${workspaceId} AND p.status::text = ANY(${OCCUPYING}::text[]) AND p."scheduledAt" >= ${now} AND pt."targetId" = ANY(${[...targetIds]}::text[])`,
   ]);
-  const occupancy = { timeZone, takenUtc: taken.map(t => t.scheduledAt), now, horizonDays: days };
+  // Seasonal rules shape only the times offered for this new post; posts already scheduled are never moved.
+  const adjustDay = seasonAdjuster(await queueSeasons(tx, workspaceId, now, new Date(now.getTime() + (days + 2) * 86_400_000)), targetIds);
+  const occupancy = { timeZone, takenUtc: taken.map(t => t.scheduledAt), now, horizonDays: days, ...(adjustDay ? { adjustDay } : {}) };
   const preferred = [...preferredSlots].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.hour - b.hour || a.minute - b.minute);
   return nextAvailableSlot({ ...occupancy, slots: preferred }) ?? nextAvailableSlot({ ...occupancy, slots: slotsForPages(rows, targetIds) });
 }
@@ -278,6 +282,7 @@ async function mixOne(workspaceId: string, now: Date, limit: CollabBounds, lifec
     const used = new Set<string>();
     const taken = (await tx.$queryRaw<Array<{ scheduledAt: Date; targets: string[] }>>`SELECT p."scheduledAt", ARRAY_AGG(DISTINCT pt."targetId") AS targets FROM posts p JOIN post_targets pt ON pt."postId" = p.id WHERE p."workspaceId" = ${workspaceId} AND p.status::text = ANY(${OCCUPYING}::text[]) AND p."scheduledAt" >= ${now} GROUP BY p.id`);
     const slotRows = await tx.$queryRaw<SlotRow[]>`SELECT "targetId", "dayOfWeek", hour, minute FROM queue_slots WHERE "workspaceId" = ${workspaceId}`;
+    const seasons = await queueSeasons(tx, workspaceId, now, new Date(now.getTime() + (limit.mixWindowDays + 2) * 86_400_000));
     let scheduled = 0; let skipped = 0;
     const dryRules: Array<{ targetId: string; labelId: string; rules: Rule[] }> = [];
     const recovered: string[] = [];
@@ -289,7 +294,8 @@ async function mixOne(workspaceId: string, now: Date, limit: CollabBounds, lifec
         const draft = candidates.shift()!;
         const slots = slotsForPages(slotRows, draft.targets);
         const takenFor = taken.filter(t => t.targets.some(x => draft.targets.includes(x))).map(t => t.scheduledAt);
-        const at = nextAvailableSlot({ slots, timeZone: timezone, takenUtc: takenFor, now, horizonDays: limit.mixWindowDays });
+        const adjustDay = seasonAdjuster(seasons, draft.targets);
+        const at = nextAvailableSlot({ slots, timeZone: timezone, takenUtc: takenFor, now, horizonDays: limit.mixWindowDays, ...(adjustDay ? { adjustDay } : {}) });
         if (!at) break;
         if (!(await eligible(workspaceId))) { skipped += 1; declined = true; break; }
         if (!(await lifecycle.schedule(tx, { workspaceId, postId: draft.id, scheduledAt: at, timeZone: timezone }))) { skipped += 1; declined = true; continue; }

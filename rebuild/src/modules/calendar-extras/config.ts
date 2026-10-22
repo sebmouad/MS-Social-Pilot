@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { entry } from '@/lib/config/entry';
+import { cron, entry } from '@/lib/config/entry';
 import { copy, copySchema } from './copy';
 import { RULES } from './contracts';
 
@@ -24,7 +24,33 @@ export const policyDefaults: z.infer<typeof policySchema> = {
  feedPath: '/api/calendar-feed/', postsPath: '/publishing/posts', transactionTimeoutMs: 15000, transactionMaxWaitMs: 5000, requestMaxBytes: 65536,
 };
 export type Policy = z.infer<typeof policySchema>;
+
+/** Public-data refresh run by the shared worker. Sources, bounds and hosts are Root-managed; nothing is read from code. */
+export const refreshSchema = z.object({
+ enabled: z.boolean(),
+ holidaysUrl: z.string().url().max(500), trendsUrl: z.string().url().max(500),
+ hostAllowlist: z.array(z.string().min(1).max(253)).min(1).max(20),
+ holidayCountryYearsPerRun: z.number().int().min(1).max(200), holidayRefreshDays: z.number().int().min(1).max(730), holidayYearsAhead: z.number().int().min(0).max(5),
+ trendCountriesPerRun: z.number().int().min(1).max(200), trendRefreshMinutes: z.number().int().min(5).max(10080),
+ maxHolidaysPerCountryYear: z.number().int().min(1).max(1000), maxTrendsPerCountry: z.number().int().min(1).max(500),
+ holidayNameLength: z.number().int().min(1).max(500), trendTitleLength: z.number().int().min(1).max(500), trendTrafficLength: z.number().int().min(1).max(100), trendNewsUrlLength: z.number().int().min(10).max(2000),
+ fetchTimeoutMs: z.number().int().min(1000).max(60000), fetchMaxBytes: z.number().int().min(1024).max(10485760), fetchMaxRedirects: z.number().int().min(0).max(5),
+ retainedCountries: z.number().int().min(1).max(500),
+}).strict();
+export const refreshDefaults: z.infer<typeof refreshSchema> = {
+ enabled: true, holidaysUrl: 'https://date.nager.at/api/v3/PublicHolidays', trendsUrl: 'https://trends.google.com/trending/rss',
+ hostAllowlist: ['date.nager.at', 'trends.google.com'],
+ holidayCountryYearsPerRun: 12, holidayRefreshDays: 90, holidayYearsAhead: 1,
+ trendCountriesPerRun: 20, trendRefreshMinutes: 180,
+ maxHolidaysPerCountryYear: 100, maxTrendsPerCountry: 50,
+ holidayNameLength: 200, trendTitleLength: 200, trendTrafficLength: 40, trendNewsUrlLength: 1000,
+ fetchTimeoutMs: 15000, fetchMaxBytes: 1048576, fetchMaxRedirects: 2, retainedCountries: 250,
+};
+export type Refresh = z.infer<typeof refreshSchema>;
 export const CALENDAR_EXTRAS_CONFIG = [
  entry({ key: 'calendarExtras.policy', group: 'Calendar extras', label: 'Calendar and subscription policy', description: 'Validated bounds, seasonal choices, note colors, feed window, paths and transaction policy.', kind: 'json', defaultValue: policyDefaults, schema: policySchema, consumption: 'active' }),
+ entry({ key: 'calendarExtras.refresh', group: 'Calendar extras', label: 'Holiday and trend refresh', description: 'Switch, public data sources, allowed hosts, batch sizes, refresh ages, size limits and fetch bounds for the background holiday and trend jobs.', kind: 'json', defaultValue: refreshDefaults, schema: refreshSchema, consumption: 'active' }),
+ entry({ key: 'calendarExtras.holidaysSchedule', group: 'Calendar extras', label: 'Holiday refresh schedule', description: 'Five-field cron schedule on which the worker fetches missing public holidays for audience countries.', kind: 'text', defaultValue: '17 4 * * *', schema: cron, consumption: 'active' }),
+ entry({ key: 'calendarExtras.trendsSchedule', group: 'Calendar extras', label: 'Trend refresh schedule', description: 'Five-field cron schedule on which the worker fetches trending topics for audience countries.', kind: 'text', defaultValue: '7 */3 * * *', schema: cron, consumption: 'active' }),
  entry({ key: 'calendarExtras.customerCopy', group: 'Calendar extras', label: 'Calendar customer copy', description: 'English and French screen labels, feedback and safe service failures.', kind: 'json', defaultValue: copy, schema: copySchema, consumption: 'active' }),
 ] as const;

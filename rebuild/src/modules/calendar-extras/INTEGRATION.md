@@ -1,5 +1,7 @@
 # Calendar extras lane handoff
 
+> **Installed 2026-10-22 (source).** Every item under "Required edits outside the owned directory" is done: config/MCP registered, pages, API and ICS routes, sidebar links, board marks, queue season hook (`server/queue-seasons.ts`), Analytics chart notes (`server/chart-notes.ts`), tests moved to `rebuild/tests/calendar-extras*.test.ts`, MCP_PARITY rows, and the `calendarHolidays`/`calendarTrends` jobs (`server/refresh.ts`). The text below is the original lane handoff; where it says "pending/not installed" the installation record in ARCHITECTURE.md supersedes it.
+
 This directory is authored implementation, **not an installed or released feature**.
 Only `rebuild/src/modules/calendar-extras/**` was editable in this lane. No app
 routes, installed hosts, shared charts, queue allocator, docs outside this directory,

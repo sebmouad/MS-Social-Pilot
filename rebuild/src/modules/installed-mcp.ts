@@ -16,6 +16,7 @@ import { FEEDS_MCP } from './feeds/mcp';
 import { INTEGRATIONS_MCP } from './integrations/mcp';
 import { HOME_MCP } from './home/mcp';
 import { HISTORY_MCP } from './history/mcp';
+import { CALENDAR_EXTRAS_MCP } from './calendar-extras/mcp';
 
 /**
  * MCP tool groups of every installed product module, in listing order. A module adds tools,
@@ -23,5 +24,5 @@ import { HISTORY_MCP } from './history/mcp';
  * when a module is installed.
  */
 export function installedMcpGroups(): readonly McpToolGroup[] {
-  return [...HOME_MCP, ...ADS_MCP, ...TASKS_MCP, ...SHARING_MCP, ...ANALYTICS_MCP, ...SETTINGS_MCP, ...PUBLISHING_MCP, ...ASYNC_POST_EXPORT_MCP, ...ASYNC_POST_EXPORT_READ_MCP, ...INBOX_MCP, ...MEDIA_MCP, ...FEEDS_MCP, ...AI_MCP, AI_CONTENT_TOOLS_MCP, ...CAPTION_TESTS_MCP, ...AGENTS_MCP, ...INTEGRATIONS_MCP, ...HISTORY_MCP];
+  return [...HOME_MCP, ...ADS_MCP, ...TASKS_MCP, ...SHARING_MCP, ...ANALYTICS_MCP, ...SETTINGS_MCP, ...PUBLISHING_MCP, ...ASYNC_POST_EXPORT_MCP, ...ASYNC_POST_EXPORT_READ_MCP, ...INBOX_MCP, ...MEDIA_MCP, ...FEEDS_MCP, ...AI_MCP, AI_CONTENT_TOOLS_MCP, ...CAPTION_TESTS_MCP, ...AGENTS_MCP, ...INTEGRATIONS_MCP, ...HISTORY_MCP, ...CALENDAR_EXTRAS_MCP];
 }

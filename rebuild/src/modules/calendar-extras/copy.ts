@@ -22,7 +22,7 @@ export const copy = {
   updated: 'Last used', never: 'Not yet', holidays: 'Public holidays', searches: 'Recent searches', source: 'Stored data', unknown: 'Not available',
   keywords: 'Topic keywords (comma separated)', keywordsHint: 'An empty list shows every stored topic. These keywords are shared with your workspace.',
   showAll: 'Show all topics', fresh: 'Fetched', country: 'Country', trendEmpty: 'No recent topics stored for this audience.',
-  noCoverage: 'No holiday coverage stored for', seasonNotice: 'Automatic seasonal scheduling is not available yet. You can save seasons for planning; existing scheduled posts stay unchanged.',
+  noCoverage: 'No holiday coverage stored for', seasonNotice: 'Seasons shape the times offered to new queued posts. Posts that are already scheduled stay exactly where they are.',
   notesCaption: 'Dated notes for this chart', global: 'Workspace-wide', feedInvalid: 'This calendar subscription is unavailable.',
  },
  fr: {
@@ -47,7 +47,7 @@ export const copy = {
   updated: 'Dernière utilisation', never: 'Pas encore', holidays: 'Jours fériés', searches: 'Recherches récentes', source: 'Données enregistrées', unknown: 'Indisponible',
   keywords: 'Mots-clés des sujets (séparés par des virgules)', keywordsHint: 'Une liste vide affiche tous les sujets enregistrés. Ces mots-clés sont partagés dans votre espace.',
   showAll: 'Afficher tous les sujets', fresh: 'Récupéré le', country: 'Pays', trendEmpty: 'Aucun sujet récent enregistré pour cette audience.',
-  noCoverage: 'Aucune couverture des jours fériés enregistrée pour', seasonNotice: 'La programmation saisonnière automatique n’est pas encore disponible. Vous pouvez enregistrer les saisons pour préparer votre calendrier ; les publications déjà programmées restent inchangées.',
+  noCoverage: 'Aucune couverture des jours fériés enregistrée pour', seasonNotice: 'Les saisons modifient les horaires proposés aux nouvelles publications mises en file. Les publications déjà programmées ne bougent pas.',
   notesCaption: 'Notes datées de ce graphique', global: 'Tout l’espace', feedInvalid: 'Cet abonnement au calendrier est indisponible.',
  }
 };

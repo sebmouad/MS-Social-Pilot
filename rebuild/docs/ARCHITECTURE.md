@@ -339,6 +339,16 @@ Source-level; mocked service/route/MCP tests only, no browser, PostgreSQL or pro
 - `GET /api/health` (`server/health.ts`): the database decides the verdict, worker state is information.
 - `src/server/errors/`: self-hosted recorder feeding `error_events` (Next `onRequestError`, error boundary, `window` listeners via `/api/errors`), scrubbed and grouped, bounded by Root keys `errors.*`. Open: worker-side recording, `system_alerts` and uptime writers.
 
+## Calendar extras install (2026-10-22)
+
+Key dates, seasons, personal calendar subscriptions, chart notes and holidays/trends are a Publishing feature in `src/modules/calendar-extras/` (`INTEGRATION.md` there lists the owned files). Installed at source: its two config entries plus `calendarExtras.refresh`, `calendarExtras.holidaysSchedule` and `calendarExtras.trendsSchedule` (spread in `installed-config.ts`; schema version not bumped here), fifteen MCP tools (`installed-mcp.ts`; MCP_PARITY rows), thin pages `/publishing/calendar/{dates,seasons,feeds,trends}` and `/analytics/notes`, API routes `/api/key-dates`, `/api/seasons`, `/api/calendar-feeds`, `/api/chart-notes`, `/api/calendar/trends` (+ `[id]`) and the bearer ICS read `/api/calendar-feed/[token]`.
+
+- **Board marks:** `CalendarScreen` loads key dates for the visible range through `loadBoardMilestones` (same scoped service, follows pages, refuses incomplete sets) and the board shows them in month, week and phone agenda. Sidebar links to the four calendar screens come from `calendarExtrasLinks` with Root-managed labels; Analytics links to Chart notes.
+- **Chart notes:** `loadChartAnnotations` feeds `NotesTimeSeriesChart` on the Analytics overview metric cards and the Explorer detail chart; a refusal or over-limit set leaves charts unmarked.
+- **Queue seasons:** `allocateQueueTime` and the content-mix planner read the workspace's overlapping `seasonal_modes` inside their transaction (`queueSeasons`) and pass a per-day `adjustDay` (pause/shift/fewer/more) to `nextAvailableSlot`. Only new queue times are shaped; scheduled posts never move.
+- **Refresh jobs:** Publishing-declared `calendarHolidays` and `calendarTrends` (worker branch in `scripts/worker.ts`, code in `server/refresh.ts`) fetch Nager.Date holidays and Google Trends RSS for audience countries through the shared SSRF-guarded `guardedFetch`. URLs, allowed hosts, batch sizes, ages, size/time limits and the master switch are Root-managed.
+- **Evidence:** mocked unit/DOM tests (`tests/calendar-extras*.test.ts`, parity 22/22, config validation). No PostgreSQL run of the retained-table SQL, no live Nager/Google fetch, no browser/theme/phone check, no real calendar client, no authenticated MCP client run. Data-control catalog rows for the retained tables still need integration-owner review.
+
 ## Verification and continuation
 
 [BROWSER_MATRIX_2026-10-21.md](BROWSER_MATRIX_2026-10-21.md) records real Chromium

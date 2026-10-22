@@ -30,6 +30,10 @@ const dependencies: WorkerDependencies = {
       const { formatFeedPollSummary, runFeedPolling } = await import('@/modules/feeds/server/polling');
       return formatFeedPollSummary(await runFeedPolling());
     }
+    if (job === 'calendarHolidays' || job === 'calendarTrends') {
+      const { formatRefreshSummary, refreshHolidays, refreshTrends } = await import('@/modules/calendar-extras/server/refresh');
+      return formatRefreshSummary(await (job === 'calendarHolidays' ? refreshHolidays({ now }) : refreshTrends({ now })));
+    }
     if (job === 'workspaceExports') {
       const { runWorkspaceExports } = await import('../src/modules/settings/server/exports');
       return runWorkspaceExports();

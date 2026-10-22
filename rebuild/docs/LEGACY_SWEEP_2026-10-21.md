@@ -30,7 +30,7 @@ Lane: legacy sweep reconcile (docs only). Evidence kind: **static source search 
 | `error_events` / `system_alerts` writers, `/api/errors` client reporter, `ErrorReporter`, alert test (gap 3) | missing | only `src/server/root/legacy/backups.ts` and `src/modules/root/server/errors.ts` reference the tables (readers) |
 | `/privacy-policy`, `/terms`, `/help`, `/pricing`, `/changelog`, `/status`, `operator.*`, `site.public` (gap 2 rest) | missing | `src/app` has only `data-deletion` among the legacy public pages |
 | Root changelog (`root/changelog`, `api/root/changelog*`, `ChangelogEntry`), Root client invitations, Root alerts test, `root/meta/usage` (`graph_usage`) | missing | `src/app/api/root` has no `changelog`, `client-invitations`, `alerts`; no table reference to `changelog_entries`, `client_invitations`, `graph_usage` |
-| Caption tests, chart notes, key dates, seasons, holidays, trends, ICS calendar feeds, chat channels (Slack/Telegram), spam check, engagement outlook, link preview, structured data, translated posts, AI image/video/voice, `api_tokens` | missing | no reference to `caption_tests`, `chart_notes`, `key_dates`, `seasonal_modes`, `public_holidays`, `calendar_feeds`, `chat_channels`, `ai_videos`, `api_tokens` in `rebuild/src` except the data-control README keep-list; no route for them in `src/app/api` |
+| Caption tests, chat channels (Slack/Telegram), spam check, engagement outlook, link preview, structured data, translated posts, AI image/video/voice, `api_tokens` | missing | no reference to `caption_tests`, `chart_notes`, `key_dates`, `seasonal_modes`, `public_holidays`, `calendar_feeds`, `chat_channels`, `ai_videos`, `api_tokens` in `rebuild/src` except the data-control README keep-list; no route for them in `src/app/api` |
 | Nine other network connectors | missing | `PLATFORM_MODULES` lists Facebook and Instagram only |
 | Host backup scripts, root `prisma/migrations`, `prod-deploy.sh` dependencies (gaps 4, 5) | open | `rebuild/scripts` has no `server/` directory; root `scripts/server/*` unchanged |
 | Legacy config import beyond Facebook/AI/auth/app URL (gap 9), OAuth client re-registration (gap 10) | open | `rebuild/scripts/import-legacy-config.ts` unchanged scope |
@@ -46,7 +46,7 @@ Source: `src/lib/scheduler/jobs.ts`, `src/middleware.ts`, `src/components/*`, `s
 | Scheduled AI agent runs (`aiAgents` job, `runDueAgents`) | `lib/ai-agents.ts` | Done: `scheduledAgents` worker (`agents/server/scheduled.ts`, hourly) claims due agents (workspace-timezone weekday + `lastRunOn`), writes drafts as the creator with hourly AI metering, never scheduling/publishing; AI failure frees the day. CRUD + run-now with exact confirmations, /agents section, REST `/api/agents/scheduled`, MCP `list_scheduled_agents`/`manage_scheduled_agent` | done (`tests/scheduled-agents.test.ts`; new keys `agents.scheduledRuns*`; provider evidence with AI lane) |
 | AI video polling (`aiVideos`), AI voice, AI image | `lib/ai-video.ts`, `ai-voice.ts`, `ai-image.ts`, `components/AiVideoPanel.tsx`, `AiVoicePanel.tsx` | none (already in section 3, repeated here for the job) | missing |
 | Caption-test evaluation job (`captionTests`) | `lib/caption-test.ts` | none | missing |
-| Holiday and trend refresh jobs (`holidays`, `trends`), `TrendKeywords` | `lib/holidays.ts`, `lib/trends.ts` | none | missing |
+| Holiday and trend refresh jobs (`holidays`, `trends`), `TrendKeywords` | `lib/holidays.ts`, `lib/trends.ts` | `calendarHolidays` / `calendarTrends` worker jobs (`scripts/worker.ts`, `modules/calendar-extras/server/refresh.ts`), Root `calendarExtras.refresh` + two schedule keys; keywords via `change_calendar_trends` | **done at source** (mocked fetch/DB tests `tests/calendar-extras-refresh.test.ts`; no live Nager/Google fetch, no PostgreSQL run) |
 | Alert evaluation job (`alerts`: publish failures, disk, uptime) and uptime days | `lib/system-alerts.ts`, `lib/uptime.ts` | no writer; Telegram/disk alerts absent (section 6) | missing |
 | Negative-comment spike watcher (`negativeComments`) | `lib/negative-comments.ts`, `negativeSpikeEmail` | `negativeSpike` notification event + sentiment input | done at source (`modules/inbox/server/notification-events.ts`, `settings/notifications/server.ts`) |
 | Inbox digest, queue-empty and token-expiry notifications | `email/notify.ts` | notification catalog, `connection-alerts.ts`, queue-empty in `settings/notifications/server.ts` | done at source (mail delivery unproven) |
@@ -96,8 +96,8 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `(app)/analytics/tests` | `app/analytics/tests/page.tsx` → `modules/caption-tests/ui/CaptionTestsPage.tsx` | done (2026-10-22: results, winner, start form, learn; `tests/caption-tests-service.test.ts`, `tests/ai-content-tools-ui.test.ts`; browser/live provider unverified) |
 | `(app)/approvals` | `publishing/approvals` | done |
 | `(app)/calendar` | `publishing/calendar` | done |
-| `(app)/calendar/dates` | none | missing (key dates) |
-| `(app)/calendar/trends` | none | missing (holidays/trends) |
+| `(app)/calendar/dates` | `publishing/calendar/dates` | done at source (route + service/UI tests; board marks on the calendar) |
+| `(app)/calendar/trends` | `publishing/calendar/trends` (+ `/seasons`, `/feeds`) | done at source (stored data; refresh jobs above) |
 | `(app)/compose`, `compose/import` | `publishing/compose` + `api/publishing/posts/import` | done |
 | `(app)/connections` | `settings/connections` | done |
 | `(app)/dashboard` | `home` | done |
@@ -183,7 +183,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/auth/password-reset`, `confirm` | `api/auth/recovery/request`, `reset` | done |
 | `api/auth/two-step/*` | `api/auth/two-step/*`, `api/settings/account/security/*` | done (trusted-devices `devices` route: partial) |
 | `api/bio` | `api/sharing/bio` | done |
-| `api/calendar-feed/[token]`, `calendar-feeds`, `[id]` | none | missing (ICS) |
+| `api/calendar-feed/[token]`, `calendar-feeds`, `[id]` | same paths | done at source (token ICS, revocable; parity exception row for the bearer read; no real calendar-client run) |
 | `api/caption-tests/[id]/learn` | `api/caption-tests/[id]/learn` → `modules/caption-tests/server/service.ts` `learnCaptionTest`; MCP `learn_from_caption_test` | done (2026-10-22: appends the winner to the workspace voice, not per-channel voice; `tests/caption-tests-service.test.ts`) |
 | `api/chart-notes`, `[id]` | none | missing |
 | `api/chat-channels`, `[id]`, `[id]/test` | none | missing (Slack/Telegram) |
@@ -199,7 +199,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/feeds`, `[id]` | `api/feeds/*` (+ WordPress) | done |
 | `api/health` | `api/health` | done (source + mocked tests): `src/app/api/health/route.ts`, `modules/history/server/health.ts`; scripts still probe `/sign-in` and legacy health until the release owner rewires them |
 | `api/instagram` | `platforms/instagram` discovery only | partial |
-| `api/key-dates`, `seasons` (+ `[id]`) | none | missing |
+| `api/key-dates`, `seasons` (+ `[id]`) | `api/key-dates`, `api/seasons` (+ `[id]`), `api/chart-notes`, `api/calendar/trends` | done at source; MCP_PARITY rows `*_calendar_*` |
 | `api/labels`, `[id]` | `api/publishing/labels/*` | done |
 | `api/link-preview` | `api/publishing/link-preview` → `modules/ai/content-tools/server/checks.ts` `linkPreview`; MCP `get_link_preview` | done (2026-10-22: neutral SSRF-guarded HTML fetch under Root `ai.linkPreviewPolicy`; the legacy Facebook re-scrape `refresh` option is not carried: it belongs to a Facebook-module hook; `tests/ai-composer-checks.test.ts`) |
 | `api/mcp` | `api/mcp` | done |
@@ -252,10 +252,12 @@ Rebuild evidence paths under `rebuild/src/`.
 | `analytics*`, `audience*`, `aggregate`, `channel-figures*`, `page-analysis*`, `network-analytics`, `network-rules`, `pinned-metrics`, `page-goals`, `goals`, `label-report`, `link-analytics`, `reports`, `report-*`, `analytics-export`, `ads-analysis` | `modules/analytics/**`, `modules/ads/**` | done / partial |
 | `engagement-prediction`, `engagement-outlook` | `modules/ai/content-tools/pure.ts` `predictEngagement`, `server/checks.ts` | done (2026-10-22) |
 | `caption-test` | `modules/caption-tests/{pure.ts,server/service.ts}` | done (2026-10-22; composer A/B creation still belongs to Publishing, tests start from existing posts) |
-| `engagement`, `chart-notes`, `chart-note-colors` | none | missing |
-| `key-dates*`, `seasons`, `holidays`, `trends` | none | missing |
-| `ics`, `calendar-feeds`, `calendar-days` | `lib/calendar-dates.ts` only | missing (feeds); calendar days done |
+| `engagement` | none | missing |
+| `chart-notes`, `chart-note-colors` | `modules/calendar-extras` (notes service, `/analytics/notes`, chart marks) | done at source |
+| `key-dates*`, `seasons`, `holidays`, `trends` | `modules/calendar-extras` (+ queue allocator season hook in `executors.ts`) | done at source |
+| `ics`, `calendar-feeds`, `calendar-days` | `modules/calendar-extras/server/{ics,subscriptions}.ts`, `lib/calendar-dates.ts` | done at source |
 | `spam-guard` | `modules/ai/content-tools/pure.ts` `assessSpamRisk`, `server/checks.ts` `spamCheck` | done (2026-10-22) |
+| `chart-notes`, `chart-note-colors` | `modules/calendar-extras` (notes service, `/analytics/notes`, chart marks in Analytics overview and Explorer) | done at source |
 | `ai`, `ai-providers`, `ai-models`, `ai-prices`, `ai-agents` | `modules/ai/**` (providers/models/limits); prices/monthly budget now in `modules/ai/server/usage.ts` (source); agents none | partial |
 | `ai-image`, `ai-video`, `ai-voice`, `voice-names` | `modules/ai/content-tools/server/{media,media-openai,media-gemini,media-ports}.ts`; voice names are the Root `ai.voicePolicy.voices` list | done (2026-10-22) |
 | `text-backgrounds`, `alt-text`, `translation`, `translated-posts` | `modules/ai` translate kind only | missing / partial |

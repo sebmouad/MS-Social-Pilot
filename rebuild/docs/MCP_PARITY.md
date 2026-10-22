@@ -443,6 +443,21 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | get_agency_overview | agency/overview | read | GET /api/agency | Person overview catalog only; REST uses browser identity, MCP uses person identity; neither accepts workspace keys. |
 | list_workspace_activity | settings/history | read | GET /api/settings/history/activity | listWorkspaceActivity; owners/admins only, same filters and paging as Settings › History. |
 | list_workspace_email_log | settings/history | read | GET /api/settings/history/email | listWorkspaceEmails; owners/admins only, same filters, paging and recent-problem count as Settings › History. |
+| get_calendar_dates_options | publishing/calendar | read | GET /api/key-dates | calendarOptions('dates'): authorized channels, Root policy and copy; the Dates screen, REST and MCP share it. Workspace-wide key scope only. |
+| list_calendar_dates | publishing/calendar | read | GET /api/key-dates | listCalendarEntries('dates'); same paging and channel narrowing as the Dates screen and the Publishing calendar board marks. |
+| change_calendar_dates | publishing/calendar | write | POST /api/key-dates; PATCH /api/key-dates/[id]; DELETE /api/key-dates/[id] | changeCalendarEntry('dates'): exact `CALENDAR DATES` create/update/delete confirmation, transaction lock and audit. |
+| get_calendar_seasons_options | publishing/calendar | read | GET /api/seasons | calendarOptions('seasons'); workspace-wide key scope only. |
+| list_calendar_seasons | publishing/calendar | read | GET /api/seasons | listCalendarEntries('seasons'); the queue allocator reads the same table for new queue times. |
+| change_calendar_seasons | publishing/calendar | write | POST /api/seasons; PATCH /api/seasons/[id]; DELETE /api/seasons/[id] | changeCalendarEntry('seasons'): exact `CALENDAR SEASONS` confirmation and audit. Seasons shape only new queue times; scheduled posts are never moved. |
+| get_calendar_feeds_options | publishing/calendar | read | GET /api/calendar-feeds | calendarOptions('feeds'): channels and channel groups for a personal subscription. |
+| list_calendar_feeds | publishing/calendar | read | GET /api/calendar-feeds | listCalendarEntries('feeds'): the caller's own subscriptions, never the token or its hash. |
+| change_calendar_feeds | publishing/calendar | write | POST /api/calendar-feeds; DELETE /api/calendar-feeds/[id] | changeCalendarEntry('feeds'): create returns the private address once; revoke deletes it. Exact `CALENDAR FEEDS` confirmation and audit without token content. |
+| get_calendar_notes_options | analytics/overview | read | GET /api/chart-notes | calendarOptions('notes'): authorized channels, colors and copy. |
+| list_calendar_notes | analytics/overview | read | GET /api/chart-notes | listCalendarEntries('notes'); the same scoped notes annotate Analytics charts. |
+| change_calendar_notes | analytics/overview | write | POST /api/chart-notes; PATCH /api/chart-notes/[id]; DELETE /api/chart-notes/[id] | changeCalendarEntry('notes'): exact `CALENDAR NOTES` confirmation and audit. |
+| get_calendar_trends_options | publishing/calendar | read | GET /api/calendar/trends | calendarOptions('trends'): audience-country channels and copy. |
+| list_calendar_trends | publishing/calendar | read | GET /api/calendar/trends | readTrends over stored holidays and recent searches with per-country coverage and freshness; refreshed by the `calendarHolidays` and `calendarTrends` worker jobs. |
+| change_calendar_trends | publishing/calendar | write | POST /api/calendar/trends | changeCalendarEntry('trends'): workspace trend keywords only; exact `UPDATE CALENDAR TRENDS` confirmation and audit. |
 <!-- parity-tools:end -->
 
 The next table records additional REST entry points for the same named tools.
@@ -547,6 +562,7 @@ excepted.
 | REST method/path | Reason |
 | --- | --- |
 | GET /api/auth/register | Public registration availability for account bootstrap; not authenticated customer workspace data. |
+| GET /api/calendar-feed/[token] | Read-only bearer calendar subscription (text/calendar) fetched by external calendar apps; the token is the credential and the creator's current plan, grants and channel selection are rechecked on every read. Subscriptions are created and revoked through mapped `change_calendar_feeds`. |
 | GET /api/connections/[platform]/callback | Provider consent callback validates browser OAuth state; autonomous tools initiate consent through mapped start_connection. |
 | GET /api/health | Unauthenticated liveness/readiness probe for proxies and deploy scripts; returns only a status code and worker state, no workspace data. Operators read the same facts through get_root_operations. |
 | GET /api/mcp | MCP HTTP transport negotiation/unsupported-stream response, not a product capability. |
@@ -582,7 +598,6 @@ alias waives the target's service-owned authorization or UI verification.
 <!-- parity-feature-aliases:start -->
 | Manifest feature | Covered feature | Reason |
 | --- | --- | --- |
-| publishing/calendar | publishing/posts | Calendar presents the post directory and scheduling operations; no independent calendar operation is declared. |
 | ads/overview | ads/campaigns | Account overview presents the same account/performance reads declared under ads/campaigns by MCP. |
 <!-- parity-feature-aliases:end -->
 

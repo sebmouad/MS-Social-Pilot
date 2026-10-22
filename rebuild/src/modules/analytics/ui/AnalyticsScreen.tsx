@@ -19,6 +19,8 @@ import { readAnalytics } from '@/modules/analytics/server/read';
 import type { AnalyticsReadResult } from '@/modules/analytics/server/types';
 import { Button } from '@/components/Button';
 import AnalyticsMetric, { AnalyticsMetricComparison } from './AnalyticsMetric';
+import { loadChartAnnotations } from '@/modules/calendar-extras/server/chart-notes';
+import { calendarExtrasLinks, type CalendarExtrasLink } from '@/modules/calendar-extras/server/links';
 import './analytics.css';
 
 type Search = Record<string, string | string[] | undefined>;
@@ -70,7 +72,7 @@ function Pagination({ query, parameter, page, pages, label, copy }: { copy: Over
   </nav>;
 }
 
-function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHref, profiles, locale, copy }: { copy: OverviewCopy; profiles?: ProfileDirectory; locale: 'en' | 'fr'; data: AnalyticsReadResult; query: string; exportHref?: string; connectionsHref?: string; explorerHref?: string }) {
+function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHref, notesLink, profiles, locale, copy }: { notesLink?: CalendarExtrasLink; copy: OverviewCopy; profiles?: ProfileDirectory; locale: 'en' | 'fr'; data: AnalyticsReadResult; query: string; exportHref?: string; connectionsHref?: string; explorerHref?: string }) {
   const t = overviewText(copy);
   const params = new URLSearchParams(query);
   const comparison = data.period.comparison?.mode ?? 'none';
@@ -119,6 +121,7 @@ function AnalyticsSidebar({ data, query, exportHref, connectionsHref, explorerHr
       </>}
       {exportHref && <><a className="analytics-sidebar-export" href={exportHref}>{t("Export CSV")}</a><p className="analytics-export-note">{t("Exports include up to {limit} data rows. Larger downloads are marked as truncated.", { limit: data.exportRowLimit })}</p></>}
       {explorerHref && <a className="analytics-sidebar-export" href={explorerHref}>{t("Explore metric sources and types")}</a>}
+      {notesLink && <a className="analytics-sidebar-export" href={notesLink.href}>{notesLink.label}</a>}
       {connectionsHref && <a className="analytics-sidebar-export" href={connectionsHref}>{t("View connections")}</a>}
       {!data.metrics.total && <p className="small-note">{t("No metrics match these filters.")}</p>}
     </div>
@@ -203,6 +206,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     failure = operationFailure(error, t("Analytics could not be loaded. Try again or reset the filters."));
   }
 
+  // Chart notes use the same scoped service as the Notes screen; a refusal or failure just leaves the charts unmarked.
+  const [annotations, [notesLink]] = await Promise.all([
+    data && data.selected.channelIds.length ? loadChartAnnotations({ userId: viewer.user.id, workspaceId: viewer.workspaceId, locale }, data.period.start, data.period.end, data.selected.channelIds) : null,
+    calendarExtrasLinks(locale, ['notes']),
+  ]);
   const canExport = data !== null && data.selected.channelIds.length > 0
     && canUseFeature(viewer.entitlements, 'analytics/reports') && canAccessFeature(viewer.permissions, 'analytics/reports');
   const canManageConnections = canUseFeature(viewer.entitlements, 'settings/connections') && canAccessFeature(viewer.permissions, 'settings/connections');
@@ -216,7 +224,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const retryQuery = rawQuery(params);
   const retryHref = `/analytics${retryQuery ? `?${retryQuery}` : ''}`;
 
-  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar copy={copy} profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} connectionsHref={!data.options.channels.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar copy={copy} retryHref={retryHref} /> : undefined}>
+  return <PageFrame module="analytics" scopedAccess sidebar={data ? <AnalyticsSidebar copy={copy} profiles={profiles} locale={locale} data={data} query={data.query} exportHref={exportHref} explorerHref={explorerHref} notesLink={notesLink} connectionsHref={!data.options.channels.length ? connectionsHref : undefined} /> : failure ? <AnalyticsRecoverySidebar copy={copy} retryHref={retryHref} /> : undefined}>
     <div className="page-stack">
       <PageHeader module="analytics" title={t("Performance")} />
         {data && <ul className="analytics-period" aria-label={t("Report filters")}>
@@ -244,7 +252,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         </section>}
         {data.detail ? <MetricTable copy={copy} locale={locale} data={data} /> : data.metrics.items.length ? <section className="panel">
           <div className="analytics-panel-title"><div><h2>{t("Available metrics")}</h2><p className="small-note">{t("Stored measurements for the selected resources and range. Use the sidebar to open a metric's full series and resource detail.")}</p></div><span className="badge">{t("{count} metrics", { count: data.metrics.total })}</span></div>
-          <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric copy={copy} key={`${metric.sourceLabel}:${metric.key}`} locale={locale} metric={metric} comparison={data.comparisons[metric.key]} previousPoints={data.previousPoints[metric.key]} chartPoints={data.chartPoints} />)}</div>
+          <div className="analytics-metrics">{data.metrics.items.map(metric => <AnalyticsMetric annotations={annotations} copy={copy} key={`${metric.sourceLabel}:${metric.key}`} locale={locale} metric={metric} comparison={data.comparisons[metric.key]} previousPoints={data.previousPoints[metric.key]} chartPoints={data.chartPoints} />)}</div>
         </section> : data.selected.channelIds.length
           ? <EmptyState title={t("No metrics match these filters")} icon={<IconChartBar />} action={<a href="/analytics">{t("Reset filters")}</a>}>{t("Change the date range, metric search, or resource selection in the sidebar.")}</EmptyState>
           : null}

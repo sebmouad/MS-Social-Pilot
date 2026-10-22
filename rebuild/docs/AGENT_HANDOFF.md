@@ -74,6 +74,10 @@ The full contract remains active and incomplete.
   Instagram, Groups, AI-agent and async-CSV gaps above explicit; integrator must
   supply the report and reconcile every additional row without reducing scope.
 
+## Calendar extras install (2026-10-22, source only)
+
+The `calendar-extras` module is installed (config, MCP, pages, API and ICS routes, sidebar links, board marks, queue season hook, Analytics chart notes, refresh jobs); see ARCHITECTURE.md "Calendar extras install". The integrator must bump `CONFIG_SCHEMA_VERSION` for the new Root keys `calendarExtras.policy`, `calendarExtras.customerCopy`, `calendarExtras.refresh`, `calendarExtras.holidaysSchedule`, `calendarExtras.trendsSchedule`. Still open: PostgreSQL execution of the retained-table SQL, live holiday/trend fetch, browser design/FR/keyboard passes, real calendar client, authenticated MCP client run, data-control rows for retained tables, and public-route throttling/log redaction for `/api/calendar-feed/[token]` at the proxy.
+
 ## Required context
 
 Read ARCHITECTURE_CONTRACT.md, ARCHITECTURE.md and GOAL.md; follow DELIVERY_PLAN.md,

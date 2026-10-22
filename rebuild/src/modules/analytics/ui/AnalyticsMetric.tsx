@@ -1,6 +1,8 @@
 import { overviewCopyDefaults, overviewText, type OverviewCopy } from '../overview-copy';
 import { MetricCard, type MetricDelta } from '@/components/MetricCard';
 import { TimeSeriesChart, DonutChart, BarChart } from '@/components/charts';
+import { NotesTimeSeriesChart } from '@/modules/calendar-extras/ui/NotesTimeSeriesChart';
+import type { ChartAnnotations } from '@/modules/calendar-extras/server/chart-notes';
 import { IconChartLine } from '@tabler/icons-react';
 import { previousSeries, type DatedValues } from './series';
 import type { MetricView } from '@/modules/analytics/server/aggregate';
@@ -36,16 +38,17 @@ export function AnalyticsMetricComparison({ metric, comparison, copy = overviewC
   return <p className="analytics-metric__comparison">{t("Previous period: {previous}. Change: {change}{relative}.", { previous, change, relative })}</p>;
 }
 
-function SeriesPreview({ metric, chartPoints, previousPoints, locale, copy }: { copy: OverviewCopy; metric: MetricView; chartPoints: number; previousPoints?: DatedValues; locale: 'en' | 'fr' }) {
+function SeriesPreview({ metric, chartPoints, previousPoints, locale, copy, annotations }: { annotations?: ChartAnnotations | null; copy: OverviewCopy; metric: MetricView; chartPoints: number; previousPoints?: DatedValues; locale: 'en' | 'fr' }) {
   const t = overviewText(copy);
   const points = metric.points.slice(-chartPoints);
   const comparison = previousSeries(points, previousPoints, metric.unit);
   if (metric.kind === 'breakdown' && metric.rows.length) return <DonutChart label={metric.label} slices={metric.rows.map(row => ({ name: row.label, value: row.value }))} />;
   if (!points.length && metric.rows.length) return <BarChart label={metric.label} orientation="horizontal" categories={metric.rows.map(row => row.label)} series={[{ id: metric.key, name: metric.label, values: metric.rows.map(row => row.value) }]} />;
   if (!points.length) return <p className="analytics-series-note">{t("No dated series is stored for this metric.")}</p>;
+  const chart = { locale, label: metric.label, format: metric.unit === 'percent' ? { style: 'percent' as const } : undefined, series: [{ id: metric.key, name: metric.label,
+    points: points.map(point => ({ t: point.date, v: Number.isFinite(point.value) ? (metric.unit === 'percent' ? point.value / 100 : point.value) : null })), ...(comparison ? { comparison } : {}) }] };
   return <div className="analytics-series-preview">
-    <TimeSeriesChart locale={locale} label={metric.label} format={metric.unit === 'percent' ? { style: 'percent' } : undefined} series={[{ id: metric.key, name: metric.label,
-      points: points.map(point => ({ t: point.date, v: Number.isFinite(point.value) ? (metric.unit === 'percent' ? point.value / 100 : point.value) : null })), ...(comparison ? { comparison } : {}) }]} />
+    {annotations ? <NotesTimeSeriesChart {...chart} notes={annotations.notes} noteColors={annotations.noteColors} copy={annotations.copy} /> : <TimeSeriesChart {...chart} />}
     <p>{t("Latest {shown} of {total} stored dates shown. Open this metric in the sidebar's Metric detail selector for the full series and resource values.", { shown: points.length, total: metric.points.length })}</p>
   </div>;
 }
@@ -62,7 +65,7 @@ export function metricDelta(metric: MetricView, comparison: AnalyticsComparisonV
   return { label: ratio ? t("{value} pts", { value: number }) : `${number}%`, direction, comparedTo: t("vs previous period") };
 }
 
-export default function AnalyticsMetric({ metric, comparison, chartPoints, previousPoints, locale = 'en', copy = overviewCopyDefaults[locale] }: { copy?: OverviewCopy; metric: MetricView; comparison?: AnalyticsComparisonValue; chartPoints: number; previousPoints?: DatedValues; locale?: 'en' | 'fr' }) {
+export default function AnalyticsMetric({ metric, comparison, chartPoints, previousPoints, locale = 'en', copy = overviewCopyDefaults[locale], annotations }: { annotations?: ChartAnnotations | null; copy?: OverviewCopy; metric: MetricView; comparison?: AnalyticsComparisonValue; chartPoints: number; previousPoints?: DatedValues; locale?: 'en' | 'fr' }) {
   const t = overviewText(copy);
   const value = metric.displayTotal ?? (metric.total === null ? t("No aggregate value") : formatValue(metric.total, metric.unit, locale));
   const detailLabel = metric.resourceKind === 'ad-account' ? t("ad accounts") : t("channels");
@@ -78,7 +81,7 @@ export default function AnalyticsMetric({ metric, comparison, chartPoints, previ
       {metric.latestAt && <p>{t("Latest data {date}", { date: new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.latestAt) })}</p>}
       {metric.updatedAt && <p>{t("Last synced {date}", { date: new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(metric.updatedAt) })}</p>}
     </div></div>
-    <div className="analytics-chart"><SeriesPreview copy={copy} metric={metric} chartPoints={chartPoints} previousPoints={previousPoints} locale={locale} /></div>
+    <div className="analytics-chart"><SeriesPreview annotations={annotations} copy={copy} metric={metric} chartPoints={chartPoints} previousPoints={previousPoints} locale={locale} /></div>
     {metric.coverage < metric.available && <p className="analytics-coverage">{t("Values are available for {covered} of {available} selected {resources}. Missing values are unknown, not zero.", { covered: metric.coverage, available: metric.available, resources: detailLabel })}</p>}
     <AnalyticsMetricComparison locale={locale} copy={copy} metric={metric} comparison={comparison} />
   </article>;

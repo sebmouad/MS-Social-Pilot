@@ -13,6 +13,7 @@ import { loadWorkspaceOperations } from "@/modules/settings/server/workspace-ope
 import { channelBadgeInfo } from "@/lib/channel-badge";
 import { formatPostPreviewTime } from "@/components/PostPreview";
 import { moveCandidates } from "@/lib/reschedule";
+import { loadBoardMilestones } from "@/modules/calendar-extras/server/board";
 import { CalendarBoard } from "./CalendarBoard";
 import { loadPostOrigins, parseOriginFilter } from "../origins/load";
 import { runtimeConfig } from '@/server/config/store';
@@ -92,8 +93,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       },
     }]);
   }
+  const milestones = await loadBoardMilestones({ userId: viewer.user.id, workspaceId: viewer.workspaceId, locale }, keys, channelId);
   const days: BoardDay[] = keys.map(key => ({
     key,
+    milestones: milestones[key],
     label: formatUtc(key, { weekday: "short", day: "numeric" }),
     longLabel: formatUtc(key, { weekday: "long", month: "long", day: "numeric" }),
     inMonth: key.startsWith(selected.key),

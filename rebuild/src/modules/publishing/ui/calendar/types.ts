@@ -37,5 +37,7 @@ export type BoardDay = {
   isPast: boolean;
   /** Server-computed ended state for each local hour, keyed by zero-padded HH:00. */
   slotEndedByHour?: Record<string, boolean>;
+  /** Key dates saved for this day (launches, sales, yearly milestones). */
+  milestones?: Array<{ id: string; title: string }>;
   posts: BoardPost[];
 };

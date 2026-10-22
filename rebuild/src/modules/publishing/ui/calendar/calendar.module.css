@@ -102,3 +102,5 @@
 .empty { border-color: var(--mod, var(--line-strong)); background: var(--mod-soft, transparent); }
 @media (prefers-reduced-motion: reduce) { .post { transition: none; } }
 @media (forced-colors: active) { .post, .day, .slot { border-color: CanvasText; } }
+.milestones { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.milestones li { overflow: hidden; padding: 1px 6px; border-left: 3px solid var(--mod, var(--accent)); border-radius: 4px; background: var(--mod-soft, var(--accent-soft)); color: var(--ink); font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }

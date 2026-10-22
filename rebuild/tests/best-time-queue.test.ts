@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 vi.mock('@/server/data', () => ({ prisma: {} }));
-vi.mock('@/server/config/store', () => ({ runtimeConfig: vi.fn() }));
+import { policyDefaults } from '@/modules/calendar-extras/config';
+import { copy as calendarCopy } from '@/modules/calendar-extras/copy';
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'calendarExtras.policy' ? policyDefaults : key === 'calendarExtras.customerCopy' ? calendarCopy : undefined }));
 import { allocateQueueTime } from '@/modules/publishing/collaboration/server/executors';
 const now = new Date('2026-10-20T00:00:00Z');
 const good = [{ dayOfWeek: 3, hour: 10, minute: 0 }];
@@ -20,6 +22,8 @@ it('sorts ranked hours chronologically and keeps queries tenant/resource-scoped'
   expect(await allocateQueueTime(tx, 'w', 'UTC', ['a'], now, 7, [...good, { ...good[0]!, hour: 8 }])).toEqual(new Date('2026-10-21T08:00:00Z'));
   for (const [sql, ...values] of raw.mock.calls) {
     expect((sql as TemplateStringsArray).join('')).toContain('"workspaceId"');
-    expect(values).toContain('w'); expect(values).toContainEqual(['a']);
+    expect(values).toContain('w');
+    // The seasonal-rule read is workspace-scoped; channel narrowing happens per day in memory.
+    if (!(sql as TemplateStringsArray).join('').includes('seasonal_modes')) expect(values).toContainEqual(['a']);
   }
 });

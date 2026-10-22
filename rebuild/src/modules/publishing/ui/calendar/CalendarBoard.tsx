@@ -64,6 +64,8 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     {post.preview && <button type="button" className={styles.viewButton} aria-haspopup="dialog" aria-label={fillCopy(copy.viewPostLabel, {text:post.text.slice(0,60) || copy.noText})} onClick={() => setPreviewPost(post)}>{copy.viewPost}</button>}
   </div>;
 
+  const milestoneList = (day: BoardDay) => day.milestones?.length
+    ? <ul className={styles.milestones} aria-label={day.longLabel}>{day.milestones.map(item => <li key={item.id} title={item.title}>{item.title}</li>)}</ul> : null;
   const newPostHref = (date: string, time: string) => `/publishing/compose?date=${date}&time=${time}`;
   const rangeIsEmpty = days.every(day => day.posts.length === 0);
   // Week view shows 6 AM to 11 PM, widened to include any hour that holds a post.
@@ -99,6 +101,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
         const dropKey = `d:${day.key}`;
         return <li key={day.key} className={styles.day} data-outside={!day.inMonth || undefined} data-past={day.isPast || undefined} data-today={day.isToday || undefined} data-over={over === dropKey || undefined} {...dropProps(dropKey, day.key, undefined, day.isPast)}>
           <div className={styles.dayHead}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? copy.todaySuffix : "")}>{Number(day.key.slice(8))}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</div>
+          {milestoneList(day)}
           {day.posts.slice(0, 3).map(postCard)}
           {day.posts.length > 3 && <a className={styles.more} href={`/publishing/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length - 3}{copy.more}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
           {canCreate && !day.isPast && <a className={styles.add} href={newPostHref(day.key, defaultScheduleTime)}>{copy.addPost}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}
@@ -106,7 +109,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
       })}</ol>
     </div> : <div className={styles.weekWrap}><div className={styles.week} style={{ gridTemplateColumns: "52px repeat(7, minmax(0, 1fr))" }}>
       <span className={styles.corner} aria-hidden="true" />
-      {days.map(day => <div key={day.key} className={styles.weekHead} data-today={day.isToday || undefined}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? copy.todaySuffix : "")}>{day.label}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</div>)}
+      {days.map(day => <div key={day.key} className={styles.weekHead} data-today={day.isToday || undefined}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? copy.todaySuffix : "")}>{day.label}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}{milestoneList(day)}</div>)}
       {hours.map(hour => [
         <span key={`h${hour}`} className={styles.hourLabel} aria-hidden="true">{hourLabel(hour, locale)}</span>,
         ...days.map(day => {
@@ -124,8 +127,9 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     </div></div>}
 
     <section className={styles.agenda} aria-label={copy.agenda}>
-      {days.filter(day => view === "week" || day.posts.length > 0).map(day => <div className={styles.agendaDay} key={day.key}>
+      {days.filter(day => view === "week" || day.posts.length > 0 || day.milestones?.length).map(day => <div className={styles.agendaDay} key={day.key}>
         <div className={styles.agendaHead}><h3><time dateTime={day.key}>{day.longLabel}</time>{day.isToday && <span className={styles.todayTag}>{copy.today}</span>}</h3>{canCreate && !day.isPast && <a className={styles.agendaAdd} href={newPostHref(day.key, defaultScheduleTime)}>{copy.addPost}<span className="ui-visually-hidden">{copy.onDay}{day.longLabel}</span></a>}</div>
+        {milestoneList(day)}
         {day.posts.length ? <div className={styles.agendaPosts}>{day.posts.map(postCard)}</div> : <p className={styles.muted}>{copy.nothingPlanned}</p>}
       </div>)}
       {rangeIsEmpty && view === "month" && <p className={styles.muted}>{copy.monthEmpty}</p>}

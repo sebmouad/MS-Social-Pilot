@@ -2,6 +2,7 @@ import type { ModuleManifest } from '../types';
 import { MEDIA_PAGES, MEDIA_ROOT_KEYS } from '../media/manifest';
 import { FEEDS_JOBS, FEEDS_PAGES, FEEDS_ROOT_KEYS } from '../feeds/manifest';
 import { ASYNC_POST_EXPORT_JOBS } from './server/export/config';
+import { CALENDAR_EXTRAS_JOBS } from '../calendar-extras/manifest';
 
 export const publishingManifest = {
   id: 'publishing',
@@ -14,8 +15,9 @@ export const publishingManifest = {
     { name: 'bestTimes', label: 'Best-time queue application', configKey: 'publishing.bestTimeApplySchedule' },
     ...FEEDS_JOBS,
     ...ASYNC_POST_EXPORT_JOBS,
+    ...CALENDAR_EXTRAS_JOBS,
   ],
-  rootSettingsPrefixes: ['publishing.', 'media.inspect', 'media.ffprobe', 'ai.'],
+  rootSettingsPrefixes: ['publishing.', 'calendarExtras.', 'media.inspect', 'media.ffprobe', 'ai.'],
   rootSettingKeys: ['sync.posts.schedule', 'storage.orphanMediaRetentionDays', 'storage.orphanMediaBatchLimit', 'storage.mediaLibraryBatchLimit', 'storage.orphanMediaCleanupSchedule', 'publishing.automation.recycleSchedule', 'publishing.automation.mixSchedule', 'publishing.automation.recycleCursor', 'publishing.automation.mixCursor', 'publishing.bestTimeApplySchedule', ...MEDIA_ROOT_KEYS, ...FEEDS_ROOT_KEYS],
   title: 'Publishing',
   mobileTitle: 'Publish',

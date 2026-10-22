@@ -8,9 +8,11 @@ import { CalendarFilters } from "./calendar/CalendarFilters";
 import { SavedViews } from "./SavedViews";
 
 /** Chooses the sidebar controls for the current publishing page. */
-export function PublishingSidebarClient({ groups, locale, channels, today, searchMaxCharacters, exportMaxPosts, exportMaxBytes, origins }: { groups?: ChannelGroup[]; locale?: 'en' | 'fr'; channels: Array<{ id: string; name: string }>; today: string; searchMaxCharacters: number; exportMaxPosts: number; exportMaxBytes: number; origins?: Array<{ kind: string; label: string }> }) {
+export function PublishingSidebarClient({ groups, locale, channels, today, searchMaxCharacters, exportMaxPosts, exportMaxBytes, origins, calendarLinks }: { calendarLinks?: Array<{ href: string; label: string }>; groups?: ChannelGroup[]; locale?: 'en' | 'fr'; channels: Array<{ id: string; name: string }>; today: string; searchMaxCharacters: number; exportMaxPosts: number; exportMaxBytes: number; origins?: Array<{ kind: string; label: string }> }) {
   const copy = usePublishingCopy(locale);
   const pathname = usePathname();
+  // The calendar's own pages (dates, seasons, subscriptions, holidays) mount their navigation and filters in the shell sidebar themselves.
+  if (pathname.startsWith("/publishing/calendar/")) return null;
   return pathname.startsWith("/publishing/collaboration")
     ? <div aria-label={copy.organizationTools}><p className="shell-subnav__label">{copy.organize}</p><p className="help">{copy.organizationHelp}</p></div>
     : pathname === "/publishing/labels"
@@ -18,6 +20,7 @@ export function PublishingSidebarClient({ groups, locale, channels, today, searc
     : pathname === "/publishing/templates"
     ? <div aria-label={copy.templateTools}><p className="shell-subnav__label">{copy.templatesTitle}</p><p className="help">{copy.templateHelp}</p></div>
     : pathname === "/publishing/calendar"
-    ? <><CalendarFilters channels={channels} today={today} /><SavedViews screen="calendar" /></>
+    ? <><CalendarFilters channels={channels} today={today} /><SavedViews screen="calendar" />
+      {calendarLinks?.length ? <nav className="shell-subnav" aria-label={copy.calendarTitle}>{calendarLinks.map(link => <a key={link.href} href={link.href}>{link.label}</a>)}</nav> : null}</>
     : <><PostFilters groups={groups} locale={locale} channels={channels} currentMonth={today.slice(0, 7)} searchMaxCharacters={searchMaxCharacters} exportMaxPosts={exportMaxPosts} exportMaxBytes={exportMaxBytes} origins={origins} />{pathname === "/publishing/posts" ? <SavedViews screen="posts" /> : null}</>;
 }
