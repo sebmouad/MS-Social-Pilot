@@ -7,14 +7,14 @@ import { useSettingsCopy } from '@/modules/settings/ui/copy-context';
 import type { BestTimeApplyStatus } from '@/modules/publishing/server/best-time-apply';
 
 const fill = (template: string, ...values: Array<string | number>) => values.reduce<string>((text, value, index) => text.replace(`{${index}}`, String(value)), template);
-const isStatus = (value: unknown): value is BestTimeApplyStatus => !!value && typeof value === 'object' && 'mode' in (value as object);
-const formatDay = (iso: string, locale: 'en' | 'fr') => new Date(iso).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US', { dateStyle: 'medium' });
+type StatusView = BestTimeApplyStatus & { labels?: { lastRunAt?: string; nextEligibleAt?: string } };
+const isStatus = (value: unknown): value is StatusView => !!value && typeof value === 'object' && 'mode' in (value as object);
 
 export function BestTimeApplyCard({ locale }: { locale: 'en' | 'fr' }) {
   const toast = useToast();
   const t = useSettingsCopy('operations', locale);
   const cancel = useSettingsCopy('team', locale).cancel;
-  const [status, setStatus] = useState<BestTimeApplyStatus | null>(null);
+  const [status, setStatus] = useState<StatusView | null>(null);
   const [open, setOpen] = useState(false);
   const refresh = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -43,7 +43,7 @@ export function BestTimeApplyCard({ locale }: { locale: 'en' | 'fr' }) {
   return <div>
     <p><IconClock aria-hidden="true" /> <strong>{t.bestTimeAuto}</strong></p>
     <p>{status.mode === 'apply' ? t.bestTimeAutoOn : t.bestTimeAutoOff}</p>
-    <p>{status.lastRunAt ? fill(t.bestTimeLastRun, formatDay(status.lastRunAt, locale)) : t.bestTimeNeverRun}{status.mode === 'apply' && status.nextEligibleAt ? ` · ${fill(t.bestTimeNextRun, formatDay(status.nextEligibleAt, locale))}` : ''}</p>
+    <p>{status.lastRunAt ? fill(t.bestTimeLastRun, status.labels?.lastRunAt ?? '') : t.bestTimeNeverRun}{status.mode === 'apply' && status.nextEligibleAt ? ` · ${fill(t.bestTimeNextRun, status.labels?.nextEligibleAt ?? '')}` : ''}</p>
     {status.mode === 'apply' ? <Button variant="secondary" onClick={() => setOpen(true)}>{t.bestTimeApplyNow}</Button> : null}
     {open && <ConfirmDialog open title={t.bestTimeAuto} objectName={t.bestTimeAuto} consequence={t.bestTimeApplyReview} confirmLabel={t.bestTimeApplyNow} cancelLabel={cancel} pendingLabel={t.saving} failureLabel={t.bestTimeApplyFailed} danger={false} onClose={() => setOpen(false)} onConfirm={applyNow} />}
   </div>;

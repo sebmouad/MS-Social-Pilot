@@ -7,7 +7,7 @@ import { Button } from '@/components/Button';
 import { ModalDialog } from '@/components/ModalDialog';
 import { RouteNotice } from '@/components/RouteNotice';
 
-type Change = { receipts?: unknown; id: string; operationType: string; objectType: string; objectId: string; status: string; createdAt: string; needsResolution: boolean; resolutionKind?: 'pending_recovery' | 'uncertain'; onHold?: boolean; resolutionNote: string | null };
+type Change = { receipts?: unknown; id: string; operationType: string; objectType: string; objectId: string; status: string; createdAt: string; labels?: { createdAt?: string }; needsResolution: boolean; resolutionKind?: 'pending_recovery' | 'uncertain'; onHold?: boolean; resolutionNote: string | null };
 type Resolution = 'applied' | 'not_applied';
 const isCreation = (type: string) => type === 'campaign.create' || type === 'adset.create' || type === 'creative.create';
 
@@ -62,7 +62,7 @@ export function ChangeHistory({ items, noteMaxCharacters, locale = 'en' }: { ite
     {message && !resolving ? <RouteNotice error={message.error} className={message.error ? 'ui-error' : 'small-note'} focusKey={message.key}>{localize(message.text)}</RouteNotice> : null}
     <Button onClick={() => void refreshHistory()} disabled={refreshing || busy}>{refreshing ? t('text127') : t('text230')}</Button>
     {!rows.length ? <p className="small-note">{t('text128')}</p> : <ul className="ads-change-history">{rows.map(change => <li key={change.id}>
-      <strong>{TYPE_TEXT[change.operationType] ?? t('text232')}</strong> {t('text166')}{isCreation(change.operationType) ? null : <>{change.objectType} {t('text166')}</>}{STATUS_TEXT[change.status] ?? t('text233')} {t('text166')}<time dateTime={change.createdAt}>{new Date(change.createdAt).toLocaleString()}</time>
+      <strong>{TYPE_TEXT[change.operationType] ?? t('text232')}</strong> {t('text166')}{isCreation(change.operationType) ? null : <>{change.objectType} {t('text166')}</>}{STATUS_TEXT[change.status] ?? t('text233')} {t('text166')}<time dateTime={change.createdAt}>{change.labels?.createdAt ?? ''}</time>
       {change.onHold && !change.needsResolution ? <p className="small-note">{t('text129')}</p> : null}
       {change.needsResolution ? <>
         {change.resolutionKind === 'pending_recovery'

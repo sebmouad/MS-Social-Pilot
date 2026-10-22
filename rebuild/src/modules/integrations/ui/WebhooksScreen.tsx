@@ -9,6 +9,7 @@ import { SectionTabs, SettingsPanel, styles } from '@/modules/settings/ui/_compo
 import { EMITTED_EVENTS } from '../contracts';
 import { WEBHOOKS_FEATURE_ID } from '../manifest';
 import { integrationsLocale, type IntegrationsCopyKey } from '../copy';
+import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { listWebhooks } from '../server/webhooks';
 import { WebhookManager } from './WebhookManager';
 
@@ -32,7 +33,8 @@ export default async function WebhooksScreen() {
   try { data = await listWebhooks({ userId: viewer.user.id, workspaceId: viewer.workspaceId }); } catch { data = null; }
   if (!data) return frame(<SettingsPanel title={t('title')}><p role="alert" className={styles['settings-note']}>{t('loadFailed')}</p></SettingsPanel>);
   if (!data.available) return frame(<SettingsPanel title={t('title')}><p className={styles['settings-note']}>{t('unavailable')}</p></SettingsPanel>);
-  const webhooks = data.webhooks.map(({ createdAt: _createdAt, ...hook }) => ({ ...hook, lastSentAt: hook.lastSentAt?.toISOString() ?? null }));
+  const instants = await workspaceInstantFormatter(viewer.workspaceId, locale);
+  const webhooks = data.webhooks.map(({ createdAt: _createdAt, ...hook }) => labelInstants({ ...hook, lastSentAt: hook.lastSentAt?.toISOString() ?? null }, { lastSentAt: 'dateTime' }, instants));
   return frame(<>
     <SettingsPanel title={t('endpoints')} detail={t('endpointsDetail')}>
       <WebhookManager initial={webhooks} events={data.events} emitted={[...EMITTED_EVENTS]} maxEndpoints={data.maxEndpoints} copy={copy} nameMaxLength={data.nameMaxLength} urlMaxLength={data.urlMaxLength} locale={locale} />

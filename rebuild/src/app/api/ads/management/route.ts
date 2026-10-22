@@ -2,6 +2,7 @@ import { withPlatformAdsLocale } from '@/server/platforms/host';
 import { adsServiceText } from '@/modules/ads/server/copy';
 import { adsLocale } from '@/modules/ads/analysis/copy';
 import { adsNoDispatchMetadata } from '@/modules/ads/management/errors';
+import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     if (view === 'capabilities') return reply(await describeAdsManagement(actor, accountId));
     if (view === 'creative-sources') return reply(await listAdsCreativeSources(actor, rest as { adAccountId: string; imageAfter?: string; targetOffset?: number }));
     if (view === 'creatives') return reply(await listAdsCreatives(actor, rest as { adAccountId: string; after?: string; limit?: number }));
-    if (view === 'changes' || view === undefined) return reply(await listAdsOperations(actor, rest));
+    if (view === 'changes' || view === undefined) { const operations = await listAdsOperations(actor, rest); const instants = await workspaceInstantFormatter(actor.workspaceId, locale); return reply({ ...operations, items: operations.items.map(item => labelInstants(item, { createdAt: 'dateTime' }, instants)) }); }
     throw new OperationError('invalid_request', await adsServiceText('managementInvalidView', {}, locale));
   } catch (error) {
     const failure = operationFailure(error, await adsServiceText('managementLoadFailure', {}, locale));

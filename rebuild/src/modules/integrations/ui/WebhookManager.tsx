@@ -7,8 +7,8 @@ import { FieldError, useFormValidation } from '@/components/FormValidation';
 import ui from './integrations.module.css';
 import { SecretReveal } from './SecretReveal';
 
-type Hook = { id: string; name: string; urlDisplay: string; events: string[]; enabled: boolean; source: 'dashboard' | 'api_key'; lastError: string | null; lastSentAt: string | null; pending: number; failed: number };
-type Delivery = { id: string; event: string; status: string; attempts: number; responseStatus: number | null; error: string | null; createdAt: string };
+type Hook = { id: string; name: string; urlDisplay: string; events: string[]; enabled: boolean; source: 'dashboard' | 'api_key'; lastError: string | null; lastSentAt: string | null; pending: number; failed: number; labels?: { lastSentAt?: string } };
+type Delivery = { id: string; event: string; status: string; attempts: number; responseStatus: number | null; error: string | null; createdAt: string; labels?: { createdAt?: string } };
 type Action = { id: string; kind: 'delete' | 'rotate' | 'redeliver' | 'test' | 'reveal' };
 type Copy = Record<string, string>;
 const fmt = (text: string, vars: Record<string, string | number>) => Object.entries(vars).reduce((out, [key, value]) => out.split(`{${key}}`).join(String(value)), text);
@@ -33,7 +33,6 @@ export function WebhookManager({ initial, events, emitted, maxEndpoints, copy, l
   const validation = useFormValidation();
   const full = hooks.length >= maxEndpoints;
   const label = (ev: string) => copy[`event.${ev}`] ?? ev;
-  const when = (iso: string) => new Date(iso).toLocaleString(locale);
 
   const reload = async () => { try { const result = await call('/api/webhooks', 'GET', copy.genericError!); if (!Array.isArray(result.webhooks)) throw new Error(); setHooks(result.webhooks); } catch { toast.notify({ title: copy.loadFailed!, tone: 'error' }); } };
   const operation = useRef<Promise<string | null> | null>(null);
@@ -85,7 +84,7 @@ export function WebhookManager({ initial, events, emitted, maxEndpoints, copy, l
     <DataTable caption={copy.title!} rows={hooks} rowKey={hook => hook.id} emptyMessage={copy.empty!} columns={[
       { key: 'webhook', label: copy.colWebhook!, render: hook => <><strong>{hook.name}</strong><br /><small>{hook.urlDisplay}</small></> },
       { key: 'events', label: copy.colEvents!, render: hook => hook.events.map(label).join(', ') },
-      { key: 'status', label: copy.colStatus!, render: hook => <>{hook.enabled ? copy.active : copy.paused}{hook.lastSentAt && <small>{fmt(copy.lastSent!, { when: when(hook.lastSentAt) })}</small>}{Boolean(hook.pending || hook.failed) && <small>{fmt(copy.queueState!, { pending: hook.pending, failed: hook.failed })}</small>}</> },
+      { key: 'status', label: copy.colStatus!, render: hook => <>{hook.enabled ? copy.active : copy.paused}{hook.lastSentAt && <small>{fmt(copy.lastSent!, { when: hook.labels?.lastSentAt ?? '' })}</small>}{Boolean(hook.pending || hook.failed) && <small>{fmt(copy.queueState!, { pending: hook.pending, failed: hook.failed })}</small>}</> },
       { key: 'actions', label: copy.colActions!, render: hook => <div className={ui['row-actions']}>
         <Button size="sm" disabled={busy} onClick={() => act({ id: hook.id, kind: 'test' }, async () => { const r = await call(`/api/webhooks/${hook.id}/test`, 'POST', copy.genericError!, { confirmation: `TEST WEBHOOK ${hook.id}` }); await reload(); if (!r.delivered) throw new Error(); return copy.testOk; })}>{copy.test}</Button>
         <Menu label={`${copy.colActions}: ${hook.name}`} items={[
@@ -107,7 +106,7 @@ export function WebhookManager({ initial, events, emitted, maxEndpoints, copy, l
       <h3>{copy.historyTitle}</h3>
       {open.error && <p role="alert" className={ui.error}>{open.error}</p>}
       <DataTable caption={copy.historyTitle!} rows={open.deliveries} rowKey={d => d.id} emptyMessage={open.loading ? copy.loading! : copy.historyEmpty!} columns={[
-        { key: 'when', label: copy.colWhen!, render: d => when(d.createdAt) },
+        { key: 'when', label: copy.colWhen!, render: d => d.labels?.createdAt ?? '' },
         { key: 'event', label: copy.colEvent!, render: d => label(d.event) },
         { key: 'result', label: copy.colResult!, render: d => <>{d.status === 'delivered' ? copy.delivered : d.status === 'pending' ? copy.retrying : copy.gaveUp} · {d.attempts} {d.attempts === 1 ? copy.attempt : copy.attempts}</> },
         { key: 'again', label: copy.colActions!, render: d => d.status !== 'pending' && <Button size="sm" disabled={busy} onClick={() => act({ id: d.id, kind: 'redeliver' }, async () => { const r = await call(`/api/webhooks/${open.id}/deliveries/${d.id}`, 'POST', copy.genericError!, { confirmation: `REDELIVER WEBHOOK DELIVERY ${d.id}` }); await loadDeliveries(open.id, 1); await reload(); if (!r.delivered) throw new Error(); return copy.againOk; })}>{copy.again}</Button> },

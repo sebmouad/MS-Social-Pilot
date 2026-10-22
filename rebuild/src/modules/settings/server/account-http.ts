@@ -5,6 +5,7 @@ import { requestOrigin } from '@/server/request-origin';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { readAccount, updateAccountProfile, changeAccountPassword, listAccountSessions, revokeAccountSession } from './account';
 
+import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { readAccountSecurity, changeAccountSecurity } from './account-security';
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
@@ -23,13 +24,15 @@ export async function accountHttp(request: Request, action: 'export' | 'read' | 
         'x-content-type-options': 'nosniff',
       } });
     }
-    if (action === 'security') return reply(await readAccountSecurity(actor));
+    const instants = ['security', 'sessions'].includes(action) ? await workspaceInstantFormatter(viewer.workspaceId, request.headers.get('accept-language')?.toLowerCase().startsWith('fr') ? 'fr' : 'en') : null;
+    if (action === 'security') { const security = await readAccountSecurity(actor); return reply({ ...security, passkeys: security.passkeys.map(passkey => labelInstants(passkey, { lastUsedAt: 'dateTime' }, instants!)) }); }
     if (['begin', 'enable', 'disable', 'remove'].includes(action)) return reply(await changeAccountSecurity(actor, action as 'begin' | 'enable' | 'disable' | 'remove', await request.json()));
     if (action === 'read') return reply(await readAccount(actor));
     if (action === 'sessions') {
       const params = new URL(request.url).searchParams;
       if ([...params.keys()].some(key => key !== 'offset') || params.getAll('offset').length > 1 || (params.has('offset') && !/^\d+$/.test(params.get('offset')!))) throw new OperationError('invalid_request', 'Choose a valid session page.');
-      return reply(await listAccountSessions(actor, params.has('offset') ? { offset: Number(params.get('offset')) } : {}));
+      const page = await listAccountSessions(actor, params.has('offset') ? { offset: Number(params.get('offset')) } : {});
+      return reply({ ...page, sessions: page.sessions.map(session => labelInstants(session, { expiresAt: 'dateTime' }, instants!)) });
     }
     const input = await request.json();
     return reply(action === 'profile' ? await updateAccountProfile(actor, input) : action === 'password' ? await changeAccountPassword(actor, input) : await revokeAccountSession(actor, input));

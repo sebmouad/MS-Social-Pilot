@@ -284,7 +284,7 @@ export function TaskBoard({ tasks, assignees, canCreate, limits, today, summary,
         </>}
         <h3>{t("Comments")}</h3>
         {comments === null ? (formError ? null : <p className={styles.help} role="status">{t("Loading comments...")}</p>) : comments.items.length === 0 ? <p className={styles.help}>{t("No comments yet.")}</p> : <ul className={styles.comments}>{comments.items.map(comment => <li key={comment.id}>
-          <span className={styles.meta}>{comment.author?.name ?? t("Former member")} · {new Date(comment.createdAt).toLocaleString(locale)}</span>{comment.body}
+          <span className={styles.meta}>{comment.author?.name ?? t("Former member")} · {(comment as { labels?: { createdAt?: string } }).labels?.createdAt ?? ''}</span>{comment.body}
           {comment.canDelete && <div><Button size="sm" variant="quiet" disabled={busy} onClick={() => setDeletingComment({ task: mode.task, comment })}>{t("Delete comment")}</Button></div>}
         </li>)}</ul>}
         {comments?.hasMore && <div><Button size="sm" disabled={busy} onClick={() => loadComments(mode.task, comments.items.length)}>{t("Load more comments")}</Button></div>}

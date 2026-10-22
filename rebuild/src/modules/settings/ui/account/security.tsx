@@ -5,7 +5,7 @@ import { useSettingsCopy } from '../copy-context';
 import { SecretReveal } from '@/modules/integrations/ui/SecretReveal';
 import { securityConfirmations } from '../../server/account-security-contract';
 import styles from '../settings.module.css';
-type Security = { twoStepEnabled: boolean; required: boolean; passkeys: { id: string; name: string; lastUsedAt: string | null }[] };
+type Security = { twoStepEnabled: boolean; required: boolean; passkeys: { id: string; name: string; lastUsedAt: string | null; labels?: { lastUsedAt?: string } }[] };
 export function AccountSecurity({ canWrite, accountName, locale, onChanged }: { canWrite: boolean; accountName: string; locale: 'en' | 'fr'; onChanged?: () => void }) {
   const t = useSettingsCopy('security', locale); const toast = useToast();
   const [data, setData] = useState<Security | null>(null);
@@ -59,7 +59,7 @@ export function AccountSecurity({ canWrite, accountName, locale, onChanged }: { 
       {recovery && <SecretReveal key={recovery} label={t.recovery} value={recovery} notice={t.recoveryNote} onDone={() => setRecovery(null)} strings={revealStrings} />}
       <DataTable caption={t.passkeys} rows={data.passkeys} rowKey={row => row.id} emptyMessage={t.empty} columns={[
         { key: 'name', label: t.name, render: row => row.name },
-        { key: 'lastUsed', label: t.lastUsed, render: row => row.lastUsedAt ? new Date(row.lastUsedAt).toLocaleString(locale) : t.never },
+        { key: 'lastUsed', label: t.lastUsed, render: row => row.lastUsedAt ? row.labels?.lastUsedAt ?? '' : t.never },
         { key: 'remove', label: t.remove, render: row => canWrite && <Button disabled={busy || !password || (data.required && !data.twoStepEnabled && data.passkeys.length <= 1)} onClick={() => setPending({ action: 'remove', id: row.id, name: row.name })}>{t.remove}</Button> },
       ]} />
     </>}

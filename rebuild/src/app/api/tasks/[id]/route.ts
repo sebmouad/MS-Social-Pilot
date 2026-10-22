@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
+import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { getTask } from '@/modules/tasks/server/tasks';
 import { TASKS_FEATURE_ID, TASKS_MODULE_ID } from '@/modules/tasks/semantics';
 
@@ -17,6 +18,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if ([...query.keys()].some(key => key !== 'commentOffset' || query.getAll(key).length > 1)) throw new OperationError('invalid_request', 'Choose a valid comment page.');
     const offset = query.get('commentOffset');
     if (offset !== null && !/^\d+$/.test(offset)) throw new OperationError('invalid_request', 'Choose a valid comment page.');
-    return reply(await getTask({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, (await context.params).id, offset === null ? undefined : { commentOffset: Number(offset) }));
+    const result = await getTask({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, (await context.params).id, offset === null ? undefined : { commentOffset: Number(offset) });
+    if (!result.ok) return reply(result);
+    const instants = await workspaceInstantFormatter(viewer.workspaceId, /^\s*fr\b/i.test(request.headers.get('accept-language') ?? '') ? 'fr' : 'en');
+    return reply({ ...result, comments: result.comments.map(comment => labelInstants(comment, { createdAt: 'dateTime' }, instants)) });
   } catch (error) { const failure = operationFailure(error, 'The task could not be loaded. Please try again.'); return reply({ error: failure.error, code: failure.code }, failure.status); }
 }

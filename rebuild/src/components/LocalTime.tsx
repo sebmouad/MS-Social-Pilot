@@ -1,6 +1,3 @@
-'use client';
-import { useEffect, useState } from 'react';
-
 export type LocalTimeStyle = 'datetime' | 'date' | 'time';
 
 /**
@@ -15,20 +12,4 @@ export function formatStableDateTime(value: string | number | Date, options: { l
   const day = new Intl.DateTimeFormat(locale, { timeZone, dateStyle: 'medium' }).format(date);
   const time = new Intl.DateTimeFormat(locale, { timeZone, timeStyle: 'medium' }).format(date);
   return style === 'date' ? day : style === 'time' ? time : `${day}, ${time}`;
-}
-
-/**
- * A timestamp in the visitor's own locale and time zone. The server (and the first client render) shows the
- * stable UTC form, so hydration always matches; the visitor's formatting replaces it right after mount.
- */
-export function LocalTime({ value, style = 'datetime', className }: { value: string | number | Date; style?: LocalTimeStyle; className?: string }) {
-  const parsed = new Date(value);
-  const iso = Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString();
-  const [text, setText] = useState(() => formatStableDateTime(iso, { timeZone: 'UTC', style }));
-  useEffect(() => {
-    if (!iso) return;
-    const date = new Date(iso);
-    setText(style === 'date' ? date.toLocaleDateString() : style === 'time' ? date.toLocaleTimeString() : date.toLocaleString());
-  }, [iso, style]);
-  return iso ? <time dateTime={iso} className={className}>{text}</time> : null;
 }

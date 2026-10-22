@@ -7,6 +7,7 @@ import { requireViewer } from '@/server/context';
 import { listNotifications, readNotificationPreferences } from '@/modules/settings/notifications/server';
 import { SettingsPage, SettingsPanel } from '@/modules/settings/ui/_components';
 import { fill } from '@/modules/settings/ui/shell-copy';
+import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { NotificationCenter } from './NotificationCenter';
 
 
@@ -21,6 +22,7 @@ export default async function NotificationsPage() {
   ]);
   // The saved personal locale drives this screen, matching NotificationCenter.
   const locale = preferences?.locale ?? 'en';
+  const instants = await workspaceInstantFormatter(viewer.workspaceId, locale);
   const uiCopy = await readSettingsUiCopy();
   const t = uiCopy.notifications[locale];
   // Chat destinations are managed by workspace owners and admins only (the service enforces this too).
@@ -30,7 +32,7 @@ export default async function NotificationsPage() {
   return <PageFrame module="settings" scopedAccess>
     <SettingsPage copy={uiCopy} tab="accountNotifications" active="settings/notifications" title={t.title} locale={locale} description={fill(t.description, { workspace: viewer.membership.workspace.name })}>
       <SettingsPanel title={t.panel} detail={t.panelDetail}>
-        <NotificationCenter initialPreferences={preferences} initialPage={notifications} locale={locale} />
+        <NotificationCenter initialPreferences={preferences} initialPage={notifications && { ...notifications, items: notifications.items.map(item => labelInstants(item, { createdAt: 'dateTime' }, instants)) }} locale={locale} />
       </SettingsPanel>
       {chatCopy ? <SettingsPanel title={chatCopy.title} detail={chatCopy.description}>
         <Link href="/settings/notifications/chat-channels">{chatCopy.title}</Link>

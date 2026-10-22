@@ -24,6 +24,7 @@ import { AdsFiltersSidebar } from '@/modules/ads/ui/ads-filters';
 import { ObjectManager } from './ObjectManager';
 import { adsTabsFor } from '../AdsTabsFor';
 import { ObjectRowLabel } from './ObjectRowLabel';
+import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { ChangeHistory } from './ChangeHistory';
 
 type Params = AdsSearchParams & { level?: string; q?: string; sort?: string; direction?: string; parentId?: string; offset?: string };
@@ -69,6 +70,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
       <section className="panel"><RouteNotice error className="ui-error" focusKey={localizeAdsMessage(catalogs, locale, error.message)}>{localizeAdsMessage(catalogs, locale, error.message)}</RouteNotice></section></div></PageFrame>;
   }
   const managementPort = adsDirectoryManagementPort();
+  const instants = await workspaceInstantFormatter(actor.workspaceId, locale);
   const history = managementPort ? await managementPort.listChanges(actor).catch(() => null) : null;
   const query = new URLSearchParams(Object.entries(values).flatMap(([key, value]) => (value !== undefined && key !== 'offset' ? [[key, value]] : [])));
   const pageLink = (offset: number) => `/insights/ads/manage?${new URLSearchParams([...query, ['offset', String(offset)]])}`;
@@ -90,7 +92,7 @@ async function AdsObjectsPage({ searchParams }: { searchParams: Promise<Params> 
       <nav aria-label={t('text076')}>{directory.offset > 0 ? <a href={pageLink(Math.max(0, directory.offset - directory.limit))}>{t('text077')}</a> : null}{' '}{directory.nextOffset !== null ? <a href={pageLink(directory.nextOffset)}>{t('text078')}</a> : null}</nav>
       <p className="small-note">{directory.note}</p>
     </section>
-    {history ? <section className="panel" id="changes" aria-labelledby="changes-title"><h2 id="changes-title">{t('text079')}</h2><ChangeHistory noteMaxCharacters={managementPolicy.recoveryNoteMaxCharacters} locale={locale} items={history} /></section> : null}
+    {history ? <section className="panel" id="changes" aria-labelledby="changes-title"><h2 id="changes-title">{t('text079')}</h2><ChangeHistory noteMaxCharacters={managementPolicy.recoveryNoteMaxCharacters} locale={locale} items={history.map(item => labelInstants(item, { createdAt: 'dateTime' }, instants))} /></section> : null}
   </div></PageFrame>;
 }
 

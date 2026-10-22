@@ -9,7 +9,7 @@ import type { McpViewer } from '../src/server/mcp/types';
 const viewer = { userId: 'u', workspaceId: 'w', apiKeyId: 'key' } as McpViewer;
 beforeEach(() => { vi.clearAllMocks(); m.viewer.mockResolvedValue({ user: { id: 'u' }, workspaceId: 'w' }); m.list.mockResolvedValue([]); m.request.mockResolvedValue({ id: 'job' }); m.download.mockResolvedValue({ id: 'job', content: Buffer.from('ZIP') }); });
 it('lists no-store jobs scoped to the current workspace', async () => {
-  const r = await GET(); expect(r.headers.get('cache-control')).toBe('no-store'); expect(await r.json()).toEqual({ jobs: [] }); expect(m.list).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w' });
+  const r = await GET(new Request('http://localhost/api/settings/data/exports')); expect(r.headers.get('cache-control')).toBe('no-store'); expect(await r.json()).toEqual({ jobs: [] }); expect(m.list).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w' });
 });
 it('blocks cross-origin and malformed requests before job creation', async () => {
   const request = (origin: string, body: string) => new Request('https://app.test/api/settings/data/exports', { method: 'POST', headers: { origin }, body });

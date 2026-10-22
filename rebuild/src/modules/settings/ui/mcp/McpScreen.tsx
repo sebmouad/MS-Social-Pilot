@@ -15,6 +15,7 @@ import { PAGES, MODULES } from '@/lib/product';
 import { SettingsPage, SettingsPanel, styles } from '@/modules/settings/ui/_components';
 import { McpKeyManager } from './keys';
 import { settingsLocale } from '@/modules/settings/ui/locale';
+import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { fill } from '@/modules/settings/ui/shell-copy';
 
 
@@ -29,6 +30,7 @@ export default async function McpKeysPage(props: { searchParams: Promise<Record<
   const t = uiCopy.mcp[locale];
   const isManager = viewer.membership.role === 'owner' || viewer.membership.role === 'admin';
   if (!isManager) return <PageFrame module="settings"><SettingsPage copy={uiCopy} tab="integrationsAssistants" active="settings/mcp" title={t.title} description={t.description} locale={locale}><SettingsPanel title={t.restricted}><p className={styles['settings-note']}>{t.managersOnly}</p></SettingsPanel></SettingsPage></PageFrame>;
+  const instants = await workspaceInstantFormatter(viewer.workspaceId, locale);
   const params = await searchParams;
   const keyOffset = params.keyOffset === undefined ? 0 : Number(params.keyOffset);
   const copy = (await configOrDefault('settings.accountConfirmationCopy', accountConfirmationCopySchema))[locale];
@@ -46,7 +48,7 @@ export default async function McpKeysPage(props: { searchParams: Promise<Record<
   const resources=resourcesTruncated?[]:[...channels.map(c=>({...c,kind:'channel' as const})),...adAccounts.map(a=>({...a,kind:'adAccount' as const}))];
   const features = PAGES.filter(feature => !SESSION_ONLY_MCP_FEATURES.has(feature.id) && workspaceMcpFeatureIds().includes(feature.id) && canUseFeature(viewer.entitlements, feature.id)).map(feature => ({ ...feature, name: feature.title, moduleLabel:MODULES.find(module=>module.id===feature.module)?.title??feature.module, canRead: canAccessFeature(viewer.permissions, feature.id, 'read'), canWrite: canAccessFeature(viewer.permissions, feature.id, 'write') })).filter(feature => feature.canRead || feature.canWrite);
   return <PageFrame module="settings"><SettingsPage copy={uiCopy} tab="integrationsAssistants" active="settings/mcp" title={t.title} locale={locale} description={fill(t.issueDescription, { workspace: viewer.membership.workspace.name })}>
-    <SettingsPanel title={t.createPanel} detail={t.createDetail}><McpKeyManager locale={locale} features={features} initialKeys={keyPage.keys.map(key => ({ ...key, expiresAt: key.expiresAt.toISOString(), revokedAt: key.revokedAt?.toISOString() ?? null, createdAt: key.createdAt.toISOString(), lastUsedAt: key.lastUsedAt?.toISOString() ?? null }))} maxLifetimeDays={maxLifetimeDays} defaultLifetimeDays={defaultLifetimeDays} resources={resources} resourcesTruncated={resourcesTruncated} /></SettingsPanel>
+    <SettingsPanel title={t.createPanel} detail={t.createDetail}><McpKeyManager locale={locale} features={features} initialKeys={keyPage.keys.map(key => labelInstants({ ...key, expiresAt: key.expiresAt.toISOString(), revokedAt: key.revokedAt?.toISOString() ?? null, createdAt: key.createdAt.toISOString(), lastUsedAt: key.lastUsedAt?.toISOString() ?? null }, { createdAt: 'date', expiresAt: 'date', lastUsedAt: 'dateTime' }, instants))} maxLifetimeDays={maxLifetimeDays} defaultLifetimeDays={defaultLifetimeDays} resources={resources} resourcesTruncated={resourcesTruncated} /></SettingsPanel>
     {(keyOffset > 0 || keyPage.nextOffset !== null) && <nav aria-label={t.title}>
       {keyOffset > 0 && <a href="/settings/integrations">{copy.previous}</a>}
       {keyPage.nextOffset !== null && <a href={`/settings/integrations?keyOffset=${keyPage.nextOffset}`}>{copy.more}</a>}

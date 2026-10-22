@@ -2,6 +2,7 @@ import { requestOrigin } from '@/server/request-origin';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { issueMcpKey, listMcpKeys, revokeMcpKey } from '@/modules/settings/mcp-access/server';
+import { labelInstants, requestLocale, workspaceInstantFormatter } from '@/server/instant-labels';
 export const runtime = 'nodejs';
 const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store'}});
 function sameOrigin(request:Request){const origin=request.headers.get('origin');if(!origin)return false;try{return new URL(origin).origin===requestOrigin(request);}catch{return false;}}
@@ -20,7 +21,7 @@ export async function GET(request:Request){try{const viewer=await manager();cons
 
 export async function POST(request:Request){
  if(!sameOrigin(request))return reply({error:'Cross-origin request denied.'},403);
- try{const viewer=await manager(true);return reply(await issueMcpKey({userId:viewer.user.id,workspaceId:viewer.workspaceId},await request.json()),201);}catch(error){return failure(error);}
+ try{const viewer=await manager(true);const issued=await issueMcpKey({userId:viewer.user.id,workspaceId:viewer.workspaceId},await request.json());const instants=await workspaceInstantFormatter(viewer.workspaceId,requestLocale(request));return reply({...issued,key:labelInstants(issued.key,{createdAt:'date',expiresAt:'date',lastUsedAt:'dateTime'},instants)},201);}catch(error){return failure(error);}
 }
 export async function DELETE(request:Request){
  if(!sameOrigin(request))return reply({error:'Cross-origin request denied.'},403);

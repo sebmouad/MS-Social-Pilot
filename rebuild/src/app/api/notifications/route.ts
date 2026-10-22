@@ -1,4 +1,5 @@
 import { requestOrigin } from '@/server/request-origin';
+import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { requireViewer } from '@/server/context';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { listNotifications, markNotificationRead, deleteNotification, readNotificationPreferences, updateNotificationPreferences } from '@/modules/settings/notifications/server';
@@ -23,7 +24,8 @@ export async function GET(request: Request) {
       readNotificationPreferences(actor),
       listNotifications(actor, { ...(pageText ? { page: Number(pageText) } : {}), ...(unreadText === 'true' ? { unreadOnly: true } : {}) }),
     ]);
-    return reply({ preferences, notifications });
+    const instants = await workspaceInstantFormatter(viewer.workspaceId, preferences.locale ?? 'en');
+    return reply({ preferences, notifications: { ...notifications, items: notifications.items.map(item => labelInstants(item, { createdAt: 'dateTime' }, instants)) } });
   } catch (error) {
     const failure = operationFailure(error, 'Notifications could not be loaded. Please try again.');
     return reply({ error: failure.error, code: failure.code }, failure.status);

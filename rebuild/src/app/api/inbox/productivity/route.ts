@@ -1,4 +1,5 @@
 import { requestOrigin } from '@/server/request-origin';
+import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
@@ -21,7 +22,9 @@ export async function GET(request: Request) {
       return reply(await listSavedReplies(current, { ...(offset !== null ? { offset: /^\d+$/.test(offset) ? Number(offset) : offset } : {}), ...(limit !== null ? { limit: /^\d+$/.test(limit) ? Number(limit) : limit } : {}), q: query.get('q') ?? '' }));
     }
     if (query.has('view') || [...query.keys()].length !== 2 || !query.has('kind') || !query.has('id')) throw new OperationError('invalid_request', 'Choose a valid Inbox productivity view.');
-    return reply(await readInboxProductivity(current, { kind: query.get('kind'), id: query.get('id') }));
+    const productivity = await readInboxProductivity(current, { kind: query.get('kind'), id: query.get('id') });
+    const instants = await workspaceInstantFormatter(current.workspaceId, /^\s*fr\b/i.test(request.headers.get('accept-language') ?? '') ? 'fr' : 'en');
+    return reply({ ...productivity, notes: productivity.notes.map(note => labelInstants(note, { createdAt: 'dateTime' }, instants)) });
   } catch (error) { const failure = operationFailure(error, 'Inbox productivity could not be loaded. Please try again.'); return reply({ error: failure.error, code: failure.code }, failure.status); }
 }
 export async function POST(request: Request) {

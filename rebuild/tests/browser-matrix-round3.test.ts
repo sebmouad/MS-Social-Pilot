@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { THEMES } from '../src/lib/themes';
-import { LocalTime, formatStableDateTime } from '../src/components/LocalTime';
+import { formatStableDateTime } from '../src/components/LocalTime';
 import { ERROR_STATE_COPY, localeFrom } from '../src/components/ErrorState';
 import { classifyServerError, engineName, finishServerError, selectThemes, summarizeReport, SERVER_ERROR_LOCALES, VIEWPORTS, type ServerErrorCell, type ServerErrorObservation } from '../scripts/verify-browser-matrix';
 
@@ -60,10 +60,6 @@ describe('engine-neutral timestamps and error copy', () => {
     expect(formatStableDateTime('2026-10-21T10:53:20Z', { timeZone: 'UTC' })).toBe('21 Oct 2026, 10:53:20');
     expect(formatStableDateTime('2026-10-21T10:53:20Z', { timeZone: 'UTC', style: 'date' })).toBe('21 Oct 2026');
     expect(formatStableDateTime('not a date')).toBe('');
-  });
-  it('renders the same stable UTC text on the server and nothing for an invalid date', () => {
-    expect(renderToString(createElement(LocalTime, { value: '2026-10-21T10:53:20Z' }))).toContain('21 Oct 2026, 10:53:20');
-    expect(renderToString(createElement(LocalTime, { value: 'nope' }))).toBe('');
   });
   it('has the same keys in English and French and picks French from the language tag', () => {
     expect(Object.keys(ERROR_STATE_COPY.fr)).toEqual(Object.keys(ERROR_STATE_COPY.en));

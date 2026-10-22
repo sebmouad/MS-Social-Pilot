@@ -24,7 +24,7 @@ export function ScheduledAgents({ agents, channels, maxDrafts, briefMax, copy: t
  const status = useRef<HTMLParagraphElement>(null);
  const [confirm, confirmation] = useConfirm({ title: t.confirm, cancel: t.cancel, confirm: t.confirm, danger: false });
  const [removeConfirm, removal] = useConfirm({ title: t.remove, cancel: t.cancel, confirm: t.remove });
- const dayName = (day: number) => new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(new Date(Date.UTC(2026, 9, 4 + day)));
+ const dayName = (day: number) => new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 9, 4 + day)));
  function clearEditor() { setEditing(undefined); setTargetId(channels[0]?.id ?? ''); setBrief(''); setWeekday('1'); setCount('5'); setEnabled(true); }
  function edit(agent: ScheduledAgent) { setEditing(agent.id); setTargetId(agent.targetId); setBrief(agent.brief); setWeekday(String(agent.weekday)); setCount(String(agent.count)); setEnabled(agent.enabled); }
  function mutate(action: 'save' | 'delete' | 'run', id?: string) {

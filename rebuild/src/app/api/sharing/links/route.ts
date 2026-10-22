@@ -1,4 +1,5 @@
 import { withSharingErrors } from '@/app/api/sharing/_http';
+import { acceptLocale, labelShareLinks } from '@/modules/sharing/server/labels';
 import { createShareLink, listShareLinks } from '@/modules/sharing/server/links';
 import { absolute, failure, ownerActor, reply, sameOrigin } from '../_http';
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,7 @@ async function GETHandler(request: Request) {
   try {
     const params = new URL(request.url).searchParams; const page = params.get('page');
     if ([...params.keys()].some(k => k !== 'page') || (page !== null && !/^[1-9]\d{0,3}$/.test(page))) return reply({ error: 'Choose a valid result page.', code: 'invalid_request' }, 400);
-    return reply(await listShareLinks(actor, page ? { page: Number(page) } : {}));
+    return reply(await labelShareLinks(await listShareLinks(actor, page ? { page: Number(page) } : {}), actor.workspaceId, acceptLocale(request)));
   } catch (error) { return failure(error, 'Share links could not be loaded.'); }
 }
 async function POSTHandler(request: Request) {

@@ -5,6 +5,7 @@ import { canAccessFeature } from '@/server/permissions';
 import { accountConfirmationCopySchema } from '../../account-confirmation-copy';
 import { PersonKeysAccountFallback } from '@/modules/settings/person-keys/AccountFallback';
 import { headers } from 'next/headers';
+import { labelPersonKeys } from '@/modules/settings/person-keys/labels';
 import { PersonKeysManager } from '@/modules/settings/person-keys/Manager';
 import type { Metadata } from 'next';
 import { PageFrame } from '@/server/PageFrame';
@@ -65,6 +66,6 @@ export async function PersonalKeysPage() {
   const t = uiCopy.personKeys[locale];
   const sections = await readSectionsCopy(locale);
   return <PageFrame module="settings" scopedAccess><SettingsPage copy={uiCopy} active="settings/account" tab="integrationsKeys" title={sections.tabs.integrationsKeys} description={t.help} locale={locale}>
-    <PersonKeysManager locale={locale} initial={personKeys} />
+    <PersonKeysManager locale={locale} initial={personKeys && labelPersonKeys(personKeys, locale)} />
   </SettingsPage></PageFrame>;
 }

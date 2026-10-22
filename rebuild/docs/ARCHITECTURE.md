@@ -889,6 +889,19 @@ post notes/versions/repeat (`createdLabel`, `nextLabel`) and Root diagnostics
 `publishNow=1` and the server schedules now plus the Root lead. Documented remaining
 browser-side uses (fallbacks and validation only) are listed in
 `tests/client-zoned-time-formatting.test.ts`, which also guards against regressions. UTC-only
-formatting and number formatting are unaffected. Not covered: client formatting with the
-browser's own zone (no explicit `timeZone`, e.g. Settings key tables, Analytics
-posts table), which is intentional local time or a separate hydration concern.
+formatting and number formatting are unaffected.
+
+Browser-zone formatting is removed too. Client components that formatted dates with no
+`timeZone` (viewer's machine zone, hydration mismatches) now receive `labels` built by
+`src/server/instant-labels.ts` (`workspaceInstantFormatter`, `labelInstants`), in the workspace
+zone and the page locale. Covered: Settings MCP keys, account sessions and passkeys, data
+exports, notifications, best-time apply status, webhooks (endpoints and deliveries), Sharing
+links and feedback, Tasks comments, Inbox notes and moderation log, Ads change history,
+Analytics posts table and Caption tests. API responses that feed interactive updates carry the
+same `labels`. Person keys are account-level (no workspace in the fallback screen), so their
+expiry is labelled in UTC (`person-keys/labels.ts`). `LocalTime` (visitor-local component)
+was removed; `formatStableDateTime` stays for server components. The guard test now also fails
+any client component using `toLocaleDateString/TimeString`, `new Date(..).toLocaleString`,
+local-zone Date getters or `Intl.DateTimeFormat` without a `timeZone`. Remaining allowlist:
+`RootWorkspaceControls` (validates a zone name only) and `CalendarBoard` (fallback with the
+workspace zone prop; the server supplies `clockLabel`).

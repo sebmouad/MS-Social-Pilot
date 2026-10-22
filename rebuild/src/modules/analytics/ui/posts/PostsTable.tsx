@@ -15,6 +15,8 @@ export type PostsTableRow = {
   publishedAt: string | null; measuredAt: string | null;
   /** Stored measure values by key; null is unknown, never zero. */
   measures: Record<string, number | null>;
+  /** Server-formatted labels in the workspace zone (see `@/server/instant-labels`). */
+  labels?: { publishedAt?: string; measuredAt?: string };
 };
 export type PostsTableMeasure = { key: string; label: string };
 
@@ -38,9 +40,7 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
   const shownKeys = (picked ?? measures.slice(0, DEFAULT_COLUMNS).map(measure => measure.key)).filter(key => measures.some(measure => measure.key === key));
   const toggle = (key: string) => setPicked(() => { const current = new Set(shownKeys); if (current.has(key)) current.delete(key); else current.add(key); return measures.filter(measure => current.has(measure.key)).map(measure => measure.key); });
   const number = useMemo(() => new Intl.NumberFormat(locale), [locale]);
-  // Viewer's own timezone; the server render may differ from the browser, so the <time> text may update on hydration.
-  const date = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }), [locale]);
-  const when = (value: string | null) => value ? <time dateTime={value} suppressHydrationWarning>{date.format(new Date(value))}</time> : unavailable;
+  const when = (value: string | null, label?: string) => value ? <time dateTime={value}>{label ?? ''}</time> : unavailable;
   const chosen = measures.filter(measure => shownKeys.includes(measure.key));
   const peak = (key: string) => Math.max(0, ...rows.map(row => row.measures[key]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value)));
 
@@ -65,7 +65,7 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
             <small className="analytics-posts__channel"><Avatar name={row.channelName} size="sm" decorative />{row.channelName}</small>
           </span>
         </span> },
-        { key: 'publishedAt', label: t("Published"), render: row => when(row.publishedAt) },
+        { key: 'publishedAt', label: t("Published"), render: row => when(row.publishedAt, row.labels?.publishedAt) },
         ...chosen.map((measure, index) => ({ key: `m:${measure.key}`, label: measure.label, align: 'end' as const, render: (row: PostsTableRow) => {
           const value = row.measures[measure.key];
           if (value === null || value === undefined) return <span title={unavailable}>—</span>;
@@ -74,7 +74,7 @@ export function PostsTable({ rows, measures: allMeasures, locale, emptyAction, c
             {index === 0 && top > 0 && <span className="analytics-posts__bar" aria-hidden="true"><span style={{ width: `${Math.max(2, Math.round((Math.max(0, value) / top) * 100))}%` }} /></span>}
           </span>;
         } })),
-        { key: 'measuredAt', label: t("Measured"), render: row => when(row.measuredAt) },
+        { key: 'measuredAt', label: t("Measured"), render: row => when(row.measuredAt, row.labels?.measuredAt) },
       ]} />
   </div>;
 }

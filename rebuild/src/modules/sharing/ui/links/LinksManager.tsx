@@ -8,8 +8,8 @@ import { ownerText, resolveOwnerCopy } from '../owner-copy';
 import styles from './sharing.module.css';
 
 type Kind = 'review' | 'calendar' | 'portal';
-type Link = { id: string; kind: Kind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; publishAnywayHours: number | null; status: 'active' | 'expired' | 'revoked'; expiresAt: string | null; createdAt: string; feedbackCount: number; version: string };
-type Feedback = { id: string; decision: 'approved' | 'rejected' | 'comment'; comment: string | null; authorName: string; createdAt: string; postStatus: string | null; postPreview: string | null };
+type Link = { id: string; kind: Kind; title: string; description: string | null; targetIds: string[]; daysBack: number; daysAhead: number; allowComments: boolean; decides: boolean; publishAnywayHours: number | null; status: 'active' | 'expired' | 'revoked'; expiresAt: string | null; createdAt: string; feedbackCount: number; version: string; labels?: { expiresAt?: string } };
+type Feedback = { id: string; decision: 'approved' | 'rejected' | 'comment'; comment: string | null; authorName: string; createdAt: string; postStatus: string | null; postPreview: string | null; labels?: { createdAt?: string } };
 type Props = {
   initial: { presentation?: { workspaceName: string | null; workspaceLogoUrl: string | null; advisoryDecisionNotificationsEnabled: boolean }; links: Link[]; page: number; hasMore: boolean }; channels: Array<{ id: string; name: string }>; canApprove: boolean;
   /** maxDaysBack, maxDaysAhead, maxTargets and publishAnywayMax are optional host hints; the service enforces the real Root bounds either way. */
@@ -21,7 +21,6 @@ type Draft = { kind: Kind; title: string; description: string; selected: string[
 type Editor = { mode: 'create' } | { mode: 'edit'; link: Link };
 type Pending = { link: Link; action: 'revoke' | 'rotate' | 'delete' };
 
-const stamp = (value: string) => new Date(value).toLocaleString();
 const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every(id => b.includes(id));
 const DEFAULT_COPY = resolveOwnerCopy('en');
 const EMPTY: Draft = { kind: 'review', title: '', description: '', selected: [], allowComments: true, decides: false, anyway: '', daysBack: '7', daysAhead: '30', lifetime: '' };
@@ -41,7 +40,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
   const postStatus = (status: string) => ({ pending_approval: t('Still waiting for review'), scheduled: t('Scheduled'), draft: t('Draft'), rejected: t('Rejected'), published: t('Published'), failed: t('Failed'), partially_failed: t('Partly failed') } as Record<string, string>)[status] ?? status;
   const channelCount = (count: number) => count === 1 ? t('{0} channel', count) : t('{0} channels', count);
   const answerCount = (count: number) => count === 1 ? t('{0} answer', count) : t('{0} answers', count);
-  const date = (value: string | null) => value ? new Date(value).toLocaleDateString() : t('No expiry set');
+  const date = (link: Link) => link.expiresAt ? link.labels?.expiresAt ?? '' : t('No expiry set');
   const unconfirmed = t('The change could not be confirmed. Refresh before trying again.');
   const request = (url: string, init: RequestInit = {}) => call(url, init, unconfirmed);
   const [links, setLinks] = useState(initial.links); const [page, setPage] = useState(initial.page); const [hasMore, setHasMore] = useState(initial.hasMore);
@@ -158,7 +157,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
   const columns: TableColumn<Link>[] = [
     { key: 'title', label: t('Link'), render: link => <><strong>{link.title}</strong><br /><small>{kindLabel(link.kind)}{link.decides ? t(' · client can decide') : ''}{link.decides && link.publishAnywayHours != null ? ` · ${t('Auto-approves {0}h before publishing', link.publishAnywayHours)}` : ''} · {scope(link)}</small></> },
     { key: 'status', label: t('Status'), render: link => <Status tone={link.status === 'active' ? 'good' : 'neutral'}>{link.status === 'active' ? t('Active') : link.status === 'expired' ? t('Expired') : t('Revoked')}</Status> },
-    { key: 'expires', label: t('Expires'), render: link => date(link.expiresAt) },
+    { key: 'expires', label: t('Expires'), render: link => date(link) },
     { key: 'feedback', label: t('Feedback'), render: link => link.feedbackCount ? <Button size="sm" variant="quiet" onClick={() => { setFeedback([]); void openFeedback(link); }} aria-label={t('View {0} on {1}', answerCount(link.feedbackCount), link.title)}>{answerCount(link.feedbackCount)}</Button> : t('None yet') },
     { key: 'manage', label: t('Manage'), render: link => <div className={styles.actions}>
       <Button size="sm" disabled={busy} onClick={() => openEdit(link)} aria-label={t('Edit {0}', link.title)}>{t('Edit')}</Button>
@@ -186,7 +185,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
         <div className={styles.row}>
           <label className={styles.field}><span>{t('Type')}</span><select value={draft.kind} disabled={busy || revoked} onChange={event => set({ kind: event.target.value as Kind, ...(event.target.value === 'calendar' ? { decides: false } : {}) })}><option value="review">{t('Review: posts waiting for feedback')}</option><option value="calendar">{t('Calendar: what is planned and published')}</option><option value="portal">{t('Portal: review and calendar together')}</option></select></label>
           <label className={styles.field}><span>{t('Title')}</span><input required maxLength={limits.titleMax} disabled={busy} value={draft.title} onChange={event => set({ title: event.target.value })} /></label>
-          <label className={styles.field}><span>{creating ? t('Lifetime in days') : t('Renew for (days)')}</span><input type="number" min={1} max={limits.maxExpiryDays} inputMode="numeric" disabled={busy || revoked} value={draft.lifetime} onChange={event => set({ lifetime: event.target.value })} placeholder={creating ? t('{0} (default)', limits.defaultExpiryDays) : t('Keep current')} /><small>{creating ? t('Up to {0} days.', limits.maxExpiryDays) : `${t('Counts from today, up to {0} days.', limits.maxExpiryDays)}${edited?.expiresAt ? ` ${t('Now expires {0}.', date(edited.expiresAt))}` : ''}`}</small></label>
+          <label className={styles.field}><span>{creating ? t('Lifetime in days') : t('Renew for (days)')}</span><input type="number" min={1} max={limits.maxExpiryDays} inputMode="numeric" disabled={busy || revoked} value={draft.lifetime} onChange={event => set({ lifetime: event.target.value })} placeholder={creating ? t('{0} (default)', limits.defaultExpiryDays) : t('Keep current')} /><small>{creating ? t('Up to {0} days.', limits.maxExpiryDays) : `${t('Counts from today, up to {0} days.', limits.maxExpiryDays)}${edited?.expiresAt ? ` ${t('Now expires {0}.', date(edited))}` : ''}`}</small></label>
         </div>
         <label className={styles.field}><span>{t('Message for the client (optional)')}</span><textarea rows={2} maxLength={limits.descriptionMax} disabled={busy} value={draft.description} onChange={event => set({ description: event.target.value })} /></label>
         {draft.kind !== 'review' && <div className={styles.row}>
@@ -227,7 +226,7 @@ export function LinksManager({ initial, channels, limits, canApprove, copy = DEF
       {feedbackState === 'error' && <div className={styles.confirm}><p className={styles.error} role="alert">{t('Answers could not be loaded.')}</p><Button size="sm" onClick={() => feedbackFor && void openFeedback(feedbackFor, feedback.length ? feedbackPage + 1 : 1)}>{t('Try again')}</Button></div>}
       {feedbackState === 'idle' && !feedback.length && <p className={styles.empty}>{t('No answers yet.')}</p>}
       <ul className={styles.feedbackList}>{feedback.map(item => <li key={item.id}>
-        <p><strong>{item.authorName}</strong> · {answerLabel(item.decision)} · <small>{stamp(item.createdAt)}</small></p>
+        <p><strong>{item.authorName}</strong> · {answerLabel(item.decision)} · <small>{item.labels?.createdAt ?? ''}</small></p>
         {item.comment && <p className={styles.quote}>{item.comment}</p>}
         <small>{item.postPreview ? t('Post: “{0}”', item.postPreview) : t('Post details are not shown: the post may have been deleted, or your role or plan cannot read Publishing.')}{item.postStatus ? t(' · Now: {0}', postStatus(item.postStatus)) : ''}</small>
       </li>)}</ul>

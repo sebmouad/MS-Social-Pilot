@@ -1,4 +1,5 @@
 import { requestOrigin } from '@/server/request-origin';
+import { labelInstants, workspaceInstantFormatter } from '@/server/instant-labels';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
@@ -15,7 +16,9 @@ export async function GET(request: Request) {
   let current; try { current = await actor(); } catch (error) { const failure = operationFailure(error, 'Moderation rules could not be loaded. Please try again.'); return reply({ error: failure.error, code: failure.code }, failure.status); }
   try {
     if ([...new URL(request.url).searchParams.keys()].length) throw new OperationError('invalid_request', 'Moderation rules do not accept URL parameters.');
-    return reply(await readInboxModeration(current));
+    const moderation = await readInboxModeration(current);
+    const instants = await workspaceInstantFormatter(current.workspaceId, /^\s*fr\b/i.test(request.headers.get('accept-language') ?? '') ? 'fr' : 'en');
+    return reply({ ...moderation, log: moderation.log.map(row => labelInstants(row, { createdAt: 'dateTime' }, instants)) });
   } catch (error) { const failure = operationFailure(error, 'Moderation rules could not be loaded. Please try again.'); return reply({ error: failure.error, code: failure.code }, failure.status); }
 }
 

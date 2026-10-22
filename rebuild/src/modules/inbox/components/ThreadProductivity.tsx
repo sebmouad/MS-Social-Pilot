@@ -14,7 +14,7 @@ import styles from './ThreadProductivity.module.css';
 
 type Locale = 'en' | 'fr';
 type Props = { kind: 'message' | 'comment'; id: string; canWrite?: boolean; onUseSavedReply?: (body: string) => void; locale?: Locale };
-type Note = { id: string; authorId: string | null; authorName: string; body: string; mentionIds?: string[]; createdAt: string; canDelete: boolean };
+type Note = { id: string; authorId: string | null; authorName: string; body: string; mentionIds?: string[]; createdAt: string; canDelete: boolean; labels?: { createdAt?: string } };
 type Reply = { id: string; name: string; body: string };
 type Data = { assignment: { assigneeId: string | null; members: { id: string; name: string | null }[] }; notes: Note[]; mentionable?: { id: string; name: string }[]; limits: { noteMaxCharacters: number; savedReplyNameMaxCharacters: number; savedReplyBodyMaxCharacters: number } };
 
@@ -61,7 +61,7 @@ export function ThreadProductivity({ kind, id, canWrite = true, onUseSavedReply,
         : <span className={styles.status}>{copy.assignedTo(memberName(data.assignment.assigneeId))}</span>}</div>}
     </div>
     <div className={styles.section}><div className={styles.heading}><h3>{copy.notes}</h3></div>{canWrite && <><MentionTextarea ariaLabel={copy.note} maxLength={data?.limits.noteMaxCharacters} value={note} mentionable={data?.mentionable ?? []} listLabel={copy.mentionList} emptyLabel={copy.mentionEmpty} placeholder={copy.notePlaceholder} onChange={(next, ids) => { setNote(next); setMentionIds(ids); }} /><div className={styles.row}><Button disabled={busy || !note.trim() || note.length > (data?.limits.noteMaxCharacters ?? 0)} onClick={async () => { const confirmation = `ADD PRIVATE NOTE ${kind} ${id}`; const ok = await act({ action: 'note.add', kind, id, body: note, ...(mentionIds.length ? { mentionIds } : {}), confirmation }, copy.done.noteAdded); if (ok) { setNote(''); setMentionIds([]); } }}>{copy.addNote}</Button><span className={styles.status}>{copy.mentionHint} {copy.notesHelp}</span></div></>}
-      {data?.notes.map(item => <article className={styles.note} key={item.id}><div className={styles.meta}>{item.authorName} · {new Date(item.createdAt).toLocaleString(locale)}</div><p><MentionedBody body={item.body} mentionIds={item.mentionIds ?? []} mentionable={data?.mentionable ?? []} /></p>{canWrite && item.canDelete && <Button size="sm" variant="quiet" disabled={busy} onClick={() => { const confirmation = `DELETE PRIVATE NOTE ${item.id}`; void act({ action: 'note.delete', id: item.id, confirmation }, copy.done.noteDeleted, copy.deleteNoteAsk); }}>{copy.deleteNote}</Button>}</article>)}
+      {data?.notes.map(item => <article className={styles.note} key={item.id}><div className={styles.meta}>{item.authorName} · {item.labels?.createdAt ?? ''}</div><p><MentionedBody body={item.body} mentionIds={item.mentionIds ?? []} mentionable={data?.mentionable ?? []} /></p>{canWrite && item.canDelete && <Button size="sm" variant="quiet" disabled={busy} onClick={() => { const confirmation = `DELETE PRIVATE NOTE ${item.id}`; void act({ action: 'note.delete', id: item.id, confirmation }, copy.done.noteDeleted, copy.deleteNoteAsk); }}>{copy.deleteNote}</Button>}</article>)}
     </div>
     <div className={styles.section}><div className={styles.heading}><h3>{copy.savedReplies}</h3></div>
       {data && !replies.length ? <EmptyState title={copy.noReplies}>{copy.noRepliesBody}</EmptyState> : null}

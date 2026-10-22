@@ -10,7 +10,7 @@ import { FieldError, useFormValidation } from '@/components/FormValidation';
 import styles from '@/modules/settings/ui/settings.module.css';
 import { fill } from './copy';
 
-type Session = { id: string; expiresAt: string; current: boolean };
+type Session = { id: string; expiresAt: string; current: boolean; labels?: { expiresAt?: string } };
 
 export function AccountManager({ initialName, email, passwordPolicy, canWrite, nameMaxLength, confirmationCopy, sessionRevision = 0, locale = 'en', part = 'profile' }: { part?: 'profile' | 'security'; sessionRevision?: number; canWrite: boolean; nameMaxLength: number; confirmationCopy: AccountConfirmationCopy; initialName: string; email: string; passwordPolicy: { minLength: number; maxBytes: number }; locale?: 'en' | 'fr' }) {
   const toast = useToast();
@@ -108,7 +108,7 @@ export function AccountManager({ initialName, email, passwordPolicy, canWrite, n
     {part === 'security' && <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>{t.sessions}</h2><p>{t.sessionsDetail}</p></div></div>
       <DataTable caption={t.sessions} rows={sessions} rowKey={session => session.id} emptyMessage={t.noSessions} emptyIcon={<IconDevices />} columns={[
         { key: 'session', label: t.session, render: session => <Badge tone={session.current ? 'module' : 'neutral'}>{session.current ? t.currentSession : t.otherSession}</Badge> },
-        { key: 'expires', label: t.expires, render: session => new Date(session.expiresAt).toLocaleString(locale) },
+        { key: 'expires', label: t.expires, render: session => session.labels?.expiresAt ?? '' },
         { key: 'actions', label: t.signOut, render: session => canWrite && !session.current && <button type="button" className="ui-button ui-button--quiet" disabled={busy} onClick={() => setPendingSession(session.id)}>{t.signOut}</button> },
       ]} />
     </section>}

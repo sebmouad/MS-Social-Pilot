@@ -70,7 +70,7 @@ export function PersonKeysManager({ locale = 'en', initial }: { locale?: 'en' | 
       {secret && <div role="status"><p>{t.secret}</p><textarea className="ui-input" readOnly aria-label={t.secret} value={secret} /><Button onClick={() => setSecret('')}>{t.dismiss}</Button></div>}
       {directory.truncated && <p role="status">{t.truncated}</p>}
       <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th>{t.name}</th><th>{t.prefix}</th><th>{t.expires}</th><th /></tr></thead><tbody>
-        {directory.keys.map(key => <tr key={key.id}><td>{key.name}</td><td>{key.tokenPrefix}</td><td>{key.expiresAt ? new Date(key.expiresAt).toLocaleString(locale) : t.unavailable}</td><td><Button disabled={busy} onClick={() => void revoke(key)} aria-label={`${t.revoke} ${key.name}`}>{t.revoke}</Button></td></tr>)}
+        {directory.keys.map(key => <tr key={key.id}><td>{key.name}</td><td>{key.tokenPrefix}</td><td>{key.expiresAt ? key.labels?.expiresAt ?? '' : t.unavailable}</td><td><Button disabled={busy} onClick={() => void revoke(key)} aria-label={`${t.revoke} ${key.name}`}>{t.revoke}</Button></td></tr>)}
         {!directory.keys.length && <tr><td colSpan={4}>{t.empty}</td></tr>}
       </tbody></table></div>
     </>}

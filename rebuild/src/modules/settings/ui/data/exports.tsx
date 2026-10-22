@@ -8,7 +8,7 @@ import { DataTable } from '@/components/DataTable';
 
 
 type ExportStatus = 'requested' | 'running' | 'ready' | 'failed' | 'expired';
-type ExportJob = { id: string; status: ExportStatus; createdAt: string; expiresAt: string | null };
+type ExportJob = { id: string; status: ExportStatus; createdAt: string; expiresAt: string | null; labels?: { createdAt?: string; expiresAt?: string } };
 const statuses = new Set(['requested', 'running', 'ready', 'failed', 'expired']);
 function isJob(value: unknown): value is ExportJob {
   if (!value || typeof value !== 'object') return false;
@@ -54,15 +54,14 @@ export function WorkspaceExports({ workspaceId, workspaceName = workspaceId, loc
     } catch { setNotice('failure'); toast.failed(copy.failure, () => void refresh(), copy.refresh); return copy.failure; }
     finally { busyRef.current = false; setBusy(false); }
   }
-  const date = (value: string) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
   return <div>
     <Button variant="primary" onClick={() => { setOpen(true); setNotice(null); }}>{copy.request}</Button>{' '}
     <Button onClick={() => { void refresh(); }}>{copy.refresh}</Button>
     {notice && !open && <p role={notice === 'failure' ? 'alert' : 'status'} tabIndex={-1} ref={node => node?.focus()}>{copy[notice]}</p>}
     {loadError ? <p role="alert">{copy.loadError}</p> : jobs === null ? <p role="status">{copy.loading}</p> : <DataTable caption={copy.history} rows={jobs} rowKey={job => job.id} emptyMessage={copy.empty} emptyAction={<Button onClick={() => setOpen(true)}>{copy.request}</Button>} columns={[
-      { key: 'created', label: copy.created, render: job => date(job.createdAt) },
+      { key: 'created', label: copy.created, render: job => job.labels?.createdAt ?? '' },
       { key: 'status', label: copy.status, render: job => <>{copy.statuses[job.status]}{job.status === 'failed' && <p>{copy.failed}</p>}</> },
-      { key: 'expiry', label: copy.expiry, render: job => job.expiresAt ? date(job.expiresAt) : copy.preparing },
+      { key: 'expiry', label: copy.expiry, render: job => job.expiresAt ? job.labels?.expiresAt ?? '' : copy.preparing },
       { key: 'download', label: copy.download, render: job => job.status === 'ready' && job.expiresAt && Date.parse(job.expiresAt) > Date.now() ? <a className="ui-button ui-button--secondary ui-button--sm" href={`/api/settings/data/exports/${encodeURIComponent(job.id)}`}>{copy.download}</a> : copy.unavailable },
     ]} />}
     {open && <ConfirmDialog open title={copy.title} objectName={workspaceName} consequence={copy.description} confirmLabel={copy.request} cancelLabel={copy.cancel} pendingLabel={copy.pending} failureLabel={copy.failure} danger={false} onClose={() => setOpen(false)} onConfirm={async () => (await requestExport()) ?? null} />}

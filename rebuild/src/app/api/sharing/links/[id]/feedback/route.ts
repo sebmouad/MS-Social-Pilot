@@ -1,4 +1,5 @@
 import { withSharingErrors } from '@/app/api/sharing/_http';
+import { acceptLocale, labelShareFeedback } from '@/modules/sharing/server/labels';
 import { listShareFeedback } from '@/modules/sharing/server/links';
 import { failure, ownerActor, reply } from '../../../_http';
 export const dynamic = 'force-dynamic';
@@ -9,7 +10,7 @@ async function GETHandler(request: Request, context: { params: Promise<{ id: str
   try {
     const { id } = await context.params; const params = new URL(request.url).searchParams; const page = params.get('page');
     if ([...params.keys()].some(k => k !== 'page') || (page !== null && !/^[1-9]\d{0,3}$/.test(page))) return reply({ error: 'Choose a valid result page.', code: 'invalid_request' }, 400);
-    return reply(await listShareFeedback(actor, { id, ...(page ? { page: Number(page) } : {}) }));
+    return reply(await labelShareFeedback(await listShareFeedback(actor, { id, ...(page ? { page: Number(page) } : {}) }), actor.workspaceId, acceptLocale(request)));
   } catch (error) { return failure(error, 'Feedback could not be loaded.'); }
 }
 

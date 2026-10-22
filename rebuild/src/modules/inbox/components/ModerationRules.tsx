@@ -7,7 +7,7 @@ import { MODERATION_ACTIONS, MODERATION_MATCHES, moderationConfirmation, moderat
 import styles from './ModerationRules.module.css';
 
 type Rule = ModerationRuleInput & { id: string };
-type LogRow = { id: string; ruleName: string; targetId: string; authorName: string | null; message: string; action: string; error: string | null; undoneAt: string | null; createdAt: string; undoable: boolean };
+type LogRow = { id: string; ruleName: string; targetId: string; authorName: string | null; message: string; action: string; error: string | null; undoneAt: string | null; createdAt: string; undoable: boolean; labels?: { createdAt?: string } };
 type Data = { rules: Rule[]; log: LogRow[]; channels: { id: string; name: string }[]; canTargetAllChannels: boolean };
 const blank = (): ModerationRuleInput => ({ name: '', enabled: true, targetIds: [], match: 'links', keywords: [], action: 'hide', replyText: null, dailyCap: 20, oncePerUser: true });
 
@@ -98,7 +98,7 @@ export function ModerationRules({ canWrite, locale = 'en' }: { canWrite: boolean
       <p className={styles.hint}>{t('logHint')}</p>
       {data && data.log.length === 0 && <div><strong>{t('logEmptyTitle')}</strong><p className={styles.hint}>{t('logEmptyHint')}</p></div>}
       {data && data.log.length > 0 && <ul className={styles.list}>{data.log.map(row => <li key={row.id} className={styles.item}>
-        <span className={styles.meta}>{new Date(row.createdAt).toLocaleString(locale)} · {channelName(row.targetId)} · {row.ruleName}</span>
+        <span className={styles.meta}>{row.labels?.createdAt ?? ''} · {channelName(row.targetId)} · {row.ruleName}</span>
         <span><strong>{row.authorName || t('someone')}</strong>: {row.message}</span>
         <span className={styles.meta}>{row.error ? t('failed', { reason: row.error }) : row.undoneAt ? t('undone') : t(`done.${row.action}` as 'done.hide')}</span>
         {canWrite && row.undoable && <div><Button size="sm" variant="quiet" disabled={busy} onClick={async () => { const result = await act({ action: 'action.undo', id: row.id, confirmation: moderationConfirmation.undo(row.id) }, t('undoHideConfirm')); if (result) setNotice(t('undoneOk')); }}>{t('undoHide')}</Button></div>}

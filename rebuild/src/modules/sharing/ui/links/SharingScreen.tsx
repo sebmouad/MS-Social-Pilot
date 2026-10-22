@@ -9,6 +9,7 @@ import { settingsLocale } from '@/modules/settings/ui/locale';
 import { SHARING_FEATURE_ID } from '@/modules/sharing/semantics';
 import type { FeatureId } from '@/lib/product';
 import { SettingsPage, SettingsPanel, styles } from '@/modules/settings/ui/_components';
+import { labelShareLinks } from '@/modules/sharing/server/labels';
 import { LinksManager } from './LinksManager';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -30,7 +31,7 @@ export default async function SharingPage() {
   return <PageFrame module="settings"><SettingsPage active={SHARING_FEATURE_ID as FeatureId} tab="sharingLinks" locale={await settingsLocale()} title={t('Client sharing')} description={t('Give clients limited access to {0} without an account.', viewer.membership.workspace.name)}>
     <SettingsPanel title={t('Share links')} detail={t('Review, calendar and portal links open without signing in, show only the channels you choose, and expire.')}>
       {ready
-        ? <LinksManager initial={JSON.parse(JSON.stringify(links))} channels={channels} canApprove={auth.canApprove} limits={{ titleMax: limits.titleMaxCharacters!, descriptionMax: limits.descriptionMaxCharacters!, defaultExpiryDays: limits.defaultExpiryDays!, maxExpiryDays: limits.maxExpiryDays!, maxDaysBack: limits.maxDaysBack!, maxDaysAhead: limits.maxDaysAhead!, maxTargets: limits.maxTargetsPerLink!, publishAnywayMax: limits.publishAnywayMaxHours! }} copy={copy} />
+        ? <LinksManager initial={JSON.parse(JSON.stringify(await labelShareLinks(links, viewer.workspaceId, await settingsLocale())))} channels={channels} canApprove={auth.canApprove} limits={{ titleMax: limits.titleMaxCharacters!, descriptionMax: limits.descriptionMaxCharacters!, defaultExpiryDays: limits.defaultExpiryDays!, maxExpiryDays: limits.maxExpiryDays!, maxDaysBack: limits.maxDaysBack!, maxDaysAhead: limits.maxDaysAhead!, maxTargets: limits.maxTargetsPerLink!, publishAnywayMax: limits.publishAnywayMaxHours! }} copy={copy} />
         : <p className={styles['settings-note']} role="alert">{t('Share links are unavailable right now.')} <a href="/settings/sharing">{t('Try again')}</a>.</p>}
     </SettingsPanel>
   </SettingsPage></PageFrame>;

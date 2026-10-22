@@ -3,6 +3,7 @@ import { OperationError, operationFailure } from '@/lib/operation-error';
 import { personKeySessionActor } from './session';
 import { issuePersonKey, listPersonKeys, revokePersonKey } from './service';
 import { personKeyCopy } from './copy';
+import { labelPersonKeys } from './labels';
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'cache-control': 'no-store' } });
 async function handle(request: Request, action: 'list' | 'issue' | 'revoke') {
@@ -15,7 +16,7 @@ async function handle(request: Request, action: 'list' | 'issue' | 'revoke') {
     }
     const actor = await personKeySessionActor();
     const value = action === 'list' ? await listPersonKeys(actor) : action === 'issue' ? await issuePersonKey(actor, await request.json()) : await revokePersonKey(actor, await request.json());
-    return reply(value);
+    return reply(action === 'list' ? labelPersonKeys(value as Awaited<ReturnType<typeof listPersonKeys>>, request.headers.get('accept-language')?.toLowerCase().startsWith('fr') ? 'fr' : 'en') : value);
   } catch (error) {
     const safe = operationFailure(error instanceof SyntaxError ? new OperationError('invalid_request', 'Invalid JSON.') : error, 'Person credentials are unavailable.');
     const copy = personKeyCopy[request.headers.get('accept-language')?.toLowerCase().startsWith('fr') ? 'fr' : 'en'];

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { instantFormatter } from '../src/server/instant-labels';
 import { PostsTable } from '../src/modules/analytics/ui/posts/PostsTable';
 
 const measures = Array.from({ length: 17 }, (_, index) => ({ key: `m${index}`, label: `Measure ${index}` }));
-const rows = [{ key: 'a:1', text: 'Launch', url: null, channelName: 'Page A', publishedAt: '2026-10-05T14:30:00.000Z', measuredAt: '2026-10-06T08:00:00.000Z', measures: { ...Object.fromEntries(measures.map(m => [m.key, null])), m3: 12, m5: 0 } }];
+const rows = [{ key: 'a:1', text: 'Launch', url: null, channelName: 'Page A', publishedAt: '2026-10-05T14:30:00.000Z', measuredAt: '2026-10-06T08:00:00.000Z', labels: { publishedAt: instantFormatter('UTC', 'en').dateTime('2026-10-05T14:30:00.000Z'), measuredAt: instantFormatter('UTC', 'en').dateTime('2026-10-06T08:00:00.000Z') }, measures: { ...Object.fromEntries(measures.map(m => [m.key, null])), m3: 12, m5: 0 } }];
 
 describe('post explorer table', () => {
   const html = renderToStaticMarkup(createElement(PostsTable, { rows, measures, locale: 'en' }));

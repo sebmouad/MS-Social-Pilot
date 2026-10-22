@@ -1,3 +1,4 @@
+import { instantFormatter } from '@/server/instant-labels';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -52,7 +53,7 @@ describe('thumbnail placement', () => {
     expect(html).toContain(`/api/media/${id}`);
   });
   it('shows the Analytics post explorer thumbnail from the row', () => {
-    const rows = postsTableRows([{ channelId: 'c1', channelName: 'Studio', postId: 'p1', text: 'Hi', url: null, publishedAt: null, measuredAt: null, measures: [{ key: 'views', value: 3 }], thumbnail: { url: 'https://cdn.example.test/t.jpg', video: false, count: 1 } }]);
+    const rows = postsTableRows([{ channelId: 'c1', channelName: 'Studio', postId: 'p1', text: 'Hi', url: null, publishedAt: null, measuredAt: null, measures: [{ key: 'views', value: 3 }], thumbnail: { url: 'https://cdn.example.test/t.jpg', video: false, count: 1 } }], instantFormatter('UTC', 'en'));
     const html = renderToStaticMarkup(createElement(PostsTable, { rows, measures: [{ key: 'views', label: 'Views' }], locale: 'en' }));
     expect(html).toContain('https://cdn.example.test/t.jpg');
   });

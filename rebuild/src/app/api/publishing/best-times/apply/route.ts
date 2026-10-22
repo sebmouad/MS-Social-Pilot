@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { labelInstants, requestLocale, workspaceInstantFormatter } from '@/server/instant-labels';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { requireViewer } from '@/server/context';
 import { requestOrigin } from '@/server/request-origin';
@@ -8,10 +9,11 @@ export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
 
 /** Automatic best-time application: status for owners/admins, and a confirmed apply-now. The service repeats every check. */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const viewer = await requireViewer({ module: 'settings', feature: 'settings/workspace' });
-    return reply(await getBestTimeApplyStatus({ userId: viewer.user.id, workspaceId: viewer.workspaceId }));
+    const status = await getBestTimeApplyStatus({ userId: viewer.user.id, workspaceId: viewer.workspaceId });
+    return reply(labelInstants(status, { lastRunAt: 'date', nextEligibleAt: 'date' }, await workspaceInstantFormatter(viewer.workspaceId, requestLocale(request))));
   } catch (error) {
     const failure = operationFailure(error, 'Best-time status is unavailable.');
     return reply({ error: failure.error, code: failure.code }, failure.status);

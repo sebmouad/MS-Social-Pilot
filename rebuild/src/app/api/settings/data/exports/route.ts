@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { requireViewer } from '@/server/context';
+import { labelInstants, requestLocale, workspaceInstantFormatter } from '@/server/instant-labels';
 import { listWorkspaceExports, requestWorkspaceExport } from '@/modules/settings/server/exports';
 
 export const runtime = 'nodejs';
@@ -13,11 +14,11 @@ function failure(error: unknown) {
   const result = operationFailure(error instanceof z.ZodError || error instanceof SyntaxError ? new OperationError('invalid_request', 'Invalid export request.') : error, 'The export operation could not be confirmed. Refresh the export list before trying again.');
   return reply({ error: result.error, code: result.code }, result.status);
 }
-export async function GET() {
+export async function GET(request: Request) {
   let viewer;
   try { viewer = await requireViewer({ feature: 'settings/data' }); }
   catch { return reply({ error: 'Not authorized.', code: 'unauthorized' }, 401); }
-  try { return reply({ jobs: await listWorkspaceExports({ userId: viewer.user.id, workspaceId: viewer.workspaceId }) }); }
+  try { const instants = await workspaceInstantFormatter(viewer.workspaceId, requestLocale(request)); return reply({ jobs: (await listWorkspaceExports({ userId: viewer.user.id, workspaceId: viewer.workspaceId })).map(job => labelInstants(job, { createdAt: 'dateTime', expiresAt: 'dateTime' }, instants)) }); }
   catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
   catch { return reply({ error: 'Not authorized.', code: 'unauthorized' }, 401); }
   try {
     const input = inputSchema.parse(await request.json());
-    return reply({ job: await requestWorkspaceExport({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input.confirmation) }, 202);
+    const job = await requestWorkspaceExport({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input.confirmation);
+    return reply({ job: labelInstants(job, { createdAt: 'dateTime', expiresAt: 'dateTime' }, await workspaceInstantFormatter(viewer.workspaceId, requestLocale(request))) }, 202);
   } catch (error) { return failure(error); }
 }

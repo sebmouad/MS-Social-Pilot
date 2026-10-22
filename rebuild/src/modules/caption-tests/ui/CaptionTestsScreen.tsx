@@ -6,11 +6,12 @@ import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
-import { LocalTime } from '@/components/LocalTime';
 import { PageHeader } from '@/components/PageHeader';
 import { useConfirm } from '@/components/useConfirm';
 import { fill, type CaptionTestsCopy } from '../copy';
-import type { CaptionTestView } from '../server/service';
+import type { CaptionTestView as BaseCaptionTestView } from '../server/service';
+/** A test with server-formatted workspace-zone date labels (see `@/server/instant-labels`). */
+export type CaptionTestView = BaseCaptionTestView & { labels?: { createdAt?: string; dueAt?: string } };
 import styles from './caption-tests.module.css';
 
 type Post = { id: string; message: string; status: string };
@@ -26,7 +27,7 @@ function withDate(template: string, date: ReactNode) {
 const REASONS = { not_enough_views: 'notEnoughViews', not_published: 'notPublished', no_insights: 'noInsights', tie: 'tie' } as const;
 
 function statusOf(test: CaptionTestView, t: CaptionTestsCopy, numberFormat: Intl.NumberFormat) {
-  if (test.status === 'running') return { tone: 'brand' as const, text: test.dueAt ? withDate(t.runningUntil, <LocalTime value={test.dueAt} style="date" />) : t.running };
+  if (test.status === 'running') return { tone: 'brand' as const, text: test.dueAt ? withDate(t.runningUntil, <time dateTime={test.dueAt}>{test.labels?.dueAt ?? ''}</time>) : t.running };
   if (test.status === 'decided') return { tone: 'success' as const, text: test.lift !== null ? fill(t.winnerLift, { label: test.winnerLabel ?? '', lift: numberFormat.format(Math.round(test.lift)) }) : fill(t.winner, { label: test.winnerLabel ?? '' }) };
   const key = REASONS[(test.reason ?? 'not_enough_views') as keyof typeof REASONS] ?? 'notEnoughViews';
   return { tone: 'warning' as const, text: fill(t[key], { views: numberFormat.format(test.minViews) }) };
@@ -116,7 +117,7 @@ export function CaptionTestsScreen({ tests: initialTests, posts: initialPosts, c
         const best = Math.max(0, ...test.results.map(result => result.rate ?? 0));
         return <li key={test.id} className={styles.card}>
           <header className={styles.cardHead}>
-            <div className={styles.title}><h2>{test.name || t.untitled}</h2><p>{withDate(t.started, <LocalTime value={test.createdAt} style="date" />)}</p></div>
+            <div className={styles.title}><h2>{test.name || t.untitled}</h2><p>{withDate(t.started, <time dateTime={test.createdAt}>{test.labels?.createdAt ?? ''}</time>)}</p></div>
             <Badge tone={state.tone} icon={test.status === 'decided' ? <IconTrophy size={14} /> : undefined}>{state.text}</Badge>
           </header>
           <ol className={styles.captions}>

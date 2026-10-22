@@ -7,6 +7,7 @@ import { PostsTable } from '@/modules/analytics/ui/posts/PostsTable';
 import { postsTableMeasures, postsTableRows } from '@/modules/analytics/ui/posts/rows';
 import { pageChannelScope } from '@/modules/shell/server/scope';
 import { insightsReadInput } from '@/modules/analytics/ui/insights/scope';
+import { workspaceInstantFormatter } from '@/server/instant-labels';
 import { readPosts } from './service';
 import styles from '@/modules/analytics/ui/reports/workflows.module.css';
 import local from './screen.module.css';
@@ -42,6 +43,6 @@ export default async function PostsScreen({ searchParams }: { searchParams: Prom
     <nav aria-label={t("Pages")} className={styles.actions}>{d.input.page > 1 && <a href={`?${query({ page: String(d.input.page - 1) })}`}>{t("Previous")}</a>}<span>{t("Page")} {d.input.page}</span>{d.nextPage && <a href={`?${query({ page: String(d.nextPage) })}`}>{t("Next")}</a>}</nav>
   </form>;
   return <PageFrame module="analytics" scopedAccess><div className={`${styles.root} ${local.content}`}>{sidebar}<header className={styles.heading}><h1>{t("Post explorer")}</h1><p>{t("Published posts with stored measures. Measures are snapshots, not period totals. Missing data is not available.")}</p></header>
-    <PostsTable copy={copy} rows={postsTableRows(d.items)} measures={postsTableMeasures(d.measures, fr ? 'fr' : 'en')} locale={fr ? 'fr' : 'en'} />
+    <PostsTable copy={copy} rows={postsTableRows(d.items, await workspaceInstantFormatter(viewer.workspaceId, fr ? 'fr' : 'en'))} measures={postsTableMeasures(d.measures, fr ? 'fr' : 'en')} locale={fr ? 'fr' : 'en'} />
   </div></PageFrame>;
 }

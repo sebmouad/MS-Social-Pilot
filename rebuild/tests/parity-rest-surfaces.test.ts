@@ -45,6 +45,7 @@ describe('account REST parity', () => {
   it('gets profile and session pages using validated current session authority', async () => {
     expect((await account(request('/api/settings/account'))).status).toBe(200);
     expect(m.readAccount).toHaveBeenCalledWith(expect.objectContaining(actor));
+    m.listAccountSessions.mockResolvedValueOnce({ sessions: [{ id: 's', expiresAt: '2026-11-01T10:00:00.000Z', current: true }], nextOffset: null });
     expect((await sessions(request('/api/settings/account/sessions?offset=2'))).status).toBe(200);
     expect(m.listAccountSessions).toHaveBeenCalledWith(expect.objectContaining(actor), { offset: 2 });
     expect((await sessions(request('/api/settings/account/sessions?offset=bad'))).status).toBe(400);

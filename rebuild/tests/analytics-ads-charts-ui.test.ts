@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { instantFormatter } from '@/server/instant-labels';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -61,7 +62,7 @@ describe('KPI delta', () => {
 
 describe('post explorer table', () => {
   const rows = postsTableRows([{ channelId: 'c1', channelName: 'Studio', postId: 'p1', text: 'Launch day', url: 'https://example.com/p1',
-    publishedAt: new Date('2026-10-01T09:00:00Z'), measuredAt: null, measures: [{ key: 'reach', value: 120 }, { key: 'likes', value: null }] }]);
+    publishedAt: new Date('2026-10-01T09:00:00Z'), measuredAt: null, measures: [{ key: 'reach', value: 120 }, { key: 'likes', value: null }] }], instantFormatter('UTC', 'en'));
   const measures = postsTableMeasures([{ key: 'reach', label: 'Reach', labelFr: 'Portée' }, { key: 'likes', label: 'Likes' }], 'fr');
 
   it('serializes dates and keeps unknown measures null', () => {

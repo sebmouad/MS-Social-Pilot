@@ -164,7 +164,7 @@ export function NotificationCenter({ initialPreferences, initialPage, locale = i
       {listLoaded && rows.length === 0 && <EmptyState title={page > 1 ? t.emptyPageTitle : unreadOnly ? t.emptyUnreadTitle : t.emptyTitle} icon={<IconBell />} action={<Button onClick={() => void loadList(1, false)}>{t.refresh}</Button>}>{page > 1 ? t.emptyPageBody : unreadOnly ? t.emptyUnreadBody : t.emptyBody}</EmptyState>}
       {rows.length > 0 && <DataTable caption={t.tableCaption} rows={rows} rowKey={item => item.id} columns={[
         { key: 'title', label: t.alert, render: item => <><span className={styles.title}>{item.title}</span><span className={styles.body}>{item.body}</span></> },
-        { key: 'when', label: t.when, render: item => <time dateTime={new Date(item.createdAt).toISOString()}>{new Date(item.createdAt).toLocaleString(locale)}</time> },
+        { key: 'when', label: t.when, render: item => <time dateTime={new Date(item.createdAt).toISOString()}>{(item as { labels?: { createdAt?: string } }).labels?.createdAt ?? ''}</time> },
         { key: 'email', label: t.emailOutcome, render: item => emailOutcome(item.emailState) },
         { key: 'status', label: t.status, render: item => <Badge tone={item.readAt ? 'neutral' : 'module'}>{item.available ? `${item.readAt ? t.read : t.unread} · ${eventName(item.kind)}` : t.sourceGone}</Badge> },
         { key: 'actions', label: t.actions, render: item => <div className={styles.actions}>{!item.readAt && <Button size="sm" disabled={busy} onClick={() => setAction({ kind: 'read', item })}>{t.markRead}</Button>}<Button size="sm" disabled={busy} variant="danger" onClick={() => setAction({ kind: 'delete', item })}>{t.delete}</Button></div> },
