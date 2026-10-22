@@ -70,7 +70,7 @@ export function InboxList({ rows: initialRows, olderCursor: initialCursor, total
     <InboxSelectionProvider pageItems={pageItems}>
       <div className={styles.listContent}>
         {pageItems.length ? <BulkBar locale={locale} maxItems={maxItems} /> : null}
-        <div className={styles.listScroll} ref={scroll} role="region" aria-label={copy.conversationsAndComments} tabIndex={0} data-inbox-list-scroll>
+        <div className={styles.listScroll} ref={scroll} role="region" aria-label={title} tabIndex={0} data-inbox-list-scroll>
           <ul className={styles.list} aria-busy={busy}>{rows.map(row => row.content)}</ul>
           <div className={styles.loadMore} ref={sentinel}>
             {failed ? <p role="alert">{copy.loadMoreError}</p> : null}

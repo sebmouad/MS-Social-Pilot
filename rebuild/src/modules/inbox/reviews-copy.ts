@@ -6,6 +6,7 @@ export const reviewCopy = {
     noRating: 'No rating available', noText: 'No written review.',
     replyUnavailable: 'Replying to reviews is not available for this channel. Answer it on the platform.',
     note: 'Reviews are read from the platform and stored here. Edits made on the platform appear after the next sync.',
+    audience: 'Public review. Everyone who can see the page can read it.',
     syncedReviews: '{count} reviews', openReview: 'Open review',
   },
   fr: {
@@ -14,6 +15,7 @@ export const reviewCopy = {
     noRating: 'Note non disponible', noText: 'Aucun commentaire écrit.',
     replyUnavailable: 'Répondre aux avis n’est pas possible pour ce canal. Répondez-y sur la plateforme.',
     note: 'Les avis sont lus sur la plateforme puis enregistrés ici. Les modifications faites sur la plateforme apparaissent après la prochaine synchronisation.',
+    audience: 'Avis public. Toutes les personnes qui voient la page peuvent le lire.',
     syncedReviews: '{count} avis', openReview: 'Ouvrir l’avis',
   },
 } as const;

@@ -40,6 +40,7 @@ const templates: Record<string, TemplateSpec> = {
   'inboxCopy.items': { parameters: ['shown', 'total'], plural: 0, zeroAt: 1 },
   'inboxCopy.nUnread': { parameters: ['n'], plural: 0 },
   'inboxCopy.conversationWith': { parameters: ['name'] }, 'inboxCopy.commentBy': { parameters: ['name'] },
+  'inboxCopy.audiencePrivate': { parameters: ['name'] },
   'inboxCopy.historyShown': { parameters: ['shown', 'total', 'noun'] }, 'inboxCopy.sentBy': { parameters: ['name'] }, 'inboxCopy.repliesTo': { parameters: ['name'] },
   'actionCopy.noun': { parameters: ['reply'], boolean: true }, 'actionCopy.cap': { parameters: ['reply'], boolean: true },
   ...Object.fromEntries(['hide', 'unhide', 'delete', 'keep', 'deleteTitle', 'hideInstead'].map(key => [`actionCopy.${key}`, { parameters: ['noun'] }])),

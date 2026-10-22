@@ -202,6 +202,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       {kind === 'comment' && canHide && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('hide', { action: 'moderate', id, hidden: !hidden }, hidden ? copy.visibleDone(cap) : copy.hiddenDone(cap), { action: 'moderate', id, hidden }, hidden ? copy.hiddenDone(cap) : copy.visibleDone(cap))}>{hidden ? copy.unhide(noun) : copy.hide(noun)}</Button>}
       {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => void openDeleteDialog()}>{copy.delete(noun)}</Button>}
     </div>
+    {kind === 'comment' && canHide ? <p className={styles.toolbarNote}>{copy.hideNote}</p> : null}
     <div role="status" aria-live="polite" className={styles.toolbarStatus}>{done}</div>
     {error && !confirming && <p role="alert" className={styles.error}>{error}</p>}
     <Dialog open={confirming} busy={deleteBusy} title={canStartDelete ? copy.deleteTitle(noun) : copy.statusTitle} description={canStartDelete ? copy.deleteBody(noun, platformName) : copy.statusBody} onClose={() => { if (!deleteBusy) { setConfirming(false); } }}
@@ -280,6 +281,7 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
 
   return <form method="post" noValidate className={styles.reply} onSubmit={event => void submit(event)}>
     <p id={ruleId} className={allowed ? styles.ruleOpen : styles.ruleClosed}><span aria-hidden="true">{allowed ? '●' : '■'}</span> <strong>{headline}</strong>{detail ? <span className={styles.ruleDetail}> {detail}</span> : null}</p>
+    <p className={styles.replyAudience} data-kind={kind}>{kind === 'message' ? copy.privateNote : copy.publicNote}</p>
     <label htmlFor={fieldId} className="ui-visually-hidden">{copy.reply}</label>
     <AutoTextarea id={fieldId} name="reply" data-inbox-reply rows={3} maxLength={maxLength} value={text} disabled={!allowed || busy} aria-describedby={[ruleId, countId, validation.fieldProps('reply')['aria-describedby']].filter(Boolean).join(' ')} aria-invalid={Boolean(error) || Boolean(validation.errors.reply) || undefined}
       placeholder={allowed ? (kind === 'message' ? copy.privatePlaceholder : copy.publicPlaceholder) : copy.unavailable} onChange={event => { updateText(event.target.value); setSent(''); }} />

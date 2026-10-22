@@ -10,6 +10,7 @@ const ICONS = {
   hidden: <><path d="M2 8s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4Z" {...shape} /><path d="m3 13 10-10" {...shape} /></>,
   message: <path d="M3 3.5h10v7H8.4L5.4 13v-2.5H3Z" {...shape} />,
   comment: <><path d="M3 3.5h10v7H8.4L5.4 13v-2.5H3Z" {...shape} /><path d="M5.6 6h4.8m-4.8 2h3" {...shape} /></>,
+  review: <path d="M8 2.2l1.8 3.7 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4L2.2 6.5l4-.6Z" {...shape} />,
   positive: <><circle cx="8" cy="8" r="5.5" {...shape} /><path d="M5.6 9.6a3.2 3.2 0 0 0 4.8 0M6 6.4h.01M10 6.4h.01" {...shape} /></>,
   neutral: <><circle cx="8" cy="8" r="5.5" {...shape} /><path d="M6 10h4M6 6.4h.01M10 6.4h.01" {...shape} /></>,
   negative: <><circle cx="8" cy="8" r="5.5" {...shape} /><path d="M5.6 10.4a3.2 3.2 0 0 1 4.8 0M6 6.4h.01M10 6.4h.01" {...shape} /></>,

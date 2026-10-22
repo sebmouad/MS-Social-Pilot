@@ -1009,3 +1009,15 @@ Owner directive: improve all modules. This batch covers the six remaining module
 - **Docs:** UX-CONTRACT.md rules, this entry, ARCHITECTURE.md status note. No `CONFIG_SCHEMA_VERSION` bump: no registry entries added (config-validation passes at 137; `media.copy` new keys default-fill, `publishing.contentCopy` falls back wholesale on old saves).
 
 Evidence: `npm run typecheck` 0 errors; touched suites pass (list in the ARCHITECTURE.md note). No full suite (not run per batch instructions), no browser, no provider, no production verification.
+
+## Inbox message vs comment surfacing — 2026-10-22 (source/unit only, uncommitted)
+
+Owner directive: inbox message vs comment must be unmistakable. Surfacing/UX batch, no remodel, no URL/route changes.
+
+- Separate lists: `InboxScreen` coerces absent/legacy-`all` kind to `message`; `InboxFilterRow` Type offers only message/comment/review; a kind switcher (`kindTabs`) shows per-kind totals + message unread and keeps sidebar channel scope and all other filters on switch.
+- Rows: `data-group` edge (solid message / dashed comment / dotted review) + icon + label; reviews get a star icon (`InboxTag` `review`). Thread head has an audience line; `ReplyBox` states private/public reply consequence; comment `ThreadToolbar` states the hide consequence.
+- Service: `readInboxList` returns optional `totals`/`unread` (`InboxKindCounts`, kind filter ignored) via grouped count + message unread sum; `inboxKindCounts` folds grouped rows. API/MCP still accept `kind: 'all'`.
+- Copy: 15 new EN/FR keys across `inboxCopy` (incl. `audiencePrivate` template), `REPLY_COPY`, `actionCopy`, `reviewCopy`, all in the existing `inbox.customerCopy` catalog. No sidebar inbox badge exists, so no badge change. No `CONFIG_SCHEMA_VERSION` bump: no registry entries added or changed (config-validation passes at 137).
+- Empty states per kind with kind-preserving next actions; list titles are kind + state ("Messages · Open").
+
+Evidence: `npm run typecheck` 0 errors; new suites pass (inbox-kind-separation 10, inbox-kind-consequences 2); touched/neighbor suites pass (inbox-browsing-page, inbox-round2-ui, inbox-round3-ui, inbox-customer-copy, inbox-scope-b5, inbox-write-receipts-ui, inbox-delete-ui, inbox-delete-recovery-ui, inbox-v2-b4, inbox-screens-redesign, inbox-mention-ui, inbox-reply-saved-menu, inbox-nested-replies, inbox-thread-scroll, inbox-progressive-list, inbox-state-isolation, inbox-reviews, inbox-reviews-read, inbox-round3, inbox-read-routes, inbox-actions-route, inbox-route-auth, inbox-key-scope80, ui-copy-coverage, config-validation). No full suite, browser, provider or production verification in this batch.

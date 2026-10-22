@@ -732,3 +732,14 @@ Source/unit evidence only; no browser, provider or production run in this batch.
 - Resolving or reopening a conversation, comment or review writes workspace history (Settings › History) in the same transaction as the state change, alongside assignment, note and moderation actions; single and bulk paths share it. Replies stay visible in the thread itself; reply/hide/delete provider outcomes are not history rows.
 - The command palette reaches the Library sub-pages (Fields, Labels, Templates) and the Settings sub-pages (Link in bio, Notifications, Appearance, Webhooks) that tabs hide. Tab routes without their own feature id (Inbox Rules, API keys, Security, channel groups) stay reachable through their section tabs.
 - Agency shows the "the channel scope does not filter it" notice only when a channel parameter is present; without one the page shows no scope notice.
+
+## Inbox message/comment display rule — 2026-10-22
+
+Source/unit evidence only; no browser, provider or production run in this batch.
+
+- Messages, comments and reviews open as three separate lists (`type=message|comment|review`); there is no mixed list. An absent or legacy `type=all` opens Messages. The Type filter offers only the three explicit kinds.
+- Kind is never color alone: every row carries `data-group` (solid edge = private message, dashed edge = public comment, dotted edge = review) plus an icon and a text label; reviews use a star icon.
+- A kind switcher above the list shows per-kind stored totals and the message unread count (`3 unread`), marks the open list with `aria-current`, and keeps the sidebar channel scope and every other filter when switching; only the kind, cursor and open thread reset. Unread is tracked for messages only and is shown only there.
+- The open thread states its audience under the title (private conversation vs public comment thread vs public review). The reply composer states who sees the reply (private vs public); comment threads state the hide consequence. Comment deletion keeps its existing platform-consequence dialog.
+- Empty states are per kind with one next action in the same list: kind-specific no-open (Show resolved keeps the kind), kind-specific never-synced (names Sync now), kind-specific no-match (Reset filters keeps the kind).
+- No URL or route changes; the command palette is unaffected. Kind tabs keep 40px targets on phones; rows keep their full-row targets and the same icon/label/edge distinctions.

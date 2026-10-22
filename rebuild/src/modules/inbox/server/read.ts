@@ -8,7 +8,7 @@ import { conversationNeedsReply } from '@/modules/inbox/server/threads';
 import { OperationError } from '@/lib/operation-error';
 import { authorizeInbox as readAccess } from './access';
 import { encodeInboxCursor, inboxFilterFingerprint, readInboxCursor, type InboxCursor } from './cursor';
-import { INBOX_QUICK_FILTERS, type InboxQuickFilter } from './types';
+import { INBOX_QUICK_FILTERS, inboxKindCounts, type InboxQuickFilter } from './types';
 import type { InboxReadActor, InboxReadConstraints, InboxLimits, InboxListItem, InboxSentiment, InboxListPage, InboxPageCursors, InboxThreadPage, ThreadEntry } from './types';
 
 const targetSelect = { id: true, name: true, providerId: true, socialAccount: { select: { provider: true } } } as const;
@@ -82,45 +82,55 @@ export async function readInboxList(actor: InboxReadActor, input: unknown = {}, 
   const cursor = readInboxCursor(parsed.data.cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
   const filters = { channelId: channelId ?? null, kind, state, hidden, q };
   const base = { ...(quick.length ? { quick } : {}), filters, channels: access.channels, timeZone: access.timeZone, limits, limit: take, cursor: parsed.data.cursor ?? null };
-  if (!channelIds.length) return { ...base, items: [], total: 0, olderCursor: null, newerCursor: null, lastSynced: null };
+  if (!channelIds.length) return { ...base, items: [], total: 0, totals: { message: 0, comment: 0, review: 0 }, unread: { message: 0, comment: 0, review: 0 }, olderCursor: null, newerCursor: null, lastSynced: null };
   const status = (alias: 'c' | 'pc' | 'r') => state === 'all' ? Prisma.empty : state === 'open' ? Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NULL` : Prisma.sql`AND ${Prisma.raw(alias)}."resolvedAt" IS NOT NULL`;
   const pattern = literalSearch(q);
   const narrow = (branch: QuickBranch) => quickConditions(quick, mentionPrefix, branch);
-  const activity = Prisma.sql`
+  // Shared by the message branch and the unread sum so both read the same matches.
+  const messageSearch = q ? Prisma.sql`AND (c.snippet ILIKE ${pattern} ESCAPE ${'\\'} OR EXISTS (SELECT 1 FROM conversation_messages m WHERE m."conversationId" = c.id AND (m.message ILIKE ${pattern} ESCAPE ${'\\'} OR m."fromName" ILIKE ${pattern} ESCAPE ${'\\'})))` : Prisma.empty;
+  const activity = (gate: typeof kind) => Prisma.sql`
     SELECT c.id, 'message'::text AS kind, c."updatedTime" AS time FROM conversations c JOIN targets t ON t.id = c."targetId"
-    WHERE ${kind === 'all' || kind === 'message'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('c')} ${narrow('message')}
-      ${q ? Prisma.sql`AND (c.snippet ILIKE ${pattern} ESCAPE ${'\\'} OR EXISTS (SELECT 1 FROM conversation_messages m WHERE m."conversationId" = c.id AND (m.message ILIKE ${pattern} ESCAPE ${'\\'} OR m."fromName" ILIKE ${pattern} ESCAPE ${'\\'})))` : Prisma.empty}
+    WHERE ${gate === 'all' || gate === 'message'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('c')} ${narrow('message')}
+      ${messageSearch}
     UNION ALL
     SELECT pc.id, 'comment'::text AS kind, pc."createdTime" AS time FROM post_comments pc
       JOIN post_targets pt ON pt.id = pc."postTargetId" JOIN targets t ON t.id = pt."targetId" JOIN posts p ON p.id = pt."postId"
-    WHERE ${kind === 'all' || kind === 'comment'} AND pc."parentRemoteId" IS NULL AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('pc')} ${narrow('comment')}
+    WHERE ${gate === 'all' || gate === 'comment'} AND pc."parentRemoteId" IS NULL AND t."workspaceId" = ${actor.workspaceId} AND p."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('pc')} ${narrow('comment')}
       ${hidden === 'visible' ? Prisma.sql`AND pc."isHidden" = false` : Prisma.empty}
       ${q ? Prisma.sql`AND (pc.message ILIKE ${pattern} ESCAPE ${'\\'} OR pc."fromName" ILIKE ${pattern} ESCAPE ${'\\'})` : Prisma.empty}
     UNION ALL
     SELECT r.id, 'review'::text AS kind, r."createdTime" AS time FROM page_reviews r JOIN targets t ON t.id = r."targetId"
-    WHERE ${kind === 'all' || kind === 'review'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('r')} ${narrow('review')}
+    WHERE ${gate === 'all' || gate === 'review'} AND t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('r')} ${narrow('review')}
       ${q ? Prisma.sql`AND (r."reviewText" ILIKE ${pattern} ESCAPE ${'\\'} OR r."reviewerName" ILIKE ${pattern} ESCAPE ${'\\'})` : Prisma.empty}`;
   const order = cursor?.direction === 'newer' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
   // Search is the expensive filter: evaluate it once for both the exact total
   // and the requested page. LEFT JOIN preserves the total beyond the last page.
   const activityPage = q ? prisma.$queryRaw<Array<{ id: string | null; kind: Key['kind'] | null; time: Date | null; count: bigint }>>(Prisma.sql`
-    WITH activity AS MATERIALIZED (${activity}),
+    WITH activity AS MATERIALIZED (${activity(kind)}),
       totals AS (SELECT COUNT(*) AS count FROM activity),
       page AS (SELECT id, kind, time FROM activity ${seek(cursor)} ORDER BY time ${order}, kind COLLATE "C" ${order}, id COLLATE "C" ${order} LIMIT ${take + 1})
     SELECT page.id, page.kind, page.time, totals.count FROM totals LEFT JOIN page ON true
     ORDER BY page.time ${order}, page.kind COLLATE "C" ${order}, page.id COLLATE "C" ${order}`)
     .then(result => ({ rows: result.flatMap(row => row.id !== null && row.kind !== null && row.time !== null ? [{ id: row.id, kind: row.kind, time: row.time }] : []), total: Number(result[0]?.count ?? 0) }))
     : Promise.all([
-      prisma.$queryRaw<Key[]>(Prisma.sql`SELECT id, kind, time FROM (${activity}) AS activity ${seek(cursor)} ORDER BY time ${order}, kind COLLATE "C" ${order}, id COLLATE "C" ${order} LIMIT ${take + 1}`),
-      prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`SELECT COUNT(*) AS count FROM (${activity}) AS activity`),
+      prisma.$queryRaw<Key[]>(Prisma.sql`SELECT id, kind, time FROM (${activity(kind)}) AS activity ${seek(cursor)} ORDER BY time ${order}, kind COLLATE "C" ${order}, id COLLATE "C" ${order} LIMIT ${take + 1}`),
+      prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`SELECT COUNT(*) AS count FROM (${activity(kind)}) AS activity`),
     ]).then(([rows, counts]) => ({ rows, total: Number(counts[0]?.count ?? 0) }));
-  const [{ rows, total }, lastSynced] = await Promise.all([
+  // Per-kind totals ignore the kind filter so the three lists can show what each one holds.
+  const kindTotals = prisma.$queryRaw<Array<{ kind: string; count: bigint }>>(Prisma.sql`SELECT kind, COUNT(*) AS count FROM (${activity('all')}) AS activity GROUP BY kind`).then(inboxKindCounts);
+  const unreadMessages = prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+    SELECT COALESCE(SUM(c."unreadCount"), 0) AS total FROM conversations c JOIN targets t ON t.id = c."targetId"
+    WHERE t."workspaceId" = ${actor.workspaceId} AND t.id IN (${Prisma.join(channelIds)}) ${status('c')} ${narrow('message')} ${messageSearch}`)
+    .then(rows => Number(rows[0]?.total ?? 0));
+  const [{ rows, total }, lastSynced, totals, unreadMessage] = await Promise.all([
     activityPage,
     inboxLastSynced(actor.workspaceId, channelIds),
+    kindTotals,
+    unreadMessages,
   ]);
   const { keys, ...cursors } = pageKeys(rows, take, cursor, fingerprint, limits.cursorMaxCharacters, cursorError);
   const items = await hydrateItems(actor.workspaceId, keys, channelIds);
-  return { ...base, ...cursors, items, total, lastSynced };
+  return { ...base, ...cursors, items, total, totals, unread: { message: unreadMessage, comment: 0, review: 0 }, lastSynced };
 }
 
 type ReviewRow = { id: string; targetId: string; reviewerName: string | null; rating: number | null; recommendationType: string | null; reviewText: string | null; createdTime: Date; resolvedAt: Date | null };

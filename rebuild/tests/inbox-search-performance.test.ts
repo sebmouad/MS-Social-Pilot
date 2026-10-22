@@ -24,8 +24,8 @@ describe('Inbox search query budget', () => {
     mocks.query.mockImplementation(async (sql: { text?: string }) => sql.text?.includes('WITH activity AS MATERIALIZED') ? [{ id: null, kind: null, time: null, count: BigInt(82) }] : []);
     const result = await readInboxList(actor, { q: 'Café 50%_\\' });
     expect(result).toMatchObject({ items: [], total: 82 });
-    // One combined activity query plus two synchronization timestamp reads.
-    expect(mocks.query).toHaveBeenCalledTimes(3);
+    // One combined activity query plus two synchronization timestamp reads, plus the per-kind totals and message unread sum.
+    expect(mocks.query).toHaveBeenCalledTimes(5);
     const query = mocks.query.mock.calls[0]![0] as { text: string; values: unknown[] };
     expect(query.text).toContain('totals LEFT JOIN page ON true');
     expect(query.text).toContain('COUNT(*) AS count FROM activity');
@@ -41,7 +41,7 @@ describe('Inbox search query budget', () => {
     mocks.query.mockResolvedValue([{ id: null, kind: null, time: null, count: BigInt(0) }]);
     const result = await readInboxList(actor, { q: 'missing' });
     expect(result).toMatchObject({ total: 0, items: [], olderCursor: null, newerCursor: null });
-    expect(mocks.query).toHaveBeenCalledTimes(3);
+    expect(mocks.query).toHaveBeenCalledTimes(5);
   });
 
   it('hydrates one bounded page and retains exact totals and continuation beyond the last page', async () => {
@@ -56,9 +56,9 @@ describe('Inbox search query budget', () => {
     expect(first.total).toBe(96);
     expect(first.olderCursor).toBeTruthy();
     expect(first.newerCursor).toBeNull();
-    // One metadata read for the whole authorized page, rather than one per item.
-    expect(mocks.query).toHaveBeenCalledTimes(4);
-    const metadataQuery = mocks.query.mock.calls[3]![0] as { text: string; values: unknown[] };
+    // One metadata read for the whole authorized page, rather than one per item, on top of the page, sync, totals and unread reads.
+    expect(mocks.query).toHaveBeenCalledTimes(6);
+    const metadataQuery = mocks.query.mock.calls[5]![0] as { text: string; values: unknown[] };
     expect(metadataQuery.text).toContain('"inboxMetadata" AS metadata');
     expect(metadataQuery.values.filter(value => String(value).startsWith('conversation-'))).toHaveLength(25);
     expect(mocks.conversations).toHaveBeenCalledTimes(1);
@@ -66,7 +66,7 @@ describe('Inbox search query budget', () => {
     page = [];
     const pastEnd = await readInboxList(actor, { q: 'matching', cursor: first.olderCursor! });
     expect(pastEnd).toMatchObject({ total: 96, items: [] });
-    expect(mocks.query).toHaveBeenCalledTimes(7);
+    expect(mocks.query).toHaveBeenCalledTimes(11);
     expect(mocks.conversations).toHaveBeenCalledTimes(1);
   });
 });

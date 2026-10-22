@@ -40,7 +40,8 @@ import { inboxLocale } from './locale';
 import { inboxScope } from './scope';
 import styles from './inbox.module.css';
 
-const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'all', state: 'open', hidden: 'visible', q: '' };
+const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'message', state: 'open', hidden: 'visible', q: '' };
+const KIND_TABS = ['message', 'comment', 'review'] as const;
 const singleValue = (value: string | string[] | undefined) => typeof value === 'string' ? value : undefined;
 
 function cursorError(field: string) {
@@ -77,8 +78,11 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const constraints = scope.constraints;
   const { channel: _scopeParam, ...listParams } = params;
 
+  // The screen shows one explicit list at a time; an absent or legacy mixed `type` opens Messages. The service still accepts `all` for API/MCP callers.
+  const listInput = inboxListInput(listParams);
+  if (listInput.kind === undefined || listInput.kind === 'all') listInput.kind = 'message';
   const listOutcome = await (async () => {
-    try { return { page: await readInboxList(actor, inboxListInput(listParams), constraints), error: null }; }
+    try { return { page: await readInboxList(actor, listInput, constraints), error: null }; }
     catch (error) { return { page: null, error: operationFailure(error, copy.listError) }; }
   })();
   const listPage = listOutcome.page;
@@ -106,7 +110,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const filters = listPage?.filters ?? DEFAULT_FILTERS;
   const channel = filters.channelId ?? 'all';
   const clearThreadHref = inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}) });
-  const resetHref = inboxHref(threadOutcome.page && requestedThread ? { thread: requestedThread } : {});
+  // The open list is an explicit choice, never a mix; reset keeps it (legacy `all` folds to Messages).
+  const activeKind = filters.kind === 'all' ? 'message' : filters.kind;
+  const resetHref = inboxHref({ type: activeKind, ...(threadOutcome.page && requestedThread ? { thread: requestedThread } : {}) });
   const listPagingLocation = {
     ...baseLocation,
     ...(threadPage && requestedThread ? { thread: requestedThread } : {}),
@@ -152,10 +158,11 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     </nav>;
     const head = <header className={styles.threadHead}>
       <h2>{thread.kind === 'message' ? copy.conversationWith(first?.author ?? copy.aVisitor) : thread.kind === 'review' ? reviewLabel(locale, 'reviewBy', { name: thread.entries[0]?.author ?? copy.aVisitor }) : copy.commentBy(thread.entries[0]?.author ?? copy.aVisitor)}</h2>
+      <p className={styles.audience} data-kind={thread.kind}>{thread.kind === 'message' ? copy.audiencePrivate(first?.author ?? copy.aVisitor) : thread.kind === 'review' ? reviewLabel(locale, 'audience') : copy.audiencePublic}</p>
       <div className={styles.threadTags}>
         <ChannelBadge name={thread.target.name} platformName={badge.platformName} mark={badge.mark} />
-        <InboxTag icon={thread.kind === 'message' ? 'message' : 'comment'}>{thread.kind === 'message' ? copy.message : thread.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
-        {thread.kind === 'review' ? <InboxTag icon="comment">{reviewSummary(locale, thread, reviews)}</InboxTag> : null}
+        <InboxTag icon={thread.kind === 'message' ? 'message' : thread.kind === 'review' ? 'review' : 'comment'}>{thread.kind === 'message' ? copy.message : thread.kind === 'review' ? reviewLabel(locale, 'review') : copy.comment}</InboxTag>
+        {thread.kind === 'review' ? <InboxTag icon="review">{reviewSummary(locale, thread, reviews)}</InboxTag> : null}
         {thread.resolved ? <InboxTag icon="resolved" tone="ok">{copy.resolvedTag}</InboxTag> : <InboxTag icon="needsReply" tone="warn">{copy.openTag}</InboxTag>}
         {thread.hidden ? <InboxTag icon="hidden">{copy.hidden}</InboxTag> : null}
       </div>
@@ -191,7 +198,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   const visibleChannels = listPage?.channels ?? [];
   const quickApplied = listPage?.quick ?? [];
-  const filtered = Boolean(filters.channelId || filters.kind !== 'all' || filters.state !== 'open' || filters.hidden !== 'visible' || filters.q || quickApplied.length);
+  const filtered = Boolean(filters.channelId || filters.state !== 'open' || filters.hidden !== 'visible' || filters.q || quickApplied.length);
 
   const abilities = listPage ? await inboxListAbilities(actor, listPage) : new Map();
   const canWriteReplies = [...abilities.values()].some(ability => ability.write);
@@ -216,9 +223,30 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     {INBOX_QUICK_FILTERS.map(filter => <a key={filter} href={quickHref(filter)} className={styles.quickChip} aria-current={quickApplied.includes(filter) ? 'true' : undefined} title={extra.quick.hint[filter]}>{extra.quick[filter]}</a>)}
   </div> : null;
 
+  // Messages, comments and reviews open as separate lists. Switching keeps the channel scope and every other filter; only the kind, cursor and open thread change.
+  const kindHref = (kind: (typeof KIND_TABS)[number]) => inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => key !== 'type' && key !== 'cursor' && key !== 'thread' && key !== 'historyCursor')), type: kind });
+  const kindLabel = (kind: (typeof KIND_TABS)[number]) => kind === 'message' ? copy.messages : kind === 'comment' ? copy.comments : reviewLabel(locale, 'reviews');
+  const kindTabs = listPage ? <nav className={styles.kindTabs} aria-label={copy.listsLabel}>
+    {KIND_TABS.map(kind => {
+      const unread = kind === 'message' ? listPage.unread?.message ?? 0 : 0;
+      return <a key={kind} href={kindHref(kind)} className={styles.kindTab} data-kind={kind} aria-current={activeKind === kind ? 'page' : undefined}>
+        <InboxTag icon={kind}>{kindLabel(kind)}</InboxTag>
+        {listPage.totals ? <span className={styles.kindCount}>{listPage.totals[kind]}</span> : null}
+        {unread > 0 ? <InboxTag icon="unread" tone="warn">{copy.nUnread(unread)}</InboxTag> : null}
+      </a>;
+    })}
+  </nav> : null;
+  const stateLabel = filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open;
+  const listTitle = `${kindLabel(activeKind)} · ${stateLabel}`;
+  const resolvedHref = inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => key !== 'status' && key !== 'cursor' && key !== 'thread' && key !== 'historyCursor')), status: 'resolved', ...(requestedThread ? { thread: requestedThread } : {}) });
+  const noMatchBody = activeKind === 'comment' ? copy.noMatchBodyComment : activeKind === 'review' ? copy.noMatchBodyReview : copy.noMatchBodyMessage;
+  const noOpenTitle = activeKind === 'comment' ? copy.noOpenCommentsTitle : activeKind === 'review' ? copy.noOpenReviewsTitle : copy.noOpenMessagesTitle;
+  const noOpenBody = activeKind === 'comment' ? copy.noOpenCommentsBody : activeKind === 'review' ? copy.noOpenReviewsBody : copy.noOpenMessagesBody;
+  const emptyBody = activeKind === 'comment' ? copy.emptyBodyComment : activeKind === 'review' ? copy.emptyBodyReview : copy.emptyBodyMessage;
+
   // Applied filters stay visible in the content header; each chip links to the same view without that one filter.
   const without = (...keys: Array<keyof InboxLocation>) => inboxHref({ ...Object.fromEntries(Object.entries(baseLocation).filter(([key]) => !keys.includes(key as keyof InboxLocation))), ...(requestedThread ? { thread: requestedThread } : {}) });
-  const typeLabel = filters.kind === 'message' ? copy.messages : filters.kind === 'comment' ? copy.comments : reviewLabel(locale, 'reviews');
+  const typeLabel = kindLabel(activeKind);
   const chips: UrlFilterChip[] = [
     ...(filters.channelId ? [{ key: 'channel', label: copy.channel, value: visibleChannels.find(item => item.id === filters.channelId)?.name ?? filters.channelId, removeHref: without('channel', 'cursor') }] : []),
     ...(filters.kind !== 'all' ? [{ key: 'type', label: copy.type, value: typeLabel, removeHref: without('type', 'cursor') }] : []),
@@ -251,20 +279,21 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     {listError ? <div role="alert" className={styles.alert}><p>{listError.error}</p><a href={resetHref}>{copy.resetAndReturn}</a></div> : null}
     {threadOutcome.error ? <div role="alert" className={styles.alert}><p>{threadOutcome.error.error}</p><a href={clearThreadHref}>{copy.returnToList}</a></div> : null}
     {noChannels ? <section className="panel"><EmptyState icon={<IconPlugConnected size={26} />} title={copy.noChannelsTitle} action={<a className="ui-button ui-button--primary" href="/settings/channels">{copy.goConnections}</a>}>{copy.noChannelsBody}</EmptyState></section> : listPage ? <div className={styles.split} data-open={thread ? 'true' : 'false'}>
-      <section className={styles.listPane} aria-label={copy.conversationsAndComments}>
+      <section className={styles.listPane} aria-label={listTitle}>
+        {kindTabs}
         {quickRow}
-        {!listPage.items.length ? <div className={styles.listHead}><h2>{filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open}</h2><span>{copy.items(0, listPage.total)}</span></div> : null}
+        {!listPage.items.length ? <div className={styles.listHead}><h2>{listTitle}</h2><span>{copy.items(0, listPage.total)}</span></div> : null}
         {listPage.items.length ? <InboxList key={listRevision} rows={rows} total={listPage.total} olderCursor={listPage.olderCursor} location={{ ...baseLocation, ...(requestedThread ? { thread: requestedThread } : {}) }}
-          locale={locale} title={filters.state === 'resolved' ? copy.resolved : filters.state === 'all' ? copy.allActivity : copy.open}
+          locale={locale} title={listTitle}
           maxItems={listPage.limits.bulkMaxItems ?? listPage.limit} pageLimit={progressivePageLimit} loadMoreAction={loadMoreInboxRows} /> : listPage.total > 0 && listPage.cursor
           ? <EmptyState icon={<IconInboxOff size={26} />} title={copy.emptyPageTitle} action={<a className="ui-button ui-button--secondary" href={inboxHref({ ...listPagingLocation, cursor: undefined })}>{copy.showLatest}</a>}>{copy.emptyPageBody}</EmptyState>
           : filtered
             ? quickApplied.length
               ? <EmptyState icon={<IconInboxOff size={26} />} title={extra.quick.noMatchTitle} action={<a className="ui-button ui-button--secondary" href={resetHref}>{copy.resetFilters}</a>}>{extra.quick.noMatchBody}</EmptyState>
-              : <EmptyState icon={<IconInboxOff size={26} />} title={copy.noMatchTitle} action={<a className="ui-button ui-button--secondary" href="/inbox">{copy.resetFilters}</a>}>{copy.noMatchBody}</EmptyState>
+              : <EmptyState icon={<IconInboxOff size={26} />} title={copy.noMatchTitle} action={<a className="ui-button ui-button--secondary" href={resetHref}>{copy.resetFilters}</a>}>{noMatchBody}</EmptyState>
             : lastSynced
-              ? <EmptyState icon={<IconInbox size={26} />} title={copy.noOpenTitle} action={<a className="ui-button ui-button--secondary" href="/inbox?status=resolved">{copy.showResolved}</a>}>{copy.noOpenBody}</EmptyState>
-              : <EmptyState icon={<IconInbox size={26} />} title={copy.emptyTitle}>{copy.emptyBody}</EmptyState>}
+              ? <EmptyState icon={<IconInbox size={26} />} title={noOpenTitle} action={<a className="ui-button ui-button--secondary" href={resolvedHref}>{copy.showResolved}</a>}>{noOpenBody}</EmptyState>
+              : <EmptyState icon={<IconInbox size={26} />} title={copy.emptyTitle}>{emptyBody}</EmptyState>}
         {listNav}
       </section>
       {threadView ?? <section className={`${styles.threadPane} ${styles.pick}`} aria-label={copy.openConversation}><EmptyState icon={<IconMessages size={26} />} title={copy.selectTitle}>{copy.selectBody}</EmptyState></section>}

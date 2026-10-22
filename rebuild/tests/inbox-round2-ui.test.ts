@@ -83,9 +83,10 @@ describe('Inbox language and shared components', () => {
     expect(html).toContain('Règles');
     expect(html).toContain('Filtres rapides');
     expect(html).toContain('Réinitialiser les filtres');
-    expect(html).toContain('Aucun résultat pour ces filtres');
+    expect(html).toContain('Aucun commentaire ouvert');
     expect(html).toContain('Filtres actifs');
     expect(html).not.toContain('Nothing matches these filters');
+    expect(html).not.toContain('No open comments');
   });
 
   it('shows applied filters as removable chips and keeps the filter form a plain GET form', async () => {

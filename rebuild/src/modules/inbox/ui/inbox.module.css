@@ -191,3 +191,29 @@
   .threadHeadRow { position: sticky; top: 0; z-index: 2; background: var(--surface); }
   .detailsToggle span { display: none; }
 }
+
+/* Message vs comment vs review is never color alone: icon + label + edge style.
+   Solid edge = private message, dashed edge = public comment, dotted edge = review. */
+.item[data-group="message"] { border-left: 3px solid var(--line-strong); }
+.item[data-group="comment"] { border-left: 3px dashed var(--line-strong); }
+.item[data-group="review"] { border-left: 3px dotted var(--line-strong); }
+.item[data-group][aria-current="true"] { border-left-color: var(--mod, var(--accent)); }
+.kindTabs { display: flex; flex: 0 0 auto; gap: 8px; padding: 10px 12px; overflow-x: auto; border-bottom: 1px solid var(--line-subtle, var(--line)); scrollbar-width: thin; }
+.kindTab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 12px 4px 10px; border: 1px solid var(--line-strong); border-inline-start-width: 4px; border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.kindTab[data-kind="message"] { border-inline-start-style: solid; }
+.kindTab[data-kind="comment"] { border-inline-start-style: dashed; }
+.kindTab[data-kind="review"] { border-inline-start-style: dotted; }
+.kindTab:hover { background: var(--surface-muted); }
+.kindTab[aria-current="page"] { border-color: var(--mod, var(--accent)); border-inline-start-color: var(--mod, var(--accent)); background: var(--mod-soft, var(--accent-soft)); }
+.kindTab:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.kindCount { color: var(--ink-soft); font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.audience { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--ink-soft); font-size: 12.5px; line-height: 1.45; }
+.audience[data-kind="message"] { border-inline-start: 3px solid var(--line-strong); }
+.audience[data-kind="comment"] { border-inline-start: 3px dashed var(--line-strong); }
+.audience[data-kind="review"] { border-inline-start: 3px dotted var(--line-strong); }
+.replyAudience { margin: 0; color: var(--ink-soft); font-size: 12.5px; line-height: 1.45; }
+.toolbarNote { margin: 0; color: var(--ink-soft); font-size: 12.5px; line-height: 1.45; }
+@media (forced-colors: active) {
+  .item[data-group], .kindTab[data-kind], .audience[data-kind] { border-inline-start-color: CanvasText; border-left-color: CanvasText; }
+  .item[data-group][aria-current="true"], .kindTab[aria-current="page"] { border-color: Highlight; }
+}

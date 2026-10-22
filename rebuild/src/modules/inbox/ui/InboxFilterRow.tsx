@@ -25,7 +25,7 @@ export function InboxFilterRow({ action, filters, scope, locale, thread, limit, 
   const copy = useInboxCatalog('inboxCopy')[locale];
   const screen = useInboxCatalog('round3Copy')[locale].screen;
   const form = useRef<HTMLFormElement>(null);
-  const [kind, setKind] = useState(filters.kind);
+  const [kind, setKind] = useState(filters.kind === 'all' ? 'message' : filters.kind);
   const [state, setState] = useState(filters.state);
   const [hidden, setHidden] = useState(filters.hidden);
   const apply = () => setTimeout(() => form.current?.requestSubmit(), 0);
@@ -36,7 +36,7 @@ export function InboxFilterRow({ action, filters, scope, locale, thread, limit, 
     <FilterButton activeCount={activeCount} title={screen.filterTitle} onClear={() => window.location.assign(resetHref)}>
       <FilterSection label={copy.type}>
         <Select name="type" aria-label={copy.type} value={kind} onChange={value => { setKind(value); apply(); }}
-          options={[{ value: 'all', label: copy.allTypes }, { value: 'message', label: copy.messages }, { value: 'comment', label: copy.comments }, { value: 'review', label: reviewText(locale, 'reviews', {}, reviews) }]} />
+          options={[{ value: 'message', label: copy.messages }, { value: 'comment', label: copy.comments }, { value: 'review', label: reviewText(locale, 'reviews', {}, reviews) }]} />
       </FilterSection>
       <FilterSection label={copy.status}>
         <Select name="status" aria-label={copy.status} value={state} onChange={value => { setState(value); apply(); }}

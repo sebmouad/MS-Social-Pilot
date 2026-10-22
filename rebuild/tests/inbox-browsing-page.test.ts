@@ -56,7 +56,7 @@ describe('Inbox paging and recoverable route context', () => {
   });
   it('keeps a valid selected thread in reset recovery after invalid list cursor and masks unknown errors', async () => {
     state.list.mockRejectedValueOnce(new OperationError('invalid_request', 'Reset this Inbox cursor.'));
-    const html = await render(); expect(html).toContain('Reset this Inbox cursor.'); expect(html).toContain('href="/inbox?thread=message%3Aconversation"');
+    const html = await render(); expect(html).toContain('Reset this Inbox cursor.'); expect(html).toContain('href="/inbox?type=message&amp;thread=message%3Aconversation"');
     state.thread.mockRejectedValueOnce(new Error('postgres://private-password')); const failed = await render(); expect(failed).not.toContain('private-password'); expect(failed).toContain('could not be opened');
   });
   it('distinguishes a changed empty page from an empty inbox and provides Latest recovery', async () => {
