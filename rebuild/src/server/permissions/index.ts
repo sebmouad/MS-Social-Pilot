@@ -25,10 +25,11 @@ export interface ScopedPermissions {
 }
 
 const DENIED: Permission = { read: false, write: false };
-const MODULES: readonly PermissionModule[] = ['publishing', 'inbox', 'analytics', 'ads', 'tasks', 'agency', 'settings'];
+export const PERMISSION_MODULES: readonly PermissionModule[] = ['publishing', 'inbox', 'analytics', 'ads', 'tasks', 'agency', 'settings'];
 
 const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'home/overview': null,
+  'agents/library': null,
   'publishing/posts': 'publishing/posts',
   'publishing/calendar': 'publishing/calendar',
   'publishing/queue': 'publishing/queue',
@@ -150,7 +151,7 @@ export function resolvePermissions(source: PermissionSource): ScopedPermissions 
     permissionForFeature(source, id, disabled, clientAccess),
   ])) as Record<FeatureId, Permission>;
 
-  const modules = Object.fromEntries(MODULES.map((module) => {
+  const modules = Object.fromEntries(PERMISSION_MODULES.map((module) => {
     const children = PAGES.filter((page) => page.module === module);
     return [module, {
       read: children.some(({ id }) => features[id].read),
@@ -163,12 +164,12 @@ export function resolvePermissions(source: PermissionSource): ScopedPermissions 
     : { all: false, ids: [...new Set(source.pageAccess.map(({ targetId }) => targetId).filter(Boolean))] };
 
   const visibleFeatures = PAGES.filter(({ id }) => features[id].read).map(({ id }) => id);
-  const visibleModules = MODULES.filter((module) => modules[module].read);
+  const visibleModules = PERMISSION_MODULES.filter((module) => modules[module].read);
   return { modules, features, pageScope, visibleFeatures, visibleModules };
 }
 
 export function canAccessModule(permissions: ScopedPermissions, module: string, action: PermissionAction = 'read'): boolean {
-  return MODULES.includes(module as PermissionModule) && permissions.modules[module as PermissionModule]?.[action] === true;
+  return PERMISSION_MODULES.includes(module as PermissionModule) && permissions.modules[module as PermissionModule]?.[action] === true;
 }
 
 export function canAccessFeature(permissions: ScopedPermissions, feature: string, action: PermissionAction = 'read'): boolean {

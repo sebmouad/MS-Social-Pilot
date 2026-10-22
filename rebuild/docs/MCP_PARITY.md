@@ -152,6 +152,10 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | MCP tool | Feature | Access | REST method/path | Mapping review note |
 | --- | --- | --- | --- | --- |
 | get_home_overview | home/overview | read | GET /api/home/overview | Shared customer operation; transport arguments may differ. |
+| list_writing_agents | agents/library | read | GET /api/agents | Agents screen, REST and MCP share writingAgents for tenant-scoped briefs and content-free history. |
+| writing_agents | agents/library | write | GET /api/agents; POST /api/agents | Agents screen, REST and MCP use writingAgents for saved briefs, history and metered suggestions. Service checks current membership, feature permission, exact write confirmation and audit; workspace-wide key scope only. |
+| posts_export_job | publishing/posts | write | POST /api/publishing/posts/export/jobs | Posts UI, REST and MCP use postExportAction for queued CSV creation. Exact EXPORT POSTS consent, current tenant/resource scope, expiry and per-request access apply in the service. |
+| posts_export_status | publishing/posts | read | GET /api/publishing/posts/export/jobs | Posts UI, REST and MCP use postExportAction for export status, attempt history and private download; readers retain independent credential ceilings, current scope and expiry checks. CSV byte limits still apply to MCP output. |
 | get_ads_report_rows | ads/campaigns | read | GET /api/ads/report/rows | Shared customer operation; transport arguments may differ. |
 | export_ads_report | ads/campaigns | read | GET /api/ads/report/export | Shared customer operation; transport arguments may differ. |
 | list_ad_accounts | ads/campaigns | read | GET /api/ads/accounts | Shared customer operation; transport arguments may differ. |

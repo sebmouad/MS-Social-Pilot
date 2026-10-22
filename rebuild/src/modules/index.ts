@@ -1,4 +1,5 @@
 import { agencyManifest } from './agency/manifest';
+import { agentsManifest } from './agents/manifest';
 import { adsManifest } from './ads/manifest';
 import { analyticsManifest } from './analytics/manifest';
 import { homeManifest } from './home/manifest';
@@ -11,6 +12,7 @@ import { tasksManifest } from './tasks/manifest';
 export const moduleManifests = [
   homeManifest,
   publishingManifest,
+  agentsManifest,
   inboxManifest,
   analyticsManifest,
   adsManifest,

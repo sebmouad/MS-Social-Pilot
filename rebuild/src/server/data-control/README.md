@@ -127,3 +127,14 @@ purge-trigger refusals, children-first deletion, foreign-workspace preservation,
 account preference cleanup and user-FK cascades. Without
 `REBUILD_PREVIEW_DATABASE_URL`, these tests skip; no live PostgreSQL outcome is
 claimed. No server, deploy, push or production operation belongs to this lane.
+
+## Writing agents and private Posts CSV storage
+
+| Table | Ownership and lifecycle |
+| --- | --- |
+| `rebuild_writing_agents` | Workspace writing briefs; workspace cascade, user references retain authorship. |
+| `rebuild_writing_agent_runs` | Workspace content-free generation history; deleted agent reference is nulled. |
+| `rebuild_post_exports` | Workspace/user private CSV with expiry and current-access download checks; cascades on workspace/user deletion. |
+| `rebuild_post_export_runs` | Content-free export attempt history; cascades with its export/workspace/user. |
+
+Portability and retained-account erasure coverage require integration by the data-control owner; table registration alone is not proof of full coverage.

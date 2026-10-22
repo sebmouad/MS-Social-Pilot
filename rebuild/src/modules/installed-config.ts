@@ -1,6 +1,8 @@
 import { ADS_MODULE_CONFIG } from './ads/config';
 import { AGENCY_CONFIG } from './agency/config';
 import { AI_CONFIG } from './ai/config';
+import { AGENTS_CONFIG, AGENT_COPY_CONFIG } from './agents/config';
+import { ASYNC_POST_EXPORT_CONFIG } from './publishing/server/export/config';
 import { ANALYTICS_MODULE_CONFIG } from './analytics/config';
 import { FEEDS_CONFIG } from './feeds/config';
 import { HOME_CONFIG } from './home/config';
@@ -29,5 +31,8 @@ export const INSTALLED_MODULE_CONFIG = [
   ...AGENCY_CONFIG,
   ...SHARING_CONFIG,
   ...AI_CONFIG,
+  ...AGENTS_CONFIG,
+  ...AGENT_COPY_CONFIG,
+  ...ASYNC_POST_EXPORT_CONFIG,
   ...INTEGRATIONS_CONFIG,
 ] as const;

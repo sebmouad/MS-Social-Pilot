@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { hashLegacySessionToken, isUsableLegacySession, LEGACY_SESSION_COOKIE } from './auth';
 import { getSessionByTokenHash, listWorkspaces, prisma } from './data';
 import { loadEntitlements, requireFeature, requireModule } from './entitlements';
-import { canAccessFeature, canAccessModule } from './permissions';
+import { PERMISSION_MODULES, canAccessFeature, canAccessModule } from './permissions';
 import { loadPermissions } from './permissions/loader';
 import { assertWorkspaceNotPurging } from './data-control/guard';
 
@@ -31,7 +31,7 @@ export async function requireViewer(access?: { module?: string; feature?: string
   try {
     if (access?.module) requireModule(entitlements, access.module);
     if (access?.feature) requireFeature(entitlements, access.feature);
-    if (access?.module && access.module !== 'home' && !canAccessModule(permissions, access.module)) redirect('/access-limited');
+    if (access?.module && (PERMISSION_MODULES as readonly string[]).includes(access.module) && !canAccessModule(permissions, access.module)) redirect('/access-limited');
     if (access?.feature && !canAccessFeature(permissions, access.feature)) redirect('/access-limited');
   } catch {
     redirect('/access-limited');

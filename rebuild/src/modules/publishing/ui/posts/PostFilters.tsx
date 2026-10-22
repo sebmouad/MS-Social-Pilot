@@ -63,6 +63,6 @@ export function PostFilters({ groups = [], locale = 'en', channels, currentMonth
     <button type="submit">{copy.applyFilters}</button>
     <a href="/publishing/posts">{copy.resetFiltersButton}</a>
     </form>
-    {exportMaxPosts !== undefined && exportMaxBytes !== undefined ? <PostExport maxPosts={exportMaxPosts} maxBytes={exportMaxBytes} /> : null}
+    {exportMaxPosts !== undefined && exportMaxBytes !== undefined ? <PostExport maxPosts={exportMaxPosts} maxBytes={exportMaxBytes} locale={locale} /> : null}
   </>;
 }

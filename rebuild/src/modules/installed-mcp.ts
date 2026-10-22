@@ -8,6 +8,8 @@ import { PUBLISHING_MCP } from './publishing/mcp';
 import { INBOX_MCP } from './inbox/mcp';
 import { MEDIA_MCP } from './media/mcp';
 import { AI_MCP } from './ai/mcp';
+import { AGENTS_MCP } from './agents/mcp';
+import { ASYNC_POST_EXPORT_MCP, ASYNC_POST_EXPORT_READ_MCP } from './publishing/server/export/entry-points';
 import { FEEDS_MCP } from './feeds/mcp';
 import { INTEGRATIONS_MCP } from './integrations/mcp';
 import { HOME_MCP } from './home/mcp';
@@ -18,5 +20,5 @@ import { HOME_MCP } from './home/mcp';
  * when a module is installed.
  */
 export function installedMcpGroups(): readonly McpToolGroup[] {
-  return [...HOME_MCP, ...ADS_MCP, ...TASKS_MCP, ...SHARING_MCP, ...ANALYTICS_MCP, ...SETTINGS_MCP, ...PUBLISHING_MCP, ...INBOX_MCP, ...MEDIA_MCP, ...FEEDS_MCP, ...AI_MCP, ...INTEGRATIONS_MCP];
+  return [...HOME_MCP, ...ADS_MCP, ...TASKS_MCP, ...SHARING_MCP, ...ANALYTICS_MCP, ...SETTINGS_MCP, ...PUBLISHING_MCP, ...ASYNC_POST_EXPORT_MCP, ...ASYNC_POST_EXPORT_READ_MCP, ...INBOX_MCP, ...MEDIA_MCP, ...FEEDS_MCP, ...AI_MCP, ...AGENTS_MCP, ...INTEGRATIONS_MCP];
 }

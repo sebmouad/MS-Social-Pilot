@@ -30,6 +30,7 @@ const MODULE_ROOT_SWITCH: Record<ModuleId, string | null> = {
   ads: 'ads',
   tasks: 'tasks',
   agency: 'agency',
+  agents: null,
   settings: null,
 };
 
@@ -61,6 +62,7 @@ const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
   'ads/objects': 'ads/performance',
   'ads/campaigns': 'ads/performance',
   'tasks/board': null,
+  'agents/library': null,
   'agency/overview': 'agency/overview',
   'agency/clients': 'agency/clients',
   'settings/connections': null,
@@ -76,7 +78,7 @@ const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
   'settings/appearance': null,
 };
 
-const MODULE_IDS: readonly ModuleId[] = ['home', 'publishing', 'inbox', 'analytics', 'ads', 'tasks', 'agency', 'settings'];
+const MODULE_IDS: readonly ModuleId[] = ['home', 'publishing', 'inbox', 'analytics', 'ads', 'tasks', 'agency', 'agents', 'settings'];
 const FEATURE_IDS = PAGES.map(({ id }) => id) as readonly FeatureId[];
 
 function isOff(switchKey: string | null, disabled: ReadonlySet<string>): boolean {

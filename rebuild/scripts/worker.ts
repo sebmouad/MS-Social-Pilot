@@ -12,6 +12,10 @@ const log = (message: string, detail?: unknown) => console.log(`${new Date().toI
 const dependencies: WorkerDependencies = {
   readConfig: runtimeConfig,
   async execute(job: JobName, now: Date, retryLimit: number, retryBackoff: RetryBackoff) {
+    if (job === 'postExports') {
+      const { runPostExportBatch } = await import('@/modules/publishing/server/export/jobs');
+      return runPostExportBatch();
+    }
     if (job === 'publishingRecycle') {
       const { runPublishingRecycle } = await import('@/modules/publishing/server/automation');
       const result = await runPublishingRecycle(now);

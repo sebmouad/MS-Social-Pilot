@@ -1,0 +1,2 @@
+import type { ModuleManifest } from '../types';
+export const agentsManifest = { id: 'agents', title: 'Writing agents', href: '/agents', pages: [{ id: 'agents/library', title: 'Writing agents', href: '/agents', description: 'Save a writing brief and prepare suggestions for review.' }], rootSettingsPrefixes: ['agents.'], rootSettingKeys: [], jobs: [], health: { configuration: true, jobHistory: true, pendingQueues: [] } } as const satisfies ModuleManifest;
