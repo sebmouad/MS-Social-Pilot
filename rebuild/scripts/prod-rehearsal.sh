@@ -7,7 +7,7 @@
 # Usage (any directory in the checkout): bash rebuild/scripts/prod-rehearsal.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."   # rebuild/
-HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
+HOST="${PROD_HOST:-$(grep -o 'root@[0-9][0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 ORDER_FILE="$(mktemp)"
 # Every migration in the repo. The server skips those already recorded in

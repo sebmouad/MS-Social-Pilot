@@ -7,7 +7,7 @@
 # Usage: bash rebuild/scripts/prod-rollback-drill.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."   # rebuild/
-HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
+HOST="${PROD_HOST:-$(grep -o 'root@[0-9][0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 [ -n "$HOST" ] || { echo 'ROLLBACK DRILL FAIL: no production host' >&2; exit 1; }
 ssh -i "$KEY" "$HOST" 'bash -s' <<'REMOTE'

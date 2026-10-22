@@ -7,7 +7,7 @@
 # Usage (any directory in the checkout): bash rebuild/scripts/dev-server-setup.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."   # rebuild/
-HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
+HOST="${PROD_HOST:-$(grep -o 'root@[0-9][0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 DEV_PORT="${DEV_PORT:-3110}"
 DEV_CPU_QUOTA="${DEV_CPU_QUOTA:-100%}"   # one core at most

@@ -18,7 +18,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."   # rebuild/
 BUILD_CPU_QUOTA="${BUILD_CPU_QUOTA:-300%}"   # at most 3 of the host's cores
 BUILD_NICE="${BUILD_NICE:-10}"
-HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
+HOST="${PROD_HOST:-$(grep -o 'root@[0-9][0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 COMMIT="$(git rev-parse origin/main)"
 echo "Release commit: $COMMIT"

@@ -7,7 +7,7 @@
 set -euo pipefail
 EMAIL="${1:?usage: prod-owner-reset-link.sh <account email>}"
 cd "$(dirname "$0")/.."   # rebuild/
-HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
+HOST="${PROD_HOST:-$(grep -o 'root@[0-9][0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 ssh -i "$KEY" "$HOST" "RESET_EMAIL='$EMAIL' bash -s" <<'REMOTE'
 set -euo pipefail

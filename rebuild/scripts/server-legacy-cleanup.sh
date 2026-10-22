@@ -13,7 +13,7 @@ set -euo pipefail
 : "${LEGACY_CLEANUP_CONFIRM:?Set LEGACY_CLEANUP_CONFIRM=YES to remove the legacy release}"
 [ "$LEGACY_CLEANUP_CONFIRM" = YES ] || { echo 'Refusing: LEGACY_CLEANUP_CONFIRM must be YES' >&2; exit 1; }
 cd "$(dirname "$0")/.."   # rebuild/
-HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
+HOST="${PROD_HOST:-$(grep -o 'root@[0-9][0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 [ -n "$HOST" ] || { echo 'LEGACY CLEANUP FAIL: no production host' >&2; exit 1; }
 # Ship the mapped schema so the server verifies every dropped table is
@@ -33,7 +33,7 @@ echo 'media root /var/lib/ms-social-pilot/media will not be touched'
 STAMP="$(date -u +%Y%m%d%H%M%S)"
 DUMP_DIR="/var/backups/legacy-cleanup-$STAMP"
 mkdir -p "$DUMP_DIR"
-sudo -u postgres pg_dump -Fc -f "$DUMP_DIR/social_pilot.dump" social_pilot
+cd /tmp; sudo -u postgres pg_dump -Fc social_pilot > "$DUMP_DIR/social_pilot.dump"; chmod 600 "$DUMP_DIR/social_pilot.dump"
 [ -s "$DUMP_DIR/social_pilot.dump" ] || fail 'fresh backup is missing or empty'
 echo "fresh backup: $DUMP_DIR/social_pilot.dump ($(du -h "$DUMP_DIR/social_pilot.dump" | cut -f1))"
 
