@@ -8,6 +8,8 @@ export interface ModulePageManifest {
   /** Sidebar area override: lets one page join another area than its module's (for example the analytics-owned Analysis page joins the Ads area). */
   readonly area?: AreaId;
   readonly navigation?: boolean;
+  /** Reachable from the command palette even when hidden from tabs/sidebar (Insights sub-pages: goals, pins, notes). */
+  readonly palette?: boolean;
   /** Position among the area's tabs when pages of several modules share an area (lower first); pages without one keep manifest order after them. */
   readonly tabOrder?: number;
   /** Other routes (and their sub-paths) that keep this page's tab current, for related screens outside its own route. */

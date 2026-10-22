@@ -231,6 +231,10 @@ export const workspaceCopyDefaults = {
     "en": "As of",
     "fr": "Au"
   },
+  "Latest stored measurement": {
+    "en": "Latest stored measurement",
+    "fr": "Dernière mesure enregistrée"
+  },
   "No resource-level measurements are stored.": {
     "en": "No resource-level measurements are stored.",
     "fr": "Aucune mesure par ressource n’est enregistrée."

@@ -51,6 +51,22 @@ describe('command palette commands', () => {
     ]));
   });
 
+  it('reaches every Insights page, including the goals, pins and notes sub-pages hidden from tabs', async () => {
+    const { items } = await listNavigationCommands(actor);
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'analytics/overview', href: '/insights' }),
+      expect.objectContaining({ id: 'analytics/explorer', href: '/insights/explore' }),
+      expect.objectContaining({ id: 'analytics/demographics', href: '/insights/audience' }),
+      expect.objectContaining({ id: 'analytics/posts', href: '/insights/posts' }),
+      expect.objectContaining({ id: 'studio/tests', href: '/insights/tests' }),
+      expect.objectContaining({ id: 'analytics/compare', href: '/insights/compare' }),
+      expect.objectContaining({ id: 'analytics/reports', href: '/insights/reports' }),
+      expect.objectContaining({ id: 'analytics/goals', href: '/insights/goals' }),
+      expect.objectContaining({ id: 'analytics/pins', href: '/insights/pins' }),
+      expect.objectContaining({ id: 'analytics/notes', href: '/insights/notes' }),
+    ]));
+  });
+
   it('leaves out modules and features the member cannot use', async () => {
     deniedModules.add('ads');
     deniedFeatures.add('settings/data');

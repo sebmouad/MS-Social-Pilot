@@ -131,4 +131,36 @@ describe('Analytics Explorer', () => {
     const html = renderToStaticMarkup(tree);
     expect(html).toMatch(/href="\/insights\/explore\?period=7&amp;channel=channel-a&amp;metric=reach/);
   });
+
+  it('states coverage, freshness and the unknown-not-zero rule on the metric detail', async () => {
+    const tree = await AnalyticsExplorerPage({ searchParams: Promise.resolve({ metric: 'reach' }) });
+    const html = renderToStaticMarkup(tree);
+    expect(html).toContain('Coverage:');
+    expect(html).toContain('Missing measurements are unknown, not zero.');
+    expect(html).toContain('Latest stored measurement');
+    expect(html).toContain('Oct 16, 2026');
+  });
+
+  it('names the comparison range behind a compared detail', async () => {
+    const compared = snapshot();
+    compared.period.comparison = { mode: 'previous', start: '2026-10-03', end: '2026-10-09', range: { from: new Date('2026-10-03T00:00:00Z'), to: new Date('2026-10-09T23:59:59.999Z') } };
+    state.read.mockResolvedValue(compared);
+    const tree = await AnalyticsExplorerPage({ searchParams: Promise.resolve({ metric: 'reach', compare: 'previous' }) });
+    const html = renderToStaticMarkup(tree);
+    expect(html).toContain('Comparison range:');
+    expect(html).toContain('Oct 3, 2026');
+    expect(html).toContain('Oct 9, 2026');
+  });
+
+  it('greys out metrics with no stored coverage, names the reason and never shows zero freshness', async () => {
+    const s = snapshot();
+    const [first, ...rest] = s.allMetrics;
+    s.allMetrics = [{ ...first!, coverage: 0, total: null, latestAt: null }, ...rest];
+    state.read.mockResolvedValue(s);
+    const tree = await AnalyticsExplorerPage({ searchParams: Promise.resolve({}) });
+    const html = renderToStaticMarkup(tree);
+    expect(html).toContain('data-unavailable="true"');
+    expect(html).toContain('No data stored');
+    expect(html).toContain('Unknown');
+  });
 });

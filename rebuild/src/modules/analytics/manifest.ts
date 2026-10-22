@@ -33,7 +33,8 @@ export const analyticsManifest = {
     // Ad-object analysis is the Analysis tab of the Ads area (Accounts · Campaigns · Manage · Analysis · Compare).
     { id: 'analytics/ads', title: 'Ads analysis', href: '/ads/analysis', area: 'ads', tabOrder: 40, description: 'Explore paid campaign, ad set and ad performance separately from channel analytics.' },
     { id: 'analytics/reports', title: 'Reports', href: '/insights/reports', tabOrder: 70, description: 'Prepare reports, reuse templates and manage scheduled delivery.' },
-    { id: 'analytics/goals', title: 'Goals', href: '/insights/goals', navigation: false, description: 'Set monthly goals per channel and track progress.' },
-    { id: 'analytics/pins', title: 'Pinned metrics', href: '/insights/pins', navigation: false, description: 'Keep a personal view of available metrics.' },
+    { id: 'analytics/goals', title: 'Goals', href: '/insights/goals', navigation: false, palette: true, description: 'Set monthly goals per channel and track progress.' },
+    { id: 'analytics/pins', title: 'Pinned metrics', href: '/insights/pins', navigation: false, palette: true, description: 'Keep a personal view of available metrics.' },
+    { id: 'analytics/notes', title: 'Chart notes', href: '/insights/notes', navigation: false, palette: true, description: 'Annotate charts with dated notes.' },
   ],
 } as const satisfies ModuleManifest;

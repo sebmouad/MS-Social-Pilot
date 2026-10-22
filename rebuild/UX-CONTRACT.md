@@ -706,3 +706,19 @@ transient `publishing`); outcome means sent or resolved (`published`,
 
 Source/DOM evidence only (typecheck + touched vitest files); no browser,
 keyboard-in-browser or screen-reader run.
+
+## Insights honesty display rule (2026-10-22)
+
+Every Insights surface states what its numbers rest on, in the same
+places: the Explore metric detail shows coverage (covered vs selected
+resources), freshness (latest stored measurement as of a UTC day, or
+Unknown) and the comparison range when a comparison is active;
+zero-coverage metrics stay in the list greyed with their "No data
+stored" reason, never silently dropped. The Compare header states the
+comparison basis (both UTC periods plus the channel count, or both
+group sizes plus the shared period). Audience, Posts, Pins and Goals
+keep their covered/selected, measured-as-of and per-channel disclosures
+where the numbers appear. The command palette reaches every Insights
+page including the Goals, Pins and Chart-notes sub-pages that tabs
+hide. Touch targets on Insights-local controls (filter chips, chart
+metric tabs, compare kind switch) reach 40px on coarse pointers.

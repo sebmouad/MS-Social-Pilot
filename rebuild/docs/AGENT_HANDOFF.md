@@ -961,3 +961,36 @@ content-v2-server, calendar-board-ui, publishing-customer-copy,
 publishing-read-service, config-validation). No browser run; full suite
 owned by the verifier. Next: browser-matrix v2 run and release per
 CUTOVER.
+
+## 2026-10-22 — Insights excellence pass (child batch, source only)
+
+Owner directive: improve Insights organization, completeness, usability
+(desktop-first, then phone). No URL moves; no Root registry changes.
+
+- Palette reaches every Insights page: new `palette` page flag
+  (`src/modules/types.ts`, `src/lib/product.ts`); `listNavigationCommands`
+  includes `navigation:false` pages flagged `palette:true`. Goals/pins
+  flagged; new `analytics/notes` page (Chart notes, `/insights/notes`,
+  same `analytics/overview` switches in entitlements + permissions).
+  Tabs unchanged (goals/pins/notes stay sub-pages).
+- Explore detail states coverage, freshness ("Latest stored measurement
+  as of …", Unknown when none) and the comparison range; list greys out
+  zero-coverage metrics with the "No data stored" reason. New workspace
+  copy key EN+FR (schema derived, no registry change).
+- Compare header states the comparison basis (both periods + channel
+  count, or group sizes + shared period). Semantics unchanged
+  (currency refused, reach caveat blocks group deltas, coverage-gated).
+- Fixed stale `/analytics/explorer` empty-state link → `/insights/explore`.
+- Phone: chip removal, chart metric tabs and the compare kind switch
+  reach 40px on coarse pointers (analytics CSS only; shared controls
+  already bump via tokens).
+- No CONFIG_SCHEMA_VERSION bump (no registry entries added or changed;
+  config-validation 9/9 passes).
+
+Evidence: `npm run typecheck` 0 errors; 9 files pass
+(command-palette, command-palette-ui, module-manifests,
+analytics-explorer, analytics-explorer-views-ui,
+insights-compare-screen (new), mcp-security, analytics-copy,
+config-validation). No browser, provider or production run. Open: true
+provider-withdrawn vs never-collected metric distinction (needs loader
+support); browser/theme/phone verification of the new lines.

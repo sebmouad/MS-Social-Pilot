@@ -43,8 +43,11 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     aStart: first(params.aStart), aEnd: first(params.aEnd), bStart: first(params.bStart), bEnd: first(params.bEnd),
     start: first(params.start), end: first(params.end), channel: list(params.channel), groupA: list(params.groupA), groupB: list(params.groupB),
   }} />;
+  const basis = data && (data.mode === 'period'
+    ? `A ${data.periods.a.start} – ${data.periods.a.end} · B ${data.periods.b.start} – ${data.periods.b.end} · ${data.selected.a.channelIds.length} ${t('channels')}`
+    : `${t('Group A')}: ${data.selected.a.channelIds.length} · ${t('Group B')}: ${data.selected.b.channelIds.length} · ${data.periods.a.start} – ${data.periods.a.end}`);
   return <PageFrame module="analytics" scopedAccess><div className={styles.root}>
-    <PageHeader module="analytics" title={t('Compare periods or channels')} info={<InfoTip name={t('Compare periods or channels')} blocks={[{ text: t("Differences are shown only where both sides measure the same thing with the same coverage. Reach and breakdowns are never subtracted, and missing data is unknown, not zero.") }]} />} actions={kindSwitch ?? undefined} />
+    <PageHeader module="analytics" title={t('Compare periods or channels')} description={basis ?? undefined} info={<InfoTip name={t('Compare periods or channels')} blocks={[{ text: t("Differences are shown only where both sides measure the same thing with the same coverage. Reach and breakdowns are never subtracted, and missing data is unknown, not zero.") }]} />} actions={kindSwitch ?? undefined} />
     {form}
     {!input && !failure && <p className={styles.note}>{t("Pick two periods for the same channels, or two separate groups of channels in one period, then select Compare.")}</p>}
     {failure && <section className={styles.panel} role="alert"><h2>{t("Comparison unavailable")}</h2><p>{failure}</p></section>}

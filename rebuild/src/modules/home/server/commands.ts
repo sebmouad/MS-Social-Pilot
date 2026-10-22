@@ -12,8 +12,9 @@ export type CommandItem = { id: string; title: string; href: string; module: str
 const querySchema = z.object({ q: z.string().trim().max(200).optional() }).strict();
 
 /**
- * The pages one member may open, in sidebar order: same modules, same pages, same access check as the
- * sidebar. Titles always match the sidebar exactly, so the palette never shows a name the sidebar hides.
+ * The pages one member may open, in sidebar order: same modules, same access check as the sidebar, plus
+ * sub-pages flagged `palette` (Insights goals, pins and notes) that tabs hide but the palette reaches. Titles always
+ * match the sidebar exactly, so the palette never shows a name the sidebar hides.
  */
 export async function listNavigationCommands(actor: CommandActor, input: unknown = {}): Promise<{ items: CommandItem[] }> {
   const parsed = querySchema.safeParse(input);
@@ -32,7 +33,7 @@ export async function listNavigationCommands(actor: CommandActor, input: unknown
   const query = parsed.data.q?.toLowerCase() ?? '';
   const items: CommandItem[] = [];
   for (const page of PAGES) {
-    if (page.navigation === false || !enabledModules.has(page.module) || !enabledFeatures.has(page.id)) continue;
+    if ((page.navigation === false && page.palette !== true) || !enabledModules.has(page.module) || !enabledFeatures.has(page.id)) continue;
     const title = page.title, moduleTitle = modules.get(page.module) ?? page.module;
     if (query && !`${title} ${moduleTitle} ${page.id}`.toLowerCase().includes(query)) continue;
     items.push({ id: page.id, title, href: page.href, module: page.module, moduleTitle });

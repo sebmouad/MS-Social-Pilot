@@ -617,6 +617,7 @@ alias waives the target's service-owned authorization or UI verification.
 | ads/overview | ads/campaigns | Account overview presents the same account/performance reads declared under ads/campaigns by MCP. |
 | studio/ai-studio | publishing/posts | AI studio page gates on the same publishing/posts capability the AI media and check MCP tools declare; the 2026-10-22 UX organization added page-only gating with no new MCP surface. |
 | studio/tests | analytics/posts | Caption tests page gates on the same analytics/posts read capability list_caption_tests declares; start and learn keep their publishing/posts and settings/workspace service gates. |
+| analytics/notes | analytics/overview | Chart notes page gates on the same analytics/overview capability the calendar notes MCP tools declare; the 2026-10-22 Insights organization added page-only gating with no new MCP surface. |
 <!-- parity-feature-aliases:end -->
 
 Selector review: `/api/tasks` POST uses the task action union; Sharing link POST

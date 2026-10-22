@@ -22,7 +22,7 @@ export function MetricViews({ label, points, unit, locale = 'en', previousPoints
       annotations ? <NotesTimeSeriesChart {...chart} notes={annotations.notes} noteColors={annotations.noteColors} copy={annotations.copy} /> : <TimeSeriesChart {...chart} /> },
     { id: 'table', label: t('Table'), icon: <IconTable />, content:
       <DataTable caption={label} rows={points} rowKey={point => point.date} emptyMessage={t('No measurements for this period.')}
-        emptyAction={<a href="/analytics/explorer">{t('Change filters')}</a>} columns={[
+        emptyAction={<a href="/insights/explore">{t('Change filters')}</a>} columns={[
           { key: 'date', label: t('Date (UTC)'), render: point => point.date },
           { key: 'value', label: t('Value'), align: 'end', render: point => format(point.value) },
         ]} /> },

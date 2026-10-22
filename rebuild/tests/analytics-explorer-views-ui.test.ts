@@ -24,4 +24,15 @@ describe('Explorer chart and table views', () => {
       expect(host.querySelector('[data-chart]')).toBeTruthy();
     } finally { await act(async () => root.unmount()); host.remove(); }
   });
+
+  it('links an empty table back to the canonical explore address', async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+    try {
+      await act(async () => root.render(createElement(MetricViews, { label: 'Engagement', unit: 'count', locale: 'en', points: [] })));
+      const tabs = host.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+      await act(async () => tabs[1]!.click());
+      expect(host.querySelector('a[href="/insights/explore"]')?.textContent).toContain('Change filters');
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  });
 });

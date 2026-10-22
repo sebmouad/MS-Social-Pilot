@@ -48,6 +48,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'analytics/posts': 'analytics/overview',
   'analytics/ads': 'analytics/overview',
   'analytics/reports': 'analytics/overview',
+  'analytics/notes': 'analytics/overview',
   'ads/overview': 'ads/performance',
   'ads/compare': 'ads/performance',
   'ads/objects': 'ads/performance',

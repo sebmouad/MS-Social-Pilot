@@ -5,6 +5,19 @@ Updated 2026-10-22 (AI Studio module) against the local working tree, configurat
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
 
+## Insights excellence pass — 2026-10-22 (source only)
+
+Palette reaches every Insights page via a new `palette` page flag
+(goals, pins and the new `analytics/notes` page; same
+`analytics/overview` switches, tabs unchanged). Explore detail shows
+coverage, freshness and the comparison basis; zero-coverage metrics are
+greyed with reason; Compare headers state the comparison basis; a stale
+`/analytics/explorer` link now points at `/insights/explore`; phone
+touch targets fixed in analytics CSS. No Root registry change, schema
+stays 137. Typecheck 0 errors; 9 touched vitest files pass
+(config-validation proves no version bump). No browser, provider or
+production run.
+
 ## AI Studio module — 2026-10-22 (source only)
 
 Owner directive: AI Studio is its own product module for content generation,

@@ -41,6 +41,8 @@ function Detail({ data, locale, copy, annotations }: { annotations?: ChartAnnota
   return <section className={styles.panel} aria-labelledby="explorer-detail-title">
     <header className={styles.detailHeader}><div><p className={styles.eyebrow}>{t("Stored metric detail")}</p><h2 id="explorer-detail-title">{metric.label}</h2><p>{metric.sourceLabel} · {metric.aggregationLabel}</p>{metric.aggregationNote && <p>{metric.aggregationNote}</p>}</div><strong>{metric.displayTotal ?? (metric.total === null ? t('Unknown') : value(metric.total, metric.unit))}</strong></header>
     <p className={styles.coverage}>{t("Coverage:")}{" "}{metric.coverage}{" "}{t("of")}{" "}{metric.available}{" "}{t("selected resources. Missing measurements are unknown, not zero.")}</p>
+    <p className={styles.coverage}>{t("Latest stored measurement")}{" "}{t("As of").toLowerCase()}{" "}{metric.latestAt ? day(metric.latestAt.toISOString().slice(0, 10)) : t('Unknown')}</p>
+    {data.period.comparison && <p className={styles.coverage}>{t("Comparison range:")}{" "}{day(data.period.comparison.start)}{" "}{t("to")}{" "}{day(data.period.comparison.end)}</p>}
     <MetricViews annotations={annotations} copy={copy} locale={locale} label={`${metric.label} · ${detail.points.total} points · UTC`} points={detail.points.items} unit={metric.unit} previousPoints={detail.previousPoints} />
     <Pager t={t} query={data.query} keyName="pointPage" page={detail.points.page} pages={detail.points.pages} label={t("Series")} />
     <div className={styles.tableWrap}><table><caption>{t("Resource values ·")}{" "}{detail.rows.total}{" "}{t("rows")}</caption><thead><tr><th scope="col">{metric.kind === 'breakdown' ? t('Dimension') : t('Resource')}</th><th scope="col">{t("Value")}</th><th scope="col">{t("As of")}</th></tr></thead><tbody>{detail.rows.items.map((row, index) => <tr key={`${row.label}:${index}`}><th scope="row">{row.label}</th><td>{value(row.value, metric.unit)}</td><td>{row.asOf ? day(row.asOf.toISOString().slice(0, 10)) : t('Date unavailable')}</td></tr>)}</tbody></table>{!detail.rows.total && <p className={styles.empty}>{t("No resource-level measurements are stored.")}</p>}</div>
@@ -101,9 +103,10 @@ export default async function AnalyticsExplorerPage({ searchParams, locale = 'en
         <h2>{ui.exploreList} <small>{data.metrics.total}</small></h2>
         {data.metrics.items.length
           ? <ul>{data.metrics.items.map(metric => <li key={metric.key}>
-            <a href={metricHref(query, metric.key)} aria-current={data.detail?.metric.key === metric.key ? 'true' : undefined}>
+            <a href={metricHref(query, metric.key)} aria-current={data.detail?.metric.key === metric.key ? 'true' : undefined} data-unavailable={metric.coverage > 0 ? undefined : 'true'}>
               <span className="insights-explore__dot" data-available={metric.coverage > 0} title={metric.coverage > 0 ? ui.exploreAvailable : ui.exploreUnavailable} />
-              <span>{metric.label}<span className="insights-explore__source">{metric.sourceLabel}</span></span>
+              <span>{metric.label}<span className="insights-explore__source">{metric.sourceLabel}</span>
+                {metric.coverage > 0 ? null : <span className="insights-explore__reason">{ui.exploreUnavailable}</span>}</span>
             </a></li>)}</ul>
           : <p className="small-note">{ui.exploreListEmpty}</p>}
         <Pager t={t} query={query} keyName="page" page={data.metrics.page} pages={data.metrics.pages} label={t("Metrics")} />

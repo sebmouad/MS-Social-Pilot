@@ -15,6 +15,7 @@ export interface ProductPage {
   area: AreaId;
   description: string;
   navigation?: boolean;
+  palette?: boolean;
   tabRoutes?: readonly string[];
 }
 
