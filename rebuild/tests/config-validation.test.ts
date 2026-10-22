@@ -17,7 +17,7 @@ describe('configuration registry', () => {
     }
   });
   it('keeps operator alerts in the single Root monitoring system', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(138);
+    expect(CONFIG_SCHEMA_VERSION).toBe(139);
     for (const key of ['notifications.systemAlertPolicy', 'notifications.systemAlertCopy', 'notifications.systemAlertTelegramToken']) {
       expect(CONFIG_BY_KEY.has(key)).toBe(false);
     }
@@ -62,7 +62,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(138);
+    expect(CONFIG_SCHEMA_VERSION).toBe(139);
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultRole')).toMatchObject({ defaultValue: 'contributor', consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(safeConfigShape().find(setting => setting.key === 'settings.teamDefaultAllChannels')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'product', id: 'settings' } });
     expect(CONFIG_BY_KEY.get('settings.teamDefaultRole')!.schema.safeParse('owner').success).toBe(false);
@@ -252,6 +252,15 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('storage.mediaRoot')!.schema.safeParse('/srv/social-pilot/media').success).toBe(true);
     expect(CONFIG_BY_KEY.get('storage.mediaRoot')!.schema.safeParse('../media').success).toBe(false);
     expect(CONFIG_BY_KEY.get('storage.mediaRoot')!.schema.safeParse('/').success).toBe(false);
+  });
+
+  it('registers Meta Llama as a fourth AI text provider', () => {
+    expect(CONFIG_BY_KEY.get('ai.llamaApiKey')).toMatchObject({ kind: 'secret', defaultValue: '', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('ai.llamaModel')).toMatchObject({ kind: 'text', defaultValue: 'Llama-4-Maverick-17B-128E-Instruct-FP8', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('ai.llamaEndpoint')).toMatchObject({ kind: 'text', defaultValue: 'https://api.meta.ai/v1/chat/completions', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('ai.llamaEndpoint')!.schema.safeParse('http://api.meta.ai/v1/chat/completions').success).toBe(false);
+    expect(CONFIG_BY_KEY.get('ai.provider')!.schema.safeParse('llama').success).toBe(true);
+    expect(safeConfigShape().find(setting => setting.key === 'ai.provider')?.options).toContainEqual({ value: 'llama', label: 'Meta Llama' });
   });
 
   it('declares the Ads management policy as a Root-managed boolean that defaults off', () => {

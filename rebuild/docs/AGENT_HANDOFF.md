@@ -1,9 +1,50 @@
 # Shared agent handoff
 
-Updated 2026-10-22 (idea batch 2: autopilot + planning; uncommitted working tree), schema **138**.
+Updated 2026-10-22 (Meta Llama AI provider; uncommitted working tree), schema **139**.
 Full goal remains active. No browser, provider, database or production call by
 this lane. Historical records below retain their dates; current source
 reconciliation wins.
+
+## Meta Llama AI text provider — 2026-10-22 (source/unit only, uncommitted)
+
+Fourth AI text provider beside anthropic/openai/gemini, text-only through the
+shared port (composer assist, report recaps, comment sentiment, alt-text
+suggestions); no image/voice/video ports added.
+
+- **Adapter** `studio/server/llama.ts` (`llamaPort`): Meta-hosted Chat
+  Completions, OpenAI-compatible wire format. Endpoint, Bearer auth, request
+  shape (`model`, `messages`, `max_completion_tokens`), response text at
+  `choices[0].message.content`, and `image_url` vision blocks (base64 `data:`
+  URLs included) verified 2026-10-22 against Meta's current docs (dev.meta.ai
+  Chat Completions protocol + image understanding). Failures map to the same
+  fixed messages as the sibling adapters and never expose provider text.
+- **Config** (`studio/config.ts`): `AiProviderId` + `AI_PROVIDER_CHOICES`
+  gain `llama` ("Meta Llama"); `AI_DEFAULTS` gains
+  `llamaModel: 'Llama-4-Maverick-17B-128E-Instruct-FP8'` and
+  `llamaEndpoint: 'https://api.meta.ai/v1/chat/completions'`; new Root keys
+  `ai.llamaApiKey` (secret), `ai.llamaModel`, `ai.llamaEndpoint`.
+  `studio/server/ai.ts` gains the `PROVIDER_KEYS` entry and the batch keys.
+  The Root `ai.provider` select renders from the registry options, so the new
+  choice appears with no UI edit.
+- **Registry:** `CONFIG_SCHEMA_VERSION` **138 → 139**; both pins in
+  `tests/config-validation.test.ts` updated.
+- **Strings:** no new customer strings — provider identity never reaches
+  customer surfaces (verified: no UI/copy references any AI provider; all
+  failures use the existing provider-agnostic messages). The "Meta Llama"
+  label is Root-only.
+- **Docs:** `ARCHITECTURE.md` status note; this entry.
+- **Not verified:** no live Llama call (none permitted this lane); default
+  model id comes from third-party Llama API integrations, not the current
+  Meta docs page (which now leads with Muse models) — confirm the id and
+  endpoint against a live key before release. Pre-existing note: sentiment
+  additionally gates on the Anthropic secret (`sentimentSettings`), so it
+  needs an `ai.apiKey` value regardless of provider; unchanged by this lane.
+
+Evidence: `npm run typecheck` 0 errors; `tests/ai-provider-ports.test.ts`
+(Llama success/key header/body, vision, non-ok/unreadable/empty/abort),
+`tests/config-validation.test.ts` (schema 139 + Llama keys + select choice),
+`tests/ai-assist.test.ts` (Llama key resolution), `tests/ai-alt-text.test.ts`
+(Llama vision block).
 
 ## Idea batch 2 (autopilot + planning) — 2026-10-22 (source/unit only, uncommitted)
 

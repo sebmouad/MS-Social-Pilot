@@ -9,7 +9,7 @@ import { toolErrorCopySchema } from './tool-errors';
 
 export const AI_DEFAULTS = {
   enabled: false, provider: 'anthropic', model: 'claude-sonnet-5-5', endpoint: 'https://api.anthropic.com/v1/messages',
-  openaiModel: 'gpt-6-luna', openaiEndpoint: 'https://api.openai.com/v1/chat/completions', geminiModel: 'gemini-3.6-flash', geminiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models', requestTimeoutMs: 30000, maxOutputTokens: 600,
+  openaiModel: 'gpt-6-luna', openaiEndpoint: 'https://api.openai.com/v1/chat/completions', geminiModel: 'gemini-3.6-flash', geminiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models', llamaModel: 'Llama-4-Maverick-17B-128E-Instruct-FP8', llamaEndpoint: 'https://api.meta.ai/v1/chat/completions', requestTimeoutMs: 30000, maxOutputTokens: 600,
   maxInputCharacters: 4000, hourlyRequestsPerWorkspace: 60, maxHashtags: 10, hashtagBodyMaxCharacters: 60, outputInputMultiplier: 2, languageMaxCharacters: 32,
   monthlyBudgetUsd: 0, fallbackInputPricePerMillionUsd: 0, fallbackOutputPricePerMillionUsd: 0, charactersPerToken: 4,
   summaryMaxCharacters: 1200, summarySubjectMaxCharacters: 200, sentimentLookbackDays: 15, transactionTimeoutMs: 10000, transactionMaxWaitMs: 5000,
@@ -23,8 +23,8 @@ export const AI_BOUNDS = {
   hashtagBodyMaxCharacters: { min: 1, max: 256 }, outputInputMultiplier: { min: 1, max: 10 }, languageMaxCharacters: { min: 2, max: 256 },
 } as const;
 /** Only providers with a shipped implementation may be selected. */
-export const AI_PROVIDER_CHOICES = [{ value: 'anthropic', label: 'Anthropic (Claude)' }, { value: 'openai', label: 'OpenAI' }, { value: 'gemini', label: 'Google Gemini' }] as const;
-export const AI_PROVIDERS = ['anthropic', 'openai', 'gemini'] as const;
+export const AI_PROVIDER_CHOICES = [{ value: 'anthropic', label: 'Anthropic (Claude)' }, { value: 'openai', label: 'OpenAI' }, { value: 'gemini', label: 'Google Gemini' }, { value: 'llama', label: 'Meta Llama' }] as const;
+export const AI_PROVIDERS = ['anthropic', 'openai', 'gemini', 'llama'] as const;
 export type AiProviderId = typeof AI_PROVIDERS[number];
 const int = (range: { min: number; max: number }) => z.number().int().min(range.min).max(range.max);
 const G = 'Publishing · AI writing assist';
@@ -170,6 +170,9 @@ export const AI_CONFIG = [
   entry({ key: 'ai.geminiApiKey', group: G, label: 'Gemini API key', kind: 'secret', description: 'Encrypted at rest. Used when the provider is Google Gemini.', defaultValue: '', schema: z.string().max(2048), consumption: 'active' }),
   entry({ key: 'ai.geminiModel', group: G, label: 'Gemini model', kind: 'text', description: 'Model identifier used when the provider is Google Gemini.', defaultValue: AI_DEFAULTS.geminiModel, schema: z.string().trim().max(120).regex(/^[A-Za-z0-9._:/-]*$/), consumption: 'active' }),
   entry({ key: 'ai.geminiEndpoint', group: G, label: 'Gemini endpoint', kind: 'text', description: 'HTTPS base address of the Gemini models API; the model and :generateContent are appended.', defaultValue: AI_DEFAULTS.geminiEndpoint, schema: z.string().url().max(500).refine(v => v.startsWith('https://'), 'Use an HTTPS URL.'), consumption: 'active' }),
+  entry({ key: 'ai.llamaApiKey', group: G, label: 'Llama API key', kind: 'secret', description: 'Encrypted at rest. Used when the provider is Meta Llama.', defaultValue: '', schema: z.string().max(2048), consumption: 'active' }),
+  entry({ key: 'ai.llamaModel', group: G, label: 'Llama model', kind: 'text', description: 'Model identifier used when the provider is Meta Llama.', defaultValue: AI_DEFAULTS.llamaModel, schema: z.string().trim().max(120).regex(/^[A-Za-z0-9._:/-]*$/), consumption: 'active' }),
+  entry({ key: 'ai.llamaEndpoint', group: G, label: 'Llama endpoint', kind: 'text', description: 'HTTPS address of the Meta Llama Chat Completions endpoint.', defaultValue: AI_DEFAULTS.llamaEndpoint, schema: z.string().url().max(500).refine(v => v.startsWith('https://'), 'Use an HTTPS URL.'), consumption: 'active' }),
   entry({ key: 'ai.requestTimeoutMs', group: G, label: 'AI request timeout (ms)', kind: 'number', description: 'Longest wait for one provider answer.', defaultValue: AI_DEFAULTS.requestTimeoutMs, schema: int(AI_BOUNDS.requestTimeoutMs), consumption: 'active' }),
   entry({ key: 'ai.maxOutputTokens', group: G, label: 'AI maximum output tokens', kind: 'number', description: 'Upper bound on one generated answer.', defaultValue: AI_DEFAULTS.maxOutputTokens, schema: int(AI_BOUNDS.maxOutputTokens), consumption: 'active' }),
   entry({ key: 'ai.maxInputCharacters', group: G, label: 'AI input limit', kind: 'number', description: 'Longest text a member may send for assist.', defaultValue: AI_DEFAULTS.maxInputCharacters, schema: int(AI_BOUNDS.maxInputCharacters), consumption: 'active' }),

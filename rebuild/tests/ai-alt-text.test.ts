@@ -16,6 +16,7 @@ import { aiStatus } from '../src/modules/studio/server/ai';
 import { anthropicPort } from '../src/modules/studio/server/anthropic';
 import { openaiPort } from '../src/modules/studio/server/openai';
 import { geminiPort } from '../src/modules/studio/server/gemini';
+import { llamaPort } from '../src/modules/studio/server/llama';
 import { aiToolDefinitions, aiWriteTools, executeAiTool } from '../src/modules/studio/mcp';
 import { altTextPolicySchema, ALT_TEXT_POLICY_DEFAULT } from '../src/modules/studio/config';
 
@@ -106,6 +107,11 @@ describe('vision input in every provider adapter', () => {
     const { seen, fetchImpl } = capture({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] });
     await geminiPort({ apiKey: 'k', endpoint: 'https://g.example/', fetchImpl }).complete(call);
     expect(JSON.stringify(seen.body)).toContain('"inlineData":{"mimeType":"image/png","data":"QUJD"}');
+  });
+  it('Llama sends an image_url data URL', async () => {
+    const { seen, fetchImpl } = capture({ choices: [{ message: { content: 'ok' } }] });
+    await llamaPort({ apiKey: 'k', endpoint: 'https://l.example/', fetchImpl }).complete(call);
+    expect(JSON.stringify(seen.body)).toContain('data:image/png;base64,QUJD');
   });
   it('text-only calls keep the plain string content', async () => {
     const { seen, fetchImpl } = capture({ choices: [{ message: { content: 'ok' } }] });

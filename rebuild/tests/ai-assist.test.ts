@@ -45,6 +45,12 @@ describe('availability', () => {
     state.secret = 'k'; state.auth.mockRejectedValue(new Error('forbidden'));
     expect((await aiStatus(actor, { port: port() })).available).toBe(false);
   });
+  it('resolves the Meta Llama keys when that provider is selected', async () => {
+    state.overrides = { 'ai.provider': 'llama' };
+    expect(await aiStatus(actor, { port: port() })).toMatchObject({ available: true, maxInputCharacters: 4000 });
+    state.overrides = { 'ai.provider': 'llama', 'ai.llamaModel': '' };
+    expect((await aiStatus(actor, { port: port() })).available).toBe(false);
+  });
   it('refuses generation when unconfigured without calling the provider', async () => {
     state.overrides['ai.enabled'] = false; const p = port();
     await expect(runAssist(actor, { kind: 'caption', text: 'x' }, { port: p })).rejects.toMatchObject({ code: 'unavailable' });

@@ -368,11 +368,15 @@ Feeds in browser round 2, whose database lacked the recipe table. The pinned
 WordPress migration and lockfile exist; exact migration receipts, export/erasure,
 full transport scope and crash recovery remain separate verification work.
 
-AI adapters for **OpenAI, Gemini and Anthropic** are selected by `ai.provider`,
+AI adapters for **OpenAI, Gemini, Anthropic and Meta Llama** are selected by `ai.provider`,
 with provider-specific Root credentials/models/endpoints. The release log records
 successful OpenAI/Gemini tests and composer suggestion generation; Anthropic
-returned insufficient account credit. This is limited provider evidence, not
-verification of every prompt, report recap or sentiment job.
+returned insufficient account credit. Meta Llama (`ai.llamaApiKey`,
+`ai.llamaModel`, `ai.llamaEndpoint`, schema 139) reuses the shared text port for
+assist, recaps, sentiment and alt text; its wire format was verified against
+Meta's current Chat Completions docs but no live Llama call has been made. This
+is limited provider evidence, not verification of every prompt, report recap or
+sentiment job.
 
 ## Facebook collection and evidence boundaries
 

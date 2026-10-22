@@ -12,6 +12,7 @@ import { METERING_KEYS, meteringFrom, monthlyUsage, recordUsage, type Metering }
 import { anthropicPort } from './anthropic';
 import { openaiPort } from './openai';
 import { geminiPort } from './gemini';
+import { llamaPort } from './llama';
 
 /** Composer assist is available to members who may write posts. */
 export const COMPOSER_FEATURE = 'publishing/posts';
@@ -27,13 +28,14 @@ const PROVIDER_KEYS: Record<AiProviderId, { secret: string; model: string; endpo
   anthropic: { secret: 'ai.apiKey', model: 'ai.model', endpoint: 'ai.endpoint', port: anthropicPort },
   openai: { secret: 'ai.openaiApiKey', model: 'ai.openaiModel', endpoint: 'ai.openaiEndpoint', port: openaiPort },
   gemini: { secret: 'ai.geminiApiKey', model: 'ai.geminiModel', endpoint: 'ai.geminiEndpoint', port: geminiPort },
+  llama: { secret: 'ai.llamaApiKey', model: 'ai.llamaModel', endpoint: 'ai.llamaEndpoint', port: llamaPort },
 };
 
 export type Settings = { port: AiPort; model: string; timeoutMs: number; maxTokens: number; maxInput: number; hourly: number; maxHashtags: number; hashtagBodyMax: number; outputInputMultiplier: number; languageMax: number; txTimeout: number; txWait: number; metering: Metering };
 /** Resolve everything assist needs; null when anything is unconfigured, so customer surfaces stay hidden. */
 export async function settings(deps: AiDeps): Promise<Settings | null> {
   try {
-    const c = await runtimeConfigBatch(['ai.enabled', 'ai.provider', 'ai.model', 'ai.endpoint', 'ai.openaiModel', 'ai.openaiEndpoint', 'ai.geminiModel', 'ai.geminiEndpoint', 'ai.requestTimeoutMs', 'ai.maxOutputTokens', 'ai.maxInputCharacters', 'ai.hourlyRequestsPerWorkspace', 'ai.maxHashtags', 'ai.hashtagBodyMaxCharacters', 'ai.outputInputMultiplier', 'ai.languageMaxCharacters', 'ai.transactionTimeoutMs', 'ai.transactionMaxWaitMs', ...METERING_KEYS]);
+    const c = await runtimeConfigBatch(['ai.enabled', 'ai.provider', 'ai.model', 'ai.endpoint', 'ai.openaiModel', 'ai.openaiEndpoint', 'ai.geminiModel', 'ai.geminiEndpoint', 'ai.llamaModel', 'ai.llamaEndpoint', 'ai.requestTimeoutMs', 'ai.maxOutputTokens', 'ai.maxInputCharacters', 'ai.hourlyRequestsPerWorkspace', 'ai.maxHashtags', 'ai.hashtagBodyMaxCharacters', 'ai.outputInputMultiplier', 'ai.languageMaxCharacters', 'ai.transactionTimeoutMs', 'ai.transactionMaxWaitMs', ...METERING_KEYS]);
     const B = AI_BOUNDS;
     const provider = c['ai.provider'] as AiProviderId;
     const keys = PROVIDER_KEYS[provider];
