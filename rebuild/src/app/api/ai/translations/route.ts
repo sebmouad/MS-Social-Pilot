@@ -1,6 +1,6 @@
-import { translatedPosts } from '@/modules/ai/server/translated/service';
-import { toolRoute } from '@/modules/ai/server/tool-kit';
-import { toolErrorCopy } from '@/modules/ai/server/tool-config';
+import { translatedPosts } from '@/modules/studio/server/translated/service';
+import { toolRoute } from '@/modules/studio/server/tool-kit';
+import { toolErrorCopy } from '@/modules/studio/server/tool-config';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

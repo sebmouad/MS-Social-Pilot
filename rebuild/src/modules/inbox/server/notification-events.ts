@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
-import { classifyCommentSentiment, sentimentAvailable } from '@/modules/ai/server/sentiment';
+import { classifyCommentSentiment, sentimentAvailable } from '@/modules/studio/server/sentiment';
 import { assertWorkspaceJobAccess } from '@/server/jobs/access';
 import { inboxTargetWhere } from './providers';
 import { emitWorkspaceAlert } from '@/modules/settings/notifications/producers';

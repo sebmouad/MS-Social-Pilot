@@ -5,15 +5,15 @@ vi.mock('@/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, 
 vi.mock('@/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('@/server/data-control/guard', () => ({ assertWorkspaceNotPurging: mocks.purge, withWorkspaceOperation: (_id: string, fn: () => unknown) => fn() }));
 vi.mock('@/server/config/store', async () => {
- const { AGENTS_CONFIG, AGENT_COPY_CONFIG } = await import('../src/modules/agents/config');
+ const { AGENTS_CONFIG, AGENT_COPY_CONFIG } = await import('../src/modules/studio/config');
  return { runtimeConfig: async (key: string) => [...AGENTS_CONFIG, ...AGENT_COPY_CONFIG].find(e => e.key === key)?.defaultValue };
 });
-import { writingAgents } from '../src/modules/agents/server/service';
+import { writingAgents } from '../src/modules/studio/agents/server/service';
 import { resolvePermissions } from '../src/server/permissions';
 const actor = { userId: 'member', workspaceId: 'workspace' };
 beforeEach(() => {
  vi.resetAllMocks();
- mocks.entitlements.mockResolvedValue({ workspaceId: 'workspace', features: { 'agents/library': true } });
+ mocks.entitlements.mockResolvedValue({ workspaceId: 'workspace', features: { 'studio/agents': true } });
  mocks.raw.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('memberships m') ? [{ id: 'member', role: 'owner', suspendedAt: null }] : []);
  mocks.transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn({ $queryRaw: mocks.raw, $executeRaw: mocks.execute }));
  mocks.execute.mockResolvedValue(1);

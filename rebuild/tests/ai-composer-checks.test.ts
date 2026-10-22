@@ -14,14 +14,14 @@ vi.mock('@/server/permissions/loader', () => ({ loadPermissions: mocks.permissio
 vi.mock('@/server/data-control/guard', () => ({ assertWorkspaceNotPurging: mocks.purge }));
 vi.mock('@/server/platforms/registry', () => ({ platformAnalytics: mocks.host }));
 vi.mock('@/server/config/store', async () => {
-  const { AI_CONFIG } = await import('../src/modules/ai/config');
+  const { AI_CONFIG } = await import('../src/modules/studio/config');
   const defaults: Record<string, unknown> = Object.fromEntries(AI_CONFIG.map(e => [e.key, e.defaultValue]));
   return { runtimeConfig: async (key: string) => state.overrides[key] ?? defaults[key] };
 });
 
 import { resolvePermissions } from '../src/server/permissions';
-import { engagementOutlook, linkPreview, spamCheck } from '../src/modules/ai/content-tools/server/checks';
-import { AI_CONTENT_TOOLS_DEFAULTS } from '../src/modules/ai/content-tools/config';
+import { engagementOutlook, linkPreview, spamCheck } from '../src/modules/studio/content-tools/server/checks';
+import { AI_CONTENT_TOOLS_DEFAULTS } from '../src/modules/studio/config';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const sql = (s: TemplateStringsArray, v: unknown[]) => ({ sql: s.join('?'), values: v });

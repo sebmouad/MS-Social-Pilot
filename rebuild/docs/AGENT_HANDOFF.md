@@ -1,8 +1,44 @@
 # Shared agent handoff
 
-Updated 2026-10-21 against local HEAD `99c41554`, schema **123**. Full goal
-remains active. No browser, provider, database or production call by this lane.
-Historical records below retain their dates; current source reconciliation wins.
+Updated 2026-10-22 (AI Studio module; uncommitted working tree), schema **137**.
+Full goal remains active. No browser, provider, database or production call by
+this lane. Historical records below retain their dates; current source
+reconciliation wins.
+
+## AI Studio module — 2026-10-22 (source only)
+
+Owner directive: AI Studio is its own product module. `src/modules/agents/`,
+`src/modules/ai/` and `src/modules/caption-tests/` were vacated and deleted;
+all code now lives in `src/modules/studio/` (manifest, config, mcp, `agents/`,
+`content-tools/`, `caption-tests/`, `server/`, `components/`, `ui/`; see
+`src/modules/studio/INTEGRATION.md`).
+
+- URLs unchanged: `/content/ai-studio`, `/content/agents`, `/insights/tests`,
+  `/api/ai/*`, `/api/agents/*`, `/api/caption-tests/*`. No route moves, no new
+  redirects. Feature ids renamed (`studio/ai-studio`, `studio/agents`,
+  `studio/tests`) with preserved role access; tabs and palette order unchanged.
+- Root keys unchanged (`ai.*`, `agents.*`, `captionTests.*`,
+  `publishing.captionTestsSchedule`); schema stays **137** (no bump:
+  `tests/config-validation.test.ts` pins 137 and passes; new copy keys fill
+  from shipped defaults so saved catalogs keep validating). Explicit key
+  declarations now win over another module's prefix in `configurationOwner`
+  (only `publishing.captionTestsSchedule` changes owner, to Studio).
+- MCP tool names unchanged; agent-tool features are `studio/agents`
+  (`docs/MCP_PARITY.md` updated). Composer screens call the Studio-owned AI
+  service; no duplicated AI logic.
+- New: scheduled-run history (newest first, from the audit trail) in the
+  `list` response shared by UI/REST/MCP, rendered on the Writing-agents
+  screen; "Plan with AI" cross-links (recipe planner, queue automation) on
+  all three Studio screens with EN/FR catalog copy. Worker `scheduledAgents`
+  handling already existed and is unchanged.
+- Saved Root customizations preserved except: the three renamed shell tab
+  labels (fall back to shipped text) and the orphaned
+  `entitlements.modules.agents` / `entitlements.features.agents|publishing/ai-studio|analytics/tests`
+  keys (regenerated `studio` keys default to available).
+- Evidence: `npm run typecheck` 0 errors; touched vitest files pass
+  (manifest/guard/redirect/shell/content, agents/ai/caption/scheduled,
+  mcp-security/scope/exec, config-validation, parity-guard, root-module,
+  copy suites). No full suite, no browser, no provider, no production run.
 
 ## Current HEAD reconciliation — 2026-10-21
 

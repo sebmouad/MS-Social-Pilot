@@ -17,7 +17,7 @@ vi.mock('@/server/data-control/guard', async () => ({ assertWorkspaceNotPurging:
 vi.mock('../src/modules/analytics/server/read', async () => { const h = await import('./report82-engine-harness'); return { readAnalyticsSnapshot: h.readSnapshot }; });
 // The provider is never reached: the AI module is mocked at its public service functions.
 const ai = vi.hoisted(() => ({ summarize: vi.fn(), summaryAvailable: vi.fn() }));
-vi.mock('@/modules/ai/server/ai', () => ai);
+vi.mock('@/modules/studio/server/ai', () => ai);
 
 import { reset, resetGen, snapshot, state } from './report82-engine-harness';
 import { createReportGenerator, recapFacts, renderReport, RECAP_LABEL, RECAP_UNAVAILABLE } from '../src/modules/analytics/reports/generation/document';

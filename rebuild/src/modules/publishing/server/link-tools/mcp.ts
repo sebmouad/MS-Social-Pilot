@@ -1,7 +1,7 @@
 import { OperationError } from '@/lib/operation-error';
 import { publishingActor, type McpToolGroup } from '@/server/mcp/kit';
 import type { McpViewer } from '@/server/mcp/types';
-import type { ToolViewerActor } from '@/modules/ai/server/tool-kit';
+import type { ToolViewerActor } from '@/modules/studio/server/tool-kit';
 import { LINK_FEATURE, linkTools } from './service';
 
 export const linkToolDefinitions = [

@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ query: vi.fn(), execute: vi.fn(), transaction:
 vi.mock('@/server/data', () => ({ prisma: { target: { findFirst: mocks.target }, $transaction: mocks.transaction } }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: vi.fn().mockResolvedValue(20) }));
 vi.mock('@/modules/settings/notifications/producers', () => ({ emitWorkspaceAlert: mocks.emit }));
-vi.mock('@/modules/ai/server/sentiment', () => ({ classifyCommentSentiment: mocks.sentiment, sentimentAvailable: mocks.available }));
+vi.mock('@/modules/studio/server/sentiment', () => ({ classifyCommentSentiment: mocks.sentiment, sentimentAvailable: mocks.available }));
 vi.mock('@/server/jobs/access', () => ({ assertWorkspaceJobAccess: mocks.access }));
 vi.mock('@/modules/inbox/server/providers', () => ({ inboxTargetWhere: vi.fn().mockResolvedValue({}) }));
 import { notificationEnqueueSchema } from '@/modules/settings/notifications/contracts';

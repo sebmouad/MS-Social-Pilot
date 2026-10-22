@@ -1,1 +1,1 @@
-export { default } from '@/modules/ai/content-tools/ui/AiStudioPage';
+export { default } from '@/modules/studio/content-tools/ui/AiStudioPage';

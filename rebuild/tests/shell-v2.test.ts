@@ -102,7 +102,7 @@ describe('shell catalog and areas', () => {
     expect(areaForPath('/content/feeds')).toBe('content');
     expect(areaForPath('/content/ai-studio')).toBe('content');
     expect(areaForPath('/insights/tests')).toBe('insights');
-    expect(pageForPath('/insights/tests')?.id).toBe('analytics/tests');
+    expect(pageForPath('/insights/tests')?.id).toBe('studio/tests');
     expect(areaPages('insights', PAGES.map(page => page.id)).map(page => page.module)).toEqual(expect.arrayContaining(['analytics']));
     expect(areaPages('insights', PAGES.map(page => page.id)).map(page => page.module)).not.toContain('ads');
     expect(areaPages('ads', PAGES.map(page => page.id)).map(page => page.module)).toEqual(expect.arrayContaining(['analytics', 'ads']));

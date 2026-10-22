@@ -29,14 +29,12 @@ export const PERMISSION_MODULES: readonly PermissionModule[] = ['publishing', 'i
 
 const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'home/overview': null,
-  'agents/library': null,
   'publishing/posts': 'publishing/posts',
   'publishing/calendar': 'publishing/calendar',
   'publishing/queue': 'publishing/queue',
   'publishing/approvals': 'publishing/approvals',
   'publishing/media': null,
   'publishing/feeds': 'publishing/posts',
-  'publishing/ai-studio': 'publishing/posts',
   'publishing/collaboration': 'publishing/posts',
   'publishing/labels': 'publishing/posts',
   'publishing/templates': 'publishing/templates',
@@ -48,7 +46,6 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'analytics/pins': 'analytics/overview',
   'analytics/goals': 'analytics/overview',
   'analytics/posts': 'analytics/overview',
-  'analytics/tests': 'analytics/overview',
   'analytics/ads': 'analytics/overview',
   'analytics/reports': 'analytics/overview',
   'ads/overview': 'ads/performance',
@@ -70,6 +67,9 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'settings/notifications': null,
   'settings/data': null,
   'settings/appearance': null,
+  'studio/ai-studio': 'publishing/posts',
+  'studio/agents': null,
+  'studio/tests': 'analytics/overview',
 };
 
 const MODULE_ROOT_SWITCH: Record<PermissionModule, string | null> = {
@@ -93,7 +93,7 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
     if (feature === 'publishing/posts' || feature === 'publishing/calendar' || feature === 'publishing/approvals') {
       return { read: true, write: feature === 'publishing/approvals' };
     }
-    if (feature === 'analytics/overview' || feature === 'analytics/explorer' || feature === 'analytics/reports' || feature === 'analytics/demographics' || feature === 'analytics/compare' || feature === 'analytics/pins' || feature === 'analytics/goals' || feature === 'analytics/posts' || feature === 'analytics/tests' || feature === 'analytics/ads') {
+    if (feature === 'analytics/overview' || feature === 'analytics/explorer' || feature === 'analytics/reports' || feature === 'analytics/demographics' || feature === 'analytics/compare' || feature === 'analytics/pins' || feature === 'analytics/goals' || feature === 'analytics/posts' || feature === 'analytics/ads' || feature === 'studio/tests') {
       return { read: clientAccess.has('analytics'), write: false };
     }
     if (feature === 'inbox/conversations') return { read: clientAccess.has('inbox'), write: false };
@@ -112,7 +112,7 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
     if (feature === 'settings/connections') return { read: true, write: false };
     return {
       read: true,
-      write: feature.startsWith('publishing/') || feature === 'inbox/conversations' || feature.startsWith('analytics/'),
+      write: feature.startsWith('publishing/') || feature === 'inbox/conversations' || feature.startsWith('analytics/') || feature === 'studio/ai-studio' || feature === 'studio/tests',
     };
   }
 
@@ -124,7 +124,7 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
     return {
       read: true,
       // Existing routes still apply authorship and operation-specific checks.
-      write: feature.startsWith('publishing/') || feature === 'inbox/conversations',
+      write: feature.startsWith('publishing/') || feature === 'inbox/conversations' || feature === 'studio/ai-studio',
     };
   }
 

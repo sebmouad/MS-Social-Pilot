@@ -1,4 +1,4 @@
-import { aiImageHttp } from '@/modules/ai/content-tools/server/http';
+import { aiImageHttp } from '@/modules/studio/content-tools/server/http';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const POST = aiImageHttp;

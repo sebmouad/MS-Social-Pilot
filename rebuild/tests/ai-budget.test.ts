@@ -4,15 +4,15 @@ const state = vi.hoisted(() => ({ auth: vi.fn(), exec: [] as Array<{ sql: string
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', async () => {
-  const { AI_CONFIG } = await import('../src/modules/ai/config');
+  const { AI_CONFIG } = await import('../src/modules/studio/config');
   const defaults = { ...Object.fromEntries(AI_CONFIG.map(e => [e.key, e.defaultValue])), 'ai.enabled': true, 'ai.model': 'test-model' };
   return { runtimeConfigBatch: async (keys: string[]) => Object.fromEntries(keys.map(key => [key, state.overrides[key] ?? (defaults as Record<string, unknown>)[key]])), runtimeSecret: async () => 'sk-test' };
 });
-vi.mock('@/modules/ai/server/access', () => ({ authorizeAi: state.auth }));
+vi.mock('@/modules/studio/server/access', () => ({ authorizeAi: state.auth }));
 
-import { aiStatus, runAssist } from '../src/modules/ai/server/ai';
-import { estimateCostUsd, estimateTokens, resolvePrice, utcMonthKey } from '../src/modules/ai/ai';
-import { AI_CONFIG, priceOverridesSchema } from '../src/modules/ai/config';
+import { aiStatus, runAssist } from '../src/modules/studio/server/ai';
+import { estimateCostUsd, estimateTokens, resolvePrice, utcMonthKey } from '../src/modules/studio/ai';
+import { AI_CONFIG, priceOverridesSchema } from '../src/modules/studio/config';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const port = () => ({ complete: vi.fn(async () => 'x'.repeat(400)) });

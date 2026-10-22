@@ -1,4 +1,4 @@
-import { agentsHttp } from '@/modules/agents/server/http';
+import { agentsHttp } from '@/modules/studio/agents/server/http';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const GET = agentsHttp;

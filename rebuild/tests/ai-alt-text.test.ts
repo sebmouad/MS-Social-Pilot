@@ -4,20 +4,20 @@ const state = vi.hoisted(() => ({ auth: vi.fn(), image: vi.fn(), overrides: {} a
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', async () => {
-  const { AI_CONFIG } = await import('../src/modules/ai/config');
+  const { AI_CONFIG } = await import('../src/modules/studio/config');
   const defaults = { ...Object.fromEntries(AI_CONFIG.map(e => [e.key, e.defaultValue])), 'ai.enabled': true, 'ai.model': 'test-model', 'data.workspaceOperationTimeoutMs': 30000, 'publishing.maxImageAltCharacters': 500 };
   return { runtimeConfigBatch: async (keys: string[]) => Object.fromEntries(keys.map(key => [key, state.overrides[key] ?? (defaults as Record<string, unknown>)[key]])), runtimeSecret: async () => 'sk' };
 });
-vi.mock('@/modules/ai/server/access', () => ({ authorizeAi: state.auth }));
+vi.mock('@/modules/studio/server/access', () => ({ authorizeAi: state.auth }));
 vi.mock('@/modules/publishing/server/media/storage', () => ({ readWorkspaceImage: state.image }));
 
-import { suggestAltText } from '../src/modules/ai/server/alt-text';
-import { aiStatus } from '../src/modules/ai/server/ai';
-import { anthropicPort } from '../src/modules/ai/server/anthropic';
-import { openaiPort } from '../src/modules/ai/server/openai';
-import { geminiPort } from '../src/modules/ai/server/gemini';
-import { aiToolDefinitions, aiWriteTools, executeAiTool } from '../src/modules/ai/mcp';
-import { altTextPolicySchema, ALT_TEXT_POLICY_DEFAULT } from '../src/modules/ai/config';
+import { suggestAltText } from '../src/modules/studio/server/alt-text';
+import { aiStatus } from '../src/modules/studio/server/ai';
+import { anthropicPort } from '../src/modules/studio/server/anthropic';
+import { openaiPort } from '../src/modules/studio/server/openai';
+import { geminiPort } from '../src/modules/studio/server/gemini';
+import { aiToolDefinitions, aiWriteTools, executeAiTool } from '../src/modules/studio/mcp';
+import { altTextPolicySchema, ALT_TEXT_POLICY_DEFAULT } from '../src/modules/studio/config';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const id = '8b2b6a54-5f43-4d6c-9d7e-3f0a1c2b4d5e';

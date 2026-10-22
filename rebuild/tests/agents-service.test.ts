@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 vi.mock('@/server/data', () => ({ prisma: {} }));
-vi.mock('@/modules/ai/server/access', () => ({ authorizeAi: vi.fn() }));
-vi.mock('@/modules/ai/server/ai', () => ({ runAssist: vi.fn() }));
+vi.mock('@/modules/studio/server/access', () => ({ authorizeAi: vi.fn() }));
+vi.mock('@/modules/studio/server/ai', () => ({ runAssist: vi.fn() }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: vi.fn() }));
-import { agentRequest } from '@/modules/agents/server/service';
-import { agentPolicySchema } from '@/modules/agents/config';
+import { agentRequest } from '@/modules/studio/agents/server/service';
+import { agentPolicySchema } from '@/modules/studio/config';
 describe('writing agent request boundary', () => {
  it('rejects injected actor and cross-workspace arguments', () => { expect(agentRequest.safeParse({ action: 'list', workspaceId: 'other' }).success).toBe(false); });
  it('requires confirmation and explicit suggestion kind', () => {

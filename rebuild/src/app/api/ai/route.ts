@@ -2,7 +2,7 @@ import { requestOrigin } from '@/server/request-origin';
 import { NextResponse } from 'next/server';
 import { operationFailure } from '@/lib/operation-error';
 import { requireViewer } from '@/server/context';
-import { aiStatus, runAssist } from '@/modules/ai/server/ai';
+import { aiStatus, runAssist } from '@/modules/studio/server/ai';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

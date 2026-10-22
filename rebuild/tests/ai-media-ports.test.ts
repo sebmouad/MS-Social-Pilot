@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { openaiImagePort, openaiVoicePort } from '../src/modules/ai/content-tools/server/media-openai';
-import { geminiVideoPort } from '../src/modules/ai/content-tools/server/media-gemini';
-import { readBounded } from '../src/modules/ai/content-tools/server/media-ports';
+import { openaiImagePort, openaiVoicePort } from '../src/modules/studio/content-tools/server/media-openai';
+import { geminiVideoPort } from '../src/modules/studio/content-tools/server/media-gemini';
+import { readBounded } from '../src/modules/studio/content-tools/server/media-ports';
 
 const signal = new AbortController().signal;
 const json = (body: unknown, init: ResponseInit = {}) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' }, ...init });

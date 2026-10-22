@@ -1,9 +1,28 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-22 (design v2 Ads area) against the local working tree, configuration schema **137**.
+Updated 2026-10-22 (AI Studio module) against the local working tree, configuration schema **137**.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding; §4 gained the owner-approved 2026-10-22 Ads-area decision.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
+
+## AI Studio module — 2026-10-22 (source only)
+
+Owner directive: AI Studio is its own product module for content generation,
+auto-planning and all relevant features. `src/modules/agents/`,
+`src/modules/ai/` and `src/modules/caption-tests/` were vacated and deleted;
+`src/modules/studio/` owns the AI studio, writing agents (incl. scheduled
+runs) and caption-tests screens, services, Root settings, MCP tools and jobs
+(see `src/modules/studio/INTEGRATION.md`). URLs are unchanged
+(`/content/ai-studio`, `/content/agents`, `/insights/tests` and the
+`/api/ai|agents|caption-tests/*` routes); feature ids are `studio/ai-studio`,
+`studio/agents`, `studio/tests` with preserved role access. Root key names are
+unchanged, schema stays 137; `configurationOwner` now lets an explicit key
+declaration win over another module's prefix (only
+`publishing.captionTestsSchedule` changes owner, to Studio). MCP tool names
+are unchanged. New in this batch: scheduled-run history in the shared `list`
+response (UI/REST/MCP) and "Plan with AI" cross-links to the Feeds recipe
+planner and Publishing queue automation. Typecheck 0 errors; touched vitest
+files pass. No browser, provider or production run.
 
 ## Lane 47 legacy removal — 2026-10-22
 
@@ -42,8 +61,9 @@ clean residues from the rebuild. Pre-removal production backup
 
 Audit: [UX_NAVIGATION_AUDIT.md](UX_NAVIGATION_AUDIT.md). Feeds is its own
 Content tab at `/content/feeds` (308 from `/content/library/feeds`); AI studio
-is a Content tab (`publishing/ai-studio`); caption tests is an Insights tab
-(`analytics/tests`); chart notes is linked from the Insights Overview header.
+is a Content tab (`publishing/ai-studio`, now `studio/ai-studio`); caption
+tests is an Insights tab (`analytics/tests`, now `studio/tests`); chart notes
+is linked from the Insights Overview header.
 Command palette reaches all promoted pages. Typecheck 0 errors; 15
 touched/adjacent vitest files pass. No browser, provider or production run;
 mobile pass not started.
@@ -257,7 +277,7 @@ not every cross-device persistence/security scenario.
 | Analytics | Catalog/series, previous-period points, comparison, posts, audience history, ad objects, pins, goals, reports/exports and charts | Stored-data surfaces share services; complete readable-provider collection, labels and provider history remain partial; response-report rounds 1–3 add comments, historical cycles, source/member breakdowns with disclosed stored-history limits |
 | Ads | Account/performance/directory/compare/export, hierarchy charts, creation options, durable confirmed management: campaign, ad set, paused ad and stored-image creative creation, status/budget/rename/assign/delete, missing-grant reconnect notice | Session REST/MCP plus key REST v1; management ships off by default; the owner reports live create/rename/delete verified in Ads Manager. The `ad.create` ledger CHECK migration exists (`20261031180000_rebuild_ads_ad_creation`, recorded applied in production by the owner/integrator); Ads locale now propagates at the service boundary; inventory supports objects without delivery. Local fixture evidence and bounded owner-reported live evidence are distinct; see ADS_PARITY.md |
 | Settings | Connections/selection, profiles/watermark, team/invitations, account/security/sessions, appearance, notifications, exports/erasure and keys | Broad service parity; selection and disconnect callers (UI, REST, MCP) share the confirmed services; partial account export is exposed (session route, MCP tool, bilingual download). Live mail/security/data coverage remain gaps; shell appearance shares persistence |
-| Media / Feeds / AI | Media images/videos/import/quota; RSS/Atom/WordPress feeds; recipe planner; AI writing/recap/sentiment | Shared UI/REST/MCP slices; real storage/source/automation and current browser/live evidence vary by feature |
+| Media / Feeds / Studio | Media images/videos/import/quota; RSS/Atom/WordPress feeds; recipe planner; Studio AI writing/recap/sentiment, media generation, writing agents with scheduled runs, caption tests | Shared UI/REST/MCP slices; real storage/source/automation and current browser/live evidence vary by feature |
 | Tasks / Agency / Sharing / Integrations | Task workflows, Agency overview/clients/export/switching, review/bio links, webhooks, scoped REST/OAuth connectors | Shared services exist; credential-specific capabilities and remaining confirmation differences must remain explicit |
 | Root | Owned settings, diagnostics/stored health, users/workspaces/plans/audit/errors, registration, installation transfer, connection refresh/disconnect and recovery | Private UI/HTTP/installation MCP includes workspace create/rename and directory GET; declaration exceptions closed. Workspace create/rename, directory, configuration save and error resolution are services in `src/modules/root/server/` that recheck the actor and own confirmations (mocked evidence). Backups page is read-only; production-scale proof incomplete |
 

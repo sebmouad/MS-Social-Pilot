@@ -2,17 +2,17 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({ query: vi.fn(), execute: vi.fn(), transaction: vi.fn(), target: vi.fn(), access: vi.fn(), secret: 'test-key' as string | null, overrides: {} as Record<string, unknown>, used: 0, claimed: true, workspace: true }));
 vi.mock('@/server/data', () => ({ prisma: { $queryRaw: m.query, $executeRaw: m.execute, $transaction: m.transaction, target: { findFirst: m.target } } }));
 vi.mock('@/server/config/store', async () => {
-  const { AI_CONFIG } = await import('../src/modules/ai/config');
+  const { AI_CONFIG } = await import('../src/modules/studio/config');
   const defaults: Record<string, unknown> = { ...Object.fromEntries(AI_CONFIG.map(e => [e.key, e.defaultValue])), 'ai.enabled': true };
   return { runtimeSecret: async () => m.secret, runtimeConfigBatch: async (keys: string[]) => Object.fromEntries(keys.map(key => [key, m.overrides[key] ?? defaults[key]])) };
 });
 vi.mock('@/server/data-control/guard', () => ({ withWorkspaceOperation: async (_w: string, fn: () => unknown) => fn() }));
 vi.mock('@/server/platforms/resource-lock', () => ({ withSelectedResourceOperation: async (_w: string, _r: unknown, fn: (tx: unknown, signal: AbortSignal) => unknown) => fn({ $executeRaw: m.execute }, new AbortController().signal) }));
-vi.mock('@/modules/ai/server/usage', async importOriginal => ({ ...await importOriginal<typeof import('@/modules/ai/server/usage')>(), recordUsage: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@/modules/studio/server/usage', async importOriginal => ({ ...await importOriginal<typeof import('@/modules/studio/server/usage')>(), recordUsage: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/server/jobs/access', () => ({ assertWorkspaceJobAccess: m.access }));
 vi.mock('@/modules/inbox/server/comment-guard', () => ({ lockInboxChannel: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/modules/inbox/server/providers', () => ({ inboxTargetWhere: vi.fn().mockResolvedValue({ enabled: true }) }));
-import { classifyCommentSentiment, parseSentiment, SENTIMENT_VERSION } from '@/modules/ai/server/sentiment';
+import { classifyCommentSentiment, parseSentiment, SENTIMENT_VERSION } from '@/modules/studio/server/sentiment';
 const now = new Date('2026-10-20T12:00:00Z');
 const port = (answer = 'negative') => ({ complete: vi.fn().mockResolvedValue(answer) });
 beforeEach(() => {

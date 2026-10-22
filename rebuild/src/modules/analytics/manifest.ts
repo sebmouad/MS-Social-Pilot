@@ -22,7 +22,6 @@ export const analyticsManifest = {
     { from: '/analytics/pins', to: '/insights/pins' },
     { from: '/analytics/reports', to: '/insights/reports' },
     { from: '/analytics/notes', to: '/insights/notes' },
-    { from: '/analytics/tests', to: '/insights/tests' },
   ],
   /** `tabOrder` fixes the Insights tabs; the Analysis page joins the Ads area through its page-level `area`. */
   pages: [
@@ -30,7 +29,6 @@ export const analyticsManifest = {
     { id: 'analytics/explorer', title: 'Explore', href: '/insights/explore', tabOrder: 20, description: 'Inspect every available stored metric, source and resource.' },
     { id: 'analytics/demographics', title: 'Audience', href: '/insights/audience', tabOrder: 30, description: 'Understand available audience breakdowns and coverage.' },
     { id: 'analytics/posts', title: 'Posts', href: '/insights/posts', tabOrder: 40, description: 'Explore and export stored per-post measures.' },
-    { id: 'analytics/tests', title: 'Caption tests', href: '/insights/tests', tabOrder: 45, description: 'Test captions against each other and learn what works.' },
     { id: 'analytics/compare', title: 'Compare', href: '/insights/compare', tabOrder: 50, description: 'Compare periods and selected resource groups with honest metric semantics.' },
     // Ad-object analysis is the Analysis tab of the Ads area (Accounts · Campaigns · Manage · Analysis · Compare).
     { id: 'analytics/ads', title: 'Ads analysis', href: '/ads/analysis', area: 'ads', tabOrder: 40, description: 'Explore paid campaign, ad set and ad performance separately from channel analytics.' },

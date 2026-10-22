@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { assessSpamRisk, formatOfAppPost, hourBucket, lengthBucket, linkKey, linksOf, parseOpenGraphHtml, predictEngagement, similarText, wordsOf, type PastPost } from '../src/modules/ai/content-tools/pure';
-import { pickModel } from '../src/modules/ai/content-tools/server/media-ports';
-import { AI_CONTENT_TOOLS_DEFAULTS, imagePolicySchema, outlookPolicySchema, toolsCopySchema, videoPolicySchema, voicePolicySchema } from '../src/modules/ai/content-tools/config';
-import { TOOLS_COPY, fill } from '../src/modules/ai/content-tools/copy';
-import { decide, firstMeasure, learningLine, planCaptions, sumMeasures, tally } from '../src/modules/caption-tests/pure';
-import { CAPTION_TESTS_COPY } from '../src/modules/caption-tests/copy';
-import { captionTestsCopySchema, captionTestsPolicySchema, CAPTION_TESTS_DEFAULTS } from '../src/modules/caption-tests/config';
+import { assessSpamRisk, formatOfAppPost, hourBucket, lengthBucket, linkKey, linksOf, parseOpenGraphHtml, predictEngagement, similarText, wordsOf, type PastPost } from '../src/modules/studio/content-tools/pure';
+import { pickModel } from '../src/modules/studio/content-tools/server/media-ports';
+import { AI_CONTENT_TOOLS_DEFAULTS, imagePolicySchema, outlookPolicySchema, toolsCopySchema, videoPolicySchema, voicePolicySchema } from '../src/modules/studio/config';
+import { TOOLS_COPY, fill } from '../src/modules/studio/content-tools/copy';
+import { decide, firstMeasure, learningLine, planCaptions, sumMeasures, tally } from '../src/modules/studio/caption-tests/pure';
+import { CAPTION_TESTS_COPY } from '../src/modules/studio/caption-tests/copy';
+import { captionTestsCopySchema, captionTestsPolicySchema, CAPTION_TESTS_DEFAULTS } from '../src/modules/studio/config';
 
 const rules = AI_CONTENT_TOOLS_DEFAULTS.outlook;
 const limits = { headScanBytes: 100_000, fieldMaxCharacters: 500 };

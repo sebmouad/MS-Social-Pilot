@@ -38,7 +38,7 @@ export const RECAP_LABEL = reportDocumentCopyDefaults.en["AI-generated summary o
 export const RECAP_UNAVAILABLE = reportDocumentCopyDefaults.en["The AI recap is unavailable for this run. The figures below are unaffected."];
 /** Recap writer. Receives only compact report figures; the default is the AI module's authorized `summarize`. */
 export type RecapWriter = (actor: { userId: string; workspaceId: string; permissionCeiling?: ReportActor['permissionCeiling'] }, request: { facts: string; subject: string; language: string }) => Promise<{ text: string }>;
-const defaultRecap: RecapWriter = async (actor, request) => (await import('@/modules/ai/server/ai')).summarize(actor, request, { feature: 'analytics/reports' });
+const defaultRecap: RecapWriter = async (actor, request) => (await import('@/modules/studio/server/ai')).summarize(actor, request, { feature: 'analytics/reports' });
 
 const bytes = (text: string) => Buffer.byteLength(text, 'utf8');
 /** Longest prefix within `max` UTF-8 bytes that never ends inside a character. */

@@ -36,11 +36,11 @@ return {
       return formatRefreshSummary(await (job === 'calendarHolidays' ? refreshHolidays({ now }) : refreshTrends({ now })));
     }
     if (job === 'captionTests') {
-      const { settleCaptionTests } = await import('@/modules/caption-tests/server/service');
+      const { settleCaptionTests } = await import('@/modules/studio/caption-tests/server/service');
       return `settled=${await settleCaptionTests({ now: () => now })}`;
     }
     if (job === 'aiVideos') {
-      const { pollAiVideos } = await import('@/modules/ai/content-tools/server/media');
+      const { pollAiVideos } = await import('@/modules/studio/content-tools/server/media');
       return `finished=${await pollAiVideos({ now: () => now })}`;
     }
     if (job === 'workspaceExports') {
@@ -82,7 +82,7 @@ return {
       return runShareLinkDeadlines(now);
     }
     if (job === 'scheduledAgents') {
-      const { runDueScheduledAgents } = await import('@/modules/agents/server/scheduled');
+      const { runDueScheduledAgents } = await import('@/modules/studio/agents/server/scheduled');
       return runDueScheduledAgents(now);
     }
     if (job === 'bestTimes') {

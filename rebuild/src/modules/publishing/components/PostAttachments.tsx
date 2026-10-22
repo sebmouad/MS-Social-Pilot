@@ -9,7 +9,7 @@ import { FieldError } from '@/components/FormValidation';
 import styles from './PostAttachments.module.css';
 import { useAttachmentCopy } from '../ui/compose/CopyProvider';
 import { fillComposerCopy } from '../composer-catalog';
-import { AltTextSuggest } from '@/modules/ai/components/AltTextSuggest';
+import { AltTextSuggest } from '@/modules/studio/components/AltTextSuggest';
 
 export type PostMediaKind = 'image' | 'video';
 export type PostMediaItem = { kind: PostMediaKind; url: string; altText?: string };

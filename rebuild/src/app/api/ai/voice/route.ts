@@ -1,4 +1,4 @@
-import { aiVoiceHttp } from '@/modules/ai/content-tools/server/http';
+import { aiVoiceHttp } from '@/modules/studio/content-tools/server/http';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const POST = aiVoiceHttp;

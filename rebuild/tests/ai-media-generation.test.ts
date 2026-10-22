@@ -12,16 +12,16 @@ vi.mock('@/server/permissions/loader', () => ({ loadPermissions: mocks.permissio
 vi.mock('@/server/data-control/guard', () => ({ assertWorkspaceNotPurging: mocks.purge, withWorkspaceOperation: (_id: string, fn: () => unknown) => fn() }));
 vi.mock('@/modules/media/server/library', () => ({ bounds: async () => ({ quota: 1_000_000_000, videoMax: 500_000_000 }) }));
 vi.mock('@/server/config/store', async () => {
-  const { AI_CONFIG } = await import('../src/modules/ai/config');
+  const { AI_CONFIG } = await import('../src/modules/studio/config');
   const defaults: Record<string, unknown> = { ...Object.fromEntries(AI_CONFIG.map(e => [e.key, e.defaultValue])), 'ai.enabled': true };
   const value = (key: string) => state.overrides[key] ?? defaults[key];
   return { runtimeConfig: async (key: string) => value(key), runtimeConfigBatch: async (keys: string[]) => Object.fromEntries(keys.map(key => [key, value(key)])), runtimeSecret: async () => state.secret };
 });
 
 import { resolvePermissions } from '../src/server/permissions';
-import { aiMediaStatus, generateImage, generateVoice, listVideos, pollAiVideos, startVideo } from '../src/modules/ai/content-tools/server/media';
-import { AI_CONTENT_TOOLS_DEFAULTS } from '../src/modules/ai/content-tools/config';
-import { executeContentTool } from '../src/modules/ai/content-tools/mcp';
+import { aiMediaStatus, generateImage, generateVoice, listVideos, pollAiVideos, startVideo } from '../src/modules/studio/content-tools/server/media';
+import { AI_CONTENT_TOOLS_DEFAULTS } from '../src/modules/studio/config';
+import { executeContentTool } from '../src/modules/studio/content-tools/mcp';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const sql = (s: TemplateStringsArray, v: unknown[]) => ({ sql: s.join('?'), values: v });

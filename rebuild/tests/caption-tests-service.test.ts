@@ -14,15 +14,15 @@ vi.mock('@/server/permissions/loader', () => ({ loadPermissions: mocks.permissio
 vi.mock('@/server/data-control/guard', () => ({ assertWorkspaceNotPurging: mocks.purge, withWorkspaceOperation: (_id: string, fn: () => unknown) => fn() }));
 vi.mock('@/server/platforms/registry', () => ({ platformAnalytics: vi.fn(async () => null) }));
 vi.mock('@/server/config/store', async () => {
-  const { CAPTION_TESTS_CONFIG } = await import('../src/modules/caption-tests/config');
+  const { CAPTION_TESTS_CONFIG } = await import('../src/modules/studio/config');
   const defaults: Record<string, unknown> = Object.fromEntries(CAPTION_TESTS_CONFIG.map(e => [e.key, e.defaultValue]));
   return { runtimeConfig: async (key: string) => state.overrides[key] ?? defaults[key] };
 });
 
 import { resolvePermissions } from '../src/server/permissions';
-import { learnCaptionTest, listCaptionTests, listTestablePosts, settleCaptionTests, startCaptionTest, startCaptionVariants } from '../src/modules/caption-tests/server/service';
-import { executeCaptionTestTool } from '../src/modules/caption-tests/mcp';
-import { CAPTION_TESTS_DEFAULTS, captionTestsPolicySchema, captionTestsCopySchema } from '../src/modules/caption-tests/config';
+import { learnCaptionTest, listCaptionTests, listTestablePosts, settleCaptionTests, startCaptionTest, startCaptionVariants } from '../src/modules/studio/caption-tests/server/service';
+import { executeCaptionTestTool } from '../src/modules/studio/caption-tests/mcp';
+import { CAPTION_TESTS_DEFAULTS, captionTestsPolicySchema, captionTestsCopySchema } from '../src/modules/studio/config';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const sql = (s: TemplateStringsArray, v: unknown[]) => ({ sql: s.join('?'), values: v });
@@ -287,7 +287,7 @@ describe('caption setting compatibility', () => {
     expect(captionTestsPolicySchema.parse({ ...legacy, defaultHours: 72 })).toMatchObject({ captionMaxCharacters, targetLimit, requestMaxBytes, defaultHours: 72 });
   });
   it('fills new localized copy while preserving saved customized labels', async () => {
-    const { CAPTION_TESTS_COPY } = await import('../src/modules/caption-tests/copy');
+    const { CAPTION_TESTS_COPY } = await import('../src/modules/studio/caption-tests/copy');
     const oldEn: Record<string, string> = { ...CAPTION_TESTS_COPY.en, title: 'Our caption lab' };
     const oldFr: Record<string, string> = { ...CAPTION_TESTS_COPY.fr, title: 'Notre atelier' };
     delete oldEn.rawHint; delete oldFr.rawHint;

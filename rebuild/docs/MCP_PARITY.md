@@ -177,10 +177,10 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | --- | --- | --- | --- | --- |
 | get_home_overview | home/overview | read | GET /api/home/overview | Shared customer operation; transport arguments may differ. |
 | list_navigation_commands | home/overview | read | GET /api/home/commands | Command palette, REST and MCP share listNavigationCommands: sidebar-ordered pages the member may use, same titles as the sidebar. |
-| list_writing_agents | agents/library | read | GET /api/agents | Agents screen, REST and MCP share writingAgents for tenant-scoped briefs and content-free history. |
-| writing_agents | agents/library | write | GET /api/agents; POST /api/agents | Agents screen, REST and MCP use writingAgents for saved briefs, history and metered suggestions. Service checks current membership, feature permission, exact write confirmation and audit; workspace-wide key scope only. |
-| list_scheduled_agents | agents/library | read | GET /api/agents/scheduled | Agents screen, REST and MCP share scheduledAgents for scheduled runs; tenant-scoped list with enabled channels. |
-| manage_scheduled_agent | agents/library | write | POST /api/agents/scheduled | Agents screen, REST and MCP share scheduledAgents for scheduled runs. Exact CREATE/UPDATE/DELETE/RUN confirmations; a run writes drafts as the creator with AI metering and audit, never scheduling or publishing. |
+| list_writing_agents | studio/agents | read | GET /api/agents | Agents screen, REST and MCP share writingAgents for tenant-scoped briefs and content-free history. |
+| writing_agents | studio/agents | write | GET /api/agents; POST /api/agents | Agents screen, REST and MCP use writingAgents for saved briefs, history and metered suggestions. Service checks current membership, feature permission, exact write confirmation and audit; workspace-wide key scope only. |
+| list_scheduled_agents | studio/agents | read | GET /api/agents/scheduled | Agents screen, REST and MCP share scheduledAgents for scheduled runs; tenant-scoped list with enabled channels and recent run history from the audit trail. |
+| manage_scheduled_agent | studio/agents | write | POST /api/agents/scheduled | Agents screen, REST and MCP share scheduledAgents for scheduled runs. Exact CREATE/UPDATE/DELETE/RUN confirmations; a run writes drafts as the creator with AI metering and audit, never scheduling or publishing. |
 | posts_export_job | publishing/posts | write | POST /api/publishing/posts/export/jobs | Posts UI, REST and MCP use postExportAction for queued CSV creation. Exact EXPORT POSTS consent, current tenant/resource scope, expiry and per-request access apply in the service. |
 | posts_export_status | publishing/posts | read | GET /api/publishing/posts/export/jobs | Posts UI, REST and MCP use postExportAction for export status, attempt history and private download; readers retain independent credential ceilings, current scope and expiry checks. CSV byte limits still apply to MCP output. |
 | get_ads_report_rows | ads/campaigns | read | GET /api/ads/report/rows | Shared customer operation; transport arguments may differ. |
@@ -615,8 +615,8 @@ alias waives the target's service-owned authorization or UI verification.
 | Manifest feature | Covered feature | Reason |
 | --- | --- | --- |
 | ads/overview | ads/campaigns | Account overview presents the same account/performance reads declared under ads/campaigns by MCP. |
-| publishing/ai-studio | publishing/posts | AI studio page gates on the same publishing/posts capability the AI media and check MCP tools declare; the 2026-10-22 UX organization added page-only gating with no new MCP surface. |
-| analytics/tests | analytics/posts | Caption tests page gates on the same analytics/posts read capability list_caption_tests declares; start and learn keep their publishing/posts and settings/workspace service gates. |
+| studio/ai-studio | publishing/posts | AI studio page gates on the same publishing/posts capability the AI media and check MCP tools declare; the 2026-10-22 UX organization added page-only gating with no new MCP surface. |
+| studio/tests | analytics/posts | Caption tests page gates on the same analytics/posts read capability list_caption_tests declares; start and learn keep their publishing/posts and settings/workspace service gates. |
 <!-- parity-feature-aliases:end -->
 
 Selector review: `/api/tasks` POST uses the task action union; Sharing link POST

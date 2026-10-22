@@ -16,7 +16,7 @@ import { pageChannelScope } from '@/modules/shell/server/scope';
 import { isDateKey } from '@/lib/calendar-dates';
 import { formatPostPreviewTime } from '@/components/PostPreview';
 import { PostComposer } from './PostComposer';
-import { aiStatus } from '@/modules/ai/server/ai';
+import { aiStatus } from '@/modules/studio/server/ai';
 import { loadWorkspaceOperations } from '@/modules/settings/server/workspace-operations';
 
 type Params = Record<string, string | string[] | undefined>;

@@ -4,20 +4,20 @@ const mocks = vi.hoisted(() => ({
   viewer: vi.fn(), image: vi.fn(), voice: vi.fn(), status: vi.fn(), videos: vi.fn(), start: vi.fn(), preview: vi.fn(), outlook: vi.fn(), spam: vi.fn(),
   list: vi.fn(), testable: vi.fn(), startTest: vi.fn(), learn: vi.fn(),
 }));
-vi.mock('@/server/config/store', async () => { const { CAPTION_TESTS_DEFAULTS } = await import('../src/modules/caption-tests/config'); return { runtimeConfig: async () => CAPTION_TESTS_DEFAULTS }; });
+vi.mock('@/server/config/store', async () => { const { CAPTION_TESTS_DEFAULTS } = await import('../src/modules/studio/config'); return { runtimeConfig: async () => CAPTION_TESTS_DEFAULTS }; });
 vi.mock('@/server/context', () => ({ requireViewer: mocks.viewer }));
 vi.mock('@/server/request-origin', () => ({ requestOrigin: () => 'https://app.example.com' }));
 vi.mock('@/server/config/config-or-default', async () => {
-  const { TOOLS_COPY } = await import('../src/modules/ai/content-tools/copy');
-  const { CAPTION_TESTS_COPY } = await import('../src/modules/caption-tests/copy');
+  const { TOOLS_COPY } = await import('../src/modules/studio/content-tools/copy');
+  const { CAPTION_TESTS_COPY } = await import('../src/modules/studio/caption-tests/copy');
   return { configOrDefault: async (key: string) => key === 'ai.toolsCopy' ? TOOLS_COPY : CAPTION_TESTS_COPY };
 });
-vi.mock('../src/modules/ai/content-tools/server/media', () => ({ aiMediaStatus: mocks.status, generateImage: mocks.image, generateVoice: mocks.voice, listVideos: mocks.videos, startVideo: mocks.start }));
-vi.mock('../src/modules/ai/content-tools/server/checks', () => ({ linkPreview: mocks.preview, engagementOutlook: mocks.outlook, spamCheck: mocks.spam }));
-vi.mock('../src/modules/caption-tests/server/service', () => ({ listCaptionTests: mocks.list, listTestablePosts: mocks.testable, startCaptionTestInput: mocks.startTest, learnCaptionTest: mocks.learn }));
+vi.mock('../src/modules/studio/content-tools/server/media', () => ({ aiMediaStatus: mocks.status, generateImage: mocks.image, generateVoice: mocks.voice, listVideos: mocks.videos, startVideo: mocks.start }));
+vi.mock('../src/modules/studio/content-tools/server/checks', () => ({ linkPreview: mocks.preview, engagementOutlook: mocks.outlook, spamCheck: mocks.spam }));
+vi.mock('../src/modules/studio/caption-tests/server/service', () => ({ listCaptionTests: mocks.list, listTestablePosts: mocks.testable, startCaptionTestInput: mocks.startTest, learnCaptionTest: mocks.learn }));
 
-import { aiImageHttp, aiMediaStatusHttp, aiVideoHttp, aiVoiceHttp, linkPreviewHttp, outlookHttp, spamCheckHttp } from '../src/modules/ai/content-tools/server/http';
-import { captionTestLearnHttp, captionTestsListHttp, captionTestsStartHttp } from '../src/modules/caption-tests/server/http';
+import { aiImageHttp, aiMediaStatusHttp, aiVideoHttp, aiVoiceHttp, linkPreviewHttp, outlookHttp, spamCheckHttp } from '../src/modules/studio/content-tools/server/http';
+import { captionTestLearnHttp, captionTestsListHttp, captionTestsStartHttp } from '../src/modules/studio/caption-tests/server/http';
 
 const post = (url: string, body: unknown, headers: Record<string, string> = {}) => new Request(`https://app.example.com${url}`, { method: 'POST', headers: { origin: 'https://app.example.com', 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
 beforeEach(() => {

@@ -11,11 +11,11 @@ vi.mock('@/server/data-control/guard', () => ({ assertWorkspaceNotPurging: async
 import { qualifyingOwner } from '../src/modules/feeds/server/access';
 import { MEDIA_CONFIG, MEDIA_DEFAULTS } from '../src/modules/media/config';
 import { FEEDS_BOUNDS, FEEDS_CONFIG, FEEDS_DEFAULTS } from '../src/modules/feeds/config';
-import { AI_BOUNDS, AI_CONFIG, AI_DEFAULTS } from '../src/modules/ai/config';
+import { AI_BOUNDS, AI_CONFIG, AI_DEFAULTS } from '../src/modules/studio/config';
 import { FEED_INPUT_SCHEMA, FEED_LIST_SCHEMA, feedInputSchema, feedListSchema, parseFeedDocument, wordpressApiUrl } from '../src/modules/feeds/feeds';
 import { importSchema, libraryQuerySchema, safeAssetName } from '../src/modules/media/library';
-import { summarizeSchema, aiRequestSchema, parseHashtags } from '../src/modules/ai/ai';
-import { aiToolDefinitions } from '../src/modules/ai/mcp';
+import { summarizeSchema, aiRequestSchema, parseHashtags } from '../src/modules/studio/ai';
+import { aiToolDefinitions } from '../src/modules/studio/mcp';
 
 it('registers the module-owned operational defaults with validated overrides', () => {
   const setting = (entries: readonly { key: string; defaultValue: unknown; schema: { safeParse(value: unknown): { success: boolean } } }[], key: string) => entries.find(entry => entry.key === key)!;

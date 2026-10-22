@@ -80,9 +80,9 @@ handler and disabled states carry their reason in context. Empty-state gaps fixe
    de contenu"); 308 redirect from /content/library/feeds; removed from Library
    section tabs; pagination links updated.
 2. AI studio → own Content-area tab at /content/ai-studio (new `publishing/ai-studio`
-   feature; EN "AI studio", FR "Studio IA").
+   feature, renamed to `studio/ai-studio` when AI Studio became its own module; EN "AI studio", FR "Studio IA").
 3. Caption tests → own Insights tab at /insights/tests (new `analytics/tests`
-   feature, tabOrder between Posts and Compare; EN "Caption tests", FR "Tests de
+   feature, renamed to `studio/tests` when AI Studio became its own module; tabOrder between Posts and Compare; EN "Caption tests", FR "Tests de
    légendes"); `tabRoutes` on Posts removed.
 4. Chart notes → linked from the Insights Overview header (Root-managed
    calendar-extras label, existing pattern).

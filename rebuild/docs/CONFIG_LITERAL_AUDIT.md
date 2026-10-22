@@ -273,12 +273,12 @@ For catalogs and compound policies, every moved field/default is enumerated in t
 | `integrations.oauth.issuedKeyNameMaxCharacters` | `100` | `src/modules/integrations/config.ts` |
 | `integrations.oauth.defaultClientName` | `'MCP client'` | `src/modules/integrations/config.ts` |
 | `integrations.oauth.issuedKeyNamePrefix` | `'OAuth: '` | `src/modules/integrations/config.ts` |
-| `ai.sentimentLookbackDays` | `15` | `src/modules/ai/config.ts` |
-| `ai.hashtagBodyMaxCharacters` | `60` | `src/modules/ai/config.ts` |
-| `ai.outputInputMultiplier` | `2` | `src/modules/ai/config.ts` |
-| `ai.languageMaxCharacters` | `32` | `src/modules/ai/config.ts` |
-| `ai.summaryMaxCharacters` | `1200` | `src/modules/ai/config.ts` |
-| `ai.summarySubjectMaxCharacters` | `200` | `src/modules/ai/config.ts` |
+| `ai.sentimentLookbackDays` | `15` | `src/modules/studio/config.ts` |
+| `ai.hashtagBodyMaxCharacters` | `60` | `src/modules/studio/config.ts` |
+| `ai.outputInputMultiplier` | `2` | `src/modules/studio/config.ts` |
+| `ai.languageMaxCharacters` | `32` | `src/modules/studio/config.ts` |
+| `ai.summaryMaxCharacters` | `1200` | `src/modules/studio/config.ts` |
+| `ai.summarySubjectMaxCharacters` | `200` | `src/modules/studio/config.ts` |
 | `mail.recipientMaxCharacters` | `320` | `src/server/mail/config.ts` |
 | `mail.workspaceIdMaxCharacters` | `128` | `src/server/mail/config.ts` |
 | `mail.templateMaxCharacters` | `100` | `src/server/mail/config.ts` |
@@ -381,7 +381,7 @@ Source: `src/lib/connection-health.ts`. Each of the following fields exists in b
 - `server/data-control/{zip,archive}.ts`: 64 MiB ZIP32 headroom moved to `data.zipSafetyHeadroomBytes`; structural byte widths are listed below.
 - `modules/media/server/library.ts` and `library.ts`: image enumeration 1000, holder excerpt 80, accepted IDs 80, max page 1000, import URL 2048, name 180 moved to media settings; service schemas/fallback helpers use current values or owning compatibility defaults.
 - `modules/feeds/{feeds.ts,server/core.ts,server/feeds.ts,server/access.ts,server/ingest.ts}`: list margin 100, qualifying-owner fallback 10, URL 2048, ID 80, max page 100000, hashtags 1000, item title/GUID 500, description 20000 and WordPress per_page 20 moved to feed settings. Parser defaults and compatibility schemas derive from the same owning catalog.
-- `modules/ai/{ai.ts,server/ai.ts,server/sentiment.ts}`: recap output 1200, subject 200, stored sentiment lookback 15 days, language 32, hashtag body 60 and output/input multiplier 2 moved to AI settings. Request and summary services use current policy; MCP descriptors advertise supported maxima.
+- `modules/studio/{ai.ts,server/ai.ts,server/sentiment.ts}`: recap output 1200, subject 200, stored sentiment lookback 15 days, language 32, hashtag body 60 and output/input multiplier 2 moved to AI settings. Request and summary services use current policy; MCP descriptors advertise supported maxima.
 - `modules/integrations/server/events.ts`: event error-code 80, destination IDs 50, author name 120, comment text 500 and disconnect reason 120 are separately configurable. `webhooks.ts`: stored error 200 and purge batch 1000 follow settings. Request services enforce every webhook and REST field/list limit listed in the key table. The declaration-only `REST_POSTS_BODY_MAX_BYTES` is removed; reader consumes the current 256 KiB default policy.
 - `modules/integrations/oauth/{protocol,server}.ts`: registration name input 200 stays distinct from displayed name 60; redirect length 2000/count 10, selected IDs length 100/count 1000, issued key name 100 and fallback/prefix copy move to the OAuth catalog. Runtime registration/consent/key issuance enforce applicable active policies. The Root-gap follow-up below wires the authorize route/screen to these limits; owning Integrations config metadata still needs its configured-to-active update.
 
@@ -458,11 +458,11 @@ npx vitest run --no-cache tests/account-settings.test.ts tests/ai-assist.test.ts
 - `src/lib/connection-health.ts`
 - `src/lib/diagnostics.ts`
 - `src/lib/root-user-controls.ts`
-- `src/modules/ai/ai.ts`
-- `src/modules/ai/config.ts`
-- `src/modules/ai/mcp.ts`
-- `src/modules/ai/server/ai.ts`
-- `src/modules/ai/server/sentiment.ts`
+- `src/modules/studio/ai.ts`
+- `src/modules/studio/config.ts`
+- `src/modules/studio/mcp.ts`
+- `src/modules/studio/server/ai.ts`
+- `src/modules/studio/server/sentiment.ts`
 - `src/modules/feeds/config.ts`
 - `src/modules/feeds/feeds.ts`
 - `src/modules/feeds/mcp.ts`

@@ -1,6 +1,6 @@
 # AI writing assist
 
-Module: `src/modules/ai/` (config.ts, mcp.ts, ai.ts pure prompts/validation, copy.ts en+fr, server/, components/AiAssist.tsx). HTTP: `/api/ai`. Settings are Root-owned and listed under Publishing (`ai.` prefix).
+Module: `src/modules/studio/` (2026-10-22: the AI module moved into AI Studio; config.ts, mcp.ts, ai.ts pure prompts/validation, copy.ts en+fr, server/, components/AiAssist.tsx). HTTP: `/api/ai`. Settings are Root-owned and listed under AI Studio (`ai.` prefix).
 
 **Suggestions only.** Every path returns text for review. Nothing is saved, scheduled, sent or published by AI; the composer changes the post only when the member presses "Use this text" / "Add to post".
 
@@ -8,7 +8,7 @@ Module: `src/modules/ai/` (config.ts, mcp.ts, ai.ts pure prompts/validation, cop
 
 Legacy composer assist: write a caption from a brief, improve wording, hashtags, translate, with workspace tone, brand voice and avoid-words, plus a report recap. Rebuilt: `caption`, `improve`, `translate`, `hashtags` (composer, HTTP, MCP) and a reusable `summarize()` for report recaps. Workspace "AI voice" settings (`aiEnabled`, `aiTone`, `aiBrandVoice`, `aiAvoidWords`, Settings > Workspace operations) are now consumed: `aiEnabled=false` hides and refuses assist; voice and avoid-words are sent as delimited style guidance only; the workspace tone is the default when the member picks none.
 
-Not ported: week planning (creates drafts), alt text from images, negative-comment sentiment, AI image/video/voice generation, per-channel voice, inbox reply suggestions (legacy had none). Spend: Root `ai.monthlyBudgetUsd` (0 = off), `ai.priceOverrides` (per-model USD per million tokens), `ai.fallbackInputPricePerMillionUsd`/`ai.fallbackOutputPricePerMillionUsd` and `ai.charactersPerToken` meter every answer (composer, recap, sentiment) as an `ai.completed` activity row (kind, model, estimated tokens, cost; never text). Tokens are estimated from characters because providers return no counts through the port; a model with no price is recorded without a cost and shown as unpriced, never as zero, and is not stopped by the budget. A spent monthly budget refuses at the usage claim before any provider call. The shared status (UI note, `GET /api/ai`, MCP `get_ai_assist_status`) carries `usage` (month, requests, spent, unpriced requests, budget, remaining). The hourly limit still applies. Mocked tests only (`tests/ai-budget.test.ts`).
+Shipped since: scheduled agents write weekly drafts (Studio › Writing agents), alt text from images, comment sentiment for spike alerts, AI image/video/voice generation, and reply-draft suggestions. Not ported: per-channel voice. Spend: Root `ai.monthlyBudgetUsd` (0 = off), `ai.priceOverrides` (per-model USD per million tokens), `ai.fallbackInputPricePerMillionUsd`/`ai.fallbackOutputPricePerMillionUsd` and `ai.charactersPerToken` meter every answer (composer, recap, sentiment) as an `ai.completed` activity row (kind, model, estimated tokens, cost; never text). Tokens are estimated from characters because providers return no counts through the port; a model with no price is recorded without a cost and shown as unpriced, never as zero, and is not stopped by the budget. A spent monthly budget refuses at the usage claim before any provider call. The shared status (UI note, `GET /api/ai`, MCP `get_ai_assist_status`) carries `usage` (month, requests, spent, unpriced requests, budget, remaining). The hourly limit still applies. Mocked tests only (`tests/ai-budget.test.ts`).
 
 ## Root configuration (`ai.*`, schema 82)
 
@@ -27,7 +27,7 @@ One service (`server/ai.ts`) backs UI, API and MCP. `authorizeAi` rebuilds membe
 ## Reusable recap
 
 ```ts
-import { summarize } from '@/modules/ai/server/ai';
+import { summarize } from '@/modules/studio/server/ai';
 const { text } = await summarize({ userId, workspaceId }, { facts: 'compact figures text', subject: 'Page name, period', language: 'French' }, { feature: 'analytics/reports' });
 ```
 

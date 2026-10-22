@@ -6,13 +6,13 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/server/data', () => ({ prisma: { $queryRaw: mocks.queryRaw, $executeRaw: mocks.executeRaw, $transaction: mocks.transaction } }));
 vi.mock('@/server/config/store', () => ({ runtimeConfigBatch: mocks.batch }));
-vi.mock('@/modules/agents/server/copy', () => ({ agentCopy: async () => new Proxy({}, { get: (_t, key) => String(key) }) }));
-vi.mock('@/modules/ai/server/access', () => ({ authorizeAi: mocks.authorize }));
-vi.mock('@/modules/ai/server/ai', () => ({ settings: mocks.settings, complete: mocks.complete }));
-vi.mock('@/modules/ai/ai', () => ({ cleanOutput: (text: string) => text.trim() }));
+vi.mock('@/modules/studio/agents/server/copy', () => ({ agentCopy: async () => new Proxy({}, { get: (_t, key) => String(key) }) }));
+vi.mock('@/modules/studio/server/access', () => ({ authorizeAi: mocks.authorize }));
+vi.mock('@/modules/studio/server/ai', () => ({ settings: mocks.settings, complete: mocks.complete }));
+vi.mock('@/modules/studio/ai', () => ({ cleanOutput: (text: string) => text.trim() }));
 vi.mock('@/modules/publishing/server/api-writes', () => ({ createPublishingPost: mocks.createPost }));
 
-import { runDueScheduledAgents, scheduledAgents } from '@/modules/agents/server/scheduled';
+import { runDueScheduledAgents, scheduledAgents } from '@/modules/studio/agents/server/scheduled';
 
 const actor = { userId: 'user-a', workspaceId: 'workspace-a' };
 const policy = {
@@ -130,5 +130,29 @@ describe('scheduled writing agents', () => {
     mocks.batch.mockResolvedValue({ ...policy, 'agents.scheduledRunsEnabled': false });
     await expect(runDueScheduledAgents(new Date())).resolves.toBe('disabled');
     expect(mocks.queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('lists schedules with recent run history from the workspace audit trail', async () => {
+    mocks.queryRaw.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = strings.join('?');
+      if (sql.includes('FROM ai_agents')) return [{ id: 'agent-a', targetId: 'target-a', targetName: 'Page', brief: 'Weekly news', weekday: 4, count: 2, enabled: true, lastRunOn: '2026-10-22', createdAt: '2026-10-01T00:00:00.000Z' }];
+      if (sql.includes('FROM activity_logs') && sql.includes('agents.scheduled.completed')) {
+        expect(values[0]).toBe('workspace-a');
+        return [
+          { agentId: 'agent-a', action: 'agents.scheduled.completed', drafts: 2, code: null, at: '2026-10-22T08:00:00.000Z' },
+          { agentId: 'agent-a', action: 'agents.scheduled.failed', drafts: null, code: 'upstream_failure', at: new Date('2026-10-15T08:00:00.000Z') },
+        ];
+      }
+      if (sql.includes('FROM targets')) return [{ id: 'target-a', name: 'Page' }];
+      return [];
+    });
+    const result = await scheduledAgents(actor, { action: 'list' }) as { agents: unknown[]; history: Array<{ agentId: string; at: string; drafts: number | null; code: string | null }> };
+    expect(result.agents).toHaveLength(1);
+    expect(result.history).toEqual([
+      { agentId: 'agent-a', at: '2026-10-22T08:00:00.000Z', drafts: 2, code: null },
+      { agentId: 'agent-a', at: '2026-10-15T08:00:00.000Z', drafts: null, code: 'upstream_failure' },
+    ]);
+    const historyQuery = mocks.queryRaw.mock.calls.map(sqlOf).find(sql => sql.includes('FROM activity_logs') && sql.includes('agents.scheduled.completed'))!;
+    expect(historyQuery).toContain('ORDER BY "createdAt" DESC');
   });
 });

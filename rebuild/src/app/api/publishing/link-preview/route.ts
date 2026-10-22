@@ -1,4 +1,4 @@
-import { linkPreviewHttp } from '@/modules/ai/content-tools/server/http';
+import { linkPreviewHttp } from '@/modules/studio/content-tools/server/http';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const POST = linkPreviewHttp;

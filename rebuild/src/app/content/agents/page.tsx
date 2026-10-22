@@ -1,1 +1,1 @@
-export { default } from '@/modules/agents/ui/AgentsPage';
+export { default } from '@/modules/studio/agents/ui/AgentsPage';

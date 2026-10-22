@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { operationFailure } from '@/lib/operation-error';
 import { requireViewer } from '@/server/context';
 import { requestOrigin } from '@/server/request-origin';
-import { suggestAltText } from '@/modules/ai/server/alt-text';
+import { suggestAltText } from '@/modules/studio/server/alt-text';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

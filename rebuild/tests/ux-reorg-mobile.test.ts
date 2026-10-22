@@ -40,11 +40,11 @@ const barOrder = () => [...container.querySelectorAll('nav.ui-bottombar a')].map
 describe('reorganized navigation on phones (2026-10-22)', () => {
   it.each([
     ['/content/feeds', 'publishing', 'content', '/content/feeds'],
-    ['/content/ai-studio', 'publishing', 'content', '/content/ai-studio'],
-    ['/insights/tests', 'analytics', 'insights', '/insights/tests'],
+    ['/content/ai-studio', 'studio', 'content', '/content/ai-studio'],
+    ['/insights/tests', 'studio', 'insights', '/insights/tests'],
   ])('BottomBar marks %s under %s and keeps Create raised central', async (path, activeModule, area, tabHref) => {
     nav.path = path;
-    await renderShell({ activeModule: activeModule as ComponentProps<typeof AppShell>['activeModule'] }, [...FEATURES, 'publishing/queue', 'publishing/approvals', 'publishing/media', 'publishing/feeds', 'publishing/ai-studio', 'analytics/posts', 'analytics/tests']);
+    await renderShell({ activeModule: activeModule as ComponentProps<typeof AppShell>['activeModule'] }, [...FEATURES, 'publishing/queue', 'publishing/approvals', 'publishing/media', 'publishing/feeds', 'studio/ai-studio', 'analytics/posts', 'studio/tests']);
     expect(barOrder()).toEqual(['Home', 'Content', 'Inbox', 'Create post', 'Insights', 'Ads']);
     const current = container.querySelector(`nav.ui-bottombar a[data-area="${area}"]`)!;
     expect(current.getAttribute('aria-current')).toBe('page');
@@ -53,7 +53,7 @@ describe('reorganized navigation on phones (2026-10-22)', () => {
   });
 
   it('folds the 8th Content tab into the More menu with a touch-sized trigger', async () => {
-    await renderShell({}, [...FEATURES, 'publishing/queue', 'publishing/approvals', 'publishing/media', 'publishing/feeds', 'publishing/ai-studio', 'agents/library']);
+    await renderShell({}, [...FEATURES, 'publishing/queue', 'publishing/approvals', 'publishing/media', 'publishing/feeds', 'studio/ai-studio', 'studio/agents']);
     expect([...container.querySelectorAll('nav.ui-tabs--links a')].map(link => link.getAttribute('href'))).toEqual([
       '/content', '/content/calendar', '/content/queue', '/content/approvals', '/content/library', '/content/feeds', '/content/ai-studio',
     ]);
@@ -94,20 +94,20 @@ describe('promoted screens on phones', () => {
   });
 
   it('keeps AI studio and caption tests in single-column phone layouts with 40px+ targets', () => {
-    const studio = read('src/modules/ai/content-tools/ui/ai-studio.module.css');
+    const studio = read('src/modules/studio/content-tools/ui/ai-studio.module.css');
     expect(studio).toMatch(/@media \(max-width: 720px\) \{ \.panel \{ padding: 1rem; \} \.preview \{ grid-template-columns: minmax\(0, 1fr\); \} \}/);
     expect(studio).toMatch(/\.channel \{[^}]*min-height: 2\.5rem/);
-    const tests = read('src/modules/caption-tests/ui/caption-tests.module.css');
+    const tests = read('src/modules/studio/caption-tests/ui/caption-tests.module.css');
     expect(tests).toMatch(/@media \(max-width: 720px\) \{[\s\S]*\.figures \{ grid-column: 1 \/ -1;[^}]*text-align: left/);
   });
 
   it('uses fullscreen dialogs and confirmations on promoted screens, never side panels', () => {
-    for (const file of ['src/modules/feeds/ui/FeedsScreen.tsx', 'src/modules/feeds/ui/FeedManager.tsx', 'src/modules/ai/content-tools/ui/AiStudioScreen.tsx', 'src/modules/caption-tests/ui/CaptionTestsScreen.tsx']) {
+    for (const file of ['src/modules/feeds/ui/FeedsScreen.tsx', 'src/modules/feeds/ui/FeedManager.tsx', 'src/modules/studio/content-tools/ui/AiStudioScreen.tsx', 'src/modules/studio/caption-tests/ui/CaptionTestsScreen.tsx']) {
       expect(read(file), file).not.toContain('SidePanel');
     }
     expect(read('src/modules/feeds/ui/FeedManager.tsx')).toContain("from '@/components/Dialog'");
-    expect(read('src/modules/ai/content-tools/ui/AiStudioScreen.tsx')).toContain("from '@/components/useConfirm'");
-    expect(read('src/modules/caption-tests/ui/CaptionTestsScreen.tsx')).toContain("from '@/components/useConfirm'");
+    expect(read('src/modules/studio/content-tools/ui/AiStudioScreen.tsx')).toContain("from '@/components/useConfirm'");
+    expect(read('src/modules/studio/caption-tests/ui/CaptionTestsScreen.tsx')).toContain("from '@/components/useConfirm'");
     expect(read('src/styles/responsive.css')).toMatch(/@media \(max-width: 640px\) \{[\s\S]*\.ui-dialog \{[^}]*height: 100dvh/);
   });
 });

@@ -2,8 +2,8 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AiAssist } from '../src/modules/ai/components/AiAssist';
-import { aiCopy } from '../src/modules/ai/copy';
+import { AiAssist } from '../src/modules/studio/components/AiAssist';
+import { aiCopy } from '../src/modules/studio/copy';
 
 const status = { available: true, kinds: ['caption', 'improve', 'translate', 'hashtags'], tones: ['friendly', 'urgent'], maxInputCharacters: 4000 };
 let root: ReturnType<typeof createRoot>; let container: HTMLDivElement;

@@ -4,16 +4,16 @@ const state = vi.hoisted(() => ({ auth: vi.fn(), workspace: vi.fn(), exec: [] as
 const db = vi.hoisted(() => ({ $queryRaw: vi.fn(), $executeRaw: vi.fn(), $transaction: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/config/store', async () => {
-  const { AI_CONFIG } = await import('../src/modules/ai/config');
+  const { AI_CONFIG } = await import('../src/modules/studio/config');
   const defaults = { ...Object.fromEntries(AI_CONFIG.map(e => [e.key, e.defaultValue])), 'ai.enabled': true, 'ai.model': 'test-model', 'data.workspaceOperationTimeoutMs': 30000 };
   return { runtimeConfigBatch: async (keys: string[]) => Object.fromEntries(keys.map(key => [key, state.overrides[key] ?? (defaults as Record<string, unknown>)[key]])), runtimeSecret: async () => state.secret };
 });
-vi.mock('@/modules/ai/server/access', () => ({ authorizeAi: state.auth }));
+vi.mock('@/modules/studio/server/access', () => ({ authorizeAi: state.auth }));
 
-import { aiStatus, runAssist, summarize, summaryAvailable } from '../src/modules/ai/server/ai';
-import { anthropicPort } from '../src/modules/ai/server/anthropic';
-import { buildPrompt, cleanOutput, parseHashtags } from '../src/modules/ai/ai';
-import { AI_MCP, aiToolDefinitions, executeAiTool } from '../src/modules/ai/mcp';
+import { aiStatus, runAssist, summarize, summaryAvailable } from '../src/modules/studio/server/ai';
+import { anthropicPort } from '../src/modules/studio/server/anthropic';
+import { buildPrompt, cleanOutput, parseHashtags } from '../src/modules/studio/ai';
+import { AI_MCP, aiToolDefinitions, executeAiTool } from '../src/modules/studio/mcp';
 
 const actor = { userId: 'u1', workspaceId: 'w1' };
 const port = (text = 'Suggested text') => ({ complete: vi.fn(async (_input: { prompt: string }) => text) });
@@ -166,7 +166,7 @@ describe('MCP definitions', () => {
 
 describe('workspace preferences and defaults', () => {
   it('defaults to claude-sonnet-5-5 and keeps the key a registered secret', async () => {
-    const { AI_CONFIG, AI_DEFAULTS } = await import('../src/modules/ai/config');
+    const { AI_CONFIG, AI_DEFAULTS } = await import('../src/modules/studio/config');
     expect(AI_DEFAULTS.model).toBe('claude-sonnet-5-5');
     expect(AI_CONFIG.find(e => e.key === 'ai.apiKey')).toMatchObject({ kind: 'secret', defaultValue: '' });
     expect(AI_CONFIG.find(e => e.key === 'ai.enabled')).toMatchObject({ defaultValue: false });

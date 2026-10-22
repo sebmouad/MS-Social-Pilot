@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { openaiPort } from '@/modules/ai/server/openai';
-import { geminiPort } from '@/modules/ai/server/gemini';
+import { openaiPort } from '@/modules/studio/server/openai';
+import { geminiPort } from '@/modules/studio/server/gemini';
 
 const call = { system: 'sys', prompt: 'hello', model: 'm-1', maxTokens: 50 };
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });

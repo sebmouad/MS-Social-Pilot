@@ -10,7 +10,7 @@ no live provider or network call. Production remains legacy.
 | Capability | Source | Notes |
 | --- | --- | --- |
 | Content feeds | `src/modules/feeds/**`, `src/app/feeds/**`, `src/app/api/feeds/**` | RSS/Atom and WordPress REST feeds. Create/update/delete with exact confirmations; "Check now" preview; draft creation (one local draft per new item, with channel rows, never scheduled or published). |
-| AI assist | `src/modules/ai/**`, `src/app/api/ai/**` | Caption, improve, translate, hashtags. Provider port + Anthropic adapter. Hidden/unavailable unless Root enables it and a key and model are saved. Composer component `modules/ai/components/AiAssist.tsx` (not yet mounted). |
+| AI assist | `src/modules/studio/**`, `src/app/api/ai/**` | Caption, improve, translate, hashtags. Provider port + Anthropic adapter. Hidden/unavailable unless Root enables it and a key and model are saved. Composer component `modules/ai/components/AiAssist.tsx` (not yet mounted). |
 | Media library | `src/modules/media/**`, `src/app/media/**`, `src/app/api/media-library/**` | Image + video list with quota, holder attribution, import from a web address, guarded delete. |
 | Shared outbound guard | `src/modules/media/net-guard.ts` | Used by feeds and media import: scheme/port/credential rules, host allowlist, resolved-address checks, per-hop redirect checks, deadline, streaming byte cap. |
 
@@ -33,7 +33,7 @@ transaction, writes `activity_logs` atomically and rolls back (and removes store
 
 ## Root configuration tuples (exported, NOT yet registered)
 
-`FEEDS_CONFIG` (`modules/feeds/config.ts`), `MEDIA_CONFIG` (`modules/media/config.ts`), `AI_CONFIG` (`modules/ai/config.ts`).
+`FEEDS_CONFIG` (`modules/feeds/config.ts`), `MEDIA_CONFIG` (`modules/media/config.ts`), `AI_CONFIG` (`modules/studio/config.ts`).
 All are `consumption: 'active'` with validated bounds; the services re-validate stored values at read time and fail as
 "unavailable" if a value is out of range or transaction timeouts exceed `data.workspaceOperationTimeoutMs`.
 
@@ -41,14 +41,14 @@ All are `consumption: 'active'` with validated bounds; the services re-validate 
 
 - `modules/feeds/mcp.ts`: `list_content_feeds`, `create_content_feed`, `update_content_feed`, `delete_content_feed`, `check_content_feed`; sets `feedTools`, `feedWriteTools`; `executeFeedTool(actor, name, args)`.
 - `modules/media/mcp.ts`: `list_media_library`, `import_media_from_url`, `delete_media_asset`; `mediaTools`, `mediaWriteTools`; `executeMediaTool`.
-- `modules/ai/mcp.ts`: `get_ai_assist_status`, `ai_assist_write`; `aiTools`, `aiWriteTools`; `executeAiTool`. The AI tool should be omitted from discovery when `get_ai_assist_status` reports unavailable.
+- `modules/studio/mcp.ts`: `get_ai_assist_status`, `ai_assist_write`; `aiTools`, `aiWriteTools`; `executeAiTool`. The AI tool should be omitted from discovery when `get_ai_assist_status` reports unavailable.
 
 ## Host wiring required (lead)
 
 1. Register `FEEDS_CONFIG`, `MEDIA_CONFIG`, `AI_CONFIG` in `src/lib/config/registry.ts` (Root groups "Content feeds", "Media library", "AI assist").
 2. Add the three MCP definition/dispatch sets to the MCP server with write confirmation handling and API-key scope checks.
 3. Navigation/manifest entries: `/feeds` (Publishing), `/media` (Publishing). Mount `<AiAssist text onUse />` in the composer.
-4. Optionally add dedicated `publishing/feeds` and `ai/assist` feature ids to `product.ts`, permissions and entitlements, then change `FEATURE` in `modules/feeds/server/feeds.ts` and `modules/ai/server/ai.ts`. Until then they share `publishing/posts`.
+4. Optionally add dedicated `publishing/feeds` and `ai/assist` feature ids to `product.ts`, permissions and entitlements, then change `FEATURE` in `modules/feeds/server/feeds.ts` and `modules/studio/server/ai.ts`. Until then they share `publishing/posts`.
 5. No schema change: uses the existing legacy tables `feed_sources`, `feed_items`, `media`, `posts`, `post_targets`, `activity_logs`. Assumes the legacy DB defaults for columns not written (e.g. `posts.timezone`, `mediaKeys`, `media`); verify against a real migrated database.
 
 ## Known gaps and limitations (not complete parity)

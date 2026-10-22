@@ -648,9 +648,20 @@ Source/DOM evidence only (typecheck + touched vitest files); no browser run.
   Library sections are Media · Templates · Labels · Fields.
 - AI studio (/content/ai-studio) and Caption tests (/insights/tests) are
   promoted from unlinked routes to area tabs with their own features
-  (`publishing/ai-studio`, `analytics/tests`); both inherit their siblings'
-  role access. Chart notes (/insights/notes) is linked from the Insights
-  Overview header with its Root-managed label.
+  (`studio/ai-studio`, `studio/tests`; renamed from `publishing/ai-studio`
+  and `analytics/tests` when AI Studio became its own module, URLs and role
+  access unchanged); both inherit their siblings' role access. Chart notes
+  (/insights/notes) is linked from the Insights Overview header with its
+  Root-managed label.
+- AI Studio (2026-10-22 module): the Content tabs AI studio and Writing
+  agents plus the Insights tab Caption tests are owned by the Studio module
+  (features `studio/ai-studio`, `studio/agents`, `studio/tests`). Every
+  Studio screen ends with a "Plan with AI" panel linking to the
+  Feeds-owned recipe planner (/content/feeds) and Publishing-owned queue
+  automation (/content/queue); those screens are not duplicated. The
+  Writing-agents screen manages scheduled runs (list, enable, schedule,
+  run now) with a run history (newest first); writes keep their exact
+  CREATE/UPDATE/DELETE/RUN confirmations.
 - The command palette reaches every promoted page (palette = navigable
   manifest pages). Section tabs and linked sub-pages (goals, pins, rules,
   bio, webhooks, keys, security, appearance, notifications) stay out of the

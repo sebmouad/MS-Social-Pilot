@@ -46,8 +46,8 @@ describe('command palette commands', () => {
     const { items } = await listNavigationCommands(actor);
     expect(items).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'publishing/feeds', href: '/content/feeds' }),
-      expect.objectContaining({ id: 'publishing/ai-studio', href: '/content/ai-studio' }),
-      expect.objectContaining({ id: 'analytics/tests', href: '/insights/tests' }),
+      expect.objectContaining({ id: 'studio/ai-studio', href: '/content/ai-studio' }),
+      expect.objectContaining({ id: 'studio/tests', href: '/insights/tests' }),
     ]));
   });
 

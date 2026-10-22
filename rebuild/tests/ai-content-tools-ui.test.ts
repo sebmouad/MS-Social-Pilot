@@ -2,12 +2,12 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CaptionTestsScreen, type CaptionAction } from '../src/modules/caption-tests/ui/CaptionTestsScreen';
-import { CAPTION_TESTS_COPY } from '../src/modules/caption-tests/copy';
-import { AiStudioScreen } from '../src/modules/ai/content-tools/ui/AiStudioScreen';
-import { TOOLS_COPY } from '../src/modules/ai/content-tools/copy';
-import type { CaptionTestView } from '../src/modules/caption-tests/server/service';
-import type { MediaStatus } from '../src/modules/ai/content-tools/server/media';
+import { CaptionTestsScreen, type CaptionAction } from '../src/modules/studio/caption-tests/ui/CaptionTestsScreen';
+import { CAPTION_TESTS_COPY } from '../src/modules/studio/caption-tests/copy';
+import { AiStudioScreen } from '../src/modules/studio/content-tools/ui/AiStudioScreen';
+import { TOOLS_COPY } from '../src/modules/studio/content-tools/copy';
+import type { CaptionTestView } from '../src/modules/studio/caption-tests/server/service';
+import type { MediaStatus } from '../src/modules/studio/content-tools/server/media';
 
 let root: ReturnType<typeof createRoot>; let container: HTMLDivElement;
 beforeEach(() => {

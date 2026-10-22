@@ -6,7 +6,7 @@ import type { ReportActor } from '../contracts';
  */
 export async function recapOffered(actor: Pick<ReportActor, 'userId' | 'workspaceId' | 'permissionCeiling'>): Promise<boolean> {
   try {
-    const { summaryAvailable } = await import('@/modules/ai/server/ai');
+    const { summaryAvailable } = await import('@/modules/studio/server/ai');
     return await summaryAvailable({ userId: actor.userId, workspaceId: actor.workspaceId, permissionCeiling: actor.permissionCeiling });
   } catch { return false; }
 }
