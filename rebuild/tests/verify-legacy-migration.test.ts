@@ -41,9 +41,6 @@ describe('legacy migration verifier', () => {
     expect(JSON.stringify(result)).not.toContain('private-');
     expect(configChecks([{ key: 'auth.loginAttempts', value: 5, encrypted: false }], ['auth.loginAttempts']).every(c => c.failures === '0')).toBe(true);
   });
-  it('requires mapped legacy configuration to be imported', () => {
-    expect(configChecks([{ key: 'facebook.appId', value: '123', encrypted: false }], []).some(c => c.rule === 'legacy_import:meta.appId' && c.failures === '1')).toBe(true);
-  });
   it('checks disk references and refuses traversal, directories and symlinks', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'migration-fixture-')); dirs.push(root);
     await mkdir(path.join(root, 'workspace', 'images'), { recursive: true });

@@ -85,7 +85,7 @@ Final local HTTP/MCP checks returned `invalid_request` for a string budget; MCP 
 
 ## Core design checkpoint
 
-The user's 2026-10-16 priority is core design before additional Facebook coverage. Navigation, Posts view, Root organization and visual-direction approval forms are pending; [CORE_DESIGN_PLAN.md](CORE_DESIGN_PLAN.md) records the requested legacy-inspired direction and proposed batches. The new shell and post layouts are not implemented by this checkpoint.
+The user's 2026-10-16 priority is core design before additional Facebook coverage. Navigation, Posts view, Root organization and visual-direction approval forms are pending; the since-removed core design plan recorded the requested legacy-inspired direction and proposed batches (superseded by [design-v2](design-v2/README.md)). The new shell and post layouts are not implemented by this checkpoint.
 
 Lower-cost agents completed two reviewed foundation fixes: flex alignment keywords now use compatible `flex-start`/`flex-end` values without replacing grid alignment; and the Facebook engine requires explicit `success: true` before confirming comment deletion. Regression tests cover false, missing/malformed, and successful confirmation. Durable deletion reconciliation and new MCP deletion remain open.
 
@@ -96,7 +96,7 @@ Consolidation verification: **406 tests in 87 files**, both PostgreSQL probes, T
 
 ## Approved two-sidebar design batch, 2026-10-16
 
-The four approval forms are now answered: two left sidebars, Table default with Feed and Cards, a grouped private Root center, and refinement of Grove/Coast/Clay/Nightfall. The implementation and remaining design work are recorded in [CORE_DESIGN_PLAN.md](CORE_DESIGN_PLAN.md).
+The four approval forms are now answered: two left sidebars, Table default with Feed and Cards, a grouped private Root center, and refinement of Grove/Coast/Clay/Nightfall. The implementation and remaining design work were recorded in the since-removed core design plan (superseded by [design-v2](design-v2/README.md)).
 
 Chrome checks with the synthetic fixture verified:
 

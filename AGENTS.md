@@ -2,9 +2,11 @@
 
 ## Active project and required reading
 
-The active project is **`rebuild/`**, a replacement application. The root `src/`, root package scripts, and most root `docs/` describe the legacy production app. They are references for capability parity, data, and recovery; they do not define the rebuild's design or architecture.
+The application is **`rebuild/`**, the live production app at `social.newsgeet.com`.
+The legacy application was removed from this repository and from the server on
+2026-10-22 (lane 47); there is no legacy tree anymore.
 
-Before planning, coding, reviewing, or delegating any rebuild task, read:
+Before planning, coding, reviewing, or delegating any task, read:
 
 1. [`rebuild/docs/ARCHITECTURE_CONTRACT.md`](rebuild/docs/ARCHITECTURE_CONTRACT.md): mandatory target and boundaries, approved by the user.
 2. [`rebuild/docs/ARCHITECTURE.md`](rebuild/docs/ARCHITECTURE.md): current implementation, known gaps, and source map.
@@ -13,7 +15,7 @@ Before planning, coding, reviewing, or delegating any rebuild task, read:
 5. [`rebuild/docs/LEGACY_CAPABILITY_PARITY.md`](rebuild/docs/LEGACY_CAPABILITY_PARITY.md) before claiming feature or rebuild completion.
 6. [`rebuild/docs/GOAL.md`](rebuild/docs/GOAL.md), [`rebuild/docs/DELIVERY_PLAN.md`](rebuild/docs/DELIVERY_PLAN.md), and [`rebuild/docs/AGENT_HANDOFF.md`](rebuild/docs/AGENT_HANDOFF.md): active goal, shared plan and durable Codex/Claude continuation context. Revalidate handoff facts against current state; these documents do not weaken the contract.
 
-These files govern the rebuild. Do not silently replace them with legacy docs, an agent's preference, or a smaller implementation that is easier to test. Direct user instructions take precedence. Clarify actual conflicting product decisions; do not ask again for routine work already authorized.
+These files govern the app. Do not silently replace them with an agent's preference or a smaller implementation that is easier to test. Direct user instructions take precedence. Clarify actual conflicting product decisions; do not ask again for routine work already authorized.
 
 ## Work rules
 
@@ -23,12 +25,8 @@ These files govern the rebuild. Do not silently replace them with legacy docs, a
 - Re-check the current tree before relying on old reports. Distinguish required behavior, implemented source, automated evidence, browser evidence, live provider evidence, and production evidence.
 - Update the architecture status and affected UX/operation documents in the same batch when behavior or ownership changes. Change the target contract only to reflect an explicit user architecture decision, with its reason recorded.
 - Keep the shared goal, delivery plan and handoff in Git. Update continuation context when a batch changes the next action or important evidence. Never publish private memory dumps, credentials, environment files, session tokens, customer records or raw private logs.
-- Run checks from `rebuild/` for rebuild changes: targeted tests, `npm run typecheck`, and the appropriate full suite/build. Root package commands validate or deploy the legacy app unless explicitly changed and reviewed.
+- Run checks from `rebuild/` for app changes: targeted tests, `npm run typecheck`, and the appropriate full suite/build.
 - Real data/API testing and identifiable test content are authorized. Verify remote outcomes and clean up test content. Never expose tokens, passwords, or customer records in logs or reports.
 - Local app previews and browser tests use realistic synthetic example data in a dedicated local database, as the user requested. Do not use production customer data as the default local fixture. Keep live-provider/release verification distinct from example-data UI testing.
-- Keep production running until the documented migration, authorization, feature, live integration, backup, and rollback gates pass. Existing `socialpilot-deploy` still deploys legacy; do not mistake it for a rebuild cutover.
+- Releases go through `rebuild/scripts/prod-deploy.sh` only, after the documented backup, rehearsal and rollback gates pass.
 - Do not declare completion from passing tests or manifests alone. Every requirement in the contract needs evidence at its actual scope.
-
-## Legacy maintenance
-
-For an explicitly requested legacy maintenance task, read [`docs/LEGACY_AGENT_GUIDE.md`](docs/LEGACY_AGENT_GUIDE.md). Its Facebook styling, translation paths, and deploy rules apply to legacy only. They do not override the rebuild contract or current user authorization.

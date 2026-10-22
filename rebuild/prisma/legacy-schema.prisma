@@ -189,7 +189,6 @@ model User {
   notificationMutes    NotificationMute[]
   aiGenerations        AiGeneration[]
   settingChanges       AppSetting[]
-  apiTokens            ApiToken[]
   mcpApiKeys           McpApiKey[]
   savedViews           SavedView[]
   inboxNotes           InboxNote[]
@@ -337,7 +336,6 @@ model Workspace {
   queueSlots           QueueSlot[]
   pageGroups           PageGroup[]
   labels               Label[]
-  snippets             Snippet[]
   calendarFeeds   CalendarFeed[]
   pageGoals            PageGoal[]
   chartNotes           ChartNote[]
@@ -354,7 +352,6 @@ model Workspace {
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
   reportSchedules      ReportSchedule[]
-  apiTokens            ApiToken[]
   mcpApiKeys           McpApiKey[]
   chatChannels         ChatChannel[]
   webhookEndpoints     WebhookEndpoint[]
@@ -369,7 +366,6 @@ model Workspace {
   instagramAccounts    InstagramAccount[]
   adAccounts           AdAccount[]
   moderationRules      ModerationRule[]
-  exports              WorkspaceExport[]
   keyDates             KeyDate[]
   seasonalModes        SeasonalMode[]
   moderationActions    ModerationAction[]
@@ -1712,19 +1708,6 @@ model ActivityLog {
 
 /// Text kept for reuse in the composer: a signature, a call to action, a set
 /// of hashtags.
-model Snippet {
-  id          String   @id @default(cuid())
-  workspaceId String
-  name        String
-  body        String
-  createdAt   DateTime @default(now())
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId])
-  @@map("snippets")
-}
-
 /// A post structure kept for reuse: a category the team
 /// names, text with `{placeholders}` filled when it is picked, hashtags, a
 /// first comment and a label. Shared per workspace.
@@ -1916,28 +1899,6 @@ model ReportSchedule {
 
 /// A key for the public API and the MCP endpoint: a person's access, with a
 /// name, shown once and stored only as a hash.
-model ApiToken {
-  id          String    @id @default(cuid())
-  workspaceId String
-  userId      String
-  name        String
-  /// sha256 of the token; the token itself is never stored.
-  tokenHash   String    @unique
-  /// The first characters, so a list can tell keys apart.
-  prefix      String
-  /// `read` or `write` (write includes read).
-  scope       String    @default("read")
-  lastUsedAt  DateTime?
-  revokedAt   DateTime?
-  createdAt   DateTime  @default(now())
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId])
-  @@map("api_tokens")
-}
-
 /// A workspace-scoped MCP bearer credential; only its token hash is stored.
 model McpApiKey {
   id           String    @id
@@ -2248,29 +2209,6 @@ model ErrorEvent {
 
 /// A ZIP of everything a workspace holds (G17): posts, schedule, analytics,
 /// comments and media. Built by the worker; the download expires.
-model WorkspaceExport {
-  id            String    @id @default(cuid())
-  workspaceId   String
-  requestedById String?
-  /// queued · building · ready · failed · expired
-  status        String    @default("queued")
-  /// Path within the media root while the file exists.
-  storageKey    String?
-  bytes         Int?
-  /// Media left out to stay under the ZIP size limit.
-  skippedMedia  Int       @default(0)
-  error         String?
-  createdAt     DateTime  @default(now())
-  finishedAt    DateTime?
-  expiresAt     DateTime?
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId, createdAt])
-  @@index([status])
-  @@map("workspace_exports")
-}
-
 /// Resumable local data erasure. The workspace and memberships stay so the
 /// owner can see/retry a failed filesystem phase without losing authorization.
 model WorkspaceDataPurge {
@@ -2458,34 +2396,6 @@ model AiVideo {
 
 /// A program that registered itself to connect over OAuth (the Claude web
 /// connector, or any MCP client): its name and where it may send people back.
-model OAuthClient {
-  id           String   @id @default(cuid())
-  name         String
-  redirectUris String[]
-  createdAt    DateTime @default(now())
-
-  codes OAuthCode[]
-}
-
-/// A one-time code from the consent screen, swapped once for an API key.
-model OAuthCode {
-  id            String   @id @default(cuid())
-  /// sha256 of the code.
-  codeHash      String   @unique
-  clientId      String
-  userId        String
-  workspaceId   String
-  redirectUri   String
-  /// PKCE S256 challenge.
-  codeChallenge String
-  /// `read` or `write`.
-  scope         String
-  expiresAt     DateTime
-  createdAt     DateTime @default(now())
-
-  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
-}
-
 /// One entry on the public changelog (S7), written by root.
 model ChangelogEntry {
   id          String   @id @default(cuid())

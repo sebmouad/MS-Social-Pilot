@@ -4,7 +4,6 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { PrismaClient, Prisma } from '../generated/client';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
-import { expectedMigratedSettings } from './migration-setting-expectations';
 import { parseResourceScope } from '../src/modules/settings/mcp-access/resource-scope';
 import { PAGES } from '../src/lib/product';
 
@@ -70,18 +69,6 @@ export function configChecks(rows: Row[], requiredKeys: string[]): Check[] {
       ? row.encrypted !== true || typeof row.value !== 'string' || !/^v1:[^:]+:[^:]+:[^:]+$/.test(row.value)
       : row.encrypted !== false || !definition.schema.safeParse(row.value).success);
   }
-  // Reuse the importer's mapping, including environment-backed import requirements.
-  // Opaque secrets are checked for presence/encrypted envelope, never decrypted or printed.
-  try {
-    for (const candidate of expectedMigratedSettings(rows as Array<{ key: string; value: unknown; encrypted: boolean }>, {
-      appUrl: process.env.APP_URL, authPolicy: process.env.SECURITY_TWO_STEP,
-      loginAttempts: process.env.LOGIN_ATTEMPTS, loginWindowMinutes: process.env.LOGIN_WINDOW_MINUTES,
-      decrypt: value => value,
-    })) {
-      const row = byKey.get(candidate.key);
-      check(`legacy_import:${candidate.key}`, !row || (!candidate.secret && JSON.stringify(row.value) !== JSON.stringify(candidate.value)));
-    }
-  } catch { check('legacy_import_shape', true); }
   return result;
 }
 

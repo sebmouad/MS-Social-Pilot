@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { baselineBlock } from './baseline-block';
 import { CHAT_COPY, CHAT_POLICY } from '@/modules/notifications/chat-channels/config';
 const mock = vi.hoisted(() => ({ query: vi.fn(), execute: vi.fn(), tx: vi.fn(), config: vi.fn(), deliver: vi.fn(), entitlement: vi.fn(), permission: vi.fn(), eligible: vi.fn() }));
 vi.mock('@/modules/settings/notifications/server', () => ({ notificationRecipientEligible: mock.eligible }));
@@ -78,7 +78,7 @@ it('cancels resource alerts after selection or event permission is revoked', asy
 });
 
 it('migration binds deliveries to the same tenant destination and blocks purge-time writes', () => {
- const migration=readFileSync(new URL('../../prisma/migrations/20261022190000_rebuild_chat_deliveries/migration.sql', import.meta.url),'utf8');
+ const migration=baselineBlock('20261022190000_rebuild_chat_deliveries');
  expect(migration).toContain('FOREIGN KEY ("channelId", "workspaceId") REFERENCES chat_channels(id, "workspaceId") ON DELETE CASCADE');
  expect(migration).toContain('UNIQUE ("workspaceId", "channelId", "eventId", event)');
  expect(migration).toContain('BEFORE INSERT OR UPDATE ON public.rebuild_chat_deliveries');

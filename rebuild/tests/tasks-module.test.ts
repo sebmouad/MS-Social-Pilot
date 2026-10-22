@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { baselineBlock, baselineSql } from './baseline-block';
 import { tasksManifest } from '../src/modules/tasks/manifest';
 import { TASKS_CONFIG } from '../src/modules/tasks/config';
 import { TASKS_FEATURE_ID, TASKS_MODULE_ID, TASKS_TOOL_ACCESS, TASK_COMMENT_MODERATOR_ROLES, TASK_MANAGER_ROLES, TASK_READ_ROLES, TASK_WRITE_ROLES } from '../src/modules/tasks/semantics';
@@ -9,7 +10,6 @@ import { tasksToolDefinitions, tasksTools, tasksWriteTools } from '../src/module
 
 const root = join(__dirname, '..');
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
-const migrations = join(root, 'prisma', 'migrations');
 const MIGRATION = '20261025100000_rebuild_task_comments';
 
 describe('Tasks manifest', () => {
@@ -37,7 +37,7 @@ describe('Tasks manifest', () => {
   it('keeps the database comment ceiling equal to the largest configurable comment length', () => {
     const comment = TASKS_CONFIG.find(item => item.key === 'tasks.commentMaxCharacters')!;
     expect(comment.schema.safeParse(20000).success).toBe(true); expect(comment.schema.safeParse(20001).success).toBe(false);
-    expect(read(`prisma/migrations/${MIGRATION}/migration.sql`)).toContain('char_length("body") <= 20000');
+    expect(baselineBlock(MIGRATION)).toContain('char_length("body") <= 20000');
   });
 });
 
@@ -79,14 +79,13 @@ describe('Tasks contracts', () => {
 });
 
 describe('Tasks comments migration', () => {
-  const sql = read(`prisma/migrations/${MIGRATION}/migration.sql`);
-  it('sorts after every other migration and has a unique timestamp', () => {
-    const names = readdirSync(migrations).filter(name => /^\d{14}_/.test(name));
-    expect(names).toContain(MIGRATION);
-    expect(names.filter(name => name.slice(0, 14) === MIGRATION.slice(0, 14))).toEqual([MIGRATION]);
-    // It reuses the erasure write-gate function, so it must sort after the migration that creates it.
-    expect(names.filter(name => name > MIGRATION && name.includes('task_comments'))).toEqual([]);
-    expect(MIGRATION > '20261024100000_workspace_data_purges').toBe(true);
+  const sql = baselineBlock(MIGRATION);
+  it('sits after the erasure write-gate function inside the ordered baseline', () => {
+    // It reuses the erasure write-gate function, so its block must come after
+    // the block that creates it.
+    expect(baselineBlock('20261024100000_workspace_data_purges')).toContain('CREATE FUNCTION rebuild_reject_purging_workspace_write()');
+    expect(baselineSql().indexOf(`: ${MIGRATION} (`)).toBeGreaterThan(
+      baselineSql().indexOf(': 20261024100000_workspace_data_purges ('));
   });
   it('is additive: it creates objects and never drops, truncates or rewrites existing data', () => {
     const code = sql.split('\n').filter(line => !line.trim().startsWith('--')).join('\n')
@@ -107,7 +106,7 @@ describe('Tasks comments migration', () => {
     expect(sql).toContain('"task_comments_authorId_idx"');
     expect(sql).toContain('CREATE TRIGGER rebuild_workspace_purge_write_gate BEFORE INSERT OR UPDATE ON "task_comments"');
     expect(sql).toContain('rebuild_reject_purging_workspace_write()');
-    expect(readFileSync(join(migrations, '20261024100000_workspace_data_purges', 'migration.sql'), 'utf8')).toContain('CREATE FUNCTION rebuild_reject_purging_workspace_write()');
+    expect(baselineBlock('20261024100000_workspace_data_purges')).toContain('CREATE FUNCTION rebuild_reject_purging_workspace_write()');
   });
   it('matches the columns the service reads and writes', () => {
     const service = read('src/modules/tasks/server/tasks.ts') + read('src/modules/tasks/server/copy.ts');

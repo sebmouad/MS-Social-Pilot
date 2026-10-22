@@ -116,10 +116,9 @@ describe('registration mutations share existing domain services', () => {
   it('deletes eligible accounts and records a value-free audit in the same transaction', async () => {
     await expect(controlRootRegistrationAccount('root', 'new-user', 'delete', { confirmation: 'DELETE UNVERIFIED ACCOUNT new-user' })).resolves.toMatchObject({ deleted: true });
     const calls = h.tx.$executeRaw.mock.calls;
-    expect(calls[0][0].join('')).toContain('DELETE FROM "OAuthCode"');
     expect(h.tx.appSetting.deleteMany).toHaveBeenCalledWith({ where: { key: 'settings.appearance.user.new-user.mode' } });
-    expect(calls[1][0].join('')).toContain('DELETE FROM users');
-    expect(calls[2]).toContain('root.unverified_registration_deleted');
+    expect(calls[0][0].join('')).toContain('DELETE FROM users');
+    expect(calls[1]).toContain('root.unverified_registration_deleted');
     expect(JSON.stringify(calls)).not.toContain(account.email);
   });
   it('replaces verification tokens using existing mail/TTL policy and audits actual delivery', async () => {
@@ -138,7 +137,7 @@ describe('registration mutations share existing domain services', () => {
     await expect(controlRootRegistrationAccount('root', 'new-user', 'resend', { confirmation: 'RESEND VERIFICATION new-user' })).resolves.toEqual({ delivery: 'uncertain', userId: 'new-user' });
   });
   it('does not report delete success if audit insertion fails', async () => {
-    h.tx.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+    h.tx.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
     await expect(controlRootRegistrationAccount('root', 'new-user', 'delete', { confirmation: 'DELETE UNVERIFIED ACCOUNT new-user' })).rejects.toMatchObject({ code: 'unavailable' });
   });
 });

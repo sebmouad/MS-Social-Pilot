@@ -40,12 +40,12 @@ setting. The worker reads `rebuild/.env` when present:
 |---|---|
 | URL | https://social.newsgeet.com, behind Cloudflare |
 | Host | `root@213.246.45.75`, Debian 12; SSH key `~/.ssh/SebMouadSSH` on the developer's machine |
-| Web server | OpenLiteSpeed, virtual host `socialpilot`, proxying to `127.0.0.1:3100`; TLS at OpenLiteSpeed |
+| Web server | OpenLiteSpeed, virtual host `socialpilot` (`/usr/local/lsws/conf/vhosts/socialpilot/vhconf.conf`), proxying to `127.0.0.1:3100`; TLS at OpenLiteSpeed |
 | Live app | `/srv/ms-social-pilot-rebuild` (`.prev` previous release, `.new` staging, `-build` persistent build folder); app directory `rebuild/` inside it |
 | Environment | `/srv/ms-social-pilot-rebuild/rebuild/.env.production.local` (mode 600, never printed) |
 | Data | `/var/lib/ms-social-pilot` (media) and PostgreSQL database `social_pilot` |
 | Services | `social-pilot-rebuild` (web) and `social-pilot-rebuild-worker` (worker), both `User=socialpilot` |
-| Legacy fallback | `/srv/ms-social-pilot`, services `social-pilot` and `social-pilot-worker` stay disabled; never run beside the rebuild worker (one publisher) |
+| Legacy fallback | Removed by `scripts/server-legacy-cleanup.sh` (lane 47): old release directories, old systemd units and the old deploy guard. Until that script runs, the old units stay stopped and disabled; never run them beside the rebuild worker (one publisher) |
 | Neighbours | Three WordPress sites on the same server must stay up |
 | Backups | `/usr/local/sbin/ms-social-pilot-backup` → `/var/backups/ms-social-pilot` (database dump, media, env), 04:15 daily; every `prod-deploy.sh` also takes `/var/backups/socialpilot-deploy-<time>/social_pilot.dump` first |
 | Off-site backups | `rebuild/scripts/server/offsite-backup.sh`, `restore-test.sh`, `install-offsite.sh` (age-encrypted, rclone); results in Root › Backups |
@@ -65,8 +65,12 @@ bash rebuild/scripts/prod-deploy.sh      # from any directory in the checkout; s
 2. On the host: pg_dump backup; incremental build in `/srv/ms-social-pilot-rebuild-build`
    (`npm ci` in `rebuild/` only when its `package-lock.json` changes, then
    `npm run build`, under `systemd-run` CPU/IO caps).
-3. Applies unrecorded migrations as `postgres` in one transaction each, records
-   them in `_prisma_migrations`, hands table/function ownership to the app role.
+3. Applies unrecorded migrations as `postgres` without a wrapping transaction
+   each (the baseline contains `ALTER TYPE ... ADD VALUE`, which PostgreSQL
+   forbids inside a transaction block), records them in `_prisma_migrations`,
+   hands table/function ownership to the app role. A database that already
+   recorded the squashed migrations gets the baseline marked applied
+   (resolve semantics) instead of re-running it.
 4. Swaps directories, restarts web and worker, probes `/api/health`, the
    sign-in Origin check and the public origin. Any failure restores the previous
    release folder (database restore is manual; the dump path is printed).
@@ -84,19 +88,27 @@ runuser -u postgres -- pg_restore --clean -d social_pilot <dump>
 ```
 
 `rebuild/scripts/prod-rollback-drill.sh` proves a backup restores into a scratch
-database and that the retained artifacts start.
+database and that the installed rebuild release starts against it (rebuild-only
+since lane 47; the legacy half of the drill was retired with the legacy release).
 
 ## Migrations
 
-New SQL migrations go in `rebuild/prisma/migrations/<YYYYMMDDHHMMSS>_<name>/migration.sql`.
-Keep them additive; shipped migrations are checksum-pinned by
+Database history is one baseline migration, `20261103000000_baseline` (a squash
+of the 140 reviewed migrations, proven equivalent by applying both to scratch
+databases), plus later additive migrations. New SQL migrations go in
+`rebuild/prisma/migrations/<YYYYMMDDHHMMSS>_<name>/migration.sql`. Keep them
+additive; shipped migrations are checksum-pinned by
 `scripts/cutover-rehearsal.sh` and must never be edited. Add every new table to
-`src/server/data-control/README.md`.
+`src/server/data-control/README.md`. `prisma migrate` is never used: the
+project applies migrations with its own `_prisma_migrations` ledger and plain
+`psql`, without a wrapping transaction, because `ALTER TYPE ... ADD VALUE`
+forbids single-transaction application. Pin any new migration in
+`cutover-rehearsal.sh` and rehearse it on a scratch database before release.
 
 ## Root recovery
 
 `rebuild/scripts/prod-owner-reset-link.sh you@example.com` issues one audited
 single-use reset link for an account while mail is unconfigured. Promoting
 another installation owner or resetting a Root second step has no web path;
-the legacy `scripts/admin` tools are being retired and a rebuild equivalent is
-tracked in [LEGACY_REMOVAL_PLAN.md](LEGACY_REMOVAL_PLAN.md).
+use the rebuild equivalents in `rebuild/scripts/admin/` (`set-root.ts`,
+`reset-two-step.ts`) from `rebuild/` with the production database URL.

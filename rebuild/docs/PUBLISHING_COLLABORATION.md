@@ -51,5 +51,5 @@ Mention and dry-notice delivery, comprehensive collaboration export/erasure
 coverage, large-workspace bounds, complete composer queue mode, native/cross-format
 history, broader stale/offline/theme/keyboard/route-leave states and production-shaped
 multi-worker/rollback evidence remain open. Facebook live media cleanup remains
-held separately. Production and socialpilot-deploy remain legacy. The full
+held separately. (Written pre-cutover; production now runs this rebuild.) The full
 ARCHITECTURE_CONTRACT.md and LEGACY_CAPABILITY_PARITY.md still govern completion.

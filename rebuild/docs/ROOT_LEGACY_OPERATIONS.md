@@ -13,14 +13,14 @@ read only the browser session and MCP rejects any call carrying `apiKeyId`.
 
 | Area | Path |
 | --- | --- |
-| Services | `src/server/root/legacy/{plans,privileges,lifecycle,errors,backups,sessions,connections}.ts` |
-| Copy (en/fr) | `src/server/root/legacy/copy.ts` (Accept-Language selects; used by sessions/connections screens) |
-| Shared vocabulary (client-safe) | `src/server/root/legacy/shared.ts` (confirmations, schemas, per-module plan feature catalog) |
-| Config tuple | `src/server/root/legacy/config.ts` (`ROOT_LEGACY_CONFIG`); runtime policy in `policy.ts` |
-| MCP definitions | `src/server/root/legacy/mcp.ts` (`rootLegacyToolDefinitions`, `rootLegacyResources`, `callRootLegacyTool`) |
-| HTTP | `src/app/api/root/{plans,privileges,lifecycle,errors,backups,sessions,connections}/**`, wrapper `server/root/legacy/http.ts` |
+| Services | `src/modules/root/server/admin/{plans,privileges,lifecycle,errors,backups,sessions,connections}.ts` |
+| Copy (en/fr) | `src/modules/root/server/admin/copy.ts` (Accept-Language selects; used by sessions/connections screens) |
+| Shared vocabulary (client-safe) | `src/modules/root/server/admin/shared.ts` (confirmations, schemas, per-module plan feature catalog) |
+| Config tuple | `src/modules/root/server/admin/config.ts`; runtime policy in `policy.ts` |
+| MCP definitions | `src/modules/root/server/admin/mcp.ts` (`rootAdminToolDefinitions`, `rootAdminResources`, `callRootAdminTool`) |
+| HTTP | `src/app/api/root/{plans,privileges,lifecycle,errors,backups,sessions,connections}/**`, wrapper `modules/root/server/admin/http.ts` |
 | UI | `src/app/root/{plans,privileges,lifecycle,errors,backups,sessions,connections}/**` |
-| Tests | `tests/root-legacy-services.test.ts`, `tests/root-legacy-http-mcp.test.ts`, `tests/root-legacy-sessions-connections.test.ts` (mocked database) |
+| Tests | `tests/root-admin-services.test.ts`, `tests/root-admin-http-mcp.test.ts`, `tests/root-admin-sessions-connections.test.ts` (mocked database) |
 
 ## Behavior
 

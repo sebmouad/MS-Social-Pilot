@@ -116,10 +116,12 @@ Historical deployment snapshot (owner/integrator statement): `ffdb1cdf`, schema 
 with migration `20261031180000_rebuild_ads_ad_creation` applied in production
 (owner/integrator record; not observed here, and no receipt such as a
 `_prisma_migrations` row or CHECK probe is in the repository; confirm it). Owner cutover: 2026-10-20 22:09 CEST, release `5f1e52d7`, via
-`rebuild/scripts/prod-cutover.sh`, origin https://social.newsgeet.com. Rebuild
-web/worker recorded active/enabled; legacy inactive/disabled, retained for rollback
-at `/srv/ms-social-pilot`. Releases use `rebuild/scripts/prod-deploy.sh`; legacy
-`socialpilot-deploy` is guarded. Keep one publisher. `app.publicOrigin` is the
+`rebuild/scripts/prod-cutover.sh` (one-shot, removed after use), origin https://social.newsgeet.com. Rebuild
+web/worker recorded active/enabled; legacy inactive/disabled. The legacy tree
+was deleted from the repository on 2026-10-22 (lane 47); server-side removal
+via `rebuild/scripts/server-legacy-cleanup.sh` is still pending, and there is
+no legacy rollback target anymore. Releases use `rebuild/scripts/prod-deploy.sh`.
+Keep one publisher. `app.publicOrigin` is the
 proxy-facing same-origin source; do not substitute internal listener addresses.
 
 The dated release log records backup/migrations/ownership repair, owner sign-in,
@@ -137,6 +139,7 @@ and the installed rebuild started on spare ports against it. **ROLLBACK DRILL PA
 live rebuild web/worker stayed active and legacy inactive. This proves a restorable
 backup and startable rollback artifacts. It does not prove a proxy cutback, media
 restoration, a restore of the newest migrations, or worker/systemd shutdown timing.
+The drill is rebuild-only since lane 47 (legacy half retired with the legacy release).
 `2e23223a` records backed-up/audited updates to 80 scheduled comments and changes
 truncation to preserve a link only when the template contains `{link}`. Do not
 restore that link based on old prose or equate planning with delivery.
@@ -465,11 +468,11 @@ and WAVE1 checks retain their dates.
    schema/defaults in `src/lib/ui/form-validation.ts`, loads via runtimeConfig and
    serializes selected copy into FormValidation for public/auth/customer/Root
    layouts. Media presentation, loading and Root-error registrations are done.
-3. Release owner reconciles actual deployed SHA/schema/migrations, pins the
-   ad.create and ads_objects migrations in `scripts/cutover-rehearsal.sh` and its
-   tests, and verifies CHECK/FK/identity/cascade/rollback probes. Preserve the one
-   publisher policy, recovery assets and unresolved photo-canary lock. No replay
-   of cutover, migration application or production action is authorized here.
+3. Release owner reconciles actual deployed SHA/schema/migrations, confirms the
+   baseline receipt in `_prisma_migrations`, and verifies CHECK/FK/identity/
+   cascade/rollback probes. Preserve the one publisher policy, recovery assets
+   and unresolved photo-canary lock. No replay of cutover, migration application
+   or production action is authorized here.
 4. Data-control owner includes ads_objects in account/workspace exports and
    retain-account erasure, with transaction/stale-sync/purge tests. See the Ads
    README and data-control README; table catalog presence alone is insufficient.
@@ -485,9 +488,10 @@ and WAVE1 checks retain their dates.
 7. Provider/Analytics owner resolves the numbers-evidence adapter gaps and Page
    metric policy registration/consumer projections. Verify database query plans,
    actual volume, worker drain timing, mixed scheduling and recipe recovery.
-8. Integrator supplies the missing legacy sweep and any later lane commits for
-   Instagram, Facebook Groups, AI agents, async Posts CSV, design round 2 and MCP
-   client execution. At this HEAD they must not be described as shipped/proven.
+8. Integrator reconciles the legacy sweep and any later lane commits for
+   Instagram, AI agents, async Posts CSV, design round 2 and MCP client
+   execution. (Facebook Groups were dropped by owner decision 2026-10-22.)
+   They must not be described as shipped/proven.
    LEGACY_CAPABILITY_PARITY ownership here permits status-cell edits only;
    adding/restructuring inventory rows requires the inventory owner.
 9. Operation/module owners reconcile stale CONTRACT_AUDIT, ADS_PARITY, config
@@ -560,8 +564,9 @@ removed; its old screen redirects to Operations and REST aliases delegate to the
 canonical monitoring service.
 
 Registry schema is 131. Existing caption, chat and Root monitoring policy/copy
-objects gain fields; three `notifications.systemAlert*` keys are removed. Apply
-and rehearse `20261022190000_rebuild_chat_deliveries` before delivery. Historical
+objects gain fields; three `notifications.systemAlert*` keys are removed. The
+`20261022190000_rebuild_chat_deliveries` source is squashed into the
+`20261103000000_baseline` migration (lane 47). Historical
 saved duplicate alert settings are not imported automatically; review the Root
 monitoring thresholds and configure its chat workspace deliberately.
 
@@ -579,7 +584,7 @@ Changes are uncommitted; migration/browser/real delivery checks remain open.
 
 ## Root administration naming lane (2026-10-22)
 
-Root administration moved to `src/modules/root/server/admin/`; consumers and regression test names follow the new paths. Root settings are renamed to `root.admin.*`, schema 132. The idempotent `20261022200000_root_admin_settings` migration preserves existing canonical values; it has not been applied to a database here. The one-time configuration importer is removed; read-only historical migration expectations remain in `scripts/migration-setting-expectations.ts`. Facebook live probes resolve configuration and credential decoding through the Facebook module. Stored auth hash and cookie formats remain unchanged. No server, provider call, deployment or push was run. See `LEGACY_COMPAT_RENAME.md` for verification.
+Root administration moved to `src/modules/root/server/admin/`; consumers and regression test names follow the new paths. Root settings are renamed to `root.admin.*`, schema 132. The idempotent `20261022200000_root_admin_settings` source (now squashed into the baseline) preserves existing canonical values. The one-time configuration importer is removed; the read-only historical migration expectations were removed with it in lane 47. Facebook live probes resolve configuration and credential decoding through the Facebook module. Stored auth hash and cookie formats remain unchanged. No server, provider call, deployment or push was run.
 
 
 Root naming continuation verification: typecheck and explicit `tsc -p .` pass;
@@ -613,6 +618,56 @@ parity/config guards. Required full suite: 711 files pass, one fails, 49 skip;
 loopback probes blocked by sandbox `listen EPERM ::1`; full suite is not green. No production
 action or live-provider claim. Changes remain uncommitted as requested.
 
+## Lane 47 legacy removal — 2026-10-22
+
+Owner approval: "delete all old app files and doc from github and server and
+cleanup the new app from any residues or old migration". Pre-removal production
+backup `/var/backups/legacy-removal-202610221216`, restore verified.
+
+Deleted from the repo (uncommitted): every tracked legacy root path (`src/`,
+`tests/`, `e2e/`, `scripts/`, `docs/`, `prisma/`, `public/`, `messages/`, root
+package/lock/configs, Dockerfile, compose, root README/guides). Root keeps
+`rebuild/`, `AGENTS.md`, `CLAUDE.md`, `.gitignore`, `.mcp.json`, `.claude/`.
+Rebuild-root reads were moved first: `test-db.sh` ported to
+`rebuild/scripts/dev/`, preview DB prep rewritten for the baseline, the chat
+test repointed (it was the only functional root read).
+
+Migrations: 139 rebuild + 1 root chat migration squashed into
+`20261103000000_baseline` (SHA-256 `8abd5224…e0f8dd`), concatenated verbatim in
+deploy ORDER. Equivalence proven by applying both chain and baseline to
+scratch PostgreSQL (PGlite) and comparing full catalogs plus seed data
+(identical except `CURRENT_TIMESTAMP` stamps).
+`tests/baseline-migration.test.ts` pins all 140 source blocks; 27 migration
+test files read the baseline via `tests/baseline-block.ts`. The rehearsal
+(`cutover-rehearsal.sh`) pins and applies only the baseline to an empty
+scratch DB; `prod-deploy.sh` marks the baseline applied on migrated databases
+(resolve semantics) and never re-runs it there; `-1` was dropped everywhere
+because the baseline contains `ALTER TYPE ... ADD VALUE`;
+`install-debian.sh` uses the project's own psql ledger instead of
+`prisma migrate`. Retired: `prod-cutover.sh` (one-shot, already ran),
+`deploy/rebuild-deploy.sh`, `deploy/rebuild-rollback.sh` (pre-cutover blocks);
+`prod-rollback-drill.sh` is rebuild-only.
+
+Residue: `OAuthCode` export/erase hooks removed; `migration-setting-expectations.ts`
+deleted (verifier keeps restore-integrity checks minus the legacy-import block);
+`legacy-schema.prisma` minus five models; manifest moves 17 tables to `in_place`
+and drops five retired entries; stale lane/plan docs removed
+(`CLAUDE_*_COORDINATION`, `CORE_DESIGN_PLAN`, `LEGACY_COMPAT_RENAME`,
+`PRODUCTION_HOST`, `plans/*`, `superpowers/plans/*`); TESTING/PREVIEW/README
+rewritten for the self-contained app; OPERATIONS/CUTOVER/ARCHITECTURE/GOAL/
+DELIVERY_PLAN updated. `LEGACY_CAPABILITY_PARITY.md` and the sweep stay as
+historical evidence.
+
+Server (not run): `scripts/server-legacy-cleanup.sh` (idempotent, prints what
+it does) removes the old units, `/srv/ms-social-pilot{,.prev}`, the old deploy
+guard, and drops `workspace_exports`, `OAuthClient`, `OAuthCode`,
+`api_tokens`, `snippets` in one transaction after a fresh dump — never
+`/var/lib/ms-social-pilot/media`. The literal schema-compare would have
+dropped ~90 live tables (the mapped client is a partial view); the script
+additionally verifies zero rebuild references and the shipped `schema.prisma`
+`@@map` list server-side. Next: run it in an authorized session, then confirm
+the baseline receipt and the five drops on production. No new Root keys;
+schema stays 135. Full-suite/typecheck results are in the lane-47 report.
 ## Design v2 B4 (Inbox) (2026-10-22, source only, uncommitted)
 
 Built per [design-v2/08-BUILD_PLAN.md](design-v2/08-BUILD_PLAN.md) B4 / [04-SCREENS.md](design-v2/04-SCREENS.md) S8. Files: `src/modules/inbox/ui/{InboxScreen,InboxChrome,InboxFilterRow,ThreadDetailsLayout,InboxActions,InboxShortcuts,moderation/ModerationScreen}.tsx`, the two inbox CSS modules, `round3-copy.ts` (`screen` block), `manifest.ts` (redirect), `src/app/inbox/rules/page.tsx` (moved from `inbox/moderation`). Deleted: `InboxFilterPanel.tsx`, the always-visible `ShortcutHint` legend. Tests: new `inbox-v2-b4`; updated `inbox-{browsing-page,round2-ui,round3-ui,screens-redesign,write-receipts-ui,thread-scroll,analytics-ux-polish}`, `instagram-customer-filters-ui`, `browser-matrix`. Evidence: unit/jsdom/server-render only; no browser, FR screenshot, keyboard-in-browser or phone-keyboard run.

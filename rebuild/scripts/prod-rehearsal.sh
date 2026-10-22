@@ -10,14 +10,14 @@ cd "$(dirname "$0")/.."   # rebuild/
 HOST="${PROD_HOST:-$(grep -o 'root@[0-9.]*' docs/OPERATIONS.md | head -1)}"
 KEY="${PROD_KEY:-$HOME/.ssh/SebMouadSSH}"
 ORDER_FILE="$(mktemp)"
-# Every migration in the repo, in name order. The server skips those already recorded in
-# _prisma_migrations, so production's missing legacy migrations are applied first, in order.
+# Every migration in the repo. The server skips those already recorded in
+# _prisma_migrations, so only unrecorded migrations are applied, in order.
 APPROVED="$(mktemp)"
 grep -o 'migration_dir/[0-9a-z_]*/migration.sql' scripts/cutover-rehearsal.sh \
   | sed 's#migration_dir/##;s#/migration.sql##' > "$APPROVED"
 ALL="$(mktemp)"; ls prisma/migrations | grep -E '^[0-9]{14}_' | sort > "$ALL"
-# Dependency-correct order: legacy migrations first (name order), then the reviewed rebuild
-# order from cutover-rehearsal.sh, then any newer rebuild migrations not yet pinned there.
+# Reviewed order from cutover-rehearsal.sh first (the baseline), then any newer
+# migration not yet pinned there.
 { grep -vxF -f "$APPROVED" "$ALL" | grep -v '_rebuild_' || true; cat "$APPROVED"; grep -vxF -f "$APPROVED" "$ALL" | grep '_rebuild_' || true; } > "$ORDER_FILE"
 echo "Repository migrations: $(wc -l < "$ORDER_FILE")"
 
@@ -32,7 +32,7 @@ scp -q -i "$KEY" "$ORDER_FILE" "$HOST:/var/tmp/rebuild-migrations/ORDER"
 ssh -i "$KEY" "$HOST" 'bash -s' <<'REMOTE'
 set -euo pipefail
 cd /tmp
-echo "Live services before: $(systemctl is-active social-pilot social-pilot-worker | tr '\n' ' ')"
+echo "Live services before: $(systemctl is-active social-pilot-rebuild social-pilot-rebuild-worker | tr '\n' ' ')"
 sudo -u postgres pg_dump -Fc social_pilot > /var/tmp/rehearsal-src.dump
 chmod 600 /var/tmp/rehearsal-src.dump
 echo "Source dump sha256: $(sha256sum /var/tmp/rehearsal-src.dump | cut -c1-64)"
@@ -45,7 +45,9 @@ applied=0; failed=0; skipped=0
 DONE="$(sudo -u postgres psql -d social_pilot_rehearsal -Atc "select migration_name from _prisma_migrations where finished_at is not null and rolled_back_at is null" 2>/dev/null || true)"
 while read -r m; do
   if printf '%s\n' "$DONE" | grep -qx "$m"; then skipped=$((skipped+1)); continue; fi
-  if sudo -u postgres psql -d social_pilot_rehearsal -v ON_ERROR_STOP=1 -q -1 < "/var/tmp/rebuild-migrations/$m.sql" >/dev/null 2>/var/tmp/rebuild-migrations/err.txt; then
+  # No single-transaction flag: migrations may contain ALTER TYPE ... ADD VALUE,
+  # which PostgreSQL forbids inside a transaction block.
+  if sudo -u postgres psql -d social_pilot_rehearsal -v ON_ERROR_STOP=1 -q < "/var/tmp/rebuild-migrations/$m.sql" >/dev/null 2>/var/tmp/rebuild-migrations/err.txt; then
     applied=$((applied+1))
   else
     failed=$((failed+1)); echo "FAILED: $m"; head -3 /var/tmp/rebuild-migrations/err.txt
@@ -53,7 +55,7 @@ while read -r m; do
 done < /var/tmp/rebuild-migrations/ORDER
 echo "Already on production: $skipped; applied now: $applied; failed: $failed"
 echo "Tables after migration: $(sudo -u postgres psql -d social_pilot_rehearsal -Atc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'")"
-echo "Live services after: $(systemctl is-active social-pilot social-pilot-worker | tr '\n' ' ')"
+echo "Live services after: $(systemctl is-active social-pilot-rebuild social-pilot-rebuild-worker | tr '\n' ' ')"
 REMOTE
 
 echo

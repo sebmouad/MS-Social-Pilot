@@ -1,11 +1,13 @@
 # Active delivery goal
 
-Updated 2026-10-21 against source HEAD `99c41554`, registry schema **123**.
+Updated 2026-10-22 (lane 47), registry schema **135**.
 **Status: active; incomplete.** The owner recorded production cutover on
 2026-10-20; current deployed SHA/schema were not re-observed by this lane.
+The legacy tree was deleted from the repository on 2026-10-22; server-side
+legacy removal is still pending.
 
-Deliver the full modular, platform-neutral replacement in `rebuild/` under
-[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md): preserve useful legacy
+Deliver the full modular, platform-neutral application in `rebuild/` under
+[ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md): preserve useful
 capabilities, one themed English/French experience, identical UI/REST/MCP
 capabilities through authorized shared services, typed Root configuration,
 complete data controls and verified provider/recovery outcomes. Deployment,
@@ -19,13 +21,14 @@ that bounded live evidence does not prove every Ads operation, cleanup or MCP.
 Historical production records include the 40/40 recipe publications and comments
 and a scratch-database rollback drill, not a proxy cutback or latest-release restore.
 
-Still missing at this HEAD: installed Instagram support, Facebook Groups,
-AI agent management and asynchronous Posts CSV. Shared validation Root delivery,
-AppShell workspace confirmation, migration rehearsal/Ads inventory data controls,
-current browser/FR/accessibility checks, live client execution and provider/data
-coverage remain open. The requested LEGACY_SWEEP_2026-10-21.md is absent; its
-additional missing rows must be reconciled when supplied. Never infer parity
-from this incomplete route inventory.
+Still missing: installed Instagram support, AI agent management and
+asynchronous Posts CSV. (Facebook Groups were dropped by owner decision
+2026-10-22; Meta removed the Groups API. They are not missing work.) Shared
+validation Root delivery, AppShell workspace confirmation, current
+browser/FR/accessibility checks, live client execution and provider/data
+coverage remain open. [LEGACY_SWEEP_2026-10-21.md](LEGACY_SWEEP_2026-10-21.md)
+is present; reconcile its rows before claiming completion. Never infer parity
+from an incomplete route inventory.
 
 Continue from [DELIVERY_PLAN.md](DELIVERY_PLAN.md) and
 [AGENT_HANDOFF.md](AGENT_HANDOFF.md). Retain the full
@@ -46,8 +49,9 @@ web monitoring cannot publish or write worker heartbeats. Worker failures feed
 the existing scrubbed error console. Release/recovery readiness probes now use
 `/api/health`; scripts were not executed against any host.
 
-New migration `20261022180000_rebuild_uptime_samples` adds minute claims and
-monitoring delivery records; apply/rehearse it before enabling monitoring.
+The `20261022180000_rebuild_uptime_samples` source (minute claims and
+monitoring delivery records) is squashed into the `20261103000000_baseline`
+migration (lane 47).
 New Root keys are listed in the operator lane verification note. Schema version
 is deliberately unchanged for the integrator. Telegram, provider usage alerts,
 test-alert parity and real database/browser/mail/release evidence remain open.
@@ -71,3 +75,13 @@ monitoring are implemented at source with schema 131. See
 The latest full suite has 11,373 passing tests and five sandbox-blocked localhost
 transport tests; it is not green. Migration, browser and real delivery gates stay
 open. The overall rebuild goal remains incomplete.
+
+## Lane 47 legacy removal (2026-10-22)
+
+Legacy root paths deleted from the repository; migration history squashed into
+the `20261103000000_baseline` migration (equivalence proven on scratch
+databases); `OAuthCode` hooks and the old migration-expectation helper removed;
+`scripts/server-legacy-cleanup.sh` produced for the pending server-side
+removal and five table drops. No new Root keys; schema stays 135. See
+[ARCHITECTURE.md](ARCHITECTURE.md#lane-47-legacy-removal--2026-10-22) and the
+lane-47 report. Work remains uncommitted as requested for this lane.

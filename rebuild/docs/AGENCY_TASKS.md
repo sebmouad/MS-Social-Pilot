@@ -86,4 +86,4 @@ probe refused because no local server was listening; no fixtures were written.
 No migration/provider/production change. Optional optimistic tokens, plan/key
 revocation races, legacy schema drift and broader configuration coverage remain
 open. Agency is a separate unfinished integration and was excluded from this
-fix snapshot and commit. Production/socialpilot-deploy remain legacy.
+fix snapshot and commit. (Written pre-cutover; production now runs this rebuild and the legacy deploy path is removed.)

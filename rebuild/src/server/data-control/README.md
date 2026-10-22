@@ -7,8 +7,8 @@ migration names already in source. No migration was applied by this lane.
 | Table | Export/erasure ownership |
 | --- | --- |
 | `ai_videos` | Workspace FK: catalog export/counts/dependency-ordered erasure |
-| `OAuthClient` | Installation client registration, retained; not personal/tenant content |
-| `OAuthCode` | No workspace/user FK: explicit tenant export/counts/delete; supplementary account export/delete hook |
+| `OAuthClient` | Dropped by the lane-47 server cleanup (replaced by `mcp_oauth_clients`; zero rows, no rebuild reader) |
+| `OAuthCode` | Dropped by the lane-47 server cleanup (replaced by `mcp_oauth_codes`; zero rows; export/erase hooks removed) |
 | `changelog_entries` | Installation release notes, retained |
 | `rebuild_monitoring_deliveries` | Installation incident delivery claims and safe outcomes only, no customer content; retained operational history |
 | `rebuild_uptime_samples` | Installation uptime minute idempotency; no customer identifiers; retained for the Root-configured monitoring history window |
@@ -47,8 +47,9 @@ promised as exported customer content. Existing export completeness remains fals
 `deleteRootUser` and `deleteUnverifiedRegistration` now call
 `deleteAccountSupplementaryData(tx, userId)` after authorization/eligibility locks
 and immediately before deleting the user, in the same transaction. Failure aborts
-the deletion. Exact-key appearance cleanup and legacy OAuth-code deletion remain
-account-scoped; workspace data is retained.
+the deletion. Exact-key appearance cleanup remains account-scoped; workspace
+data is retained. (The legacy OAuth-code deletion was removed with its table
+in lane 47.)
 
 `src/modules/settings/server/account-export.ts` provides `exportAccountData`.
 The shared service requires current session, membership, Settings account read
@@ -68,15 +69,14 @@ session-only `ACCOUNT_EXPORT_MCP` group/tool `export_account_data`, calling that
 same service. These are tested adapters; public registration and UI are pending.
 No write confirmation is required for this authorized read.
 
-Migration `20261031150000_rebuild_supplementary_purge_gates` adds INSERT/UPDATE
-gates for `OAuthCode` and `rebuild_channel_profiles`, leaving DELETE available
-for erasure. The legacy-code gate follows the shared workspace-lock/status policy
-and also refuses missing workspace parents because no FK exists. The profile
-gate resolves target ownership, locks the workspace first and rechecks/locks the
-target before checking purge state. Existing historical orphans are not deleted
-and no unaudited foreign keys are added. Migration is **unapplied** in this lane.
-Reviewed SHA-256:
-`f3f22b82d60a3bbbbacd5b152b3ceb577a3d39d126fd0ecdc09151e106f09768`.
+The supplementary purge gates (squashed into the baseline from
+`20261031150000_rebuild_supplementary_purge_gates`) add INSERT/UPDATE gates for
+`rebuild_channel_profiles`, leaving DELETE available for erasure. They formerly
+also gated the retired `OAuthCode` table; that trigger is dropped with the
+table by the lane-47 server cleanup. The profile gate resolves target
+ownership, locks the workspace first and rechecks/locks the target before
+checking purge state. Existing historical orphans are not deleted and no
+unaudited foreign keys are added.
 
 ## Integration required outside owned paths
 
@@ -95,13 +95,9 @@ The lane's ownership rule forbids the following files. Integration owner must:
   English safe-error pattern. No UI implementation or browser outcome is claimed.
 - Broaden the description/label of `data.maxArchiveBytes` in Settings `config.ts`
   to cover both account JSON and workspace archives, since both consume it.
-- Pin the new migration in `rebuild/scripts/cutover-rehearsal.sh`: append its name
-  to `approved_migrations`, add `verify_migration` with the exact checksum above,
-  and apply it via `psql "$source_url" -q -v ON_ERROR_STOP=1 -f
-  "$migration_dir/20261031150000_rebuild_supplementary_purge_gates/migration.sql"`
-  after the existing WordPress migration. Extend the rehearsal's catalog checks
-  to require both enabled triggers and their expected functions, plus a test of
-  those script pins. This script is outside owned paths and was not modified.
+- Migration pins: done. The supplementary purge gates are squashed into the
+  `20261103000000_baseline` migration, which the rehearsal checksum-pins and
+  applies (lane 47).
 - Update ARCHITECTURE.md, DELIVERY_PLAN.md and AGENT_HANDOFF.md with these source
   changes and remaining integration/database/browser proof. Do not describe the
   export adapters as publicly exposed until their host registration is merged.
@@ -138,7 +134,7 @@ claimed. No server, deploy, push or production operation belongs to this lane.
 | `rebuild_writing_agent_runs` | Workspace content-free generation history; deleted agent reference is nulled. |
 | `rebuild_post_exports` | Workspace/user private CSV with expiry and current-access download checks; cascades on workspace/user deletion. |
 | `rebuild_post_export_runs` | Content-free export attempt history; cascades with its export/workspace/user. |
-| `rebuild_chat_deliveries` | Notifications-owned content-free event outbox. Direct workspace FK enables catalog-driven export and children-first erasure; channel deletion cascades delivery rows. Unique workspace/channel/event identity suppresses duplicate intents. Sending claims become uncertain after expiry and are never automatically replayed. Migration `20261022190000_rebuild_chat_deliveries` is authored, not applied by lane 43. |
+| `rebuild_chat_deliveries` | Notifications-owned content-free event outbox. Direct workspace FK enables catalog-driven export and children-first erasure; channel deletion cascades delivery rows. Unique workspace/channel/event identity suppresses duplicate intents. Sending claims become uncertain after expiry and are never automatically replayed. The `20261022190000_rebuild_chat_deliveries` source is squashed into the baseline. |
 
 Portability and retained-account erasure coverage require integration by the data-control owner; table registration alone is not proof of full coverage.
 

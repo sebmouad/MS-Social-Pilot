@@ -9,6 +9,10 @@
 # other sites on the host stay responsive.
 # Self-contained: only rebuild/ is shipped (git archive of the rebuild/ tree), installed, built and
 # migrated; the migration set comes from rebuild/prisma/migrations. No root package is used.
+# History is one baseline migration: a database that already recorded the squashed
+# migration names gets the baseline marked applied (resolve semantics) and never
+# re-runs it; a fresh database applies it without a wrapping transaction
+# (ALTER TYPE ... ADD VALUE forbids single-transaction application).
 # Usage (any directory in the checkout): bash rebuild/scripts/prod-deploy.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."   # rebuild/
@@ -51,12 +55,28 @@ systemd-run --quiet --wait --collect --uid=socialpilot --gid=socialpilot -p CPUQ
 echo "$LOCK_SUM" > "$BUILD/rebuild/.lock-sum"
 echo "Build: OK in $(( $(date +%s) - start ))s (dependencies $( [ $INSTALL = 1 ] && echo reinstalled || echo reused ))"
 rm -rf "$NEW"; cp -a "$BUILD" "$NEW"
+sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -q -c 'CREATE TABLE IF NOT EXISTS "_prisma_migrations" ("id" VARCHAR(36) PRIMARY KEY NOT NULL, "checksum" VARCHAR(64) NOT NULL, "finished_at" TIMESTAMPTZ, "migration_name" VARCHAR(255) NOT NULL, "logs" TEXT, "rolled_back_at" TIMESTAMPTZ, "started_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, "applied_steps_count" INTEGER NOT NULL DEFAULT 0)' >/dev/null
 DONE="$(sudo -u postgres psql -d social_pilot -Atc "select migration_name from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
+BASELINE=20261103000000_baseline
+if ! printf '%s\n' "$DONE" | grep -qx "$BASELINE" && [ -d "/var/tmp/deploy-migrations/$BASELINE" ]; then
+  OLD_COUNT="$(sudo -u postgres psql -d social_pilot -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null and migration_name <> '$BASELINE'")"
+  if [ "$OLD_COUNT" -gt 0 ]; then
+    # prisma migrate resolve --applied semantics: this database already has the
+    # squashed migrations, so record the baseline and never re-run it here.
+    f="/var/tmp/deploy-migrations/$BASELINE/migration.sql"
+    sudo -u postgres psql -d social_pilot -q -c "insert into _prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) values (gen_random_uuid()::text, '$(sha256sum "$f" | cut -d' ' -f1)', now(), '$BASELINE', 'baseline marked applied: squashed history already recorded', null, now(), 1)" >/dev/null
+    DONE="$(sudo -u postgres psql -d social_pilot -Atc "select migration_name from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
+    echo "Baseline $BASELINE marked applied ($OLD_COUNT squashed migrations already recorded); not re-run."
+  fi
+fi
 applied=0
 while read -r m; do
   printf '%s\n' "$DONE" | grep -qx "$m" && continue
   f="/var/tmp/deploy-migrations/$m/migration.sql"
-  sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -q -1 < "$f" >/dev/null 2>/tmp/deploy-mig-err.txt || { echo "Migration $m failed; live release untouched"; head -5 /tmp/deploy-mig-err.txt; exit 1; }
+  # No single-transaction flag: migrations may contain ALTER TYPE ... ADD VALUE,
+  # which PostgreSQL forbids inside a transaction block. ON_ERROR_STOP still
+  # aborts the file on the first failure while the live release is untouched.
+  sudo -u postgres psql -d social_pilot -v ON_ERROR_STOP=1 -q < "$f" >/dev/null 2>/tmp/deploy-mig-err.txt || { echo "Migration $m failed; live release untouched"; head -5 /tmp/deploy-mig-err.txt; exit 1; }
   sudo -u postgres psql -d social_pilot -q -c "insert into _prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) values (gen_random_uuid()::text, '$(sha256sum "$f" | cut -d' ' -f1)', now(), '$m', null, null, now(), 1)" >/dev/null
   applied=$((applied+1))
 done < /var/tmp/deploy-migrations/ORDER

@@ -38,8 +38,9 @@ per-delivery lease and batch sizes, and owner inspection bounds. New policy and
 catalog fields have shipped defaults so saved pre-delivery Root overrides keep
 working. Provider URL shapes and semantic receipts remain isolated in transport.
 
-Repository migration `20261022190000_rebuild_chat_deliveries` adds the content-free
-outbox and destination/workspace identity constraint. Workspace and destination
+Baseline source `20261022190000_rebuild_chat_deliveries` (squashed into
+`20261103000000_baseline`) adds the content-free outbox and
+destination/workspace identity constraint. Workspace and destination
 removal cascade to delivery records. Data-control ownership is documented in
 `src/server/data-control/README.md`; live migration/erasure evidence remains a
 release gate.

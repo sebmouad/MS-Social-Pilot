@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-# psql through the test container, for machines without a local psql.
-# e2e/prepare.ts calls `psql <url> -c ...`; put this directory first on PATH:
-#   PATH="$PWD/scripts/dev/bin:$PATH" npx playwright test
-args=()
-for a in "$@"; do args+=("${a//127.0.0.1:55432/localhost:5432}"); done
-exec docker exec -i msp-test-pg psql "${args[@]}"

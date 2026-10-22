@@ -3,8 +3,8 @@
 # Self-contained: installs and builds from rebuild/ only (no root package).
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$ROOT"
+APP="$(cd "$(dirname "$0")/.." && pwd)"   # rebuild/
+cd "$APP"
 
 if [ ! -f package-lock.json ]; then
   echo "Missing rebuild/package-lock.json; cannot create a reproducible build." >&2

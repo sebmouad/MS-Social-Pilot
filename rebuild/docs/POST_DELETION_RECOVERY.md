@@ -46,11 +46,10 @@ identity tombstones until erasure.
 
 ## Schema and evidence
 
-The additive migration is
-`../../prisma/migrations/20261016220000_rebuild_post_deletions/migration.sql`.
-Its SHA-256 is
-`80e406ae33000a349d07f9e428563d20083bc36c65956a969a5e7ccc77c32f07` and is
-pinned in `../scripts/cutover-rehearsal.sh`. It has a workspace cascade relation,
+The schema source `20261016220000_rebuild_post_deletions` is squashed into the
+`20261103000000_baseline` migration
+(`../prisma/migrations/20261103000000_baseline/migration.sql`), which the
+cutover rehearsal checksum-pins. It has a workspace cascade relation,
 no post, target, or user foreign keys, state/reason/timestamp constraints, and
 a partial unique key for active or completed remote identities. Rejected
 history permits a later explicit request.

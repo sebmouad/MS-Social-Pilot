@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { baselineBlock } from './baseline-block';
 
-const migration = readFileSync('prisma/migrations/20261019030000_rebuild_facebook_native_journal/migration.sql', 'utf8');
+const migration = baselineBlock('20261019030000_rebuild_facebook_native_journal');
 
 describe('Facebook native journal migration', () => {
   it('adds a bounded child journal under the neutral publication claim', () => {

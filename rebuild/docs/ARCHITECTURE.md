@@ -1,9 +1,42 @@
 # MS Social Pilot architecture
 
-Updated 2026-10-21 against local HEAD `99c41554`, configuration schema **123**.
+Updated 2026-10-22 (lane 47) against the local working tree, configuration schema **135**.
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) remains binding and unchanged.
 Current reconciliation below takes precedence over historical batch snapshots.
 Source, automated, browser, live-provider and production evidence remain distinct.
+
+## Lane 47 legacy removal — 2026-10-22
+
+Owner approval: delete the legacy app from the repository and the server and
+clean residues from the rebuild. Pre-removal production backup
+`/var/backups/legacy-removal-202610221216`, restore verified.
+
+- Repository: all tracked legacy root paths deleted (`src/`, `tests/`, `e2e/`,
+  `scripts/`, `docs/`, `prisma/`, `public/`, `messages/`, root package/configs,
+  Dockerfile, compose, root README/guides). Root keeps `rebuild/`, `AGENTS.md`,
+  `CLAUDE.md`, `.gitignore`, `.mcp.json`, `.claude/`.
+- Migrations: the 139 rebuild migrations plus the root chat-deliveries
+  migration are squashed into one baseline,
+  `prisma/migrations/20261103000000_baseline/migration.sql` (SHA-256
+  `8abd5224…e0f8dd`). Equivalence was proven by applying both the chain and the
+  baseline to scratch PostgreSQL databases and comparing full catalogs plus
+  seed data (identical except `CURRENT_TIMESTAMP` apply stamps).
+  `tests/baseline-migration.test.ts` pins all 140 source blocks. Production
+  marks the baseline applied without re-running it (`prod-deploy.sh` resolve
+  handling); fresh databases apply it without a wrapping transaction (`ALTER
+  TYPE ... ADD VALUE`). `prisma migrate` is not used anymore.
+- Code: the `OAuthCode` export/erase hooks are removed; the old
+  `migration-setting-expectations.ts` helper is deleted and the verifier's
+  legacy-import check with it. `legacy-schema.prisma` drops five models
+  (`ApiToken`, `Snippet`, `WorkspaceExport`, `OAuthClient`, `OAuthCode`); the
+  manifest moves seventeen tables to `in_place` (readers verified) and drops
+  the five retired entries.
+- Server (not run here): `scripts/server-legacy-cleanup.sh` removes the old
+  units, `/srv/ms-social-pilot{,.prev}`, the old deploy guard, and drops the
+  five legacy-only tables in one transaction after a fresh dump. Until it
+  runs, the old units stay stopped and disabled.
+- No new Root keys; schema stays 135. `config-validation`, `parity-guard`
+  and the full suite were re-run (see the lane-47 report).
 
 ## Current HEAD reconciliation — 2026-10-21
 
@@ -80,9 +113,11 @@ The full contract remains active and incomplete.
 The owner cut over on **2026-10-20 at 22:09 CEST**. The rebuild serves
 `https://social.newsgeet.com`; `social-pilot-rebuild` and
 `social-pilot-rebuild-worker` were recorded active/enabled, and legacy web/worker
-inactive/disabled. Legacy files remain for rollback. Releases use
-`rebuild/scripts/prod-deploy.sh`; legacy `socialpilot-deploy` refuses while the
-rebuild is enabled except for status or an explicit legacy override.
+inactive/disabled. The legacy tree was deleted from the repository on
+2026-10-22 (lane 47); server-side removal runs via
+`rebuild/scripts/server-legacy-cleanup.sh` and is still pending. Releases use
+`rebuild/scripts/prod-deploy.sh`; the legacy `socialpilot-deploy` guard is
+removed by that cleanup.
 
 These are recorded production outcomes in [RELEASE_GATES_PLAN.md](RELEASE_GATES_PLAN.md#production-cutover--2026-10-20-2209-cest),
 not fresh probes by this documentation worker. That log records 34 applied
@@ -616,8 +651,9 @@ removed; its old screen redirects to Operations and REST aliases delegate to the
 canonical monitoring service.
 
 Registry schema is 131. Existing caption, chat and Root monitoring policy/copy
-objects gain fields; three `notifications.systemAlert*` keys are removed. Apply
-and rehearse `20261022190000_rebuild_chat_deliveries` before delivery. Historical
+objects gain fields; three `notifications.systemAlert*` keys are removed. The
+`20261022190000_rebuild_chat_deliveries` source is squashed into the
+`20261103000000_baseline` migration (lane 47). Historical
 saved duplicate alert settings are not imported automatically; review the Root
 monitoring thresholds and configure its chat workspace deliberately.
 
@@ -627,9 +663,9 @@ verification is claimed. Changes remain uncommitted as requested for this lane.
 
 ## Root administration naming lane (2026-10-22)
 
-Root administration moved to `src/modules/root/server/admin/`; consumers and regression test names follow the new paths. Root settings are renamed to `root.admin.*`, schema 132. The idempotent `20261022200000_root_admin_settings` migration preserves existing canonical values; it has not been applied to a database here. The one-time configuration importer is removed; read-only historical migration expectations remain in `scripts/migration-setting-expectations.ts`. Facebook live probes resolve configuration and credential decoding through the Facebook module. Stored auth hash and cookie formats remain unchanged. No server, provider call, deployment or push was run. See `LEGACY_COMPAT_RENAME.md` for verification.
+Root administration moved to `src/modules/root/server/admin/`; consumers and regression test names follow the new paths. Root settings are renamed to `root.admin.*`, schema 132. The idempotent `20261022200000_root_admin_settings` source (now squashed into the baseline) preserves existing canonical values. The one-time configuration importer is removed; the read-only historical migration expectations were removed with it in lane 47. Facebook live probes resolve configuration and credential decoding through the Facebook module. Stored auth hash and cookie formats remain unchanged. No server, provider call, deployment or push was run.
 
-Root naming follow-up: live probes merge Root configuration in the Facebook module and explicitly clear bundled app secrets when current signing material is absent. Automated regression tests cover this boundary and saved-setting SQL collisions/idempotence (SQLite only); no provider or PostgreSQL proof is claimed. See `LEGACY_COMPAT_RENAME.md` for current verification.
+Root naming follow-up: live probes merge Root configuration in the Facebook module and explicitly clear bundled app secrets when current signing material is absent. Automated regression tests cover this boundary and saved-setting SQL collisions/idempotence (SQLite only); no provider or PostgreSQL proof is claimed.
 
 ## Lane 45 — sweep gaps G1, G3, G5, G6, G7 (2026-10-22, source only, schema 134)
 

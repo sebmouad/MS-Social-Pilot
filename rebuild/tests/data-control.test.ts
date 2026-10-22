@@ -176,7 +176,6 @@ describe('workspace data controls', () => {
     expect(position('wordpress_recipe_plans')).toBeLessThan(position('targets'));
     expect(position('rebuild_facebook_sync_cursors')).toBeLessThan(position('targets'));
     expect(position('rebuild_channel_profiles')).toBeLessThan(position('targets'));
-    expect(position('OAuthCode')).toBeGreaterThanOrEqual(0);
     expect(sql.every(statement => statement.startsWith('DELETE FROM'))).toBe(true);
     expect(tx.$executeRawUnsafe.mock.calls.every((call: unknown[]) => call[1] === 'w1')).toBe(true);
   });

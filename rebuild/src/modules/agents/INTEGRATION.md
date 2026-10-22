@@ -12,8 +12,8 @@ real worker/MCP/provider or production verification was performed.
 - Publishing private background CSV jobs, independent status/read MCP tool,
   REST create/status/download route, sidebar progress UI, worker registration,
   expiry cleanup, bounded retries, lease settlement, attempt history and audit.
-- Repository-root migrations `20261101100000_rebuild_writing_agents` and
-  `20261101100100_rebuild_post_exports`; data-control README ownership rows.
+- Baseline sources `20261101100000_rebuild_writing_agents` and
+  `20261101100100_rebuild_post_exports` (squashed into `20261103000000_baseline`); data-control README ownership rows.
   Schema source files remain references; no runtime DDL.
 
 ## Root keys

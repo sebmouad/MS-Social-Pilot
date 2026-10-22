@@ -33,22 +33,19 @@ resent. A missing remote id remains uncertain. Explicit confirmed recovery recor
 human attestation without contacting the provider or inventing a created identity.
 Only a positively recorded provider success returns the `created` receipt.
 
-Migration `20261031180000_rebuild_ads_ad_creation` extends the existing
-operation-kind CHECK to `ad.create`; it preserves prior operations, records,
-indexes, uniqueness and resolution rules. Its SHA-256 is
-`1769fa24129e6d74119e84d0677a2baf0c935cb73a4e722ae0a443b7fbc7120f`.
-Source/checksum and mocked recovery tests are distinct from PostgreSQL application,
-provider writes, browser and production evidence. No migration was applied here.
+The `20261031180000_rebuild_ads_ad_creation` source (squashed into the
+`20261103000000_baseline` migration) extends the existing operation-kind CHECK
+to `ad.create`; it preserves prior operations, records, indexes, uniqueness
+and resolution rules. Source/checksum and mocked recovery tests are distinct
+from PostgreSQL application, provider writes, browser and production evidence.
+No migration was applied here.
 
 ## Integration outside this lane
 
-- `rebuild/scripts/cutover-rehearsal.sh`: append the new migration name to
-  `approved_migrations`, add `verify_migration` with the SHA above and apply the
-  file after `20261030110000_rebuild_ads_creative_creation`. Extend the migration
-  history refusal placeholders/USING list to include the new migration (the
-  current query only checks its first 22 parameters despite a longer USING list).
-  Add a post-apply CHECK/valid-invalid operation probe. Update the approved set
-  and pin/order assertions in `tests/cutover-rehearsal.test.ts` together.
+- `rebuild/scripts/cutover-rehearsal.sh`: done — the baseline carrying this
+  source is checksum-pinned and applied by the rehearsal (lane 47). Add a
+  post-apply CHECK/valid-invalid operation probe. Update the rehearsal
+  assertions in `tests/cutover-rehearsal.test.ts` together.
 - `src/modules/ads/ui/campaigns/CampaignsScreen.tsx`,
   `src/app/api/ads/management/route.ts` and `src/modules/ads/mcp.ts`: pass the
   resolved customer locale into
@@ -95,15 +92,11 @@ without inventing daily metric samples. Both screens reuse existing tables,
 responsive row cards, semantic actions, neutral no-delivery text and configurable
 English/French copy (`ads.customerCopy.text171`). No new Root keys.
 
-Additive migration `20261101120000_ads_object_inventory` SHA-256:
-`a6ea92c28d7697c4d229c6c90e068cc6da6b1d5575864b43e1d0976a31b50861`.
-The source checksum is pinned by `tests/ads-object-inventory.test.ts`; **the
-cutover rehearsal pin is pending integration outside lane ownership**. Add the
-migration to `scripts/cutover-rehearsal.sh` approved/history-refusal lists, checksum
-verification, ordered application and post-apply account-FK/level/primary-key
-probes; update `tests/cutover-rehearsal.test.ts` together before applying/releasing.
-No migration, live-provider or browser run occurred here. A database rehearsal
-must verify transaction rollback, cascade erasure and stale-sync tombstones.
+The `20261101120000_ads_object_inventory` source is squashed into the
+`20261103000000_baseline` migration, which the cutover rehearsal
+checksum-pins and applies (lane 47). No migration, live-provider or browser
+run occurred here. A database rehearsal must verify transaction rollback,
+cascade erasure and stale-sync tombstones.
 
 Integration also needs architecture/parity/handoff updates and explicit inventory
 coverage in account/workspace exports and retain-account erasure paths; those

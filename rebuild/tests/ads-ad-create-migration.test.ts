@@ -1,14 +1,10 @@
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { baselineBlock } from './baseline-block';
 
-const migration = readFileSync('prisma/migrations/20261031180000_rebuild_ads_ad_creation/migration.sql', 'utf8');
-const previous = readFileSync('prisma/migrations/20261030110000_rebuild_ads_creative_creation/migration.sql', 'utf8');
+const migration = baselineBlock('20261031180000_rebuild_ads_ad_creation');
+const previous = baselineBlock('20261030110000_rebuild_ads_creative_creation');
 
 describe('additive ad.create journal migration', () => {
-  it('pins the reviewed SQL checksum', () => {
-    expect(createHash('sha256').update(migration).digest('hex')).toBe('1769fa24129e6d74119e84d0677a2baf0c935cb73a4e722ae0a443b7fbc7120f');
-  });
 
   it('extends only the operation-kind CHECK and preserves all existing operations', () => {
     const kinds = (sql: string) => [...sql.matchAll(/"operationType" IN \(([^)]+)\)/g)][0]![1]!.match(/'[^']+'/g)!;

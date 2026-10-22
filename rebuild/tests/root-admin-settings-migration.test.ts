@@ -1,13 +1,13 @@
-import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
+import { baselineBlock } from './baseline-block';
 
 // Optional local SQL execution on Node versions with the built-in SQLite module.
 // PostgreSQL rehearsal remains a separate release requirement.
 let DatabaseSync: typeof import('node:sqlite').DatabaseSync | undefined;
 try { ({ DatabaseSync } = createRequire(import.meta.url)('node:sqlite')); } catch { /* Node 20 */ }
 
-const sql = readFileSync('prisma/migrations/20261022200000_root_admin_settings/migration.sql', 'utf8');
+const sql = baselineBlock('20261022200000_root_admin_settings');
 
 describe('saved Root administration setting rename', () => {
   it.skipIf(!DatabaseSync)('preserves values and metadata, skips collisions and is idempotent', () => {

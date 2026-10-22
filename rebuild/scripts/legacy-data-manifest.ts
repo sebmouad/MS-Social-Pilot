@@ -46,11 +46,10 @@ export const LEGACY_TABLES: readonly LegacyTable[] = [
   t('recovery_codes', 'RecoveryCode', 'in_place', 'prisma', 'none', 'shared auth'),
   t('trusted_devices', 'TrustedDevice', 'in_place', 'sql', 'none', 'settings (account security)', 'Rebuild only deletes rows on account security changes; no reader found in source.'),
   t('mcp_api_keys', 'McpApiKey', 'in_place', 'prisma', 'required', 'settings (mcp access)'),
-  t('api_tokens', 'ApiToken', 'needed_unbuilt', 'none', 'required', 'integrations / settings (api)', 'Legacy REST tokens are not honoured; issue replacement mcp_api_keys or accept the break before deleting.'),
   t('plans', 'Plan', 'in_place', 'sql', 'none', 'shared entitlements'),
-  t('app_settings', 'AppSetting', 'in_place', 'prisma', 'none', 'Root configuration', 'Historical source keys are retained; typed settings are verified by migration-setting-expectations.ts. The completed one-time importer is retired.'),
+  t('app_settings', 'AppSetting', 'in_place', 'prisma', 'none', 'Root configuration', 'Historical source keys are retained; typed Root settings are verified by the config tests. The completed one-time importer is retired.'),
   t('workspace_data_purges', 'WorkspaceDataPurge', 'in_place', 'prisma', 'required', 'shared data-control', 'Erasure recovery state; never delete.'),
-  t('client_invitations', 'ClientInvitation', 'needed_unbuilt', 'none', 'none', 'agency', 'Pending client invitations are unread by the rebuild Agency module.'),
+  t('client_invitations', 'ClientInvitation', 'in_place', 'sql', 'none', 'agency', 'Pending client invitations are read by the Agency module.'),
 
   // Connections and destinations
   t('social_accounts', 'SocialAccount', 'in_place', 'prisma', 'required', 'settings (connections) + platforms/facebook'),
@@ -63,7 +62,7 @@ export const LEGACY_TABLES: readonly LegacyTable[] = [
   t('instagram_insights', 'InstagramInsight', 'in_place', 'prisma', 'none', 'platforms/instagram'),
   t('ad_accounts', 'AdAccount', 'in_place', 'prisma', 'required', 'ads + platforms/facebook'),
   t('ad_insights', 'AdInsight', 'in_place', 'prisma', 'none', 'ads + platforms/facebook'),
-  t('chat_channels', 'ChatChannel', 'needed_unbuilt', 'none', 'required', 'integrations', 'Chat notification targets; no rebuild reader.'),
+  t('chat_channels', 'ChatChannel', 'in_place', 'sql', 'required', 'integrations', 'Chat notification targets; chat deliveries reference them.'),
 
   // Publishing
   t('posts', 'Post', 'in_place', 'prisma', 'required', 'publishing'),
@@ -77,7 +76,6 @@ export const LEGACY_TABLES: readonly LegacyTable[] = [
   t('queue_slots', 'QueueSlot', 'in_place', 'sql', 'required', 'publishing (queue)'),
   t('content_mix_rules', 'ContentMixRule', 'in_place', 'sql', 'required', 'publishing (collaboration)'),
   t('post_templates', 'PostTemplate', 'in_place', 'sql', 'required', 'publishing (templates)'),
-  t('snippets', 'Snippet', 'needed_unbuilt', 'none', 'required', 'publishing (templates)', 'Rebuild folds snippets into templates only partly; migrate rows into post_templates or keep.'),
   t('media', 'Media', 'in_place', 'sql', 'required', 'media', 'Rows reference files under the media root; verify files with verify-legacy-migration.ts.'),
   t('short_links', 'ShortLink', 'in_place', 'sql', 'required', 'publishing (short links)'),
   t('link_clicks', 'LinkClick', 'in_place', 'sql', 'none', 'analytics (link reports)'),
@@ -86,16 +84,16 @@ export const LEGACY_TABLES: readonly LegacyTable[] = [
   t('page_videos', 'PageVideo', 'export_purge_only', 'none', 'none', 'shared data-control', 'Counted, exported and erased; no product reader.'),
   t('feed_sources', 'FeedSource', 'in_place', 'sql', 'required', 'feeds'),
   t('feed_items', 'FeedItem', 'in_place', 'sql', 'none', 'feeds'),
-  t('calendar_feeds', 'CalendarFeed', 'needed_unbuilt', 'none', 'required', 'publishing (calendar)', 'ICS subscription tokens; feature absent.'),
+  t('calendar_feeds', 'CalendarFeed', 'in_place', 'sql', 'required', 'publishing (calendar)', 'ICS subscription tokens; calendar extras read them.'),
   t('bio_pages', 'BioPage', 'in_place', 'sql', 'required', 'sharing'),
   t('bio_links', 'BioLink', 'in_place', 'sql', 'none', 'sharing'),
   t('share_links', 'ShareLink', 'in_place', 'sql', 'required', 'sharing'),
   t('tasks', 'Task', 'in_place', 'sql', 'required', 'tasks'),
-  t('key_dates', 'KeyDate', 'needed_unbuilt', 'none', 'required', 'publishing (planning)', 'Feature absent.'),
-  t('seasonal_modes', 'SeasonalMode', 'needed_unbuilt', 'none', 'required', 'publishing (planning)', 'Feature absent.'),
-  t('public_holidays', 'PublicHoliday', 'needed_unbuilt', 'none', 'none', 'publishing (planning)', 'Reference data; can be re-fetched, but keep until the holidays feature is decided.'),
-  t('holiday_years', 'HolidayYear', 'needed_unbuilt', 'none', 'none', 'publishing (planning)', 'Reference data companion of public_holidays.'),
-  t('trending_topics', 'TrendingTopic', 'needed_unbuilt', 'none', 'none', 'publishing (planning)', 'Feature absent.'),
+  t('key_dates', 'KeyDate', 'in_place', 'sql', 'required', 'publishing (planning)', 'Board milestones; calendar extras read them.'),
+  t('seasonal_modes', 'SeasonalMode', 'in_place', 'sql', 'required', 'publishing (planning)', 'Queue seasons; calendar extras read them.'),
+  t('public_holidays', 'PublicHoliday', 'in_place', 'sql', 'none', 'publishing (planning)', 'Holiday overlays; calendar extras read them.'),
+  t('holiday_years', 'HolidayYear', 'in_place', 'sql', 'none', 'publishing (planning)', 'Reference data companion of public_holidays.'),
+  t('trending_topics', 'TrendingTopic', 'in_place', 'sql', 'none', 'publishing (planning)', 'Topic ideas; calendar extras read them.'),
 
   // Inbox and reviews
   t('conversations', 'Conversation', 'in_place', 'prisma', 'none', 'inbox + platforms/facebook'),
@@ -111,17 +109,17 @@ export const LEGACY_TABLES: readonly LegacyTable[] = [
   t('page_insights', 'PageInsight', 'in_place', 'prisma', 'none', 'analytics + platforms/facebook'),
   t('metric_availability', 'MetricAvailability', 'export_purge_only', 'none', 'none', 'shared data-control', 'Counted, exported and erased; no product reader.'),
   t('page_goals', 'PageGoal', 'in_place', 'sql', 'required', 'analytics (goals)'),
-  t('chart_notes', 'ChartNote', 'needed_unbuilt', 'none', 'required', 'analytics', 'Annotations on charts; feature absent.'),
-  t('caption_tests', 'CaptionTest', 'needed_unbuilt', 'none', 'required', 'analytics', 'A/B caption experiments; feature absent.'),
+  t('chart_notes', 'ChartNote', 'in_place', 'sql', 'required', 'analytics', 'Annotations on charts.'),
+  t('caption_tests', 'CaptionTest', 'in_place', 'sql', 'required', 'analytics', 'A/B caption experiments.'),
   t('saved_views', 'SavedView', 'in_place', 'prisma', 'required', 'publishing (saved views)'),
   t('report_templates', 'ReportTemplate', 'in_place', 'sql', 'required', 'analytics (reports)'),
   t('report_schedules', 'ReportSchedule', 'in_place', 'sql', 'required', 'analytics (reports)'),
   t('report_runs', 'RebuildReportRun', 'in_place', 'prisma', 'required', 'analytics (reports)', 'Created by the additive rebuild report migration.'),
 
   // AI
-  t('ai_agents', 'AiAgent', 'needed_unbuilt', 'none', 'required', 'ai', 'Agent management is absent in the rebuild.'),
-  t('ai_generations', 'AiGeneration', 'needed_unbuilt', 'none', 'required', 'ai', 'Usage history for budgets; rebuild limits are per hour only.'),
-  t('ai_videos', 'AiVideo', 'needed_unbuilt', 'none', 'required', 'ai', 'AI video jobs and files; feature absent.'),
+  t('ai_agents', 'AiAgent', 'in_place', 'sql', 'required', 'ai', 'Agent records; the AI provider router reads them.'),
+  t('ai_generations', 'AiGeneration', 'in_place', 'sql', 'required', 'ai', 'Usage history for budgets.'),
+  t('ai_videos', 'AiVideo', 'in_place', 'sql', 'required', 'ai', 'AI video jobs and files.'),
 
   // Notifications, activity and integrations
   t('notification_settings', 'NotificationSetting', 'in_place', 'sql', 'required', 'settings (notifications)'),
@@ -137,15 +135,10 @@ export const LEGACY_TABLES: readonly LegacyTable[] = [
   t('backup_runs', 'BackupRun', 'in_place', 'read_only', 'none', 'Root (backups)', 'Rebuild reads only; nothing writes new rows until a backup writer is built.'),
   t('system_alerts', 'SystemAlert', 'in_place', 'read_only', 'none', 'Root (backups)', 'Read-only; no rebuild writer.'),
   t('error_events', 'ErrorEvent', 'in_place', 'read_only', 'none', 'Root (errors)', 'Read and resolve only; no rebuild writer.'),
-  t('worker_job_runs', 'WorkerJobRun', 'obsolete_candidate', 'none', 'none', 'replaced by rebuild_sync_runs', 'Legacy scheduler run history.'),
-  t('graph_usage', 'GraphUsage', 'obsolete_candidate', 'none', 'none', 'platforms/facebook', 'Legacy Graph rate-limit counters; transient.'),
-  t('uptime_days', 'UptimeDay', 'obsolete_candidate', 'none', 'none', 'Root', 'Uptime history; no reader or writer. Export before dropping if the history matters.'),
-  t('changelog_entries', 'ChangelogEntry', 'obsolete_candidate', 'none', 'none', 'Root', 'Release notes; data-control retains it as installation data.'),
-
-  // Superseded
-  t('workspace_exports', 'WorkspaceExport', 'obsolete_replaced', 'none', 'required', 'rebuild_workspace_exports', 'Old export rows and files are replaced by the asynchronous ZIP service.'),
-  t('OAuthClient', 'OAuthClient', 'obsolete_replaced', 'none', 'none', 'mcp_oauth_clients', 'Not migrated: legacy OAuth clients must re-register.'),
-  t('OAuthCode', 'OAuthCode', 'obsolete_replaced', 'none', 'required', 'mcp_oauth_codes', 'No workspace FK. Account deletion still removes these rows, so keep until legacy code is gone.'),
+  t('worker_job_runs', 'WorkerJobRun', 'in_place', 'sql', 'none', 'jobs runtime', 'Scheduler run history; the jobs runtime appends.'),
+  t('graph_usage', 'GraphUsage', 'in_place', 'sql', 'none', 'platforms/facebook', 'Graph rate-limit counters.'),
+  t('uptime_days', 'UptimeDay', 'in_place', 'sql', 'none', 'Root', 'Uptime history; operator monitoring reads it.'),
+  t('changelog_entries', 'ChangelogEntry', 'in_place', 'sql', 'none', 'Root', 'Release notes; the Root changelog reads them.'),
 ];
 
 /** Tables the rebuild owns itself; anything else outside the manifest is reported as unclassified. */

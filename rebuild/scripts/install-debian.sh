@@ -12,8 +12,8 @@
 #
 # Safe to run again: each step checks for its own result first, nothing that
 # exists is recreated, and an existing .env or encryption key is never replaced.
-# This script does not touch the legacy app, a proxy, or production data. A
-# production cutover still follows docs/CUTOVER.md (prod-cutover.sh).
+# This script does not touch a proxy or production data. Releases on an
+# installed host follow docs/CUTOVER.md (rebuild/scripts/prod-deploy.sh).
 
 set -euo pipefail
 
@@ -101,7 +101,21 @@ say "Installing dependencies"
 su "$APP_USER" -c "cd '$APP_DIR' && npm ci"
 
 say "Applying migrations"
-su "$APP_USER" -c "cd '$APP_DIR' && set -a && . ./.env && set +a && npx prisma migrate deploy --schema prisma/schema.prisma"
+# The project's own ledger (same format as prod-deploy.sh), not prisma migrate:
+# the baseline contains ALTER TYPE ... ADD VALUE, which PostgreSQL forbids
+# inside the single transaction Prisma wraps migrations in. Files apply in
+# name order without a wrapping transaction; recorded names are skipped.
+su "$APP_USER" -c "cd '$APP_DIR' && set -a && . ./.env && set +a && psql \"\$DATABASE_URL\" -v ON_ERROR_STOP=1 -q -c 'CREATE TABLE IF NOT EXISTS \"_prisma_migrations\" (\"id\" VARCHAR(36) PRIMARY KEY NOT NULL, \"checksum\" VARCHAR(64) NOT NULL, \"finished_at\" TIMESTAMPTZ, \"migration_name\" VARCHAR(255) NOT NULL, \"logs\" TEXT, \"rolled_back_at\" TIMESTAMPTZ, \"started_at\" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, \"applied_steps_count\" INTEGER NOT NULL DEFAULT 0)'"
+for m in "$APP_DIR"/prisma/migrations/*/; do
+  m="$(basename "$m")"
+  [[ "$m" =~ ^[0-9]{14}_ ]] || continue
+  recorded="$(su "$APP_USER" -c "cd '$APP_DIR' && set -a && . ./.env && set +a && psql \"\$DATABASE_URL\" -Atc \"select count(*) from _prisma_migrations where migration_name='$m' and finished_at is not null and rolled_back_at is null\"")"
+  if [ "$recorded" = 1 ]; then note "$m already applied"; continue; fi
+  su "$APP_USER" -c "cd '$APP_DIR' && set -a && . ./.env && set +a && psql \"\$DATABASE_URL\" -v ON_ERROR_STOP=1 -q -f 'prisma/migrations/$m/migration.sql'"
+  sum="$(sha256sum "$APP_DIR/prisma/migrations/$m/migration.sql" | cut -d' ' -f1)"
+  su "$APP_USER" -c "cd '$APP_DIR' && set -a && . ./.env && set +a && psql \"\$DATABASE_URL\" -q -c \"insert into _prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) values (gen_random_uuid()::text, '$sum', now(), '$m', null, null, now(), 1)\""
+  note "$m applied"
+done
 
 say "Building"
 su "$APP_USER" -c "cd '$APP_DIR' && npm run build"

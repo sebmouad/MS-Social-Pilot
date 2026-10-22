@@ -13,7 +13,7 @@ beforeEach(() => {
   m.authorize.mockResolvedValue(undefined);
   m.query.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('FOR SHARE') ? [{ id: actor.userId }] : [await m.profile()]);
   m.profile.mockResolvedValue({ id: actor.userId, name: 'Émilie', email: 'synthetic@example.test' });
-  m.hook.mockResolvedValue({ appearance: { theme: 'warm', mode: 'dark' }, personCredentials: [{ id: 'safe-metadata' }], oauthGrants: [], legacyOauthGrants: [] });
+  m.hook.mockResolvedValue({ appearance: { theme: 'warm', mode: 'dark' }, personCredentials: [{ id: 'safe-metadata' }], oauthGrants: [] });
   m.config.mockImplementation(async key => key === 'data.maxArchiveBytes' ? 100000 : 30000);
   m.transaction.mockImplementation(async run => run(tx));
 });

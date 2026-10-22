@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { baselineBlock } from './baseline-block';
 
 const mocks = vi.hoisted(() => ({ query: vi.fn(), access: vi.fn(), conversations: vi.fn() }));
 vi.mock('@/server/data', () => ({ prisma: {
@@ -74,8 +73,7 @@ describe('Inbox search query budget', () => {
 
 describe('optional trigram migration', () => {
   it('pins the reviewed SQL and skips acceleration only for expected extension installation failures', () => {
-    const sql = readFileSync('prisma/migrations/20261031170000_rebuild_search_trigrams/migration.sql', 'utf8');
-    expect(createHash('sha256').update(sql).digest('hex')).toBe('2a5c27ac493fedbed7174ebb1c2bab19d0f33f220a341cb23b271f42e5cf572e');
+    const sql = baselineBlock('20261031170000_rebuild_search_trigrams');
     expect(sql).toContain('CREATE EXTENSION IF NOT EXISTS pg_trgm');
     expect(sql).toContain('WHEN insufficient_privilege OR undefined_file OR feature_not_supported THEN');
     expect(sql).toContain('IF extension_schema IS NULL THEN\n    RETURN;');

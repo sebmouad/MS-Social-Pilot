@@ -63,4 +63,4 @@ complete Root configuration, full Facebook capability coverage or production
 migration/rollback. Existing held Facebook photo-cleanup evidence remains held.
 Legacy all-channel links may briefly lock more selected connections than their
 individual post needs during feedback; reads remain lock-free.
-Production/socialpilot-deploy remain legacy.
+(Written pre-cutover; production now runs this rebuild.)

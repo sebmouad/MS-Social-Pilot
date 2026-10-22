@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { baselineBlock } from './baseline-block';
 
 vi.mock('../src/platforms/facebook/formats/journal', () => ({ executeFacebookNativeWithJournal: vi.fn() }));
 
@@ -193,7 +193,7 @@ describe('Reel follow-ups', () => {
 });
 
 describe('Story proof migration', () => {
-  const sql = readFileSync(new URL('../prisma/migrations/20261030100000_rebuild_facebook_native_story_proofs/migration.sql', import.meta.url), 'utf8');
+  const sql = baselineBlock('20261030100000_rebuild_facebook_native_story_proofs');
   it('is additive: widens the format check and the accepted-proof guard only', () => {
     expect(sql).not.toMatch(/DROP TABLE|DELETE FROM|TRUNCATE|ALTER COLUMN|DROP COLUMN/i);
     expect(sql).toContain(`"format" IN ('video', 'reel', 'story_photo', 'story_video')`);

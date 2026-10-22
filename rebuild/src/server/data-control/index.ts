@@ -80,8 +80,6 @@ function tableSql(table: string) {
 const ownedBy = (foreignKey: string, parentTable: string) =>
   `child."${foreignKey}" IN (SELECT "id" FROM ${tableSql(parentTable)} WHERE "workspaceId" = $1)`;
 const INDIRECT_WORKSPACE_TABLES = [
-  // Legacy OAuth codes carry tenant identity without a workspace/user FK.
-  { table: 'OAuthCode', where: 'child."workspaceId" = $1' },
   { table: 'bio_links', where: ownedBy('pageId', 'bio_pages') },
   { table: 'external_posts', where: ownedBy('targetId', 'targets') },
   { table: 'feed_items', where: ownedBy('feedSourceId', 'feed_sources') },

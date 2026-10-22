@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { baselineBlock } from './baseline-block';
 import { OperationError } from '../src/lib/operation-error';
 
 type Q = { sql: string; values: unknown[] };
@@ -483,8 +484,7 @@ describe('source and migration properties', () => {
     expect(read('src/modules/integrations/oauth/ui/ConsentForm.tsx')).toContain("from '@/components/useConfirm'");
   });
   it('ships an additive migration that stores only hashes and cannot touch existing tables', () => {
-    const dir = readdirSync('prisma/migrations').find(name => name.endsWith('_rebuild_oauth_connectors'))!;
-    const sql = read(`prisma/migrations/${dir}/migration.sql`);
+    const sql = baselineBlock('20261026100000_rebuild_oauth_connectors');
     expect(sql.match(/CREATE TABLE /g)).toHaveLength(2);
     expect(sql).not.toMatch(/\b(ALTER TABLE|DROP|TRUNCATE|INSERT INTO|UPDATE "|DELETE FROM)/i);
     expect(sql).toContain('"codeHash" TEXT NOT NULL');

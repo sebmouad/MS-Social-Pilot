@@ -171,7 +171,7 @@ Release requires all of the following, not just a successful build:
 7. A verified restorable backup and a rehearsed service/proxy/data recovery path for the exact release.
 8. Safe cutover with one publisher, health checks, representative production workflows and observed results.
 
-Follow [CUTOVER.md](CUTOVER.md). Existing `socialpilot-deploy` currently targets legacy. Rewire and use it for rebuild deployment only after cutover gates pass; do not mistake a legacy deployment for delivering the rebuild.
+Follow [CUTOVER.md](CUTOVER.md). User decision, 2026-10-22: the legacy application is deleted from the repository and server after a verified backup; `rebuild/scripts/prod-deploy.sh` is the only deploy path. Reason: the owner confirmed capability parity and requested removal.
 
 ## 11. Definition of done and change discipline
 

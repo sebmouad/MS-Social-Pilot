@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { BASELINE_NAME, BASELINE_SHA256, baselineBlock } from './baseline-block';
 const name = '20261031120000_rebuild_facebook_sync_cursors';
-const migration = readFileSync(`prisma/migrations/${name}/migration.sql`, 'utf8');
+const migration = baselineBlock(name);
 describe('Facebook cursor persistence boundary', () => {
- it('pins the migration and refuses an already migrated scratch dump', () => {
+ it('is pinned inside the baseline rehearsal on an empty scratch database', () => {
   const script = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
-  expect(script).toContain(`verify_migration ${name} ${createHash('sha256').update(migration).digest('hex')}`);
-  expect(script).toContain(`-f "$migration_dir/${name}/migration.sql"`);
-  expect(script).toContain("to_regclass('public.rebuild_facebook_sync_cursors') IS NOT NULL");
+  expect(script).toContain(`verify_migration ${BASELINE_NAME} ${BASELINE_SHA256}`);
+  expect(script).toContain(`-f "$migration_dir/${BASELINE_NAME}/migration.sql"`);
+  expect(script).toContain('scratch database is not empty; refusing to apply the baseline');
  });
  it('migrates exact joined keys before deleting obsolete configuration state', () => {
   expect(migration).toContain("s.key = 'facebook.history.' || t.\"workspaceId\" || '.' || t.id || '.' || t.\"providerId\"");

@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { BASELINE_NAME, BASELINE_SHA256, baselineBlock } from './baseline-block';
 
 const schema = readFileSync('prisma/schema.prisma', 'utf8');
-const migration = readFileSync('prisma/migrations/20261016220000_rebuild_post_deletions/migration.sql', 'utf8');
+const migration = baselineBlock('20261016220000_rebuild_post_deletions');
 const rehearsal = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
 const model = schema.split('model RebuildPostDeletion {')[1]?.split('\n}')[0] ?? '';
 const tableDefinition = migration.slice(migration.indexOf('CREATE TABLE'), migration.indexOf('\n);') + 3);
@@ -44,11 +44,8 @@ describe('remote post deletion journal schema', () => {
     for (const column of ['createdAt', 'updatedAt']) expect(migration).toContain(`"${column}" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`);
   });
 
-  it('pins the new migration checksum and keeps existing rehearsal migration pins intact', () => {
-    const checksum = createHash('sha256').update(migration).digest('hex');
-    expect(rehearsal).toContain(`verify_migration 20261016220000_rebuild_post_deletions ${checksum}`);
-    expect(rehearsal).toContain('20261015120000_mcp_api_keys 988d873c33229b439818d079d72c8bc49ffec93cbfe081ee4061ef93d2b2b3f4');
-    expect(rehearsal).toContain('20261023100000_rebuild_worker_jobs 5fb7962a2c720f8a3f30480c4c5afa6f0d48c92a8f2ee58047fb96ccf04a7205');
-    expect(rehearsal).toContain('20261016190000_rebuild_inbox_deletions 457327ad55d02af41eefe00f56021923abe5e13cf7ca668a96c064fa714acc57');
+  it('is pinned inside the checksummed baseline rehearsal', () => {
+    expect(rehearsal).toContain(`verify_migration ${BASELINE_NAME} ${BASELINE_SHA256}`);
+    expect(rehearsal).toContain(`migration_dir/${BASELINE_NAME}/migration.sql`);
   });
 });

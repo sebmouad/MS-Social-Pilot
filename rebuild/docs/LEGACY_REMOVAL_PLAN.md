@@ -1,9 +1,15 @@
-# Legacy removal plan
+# Legacy removal plan (executed 2026-10-22 by lane 47; kept as the audit trail)
 
-Prepared 2026-10-21 against local source `f0aaf405958d3a15b29997f1a94f7c602fd0ae23`.
-**Inventory and future execution plan only. Nothing is approved for deletion by
-this document.** This lane changes this file only; it does not operate a host,
-delete data, alter configuration, commit, push or deploy.
+Prepared 2026-10-21; executed 2026-10-22 under owner approval ("delete all old
+app files and doc from github and server and cleanup the new app from any
+residues or old migration"). Production backup taken and restore verified
+(`/var/backups/legacy-removal-202610221216`). Lane 47 deleted the tracked
+legacy paths from the repository, squashed the migration history into the
+`20261103000000_baseline` migration, removed the `OAuthCode` export/erase hooks
+and the old migration-expectation helper, and produced
+`scripts/server-legacy-cleanup.sh` (not run here) for the server-side removal
+and the five legacy-only table drops. The phase plan below is the historical
+record.
 
 The binding [architecture contract](ARCHITECTURE_CONTRACT.md),
 [cutover procedure](CUTOVER.md), [capability inventory](LEGACY_CAPABILITY_PARITY.md),

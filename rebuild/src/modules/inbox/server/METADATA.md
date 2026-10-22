@@ -23,14 +23,14 @@ in Facebook. Add mocked-Graph tests at that mapper boundary. Current new tests
 exercise supplied normalized engine observations and shared storage/read behavior;
 the existing mocked-Graph discovery suite is regression evidence only.
 
-The additive root migration is
-`prisma/migrations/20261031170000_rebuild_inbox_metadata/migration.sql`.
-Before shipping, the release/integration owner must add it to
-`rebuild/scripts/cutover-rehearsal.sh`'s exact `approved_migrations` allowlist and
+The additive source `20261031170000_rebuild_inbox_metadata` is squashed into
+the `20261103000000_baseline` migration, which the cutover rehearsal
+checksum-pins and applies (lane 47). Before shipping, verify the rehearsal
+covers the new columns and
 the migration application sequence, and add:
 
 ```sh
-verify_migration 20261031170000_rebuild_inbox_metadata 0f64264b7fbdb9108ffd77fd4dff7b8a233d6c227ec6a57652b9f88c8f63f870
+verify_migration 20261103000000_baseline 8abd5224f753f0cb845f9bd748e12e8db3cb7dbb4f1348c714e1d62231e0f8dd
 ```
 
 Add nullable `inboxMetadata Json?` fields to `Conversation`,

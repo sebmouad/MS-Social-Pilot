@@ -29,7 +29,7 @@ describe('legacy data manifest', () => {
   });
 
   it('builds quoted read-only SQL', () => {
-    expect(countSql('OAuthCode')).toBe('SELECT count(*)::text AS n FROM public."OAuthCode"');
+    expect(countSql('posts')).toBe('SELECT count(*)::text AS n FROM public."posts"');
     const posts = LEGACY_TABLES.find(e => e.table === 'posts')!;
     expect(orphanWorkspaceSql(posts)).toContain('LEFT JOIN public.workspaces');
     expect(orphanWorkspaceSql(LEGACY_TABLES.find(e => e.table === 'users')!)).toBeNull();
@@ -52,9 +52,12 @@ describe('legacy data manifest', () => {
     const by = (t: string) => LEGACY_TABLES.find(e => e.table === t)!;
     expect(deleteGate(by('posts'), 10)).toBe('keep');
     expect(deleteGate(by('ai_agents'), 3)).toBe('keep');
-    expect(deleteGate(by('uptime_days'), 3)).toBe('decision_required');
-    expect(deleteGate(by('uptime_days'), 0)).toBe('retire_after_backup');
-    expect(deleteGate(by('workspace_exports'), 3)).toBe('retire_after_backup');
+    expect(deleteGate(by('uptime_days'), 3)).toBe('keep');
+    // Obsolete dispositions keep their gate semantics for future tables.
+    const candidate = { ...by('posts'), disposition: 'obsolete_candidate' as const };
+    expect(deleteGate(candidate, 3)).toBe('decision_required');
+    expect(deleteGate(candidate, 0)).toBe('retire_after_backup');
+    expect(deleteGate({ ...by('posts'), disposition: 'obsolete_replaced' as const }, 3)).toBe('retire_after_backup');
   });
 
   it('fails on orphans, unvalidated constraints and unclassified tables', () => {

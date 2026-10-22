@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BASELINE_NAME, BASELINE_SHA256, baselineBlock } from './baseline-block';
 
 const state = vi.hoisted(() => ({
   config: { 'publishing.remoteScheduling.offered': true, 'publishing.remoteScheduling.defaultMode': 'application', 'publishing.remoteScheduling.handOffBatch': 25 } as Record<string, unknown>,
@@ -194,14 +194,12 @@ describe('hand-off of automatically scheduled posts to the platform', () => {
 });
 
 describe('migration', () => {
-  const file = 'prisma/migrations/20261031100000_rebuild_destination_schedule_mode/migration.sql';
   it('adds one nullable, constrained column and is pinned in the cutover rehearsal', () => {
-    const sql = readFileSync(file, 'utf8');
+    const sql = baselineBlock('20261031100000_rebuild_destination_schedule_mode');
     const script = readFileSync('scripts/cutover-rehearsal.sh', 'utf8');
-    const hash = createHash('sha256').update(sql).digest('hex');
     expect(sql).toContain('ADD COLUMN "scheduleMode" TEXT;');
     expect(sql).not.toMatch(/NOT NULL|DROP|DELETE|UPDATE/i);
-    expect(script).toContain(`verify_migration 20261031100000_rebuild_destination_schedule_mode ${hash}`);
-    expect(script).toContain('migration_dir/20261031100000_rebuild_destination_schedule_mode/migration.sql');
+    expect(script).toContain(`verify_migration ${BASELINE_NAME} ${BASELINE_SHA256}`);
+    expect(script).toContain(`migration_dir/${BASELINE_NAME}/migration.sql`);
   });
 });

@@ -1,19 +1,15 @@
 #!/usr/bin/env bash
-# Restore a sanitized custom-format staging dump into uniquely named local
-# scratch databases, check the rebuild's mapped schema, then prove a second
-# backup/restore preserves the data. This script never connects to production.
+# Staging migration rehearsal (lane 47): apply the single checksum-pinned
+# baseline migration to an empty local scratch database, verify the mapped
+# schema/constraints, then prove a backup/restore preserves it. This script
+# never connects to production. The pre-cutover dump flow is retired: the
+# database history is one baseline, and production marks it applied without
+# re-running it (see prod-deploy.sh resolve handling).
 set -euo pipefail
 
 fail() { echo "cutover rehearsal: $*" >&2; exit 1; }
 
-: "${CUTOVER_STAGING_DUMP:?Set CUTOVER_STAGING_DUMP to a sanitized staging pg_dump -Fc file}"
 : "${CUTOVER_ADMIN_URL:?Set CUTOVER_ADMIN_URL to a local PostgreSQL admin URL ending in /postgres}"
-: "${CUTOVER_DUMP_SANITIZED:?Set CUTOVER_DUMP_SANITIZED=YES only after confirming the dump is sanitized}"
-: "${CUTOVER_APPROVED_MIGRATION_SET:?Set CUTOVER_APPROVED_MIGRATION_SET to the reviewed migration set}"
-[ "$CUTOVER_DUMP_SANITIZED" = YES ] || fail "CUTOVER_DUMP_SANITIZED must be YES"
-approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution,20261018150000_rebuild_notifications,20261018170000_rebuild_ads_operations,20261018190000_rebuild_ads_creation,20261018193000_rebuild_purge_write_gates,20261025100000_rebuild_task_comments,20261018230000_rebuild_sharing_expiry,20261018233000_rebuild_mcp_resource_scope,20261019010000_rebuild_report_runs,20261019011000_rebuild_report_purge_gate,20261019020000_rebuild_destination_formats,20261019030000_rebuild_facebook_native_journal,20261019040000_rebuild_facebook_native_status_proofs,20261019050000_rebuild_publication_submissions,20261019060000_rebuild_template_comment_delay,20261026100000_rebuild_oauth_connectors,20261027100000_rebuild_workspace_exports,20261028100000_rebuild_alert_delivery,20261029100000_rebuild_channel_profiles,20261030100000_rebuild_facebook_native_story_proofs,20261030100000_rebuild_review_resolution,20261030110000_rebuild_ads_creative_creation,20261030120000_rebuild_workspace_watermark,20261030130000_rebuild_comment_sentiment,20261030130000_rebuild_person_mcp_keys,20261030140000_rebuild_facebook_native_schedule_changes,20261031100000_rebuild_destination_schedule_mode,20261031120000_rebuild_facebook_sync_cursors,20261031140000_rebuild_wordpress_sources'
-[ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
-[ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"   # rebuild/ (migrations and schema live here)
 migration_dir="$ROOT/prisma/migrations"
@@ -29,42 +25,7 @@ verify_migration() {
   fi
   [ "$actual" = "$expected" ] || fail "reviewed migration checksum changed: $name"
 }
-verify_migration 20261031120000_rebuild_facebook_sync_cursors d7226dcf14f8c673e39de1d441e6f6bb1271d993c4bec263f20aabe12e24028e
-verify_migration 20261031140000_rebuild_wordpress_sources cce64edcfbcf19553f7eafe661f86fb067d8d0152e08712d05dc1745121c4642
-verify_migration 20261015120000_mcp_api_keys 988d873c33229b439818d079d72c8bc49ffec93cbfe081ee4061ef93d2b2b3f4
-verify_migration 20261023100000_rebuild_worker_jobs 5fb7962a2c720f8a3f30480c4c5afa6f0d48c92a8f2ee58047fb96ccf04a7205
-verify_migration 20261016190000_rebuild_inbox_deletions 457327ad55d02af41eefe00f56021923abe5e13cf7ca668a96c064fa714acc57
-verify_migration 20261016220000_rebuild_post_deletions 80e406ae33000a349d07f9e428563d20083bc36c65956a969a5e7ccc77c32f07
-verify_migration 20261017010000_rebuild_publication_attempts 03973b6fb80dcf2580c5e39f0d2be8fd5715f47c1a953127ce939638bfece267
-verify_migration 20261017020000_rebuild_facebook_media_steps 897464050aedf8c727fd695cc9b1fead0810d6c08606f3074c4d70529940a0e1
-verify_migration 20261017030000_rebuild_facebook_media_deletions 3f5df63bf339fe532581f14738d089ca5f20a4c245f581f1587573b5bfe6cca5
-verify_migration 20261017040000_rebuild_facebook_media_resolution 3227fbe5f381a25c87955ac809ef605fe1f2d51d9bb4f3ca4e5e9ce743c2a844
-verify_migration 20261018150000_rebuild_notifications b60b92752dc3019e15156f1ecb4cb58d29b5de4a6676dd141ac13a955277b067
-verify_migration 20261018170000_rebuild_ads_operations 61f575314590e45e8eafc7cb8088677fec2a78b39210b82187b6f2c05197d6d2
-verify_migration 20261018190000_rebuild_ads_creation 749fc69e2937588b95e7b050ebb49525e30b2624915abd2bdc92de6e92a899d0
-verify_migration 20261018193000_rebuild_purge_write_gates 5250ec9a2e1176d59f8dd97b6b86d622187b87bd2d3944c41c7a411d157b51d6
-verify_migration 20261025100000_rebuild_task_comments 648427469b965c3c5572b131c4834f772f1fdfe6884a0fd8c32aebc3588750ea
-verify_migration 20261018230000_rebuild_sharing_expiry 28d4f9da65ed866f6139aa982d4756906cd329080dccf6cf2d87dee32e59d263
-verify_migration 20261018233000_rebuild_mcp_resource_scope 465a5d76679b45d7cb3fa6560b9d6a32501e56faab1922107547452a0b5519ab
-verify_migration 20261019010000_rebuild_report_runs caa0c553569cf9f984e973ceb6e3ee858750209c6d2931e1316d3323b4357c4a
-verify_migration 20261019011000_rebuild_report_purge_gate 122e813070361737ba1a89d775d2f92922dadd36423debb83411e0d5a4aa5d9e
-verify_migration 20261019020000_rebuild_destination_formats 30325cdda1951cde93fab77a12bc349caa4422861fe133f68320ac3b979af6c6
-verify_migration 20261019030000_rebuild_facebook_native_journal 3ef505dccb5156ea1d84472998d19fb8427b1232669f57ca98a8ac6cd1e04d46
-verify_migration 20261019040000_rebuild_facebook_native_status_proofs 253e8fb4f18b4cf60fcce16702772dd166358e641fb875c2781cb84d8dc767d4
-verify_migration 20261019050000_rebuild_publication_submissions 91011f00b776d402038d74ff1862e5ab352bbeb500d386b5000172a17ffb5931
-verify_migration 20261019060000_rebuild_template_comment_delay 4c2f5699a826b8008003718084ee13eb0e4ee37e8e861ffdaf4a8a0a292bcfc5
-verify_migration 20261026100000_rebuild_oauth_connectors 58514dc2c438333ac8fb74d632254e230d1d8e69967cc61b2076676eba9879d5
-verify_migration 20261027100000_rebuild_workspace_exports 1d154d62c8422a6f8ac99a92c2975da9e7d211dc018950cc4f3a411c4e96acac
-verify_migration 20261028100000_rebuild_alert_delivery ed079e77ebb54ab01b46811686237c72308a11e43b75dfc9b9c9b0304801f36b
-verify_migration 20261029100000_rebuild_channel_profiles eaad76b014a355047385425fee74caa5fd656c942f461016f98b96c32142f7f4
-verify_migration 20261030100000_rebuild_facebook_native_story_proofs a74d6f4c546dd7f36f464636171bfe61d850dc42cca7786340c0169119fc680e
-verify_migration 20261030100000_rebuild_review_resolution bf99bb579b7d989d3ec1ec2651d8db216cbcaa44d8fe7d0e10ccb1448e08e68e
-verify_migration 20261030110000_rebuild_ads_creative_creation 2109fc4f75cf1f528a6940a14979b1a5b60e6b79f3d9f269dc19507001703aec
-verify_migration 20261030120000_rebuild_workspace_watermark c950bc2f869e81840eb4dc9d06d5749559855ca40556b1e955203d5cfd6a30ce
-verify_migration 20261030130000_rebuild_comment_sentiment a617901b60682c7200d5e8d561df615ac2302ef1fe0677fe246e7dba38b093e4
-verify_migration 20261030130000_rebuild_person_mcp_keys ce14b0b7867c5a86a1c92290c173462964bd081213b90b037314f6dc64d789ff
-verify_migration 20261031100000_rebuild_destination_schedule_mode 19fb66c945d4610accd4712bf769147409f5ba8a33632f360ec8c7d88671339b
-verify_migration 20261030140000_rebuild_facebook_native_schedule_changes 08e1dd1d976c8dfc97207847a47fe8e671f2eeaf5987f9ab9272f9d00c17886e
+verify_migration 20261103000000_baseline 8abd5224f753f0cb845f9bd748e12e8db3cb7dbb4f1348c714e1d62231e0f8dd
 
 # Only loopback TCP or the standard local PostgreSQL socket and database
 # /postgres are accepted. A copied production DATABASE_URL must fail closed.
@@ -94,99 +55,14 @@ trap cleanup EXIT
 psql "$CUTOVER_ADMIN_URL" -q -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$source_db\""
 created_source=1
 source_url="$(db_url "$source_db")"
-pg_restore --no-owner --no-privileges --exit-on-error --dbname "$source_url" "$CUTOVER_STAGING_DUMP"
 
-# The supplied dump must be a pre-migration baseline. Refuse already-applied
-# or partially-applied targets so this run cannot silently skip or duplicate
-# migration effects. Only these checksum-pinned SQL files are executed.
-psql "$source_url" -q -v ON_ERROR_STOP=1 <<'SQL'
-DO $$
-DECLARE already_applied boolean := false;
-BEGIN
-  IF to_regclass('public.workspace_data_purges') IS NULL THEN
-    RAISE EXCEPTION 'workspace_data_purges prerequisite table is missing';
-  END IF;
-  IF to_regclass('public.mcp_api_keys') IS NOT NULL
-     OR to_regclass('public.rebuild_job_leases') IS NOT NULL
-     OR to_regclass('public.rebuild_sync_runs') IS NOT NULL
-     OR to_regclass('public.rebuild_inbox_deletions') IS NOT NULL
-     OR to_regclass('public.rebuild_post_deletions') IS NOT NULL
-     OR to_regclass('public.rebuild_publication_attempts') IS NOT NULL
-     OR to_regclass('public.rebuild_facebook_media_steps') IS NOT NULL
-     OR to_regclass('public.rebuild_facebook_media_deletions') IS NOT NULL
-     OR to_regclass('public.rebuild_facebook_media_resolutions') IS NOT NULL
-     OR to_regclass('public.rebuild_notifications') IS NOT NULL
-     OR to_regclass('public.ads_management_operations') IS NOT NULL
-     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'share_links' AND column_name = 'expiresAt')
-     OR to_regclass('public.task_comments') IS NOT NULL
-     OR to_regclass('public.report_runs') IS NOT NULL
-     OR to_regclass('public.rebuild_facebook_sync_cursors') IS NOT NULL
-     OR to_regclass('public.wordpress_recipe_sources') IS NOT NULL
-     OR to_regclass('public.wordpress_recipe_plans') IS NOT NULL
-     OR to_regclass('public.rebuild_facebook_native_journal') IS NOT NULL
-     OR to_regclass('public.rebuild_facebook_native_status_proofs') IS NOT NULL
-     OR to_regprocedure('public.rebuild_facebook_native_status_proofs_guard()') IS NOT NULL
-     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_targets' AND column_name = 'formatId')
-     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_versions' AND column_name = 'destinationFormats')
-     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_templates' AND column_name = 'firstCommentDelayMinutes')
-     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'post_versions' AND column_name = 'firstCommentDelayMinutes')
-     OR EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'rebuild_workspace_purge_write_gate' AND tgrelid = to_regclass('public.report_runs'))
-     OR to_regprocedure('public.rebuild_facebook_media_deletions_binding_immutable()') IS NOT NULL
-     OR to_regprocedure('public.rebuild_facebook_media_resolutions_immutable()') IS NOT NULL
-     OR to_regprocedure('public.rebuild_facebook_native_journal_guard()') IS NOT NULL
-     OR to_regprocedure('public.rebuild_facebook_native_status_proofs_guard()') IS NOT NULL
-     OR to_regprocedure('public.rebuild_publication_attempts_native_binding_guard()') IS NOT NULL THEN
-    RAISE EXCEPTION 'staging dump already contains reviewed migration objects; use a pre-migration sanitized baseline';
-  END IF;
-  IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
-    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
-      INTO already_applied
-      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution', '20261018150000_rebuild_notifications', '20261018170000_rebuild_ads_operations', '20261018190000_rebuild_ads_creation', '20261018193000_rebuild_purge_write_gates', '20261025100000_rebuild_task_comments', '20261018230000_rebuild_sharing_expiry', '20261018233000_rebuild_mcp_resource_scope', '20261019010000_rebuild_report_runs', '20261019011000_rebuild_report_purge_gate', '20261019020000_rebuild_destination_formats', '20261019030000_rebuild_facebook_native_journal', '20261019040000_rebuild_facebook_native_status_proofs', '20261019050000_rebuild_publication_submissions', '20261019060000_rebuild_template_comment_delay', '20261026100000_rebuild_oauth_connectors', '20261027100000_rebuild_workspace_exports', '20261028100000_rebuild_alert_delivery', '20261029100000_rebuild_channel_profiles', '20261030100000_rebuild_facebook_native_story_proofs', '20261030100000_rebuild_review_resolution', '20261030110000_rebuild_ads_creative_creation', '20261030120000_rebuild_workspace_watermark', '20261030130000_rebuild_comment_sentiment', '20261030130000_rebuild_person_mcp_keys', '20261030140000_rebuild_facebook_native_schedule_changes', '20261031100000_rebuild_destination_schedule_mode';
-    IF already_applied THEN
-      RAISE EXCEPTION 'staging dump migration history already contains an allowlisted migration';
-    END IF;
-  END IF;
-END $$;
-SQL
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261015120000_mcp_api_keys/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261023100000_rebuild_worker_jobs/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261016190000_rebuild_inbox_deletions/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261016220000_rebuild_post_deletions/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261017010000_rebuild_publication_attempts/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261017020000_rebuild_facebook_media_steps/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261017030000_rebuild_facebook_media_deletions/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261017040000_rebuild_facebook_media_resolution/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261018150000_rebuild_notifications/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261018170000_rebuild_ads_operations/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261018190000_rebuild_ads_creation/migration.sql"
-# The purge gate function must exist before task comments install their trigger.
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261018193000_rebuild_purge_write_gates/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261025100000_rebuild_task_comments/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261018230000_rebuild_sharing_expiry/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261018233000_rebuild_mcp_resource_scope/migration.sql"
-# Report history needs the existing purge-gate function; install the table
-# first, then attach its write gate in the following additive migration.
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019010000_rebuild_report_runs/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019011000_rebuild_report_purge_gate/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019020000_rebuild_destination_formats/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019030000_rebuild_facebook_native_journal/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019040000_rebuild_facebook_native_status_proofs/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019050000_rebuild_publication_submissions/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261019060000_rebuild_template_comment_delay/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261026100000_rebuild_oauth_connectors/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261027100000_rebuild_workspace_exports/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261028100000_rebuild_alert_delivery/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261029100000_rebuild_channel_profiles/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261030100000_rebuild_facebook_native_story_proofs/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261030100000_rebuild_review_resolution/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261030110000_rebuild_ads_creative_creation/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261030120000_rebuild_workspace_watermark/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261030130000_rebuild_comment_sentiment/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261030130000_rebuild_person_mcp_keys/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261030140000_rebuild_facebook_native_schedule_changes/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261031100000_rebuild_destination_schedule_mode/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261031120000_rebuild_facebook_sync_cursors/migration.sql"
-psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261031140000_rebuild_wordpress_sources/migration.sql"
+# The scratch database must be empty: the baseline creates the whole schema.
+[ "$(psql "$source_url" -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_tables WHERE schemaname = 'public'")" = 0 ] \
+  || fail "scratch database is not empty; refusing to apply the baseline"
+# No single-transaction flag: the baseline contains ALTER TYPE ... ADD VALUE,
+# which PostgreSQL forbids inside a transaction block. ON_ERROR_STOP still
+# aborts on the first failure, and the scratch database is removed on exit.
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261103000000_baseline/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
 DO $$
@@ -279,11 +155,11 @@ BEGIN
 END $$;
 ROLLBACK;
 SQL
-echo "reviewed additive migrations applied to local scratch database"
+echo "baseline migration applied to local scratch database"
 
 # Required tables/columns are taken from rebuild/prisma/schema.prisma and
-# reviewed raw-SQL journal queries. This verifies the client view against the legacy database layout without applying
-# or generating DDL. The omitted legacy columns and tables remain untouched.
+# reviewed raw-SQL journal queries. This verifies the client view against the
+# baseline-created layout. The omitted columns and tables remain untouched.
 psql "$source_url" -q -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
 DECLARE item text[];
@@ -452,7 +328,7 @@ SQL
 before="$(count_rows "$source_url")"
 echo "staging row counts: $before"
 
-# Rehearse a backup and restore independently of the supplied staging dump.
+# Rehearse a backup and restore of the migrated scratch database.
 backup_file="$(mktemp "${TMPDIR:-/tmp}/cutover-rehearsal.XXXXXX")"
 trap 'rm -f "$backup_file"; cleanup' EXIT
 pg_dump --format=custom --no-owner --no-acl --file "$backup_file" "$source_url"

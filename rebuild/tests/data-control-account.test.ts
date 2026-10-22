@@ -9,7 +9,7 @@ describe('supplementary account data hooks', () => {
       appSetting: { findUnique: vi.fn().mockResolvedValue({ value: 'dark', encrypted: false }) },
     };
     const result = await exportAccountSupplementaryData(tx as unknown as Prisma.TransactionClient, 'a.b%_');
-    expect(result).toEqual({ appearance: { theme: 'warm', mode: 'dark' }, personCredentials: [{ id: 'metadata' }], oauthGrants: [{ id: 'metadata' }], legacyOauthGrants: [{ id: 'metadata' }] });
+    expect(result).toEqual({ appearance: { theme: 'warm', mode: 'dark' }, personCredentials: [{ id: 'metadata' }], oauthGrants: [{ id: 'metadata' }] });
     expect(tx.appSetting.findUnique).toHaveBeenCalledWith({ where: { key: 'settings.appearance.user.a.b%_.mode' }, select: { value: true, encrypted: true } });
     for (const [sql, ...args] of tx.$queryRaw.mock.calls as unknown as [TemplateStringsArray, ...unknown[]][]) {
       expect(args).toEqual(['a.b%_']);
@@ -23,7 +23,7 @@ describe('supplementary account data hooks', () => {
   it('deletes only the exact account preference in the caller transaction', async () => {
     const tx = { $executeRaw: vi.fn().mockResolvedValue(1), appSetting: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) } };
     expect(await deleteAccountSupplementaryData(tx as unknown as Prisma.TransactionClient, 'a.b%_')).toEqual({ count: 1 });
-    expect(tx.$executeRaw.mock.calls[0].slice(1)).toEqual(['a.b%_']);
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
     expect(tx.appSetting.deleteMany).toHaveBeenCalledWith({ where: { key: 'settings.appearance.user.a.b%_.mode' } });
   });
 });

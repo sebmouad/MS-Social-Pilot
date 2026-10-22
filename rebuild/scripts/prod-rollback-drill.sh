@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Post-cutover recovery smoke test; run from anywhere in the checkout. Never swaps releases or starts workers.
+# Recovery smoke test; run from anywhere in the checkout. Restores the newest
+# deploy backup into a scratch database and starts the installed rebuild
+# release against it with a read-only role. Never swaps releases or starts workers.
+# The legacy half of this drill was retired with the legacy release (lane 47).
 # Safety targets are deliberately fixed bootstrap values, not application/Root policy.
 # Usage: bash rebuild/scripts/prod-rollback-drill.sh
 set -euo pipefail
@@ -14,11 +17,11 @@ umask 077
 unset PGHOST PGHOSTADDR PGPORT PGDATABASE PGUSER PGPASSWORD PGSERVICE PGSERVICEFILE PGOPTIONS
 export PGSYSCONFDIR=/nonexistent PGPASSFILE=/dev/null
 readonly DB=social_pilot_drill
-readonly LEGACY_PORT=3120 REBUILD_PORT=3121
-readonly LEGACY=/srv/ms-social-pilot REBUILD=/srv/ms-social-pilot-rebuild/rebuild
+readonly REBUILD_PORT=3121
+readonly REBUILD=/srv/ms-social-pilot-rebuild/rebuild
 readonly ROLE=social_pilot_drill_role
 readonly TIMEOUT=120 CURL_TIMEOUT=5 POLL_SECONDS=2
-START=$(date +%s); RESTORE_SECONDS=not_run; LEGACY_SECONDS=not_run; REBUILD_SECONDS=not_run
+START=$(date +%s); RESTORE_SECONDS=not_run; REBUILD_SECONDS=not_run
 DB_CREATED=0 ROLE_CREATED=0 COMPLETE=0 TMP=''
 STARTED_UNITS=()
 fail() { echo "$*" >&2; exit 1; }
@@ -36,9 +39,9 @@ cleanup() {
   fi
   if [ "$ROLE_CREATED" = 1 ]; then pg -q -c "DROP ROLE $ROLE" || rc=1; fi
   [ -z "$TMP" ] || rm -rf -- "$TMP" || rc=1
-  echo "restore_seconds=$RESTORE_SECONDS legacy_seconds=$LEGACY_SECONDS rebuild_seconds=$REBUILD_SECONDS total_seconds=$(( $(date +%s) - START ))"
+  echo "restore_seconds=$RESTORE_SECONDS rebuild_seconds=$REBUILD_SECONDS total_seconds=$(( $(date +%s) - START ))"
   if [ "$rc" = 0 ] && [ "$COMPLETE" = 1 ]; then
-    echo 'ROLLBACK DRILL PASS: backup restored; legacy and installed rebuild HTTP/DB checks passed; scratch resources removed'
+    echo 'ROLLBACK DRILL PASS: backup restored; installed rebuild HTTP/DB checks passed; scratch resources removed'
   else
     echo 'ROLLBACK DRILL FAIL: recovery unproven; inspect private host evidence and cleanup failures' >&2
     rc=1
@@ -52,23 +55,17 @@ trap 'exit 129' HUP
 [ "$EUID" = 0 ] || fail 'Refusing: remote root required'
 # Fail closed even if a later edit accidentally changes a safety target.
 [ "$DB" = social_pilot_drill ] && [ "$DB" != social_pilot ] &&
-  [ "$LEGACY_PORT" = 3120 ] && [ "$REBUILD_PORT" = 3121 ] &&
-  [ "$LEGACY_PORT" != 3100 ] && [ "$REBUILD_PORT" != 3100 ] &&
-  [ "$LEGACY_PORT" != "$REBUILD_PORT" ] || fail 'Refusing: unsafe database or port'
+  [ "$REBUILD_PORT" = 3121 ] && [ "$REBUILD_PORT" != 3100 ] || fail 'Refusing: unsafe database or port'
 exec 9>/run/lock/socialpilot-rollback-drill.lock
 flock -n 9 || fail 'Refusing: another rollback drill holds the lock'
 for command in systemd-run systemctl ss curl openssl sha256sum pg_restore; do command -v "$command" >/dev/null || fail "Missing tool: $command"; done
-for port in "$LEGACY_PORT" "$REBUILD_PORT"; do
-  [ -z "$(ss -H -ltn "sport = :$port")" ] || fail 'Refusing: port already listening'
-done
+[ -z "$(ss -H -ltn "sport = :$REBUILD_PORT")" ] || fail 'Refusing: port already listening'
 [ "$(pg -Atc "SELECT count(*) FROM pg_database WHERE datname='$DB'")" = 0 ] || fail 'Refusing: scratch database already exists'
 [ "$(pg -Atc "SELECT count(*) FROM pg_roles WHERE rolname='$ROLE'")" = 0 ] || fail 'Refusing: scratch role already exists'
-ARTIFACTS=$(sha256sum "$LEGACY/.next/BUILD_ID" "$REBUILD/.next/BUILD_ID")
-for release in "$LEGACY" "$REBUILD"; do
-  [ -s "$release/.next/BUILD_ID" ] && [ -f "$release/node_modules/next/dist/bin/next" ] || fail 'Refusing: installed release artifact missing'
-  echo "Release artifact: $release"
-  sha256sum "$release/.next/BUILD_ID"
-done
+ARTIFACTS=$(sha256sum "$REBUILD/.next/BUILD_ID")
+[ -s "$REBUILD/.next/BUILD_ID" ] && [ -f "$REBUILD/node_modules/next/dist/bin/next" ] || fail 'Refusing: installed release artifact missing'
+echo "Release artifact: $REBUILD"
+sha256sum "$REBUILD/.next/BUILD_ID"
 # Newest dump by mtime, not a directory name or an older fallback after failure.
 DUMP=$(find /var/backups -maxdepth 2 -type f -path '/var/backups/socialpilot-deploy-*/social_pilot.dump' -printf '%T@ %p\n' | sort -nr | sed -n '1s/^[^ ]* //p')
 [ -n "$DUMP" ] && [ -s "$DUMP" ] || fail 'Refusing: newest deploy dump missing/empty'
@@ -94,21 +91,19 @@ GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO $ROLE;
 SQL
 TMP=$(mktemp -d /run/socialpilot-rollback-drill.XXXXXX)
 # Do not copy the live env or encryption/provider/session credentials.
-for label in legacy rebuild; do
-ENVF=$TMP/$label.env
+ENVF=$TMP/rebuild.env
 {
-  echo "DATABASE_URL=postgresql://$ROLE:$PASSWORD@127.0.0.1:5432/$DB?application_name=rollback-$label"
-  echo "DIRECT_URL=postgresql://$ROLE:$PASSWORD@127.0.0.1:5432/$DB?application_name=rollback-$label"
+  echo "DATABASE_URL=postgresql://$ROLE:$PASSWORD@127.0.0.1:5432/$DB?application_name=rollback-rebuild"
+  echo "DIRECT_URL=postgresql://$ROLE:$PASSWORD@127.0.0.1:5432/$DB?application_name=rollback-rebuild"
   echo 'NODE_ENV=production'
   echo 'NEXT_TELEMETRY_DISABLED=1'
   echo "ENCRYPTION_KEY=$(openssl rand -hex 32)"
   echo "SESSION_SECRET=$(openssl rand -hex 32)"
 } > "$ENVF"
-done
 unset PASSWORD
 # Next must never load release .env files; hide them in the unit mount namespace.
 HIDDEN=''
-for base in "$LEGACY" /srv/ms-social-pilot-rebuild "$REBUILD"; do
+for base in /srv/ms-social-pilot-rebuild "$REBUILD"; do
   for name in .env .env.local .env.production .env.production.local; do HIDDEN="$HIDDEN -$base/$name"; done
 done
 run_release() {
@@ -143,13 +138,10 @@ run_release() {
   done
   fail "$label: HTTP/DB readiness timed out"
 }
-run_release legacy "$LEGACY" "$LEGACY_PORT" /api/health
-LEGACY_SECONDS=$elapsed
-# Both releases use precisely the same restored schema/data; incompatibility fails the gate.
 run_release rebuild "$REBUILD" "$REBUILD_PORT" /api/health
 REBUILD_SECONDS=$elapsed
-# Ensure the first release survived the second check as well.
-curl --noproxy '*' --fail --silent --max-time "$CURL_TIMEOUT" -o /dev/null "http://127.0.0.1:$LEGACY_PORT/api/health" || fail 'Legacy did not remain healthy'
-[ "$(sha256sum "$LEGACY/.next/BUILD_ID" "$REBUILD/.next/BUILD_ID")" = "$ARTIFACTS" ] || fail 'Release changed during drill; rerun without concurrent deployment'
+# Ensure the release is still healthy after the check.
+curl --noproxy '*' --fail --silent --max-time "$CURL_TIMEOUT" -o /dev/null "http://127.0.0.1:$REBUILD_PORT/api/health" || fail 'Rebuild did not remain healthy'
+[ "$(sha256sum "$REBUILD/.next/BUILD_ID")" = "$ARTIFACTS" ] || fail 'Release changed during drill; rerun without concurrent deployment'
 COMPLETE=1
 REMOTE

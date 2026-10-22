@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { baselineBlock } from './baseline-block';
 
-const migration = readFileSync('prisma/migrations/20261017030000_rebuild_facebook_media_deletions/migration.sql', 'utf8');
+const migration = baselineBlock('20261017030000_rebuild_facebook_media_deletions');
 
 describe('Facebook staged-photo deletion journal migration', () => {
   it('adds only a content-free workspace-owned journal with immutable bindings', () => {

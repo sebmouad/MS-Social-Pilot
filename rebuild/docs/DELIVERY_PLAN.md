@@ -1,10 +1,12 @@
 # Shared delivery plan
 
-Updated 2026-10-21 against source HEAD `99c41554`, registry schema **123**.
+Updated 2026-10-22 (lane 47), registry schema **135**.
 [GOAL.md](GOAL.md) remains active; [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md)
-is unchanged. [ARCHITECTURE.md](ARCHITECTURE.md#current-head-reconciliation--2026-10-21)
-and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) separate current source from historical
+is unchanged. [ARCHITECTURE.md](ARCHITECTURE.md) and
+[AGENT_HANDOFF.md](AGENT_HANDOFF.md) separate current source from historical
 browser, provider and production evidence. No new deployment is asserted here.
+The legacy tree was deleted from the repository; server-side legacy removal is
+still pending.
 
 Current source includes Ads inventory independent of delivery (`e050b3a6`),
 audit fixes and registered policies/catalogs (`8d9ccbe7`), separate paid/channel
@@ -19,12 +21,12 @@ before treating that bounded run as an exhaustive Ads or release gate.
 | --- | --- | --- |
 | 1 | Restore workspace picker integration | Shared shell owner sends exact SELECT WORKSPACE confirmation from AppShell; Agency service already enforces it. Test success/refusal and retained pending/error state. Sharing copy-only confirmation is now implemented. |
 | 2 | Finish shared Root validation copy | Shared config/UI owner registers shared.formValidationCopy and delivers selected runtime copy to public/auth/customer/Root forms. storage.mediaPresentationPolicy, ui.loadingCopy and root.errorCopy are already registered. |
-| 3 | Reconcile release/migrations/recovery | Release owner confirms deployed SHA/schema and migration receipts; pins ad.create and ads_objects migrations with checksum/order/history/probes in cutover rehearsal/tests. Verify latest-release backup/media restore, proxy cutback and worker drain; preserve one publisher. |
+| 3 | Reconcile release/migrations/recovery | Release owner confirms deployed SHA/schema and the baseline migration receipt (lane 47 squashed history into `20261103000000_baseline`; production marks it applied). Verify latest-release backup/media restore and worker drain; preserve one publisher. No legacy rollback target remains. |
 | 4 | Complete Ads inventory data controls and runtime proof | Data-control/Ads owners verify ads_objects export/erasure, cascade/transaction rollback and stale tombstones; external-removal reconciliation remains missing. Record live run levels/audit/confirmation/cleanup/spend, then test remaining operations and real scoped MCP. Review unrestricted-channel creation versus recovery policy. |
 | 5 | Current design, FR and accessibility review | UI owners rerun synthetic Chromium/Firefox/WebKit for all themes/viewports, keyboard, language and failure recovery. Merged Settings/Root/Inbox/Publishing passes and shared CSS tests are source/DOM evidence. No completed two-round browser design proof; browser round 6 is partial. Fix hydration, soft 404s, raw messages and shell boundaries; remove smoke waivers only with evidence. |
 | 6 | Numbers, performance and provider semantics | Provider/Analytics owners resolve Page-only Home performance, external destination deduplication, audience series identity and nested reactions. Verify real SQL/query plans/volume, selected scope and missing versus zero. Current arithmetic/query-budget fixtures prove bounded local behavior only. |
 | 7 | Scheduling, feeds and portability | Publishing/Feeds/data owners prove mixed native/app scheduling, uncertain identity recovery, pause-cancel/retry, cross-slot allocation, source/notice delivery and export/erasure in actual databases/providers. Keep uncertain ledgers held; Home supply-card mount remains absent. |
-| 8 | Finish legacy inventory and capabilities | Integrator supplies LEGACY_SWEEP_2026-10-21.md and reconciles every missing row. At current HEAD Instagram is helpers only; Groups, AI agent management and async Posts CSV are missing. Implement each with shared UI/REST/MCP service, Root config and scoped authorization evidence. |
+| 8 | Finish inventory and capabilities | Reconcile every missing [LEGACY_SWEEP_2026-10-21.md](LEGACY_SWEEP_2026-10-21.md) row. Instagram is helpers only; AI agent management and async Posts CSV are missing. (Facebook Groups were dropped by owner decision 2026-10-22.) Implement each with shared UI/REST/MCP service, Root config and scoped authorization evidence. |
 | 9 | Cross-interface execution | Module/integration owners run the current owner/member/viewer/cross-workspace/resource/key/Root matrix and actual authenticated MCP client outcomes. Mocked host/service execution and the structural parity guard do not close this gate. |
 
 ## Evidence and delivery discipline
@@ -37,11 +39,9 @@ browser matrices retain unresolved findings and their original merge coverage.
 The latest smoke suite renders pages and invokes routes with synthetic mocks in
 EN/FR; it does not run a server, browser, real database or provider.
 
-Current schema is 123; this lane adds no Root keys and leaves the registry intact.
-Module-owned services retain auth, tenant/resource scope, confirmations and audit;
-Facebook logic remains platform-owned. Lane authority is eight owned docs only,
-with full local suite/typecheck required and no servers, deploy, push or production.
-Leave verified working-tree changes for integration; do not replay old release work.
+Current schema is 135. Module-owned services retain auth, tenant/resource scope,
+confirmations and audit; Facebook logic remains platform-owned. Leave verified
+working-tree changes for integration; do not replay old release work.
 
 ## Legacy shell lane q-35 — 2026-10-22
 
@@ -59,8 +59,9 @@ web monitoring cannot publish or write worker heartbeats. Worker failures feed
 the existing scrubbed error console. Release/recovery readiness probes now use
 `/api/health`; scripts were not executed against any host.
 
-New migration `20261022180000_rebuild_uptime_samples` adds minute claims and
-monitoring delivery records; apply/rehearse it before enabling monitoring.
+The `20261022180000_rebuild_uptime_samples` source (minute claims and
+monitoring delivery records) is squashed into the `20261103000000_baseline`
+migration (lane 47).
 New Root keys are listed in the operator lane verification note. Schema version
 is deliberately unchanged for the integrator. Telegram, provider usage alerts,
 test-alert parity and real database/browser/mail/release evidence remain open.
@@ -80,15 +81,16 @@ failures are loopback `facebook-native-http` tests blocked by sandbox
 
 Source follow-ups for raw-caption tests, subscribed chat events and the single
 Root monitoring/test flow are described in [LANE_43_FOLLOWUPS.md](LANE_43_FOLLOWUPS.md).
-Before enabling delivery, rehearse/apply the chat outbox migration, review Root
-monitoring settings after duplicate-key removal, select the owner workspace for
-operator chat alerts, and verify real email/Slack/Telegram outcomes. Browser
-checks for the new caption controls and Root test dialog remain open. No commit,
-push, server or production action is authorized in this lane.
+The chat outbox migration is squashed into the baseline (lane 47). Before
+enabling delivery, review Root monitoring settings after duplicate-key removal,
+select the owner workspace for operator chat alerts, and verify real
+email/Slack/Telegram outcomes. Browser checks for the new caption controls and
+Root test dialog remain open. No commit, push, server or production action is
+authorized in this lane.
 
 ## Root administration naming lane (2026-10-22)
 
-Root administration moved to `src/modules/root/server/admin/`; consumers and regression test names follow the new paths. Root settings are renamed to `root.admin.*`, schema 132. The idempotent `20261022200000_root_admin_settings` migration preserves existing canonical values; it has not been applied to a database here. The one-time configuration importer is removed; read-only historical migration expectations remain in `scripts/migration-setting-expectations.ts`. Facebook live probes resolve configuration and credential decoding through the Facebook module. Stored auth hash and cookie formats remain unchanged. No server, provider call, deployment or push was run. See `LEGACY_COMPAT_RENAME.md` for verification.
+Root administration moved to `src/modules/root/server/admin/`; consumers and regression test names follow the new paths. Root settings are renamed to `root.admin.*`, schema 132. The idempotent `20261022200000_root_admin_settings` source (now squashed into the baseline) preserves existing canonical values. The one-time configuration importer is removed; the read-only historical migration expectations were removed with it in lane 47. Facebook live probes resolve configuration and credential decoding through the Facebook module. Stored auth hash and cookie formats remain unchanged. No server, provider call, deployment or push was run.
 
 
 Root naming continuation verification: typecheck and explicit `tsc -p .` pass;
@@ -117,3 +119,27 @@ parity/config guards. Required full suite: 711 files pass, one fails, 49 skip;
 11,511 tests pass, five fail, 2,553 skip. All failures are unchanged Facebook
 loopback probes blocked by sandbox `listen EPERM ::1`; full suite is not green. No production
 action or live-provider claim. Changes remain uncommitted as requested.
+
+## Lane 47 legacy removal — 2026-10-22
+
+Owner approval: delete the legacy app from the repository and the server and
+clean rebuild residues. Pre-removal production backup
+`/var/backups/legacy-removal-202610221216`, restore verified.
+
+Done in the working tree (uncommitted): all tracked legacy root paths deleted;
+139 rebuild migrations plus the root chat-deliveries migration squashed into
+`20261103000000_baseline` (equivalence proven on scratch databases;
+`tests/baseline-migration.test.ts` pins all 140 source blocks); deploy,
+rehearsal, drill and installer scripts retargeted to the baseline with
+production resolve handling; 27 migration test files repointed; `OAuthCode`
+export/erase hooks and `scripts/migration-setting-expectations.ts` removed;
+`legacy-schema.prisma` minus five models; manifest dispositions corrected
+(17 to `in_place`, five retired entries dropped);
+`scripts/server-legacy-cleanup.sh` produced (not run here). No new Root keys;
+schema stays 135.
+
+Still pending: run the server cleanup (old units/dirs/guard plus five table
+drops) in an authorized session; confirm the baseline receipt on production;
+integrator schema bump for the queued lanes' keys. See
+[ARCHITECTURE.md](ARCHITECTURE.md#lane-47-legacy-removal--2026-10-22) and
+[AGENT_HANDOFF.md](AGENT_HANDOFF.md) for the handoff.
