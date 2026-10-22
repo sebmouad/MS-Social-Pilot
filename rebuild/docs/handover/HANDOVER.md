@@ -37,8 +37,12 @@ widths in EN/FR with keyboard; live-provider token renewal run).
   session: `DESIGN.md` Layout rewritten for the v2 shell; saved
   `home.shellCopy` catalogs with `pageTools` keys now load their
   remaining entries (`resolveShellCopy`, tested).
-- Owner action: repoint Meta dashboard deauthorize/data-deletion URLs to
-  `/api/platforms/facebook/deauthorize` and `/data-deletion`.
+- Done 2026-10-22: Meta app 699780715171676 now points deauthorize and
+  data-deletion callbacks (Basic settings and Facebook Login for Business)
+  at `/api/platforms/facebook/deauthorize` and `/data-deletion`; verified
+  after reload. Live Root token refresh on the 10-channel connection
+  returned "Token renewed." Remaining: real MCP client check (owner creates
+  an MCP key in Settings and connects a client; agents may not handle keys).
 - Live-provider, MCP-client and release gates in
   `ARCHITECTURE_CONTRACT.md` §10 remain open.
 
