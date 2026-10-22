@@ -115,6 +115,11 @@ export async function connectionFlow(provider: string): Promise<PlatformHost['co
   return host.connection;
 }
 
+/** True when the module connects by entering a credential (app password, bot token) rather than by redirect. */
+export function platformConnectsWithCredentials(provider: string): boolean {
+  return Boolean(hostFor(provider)?.connection.credentials);
+}
+
 /** Customer-worded permission areas for one stored connection; empty when the module reports none. */
 export async function platformGrantHealth(provider: string, input: { scopes: string | null | undefined; hasAdAccounts: boolean; locale?: 'en' | 'fr' }) {
   const grantHealth = hostFor(provider)?.connection.grantHealth;

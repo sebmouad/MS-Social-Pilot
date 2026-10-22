@@ -27,7 +27,7 @@ describe('transactional mail', () => {
     expect(MAIL_CONFIG.map((definition) => definition.key)).toEqual([
       'mail.recipientMaxCharacters', 'mail.workspaceIdMaxCharacters', 'mail.templateMaxCharacters', 'mail.providerIdMaxCharacters',
       'mail.enabled', 'mail.publicOrigin', 'mail.smtpHost', 'mail.smtpPort', 'mail.smtpSecure', 'mail.smtpRequireTls',
-      'mail.smtpUsername', 'mail.smtpPassword', 'mail.fromAddress', 'mail.fromName', 'mail.connectionTimeoutMs',
+      'mail.smtpUsername', 'mail.smtpPassword', 'mail.provider', 'mail.apiEndpoint', 'mail.apiKey', 'mail.fromAddress', 'mail.fromName', 'mail.connectionTimeoutMs',
       'mail.socketTimeoutMs', 'mail.subjectMaxCharacters', 'mail.bodyMaxBytes',
     ]);
     expect(MAIL_CONFIG.find((definition) => definition.key === 'mail.smtpPassword')?.kind).toBe('secret');

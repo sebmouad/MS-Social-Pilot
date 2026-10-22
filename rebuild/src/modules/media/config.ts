@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { entry } from '@/lib/config/entry';
+import { entry, cron } from '@/lib/config/entry';
 import { copySchema } from '@/lib/config/copy-schema';
 import { mediaCopy } from './copy';
 import { mediaMessages, mediaMessagesSchema } from './messages';
@@ -29,7 +29,13 @@ export const webpImportPolicySchema = z.object({
   maxConcurrent: z.number().int().min(1).max(8), timeoutMs: z.number().int().min(100).max(300000),
   maxOutputBytes: z.number().int().min(1).max(104857600),
 }).strict();
+/** Unused library assets (no post references them) are removed after `unusedDays`; off until Root enables it. */
+export const mediaRetentionPolicySchema = z.object({
+  enabled: z.boolean(), unusedDays: z.number().int().min(1).max(3650), batchLimit: z.number().int().min(1).max(1000),
+}).strict();
 export const MEDIA_CONFIG = [
+  entry({ key: 'media.retentionPolicy', group: G, label: 'Unused media retention', kind: 'json', description: 'When enabled, a leased worker job removes library assets older than unusedDays that no post references (checked again inside a workspace lock; any scan that cannot finish keeps the asset). batchLimit caps assets removed per workspace per run. Stored files are removed after the record. Each removal is audited. Off by default.', defaultValue: { enabled: false, unusedDays: 90, batchLimit: 100 }, schema: mediaRetentionPolicySchema, consumption: 'active' }),
+  entry({ key: 'media.retentionSchedule', group: G, label: 'Unused media retention schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone for the unused media retention job.', defaultValue: '43 3 * * *', schema: cron, consumption: 'active' }),
   entry({ key: 'media.webpImportPolicy', group: G, label: 'WebP import conversion', kind: 'json', description: 'Convert still WebP imports to PNG for workspace image storage. Animated WebP is refused. Bounds cover decoded pixels, concurrent conversions per process, elapsed time and encoded output bytes.', defaultValue: { enabled: true, maxPixels: 16000000, maxConcurrent: 2, timeoutMs: 10000, maxOutputBytes: 26214400 }, schema: webpImportPolicySchema, consumption: 'active' }),
   entry({ key: 'media.libraryPageSize', group: G, label: 'Library page size', kind: 'number', description: 'Assets listed on one media library page.', defaultValue: MEDIA_DEFAULTS.pageSize, schema: int(MEDIA_BOUNDS.pageSize), consumption: 'active' }),
   entry({ key: 'media.workspaceQuotaBytes', group: G, label: 'Workspace storage quota (bytes)', kind: 'number', description: 'Total stored media bytes one workspace may hold; imports beyond it are refused.', defaultValue: MEDIA_DEFAULTS.workspaceQuotaBytes, schema: int(MEDIA_BOUNDS.workspaceQuotaBytes), consumption: 'active' }),

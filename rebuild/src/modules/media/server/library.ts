@@ -67,6 +67,9 @@ async function audit(tx: Tx, actor: ToolActor, action: string, detail: object) {
 
 type Source = { id: string; source: LibraryAsset['source']; url?: string | null; storageKey?: string | null };
 /** Which posts reference each asset. One scan per call, bounded by `scan`; `truncated` means more posts matched than were examined. */
+export async function attributeAssets(db: Pick<Tx, '$queryRaw'>, workspaceId: string, assets: readonly Source[], scan: number, excerptCharacters: number) {
+  return attribute(db, workspaceId, assets, scan, excerptCharacters);
+}
 async function attribute(db: Pick<Tx, '$queryRaw'>, workspaceId: string, assets: readonly Source[], scan: number, excerptCharacters: number): Promise<{ byAsset: Map<string, AssetHolder[]>; truncated: boolean }> {
   const byAsset = new Map<string, AssetHolder[]>();
   const refs = new Map(assets.map(a => [a.id, assetReferences(a)]));

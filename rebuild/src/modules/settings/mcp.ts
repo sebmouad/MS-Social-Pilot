@@ -5,6 +5,7 @@ import { ACCOUNT_MCP } from './account-mcp';
 import { ACCOUNT_EXPORT_MCP } from './server/account-export-mcp';
 import { SESSION_PARITY_MCP } from './session-parity-mcp';
 import { CONNECTION_START_MCP } from './connection-start-mcp';
+import { CONNECTION_CREDENTIALS_MCP } from './connection-credentials-mcp';
 import { AGENCY_SESSION_MCP } from '@/modules/agency/mcp';
 import { CHANNEL_PROFILES_MCP } from './channel-profiles/mcp';
 import { WATERMARK_MCP } from './watermark/mcp';
@@ -29,6 +30,7 @@ export const SETTINGS_MCP: readonly McpToolGroup[] = [
   SESSION_PARITY_MCP,
   WEB_APP_MCP,
   CONNECTION_START_MCP,
+  CONNECTION_CREDENTIALS_MCP,
   AGENCY_SESSION_MCP,
   ACCOUNT_MCP,
   ACCOUNT_EXPORT_MCP,

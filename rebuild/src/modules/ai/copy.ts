@@ -18,6 +18,7 @@ export const aiCopy = {
     needLanguage: 'Choose a language to translate into.',
     failed: 'AI assist could not complete this request.',
     unreachable: 'AI assist could not be reached. Your text is unchanged.',
+    altText: { suggest: 'Suggest description', working: 'Describing…', failed: 'The description could not be suggested. Write it yourself.', note: 'Suggestion from the picture. Check it before posting.' },
   },
   fr: {
     region: 'Aide à la rédaction par IA',
@@ -34,6 +35,7 @@ export const aiCopy = {
     needLanguage: 'Choisissez la langue de traduction.',
     failed: 'L’aide par IA n’a pas pu traiter cette demande.',
     unreachable: 'L’aide par IA est injoignable. Votre texte n’a pas été modifié.',
+    altText: { suggest: 'Suggérer une description', working: 'Description en cours…', failed: 'La description n’a pas pu être suggérée. Rédigez-la vous-même.', note: 'Suggestion issue de l’image. Vérifiez-la avant de publier.' },
   },
 } as const;
 export type AiCopy = (typeof aiCopy)['en'];

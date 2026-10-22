@@ -10,12 +10,13 @@ import { connectionState, type ConnectionStatusLabels } from '@/lib/connection-s
 import { fill } from '@/modules/settings/ui/shell-copy';
 
 import { summarizeDisconnectCounts } from './preview';
+import { CredentialConnectDialog } from './CredentialConnectDialog';
 
 type Channel = { id: string; name: string; type: string; enabled: boolean };
 type AdAccount = { id: string; name: string; actId: string; enabled: boolean };
 type Source = { id: string; name: string; provider: string; platformName?: string; invalidatedAt: Date | null; tokenExpiresAt: Date | null; targets: Channel[]; adAccounts: AdAccount[] };
 
-type Connectable = { id: string; name: string; mark: { text: string; color: string } };
+type Connectable = { id: string; name: string; mark: { text: string; color: string }; credentials?: boolean };
 
 export function ConnectionManager({ statusLabels, sources, canManage, platforms, initiallyOpen = false, initialSourceId, initialAction, locale = 'en' }: { statusLabels: ConnectionStatusLabels; sources: Source[]; canManage: boolean; platforms: Connectable[]; initiallyOpen?: boolean; initialSourceId?: string; initialAction?: 'manage' | 'disconnect'; locale?: 'en' | 'fr' }) {
   const router = useRouter();
@@ -29,6 +30,7 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
   const [busy, setBusy] = useState(false);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  const [credentialPlatform, setCredentialPlatform] = useState<Connectable | null>(null);
   const [disconnect, setDisconnect] = useState<Source | null>(initialSource && initialAction === 'disconnect' ? initialSource : null);
   const [disconnectMode, setDisconnectMode] = useState<'retain' | 'delete'>('retain');
   const [deletePreview, setDeletePreview] = useState<Record<string, number> | null>(null);
@@ -45,6 +47,7 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
   const toggle = (kind: 'target' | 'adAccount', id: string, checked: boolean) => setSelected(current => ({ ...current, [`${kind}:${id}`]: checked }));
 
   async function connect(platform: Connectable) {
+    if (platform.credentials) { setCredentialPlatform(platform); return; }
     setConnecting(platform.id); setNotice('');
     try {
       const response = await fetch(`/api/oauth/connections/${encodeURIComponent(platform.id)}/start`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation: `START CONNECTION ${platform.id}` }) });
@@ -103,6 +106,9 @@ export function ConnectionManager({ statusLabels, sources, canManage, platforms,
   if (!canManage || (!sources.length && !platforms.length)) return null;
   return <>
     <div id="connection-actions" className={styles['connection-toolbar']}><p>{sources.length ? t.toolbarSources : t.toolbarEmpty}</p><div>{platforms.map(platform => <button type="button" key={platform.id} onClick={() => connect(platform)} disabled={connecting !== null}><span aria-hidden="true" className={styles['connection-mark']} style={{ background: platform.mark.color }}>{platform.mark.text}</span>{connecting === platform.id ? t.connecting : fill(t.connect, { platform: platform.name })}</button>)}{sources.length > 0 && <button type="button" className={styles['connection-primary-button']} onClick={() => setOpen(true)}>{t.manageSelections}</button>}</div></div>
+    {credentialPlatform && <CredentialConnectDialog platformId={credentialPlatform.id} platformName={credentialPlatform.name} locale={locale}
+      labels={{ cancel: t.cancel, connecting: t.connecting, close: t.close, failed: fill(t.startFailed, { platform: credentialPlatform.name }), loading: t.connecting }}
+      onClose={() => setCredentialPlatform(null)} onConnected={() => { setCredentialPlatform(null); setOpen(true); router.refresh(); }} />}
     {notice && !open && !disconnect && <p role="alert" className={styles['connection-error']}>{notice}</p>}
     {open && <ModalDialog className={styles['connection-dialog']} labelledBy="connection-dialog-title" onDismiss={() => setOpen(false)} busy={busy} initialFocus={initialSource && initialAction === 'manage' ? '[data-connection-source-focus]' : '[data-dialog-cancel]'}>
       <header><div><p className={styles['settings-eyebrow']}>{t.dialogEyebrow}</p><h2 id="connection-dialog-title">{t.dialogTitle}</h2><p>{t.dialogDetail}</p></div><button type="button" aria-label={t.close} disabled={busy} onClick={() => setOpen(false)}>×</button></header>

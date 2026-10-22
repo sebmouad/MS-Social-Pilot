@@ -4,6 +4,7 @@ import { Prisma } from '../../../generated/client';
 import { prisma } from '@/server/data';
 import { runtimeConfig, runtimeSecret } from '@/server/config/store';
 import { MAIL_TRANSPORT_SCHEMA, type MailTransportConfig } from './config';
+import { createApiMailTransport } from './api-transport';
 
 export type TransactionalMailInput = { to: string; subject: string; text: string; html?: string; template: string; workspaceId?: string };
 export type MailDeliveryResult = { status: 'sent' | 'failed' | 'unavailable' | 'uncertain'; deliveryId?: string };
@@ -17,12 +18,12 @@ type MailDependencies = {
   record: (input: { to: string; subject: string; template: string; workspaceId?: string; providerId?: string; status: 'sent' | 'failed'; error?: string }) => Promise<void>;
 };
 
-const keys = ['enabled','publicOrigin','smtpHost','smtpPort','smtpSecure','smtpRequireTls','smtpUsername','smtpPassword','fromAddress','fromName','connectionTimeoutMs','socketTimeoutMs','subjectMaxCharacters','bodyMaxBytes','recipientMaxCharacters','workspaceIdMaxCharacters','templateMaxCharacters','providerIdMaxCharacters'] as const;
+const keys = ['provider','apiEndpoint','apiKey','enabled','publicOrigin','smtpHost','smtpPort','smtpSecure','smtpRequireTls','smtpUsername','smtpPassword','fromAddress','fromName','connectionTimeoutMs','socketTimeoutMs','subjectMaxCharacters','bodyMaxBytes','recipientMaxCharacters','workspaceIdMaxCharacters','templateMaxCharacters','providerIdMaxCharacters'] as const;
 
 
 async function loadMailConfig(readConfig: MailConfigReader, readSecret: MailSecretReader): Promise<MailTransportConfig | null> {
   try {
-    const values = await Promise.all(keys.map(async (key) => key === 'smtpPassword'
+    const values = await Promise.all(keys.map(async (key) => key === 'smtpPassword' || key === 'apiKey'
       ? (await readSecret(`mail.${key}`)) ?? ''
       : await readConfig(`mail.${key}`)));
     const candidate = Object.fromEntries(keys.map((key, index) => [key, values[index]]));
@@ -42,6 +43,7 @@ function validInput(input: TransactionalMailInput, config: MailTransportConfig):
 }
 
 function makeDefaultTransport(config: MailTransportConfig): MailTransport {
+  if (config.provider === 'api') return createApiMailTransport(config) as unknown as MailTransport;
   return nodemailer.createTransport({
     host: config.smtpHost, port: config.smtpPort, secure: config.smtpSecure, requireTLS: config.smtpRequireTls,
     connectionTimeout: config.connectionTimeoutMs, socketTimeout: config.socketTimeoutMs,
@@ -65,7 +67,8 @@ const dependencies: MailDependencies = {
 export function createTransactionalMailService(deps: MailDependencies = dependencies) {
   async function readyConfig() {
     const config = await loadMailConfig(deps.readConfig, deps.readSecret);
-    return config?.enabled && config.smtpHost && config.fromAddress ? config : null;
+    if (!config?.enabled || !config.fromAddress) return null;
+    return (config.provider === 'api' ? config.apiEndpoint && config.apiKey : config.smtpHost) ? config : null;
   }
 
   return {

@@ -79,15 +79,15 @@ Every row that was missing or partial now reads **done** with evidence paths, ex
 | `facebook.uploadTimeoutSeconds` | `facebook.native.*` timeouts |
 | `media.dir`, `media.workspaceQuotaMb`, `media.maxUploadMb` | `storage.mediaRoot`, `media.workspaceQuotaBytes`, `publishing.maxImageUploadBytes`, `media.videoMaxBytes` |
 
-**Open items (not implemented at this HEAD; the owner needs to schedule or decide):**
+**Open items — lane 45 outcome (2026-10-22, source only; registry schema 134):**
 
-- **G1 Graph usage** (`root/meta/usage`, `graph_usage`): no Facebook-module recorder of the app usage headers and no Root reader.
-- **G2 Legacy `api_tokens`**: not honoured as bearer credentials. Scoped `mcp_` keys and person keys replace them, so integrators re-issue keys. Honouring old hashes would widen the authentication surface; this needs an owner decision.
-- **G3 Seven staged connectors** (Mastodon, Threads, X, Bluesky, Telegram, LinkedIn, Pinterest): adapters and Root settings exist with fixtures. They are not installed in `PLATFORM_MODULES` or customer-usable until live OAuth/credential flows and release gates pass.
-- **G4 Text backgrounds** for text-only Facebook posts: absent. The preset ids are undocumented by Meta (see the legacy header comment), so this needs an owner decision before it becomes a Facebook-module feature.
-- **G5 Alt text suggestion**: absent. It needs an image-input (vision) call in the AI provider transports, which currently take text only.
-- **G6 Mail HTTP API provider** (`email.provider=api`, `email.apiKey`): only SMTP is carried by `mail.*`.
-- **G7 `media.retainUnusedDays`**: no unused-media sweep.
+- **G1 Graph usage — implemented at source.** The Facebook module records the `x-app-usage`, `x-ad-account-usage` and `x-business-use-case-usage` headers of every Graph response (`platforms/facebook/graph-usage.ts`, wired in `runtime.ts`) into `graph_usage`, throttled by Root `meta.graphUsagePolicy`; labels in `meta.graphUsageCopy`. Root reads them through the neutral `PlatformHost.apiUsage` hook: `/root/platforms/<id>` panel, `GET /api/root/api-usage`, MCP `get_root_api_usage` and resource `msp://root/api-usage` (installation owner only; limit `root.apiUsagePolicy`, copy `root.apiUsageCopy`). Values are Meta-reported estimates, not a quota guarantee. Live proof (real headers, real table) is open.
+- **G2 Legacy `api_tokens` — dropped by decision 2026-10-22.** Legacy tokens are retired; scoped person/workspace keys replace them and integrators re-issue keys. The `api_tokens` table stays untouched and unread.
+- **G3 Bluesky and Telegram — installed at source, off by default.** Both are in `PLATFORM_MODULES`/`PLATFORM_HOSTS` with credential connection (Bluesky app password; Telegram bot token plus channel), discovery of the one account/channel, and text-only publishing (no media, schedules, first comments, status or delete; an unconfirmed write is `uncertain` and never resent). The shared flow is `connectWithCredentials` (session only, owner/admin, entitlement, exact `CONNECT WITH CREDENTIALS <platform>`, encrypted persistence, audit) with a Connections dialog, `GET/POST /api/oauth/connections/[platform]/credentials` and MCP `get_connection_credential_form` / `connect_with_credentials`. Root keys per platform: `platforms.<id>.enabled|includedByDefault|planFeatures` and `<id>.policy` (endpoint, timeout, bounds, EN/FR form and failure copy). **Still staged (settings registered, not installed): Mastodon, Threads, X, LinkedIn, Pinterest** — each needs a live OAuth flow and release gates. **Live gates remaining for Bluesky and Telegram:** a real app-password session and post, a real bot/channel connect and post, outcome verification with cleanup, a browser EN/FR/keyboard pass of the dialog, and a Root decision to enable.
+- **G4 Text backgrounds — dropped by decision 2026-10-22.** Meta's preset ids are undocumented; not implemented and not planned.
+- **G5 Alt-text suggestion — implemented at source.** `AiPort.complete` accepts one optional image (Anthropic image block, OpenAI `image_url` data URL, Gemini `inlineData`). `suggestAltText` reads one stored workspace image tenant-bound, applies the composer-assist authorization, Root switch, hourly and budget limits, and returns review-only text. Composer button (stored images only, when `aiStatus.altText`), `POST /api/ai/alt-text`, MCP `suggest_image_alt_text`; Root `ai.altTextPolicy` (switch, image-size bound, prompts, default language). Image tokens are metered by character estimate only. Live provider vision proof is open.
+- **G6 Mail HTTP API provider — implemented at source.** Root `mail.provider` (`smtp`|`api`), `mail.apiEndpoint` (HTTPS, Resend-compatible JSON) and secret `mail.apiKey`; the shared mail service keeps one outcome model (client refusal = failed; rate limit, server error or timeout = uncertain, never resent). No live send verified.
+- **G7 Unused-media retention — implemented at source.** Leased job `mediaRetention` (`media.retentionSchedule`) with policy `media.retentionPolicy` (off by default; `unusedDays`, `batchLimit`): removes old library assets that no post references (re-checked under the workspace lock; an inconclusive scan keeps the asset), audited per removal, stored file removed after the record. Complements the existing orphan-image job. Not run against a real database.
 
 Totals for this reconcile: 7 rows closed, advanced or retired at source (0.1), 19 rows in 0.3 (10 missing, 5 partial, 4 done; two of them, AI video/voice/image and `/l/` to `/s/`, repeat section 3 to record the job or path side). Rows whose live proof is unobserved stay unproven.
 
@@ -143,7 +143,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `(app)/settings` | `settings/workspace` | done |
 | `(app)/settings/account` | `settings/account` | done |
 | `(app)/settings/agents` | none | done (`src/app/agents/page.tsx`, `modules/agents`) |
-| `(app)/settings/api` | `settings/mcp` (+ person keys, v1 routes) | done (replaced): scoped keys at `settings/mcp`; legacy tokens are not honoured (item G2) |
+| `(app)/settings/api` | `settings/mcp` (+ person keys, v1 routes) | done (replaced): scoped keys at `settings/mcp`; legacy tokens retired by decision 2026-10-22 (item G2) |
 | `(app)/settings/bio` | `settings/bio` | done |
 | `(app)/settings/export` | `settings/data` | done: `settings/data`; coverage is disclosed in the UI |
 | `(app)/settings/fields` | `publishing/collaboration` FieldsManager | done |
@@ -174,7 +174,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `root/danger` | `root/lifecycle` | done |
 | `root/errors` | `root/errors`, `root/errors/[id]` | done for the recorder (2026-10-22): `src/server/errors/recorder.ts` (instrumentation `onRequestError`, browser reports, error boundary) now writes `error_events`; worker-side `recordError`, incident and uptime writers added by operator follow-up (2026-10-22); runtime evidence remains open |
 | `root/meta`, `meta/connections` | `root/platforms/[id]` (Facebook), `root/connections` | done: `root/diagnostics` runs platform connectivity checks (replaces the app-check button) |
-| `root/meta/usage` (Graph usage) | `api.meta.requestsPerMinute` key only | open (item G1): `graph_usage` has no reader or writer in the rebuild |
+| `root/meta/usage` (Graph usage) | `api.meta.requestsPerMinute` key only | done at source (item G1): Facebook recorder, Root panel, `GET /api/root/api-usage`, MCP `get_root_api_usage`; live proof open |
 | `root/plans` | `root/plans` | done |
 | `root/platforms`, `[platform]` | `root/platforms`, `[id]` | done |
 | `root/privileges` | `root/privileges` | done |
@@ -233,7 +233,7 @@ Rebuild paths are relative to `rebuild/src/app/`.
 | `api/mcp` | `api/mcp` | done |
 | `api/media`, `[id]`, `[id]/raw`, `import` | `api/media`, `api/media-library/*` | done |
 | `api/moderation/rules*`, `actions/[id]/undo` | `api/inbox/moderation` | done |
-| `api/networks/[network]/connect|callback`, `bluesky`, `telegram` | staged adapters; generic `api/platforms/[platform]` OAuth routes | open for Bluesky/Telegram credential flows (item G3) |
+| `api/networks/[network]/connect|callback`, `bluesky`, `telegram` | installed modules; `api/oauth/connections/[platform]/credentials` | done at source for Bluesky/Telegram credential flows (item G3); live gates open |
 | `api/notifications` | `api/notifications` | done |
 | `api/oauth/authorize`, `register`, `token` | same | done |
 | `api/page-goals` | `api/analytics/goals` | done |
@@ -276,7 +276,7 @@ Rebuild evidence paths under `rebuild/src/`.
 | `facebook/publish`, `graph`, `oauth`, `permissions`, `insights`, `edges`, `metrics`, `ads`, `analytics`, `budget*`, `call-source`, `opengraph` | `platforms/facebook/**` | done (opengraph preview: `modules/ai/content-tools/server/checks.ts`); Group publishing dropped: Meta removed the Groups API 2024-04-22 |
 | `facebook/instagram*`, `instagram` | `platforms/instagram/**` (discovery, analytics, inbox, publishing, first comment) | done (installed, disabled by default; fixture evidence) |
 | `networks/youtube`, `networks/tiktok`, YouTube/TikTok branches of `networks/connect` and `network-rules` | `platforms/youtube/**`, `platforms/tiktok/**`, shared `server/platforms/{token-connection,token-renewal-job,provider-http,request-locale}.ts` | done at fixture level (stubbed `fetch`; no live Google/TikTok run). Not carried over: YouTube/TikTok public-counter `stats` (no analytics host), YouTube `remove` is done, TikTok has no delete API |
-| `networks/{bluesky,mastodon,linkedin,threads,x,pinterest,telegram}` (7 connectors) | `platforms/{bluesky,mastodon,linkedin,threads,x,pinterest,telegram}/**` staged adapters | open (item G3): not customer-installable |
+| `networks/{bluesky,mastodon,linkedin,threads,x,pinterest,telegram}` (7 connectors) | `platforms/{bluesky,telegram}/**` installed (off by default); `platforms/{mastodon,linkedin,threads,x,pinterest}/**` staged adapters | partial (item G3): Bluesky and Telegram installed at source, five connectors still not customer-installable |
 | `inbox`, `inbox-notes`, `inbox-response`, `moderation*`, `reply-template`, `response-time`, `negative-comments`, `mentions` | `modules/inbox/**`, `modules/ai/server/sentiment.ts` | done |
 | `analytics*`, `audience*`, `aggregate`, `channel-figures*`, `page-analysis*`, `network-analytics`, `network-rules`, `pinned-metrics`, `page-goals`, `goals`, `label-report`, `link-analytics`, `reports`, `report-*`, `analytics-export`, `ads-analysis` | `modules/analytics/**`, `modules/ads/**` | done |
 | `engagement-prediction`, `engagement-outlook` | `modules/ai/content-tools/pure.ts` `predictEngagement`, `server/checks.ts` | done (2026-10-22) |
@@ -289,7 +289,7 @@ Rebuild evidence paths under `rebuild/src/`.
 | `chart-notes`, `chart-note-colors` | `modules/calendar-extras` (notes service, `/analytics/notes`, chart marks in Analytics overview and Explorer) | done at source |
 | `ai`, `ai-providers`, `ai-models`, `ai-prices`, `ai-agents` | `modules/ai/**` incl. prices and budget (`usage.ts`) and agents (`modules/agents`) | done |
 | `ai-image`, `ai-video`, `ai-voice`, `voice-names` | `modules/ai/content-tools/server/{media,media-openai,media-gemini,media-ports}.ts`; voice names are the Root `ai.voicePolicy.voices` list | done (2026-10-22) |
-| `text-backgrounds`, `alt-text`, `translation`, `translated-posts` | `modules/ai` translate kind only | translation and translated-posts done (`modules/ai/server/translated`); `text-backgrounds` and `alt-text` open (items G4, G5) |
+| `text-backgrounds`, `alt-text`, `translation`, `translated-posts` | `modules/ai` translate kind only | translation and translated-posts done (`modules/ai/server/translated`); `alt-text` done at source (item G5, vision input, live proof open); `text-backgrounds` dropped by decision 2026-10-22 (item G4) |
 | `chat` | `modules/notifications/chat-channels/server/{service,delivery,transport}.ts` | Source/UI/REST/MCP plus leased, idempotent event delivery. Uncertain sends are held; real transport outcomes remain unverified. |
 | `system-alerts`, `error-tracking`, `uptime`, `health`, `housekeeping`, `background-refresh` | `modules/root/server/operator-monitoring.ts`, shared runner, error recorder; alerts + sampled uptime + worker errors implemented | done at source for writers and health probes (2026-10-22); Telegram/provider-usage parity and live evidence remain |
 | `media`, `image-format`, `image-variants`, `media-links`, `zip`, `workspace-export` | `modules/media/**`, `server/data-control/**`, `modules/settings/server/exports.ts` | done |
@@ -338,10 +338,10 @@ Legacy `app_settings` keys (`src/lib/settings/definitions.ts`) vs rebuild regist
 | `ai.rateLimitPerHour` | `ai.hourlyRequestsPerWorkspace` | done |
 | `ai.monthlyBudgetUsd`, `ai.priceOverrides` | `ai.monthlyBudgetUsd`, `ai.priceOverrides`, `ai.fallbackInputPricePerMillionUsd`, `ai.fallbackOutputPricePerMillionUsd`, `ai.charactersPerToken` | done in source (mocked tests; estimated tokens, not provider-reported; no live run) |
 | `alerts.email/telegramBotToken/telegramChatId/publishFailures/diskPercent` | `root.monitoringPolicy`, `root.monitoringMailCopy`, `notifications.chatPolicy` and encrypted workspace chat destinations | One Root monitor supplies email and selected workspace chat subscriptions; publish/disk thresholds are Root-owned. Old duplicate notifications.systemAlert* keys removed in lane 43. Legacy settings are not automatically migrated by this lane. |
-| `email.provider/smtp*/apiKey/from` | `mail.*` (SMTP); the HTTP API provider is not carried (item G6) | open |
+| `email.provider/smtp*/apiKey/from` | `mail.*` (SMTP plus `mail.provider`, `mail.apiEndpoint`, `mail.apiKey`) | done at source (item G6); no live send verified |
 | `links.shortenerDomain` | `publishing.shortLinkBaseUrl` | done |
 | `retention.activityDays/emailDays/clickDays/aiDays/sweepHours` | `retention.auditDays/emailDays/clickDays/aiDays/errorDays/schedule`, `root.auditRetention*`, section 0.4 | done (mapping) |
-| `media.dir`, `media.workspaceQuotaMb`, `media.maxUploadMb`, `media.retainUnusedDays` | `storage.mediaRoot`, `media.workspaceQuotaBytes`, `publishing.maxImageUploadBytes`, `media.videoMaxBytes` | open: `retainUnusedDays` (item G7) |
+| `media.dir`, `media.workspaceQuotaMb`, `media.maxUploadMb`, `media.retainUnusedDays` | `storage.mediaRoot`, `media.workspaceQuotaBytes`, `publishing.maxImageUploadBytes`, `media.videoMaxBytes` | `retainUnusedDays` carried by `media.retentionPolicy` and job `mediaRetention` (item G7), done at source, off by default |
 
 Env (`.env.example`): `DATABASE_URL`, `ENCRYPTION_KEY` used. `SESSION_SECRET`: no `process.env.SESSION_SECRET` in `rebuild/`, but `prod-cutover.sh` still copies it (unused leftover). `TRUST_PROXY`, `PORT` used (`HOST`, `APP_PORT`, `POSTGRES_PASSWORD` are Docker/legacy). Rebuild also reads `APP_URL`, `LOGIN_ATTEMPTS`, `LOGIN_WINDOW_MINUTES`, `SECURITY_TWO_STEP` (import script / seeds only).
 

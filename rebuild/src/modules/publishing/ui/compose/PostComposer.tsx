@@ -407,7 +407,7 @@ function PostComposerContent({ copyCatalog = composerCatalogDefaults, profiles, 
         <legend>{ui.attachments}<span>{ui.optional}</span></legend>
         <label htmlFor="composer-link">{ui.link}<span>{ui.optional}</span></label>
         <input id="composer-link" name="link" type="url" value={link} onChange={event => setLink(event.currentTarget.value)} placeholder={ui.linkPlaceholder} />
-        <PostAttachments controller={attachments} disabled={uploading || pending || saved} />
+        <PostAttachments controller={attachments} disabled={uploading || pending || saved} {...(aiStatus?.available && aiStatus.altText ? { altTextAssist: { locale: aiLocale } } : {})} />
         <small>{ui.attachmentSupport}</small>
       </fieldset>
       </Step>

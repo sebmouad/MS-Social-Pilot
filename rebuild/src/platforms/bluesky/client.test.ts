@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createClient } from './client';
 import { POLICY_DEFAULTS, policySchema } from './config';
-import { manifest } from './manifest';
+import { blueskyModule } from './module';
 describe('staged provider boundary', () => {
-  it('advertises no customer operations', () => { expect(Object.values(manifest.capabilities).every(value => value === 'unsupported')).toBe(true); });
+  it('advertises only connection, discovery and text publishing', () => { expect(Object.entries(blueskyModule.capabilities).filter(([, value]) => value === 'supported').map(([key]) => key)).toEqual(['connection', 'discovery', 'publishing']); });
   it('rejects insecure or credential-bearing endpoints', () => {
     for (const baseUrl of ['http://example.com', 'https://user:pass@example.com', 'https://example.com/?token=x']) expect(policySchema.safeParse({ ...POLICY_DEFAULTS, baseUrl }).success).toBe(false);
   });

@@ -4,6 +4,8 @@ import { instagramHost } from '@/platforms/instagram/host';
 import { facebookHost } from '@/platforms/facebook/host';
 import { youtubeHost } from '@/platforms/youtube/host';
 import { tiktokHost } from '@/platforms/tiktok/host';
+import { blueskyHost } from '@/platforms/bluesky/host';
+import { telegramHost } from '@/platforms/telegram/host';
 
 export type { ConnectionViewer, PlatformHost, PlatformInboxHost, PlatformAdsHost, PlatformAnalyticsHost } from './host';
 
@@ -13,4 +15,6 @@ export const PLATFORM_HOSTS: Readonly<Record<PlatformId, PlatformHost>> = {
   instagram: instagramHost,
   youtube: youtubeHost,
   tiktok: tiktokHost,
+  bluesky: blueskyHost,
+  telegram: telegramHost,
 };

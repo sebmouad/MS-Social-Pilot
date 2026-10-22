@@ -7,6 +7,7 @@ import { FieldError } from '@/components/FormValidation';
 import styles from './PostAttachments.module.css';
 import { useAttachmentCopy } from '../ui/compose/CopyProvider';
 import { fillComposerCopy } from '../composer-catalog';
+import { AltTextSuggest } from '@/modules/ai/components/AltTextSuggest';
 
 export type PostMediaKind = 'image' | 'video';
 export type PostMediaItem = { kind: PostMediaKind; url: string; altText?: string };
@@ -313,7 +314,7 @@ export function usePostAttachments(options: PostAttachmentOptions): PostAttachme
   };
 }
 
-export function PostAttachments({ controller, disabled = false }: { controller: PostAttachmentsController; disabled?: boolean }) {
+export function PostAttachments({ controller, disabled = false, altTextAssist }: { controller: PostAttachmentsController; disabled?: boolean; /** Offer AI image descriptions for stored images (set only when the server reports it available). */ altTextAssist?: { locale: 'en' | 'fr' } }) {
   const c = useAttachmentCopy();
   const fileInput = useRef<HTMLInputElement>(null);
   // A link is only tried once it is pasted or the field is left, not on every keystroke.
@@ -375,6 +376,7 @@ export function PostAttachments({ controller, disabled = false }: { controller: 
           <span>{fillComposerCopy(c.descriptionLabel, { n: index + 1 })} <span>{c.optional}</span></span>
           <input className="ui-input" id={`${controller.idPrefix}-media-alt-${item.clientId}`} name={`mediaAlt-${item.clientId}`} type="text" disabled={disabled || controller.uploading} maxLength={controller.maxAltCharacters} value={item.altText ?? ''} onChange={event => controller.updateItem(item.clientId, { altText: event.currentTarget.value })} aria-invalid={item.error && item.errorField === 'alt' ? true : undefined} aria-describedby={item.error && item.errorField === 'alt' ? `${controller.idPrefix}-media-error-${item.clientId}` : undefined} />
         </label>}
+        {item.kind === 'image' && altTextAssist && item.url.startsWith('media:') && <AltTextSuggest imageId={item.url.slice('media:'.length)} locale={altTextAssist.locale} disabled={disabled || controller.uploading} onSuggestion={text => controller.updateItem(item.clientId, { altText: text.slice(0, controller.maxAltCharacters) })} />}
         {item.error && <FieldError id={`${controller.idPrefix}-media-error-${item.clientId}`}>{item.error}</FieldError>}
         <div className={styles.itemActions}>
           <Button size="sm" variant="quiet" aria-label={fillComposerCopy(c.moveUpLabel, { n: index + 1 })} disabled={disabled || controller.uploading || index === 0} onClick={() => move(index, -1)}>{c.moveUp}</Button>

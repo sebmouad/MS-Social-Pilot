@@ -253,6 +253,8 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | reveal_webhook_secret | settings/webhooks | write | POST /api/webhooks/[id]/secret/reveal | Shared customer operation; transport arguments may differ. |
 | rotate_webhook_secret_once | settings/webhooks | write | POST /api/webhooks/[id]/secret | Shared customer operation; transport arguments may differ. |
 | start_connection | settings/connections | write | POST /api/connections/[platform]/start | Shared customer operation; transport arguments may differ. |
+| get_connection_credential_form | settings/connections | read | GET /api/oauth/connections/[platform]/credentials | readConnectionCredentialForm; module-worded credential fields for platforms connected by entering a credential. Session only; owner/admin, entitlement and enabled module rechecked. |
+| connect_with_credentials | settings/connections | write | POST /api/oauth/connections/[platform]/credentials | connectWithCredentials; exact CONNECT WITH CREDENTIALS <platform>, session only, module verifies the credential, encrypted persistence, no auto-selection, audit. |
 | list_agency_clients | agency/clients | read | GET /api/agency | GET view=clients; browser sessions only, separate from person overview credentials. |
 | select_workspace | settings/account | write | POST /api/workspaces/select | Browser-session operation in both transports; confirmation consistency remains a gap. |
 | get_account_security | settings/account | read | GET /api/settings/account/security | Shared customer operation; transport arguments may differ. |
@@ -421,6 +423,7 @@ live catalog inside the test or add a blanket exclusion to make it pass.
 | retry_recipe_slots | publishing/feeds | write | POST /api/feeds/wordpress/retry | Shared customer operation; transport arguments may differ. |
 | get_ai_assist_status | publishing/posts | read | GET /api/ai | Shared customer operation; transport arguments may differ. |
 | ai_assist_write | publishing/posts | write | POST /api/ai | Shared customer operation; transport arguments may differ. |
+| suggest_image_alt_text | publishing/posts | write | POST /api/ai/alt-text | suggestAltText: vision (image input) description for one stored workspace image read tenant-bound from storage; review only, nothing saved. Classified write because it spends the workspace AI allowance, like ai_assist_write. |
 | get_ai_media_status | publishing/posts | read | GET /api/ai/media | aiMediaStatus: availability, formats, voices and exact confirmations for AI picture, video and voice; workspace-wide key scope only. |
 | generate_ai_image | publishing/posts | write | POST /api/ai/image | generateImage saves one picture to the media library after GENERATE IMAGE; shares the hourly allowance and monthly budget with AI assist; workspace-wide key scope only. |
 | generate_ai_voice | publishing/posts | write | POST /api/ai/voice | generateVoice returns audio (REST bytes, MCP base64) after GENERATE VOICE; nothing stored; workspace-wide key scope only. |
@@ -560,6 +563,7 @@ or person credential access. Root resources read through these same tools.
 | get_root_monitoring | installation/root | read | GET /api/root/monitoring; GET /api/root/alerts | readRootOperatorMonitoring; one bounded incident/availability/delivery view, installation-owner only. |
 | evaluate_root_monitoring | installation/root | write | POST /api/root/monitoring; POST /api/root/alerts/check | runRootOperatorMonitoring; exact EVALUATE ROOT MONITORING, Root recheck, audit and shared leased runner. |
 | test_root_monitoring | installation/root | write | POST /api/root/monitoring/test; POST /api/root/alerts/test | testRootOperatorMonitoring; exact TEST ROOT MONITORING, durable test intent, Root recheck and audit. Email and subscribed owner-workspace chats share incident delivery; uncertain sends are held. |
+| get_root_api_usage | installation/root | read | GET /api/root/api-usage | readRootApiUsage; installation-owner read of provider-reported API usage per installed platform through the neutral platform-host apiUsage hook. Values are platform estimates, never a quota guarantee. |
 <!-- parity-root-tools:end -->
 
 The remaining 24 exceptions are authentication bootstrap/ceremonies, transport or

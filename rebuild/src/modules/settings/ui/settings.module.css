@@ -88,6 +88,10 @@
 .connection-dialog > header h2 { margin: 4px 0 6px; font-size: 20px; letter-spacing: -.03em; }
 .connection-dialog > header p:last-child { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
 .connection-dialog > header > button { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 22px; cursor: pointer; }
+.connection-field { display: grid; gap: 6px; margin: 0 0 16px; color: var(--ink); font-size: 13px; font-weight: 650; }
+.connection-field input { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 450; }
+.connection-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.connection-field small { color: var(--ink-faint); font-size: 12px; font-weight: 450; line-height: 1.45; }
 .connection-source,.connection-retention { margin: 0 0 14px; padding: 14px; border: 1px solid var(--line); border-radius: 11px; }
 .connection-source--selected { border-color: var(--accent); background: var(--accent-soft); }
 .connection-source legend,.connection-retention legend { padding: 0 6px; color: var(--ink); font-size: 13px; font-weight: 700; }

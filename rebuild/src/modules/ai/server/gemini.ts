@@ -6,14 +6,14 @@ import type { AiPort } from '../ai';
 export function geminiPort(settings: { apiKey: string; endpoint: string; fetchImpl?: typeof fetch }): AiPort {
   const doFetch = settings.fetchImpl ?? fetch;
   return {
-    async complete({ system, prompt, model, maxTokens, signal }) {
+    async complete({ system, prompt, model, maxTokens, signal, image }) {
       const url = `${settings.endpoint.replace(/\/+$/, '')}/${encodeURIComponent(model)}:generateContent`;
       let response: Response;
       try {
         response = await doFetch(url, {
           method: 'POST', signal, redirect: 'error', cache: 'no-store',
           headers: { 'content-type': 'application/json', 'x-goog-api-key': settings.apiKey },
-          body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } }),
+          body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: image ? [{ inlineData: { mimeType: image.mimeType, data: image.base64 } }, { text: prompt }] : [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } }),
         });
       } catch { throw new OperationError('upstream_failure', signal.aborted ? 'AI assist took too long to answer. Try again.' : 'AI assist could not be reached. Try again later.'); }
       if (!response.ok) { void response.body?.cancel().catch(() => undefined); throw new OperationError('upstream_failure', 'AI assist could not complete this request. Try again later.'); }

@@ -89,6 +89,10 @@ return {
       const { runBestTimeApplication } = await import('@/modules/publishing/server/best-time-apply');
       return runBestTimeApplication(now);
     }
+    if (job === 'mediaRetention') {
+      const { runMediaRetention, formatMediaRetentionSummary } = await import('@/modules/media/server/retention');
+      return formatMediaRetentionSummary(await runMediaRetention(now));
+    }
     if (job === 'mediaCleanup') {
       const { cleanupOrphanImages } = await import('@/modules/publishing/server/media/storage');
       const result = await cleanupOrphanImages(now);

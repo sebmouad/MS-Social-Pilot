@@ -24,6 +24,9 @@ export const MAIL_CONFIG = [
   entry({ key: 'mail.smtpRequireTls', group: 'Shared · Transactional mail', label: 'Require SMTP TLS upgrade', kind: 'boolean', description: 'Require STARTTLS for non-local SMTP hosts. Local mail capture can disable this in development.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'mail.smtpUsername', group: 'Shared · Transactional mail', label: 'SMTP username', kind: 'text', description: 'Optional SMTP authentication username.', defaultValue: '', schema: z.string().max(320), consumption: 'active' }),
   entry({ key: 'mail.smtpPassword', group: 'Shared · Transactional mail', label: 'SMTP password', kind: 'secret', description: 'SMTP authentication password, encrypted at rest.', defaultValue: '', schema: z.string().max(4096), consumption: 'active' }),
+  entry({ key: 'mail.provider', group: 'Shared · Transactional mail', label: 'Mail delivery method', kind: 'select', description: 'SMTP sends through the SMTP settings below. HTTP API posts a JSON message to the endpoint below (Resend-compatible: from, to, subject, text, html; Bearer key; JSON reply with id).', defaultValue: 'smtp', schema: z.enum(['smtp', 'api']), options: [{ value: 'smtp', label: 'SMTP' }, { value: 'api', label: 'HTTP API' }], consumption: 'active' }),
+  entry({ key: 'mail.apiEndpoint', group: 'Shared · Transactional mail', label: 'Mail HTTP API endpoint', kind: 'text', description: 'HTTPS URL that accepts the JSON send request when the delivery method is HTTP API.', defaultValue: 'https://api.resend.com/emails', schema: z.string().max(2000).refine(value => value === '' || (() => { try { return new URL(value).protocol === 'https:'; } catch { return false; } })(), 'Use an HTTPS URL.'), consumption: 'active' }),
+  entry({ key: 'mail.apiKey', group: 'Shared · Transactional mail', label: 'Mail HTTP API key', kind: 'secret', description: 'Bearer key for the mail HTTP API, encrypted at rest. Never returned by the configuration API.', defaultValue: '', schema: z.string().max(4096), consumption: 'active' }),
   entry({ key: 'mail.fromAddress', group: 'Shared · Transactional mail', label: 'Sender address', kind: 'text', description: 'Email address used as the transactional message sender.', defaultValue: '', schema: z.string().max(320).refine((value) => value === '' || z.string().email().safeParse(value).success, 'Enter a valid email address.'), consumption: 'active' }),
   entry({ key: 'mail.fromName', group: 'Shared · Transactional mail', label: 'Sender name', kind: 'text', description: 'Display name used for transactional messages.', defaultValue: 'MS Social Pilot', schema: z.string().trim().min(1).max(120), consumption: 'active' }),
   entry({ key: 'mail.connectionTimeoutMs', group: 'Shared · Transactional mail', label: 'SMTP connection timeout (ms)', kind: 'number', description: 'Maximum time to establish an SMTP connection.', defaultValue: 10000, schema: z.number().int().min(1000).max(60000), consumption: 'active' }),
@@ -38,6 +41,7 @@ export const MAIL_TRANSPORT_SCHEMA = z.object({
   templateMaxCharacters: z.number().int().min(1).max(1000),
   providerIdMaxCharacters: z.number().int().min(1).max(1000),
 
+  provider: z.enum(['smtp', 'api']).default('smtp'), apiEndpoint: z.string().max(2000).default(''), apiKey: z.string().max(4096).default(''),
   enabled: z.boolean(), publicOrigin: z.string(), smtpHost: hostSchema, smtpPort: z.number().int().min(1).max(65535),
   smtpSecure: z.boolean(), smtpRequireTls: z.boolean(), smtpUsername: z.string().max(320), smtpPassword: z.string().max(4096),
   fromAddress: z.string().max(320), fromName: z.string().trim().min(1).max(120), connectionTimeoutMs: z.number().int().min(1000).max(60000),
@@ -45,6 +49,12 @@ export const MAIL_TRANSPORT_SCHEMA = z.object({
 }).strict().superRefine((config, context) => {
   if (!exactOrigin(config.publicOrigin)) context.addIssue({ code: 'custom', path: ['publicOrigin'], message: 'invalid_origin' });
   if (!config.enabled) return;
+  if (config.provider === 'api') {
+    let secure = false;
+    try { secure = new URL(config.apiEndpoint).protocol === 'https:'; } catch { /* invalid URL */ }
+    if (!secure || !config.apiKey || !config.fromAddress || !z.string().email().safeParse(config.fromAddress).success) context.addIssue({ code: 'custom', message: 'incomplete_mail_api_configuration' });
+    return;
+  }
   if (!config.smtpHost || !config.fromAddress || !z.string().email().safeParse(config.fromAddress).success) context.addIssue({ code: 'custom', message: 'incomplete_mail_configuration' });
   if ((config.smtpUsername === '') !== (config.smtpPassword === '')) context.addIssue({ code: 'custom', message: 'incomplete_smtp_authentication' });
   const local = config.smtpHost === 'localhost' || config.smtpHost === '127.0.0.1' || config.smtpHost === '::1';

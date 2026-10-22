@@ -626,3 +626,12 @@ verification is claimed. Changes remain uncommitted as requested for this lane.
 Root administration moved to `src/modules/root/server/admin/`; consumers and regression test names follow the new paths. Root settings are renamed to `root.admin.*`, schema 132. The idempotent `20261022200000_root_admin_settings` migration preserves existing canonical values; it has not been applied to a database here. The one-time configuration importer is removed; read-only historical migration expectations remain in `scripts/migration-setting-expectations.ts`. Facebook live probes resolve configuration and credential decoding through the Facebook module. Stored auth hash and cookie formats remain unchanged. No server, provider call, deployment or push was run. See `LEGACY_COMPAT_RENAME.md` for verification.
 
 Root naming follow-up: live probes merge Root configuration in the Facebook module and explicitly clear bundled app secrets when current signing material is absent. Automated regression tests cover this boundary and saved-setting SQL collisions/idempotence (SQLite only); no provider or PostgreSQL proof is claimed. See `LEGACY_COMPAT_RENAME.md` for current verification.
+
+## Lane 45 — sweep gaps G1, G3, G5, G6, G7 (2026-10-22, source only, schema 134)
+
+- **Graph usage (G1):** Facebook-owned recorder (`platforms/facebook/graph-usage.ts`) feeds `graph_usage`; Root reads it via the neutral `PlatformHost.apiUsage` hook (`modules/root/server/api-usage.ts`, `/root/platforms/<id>`, `GET /api/root/api-usage`, MCP `get_root_api_usage`).
+- **Credential connections (G3):** `PlatformHost.connection.credentials` (module-worded form and verification) plus the shared `connectWithCredentials` service in Settings (UI dialog, `/api/oauth/connections/[platform]/credentials`, MCP `get_connection_credential_form`/`connect_with_credentials`). Bluesky (app password) and Telegram (bot token + channel) are installed, off by default, text-only.
+- **Alt text (G5):** `AiPort` takes an optional image; `suggestAltText` (UI button, `POST /api/ai/alt-text`, MCP `suggest_image_alt_text`).
+- **Mail API (G6):** `mail.provider=api` with `mail.apiEndpoint`/`mail.apiKey` (`server/mail/api-transport.ts`).
+- **Media retention (G7):** leased job `mediaRetention`, policy `media.retentionPolicy`.
+- Decisions recorded: G2 legacy `api_tokens` retired, G4 text backgrounds dropped (2026-10-22). Evidence is unit/mocked only; see `LEGACY_SWEEP_2026-10-21.md` section 0.4 for live gates.

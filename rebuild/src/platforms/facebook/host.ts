@@ -13,6 +13,7 @@ import { facebookReplyPolicy, canManageFacebookInbox, syncFacebookInbox, replyTo
 import { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } from './jobs';
 import { syncFacebookSubmittedPosts } from './submitted-jobs';
 import { refreshFacebookLinkCard } from './link-preview';
+import { readFacebookGraphUsage } from './graph-usage';
 
 async function syncFacebookPosts(now?: Date, retryLimit?: number, retryBackoff?: Parameters<typeof syncScheduledPostStatus>[2]) {
   const scheduled = await syncScheduledPostStatus(now, retryLimit, retryBackoff);
@@ -27,6 +28,7 @@ export const facebookHost = {
   ads: { ...facebookAdsHost, operations: facebookAdsOps, configuredOperations: configuredFacebookAdsOps },
   analytics: facebookAnalyticsHost,
   linkPreview: { refresh: refreshFacebookLinkCard },
+  apiUsage: { read: readFacebookGraphUsage },
   inbox: { replyPolicy: facebookReplyPolicy, canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, moderate: moderateFacebookComment, prepareDeleteComment: prepareDeleteFacebookComment, readCommentPresence: readFacebookCommentPresence, reviews: { sync: syncFacebookReviews } },
   dataCallbacks: { deauthorize: handleFacebookDeauthorize, dataDeletion: handleFacebookDataDeletion },
   connection: {

@@ -6,6 +6,7 @@ import { requireRootPage } from '@/server/config/access';
 import { RootModuleSettings } from '@/server/root/RootModuleSettings';
 import { RootPlatformPublicationEvidence } from '@/server/root/RootPlatformPublicationEvidence';
 import { platformModule } from '@/platforms';
+import { RootApiUsage } from '@/modules/root/ui/RootApiUsage';
 
 export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -25,5 +26,6 @@ export default async function RootPlatformModulePage({ params, searchParams }: {
       <ul className="root-control__capabilities">{declared.map(([capability]) => <li key={capability}><Badge tone="brand" icon={<IconCircleCheck size={14} />}>{capability.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, letter => letter.toUpperCase())}</Badge></li>)}</ul>
     </section>
     <RootPlatformPublicationEvidence providerId={module.id} operationId={query.operationId} />
+    <RootApiUsage providerId={module.id} />
   </RootModuleSettings>;
 }

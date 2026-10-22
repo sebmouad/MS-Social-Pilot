@@ -11,6 +11,7 @@ import { runtimeConfig, runtimeConfigBatch, runtimeSecret } from '@/server/confi
 import { facebookMediaJournal } from './media-journal';
 import { FACEBOOK_NATIVE_CONFIG, FACEBOOK_NATIVE_TRANSPORT_CONFIG, facebookNativePolicyFrom, facebookNativeTransportPolicyFrom } from './native-config';
 import { createFacebookNativeTransport } from './formats/transport';
+import { withGraphUsageRecording } from './graph-usage';
 
 async function configured<T>(key: string): Promise<T> {
   return await runtimeConfig(key) as T;
@@ -37,7 +38,8 @@ export async function configuredFacebookConfig(): Promise<FacebookConfig> {
 
 export async function configuredFacebookEngine(options?: { signal?: AbortSignal }) {
   const signal = options?.signal;
-  const transport: typeof fetch = signal ? (input, init) => fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal }) : fetch;
+  const recorded = withGraphUsageRecording(fetch);
+  const transport: typeof fetch = signal ? (input, init) => recorded(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal }) : recorded;
   const config = await configuredFacebookConfig();
   const engine = createFacebookEngine(config, transport, facebookMediaJournal);
   return { ...engine, async getPostHistory(token: string, pageId: string, now: Date, progress?: HistoryProgress | null) {
@@ -69,7 +71,7 @@ export async function configuredFacebookAdapter() {
   // An inconsistent window fails closed: Facebook-held scheduling is simply not declared.
   const feedSchedule = scheduleValues['facebook.schedule.providerHeldEnabled'] === true && Number.isSafeInteger(minLeadSeconds) && Number.isSafeInteger(maxLeadSeconds) && minLeadSeconds < maxLeadSeconds
     ? { minLeadSeconds, maxLeadSeconds } : undefined;
-  return createFacebookAdapter(config, fetch, { feedFormatLabel, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal, ...(native ? { native } : {}), ...(feedSchedule ? { feedSchedule } : {}) });
+  return createFacebookAdapter(config, withGraphUsageRecording(fetch), { feedFormatLabel, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal, ...(native ? { native } : {}), ...(feedSchedule ? { feedSchedule } : {}) });
 }
 
 

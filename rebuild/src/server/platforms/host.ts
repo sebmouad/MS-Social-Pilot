@@ -181,7 +181,27 @@ export type PlatformDataCallbackResult =
 export interface PlatformLinkCard { title: string | null; description: string | null; imageUrl: string | null; siteName: string | null }
 export interface PlatformLinkPreviewHost { refresh(url: string, signal: AbortSignal): Promise<PlatformLinkCard | null> }
 
+/** One provider throttling scope with the latest value the provider reported; never a quota guarantee. */
+export interface PlatformApiUsageScope {
+  scope: string;
+  label: string;
+  capturedAt: string;
+  /** True when the reading is older than the module's freshness bound. */
+  stale: boolean;
+  metrics: Array<{ key: string; label: string; value: number; unit: 'percent' | 'seconds' | 'minutes'; warning: boolean }>;
+}
+
+/** Module-worded form for providers connected by entering a credential (app password, bot token) instead of an OAuth redirect. */
+export interface PlatformCredentialForm {
+  title: string;
+  intro: string;
+  submit: string;
+  fields: Array<{ key: string; label: string; help?: string; secret: boolean; maxLength: number }>;
+}
+
 export interface PlatformHost {
+  /** Optional: latest provider-reported API usage (rate-limit) readings, read by Root. */
+  apiUsage?: { read(limit: number, locale: 'en' | 'fr'): Promise<PlatformApiUsageScope[]> };
   diagnostics?: import('@/server/diagnostics/types').PlatformDiagnostics;
   inbox?: PlatformInboxHost;
   ads?: PlatformAdsHost;
@@ -197,6 +217,15 @@ export interface PlatformHost {
     dataDeletion(signedRequest: string): Promise<PlatformDataCallbackResult>;
   };
   connection: {
+    /**
+     * Credential-entry connection (no redirect). The module validates the credential with its provider and
+     * returns the account and destinations; the shared Settings service owns authorization, confirmation,
+     * encrypted persistence and audit. When present, `start`/`callback` are not used for this module.
+     */
+    credentials?: {
+      form(locale: 'en' | 'fr'): Promise<PlatformCredentialForm>;
+      connect(fields: Record<string, string>, signal?: AbortSignal): Promise<import('./token-connection').TokenConnectionResult>;
+    };
     /** Server-only renewal; null means this credential cannot be renewed. No persistence or UI data. */
     renewToken?(input: { accessToken: string; refreshToken: string | null; signal: AbortSignal }): Promise<{ accessToken: string; expiresAt: Date | null; refreshToken?: string | null } | null>;
     /** True when Root has filled in what a customer needs to connect. */

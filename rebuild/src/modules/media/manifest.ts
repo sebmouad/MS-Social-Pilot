@@ -9,8 +9,14 @@ export const MEDIA_PAGES = [
   { id: MEDIA_FEATURE_ID, title: 'Media library', href: '/publishing/media', description: 'Browse, search, import and clean up the images and videos your posts use.' },
 ] as const;
 
+/** Worker jobs of the media library; Publishing's manifest spreads them (no separate module id). */
+export const MEDIA_JOBS = [
+  { name: 'mediaRetention', label: 'Unused media retention', configKey: 'media.retentionSchedule' },
+] as const;
+
 /** Must equal the keys of MEDIA_CONFIG (checked by tests/media-library-module.test.ts). */
 export const MEDIA_ROOT_KEYS = [
+  'media.retentionPolicy', 'media.retentionSchedule',
   'media.webpImportPolicy', 'media.copy', 'media.messages', 'media.libraryPageSize', 'media.workspaceQuotaBytes', 'media.videoMaxBytes', 'media.allowedVideoMimeTypes', 'media.importMaxBytes',
   'media.importTimeoutMs', 'media.importMaxRedirects', 'media.importAllowHttp', 'media.importHostAllowlist', 'media.holderScanLimit',
   'media.holderListLimit', 'media.imageListLimit', 'media.holderExcerptCharacters', 'media.identifierMaxCharacters', 'media.pageNumberMax', 'media.importUrlMaxCharacters', 'media.assetNameMaxCharacters', 'media.searchMaxCharacters', 'media.transactionTimeoutMs', 'media.transactionMaxWaitMs',

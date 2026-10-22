@@ -1,5 +1,5 @@
 import type { ModuleManifest } from '../types';
-import { MEDIA_PAGES, MEDIA_ROOT_KEYS } from '../media/manifest';
+import { MEDIA_JOBS, MEDIA_PAGES, MEDIA_ROOT_KEYS } from '../media/manifest';
 import { FEEDS_JOBS, FEEDS_PAGES, FEEDS_ROOT_KEYS } from '../feeds/manifest';
 import { ASYNC_POST_EXPORT_JOBS } from './server/export/config';
 import { CAPTION_TESTS_JOBS } from '../caption-tests/config';
@@ -16,6 +16,7 @@ export const publishingManifest = {
     { name: 'publishingRecycle', label: 'Post recycling', configKey: 'publishing.automation.recycleSchedule' },
     { name: 'publishingMix', label: 'Content mix scheduling', configKey: 'publishing.automation.mixSchedule' },
     { name: 'bestTimes', label: 'Best-time queue application', configKey: 'publishing.bestTimeApplySchedule' },
+    ...MEDIA_JOBS,
     ...FEEDS_JOBS,
     ...ASYNC_POST_EXPORT_JOBS,
     ...CALENDAR_EXTRAS_JOBS,

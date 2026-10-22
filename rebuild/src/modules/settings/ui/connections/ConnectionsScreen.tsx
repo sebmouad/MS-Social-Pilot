@@ -9,7 +9,7 @@ import { SettingsPage, SettingsPanel, Status, styles } from '@/modules/settings/
 import { settingsLocale } from '@/modules/settings/ui/locale';
 import { fill } from '@/modules/settings/ui/shell-copy';
 import { ConnectionManager } from './manager';
-import { connectablePlatforms, platformGrantHealth } from '@/server/platforms/registry';
+import { connectablePlatforms, platformConnectsWithCredentials, platformGrantHealth } from '@/server/platforms/registry';
 import { summarizeConnectionHealth, connectionHealthText, type ConnectionHealthCopyKey } from '@/lib/connection-health';
 import { ConnectionRowMenu } from './row-menu';
 import { Avatar, DataTable, EmptyState } from '@/components';
@@ -31,7 +31,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const t = uiCopy.connections[locale];
   const allowedProviders = entitledPlatformIds(viewer.entitlements);
   const [accounts, adAccounts, platforms, statusLabels] = await Promise.all([listConnections(viewer.workspaceId, allowedProviders), getAdAccounts(viewer.workspaceId, allowedProviders), connectablePlatforms(allowedProviders), runtimeConfig('connections.statusLabels')]);
-  const connectable = platforms.map(({ id, name, mark }) => ({ id, name, mark }));
+  const connectable = platforms.map(({ id, name, mark }) => ({ id, name, mark, credentials: platformConnectsWithCredentials(id) }));
   const socialById = new Map(accounts.map(account => [account.id, account]));
   const adRows = adAccounts.map(ad => {
     const social = ad.socialAccountId ? socialById.get(ad.socialAccountId) : undefined;

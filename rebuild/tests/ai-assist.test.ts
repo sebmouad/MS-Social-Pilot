@@ -158,8 +158,8 @@ describe('MCP definitions', () => {
   it('declares a feature-gated, scope-classified group', () => {
     expect(AI_MCP).toHaveLength(1);
     const group = AI_MCP[0]!;
-    expect(group.features).toEqual({ get_ai_assist_status: 'publishing/posts', ai_assist_write: 'publishing/posts' });
-    expect([...(group.writeTools ?? [])]).toEqual(['ai_assist_write']);
+    expect(group.features).toEqual({ get_ai_assist_status: 'publishing/posts', ai_assist_write: 'publishing/posts', suggest_image_alt_text: 'publishing/posts' });
+    expect([...(group.writeTools ?? [])]).toEqual(['ai_assist_write', 'suggest_image_alt_text']);
     expect(Object.keys(group.features).sort()).toEqual([...group.tools.map(t => t.name)].sort());
   });
 });

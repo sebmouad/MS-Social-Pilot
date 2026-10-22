@@ -28,7 +28,7 @@ describe('Root monitoring thin surfaces', () => {
   });
   it('declares resource and strict bilingual Root catalog', () => {
     expect(rootMonitoringResources[0].tool).toBe('get_root_monitoring');
-    expect(rootMonitoringToolDefinitions).toHaveLength(3);
+    expect(rootMonitoringToolDefinitions).toHaveLength(4);
     expect(rootMonitoringCopySchema.parse(ROOT_MONITORING_COPY)).toEqual(ROOT_MONITORING_COPY);
   });
 });

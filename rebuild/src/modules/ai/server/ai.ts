@@ -2,10 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from '@/server/data';
 import { runtimeConfigBatch, runtimeSecret } from '@/server/config/store';
-import { AI_BOUNDS, AI_PROVIDERS, type AiProviderId } from '../config';
+import { AI_BOUNDS, AI_PROVIDERS, altTextPolicySchema, type AiProviderId } from '../config';
 import {
   AI_KINDS, AI_REQUEST_SCHEMA, summarizeSchema, TONES, buildPrompt, buildSummaryPrompt, cleanOutput, parseHashtags,
-  type AiContext, type AiPort, type AiResult, type AiStatus, type SummarizeRequest, type SummaryResult,
+  type AiContext, type AiImageInput, type AiPort, type AiResult, type AiStatus, type SummarizeRequest, type SummaryResult,
 } from '../ai';
 import { authorizeAi, type AiActor } from './access';
 import { METERING_KEYS, meteringFrom, monthlyUsage, recordUsage, type Metering } from './usage';
@@ -73,7 +73,8 @@ export async function aiStatus(actor: AiActor, deps: AiDeps = {}): Promise<AiSta
   const [s, workspace] = await Promise.all([settings(deps), workspaceContext(actor.workspaceId)]);
   if (!s || !workspace?.enabled) return none;
   let usage; try { usage = await monthlyUsage(actor.workspaceId, s.metering.budgetUsd, (deps.now ?? (() => new Date()))()); } catch { usage = undefined; }
-  return { available: true, kinds: AI_KINDS, tones: TONES, maxInputCharacters: s.maxInput, ...(usage ? { usage } : {}) };
+  const altText = await runtimeConfigBatch(['ai.altTextPolicy']).then(values => { const policy = altTextPolicySchema.safeParse(values['ai.altTextPolicy']); return policy.success && policy.data.enabled; }, () => false);
+  return { available: true, kinds: AI_KINDS, tones: TONES, maxInputCharacters: s.maxInput, altText, ...(usage ? { usage } : {}) };
 }
 
 /** Whether a report recap can be offered to this actor now: write access to Reports, AI configured and on for the workspace. No provider call, nothing claimed. */
@@ -104,10 +105,10 @@ export async function claim(actor: AiActor, s: ClaimLimits, kind: string, inputL
   }, { timeout: s.txTimeout, maxWait: s.txWait });
 }
 
-export async function complete(s: Settings, system: string, prompt: string): Promise<string> {
+export async function complete(s: Settings, system: string, prompt: string, image?: AiImageInput): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), s.timeoutMs);
-  try { return await s.port.complete({ system, prompt, model: s.model, maxTokens: s.maxTokens, signal: controller.signal }); }
+  try { return await s.port.complete({ system, prompt, model: s.model, maxTokens: s.maxTokens, signal: controller.signal, ...(image ? { image } : {}) }); }
   catch (error) { if (error instanceof OperationError) throw error; throw new OperationError('upstream_failure', 'AI assist could not complete this request. Try again later.'); }
   finally { clearTimeout(timer); }
 }

@@ -24,7 +24,7 @@ export type AiUsage = {
   /** Estimated spend over priced requests only; unpriced requests are counted separately, never as zero cost. */ spentUsd: number; unpricedRequests: number;
   /** Null when no budget is set. */ budgetUsd: number | null; remainingUsd: number | null;
 };
-export type AiStatus = { available: boolean; kinds: readonly AiKind[]; tones: readonly Tone[]; maxInputCharacters: number | null; usage?: AiUsage };
+export type AiStatus = { available: boolean; kinds: readonly AiKind[]; tones: readonly Tone[]; maxInputCharacters: number | null; usage?: AiUsage; /** True when image descriptions (alt text) can be suggested. */ altText?: boolean };
 
 export type TokenPrice = { inputPerMillionUsd: number; outputPerMillionUsd: number };
 /** Estimated tokens for a text; providers return no counts through the port. */
@@ -104,5 +104,15 @@ export function cleanOutput(text: string, maxChars: number): string {
 
 /** Provider port. Implementations take a plain prompt and return plain text; they never see workspace data beyond it. */
 export interface AiPort {
-  complete(input: { system: string; prompt: string; model: string; maxTokens: number; signal: AbortSignal }): Promise<string>;
+  /** `image` is optional vision input (one still image, base64); every shipped provider adapter supports it. */
+  complete(input: { system: string; prompt: string; model: string; maxTokens: number; signal: AbortSignal; image?: AiImageInput }): Promise<string>;
 }
+export type AiImageInput = { mimeType: string; base64: string };
+
+/** Alt-text suggestion for one stored workspace image. Only the stored image identity and an optional language are accepted. */
+export const ALT_TEXT_IMAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const altTextRequestSchema = (maxLanguage: number) => z.object({
+  imageId: z.string().regex(ALT_TEXT_IMAGE_ID),
+  language: z.string().trim().min(2).max(maxLanguage).regex(/^[A-Za-z][A-Za-z -]*$/).optional(),
+}).strict();
+export type AltTextResult = { text: string };

@@ -3,17 +3,20 @@ import type { McpToolGroup } from '@/server/mcp/kit';
 import { AI_KINDS, TONES } from './ai';
 import { AI_BOUNDS } from './config';import { aiStatus, runAssist, COMPOSER_FEATURE, type AiDeps } from './server/ai';
 import type { AiActor } from './server/access';
+import { suggestAltText } from './server/alt-text';
 
 export const aiToolDefinitions = [
   { name: 'get_ai_assist_status', description: 'Report whether AI writing assist is available to this member in the current workspace, with supported kinds, tones, input limit and the estimated AI usage this month against the workspace budget. Unavailable when it is not configured by the installation operator or is switched off for the workspace.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'ai_assist_write', description: 'Generate suggested post text (caption, improve, translate or hashtags). Returns text for review only: it saves, schedules and publishes nothing, so the member must use the text deliberately. Counted against the workspace hourly AI limit.', inputSchema: { type: 'object', required: ['kind', 'text'], properties: { kind: { enum: [...AI_KINDS] }, text: { type: 'string', minLength: 1, maxLength: AI_BOUNDS.maxInputCharacters.max }, tone: { enum: [...TONES] }, language: { type: 'string', maxLength: AI_BOUNDS.languageMaxCharacters.max, description: 'Required for translate, for example French.' } }, additionalProperties: false } },
+  { name: 'suggest_image_alt_text', description: 'Suggest a description (alt text) for one stored image of this workspace, using the picture itself. Returns text for review only: it saves and publishes nothing. Counted against the workspace hourly AI limit and monthly budget. Unavailable when AI or image descriptions are off.', inputSchema: { type: 'object', required: ['imageId'], properties: { imageId: { type: 'string', description: 'Stored workspace image ID (the id after media: in a post image reference).' }, language: { type: 'string', maxLength: AI_BOUNDS.languageMaxCharacters.max, description: 'Language of the description, for example French. Defaults to the Root setting.' } }, additionalProperties: false } },
 ] as const;
 export const aiTools = new Set<string>(aiToolDefinitions.map(tool => tool.name));
-export const aiWriteTools = new Set<string>(['ai_assist_write']);
+export const aiWriteTools = new Set<string>(['ai_assist_write', 'suggest_image_alt_text']);
 
 export async function executeAiTool(actor: AiActor, name: string, args: unknown, deps: AiDeps = {}) {
   if (name === 'get_ai_assist_status') return aiStatus(actor, deps);
   if (name === 'ai_assist_write') return runAssist(actor, args, deps);
+  if (name === 'suggest_image_alt_text') return suggestAltText(actor, args, deps);
   throw new OperationError('invalid_request', 'Choose a supported AI action.');
 }
 
@@ -27,10 +30,10 @@ export const AI_MCP: readonly McpToolGroup[] = [
   {
     id: 'ai',
     tools: aiToolDefinitions,
-    features: { get_ai_assist_status: COMPOSER_FEATURE, ai_assist_write: COMPOSER_FEATURE },
-    writeTools: ['ai_assist_write'],
-    selfLockedWrites: ['ai_assist_write'],
-    scope: { resourceTools: ['get_ai_assist_status', 'ai_assist_write'] },
+    features: { get_ai_assist_status: COMPOSER_FEATURE, ai_assist_write: COMPOSER_FEATURE, suggest_image_alt_text: COMPOSER_FEATURE },
+    writeTools: ['ai_assist_write', 'suggest_image_alt_text'],
+    selfLockedWrites: ['ai_assist_write', 'suggest_image_alt_text'],
+    scope: { resourceTools: ['get_ai_assist_status', 'ai_assist_write', 'suggest_image_alt_text'] },
     execute: (viewer, name, args) => executeAiTool({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(viewer.permissions ? { permissionCeiling: viewer.permissions } : {}) }, name, args),
   },
 ];
