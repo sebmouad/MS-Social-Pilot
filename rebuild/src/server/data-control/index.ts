@@ -100,6 +100,11 @@ const INDIRECT_WORKSPACE_TABLES = [
   { table: 'post_versions', where: ownedBy('postId', 'posts') },
   { table: 'review_decisions', where: `(${ownedBy('postId', 'posts')} OR ${ownedBy('shareLinkId', 'share_links')})` },
 ] as const;
+// Inventory is erased by its ad-account FK cascade. Export it explicitly without
+// changing the dependency-ordered erasure path in this portability batch.
+const EXPORT_ONLY_INDIRECT_TABLES = [
+  { table: 'ads_objects', where: ownedBy('adAccountId', 'ad_accounts') },
+] as const;
 /** Inbox-owned tables and how the export reaches each; coverage reports any that the export did not include. */
 const INBOX_EXPORT_TABLES = [
   { table: 'conversations', via: 'targets' }, { table: 'conversation_messages', via: 'targets' },
@@ -139,7 +144,7 @@ async function directWorkspaceCounts(tx: DataControlTransaction | typeof prisma,
 async function exportIndirectWorkspaceTables(workspaceId: string) {
   const datasets: Record<string, unknown[]> = {};
   const rowCounts: Record<string, number> = {};
-  for (const { table, where } of INDIRECT_WORKSPACE_TABLES) {
+  for (const { table, where } of [...INDIRECT_WORKSPACE_TABLES, ...EXPORT_ONLY_INDIRECT_TABLES]) {
     if (table === 'instagram_media') continue; // Exported through the mapped model below.
     const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
       `SELECT child.* FROM ${tableSql(table)} child WHERE ${where}`, workspaceId,
@@ -219,6 +224,7 @@ export async function exportWorkspaceData(actor: DataControlActor) {
       includedIndirectTables: [
         'post_targets', 'post_comments', 'page_insights', 'conversations', 'conversation_messages', 'ad_insights', 'instagram_insights',
         ...INDIRECT_WORKSPACE_TABLES.map(({ table }) => table),
+        ...EXPORT_ONLY_INDIRECT_TABLES.map(({ table }) => table),
       ],
       indirectRowCounts: { ...mappedIndirectRowCounts, ...indirect.rowCounts, instagram_media: instagramMedia.length },
       inbox: inboxExportCoverage(new Set([

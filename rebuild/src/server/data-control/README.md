@@ -25,7 +25,7 @@ migration names already in source. No migration was applied by this lane.
 | `rebuild_facebook_sync_cursors` | Workspace FK: catalog export/counts/dependency-ordered erasure before targets |
 | `wordpress_recipe_sources` | Workspace FK: catalog export/counts/dependency-ordered erasure after plans |
 | `wordpress_recipe_plans` | Workspace FK: catalog export/counts/dependency-ordered erasure before sources/targets |
-| `ads_objects` | Ad account FK with ON DELETE CASCADE: erased with its ad account; provider object identity only, no customer content |
+| `ads_objects` | Explicit indirect export via workspace-owned ad accounts, with recursive credential redaction and row counts. Erased by its ad-account FK cascade. Real PostgreSQL cascade/export proof remains separate. |
 
 Account appearance is not a new table: `users.theme` and the exact
 `app_settings` key `settings.appearance.user.<userId>.mode` belong to the account.
@@ -138,3 +138,34 @@ claimed. No server, deploy, push or production operation belongs to this lane.
 | `rebuild_post_export_runs` | Content-free export attempt history; cascades with its export/workspace/user. |
 
 Portability and retained-account erasure coverage require integration by the data-control owner; table registration alone is not proof of full coverage.
+
+## Owner ZIP portability lane (2026-10-22)
+
+`archive.ts` now derives `channels.json`, `posts.json`, `posts.csv`,
+`schedule.json`, `analytics/channels.csv` and `comments.json` from the same
+authorized, recursively scrubbed `exportWorkspaceData` result. These restore
+the useful legacy portable files alongside the full `database/workspace.json`
+and stored media. Neutral channel names replace provider-specific file naming;
+machine field names and archive filenames are versioned format identifiers.
+The manifest lists the exact files and CSV formula protection. UTF-8, quoted
+newlines, destinationless drafts, first comments, label joins, destination
+status/times and object-valued insights are covered by synthetic tests.
+Spreadsheet formula cells gain a leading apostrophe in CSV only; JSON retains
+the original content. Existing archive byte and ZIP32 limits still apply to all
+new entries. A larger portable archive may therefore be refused at the existing
+Root size limit rather than silently omitting data.
+
+`index.ts` additionally exports `ads_objects` through the workspace's
+`ad_accounts`. This export-only ownership path does not change erasure order.
+All existing UI, REST and MCP ZIP downloads receive these additions through
+the existing shared request/build/download services, confirmations and audit.
+There is no second export endpoint or new data-control Root setting.
+
+Evidence: `src/modules/agency/export-{legacy-parity,inventory,archive}.test.ts`
+(13 tests), existing data-control/archive/deletion-order/export-job/surface
+tests and parity guard pass. Inventory tests cover owner/admin success,
+editor/contributor/viewer/client/no-membership refusal and cross-workspace
+denial. Actual PostgreSQL, disk concurrency, browser download and live-client
+verification have not run. `coverage.complete` and `database.complete` remain
+false: these additions close bounded portability gaps, not the complete
+customer-data export/erasure contract.

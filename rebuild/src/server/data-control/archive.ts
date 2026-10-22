@@ -6,6 +6,7 @@ import { prisma } from '@/server/data';
 import { exportWorkspaceData, type DataControlActor } from './index';
 import { readWorkspaceStorage, validateWorkspaceId } from './storage';
 import { ZipWriter, ZIP32_MAX_BYTES } from './zip';
+import { portableWorkspaceFiles } from './portable-files';
 
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 
@@ -43,6 +44,8 @@ export async function exportWorkspaceArchive(actor: DataControlActor): Promise<B
   const zip = new ZipWriter(zipPath, maxBytes);
   try {
     await zip.add('database/workspace.json', databaseJson);
+    const portableFiles = portableWorkspaceFiles(data);
+    for (const [name, content] of Object.entries(portableFiles)) await zip.add(name, content);
     for (const file of files) await zip.add(file.path, file.content);
     const legacyTables = data.coverage?.directlyOwnedLegacyTables ?? [];
     const legacyRowCounts = data.coverage?.directlyOwnedLegacyRowCounts ?? {};
@@ -55,6 +58,7 @@ export async function exportWorkspaceArchive(actor: DataControlActor): Promise<B
         legacyTables: legacyTables.map((table: string) => ({ table, rows: legacyRowCounts[table] ?? 0 })),
         omitted: data.coverage?.omitted ?? ['instance-wide audit and authentication records', 'records owned indirectly through non-workspace foreign keys'],
       },
+      portableFiles: { version: 1, files: Object.keys(portableFiles), source: 'database/workspace.json', csvFormulaCellsEscaped: true },
       media: { directory: 'media/', files: files.length, referencedFiles: referenced.length, complete: true },
       security: { providerCredentialsExcluded: true, secretsExcluded: true },
       coverage: { complete: data.coverage?.complete ?? false, directlyOwnedLegacyTablesComplete: data.coverage?.directlyOwnedLegacyTablesComplete ?? false, reason: 'Direct workspace-owned tables are exported; see database.omitted for records outside that ownership boundary.' },

@@ -1,0 +1,16 @@
+.root { display: grid; gap: 1.25rem; min-width: 0; }
+.heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.heading h2 { margin: 0 0 .5rem; font-size: 1.25rem; letter-spacing: -.025em; }
+.heading p { margin: 0; max-width: 68ch; color: var(--ink-soft); line-height: 1.6; }
+.form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 1rem; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.form > * { min-width: 0; }
+.muted { color: var(--ink-soft); }
+.identity { display: grid; gap: .3rem; overflow-wrap: anywhere; }
+.identity span { color: var(--ink-soft); }
+.receipt { display: grid; gap: .75rem; justify-items: start; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.receipt label { width: 100%; min-width: 0; }
+.receipt textarea { width: 100%; min-height: 5rem; overflow-wrap: anywhere; resize: vertical; }
+.feedback { margin: 0; line-height: 1.6; overflow-wrap: anywhere; }
+.feedback:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+@media (max-width: 900px) { .form { grid-template-columns: minmax(0, 1fr); } .form button { justify-self: start; } }
+@media (max-width: 600px) { .heading { flex-direction: column; } .form, .receipt { padding: 1rem; } }

@@ -2,12 +2,15 @@ import { agencyExportCatalog, agencyExportCopySchema } from './export-copy';
 import { z } from 'zod';
 import { customerCopy, customerCopySchema } from './ui/copy';
 import { entry } from '@/lib/config/entry';
+import { clientInvitationDefaults, clientInvitationPolicySchema, clientInvitationCopy, clientInvitationCopySchema } from './invitation-policy';
 
 const weight = (key: string, label: string, description: string, defaultValue: number) =>
   entry({ key, group: 'Agency', label, kind: 'number', description, defaultValue, schema: z.number().int().min(0).max(10_000), consumption: 'active' });
 
 /** Root-owned agency limits and attention weights. Every value is read at request time through `runtimeConfig`. */
 export const AGENCY_CONFIG = [
+  entry({ key: 'agency.clientInvitationPolicy', group: 'Agency · Client invitations', label: 'Client invitation policy', kind: 'json', description: 'Private Root client invitation lifetime, bounds, transaction settings and registration path. Issuance defaults off until registration token consumption is integrated; legacy listing and revocation remain available.', defaultValue: clientInvitationDefaults, schema: clientInvitationPolicySchema, consumption: 'active' }),
+  entry({ key: 'agency.clientInvitationCopy', group: 'Agency · Client invitations', label: 'Client invitation copy', kind: 'json', description: 'English and French client invitation screen and email copy. Email placeholders are required exactly once.', defaultValue: clientInvitationCopy, schema: clientInvitationCopySchema, consumption: 'active' }),
   entry({ key: 'agency.exportCopy', group: 'Agency', label: 'Export copy', kind: 'json', description: 'English and French export controls, feedback, headings and column labels.', defaultValue: agencyExportCatalog, schema: agencyExportCopySchema, consumption: 'active' }),
   entry({ key: 'agency.customerCopy', group: 'Agency', label: 'Customer copy', kind: 'json', description: 'English and French customer screen labels, feedback and empty states.', defaultValue: customerCopy, schema: customerCopySchema, consumption: 'active' }),
   entry({ key: 'agency.workspaceIdMaxLength', group: 'Agency', label: 'Workspace selection identifier length', kind: 'number', description: 'Maximum workspace identifier length accepted by browser and MCP workspace selection.', defaultValue: 200, schema: z.number().int().min(1).max(2000), consumption: 'active' }),
