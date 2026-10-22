@@ -211,3 +211,14 @@ LEGACY_AUDIT_DATABASE_URL='postgresql://…/<name>_rehearsal' npx tsx scripts/le
 - `LEGACY_SWEEP_2026-10-21.md` is the source for the unbuilt-feature list; its
   `needed_unbuilt` and `obsolete` judgments were re-checked against rebuild source
   references only.
+
+## Production row counts (2026-10-22, read-only)
+
+Zero rows: `ai_agents`, `ai_generations`, `ai_videos`, `api_tokens`, `calendar_feeds`,
+`caption_tests`, `chart_notes`, `chat_channels`, `client_invitations`, `snippets`,
+`key_dates`, `seasonal_modes`, `changelog_entries`, `page_videos`, `OAuthClient`, `OAuthCode`.
+With rows: `trending_topics` 30, `public_holidays` 66, `holiday_years` 6,
+`metric_availability` 1456, `worker_job_runs` 39, `uptime_days` 18, `graph_usage` 1,
+`workspace_exports` 1. No customer data exists only in a table whose feature is
+unbuilt, except the planning reference rows (trends, holidays), which the calendar
+extras lane must read in place.
