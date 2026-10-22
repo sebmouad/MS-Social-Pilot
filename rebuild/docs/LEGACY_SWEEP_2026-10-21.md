@@ -347,3 +347,29 @@ Safe to retire after backup + verification: workspace_exports (replaced), oauth_
 - Owned file only; no source, config, migration or MCP_PARITY edits. The small fixes asked for were not made because every candidate (health route, deletion callbacks, error recorder, legal pages) is a new feature outside the owned path.
 - Counts are from grep; a legacy feature implemented under a different name may be misreported as missing. Verify rows marked missing against the owning module before scheduling work.
 - Suggested additions to LEGACY_CAPABILITY_PARITY.md: rows for gaps 1-3, 7 and 9.
+
+
+## LinkedIn / Pinterest platform lane — 2026-10-22
+
+| Legacy surface | Rebuild evidence | Status |
+| --- | --- | --- |
+| `src/lib/networks/linkedin.ts`; network connect/callback | `src/platforms/linkedin/{manifest,config,adapter,transport,runtime,connection,oauth-state,host}.ts`; `tests/networks-linkedin-pinterest.test.ts`, `tests/networks-connection.test.ts` | Adapter/connection source done with synthetic fixtures; staged in `src/platforms/index.ts`, dispatch installation pending central-file ownership. Member/company discovery, text/article/images and scoped status; no live evidence. Custom article preview metadata needs a neutral host extension. |
+| `src/lib/networks/pinterest.ts`; network connect/callback | `src/platforms/pinterest/{manifest,config,adapter,transport,runtime,connection,oauth-state,host}.ts`; same fixture/security tests | Adapter/connection source done; staged registration, host installation pending. Boards, single/multi-image Pins, status/delete and refresh exchange implemented. Automatic near-expiry refresh and atomic destination credential rotation remain open; legacy parity is partial. |
+
+Both modules register six typed Root entries; configuration schema version unchanged.
+No UI screen changed, new route/tool/table, server, deployment, production access,
+commit or push. Module READMEs contain the exact required host-registration and
+parity/status documentation edits for the integrator. The broad non-Facebook gap
+above is not marked done by these two staged implementations.
+
+Lane verification (rebuild directory; synthetic/mocked evidence only):
+
+- `npx tsc --noEmit -p .`: zero errors.
+- `npx vitest run --no-cache tests/networks-linkedin-pinterest.test.ts tests/networks-connection.test.ts tests/networks-runtime.test.ts tests/platform-modules.test.ts tests/parity-guard.test.ts tests/config-validation.test.ts`: six files, 103 tests passed.
+- `npx vitest run --no-cache --exclude "**/facebook-diagnostic-transport.test.ts"`:
+  656 files passed, 49 skipped, one failed; 10,204 tests passed, 2,153 skipped,
+  five failed. All failures are in `facebook-native-http.test.ts`, where the
+  sandbox refuses loopback binding (`listen EPERM ::1`). Full suite is not green.
+- Vitest caching was disabled because linked `node_modules/.vite` is outside the
+  writable sandbox; the initial cached runs passed assertions but exited on cache
+  write EPERM. No sandbox policy or unrelated dependency path was changed.
